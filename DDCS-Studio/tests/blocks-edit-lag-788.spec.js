@@ -11,12 +11,15 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 async function loadPocketBlocks(page) {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.showApp && window.ddcsGetBlockProgram);
   await page.evaluate(() => window.showApp('blocks'));
   await page.evaluate(async () => { const { builderOf } = await import('/blocks/opBuilders.js'); window.ddcsLoadBlockStack(builderOf('user_pocket_data')()); });
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length > 5 && window.__ddcsEditPerf);
-  await page.waitForTimeout(500);
+  // QUIESCENT before sampling: no load-scheduled preview may fire INSIDE a test's measuring window (the old 500ms
+  // sleep raced exactly that under load — a straggling deferred render bumped previewCount mid-test). The debounce's
+  // own signal: no timer pending.
+  await page.waitForFunction(() => { const p = window.__ddcsEditPerf(); return p && !p.pending; });
 }
 // a numeric value field in the pocket op whose edit changes the emit
 const pickField = () => {
@@ -53,10 +56,23 @@ test('a burst of edits (a spinner drag) COALESCES to ONE deferred preview render
     const t0 = performance.now();
     for (let i = 0; i < 12; i++) tgt.setFieldValue(String(Number(tgt.getFieldValue('NUM')) + 1), 'NUM');
     const burstSyncMs = performance.now() - t0;
-    await new Promise((res) => setTimeout(res, 30));    // events drained → the preview is scheduled, not yet run
-    const mid = window.__ddcsEditPerf();
-    await new Promise((res) => setTimeout(res, 450));   // past the throttle window → the ONE coalesced render fires
-    const done = window.__ddcsEditPerf();
+    // MID sample, DETERMINISTIC (was a 30ms sleep — a coin flip against the ~300ms throttle under load): Blockly
+    // delivers the burst's change events on its setTimeout(0) fire queue; the throttle timer is only ARMED in that
+    // drain, ~300ms ahead. Poll on 1ms timers until the drain is fully counted (all 12 edits) — every poll timer
+    // expires BEFORE the throttle timer, and expired timers run in expiry order, so the sample that sees the drain
+    // runs strictly before the deferred render can, however starved the event loop is.
+    let mid = window.__ddcsEditPerf();
+    for (let i = 0; i < 4000 && !(mid.editsSincePreview >= 12 || mid.previewCount !== before); i++) {
+      await new Promise((res) => setTimeout(res, 1));
+      mid = window.__ddcsEditPerf();
+    }
+    // SETTLE on the debounce's own completion signal (was a 450ms sleep): the coalesced render ran (count moved)
+    // and no further render is pending.
+    let done = window.__ddcsEditPerf();
+    for (let i = 0; i < 4000 && !(done.previewCount > before && !done.pending); i++) {
+      await new Promise((res) => setTimeout(res, 5));
+      done = window.__ddcsEditPerf();
+    }
     return { before, burstSyncMs: Math.round(burstSyncMs), midPreview: mid.previewCount, midPending: mid.pending, settledPreview: done.previewCount, editsCoalesced: mid.editsSincePreview };
   });
   expect(r.burstSyncMs, 'the 12-edit burst does not run the heavy preview synchronously (no freeze)').toBeLessThan(120);
@@ -91,7 +107,7 @@ test('emit is BYTE-IDENTICAL after settle — the debounce changes WHEN the prev
 
 test('RIDER: the op block HIDES an empty SIM socket; an op WITH a sim override keeps it + round-trips', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.showApp);
   await page.evaluate(() => window.showApp('blocks'));
 
