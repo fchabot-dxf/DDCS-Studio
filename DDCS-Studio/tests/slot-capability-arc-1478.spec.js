@@ -49,6 +49,10 @@ test('PREMISE 2 — the atom still has the four shapes the design says it has', 
             // geometry now that C4 emptied the ramp's. Same declaration, a source that is still true.
             insetIsOne: (m.SURFACE_RASTER_BAKES['parallel/helix'].inputs || []).includes('inset'),
             landed: arc.SLOT_CAPABILITIES.find((c) => c.id === 'declared-run-vector').landed,
+            // t1490 — C2's own row, read the same way
+            insetSplit: (() => { const i = m.rasterInsetOf({ insetAlong: 1, insetAcross: 2 }); return i.along === 1 && i.across === 2; })(),
+            insetEven: (() => { const i = m.rasterInsetOf({ inset: 3 }); return i.along === 3 && i.across === 3; })(),
+            insetLanded: arc.SLOT_CAPABILITIES.find((c) => c.id === 'two-axis-inset').landed,
         };
     });
     expect(r.rowAxis, 'the row axis is still chosen by a declared helper (C3\'s starting point)').toBe(true);
@@ -69,7 +73,18 @@ test('PREMISE 2 — the atom still has the four shapes the design says it has', 
     expect(r.helixBakes, 'the HELIX half did not land, so those rows still bake').toBe(true);
     expect(r.helixWhy, 'and still name the inradius clamp that keeps them there').toMatch(/inradius/i);
     expect(r.plungeClean, 'plunge already baked nothing, which is why C4 only ever changed the descents').toBe(true);
-    expect(r.insetIsOne, 'inset is still a single declared input — C2 is what splits it').toBe(true);
+    /**
+     * ⚠ t1490 — C2 LANDED TOO, so this premise inverts exactly as C4's did at t1487. It read "inset is still a
+     * single declared input — C2 is what splits it", and C2 split it: `rasterInsetOf` resolves one word OR a pair,
+     * and the BAKES rows carry every spelling so a dialled axis is refused whichever word the caller used. The
+     * single-inset case is asserted byte-identical over 432 configs in two-axis-inset-1490 — which is what lets this
+     * flip without the corpus moving underneath it.
+     */
+    expect(r.insetIsOne, 'the helix still refuses a dialled inset — it bakes the span-derived inradius').toBe(true);
+    expect(r.insetSplit, 'C2 LANDED: inset resolves as a PAIR now, along the pass and across it').toBe(true);
+    expect(r.insetEven, 'and one word still means both axes, which is what keeps every existing caller byte-identical').toBe(true);
+    expect(r.insetLanded, 'the arc records C2 as shipped').toMatch(/SHIPPED at t1490/);
+    expect(r.insetLanded, 'while saying plainly it is the precondition for C1, not the whole slot fix').toMatch(/DOES NOT MAKE THE ATOM SLOT-READY/);
     expect(r.landed, 'and the arc RECORDS that C4 shipped, so the design does not read as still pending').toMatch(/RAMP HALF SHIPPED/);
     expect(r.landed, 'while naming the half that did not').toMatch(/HELIX HALF DID NOT/);
 });

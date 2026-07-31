@@ -117,6 +117,14 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
         })).filter((s) => Math.abs(s.z1 - s.z2) < 1e-6).flatMap((s) => [h.q(s.x1), h.q(s.x2)]))].sort((a, b) => a - b);
         const slotXs = [...new Set(cutsOf(h.slotPath(SLOT)).filter((s) => Math.abs(s.z1 - s.z2) < 1e-6).flatMap((s) => [h.q(s.x1), h.q(s.x2)]))].sort((a, b) => a - b);
 
+        // t1490 (C2) — the SAME rect walked with the pair the slot actually needs: nothing along the length,
+        // tool/2 across the width. This is the half of clause 2 that C2 retires.
+        const insetPairXs = [...new Set(cutsOf(h.surfaceRasterLines({
+            x: 0, y: -6, z0: 0, w: 60, h: 12, insetAlong: 0, insetAcross: 3, depth: 1.5, stepdown: 1.5, toolDia: 6,
+            stepoverPct: 40, feed: 2000, plunge: 150, clearance: 5, strategy: 'parallel', direction: 'bothways',
+            entry: 'plunge', rowAxis: 'x',
+        })).filter((s) => Math.abs(s.z1 - s.z2) < 1e-6).flatMap((s) => [h.q(s.x1), h.q(s.x2)]))].sort((a, b) => a - b);
+
         // 3 — the bearing (and: NO ARCS ANYWHERE, which is the dispatch's rounded-end hypothesis, measured)
         const ang = h.slotPath({ ...SLOT, x1: 51.962, y1: 30 });
         const bearings = cutsOf(ang).filter((s) => Math.abs(s.z1 - s.z2) < 1e-6)
@@ -128,7 +136,7 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
         const atomEntry = (entry) => h.surfaceRasterLines({ x: 0, y: -3, z0: 0, w: 60, h: 6, inset: 0, depth: 3, stepdown: 1.5, toolDia: 6, stepoverPct: 40, feed: 2000, plunge: 150, clearance: 5, strategy: 'parallel', direction: 'bothways', entry, rampAngle: 3, helixDia: 4, helixPitch: 0.75, rowAxis: 'x' });
         const slotEntry = (entry) => h.slotPath({ ...SLOT, depth: 3, entry, rampAngle: 3, helixDia: 4, helixPitch: 0.75 });
         return {
-            insetXs, slotXs, bearings, arcs,
+            insetXs, insetPairXs, slotXs, bearings, arcs,
             slotRamp: firstCut(slotEntry('ramp')), atomRamp: firstCut(atomEntry('ramp')),
             slotHelix: firstCut(slotEntry('helix')), atomHelix: firstCut(atomEntry('helix')),
             gap: h.SLOT_RASTER_GAP,
@@ -137,8 +145,24 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
 
     // 2 — ANISOTROPIC INSET
     expect(r.slotXs, 'the slot runs its full centreline, A to B').toEqual([0, 60]);
-    expect(r.insetXs, 'the atom holds the SAME inset along the length — a 54mm channel where 60 was asked').toEqual([3, 57]);
-    expect(r.gap).toContain('a 60mm slot walks 3..57');
+    expect(r.insetXs, 'ONE number still holds the same inset on both axes — a 54mm channel where 60 was asked').toEqual([3, 57]);
+    /**
+     * ── ⚠ t1490 (C2) — THIS CLAUSE IS RETIRED, AND BOTH HALVES ARE ASSERTED HERE ─────────────────────────────────
+     *
+     * The measurement above is unchanged and still true of a caller passing ONE number, which is why it stays: it is
+     * the defect this clause was written from. What changed is that the atom no longer has to be that caller — C2
+     * gives it a PAIR (along the pass, across it), and handed the slot's own (0, tool/2) it walks the full
+     * centreline. So the clause moves from "the atom cannot" to "the atom can, and here is it doing it".
+     *
+     * ⚠ THE BOUNDARY DOES NOT MOVE. C2 fixes the walked SPAN; the ROW RULE inside that span is still the atom's own
+     * (C1), the AXIS is still X-or-Y (C3), and the descent still stands on its helix half. That is asserted in
+     * `two-axis-inset-1490` and named — not counted — in the gap text, so landing the rest of the arc cannot leave a
+     * stale number behind.
+     */
+    expect(r.insetPairXs, '…and the PAIR walks the full centreline, A to B — the clause C2 retires').toEqual([0, 60]);
+    expect(r.gap, 'the boundary records the measurement as history').toContain('a 60mm slot walked 3..57');
+    expect(r.gap, 'and records C2 as what retired it').toMatch(/C2 \(t1490\) taught it a PAIR/);
+    expect(r.gap, 'while still NAMING the capabilities the atom does not declare').toMatch(/THE ROW RULE \(C1/);
 
     // 3 — THE BEARING, and the arc-ends hypothesis REFUTED rather than assumed
     expect(r.bearings.filter((b) => Math.abs(Math.abs(b) - 30) < 0.01 || Math.abs(Math.abs(b) - 150) < 0.01).length,

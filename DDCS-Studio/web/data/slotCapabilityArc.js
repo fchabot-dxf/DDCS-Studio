@@ -132,6 +132,17 @@ export const SLOT_CAPABILITIES = [
             + 'folded the same way; two of them fold the same way twice',
         envelope: 'the BAKES table\'s `inset` key becomes two, so a config can declare one axis live and the other baked',
         gate: '',
+        /** t1490 — what actually landed, recorded on the row (the shape C4 introduced at t1487). */
+        landed: 'SHIPPED at t1490. `rasterInsetOf` / `rasterInsetAxes` resolve one word OR a pair into the two span '
+            + 'seeds; the pair is named by ROLE (along the pass / across it) and maps to X/Y through `rowAxis`, which '
+            + 'is what makes C3 a rename rather than a re-keying. The single-inset case is BYTE-IDENTICAL — measured '
+            + 'over 432 configs (both walks × three descents × three directions × both row axes × skim × rotation × a '
+            + 'LIVE inset), 0 differ — and an anisotropic pair walks the full centreline: a 60mm slot handed '
+            + '(along 0, across tool/2) walks 0..60 where one inset walked 3..57. '
+            + '⚠ THIS DOES NOT MAKE THE ATOM SLOT-READY, and saying so is the point: it fixes the walked SPAN, which '
+            + 'is C1\'s precondition (`stepsAfter` says exactly that). The rows INSIDE that span are still uniformly '
+            + 'spaced half a stepover in — measured y −1.8..3 on a 12mm width where a slot needs −3..3 — and closing '
+            + 'that is C1\'s phase+clamp, which this arc says must land as ONE step or it ships a gouge',
     },
     {
         id: 'wall-anchored-rows', order: 3, label: 'C1 — the wall-anchored row rule',

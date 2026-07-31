@@ -116,6 +116,40 @@ export function rasterRowAxisOf(p = {}) {
 }
 
 /**
+ * ── t1490 (C2) — THE INSET IS A PAIR, AND THIS IS THE ONE PLACE A CALLER'S INSET WORDS BECOME ONE ─────────────────
+ *
+ * THE DEFECT IT EXISTS FOR, measured at t1442: the atom held ONE inset and moved it on BOTH axes, so handing it a
+ * tool radius walked a 60mm slot from x=3 to x=57 — a 54mm channel where 60 was asked. A slot needs `tool/2` ACROSS
+ * its width and NOTHING along its length; the tool centre runs the full centreline, A to B.
+ *
+ * ⚠ THE PAIR IS NAMED BY ROLE, NOT BY AXIS — `along` is the axis a pass RUNS along, `across` is the one the passes
+ * step across — and that is a deliberate coupling to `rowAxis` rather than an oversight, for two reasons. It is what
+ * the only asymmetric consumer actually needs (a slot's need is stated in exactly those words), and it is what makes
+ * C3 (the bearing) a rename rather than a re-keying: once passes run on a bearing, "along" and "across" ARE the
+ * axes. The cost is that flipping `rowAxis` transposes which span each inset moves — harmless while the two are
+ * equal, which is every caller that exists today, and the reason the equal case is asserted byte-identical.
+ *
+ * A RING WALK HAS NO ROWS, so there is nothing for "along" to mean; `rasterRowAxisOf` answers 'x' for it and the
+ * pair lands on X/Y in the order written. That is stated here rather than left for a reader to deduce from a
+ * default, because a silent default that reads like a decision is this file's own recurring defect (t1399, t1404).
+ *
+ * Returns the caller's WORDS, not numbers: each may be a register, and `geoTerm` is what resolves either kind.
+ */
+export function rasterInsetOf(p = {}) {
+    const both = p.inset;
+    return {
+        along: p.insetAlong == null ? both : p.insetAlong,
+        across: p.insetAcross == null ? both : p.insetAcross,
+    };
+}
+
+/** The two inset words mapped onto the X and Y spans, which is the only form the seeds can use. */
+export function rasterInsetAxes(p = {}) {
+    const { along, across } = rasterInsetOf(p);
+    return rasterRowAxisOf(p) === 'y' ? { x: across, y: along } : { x: along, y: across };
+}
+
+/**
  * ── t1425 — A GEOMETRY INPUT THAT MAY BE A PENDANT REGISTER, AND THE ONE PLACE THEIR ARITHMETIC COMBINES ─────────
  *
  * THE DEFECT THIS CLOSES, MEASURED AT t1422 BEFORE ANY OF IT WAS BUILT. A CAM slot holds its geometry in REGISTERS
@@ -331,11 +365,17 @@ export function surfaceRasterWorkSteps(p = {}) {
      * past a check written for today's set.
      */
     const live = (v) => /^(#|\[)/.test(String(v == null ? '' : v).trim());
-    if ([p.depth, p.stepdown, p.w, p.h, p.toolDia, p.stepoverPct, p.stepover, p.helixPitch, p.inset].some(live)) return null;
+    // t1490 (C2) — BOTH inset words are checked, through the same resolver the seeds use. Checking only `inset`
+    // would have let a live `insetAcross` past a guard written for the single-inset spelling, and the failure mode
+    // is the one this whole block exists to prevent: a work count declared confidently from a default nobody set.
+    const insetAx = rasterInsetAxes(p);
+    if ([p.depth, p.stepdown, p.w, p.h, p.toolDia, p.stepoverPct, p.stepover, p.helixPitch,
+        insetAx.x, insetAx.y].some(live)) return null;
     // t1404 — the pass counts below multiply the AREA, and the area the walk covers is the INSET one. Reading the
     // given rect here would over-declare the work by two insets' worth of rows on every consumer that passes one.
-    const inset = Math.max(0, num(p.inset, 0));
-    const w = num(p.w, 100) - 2 * inset, h = num(p.h, 80) - 2 * inset;
+    // t1490 — each axis by its own inset, so an anisotropic walk declares the work it actually does.
+    const inX = Math.max(0, num(insetAx.x, 0)), inY = Math.max(0, num(insetAx.y, 0));
+    const w = num(p.w, 100) - 2 * inX, h = num(p.h, 80) - 2 * inY;
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
     const tool = Math.max(0.1, num(p.toolDia, 12));
     const step = Math.max(0.01, tool * stepoverPctOf(p, tool) / 100);
@@ -413,19 +453,37 @@ export function surfaceRasterLines(p = {}) {
      * Every `.n` below is EXACTLY the number this file computed before (same defaults, same floors), so the baked
      * path is unchanged by construction; `.w` is what the seed prints, which is the only thing a live input moves.
      */
-    const iT = geoTerm(p.inset, 0, 0);
+    /**
+     * ── t1490 (C2) — TWO INSETS, FOLDED INTO THE TWO SPAN SEEDS. See `rasterInsetOf` for what along/across mean ───
+     *
+     * The pair lands here and NOWHERE ELSE: everything downstream reads `wT`/`hT`/`oxT`/`oyT`, which is why the arc
+     * costs this at 0 registers — the insets fold into #40/#41, which already carry the walked spans, exactly as a
+     * single live inset has folded since t1425. Two of them fold the same way twice.
+     *
+     * ⚠ THE SINGLE-INSET CASE IS BYTE-IDENTICAL BY CONSTRUCTION, not by promise: when a caller passes only `inset`,
+     * `rasterInsetAxes` hands the SAME word to both axes, so `iXT` and `iYT` are the same term and every expression
+     * below folds exactly as it did. That is the design's own stay-clause, and the identity sweep asserts it.
+     */
+    const insetW = rasterInsetAxes(p);
+    const iXT = geoTerm(insetW.x, 0, 0), iYT = geoTerm(insetW.y, 0, 0);
     const xT = geoTerm(p.x, 0), yT = geoTerm(p.y, 0);
     const wT0 = geoTerm(p.w, 100), hT0 = geoTerm(p.h, 80);
     const toolT = geoTerm(p.toolDia, 12, 0.1);
-    // the WALKED rect: the declared one held `inset` inside on both sides
-    const wT = geoSum(wT0, iT, -2), hT = geoSum(hT0, iT, -2);
-    const inset = iT.n;
-    const insetOn = iT.live || iT.n > 0;
+    // the WALKED rect: the declared one held its own inset inside on each axis
+    const wT = geoSum(wT0, iXT, -2), hT = geoSum(hT0, iYT, -2);
+    const inset = iXT.n;
+    const insetOn = iXT.live || iXT.n > 0 || iYT.live || iYT.n > 0;
     // A REGISTER IS NAMED, never printed as though it were a millimetre value ("the #22mm inset" reads as 22mm).
     // The NUMERIC wording is byte-for-byte what this file has always emitted -- caught by the identity sweep when a
     // first cut reworded both at once, which is exactly what that sweep is for.
-    const insetHeld = iT.live ? `the ${iT.w} inset` : `${iT.w}mm`;
-    const insetSay = iT.live ? `${iT.w} inset` : `${iT.w}mm inset`;   // a live inset IS an inset — reading `> 0` off a register gave 0 and silently faced the part
+    // t1490 — the SAME wording whenever the two agree (which is every caller that exists today, so the corpus does
+    // not move); when they differ the sentence names BOTH, because "held 3mm inside the declared edge" would be a
+    // wrong operator message on a walk held 3mm one way and 0mm the other — the class this file guards hardest.
+    const evenInset = iXT.w === iYT.w;
+    const heldOf = (t) => (t.live ? `the ${t.w} inset` : `${t.w}mm`);
+    const sayOf = (t) => (t.live ? `${t.w} inset` : `${t.w}mm inset`);   // a live inset IS an inset — reading `> 0` off a register gave 0 and silently faced the part
+    const insetHeld = evenInset ? heldOf(iXT) : `${heldOf(iXT)} in X and ${heldOf(iYT)} in Y`;
+    const insetSay = evenInset ? sayOf(iXT) : `${sayOf(iXT)} in X / ${sayOf(iYT)} in Y`;
     const LBL = labelsOf(p);   // t1408 — the emitter's per-program label assignment (the legacy numbers when called direct)
     const w = wT.n, h = hT.n;
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
@@ -474,7 +532,8 @@ export function surfaceRasterLines(p = {}) {
     // block's own x/y/w/h, which is what keeps the declared footprint the GIVEN rect. At inset=0 these are unchanged.
     // t1425 — the WALK's origin: the op's own frame moved IN by the inset. Both may now be registers, so the origin
     // is a word-or-number like everything else; `.n` is the number this line always produced.
-    const oxT = geoSum(xT, iT), oyT = geoSum(yT, iT);
+    // t1490 (C2) — each axis moves in by its OWN inset; at an even pair this is the single-inset expression verbatim
+    const oxT = geoSum(xT, iXT), oyT = geoSum(yT, iYT);
     const x0 = oxT.n, y0 = oyT.n, z0 = num(p.z0, 0);
     const confirmEvery = Math.max(0, Math.round(num(p.confirmEvery, 0)));
     const zTop = r3(z0);   // the surface this op faces from — 0 in the op's own frame, the placement's offZ when placed
@@ -1311,7 +1370,25 @@ export const SURFACE_RASTER_IGNORES = {};
  * `direction` is NOT an axis here: what a descent bakes is the same whichever way the rows run. (The one-way mirror
  * moves the descent's START to the far end, which is a term in the same already-baked rect, not a new bake.)
  */
-const BAKES_GEOMETRY = ['w', 'h', 'inset', 'toolDia', 'stepoverPct', 'stepover'];
+/**
+ * t1490 (C2) — `inset` became a PAIR, so it comes out of this flat list and is read through `rasterInsetOf`: a
+ * caller may spell it `inset`, or `insetAlong`/`insetAcross`, and a list that named only one spelling would report
+ * a dialled slot inset as baked (or a baked one as dialled) depending on which word the caller happened to use.
+ * The arc's envelope row for C2 is exactly this — "the BAKES table's inset key becomes two, so a config can declare
+ * one axis live and the other baked".
+ */
+const BAKES_GEOMETRY = ['w', 'h', 'toolDia', 'stepoverPct', 'stepover'];
+/** EVERY spelling of the pair, so a row that bakes the walked span refuses a dialled inset whichever word says it. */
+const BAKES_INSET = ['inset', 'insetAlong', 'insetAcross'];
+/** The inset KEYS a caller actually dialled, reported in the caller's own spelling so a message can name it back. */
+function insetLiveKeys(p = {}) {
+    const one = rasterInsetOf(p);
+    const out = [];
+    if (p.insetAlong == null && p.insetAcross == null) return liveWordOf(p.inset) != null ? ['inset'] : [];
+    if (liveWordOf(one.along) != null) out.push('insetAlong');
+    if (liveWordOf(one.across) != null) out.push('insetAcross');
+    return out;
+}
 export const SURFACE_RASTER_BAKES = {
     'parallel/plunge': { inputs: [], why: '' },
     'concentric/plunge': { inputs: [], why: '' },
@@ -1323,8 +1400,11 @@ export const SURFACE_RASTER_BAKES = {
     // SURFACE_RASTER_IGNORES, applied here) and the ramp is pendant-true end to end.
     'parallel/ramp': { inputs: [], why: '' },
     'concentric/ramp': { inputs: [], why: '' },
-    'parallel/helix': { inputs: BAKES_GEOMETRY, why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
-    'concentric/helix': { inputs: BAKES_GEOMETRY, why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
+    // t1490 (C2) — the inset keys ride explicitly now that they are no longer inside BAKES_GEOMETRY. A helix bakes
+    // its inradius from the WALKED spans, and those are the given rect held its insets inside — so a dialled inset
+    // moves the clamp exactly as a dialled w/h does, and the row has always meant to say so.
+    'parallel/helix': { inputs: BAKES_GEOMETRY.concat(BAKES_INSET), why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
+    'concentric/helix': { inputs: BAKES_GEOMETRY.concat(BAKES_INSET), why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
 };
 
 /**
@@ -1332,7 +1412,7 @@ export const SURFACE_RASTER_BAKES = {
  * refusal, the emitter's honest degrade and the specs — so none of them can disagree about what "live" means here.
  */
 export function surfaceRasterLiveInputs(p = {}) {
-    return BAKES_GEOMETRY.filter((k) => liveWordOf(p[k]) != null)
+    return BAKES_GEOMETRY.filter((k) => liveWordOf(p[k]) != null).concat(insetLiveKeys(p))
         .concat(liveWordOf(p.x) != null ? ['x'] : []).concat(liveWordOf(p.y) != null ? ['y'] : []);
 }
 
@@ -1417,6 +1497,25 @@ export const surfaceRasterBlock = {
     // t1429 — `rowAxis` joins the declaration in the same act that teaches the walk to read it, for the reason z0 and
     // `inset` did before it: `lines()` reads it, so a declaration that omitted it would be a feature DROP the day this
     // atom round-trips through the canvas. Default 'x' = the assumption this act made explicit, asserted byte-identical.
+    /**
+     * ⚠ t1490 (C2) — THE PAIR IS **NOT** DECLARED HERE YET, AND THAT IS A NAMED GAP, NOT AN OVERSIGHT.
+     *
+     * The t1351 lesson says an emitter reading a key the block does not declare is a drop waiting to happen. So the
+     * first cut of this act DID declare `insetAlong`/`insetAcross` here, defaulting to null (null is what makes
+     * `inset` alone keep meaning both axes — 0 cannot stand in, because 0 is a MEANINGFUL inset and is exactly the
+     * value the slot case wants along its length).
+     *
+     * THE FULL SUITE CAUGHT IT: `roundtrip-whole-program-1319`'s iron rule (text differences may only SHRINK from
+     * 11) went to 12, with `user_pocket_data` joining — a nullable field does not survive the Blockly round trip
+     * unchanged. That is a real defect in waiting: if null came back as 0, `rasterInsetOf` would read a REAL inset of
+     * zero and silently drop the caller's single `inset`, which is the silent-substitution class this file keeps
+     * closing (t1425).
+     *
+     * SO THE SEAM STAYS AT THE EMITTER, WHERE IT HAS A CONSUMER, AND OFF THE BLOCK, WHERE IT HAS NONE. Nothing is
+     * lost today: no block instance carries these keys, and every caller that sets them (the slot arc's C1/C3) hands
+     * params straight to `surfaceRasterLines`. THE DAY A BLOCK MUST CARRY THEM, the nullable round trip is the thing
+     * to fix first — in `stackBridge`, on its own act, not as a rider on this one.
+     */
     defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', rowAxis: 'x', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
     fields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'rowAxis', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment

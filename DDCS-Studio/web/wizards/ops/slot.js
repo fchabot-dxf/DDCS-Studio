@@ -146,14 +146,17 @@ export const SLOT_RASTER_GAP = 'a slot is not a rectangle the raster atom walks,
     + 'the channel is exactly the width you typed; the atom takes uniformly spaced rows half a stepover inside the '
     + 'walked edge and keeps only those that FIT (60x12 Ø6 @40%: 4 passes at -3,-0.6,1.8,3 against 3 at -1.8,0.6,3 - a '
     + 'channel 1.2mm NARROW, or 1.2mm OVERSIZE once the seeding is phase-corrected). THE INSET: a slot is held tool/2 '
-    + 'inside across its WIDTH and not at all along its LENGTH, and the atom insets both axes by one number (a 60mm '
-    + 'slot walks 3..57). THE AXIS: the passes run on the slot bearing, the atom rows run parallel to X or Y. THE '
+    + 'inside across its WIDTH and not at all along its LENGTH; the atom used to inset both axes by one number (a '
+    + '60mm slot walked 3..57) and C2 (t1490) taught it a PAIR, so this clause is retired - handed (0, tool/2) the '
+    + 'atom walks the full 0..60 centreline. THE AXIS: the passes run on the slot bearing, the atom rows run parallel to X or Y. THE '
     + 'DESCENT: a slot ramps ALONG its length and helixes at the ENTRY END clamped to the slot width; the atom now '
     + 'ramps along its own ROW (C4, t1485 - it used to ramp toward the AREA CENTRE, and that half of this clause is '
     + 'retired) but still helixes in the middle of the channel with the radius clamped by the rect inradius. Three of '
-    + 'the four still need a capability the atom does not declare - the descent clause survives on its HELIX half, and '
-    + 'the ramp half only ever agreed with a slot that happens to be axis-aligned, which THE AXIS already covers - so '
-    + 'the slot keeps its literal kernel until it is taught them deliberately';
+    + 'the four still need a capability the atom does not declare, and they are NAMED rather than counted so this '
+    + 'cannot go stale silently as the arc lands: THE ROW RULE (C1 - and C2 was its precondition, since rows anchor '
+    + 'to the walked span), THE AXIS (C3), and THE DESCENT on its HELIX half - the ramp half only ever agreed with a '
+    + 'slot that happens to be axis-aligned, which THE AXIS already covers. So the slot keeps its literal kernel '
+    + 'until it is taught them deliberately';
 
 /**
  * Why THIS slot's clearing cannot ride the parametric raster — or '' when there is no clearing walk to port at all.
