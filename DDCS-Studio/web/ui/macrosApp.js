@@ -12,6 +12,7 @@ import { fileTreeFor, flattenFiles } from '../data/controllerFiles.js';   // t66
 import { seedBody } from '../data/controllerFileSeeds.js';                 // t662 (E1) — first-open dump seeds for plain files
 import { UIUtils } from './uiUtils.js';                                    // t662 (E1) — downloadFile for the no-LAN (DM500) export transport
 import * as slotPack from '../data/slotPack.js';
+import { openMenu, attachLongPress } from './opContextMenu.js';   // t1456 — the app's ONE floating menu + long-press = right-click (this surface has no menu of its own, so it uses openMenu, unlike the Blockly canvas)
 import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor, autoIconLayers, autoGlyphLayers, imageTileLayer } from './iconEditor.js';   // t1135 S5b — the inline (mounted) icon editor + the layer helpers (auto default / op-glyph default / imported-BMP tile)
 import { slotFromOp } from '../data/opToSlot.js';
@@ -1696,7 +1697,7 @@ function homingPostIsExpert() {
                     ${slot.icon ? `<img src="${slot.icon.data}" alt="" style="width:72px; height:36px; object-fit:contain; border:1px solid var(--border); background:#000;"><span style="font-size:10px; color:var(--text-dim);">${camEsc(slot.icon.name)}${slot.icon.w ? ' · ' + slot.icon.w + '×' + slot.icon.h + (slot.icon.w === 360 && slot.icon.h === 180 ? '' : ' ⚠ not 360×180') : ''}</span>` : '<span style="font-size:11px; color:var(--text-dim);">No icon (camN.bmp)</span>'}
                 </div>
                 ${opSummary ? `<div style="font-size:11px; color:var(--text-dim); margin-top:6px;"><span style="opacity:.65;">ops:</span> ${camEsc(opSummary)}</div>` : ''}
-                <div class="settings-row" style="margin-top:6px; flex-wrap:wrap;">${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="editslot" title="Reopen this slot in the wizard, pre-seeded from its ops — tune expose/bake + values, then Update it in place.">✎ Edit</button>' : '<span title="This slot has no declared ops (a legacy hand-built macro), so it can’t be edited in the wizard — re-author it via ＋ New CAM slot. View output / Simulate / Delete still work." style="font-size:10px; color:var(--text-dim); cursor:help; align-self:center;">ⓘ hand-built — no wizard Edit</span>'}<span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button>${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="expcam" title="Write this slot to your library folder as a shareable .cam recipe — its declared OPS, not the baked macro, so it imports editable">⬆ Export .cam</button>' : ''}</div>
+                <div class="settings-row" style="margin-top:6px; flex-wrap:wrap;">${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="editslot" title="Reopen this slot in the wizard, pre-seeded from its ops — tune expose/bake + values, then Update it in place.">✎ Edit</button><button class="toolbar-btn settings-io" data-act="regen" title="Re-derive the macro from this slot&#39;s ops — the same rebuild a changed wizard triggers, run on demand. Hand edits to the macro body are discarded (it asks first).">⟲ Rebuild</button>' : '<span title="This slot has no declared ops (a legacy hand-built macro), so it can’t be edited or rebuilt in the wizard — re-author it via ＋ New CAM slot. View output / Simulate / Delete still work." style="font-size:10px; color:var(--text-dim); cursor:help; align-self:center;">ⓘ hand-built — no wizard Edit</span>'}<span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button>${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="expcam" title="Write this slot to your library folder as a shareable .cam recipe — its declared OPS, not the baked macro, so it imports editable">⬆ Export .cam</button>' : ''}</div>
             </div>`;
         }).join('');
     }
@@ -1775,13 +1776,31 @@ function homingPostIsExpert() {
                 else { slot[fld] = t.value; saveCamPack(); renderCamBuilder(); }
             }
         });
-        camHost.addEventListener('click', (e) => {
-            const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
-            // S1 — the settings panel is read-mostly: only the DISPLAY actions live here (Delete / Duplicate the slot,
-            // Simulate, View output). Authoring (fields, ops, macro, icon) moved to the wizard (S2/S3/S5).
-            if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
-            else if (a === 'editslot') { editCamSlot(slot); }   // t1127 S3 — reopen the wizard pre-seeded from the manifest → Update in place (+ S4-2 — a universal slot also loads into Blocks)
-            else if (a === 'dupslot') {
+        /**
+         * ── t1456 — THE SLOT ACTIONS, NAMED ONCE so the row buttons and the context menu cannot drift ──────────────
+         *
+         * The menu is not a second implementation: every entry calls the SAME function its button calls, from this one
+         * table. Two copies of "delete this slot" is two chances to disagree about which slot, and the disagreement
+         * writes to the user's pack.
+         *
+         * ⚠ `regen` IS NEW, and it exists because RULE 1 forced the question. The pass asked for a Rebuild entry; the
+         * survey found rebuild had NO visible door — `buildSlotFromOps` ran only from a duplicate or a def-change, and
+         * `regenGuard`'s "Rebuild" confirm was reachable from nothing. A menu-only action is exactly what rule 1
+         * forbids, so it arrived as a row BUTTON first (⟲ Rebuild) and the entry shortcuts it — the same shape
+         * comment/uncomment took on the editor surface.
+         *
+         * It rides `regenGuard`, so a slot whose macro body was hand-edited asks before discarding those edits; a
+         * clean slot rebuilds straight away. That guard already existed for exactly this operation — it simply had no
+         * caller a user could reach.
+         */
+        const slotActs = {
+            dels: (slot, si) => { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); },
+            editslot: (slot) => editCamSlot(slot),
+            regen: (slot) => regenGuard(slot, () => { buildSlotFromOps(slot); saveCamPack(); renderCamBuilder(); }),
+            sim: (slot) => simulateSlot(slot),
+            exp: (slot) => insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + slotPack.slotEng(slot) + '\n\n' + slotPack.slotMacro(slot)),
+            expcam: (slot) => exportSlotRecipe(slot),
+            dupslot: (slot) => {
                 const clone = JSON.parse(JSON.stringify(slot)); delete clone.bodyDirty;
                 clone.slot = nextSlotNum();
                 const otherUsed = new Set(); _camPack.slots.forEach((s) => (s.fields || []).forEach((f) => otherUsed.add(f.idx)));
@@ -1790,12 +1809,45 @@ function homingPostIsExpert() {
                 else reallocSlotParams(clone, otherUsed);                     // legacy → remap params off the original
                 clone.name = (clone.name || 'Slot') + ' (copy)';
                 saveCamPack(); renderCamBuilder();
-            }
-            else if (a === 'sim') { simulateSlot(slot); }
-            else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + slotPack.slotEng(slot) + '\n\n' + slotPack.slotMacro(slot)); }
-            // t1247 — SHARE THE RECIPE, NOT THE BAKE. camToFile writes slot.ops (the buildSlotFromOps input); the macro
-            // text stays derived. A recipient rebuilds it and can edit every value, which a shared .nc could never offer.
-            else if (a === 'expcam') { exportSlotRecipe(slot); }
+            },
+        };
+        /**
+         * The right-click menu for a slot row. Uses `openMenu` — the app's one floating menu — because unlike the
+         * Blocks canvas this surface has no menu of its own to join.
+         *
+         * A slot with no declared ops (a legacy hand-built macro) has no Edit, Rebuild or .cam recipe. Those entries
+         * are GREYED WITH THE REASON rather than hidden, which is this app's own rule for an unavailable control
+         * (postGating: grey and say why, never hide) — and it is the honest one here, because "where did Edit go?" is
+         * the question a hidden row would leave the operator holding.
+         */
+        camHost.addEventListener('contextmenu', (e) => {
+            const card = e.target.closest && e.target.closest('.cam-slot'); if (!card) return;
+            const si = +card.dataset.si, slot = _camPack.slots[si]; if (!slot) return;
+            e.preventDefault();
+            const structured = !!(slot.ops && slot.ops.length);
+            const why = 'This slot is hand-built — it has no declared ops to work from. Re-author it via ＋ New CAM slot.';
+            const it = (label, key, need) => ({ label, fn: () => slotActs[key](slot, si), disabled: need && !structured, title: need && !structured ? why : '' });
+            openMenu([
+                it(`✎ Edit ${slot.name || ('cam' + slot.slot)}`, 'editslot', true),
+                it('⟲ Rebuild from ops', 'regen', true),
+                it('⬇ Export macro + eng to editor', 'exp', false),
+                it('⬆ Export .cam recipe', 'expcam', true),
+                it('✕ Delete slot', 'dels', false),
+            ], e.clientX, e.clientY);
+        });
+        attachLongPress(camHost);   // t1456 — long-press = right-click; the user tests on a phone
+        camHost.addEventListener('click', (e) => {
+            const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
+            // S1 — the settings panel is read-mostly: only the DISPLAY actions live here (Delete / Duplicate the slot,
+            // Simulate, View output). Authoring (fields, ops, macro, icon) moved to the wizard (S2/S3/S5).
+            // t1127 S3 — `editslot` reopens the wizard pre-seeded from the manifest → Update in place (+ S4-2 — a
+            // universal slot also loads into Blocks).
+            // t1247 — `expcam` SHARES THE RECIPE, NOT THE BAKE: camToFile writes slot.ops (the buildSlotFromOps input)
+            // and the macro text stays derived, so a recipient rebuilds it and can edit every value — which a shared
+            // .nc could never offer.
+            // t1456 — every arm now lives in `slotActs` above, so the row button and the context-menu entry are the
+            // SAME call. The chain of else-ifs it replaced was the second implementation waiting to happen.
+            if (slotActs[a]) slotActs[a](slot, si);
         });
     }
     const _camName = q('cam_pack_name');

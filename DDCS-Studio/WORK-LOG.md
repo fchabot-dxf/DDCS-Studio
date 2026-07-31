@@ -11630,3 +11630,40 @@ block's id and Show G-code putting the panel in its selected state · both hidde
 round-trip **34/34** with **IRON RULE 11/11, same list, no growth** · smoke **71/71**. Screenshot in
 `test-results/t1454-shots/` and **eyeballed**: ✎ Edit op and ▤ Show G-code at the top, with Blockly's Duplicate, Add
 Comment, Inline Inputs, Collapse Block, Disable Block and Delete all intact below.
+
+## t1456 (seat A) — SURFACE 3: the CAM slot list. Rule 1 forced a second feature, and the else-if chain became a table.
+
+### RULE 1 FORCED A FEATURE AGAIN — and finding that out was the point of doing discovery first
+
+The pass asked for edit / rebuild / export / delete. The survey found visible doors for three (`✎ Edit`,
+`⬇ Export macro + eng`, `⬆ Export .cam`, `✕`) and **none for rebuild**: `buildSlotFromOps` ran only from a duplicate
+or a wizard-def change, and `regenGuard`'s "Rebuild" confirm — written for exactly this operation — **was reachable
+from nothing at all**. A menu-only action is what rule 1 forbids, so `⟲ Rebuild` arrived as a ROW BUTTON first and
+the entry shortcuts it. Same shape comment/uncomment took on the editor surface; second time the rule has turned a
+requested "entry" into a small feature, which is the rule doing its job rather than obstructing it.
+
+It rides the EXISTING `regenGuard`, so a slot whose macro body was hand-edited is asked before those edits are
+discarded and a clean slot rebuilds straight away. Nothing new was invented for the safety — it simply had no caller.
+
+### THE ELSE-IF CHAIN WAS THE SECOND IMPLEMENTATION WAITING TO HAPPEN
+
+The row's click handler was a chain of `else if (a === …)` with each action's body inline. Adding a menu would have
+meant a second copy of "delete this slot" — two chances to disagree about WHICH slot, and the disagreement writes to
+the user's pack. So the arms are now one `slotActs` table and BOTH doors call it. The spec drives both and asserts
+they land on the same result: with TWO slots seeded, so a delete that hit the wrong index is visible rather than lucky.
+
+### THE GREYED ENTRIES SAY WHY, and `openMenu` gained the one thing that makes that possible
+
+A hand-built slot (a legacy macro with no declared ops) cannot be edited, rebuilt, or exported as a recipe. Those
+three entries are GREYED, not hidden — this app's own rule for an unavailable control (postGating: grey and say why,
+never hide) — and `item()` gained `title` support so the reason is actually readable. A disabled row with no reason
+leaves the operator holding the question "where did Edit go?", which is precisely what hiding would have done.
+
+### GATE (fast tier)
+
+new spec `context-menu-cam-1456` **4/4** (rule 1 asserted as *every entry has a visible row button* · a hand-built
+slot greys the three ops-dependent entries AND says why · the menu and the button are ONE implementation, proven by
+deleting the right slot from a two-slot pack through each door · Rebuild re-deriving a hand-edited body through the
+existing guard) · CAM family + the two earlier menu specs + round-trip **43/43** with **IRON RULE 11/11, same list,
+no growth** · smoke **71/71**. Screenshot in `test-results/t1456-shots/` and **eyeballed**: the five entries over the
+slot row, with the row's own Simulate / Export buttons visible behind it.

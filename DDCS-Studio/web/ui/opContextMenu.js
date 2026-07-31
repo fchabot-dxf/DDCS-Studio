@@ -38,9 +38,12 @@ function place(m, x, y) {
     m.style.left = Math.round(Math.min(x, window.innerWidth - r.width - 6)) + 'px';
     m.style.top = Math.round(Math.min(y, window.innerHeight - r.height - 6)) + 'px';
 }
-function item(m, label, fn, disabled) {
+function item(m, label, fn, disabled, title) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'op-ctx-item'; b.textContent = label; b.disabled = !!disabled;
+    // t1456 — a GREYED entry must be able to say WHY. This app's rule for an unavailable control is postGating's
+    // (grey and say why, never hide), and a disabled row with no reason leaves the operator holding the question.
+    if (title) b.title = title;
     b.addEventListener('click', () => { hideOpMenu(); fn(); });
     m.appendChild(b);
 }
@@ -100,7 +103,7 @@ export function attachLongPress(el, opts = {}) {
 export function openMenu(items, x, y) {
     const m = ensure();
     m.innerHTML = '';
-    for (const it of (items || [])) if (it) item(m, it.label, it.fn, it.disabled);
+    for (const it of (items || [])) if (it) item(m, it.label, it.fn, it.disabled, it.title);
     if (!m.children.length) return false;
     // …and these entries do NOT steal focus. The op menu's actions open a wizard, so focus moving is fine there; a
     // TEXT action has to run against the selection that is live when it is picked, and a blur drops it (the same
