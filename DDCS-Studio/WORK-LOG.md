@@ -11236,3 +11236,97 @@ round-trip **13/13** with **IRON RULE 11/11, same list, no growth**. Surfacing +
 No screenshot, and the reason rather than silence: the diff is **+73 lines in `slot.js` and ZERO deletions** — a
 declaration plus a function read only by the spec. No emit changed, no wizard field changed, no CAM row appeared. There
 is no pixel to photograph, which is a different statement from "I did not look".
+
+## t1444 (seat A) — A TOOL THAT CANNOT FIT THE FEATURE CUTS NOTHING, AND SAYS SO (user-ruled, then universalised)
+
+The user's words, and the second set changed the shape of the act: *"if we set a slot or pocket to .25in and have a
+.5 tool it shouldnt trace anything and notice user"* + *"exactly equal is fine too"* — then, mid-task,
+*"it should apply the same for all"*.
+
+### WHAT IT WAS, MEASURED BEFORE ANYTHING WAS BUILT
+
+`slotPath` opened with `width = Math.max(tool, num(p.width, tool))`. A 6.35mm slot asked of a 12.7mm tool became a
+**12.7mm slot**. Not a crash, not a warning — clean G-code, a confident preview, and a channel twice the width that
+was typed. **The clamp is why it survived: the wrong number was repaired into a plausible one before anything could
+notice it was wrong.** The same shape, three more times:
+
+    pocket   Ø12.7 tool plunged into a "6.35mm pocket"      -> a 12.7mm hole, program looks finished
+    bore     Ø6 hole, Ø12 end mill -> `r <= 0.01` -> plunge -> a 12mm hole ("a legitimate way to drill with an end
+             mill" was TRUE of equal and FALSE of smaller — the branch was wider than its own reason)
+    text     2.5mm stroke, Ø6 tool -> 9 confident cutting moves over the right outline, ~6mm-wide letters
+
+### THE DECLARATION — one predicate, and the epsilon is part of the ruling
+
+`wizards/ops/toolFit.js`: `toolTooLarge(maxToolDia, toolDia)` + `toolFitRefusal(...)` + `refusalLines(why)`. Four
+consumers must agree (emit · preview · CAM pack · the twin's derived guards) and four hand-rolled comparisons is
+exactly how two of them drift — here an off-by-an-epsilon is the difference between cutting a tool-width slot and
+refusing it. So the tolerance is a MICRON: "exactly equal is fine" has to survive a 0.25in→6.35mm conversion, and a
+genuinely smaller feature is at minimum a rounding step away.
+
+### THE PREVIEW SURFACE IS THE ENGINE'S, NOT A PER-WIZARD PATCH — and that is the act's best move
+
+A build-time refusal emits no motion, so it reached the panel as **"No drawable moves"** — the sentence for an EMPTY
+program, which is precisely what a user asking "why is nothing drawn?" cannot act on. Rather than teach the slot and
+the pocket to each tell the preview something, the ENGINE now reads the program's own refusal back: an EXECUTED write
+to `#1505` surfaces as `stats.refused` / `refusedWhy`, and the panel shows it exactly where `capped`/`cappedWhy`
+already goes (t1383's shape, pointed at the other way a preview can be honest-looking and wrong). Every op that emits
+the family's refusal form gets an honest preview for free — including the ones this act never touched.
+
+**⚠ AND THE FIRST DETECTOR WOULD HAVE SHIPPED A WRONG OPERATOR MESSAGE.** `#1505` is NOT only an error flag on the
+Expert: the dialect drives the HMI through it — `hmiPrompt` emits `#1505=1(Hover OVER the corner…)`, `hmiToast` emits
+`#1505=-5000(msg)`, both ordinary writes with truthy values. Keying on the register alone would have put a red REFUSED
+banner on **every corner probe that asks the operator to jog**. Caught by reading the dialect rather than by a test.
+The corpus separates them itself and the detector only reads that separation: a refusal LABELS its message `ERROR:` /
+`FAULT:`. **The label is the mark, not the bracket** — the atoms write it after a semicolon, the ATC wizards write it
+inside the parens (`assign`'s note), and both are real refusals; keying on the bracket would have caught one family
+and silently missed the other. Named limit: `atcInterpreter`'s `#1505 = 1(Tool not in magazine!)` carries no label at
+all and is NOT detected — widening to "any message" re-admits every jog prompt, so the limit is recorded rather than
+traded for the false positive.
+
+### THE AMENDMENT — the law is universal, and it overruled me
+
+I had exempted the PECK cycle with an argument: `holeDia` never reaches the peck body (only `boreRadius` reads it), so
+there is no arithmetic to get wrong. The user extended the ruling to every op, in their own example — *"a 12mm drill
+cannot make a 6mm hole"*. **They are right and the argument was beside the point:** the op still states a 6mm hole,
+the machine still makes a 12mm one, and "the number is unused downstream" is not a reason the hole comes out right.
+The comparison exists the moment the op carries both numbers. Peck refuses.
+
+Re-pointed, each in its own surface form: **slot** (width) · **pocket / cpocket** (the inradius, as `pocketMaxToolDia`
+— `insetTooSmall` SOLVED FOR THE TOOL, so the sentence has a millimetre to quote; swept against the shipped predicate
+over **1728 configs, 0 disagreements**) · **bore + drill** (hole Ø) · **text** (stroke width).
+
+**MEASURED EXCEPTION, reported rather than assumed: SURFACING.** Facing DECLARES the area as the tool-CENTRE sweep
+with the tool overhanging it — that is in the atom's header and asserted by its bridges — so it never claims the cut
+equals the area, and there is no fit comparison to re-point. A 5×5 face with a Ø12 tool cuts one pass, by design.
+
+### THREE MORE COPIES OF THE SAME LIE, found by sweeping for the comparison rather than for the bug
+
+`Math.max(tool, width)` also sat in `slot.extent`, `slotBBox` and `slotView` — so a refused slot still declared a
+tool-width FOOTPRINT to the placement fold and still DREW a tool-width channel on the 2D canvas the operator is
+looking at. Removing the clamp is a no-op for every slot that still cuts (width ≥ tool) and honest for the one that
+does not.
+
+### WHAT THE TESTS COST, AND THE TWO PLACES I REFUSED THE EASY MOVE
+
+- **The golden is NOT regenerated.** 40 of the 96 pocket-E0 entries are `tiny` pockets whose emit changed by ruling.
+  Re-capturing would have been one command and would have destroyed what the golden is for. Instead the refusing cases
+  are EXEMPTED BY NAME, each asserting the new contract (refuses · zero motion), the exempt set is counted, and the
+  other 56 still face the untouched capture: **goldenDiffs 0, refusals 40, every key a `|tiny|`, none outside**.
+- **No assertion was deleted to go green.** `pocket-data-emit` asserted the derive-hook selects the PLUNGE arm; `tiny`
+  no longer reaches it. The arm still SHIPS (for exactly tool-sized pockets), so the sweep GREW a third size —
+  `equal: 6×6` — rather than losing the coverage: 144 cases, plunge 24 / stepover 48 / refuse 96, twin-vs-builtin
+  byte-diff **0**. Same in `pocket-asblocks` (sample Ø4→Ø6, refusal asserted beside it) and `cam-op-seed` (the 10mm
+  slot fixture now refuses at pack — moved to width==tool, with both gates asserted).
+
+### THE REAL SYMPTOM, AT THE PIXEL
+
+`tool-fit-refusal-1444` **5/5**: the LAW as a TABLE across all six op/span pairs × smaller/equal/larger (a per-op test
+would let the next op join the family without joining the law) · the two PREVIEW tests driven end-to-end (wizard params
+→ `generate()` → the shipping panel) · the HMI false-positive lock · the PACK. Screenshots saved to
+`test-results/t1444-shots/` and **eyeballed**: the stock renders, no toolpath at all, and the status line reads
+*"No toolpath — the 12.7mm tool cannot fit the 6.35mm slot"* in red error styling. Same for the pocket.
+
+### GATE (fast tier)
+
+new spec **5/5** · slot + pocket families + round-trip **58/58** with **IRON RULE 11/11, same list, no growth** ·
+drill + bore + text + declared-work **42/42** · surfacing + raster + rest + CAM **154/154** · smoke **71/71**.
