@@ -93,7 +93,7 @@ export function openMenu(items, x, y) {
     if (!m.children.length) return false;
     // …and these entries do NOT steal focus. The op menu's actions open a wizard, so focus moving is fine there; a
     // TEXT action has to run against the selection that is live when it is picked, and a blur drops it (the same
-    // reason the toolbar buttons preventDefault on mousedown — see editorIndent).
+    // reason the toolbar buttons preventDefault on mousedown — see editorTextOps).
     for (const b of m.children) b.addEventListener('mousedown', (e) => e.preventDefault());
     place(m, x, y);
     return true;

@@ -8,7 +8,7 @@
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
 import { showOpMenu, showGroupMenu, hideOpMenu, openMenu, attachLongPress } from './opContextMenu.js';
-import { indentMenuItems, installEditorIndent } from './editorIndent.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
+import { indentMenuItems, installEditorIndent } from './editorTextOps.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
 import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip

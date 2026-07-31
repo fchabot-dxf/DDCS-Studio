@@ -1,5 +1,6 @@
 /**
- * ui/editorIndent.js — BLOCK INDENT / OUTDENT in the editor, on the selection (t1450, user-designed).
+ * ui/editorTextOps.js — the editor's LINE-BLOCK operations on a selection: indent / outdent (t1450) and
+ * comment / uncomment (t1452). Both user-designed; both write REAL bytes.
  *
  * Three ways in, ONE implementation: the toolbar buttons, Tab / Shift+Tab, and the right-click menu all call
  * `indentEditor(dir)`. Three entry points with three copies of the string surgery is how two of them come to disagree
