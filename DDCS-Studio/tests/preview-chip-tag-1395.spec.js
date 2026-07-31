@@ -20,7 +20,7 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 950 } });
 
 const boot = async (page) => {
-    await page.goto('http://localhost:3211');
+    await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 };
 
@@ -32,22 +32,42 @@ const boot = async (page) => {
  * ("1 cuts · 1 probes · 1 rapids") for all nine lines. The chip is written by `onLineChange`, which only fires while the
  * sim is RUNNING. Caught by dumping the chip per line instead of trusting three green asserts — the same lesson as
  * t1383, one level in: a test that reads the right element at the wrong moment is still reading nothing.
+ *
+ * ⚠ And the second lesson, from the full-suite load flakes: a 15ms SAMPLING LOOP is a lottery — a zero-cost line's
+ * chip lives between two samples, and under a starved event loop whole stretches of the run fall in the gaps. So this
+ * collects every paint instead of sampling: setStatus writes `.pp-status`'s textContent per executed line, and a
+ * MutationObserver reconstructs the full painted sequence (each replaced text node carries the value the next write
+ * displaced). The window is the WHOLE run, ended by the run's own completion signal — the engine's onFinish reaches
+ * the panel's `opts.onLine(null)` hook — not a sample count sized to the program.
  */
 const chipsWhilePlaying = async (page, program) => page.evaluate(async (program) => {
     const { createPreviewPanel } = await import('/viz/createPreviewPanel.js');
     const host = document.createElement('div');
     host.style.cssText = 'position:fixed;left:0;top:0;width:900px;height:520px;z-index:99999';
     document.body.appendChild(host);
-    const panel = createPreviewPanel(host, { getGcode: () => program });
+    let runDone = false;
+    const panel = createPreviewPanel(host, { getGcode: () => program, onLine: (i) => { if (i === null) runDone = true; } });
     panel.setGcode(program);
-    await new Promise((r) => setTimeout(r, 200));
     const el = host.querySelector('.pp-status');
+    const tick = (ms) => new Promise((r) => setTimeout(r, ms));
+    // the program is processed when the chip shows the parse summary — the condition the Run click needs
+    for (let i = 0; i < 1000 && !(el.textContent && el.textContent.trim()); i++) await tick(10);
     const seen = [];
-    const sample = () => { const t = el && el.textContent; if (t && seen[seen.length - 1] !== t) seen.push(t); };
+    const push = (t) => { if (t && seen[seen.length - 1] !== t) seen.push(t); };
+    const drain = (recs) => {
+        for (const rec of recs) {
+            if (rec.type === 'characterData' && rec.oldValue != null) push(rec.oldValue);
+            for (const rn of rec.removedNodes || []) if (rn.nodeType === 3) push(rn.data);
+        }
+        push(el.textContent);
+    };
+    const mo = new MutationObserver(drain);
+    mo.observe(el, { childList: true, characterData: true, characterDataOldValue: true, subtree: true });
     const run = host.querySelector('.pp-run');
     if (run) run.click();
-    // Sample densely for long enough to cover the whole (tiny) program at any speed tier.
-    for (let i = 0; i < 400; i++) { sample(); await new Promise((r) => setTimeout(r, 15)); }
+    for (let i = 0; i < 4000 && !runDone; i++) await tick(10);   // bounded; released by the run's own end signal
+    drain(mo.takeRecords());   // records queued but not yet delivered when the run ended
+    mo.disconnect();
     try { panel.stop(); } catch (_) { /* teardown best-effort */ }
     host.remove();
     return seen;
