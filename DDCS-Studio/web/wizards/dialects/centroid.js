@@ -17,7 +17,8 @@ export const dialect = {
     // trigger/status var. The machine-pos / WCS-offset / tool-table system vars are in operators-manual
     // §11.2.16 (not in our dump) ⇒ left null + TO CONFIRM. #4120 req tool / #4203 in-spindle are known.
     vars: { dro: null, probeStatus: null, probeTrig: null, wcsBase: null, wcsStride: null, activeWcs: null, toolTable: null, ax: AX },
-    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: true, toolTable: true, probePort: false },   // M115 probe / M225 msg — TO CONFIRM on hardware
+    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: true, toolTable: true, probePort: false,
+        helicalArc: false },   // M115 probe / M225 msg — TO CONFIRM on hardware. t1472 — helicalArc false for the SAME reason: no captured Centroid arc of either kind, and this dialect is unconfirmed hardware throughout
 
     // M115 /Z-10 P3 F20  (manual:309 "M115 /Z P3 F20"; corner-probe-FL.mac:38 "M115 /Z[..] P[..] F[..]").
     // Move-until-input: stops AT contact and AUTO-CANCELS WITH AN ERROR if the bound is reached without

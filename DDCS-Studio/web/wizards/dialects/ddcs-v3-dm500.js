@@ -19,6 +19,7 @@ export const dialect = {
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
     vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
+        helicalArc: false,   // t1472 — no arc evidence of EITHER kind in the DM500 capture; the weakest corpus of the family
         wcsAuto: false, wcsFixed: false, wcsSync: false },   // t479 — WCS via G92 (grounded, defprobe.nc): active-frame-driven, WCS-agnostic → the number is GATED; auto M350-only; no slave-sync
 
     // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.

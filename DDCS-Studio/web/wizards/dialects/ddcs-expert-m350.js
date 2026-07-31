@@ -15,7 +15,14 @@ export const dialect = {
         // slot = var-1000 — boundary-confirmed by the captured sentinels) so the gateway can READ them over SMB;
         // targetTool #1504 is a runtime var (M6 Txx). Param meanings from default_vars.js (#1300/#1330/#1350/#1370).
         atc: { currentTool: 1300, capacity: 1301, targetTool: 1504, pocketX: 1330, pocketY: 1350, pocketZ: 1370 }, ax: AX },
-    caps: { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true, atc: true },   // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300; atc = full pick&place model)
+    caps: { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true, atc: true,
+        // t1472 — HELICAL ARC (a G2/G3 carrying a Z, i.e. an arc and a descent in ONE block). PLANAR arcs are richly
+        // attested here: 7353 G02/G03 I/J lines in the captured CNCDISK job the user actually ran, plus the V4.1
+        // factory slib-g's own `G02 X0 I-#6` full circle. THE HELICAL FORM IS A DIFFERENT CAPABILITY AND IT IS
+        // UNATTESTED: across every captured .nc in bridge/controllers, 7355 arc lines carry a Z ZERO times, and the
+        // M350 reference documents no G02/G03 at all. A neighbouring form working proves only itself (the t1339
+        // ATAN lesson), and unlike a bad variable read a mis-fed arc STEERS A CUT. false until V16_helical_arc.nc.
+        helicalArc: false },   // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300; atc = full pick&place model)
     // t1085 — the low macro vars THIS POST injects on its own, declared beside the methods that write them so the two cannot
     // drift. Read off the assignments, not prose: safeRetract/safeHop #42 read-scratch + #43 hop-target (:43,:60-61); the
     // wcsBaseInto family #70 base / #71 active index / #72 zero-based (:83,:87,:97-99); wcsZeroAtCurrent #150/#151/#152

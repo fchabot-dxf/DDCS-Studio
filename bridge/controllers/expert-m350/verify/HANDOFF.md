@@ -74,6 +74,12 @@ This file is the quick "where are we / how to resume" sheet.
 | **V3b** | `G28` — configured or inert? Does it move, and to where? | Park safe, expendable line, watch where it goes. |
 | **V6 (G43 half)** | Is `G43 H1` actually HONORED (applies offset on a Z move), or direct register math only? | Set `#900`, `G43 H1`, make a small Z move, see if it shifts by the offset. |
 | **V7** | Formal homed-DRO read (only seen incidentally = Mach 5/−5/−5). | Home all, read `#880/#881/#882`. |
+| **V16** helical arc | Does a `G2/G3` interpolate a **Z** in the same block? **PLANAR arcs are richly attested (7361 captured lines); the HELICAL form appears ZERO times** and the M350 reference documents no `G02/G03` at all. | `V16_helical_arc.nc` — **tool OUT, spindle off**, park with 12mm free in −X / 6mm in Y / 2mm down, rapid override low, hand on feed-hold. One 5mm circle descending 1mm in G91, then it puts the 1mm back. Reads `#792` either side and reports the **drop**. `1.000` = works · **`0.000` = the arc ran and the Z was SILENTLY IGNORED** · no popup = rejected, loud. |
+
+> ⚠ **V16 is not only a gate on a future feature — it checks emit that ALREADY SHIPS.** The circle-contour ramp
+> entry (`wizards/ops/contour.js`, one site, inventoried by `tests/helical-arc-evidence-1472.spec.js` LOCK 4) has
+> been sending a helical `G3` to real machines on a capability nobody has confirmed. A `0.000` here means those
+> entry circles have been cut at one depth instead of descending.
 
 ## Deferred / not pursued
 - **V2** (G10 L2 specifically) — folded into V1 (any axis-word G10 is dangerous).

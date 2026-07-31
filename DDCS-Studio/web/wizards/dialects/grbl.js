@@ -19,6 +19,7 @@ export const dialect = {
     g53NeedsVar: false,   // grbl G53 takes a literal coord directly (no #var staging — grbl has no #vars)
     vars: { dro: null, probeStatus: null, probeTrig: null, wcsBase: null, wcsStride: null, activeWcs: null, toolTable: null, ax: AX },
     caps: { vars: false, flow: 'none', probeStatusCheck: false, hmi: false, toolTable: false, probePort: false,
+        helicalArc: true,   // t1472 — grbl implements helical motion (G2/G3 + the linear axis) per its own G-code support table
         wcsAuto: false, wcsFixed: true, wcsSync: false },   // t475 — WCS via G10 L20 P<n>; auto gated (no active-WCS var); no slave-sync (host-streamed — a WCS macro is best-effort)
 
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G38.2 ${axis}${dist} F${feed}`],   // result pushed as [PRB:…] over serial

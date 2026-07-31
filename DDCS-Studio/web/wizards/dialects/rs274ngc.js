@@ -23,6 +23,7 @@ export const dialect = {
     // dro #5420-28 current-position (:321), toolTable #5401-09 active-tool offsets (:320-321, #5400=tool# :319).
     vars: { dro: 5420, probeStatus: 5070, probeTrig: 5061, wcsBase: 5221, wcsStride: 20, activeWcs: 5220, toolTable: 5401, ax: AX },
     caps: { vars: true, flow: 'oword', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false,
+        helicalArc: true,   // t1472 — SPEC-attested, not inferred: RS274/NGC defines helical motion as G2/G3 with the axis perpendicular to the selected plane
         wcsAuto: false, wcsFixed: true, wcsSync: false },   // t475 — WCS via G10 L20 P<n> (fixed WCS targetable); auto gated (M350-only ruling); no slave-sync
 
     // G38.2 Z-10 F100  (probe-hole.ngc:22 "G91 G38.2 X#1000"; gridprobe.ngc:35 "G38.2Z#8"). G38.2 ALARMs on

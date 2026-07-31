@@ -12124,3 +12124,76 @@ growth.** Smoke **71/71**. Screenshot `scratchpad/t1470-cam-phone.png`, **eyebal
 aligned panel, readable table with its fourth column cut at the scroll edge.
 
 **RELEASE:** user-visible on mobile — worth a `.ver` bump, left to the advisor's full-suite gate.
+
+## t1472 (seat A) — TRUE-ARC HELIX: **GATED at the premise.** Planar arcs are proven; the HELICAL form is not, and Studio already ships one.
+
+### THE ACT'S PREMISE, CHECKED BEFORE BUILDING ON IT — and half of it does not hold
+
+The dispatch opens "the circle contour already emits G3 — the compact form is proven in-family". I went to cite that
+and found it splits into two capabilities that the phrase runs together:
+
+    PLANAR   G02/G03 with I/J            7361 lines across the captured corpus — including the CNCDISK job that ran
+                                         on the user's OWN M350, and the V4.1 factory slib-g's `G02 X0 I-#6` circle
+    HELICAL  the same arc carrying a Z   ZERO. In 7361 arc lines. And the M350 reference documents no G02/G03 at all.
+
+**A helical arc is not a planar arc with an extra word — it is a different interpolator**, and this is the t1339
+ATAN lesson pointed at geometry instead of arithmetic: a neighbouring form working proves only itself.
+
+⚠ **AND THE FAILURE MODE IS WORSE THAN THE TRIG ONE, WHICH IS WHY I STOPPED RATHER THAN GATED-AND-BUILT.** SQRT's
+bad branch is a wrong number. This one's bad branch is a controller that **accepts the arc and drops the Z**: the
+entry cuts its circle at one depth, and the next block — which assumes the descent happened — takes the whole
+remaining depth in a single move. That is a cutting move on an unattested capability.
+
+### ⚠ THE FINDING THAT OUTRANKS THE ACT: WE ARE ALREADY EMITTING ONE
+
+A sweep of every shipped emit source found **exactly one** helical-arc site — `wizards/ops/contour.js:98`, the
+**circle contour's RAMP entry**, `G3 X.. Y.. I.. J0 Z.. F..`, one per revolution. It has been going to real
+machines since it shipped. So the question this act opened is not a feature gate at all: **it is an open question
+about emit that is already in the field**, and it is the same "SHIPPED-by-Studio, never confirmed" tier that t1339
+called the riskiest of the three because *it looks like usage without being evidence*.
+
+I did **not** touch that site. Changing shipped cutting behaviour on my own reading is exactly the scope decision
+that belongs to the advisor, and there are three defensible answers (leave it pending V16 · degrade it to plunge +
+planar circles · keep it and say so on the form). It is inventoried instead, so a SECOND one cannot appear while
+the question is open.
+
+### WHAT I LANDED — the half that does not depend on the answer
+
+1. **`caps.helicalArc` declared in every dialect**, with its evidence beside it. This is the dispatch's own
+   "declared, not assumed" clause, applied to what the corpus actually says: **`false` for all three DDCS targets**
+   (the only machines anyone here can run) and **`true` for `rs274ngc` / `grbl` / `grblhal`**, where helical motion
+   is in the standard they implement — a genuinely different evidence class from "a neighbour works".
+2. **`V16_helical_arc.nc`** — one 5mm circle descending 1mm in G91, reading `#792` either side and reporting the
+   **drop**, so the silent case reads as a number rather than as nothing. Unlike the V13 set **it moves**, because
+   the question IS whether the machine descends while it arcs; it is filed in the MOTION section with the tool-out
+   setup spelled out.
+3. **The measurement instrumented** so it cannot decay into a remembered sentence.
+
+### WHY NOT BUILD THE ARC ARM BEHIND THE GATE ANYWAY
+
+I nearly did — `rs274ngc`/`grbl` declare true, so the arm would have a real consumer, and the porting arc is next.
+Against it: the arm would ship to **no machine the user owns**, its bridge and its @work recalibration would be
+measured on a target nobody here can run, and the whole shape changes if V16 comes back yes (the Expert flips and
+the arm is the main path) or no (the contour site needs deciding first). "Park fresh rather than half-land" reads
+directly onto that. **Say the word and I build it in one act** — the declaration it hangs off is now in place.
+
+### AND ONE MEASUREMENT ALMOST LIED — the reason LOCK 1 counts BOTH kinds
+
+My first regex was `/\bG0?[23]\b/`, and posted G-code writes `G02X441.96Y48.961I-38.295` with **no separators**, so
+the trailing `\b` never matched: it found **11** arcs where there are 7361. Had I only asserted "zero helical" the
+spec would have passed loudly while proving nothing. **The positive half — "planar arcs really are attested" — is
+what caught it**, and it is now a permanent part of the lock. The digit-guard `(?![0-9])` does the G20/G28
+exclusion the word-boundary was there for.
+
+LOCK 1 also went red on **my own V16 macro**, which lives under the scanned tree: our probe commands the very form
+the lock says nobody has seen. `verify/` is excluded now, and the exclusion is the point — *counting our own
+question as evidence would let a test prove itself*.
+
+### GATE (fast tier)
+
+new spec `helical-arc-evidence-1472` **5/5** — the corpus re-measured every run (self-red-ing the day a dump shows
+a helical arc) · every dialect DECLARES the cap (an undeclared capability is an assumed one) · the DDCS three false
+and the spec-defined targets true · the shipped-site inventory pinned at **1** · V16 exists and probes the **Z**.
+Dialect family (atc · atom-gating · blocks-decode · io-step-edge · preview-parity · sysstart · wcs-emit · wcs-gating)
+**19/19**. Boundary locks `literal-boundaries-1464` + `trig-lift-plan-1466` still green. **IRON RULE 11/11, same
+list, no growth.** Smoke **71/71**. **No emit changed** — dialect caps data, one .nc, one spec, one docs row.

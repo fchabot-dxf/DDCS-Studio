@@ -15,6 +15,7 @@ export const dialect = {
     // dro = machine pos #1500-1503; wcsWork = workpiece pos #1506-1509 (what zero*.nc writes); toolTable #1560/#764.
     vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, atc: null, ax: AX },   // atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the dump shows them as generic "system parameter area")
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
+        helicalArc: false,   // t1472 — planar G02/G03 IS factory-demonstrated here (slib-g.nc:4,11 `G02 X0 I-#6`), but no captured arc anywhere carries a Z
         wcsAuto: false, wcsFixed: false, wcsSync: false },   // t477 — WCS via #1506-1509 (ACTIVE work registers, no per-WCS index → number gated); no active-WCS var; no slave-sync
 
     // G91 G31 Z-1000 L#682 Q1 K0 F#106  (probe-float.nc, live). L#682 = probe-selector config param; no P-port word.
