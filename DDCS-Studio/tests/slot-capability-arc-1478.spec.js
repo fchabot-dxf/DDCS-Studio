@@ -147,6 +147,15 @@ test('DESIGN — the arc is ordered, costed, bridged, and honest about its one g
     const adds = SLOT_CAPABILITIES.filter((c) => /^\+[1-9]/.test(c.registers));
     expect(adds.length, 'exactly one capability grows the band, and it grows it by one').toBe(1);
     expect(adds[0].registers).toMatch(/^\+1\b/);
+    // ⚠ t1480 — C4's REACH, mapped before any emit was touched: the capability is declared in THREE places, and
+    // collapsing it in one leaves the other two asserting something untrue. The build act reads this list.
+    const c4 = SLOT_CAPABILITIES.find((c) => c.order === 1);
+    expect(Array.isArray(c4.reach) && c4.reach.length >= 6, 'C4 declares every consumer it reaches').toBe(true);
+    expect(c4.reach.join(' '), 'including the CAM entry gate, which nothing else would catch').toMatch(/entryHasGeometry/);
+    expect(c4.reach.join(' '), 'and the trig lift plan, whose raster-ramp row goes stale the moment C4 lands').toMatch(/trigEvidence/);
+    expect(c4.reach.join(' '), 'and the LOCK that ties the two into ONE act rather than a follow-up').toMatch(/LOCK 2/);
+    expect(c4.needsRuling, 'the one decision C4 cannot make for itself is named').toMatch(/raster-ramp/);
+
     // and the evidence-blocked neighbour stays OUT, named
     expect(SLOT_ARC_NOT_INCLUDED.what).toMatch(/rest/i);
     expect(SLOT_ARC_NOT_INCLUDED.why, 'because it is evidence-blocked, not teachable').toMatch(/SQRT|evidence/i);

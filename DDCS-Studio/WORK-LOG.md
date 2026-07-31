@@ -12378,3 +12378,65 @@ C4 the smallest step · the CAM width gate still keyed on width>tool and still n
 FINDING re-measured in the spec itself and a DESIGN lock (ordered, costed, each step declaring what must NOT move,
 exactly one gate and it is last). `slot-parametric-boundary-1442` **11/11**, untouched. **IRON RULE 11/11, same
 list, no growth.** Smoke **71/71**. **No product code** — one data module, one spec.
+
+## t1480 (seat A) — C4 PARKED BEFORE EMIT, with its true reach mapped. The act is wider than either of us scoped.
+
+### WHAT I DID, AND WHY IT STOPS HERE
+
+The dispatch is a build act and it also says **"Park fresh rather than half-land"**. I mapped C4's consumers before
+touching `rampLines`, and the map is the reason to stop: **this boundary is declared in THREE places, and
+collapsing it in one leaves the other two asserting something untrue.**
+
+**THE EMIT HALF IS EXACTLY AS SCOUTED, and simpler than what it replaces.** The declared vector is the walk's own
+first cut direction — the row walk leaves its row start along the row axis (sign from `reverse`), the ring walk
+leaves its corner along +X (`IN_X,IN_Y → OUT_X,IN_Y`, read, not assumed) — and the available distance is already a
+LIVE register (`#40`/`#41`). So the new ramp drops the hypotenuse, the baked `toC` guard limit AND the baked unit
+vector: `IF #34 > #40 GOTO plunge` where today it is `IF #34 > <literal toC>`. Strictly less baked, +1 register as
+costed.
+
+### ⚠ THE REACH THE SCOUT'S COSTING MISSED
+
+    surfaceraster.js          rampLines takes the vector; the two BAKES rows collapse       (dispatched)
+    the live-geometry gap     lifts for RAMP automatically (keyed off BAKES) — must be       (implied)
+                              asserted to STILL refuse helix, which keeps baking its inradius
+    opCamMap.js               entryHasGeometry must narrow (ramp||helix) → helix ALONE, or   (NOT dispatched)
+                              a CAM slot keeps knobs bake-only for a reason that is gone
+ ⚠  trigEvidence.js           the `raster-ramp` row is `needs: SQRT, lifts: true`. C4 lifts  (NOT dispatched)
+                              that boundary by the OTHER path — which the row's own `onNo`
+                              predicted — so the row goes STALE THE MOMENT C4 LANDS
+ ⚠  trig-lift-plan-1466       LOCK 2 asserts every GATED row's site still cites V13_trig.nc.
+       LOCK 2                 When the ramp rows collapse, surfaceraster stops citing it and
+                              LOCK 2 goes RED. Correctly — and that is why the trigEvidence
+                              restatement CANNOT be a follow-up: the lock ties them into ONE act
+    raster-live-geometry-1425 PROOF 3 asserts the declared bakes — red by design
+    @work                     the new ramp emits the SAME line count, so the t1440 constant
+                              is expected to hold — to be MEASURED, not assumed
+
+### THE ONE THING C4 CANNOT DECIDE FOR ITSELF
+
+`trigEvidence.js` is an EVIDENCE registry whose whole job is keeping a machine visit honest. Its `raster-ramp` row
+says SQRT lifts this boundary; after C4 the boundary is gone by another road. Three honest options with different
+meanings — delete the row (a lift plan should list only live ones) · keep it `lifts: false` noting the non-trig path
+took it (so the visit is not oversold) · re-point it at the HELIX rows, which still bake and still wait. **My lean is
+the second, then the third as a separate fact.** But a registry that exists to keep a machine visit honest should not
+be quietly re-scoped by the act that happens to trip it, so it goes back as a ruling — the same shape as the contour
+ramp at t1474, which was the right call then.
+
+### CAPACITY — the honest reason this is a park and not a stall
+
+Flagged before t1478 and again in its pass-back: the first build act is emit-class on the descent band, and this is
+the eighth act of this seat. The dispatch came anyway, which is the advisor's call and I took it. What changed is
+INFORMATION, not appetite: the act reaches two declared registries and a lock that were not in its scope, and one of
+them needs a ruling. Landing the emit and leaving `trigEvidence` stale — or re-scoping it on my own judgement — are
+both worse than handing over a mapped, turnkey act. **No emit was touched. Main is green.**
+
+### GATE (fast tier)
+
+`slot-capability-arc-1478` **6/6** with the reach map and the ruling question now LOCKED into the design (so the next
+seat cannot miss them). `trig-lift-plan-1466` + `raster-live-geometry-1425` + `slot-parametric-boundary-1442`
+**24/24**, all untouched and still green — which is the point: nothing has moved yet. Smoke **71/71**.
+
+*(Aside, cost me a detour: rewriting the spec tripped the stale-transform-cache collection error again. It was NOT
+the cache — my edit had closed the C4 object one line early, orphaning `paysTwice`, and Playwright reported the
+SPEC's line numbers for a syntax error in the DATA module it imports. `node --check` on the spec passes in that
+case; check the imported module.)*

@@ -69,6 +69,40 @@ export const SLOT_CAPABILITIES = [
         envelope: 'SURFACE_RASTER_BAKES parallel/ramp + concentric/ramp collapse to inputs [] — the ramp stops baking '
             + 'its distance-to-centre and becomes pendant-true',
         gate: '',
+        /**
+         * ⚠ t1480 — C4'S TRUE REACH, MAPPED BEFORE ANY EMIT WAS TOUCHED. The scout costed this capability as
+         * "+1 register, touches only the descent", and the EMIT half of that is right: the declared vector is the
+         * row's own cut direction (±1 on the row axis — the ring walk leaves its corner along +X, the row walk along
+         * its row) with the available distance already in a LIVE register (#40 / #41 span). No hypotenuse, no baked
+         * unit vector, no baked toC — the new ramp is strictly SIMPLER than the one it replaces.
+         *
+         * What the costing missed is that this boundary is DECLARED IN THREE PLACES, and collapsing it in one leaves
+         * the other two asserting something that is no longer true. Listed so the build act is turnkey rather than
+         * discovering them one red spec at a time:
+         */
+        reach: [
+            'wizards/ops/surfaceraster.js — rampLines takes the declared vector; the two BAKES rows collapse',
+            'the live-geometry refusal lifts for RAMP automatically (it is keyed off the BAKES table) and must be '
+                + 'asserted to still refuse HELIX, which keeps baking its inradius',
+            'data/opCamMap.js — entryHasGeometry must narrow from (ramp || helix) to helix ALONE, or a CAM slot keeps '
+                + 'stepoverPct/stepdown bake-only for a reason that no longer exists',
+            '⚠ data/trigEvidence.js — the `raster-ramp` row is declared `needs: SQRT, lifts: true`. C4 lifts that same '
+                + 'boundary by the OTHER path, which the row\'s own `onNo` already predicted ("the pendant-true ramp '
+                + 'goes to its OTHER answer: the +X declared run vector"). So the row becomes STALE THE MOMENT C4 '
+                + 'lands and must be restated in the same act',
+            '⚠ tests/trig-lift-plan-1466 LOCK 2 asserts every GATED row\'s site still cites V13_trig.nc. When the ramp '
+                + 'rows collapse, surfaceraster stops citing it and LOCK 2 goes RED — correctly. That is why the '
+                + 'trigEvidence restatement cannot be a follow-up: the lock ties them into one act',
+            'tests/raster-live-geometry-1425 PROOF 3 asserts the declared bakes per (strategy, entry) — red by design',
+            '@work: the new ramp emits the same NUMBER of lines (assign · guard · G0 Z · ramp · return · goto · two '
+                + 'labels · plunge), so the t1440 per-descent constant is expected to hold — to be MEASURED, not assumed',
+        ],
+        needsRuling: 'what becomes of trigEvidence\'s `raster-ramp` row. It is an EVIDENCE registry and the honest '
+            + 'options differ in meaning: (a) delete it — the boundary is gone, and a lift plan should only list live '
+            + 'ones; (b) keep it with `lifts: false` and a note that the boundary was lifted by the non-trig path, so '
+            + 'the machine visit is not oversold for it; (c) keep it pointed at the HELIX rows, which still bake and '
+            + 'still wait. My lean is (b) then (c) as separate facts, but a registry that exists to keep a machine '
+            + 'visit honest should not be re-scoped by the act that happens to trip it',
         paysTwice: 'this is ALSO the improvement remainder\'s pendant-true ramp (t1339: the run vector "needs no square '
             + 'root at all"), so it lifts a raster row that is otherwise waiting on V13. Doing it here retires that item',
     },
