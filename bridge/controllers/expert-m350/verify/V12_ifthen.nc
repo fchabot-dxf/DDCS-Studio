@@ -1,5 +1,5 @@
 (V12 - does IF cond THEN inline-assign work, or only IF ... GOTO)
-(camMacroKit CAM-slot macros emit IF #x GT [n] THEN #x=[n] clamps. The verified findings)
+(camMacroKit CAM-slot macros emit a bracketed IF #x GT n THEN #x=n clamp. The verified findings)
 (confirm IF/GOTO + WHILE/DO/END but NOT the inline THEN-assign. This tests it directly.)
 (No motion - a pure variable clamp - safe. If IF..THEN is a syntax error the WHOLE file)
 (fails to parse: you get a syntax-error popup and NO V12 message = IF..THEN is rejected.)

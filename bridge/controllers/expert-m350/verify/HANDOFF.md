@@ -53,6 +53,20 @@ This file is the quick "where are we / how to resume" sheet.
 | **V8** dual-Y gantry | `V8_read_gantry.nc` | `#806 Yoff == #808 Aoff` (−665.944) → A tracks Y in the WCS table; sim can ignore A/B. |
 | **V6** tool-length (write) | `V6_set/V6_restore.nc` | macro `#900` = param `#400` = H01 offset (panel showed 12.5). H01–H16 = `#900-#915` = `#400-#415` (+500). Register-writable; no `G43` needed for the write. |
 
+## Left to do — NO MOTION, drop and run (do these first: nothing moves, nothing is saved or restored)
+
+| Test | Question | Run order / how to read |
+|---|---|---|
+| **V13** trig | Does the macro parser have `COS` / `SIN` / `SQRT` / `ATAN`? **The single decider for four declared boundaries** (see `DDCS-Studio/web/data/trigEvidence.js` — what each answer changes, written before the visit). | **1.** `V13_trig.nc` — probes all four in one run. If it reaches the end (`#601=100`) you are done in one go. Its *abort* is evidence too: it is the only file that can show whether an **unknown function fails LOUD** at all, which is the question the corpus rule turns on. **2.** if it aborted: `V13c_sqrt.nc` (**SQRT first — three shipped boundaries wait on it**), then `V13a_cos.nc`, `V13b_sin.nc`, `V13d_atan.nc`. One function per file (rule 3) so none can blind another. Each pops its own result. **Three outcomes, all useful:** expected value = works · a *different* number = parsed but silently wrong (write the number down) · no popup + syntax error = rejected, loud, nothing ran. |
+| **V14** WCS pos | Are `#790`/`#791` (X/Y work position) readable? `#792`=Z is factory-proven. | Jog off-zero on all 3 axes, write down the workpiece DRO, run `V14_wcs_pos.nc`, compare. |
+| **V15** indent | Does the parser tolerate leading spaces (Studio's default emit style)? | `V15_indent.nc` — 3 sections; a syntax error's line number says which construct broke. |
+| **V12** IF..THEN | Is the inline `IF cond THEN #x=n` clamp accepted, or only `IF..GOTO`? | `V12_ifthen.nc` — no popup = the form is rejected. |
+
+> ⚠ **t1466 — a comment can fake a failure, and it nearly did.** Safety rule 1 below is not cosmetic: `V13_trig.nc`
+> carried five bracketed comment lines and V12/V14/V15 carried more. A parse abort caused by a *comment* reads
+> exactly like the *test* failing — a false negative that costs a whole visit. All are now stripped, and
+> `DDCS-Studio/tests/trig-lift-plan-1466.spec.js` LOCK 5 fails the build if any `.nc` here re-introduces one.
+
 ## Left to do — ALL need a deliberate MOTION setup (Z clearance, low rapid override, hand on feed-hold)
 
 | Test | Question | How to approach |

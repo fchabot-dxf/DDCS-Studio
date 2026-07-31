@@ -11909,3 +11909,98 @@ new spec `literal-boundaries-settled-1464` **4/4** (three self-red-ing locks + t
 rest + slot + round-trip **81/81** with **POCKET E0 `goldenDiffs: 0`** — the untouched pre-E0 capture still matching
 byte-for-byte is the real proof no G-code moved, far stronger than anything I could assert in a new file · contour
 family **12/12** · **IRON RULE 11/11, same list, no growth** · smoke **71/71**.
+
+## t1466 (seat A, FRESH) — SQRT DIAGNOSED: **V13-GATED**, and the act converts to V13-PREP. No emit changed.
+
+### THE DIAGNOSIS — the rule is satisfiable here, and the one thing missing is the premise itself
+
+The dispatch asked which way the corpus discipline falls before anything was built. It falls to **GATED**, and the
+reasoning is worth keeping because two of its three legs point the *other* way and it still gates:
+
+**1. "LOUD" IS UNUSUALLY GOOD ON THIS CONTROLLER — better news than the queue assumed.** The rule (ddcs-expert
+`references/CORE_TRUTH.md` §9) permits ◐/◔ emit "only where a failure is LOUD — a parse error that stops the
+program". I went looking for what a parse error actually does here and `verify/HANDOFF.md` safety rule 3 is
+**machine-CONFIRMED**: a syntax error aborts the **WHOLE file** — *nothing executes, state pristine*. So a loud
+failure at this site is not a halt mid-cut with the tool down; it is a program that never starts. The rule is
+**satisfiable in principle**, which I had half-expected to be the blocker and is not.
+
+**2. THE PRECEDENT IS REAL BUT NARROWER THAN ITS HEADLINE.** Studio already emits both functions to real machines —
+`ATAN` in the alignment probe (`probeToSlot.js:538`) and **`SQRT` in the rotary 3-point fit** (`rotaryCenterWizard.js:158`,
+which I did not expect to find). But both are **operator-attended probing**, one behind an explicit ADVANCED /
+verify-on-machine banner. A raster ramp is an unattended cut into material. The shipped cases do not license the new
+one — so rather than cite them as cover, they became **rows on the plan in their own right**.
+
+**3. ⚠ AND THE LOUDNESS OF AN *UNKNOWN FUNCTION* IS EXACTLY WHAT IS UNEVIDENCED — that is the whole gate.** Every
+observed `syntax error!` in the corpus is malformed **SYNTAX**: bracketed IF conditions, GOTO spacing, three-digit
+labels. **Not one is an unimplemented function word.** A parser that tokenises `SQRT` as a stray word and evaluates
+the bracket anyway returns a *number* — and at this site that number is a **divisor** (`toC` near zero turns the ramp
+midpoint into a wild coordinate). That is the forbidden half of the rule, and no amount of reasoning converts it into
+the permitted half. **The premise the rule turns on is the thing the test settles.** Gated, and the decider exists.
+
+I considered and rejected a third path rather than leaving it for someone to re-propose: make the site loud **by
+construction** — emit the SQRT, then verify `x·x ≈ radicand` with an `IF` (✅ LIVE-SHIPPED) and halt with a message.
+It does close the logic. It also puts the refusal **at the machine, with the tool down**, and `SURFACE_RASTER_BAKES`
+already ruled the other way in its own words: *"Refusing at PACK time in these words is the whole point — never at
+the machine."* A guard that contradicts a shipped principle is not a cheaper answer, it is a second answer.
+
+### THE PREP — and the visit's best find was a trap already armed on the decider
+
+**⚠ `V13_trig.nc` CARRIED FIVE BRACKETED COMMENT LINES.** Safety rule 1 — machine-learned, twice (V1 line 2,
+IF_neg_test line 3) — says a `(...)` comment may carry no inner parens and **no square brackets**: it closes at the
+first `)` and the rest parses as code. So a parse abort on V13's **line 5** would have read as *"trig rejected"* when
+the real cause was a comment about a markdown filename — **a false negative on the one macro that decides four
+boundaries**, discovered by reading instead of by a wasted drive out. A sweep found the same hazard in **V12, V14 and
+V15**, all three queued for the *same* visit. All four stripped to prose; nothing about any test changed.
+
+**THE FILE STRUCTURE WAS THE SECOND HALF OF THE SAME PROBLEM.** V13 probes four functions in one file with COS and
+SIN **ahead of** SQRT — and the firmware libm import table (V13's own header) holds `sqrt`/`atan` but **not**
+`cos`/`sin`. So the *likeliest* outcome was an abort on the COS line that never reaches the one function three
+shipped boundaries wait on. Split into `V13a_cos` / `V13b_sin` / `V13c_sqrt` / `V13d_atan` (the V3a–V3d precedent),
+one risky form per file, each on the `#1510` + `#1505=-5000` popup idiom rather than the "fiddly" variable page.
+
+**THE COMBINED FILE STAYS, AND EARNS IT** — I nearly retired it. It is run **first**: if it completes, one run
+answers all four. And its *abort* is the only evidence obtainable for **whether an unknown function fails loud at
+all** — leg 3 of the diagnosis above. No split file can answer that on its own.
+
+Every macro now names its **three** outcomes, because two of them were collapsed: expected value = works · *a
+different number* = parsed but **silently wrong** (write the number down) · no popup = rejected, loud, nothing ran.
+
+### THE LIFT PLAN IS DATA, and it is honest about what the visit is NOT worth
+
+`web/data/trigEvidence.js` — six rows, because prose in six source headers cannot be read as a set: each header knows
+its own boundary and none knows the others. Two rows **lift** outright on SQRT (raster ramp, rest walk). Two only get
+**reworded** — non-rect pockets and polygon/ellipse contours carry a second, independent reason (t1464's LIST-vs-
+FORMULA), so proving SIN/COS changes their wording, not their existence. Two are **not lifts at all** but defect
+checks on shipped emit, and `kind: 'shipped-unconfirmed'` says so. **Overselling the visit is the failure this file
+exists to prevent**, which is also why `TRIG_NOT_GATED` names `SLOT_RASTER_GAP` and the helix rows as things V13
+changes *neither way*.
+
+The highest-stakes row is not a lift: if **ATAN** comes back NO, the alignment probe has been emitting either an
+unparseable macro or a wrong angle to a real machine. `V13d`'s header says that to the operator's face, and asks for
+the *number* — 45 wrong by a known factor is a different repair from 45 lost.
+
+### GATE (fast tier)
+
+new spec `trig-lift-plan-1466` **6/6** — and **MUTATION-TESTED rather than assumed**: I re-armed the exact defect
+(a bracketed comment + a second function in a split file) and watched LOCK 5 and LOCK 3 go **RED**, then revert to
+green. LOCK 6 also caught **my own** thin data on the first run (contour's `onNo` was the word "unchanged") — the
+data was fixed, not the lock. Boundary specs `literal-boundaries-settled-1464` + `rest-parametric-boundary-1431` +
+`raster-live-geometry-1425` **25/25**, unchanged. **IRON RULE 11/11, same list, no growth.** Smoke **71/71**.
+
+**NO EMIT MOVED AND NONE COULD**: `trigEvidence.js` is imported by nothing but the spec, and the only other changes
+are `.nc` comments and a docs table.
+
+### SCOPE I TOOK BEYOND THE NAMED ITEM — flagged, not smuggled
+
+V12/V14/V15's comment fix is *adjacent*: those are different tests, queued for the same visit. I took it because the
+dispatch's word was **turnkey** and because a V13-only lock would have left a known false-negative trap armed on two
+macros while installing the very lock that names it. Comment-only, zero behavioural risk, one line each. Rule it back
+if you disagree. Also noted, **not** touched: `verify/HANDOFF.md`'s header link to `docs/VERIFY-AT-MACHINE.md` is
+stale — the file moved to `docs/archive/`.
+
+**QUEUE RECEIVED (two mid-turn amendments, neither touching this act — recorded so they survive the seat):** after
+this lands, the order is **1. the feature-canvas BOTTOM-HANDLE defect** (user-visible, jumps the remainder queue:
+dragging the preview's bottom-edge handle moves the handle into grey, canvas does not extend/repaint — diagnose the
+seam, verify at ~412px AND desktop, assert at the pixel), **2. the MOBILE CAM-BUILDER cleanup** (Build-CAM-slot page
+at phone width: tools to a horizontal row above a full-width canvas, panel below, field table scrolling in its own
+container; desktop asserted unmoved), **then** the remainder resumes at true-arc helix.
