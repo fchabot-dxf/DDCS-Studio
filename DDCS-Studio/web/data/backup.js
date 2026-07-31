@@ -20,6 +20,7 @@ import { UIUtils } from '../ui/uiUtils.js';
 import { exportAllEntries, importAllEntries, clearAllEntries, baseName } from '../ui/projects/projectStore.js';
 import { loadUserOps } from '../blocks/userOps.js';
 import { getMachine, setMachine, MACHINE_KEY } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record
+import { LASTVALS_PREFIX } from './wizardLastValues.js';   // t1437 — the key prefix is IMPORTED, not restated: a copied prefix is a row that silently backs up nothing
 
 export const BACKUP_VERSION = 1;
 const MACRO_KIND = 'ddcs.backup';
@@ -86,6 +87,12 @@ export const BACKUP_STORES = [
     { id: 'campack', label: 'CAM pack', ...ls('ddcs_campack'), count: (v) => len(v && v.slots), unit: 'slots' },
     { id: 'wizardLayout', label: 'Wizard bar layout', ...ls('ddcs_wizard_layout'), count: (v) => (v ? (len(v.customGroups) + Object.keys(v.entries || {}).length) : 0), unit: 'overrides' },
     { id: 'presets', label: 'Wizard presets', ...lsPrefix('ddcs_tpl_'), count: (v) => (v ? Object.values(v).reduce((n, list) => n + len(list), 0) : 0), unit: 'presets' },
+    // t1437 — WIZARD VALUE PERSISTENCE (user-ruled): what each wizard was last INSERTED with. One key per op type,
+    // the same per-op-type prefix shape the presets row above already uses — so this is a declared ROW, not new
+    // machinery. It is a SEPARATE row from `presets` on purpose: a preset is a named thing the user saved and can
+    // pick, this is the unnamed one the form falls back to, and folding them would make "reset my last values" also
+    // delete saved presets. localStorage stays a buffer; this row is what carries it into the master .ddcs.
+    { id: 'wizardValues', label: 'Wizard last-used values', ...lsPrefix(LASTVALS_PREFIX), count: (v) => (v ? Object.keys(v).length : 0), unit: 'wizards' },
     { id: 'variables', label: 'User variables (your #var values)', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
     { id: 'displayPrefs', label: 'What the 3D preview shows', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
     { id: 'panePrefs', label: 'Window layout (which panes are open, their sizes)', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },

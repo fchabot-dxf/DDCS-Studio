@@ -55,6 +55,12 @@ function saveProbeFieldOverride(id, value) {
 // _seedForm() uses it to restore params into the form when re-opening a wizard to edit an op (params = single truth).
 import { paramFields } from './blocks/opSchema.js';
 
+// t1437 — WIZARD VALUE PERSISTENCE (user-ruled): a form remembers what you last INSERTED with it, across restarts.
+// The record is `recordOp`'s params — the same object EDIT-IN-PLACE already seeds a form from — so capture and
+// restore ride seams that exist and are proven, and custom ops (whose `inputIds` is empty by design) work for free.
+import { loadLastValues, saveLastValues, omitProbeDefaultParams } from './data/wizardLastValues.js';
+import { getLastOp } from './blocks/opRecord.js';   // import-free by design, so this cannot cycle
+
 // ROUND-TRIP DISCOVERABILITY (human 07-04): the form↔Blocks round-trip IS the product vision but is invisible until
 // stumbled into. The FIRST time a wizard op inserts as an editable block stack, point the user at the Blocks tab —
 // ONCE ever (a persisted flag), never nags. Reuses the shared transient toast (no second toast system).
@@ -275,6 +281,19 @@ export class WizardManager {
             if (view && typeof view.onShow === 'function') view.onShow(this);
             decorateProbeSrc(view);   // controller/Studio source chips (before first generate)
             this.applyProbeDefaults();   // seed probe fields from the global 3D-probe defaults
+            /**
+             * ── t1437 — LAST-USED VALUES, seeded on a FRESH open ──────────────────────────────────────────────────
+             *
+             * AFTER `applyProbeDefaults` deliberately: where both have an opinion the remembered value is the later
+             * write and wins — but they overlap in almost nothing, because the probe-default fields are excluded from
+             * the record at capture (see wizardLastValues.omitProbeDefaultParams for why: the sticky-override
+             * mechanism already knows which probe fields the user actually SET, and this snapshot cannot).
+             *
+             * EDIT-IN-PLACE IS UNTOUCHED and needs no flag here: `openForEdit` calls this method and THEN seeds the
+             * op's own params, so the op wins by the same ordering that already lets it beat the shipped defaults
+             * this line used to be the only alternative to. One path, one rule — the last seed wins.
+             */
+            { const remembered = loadLastValues(type); if (remembered) this._seedForm(type, remembered); }
             // Ensure fields & preview reflect current defaults immediately
             this.update();
             if (view && typeof view.onOpen === 'function') view.onOpen(this);
@@ -308,6 +327,30 @@ export class WizardManager {
             const val = params[key]; if (val == null) continue;
             if (e.type === 'checkbox') e.checked = !!val; else e.value = val;
         }
+    }
+
+    /**
+     * ── t1437 — REMEMBER WHAT PRODUCED THIS OP (the capture half of wizard value persistence) ─────────────────────
+     *
+     * Called from `insert()` the moment something really was inserted — including the text-insert families (probe /
+     * ATC), which have no block builder but DO call `recordOp`, so they are covered by the same line rather than by
+     * a second path written for them.
+     *
+     * A NEW INSERT ONLY. Editing an existing op re-commits values too, and whether that should move the remembered
+     * record is a genuine UX fork rather than an oversight: an edit is a correction to a PAST op, not a statement
+     * about the next one, and "capture on insert" was ruled about the op you are making. The narrow reading is the
+     * reversible one, so it is what ships — flagged for a ruling rather than decided quietly.
+     *
+     * THE PROBE-DEFAULT FIELDS ARE DROPPED HERE, through the schema's own param→field map, so this module never
+     * carries a second copy of `PROBE_DEFAULT_FIELDS`' id list. See `omitProbeDefaultParams` for the reason.
+     */
+    _rememberLastValues() {
+        if (this.editingOpId) return;
+        try {
+            const rec = getLastOp();
+            if (!rec || !rec.type || !rec.params) return;
+            saveLastValues(rec.type, omitProbeDefaultParams(rec.params, paramFields(rec.type), PROBE_DEFAULT_FIELDS));
+        } catch (_) { /* never let remembering a value break an insert */ }
     }
 
     /** Snapshot the current values of all input fields for the active wizard view. */
@@ -459,6 +502,7 @@ export class WizardManager {
         if (!committed && !this.editingOpId && code) this.editorManager.insert(code);   // last resort (new op, nothing decoded)
 
         if (committed || code) {
+            this._rememberLastValues();   // t1437 — an op really was produced; remember what produced it
             // Carry the start position the user set in this wizard's 3D preview over to the main preview.
             try {
                 const p = this._activePanel;

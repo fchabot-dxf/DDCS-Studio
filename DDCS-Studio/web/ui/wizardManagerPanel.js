@@ -22,6 +22,7 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dial
 // t1247 — THE LIBRARY FOLDER: one granted folder holds the shareable sources (.wiz here, .cam on the CAM surface)
 import { writeLibraryFile, hasFSA } from '../data/libraryFolder.js';
 import { renderLibraryShelf } from './libraryShelf.js';
+import { hasLastValues, clearLastValues } from '../data/wizardLastValues.js';   // t1437 — the per-wizard "forget what I last used"
 // Authoring custom ops lives in Blocks → Dev mode (the one authoring path); this panel only DESIGNS the bar.
 
 const SECTION_LABEL = { left: 'LEFT', center: 'CENTRE', right: 'RIGHT' };
@@ -347,6 +348,38 @@ function renderRow(entry, group, ei, allGroups, apply) {
     iconBtn.classList.add('wizicon-btn');
     iconBtn.style.cssText += ' font-size:15px; min-width:32px; padding:4px 6px;';
     row.appendChild(iconBtn);
+    /**
+     * ── t1437 — PER-WIZARD "RESET VALUES" (the ruled reset) ───────────────────────────────────────────────────────
+     *
+     * Forgets what THIS wizard was last inserted with, so its form opens on the shipped defaults again. Shown ONLY
+     * when a record exists — the same rule the Restore-default button beside it follows, and the same reason: a
+     * button with nothing to do is a button that teaches the user nothing.
+     *
+     * IT IS A SEPARATE BUTTON, NOT A CLAUSE ADDED TO "↺ Restore default", and the two reasons are worth stating.
+     * (a) That button reverts a wizard's NAME / ORDER / ICON and its factory twin — bar customisation. Remembered
+     *     values are an unrelated concern, and folding them in would mean putting your icon back also throws away
+     *     your feeds and speeds, which nothing on the button says.
+     * (b) It only exists on BUILT-INS (the `else` arm below). Custom ops remember their values too, so a clause
+     *     there would have left half the wizards with no way to forget.
+     *
+     * THE PRESET ROW IS UNTOUCHED, deliberately: a preset is a NAMED thing the user saved and can pick again; this
+     * is the unnamed fallback the form opens on. They ride separate backup rows for the same reason.
+     *
+     * ⚠ A WIZARD CAN OWN TWO KEYS, and this was measured rather than assumed. Most built-ins here declare an
+     * `opensAs` TWIN (Pocket's bar entry opens `user_pocket_data`, not `pocket`), so the bar gesture records under
+     * the TWIN's type — while `openWiz('pocket')` still reaches the built-in view and records under its own. They
+     * are ONE wizard to the operator, so the row offers one button that answers for both: shown when EITHER has a
+     * record, and it forgets both. Keying on `opensAs` alone would leave a stale record with no way to reach it.
+     */
+    const valuesTypes = [entry.type, entry.opensAs].filter(Boolean);
+    if (valuesTypes.some(hasLastValues)) {
+        row.appendChild(mkBtn('↺ Reset values', async () => {
+            if (await dlgConfirm(`Forget the values “${entry.label}” was last used with?\nIts form will open on the shipped defaults again. Your saved presets for it are kept.`, { okLabel: 'Reset values' })) {
+                valuesTypes.forEach(clearLastValues);
+                apply();
+            }
+        }, { title: 'Forget this wizard’s last-used values — its form opens on the shipped defaults again (saved presets are kept)' }));
+    }
     // re-author / export / delete are custom-op only (built-ins are authored in Blocks → Dev mode)
     if (entry.kind === 'user') {
         row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
