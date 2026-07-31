@@ -66,6 +66,79 @@ export function slotPath(p) {
     return L;
 }
 
+/**
+ * ── t1442 — WHY A SLOT'S CLEARING STAYS LITERAL, DECLARED AS DATA (the rest-machining precedent) ──────────────────
+ *
+ * T4 opened by asking whether this kernel's zig-zag is the raster atom's parallel walk over the slot's rect. It was
+ * MEASURED before anything was built (both walks emitted, both traced through the real engine) and the answer is no —
+ * four times over, three of them on a capability the atom does not declare. Written down rather than left to be
+ * rediscovered, exactly as `REST_PARAMETRIC_GAP` is, because the acts behind this one (the pocketfill retirement, the
+ * porting arc) must know which walks may become runtime loops from a DECLARATION and not by reading three kernels.
+ *
+ * ── 1. THE ROW RULE IS A DIFFERENT RULE, and it is the one that cuts a different part ─────────────────────────────
+ * This kernel anchors its passes ON the wall — `offs` runs ±(width−tool)/2 — and FORCES a final pass clamped to the far
+ * wall, so the finished channel is exactly `width` whatever the stepover leaves over. The atom counts *rows that FIT*:
+ * uniformly spaced, the first half a stepover INSIDE the walked edge, the last wherever it lands. That is the right
+ * rule for its own two jobs (surfacing lets the tool overhang; a pocket has a wall-finish pass behind it) and a slot
+ * has neither. Measured on 60×12, Ø6 @40%:
+ *
+ *     slotPath   4 passes at y = −3, −0.6, 1.8, 3        → a 12.0mm channel, the width that was typed
+ *     the atom   3 rows   at y = −1.8, 0.6, 3            → a 10.8mm channel — 1.2mm NARROW
+ *     …and phase-corrected (walk a rect one stepover taller, so the rows start on the wall) the atom's last row lands
+ *     at 4.2 — 1.2mm PAST the wall, i.e. OVERSIZE, which is the destructive direction of the same miss.
+ *
+ * THE DIVERGENCE REGION IS NAMED, because an unmeasured agreement is not an agreement: the two row sets coincide
+ * EXACTLY when (width − tool) is a whole multiple of the stepover (measured identical at 18×Ø6@40%, 13.2×Ø6@40%,
+ * 20×Ø8@50%; different at 12, 16.8 and 15). So the row rule alone CAN be dialled past — which is precisely why the
+ * boundary does not rest on it, and why the three below matter.
+ *
+ * ── 2. THE INSET IS ANISOTROPIC, and the atom's is one number ─────────────────────────────────────────────────────
+ * A slot is held tool/2 inside across its WIDTH and not at all along its LENGTH — the tool centre runs the full
+ * centreline, A to B. The atom's `inset` moves BOTH axes (`w − 2·inset`, `h − 2·inset`), so handing it tool/2 walks a
+ * 60mm slot from x=3 to x=57: a 54mm channel where 60 was asked. Measured.
+ *
+ * ── 3. THE AXIS — a slot has a bearing, the atom's rows have an axis ──────────────────────────────────────────────
+ * The passes run on the slot's own bearing (measured 30.000° on a 30° slot, its step-overs at 120°); the atom's rows
+ * run ∥X or ∥Y (`rasterRowAxisOf`). Only `rotAngle` could express the angle, and that socket means the PROGRAM's
+ * declared rotation — a second, unrelated quantity that would have to compose with it.
+ *
+ * ── 4. THE DESCENT IS ANCHORED TO DIFFERENT GEOMETRY ──────────────────────────────────────────────────────────────
+ * This kernel declares its run vector: a slot ramps ALONG its length (measured (0,−3)→(28.622,−3), pure along-axis)
+ * and helixes at the ENTRY END clamped to the slot WIDTH (centre (1,−3)). The atom bakes ramp-toward-AREA-CENTRE
+ * (measured (0,−1.8)→(28.57,−0.086) — a diagonal that drifts across the channel) and a helix at the AREA CENTRE
+ * (measured (32,0) — the middle of the slot, which it then cuts back out of).
+ *
+ * ⚠ THIS IS A BOUNDARY OF THE ATOM'S DECLARED AXES, NOT OF ARITHMETIC — and that distinction is the whole reason it is
+ * recorded rather than ruled. Rest's obstruction is SQRT on an unverified controller and only evidence lifts it. These
+ * four are things the atom COULD be taught (a wall-anchored row rule, a two-axis inset, the slot's bearing, the
+ * declared run vector t1339's own TODO already names) — which makes this a capability arc to be opened deliberately,
+ * with its own bridge per step, and NOT a re-point that can ride the t1406 recipe. `tests/slot-parametric-boundary-
+ * 1442.spec.js` MEASURES every clause on the real walks, so the day any of them closes the spec goes red and this
+ * declaration has to be cut down rather than quietly kept.
+ */
+export const SLOT_RASTER_GAP = 'a slot is not a rectangle the raster atom walks, measured four ways. THE ROW RULE: '
+    + 'slotPath anchors its passes ON the wall (+/-(width-tool)/2) and FORCES a final pass clamped to the far wall, so '
+    + 'the channel is exactly the width you typed; the atom takes uniformly spaced rows half a stepover inside the '
+    + 'walked edge and keeps only those that FIT (60x12 Ø6 @40%: 4 passes at -3,-0.6,1.8,3 against 3 at -1.8,0.6,3 - a '
+    + 'channel 1.2mm NARROW, or 1.2mm OVERSIZE once the seeding is phase-corrected). THE INSET: a slot is held tool/2 '
+    + 'inside across its WIDTH and not at all along its LENGTH, and the atom insets both axes by one number (a 60mm '
+    + 'slot walks 3..57). THE AXIS: the passes run on the slot bearing, the atom rows run parallel to X or Y. THE '
+    + 'DESCENT: a slot ramps ALONG its length and helixes at the ENTRY END clamped to the slot width, the atom ramps '
+    + 'toward the AREA CENTRE and helixes in the middle of the channel. Three of the four need a capability the atom '
+    + 'does not declare, so the slot keeps its literal kernel until it is taught them deliberately';
+
+/**
+ * Why THIS slot's clearing cannot ride the parametric raster — or '' when there is no clearing walk to port at all.
+ *
+ * Keyed on the SAME degenerate test the kernel itself branches on (a zero-length slot is a single plunge, not a walk),
+ * and NOT on any of the numbers: every clause above lives in the walk, so no width, tool, stepover or angle can dial
+ * past it. The 1442 spec asserts both halves — the refusal on every dimension moved, and the '' on the degenerate.
+ */
+export function slotRasterGap(p = {}) {
+    const len = Math.hypot(num(p.x1, 60) - num(p.x0, 0), num(p.y1, 0) - num(p.y0, 0));
+    return len < 1e-6 ? '' : SLOT_RASTER_GAP;
+}
+
 export const slotBlock = {
     type: 'slot', label: 'Slot', kind: 'leaf', category: 'Toolpaths',
     defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, feed: 2000, plunge: 150, clearance: 5 },
