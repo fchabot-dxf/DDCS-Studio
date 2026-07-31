@@ -12440,3 +12440,55 @@ seat cannot miss them). `trig-lift-plan-1466` + `raster-live-geometry-1425` + `s
 the cache — my edit had closed the C4 object one line early, orphaning `paysTwice`, and Playwright reported the
 SPEC's line numbers for a syntax error in the DATA module it imports. `node --check` on the spec passes in that
 case; check the imported module.)*
+
+## t1483 (seat A) — C4 PARKED ON A BRANCH. The run vector works; the collapse it authorises would have DECLARED A FALSEHOOD.
+
+### WHAT WORKS, and it is most of the act — on `wip/c4-run-vector`, commit 152795ab
+
+The declared run vector lands as designed. The walk declares the direction (a row's own cut direction with the sign
+from `reverse`; a ring's +X, read out of its first cut move) and the guard reads a LIVE span register. **Three baked
+quantities are gone** — the hypotenuse, the baked distance-to-centre limit, the baked unit vector:
+
+    was   IF #34 > 41.231 GOTO41   ( ramp needs more run than the 41.231mm to centre -> plunge )
+    now   IF #34 > #40    GOTO41   ( ramp needs more run than the width available along the pass -> plunge )
+
+Done and green on that branch: the `SURFACE_RASTER_PROVEN` ledger restated (the five ramp rows changed their
+CRITERION, not their status — relationship-bridged now, keys kept so the ledger cannot read as coverage lost), the
+`opCamMap` entry gate narrowed to helix alone, `trigEvidence`'s `raster-ramp` row CLOSED with a new `raster-helix`
+row beside it, and both honesty-lock transitions carried (`trig-lift` LOCK 2 four gated → three; `raster-live`
+PROOF 3 with the ramp moved to the honouring side **and the helix asserted unmoved in the same test**).
+
+### ⚠ WHAT STOPPED IT — found by dumping the real emit, not by trusting the change
+
+I dumped a dialled-stepover program to check the collapse was honest before committing to it:
+
+    #47=[0 + #44 / 2 + #48 * #44]           ← the walk's LIVE row coordinate
+    G0 X0 Y#47                              ← the walk's own approach already uses it
+    G1 X[0 + #34 * 1] Y[3.6 + #34 * 0] …    ← ⚠ THE RAMP BAKES 3.6 INSTEAD
+    G1 X0 Y3.6 F1200                        ← and returns to the baked one
+
+**The descent's CROSS-axis start is still `stepBaked/2`.** Under a dialled stepover the ramp descends at a stale Y
+and the row then cuts at `#47` — precisely the kinked-entry hazard the bake existed to prevent. The run vector fixed
+the ALONG axis and left the ACROSS axis exactly as it was.
+
+So `inputs: []` on those two rows is **not yet true**, and shipping it would make the registry lie about the one
+thing it exists to declare. That is worse than not doing the act: every consumer — the live-geometry refusal, the
+CAM entry gate, the trig lift plan — reads that table and would each become wrong in its own words.
+
+**THE FIX IS KNOWN AND SMALL IN SHAPE:** the descent's cross component must ride the row register. The walk computes
+`#47` before the descent and already uses it for its own approach, so it is a matter of passing the walk's declared
+cross FORM into `rampLines` instead of a baked number, plus its affine term so the rotated build stays correct.
+That last part is the `AX`/`TM` rotation machinery — the delicate half, and the reason this is a park.
+
+### WHY A BRANCH AND NOT A REVERT, AND WHY NOW
+
+The dispatch says "park fresh rather than half-land", and half-landing here has a specific meaning: the emit change
+is correct and useful, but the DECLARATION it authorises is not yet earned. Landing both ships a lie; landing the
+emit without the declaration leaves the table saying the ramp bakes things it no longer bakes. Neither is a state to
+hand over, so the whole act sits on `wip/c4-run-vector` with the inventory named and **the working branch is
+untouched and green** (25/25 on the three affected specs, smoke 71/71).
+
+Capacity, stated plainly because it is a reportable fact: ninth act this seat, and I made three separate
+syntax/escaping slips inside this one (an object closed a line early, a `\n` mangled into a real newline by a Python
+escape, two unescaped apostrophes). Each was caught and fixed, but that rate on the `AX`/`TM` rotation machinery —
+the code whose last collision produced a 416mm error — is the argument for stopping here rather than pushing.
