@@ -12687,3 +12687,118 @@ the part nobody greps for.**
 **FULL SUITE ON THE MERGED BRANCH, before the merge back, since this turn IS the gate: 2283 passed, 6 skipped,
 0 failed (17.9m).** Nothing was dropped: every row that had coverage still has it, under a criterion that says what
 it actually checks.
+
+## t1490 (seat A) — C2, THE TWO-AXIS INSET (slot arc 2/4). Built to the arc's own design row.
+
+### THE CHANGE, AND WHY IT IS A RESOLVER RATHER THAN TWO MORE PARAMS
+
+The atom held ONE inset and moved it on BOTH axes, so handing it a tool radius walked a 60mm slot from x=3 to x=57 —
+a 54mm channel where 60 was asked (t1442, measured). A slot needs `tool/2` ACROSS its width and NOTHING along its
+length: the tool centre runs the full centreline, A to B.
+
+`rasterInsetOf` / `rasterInsetAxes` are the whole capability. One declared place turns a caller's inset WORDS — one
+number, or a pair — into the two span seeds, and every consumer reads it: the seeds, `@work`, the live-input reading
+and the BAKES gate. That is the same shape `rasterRowAxisOf` and `rasterDirectionOf` already have in this file, and
+it is what stops the four consumers from each deciding separately what "inset" means, which is exactly how the
+single-inset reading got into four places to begin with.
+
+**Registers: 0, as the arc costed it.** The pair folds into #40/#41, which already carry the walked spans — a live
+inset has folded the same way since t1425, and two of them fold the same way twice.
+
+### ⚠ THE ONE REAL DESIGN DECISION: THE PAIR IS NAMED BY ROLE, NOT BY AXIS
+
+`along` is the axis a pass RUNS along; `across` is the one passes step across. So the pair maps to X/Y **through
+`rowAxis`**, and flipping the row axis transposes which span each inset moves. That coupling is deliberate and it is
+worth being explicit about, because the alternative (`insetX`/`insetY`, pure geometry, no coupling) is genuinely
+defensible:
+
+- it is what the only asymmetric consumer needs — a slot's requirement is *stated* in those words;
+- it is what makes **C3 (the bearing) a rename rather than a re-keying**: once passes run on a bearing, along/across
+  ARE the axes, and an X/Y pair would have to be re-derived there;
+- the arc's own C2 row says "(along, across)", so this follows the design rather than re-deciding it mid-build.
+
+The cost is real and named in the code: transposing `rowAxis` transposes the insets. It is harmless while the two
+are equal — which is every caller that exists today — and that is exactly why the equal case is the guarded one.
+A RING walk has no rows, so `rasterRowAxisOf` answers 'x' for it and the pair lands X/Y in the order written; said
+out loud in the resolver rather than left as a default that reads like a decision (this file's own recurring defect).
+
+### THE TWO PROOFS THE ARC ASKED FOR
+
+**THE STAY — 432 configs, 0 differ.** A single inset and an EVEN pair emit the *same program, character for
+character*, across both walks × three descents × three directions × **both row axes** (the axis that could transpose
+it) × skim × rotation × a LIVE inset. The existing corpus passes one number, so this is the guard the act rests on,
+and it holds by CONSTRUCTION rather than by promise: one word hands the same term to both axes, so every expression
+folds as it did.
+
+**THE GAIN — the walked box, traced.** One inset: x 3..57. The pair (along 0, across 3): **x 0..60** — the full
+centreline, with ACROSS unchanged. And on a walk turned 90° the same pair insets the OTHER axis, which is the role
+naming being real rather than cosmetic.
+
+### ⚠ WHAT C2 IS NOT, ASSERTED RATHER THAN LEFT TO A READER
+
+**C2 does not make the atom slot-ready, and the spec says so in its own test.** It fixes the walked SPAN. The ROWS
+inside that span are still uniformly spaced half a stepover in — measured y −1.8..3 on a 12mm width where a slot
+needs −3..3 — and closing that is C1's phase+clamp, which the arc rules must land as ONE step *or it ships a gouge*.
+C1's own `stepsAfter` names C2 as its precondition, which is the order this arc is being built in.
+
+A capability that let itself be read as the whole fix is how a boundary quietly stops being true, so the boundary
+text, the arc row and the bridge all state the remainder.
+
+### THE DECLARATIONS THAT MOVED WITH IT
+
+- **`SLOT_RASTER_GAP`** — the INSET clause is retired the same both-halves way the descent clause was at t1487: the
+  measurement stays as history ("a 60mm slot **walked** 3..57"), C2 is named as what retired it, and the spec asserts
+  the pair walking 0..60 beside the single inset still walking 3..57. **And the count became NAMES**: "three of the
+  four" is now "THE ROW RULE (C1), THE AXIS (C3), and THE DESCENT on its HELIX half", so landing the rest of the arc
+  cannot leave a stale number behind — which it would have, twice, in the next two acts.
+- **The arc row** carries `landed`, the field C4 introduced at t1487, including the sentence about what it is NOT.
+- **`BAKES_GEOMETRY`** loses `inset` to a `BAKES_INSET` list of all three spellings, because a caller may write
+  `inset` or `insetAlong`/`insetAcross` and a flat list naming one spelling would report a dialled slot inset as
+  baked (or a baked one as dialled) depending on which word they happened to use. The helix rows concat it: a helix
+  bakes its inradius from the WALKED spans, so a dialled inset moves that clamp exactly as a dialled w/h does.
+- **The block does NOT declare the pair** — it tried to, and the full suite refused it; see the section below.
+- **The arc's PREMISE 2** inverts its inset clause, exactly as it inverted C4's at t1487.
+
+### A CORRECTION I MADE TO MY OWN TEST, WHICH IS THE MORE USEFUL FINDING
+
+I first asserted that the pair declares MORE `@work` than the single inset, on the reasoning that it walks a longer
+area. **The run refuted it: 67 and 67.** `@work` counts EXECUTED STEPS, and a longer pass is the same number of
+steps, only longer moves. What decides the count is the ROW COUNT, and rows are counted in the CROSS span. So the
+sharper property — the one now asserted — is that the ACROSS inset moves the count (93 → 67) and the ALONG inset
+does not. That is the anisotropy read off the declaration itself, and it is a better test than the one I meant to
+write. Measured, not reasoned.
+
+### THE FULL SUITE CAUGHT A REAL DEFECT-IN-WAITING, AND IT IS NOW A NAMED GAP + A FORK FOR YOU
+
+I declared `insetAlong`/`insetAcross` on the block's `fields`/`defaults`, because t1351's lesson is that an emitter
+reading a key the block does not declare is a drop waiting to happen. **`roundtrip-whole-program-1319` refused it**:
+its iron rule (text differences may only SHRINK from 11) went to **12**, with `user_pocket_data` joining the list.
+
+The cause is worth stating exactly, because it is not a cosmetic diff. **A NULLABLE field does not survive the
+Blockly round trip** — and `null` is the only honest "unspecified" here. **0 cannot stand in**: 0 is a MEANINGFUL
+inset and is precisely the value the slot case wants along its length. So if null came back as 0, `rasterInsetOf`
+would read a real inset of zero and **silently drop the caller's single `inset`** — the silent-substitution class
+this file has spent t1399/t1404/t1425 closing.
+
+So the seam stays at the EMITTER, where it has consumers, and off the BLOCK, where it has none. Nothing is lost
+today: no block instance carries these keys, and every caller that will set them (C1/C3) hands params straight to
+`surfaceRasterLines`. The gap is NAMED in `surfaceRasterBlock` and ASSERTED in the bridge (the pair is asserted
+absent from `fields`, so it cannot drift back in unnoticed), and the iron rule is back to **11/11 — the same
+eleven**.
+
+**⚠ THE FORK IS YOURS, and it lands before C1 rather than during it:** C1 is the first act with a real consumer, so
+it will need this decided. (A) fix the nullable round trip in `stackBridge` on its own act, then declare the pair on
+the block; (B) keep the pair emitter-only and have C1's consumer pass params directly; (C) a declared non-null
+sentinel, which needs a convention and still adds two dead UI fields. I did not choose — B is what the code does
+TODAY because it is the reversible one and the only one inside this act's scope, and the gap says so out loud.
+
+### CAPACITY, stated plainly
+
+Third act this seat and the second in this turn-pair, and I made TWO escaping slips today — backticks in a pass
+note (the shell ate two words; re-passed), and an apostrophe in a Python-written JS string that produced a syntax
+error caught by `node --check`. Both were caught and neither reached the code under test, but the rate is up while
+the work is moving toward C1 — the capability the arc itself flags as the dangerous one, where phase-without-clamp
+is measured OVERSIZE and destructive. **A fresh seat should take C1.** It is designed, its bridge is specified in
+the arc (equality arm + divergence arm), and its precondition just landed.
+
+**Full suite on the branch: 2287 passed, 6 skipped, 0 failed.** Branch `wip/c2-two-axis-inset`.
