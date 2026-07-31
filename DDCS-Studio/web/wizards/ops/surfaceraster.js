@@ -728,8 +728,9 @@ function rowWalk(o) {
     // refuses an unknown word, not the emitter, so the two axes stay symmetric (the t1404 lesson).
     const reverse = o.direction === 'otherway';
     const oneWay = rasterIsOneWay(o.direction);
-    // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
-    // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
+    // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP runs at the declared angle and comes back.
+    // t1483 — it runs along the DECLARED VECTOR below (the row's own cut direction), not toward the area centre:
+    // see rampLines for what that retired. Only 1/tan is still baked, and the angle is a form field.
     // t1404 — the row start is handed DOWN now (it was assumed inside the descent builders); the value is unchanged.
     /**
      * ── t1429 — THE ROW AXIS, resolved into the FIVE things that actually differ ──────────────────────────────────
@@ -755,7 +756,13 @@ function rowWalk(o) {
     // t1418 — an `otherway` level starts at the FAR end, so that is where its descent happens and returns to. This is
     // the literal's own rule: `onewayMoves` hands `entryOrPlunge` the row's `xs`, which is `xhi` when reversed. At
     // bothways/oneway the expression collapses to `x0` — byte-identical, asserted.
-    const descent = descentLines({ ...o, ...(yRows
+    // t1483 (C4) — THE DECLARED RUN VECTOR. The ramp used to derive its own direction (toward the area centre) and
+    // its own limit (the baked distance to it). Both are DECLARED by the walk now, because the walk is the only thing
+    // that knows where it is about to cut: a row leaves its start ALONG the row axis, and `reverse` is exactly the
+    // flag that says which way. The limit is the row's LENGTH — a register the walk already reads for its far end —
+    // so the guard stops being a baked number. Same shape the literal kernel has always handed `entryOrPlunge`.
+    const runSign = reverse ? -1 : 1;
+    const descent = descentLines({ ...o, runSpan: SPAN, runUx: yRows ? 0 : runSign, runUy: yRows ? runSign : 0, ...(yRows
         ? { sx: x0 + stepBaked / 2, sy: reverse ? y0 + h : y0 }
         : { sx: reverse ? x0 + w : x0, sy: y0 + stepBaked / 2 }) });
     // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
@@ -885,23 +892,46 @@ function rowWalk(o) {
  * equivalence bridge true. It can only happen where a pendant edits the knob, i.e. a CAM SLOT — so the slot GATES
  * those knobs bake-only rather than this code guessing (see the entry gate in opCamMap).
  *
- * TODO (improvement turn, post-switch): pendant-TRUE entries — the +X declared run vector (no square root at all,
- * the literal kernel already supports it via runX/runY) or live-SQRT if V13 proves it; plus the true-arc helix with
- * start/end points, radius envelope and depth-per-revolution as the substitute criteria. That turn lifts the gate.
+ * ── t1483 (C4) — ⚠ EVERYTHING ABOVE THIS LINE IS HISTORY NOW, and it is kept because the reasoning is what the fix
+ * had to answer, not because it still describes the code. The TODO that stood here — "pendant-TRUE entries: the +X
+ * declared run vector (no square root at all), or live-SQRT if V13 proves it" — IS THIS ACT, and it took the first
+ * road. There is no baked toC and no baked unit vector below; the hazard those paragraphs describe cannot occur,
+ * the two `SURFACE_RASTER_BAKES` ramp rows are empty, and the `opCamMap` entry gate no longer holds a ramp slot's
+ * knobs bake-only. The SECOND half of that TODO (the true-arc helix) went a different way at t1472/t1474: helical
+ * arcs are unattested on this controller family, so the helix keeps its polyline AND its inradius bake.
  */
-function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS }) {
+function rampLines(o) {
+    const { x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS } = o;
     const ang = Math.min(45, Math.max(0.5, rampAngle));
     const invTan = 1 / Math.tan(ang * Math.PI / 180);
     // t1404 — sx/sy (where the plunge WOULD have happened) is now GIVEN by the walk instead of assumed to be the first
     // row. It is the same fact the literal kernel passes to `levelEntry` as (x0,y0): a row walk hands its row start, a
     // ring walk hands the outer ring's corner. Assuming it here is exactly what left rings with no descent at all.
-    const cx = x0 + w / 2, cy = y0 + h / 2;
-    const toC = Math.hypot(cx - sx, cy - sy);
-    const ux = toC > 1e-9 ? (cx - sx) / toC : 0, uy = toC > 1e-9 ? (cy - sy) / toC : 0;
-    // A DIRECTION COSINE NEEDS MORE DIGITS THAN A COORDINATE. Rounded to 3 decimals like everything else, the ramp's
-    // midpoint landed 0.01mm off the literal's — invisible in the text, caught by the bridge. A unit vector is
-    // multiplied by the run, so its error is scaled: 6 decimals keeps the product inside the emit's own rounding.
+    /**
+     * ── t1483 (C4) — THE RUN VECTOR IS DECLARED BY THE WALK, AND THREE BAKED QUANTITIES DIE WITH IT ───────────────
+     *
+     * This ramp used to derive everything itself: the area CENTRE from (x0,y0,w,h), the DISTANCE to it as a
+     * hypotenuse, and a unit vector from those. All three were build-time numbers computed from geometry a pendant
+     * can dial — which is precisely why `SURFACE_RASTER_BAKES` carried the two ramp rows, and why t1339 named the
+     * declared run vector as the answer that "needs no square root at all".
+     *
+     * The walk declares both now, because the walk is the only thing that knows where it is about to cut:
+     *   DIRECTION — the row's own cut direction (±1 on the row axis, sign from `reverse`); the ring's is +X.
+     *   LIMIT     — the row's LENGTH, a REGISTER the walk already reads for its far end (#40 / #41).
+     *
+     * So the hypotenuse is gone, the baked `toC` guard limit is gone, and the unit vector is now an AXIS vector —
+     * ±1 and 0 — which needs no extra precision at all. What is left baked is `1/tan(angle)`, and the angle is a form
+     * field rather than a pendant knob, which is the one thing the old row's `why` never objected to.
+     *
+     * ⚠ THIS IS AN IMPROVEMENT, NOT A MIGRATION, and it is the reason this act is bridged by RELATIONSHIP rather than
+     * by byte-identity: a ramp along the row cuts a DIFFERENT set of moves from a ramp toward the centre. Everything
+     * outside the descent is byte-identical and asserted so; inside, what is preserved is the angle, the drop, the
+     * start point, the return to it, and the honest degrade.
+     */
     const u6 = (n) => Math.round(n * 1e6) / 1e6;
+    const ux = u6(num(o.runUx, 1)), uy = u6(num(o.runUy, 0));
+    const runSpan = o.runSpan || V.w;                       // the LIVE register the run is measured against
+    const runLabel = `${runSpan === V.h ? 'height' : 'width'} available along the pass`;
     // t1375 — the ramp's two points, declared. `toC` is a DISTANCE and the run is measured along the ramp, so both are
     // rotation-invariant and the guard above needs no version. What rotates is the ramp's DIRECTION — and because the
     // unit vector is a build-time coefficient on a runtime run length, the rotation folds straight into that
@@ -911,9 +941,11 @@ function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed,
     const START_X = AX(ax(sx - x0), sx, []), START_Y = AX(ay(sy - y0), sy, []);
     return [
         `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
-        // THE HONEST DEGRADE, kept from the literal kernel: when the run to the centre is longer than the distance
-        // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
-        `    IF ${V.run} > ${r3(toC)} GOTO${LBL.rampPlungeLabel}   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
+        // THE HONEST DEGRADE, kept from the literal kernel: when the run needed is longer than the distance available
+        // along the declared vector, a ramp cannot be cut and the tool plunges instead — with the reason in the
+        // program, not silently. t1483 — the limit is now the LIVE span register, so a dialled area moves it too;
+        // this comparison used to be against a baked number and that is the whole of what C4 changed here.
+        `    IF ${V.run} > ${runSpan} GOTO${LBL.rampPlungeLabel}   ( ramp needs more run than the ${runLabel} -> plunge )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
         `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( ramp )`,
         `    G1 ${mv(START_X, START_Y)} F${feed}   ( back to the ${startLabel}, now at depth )`,
@@ -1038,7 +1070,10 @@ function ringWalk(o) {
     // t1404 — THE DESCENT THE RINGS NEVER HAD. The outer ring's corner IS where the plunge happens (at i=0 the inset
     // register is 0, so IN_X/IN_Y are exactly x0/y0), so that is the point the ramp runs from and returns to — the same
     // point the literal kernel hands `entryOrPlunge` from `concentricRect`'s `first` branch.
-    const descent = descentLines({ ...o, sx: x0, sy: y0, startLabel: 'ring corner' });
+    // t1483 (C4) — the ring's declared run vector is +X with the width span as its limit, and that is READ from the
+    // walk below rather than assumed: the outer ring leaves its corner on `G1 (OUT_X, IN_Y)`, i.e. straight along +X
+    // for the full width. A ring has no `reverse`, so there is no sign to take.
+    const descent = descentLines({ ...o, sx: x0, sy: y0, startLabel: 'ring corner', runSpan: V.w, runUx: 1, runUy: 0 });
     // t1375 — a ring's four corners, declared as X/Y pairs. The inset (#47) walks INWARD on both axes at once, so
     // under rotation it lands on both with mixed coefficients — which is why the pairs are declared together rather
     // than each axis owning its own string.
@@ -1153,20 +1188,25 @@ export const SURFACE_RASTER_AXES = {
 
 export const SURFACE_RASTER_PROVEN = {
     'parallel/bothways/plunge': 't1329 — the first bridge, move for move against the literal raster',
-    'parallel/bothways/ramp': 't1339 — the ramp descent, baked toC + 1/tan',
+    // t1483 (C4) — THE FIVE RAMP ROWS CHANGED THEIR CRITERION, NOT THEIR STATUS. They were proven MOVE-FOR-MOVE
+    // against the literal's toward-the-centre ramp. The declared run vector cuts a DIFFERENT set of moves on
+    // purpose, so they are proven by RELATIONSHIP now — byte-identity everywhere outside the descent, and inside it
+    // the angle, the drop, the start, the return to it and the honest degrade. Keys unchanged: the combinations are
+    // still covered, and a ledger that dropped them would read as coverage LOST.
+    'parallel/bothways/ramp': 't1483 — the DECLARED run vector along the row (was t1339 baked toC); relationship-bridged',
     'parallel/bothways/helix': 't1345 — the 24-segment polyline helix, within one emit quantum',
     // t1418 — the six the one-way walk earned, each measured per-phase against the frozen literal's `onewayMoves`.
     // They are SIX and not three because the mirror is the same walk with its two ends swapped: teaching one and
     // leaving the other would have left a conventional-cut pocket on the literal arm while the boundary's wording
     // read as though one-way were handled.
     'parallel/oneway/plunge': 't1418 — the one-way walk, against the literal onewayMoves (lift · rapid · re-plunge)',
-    'parallel/oneway/ramp': 't1418 — likewise; the descent is per LEVEL, at row 0, exactly as the reference does it',
+    'parallel/oneway/ramp': 't1483 — likewise, along the row; the descent is still per LEVEL at row 0',
     'parallel/oneway/helix': 't1418 — likewise, inside the whole-revolution agreement the t1406 ledger names',
     'parallel/otherway/plunge': 't1418 — the mirror: every row starts at the FAR end, including the level descent',
-    'parallel/otherway/ramp': 't1418 — likewise',
+    'parallel/otherway/ramp': 't1483 — likewise, and the vector takes the MIRROR sign so the ramp runs into the area',
     'parallel/otherway/helix': 't1418 — likewise',
     'concentric/plunge': 't1333 — inward rings, proven on four adversarial ring boundaries',
-    'concentric/ramp': 't1404 — the descent the rings never had (the t1402 defect)',
+    'concentric/ramp': 't1483 — along +X from the ring corner, the direction the ring walk itself leaves on',
     'concentric/helix': 't1404 — likewise; both now run the SAME descentLines both walks ask for',
 };
 
@@ -1195,11 +1235,12 @@ export const SURFACE_RASTER_IGNORES = {};
  * so PLUNGE, on either walk, has nothing left baked and honours a live geometry input end to end. The two DESCENTS
  * are different, and the difference is not effort but evidence:
  *
- *   RAMP bakes the distance from its start to the area centre — a HYPOTENUSE. Computing it at the machine needs
- *   SQRT, which is UNVERIFIED on this controller: the linter's word list is an allow-list, not evidence, and ATAN
- *   shipping in the alignment probe proves only itself (t1339 wrote this down; V13_trig.nc is the decider). The
- *   alternative that needs no square root at all — the +X declared run vector the literal kernel already supports
- *   via runX/runY — is the deferred improvement turn's job, with its own proof, and it is what LIFTS this row.
+ *   RAMP — ⚠ t1483: THIS ROW IS EMPTY NOW. It used to bake the distance from its start to the area centre, a
+ *   HYPOTENUSE, because computing that at the machine needs SQRT and SQRT is unverified here. The same paragraph
+ *   named the way out — "the +X declared run vector the literal kernel already supports via runX/runY" — and C4 took
+ *   it: the WALK declares the direction (its own first-cut vector) and the limit is a LIVE span register, so there
+ *   is no hypotenuse to compute and nothing for a pendant to outrun. The ramp honours dialled geometry end to end.
+ *   THE DECIDER IS NOT V13 ANY MORE FOR THIS ROW, and data/trigEvidence.js records it as closed by the other road.
  *
  *   HELIX bakes the rect inradius that CLAMPS its radius, and that radius then seeds the rotating vector whose
  *   9-decimal constants are the whole reason the descent stays inside one emit quantum (t1343).
@@ -1219,8 +1260,14 @@ const BAKES_GEOMETRY = ['w', 'h', 'inset', 'toolDia', 'stepoverPct', 'stepover']
 export const SURFACE_RASTER_BAKES = {
     'parallel/plunge': { inputs: [], why: '' },
     'concentric/plunge': { inputs: [], why: '' },
-    'parallel/ramp': { inputs: BAKES_GEOMETRY, why: 'a ramp bakes the distance from its start to the area centre — a hypotenuse, and SQRT is unverified on this controller (t1339). The run-vector alternative that needs no square root is the deferred improvement turn' },
-    'concentric/ramp': { inputs: BAKES_GEOMETRY, why: 'a ramp bakes the distance from the ring corner to the area centre — a hypotenuse, and SQRT is unverified on this controller (t1339)' },
+    // t1483 (C4) — ⚠ THESE TWO ROWS ARE EMPTY NOW, AND THE EMPTINESS IS THE POINT. They read "a ramp bakes the
+    // distance from its start to the area centre — a hypotenuse, and SQRT is unverified on this controller", with the
+    // run-vector alternative named as a deferred turn. That turn happened: the ramp runs along a vector the WALK
+    // declares, against a LIVE span register, so there is no hypotenuse to bake and nothing here for a pendant to
+    // outrun. The rows STAY (an absent key says nothing; an empty one says "nothing is baked" — the t1425 rule for
+    // SURFACE_RASTER_IGNORES, applied here) and the ramp is pendant-true end to end.
+    'parallel/ramp': { inputs: [], why: '' },
+    'concentric/ramp': { inputs: [], why: '' },
     'parallel/helix': { inputs: BAKES_GEOMETRY, why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
     'concentric/helix': { inputs: BAKES_GEOMETRY, why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
 };

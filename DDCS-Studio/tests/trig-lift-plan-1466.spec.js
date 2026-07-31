@@ -38,12 +38,23 @@ test('LOCK 1 — every lift-plan row still points at a declaration that exists',
     }
     expect(missing, 'a lift-plan row has gone stale — update web/data/trigEvidence.js, do not delete the assert:\n'
         + missing.join('\n')).toEqual([]);
-    expect(TRIG_LIFT_PLAN.length, 'six sites name the trig gate').toBe(6);
+    // t1483 — SEVEN: the raster-ramp row CLOSED (the declared run vector took it, not V13) and a raster-HELIX row
+    // joined, because what remains of the raster's descent bake was never a trig boundary and a reader would
+    // otherwise assume the visit fixes it. A lift plan grows when a distinction is found, not only when work lands.
+    expect(TRIG_LIFT_PLAN.length, 'seven rows name the gate or its edges').toBe(7);
 });
 
 test('LOCK 2 — every GATED row still cites V13_trig.nc, and every NOT-GATED site still does not', () => {
+    // ⚠ t1483 — THE HONESTY LOCK DID ITS JOB AND THIS IS THE TRANSITION. This assert read FOUR gated rows and went
+    // RED the moment C4 collapsed the ramp's bake — which is exactly why the trigEvidence restatement could not be a
+    // follow-up act: the lock welds the emit change and the registry to the same turn. THREE now.
     const gated = TRIG_LIFT_PLAN.filter((r) => r.kind === 'gated');
-    expect(gated.length, 'four declared boundaries wait on the answer').toBe(4);
+    expect(gated.length, 'three declared boundaries still wait on the answer').toBe(3);
+    // and the row that left is CLOSED rather than deleted, with the road that closed it named
+    const closed = TRIG_LIFT_PLAN.filter((r) => r.kind === 'closed');
+    expect(closed.map((r) => r.id), 'the ramp closed by the non-trig path').toEqual(['raster-ramp']);
+    expect(closed[0].closedBy, 'and says what closed it, so the visit is not credited for it').toMatch(/run vector/);
+    expect(closed[0].lifts, 'a closed row lifts nothing — the visit buys nothing here').toBe(false);
     for (const row of gated) {
         expect(src(row.site).includes('V13_trig.nc'), `${row.id} (${row.site}) must still name the decider — if this `
             + 'boundary stopped waiting on trig, its row has to come OFF the plan').toBe(true);
@@ -103,8 +114,10 @@ test('LOCK 5 — no verify macro carries a bracket or a nested paren inside a co
 
 test('LOCK 6 — the plan is honest about what a YES buys', () => {
     for (const row of TRIG_LIFT_PLAN) {
-        expect(['gated', 'shipped-unconfirmed']).toContain(row.kind);
-        expect(Object.keys(TRIG_FUNCTIONS).some((f) => row.needs.includes(f)), `${row.id} names a probed function`).toBe(true);
+        expect(['gated', 'shipped-unconfirmed', 'closed', 'not-gated']).toContain(row.kind);
+        if (row.kind === 'gated' || row.kind === 'shipped-unconfirmed') {
+            expect(Object.keys(TRIG_FUNCTIONS).some((f) => row.needs.includes(f)), `${row.id} names a probed function`).toBe(true);
+        }
         expect(row.onYes.length, `${row.id} says what a YES changes`).toBeGreaterThan(20);
         expect(row.onNo.length, `${row.id} says what a NO means`).toBeGreaterThan(20);
         if (!row.lifts) expect((row.whyNotLift || '').length, `${row.id} is lifts:false and MUST say what else is in `
@@ -113,6 +126,8 @@ test('LOCK 6 — the plan is honest about what a YES buys', () => {
         if (row.kind === 'shipped-unconfirmed') expect(row.lifts, `${row.id} ships already — a YES buys confidence, `
             + 'not capability').toBe(false);
     }
+    // t1483 — ONE row lifts now. The other was the raster ramp, and it did not become unliftable: it was LIFTED, by
+    // a road that needed no evidence at all. That is the single most useful thing this plan can tell a machine visit.
     expect(TRIG_LIFT_PLAN.filter((r) => r.lifts).map((r) => r.id).sort(),
-        'exactly two rows lift a boundary outright, both on SQRT').toEqual(['raster-ramp', 'rest-walk']);
+        'exactly one row still lifts a boundary outright on SQRT').toEqual(['rest-walk']);
 });

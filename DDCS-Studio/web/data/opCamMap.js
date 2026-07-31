@@ -89,7 +89,18 @@ export function enumClassOf(b) {
  */
 export const ENTRY_GEOMETRY_KNOBS = ['stepoverPct', 'stepdown'];
 export const ENTRY_GATE_REASON = 'changes the entry geometry, which this descent bakes at build — baked when built';
-export const entryHasGeometry = (params) => { const e = (params && params.entry) || 'plunge'; return e === 'ramp' || e === 'helix'; };
+/**
+ * t1483 (C4) — ⚠ THE RAMP CAME OFF THIS GATE, and it came off because the reason for it stopped existing rather than
+ * because the gate got friendlier. A ramp used to bake its distance to the area centre, so an operator dialling the
+ * stepover on a ramped slot left the descent stale against a raster that re-derived — a kinked entry, possibly a
+ * gouge. The declared run vector retired that: `SURFACE_RASTER_BAKES`'s two ramp rows are EMPTY and the run is
+ * compared against a live span register, so there is nothing left for a pendant to outrun.
+ *
+ * THE HELIX STAYS, and keeping the gate NARROW is the whole point — it still bakes the rect inradius that clamps its
+ * radius and seeds the rotating vector (t1343). Widening this to "any descent" would have been easier to write and
+ * would take away knobs that are now provably safe.
+ */
+export const entryHasGeometry = (params) => ((params && params.entry) || 'plunge') === 'helix';
 
 /**
  * ── t1414 — WHAT A PER-TYPE GENERATOR'S MACRO DOES **NOT** CARRY, declared ────────────────────────────────────────

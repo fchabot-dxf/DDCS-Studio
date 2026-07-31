@@ -150,9 +150,15 @@ for (const c of LIVE_CASES) {
  * ── PROOF 3 — WHAT STILL BAKES IS DECLARED, AND IT REFUSES RATHER THAN GUESSING ───────────────────────────────────
  *
  * The next act's delegation must know which combinations it may pack live and which it must refuse at PACK time —
- * from data, not by reading three walks. Both descents bake, and for reasons that are evidence rather than effort:
- * a ramp needs a hypotenuse (SQRT, unverified on this controller per t1339) and a helix bakes the inradius that
- * clamps its radius, which seeds the rotating vector (t1343).
+ * from data, not by reading three walks.
+ *
+ * ── t1483 (C4) — ⚠ THE RAMP MOVED FROM THE REFUSING SIDE TO THE HONOURING SIDE, AND THIS TEST IS WHERE THAT SHOWS.
+ * It used to assert that BOTH descents bake. The ramp's reason was evidence — it needed a hypotenuse, and SQRT is
+ * unverified on this controller — and t1339 named the way out in the same breath: a DECLARED run vector needs no
+ * square root at all. C4 took that road, so the ramp now honours dialled geometry end to end and its two BAKES rows
+ * are empty. THE HELIX DID NOT MOVE: it still bakes the inradius that clamps its radius and seeds the rotating
+ * vector (t1343), and half this test exists to keep those two apart — a capability that lifted one and quietly
+ * carried the other would read exactly the same from outside.
  *
  * The refusal is CHEAP by a fact measured at t1422: `POCKET_FIELDS` carries no descent control, so a packed pocket's
  * entry is whatever the op held and a pocket op defaults to plunge. Nobody can dial into a refused combination.
@@ -186,38 +192,52 @@ test('PROOF 3 — the remaining bakes are declared per (strategy, entry), and re
             // the DEGRADE: a directly-called ramp with dialled geometry plunges and says so, never cuts baked geometry
             rampText: m.surfaceRasterLines({ strategy: 'parallel', entry: 'ramp', depth: 3, stepdown: 1.5, feed: 1, plunge: 1, clearance: 5, ...LIVE }).join('\n'),
             rampLabels: m.surfaceRasterBlock.flowLabels({ strategy: 'parallel', entry: 'ramp', ...LIVE }),
+            // t1483 — the HELIX arm of the same call, so the ramp's lift and the helix's unchanged refusal are read
+            // from one place and cannot drift apart in the reading
+            helixText: m.surfaceRasterLines({ strategy: 'parallel', entry: 'helix', depth: 3, stepdown: 1.5, feed: 1, plunge: 1, clearance: 5, ...LIVE }).join(String.fromCharCode(10)),
         };
     });
 
     // THE TABLE IS THE CROSS-PRODUCT — a combination cannot be missed by being forgotten; it has to be listed.
     expect(r.keys, 'every (strategy, entry) has a row').toEqual([
         'concentric/helix', 'concentric/plunge', 'concentric/ramp', 'parallel/helix', 'parallel/plunge', 'parallel/ramp']);
-    // PLUNGE BAKES NOTHING on either walk — that is what this act bought, and it is the row the delegation packs.
-    for (const k of ['parallel/plunge', 'concentric/plunge']) {
+    // PLUNGE BAKES NOTHING on either walk — t1425's own purchase — and t1483 put THE RAMP ON THIS SIDE TOO.
+    for (const k of ['parallel/plunge', 'concentric/plunge', 'parallel/ramp', 'concentric/ramp']) {
         expect(r.grid[k].declared.inputs, `${k} bakes nothing`).toEqual([]);
         expect(r.grid[k].liveGap, `${k} honours dialled geometry`).toBe('');
         expect(r.grid[k].covers, `${k} is inside the envelope with live inputs`).toBe(true);
     }
-    // THE DESCENTS REFUSE, each naming what it bakes and why — never a bare false.
-    for (const k of ['parallel/ramp', 'concentric/ramp', 'parallel/helix', 'concentric/helix']) {
+    // ⚠ AND THE HELIX DID NOT MOVE — asserted in the SAME test, because a capability that lifted one descent and
+    // quietly carried the other would look identical from outside. It still bakes, still refuses, still says why.
+    for (const k of ['parallel/helix', 'concentric/helix']) {
         expect(r.grid[k].declared.inputs.length, `${k} declares what it bakes`).toBeGreaterThan(0);
         expect(r.grid[k].liveGap, `${k} refuses dialled geometry, with a reason`).not.toBe('');
         expect(r.grid[k].covers, `${k} is OUTSIDE the envelope with live inputs`).toBe(false);
         expect(r.grid[k].bakedCovers, `${k} is still fully covered with BAKED geometry — the wizard path is untouched`).toBe(true);
     }
-    expect(r.grid['parallel/ramp'].liveGap, 'and the ramp names the evidence, not the effort').toMatch(/SQRT is unverified/);
+    // the ramp's reason is GONE rather than reworded — an empty row and an empty gap, together
+    expect(r.grid['parallel/ramp'].declared.why, 'the ramp no longer names a reason, because it no longer has one').toBe('');
     expect(r.grid['parallel/helix'].liveGap, 'the helix names its inradius clamp').toMatch(/inradius/);
+    expect(r.grid['parallel/helix'].liveGap, 'and it is NOT the trig reason — that one left with the ramp').not.toMatch(/SQRT is unverified/);
     expect(r.inputs, 'the live-input reading is one source, and reports only what is actually dialled').toEqual(['w', 'toolDia']);
     // SKIM — the pre-existing gap, refused rather than quietly changed under cover of this act.
     expect(r.skimGap, 'a skim body refuses dialled geometry because its frame drops the op origin').toMatch(/silently ignored/);
     // ROTATION — refused for a live frame, unchanged for a baked one.
     expect(typeof r.rotLive, 'a live frame refuses the program rotation, with its reason').toBe('string');
     expect(r.rotBaked, 'a baked one still absorbs it').toBe(true);
-    // THE HONEST DEGRADE — belt and braces behind the envelope, because a direct call bypasses the envelope and a
-    // ramp built from default w/h against a dialled rect would cut a real descent in the wrong place.
-    expect(r.rampText, 'a directly-called ramp with dialled geometry degrades to a plunge').toMatch(/entry degraded to a plunge/);
-    expect(r.rampText, 'and emits no ramp move').not.toMatch(/\( ramp \)/);
-    expect(r.rampLabels, 'and declares none of the ramp labels it no longer writes').not.toContain('rampPlungeLabel');
+    // ⚠ THE HONEST DEGRADE, AND WHOSE IT IS NOW (t1483). It was belt-and-braces for BOTH descents: a direct call
+    // bypasses the envelope, and a descent built from default w/h against a dialled rect would cut in the wrong
+    // place. The RAMP no longer has that failure mode — it bakes no geometry, so there is nothing to be built from
+    // stale defaults — and it therefore emits a REAL RAMP against dialled registers instead of degrading.
+    expect(r.rampText, 'a dialled ramp now cuts a real ramp — nothing left to degrade').not.toMatch(/entry degraded to a plunge/);
+    expect(r.rampText, 'and it is a ramp move, not a silent plunge').toMatch(/\( ramp \)/);
+    expect(r.rampLabels, 'so it declares the labels it writes').toContain('rampPlungeLabel');
+    // …AND THE RUN GUARD IS AGAINST A REGISTER, not a baked number: that single character is the whole capability.
+    expect(r.rampText, 'the run is compared to the LIVE span register').toMatch(/IF #34 > #4[01] GOTO/);
+    expect(r.rampText, 'and no baked distance-to-centre survives').not.toMatch(/mm to centre/);
+    // THE HELIX KEEPS THE DEGRADE, asserted here so the two cannot be confused for one another.
+    expect(r.helixText, 'a dialled helix still degrades, because it still bakes its inradius').toMatch(/entry degraded to a plunge/);
+    expect(r.helixText, 'and emits no helix move').not.toMatch(/\( helix \)/);
 });
 
 /**

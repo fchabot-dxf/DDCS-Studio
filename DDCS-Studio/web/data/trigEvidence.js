@@ -82,19 +82,45 @@ export const TRIG_RUN_ORDER = ['V13_trig.nc', 'V13c_sqrt.nc', 'V13a_cos.nc', 'V1
  */
 export const TRIG_LIFT_PLAN = [
     {
-        id: 'raster-ramp', kind: 'gated', needs: 'SQRT', lifts: true,
+        /**
+         * ⚠ t1483 — THIS ROW IS CLOSED, AND IT CLOSED BY THE ROAD IT ITSELF NAMED. It was declared `needs: SQRT,
+         * lifts: true`: the raster ramp baked its distance to the area centre, and proving SQRT on the machine was
+         * one way out. Its `onNo` named the other — "the +X declared run vector, which needs no square root at all" —
+         * and C4 took that one. The two BAKES rows are empty, the ramp is pendant-true, and V13 has nothing left to
+         * lift here.
+         *
+         * KEPT RATHER THAN DELETED, ruled that way deliberately: a lift plan exists to keep a MACHINE VISIT honest,
+         * and a row that silently disappears would leave the visit looking more valuable than it is. `lifts: false`
+         * with the reason is the honest form — this is now a HISTORY row, and the visit buys nothing for it.
+         */
+        id: 'raster-ramp', kind: 'closed', needs: 'SQRT', lifts: false, closedBy: 't1483 — the declared run vector',
         site: 'wizards/ops/surfaceraster.js', decl: 'SURFACE_RASTER_BAKES', anchor: 'SURFACE_RASTER_BAKES',
         keys: ['parallel/ramp', 'concentric/ramp'],
-        what: 'a ramp bakes toC, the distance from its start to the area centre — a hypotenuse. The start sits at '
-            + 'y0 + step/2 and step is the DERIVED stepover a pendant can change, so a baked toC under a dialled '
-            + 'stepover gives a kinked entry',
-        onYes: 'compute toC live and both ramp rows collapse to inputs [] / why "" — the ramp becomes pendant-true. '
-             + 'The opCamMap ENTRY_GEOMETRY_KNOBS gate that marks stepoverPct + stepdown bake-only on a ramp slot '
-             + 'lifts with it, and raster-live-geometry-1425.spec.js goes red by design',
-        onNo: 'the row stays, permanently rather than pending, and the pendant-true ramp goes to its OTHER answer: '
-            + 'the +X declared run vector, which needs no square root at all (the literal kernel already supports it '
-            + 'via runX/runY). That path is an IMPROVEMENT-class change — a different set of moves, so a new entry '
-            + 'mode with its own bridge, never a silent substitution',
+        what: 'the ramp USED TO bake toC, the distance from its start to the area centre — a hypotenuse. It now runs '
+            + 'along a vector the WALK declares, against a live span register, so no square root is computed anywhere',
+        onYes: 'nothing — this boundary is already gone. A YES still matters for the OTHER rows on this plan',
+        onNo: 'nothing. The ramp did not wait for the answer, which is the point of having named both roads',
+        whyNotLift: 'closed by the non-trig path. Its two SURFACE_RASTER_BAKES rows are empty, the opCamMap entry '
+            + 'gate no longer holds a ramp slot\'s knobs bake-only, and V13 changes none of it either way',
+    },
+    {
+        /**
+         * t1483 — THE HELIX ROWS ARE WHAT REMAINS OF THE RASTER'S DESCENT GATE, and they are listed separately rather
+         * than by rewriting the ramp row above, because they never had the same obstruction. A helix bakes the rect
+         * INRADIUS that clamps its radius, which seeds the rotating vector whose 9-decimal constants keep the descent
+         * inside one emit quantum (t1343). That is a recurrence-precision fact, not a trig-availability one — so this
+         * row is NOT SQRT-gated either, and it is here to say so where a reader would otherwise assume it.
+         */
+        id: 'raster-helix', kind: 'not-gated', needs: 'none', lifts: false,
+        site: 'wizards/ops/surfaceraster.js', decl: 'SURFACE_RASTER_BAKES', anchor: 'SURFACE_RASTER_BAKES',
+        keys: ['parallel/helix', 'concentric/helix'],
+        what: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the '
+            + 'descent depends on',
+        onYes: 'nothing — the helix never needed trig; it needs its own act',
+        onNo: 'nothing either, and that symmetry IS the row: an answer in either direction leaves this bake exactly '
+            + 'where it is, which is what makes listing it worth the line',
+        whyNotLift: 'not a trig boundary at all. Listed so nobody reads the raster\'s remaining descent bake as '
+            + 'something the machine visit will fix',
     },
     {
         id: 'rest-walk', kind: 'gated', needs: 'SQRT', lifts: true,
