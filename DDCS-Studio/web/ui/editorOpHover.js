@@ -7,7 +7,8 @@
  * params are the single source of truth; ddcsEditOp seeds the wizard from them and replaceOp rebuilds the op.
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
-import { showOpMenu, showGroupMenu, hideOpMenu } from './opContextMenu.js';
+import { showOpMenu, showGroupMenu, hideOpMenu, openMenu } from './opContextMenu.js';
+import { indentMenuItems, installEditorIndent } from './editorIndent.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
 import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
@@ -217,9 +218,8 @@ export function initEditorOpHover() {
     // (no op wrapper → ddcsOpAtLine null) → the in-context "Group" menu instead: wrap that contiguous run in one
     // `group` op so it becomes editable (the headline feature; each loose run groups independently).
     editor.addEventListener('contextmenu', (e) => {
-        if (typeof window.ddcsOpAtLine !== 'function') return;
         const line = lineAtY(e.clientY);
-        const op = window.ddcsOpAtLine(line);
+        const op = (typeof window.ddcsOpAtLine === 'function') ? window.ddcsOpAtLine(line) : null;
         if (op) {
             e.preventDefault();
             hide();                                        // drop the hover chip while the menu is up
@@ -227,10 +227,25 @@ export function initEditorOpHover() {
             return;
         }
         const run = (typeof window.ddcsLooseRunAtLine === 'function') ? window.ddcsLooseRunAtLine(line) : null;
-        if (!run || !run.length) return;                   // not over an op or a loose run → leave the native menu
+        if (run && run.length) {
+            e.preventDefault();
+            hide();
+            showGroupMenu(run, e.clientX, e.clientY);
+            return;
+        }
+        /**
+         * t1450 — PLAIN TEXT: the indent/outdent entries. This is the branch that used to `return` and leave the
+         * native menu, and it is the only place the two entries can live without displacing something: over an OP the
+         * op actions are what the user came for, and over a loose run it is Group.
+         *
+         * The rule the next act's menu pass states is already honoured here — an entry only shortcuts an action that
+         * exists somewhere visible. Both of these are toolbar buttons AND Tab / Shift+Tab; the menu is the third door
+         * to one implementation, never its only door.
+         */
         e.preventDefault();
         hide();
-        showGroupMenu(run, e.clientX, e.clientY);
+        openMenu(indentMenuItems(), e.clientX, e.clientY);
     });
     editor.addEventListener('scroll', hideOpMenu);
+    installEditorIndent();   // t1450 — Tab / Shift+Tab + the toolbar buttons (idempotent; the menu path is above)
 }

@@ -662,5 +662,18 @@ Expert SYSDISK capture and the CAM-menu install set. Counts are occurrences in f
       (skim) op needs. Run `verify/V14_wcs_pos.nc` (motion-free) and record the result here.
       **Why it matters:** if X/Y read true, a parametric op can carry a runtime frame in registers and reuse its
       ordinary absolute body for skim, instead of needing a second G91-relative emitter.
+- [ ] **[TO TEST · t1450] LEADING WHITESPACE — does the parser tolerate an INDENTED line?**
+      Studio's parametric bodies have shipped **indented** since the first one (a loop body stepped in by two spaces,
+      so a macro reads like the structure it is), and nothing has ever tested whether this parser accepts it. The
+      corpus cannot answer it either, and that was **measured rather than assumed**: **285 captured `.nc` files, ZERO
+      lines with leading whitespace before a code token.** Every factory macro is flush-left — which is the *absence*
+      of evidence, not evidence against.
+      Run `verify/V15_indent.nc` (motion-free): it exercises an indented assignment, an indented two-level `WHILE`
+      body and an indented `IF`/`GOTO` + label, then reports a loop count and two guard values.
+      **Why it matters:** it decides whether Studio's default output shape is a preference or a requirement. The
+      fallback already exists and is one switch — *Settings → G-CODE OUTPUT → Indentation → Flush left* — which emits
+      the identical program with leading spaces stripped (whitespace-only; no coordinate, feed or word moves). The
+      outcome to watch for is **not** a syntax error but a clean run with the WRONG count: that would mean indented
+      lines parsed and were silently skipped, which no error message would have reported.
 - [ ] Find the system var holding the live alarm code → log *which* error.
 - [ ] Port the V4.1 `M47` dispatcher to `sysstart.nc` here (file-reload trick over SMB) — **safety first** (E-stop).

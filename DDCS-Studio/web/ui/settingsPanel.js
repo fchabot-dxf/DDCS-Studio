@@ -415,6 +415,12 @@ function loadSettings() {
                 // t664 (E3) — the user-added file list rides the profile too.
                 workspaceFiles: Array.isArray(p.workspaceFiles) ? p.workspaceFiles : [],
                 // t656 — the STORED autostart macro + its regen inputs persist with the profile (survive reload, export/import).
+                // t1450 — the EMIT's indent style. LISTED, because this merge is a WHITELIST: the note above says it
+                // outright ("must be listed or loadSettings drops it"), and a setting that silently reverts on reload
+                // is worse than one that does not exist — the user sets it, the emit obeys, and tomorrow it is back.
+                // ⚠ ADJACENT, NOT FIXED: top-level `units` is NOT listed here either and looks like it has the same
+                // problem. Left alone (it is not this act's) and reported instead.
+                indentStyle: (p.indentStyle === 'flush' || p.indentStyle === 'indented') ? p.indentStyle : undefined,
                 sysstartCustomGcode: typeof p.sysstartCustomGcode === 'string' ? p.sysstartCustomGcode : '',
                 autostartBody: typeof p.autostartBody === 'string' ? p.autostartBody : undefined,   // undefined = never seeded → the panel migrates it on first open
                 autostartHandEdited: !!p.autostartHandEdited,
@@ -1221,10 +1227,19 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint" id="set_controller_hint">The controller this machine runs — dialect, envelope, WCS and the boot macro are all generated for it. Changing it retargets this workspace, and the choice travels in the .ddcs (opening this workspace on another device adopts it). To generate for a different controller, duplicate the workspace and change the copy.</div>
                     </div>
+                    <!-- t1450 — G-CODE OUTPUT: its own section because none existed. The controller section above
+                         answers "which dialect"; this answers "what shape", which is a different question and the
+                         first of its kind. -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">G-CODE OUTPUT</div>
+                        <label class="settings-check" title="How wizard-generated G-code is laid out. Indented is the shipped style — loop and branch bodies are stepped in by two REAL spaces, so a macro reads like the structure it is. Flush emits every line hard against the left margin."><span style="opacity:.85;">Indentation</span> <select id="set_indent_style" class="settings-io" style="margin-left:8px;"><option value="indented">Indented (2 spaces per level)</option><option value="flush">Flush left</option></select></label>
+                        <div class="settings-hint">The spaces are <b>real bytes</b> in the file — Studio never fakes indentation on screen. Every controller in the corpus runs indented lines fine, and the factory's own macros are flush, so this is the <b>fallback</b> if yours ever balks at leading whitespace. It changes whitespace only: no coordinate, feed or word moves.</div>
+                    </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR</div>
                         <label class="settings-check"><input type="checkbox" id="set_suggest_on"> Smart suggestion bar (predictive keys above the keyboard)</label>
                         <div class="settings-hint">A phone-style row suggesting the likely next G-code / macro token. Turning it off hides the row and reclaims the space.</div>
+                        <div class="settings-hint">Select lines and press <b>Tab</b> / <b>Shift+Tab</b> — or use the <b>⇥ / ⇤</b> buttons, or right-click — to indent or outdent a block. Those write real spaces too, and undo restores them.</div>
                     </div>
                     <!-- legacy hardware-tab toggles kept hidden so profile gating still works (replaced by the Input/Output tables) -->
                     <div style="display:none">
@@ -1726,6 +1741,10 @@ function wireSettingsOverlay(ov) {
     // Cloud tab already hosts (t1243), and its one unique control — Default save location — moved there with it.
     // t990 — Display units (mm | inch): an app-wide DISPLAY pref (mm-native STORAGE regardless). Live → re-render open forms via settings-changed.
     { const un = q('set_units'); if (un) { un.value = getSettings().units || 'mm'; un.addEventListener('change', () => { getSettings().units = un.value; saveSettings(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); }); } }
+    // t1450 — the EMIT's indent style. Read by `activeDialectOpts` (the one place that answers "what does this
+    // workspace want the emit to look like"), so the preview and the inserted program can never be on different
+    // settings. Absent → 'indented', which is the bytes every emitter already wrote.
+    { const ind = q('set_indent_style'); if (ind) { ind.value = getSettings().indentStyle || 'indented'; ind.addEventListener('change', () => { getSettings().indentStyle = ind.value; saveSettings(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); }); } }
     renderMachineNet(q('set_machinenet_mount'));   // MACHINE NETWORK: live controller connection via the gateway
     renderLanAccess(q('set_lan_mount'));   // LAN ACCESS: shareable URL + QR for the exe-served Studio
 

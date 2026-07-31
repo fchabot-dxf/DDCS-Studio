@@ -11432,3 +11432,80 @@ that only chased red tests would have walked past it.
 Touched + affected files **78/78** · every touched file + pocket family + tool-fit + round-trip **142/142** with
 **IRON RULE 11/11, same list, no growth** · smoke **71/71**. Sweep re-run: the 17 remaining `feature < tool` fixtures
 are ALL intentional refusal assertions or the three checked-and-clear cases above.
+
+## t1450 (seat A) — THE INDENT ACT: literal, editable, controlled (user-designed) — and two defects found by driving it
+
+All four parts landed. The interesting part is not the feature; it is that **two real defects only appeared when the
+feature was driven the way a user drives it**, and both were invisible to the code and to the first tests.
+
+### THE DECLARATION — one width, two consumers
+
+`data/indentStyle.js`: `INDENT` (two spaces — a MEASUREMENT of what the emitters have written since the first
+parametric body, not a preference), `applyIndentStyle` (the emit transform) and `indentBlock` (the editor's block
+operation, pure so the real symptom is assertable on bytes without a DOM). Typed twice, the emitter and the editor
+drift the first time either is tuned, and the symptom is silent: a hand-indented line and a regenerated region end up
+mixing two widths that look identical until something counts them.
+
+### PART 1 — THE EMIT SETTING, ONE BOUNDARY, AND THE ORDER MATTERS
+
+`applyIndentStyle(T, settings)` runs **LAST** of the emitter passes, and that is a decision rather than an
+appendix: every pass above rewrites line TEXT (the modal-feed fold matches the F word, cap-gating comments lines out,
+oword balancing looks for the o-label), so any of them could be perturbed by leading whitespace appearing or
+vanishing underneath it. Running last means the whole pipeline sees exactly the bytes it always saw. It mutates in
+place because the line COUNT must not move — `map`, `absorbed`, `feedFolds` and every op range are line indices.
+
+Measured across six wizard programs: **line counts identical, ZERO mismatches, and with all whitespace deleted the
+two programs are byte-identical** — the second assertion is the one that would catch a transform that helpfully
+tidied a coordinate. `indented` is the default, so every existing path is unchanged by construction.
+
+⚠ AND A FACT WORTH RECORDING RATHER THAN LEAVING AS A SILENT PASS: **the circle pocket and the slot emit ZERO
+indented lines.** They are literal-transcript emitters — JS-unrolled flat lines, no loop bodies — so flush is a no-op
+there. The setting only ever moves the PARAMETRIC bodies. Asserted by name, so the zero is a known fact.
+
+### PART 2 — THREE DOORS, ONE IMPLEMENTATION… and the two defects
+
+Toolbar indent/outdent, Tab / Shift+Tab, and the right-click menu all call `indentEditor(dir)`. Real spaces; the
+width is the shared constant; `execCommand insertText` rather than assigning `.value`, because **assignment wipes the
+native undo stack** — the user would lose this edit and every edit before it. The right-click entries reuse the
+existing `op-ctx-menu` element through a new `openMenu(items, x, y)` rather than a second floating menu with its own
+dismissal, clamping and stop-previews contract.
+
+**⚠ DEFECT 1 — THE TOOLBAR BUTTON STOLE THE SELECTION.** Pressing it blurs the textarea; the blur drops the
+selection the button is about to act on, and in this app it also lets the editor re-sync from the program model
+underneath the gesture. `preventDefault` on mousedown is the cure (the click still fires, the caret never moves), and
+the same applies to the menu entries — a TEXT action must run against the selection that is live when it is picked.
+**The keyboard path never blurs, so Tab/Shift+Tab passed and hid this completely.** It surfaced only because the
+button was driven as a click rather than called as a function.
+
+**⚠ DEFECT 2 — THE BUTTONS OVERLAPPED THE MAKE BUTTON AT WIDE VIEWPORTS.** Caught by EYEBALLING the screenshot, then
+measured. The editor's overlay buttons stack off `--kbd-clear` (and off the 3D drawer in portrait) in CSS, 32px
+apart — the inline `bottom` each carries is **overridden there**, so my hand-picked inline offset was right at one
+viewport and wrong at another (indent 904-928 against Make 894-918). The pair now takes the next slot in that same
+declared stack, and a layout test asserts the four rects never intersect. A hand-picked offset beside a declared
+stack is the same class of mistake as a hand-rolled constant beside a declared one.
+
+### PART 3 — TOLERANCE, ASSERTED AT THE NEW ENTRY POINTS
+
+An indented user line (spaces AND tabs, mixed depths) traces move-for-move identically to its flush twin, and a
+regenerated op region re-emits its canonical indented form.
+
+### PART 4 — V15_indent.nc, AND THE CORPUS CLAIM MEASURED
+
+`bridge/controllers/expert-m350/verify/V15_indent.nc` + a FINDINGS row. Motion-free; it exercises an indented
+assignment, an indented two-level WHILE body and an indented IF/GOTO + label, then reports a loop count and two
+guards. The dispatch's premise was checked rather than restated: **285 captured .nc files, ZERO lines with leading
+whitespace before a code token.** Every factory macro is flush — the *absence* of evidence, not evidence against.
+The macro's own header names the outcome to fear: not a syntax error but a clean run with the WRONG count, which
+would mean indented lines parsed and were silently skipped.
+
+⚠ ADJACENT, NOT FIXED: the settings load is a WHITELIST (its own note says it outright). `indentStyle` is listed.
+Top-level `units` is **not**, and looks like it has the same problem — reported rather than fixed, since it is not
+this act's.
+
+### GATE (fast tier)
+
+new spec `editor-indent-1450` **8/8** (the shared width read off real output · the button · the layout stack · Tab /
+Shift+Tab incl. repeat · undo · the right-click menu · the whitespace-only sweep · tolerance) · editor + settings +
+round-trip + blocks **46/46** with **IRON RULE 11/11, same list, no growth** · emit-path specs **104/104** · smoke
+**71/71**. Screenshots in `test-results/t1450-shots/` and **eyeballed**: the menu open over a live selection, and the
+three selected lines carrying their two real spaces with the button stack clean.

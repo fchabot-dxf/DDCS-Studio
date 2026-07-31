@@ -34,6 +34,27 @@ function item(m, label, fn, disabled) {
     m.appendChild(b);
 }
 
+/**
+ * t1450 — OPEN AN ARBITRARY MENU in this same element: `[{ label, fn, disabled }]` at (x, y).
+ *
+ * Exported because the editor's indent/outdent entries are NOT op actions — they act on a text selection that may
+ * have nothing to do with an op — and a second floating-menu implementation would be a second thing to dismiss, a
+ * second thing to clamp into the viewport, and a second thing to forget on `ddcs:stop-previews`. One element, one
+ * dismissal contract; the caller only decides what goes in it.
+ */
+export function openMenu(items, x, y) {
+    const m = ensure();
+    m.innerHTML = '';
+    for (const it of (items || [])) if (it) item(m, it.label, it.fn, it.disabled);
+    if (!m.children.length) return false;
+    // …and these entries do NOT steal focus. The op menu's actions open a wizard, so focus moving is fine there; a
+    // TEXT action has to run against the selection that is live when it is picked, and a blur drops it (the same
+    // reason the toolbar buttons preventDefault on mousedown — see editorIndent).
+    for (const b of m.children) b.addEventListener('mousedown', (e) => e.preventDefault());
+    place(m, x, y);
+    return true;
+}
+
 /** Show the op menu for `op` ({ id, opType, label }) at viewport (x, y). */
 export function showOpMenu(op, x, y) {
     if (!op || !op.id) return;
