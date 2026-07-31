@@ -12492,3 +12492,106 @@ Capacity, stated plainly because it is a reportable fact: ninth act this seat, a
 syntax/escaping slips inside this one (an object closed a line early, a `\n` mangled into a real newline by a Python
 escape, two unescaped apostrophes). Each was caught and fixed, but that rate on the `AX`/`TM` rotation machinery —
 the code whose last collision produced a 416mm error — is the argument for stopping here rather than pushing.
+
+## t1485 (seat A) — C4 COMPLETED ON THE BRANCH. The cross axis rides the row register; ⚠ the MERGE is gated on 25 pre-existing red ramp bridges.
+
+### THE PIECE THE DISPATCH NAMED — done, and it needed one more hole closed than the park knew about
+
+The descent now starts from the **walk's own declared axis forms**, not from a rebuilt pair of numbers. `rowWalk`
+hands `startX`/`startY` — the same `AX` objects it prints for its row moves — so the ramp cannot disagree with the
+row about where the row IS. Not because two expressions are kept in step: **there is only one expression.**
+
+    was   G1 X[0 + #34 * 1] Y[1.8 + #34 * 0]      the row cut at #47, the ramp descended at a baked 1.8
+    now   G1 X[0 + #34 * 1] Y[#47 + #34 * 0]      one register, both moves
+
+**THE HAZARD WAS BIGGER THAN A KINKED ENTRY, and I only saw that by tracing the pre-fix branch rather than reasoning
+about it.** The row cut deliberately OMITS its cross-axis word — `ROW_Y(null)`, modal, so the tool stays down between
+rows. So a ramp that ends at the wrong cross coordinate does not merely enter badly, it **leaves the tool there and
+the row inherits it**. Traced at a pendant 40% on a Ø6:
+
+    ramp   (0, 1.2, 0) → (28.621, 0, −1.5)     the rapid put the tool on the live row; the ramp cut off it
+    back   (28.621, 0, −1.5) → (0, 0, −1.5)
+    ROW    (0, 0, −1.5) → (80, 0, −1.5)        ⚠ the row itself cut at Y0, not the Y1.2 it was counted for
+
+**A SECOND HOLE, same claim, one axis over — found while dumping, not predicted.** `otherway` started its ramp at the
+BAKED far end. For a dialled area that is `num('#4', 100)` — the DEFAULT width — so the mirror ramped to X−28.621,
+**28.6mm outside the stock at cutting feed**; with a live inset the start collapsed to the origin entirely. Exactly
+the silent-default substitution t1425 exists to close, surviving in the one place t1483 did not look. `inputs: []`
+could not be true with that open either, so it is fixed in the same act rather than named as a remainder.
+
+`rampLines` now has **no fallback**: a walk that does not declare where it starts cannot get a guess. `ringWalk`
+declares its corner the same way and stays byte-identical (`X0 Y0`). `PLUS_RUN` splices into an existing bracket
+instead of wrapping one, so a live far end emits a flat `[0 + #40 + #34 * -1]` — checked, 0 malformed axis words over
+384 configs. I had written that the controller "has never been given" a nested form; **that was false and the sweep
+caught me** — `FIX[[…] / [2 * #44]]` has shipped since t1333. The comment now gives the true reason (every axis word
+this body prints is a flat sum) rather than a tidier wrong one.
+
+### THE BRIDGES, and what each is worth
+
+**BRIDGE F** (5 rows, new): descend-at == cut-at, through the REAL tracer, at values dialled AWAY from the atom's
+defaults — plus the along-axis start and a "the ramp stays inside the material" bound that catches the mirror. The
+expected coordinate is computed by the test from the dialled numbers, never read back out of the emit.
+**The ramp joins PROOF 2** (5 rows): live-seeded vs baked, same cuts and same rapids. It could not have joined before
+— that table was plunge-only because a plunge was the only descent that baked nothing, which is precisely the claim
+`SURFACE_RASTER_BAKES` now makes for the ramp.
+
+**BOTH BITE, and I measured which**: on the parked branch BRIDGE F fails 5/5 and PROOF 2 fails 4/5. The CONCENTRIC
+row passes there — a ring's start is the walk ORIGIN, which the frame printer has always resolved live, so it never
+had the defect. That is written into the spec as a regression guard, **not** as proof of the lift; reading it as the
+latter would be reading it wrong.
+
+**Two defects in t1483's OWN spec, found by running it rather than by trusting the 25/25:**
+- `BRIDGE A` was **already RED on the parked branch** — it asserted nothing outside the descent may move, and the
+  `@work` token *must* move (482 vs 494: a ramp executes six more steps per level, and that count sizes the tracer's
+  preview cap). Only the NUMBER is neutralised now, with a companion assert that it really did move.
+- `BRIDGE C`'s "rows-along-Y" row passed `direction: 'y'` where the axis is selected by `rowAxis` — so it had been
+  running the bothways X walk under a Y-row label. A green assert about a case it never reached.
+
+### ⚠ THE MERGE IS GATED, AND THIS IS THE FLAG THE DISPATCH ASKED FOR
+
+The dispatch's criterion was "merge, and the whole widened act gates as one: full suite green". **It cannot go green,
+and not because of this turn.** Measured both sides over the 33 specs that read this atom:
+
+    parked branch 152795ab   26 failed · 291 passed
+    with this turn           25 failed · 302 passed      (+11 passes, −1 failure, 0 new failures)
+
+**All 25 are RAMP tests, all pre-existing, and they are the act's own consequence rather than a defect in it.** They
+split into two kinds, and the split is what the ruling needs:
+
+- **~19 MOVE-FOR-MOVE literal-equivalence bridges** (`ring-descent-1404` ×8, `surfacing-parametric-1329` ×5,
+  `raster-direction-1418` ×4, `pocket-rides-raster-1406` ×2, `surfacing-rotation-absorbed-1375`). Their criterion is
+  "identical to the LITERAL kernel's ramp, move for move". C4's whole purpose is that the ramp is no longer the
+  literal's ramp — it runs along the row, not toward the centre. **These cannot be "fixed"; they can only be retired
+  or restated,** and there is no literal counterpart to restate them against.
+- **~6 DECLARED-INTENT assertions naming the OLD refusal** (`pocket-delegation-1429` PROOF F: "a ramp degrades and
+  says so"; `surfacing-parametric-1329` THE ENTRY GATE: "a ramp slot refuses the knobs that would kink its descent";
+  `slot-capability-arc-1478` PREMISE 2; `slot-parametric-boundary-1442` CLAUSES 2-4). These are the same shape as the
+  two honesty-lock transitions t1483 carried on your explicit instruction — the act simply did not find these four.
+
+**I DID NOT TOUCH EITHER SET, and did not merge.** Inverting six more honesty locks is the kind of move you named
+specifically last time; retiring nineteen equivalence bridges changes what the proof corpus MEANS for the ramp, which
+is a ledger decision and not a worker's. Merging red into the working line would also break the one thing the park
+was protecting. So the branch carries the completed act and main stays green.
+
+**THE OPTIONS, as I read them:**
+- **A** — rule the ~19 literal bridges RETIRED for ramp (the literal ramp is superseded), keep them for plunge/helix,
+  and record the retirement in the PROVEN ledger, which already says "relationship-bridged" for those five rows.
+- **B** — RESTATE them as relationship bridges: same walk outside the descent, and inside it the angle / drop /
+  start / return / degrade — the shape `ramp-run-vector-1483` already uses. More work, keeps a bridge on every row.
+- **C** — the ~6 declared-intent ones are mechanical either way and I would take them in the same act as whichever of
+  A/B you rule, so the ledger, the specs and the gate all change their words at one moment rather than in three.
+
+My reading is **B for the six declared-intent ones (they have a true new statement to make) and A for the nineteen**,
+because a "relationship bridge" against a kernel that cuts a different path is a bridge to nowhere — but this is your
+ruling, and the merge waits on it.
+
+### HOUSEKEEPING
+
+The working line was merged INTO the branch (not rebased — your amendment said not to untangle the macro-restore
+payload, and a merge rewrites nothing). That brought t1483's WORK-LOG entry under the branch, so this entry appends
+linearly and the eventual merge back carries no doc conflict. Fast tier after the merge: smoke **71/71**, the three
+affected specs **34/34**. Branch tip carries the fix at `1ff965ba`.
+
+*(Method note for the next seat: the emit AND the tracer both import cleanly under plain `node` from the repo — no
+Playwright, no mem-server. Dumping a program and tracing its motion is seconds, not a suite run, and every finding
+above came out of that loop before a single spec was written. `node -e "import('file:///…/surfaceraster.js')"`.)*
