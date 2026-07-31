@@ -1,7 +1,18 @@
 /**
- * ui/opContextMenu.js — the shared right-click op menu (✎ Edit / ⧉ Duplicate / 🗑 Delete), reused by every
- * surface that can identify an op: the editor (line→op), the Blocks code panel (span ancestry→op), and the
- * Blockly op blocks. Acts via the window hooks (ddcsEditOp + opSession duplicate/delete) — params stay the truth.
+ * ui/opContextMenu.js — the app's ONE floating menu element, and the shared right-click OP menu that rides in it
+ * (✎ Edit / ⧉ Duplicate / ▸ Build CAM slot / 🧩 Customize / 🗑 Delete). Acts via the window hooks (ddcsEditOp +
+ * opSession duplicate/delete) — params stay the truth.
+ *
+ * ⚠ t1454 — WHO ACTUALLY USES IT, corrected. This header used to claim the menu was "reused by every surface that
+ * can identify an op: the editor, the Blocks code panel, and the Blockly op blocks". Only the EDITOR imports it —
+ * measured, not assumed — and the claim had been stale long enough to mislead this very pass's survey. The others:
+ *   Blocks CANVAS   has Blockly's OWN context menu, deliberately left alive (blocksApp's middle-pan guard says so),
+ *                   already shipping Duplicate/Delete/Comment/Collapse/Inline. t1454 REGISTERS our two entries into
+ *                   that menu rather than opening this one over it — opening ours would have suppressed all five,
+ *                   including the two this pass exists to add.
+ *   Blocks CODE PANEL  no context menu today.
+ * A header that names consumers it does not have is how a survey concludes a surface is done when it was never
+ * started; this one now says what is true and names where the other menu lives.
  */
 import { seedFromOp, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1). U2 — seedFromOp is the FINAL verdict (generator | universal | unsupported), so the universal fallback greys/enables correctly. t1073 — isCamGeneratorTwin gates the Customize action to the 8 CAM-generator twins
 import { getUserDef } from '../blocks/userOps.js';   // t1073 — the Customize action needs a registered def (else editWizardDef alerts "no longer in your library")

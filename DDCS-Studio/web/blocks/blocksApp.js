@@ -591,6 +591,43 @@ async function buildWorkspace() {
   });
   host.addEventListener('mouseleave', () => setHover(null, null));
 
+  /**
+   * ── t1454 — THE CANVAS'S CONTEXT MENU: our entries JOIN Blockly's, they do not replace it ────────────────────────
+   *
+   * ⚠ THIS SURFACE IS THE ONE THAT DOES **NOT** GO THROUGH `openMenu`, and that is a measured decision rather than an
+   * oversight. The Blocks canvas ALREADY HAS a right-click menu — Blockly's own, deliberately left alive (the
+   * middle-pan guard above says so in as many words: *"RMB (button 2 = context menu) are untouched"*) — and its
+   * registry already ships **Duplicate, Delete, Comment, Collapse/Expand and Inline**. Opening our menu on
+   * `contextmenu` would have suppressed all five. Two of them are literally the entries this pass was asked to add,
+   * so "reuse the one mechanism" would have DELETED the very actions it was meant to provide.
+   *
+   * So the canvas keeps ONE menu — the rule's real intent — and we register into it. Duplicate and Delete are
+   * therefore already satisfied here and are NOT re-added: a second Delete beside Blockly's would be two entries that
+   * must agree forever, which is the same defect as two menus one level down.
+   *
+   * RULE 1 holds for both entries: ✎ Edit is the hover chip's action, visible in the editor and in the op menu; and
+   * ▤ Show G-code is what a plain CLICK on a block already does (it selects the op and scrolls the code panel to it) —
+   * the entry names a behaviour the surface has, for a user who has not discovered that clicking does it.
+   */
+  (function registerCanvasMenu() {
+    const CMR = B.ContextMenuRegistry;
+    if (!CMR || !CMR.registry || !CMR.ScopeType) return;                    // a Blockly build without the registry: skip, never crash
+    /** The op block that owns `blk` (the canvas shows an op's INNER stack), or null outside an op. */
+    const opOf = (blk) => { let b = blk; while (b && !(b.type === 'op' || (typeof b.type === 'string' && b.type.endsWith('_op')))) b = b.getParent && b.getParent(); return b || null; };
+    const labelOf = (opBlk) => { try { return (JSON.parse(opBlk.data || '{}').label) || opBlk.opType || 'op'; } catch (_) { return opBlk.opType || 'op'; } };
+    const reg = (id, text, cb, weight) => {
+      try { CMR.registry.unregister(id); } catch (_) { /* first run */ }     // idempotent: the tab can re-inject
+      CMR.registry.register({
+        id, weight, scopeType: CMR.ScopeType.BLOCK,
+        preconditionFn: (scope) => (opOf(scope.block) ? 'enabled' : 'hidden'),   // hidden off an op — never a dead entry
+        displayText: (scope) => text(opOf(scope.block)),
+        callback: (scope) => { const o = opOf(scope.block); if (o) cb(o); },
+      });
+    };
+    reg('ddcsEditOp', (o) => `✎ Edit ${labelOf(o)}`, (o) => { if (window.ddcsEditOp) window.ddcsEditOp(o.id); }, 0.5);
+    reg('ddcsShowGcode', () => '▤ Show G-code', (o) => { try { o.select(); } catch (_) { /* */ } setSelected(o.id, { scrollCode: true }); }, 0.6);
+  })();
+
   // DECLARE the edit, don't infer it: when a REAL user change fires (not a UI event, not our own muted model→workspace
   // rebuild), record which op's atom it touched. The round-trip's representation drift (empty move sockets → 0, #var →
   // record) happens during MUTED reloads, so it never fires here → it can never be mistaken for an edit.

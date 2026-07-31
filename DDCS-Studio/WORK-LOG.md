@@ -11582,3 +11582,51 @@ nested-paren consequence · Ctrl+/ and undo · the menu entry acting at the pixe
 still green · editor family + round-trip + blocks **36/36** with **IRON RULE 11/11, same list, no growth** · smoke
 **71/71**. Screenshots in `test-results/t1452-shots/` and **eyeballed**: the menu open over a live selection, and the
 two commented lines carrying real semicolons with the blank line untouched and the button row clean.
+
+## t1454 (seat A) — THE RENAME, then SURFACE 2 (Blocks canvas). Parked before surface 3.
+
+### THE RENAME — its own commit, as blessed
+
+`ui/editorIndent.js` → `ui/editorTextOps.js` (031790e8). Only the import path, one comment reference and the file's
+own header changed, so the move is reviewable AS a move; git recorded it as an `R`. 15/15 unchanged after.
+
+### ⚠ SURFACE 2 CONTRADICTED ITS OWN DISPATCH CLAUSE, AND THE MEASUREMENT IS THE REASON
+
+The instruction was to wire every surface "through THE one mechanism (openMenu)". **The Blocks canvas already HAS a
+right-click menu — Blockly's own** — and it is alive deliberately: `blocksApp`'s middle-pan guard says so in as many
+words (*"RMB (button 2 = context menu) are untouched"*). Blockly's registry already ships **Duplicate, Delete,
+Comment, Collapse/Expand and Inline**.
+
+So opening `openMenu` on `contextmenu` would have SUPPRESSED all five — and **two of them are the entries this pass
+was asked to add**. "Reuse the one mechanism" taken literally would have deleted the very actions it exists to
+provide. The rule's real intent is *one menu per surface*, and that is what landed: our two entries are REGISTERED
+into Blockly's registry (`ContextMenuRegistry`, scoped to BLOCK, `preconditionFn` hiding them off an op so there is
+never a dead row). Duplicate and Delete are deliberately NOT re-added — a second Delete beside Blockly's would be two
+entries that must agree forever, which is the same defect as two menus one level down.
+
+**RULE 1 for the two added:** `✎ Edit` is the hover chip's action (visible in the editor and in the op menu);
+`▤ Show G-code` is what a plain CLICK on a block already does — it selects the op and scrolls the code panel — so the
+entry names a behaviour the surface HAD but never advertised. The spec asserts that by checking the panel's own
+`.has-sel` state, i.e. that the shortcut and the click agree.
+
+### THE STALE HEADER, CORRECTED — and it had already misled this pass
+
+`opContextMenu`'s header claimed the menu was "reused by every surface that can identify an op: the editor, the
+Blocks code panel, and the Blockly op blocks". **Only the editor imports it** — and that stale claim is exactly what
+made my own t1452 survey have to re-derive the truth. It now says what is true and names where the other menu lives.
+
+### TWO MEASURED TEST FACTS worth keeping
+
+- **A synthesised `contextmenu` event does not open Blockly's menu.** v13 opens it from its own gesture handling (a
+  pointerdown with button 2), not from a dispatched DOM event on the block's SVG root. The first cut dispatched one
+  and nothing appeared. Driving the real mouse is both the fix and the better test.
+- **Same for picking an entry:** a Blockly menu item answers pointer events, not `.click()`.
+
+### GATE (fast tier)
+
+new spec `context-menu-blocks-1454` **3/3** (ours appear AND Blockly's SURVIVE — a test that only checked ours would
+pass on the version that deleted Duplicate and Delete · the entries ACT, Edit routing to the one hook with the op
+block's id and Show G-code putting the panel in its selected state · both hidden off an op) · menus + blocks family +
+round-trip **34/34** with **IRON RULE 11/11, same list, no growth** · smoke **71/71**. Screenshot in
+`test-results/t1454-shots/` and **eyeballed**: ✎ Edit op and ▤ Show G-code at the top, with Blockly's Duplicate, Add
+Comment, Inline Inputs, Collapse Block, Disable Block and Delete all intact below.
