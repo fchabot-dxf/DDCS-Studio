@@ -69,7 +69,7 @@ const server = http.createServer((req, res) => {
   res.end(req.method === 'HEAD' ? undefined : entry.buf);
 });
 
-const port = parseInt(process.argv[2], 10) || 3211;
+const port = parseInt(process.argv[2], 10) || parseInt(process.env.DDCS_TEST_PORT || '', 10) || 3211;   // argv wins; DDCS_TEST_PORT for a standalone run; default 3211 unchanged
 server.listen(port, () => {
   const actual = server.address().port;
   process.stderr.write(`[mem-server] ${store.size} files preloaded from web/ → listening ${actual}\n`);

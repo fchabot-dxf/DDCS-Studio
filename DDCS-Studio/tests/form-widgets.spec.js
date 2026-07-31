@@ -16,7 +16,7 @@ const BINDINGS = [
 ];
 
 test('form widgets: typed bindings render the right control + Insert reads each value', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
 
   await page.evaluate(async ({ TEMPLATE, BINDINGS }) => {
@@ -56,7 +56,7 @@ test('form widgets: typed bindings render the right control + Insert reads each 
 });
 
 test('form widgets: corner-grid datum picker renders + reads its [X][Y] code', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
 
   await page.evaluate(async () => {
@@ -84,7 +84,7 @@ test('form widgets: corner-grid datum picker renders + reads its [X][Y] code', a
 });
 
 test('form widgets: xy-pad canvas picker — group of bindings → one canvas, drag drives both params', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
 
   await page.evaluate(async () => {
@@ -106,12 +106,38 @@ test('form widgets: xy-pad canvas picker — group of bindings → one canvas, d
   await expect(form.locator('svg')).toHaveCount(1);
   await expect(form.locator('.fc-handle-move')).toHaveCount(1);
 
+  // Count the pad's own drag signal BEFORE dragging: every onDrag dispatches a bubbling 'input' on the widget host
+  // (the pad is the form's only widget), so "the drag actually drove cx,cy" is observable — not assumed.
+  await page.evaluate(() => {
+    window.__xyDragInputs = 0;
+    document.querySelector('.uop-form').addEventListener('input', () => { window.__xyDragInputs++; });
+  });
+  // THE SETTLE RACE: the canvas draws on a rAF ("wait for the host to have a size") and re-renders on ResizeObserver
+  // when the late form layout settles — a boundingBox read between those frames aimed the mouse at where the handle
+  // WAS, the grab missed, and the params sat at their defaults. 3 STABLE FRAMES: only read the box once the handle's
+  // rect is unchanged across three consecutive animation frames (streak resets on any movement — no mid-flight read).
+  await page.waitForFunction(() => {
+    const h = document.querySelector('.uop-form .fc-handle-move');
+    if (!h) return false;
+    const r = h.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) { window.__xyStable = []; return false; }
+    const s = (window.__xyStable = window.__xyStable || []);
+    const last = s[s.length - 1];
+    if (!last || Math.abs(last.x - r.x) > 0.01 || Math.abs(last.y - r.y) > 0.01) { window.__xyStable = [{ x: r.x, y: r.y }]; return false; }
+    s.push({ x: r.x, y: r.y });
+    return s.length >= 3;
+  }, null, { polling: 'raf', timeout: 5000 });
+
   // drag the position handle → onDrag drives cx,cy
   const box = await form.locator('.fc-handle-move').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + 45, box.y - 25, { steps: 6 });
   await page.mouse.up();
+
+  // the drag was SEEN (onDrag fired → the pad's values moved) before Insert reads them — a missed grab fails HERE,
+  // loudly, instead of surfacing as default params at the assert below
+  await page.waitForFunction(() => window.__xyDragInputs > 0, null, { timeout: 5000 });
 
   await form.locator('.uop-insert').click();
   await expect(form).toHaveCount(0);
@@ -126,7 +152,7 @@ test('form widgets: xy-pad canvas picker — group of bindings → one canvas, d
 });
 
 test('form widgets: rect canvas picker reads x/y/w/h at defaults', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
 
   await page.evaluate(async () => {
@@ -156,7 +182,7 @@ test('form widgets: rect canvas picker reads x/y/w/h at defaults', async ({ page
 });
 
 test('form widgets: stepperSide:left renders the spinner on the LEFT; default fields unchanged; no emit change', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
 
   await page.evaluate(async () => {
@@ -206,7 +232,7 @@ test('form widgets: stepperSide:left renders the spinner on the LEFT; default fi
 });
 
 test('form widgets: registry defaults a widget per binding.type', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   const r = await page.evaluate(async () => {
     const FW = await import('/ui/formWidgets.js');
     const which = (b) => Object.keys(FW.FORM_WIDGETS).find((k) => FW.FORM_WIDGETS[k] === FW.resolveFormWidget(b));

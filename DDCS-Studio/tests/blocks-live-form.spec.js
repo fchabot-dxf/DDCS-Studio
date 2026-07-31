@@ -9,7 +9,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('editing a custom op shows its form derived from the blocks; editing a block updates the form', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
 
   // a custom op with one exposed number knob "depth" = -5
@@ -51,7 +51,7 @@ test('editing a custom op shows its form derived from the blocks; editing a bloc
 
 test('form→block writeback: editing the live form writes the value back to the block + G-code (no echo clobber)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
 
   await page.evaluate(async () => {
@@ -88,7 +88,7 @@ test('form→block writeback: editing the live form writes the value back to the
 
 test('editing-context chrome: re-authoring shows the glow class + named chip; saving clears it', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
 
   await page.evaluate(async () => {
@@ -98,9 +98,20 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
     U.createUserOp(U.userOpFromStack('chrome', 'Chrome Op', template, U.extractParamBlocks(template)));
     window.ddcsRefreshWizardBar();
   });
+  // the Blocks app must be UP before the re-author call: editWizardDef's internal wait for it is capped, and under
+  // load the cap could expire → the load silently skipped → the 8s formpane wait timed out as a phantom "chrome" red
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.ddcsLoadBlockStack && window.__blkws);
   await page.evaluate(() => window.ddcsEditWizardDef('user_chrome'));
   await page.waitForSelector('#blk-formpane:not([hidden])', { timeout: 8000 });
 
+  // DETERMINISTIC: the formpane unhides on the projection while the chrome (glow class + chip) is applied by
+  // devMode's own refresh — a sample squeezed between the two read half-applied chrome under load. Wait for the
+  // condition the asserts read (same shape as the save-clear wait below); if it never applies, this times out.
+  await page.waitForFunction(() => {
+    const app = document.getElementById('blocks-app'), chip = document.querySelector('.blk-edit-chip');
+    return app && app.classList.contains('editing-wizard') && chip && !chip.hidden && /Chrome Op/.test(chip.textContent || '');
+  }, { timeout: 8000 });
   const editing = await page.evaluate(() => ({
     hasClass: document.getElementById('blocks-app').classList.contains('editing-wizard'),
     chipShown: !document.querySelector('.blk-edit-chip').hidden,
@@ -110,7 +121,10 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   expect(editing.chipShown, 'the editing chip is shown').toBe(true);
   expect(editing.chipText, 'the chip names the wizard').toContain('Chrome Op');
 
-  // save → exits the editing context (glow + chip clear)
+  // save → exits the editing context (glow + chip clear). The workspace must actually HOLD the re-authored op first:
+  // the formpane shows on the editing flag alone, while the save reads the LIVE workspace (collectAuthoring) — saving
+  // before the blocks land alerts "No op to save" and the dialog never opens (the load-time face of the same race).
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
   await page.evaluate(() => window.ddcsSaveAsWizard());
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Chrome Op');
   await page.click('.blk-dev-savedlg .blk-dev-save');
@@ -145,9 +159,15 @@ const listOps = (page) => page.evaluate(async () => (await import('/blocks/userO
 
 test('non-destructive save: re-author + "Save as new" creates a copy, leaving the original intact', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+  // the Blocks app must be UP before re-authoring (editWizardDef's internal wait is capped — see the chrome test)
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(() => window.ddcsLoadBlockStack && window.__blkws);
   await reauthor(page, 'orig', 'Original');
+  // …and the workspace must HOLD the re-authored op before saving: the save reads the LIVE workspace
+  // (collectAuthoring) — saved too early it alerts "No op to save" and the dialog never opens
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
 
   await page.evaluate(() => window.ddcsSaveAsWizard());
   // the dialog offers BOTH actions when editing: an explicit "Update", and the accent "Save as new"
@@ -156,7 +176,9 @@ test('non-destructive save: re-author + "Save as new" creates a copy, leaving th
 
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Original Copy');
   await page.click('.blk-dev-savedlg .blk-dev-save');   // "Save as new" → a separate wizard
-  await page.waitForTimeout(250);
+  // DETERMINISTIC: wait for the save's RESULT — the ops list the asserts below read — not a sleep sized to the
+  // commit's async tail (250ms lost to full-gate load). If the copy never lands, this times out honestly.
+  await expect.poll(async () => (await listOps(page)).length, { timeout: 8000 }).toBe(2);
 
   const ops = await listOps(page);
   expect(ops.some((o) => o.opType === 'user_orig' && o.label === 'Original'), 'original untouched').toBe(true);
@@ -168,7 +190,7 @@ test('non-destructive save: re-author + "Save as new" creates a copy, leaving th
 
 test('non-destructive save: "Update" overwrites the re-authored wizard in place (no duplicate)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
   await reauthor(page, 'orig', 'Original');
 
@@ -186,7 +208,7 @@ test('non-destructive save: "Update" overwrites the re-authored wizard in place 
 });
 
 test('the live form pane is hidden when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
-  await page.goto('http://localhost:3211');
+  await page.goto('/');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws);
