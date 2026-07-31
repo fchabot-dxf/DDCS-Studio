@@ -40,8 +40,14 @@ test('THE TENANT MOVED OUT — pocket carries NO literal hole, across its whole 
             circle: scan({ ...BIG, shape: 'circle', dia: 50 }),
             polygon: scan({ ...BIG, shape: 'polygon', dia: 50, sides: 6 }),
             // THE ARM THAT CAUGHT IT — both shapes, the ones defaults never reach.
-            tinyCircle: scan({ ...BIG, shape: 'circle', dia: 4, depth: 3, stepdown: 1 }),
-            tinyRect: scan({ ...BIG, shape: 'rect', w: 4, h: 4, depth: 3, stepdown: 1 }),
+            // t1444 — EXACTLY TOOL-SIZED, not smaller. These were Ø4 / 4×4 against a Ø6 tool and now REFUSE (a feature
+            // the tool cannot fit cuts nothing), which would have made this test pass VACUOUSLY: an arm that emits no
+            // hole at all trivially "carries no literal hole". The ownership claim needs the arm that really does build
+            // a hole, and that is the plunge arm's remaining domain — a pocket the tool exactly fills.
+            tinyCircle: scan({ ...BIG, shape: 'circle', dia: 6, depth: 3, stepdown: 1 }),
+            tinyRect: scan({ ...BIG, shape: 'rect', w: 6, h: 6, depth: 3, stepdown: 1 }),
+            // …and the refusing configs they vacated, kept as a case: no literal hole there either, for the new reason.
+            refusedCircle: scan({ ...BIG, shape: 'circle', dia: 4, depth: 3, stepdown: 1 }),
             // …and the GUARDED SUPERSET, which carries every arm at once (what the data twin prunes over).
             superset: scan({ ...BIG, shape: 'rect', w: 80, h: 60 }, { superset: true }),
         };
@@ -69,7 +75,11 @@ test('THE TENANT MOVED OUT — the fallback emits the PARAMETRIC body, not the l
     const r = await page.evaluate(async () => {
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
-        const tiny = emitMapped(pocketStack({ shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 })).text;
+        // t1444 — Ø == tool: the plunge arm's remaining domain. At Ø4 the pocket now REFUSES and emits no body at
+        // all, so every assertion below would have been checking the absence of a ladder in a program that has
+        // no cycle either — true, and vacuous. The refusal gets its own assertion instead (see `refusedTxt`).
+        const tiny = emitMapped(pocketStack({ shape: 'circle', dia: 6, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 })).text;
+        const refusedTxt = emitMapped(pocketStack({ shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 })).text;
         const big = emitMapped(pocketStack({ shape: 'circle', dia: 50, toolDia: 6, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 })).text;
         return {
             tinyBakedZ: (tiny.match(/^G1 Z-?[\d.]+ F/gm) || []).length,   // the literal ladder's baked steps
@@ -77,6 +87,8 @@ test('THE TENANT MOVED OUT — the fallback emits the PARAMETRIC body, not the l
             tinyHasLiveSeed: /^#81=3/m.test(tiny),
             tinyDeclaresWork: /@work \d+/.test(tiny),
             bigHasZ: /G1 Z/.test(big),
+            refusedNoCycle: !/WHILE \[#8\d/.test(refusedTxt) && !/G1 Z/.test(refusedTxt),   // t1444 — neither body: it refuses
+            refusedSays: /cannot fit/.test(refusedTxt),
         };
     });
     expect(r.tinyBakedZ, 'no BAKED Z ladder any more — that was the literal kernel').toBe(0);
@@ -84,6 +96,10 @@ test('THE TENANT MOVED OUT — the fallback emits the PARAMETRIC body, not the l
     expect(r.tinyHasLiveSeed, 'seeding the depth into the live register').toBe(true);
     expect(r.tinyDeclaresWork, 'and it declares its expected work, like every other holecycle program').toBe(true);
     expect(r.bigHasZ, 'while a normal pocket still cuts (the comparison has a working sibling)').toBe(true);
+    // t1444 — and the config this fixture vacated emits NEITHER body, which is why it could not stay: an absent
+    // literal ladder proves nothing about ownership when the parametric one is absent too.
+    expect(r.refusedNoCycle, 'a pocket the tool cannot fit emits no cycle at all — literal OR parametric').toBe(true);
+    expect(r.refusedSays, '…it refuses, with the reason').toBe(true);
 });
 
 /**

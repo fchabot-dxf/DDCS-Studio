@@ -44,7 +44,11 @@ test('SHOT — the too-small pocket emit: the arm act 1 re-pointed, drawn and de
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { createPreviewPanel } = await import('/viz/createPreviewPanel.js');
-        const text = emitMapped(pocketStack({ shape: 'circle', dia: 4, toolDia: 6, depth: 12, stepdown: 1, feed: 600, plunge: 150, clearance: 5 })).text;
+        // t1444 — Ø == tool, not smaller. This shot exists to picture the RE-POINTED plunge arm tracing whole and
+        // cutting; at Ø4 the pocket now refuses and the picture would have shown an empty canvas and a red
+        // refusal — evidence for a different claim entirely. The arm did not move, its domain did, so the shot
+        // follows it to the case it still covers: a pocket the tool exactly fills.
+        const text = emitMapped(pocketStack({ shape: 'circle', dia: 6, toolDia: 6, depth: 12, stepdown: 1, feed: 600, plunge: 150, clearance: 5 })).text;
         const host = document.createElement('div');
         host.style.cssText = 'position:fixed;inset:0;z-index:99999;display:grid;grid-template-columns:520px 1fr;background:#0e1116;color:#dfe6ee';
         const pre = document.createElement('pre');

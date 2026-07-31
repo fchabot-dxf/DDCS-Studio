@@ -11373,3 +11373,62 @@ true, not wanted, and it would have made the test fail the day framing changed f
 `pocket-tenant-extraction-1391` **11/11** (5 bridge · 3 refusal · normal arms · header · twin) — which is exactly the
 11 the full suite reported. Pocket family + tool-fit + round-trip **93/93** with **IRON RULE 11/11, same list, no
 growth**. Smoke **71/71**. Test-only change: 1 file, +76/−0 lines of product code.
+
+## t1448 (seat A) — THE WHOLE CORPUS SWEPT FOR THE FIXTURE SHAPE, so the next full suite CONFIRMS rather than finds
+
+The dispatch named four files and then applied the t1393 lesson to me: do not fix four and stop. So the sweep came
+first, and it was written to find the SHAPE rather than the word — which is exactly why the earlier sweep missed
+`pocket-tenant-extraction-1391` (it names the concept `TINY`, not `tooSmall`).
+
+### THE SWEEP, AND ITS OWN BLIND SPOT — found by comparing against what the full suite already knew
+
+A scanner over all **692** spec files: balanced multi-line object literals, extract every `key: number`, apply the
+product's own per-op spans (slot width · pocket min-side + 2·wallOffset · circle Ø · polygon apothem · hole Ø ·
+stroke) and flag `span < tool`. Pass 1 found 20 fixtures in 8 files — and **it did not find `cam-arm-classify-1410`,
+which the advisor's full suite had.** That is the check that mattered: the fixture is `{ ...P, w: 4, h: 4 }` and the
+TOOL comes from the spread, so a scanner requiring a tool key in the same literal cannot see it. Pass 2 was written
+for exactly that (a literal with a spread and a small feature override), and it caught it plus 18 more candidates.
+
+**A sweep that agrees with itself proves nothing; this one was calibrated against a known miss.**
+
+### THE VERDICT, TRIAGED BY RUNNING rather than by reading
+
+All 11 candidate files were run. **Exactly the four named failed, and nothing else** — so the corpus is now known,
+not guessed. What survives the sweep and is CORRECT is reported too, because a sweep that only lists what it changed
+cannot be told from one that only looked where it expected something:
+
+    pocket-rides-raster-1406 / raster-direction-1418   the `too small for its tool` entry in each REFUSED-arm list.
+                                                       Still true and still meaningful — it refuses one layer earlier
+                                                       now, and the claim is that it does not ride the raster.
+    surfacing-parametric-1329                          `w:120 h:5 toolDia:12` — a FALSE POSITIVE of my own heuristic,
+                                                       correctly: facing declares the tool as overhanging, so it has
+                                                       no fit comparison. The measured exception, holding.
+    pocket-wall-parametric-1433                        `{...base, w:4}` drives `wallFinishLines` (the ATOM) directly,
+                                                       not the pocket wizard, so the op-level refusal never applies.
+    depth-entry / tool-prefill / wizard-pathdatum      equal-or-larger, or a tool-table Ø rather than a feature.
+
+### THE FOUR, RESTATED — same rule, and one of them was nearly vacuous
+
+Fixtures move to EXACTLY-EQUAL where the ARM's property is the subject; the vacated strictly-smaller configs stay as
+refusal-contract cases. The `literal-hole-ownership-1389` pair is the one worth naming: its claim is *"pocket carries
+NO literal hole"*, and at Ø4 the arm now emits **no hole at all** — so it would have passed **VACUOUSLY**, an absent
+literal ladder proving nothing about ownership when the parametric one is absent too. Ø6 restores a real hole to own,
+and the refusing config is asserted separately (neither body, and it says why). `cam-arm-classify-1410` gains a
+`refused` arm asserting it exposes NOTHING — the interesting failure there would be silent, because that arm still
+carries a `placeonstock` and an arm still offering the plunge's three knobs would hand an operator pendant control
+over a program that cannot cut.
+
+### ⚠ AND THE SWEEP FOUND A PRODUCT DEFECT, NOT JUST FIXTURES
+
+`pocketRasterGap` returned *"a pocket narrower than its tool is a single centre plunge, not a raster"* for BOTH
+halves of a domain the ruling split. After t1444 only the exactly-tool-sized one plunges; the narrower one cuts
+nothing. That string is **operator-facing** (`armGap` feeds the CAM table's why-column), so a stale half is a wrong
+operator message — the class this project treats as seriously as wrong motion. Split in two. **The two specs that
+name that clause still PASSED**, because they assert the refusal and not the words, which is precisely why a sweep
+that only chased red tests would have walked past it.
+
+### GATE (fast tier)
+
+Touched + affected files **78/78** · every touched file + pocket family + tool-fit + round-trip **142/142** with
+**IRON RULE 11/11, same list, no growth** · smoke **71/71**. Sweep re-run: the 17 remaining `feature < tool` fixtures
+are ALL intentional refusal assertions or the three checked-and-clear cases above.

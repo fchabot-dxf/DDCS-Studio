@@ -53,7 +53,11 @@ test('PER-ARM — a rect pocket exposes its depth walk in every direction; a ref
             otherway: classifyExposable(def, { ...P, strategy: 'raster', direction: 'otherway' }),
             circle: classifyExposable(def, { ...P, shape: 'circle', dia: 50 }),
             rest: classifyExposable(def, { ...P, restDia: 3 }),
-            tiny: classifyExposable(def, { ...P, w: 4, h: 4 }),
+            // t1444 — EXACTLY TOOL-SIZED (POCKET_DEFAULTS carries toolDia 6). At 4x4 this arm now REFUSES and there
+            // is no holecycle to classify, so the assertion below would have been checking the knobs of an arm the
+            // build no longer takes. The plunge arm itself is unchanged — only its domain narrowed.
+            tiny: classifyExposable(def, { ...P, w: 6, h: 6 }),
+            refused: classifyExposable(def, { ...P, w: 4, h: 4 }),   // t1444 — strictly smaller: the refusal arm
             noParams: classifyExposable(def),                       // asked in the ABSTRACT — must stay fail-closed
         };
         return {
@@ -63,6 +67,7 @@ test('PER-ARM — a rect pocket exposes its depth walk in every direction; a ref
             circleWhy: arms.circle.depth && arms.circle.depth.reason,
             spiralWhy: arms.spiral.depth && arms.spiral.depth.reason,
             abstractWhy: arms.noParams.depth && arms.noParams.depth.reason,
+            refusedWhy: arms.refused.depth && arms.refused.depth.reason,
         };
     });
 
@@ -86,6 +91,14 @@ test('PER-ARM — a rect pocket exposes its depth walk in every direction; a ref
      */
     expect(r.expo.tiny, 'the too-small arm is a parametric holecycle plunge — its own live registers, and only those')
         .toEqual(['depth', 'plunge', 'stepdown']);
+    /**
+     * t1444 — AND THE ARM THAT REPLACED THE OTHER HALF OF `tiny`. A pocket the tool cannot fit emits a refusal and no
+     * motion, so there is no live register anywhere in it and the classifier must expose NOTHING. Asserted rather than
+     * assumed, because the interesting failure would be silent: the refusal arm still carries a `placeonstock`, and an
+     * arm that kept offering the plunge's three knobs would be handing an operator pendant control over a program that
+     * cannot cut — the same wrong-affordance class the fail-closed rule below exists for.
+     */
+    expect(r.expo.refused, 'a refused arm has no live registers at all — nothing to expose').toEqual([]);
     // …AND THE WHY IS THE BOUNDARY'S OWN WORDS, not a generic grey. This is the operator-facing half: it names the
     // setting to change to get the knob back.
     expect(r.onewayWhy, 'the one-way arm now says it rides through, like every other parametric arm').toContain('rides through emit');

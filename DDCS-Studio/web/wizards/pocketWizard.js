@@ -156,7 +156,14 @@ export function pocketRasterStrategy(params = {}) { return (params.strategy || '
 export function pocketRasterGap(params = {}) {
     const shape = params.shape || 'rect';
     if (shape !== 'rect') return `a ${shape} pocket clears through a JS contour walk, not the atom's analytic rectangle`;
-    if (pocketTooSmall(params)) return 'a pocket narrower than its tool is a single centre plunge, not a raster';
+    // t1444 — THE SENTENCE SPLIT WITH THE ARM, and leaving it whole would have made it a lie for half its domain.
+    // This read "a pocket narrower than its tool is a single centre plunge, not a raster" for BOTH cases; after the
+    // ruling only the exactly-tool-sized one plunges, and the narrower one cuts nothing at all. This string is
+    // operator-facing — `armGap` feeds the CAM table's why-column — so a stale half is a wrong operator message, which
+    // this project treats as seriously as wrong motion. Found by the t1448 fixture sweep, in the product rather than
+    // in a test: the two specs that name this clause still PASSED, because they assert the refusal and not the words.
+    if (pocketToolRefuses(params)) return pocketToolRefusal(params) + ' — so there is nothing to clear, by raster or otherwise';
+    if (pocketTooSmall(params)) return 'a pocket exactly its tool\'s size is a single centre plunge, not a raster';
     if (restValid(params)) return 'a rest pass rides inside the clearing place, and that place must hold the atom alone';
     const probe = { strategy: pocketRasterStrategy(params), direction: params.direction || 'bothways', entry: params.entry || 'plunge' };
     return surfaceRasterCovers(probe) ? '' : surfaceRasterGap(probe);
