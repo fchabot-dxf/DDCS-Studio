@@ -11786,3 +11786,68 @@ new spec `context-menu-viz-1460` **3/3** (the three presets + Fit + the settings
 entries landing where `setView` does, so menu and ViewCube agree · long-press) · all five menu surfaces +
 declared-work + round-trip **39/39** with **IRON RULE 11/11, same list, no growth** · smoke **71/71**. Screenshot in
 `test-results/t1460-shots/` and **eyeballed** — after the z-index fix above made it show anything at all.
+
+## t1462 (seat A) — SURFACE 5 BUILT · THE CONTEXT-MENU PASS IS COMPLETE (closing table below)
+
+### SURFACE 5 — Open + Delete, rename ABSENT by ruling, and the absence LOCKED
+
+Ruled (A). The two entries **click the row's own buttons** rather than re-implementing either: both actions end in
+something irreversible — a `location.reload()` that replaces the app, and a `removeEntry` that does not go to the
+Recycle Bin — so a second copy would be a second chance to get the index wrong on the two operations least able to
+survive it. Dispatching the real button also inherits the busy-row guard, the double-click lock and the delete
+confirm unchanged. The spec proves that by asserting the **outcome**: picking Delete raises the app's own confirm,
+naming the file and keeping its permanence warning.
+
+**RENAME IS ABSENT, AND THE ABSENCE IS INSTRUMENTED.** t1223's one-name rule is cited in the source beside the menu.
+The lock reads the shipping module and trips on ANY rename door — a `data-wsm-ren*` action, a `renameWorkspace`
+function, or a File System Access `.move()`. It goes RED the day the queued file-rename lands, which is the point:
+**a menu that quietly lacks an action the app has grown is the same defect as one that offers an action it lacks**,
+and only a lock catches the first kind.
+
+### ⚠ AND THIS SURFACE FOUND A REAL DEFECT IN THE SHARED MENU — one that made it unusable on every modal
+
+`.op-ctx-menu` was **`z-index: 1000`**. Every overlay in the app outranks that: `.wsm-overlay` is 13200, the profile
+modal 13100, the CAM authoring overlay 9998. So a context menu opened on ANY modal surface rendered **behind it** —
+present in the DOM, invisible on screen, un-clickable. It went unnoticed for the four surfaces built so far because
+none of them is a modal, and the **first real-mouse test inside one caught it immediately**: the click meant for an
+entry landed on the overlay. A DOM-only test would have passed forever.
+
+Fixed to **15000** — above every app overlay, and STRICTLY below `ui/dialog.js`'s 20000. A first cut used 20000 and
+**tied** with the dialog, leaving "does the confirm cover the menu?" to DOM order; the delete flow raises a confirm
+FROM a menu entry, so that ordering has to be a fact, not an accident. Asserted both ways.
+
+### THE PASS, CLOSED — six surfaces
+
+    #  SURFACE          MECHANISM                      ENTRIES                                   NOTE
+    1  Editor           openMenu + long-press          indent · outdent · comment/uncomment ·    comment/uncomment was BUILT
+                                                       edit-this-op                              (rule 1: it existed nowhere)
+    2  Blocks canvas    Blockly's OWN registry         edit op · show G-code                     joined Blockly's menu; its
+                                                       (+ Blockly's duplicate/delete/…)          5 entries would have been
+                                                                                                 suppressed by openMenu
+    3  CAM slot list    openMenu + long-press          edit · rebuild · export macro ·           ⟲ Rebuild was BUILT (rule 1);
+                                                       export .cam · delete                      else-if chain → slotActs table
+    4  Wizard bar       openMenu + long-press          open · wizard settings · reset values     targets the ENTRY, not the
+                                                                                                 group; presets absent (needs
+                                                                                                 an open form) — asserted
+    5  Workspace rows   openMenu + long-press          open · delete                             rename absent by t1223, and
+                                                                                                 LOCKED to go red when it lands
+    6  3D preview       openMenu + long-press          top · front · iso · fit · 3 settings      the ⚙ count is capped at 3 and
+                                                       links                                     asserted as a COUNT
+
+**TWO HARD RULES, HELD ON ALL SIX.** Every entry shortcuts an action with a visible door — and where one did not
+exist, rule 1 turned the "entry" into a small FEATURE rather than being waived (surfaces 1 and 3). Long-press is
+declared ONCE (`attachLongPress`) and synthesises a real `contextmenu` event, so each surface keeps a single
+listener written for the mouse and its touch twin can never drift.
+
+**THREE LESSONS THE PASS PAID FOR, all the same shape — drive the gesture, not the abstraction:** a synthesised
+`contextmenu` does not open Blockly's menu (v13 uses its own gesture handling); a Blockly menu item answers pointer
+events, not `.click()`; and `locator.click()` times out on an entry over an open dropdown or a fixed host, where a
+user simply clicks. Every one surfaced only because the tests drove the real mouse.
+
+### GATE (fast tier)
+
+new spec `context-menu-workspace-1462` **6/6** (the row shape pinned to the real renderer · the z-index ordering both
+ways · the ruling cited in source · the absence LOCK · Open+Delete with no rename entry · the delete confirm proving
+the menu inherited the real path) · all six menu surfaces + settings + round-trip **40/40** with **IRON RULE 11/11,
+same list, no growth** · smoke **71/71**. Screenshot in `test-results/t1462-shots/` and **eyeballed**: the menu
+sitting ON TOP of the workspace modal — which is the picture of the z-index fix.

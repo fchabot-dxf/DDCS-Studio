@@ -346,6 +346,49 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
         await renderPlace(ov);
     });
 
+    /**
+     * ── t1462 — SURFACE 5 OF THE CONTEXT-MENU PASS: the WORKSPACE ROWS ───────────────────────────────────────────
+     *
+     * OPEN + DELETE, and the menu CLICKS THE ROW'S OWN BUTTONS rather than re-implementing either. Both actions here
+     * end in something irreversible — a `location.reload()` that replaces the app, and a File System Access
+     * `removeEntry` that does not go to the Recycle Bin — so a second copy of either would be a second chance to get
+     * the index wrong, on the two operations in this app least able to survive it. Dispatching the row's real button
+     * also keeps the busy-row guard, the double-click lock and the delete confirm exactly as they are.
+     *
+     * ── ⚠ RENAME IS ABSENT, BY A SHIPPED RULING, AND ITS ABSENCE IS LOCKED ───────────────────────────────────────
+     * t1223's ONE-NAME RULE: *"the name input is GONE. The workspace's name IS its filename IS what every surface
+     * shows… Renaming is Save As."* There is no rename action anywhere to shortcut, and `Save As` is a HEADER action
+     * on the workspace that is currently OPEN — offering it on some other card would mean "open that one first",
+     * which the Open entry already is. (That reading was rejected explicitly: it is Open wearing a second label, and
+     * the user would discover the difference only after their file had not been renamed.)
+     *
+     * The queued FILE-rename feature is a different thing and PRESERVES one-name — it renames the file itself, so the
+     * one name simply changes. It lives in another lane. So this menu must not lag it: `context-menu-workspace-1462`
+     * asserts the absence AND instruments the module for a real rename capability, and goes RED the day one lands.
+     * A menu that quietly lacks an action the app has grown is the same defect as one that offers an action it lacks.
+     */
+    ov.querySelector('#wsmCards').addEventListener('contextmenu', async (e) => {
+        const row = e.target.closest && e.target.closest('.wsm-fp-row');
+        if (!row) return;
+        const openBtn = row.querySelector('[data-wsm-open]');
+        const delBtn = row.querySelector('[data-wsm-del]');
+        if (!openBtn) return;
+        const card = (ov.__cards || [])[Number(openBtn.dataset.wsmOpen)];
+        if (!card) return;
+        e.preventDefault();
+        const { openMenu } = await import('./opContextMenu.js');
+        openMenu([
+            {
+                label: `▶ Open ${card.name}`,
+                fn: () => openBtn.click(),
+                disabled: !!card.invalid,
+                title: card.invalid ? (card.reason || 'not a readable workspace') : '',
+            },
+            { label: '🗑 Delete…', fn: () => delBtn && delBtn.click(), disabled: !delBtn },
+        ], e.clientX, e.clientY);
+    });
+    import('./opContextMenu.js').then((m) => m.attachLongPress(ov.querySelector('#wsmCards'))).catch(() => { /* optional */ });
+
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
         // t1263 — the RE-ALLOW. A click is a user gesture, so the runtime will actually ask; the handle is the one
         // already remembered, so there is no OS picker and no chance of picking a different folder by mistake.

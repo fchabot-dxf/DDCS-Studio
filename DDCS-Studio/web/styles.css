@@ -833,7 +833,16 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 
 /* Right-click op context menu (Edit / Duplicate / Delete). */
 .op-ctx-menu {
-    position: fixed; z-index: 1000; min-width: 168px; padding: 4px;
+    /* t1462 — ABOVE THE MODALS IT OPENS INSIDE, below the app dialog it can raise.
+       This was 1000, which is under EVERY overlay in the app — `.wsm-overlay` is 13200, the CAM authoring overlay
+       9998 — so a context menu on any modal surface rendered BEHIND it: present in the DOM, invisible on screen,
+       and un-clickable. It went unnoticed while the menu only served the editor and the bar, which are not modals;
+       the workspace-row menu is the first one inside a modal, and its real-mouse test found it at once (a click
+       meant for an entry landed on the overlay). 15000 clears every app overlay (`.wsm-overlay` 13200, the profile
+       modal 13100, the CAM authoring overlay 9998) and stays STRICTLY BELOW `ui/dialog.js`'s 20000 — a first cut
+       used 20000 and TIED with it, leaving "does the confirm cover the menu?" to DOM order. It must not: the delete
+       flow raises a confirm FROM a menu entry, and that confirm has to sit on top. */
+    position: fixed; z-index: 15000; min-width: 168px; padding: 4px;
     display: flex; flex-direction: column; gap: 2px;
     background: var(--panel, #1d2530); border: 1px solid var(--border, rgba(255,255,255,.18));
     border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.5);
