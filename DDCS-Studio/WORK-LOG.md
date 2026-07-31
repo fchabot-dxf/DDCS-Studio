@@ -10972,3 +10972,79 @@ run can catch it. Nothing in this act touches the drill grid it asserts.
 cam-universal-scratch + cam-scratch-alloc + cam-scratch-guard **10/10** · the wider CAM tier (op-seed / substack /
 arm-classify / row-honesty / sim-seed / enum-params) **25/25** · smoke **71/71**. Test-only change — no product file
 moved, so no emitted G-code moved and the golden is untouched.
+
+## t1437 (seat A) — WIZARD VALUE PERSISTENCE: the form remembers what you last inserted, and it rides seams that already existed
+
+**The whole feature, and almost no new machinery.** One new leaf module (the store), one declared backup row, three
+call sites, one ruled button. The design work was mostly deciding *what* to remember — and the first plausible answer
+was wrong in a way that would have shipped a hole.
+
+### WHAT IS REMEMBERED — the op's params, not the form's DOM
+
+The obvious build is `_captureForm()`: the manager already walks `view.inputIds` and snapshots `.value`/`.checked` for
+the Cancel revert. **It is empty for every custom op** — `userOpView.inputIds` is `[]` by design, because that form is
+rendered from the def's bindings rather than a fixed id list. A feature built on it would have written `{}` for every
+user op and *looked* like it worked.
+
+So the record is `recordOp`'s params — the object every wizard already hands the block builder, restored through
+`_seedForm`, which is the DECLARED params→form path **edit-in-place already uses and proves every day**. No new codec,
+no third serialisation of "what the form holds", and custom ops work for free rather than as a second arm.
+
+### THE PROBE RECONCILIATION — they never compete, and that is the answer
+
+The dispatch asked which wins between this record and `applyProbeDefaults`. Neither, because the probe fields are
+**excluded from the record at capture**. `ddcs_probe_field_overrides` already records a probe field ONLY on a `change`
+event — a user COMMIT — so it knows exactly which fields the operator actually set, and it already beats the global
+`settings.probes`. This snapshot cannot know that: it holds whatever the global was at insert time. Remembering those
+would FREEZE a stale global into the form — change the probe's fast feed in Settings and the wizard keeps offering the
+old one, silently — which is precisely the contract the sticky-override comment says it preserves.
+
+So **last-used wins for every field the user actually set, and the mechanism that knows which those are is the one
+that answers.** The exclusion resolves param→field through the schema's own `paramFields` map, so `wizardLastValues`
+never carries a second copy of `PROBE_DEFAULT_FIELDS`' id list.
+
+### THE BAR OPENS A DIFFERENT WIZARD THAN I WAS TESTING — measured, and it corrected the act
+
+My round trips drove `openWiz('pocket')`. **The bar does not.** Most built-in entries declare an `opensAs` TWIN, so
+clicking "Pocket" opens `user_pocket_data` in the generic `#wiz_user` panel — a different view, a different record key,
+and the same wizard as far as the operator is concerned. The per-wizard reset button, keyed on `opensAs` alone in the
+first cut, therefore did nothing for a record written by the direct API; keyed on `type` alone it does nothing for the
+one the BAR writes.
+
+Both are now owned by the one row: the button shows when **either** key has a record and forgets **both**. And the
+round trip is run again through the twin, at the pixel, because a feature that only worked on the direct API would be
+a feature nobody could reach by clicking. That test is the one that found this.
+
+### EDIT-IN-PLACE NEEDED NO FLAG
+
+`openForEdit` calls `open()` and THEN seeds the op's params, so the op wins by the same ordering that already lets it
+beat the shipped defaults. One path, one rule — the last seed wins. Asserted both ways: opening an op to edit shows the
+OP's value even with a different value remembered (the worst failure would be silently rewriting an op the user opened
+to *read*), and re-committing that edit leaves the record where it was.
+
+**THAT SECOND HALF IS A JUDGEMENT CALL I WANT RULED.** An edit does produce an op with values, so "capture on insert"
+could reasonably include it. I shipped the narrow reading — new inserts only — because an edit is a correction to a
+PAST op rather than a statement about the next one, and narrow is the reversible direction. One line if you disagree.
+
+### THE AFFORDANCE — one button, and only when it has something to do
+
+"↺ Reset values" per row, shown only where a record exists (the rule the Restore-default button beside it already
+follows). It is a SEPARATE button rather than a clause on that one, for two reasons: (a) Restore-default reverts a
+wizard's NAME / ORDER / ICON and its factory twin — putting your icon back should not also throw away your feeds, and
+nothing on the button says it would; (b) it only exists on BUILT-INS, so a clause there would have left every custom
+op with no way to forget. **The preset row is untouched** and rides its own backup row, so resetting values can never
+delete a saved preset. Verified in the running app: the button appears on the Pocket row and on no other.
+
+### STORAGE
+
+`ddcs_lastvals_<type>`, one key per op type — the `ddcs_tpl_*` per-op-type shape — and ONE declared `BACKUP_STORES`
+row reading that prefix. The prefix is IMPORTED by backup.js rather than restated: a copied prefix is a registry row
+that silently backs up nothing. localStorage stays a buffer by principle; the row is what makes the values the user's,
+in their own `.ddcs`.
+
+### GATE (fast tier)
+
+the new spec **8/8** (two built-in round trips through a real page RELOAD at the pixel · the twin/bar gesture · a
+custom op · the probe exclusion · edit-in-place both ways · the backup row · the affordance through the real Settings
+panel) · wizard + settings + backup + workspace **48/48** · two wizard families + blocks/op-params **24/24** · smoke
+**71/71**.
