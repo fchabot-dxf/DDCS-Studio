@@ -162,7 +162,10 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
     expect(r.insetPairXs, '…and the PAIR walks the full centreline, A to B — the clause C2 retires').toEqual([0, 60]);
     expect(r.gap, 'the boundary records the measurement as history').toContain('a 60mm slot walked 3..57');
     expect(r.gap, 'and records C2 as what retired it').toMatch(/C2 \(t1490\) taught it a PAIR/);
-    expect(r.gap, 'while still NAMING the capabilities the atom does not declare').toMatch(/THE ROW RULE \(C1/);
+    // t1492 — C1 landed, so THE ROW RULE left this list too. What the boundary still names is THE AXIS (plus the
+    // descent's helix half), and asserting the NAME rather than a count is what let this line move by one word.
+    expect(r.gap, 'while still NAMING the capability the atom does not declare').toMatch(/THE AXIS \(C3\)/);
+    expect(r.gap, 'and recording the row rule as retired by C1, not as pending').toMatch(/C1 \(t1492\) taught it the wall rule/);
 
     // 3 — THE BEARING, and the arc-ends hypothesis REFUTED rather than assumed
     expect(r.bearings.filter((b) => Math.abs(Math.abs(b) - 30) < 0.01 || Math.abs(Math.abs(b) - 150) < 0.01).length,

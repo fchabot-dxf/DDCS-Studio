@@ -139,13 +139,19 @@ test('THE REMAINDER — C2 fixes the SPAN; the row rule inside it is still C1\'s
             landed: arc.SLOT_CAPABILITIES.find((c) => c.id === 'two-axis-inset').landed,
         };
     });
-    // THE ROWS ARE STILL THE ATOM'S OWN RULE: half a stepover inside the walked edge, so the far wall is missed.
-    expect(r.rowYs[0], 'the first row still sits half a stepover in, not ON the wall — C1\'s job').toBe(-1.8);
-    expect(r.rowYs[0], 'a slot needs it at −3').not.toBe(-3);
-    // AND THE DECLARATIONS SAY BOTH HALVES — the clause C2 retires, and the ones that still stand.
+    /**
+     * ⚠ t1492 — C1 HAS SINCE LANDED, and this is where C2's remainder is re-stated rather than left reading as
+     * though the row rule were still open. What C2 actually asserted is UNCHANGED and still asserted: a walk that
+     * does not ask for the wall anchor still sits half a stepover in, because `fit` is the default and C2 never
+     * touched the row rule. What moved is the BOUNDARY's wording — and because that wording NAMES its capabilities
+     * instead of counting them, this assertion moves by one name rather than by a number nobody would have checked.
+     */
+    expect(r.rowYs[0], 'a FIT walk still sits half a stepover in — C2 did not touch the row rule').toBe(-1.8);
+    expect(r.rowYs[0], 'which is not where a slot needs it').not.toBe(-3);
+    // AND THE DECLARATIONS SAY BOTH HALVES — the clause C2 retires, and what still stands now C1 has landed too.
     expect(r.gap, 'the boundary records the inset clause as retired by C2').toMatch(/C2 \(t1490\) taught it a PAIR/);
-    expect(r.gap, 'and still names the capabilities the atom does not declare, rather than counting them').toMatch(/THE ROW RULE \(C1/);
-    expect(r.gap, 'the axis among them').toMatch(/THE AXIS \(C3\)/);
+    expect(r.gap, 'and the row rule as retired by C1').toMatch(/C1 \(t1492\) taught it the wall rule/);
+    expect(r.gap, 'with THE AXIS the capability that still stands').toMatch(/THE AXIS \(C3\)/);
     expect(r.landed, 'and the arc records C2 as shipped').toMatch(/SHIPPED at t1490/);
     expect(r.landed, 'while saying plainly that it does NOT make the atom slot-ready').toMatch(/DOES NOT MAKE THE ATOM SLOT-READY/);
 });

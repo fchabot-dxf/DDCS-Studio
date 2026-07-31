@@ -166,6 +166,19 @@ export const SLOT_CAPABILITIES = [
             + 'wherever (width − tool) is a whole multiple of the stepover (the three cases above). THE DIVERGENCE ARM '
             + 'is the other three, where the assert is that the last pass lands ON the wall rather than past it — i.e. '
             + 'the bridge proves the clamp, not just the phase',
+        /** t1492 — what actually landed, recorded on the row (the shape C4 introduced at t1487). */
+        landed: 'SHIPPED at t1492, phase AND clamp in ONE act as this row insisted. `rasterRowAnchorOf` declares the '
+            + 'rule (fit = every existing caller, wall = a slot), and BOTH halves fall out of one count and one '
+            + 'guard: n = FIX[(span - 0.001)/step] + 2, row = origin + i*step, IF row > far wall THEN row = far wall. '
+            + 'At a WHOLE multiple the last loop row lands exactly ON the wall and the clamp is a no-op; where it is '
+            + 'not, the clamp is what stops the overshoot this row measured (+1.20 / +1.20 / +0.60, all OVERSIZE). '
+            + 'BRIDGED against slotPath move for move at TEN widths - the three whole-multiple cases, the three '
+            + 'divergent ones, two narrower than a stepover and two long - all MATCH. The fit default is asserted '
+            + 'byte-identical over 432 configs, and an unknown word falls to fit like every other walk word. '
+            + '⚠ ONE DIVERGENCE NAMED RATHER THAN PAPERED OVER: at width == tool the band is zero, where slotPath '
+            + 'emits a single centreline pass and the atom REFUSES (its collapsed-inset guard fires first, in its own '
+            + 'words). That is the atom being louder, not wronger, and it is the degenerate the slot kernel has its '
+            + 'own arm for.',
         stepsAfter: 'two-axis-inset — rows anchor to the walked span, so the span must be right first or a row bug and '
             + 'an inset bug are indistinguishable in the output',
         registers: '0 — the row position moves from `step/2 + i·step` to `−half + i·step`, and `half` is derived from '

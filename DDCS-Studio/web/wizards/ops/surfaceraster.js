@@ -116,6 +116,23 @@ export function rasterRowAxisOf(p = {}) {
 }
 
 /**
+ * ── t1492 (C1) — WHICH ROW RULE THIS WALK USES, declared in one place like the axis and the direction ────────────
+ *
+ * 'fit'  — rows half a stepover inside the walked edge, keeping those that land inside. Surfacing's rule (the tool
+ *          overhangs) and a pocket's (a wall-finish pass follows). THE DEFAULT, so every existing caller is
+ *          untouched, and an unknown word falls here exactly as `rasterRowAxisOf` and `rasterDirectionOf` do.
+ * 'wall' — passes anchored ON the wall plus a forced final pass clamped to the far one, so the finished channel is
+ *          exactly the width that was typed. A slot's rule, and NOTHING else asks for it today.
+ *
+ * ⚠ It is a WALK rule, not a geometry input: it changes where the passes sit inside the span C2's inset decides, and
+ * the arc names C2 as its precondition for exactly that reason — get the span wrong first and a row bug and an inset
+ * bug are indistinguishable in the output.
+ */
+export function rasterRowAnchorOf(p = {}) {
+    return String(p.rowAnchor == null ? '' : p.rowAnchor).trim() === 'wall' ? 'wall' : 'fit';
+}
+
+/**
  * ── t1490 (C2) — THE INSET IS A PAIR, AND THIS IS THE ONE PLACE A CALLER'S INSET WORDS BECOME ONE ─────────────────
  *
  * THE DEFECT IT EXISTS FOR, measured at t1442: the atom held ONE inset and moved it on BOTH axes, so handing it a
@@ -385,9 +402,16 @@ export function surfaceRasterWorkSteps(p = {}) {
     const concentric = String(p.strategy || '') === 'concentric';
     // t1429 — the row count is counted in the span the rows step ACROSS, which the row axis chooses. `concentric` has
     // no rows to turn, so its shorter-side count is unaffected — the same asymmetry SURFACE_RASTER_AXES already declares.
+    // t1492 (C1) — and the ROW ARM now has two forms, because the walk does. A wall-anchored walk cuts the passes
+    // from the near wall PLUS the forced final one, which is one more pass than the fit rule declares on the same
+    // span — so a declaration still reading the fit formula would under-count every slot-shaped job by exactly the
+    // pass the clamp adds. The formulas are the ones the macro emits, which is what keeps this a declaration.
+    const crossSpan = rasterRowAxisOf(p) === 'y' ? w : h;
     const passes = concentric
         ? Math.max(1, Math.floor((Math.min(w, h) - 0.001) / (2 * step)) + 1)
-        : Math.max(1, Math.floor(((rasterRowAxisOf(p) === 'y' ? w : h) - step / 2) / step) + 1);
+        : (rasterRowAnchorOf(p) === 'wall'
+            ? Math.max(2, Math.floor((crossSpan - 0.001) / step) + 2)
+            : Math.max(1, Math.floor((crossSpan - step / 2) / step) + 1));
     /**
      * ── t1440 — RE-CALIBRATED AGAINST THE ENGINE'S OWN STEP COUNT, BY DIFFERENCING ────────────────────────────────
      *
@@ -611,6 +635,12 @@ export function surfaceRasterLines(p = {}) {
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked,
         direction: rasterDirectionOf(p),   // t1418 — the row walk reads it; ringWalk does not, and SURFACE_RASTER_AXES says so
         rowAxis: rasterRowAxisOf(p),       // t1429 — likewise: the ROW walk reads it, ringWalk has no rows to turn
+        // t1492 (C1) — RESOLVED HERE, at the seed, with the other two walk words. The first cut left it out of this
+        // object and read it off `o` inside the walk, where it was undefined and silently fell to 'fit' — the exact
+        // t1402 shape (ringWalk never destructured `entry`, so a ramp selection emitted a plunge in released code).
+        // Caught by the slotPath bridge on the first run rather than by reading the code, which is why the bridge is
+        // written before the capability is trusted.
+        rowAnchor: rasterRowAnchorOf(p),
         wT, hT, geoLive: wT.live || hT.live,   // t1425 — the ring count resolves its min at RUN time when either side is live
         liveGap: surfaceRasterLiveGap(p),      // t1425 — a descent that bakes geometry degrades honestly rather than baking against a dial
         rot, mv, AX, TM, LBL };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
@@ -876,7 +906,40 @@ function rowWalk(o) {
      * kind this body already emits (`#48 * #44`), so it needs no form the controller has not already been given.
      */
     const END_X = () => AX(null, a0, [TM(SPAN, 0.5), TM(`${SPAN} * ${V.dir}`, -0.5)]);
-    const count = [
+    /**
+     * ── t1492 (C1) — THE ROW RULE IS DECLARED, AND ITS TWO FORMS CANNOT BE SPLIT ─────────────────────────────────
+     *
+     * FIT (the default, and every caller that exists today): rows sit at step/2 + i·step — half a stepover inside the
+     * walked edge — and the count is how many of THOSE land inside. Right for surfacing (the tool overhangs the edge)
+     * and for a pocket (a wall-finish pass follows), and byte-identical here by construction: the `fit` arm below is
+     * the exact text this file has always emitted.
+     *
+     * WALL (what a slot needs): passes anchored ON the wall, plus a FORCED final pass clamped to the far wall, so the
+     * finished channel is exactly the width that was typed.
+     *
+     * ⚠ THE PHASE AND THE CLAMP LAND TOGETHER OR NOT AT ALL, and that is measured, not stylistic. The arc re-measured
+     * it at t1478: phase-corrected rows coincide with the slot kernel exactly when (width − tool) is a whole multiple
+     * of the stepover; where it is NOT, the phased-but-unclamped last row OVERSHOOTS the far wall — +1.20mm at
+     * 12×Ø6@40%, +1.20 at 16.8, +0.60 at 15 — every one in the OVERSIZE, destructive direction. So the phase ALONE is
+     * worse than neither, and the clamp is not a refinement of it but its other half.
+     *
+     * ── HOW BOTH FALL OUT OF ONE COUNT AND ONE GUARD (verified against `slotPath` on all six arc widths) ──────────
+     *
+     *     n   = FIX[(span − 0.001)/step] + 2      rows from the near wall, PLUS the forced final one
+     *     row = origin + i·step
+     *     IF row > far wall THEN row = far wall
+     *
+     * At a WHOLE multiple the last loop row lands exactly ON the wall and the clamp is a no-op (span 12, step 2.4 →
+     * −6,−3.6,−1.2,1.2,3.6,6). Where it is not, the clamp is what stops the overshoot (span 6 → −3,−0.6,1.8,[4.2→3]).
+     * Both reproduce `slotPath` move for move. The −0.001 is the same collapse boundary the ring count already uses,
+     * and it is what keeps the whole-multiple case from emitting the wall twice.
+     */
+    const wallAnchored = rasterRowAnchorOf(o) === 'wall';
+    const FAR_WALL = crossE(0, CROSS);          // the far wall as this frame prints it
+    const count = wallAnchored ? [
+        `${V.n}=[FIX[[${CROSS} - 0.001] / ${V.step}] + 2]   ( passes: from the near wall, plus the FORCED final one on the far wall )`,
+        `IF ${V.n} < 2 THEN ${V.n}=2   ( a channel narrower than one stepover still gets both walls )`,
+    ] : [
         // THE ROW COUNT — not h/step rounded up. Rows sit at step/2 + i·step, so the count is how many of THOSE land
         // inside the area. The two formulas agree at 150/7.2 and 40/5 and disagree at 60/7.2 (8 rows, not 9), where
         // rounding up puts a row at 61.2 — off the far edge of a 60mm face, cutting air.
@@ -885,7 +948,14 @@ function rowWalk(o) {
         `${V.n}=[FIX[[${CROSS} - ${V.step} / 2] / ${V.step}] + 1]   ( rows that FIT: the last lands inside the area, not past it )`,
         `IF ${V.n} < 1 THEN ${V.n}=1   ( a face narrower than one stepover is still one row )`,
     ];
-    const rowY = `    ${V.y}=${crossE(0, `${V.step} / 2 + ${V.i} * ${V.step}`)}`;
+    const rowLines = wallAnchored ? [
+        `    ${V.y}=${crossE(0, `${V.i} * ${V.step}`)}`,
+        // THE CLAMP, and it is the half that keeps the channel from going OVERSIZE. Without it the last pass rides
+        // past the wall by up to one stepover, into the material the operator did not ask to remove.
+        `    IF ${V.y} > ${FAR_WALL} THEN ${V.y}=${FAR_WALL}   ( the final pass rides the far wall, never past it )`,
+    ] : [
+        `    ${V.y}=${crossE(0, `${V.step} / 2 + ${V.i} * ${V.step}`)}`,
+    ];
 
     /**
      * ── t1418 — THE ONE-WAY WALK. Every row cut the same way; the tool LIFTS between them ─────────────────────────
@@ -909,7 +979,7 @@ function rowWalk(o) {
         return { count, body: [
             `  ${V.i}=0`,
             `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
-            rowY,
+            ...rowLines,
             `    IF ${V.i} > 0 GOTO${LBL.rowStepLabel}   ( already down: only the FIRST row of a level gets the descent )`,
             `    G0 ${P(FROM(), ROW_Y())}`,
             ...descent,
@@ -935,7 +1005,7 @@ function rowWalk(o) {
         // backwards. The equivalence bridge caught it at move 42 of 84.
         `  ${V.dir}=1   ( the raster restarts at the near corner for each level )`,
         `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
-        rowY,
+        ...rowLines,
         `    IF ${V.i} > 0 GOTO${LBL.rowStepLabel}   ( already down: step over at depth rather than lifting between rows )`,
         // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 < 0]` looked
         // like it would evaluate 0/1 and the tracer read it as a plain 1, putting the first plunge off the corner.
