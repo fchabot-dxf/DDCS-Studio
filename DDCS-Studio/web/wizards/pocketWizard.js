@@ -24,6 +24,7 @@ import { regionDesc } from './ops/region.js';
 import { restValid } from './ops/restmachining.js';   // t871 — REST MACHINING: append a corner-clear pass with a smaller 2nd tool
 import { pocketInsetMm } from './ops/pocketfill.js';   // t1406 — the ONE reading of how far in a pocket's tool centre sits
 import { surfaceRasterCovers, surfaceRasterGap } from './ops/surfaceraster.js';   // t1406 — the atom's own declared envelope decides whether this pocket may ride it
+import { toolTooLarge, toolFitRefusal } from './ops/toolFit.js';   // t1444 — the ONE too-small boundary (strictly smaller refuses, exactly equal is allowed)
 
 /** The TRUE pocket region (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)) — the size you
  *  type, before insetting. Shape-centred at (originX, originY) except rect (its corner). */
@@ -75,6 +76,38 @@ function insetTooSmall(rg, inset) {
 export function pocketTooSmall(params = {}) {
     const r = Math.max(0.1, num(params.toolDia, 6)) / 2;
     return insetTooSmall(regionDesc(trueRegionParams(params)), r - num(params.wallOffset, 0));
+}
+
+/**
+ * ── t1444 — THE LARGEST TOOL THIS POCKET CAN HOLD, in mm. The number both the refusal and its SENTENCE read ───────
+ *
+ * `pocketTooSmall` answers "does the inset degenerate" and that is the right question for the PLUNGE arm, but it
+ * cannot tell an operator anything: it is a boolean about an inset nobody typed. The user's ruling needs two things
+ * it does not have — the STRICT side of the same boundary (equal is allowed, smaller refuses) and a millimetre to
+ * put in the sentence — so the same geometry is expressed as the tool Ø at which the region closes.
+ *
+ * IT IS `insetTooSmall` SOLVED FOR THE TOOL, not a second opinion about pocket geometry: the inset that closes each
+ * shape is its inradius (rect → min(w,h)/2 · circle → r · polygon → r·cos(π/n), the apothem · ellipse → min(rx,ry)),
+ * and the inset a pocket walks with is `tool/2 − wallOffset`. Setting them equal gives the Ø below. The 1444 spec
+ * sweeps both against each other so the re-expression cannot drift from the predicate that has always shipped.
+ */
+export function pocketMaxToolDia(params = {}) {
+    const rg = regionDesc(trueRegionParams(params));
+    const inrad = rg.kind === 'circle' ? rg.r
+        : rg.kind === 'polygon' ? rg.r * Math.cos(Math.PI / Math.max(3, Math.round(rg.sides || 6)))
+            : rg.kind === 'ellipse' ? Math.min(rg.rx, rg.ry)
+                : Math.min(rg.w, rg.h) / 2;
+    return 2 * (inrad + num(params.wallOffset, 0));
+}
+
+/** Is this pocket STRICTLY smaller than its tool → refuse everywhere? (Exactly tool-size keeps its plunge — the ruling.) */
+export function pocketToolRefuses(params = {}) {
+    return toolTooLarge(pocketMaxToolDia(params), Math.max(0.1, num(params.toolDia, 6)));
+}
+
+/** The operator sentence for a pocket the tool cannot fit, or '' — one wording for emit, preview, twin and CAM pack. */
+export function pocketToolRefusal(params = {}) {
+    return toolFitRefusal(pocketMaxToolDia(params), Math.max(0.1, num(params.toolDia, 6)), 'pocket');
 }
 
 /** The pocket CENTRE (the tooSmall drill-plunge point) — rect = corner+size/2; circle/polygon/ellipse = the shape origin.
@@ -257,6 +290,31 @@ export function pocketStack(params = {}, opts = {}) {
         hole.params = { pattern: 'single', cycle: 'peck', x0: cx, y0: cy, depth, peck: by, feed: plunge, clearance: clr };
         return makePlace(params, bbox, hole, 'clear');   // t1406 — the too-small arm IS the clearing place for its state
     };
+    /**
+     * ── t1444 — THE REFUSAL ARM: strictly smaller than the tool cuts NOTHING, and says why (user-ruled) ────────────
+     *
+     * `_tooSmall` used to mean one thing and now covers two states that the ruling separates: a pocket the tool
+     * exactly fills still gets its centre plunge (the normal way to make a tool-sized pocket — nothing about it is
+     * approximate), while one the tool CANNOT fit gets no motion at all, because any hole such a cut could make is
+     * OVERSIZE BY CONSTRUCTION. Plunging a Ø12.7 tool into a "Ø6.35 pocket" produced a Ø12.7 hole and a program that
+     * looked finished, which is the same silent-substitution class as the slot's width clamp.
+     *
+     * IT RIDES `assign`, NOT A NEW BLOCK, and it labels its message `ERROR:` — the idiom the ATC wizards already use
+     * for exactly this (`#1505=1 ( ERROR: Tool Setter missed )`). That label is what the engine reads back to tell a
+     * REFUSAL from an HMI prompt on the same register, so the preview gets the sentence for free rather than through
+     * a second pocket-shaped code path.
+     *
+     * ⚠ IT KEEPS ITS PLACE BLOCK, and the first cut of this did not — which the E0 binding derivation caught at once
+     * ("spec originX matched 0 blocks"). The reasoning that dropped it ("there is no toolpath to place") was wrong on
+     * both counts: every binding spec resolves `originX`/`originY` THROUGH the arm's one `placeonstock`, so an arm
+     * without one cannot be instantiated at all — and a refused pocket still HAS an origin and a footprint that the
+     * operator can move. What it has no more of is MOTION, which is the child, not the placement.
+     */
+    const refusePlace = () => {
+        const b = newBlock('assign');
+        b.params = { var: '#1505', value: '1', note: `ERROR: ${pocketToolRefusal(params)}` };
+        return makePlace(params, bbox, [b], 'clear');   // the arm's ONE place — the op still has a position; it just cuts nothing
+    };
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
     // t871 — the REST section rides INSIDE the main clear's ONE placeonstock (a second place would duplicate the placement
     // bindings): a StepDown of the pocketrest leaf, preceded by a STATIC marker comment (so the twin freezes byte-identically
@@ -270,7 +328,8 @@ export function pocketStack(params = {}, opts = {}) {
     const clearPlace = (kids, restKids) => { const down = newBlock('stepdown'); down.params = { to: depth, by, confirmEvery: num(params.confirmEvery, 0) }; down.children = kids; return makePlace(params, bbox, restKids ? [down, ...restKids] : [down], 'clear'); };   // t1031 — confirmEvery pause (0 = off → byte-identical)
 
     if (!superset) {   // concrete: the geometry-derived tooSmall + strategy select the arm directly
-        if (tooSmall) return [makeStart(params), wcs, drillPlace(), makeEnd(params)];
+        if (pocketToolRefuses(params)) return [makeStart(params), wcs, refusePlace(), makeEnd(params)];   // t1444 — strictly smaller: no motion
+        if (tooSmall) return [makeStart(params), wcs, drillPlace(), makeEnd(params)];                     // …exactly tool-size keeps its plunge
         // t1406 — the RE-POINTED arm. The predicate is the one source (pocketRasterGap); everything it refuses falls
         // through to the literal build below, unchanged and byte-identical, which is what makes the boundary testable.
         if (pocketRidesRaster(params)) {
@@ -292,13 +351,19 @@ export function pocketStack(params = {}, opts = {}) {
     ];
     return [
         makeStart(params), wcs,
-        GUARD({ param: '_tooSmall', is: true }, [drillPlace()]),
-        GUARD({ param: '_tooSmall', is: false }, [
-            GUARD({ param: '_para', is: true }, strategyFork((s) => [rasterPlace(s)], () => [wallPlace()])),
-            GUARD({ param: '_para', is: false }, [clearPlace(
-                strategyFork((s) => [fillLeaf(s)], () => [wallLeaf()]),
-                [GUARD({ param: '_rest', is: true }, restInner())],
-            )]),   // t871 — the rest corner-clear rides the SAME place, on the geometry-derived `_rest` guard (absent → byte-identical)
+        // t1444 — the REFUSAL fork sits OUTSIDE `_tooSmall` and `_tooSmall` nests inside its false arm, because
+        // refuse ⊂ too-small (a pocket the tool cannot fit is certainly one the inset closes). Nesting keeps the two
+        // guards independent instead of crossed — the same reason `_para` sits inside `_tooSmall:false` below.
+        GUARD({ param: '_refuse', is: true }, [refusePlace()]),
+        GUARD({ param: '_refuse', is: false }, [
+            GUARD({ param: '_tooSmall', is: true }, [drillPlace()]),
+            GUARD({ param: '_tooSmall', is: false }, [
+                GUARD({ param: '_para', is: true }, strategyFork((s) => [rasterPlace(s)], () => [wallPlace()])),
+                GUARD({ param: '_para', is: false }, [clearPlace(
+                    strategyFork((s) => [fillLeaf(s)], () => [wallLeaf()]),
+                    [GUARD({ param: '_rest', is: true }, restInner())],
+                )]),   // t871 — the rest corner-clear rides the SAME place, on the geometry-derived `_rest` guard (absent → byte-identical)
+            ]),
         ]),
         makeEnd(params),
     ];

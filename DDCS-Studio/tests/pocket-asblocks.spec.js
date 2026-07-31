@@ -49,9 +49,18 @@ test('cutting wizards emit through their block stacks (deterministic + correct)'
      * (`G1 Z[0 - #83] F150`). The CLAIM is unchanged — a pocket narrower than its tool becomes a single plunge with no arc
      * wall — so it is asserted where that is now visible: one hole in the parametric header, the depth reaching the
      * register, a Z FEED move driven by a register, and still no arc.
+     *
+     * ⚠ t1444 — THE SAMPLE MOVED FROM Ø4 TO Ø6, and the reason is the whole of the user's ruling. A Ø4 pocket asked of
+     * a Ø6 tool is STRICTLY SMALLER: it now refuses with no motion, because the plunge it used to emit made a Ø6 hole
+     * where Ø4 was asked. The plunge ARM is unchanged and still shipping — for a pocket the tool EXACTLY fills — so
+     * the sample is the equal case and the claim it carries is untouched. The refusal gets its own assertion below
+     * rather than replacing this one: retiring live coverage of a shipping arm to make a red test pass is how an arm
+     * stops being tested at all.
      */
-    const tiny = { shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 };
+    const tiny = { shape: 'circle', dia: 6, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 };
     const tinyTxt = new PocketWizard().generate(tiny);
+    const refuseTxt = new PocketWizard().generate({ ...tiny, dia: 4 });   // t1444 — strictly smaller: no motion at all
+    out.pocketRefuse = { says: /cannot fit/.test(refuseTxt), flags: /#1505=1/.test(refuseTxt), noMotion: !/^\s*G[0-9]+\s+[XY]/m.test(refuseTxt) };
     const tinyHeader = /parametric: 1 hole \(single\) x peck/.test(tinyTxt);
     const tinyDepthSeed = /^#81=3/m.test(tinyTxt);
     const tinyZFeed = /G1 Z\[[^\]]*#\d+[^\]]*\] F/.test(tinyTxt);
@@ -74,7 +83,9 @@ test('cutting wizards emit through their block stacks (deterministic + correct)'
   expect(r.pocketCircleArc, 'circle pocket finishes with a G3 arc wall').toBe(true);
   // Asserted PART BY PART rather than as one boolean: a composed `a && b && c` reports only "false" and says nothing
   // about which half of the claim broke, which cost real time when this assert first went red at t1391.
-  expect(r.pocketTiny, 'tiny pocket falls back to a single parametric plunge, no arc (t1391: through holecycle)').toEqual({
+  expect(r.pocketRefuse, 't1444 — a pocket STRICTLY smaller than its tool refuses: the reason, the flag, and NO motion')
+    .toEqual({ says: true, flags: true, noMotion: true });
+  expect(r.pocketTiny, 'an EXACTLY tool-sized pocket still falls back to a single parametric plunge, no arc (t1391: through holecycle)').toEqual({
     tinyHeader: true, tinyDepthSeed: true, tinyZFeed: true, tinyNoArc: true,
   });
   expect(r.drill.holes, 'drill grid 3x2 = 6 holes').toBe(6);

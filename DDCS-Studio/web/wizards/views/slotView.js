@@ -31,7 +31,10 @@ function applyTool() {
 /** 2D layout: the slot centreline + its two edges, with draggable A, B and a width handle. */
 function buildSlotSpec(params, stock) {
     const ax = num(params.ax, 0), ay = num(params.ay, 0), bx = num(params.bx, 60), by = num(params.by, 0);
-    const W = Math.max(num(params.toolDia, 6), num(params.width, num(params.toolDia, 6)));
+    // t1444 — the 2D draws the width you TYPED. The clamp made a too-narrow slot draw itself at tool width, so the
+    // canvas agreed with a cut the emit now refuses to make — the same silent repair, on the surface the operator
+    // is actually looking at. It is a no-op for every slot that still cuts (width ≥ tool).
+    const W = num(params.width, num(params.toolDia, 6));
     const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len, ny = dx / len;          // perpendicular unit
     const mx = (ax + bx) / 2, my = (ay + by) / 2;  // midpoint

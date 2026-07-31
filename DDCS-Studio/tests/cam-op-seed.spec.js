@@ -25,7 +25,12 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
     const surface = seedFromOp(op('surfacing', P_SURF));
     const corner = seedFromOp(op('corner', P_CORNER));
     const drill = seedFromOp(op('drill', P_DRILL));
-    const slot = seedFromOp(op('slot', { ax: 0, ay: 0, bx: 100, by: 0, depth: 8, stepdown: 2, feed: 600, clearance: 5, rpm: 8000, width: 10, toolDia: 6 }));
+    // t1444 — WIDTH 10 ON A Ø6 TOOL NO LONGER PACKS: the CAM macro cuts ONE centreline pass, so it would cut 6mm
+    // where 10 was asked (t1442 measured it). The fixture moves to the case the macro DOES cut correctly —
+    // width == tool — and the refusal it now gets instead is asserted below rather than left as a hole.
+    const slot = seedFromOp(op('slot', { ax: 0, ay: 0, bx: 100, by: 0, depth: 8, stepdown: 2, feed: 600, clearance: 5, rpm: 8000, width: 6, toolDia: 6 }));
+    const slotWide = seedFromOp(op('slot', { ax: 0, ay: 0, bx: 100, by: 0, depth: 8, width: 10, toolDia: 6 }));
+    const slotNarrow = seedFromOp(op('slot', { ax: 0, ay: 0, bx: 100, by: 0, depth: 8, width: 3, toolDia: 6 }));
 
     // the wizard's ACTUAL absolute stepover for the surface sample. t1361 — the switch retires the `surfacefill`
     // block AND its flat mm socket: `surfaceraster` carries the two knobs the millimetre is DERIVED from, which is
@@ -50,6 +55,8 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
       unsupported: {
         middleSingle: seedFromOp(op('middle', { featureType: 'pocket', twoAxis: false })).unsupported,
         polygon: seedFromOp(op('pocket', { shape: 'polygon', dia: 50 })).unsupported,
+        slotWide: slotWide.unsupported, slotNarrow: slotNarrow.unsupported,   // t1444 — the two slot pack gates
+        pocketNarrow: seedFromOp(op('pocket', { shape: 'rect', w: 4, h: 40, toolDia: 12 })).unsupported,   // t1444 — strictly smaller than its tool
         contour: seedFromOp(op('contour', {})).unsupported,
       },
       val: {
@@ -79,6 +86,10 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
   // unsupported forks
   expect(r.unsupported.middleSingle, 'middle single-axis unsupported').toContain('BOTH-AXIS');
   expect(r.unsupported.polygon, 'pocket polygon unsupported').toContain('no CAM generator');
+  // t1444 — the two "never emit a wrong slot" gates, each refusing in the operator's own terms
+  expect(r.unsupported.slotWide, 'a slot wider than its tool refuses at PACK, with somewhere to go').toContain('Slot wizard');
+  expect(r.unsupported.slotNarrow, 'a slot NARROWER than its tool refuses too — the user ruling').toContain('cannot fit');
+  expect(r.unsupported.pocketNarrow, '…and so does a pocket the tool cannot fit').toContain('cannot fit');
   expect(r.unsupported.contour, 'contour unsupported').toContain('NO CAM generator');
   // t1089 — drill/bore 'single' is NO LONGER unsupported: it is a declared generator pattern (see the note at its seed
   // above). Asserting the POSITIVE invariant rather than deleting the case, so the suite guards the fix.
@@ -198,7 +209,7 @@ test('S1 fix hardening: edge/slot/drill/middle twins seeded + drill placement so
     const op = (opType, params) => ({ opType, params });
     const byKey = (res, k) => (res.fields || []).find((f) => f.key === k);
     const edge = seedFromOp(op('user_edge_data', { axis: 'Y', dir: 'neg', wcs: 'G56', dist: 60, retract: 3, radius: 2, f_fast: 200, f_slow: 40 }));
-    const slot = seedFromOp(op('user_slot_data', { ax: 5, ay: 10, bx: 105, by: 10, depth: 8, stepdown: 2, feed: 600, rpm: 8000, toolDia: 6, width: 10 }));
+    const slot = seedFromOp(op('user_slot_data', { ax: 5, ay: 10, bx: 105, by: 10, depth: 8, stepdown: 2, feed: 600, rpm: 8000, toolDia: 6, width: 6 }));   // t1444 — width == tool: the case the centreline macro cuts correctly (width 10 now refuses at pack)
     const drill = seedFromOp(op('user_drill_data', { pattern: 'grid', x0: 0, y0: 0, originX: 100, originY: 50, cols: 3, rows: 2, dx: 20, dy: 20, depth: 12, peck: 3, feed: 280, rpm: 8000 }));
     const inside = seedFromOp(op('user_middle_data', { featureType: 'pocket', twoAxis: true, wcs: 'G54', dist: 30, retract: 2, radius: 2, f_fast: 200, f_slow: 50 }));
     const boss = seedFromOp(op('user_middle_data', { featureType: 'boss', twoAxis: true, wcs: 'G55', dist: 60, retract: 3, radius: 2, f_fast: 200, f_slow: 50 }));

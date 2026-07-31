@@ -44,6 +44,7 @@ import { num, r3, val } from './util.js';
 import { affineFrame } from './affineFrame.js';
 import { patternPoints } from './array.js';
 import { workMarker } from '../../engine/declaredWork.js';   // t1383 — this body DECLARES how much it executes; the tracer's cap reads it
+import { toolFitRefusal, refusalLines } from './toolFit.js';   // t1444 — the ONE too-small boundary + the family's refusal form
 
 /**
  * ── THE BAND ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -132,6 +133,13 @@ export const cycleOf = (v) => (CYCLES.includes(v) ? v : 'peck');
 
 /** The bore's cut RADIUS at build values — (hole Ø − tool Ø) / 2, the literal's own derivation. */
 const boreRadius = (p) => (num(p.holeDia, 12) - num(p.toolDia, 6)) / 2;
+
+/**
+ * t1444 — the operator sentence for a BORE the tool cannot fit, or '' (peck is exempt — see `holeCycleLines`).
+ * The span a bore offers is its hole Ø, so the boundary reads the same two numbers `boreRadius` does — which is what
+ * keeps the refusal and the degenerate-plunge branch from ever disagreeing about where "equal" sits.
+ */
+export const holeCycleToolRefusal = (p = {}) => toolFitRefusal(num(p.holeDia, 12), num(p.toolDia, 6), 'hole');
 
 /**
  * THE PATTERN, RESOLVED AT BUILD TIME — the count, and the points the runtime arithmetic must reproduce.
@@ -370,6 +378,19 @@ export function holeCycleWorkSteps(p = {}) {
 export function holeCycleLines(p = {}) {
     const cycle = cycleOf(p.cycle);
     const pattern = String(p.pattern || 'single');
+    /**
+     * t1444 — A HOLE STRICTLY NARROWER THAN ITS TOOL REFUSES, ON EVERY CYCLE. Same boundary as the slot and the
+     * pocket, asked of the one predicate rather than re-compared here.
+     *
+     * ⚠ THE PECK CYCLE IS NOT EXEMPT, and I had exempted it — the user's ruling extended the law to be universal and
+     * overruled that, in their own example: *"a 12mm drill cannot make a 6mm hole"*. My reasoning was that `holeDia`
+     * never reaches the peck BODY (only `boreRadius` reads it), so there was no arithmetic to get wrong. That is true
+     * of the emitter and beside the point for the operator: the op still states a 6mm hole, the machine still makes a
+     * 12mm one, and "the number is unused downstream" is not a reason the hole comes out right. The comparison exists
+     * the moment the op carries both numbers, so it is asked here for every cycle.
+     */
+    const fitRefusal = holeCycleToolRefusal(p);
+    if (fitRefusal) return refusalLines(fitRefusal);
     const feed = val(p.feed, 100);            // a #var feed survives — the literal reads it the same way
     const clr = num(p.clearance, 5);
     const depth = num(p.depth, 5);
@@ -445,8 +466,17 @@ export function holeCycleLines(p = {}) {
         : cycle === 'bore-helix' ? boreHelixCycle({ feed, clr, r, ENTRY, IJ, HELIX, azE, az })
             : boreStepCycle({ feed, clr, r, ENTRY, IJ, azE, az });
 
-    // A HOLE NO BIGGER THAN THE TOOL IS A PLUNGE, not a bore — the literal's own fallback, and a BUILD-TIME branch
-    // because the radius is baked. Reproduced rather than refused: it is a legitimate way to drill with an end mill.
+    /**
+     * A HOLE NO BIGGER THAN THE TOOL IS A PLUNGE, not a bore — the literal's own fallback, and a BUILD-TIME branch
+     * because the radius is baked. Reproduced rather than refused: it is a legitimate way to drill with an end mill.
+     *
+     * ⚠ t1444 — …AND THAT SENTENCE WAS TRUE OF *EQUAL* AND FALSE OF *SMALLER*, which is how this arm became the sweep's
+     * one measured liar. `r <= 0.01` swallowed both cases into the plunge, so a Ø5 hole asked of a Ø12 end mill emitted
+     * a confident plunge that makes a **Ø12 hole** — the same silent oversize as the slot's width clamp, arrived at
+     * from the other direction (there a number was repaired, here a branch was widened past what its reason covered).
+     * Equal keeps the plunge exactly as shipped, byte-identical; strictly smaller now refuses upstream (see the guard
+     * at the top of this function), so `plunge` here is only ever reached by the case its comment describes.
+     */
     const bored = cycle !== 'peck';
     const plunge = bored && r <= 0.01;
     const cycleBody = plunge

@@ -18,13 +18,19 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
         if (!build) return { registered: false };
 
         const SHAPES = ['rect', 'circle', 'polygon', 'ellipse'], STRAT = ['spiral', 'raster'];
-        const SIZES = { normal: { w: 80, h: 60, dia: 50 }, tiny: { w: 4, h: 4, dia: 4 } };
+        // t1444 — `equal` JOINS THE SWEEP because the ruling SPLIT what `tiny` used to cover. A pocket strictly
+        // smaller than its tool now REFUSES (no motion), so `tiny` no longer reaches the centre-plunge arm at all —
+        // and the assertion below that the derive-hook selects that arm would have had to be deleted to go green.
+        // Deleting it would have retired live coverage of a shipping arm to make a red test pass. The arm still
+        // exists, for EXACTLY tool-sized pockets, so the sweep now contains one instead: 4mm refuses, 6mm plunges,
+        // 80x60 clears, and all three assertions keep meaning what they say.
+        const SIZES = { normal: { w: 80, h: 60, dia: 50 }, equal: { w: 6, h: 6, dia: 6 }, tiny: { w: 4, h: 4, dia: 4 } };
         const SCALARS = [
             {}, { toolDia: 10, stepoverPct: 55 }, { depth: 9, stepdown: 2 }, { wallOffset: 1.5 },
             { originX: 12, originY: -8, feed: 800, plunge: 120, clearance: 3 }, { wcs: 'G55', sides: 5 },
         ];
         const hasType = (stack, t) => JSON.stringify(stack).includes(`"type":"${t}"`);
-        let diffs = 0, cases = 0, first = null, drillArm = 0, stepArm = 0, armWrong = 0;
+        let diffs = 0, cases = 0, first = null, drillArm = 0, stepArm = 0, armWrong = 0, refuseArm = 0;
         for (const shape of SHAPES) for (const strategy of STRAT) for (const sz of Object.keys(SIZES)) for (let si = 0; si < SCALARS.length; si++) {
             // t945 — seed the live machine Head so the reference pocketStack (via makeStart) spins up like the data-op does at
             // build (spindleHeadPatch) → the M3 header is byte-matched (params.spindle is inert for the data builder itself).
@@ -43,17 +49,19 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
             const isTiny = sz === 'tiny';
             const hasDrill = hasType(twinStack, 'holecycle'), hasFill = hasType(twinStack, 'pocketfill');
             if (hasDrill && !hasFill) drillArm++; else if (hasFill && !hasDrill) stepArm++;
+            if (/#1505=1/.test(twin)) refuseArm++;   // t1444 — the third arm: strictly smaller than the tool, no motion
             // the ARM must match the built-in's arm (independent: does the built-in emit a drill or a stepover for this p?)
             const biDrill = hasType(pocketStack(p), 'holecycle');
             if (hasDrill !== biDrill) armWrong++;
         }
-        return { registered: true, diffs, cases, first, drillArm, stepArm, armWrong };
+        return { registered: true, diffs, cases, first, drillArm, stepArm, armWrong, refuseArm };
     });
     expect(r.registered, 'user_pocket_data is seeded/registered on boot').toBe(true);
     if (r.first) console.log('POCKET DIFF @ ' + JSON.stringify(r.first.p) + '\n--TWIN--\n' + r.first.twin + '\n--BUILTIN--\n' + r.first.builtin);
-    console.log('POCKET E1: ' + JSON.stringify({ cases: r.cases, diffs: r.diffs, drillArm: r.drillArm, stepArm: r.stepArm, armWrong: r.armWrong }));
-    expect(r.cases).toBe(96);
-    expect(r.drillArm, 'the derive-hook selects the PLUNGE arm for tooSmall pockets (t1391: a holecycle single, was a literal drill)').toBeGreaterThan(0);
+    console.log('POCKET E1: ' + JSON.stringify({ cases: r.cases, diffs: r.diffs, drillArm: r.drillArm, stepArm: r.stepArm, refuseArm: r.refuseArm, armWrong: r.armWrong }));
+    expect(r.cases, '4 shapes x 2 strategy x 3 sizes x 6 scalars').toBe(144);
+    expect(r.drillArm, 'the derive-hook still selects the PLUNGE arm — now for EXACTLY tool-sized pockets (t1444 split it from refuse)').toBeGreaterThan(0);
+    expect(r.refuseArm, '…and the REFUSAL arm for the ones strictly smaller than the tool').toBeGreaterThan(0);
     expect(r.stepArm, 'the STEPOVER arm for big pockets').toBeGreaterThan(0);
     expect(r.armWrong, 'the twin selects the SAME arm as the built-in for every case (the tooSmall derive is correct)').toBe(0);
     expect(r.diffs, 'the twin emit is BYTE-IDENTICAL to pocketStack across the full sweep (byte-diff ZERO)').toBe(0);

@@ -967,7 +967,13 @@ export function createPreviewPanel(container, opts = {}) {
         // moves that were TRACED, so on a truncated path they are a partial tally wearing the badge of a total — which is
         // the same silent-partial defect one level along. It belongs at THIS write and not at the trace above, because this
         // is the ONE summary status setGcode ends on; set earlier, it was simply overwritten here (measured, not assumed).
-        if (s.capped) setStatus(s.cappedWhy || 'Preview truncated — the path shown is INCOMPLETE.', true);
+        // t1444 — …AND A REFUSED PROGRAM SAYS WHY, for the same reason and one rung more specific. A build-time refusal
+        // emits no motion, so it arrived here as "No drawable moves" — the sentence for an EMPTY program, which is
+        // exactly what a user asking "why is nothing drawn?" cannot act on. `refusedWhy` is the op's OWN words, carried
+        // out of the emitted `;ERROR:` comment by the engine, so no surface re-phrases a refusal it did not author.
+        // It is tested FIRST because it is the more specific truth: a refusal has nothing to truncate.
+        if (s.refused) setStatus(s.refusedWhy, true);
+        else if (s.capped) setStatus(s.cappedWhy || 'Preview truncated — the path shown is INCOMPLETE.', true);
         else setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
         syncJog();
         renderLegend(parsed);

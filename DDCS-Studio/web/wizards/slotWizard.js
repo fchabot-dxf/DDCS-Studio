@@ -18,7 +18,7 @@ import { pointsBBox } from './ops/placement.js';
  *  + the 2D view. */
 export function slotBBox(params = {}) {
     const ax = num(params.ax, 0), ay = num(params.ay, 0), bx = num(params.bx, 60), by = num(params.by, 0);
-    const W = Math.max(num(params.toolDia, 6), num(params.width, num(params.toolDia, 6)));
+    const W = num(params.width, num(params.toolDia, 6));   // t1444 — no width clamp: a no-op for every slot that cuts, a lie for the one that refuses (see slot.js extent)
     const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
     const px = (-dy / len) * (W / 2), py = (dx / len) * (W / 2);   // half-width, perpendicular to the centreline
     const xs = [ax + px, ax - px, bx + px, bx - px], ys = [ay + py, ay - py, by + py, by - py];

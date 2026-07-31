@@ -19,7 +19,7 @@
  * state (each block type appears at most once). Proven byte-identical to pocketStack across strategy × tooSmall (BOTH states)
  * × the 4 shapes × a scalar sweep + cross-dialect (tests/pocket-data-emit.spec.js).
  */
-import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster, pocketRasterGap } from '../../wizards/pocketWizard.js';
+import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster, pocketRasterGap, pocketToolRefuses, pocketToolRefusal } from '../../wizards/pocketWizard.js';   // t1444 — the strictly-smaller refusal: its guard + its operator sentence
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';
@@ -310,7 +310,11 @@ function pocketDataStack(defaults) {
 // parametric sockets are reached at instantiate instead, where bindingSpecs re-derive over the PRUNED stack per state.
 // (`_rest: true` already forces `_para` false via pocketRasterGap; it is written out so the canonical state is stated
 // rather than implied by another flag's side effect.)
-const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _tooSmall: false, _rest: true, _para: false, restDia: 3 };   // t871 — _rest+a real restDia so the pocketrest leaf is present → restDia/restStepover derive their bindings
+// t1444 — `_refuse: false` IS WRITTEN OUT, and the omission is what caught it: `pruneGuards` matches on a strict ===,
+// so a guard key this bag does not name drops BOTH of its arms — the canonical stack lost its whole body and every
+// binding spec then "matched 0 blocks". A new derived fork has to be stated here in the same act that adds it, which
+// is exactly why this state is spelled out rather than implied by another flag's side effect (see the note above).
+const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _refuse: false, _tooSmall: false, _rest: true, _para: false, restDia: 3 };   // t871 — _rest+a real restDia so the pocketrest leaf is present → restDia/restStepover derive their bindings
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(pocketDataStack(POCKET_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const POCKET_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), POCKET_BINDING_SPECS));
 
@@ -336,7 +340,10 @@ export function pocketDataDef() {
     // tool vs size, a rest tool, direction, and the atom's own PROVEN table), so it cannot be a plain param guard. The
     // predicate is `pocketRasterGap`'s — ONE source shared with the concrete build, so the twin and the wizard can
     // never disagree about which arm a given pocket is on. That agreement IS the byte-identity claim.
-    def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}), _rest: restValid(p || {}) && !pocketTooSmall(p || {}), _para: pocketRidesRaster(p || {}) });   // t871 — _rest: a valid smaller rest tool on a cornered pocket (GEOMETRY-DERIVED, injected before prune)
+    // t1444 — `_refuse`: strictly smaller than its tool → no motion at all. Geometry-derived like its two neighbours,
+    // and read from the SAME one source the concrete build uses (`pocketToolRefuses`), so the twin and the wizard
+    // cannot disagree about which side of the user's equal-is-fine line a given pocket falls on.
+    def.deriveGuards = (p) => ({ _refuse: pocketToolRefuses(p || {}), _tooSmall: pocketTooSmall(p || {}), _rest: restValid(p || {}) && !pocketTooSmall(p || {}), _para: pocketRidesRaster(p || {}) });   // t871 — _rest: a valid smaller rest tool on a cornered pocket (GEOMETRY-DERIVED, injected before prune)
     def.postInstantiate = (stack, resolved) => {                  // rewrite the DERIVED sockets the frozen superset baked at DEFAULT geometry
         const { cx, cy } = pocketDrillCentre(resolved || {});     // the too-small arm's plunge point (geometry-derived)
         const bb = pocketBBox(resolved || {});                    // the PlaceOnStock footprint bbox (drives placementShift's corner; baked-stale otherwise → a phantom shift)
@@ -346,6 +353,10 @@ export function pocketDataDef() {
             // t1391 — x0/y0, NOT x/y: holecycle ABSORBS the placement, so the place fold hands it the shift through x/y.
             // Writing the centre there would collide with the placement; x0/y0 is the pattern's own origin (see pocketWizard).
             if (b.type === 'holecycle') { b.params.x0 = cx; b.params.y0 = cy; }
+            // t1444 — THE REFUSAL SENTENCE IS A DERIVED SOCKET TOO, and forgetting it would have been the worst kind of
+            // wrong: the frozen superset bakes the note at DEFAULT geometry, so a twin refusing a 6.35mm pocket would
+            // have told the operator about an 80mm one. Same failure `pocketDrillCentre` is here for, one arm along.
+            else if (b.type === 'assign' && b.params.var === '#1505') { b.params.note = `ERROR: ${pocketToolRefusal(r)}`; }
             else if (b.type === 'placeonstock') { b.params.bminX = bb.minX; b.params.bmaxX = bb.maxX; b.params.bminY = bb.minY; b.params.bmaxY = bb.maxY; }
             // t1406 — `inset` is DERIVED from toolDia AND wallOffset together, so no single binding can drive it; it
             // belongs here with the other derived sockets rather than being re-derived at emit. `pocketInsetMm` is the

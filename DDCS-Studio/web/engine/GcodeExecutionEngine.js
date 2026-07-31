@@ -18,6 +18,7 @@ import { axisHomeMotion, limitSwitchTrips, axisSpan } from './limitSwitches.js';
 import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
 import { SAVE_PROBE_Z_MARK, RETURN_PROBE_Z_MARK } from '../data/simMarkers.js';   // t897 — the DECLARED save/return-Z markers a machine-lift traverse emits; the sim restores the saved scene-Z exactly (declare, not infer)
 import { traceCap, truncationReason } from './declaredWork.js';   // t1383 — the runaway guard sized by the program's DECLARED work, not by its text length (a loop collapses the text)
+import { REFUSE_VAR } from '../wizards/ops/toolFit.js';   // t1444 — the register the family refuses through: the emitters write it, this engine reads it back (one name, not two)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
 // read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
@@ -285,6 +286,15 @@ export class GcodeExecutionEngine {
         this._probeArmed = false;   // DM500 move-until-input: M101 arms, the next G01 is a probe, M102 disarms
         this._savedReturnZ = [];    // t897 — a LIFO stack of scene-Z recorded at each saveMachineZNode SAVE (@saveProbeZ); the paired G53 @returnProbeZ move pops it → the machine-lift traverse returns to the EXACT probe depth (declared, map-independent)
         this._datumOrigin = {};     // t644 — machine coord of work-0 per axis after a WCS write (G92 / register); the datum check
+        /**
+         * t1444 — THE PROGRAM'S OWN REFUSAL, READ BACK. A build-time refusal (`#1505=1 ;ERROR: …`, the family's form)
+         * used to reach a preview as an EMPTY program, and "No drawable moves" is what an empty program and a refused
+         * one both look like. It is detected on the EXECUTED write rather than on the text, because the parametric
+         * family also emits refusals it JUMPS OVER at run time (surfaceraster's zero-stepover guard) — a program that
+         * merely CONTAINS the form has not refused, and reading the text could not tell the two apart. This is the
+         * `capped`/`cappedWhy` shape (t1383) pointed at the other way a preview can be honest-looking and wrong.
+         */
+        this._refusedWhy = '';
         this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
         this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
         this._maxPass = 0;        // highest pass reached → stats.passes = _maxPass + 1
@@ -451,7 +461,7 @@ export class GcodeExecutionEngine {
             // `capped` stays a BOOLEAN (every existing reader asserts `.toBe(false)`); `cappedWhy` carries the sentence a
             // surface can show, and `truncated()` is the ONE phrasing so the 2D panel, the 3D panel and any later host
             // cannot describe the same truncation three different ways.
-            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, cappedWhy: capped ? truncationReason(capped) : '', absolute: this.stats.absolute, dwellMs: this.stats.dwellMs, toolChanges: this.stats.toolChanges },
+            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, cappedWhy: capped ? truncationReason(capped) : '', refused: !!this._refusedWhy, refusedWhy: this._refusedWhy, absolute: this.stats.absolute, dwellMs: this.stats.dwellMs, toolChanges: this.stats.toolChanges },
         };
     }
 
@@ -839,7 +849,7 @@ export class GcodeExecutionEngine {
                 const stmt = ifThen[2].trim();
                 const g = stmt.match(/^GOTO\s*(\d+)$/i);
                 if (g && this.labels.has(Number.parseInt(g[1], 10))) { this.ip = this.labels.get(Number.parseInt(g[1], 10)); return false; }
-                if (/^#/.test(stmt)) this._handleAssignment(stmt);
+                if (/^#/.test(stmt)) { this._handleAssignment(stmt); this._noteRefusal(step.raw); }   // t1444 — a conditional refusal counts too (the guard that FIRED, not the one that was written)
             }
             this.ip += 1;
             return false;
@@ -896,6 +906,10 @@ export class GcodeExecutionEngine {
 
         if (/^#/.test(line)) {
             this._handleAssignment(line);
+            // t1444 — an EXECUTED write to the refusal register IS the refusal. The reason rides the raw line's own
+            // `;ERROR:` comment (the form every emitter already writes), so the sentence has exactly one author — the
+            // op that refused — and the engine transports it rather than re-wording it.
+            this._noteRefusal(step.raw);
             // t897 — a DECLARED save-Z marker (saveMachineZNode → `#95=#882 ( @saveProbeZ )`): RECORD the current scene-Z so the
             // paired G53 @returnProbeZ move can restore it EXACTLY. Read off the RAW line (same pattern as the REPOSITION: marker).
             // The #95=#882 assignment still runs (harmless) — the sim uses this recorded scene-Z, not the mapped register value.
@@ -1438,6 +1452,36 @@ export class GcodeExecutionEngine {
             this._setStatus(`MGETDATA pull <- slave ${slave} reg ${reg} fn ${fn} (no slave in sim; vars unchanged)`, true);
         }
         return true;
+    }
+
+    /**
+     * t1444 — record a refusal when the line just executed WROTE the refusal register in the family's ERROR form.
+     *
+     * ⚠ THE COMMENT FORM IS PART OF THE TEST, and that is a correction made after reading the corpus rather than a
+     * belt-and-braces flourish. `#1505` is NOT only an error flag on the Expert: the dialect ALSO drives the HMI
+     * through it — `hmiPrompt` emits `#1505=1(Hover OVER the corner…)` and `hmiToast` emits `#1505=-5000(msg)`, both
+     * perfectly ordinary writes with truthy values. A detector keyed on the register alone would have put a red
+     * refusal on every corner probe that asks the operator to jog, which is a wrong operator message — the thing this
+     * project treats as seriously as wrong motion.
+     *
+     * The corpus separates them itself and this only reads that separation: a REFUSAL labels its message `ERROR:` or
+     * `FAULT:`, a PROMPT does not. THE LABEL IS THE MARK, NOT THE BRACKET — the atoms write it after a semicolon
+     * (`surfaceraster`, `wallfinish`, `holecycle`, `refusalLines`) and the ATC wizards write it inside the parens
+     * (`assign`'s note: `#1505=1 ( ERROR: Tool Setter missed )`), and both are real refusals. Keying on the bracket
+     * would have detected one family and silently missed the other. The value is still checked (a guard that writes 0
+     * has CLEARED, not refused), and only the FIRST is kept — a program that refuses twice refused for the first reason.
+     *
+     * KNOWN, NAMED LIMIT: `atcInterpreter`'s `#1505 = 1(Tool not in magazine!)` is a real refusal carrying no label at
+     * all, so it is not detected. Widening to "any message" would re-admit every jog prompt, so the limit is recorded
+     * rather than traded for a false positive; that line adopting the label is the fix, in its own act.
+     */
+    _noteRefusal(raw) {
+        if (this._refusedWhy || !raw) return;
+        const line = String(raw);
+        if (!new RegExp(`^\\s*#\\s*${REFUSE_VAR}\\s*=`).test(line)) return;
+        const m = line.match(/[;(]\s*(?:ERROR|FAULT)\s*:\s*([^)]+?)\s*\)?\s*$/i);
+        if (!m || !this.vars.get(REFUSE_VAR)) return;
+        this._refusedWhy = m[1].trim();
     }
 
     _handleAssignment(line) {

@@ -176,10 +176,11 @@ test('THE BOUNDARY IS ABOUT THE WALK, not about a slot\'s numbers — so nothing
  * UNCONDITIONALLY — no width gate, no pattern gate). Its macro is ONE centreline pass per level, and its own comment
  * admits it: *"For width > tool, add perpendicular offset passes."*
  *
- * ⚠ THIS TEST ASSERTS A GAP, NOT A FIX. The act that closes it — teaching the generator the offset passes, or routing
- * a widened slot to the universal unroll the way single-axis middle and polygon pockets already are — MUST update
- * these expectations. They exist so the drop cannot be forgotten or half-closed, which is the same job
- * `cam-row-honesty-1414` does for a greyed row.
+ * ⚠ THIS TEST ASSERTED A GAP, AND t1444 CLOSED HALF OF IT — which is the lock doing its job rather than a nuisance.
+ * The generator STILL drops width/stepover/entry/plunge (its macro is unchanged), but a slot it would cut wrongly no
+ * longer reaches it: `camTypeOf` now refuses at PACK, on the "never emit a wrong slot" rule that single-axis middle
+ * and polygon pockets have always been held to. So the DROP assertions stand as they were and the ROUTING ones are
+ * inverted, with the refusal's own sentence asserted. Teaching the macro the offset passes is what closes the rest.
  */
 test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, and nothing declares it', async ({ page }) => {
     await boot(page);
@@ -197,6 +198,7 @@ test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, an
             wizardWidth: Math.max(...ys) - Math.min(...ys) + 6,
             zLine: (gen.body || '').split('\n').map((l) => l.trim()).find((l) => /^G1 Z/.test(l)),
             camRoute: camTypeOf({ opType: 'slot', params: { width: 12, toolDia: 6, pattern: 'grid' } }),
+            camEqual: camTypeOf({ opType: 'slot', params: { width: 6, toolDia: 6 } }),
             slotIgnores: GENERATOR_IGNORES.slot || null,
             entrySentence: generatorIgnores('slot', 'entry', {}),
         };
@@ -208,9 +210,11 @@ test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, an
     expect(r.keys, '…and carries exactly these').toEqual(['ax', 'ay', 'bx', 'by', 'depth', 'stepdown', 'feed', 'clearance', 'rpm']);
     // WHAT IT COSTS, in millimetres: the wizard cuts the typed width, the macro cuts the tool
     expect(r.wizardWidth, 'the wizard cuts the 12mm channel that was typed').toBeCloseTo(12, 3);
-    // …and every slot routes there regardless, so no gate catches it
-    expect(r.camRoute.camType, 'a 12mm-wide, GRID-patterned slot still packs the centreline generator').toBe('slot');
-    expect(r.camRoute.universal, 'no universal fork, unlike single-axis middle / polygon pocket').toBeFalsy();
+    // t1444 — …and a slot the macro would cut WRONGLY no longer reaches it: the pack refuses, by name, with the exit
+    expect(r.camRoute.camType, 'a 12mm-wide slot no longer packs the centreline generator').toBeUndefined();
+    expect(r.camRoute.unsupported, 'it is refused at PACK, in the operator\'s own terms').toContain('ONE centreline pass');
+    expect(r.camRoute.unsupported, '…with somewhere to go, because "unsupported" alone makes the operator guess').toContain('Slot wizard');
+    expect(r.camEqual.camType, 'and the case the macro DOES cut correctly still packs — width == tool').toBe('slot');
     // THE PLUNGE FEED IS DROPPED TOO — the macro descends at the CUTTING feed
     expect(r.zLine, 'the Z descent rides F#7, the cut feed — the op\'s plunge feed has no field').toBe('G1 Z[-#50] F#7');
     // AND NOTHING DECLARES ANY OF IT

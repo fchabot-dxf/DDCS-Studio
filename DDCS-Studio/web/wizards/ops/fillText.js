@@ -8,6 +8,7 @@ import { num } from './util.js';
 import { scanlineFill, fillLevelMoves } from '../clearing.js';
 import { textContours, layoutText } from '../textGeometry.js';
 import { pointsBBox } from './placement.js';
+import { toolFitRefusal, refusalLines } from './toolFit.js';   // t1444 — the ONE too-small boundary + the family's refusal form
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
 // t764 — a self-describing {SN} marker: fillText marks WHERE (+ the cut params) at each fill level; the blockEmitter
@@ -29,6 +30,18 @@ export const fillTextBlock = {
     },
     fields: ['text', 'font', 'height', 'width', 'slant', 'rotation', 'spacing', 'lineSpacing', 'align', 'x', 'y', 'strokeWidth', 'toolDia', 'stepoverPct', 'z', 'feed', 'plunge', 'clearance', 'snSlot', 'snWidth', 'snIncrement', 'dateStamp'],
     lines: (p, z) => {
+        /**
+         * t1444 (user amendment: the law is UNIVERSAL) — a stroke narrower than the tool comes out FAT, and it used to
+         * come out fat silently. MEASURED before it was fixed: a 2.5mm stroke cut with a Ø6 tool still emitted 9 cutting
+         * moves over the same glyph outline, so the program looked right and the letters would have been ~6mm wide —
+         * oversize by construction, the same class as the slot's width clamp and the pocket's plunge.
+         *
+         * The span a glyph offers is its STROKE WIDTH, and it is asked of the one predicate rather than compared here.
+         * The refusal repeats per depth level (this hook is called once per level and cannot see which one it is);
+         * that is honest — every level refuses — and the engine reports the first, which is the one the operator reads.
+         */
+        const fitRefusal = toolFitRefusal(num(p.strokeWidth, 2.5), num(p.toolDia, 1.5), 'engraved stroke');
+        if (fitRefusal) return refusalLines(fitRefusal);
         const tool = Math.max(0.1, num(p.toolDia, 1.5));
         const so = Math.max(0.15, tool * num(p.stepoverPct, 50) / 100);
         const rows = scanlineFill(textContours(p), so);

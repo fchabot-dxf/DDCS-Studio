@@ -58,7 +58,7 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async (golden) => {
-        const { pocketStack, pocketTooSmall, pocketRidesRaster } = await import('/wizards/pocketWizard.js');
+        const { pocketStack, pocketTooSmall, pocketRidesRaster, pocketToolRefuses } = await import('/wizards/pocketWizard.js');
         const { pruneGuards } = await import('/blocks/whenGuard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
 
@@ -70,6 +70,7 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
             { originX: 12, oy: -8, feed: 800, plunge: 120, clearance: 3 }, { wcs: 'G55', sides: 5 },
         ];
         let goldenDiffs = 0, gateDiffs = 0, leftoverGuards = 0, supGuardMax = 0, tooSmallSeen = 0, wallSeen = 0, cases = 0;
+        let refusedSeen = 0, refusalMissing = 0, refusalHadMotion = 0; const refusedKeys = [];   // t1444 — the ruled exemption, counted
         let firstGolden = null, firstGate = null, hasFillLeaf = false, hasWallLeaf = false;
         for (const shape of SHAPES) for (const strategy of STRAT) for (const sz of Object.keys(SIZES)) for (let si = 0; si < SCALARS.length; si++) {
             const p = { shape, strategy, ...SIZES[sz], ...SCALARS[si] };
@@ -80,7 +81,22 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
             if (JSON.stringify(concreteStack).includes('"type":"pocketfill"')) hasFillLeaf = true;
             if (JSON.stringify(concreteStack).includes('"type":"pocketwall"')) hasWallLeaf = true;
             // (1) FLATTEN byte-identity — concrete (flat leaves) == the pre-E0 golden (stepover+contour region socket)
-            if (golden[key] && concrete !== golden[key].emit) { goldenDiffs++; if (!firstGolden) firstGolden = { key, a: concrete.slice(0, 1400), b: golden[key].emit.slice(0, 1400) }; }
+            //
+            // t1444 — THE REFUSING CASES ARE EXEMPTED BY NAME, AND THE GOLDEN IS NOT REGENERATED. The user's ruling
+            // deliberately changed what a pocket STRICTLY SMALLER than its tool emits (a confident centre plunge that
+            // made an oversize hole → a refusal with no motion), so those entries cannot match a capture taken before
+            // the ruling. Re-capturing the golden would have been the easy move and it would have destroyed the very
+            // thing the golden is for: a frozen reference that gets refreshed whenever it disagrees proves nothing.
+            // So each refusing case asserts the NEW contract instead, the exempt set is counted, and every entry
+            // outside it still faces the untouched golden — which is what makes "only the ruled cases moved" a
+            // measurement rather than a claim.
+            if (pocketToolRefuses(p)) {
+                refusedSeen++;
+                if (!/#1505=1/.test(concrete)) refusalMissing++;                    // it must actually refuse…
+                if (/G1 [XY]/.test(concrete)) refusalHadMotion++;                   // …and cut NOTHING
+                if (!refusedKeys.includes(key)) refusedKeys.push(key);
+            }
+            else if (golden[key] && concrete !== golden[key].emit) { goldenDiffs++; if (!firstGolden) firstGolden = { key, a: concrete.slice(0, 1400), b: golden[key].emit.slice(0, 1400) }; }
             // (2) E0 GATE — prune(superset) == concrete
             const sup = pocketStack(p, { superset: true });
             supGuardMax = Math.max(supGuardMax, (JSON.stringify(sup).match(/"type":"guard"/g) || []).length);
@@ -88,14 +104,17 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
             // right answer by accident. `_rest` was never passed and read as undefined, which happened to falsify its
             // `is:true` guard; `_para` has BOTH polarities in the superset, so an undefined value would falsify both and
             // prune the clearing away entirely. Stating them is what makes this gate a test of prune rather than of luck.
-            pruneGuards(sup, { ...p, _tooSmall: pocketTooSmall(p), _rest: false, _para: pocketRidesRaster(p) });
+            // t1444 — `_refuse` joins them, and it is the third instance of the very hazard the note above describes:
+            // the refusal fork carries BOTH polarities, so leaving it undefined prunes the ENTIRE body away. Added in
+            // the act that adds the fork, because a guard key invented without its canonical value is a silent hole.
+            pruneGuards(sup, { ...p, _refuse: pocketToolRefuses(p), _tooSmall: pocketTooSmall(p), _rest: false, _para: pocketRidesRaster(p) });
             if (JSON.stringify(sup).includes('"type":"guard"')) leftoverGuards++;
             const pruned = emitMapped(sup).text;
             if (pruned !== concrete) { gateDiffs++; if (!firstGate) firstGate = { key, a: pruned.slice(0, 1400), b: concrete.slice(0, 1400) }; }
             if (pocketTooSmall(p)) tooSmallSeen++;
             if (strategy === 'raster' && !pocketTooSmall(p)) wallSeen++;
         }
-        return { goldenDiffs, gateDiffs, leftoverGuards, supGuardMax, tooSmallSeen, wallSeen, cases, firstGolden, firstGate, hasFillLeaf, hasWallLeaf };
+        return { goldenDiffs, gateDiffs, leftoverGuards, supGuardMax, tooSmallSeen, wallSeen, cases, firstGolden, firstGate, hasFillLeaf, hasWallLeaf, refusedSeen, refusalMissing, refusalHadMotion, refusedKeys };
     }, GOLDEN);
 
     console.log('POCKET E0: ' + JSON.stringify({ cases: r.cases, goldenDiffs: r.goldenDiffs, gateDiffs: r.gateDiffs, leftoverGuards: r.leftoverGuards, supGuardMax: r.supGuardMax, tooSmallSeen: r.tooSmallSeen, wallSeen: r.wallSeen }));
@@ -109,10 +128,18 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
     // it names is still shipping and this sweep is still the thing that exercises it.
     expect(r.hasWallLeaf, 'a REFUSED raster arm still rides the FLAT pocketwall leaf').toBe(true);
     expect(r.tooSmallSeen, 'the sweep exercises the tooSmall drill arm').toBeGreaterThan(0);
+    // ── t1444 — THE RULED EXEMPTION, MEASURED IN BOTH DIRECTIONS ──────────────────────────────────────────────────
+    console.log('POCKET E0 t1444 refusals: ' + r.refusedSeen + ' :: ' + JSON.stringify(r.refusedKeys));
+    expect(r.refusedSeen, 'the sweep really does contain pockets smaller than their tool (the `tiny` sizes)').toBeGreaterThan(0);
+    expect(r.refusalMissing, 'every one of them EMITS the refusal').toBe(0);
+    expect(r.refusalHadMotion, '…and none of them cuts anything — the whole point of the ruling').toBe(0);
+    // and the exemption cannot creep: only `tiny` pockets are small enough to refuse, so a NORMAL one appearing here
+    // would mean the boundary had moved, which is exactly the drift a named exemption exists to catch.
+    expect(r.refusedKeys.filter((k) => !k.includes('|tiny|')), 'ONLY the tiny pockets are exempt — nothing else moved').toEqual([]);
     expect(r.wallSeen, 'the sweep exercises the raster wall arm').toBeGreaterThan(0);
     expect(r.supGuardMax, 'the superset carries guards (tooSmall×2 + strategy×2 = 4)').toBeGreaterThanOrEqual(4);
     expect(r.leftoverGuards, 'prune leaves ZERO guard blocks (fully collapsed to the concrete shape)').toBe(0);
-    expect(r.goldenDiffs, 'FLATTEN byte-identity: the flat pocketfill/pocketwall leaves == the pre-E0 stepover+contour golden (byte-diff ZERO)').toBe(0);
+    expect(r.goldenDiffs, 'FLATTEN byte-identity: every NON-exempt case still matches the untouched pre-E0 golden (byte-diff ZERO)').toBe(0);
     expect(r.gateDiffs, 'E0 GATE: prune(superset) is BYTE-IDENTICAL to concrete pocketStack for ALL 96 combos (byte-diff ZERO)').toBe(0);
 });
 

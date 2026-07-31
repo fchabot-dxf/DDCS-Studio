@@ -10,12 +10,36 @@
 import { num, r3 } from './util.js';
 import { depthLevels, entryOrPlunge } from '../clearing.js';
 import { pointsBBox } from './placement.js';
+import { toolTooLarge, toolFitRefusal, refusalLines } from './toolFit.js';   // t1444 — the ONE too-small boundary + the family's refusal form
+
+/**
+ * t1444 — THE SLOT'S OWN SPAN, DECLARED: a slot offers the tool exactly its WIDTH, and nothing else about a slot
+ * constrains the tool (its LENGTH is travel, not clearance — a slot shorter than the tool is still a legal plunge-
+ * and-move, and the zero-length degenerate already has its own arm). So the boundary is one comparison, and both the
+ * predicate and the sentence read this one number.
+ */
+export const slotMaxToolDia = (p = {}) => num(p.width, num(p.tool, num(p.toolDia, 6)));
+/** Is this slot strictly narrower than its tool → refuse everywhere? (Exactly tool-width is ALLOWED — the ruling.) */
+export const slotTooSmall = (p = {}) => toolTooLarge(slotMaxToolDia(p), num(p.tool, num(p.toolDia, 6)));
+/** The operator sentence for a slot the tool cannot fit, or '' — one wording for emit, preview, twin and CAM pack. */
+export const slotToolRefusal = (p = {}) => toolFitRefusal(slotMaxToolDia(p), num(p.tool, num(p.toolDia, 6)), 'slot');
 
 /** Slot toolpath: clearance preamble + zig-zag offset passes stepping down (+ zero-length single-plunge guard). */
 export function slotPath(p) {
     const x0 = num(p.x0, 0), y0 = num(p.y0, 0), x1 = num(p.x1, 60), y1 = num(p.y1, 0);
     const tool = Math.max(0.1, num(p.tool, 6));
-    const width = Math.max(tool, num(p.width, tool));
+    /**
+     * ── t1444 — THE CLAMP THAT HID THE DEFECT, REPLACED BY A REFUSAL (user-ruled) ─────────────────────────────────
+     *
+     * This line was `Math.max(tool, num(p.width, tool))`. A 6.35mm slot asked of a 12.7mm tool came out as a **12.7mm
+     * slot** — the wrong number repaired into a plausible one before anything could notice it was wrong, which is why
+     * it survived: the program was clean, the preview confident, and the channel twice the width that was typed.
+     * A strictly-smaller slot now refuses with no motion (`slotTooSmall` is the one boundary, shared with the twin and
+     * the CAM pack); EXACTLY tool-width keeps the single centreline pass it has always emitted, byte-identical.
+     */
+    const width = num(p.width, tool);
+    const refusal = slotToolRefusal({ ...p, tool, width });
+    if (refusal) return refusalLines(refusal);
     const so = Math.max(0.2, tool * num(p.stepoverPct, 40) / 100);
     const depth = num(p.depth, 4);
     const clr = num(p.clearance, 5), feed = num(p.feed, 2000), plunge = num(p.plunge, 150);
@@ -153,7 +177,10 @@ export const slotBlock = {
     // — makes stock-attach track the geometry, and lets an enclosing Array compose the pattern footprint. (See drill/array.)
     extent: (p) => {
         const x0 = num(p.x0, 0), y0 = num(p.y0, 0), x1 = num(p.x1, 60), y1 = num(p.y1, 0);
-        const tool = Math.max(0.1, num(p.tool, 6)), W = Math.max(tool, num(p.width, tool));
+        // t1444 — the width clamp is gone from here too. It was a no-op for every slot that still cuts (width ≥ tool)
+        // and a LIE for the one that no longer does: a 6.35mm slot refused by the emit was still declaring a 12.7mm
+        // footprint to the placement fold. Same clamp, same class, three copies — this one, `slotBBox` and `slotView`.
+        const tool = Math.max(0.1, num(p.tool, 6)), W = num(p.width, tool);
         const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1;
         const px = (-dy / len) * (W / 2), py = (dx / len) * (W / 2);
         return pointsBBox([{ x: x0 + px, y: y0 + py }, { x: x0 - px, y: y0 - py }, { x: x1 + px, y: y1 + py }, { x: x1 - px, y: y1 - py }]);

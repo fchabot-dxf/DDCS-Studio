@@ -23,6 +23,9 @@ import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CA
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
 import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive
 import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
+import { num } from '../wizards/ops/util.js';   // t1444 — the pack gates read numbers the same way every emitter does
+import { slotTooSmall, slotToolRefusal } from '../wizards/ops/slot.js';         // t1444 — the ONE too-small boundary + its sentence, shared with the emit
+import { pocketToolRefuses, pocketToolRefusal } from '../wizards/pocketWizard.js';   // t1444 — …and the pocket's, from the same one source
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
 export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'edge', slot: 'slot', pocket: 'pocket', drill: 'drill' };
@@ -408,9 +411,32 @@ export function camTypeOf(op) {
             return { camType: 'surface' };
         case 'corner': return { camType: 'corner' };
         case 'edge': return { camType: 'edge' };
-        case 'slot': return { camType: 'slot' };
+        /**
+         * ── t1444 — THE SLOT'S TWO PACK GATES, both of them "never emit a wrong slot" ─────────────────────────────
+         *
+         * THE WIDTH GATE (t1442's measured find, ruled here). `slotFromOp`'s macro is ONE centreline pass per level —
+         * its own comment says *"For width > tool, add perpendicular offset passes"* — and this line packed EVERY slot
+         * into it regardless. A 12mm-wide slot became a slot cutting 6mm: the op's DEFINING dimension dropped, with no
+         * gate and nothing declared. It now packs only the case the macro cuts correctly (width ≤ tool) and refuses
+         * the rest by name, which is the same rule single-axis middle and polygon pockets have always been held to.
+         * The slot capability arc (SLOT_RASTER_GAP) is what lifts this later; until then the wizard path is correct
+         * and the sentence says so, because an operator told "unsupported" with no exit does the wrong thing next.
+         *
+         * THE TOO-SMALL GATE is the user's ruling reaching the third surface: a slot narrower than its tool refuses at
+         * BUILD, so the operator hears it here rather than at the machine. Belt and braces — the wizard's own emit
+         * refuses too (`slotPath`), and this is the brace.
+         */
+        case 'slot': {
+            if (slotTooSmall(p)) return { unsupported: slotToolRefusal(p) };
+            if (num(p.width, 0) > num(p.toolDia, 6) + 0.001)
+                return { unsupported: `this slot is ${num(p.width, 0)}mm wide and the CAM macro cuts ONE centreline pass, so it would cut ${num(p.toolDia, 6)}mm — build it from the Slot wizard instead, which emits the offset passes` };
+            return { camType: 'slot' };
+        }
         case 'pocket': {
             const shape = p.shape || 'rect';
+            // t1444 — the user's ruling at PACK: a pocket the tool cannot fit has no correct macro to build, on any
+            // shape, so it refuses before the shape fork rather than packing a generator that would plunge oversize.
+            if (pocketToolRefuses(p)) return { unsupported: pocketToolRefusal(p) };
             if (shape === 'rect') return { camType: 'pocket' };
             if (shape === 'circle') return { camType: 'cpocket' };   // t1043 ruling — circle -> circlePocketSlot
             return { universal: true, reason: `pocket shape "${shape}" has no CAM generator (only rect + circle) → universal` };   // polygon/ellipse → the unrolled long-tail path
