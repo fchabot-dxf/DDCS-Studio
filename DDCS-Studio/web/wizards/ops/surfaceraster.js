@@ -348,20 +348,46 @@ export function surfaceRasterWorkSteps(p = {}) {
     const passes = concentric
         ? Math.max(1, Math.floor((Math.min(w, h) - 0.001) / (2 * step)) + 1)
         : Math.max(1, Math.floor(((rasterRowAxisOf(p) === 'y' ? w : h) - step / 2) / step) + 1);
-    // t1418 — THE ROW COUNT IS THE SAME IN EVERY DIRECTION (the scout's first fact: 46 rows either way, same Y, same
-    // extents) — a one-way walk is a TRAVEL change, not a geometry change. What DOES move is the per-pass body, and
-    // it moves DOWN, not up: the one-way row spends three lines on the lift/rapid/plunge triple but loses all four
-    // of the both-ways walk's end-choosing branches plus its step-over and its `#49` flip. Counted off the emitted
-    // body rather than guessed — t1416's scout predicted 22 by assuming the branches survived; they do not, and the
-    // t1418 spec asserts this number against the real line count so the two can never drift.
-    const PER_PASS = concentric ? 14 : (rasterIsOneWay(rasterDirectionOf(p)) ? 11 : 20);
+    /**
+     * ── t1440 — RE-CALIBRATED AGAINST THE ENGINE'S OWN STEP COUNT, BY DIFFERENCING ────────────────────────────────
+     *
+     * Every constant below was solved from REAL executed-step counts rather than counted off the emitted text, and
+     * that distinction is the whole finding. The old numbers counted BODY LINES; a walk's body is full of forks, and
+     * only one arm of each fork executes per pass. So `20` for the both-ways row was the number of lines you can SEE
+     * and `13` is the number the controller actually runs.
+     *
+     * HOW: emit the body, run it through `GcodeExecutionEngine.trace` with the step call instrumented, and difference
+     * two areas at one depth (isolating the per-pass term) against two depths at one area (isolating the per-level
+     * term and the header). Nine (strategy × direction × entry) configs, all agreeing on a header of 16.
+     *
+     *     walk                 per pass   was      per level (plunge)   was
+     *     parallel/bothways       13       20              12            12
+     *     parallel/oneway         11       11 ✓             6            12
+     *     concentric              12       14               9            12
+     *
+     * t1418's `11` for the one-way row was RIGHT — it was the one number derived by counting what executes rather
+     * than what is written, and the audit confirms it untouched. The other two were overstatements in the SAFE
+     * direction (the cap drew more than needed, never less), which is why nothing ever surfaced them.
+     *
+     * ⚠ THE DESCENT'S HELIX TERM WAS UNDER-DECLARED, and that is the one on the WRONG side. `* 10` per segment
+     * against a measured 10.46 (251 steps for a 24-segment revolution) meant a deep helix declared less work than it
+     * does — the direction that TRUNCATES a preview. It is 11 now: measured, rounded UP, and the residual over-
+     * declaration is 13 steps per level flat, which the assertions below pin.
+     *
+     * THE MODEL CHANGED SHAPE, not just its numbers: the level overhead is per-WALK (a both-ways level does more
+     * branching than a one-way one) and the descent cost is walk-INDEPENDENT (+0 plunge / +6 ramp / +11 per helix
+     * segment on all three, measured identical). One flat `PER_LEVEL = 8` could not express that, which is why it
+     * was absorbing the error.
+     */
+    const dirKey = concentric ? 'concentric' : (rasterIsOneWay(rasterDirectionOf(p)) ? 'oneway' : 'bothways');
+    const PER_PASS = { bothways: 13, oneway: 11, concentric: 12 }[dirKey];
+    const PER_LEVEL = { bothways: 12, oneway: 6, concentric: 9 }[dirKey];
     // THE DESCENT is per LEVEL, not per pass, and only the helix is large: it is a 24-segment-per-revolution polyline.
     const entry = String(p.entry || '');
-    const helixSegs = entry === 'helix'
-        ? Math.max(24, Math.ceil(stepdown / Math.max(0.001, num(p.helixPitch, 1))) * 24) * 10
-        : entry === 'ramp' ? 12 : 4;
-    const PER_LEVEL = 8;   // the level's own bookkeeping: the Z advance, the clamp, the confirm test, END1, the re-eval
-    return 16 + levels * (PER_LEVEL + helixSegs + passes * PER_PASS);
+    const descent = entry === 'helix'
+        ? Math.max(24, Math.ceil(stepdown / Math.max(0.001, num(p.helixPitch, 1))) * 24) * 11
+        : entry === 'ramp' ? 6 : 0;
+    return 16 + levels * (PER_LEVEL + descent + passes * PER_PASS);
 }
 
 export function surfaceRasterLines(p = {}) {
@@ -938,6 +964,38 @@ function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed
     const ARC_X = AX(axE(cx - x0, HX.vx), cx, [TM(HX.vx)]);
     const ARC_Y = AX(ayE(cy - y0, HX.vy), cy, [TM(HX.vy)]);
     const OUT_X = AX(ax(sx - x0), sx, []), OUT_Y = AX(ay(sy - y0), sy, []);
+    /**
+     * ── t1440 — WHOLE REVOLUTIONS, RULED ON THE GEOMETRY (the t1406 divergence, decided) ──────────────────────────
+     *
+     * This body rounds the REVOLUTION count UP (`FUP`); the literal kernel rounds the SEGMENT count to NEAREST
+     * (`Math.round(max(1, depth/pitch) * 24)`). They agree wherever depth/pitch lands on a whole number of segments —
+     * which is every surfacing default and every bridge config, which is why the split survived from t1345 to t1406
+     * unnoticed. Outside that they cut different descents, and t1406 recorded it as pre-existing rather than deciding
+     * it. DECIDED NOW, and on what the number MEANS rather than on which behaviour got here first:
+     *
+     * `pitch` IS A CEILING, NOT A TARGET. It is millimetres of descent per revolution — the axial engagement of a
+     * helical entry, which is the quantity that loads the tool. Asking for 1mm/rev is asking for "no more than 1mm
+     * per revolution"; a descent that takes LESS is gentler and always safe, one that takes MORE is the thing the
+     * operator set the number to prevent.
+     *
+     * MEASURED, BOTH DIRECTIONS, because the decision rests on the asymmetry and not on the sizes:
+     *   NEAREST-ROUND can EXCEED the ceiling, by up to ~2.1% (worst at just over one revolution: 1.0207 rev rounds
+     *          to 24 segments = 1.000 rev, so the achieved pitch is 2.07% steeper than asked). Small — and a bound
+     *          you are allowed to cross is not a bound.
+     *   FUP can only FALL SHORT, by up to 50% (just over one revolution rounds to two, halving the pitch). Larger in
+     *          magnitude, and entirely in the direction the operator is protected by. Its cost is TIME.
+     *
+     * So FUP stands — not because it is incumbent, but because a ceiling that can be exceeded is not doing the job
+     * the parameter exists for. THE LITERAL'S NEAREST-ROUND IS THE LOSER and its history line is here: it was the
+     * shipped behaviour of `helixPoints` and remains frozen in `/_test/literalPocketFill.js`, deliberately — the
+     * bridge that measures the two apart now names this divergence as the FIX rather than as a difference.
+     *
+     * ⚠ A THIRD RULE EXISTS AND IS NOT TAKEN — surfaced, not shipped. Ceiling at the SEGMENT level
+     * (`FUP[revs * 24]` rather than `FUP[revs] * 24`) also never exceeds the pitch, and undershoots by at most one
+     * segment (~4%/rev) instead of up to 50%. It dominates on both stated criteria and costs one thing: the descent
+     * ends MID-revolution, so the helix does not close its circle at the final depth. That is an emit-shape change
+     * with its own bridge, and the ruling asked for a decision between the two that exist. Recorded for the ruling.
+     */
     return [
         `    ${HX.segs}=[FUP[${V.stepdown} / ${r3(pitch)}] * ${SEG}]   ( segments: ${SEG} per rev, at ${r3(pitch)}mm per rev )`,
         `    IF ${HX.segs} < ${SEG} THEN ${HX.segs}=${SEG}   ( never less than one revolution )`,

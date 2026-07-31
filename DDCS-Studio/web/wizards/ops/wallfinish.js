@@ -188,11 +188,17 @@ export function wallFinishWorkSteps(p = {}) {
     if ([p.depth, p.stepdown, p.w, p.h, p.inset, p.x, p.y].some((v) => liveWordOf(v) != null)) return null;
     const depth = num(p.depth, 4), stepdown = Math.max(0.01, num(p.stepdown, 1.5));
     const levels = Math.max(1, Math.ceil(depth / stepdown));
-    const PER_LEVEL = 11;                                                    // 7 motion + 4 loop bookkeeping
-    const CONFIRM = Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0 ? 6 : 0;
+    // t1440 — CALIBRATED AGAINST THE ENGINE'S OWN STEP COUNT, by the same differencing that swept the raster's rows.
+    // PER_LEVEL 11 was right (measured exactly, by differencing two depths at one area). The other two were not:
+    // the HEADER was 6 against a measured 9 — an UNDER-declaration, the direction that truncates a preview — and the
+    // confirm's 6 is really 4.25 (its two pause lines fire on one level in N, while its three guard lines fire on
+    // every level, and the last level short-circuits at the first IF). 5 is the measured value rounded UP, because
+    // where a declaration cannot be exact it must err high.
+    const PER_LEVEL = 11;
+    const CONFIRM = Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0 ? 5 : 0;
     // the header + the refusal tails — sized from the SAME predicate the body emits them under, so a config that
     // drops the ring guard does not carry six phantom steps in its declaration
-    const HEADER = 6 + (wallFinishNeedsRingGuard(p) ? 6 : 0);
+    const HEADER = 9 + (wallFinishNeedsRingGuard(p) ? 6 : 0);
     return HEADER + levels * (PER_LEVEL + CONFIRM);
 }
 

@@ -329,8 +329,8 @@ test('THE DECLARED WORK — the per-level line count is measured against the emi
     // controller also executes each turn, which is where 9 becomes 11.
     expect(r.perLevel, 'the emitted per-level body').toBe(9);
     expect(r.perLevelConfirm - r.perLevel, 'a confirm adds six lines per level').toBe(6);
-    expect(r.steps, '3 levels, no ring guard: 6 + 3 × 11').toBe(6 + 3 * 11);
-    expect(r.stepsConfirm, '4 levels with a confirm: 6 + 4 × 17').toBe(6 + 4 * 17);
+    expect(r.steps, '3 levels, no ring guard: 9 + 3 x 11 (t1440 re-calibrated the header from 6 to the measured 9)').toBe(9 + 3 * 11);
+    expect(r.stepsConfirm, '4 levels with a confirm: 9 + 4 x 16 (t1440: the confirm is 5, its measured 4.25 rounded UP)').toBe(9 + 4 * 16);
     expect(r.liveOmits, 'and it is OMITTED, never guessed, once an input is dialled').toBe(null);
 
     /**

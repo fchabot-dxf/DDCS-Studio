@@ -299,22 +299,35 @@ test('THE NAMED DIVERGENCES — a sub-0.05 stepdown and a sub-0.2mm stepover cut
 });
 
 /**
- * THE THIRD DIVERGENCE — THE HELIX TAKES WHOLE REVOLUTIONS. **Pre-existing, and NOT caused by this act.**
+ * ── t1440 — THE HELIX DIVERGENCE IS THE **FIX**, RULED ON THE GEOMETRY ────────────────────────────────────────────
+ *
+ * This test was written at t1406 as "pre-existing, not fixed here" — a difference recorded because nobody had decided
+ * which side was right. t1440 decided it, and the decision reverses what this test is SAYING while changing not one
+ * number in it: the atom's whole revolutions are CORRECT and the literal's nearest-round is the loser.
+ *
+ * `pitch` is a CEILING (millimetres of descent per revolution = the axial engagement of a helical entry), not a
+ * target. Nearest-round can EXCEED it by up to ~2.1%; FUP can only fall SHORT, by up to 50%. The magnitudes favour
+ * nearest-round and the DIRECTIONS decide it — a bound you may cross is not a bound, and the cost of falling short
+ * is time rather than tool load.
+ *
+ * SO THE NUMBERS BELOW ARE THE FIX'S SIZE, not a defect's. They are kept exactly as measured, and the frozen literal
+ * reference is deliberately NOT corrected: it is the record of what shipped, and a reference that gets "improved"
+ * stops being one (its own header says so).
+ *
+ * ── THE DIVERGENCE REGION, NAMED ──────────────────────────────────────────────────────────────────────────────────
+ * The two agree exactly when `stepdown / pitch` is a whole number of revolutions (every surfacing default, and the
+ * three pitches asserted identical below). They diverge otherwise, and the atom is always the FINER descent — which
+ * is the ceiling being honoured, stated as a property rather than as a per-pitch table.
  *
  * The atom has emitted `#38=[FUP[#43 / pitch] * 24]` since t1345: it rounds the REVOLUTION count UP, so the descent
  * always completes whole turns and ends at the angle it entered on. The literal kernel rounds the SEGMENT count to
- * nearest (`Math.round(max(1, depth/pitch) * 24)`), so it can finish part-way round. Where the stepdown divides by the
- * pitch exactly the two are identical — which is why the bridge above uses such a pitch and really does prove the
- * helix walk. Where it does not, they differ, and by how much is recorded here rather than left to be rediscovered.
+ * nearest (`Math.round(max(1, depth/pitch) * 24)`), so it can finish part-way round.
  *
- * WHY IT SURFACED NOW AND NOT AT t1345: surfacing's own defaults are stepdown 0.5 at 1mm/rev, where the literal's
- * `max(1, …)` clamp and the atom's `IF #38 < 24` floor both land on exactly one revolution. Every surfacing bridge sat
- * inside that agreement. A pocket's stepdown is millimetres, not tenths, so it walks straight out of it — the same
- * class as t1402's `concentric × ramp`: not a new bug, a combination nothing had ever measured.
- *
- * NOT FIXED HERE. Changing it would move surfacing's shipped emit, which is a different act with its own bridge.
+ * WHY IT SURFACED AT t1406 AND NOT AT t1345: surfacing's own defaults are stepdown 0.5 at 1mm/rev, where the
+ * literal's `max(1, …)` clamp and the atom's `IF #38 < 24` floor both land on exactly one revolution. Every surfacing
+ * bridge sat inside that agreement. A pocket's stepdown is millimetres, not tenths, so it walks straight out of it.
  */
-test('THE HELIX DIVERGENCE — whole revolutions vs a rounded segment count, measured and flagged (pre-existing)', async ({ page }) => {
+test('THE HELIX DIVERGENCE IS THE FIX — whole revolutions honour the pitch ceiling; nearest-round can exceed it', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async ({ base, PROGRAMS, CUTS_BY_LEVEL }) => {
         const { traceToolpath } = await import('/engine/trace.js');
@@ -335,7 +348,15 @@ test('THE HELIX DIVERGENCE — whole revolutions vs a rounded segment count, mea
     // …and outside them, the atom cuts MORE segments, because it finishes the turn. The exact numbers, so a change shows.
     expect([by['0.8'].lit, by['0.8'].par], 'pitch 0.8 (1.875 rev): the literal rounds to 45 segments/level, the atom takes 2 whole turns').toEqual([315, 324]);
     expect([by['1'].lit, by['1'].par], 'pitch 1.0 (1.5 rev): the widest case in this sweep').toEqual([288, 324]);
-    expect(by['1'].par, 'and the atom is always the FINER descent, never the coarser one').toBeGreaterThan(by['1'].lit);
+    /**
+     * t1440 — THE DIRECTION IS THE RULING, and it is the assertion that matters most here. The atom is always the
+     * FINER descent: more segments for the same drop means a SHALLOWER achieved pitch, i.e. at or under the ceiling
+     * the operator declared. The literal being coarser is the same fact read the other way — it can descend faster
+     * per revolution than was asked. Asserting the direction (rather than only the two sample numbers above) is what
+     * makes this a statement about the RULE instead of about two pitches somebody happened to measure.
+     */
+    expect(by['1'].par, 'the atom is always the FINER descent — the pitch ceiling honoured, never exceeded').toBeGreaterThan(by['1'].lit);
+    expect(by['0.8'].par, 'and at the other divergent pitch too — one direction, not a coincidence').toBeGreaterThan(by['0.8'].lit);
 });
 
 /**

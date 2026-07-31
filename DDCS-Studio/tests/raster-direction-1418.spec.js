@@ -451,6 +451,21 @@ test('THE DECLARED WORK — the per-pass count is the emitted row body, in every
             // THE EMITTED BODY: the lines strictly inside the pass loop, less the ONE line a plunge descent costs.
             const i = L.findIndex((l) => /DO2/.test(l)), j = L.findIndex((l) => /^\s*END2\s*$/.test(l));
             const measured = (j - i - 1) - 1;
+            /**
+             * ── t1440 — AND THE EXECUTED COUNT, WHICH IS THE ONE THE DECLARATION IS ABOUT ─────────────────────────
+             * The line count above is what you can SEE; a walk's body is full of forks and only one arm of each runs
+             * per pass, so the two are different numbers and this test used to compare the declaration against the
+             * wrong one. Executed steps come from the engine's own step call, differenced across one more pass.
+             */
+            const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+            const runSteps = (q) => {
+                const eng = new GcodeExecutionEngine({ autoAnswer: true });
+                let n = 0; const orig = eng._executeStep.bind(eng);
+                eng._executeStep = (s) => { n++; return orig(s); };
+                eng.traceStepCap = 8000000;
+                eng.trace(m.surfaceRasterLines(q).join(String.fromCharCode(10)));
+                return n;
+            };
             // THE DECLARATION, differenced across exactly one more PASS at the same level count. A pass is a row on
             // the parallel walk and a RING on the concentric one, and using the row formula for both is what made
             // this read 0 on the first run — the ring count is driven by the SHORTER side, so growing `h` past 80
@@ -464,30 +479,44 @@ test('THE DECLARED WORK — the per-pass count is the emitted row body, in every
             let big = { ...p }; while (passes(big) === passes(p)) big = { ...big, w: big.w + 0.5, h: big.h + 0.5 };
             const levels = Math.ceil(p.depth / p.stepdown);
             const declared = (m.surfaceRasterWorkSteps(big) - m.surfaceRasterWorkSteps(p)) / (levels * (passes(big) - passes(p)));
-            out[direction] = { measured, declared, i, j };
+            const executed = (runSteps(big) - runSteps(p)) / (levels * (passes(big) - passes(p)));
+            out[direction] = { measured, declared, executed, i, j };
         }
         return out;
     });
 
-    // THE SAFETY PROPERTY, on every walk: the declaration is a CAP, so it may overstate but must never UNDERSTATE.
-    // Understating is the shipping defect t1383 measured — a preview silently drawing a fraction of the toolpath.
-    for (const [dir, v] of Object.entries(r))
-        expect(v.declared, `${dir}: the declared per-pass count (${v.declared}) is never below the emitted body (${v.measured})`).toBeGreaterThanOrEqual(v.measured);
-    // THE THREE THIS ACT OWNS ARE EXACT, and the numbers are written down so a change to either side has to come here
-    // and say what moved.
-    expect([r.bothways.declared, r.bothways.measured], 'the both-ways row body is 20 lines, declared 20 — unchanged').toEqual([20, 20]);
-    expect([r.oneway.declared, r.oneway.measured], 'the one-way row body is ELEVEN: it gains the lift/rapid/plunge triple and drops the four end-choosing branches, the step-over and the #49 flip').toEqual([11, 11]);
-    expect([r.otherway.declared, r.otherway.measured], 'and the mirror is the same size').toEqual([11, 11]);
     /**
-     * THE RING BODY OVER-DECLARES BY TWO — PRE-EXISTING, NOT CAUSED BY THIS ACT, AND DELIBERATELY NOT FIXED HERE.
+     * ── THE SAFETY PROPERTY, AGAINST THE RIGHT NUMBER (restated t1440) ────────────────────────────────────────────
      *
-     * `PER_PASS = 14` for concentric against an emitted ring body of 12. It has been 14 since t1329 and it is in the
-     * SAFE direction — the cap comes out 2·rings·levels larger than the walk needs, so the tracer draws the whole
-     * path and then some. Surfaced by building the calibration this act's own row needed; recorded with its numbers
-     * rather than silently corrected, because moving it would move the declared work of every shipped spiral pocket
-     * and every concentric surfacing op, which is a different act with its own bridge.
+     * The declaration is a CAP on EXECUTED steps, so it may overstate but must never UNDERSTATE — understating is the
+     * shipping defect t1383 measured, a preview silently drawing a fraction of the toolpath.
+     *
+     * IT USED TO BE ASSERTED AGAINST THE EMITTED LINE COUNT, and that was the class defect t1440 swept: a walk's body
+     * is full of forks and only one arm of each executes per pass, so the line count is not the executed count and
+     * this test was enforcing the very confusion that made the declarations wrong. Comparing against the ENGINE is
+     * the correction, and it is a strictly stronger check — the line count is now recorded as context, not criterion.
      */
-    expect([r.concentric.declared, r.concentric.measured], 'the ring body over-declares by 2 — pre-existing, safe direction, named not fixed').toEqual([14, 12]);
+    for (const [dir, v] of Object.entries(r))
+        expect(v.declared, `${dir}: the declared per-pass count (${v.declared}) is never below the EXECUTED count (${v.executed}; its emitted body is ${v.measured} lines)`).toBeGreaterThanOrEqual(v.executed);
+    // THE FOUR, EXACT, and both numbers written down so a change to either side has to come here and say what moved.
+    // The GAP between them is the finding: 20 lines of both-ways body, 13 of which run on any given pass.
+    expect([r.bothways.declared, r.bothways.executed, r.bothways.measured], 'the both-ways row: 20 lines emitted, THIRTEEN executed, declared 13 (was 20 — the t1440 correction)').toEqual([13, 13, 20]);
+    expect([r.oneway.declared, r.oneway.executed, r.oneway.measured], 'the one-way row is ELEVEN both ways — it has no end-choosing branch to skip, so its lines and its steps coincide. t1418 counted this one right.').toEqual([11, 11, 11]);
+    expect([r.otherway.declared, r.otherway.executed, r.otherway.measured], 'and the mirror is the same size').toEqual([11, 11, 11]);
+    expect([r.concentric.declared, r.concentric.executed], 'a concentric ring executes 12, not the 14 declared since t1329').toEqual([12, 12]);
+    /**
+     * ── THE RING'S OVER-DECLARATION IS FIXED (t1440) — this note is its history line ───────────────────────────────
+     *
+     * t1418 found `PER_PASS = 14` for concentric against an emitted ring body of 12, named it as pre-existing and in
+     * the safe direction, and deliberately left it: moving it moves the declared work of every shipped spiral pocket
+     * and every concentric surfacing op, which is its own act. t1440 IS that act, and it corrected more than the
+     * instance — the same audit found the both-ways row declaring 20 against 13 executed, and the helix's per-segment
+     * cost UNDER-declared, which is the direction that truncates.
+     *
+     * The line count (12) is kept in the assertion above as CONTEXT: for the ring it happens to equal the executed
+     * count, and that coincidence is exactly what made "count the body" look like a valid method for years.
+     */
+    expect(r.concentric.measured, 'the emitted ring body is 12 lines — and for THIS walk that equals its executed count').toBe(12);
 });
 
 /**
