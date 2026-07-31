@@ -11713,3 +11713,76 @@ gets no menu · Reset values greyed-with-reason then live, and really forgetting
 entry's own click) · all four menu surfaces + settings + round-trip **44/44** with **IRON RULE 11/11, same list, no
 growth** · smoke **71/71**. Screenshot in `test-results/t1458-shots/` and **eyeballed**: the menu over the open
 Setup dropdown with Reset values correctly greyed on a wizard that has no remembered values.
+
+## t1460 (seat A) — SURFACE 6 (3D preview) BUILT · and SURFACE 5's RULING CONFLICT, written down in full
+
+### SURFACE 6 — a menu on a surface that had one TAKEN AWAY
+
+The 3D view already suppresses the native menu (`contextmenu → preventDefault`, because right-drag pans). So this
+is not a menu competing with another; it is the right button being given something to do again.
+
+**RULE 1, per entry:** the VIEW PRESETS call the same `viz.setView(v)` the corner **ViewCube** calls when you click a
+face — the spec asserts the menu leaves the camera exactly where `setView('top')` puts it, so the two doors cannot
+drift. FIT is already advertised in the panel's own hint line — *"dbl-click fit work/machine"* — and the entry calls
+the same `fitAll` that gesture does. The THREE LINKS each open a surface reachable on its own: Settings → Machine,
+Settings → Preview, and the Stock modal (`ddcsOpenStock`, the same door the Setup checklist uses).
+
+**THE CAP IS ASSERTED AS A COUNT, not described.** A link earns its place by GOVERNING WHAT THE VIEW SHOWS. Tool
+table, WCS and Program all influence a program somewhere; admitting one of them would replace the rule with "it is
+related", which is how a menu becomes a second Settings index nobody maintains. The spec counts the gear entries and
+requires exactly 3.
+
+**⚠ AND THE SCREENSHOT CAUGHT SOMETHING THE ASSERTIONS COULD NOT.** The first run's picture showed no menu at all
+while every DOM assertion passed: my test host was `z-index:99999` and the shared menu is `z-index:1000`, so the menu
+rendered correctly and sat BEHIND the host. **A test host that outranks the thing under test cannot photograph it** —
+and a spec that only reads the DOM would have called that green forever. Host dropped below the menu; the picture
+now shows the three views, Fit, and the three settings links.
+
+### SURFACE 5 — THE RULING CONFLICT, STATED (not built, per the dispatch)
+
+**THE ADVISOR'S CALIBRATION GUESS WAS: "workspace-row RENAME collides with the queued name=filename ruling (seat B
+Task 3 — the 3-way name the user called built wrong)". THAT IS NOT WHAT I FOUND**, and per the dispatch's own
+instruction ("if it is something else, all the more reason to write it") here it is precisely.
+
+**WHAT I FOUND — a SHIPPED ruling, already in the source, not a queued one.** t1223's ONE-NAME RULE, quoted from
+`settingsPanel.js` (lines 1215-1217 and again at 1988-1989):
+
+> *"the name input is GONE. The workspace's name IS its filename IS what every surface shows, so a second place to
+> type it could only ever disagree with the file. **Renaming is Save As.** The identity band above the tab strip
+> displays it."*
+
+I also searched `ROADMAP.md` and `NEXT-SESSION.md` for a "seat B Task 3" / "3-way name" item and **found no such
+entry**. So either it lives in a doc this seat does not see, or the guess and the finding are two different things.
+Recorded as a fact rather than reconciled, because guessing which is the "real" ruling is exactly what the dispatch
+told me not to do.
+
+**THE COLLISION, precisely:**
+- The pass asks for `open / rename / delete` on each workspace row.
+- `open` and `delete` are rule-1 clean AND per-card: every card IS a `[data-wsm-open]` button, and each carries a
+  `[data-wsm-del]` trash whose confirm already names the file and states that deletion is permanent and skips the
+  Recycle Bin.
+- `rename` **has no implementation anywhere**, by the ruling above. The nearest thing is `data-wsm="saveas"` — and
+  that is a HEADER action on the **currently open** workspace, not a per-card one. Offering it on some *other* card
+  would mean "open that one first", which the `Open` entry already is.
+
+**THE OPTIONS, and my lean:**
+- **(A) — MY RECOMMENDATION. Open + Delete only**, with the one-name rule cited in the spec as the reason `rename`
+  is absent. Rule-1 clean, per-card, and it leaves the standing ruling intact. The cost is honest: the pass asked
+  for three entries on this surface and gets two, so the shortfall is *named* rather than quietly filled.
+- **(B) A per-card rename is built.** This is a NEW FEATURE that contradicts a shipped ruling — it needs the file
+  renamed on disk (a File System Access move/copy+delete), the identity band, the save handle and the workspace
+  list all following it. That is its own act with its own risks, not a menu entry.
+- **(C) The entry opens the workspace and then Save As.** Rejected rather than offered as a real option: it is
+  `Open` wearing a second label, and the user would discover that only after their file did not get renamed.
+
+**WHY I AM NOT TAKING (A) MYSELF**, having taken comparable narrowings before: the presets absence (t1458) and the
+Blockly non-duplicates (t1454) removed entries whose action ALREADY EXISTED elsewhere on that surface. Dropping
+`rename` removes a named requirement outright, with nothing standing in its place. That is a scope decision, and
+scope is the advisor's.
+
+### GATE (fast tier)
+
+new spec `context-menu-viz-1460` **3/3** (the three presets + Fit + the settings-link count capped at 3 · the view
+entries landing where `setView` does, so menu and ViewCube agree · long-press) · all five menu surfaces +
+declared-work + round-trip **39/39** with **IRON RULE 11/11, same list, no growth** · smoke **71/71**. Screenshot in
+`test-results/t1460-shots/` and **eyeballed** — after the z-index fix above made it show anything at all.

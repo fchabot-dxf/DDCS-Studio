@@ -478,9 +478,52 @@ export function createPreviewPanel(container, opts = {}) {
         for (const cb of touchSubs) cb(ev);
     }
 
+    /**
+     * ── t1460 — SURFACE 6: the 3D PREVIEW's right-click menu ──────────────────────────────────────────────────────
+     *
+     * The 3D view already SUPPRESSES the native menu (gcodeViz3d does `contextmenu → preventDefault`, because
+     * right-drag pans), so this is a menu on a surface that had one taken away rather than one competing for it.
+     *
+     * ── RULE 1, CHECKED PER ENTRY ────────────────────────────────────────────────────────────────────────────────
+     *   VIEW PRESETS  the ViewCube in the corner already snaps the camera to a named face — `pickCube` calls the same
+     *                 `viz.setView(v)` these entries call. The menu is the keyboard-free, cube-free way to the same
+     *                 three views a user actually asks for.
+     *   FIT           the panel's own hint line already advertises it in words: *"dbl-click fit work/machine"*. The
+     *                 entry names the behaviour that hint describes, calling the same `fitAll` the dblclick handler
+     *                 does — including its wide/work toggle, so the menu and the gesture stay one behaviour.
+     *   THE 3 LINKS   each opens a surface that exists and is reachable on its own: Settings → Machine, Settings →
+     *                 Preview, and the Stock modal (`ddcsOpenStock`, the same door the Setup checklist uses).
+     *
+     * ⚠ AND THE LINK LIST IS CAPPED AT THREE, DELIBERATELY. The rule for this menu is that a link earns its place by
+     * GOVERNING WHAT THE VIEW SHOWS — the envelope box, the preview display options, the stock body. Tool table,
+     * WCS, Program and the rest all influence a program somewhere, and a menu that grows to "everything related"
+     * stops being a shortcut and becomes a second Settings index nobody maintains.
+     */
+    function openVizMenu(ev) {
+        if (!viz) return;
+        ev.preventDefault();
+        Promise.all([import('../ui/opContextMenu.js'), import('../ui/settingsPanel.js')]).then(([CM, SP]) => {
+            const view = (v, label) => ({ label, fn: () => { try { viz.setView(v); } catch (_) { /* pre-render */ } } });
+            CM.openMenu([
+                view('top', '⬒ Top view'),
+                view('front', '⬓ Front view'),
+                view('iso', '⬔ Iso view'),
+                { label: '⤢ Fit to work', fn: () => { try { viz.fitAll(false); } catch (_) { /* */ } } },
+                { label: '⚙ Machine / envelope…', fn: () => SP.openSettings({ group: 'hardware', panel: 'set_tab_machine' }) },
+                { label: '⚙ Preview display…', fn: () => SP.openSettings({ panel: 'set_tab_preview' }) },
+                { label: '⚙ Stock…', fn: () => { if (window.ddcsOpenStock) window.ddcsOpenStock(); } },
+            ], ev.clientX, ev.clientY);
+        }).catch(() => { /* menu module optional */ });
+    }
+
     function ensureViz() {
         if (viz) return viz;
-        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(previewStock()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
+        try {
+            viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(previewStock()); viz.setMachine(machineForViz()); applyPreviewSettings();
+            // t1460 — the view's own menu + long-press (the phone has no right button, and no ViewCube-sized target).
+            container.addEventListener('contextmenu', openVizMenu);
+            import('../ui/opContextMenu.js').then((m) => m.attachLongPress(container)).catch(() => { /* optional */ });
+        }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
         if (viz) viz.onStartChange = (starts) => {   // a 3D jog/drag (any pass) → sync the shared starts, PIN the moved pass, re-trace + replay (#18, INC2)
