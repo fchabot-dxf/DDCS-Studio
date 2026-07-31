@@ -124,8 +124,16 @@ test('SLOT plunge = byte-identical; ramp runs ALONG the slot at ≤ angle; wide-
     expect(r.narrowDegrade, 'a tool-width slot degrades helix → plunge with the why').toBe(true);
 });
 
-// ---------------- CONTOUR (own descent; ramp along the FIRST SEGMENT / a helical lead-in on a circle; NO helix mode) ----------------
-test('CONTOUR plunge = byte-identical; rect ramps along the first segment ≤ angle; circle ramps as a helical lead-in', async ({ page }) => {
+// ---------------- CONTOUR (own descent; ramp along the FIRST SEGMENT / a CHORDED lead-in on a circle; NO helix mode) ----------------
+/**
+ * t1474 — THIS TEST WAS RESTATED, NOT RELAXED. It used to pin the SHAPE of the circle lead-in (`G3 … Z … ( ramp )`),
+ * and t1472 measured that shape to be unattested on this controller family — 7361 captured planar arcs, ZERO
+ * carrying a Z — so t1474 converted it to chorded `G1` moves. A test that names a FORM goes red when the form is
+ * corrected, which is what happened here; a test that names the PROPERTY survives the correction and still catches
+ * the defect. The property was always the continuous monotonic descent around the circle, and that is what is
+ * asserted below — plus the conversion's own contract, that no arc anywhere in the emit carries a Z.
+ */
+test('CONTOUR plunge = byte-identical; rect ramps along the first segment ≤ angle; circle descends on CHORDS, no arc carries a Z', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
@@ -135,20 +143,52 @@ test('CONTOUR plunge = byte-identical; rect ramps along the first segment ≤ an
         const noEntry = emitMapped(contourStack(rect)).text;
         const plunge = emitMapped(contourStack({ ...rect, entry: 'plunge' })).text;
         const ramp = emitMapped(contourStack({ ...rect, entry: 'ramp', rampAngle: 5 })).text.split('\n');
-        // circle ramp = a descending G3 helical lead-in (G3 … Z … ( ramp ))
+        // t1474 — circle ramp = a CHORDED descent (G1 X Y Z … ( ramp )), the attested form. Was a helical G3+Z.
         const circ = emitMapped(contourStack({ shape: 'circle', dia: 50, side: 'outside', toolDia: 6, depth: 4, stepdown: 1.5, entry: 'ramp', rampAngle: 5 })).text.split('\n');
-        const circRamps = circ.filter((l) => /G3 .* Z-?[\d.]+ .*\( ramp \)/.test(l));
+        const circRamps = circ.filter((l) => /G1 X-?[\d.]+ Y-?[\d.]+ Z-?[\d.]+ .*\( ramp \)/.test(l));
+        // THE CONVERSION'S CONTRACT, over the WHOLE emit and not just the ramp: no arc carries a Z anywhere.
+        // No \b after the code — posted G-code writes `G02X4.1` with no separator; the digit-guard excludes G20/G28.
+        const ARC = /\bG0?[23](?![0-9])/;
+        const helicalArcs = circ.filter((l) => { const i = l.search(ARC); return i >= 0 && /Z\s*-?[\d.]/.test(l.slice(i)); });
+        // group the ramp Zs into CONTIGUOUS runs — one per depth level, split by the retract/finish lines between
+        // them. Grouping by "Z rose" would merge levels 1 and 2, whose ramps happen to meet without a gap.
+        const circRuns = []; let open = null;
+        for (const l of circ) {
+            const isRamp = /G1 X-?[\d.]+ Y-?[\d.]+ Z-?[\d.]+ .*\( ramp \)/.test(l);
+            if (!isRamp) { open = null; continue; }
+            if (!open) { open = []; circRuns.push(open); }
+            open.push(+(/Z(-?[\d.]+)/.exec(l)[1]));
+        }
         return { same: noEntry === plunge, plungeClean: !/\( ramp|\( helix/.test(plunge), ramp,
             helixNever: !ramp.join('\n').includes('( helix )'), circRampCount: circRamps.length,
-            circZs: circRamps.map((l) => { const m = /Z(-?[\d.]+)/.exec(l); return m ? +m[1] : null; }) };
+            helicalArcs, planarArcs: circ.filter((l) => ARC.test(l)).length, circRuns };
     });
     expect(r.same, 'contour entry:plunge == no entry (byte-identical)').toBe(true);
     expect(r.plungeClean, 'contour plunge: no ramp/helix').toBe(true);
     const rs = assertRampSlope(r.ramp, 5, 3);                       // depth 4 / stepdown 1.5 = 3 levels; rect first segment
     expect(r.helixNever, 'contour never emits a helix (would gouge the interior)').toBe(true);
-    expect(r.circRampCount, 'circle ramp emits a descending G3 helical lead-in').toBeGreaterThanOrEqual(3);
-    // the circle helix descends monotonically
-    for (let i = 1; i < r.circZs.length; i++) if (r.circZs[i] != null && r.circZs[i - 1] != null) expect(r.circZs[i]).toBeLessThanOrEqual(r.circZs[i - 1] + 1e-6);
+    expect(r.circRampCount, 'the circle lead-in descends on chorded G1 moves').toBeGreaterThanOrEqual(3);
+    // ⚠ THE CONVERSION'S CONTRACT (t1474): the circle still finishes on a PLANAR arc — so this is not "arcs were
+    // removed", it is "no arc carries a Z". Both halves asserted, because either alone would pass on the wrong emit.
+    expect(r.planarArcs, 'the finishing pass is still a true planar arc').toBeGreaterThanOrEqual(3);
+    expect(r.helicalArcs, 'no arc may carry a Z — the helical form is unattested on this family (t1472: 7361 '
+        + 'captured planar arcs, zero with a Z)').toEqual([]);
+    // THE PROPERTY THIS TEST IS REALLY ABOUT, and the one the old G3 shape was only ever a proxy for: the descent
+    // around the circle is CONTINUOUS AND MONOTONE. A dropped Z, a stepped plunge or a re-ordered walk all break it.
+    //
+    // ⚠ PER LEVEL, NOT ACROSS THEM, and finding that out was worth the restatement. Each depth level RETRACTS to
+    // clearance and re-enters at its own start height, so Z legitimately rises between levels — and on the last
+    // (partial) level it re-enters a full stepdown above the floor, at −2.5 over ground already cut to −3. That is
+    // PRE-EXISTING level-stepping, not the conversion: the old emit did the identical `G0 Z-2.5`. It was invisible
+    // only because one G3 per level sampled the level's END and never its start. Chords sample the whole descent,
+    // so the assert has to say what it actually means.
+    const runs = r.circRuns;
+    expect(runs.length, 'one descending run per depth level (4mm at 1.5 stepdown = 3)').toBe(3);
+    for (const run of runs) {
+        expect(run.length, 'each level descends over many chords, not one step').toBeGreaterThan(10);
+        for (let i = 1; i < run.length; i++) expect(run[i], 'Z never rises within a level').toBeLessThanOrEqual(run[i - 1] + 1e-6);
+    }
+    expect(runs[runs.length - 1].slice(-1)[0], 'and the last level arrives at the final depth').toBeCloseTo(-4, 3);
 });
 
 test('CONTOUR twin: user_contour_data offers plunge+ramp (no helix) + ramp round-trips', async ({ page }) => {

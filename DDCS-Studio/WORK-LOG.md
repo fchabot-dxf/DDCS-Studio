@@ -12266,3 +12266,44 @@ Contour + CAM families **158/158**. Pocket family **52/52** with **POCKET E0 `go
 11/11, same list, no growth.** Smoke **71/71**.
 
 Nothing said on the form: the behaviour is still "ramp descent" — it is the same descent, now evidence-clean.
+
+## t1476 (seat A) — the radius red RESTATED, not relaxed. And the restatement found real structure the old assert could not see.
+
+### THE RED WAS A TEST NAMING A FORM
+
+`depth-entry-everywhere-842`'s contour case pinned the SHAPE of the circle lead-in — its title said "circle ramps
+as a helical lead-in" and its filter was `/G3 .* Z-?[\d.]+ .*\( ramp \)/`. t1474 replaced exactly that shape, so
+the spec went red for the right reason and in the right place. **A test that names a form goes red when the form is
+corrected; a test that names the PROPERTY survives the correction and still catches the defect.** Restated to the
+property, with t1474 cited in the body, and the title now says what it does: *circle descends on CHORDS, no arc
+carries a Z*.
+
+Three things asserted where one shape used to be:
+- **the descent is continuous and monotone** (the `circZs` idea, kept, pointed at the chorded G1 form),
+- **the conversion's contract** — no arc anywhere in the emit carries a Z — and, deliberately, **its other half**:
+  the finishing pass is STILL a true planar arc. Either assert alone passes on the wrong emit; "no helical arcs"
+  would be satisfied by having removed arcs altogether,
+- **the plunge and rect arms byte-identical**, untouched from before.
+
+### ⚠ AND THE NEW ASSERT IMMEDIATELY FOUND SOMETHING — pre-existing, and NOT the conversion
+
+Monotone-across-the-whole-descent failed at `−3 → −2.504`. Not a regression: **each depth level retracts to
+clearance and re-enters at its own start height**, and on the LAST (partial) level it re-enters a full stepdown
+above the floor — `G0 Z-2.5` over ground already cut to −3, then ramps 1.5mm to reach −4. The old emit does the
+identical `G0 Z-2.5`; it was invisible because **one G3 per level sampled the level's END and never its start**.
+Chords sample the whole descent, so the property had to be stated as it really is: **monotone WITHIN a level**,
+three runs for 4mm at 1.5 stepdown, the last arriving exactly at −4.
+
+I did **not** change that stepping. It cuts air over 0.5mm of already-cleared depth on the final partial level —
+wasteful by a fraction of a second, not wrong — and it is pre-existing behaviour outside this act's scope. Named
+here so it is a known fact rather than a rediscovery.
+
+**A second wrong-shape attempt is worth recording too:** I first grouped the runs by "Z rose", which merged levels
+1 and 2 — their ramps happen to meet without a gap (−1.5 → −1.504). The runs are split on the retract lines
+BETWEEN them instead, which is the structure that actually exists rather than a proxy for it.
+
+### GATE (fast tier, as dispatched)
+
+`depth-entry-everywhere-842` **6/6**, and **MUTATION-TESTED**: re-emitting the chords as `G3` (an arc carrying a Z)
+turns it RED, so the restated test pins the conversion rather than merely tolerating it. Contour family +
+`helical-arc-evidence-1472` **23/23**. Smoke **71/71**. No source changed this turn — the fix was the test.
