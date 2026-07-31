@@ -82,6 +82,39 @@ export function contourRegion(p) {
     return offsetRegion(coerceRegion(p.region), sideOffset(p.side || 'on', num(p.tool, 6) / 2));
 }
 
+/**
+ * ── t1474 — THE CHORD BOUND FOR A CONVERTED ARC, DECLARED ────────────────────────────────────────────────────────
+ *
+ * The ramp entry below used to be a HELICAL G3 — one block arcing and descending together. t1472 measured that form
+ * to be UNATTESTED on this controller family (7361 captured planar arcs, ZERO carrying a Z) while the planar arc is
+ * richly proven, so it converts to the attested chorded form. That conversion approximates a circle, and this is
+ * the number that says by how much.
+ *
+ * ⚠ THE RASTER HELIX'S OWN 24-PER-TURN IS NOT REUSABLE HERE, and the reason is the job rather than the maths. The
+ * raster's chords cut AIR in the middle of an area being cleared — the finished part never sees them. THIS ramp
+ * descends ON THE FINISH PROFILE, so every chord is the wall. An inscribed 24-gon deviates
+ * `r·(1 − cos(π/24))`, measured:
+ *
+ *     r =  3mm  0.026     r = 25mm  0.214      ← 214× the 0.001mm emit quantum, and INTO the part on an
+ *     r = 12.5  0.107     r = 50mm  0.428        outside contour. A gouge, not a rounding difference.
+ *
+ * AND A FIXED COUNT CANNOT BOUND IT AT ALL — the error is proportional to the radius, so any constant is only ever
+ * right for one size. The count is DERIVED from the tolerance instead, which is what makes the bound a fact rather
+ * than a hope: `n = ceil(π / acos(1 − tol/r))`, floored at 24 so a tiny radius still reads as a circle.
+ *
+ * THE TOLERANCE IS THE EMIT QUANTUM ITSELF (0.001mm) — deliberately, not conservatively. Below it the emit cannot
+ * express a difference, so the converted path is not a different cut in any sense the machine can be commanded in.
+ * Its cost is LINE COUNT (Ø50 outside a Ø6 tool → 373 chords per revolution), which contour of all families can
+ * afford: `CONTOUR_PARAMETRIC_GAP` already declares this atom a literal transcript BY DESIGN.
+ *
+ * NO 9-DECIMAL RECURRENCE HERE, and that is not an oversight. The raster's rotating-vector constants exist because
+ * a MACRO LOOP cannot call trig and its error compounds every segment. This emit is literal JS: every point is
+ * computed independently at full double precision, so there is nothing to compound and nothing to re-seed.
+ */
+export const ARC_CHORD_TOL_MM = 0.001;
+export const chordSegsPerTurn = (r, tol = ARC_CHORD_TOL_MM) =>
+    Math.max(24, Math.ceil(Math.PI / Math.acos(Math.max(-1, 1 - tol / Math.max(1e-9, r)))));
+
 /** Crisp circular contour: rapid to the rim, plunge, one full G3 circle, retract. Exported so the FLAT twin atom
  *  (contourfill — the region-pill→flat reframe) reuses the EXACT circle emit → byte-identical to this region-socket atom. */
 export function circleTrace(rg, z, clr, feed, plunge, entry, prevZ, rampAngle) {
@@ -91,11 +124,19 @@ export function circleTrace(rg, z, clr, feed, plunge, entry, prevZ, rampAngle) {
     if (entry === 'ramp' && rg.r > 1e-6 && drop > 1e-6) {
         // t842 — a circle profile has no straight "first segment": ramp = a HELICAL descent AROUND the circle (the standard
         // circular lead-in), revs sized so the per-rev descent stays ≤ the ramp angle, then a flat finishing pass.
+        // t1474 — the descent is CHORDED (G1) rather than a helical G3: same geometry, same continuous Z, but every
+        // move is a form the corpus attests. The finishing pass below is a PLANAR arc and is untouched.
         const ang = Math.min(45, Math.max(0.5, num(rampAngle, 3)));
         const perRev = 2 * Math.PI * rg.r * Math.tan(ang * Math.PI / 180);
         const revs = Math.max(1, Math.ceil(drop / perRev));
+        const per = chordSegsPerTurn(rg.r), n = revs * per;
         L.push(`G0 Z${r3(prevZ)}`);
-        for (let i = 1; i <= revs; i++) L.push(`G3 X${x} Y${y} I${r3(-rg.r)} J0 Z${r3(prevZ - drop * i / revs)} F${feed}   ( ramp )`);
+        // CCW from (cx+r, cy) — the same start, direction and end the G3 had, so the ramp still closes on its own
+        // start with Z exactly at this level's depth. k runs to n inclusive: the last chord IS the arrival.
+        for (let k = 1; k <= n; k++) {
+            const th = 2 * Math.PI * k / per;
+            L.push(`G1 X${r3(rg.cx + rg.r * Math.cos(th))} Y${r3(rg.cy + rg.r * Math.sin(th))} Z${r3(prevZ - drop * k / n)} F${feed}   ( ramp )`);
+        }
         L.push(`G3 X${x} Y${y} I${r3(-rg.r)} J0 F${feed}   ( contour )`);
         return L;
     }

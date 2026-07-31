@@ -12197,3 +12197,72 @@ and the spec-defined targets true · the shipped-site inventory pinned at **1** 
 Dialect family (atc · atom-gating · blocks-decode · io-step-edge · preview-parity · sysstart · wcs-emit · wcs-gating)
 **19/19**. Boundary locks `literal-boundaries-1464` + `trig-lift-plan-1466` still green. **IRON RULE 11/11, same
 list, no growth.** Smoke **71/71**. **No emit changed** — dialect caps data, one .nc, one spec, one docs row.
+
+## t1474 (seat A) — THE SHIPPED HELICAL ARC CONVERTS. Ruled (b'): chorded descent, same geometry, attested form. The field risk is closed.
+
+### THE CONVERSION, and it reached exactly one path
+
+`circleTrace`'s RAMP branch — the circle contour's helical lead-in — now descends as chorded `G1` moves instead of
+`G3 X.. Y.. I.. J0 Z..`. Same start, same CCW direction, same closing point, same continuous descent; every move is
+now a form the corpus attests. **The finishing pass is a PLANAR arc and is untouched, character for character.**
+
+Worth recording because it narrows the blast radius: the ramp branch is reachable **only through `contourfill`**
+(the flat twin, `entry === 'ramp'`). `contour` proper and `pocketfill`'s circle wall-finish both call `circleTrace`
+WITHOUT an entry, so they take the plunge branch and were never helical at all. The bridge asserts that plunge path
+byte-for-byte.
+
+### ⚠ THE RASTER HELIX'S 24-PER-TURN IS NOT REUSABLE HERE, and the ruling's "where practical" is doing the work
+
+I went to import `SEG_PER_TURN` as instructed and measured what it would cut first. **An inscribed 24-gon deviates
+`r·(1 − cos(π/24))`:**
+
+    r =  3mm   0.026mm        r = 25mm   0.214mm   ← 214× the emit quantum
+    r = 12.5   0.107mm        r = 50mm   0.428mm
+
+and on an OUTSIDE contour that deviation is **into the part**. The raster's chords are safe because they cut AIR in
+the middle of an area being cleared — the finished part never sees them. **This ramp descends ON THE FINISH
+PROFILE, so every chord IS the wall.** Same maths, different job, and reusing the constant would have been a
+two-tenths-of-a-millimetre gouge shipped under the word "conversion".
+
+**AND A CONSTANT CANNOT BOUND IT AT ALL** — the error is proportional to the radius, so any fixed count is right
+for exactly one size. The count is DERIVED: `n = ceil(π / acos(1 − tol/r))`, floored at 24. That is what makes the
+bound a fact rather than a hope, and it is the honest reading of "reuse where practical".
+
+**NO 9-DECIMAL RECURRENCE, deliberately.** Those constants exist because a MACRO LOOP cannot call trig and its
+error compounds per segment. This emit is literal JS at full double precision with every point computed
+independently: nothing compounds, nothing needs re-seeding. Reusing the discipline would have been cargo.
+
+### THE BOUND HAS TWO TERMS, WHICH ONLY THE MEASUREMENT SHOWED
+
+The bridge first failed at 0.001532mm against a bound I had written as 0.0015. The excess is not sloppiness in the
+chords — it is **the emit's own coordinate rounding**: each endpoint is quantised to 0.001, which can shift a
+chord's midpoint by up to another half-quantum. So **the emit quantum is both the target AND the floor** — no chord
+count can get under ~1.5 quanta, because the coordinates cannot express it. The assert now states both terms
+(`tol + one quantum`) instead of padding a number until it passed.
+
+### THE COST, NAMED, WITH THE LEVER
+
+    case                    r    chords/turn  revs   OLD lines   NEW lines
+    Ø12 tool6 outside       6        173        2         6         350
+    Ø50 tool6 outside      28        372        1         5         376
+    Ø100 tool6             53        512        1         5         516
+
+70–100× on this entry. Affordable, and I checked rather than assumed why: contourfill is **not** in `opCamMap`, so
+it never packs into a size-limited CAM slot; the machine reads far larger posted programs routinely; and
+`CONTOUR_PARAMETRIC_GAP` already declares this family a literal transcript BY DESIGN. **The lever is one declared
+number** — `ARC_CHORD_TOL_MM`. At 0.01mm the counts fall ~3× (118/turn at r=28) for a 10µm deviation. I did NOT
+take that: the ruling said the emit quantum and the quantum is achievable, so loosening it is the advisor's call
+and not mine to make quietly.
+
+### GATE (fast tier)
+
+new spec `contour-ramp-chorded-1474` **4/4** — the Z-profile CONTINUOUS (monotone, arriving exactly at depth, no
+move taking a disproportionate bite: the property a dropped Z would destroy) · **every point** within the bound,
+including the CHORD MIDPOINTS, which is the number a vertices-only check would miss entirely · the planar-arc paths
+byte-identical (the plunge entry asserted as an exact 4-line array) · the descent still closes on its own start.
+`helical-arc-evidence-1472` **5/5** with **LOCK 4 flipped 1 → 0**: it went red the moment the site changed, which
+is an inventory doing its second job, and the zero now holds until `caps.helicalArc` lets the compact form back in.
+Contour + CAM families **158/158**. Pocket family **52/52** with **POCKET E0 `goldenDiffs: 0`**. **IRON RULE
+11/11, same list, no growth.** Smoke **71/71**.
+
+Nothing said on the form: the behaviour is still "ramp descent" — it is the same descent, now evidence-clean.

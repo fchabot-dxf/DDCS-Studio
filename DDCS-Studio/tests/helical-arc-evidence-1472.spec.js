@@ -103,7 +103,7 @@ test('LOCK 3 — the DDCS family declares FALSE, and the spec-defined targets de
     for (const id of ['rs274ngc', 'grbl']) expect(r[id], `${id} declares helical support from its own spec`).toBe(true);
 });
 
-test('LOCK 4 — exactly ONE shipped site emits a helical arc, and it is inventoried', () => {
+test('LOCK 4 — NO shipped site emits a helical arc (t1474: the one that did has converted)', () => {
     const web = join('web');
     const files = [];
     (function walk(d) {
@@ -122,11 +122,13 @@ test('LOCK 4 — exactly ONE shipped site emits a helical arc, and it is invento
             if (m && /[ }]Z[$\-\d#[{]/.test(ln.slice(m.index))) sites.push(`${f}:${i + 1}`);
         });
     }
-    // ⚠ THE PRE-EXISTING EXPOSURE, NAMED. The circle contour's RAMP entry has been sending a helical G3 to real
-    // machines since it shipped, on a capability nothing has confirmed. This test does not fix that — it stops a
-    // SECOND one appearing while the question is open, and goes red the day the first one is dealt with either way.
-    expect(sites.length, 'shipped helical-arc emit sites:\n' + sites.join('\n')).toBe(1);
-    expect(sites[0].replace(/\\/g, '/'), 'and it is the circle-contour ramp entry').toContain('wizards/ops/contour.js');
+    // ⚠ THE EXPOSURE IS CLOSED. t1472 found exactly ONE shipped site — the circle contour's RAMP entry, sending a
+    // helical G3 to real machines on a capability nothing has confirmed — and pinned the count at 1 so a second
+    // could not appear while the question was open. t1474 CONVERTED it to the attested chorded form, and this lock
+    // did its other job on the way: it went red the moment the site changed, which is how an inventory should
+    // behave. ZERO now, and it stays zero until V16 proves the form — at which point caps.helicalArc is the gate
+    // that lets the compact G3+Z back in, deliberately, rather than one creeping in unnoticed.
+    expect(sites.length, 'no shipped emit may use the unattested helical form:\n' + sites.join('\n')).toBe(0);
 });
 
 test('LOCK 5 — the machine test exists and probes the Z, not just the arc', () => {
