@@ -762,9 +762,6 @@ function rowWalk(o) {
     // flag that says which way. The limit is the row's LENGTH — a register the walk already reads for its far end —
     // so the guard stops being a baked number. Same shape the literal kernel has always handed `entryOrPlunge`.
     const runSign = reverse ? -1 : 1;
-    const descent = descentLines({ ...o, runSpan: SPAN, runUx: yRows ? 0 : runSign, runUy: yRows ? runSign : 0, ...(yRows
-        ? { sx: x0 + stepBaked / 2, sy: reverse ? y0 + h : y0 }
-        : { sx: reverse ? x0 + w : x0, sy: y0 + stepBaked / 2 }) });
     // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
     // NEAR/FAR are the row's two ends; ROW is the row's cross-axis coordinate, which the body has already computed into
     // #47 as an ABSOLUTE (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps
@@ -772,6 +769,37 @@ function rowWalk(o) {
     const NEAR_X = () => AX(alongAt(), a0, []);
     const FAR_X = () => AX(alongE(0, SPAN), a0, [TM(SPAN)]);
     const ROW_Y = (word = V.y) => AX(word, 0, [TM(V.y)]);
+    /**
+     * ── t1485 (C4, completed) — THE DESCENT STARTS FROM THE WALK'S OWN DECLARED POINT, not from a rebuilt copy ────
+     *
+     * t1483 gave the ramp a declared run VECTOR and left its START a pair of build-time numbers, and dumping the real
+     * emit under a dialled stepover is what showed the second half was still missing:
+     *
+     *     #47=[0 + #44 / 2 + #48 * #44]              the row's LIVE coordinate
+     *     G0 X0 Y#47                                 the walk's own approach already rides it
+     *     G1 X[0 + #34 * 1] Y[1.8 + #34 * 0] …       ⚠ the ramp descended at the BAKED 1.8
+     *
+     * The run vector fixed the axis the ramp RUNS ALONG and left the axis it SITS ON exactly as it was, so a dialled
+     * stepover descended at a stale coordinate and the row then cut at `#47` — precisely the kinked entry the bake
+     * existed to prevent. The mirror had the same hole one axis over: `otherway` started its ramp at the baked far
+     * end, which for a dialled area is `num('#4', 100)` — the DEFAULT width, not the operator's.
+     *
+     * SO THE START IS DECLARED RATHER THAN RE-DERIVED. These three points are what the walk cuts; handing the descent
+     * the same objects means the ramp cannot disagree with the row about where the row IS — not because both
+     * expressions were kept in step, but because there is only one expression. That is the whole fix, and it is what
+     * makes `SURFACE_RASTER_BAKES`'s two empty ramp rows a true statement instead of a hopeful one.
+     *
+     * The HELIX still takes its come-back-out point as NUMBERS (`sx`/`sy` below): it bakes the rect inradius anyway
+     * and its two rows say so, so lifting only half of it would buy nothing and move a byte-identical descent.
+     */
+    const START_ALONG = reverse ? FAR_X() : NEAR_X();
+    const alongN = reverse ? a0 + (yRows ? h : w) : a0;              // the same point as a NUMBER, for the helix
+    const crossN = (yRows ? x0 : y0) + stepBaked / 2;                // …and its cross-axis half, the row-0 coordinate
+    const descent = descentLines({ ...o,
+        runSpan: SPAN, runUx: yRows ? 0 : runSign, runUy: yRows ? runSign : 0,
+        startX: yRows ? ROW_Y() : START_ALONG, startY: yRows ? START_ALONG : ROW_Y(),
+        sx: yRows ? crossN : alongN, sy: yRows ? alongN : crossN,
+    });
     /**
      * THE STEP-OVER'S X — a value only a ROTATED build has to name. Unrotated, the step over at depth is a Y-only move
      * and leaving X modal is what keeps the tool down. Rotated, that same straight step is a DIAGONAL, so X must be
@@ -901,12 +929,14 @@ function rowWalk(o) {
  * arcs are unattested on this controller family, so the helix keeps its polyline AND its inradius bake.
  */
 function rampLines(o) {
-    const { x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS } = o;
+    const { startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, az, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS } = o;
     const ang = Math.min(45, Math.max(0.5, rampAngle));
     const invTan = 1 / Math.tan(ang * Math.PI / 180);
-    // t1404 — sx/sy (where the plunge WOULD have happened) is now GIVEN by the walk instead of assumed to be the first
+    // t1404 — the start (where the plunge WOULD have happened) is GIVEN by the walk instead of assumed to be the first
     // row. It is the same fact the literal kernel passes to `levelEntry` as (x0,y0): a row walk hands its row start, a
     // ring walk hands the outer ring's corner. Assuming it here is exactly what left rings with no descent at all.
+    // t1485 — and it arrives as the walk's declared AXIS FORMS rather than as two numbers, which is what stops the
+    // ramp from re-deriving a point the walk has already moved (see `startX`/`startY` below).
     /**
      * ── t1483 (C4) — THE RUN VECTOR IS DECLARED BY THE WALK, AND THREE BAKED QUANTITIES DIE WITH IT ───────────────
      *
@@ -932,13 +962,29 @@ function rampLines(o) {
     const ux = u6(num(o.runUx, 1)), uy = u6(num(o.runUy, 0));
     const runSpan = o.runSpan || V.w;                       // the LIVE register the run is measured against
     const runLabel = `${runSpan === V.h ? 'height' : 'width'} available along the pass`;
+    /**
+     * ── t1485 — THE START POINT IS THE WALK'S, and adding the run to it must not GROW A BRACKET ──────────────────
+     *
+     * `startX`/`startY` arrive as the walk's own declared axis forms — the same objects its row moves print — so the
+     * ramp sits exactly where the row sits by construction (see rowWalk for the defect this closes). What is left
+     * here is one composition: the ramp's far point is that start PLUS the run along this axis' component.
+     *
+     * It SPLICES into an existing bracket rather than wrapping one, because a start may already be an expression
+     * (`[0 + #40]`, the live far end) and wrapping would give `[[0 + #40] + #34 * -1]`. Not because the controller
+     * cannot nest — the ring count has emitted `FIX[[…] / [2 * #44]]` since t1333, and that was checked rather than
+     * assumed — but because EVERY AXIS WORD this body prints is a flat sum, and `affineFrame`'s own `foldE` flattens
+     * the frame origin for exactly that reason. This is that rule applied one level out, so the ramp's move stays the
+     * shape the tracer, the linter and the man at the pendant have always read on a motion line.
+     */
+    const PLUS_RUN = (S, k) => AX(/^\[.*\]$/.test(S.word)
+        ? `${S.word.slice(0, -1)} + ${V.run} * ${k}]`
+        : `[${S.word} + ${V.run} * ${k}]`, S.c, [...S.terms, TM(V.run, k)]);
     // t1375 — the ramp's two points, declared. `toC` is a DISTANCE and the run is measured along the ramp, so both are
     // rotation-invariant and the guard above needs no version. What rotates is the ramp's DIRECTION — and because the
     // unit vector is a build-time coefficient on a runtime run length, the rotation folds straight into that
     // coefficient: one number per axis, exactly the shape the unrotated line already emits.
-    const RAMP_X = AX(axE(sx - x0, `${V.run} * ${u6(ux)}`), sx, [TM(V.run, u6(ux))]);
-    const RAMP_Y = AX(ayE(sy - y0, `${V.run} * ${u6(uy)}`), sy, [TM(V.run, u6(uy))]);
-    const START_X = AX(ax(sx - x0), sx, []), START_Y = AX(ay(sy - y0), sy, []);
+    const START_X = o.startX, START_Y = o.startY;
+    const RAMP_X = PLUS_RUN(START_X, ux), RAMP_Y = PLUS_RUN(START_Y, uy);
     return [
         `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run needed is longer than the distance available
@@ -1065,15 +1111,20 @@ function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed
  * a DIAGONAL CUTTING move and never lifts within a level — one plunge, like the both-ways raster.
  */
 function ringWalk(o) {
-    const { x0, y0, w, h, feed, clr, r3, F, ax, axE, ayE, mv, AX, TM, LBL } = o;
-    void clr; void F; void ax;
+    const { x0, y0, w, h, feed, clr, r3, F, ax, ay, axE, ayE, mv, AX, TM, LBL } = o;
+    void clr; void F;   // t1485 — `ax`/`ay` stopped being spare: the ring now DECLARES its descent start with them
     // t1404 — THE DESCENT THE RINGS NEVER HAD. The outer ring's corner IS where the plunge happens (at i=0 the inset
     // register is 0, so IN_X/IN_Y are exactly x0/y0), so that is the point the ramp runs from and returns to — the same
     // point the literal kernel hands `entryOrPlunge` from `concentricRect`'s `first` branch.
     // t1483 (C4) — the ring's declared run vector is +X with the width span as its limit, and that is READ from the
     // walk below rather than assumed: the outer ring leaves its corner on `G1 (OUT_X, IN_Y)`, i.e. straight along +X
     // for the full width. A ring has no `reverse`, so there is no sign to take.
-    const descent = descentLines({ ...o, sx: x0, sy: y0, startLabel: 'ring corner', runSpan: V.w, runUx: 1, runUy: 0 });
+    // t1485 — and its START, declared in the same axis forms the row walk hands (there is no fallback inside the ramp
+    // any more: a walk that does not say where it starts cannot get a guess). A ring's is the walk ORIGIN itself — at
+    // i=0 the inset register is 0, which is the line above `descent` in the body below, not an unwritten invariant —
+    // so these carry no term and print exactly the `X0 Y0` this descent has always printed.
+    const descent = descentLines({ ...o, sx: x0, sy: y0, startLabel: 'ring corner', runSpan: V.w, runUx: 1, runUy: 0,
+        startX: AX(ax(0), x0, []), startY: AX(ay(0), y0, []) });
     // t1375 — a ring's four corners, declared as X/Y pairs. The inset (#47) walks INWARD on both axes at once, so
     // under rotation it lands on both with mixed coefficients — which is why the pairs are declared together rather
     // than each axis owning its own string.

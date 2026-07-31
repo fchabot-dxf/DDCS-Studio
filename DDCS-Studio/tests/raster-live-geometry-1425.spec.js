@@ -98,6 +98,25 @@ const LIVE_CASES = [
     { name: 'a NARROW area — one row', cfg: { strategy: 'parallel', entry: 'plunge' }, over: { w: 40, h: 9, inset: 1 } },
     { name: 'the last bite is CLAMPED, not overshot', cfg: { strategy: 'parallel', entry: 'plunge' }, over: { depth: 2, stepdown: 5 } },
     { name: 'a ZERO inset — the surfacing meaning, dialled', cfg: { strategy: 'parallel', entry: 'plunge' }, over: { inset: 0 } },
+    /**
+     * ── t1485 — THE RAMP JOINS THIS PROOF, and until now it COULD NOT HAVE ────────────────────────────────────────
+     *
+     * Every row above is a PLUNGE, because a plunge was the only descent that baked nothing. That is no longer the
+     * distinction the table draws — `SURFACE_RASTER_BAKES` says the ramp bakes nothing either — so the ramp owes this
+     * proof exactly as the plunge does, and these rows are what makes that claim falsifiable instead of asserted.
+     *
+     * They bite precisely because `VALUES` is NOT the atom's defaults (w 100 · h 80 · tool Ø12): a descent that baked
+     * any part of its start builds that part from the defaults and cuts a different path from the baked side. Run
+     * against the parked t1483 branch, the FOUR PARALLEL rows fail and the CONCENTRIC one passes — measured, not
+     * assumed, and worth writing down: a ring's descent starts at the walk ORIGIN, which the frame printer has always
+     * resolved live, so it never had the defect. That row is a regression guard, not a defect catcher, and reading it
+     * as proof of the lift would be reading it wrong.
+     */
+    { name: 'parallel · RAMP · bothways — the descent on registers, end to end', cfg: { strategy: 'parallel', entry: 'ramp', direction: 'bothways' } },
+    { name: 'parallel · RAMP · one-way', cfg: { strategy: 'parallel', entry: 'ramp', direction: 'oneway' } },
+    { name: 'parallel · RAMP · OTHERWAY — the mirror, whose start is the far end', cfg: { strategy: 'parallel', entry: 'ramp', direction: 'otherway' } },
+    { name: 'parallel · RAMP · rows ∥ Y — the axes swap under the descent too', cfg: { strategy: 'parallel', entry: 'ramp', rowAxis: 'y' } },
+    { name: 'CONCENTRIC · RAMP — from the ring corner, along +X', cfg: { strategy: 'concentric', entry: 'ramp' } },
 ];
 
 for (const c of LIVE_CASES) {
