@@ -11667,3 +11667,49 @@ deleting the right slot from a two-slot pack through each door · Rebuild re-der
 existing guard) · CAM family + the two earlier menu specs + round-trip **43/43** with **IRON RULE 11/11, same list,
 no growth** · smoke **71/71**. Screenshot in `test-results/t1456-shots/` and **eyeballed**: the five entries over the
 slot row, with the row's own Simulate / Export buttons visible behind it.
+
+## t1458 (seat A) — SURFACE 4: the wizard bar. The markup settled the design pick; presets are absent on purpose.
+
+### THE DESIGN PICK I FLAGGED LAST TURN WAS SETTLED BY THE MARKUP, NOT BY TASTE
+
+Group button or wizard entry? A wizard entry is `<button data-optype=…>` — it names ONE wizard. The group button
+("Mill ▾") names none, and every action this surface offers is per-wizard, so a menu there would have been a menu of
+things that cannot be done. The target is the entry; the menu opens over the group's open dropdown, which is
+ordinary (a file manager does the same over an open folder). The spec asserts the group button gets NO menu, so the
+absence is a decision rather than a gap.
+
+### ⚠ PRESETS ARE ABSENT, MEASURED — and that is the outstanding rule-1 check from t1456, resolved
+
+`openTemplatesPopover` requires `wm._activeType`: a wizard that is **OPEN**. A preset saves *the values currently in
+the form* ("Save the current values as a reusable preset"), so from the bar — where there is no form — a "Presets…"
+entry could only mean "open the wizard", which `▶ Open` already is. Omitted, and the spec ASSERTS the absence so it
+cannot quietly drift back. Same restraint as not re-adding Duplicate/Delete beside Blockly's on the canvas.
+
+### THE THREE THAT ARE HERE, each rule-1 clean
+
+`▶ Open` calls the entry's OWN `btn.click()` — not a re-derived opener, so whatever the bar entry does the menu does.
+`⚙ Wizard settings…` opens Settings → Wizard bar (the library manager row for that wizard) through the app's own
+`openSettings({ panel })` door. `↺ Reset values` clears the SAME two keys the library row clears (`type` AND
+`opensAs`, looked up from `getLibrary()` rather than guessed from the one attribute) behind the SAME confirm text —
+greyed with its reason when nothing is remembered.
+
+### ⚠ AND A REAL MOBILE DEFECT IN THE SHARED PLACER, found by looking at the screenshot
+
+`place()` clamped the RIGHT and BOTTOM edges only. On a narrow screen — the phone this whole long-press half exists
+for — a menu WIDER than the viewport makes `innerWidth - width - 6` NEGATIVE, so the menu is positioned off the LEFT
+edge and the part that disappears is the leading icon and the first word of every label. Clamped at both ends now.
+It would have shipped invisible on desktop and broken on exactly the device the pass was written for.
+
+### ONE MORE TEST LESSON, same family as t1454's
+
+`locator.click()` timed out on a menu entry sitting over a dropdown the test had forced open: Playwright waits for an
+"unobstructed" element that a user would simply click. Driving the real mouse at the item's box is the fix — the
+third time this pass that driving the gesture beat driving the abstraction.
+
+### GATE (fast tier)
+
+new spec `context-menu-wizbar-1458` **4/4** (the three entries + the asserted ABSENCE of presets · the group button
+gets no menu · Reset values greyed-with-reason then live, and really forgetting the values · Open routing to the
+entry's own click) · all four menu surfaces + settings + round-trip **44/44** with **IRON RULE 11/11, same list, no
+growth** · smoke **71/71**. Screenshot in `test-results/t1458-shots/` and **eyeballed**: the menu over the open
+Setup dropdown with Reset values correctly greyed on a wizard that has no remembered values.

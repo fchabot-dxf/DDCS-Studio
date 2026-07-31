@@ -652,6 +652,69 @@ export class CommandDeck {
     // Render the wizard bar from the wizard library (blocks/wizardLibrary.getLibrary()): each dropdown lands in
     // its SECTION (left / center / right) — user-designable in the Settings manager. The fixed Copy/Clear editor
     // actions are pinned to the far end of the right section. Re-callable for live refresh (ddcsRefreshWizardBar).
+    /**
+     * ── t1458 — SURFACE 4: the WIZARD BAR's right-click menu ──────────────────────────────────────────────────────
+     *
+     * THE TARGET IS THE WIZARD ENTRY, NOT THE GROUP BUTTON, and the markup settles it rather than taste: an entry is
+     * `<button data-optype=…>` — it names ONE wizard — while the group button ("Mill ▾") names none. Every action
+     * this surface offers is per-wizard, so a menu on the group would have nothing to act on. The menu therefore
+     * opens over the group's open dropdown, which is ordinary (a file manager does the same over an open folder).
+     *
+     * ⚠ PRESETS ARE DELIBERATELY ABSENT, and the reason is measured rather than an omission. `openTemplatesPopover`
+     * requires `wm._activeType` — a wizard that is OPEN — because a preset saves *the values currently in the form*.
+     * From the bar there is no form, so a "Presets…" entry could only mean "open the wizard", which `▶ Open` already
+     * is. That is the same restraint as not re-adding Duplicate/Delete beside Blockly's on the Blocks canvas: a
+     * second entry doing an existing entry's job is a thing that must agree with it forever.
+     *
+     * RULE 1 for the three that ARE here: `▶ Open` is the entry's own click; `↺ Reset values` is the per-wizard button
+     * in Settings → Wizard bar (t1437); `⚙ Wizard settings…` opens that same library row. None is the only path.
+     */
+    _bindWizardBarMenu() {
+        const bar = document.querySelector('.dock-header');
+        if (!bar || bar.dataset.wizMenuWired === '1') return;
+        bar.dataset.wizMenuWired = '1';
+        /** The library entry this bar button stands for — matched on the SAME expression wizItemHtml stamps. */
+        const entryFor = (optype) => {
+            try {
+                for (const g of (getLibrary().groups || []))
+                    for (const e of (g.items || []))
+                        if (String(e.type || e.opensAs || e.id || '') === optype) return e;
+            } catch (_) { /* library unavailable */ }
+            return null;
+        };
+        bar.addEventListener('contextmenu', async (ev) => {
+            const btn = ev.target && ev.target.closest && ev.target.closest('.toolbar-dropdown-content button[data-optype]');
+            if (!btn) return;                                  // the group button / the bar itself: leave the native menu
+            const optype = btn.dataset.optype || '';
+            const entry = entryFor(optype);
+            const label = (entry && entry.label) || btn.textContent.trim() || optype;
+            ev.preventDefault();
+            const [{ openMenu }, LV, SP] = await Promise.all([
+                import('./opContextMenu.js'), import('../data/wizardLastValues.js'), import('./settingsPanel.js'),
+            ]);
+            // the reset clears BOTH keys the library row clears (type AND opensAs) — one behaviour, not a near-copy
+            const types = [entry && entry.type, entry && entry.opensAs, optype].filter(Boolean);
+            const hasVals = types.some((t) => LV.hasLastValues(t));
+            openMenu([
+                { label: `▶ Open ${label}`, fn: () => btn.click() },
+                { label: '⚙ Wizard settings…', fn: () => SP.openSettings({ panel: 'set_tab_wizards' }) },
+                {
+                    label: '↺ Reset values',
+                    disabled: !hasVals,
+                    title: hasVals ? 'Forget this wizard’s last-used values — its form opens on the shipped defaults again (saved presets are kept)'
+                        : 'This wizard has no remembered values yet — its form already opens on the shipped defaults.',
+                    fn: async () => {
+                        const { dlgConfirm } = await import('./dialog.js');
+                        if (await dlgConfirm(`Forget the values “${label}” was last used with?\nIts form will open on the shipped defaults again. Your saved presets for it are kept.`, { okLabel: 'Reset values' })) {
+                            types.forEach(LV.clearLastValues);
+                        }
+                    },
+                },
+            ], ev.clientX, ev.clientY);
+        });
+        import('./opContextMenu.js').then((m) => m.attachLongPress(bar)).catch(() => { /* menu module optional */ });
+    }
+
     _renderWizardBar() {
         let groups = [];
         try { groups = getLibrary().groups || []; } catch (err) { console.warn('wizard library unavailable', err); }
@@ -665,6 +728,7 @@ export class CommandDeck {
         const rightTarget = document.querySelector('.dock-header .header-right');   // pure user dropdowns now (Copy/Clear moved to the header chevron menu)
         if (rightTarget) rightTarget.innerHTML = `<div style="display:flex; gap:6px; align-items:center;">${sect.right.map(wizGroupHtml).join('')}</div>`;
         this._bindWizardDropdowns();
+        this._bindWizardBarMenu();
         // …and grey what this machine cannot run, every time the bar is (re)built — the gating is idempotent and
         // reversible, so a re-render or a kind switch both land in the same place.
         try { applyAxisGating(document); } catch (_) { /* gating is advisory */ }

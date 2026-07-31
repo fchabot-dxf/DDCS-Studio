@@ -35,8 +35,13 @@ export function hideOpMenu() { if (menu) menu.hidden = true; }
 function place(m, x, y) {
     m.hidden = false;
     const r = m.getBoundingClientRect();
-    m.style.left = Math.round(Math.min(x, window.innerWidth - r.width - 6)) + 'px';
-    m.style.top = Math.round(Math.min(y, window.innerHeight - r.height - 6)) + 'px';
+    // t1458 — CLAMPED AT BOTH ENDS. This only ever clamped the right/bottom edge, which is fine on a desktop and
+    // wrong on the phone the user tests with: when the menu is WIDER than the viewport, `innerWidth - width - 6`
+    // goes NEGATIVE and the menu is positioned off the left edge — the labels that matter (the leading icon and the
+    // first word) being exactly the part that disappears. A lower bound costs one call and makes the menu reachable
+    // on a narrow screen, which is the whole point of the long-press half of this pass.
+    m.style.left = Math.round(Math.max(6, Math.min(x, window.innerWidth - r.width - 6))) + 'px';
+    m.style.top = Math.round(Math.max(6, Math.min(y, window.innerHeight - r.height - 6))) + 'px';
 }
 function item(m, label, fn, disabled, title) {
     const b = document.createElement('button');
