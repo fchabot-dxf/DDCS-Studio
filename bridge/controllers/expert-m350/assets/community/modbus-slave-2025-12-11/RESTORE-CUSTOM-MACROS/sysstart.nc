@@ -9,4 +9,8 @@ G04 P1.0      (Pause 1 second for homing to complete)
 (Mark A-axis as homed - turn home icon green)
 #1518 = 1     (Set A-axis homed status)
 
+(Zero B in place - no homing move, just declare it at zero)
+#884 = 0      (Set B machine position to 0)
+#1519 = 1     (Mark B 5th-axis homed - home icon green)
+
 (MSG, STARTUP HOMING COMPLETE - GANTRY SYNCED)
