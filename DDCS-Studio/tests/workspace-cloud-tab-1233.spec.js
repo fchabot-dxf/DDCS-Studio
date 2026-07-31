@@ -65,7 +65,7 @@ async function fakeDrive(page, files = CLOUD) {
 }
 
 async function boot(page, { signedIn = true } = {}) {
-    await page.goto('http://localhost:3211');
+    await page.goto('/');
     await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsFileSavedPlace);
     await page.evaluate(() => { window.__ddcsNoReload = true; });
     await page.evaluate((yes) => {
@@ -117,7 +117,12 @@ test('clicking a cloud row OPENS it — the whole file — and a later Save goes
     await openCloudTab(page);
     await page.locator('#wsmCards .wsm-fp-row', { hasText: 'bench-router' }).click();
 
-    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
+    // THE ASYNC-OPEN RACE: the name is stamped MID-open (before the post-reseed second baseline + the handle adopt —
+    // openWorkspaceObject re-baselines after controllerSettled because the cross-controller variable re-seed lands
+    // late), so a wait keyed on the name alone sampled a half-open workspace under load and read it "dirty". The
+    // open's own completion signal is the centred busy overlay coming down (clearBusyOverlay is the reload stand-in
+    // under __ddcsNoReload) — the overlay is raised ON the click, so name-stamped AND overlay-gone = open finished.
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs' && !document.getElementById('ddcs-busy-overlay'), null, { timeout: 8000 });
     const after = await page.evaluate(() => ({
         machine: window.ddcsGetMachine(), envX: window.ddcsGetSettings().machine.x,
         place: window.ddcsFileSavedPlace(), dirty: window.ddcsWorkspaceDirtyToFile(), handle: window.ddcsSaveHandleName(),
