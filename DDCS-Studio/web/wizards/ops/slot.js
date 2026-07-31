@@ -96,7 +96,8 @@ export function slotPath(p) {
  * T4 opened by asking whether this kernel's zig-zag is the raster atom's parallel walk over the slot's rect. It was
  * MEASURED before anything was built (both walks emitted, both traced through the real engine) and the answer is no —
  * four times over, three of them on a capability the atom does not declare. Written down rather than left to be
- * rediscovered, exactly as `REST_PARAMETRIC_GAP` is, because the acts behind this one (the pocketfill retirement, the
+ * rediscovered, exactly as `REST_PARAMETRIC_GAP` is, because the acts behind this one (pocketfill's declared domain —
+ * t1464 CLOSED that item as SCOPED rather than retired: the atom shrank to non-rect + rest permanently — and the
  * porting arc) must know which walks may become runtime loops from a DECLARATION and not by reading three kernels.
  *
  * ── 1. THE ROW RULE IS A DIFFERENT RULE, and it is the one that cuts a different part ─────────────────────────────

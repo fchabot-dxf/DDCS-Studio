@@ -119,7 +119,7 @@ export const restStepMm = (p) => Math.max(0.15, num(p.restDia, 0) * Math.max(1, 
  * ── t1431 — WHY THE REST WALK STAYS LITERAL, DECLARED AS DATA ─────────────────────────────────────────────────────
  *
  * The parametric family reached this atom and STOPPED HERE, and the boundary is written down rather than left to be
- * rediscovered — the same reason `SURFACE_RASTER_BAKES` is a table: the next act (and the pocketfill retirement behind
+ * rediscovered — the same reason `SURFACE_RASTER_BAKES` is a table: the next act (and pocketfill's own domain behind
  * it) must know which walks may become runtime loops from a declaration, not by reading three kernels.
  *
  * ── THE OBSTRUCTION IS SQRT, AND IT IS MEASURED RATHER THAN ESTIMATED ─────────────────────────────────────────────

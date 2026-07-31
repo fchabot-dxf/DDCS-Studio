@@ -17,6 +17,16 @@
  * stayed honest — right up until somebody re-points `fillStrategy` itself, at which point the baseline would move
  * silently underneath every assertion in this act. Frozen is the only version of "as they ship TODAY" that stays true.
  *
+ * ── t1464 UPDATE — "NOT RETIRING THIS ACT" IS NOW "NOT RETIRING, FULL STOP" ──────────────────────────────────────
+ * That paragraph read as a schedule (retirement pending, just not yet). It is settled: `pocketfill`'s domain is
+ * DECLARED and PERMANENT — non-rect shapes (`POCKET_SHAPE_GAP`: a JS-walked offset polyline, 124-2496 trig calls per
+ * level against ZERO for a rect) and rest machining (`REST_PARAMETRIC_GAP`: SQRT per row per corner). The one-way
+ * raster arm did convert (t1418) and `direction` left the boundary; the rest of that list stands.
+ *
+ * WHAT THAT CHANGES FOR THIS FILE: nothing about the freeze, and everything about WHY it is kept. It is no longer a
+ * bridge held until an atom dies — the atom is not dying — it is the independent baseline for a boundary that is now
+ * permanent, which is a longer job, not a shorter one.
+ *
  * ── WHAT IS FROZEN, AND WHAT DELIBERATELY IS NOT ──────────────────────────────────────────────────────────────────
  * FROZEN: the KERNEL ARITHMETIC — `fillStrategy`'s rect dispatch, `scanlineFill`, `fillLevelMoves`, `onewayMoves`,
  * `concentricRect`, `entryOrPlunge`/`levelEntry` and `helixPoints`, verbatim as of t1404.

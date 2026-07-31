@@ -10,6 +10,22 @@
  * Both compute the SAME inset region internally (pocketInsetRegion) and reuse the SAME kernels (fillStrategy /
  * fillSegments from stepover; circleTrace / contourLevel from contour). The shared stepover/contour/region atoms
  * are UNTOUCHED — pocket's own region-socket path retires only in the twin's flat template (do NOT mutate a shared atom).
+ *
+ * ── t1464 — THIS ATOM'S DOMAIN IS PERMANENT. IT IS NOT AWAITING RETIREMENT ────────────────────────────────────────
+ *
+ * For a long stretch of the parametric arc this file was described as a thing to be retired once the pocket
+ * converted. **That is settled and it is wrong now**: the rect pocket converted (t1406 → `surfaceraster`, t1433 →
+ * `wallfinish`) and everything that did NOT convert lives here, by ruling, for good:
+ *
+ *     NON-RECT SHAPES (circle · polygon · ellipse)   see POCKET_SHAPE_GAP below — a JS-walked offset polyline,
+ *                                                    hundreds to thousands of trig calls per level, and a POINT
+ *                                                    LIST rather than a formula a macro can count into.
+ *     REST MACHINING (the corner-clear pass)         see restmachining's REST_PARAMETRIC_GAP — SQRT per row per
+ *                                                    corner, on a controller where SQRT is unverified.
+ *
+ * So the retirement item is CLOSED AS SCOPED, not deleted: the atom shrank to its permanent domain instead of
+ * disappearing. Anything still calling this file "to be retired" is stale — correct it and cite t1463/t1464. The
+ * two gap declarations are the domain, and each is instrumented by a spec that goes RED if its obstruction lifts.
  */
 import { num } from './util.js';
 import { regionDesc } from './region.js';
@@ -56,6 +72,45 @@ export function pocketInsetRegion(p) {
 /** The absolute stepover (mm) from the % + tool — matching pocketWizard's `so` (max(0.2, tool·%/100)). Exported (t802) so
  *  the 2D preview draws its concentric rings at the SAME spacing the emit cuts. */
 export function stepoverMm(p) { return Math.max(0.2, Math.max(0.1, num(p.toolDia, 6)) * num(p.stepoverPct, 40) / 100); }
+
+/**
+ * ── t1464 — WHY A NON-RECT POCKET STAYS LITERAL, DECLARED AS DATA (the rest-machining precedent) ──────────────────
+ *
+ * The parametric arc converted the RECT pocket at t1406 and stops here. That is now a settled, permanent fact rather
+ * than a queue item, and it is written down beside the walk it describes — the same reason `REST_PARAMETRIC_GAP` is
+ * a declaration: the next reader must learn which walks can become runtime macro loops from a DECLARATION, not by
+ * reading three kernels and guessing.
+ *
+ * ── THE OBSTRUCTION IS TRIG, AND IT IS MEASURED RATHER THAN ASSERTED ─────────────────────────────────────────────
+ * A rect's clearing is analytic: rows at `step/2 + i·step`, rings inset by `i·step` — arithmetic a macro can count
+ * itself into, which is exactly what `surfaceraster` does. Every other shape is walked as a TESSELLATED POLYLINE
+ * computed in JavaScript: `offsetRegion` builds the inset boundary point by point, and the fill scans or rings it.
+ * Instrumenting `Math.sin/cos/atan2` on the REAL walk, one depth level, Ø6 tool at 40%:
+ *
+ *     rect 80x60        0 trig calls        ← the analytic shape; this is the one that converted
+ *     polygon Ø50 x6  124 trig calls
+ *     circle Ø50      384 trig calls
+ *     ellipse 80x60  2496 trig calls  ·  1167 emitted lines at ONE level
+ *
+ * TRIG IS UNVERIFIED ON THIS CONTROLLER — t1339's standing finding, unchanged, and the SAME evidence that keeps the
+ * raster's ramp baking its distance-to-centre and the rest walk literal. So this is not a third limit: it is the one
+ * limit reaching a third walk, and `V13_trig.nc` lifts all three or none.
+ *
+ * ⚠ AND TRIG IS ONLY HALF OF IT, which is why this boundary is stated as permanent rather than pending. Even with
+ * SIN/COS proven, the ellipse's 1167 lines at one level are a JS-computed point list — a macro cannot COUNT itself
+ * into a tessellated offset polyline the way it counts rows into a rectangle. Converting it would mean emitting the
+ * points as literals, which is the transcript it already emits. The rect converted because its walk is a FORMULA;
+ * these stay because theirs is a LIST.
+ */
+export const POCKET_SHAPE_GAP = 'a circle / polygon / ellipse pocket is cleared by walking a TESSELLATED offset '
+    + 'polyline computed in JavaScript, not the analytic rectangle a macro can count itself into: the same walk needs '
+    + 'hundreds to thousands of SIN/COS/ATAN calls per depth level (measured: 124 polygon, 384 circle, 2496 ellipse, '
+    + 'against ZERO for a rect), and trig is unverified on this controller (t1339; V13_trig.nc is the decider — the '
+    + 'same one the raster ramp and the rest walk wait on). And proving trig would not be enough: the walk is a POINT '
+    + 'LIST, not a formula, so a macro loop has nothing to count. Non-rect pockets stay literal, permanently';
+
+/** Why THIS pocket's shape cannot be a runtime macro loop — or '' for the RECT, which converted at t1406. */
+export function pocketShapeGap(p = {}) { return (p && (p.shape || 'rect') === 'rect') ? '' : POCKET_SHAPE_GAP; }
 
 export const pocketFillBlock = {
     type: 'pocketfill', label: 'Pocket Fill', kind: 'fill', category: 'Toolpaths',

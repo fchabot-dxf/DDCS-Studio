@@ -103,6 +103,42 @@ export function circleTrace(rg, z, clr, feed, plunge, entry, prevZ, rampAngle) {
     return L;
 }
 
+/**
+ * ── t1464 — CONTOUR IS DECLARED-LITERAL, BY DESIGN. The arc's day-one ruling, finally written down ────────────────
+ *
+ * The parametric arc converted surfacing, the drill family and the rect pocket; contour was ruled "never converts"
+ * from the first act and that ruling has lived only in dispatch notes. It is a declaration now, in the family's own
+ * source, in the shape every other boundary here uses (`REST_PARAMETRIC_GAP`, `SLOT_RASTER_GAP`, `POCKET_SHAPE_GAP`)
+ * — so the next reader learns it from the code rather than from an act they would have to find.
+ *
+ * ── MEASURED, PER REGION KIND, on the real emit (Ø6 tool, side:'outside', one level) ─────────────────────────────
+ *
+ *     rect 80x60        7 lines ·   0 trig   ← analytic, and a 4-corner box: a macro loop over four points saves
+ *                                              nothing. There is no parametric win here to go and get.
+ *     circle Ø50        4 lines ·  1 G3 ARC  ← ALREADY the compact form. A true arc IS the parametric answer for a
+ *                                              circle; converting it could only make it longer.
+ *     polygon Ø50 x6    9 lines ·  13 trig   ← the vertices are trig-computed in JS.
+ *     ellipse 80x60    99 lines · 192 trig   ← a 96-segment tessellated polyline. This is the transcript case.
+ *
+ * ── SO THE RULING IS RIGHT FOR THREE SEPARATE REASONS, AND ONLY ONE OF THEM IS TRIG ──────────────────────────────
+ * A rect has nothing to gain; a circle is already an arc; and only polygon/ellipse are transcripts — whose vertices
+ * need SIN/COS, which is unverified on this controller (t1339; `V13_trig.nc` is the decider, the same one the raster
+ * ramp, the rest walk and the non-rect pocket fills wait on). Even proven, the ellipse's boundary is a POINT LIST
+ * rather than a formula, exactly as `POCKET_SHAPE_GAP` records for the fills — the same shape, one layer out.
+ *
+ * ⚠ THIS IS A DESIGN STATEMENT, NOT A DEFERRAL. Contour emits literal transcripts because that is the correct output
+ * for what it cuts, not because an act has not got to it yet. Nothing here is queued.
+ */
+export const CONTOUR_PARAMETRIC_GAP = 'a contour pass emits a literal transcript BY DESIGN, and for three separate '
+    + 'reasons: a RECT boundary is four corners (a macro loop over four points saves nothing), a CIRCLE already emits '
+    + 'a single true G3 arc (which IS the compact parametric form), and only POLYGON / ELLIPSE are transcripts — '
+    + 'their vertices are trig-computed in JS (measured: 13 calls for a hexagon, 192 for an ellipse whose boundary is '
+    + 'a 96-segment polyline), and trig is unverified on this controller (t1339; V13_trig.nc is the decider). Proving '
+    + 'trig would not change it: a tessellated boundary is a POINT LIST, not a formula a macro can count itself into';
+
+/** Why this contour stays literal — '' is never returned: the ruling covers every region kind, for the reasons above. */
+export function contourParametricGap() { return CONTOUR_PARAMETRIC_GAP; }
+
 export const contourBlock = {
     type: 'contour', label: 'Contour', kind: 'leaf', category: 'Toolpaths',
     defaults: { region: null, side: 'on', tool: 6, z: 'z', feed: 400, plunge: 200, clearance: 5 },

@@ -11851,3 +11851,61 @@ ways · the ruling cited in source · the absence LOCK · Open+Delete with no re
 the menu inherited the real path) · all six menu surfaces + settings + round-trip **40/40** with **IRON RULE 11/11,
 same list, no growth** · smoke **71/71**. Screenshot in `test-results/t1462-shots/` and **eyeballed**: the menu
 sitting ON TOP of the workspace modal — which is the picture of the z-index fix.
+
+## t1464 (seat A) — THE SETTLING ACT: three literal boundaries become permanent, instrumented facts. No G-code moved.
+
+### THE OBSTRUCTION IS ONE THING WEARING THREE NAMES, and measuring it said so
+
+Every boundary this act settles waits on the SAME evidence — **trig is unverified on this controller** (t1339;
+`V13_trig.nc` is the decider) — which is also what keeps the raster's ramp baking its distance-to-centre and the
+rest walk literal. One machine visit lifts all of them or none. That is a better fact than three separate excuses,
+and it only became visible because each was instrumented rather than asserted.
+
+**NON-RECT POCKET FILLS**, `Math.sin/cos/atan2` counted on the REAL walk, one depth level, Ø6 @40%:
+
+    rect 80x60        0 trig   ← the shape that CONVERTED (t1406). Analytic: rows at step/2 + i·step.
+    polygon Ø50 x6  124 trig
+    circle Ø50      384 trig
+    ellipse 80x60  2496 trig  ·  1167 emitted lines at ONE level
+
+The zero is what makes it a boundary rather than a complaint: the converted arm needs none, and every other shape
+needs hundreds to thousands. **⚠ AND TRIG IS ONLY HALF.** Even proven, the ellipse's 1167 lines are a JS-computed
+POINT LIST — a macro cannot count itself into a tessellated offset polyline the way it counts rows into a rectangle.
+The rect converted because its walk is a FORMULA; these stay because theirs is a LIST. That second reason is why the
+boundary is stated as PERMANENT rather than pending, and both are in `POCKET_SHAPE_GAP`.
+
+### CONTOUR — the day-one ruling is right for THREE reasons, and only one is trig
+
+Measured per region kind on the real emit, which is the part a single "never converts" label was hiding:
+
+    rect 80x60     7 lines ·   0 trig   ← four corners. A macro loop over four points saves NOTHING.
+    circle Ø50     4 lines ·  1 G3 ARC  ← ALREADY the compact form. A true arc IS the parametric answer.
+    polygon Ø50    9 lines ·  13 trig
+    ellipse 80x60 99 lines · 192 trig   ← a 96-segment polyline: the only real transcript case.
+
+So "contour never converts" is three different facts: nothing to gain, already optimal, and trig-bound. Declared as
+`CONTOUR_PARAMETRIC_GAP` with all three, and stated as a DESIGN STATEMENT rather than a deferral — nothing here is
+queued.
+
+### pocketfill's DOMAIN IS PERMANENT — the retirement item closes as SCOPED
+
+The atom was described for a long stretch as a thing to be retired once the pocket converted. The pocket converted;
+what did not lives here for good: **non-rect shapes** (`POCKET_SHAPE_GAP`) and **rest machining**
+(`REST_PARAMETRIC_GAP`). The atom SHRANK to its permanent domain instead of disappearing, and its header says so.
+Two stale claims swept (`restmachining`, `slot`) — both phrased retirement as a future act — and the frozen
+`/_test/literalPocketFill.js` header's "**not retiring THIS ACT**" (which read as a schedule) is now "not retiring,
+full stop", with a note that this changes nothing about the freeze and everything about why it is kept: it is no
+longer a bridge held until an atom dies, it is the baseline for a boundary that is now permanent — a longer job.
+
+### THE DOMAIN IS ASSERTED AGAINST THE REGISTRY, not just described
+
+The third lock walks the real predicates: every non-rect shape refuses the atom AND is covered by the shape gap; a
+rect with a rest tool refuses too but is NOT covered by the shape gap (it is pocketfill's by the REST boundary).
+That keyed-on-shape-alone distinction is exactly the kind of thing a prose declaration blurs.
+
+### GATE (fast tier) — and the byte-identity is the GOLDEN, not a new assertion
+
+new spec `literal-boundaries-settled-1464` **4/4** (three self-red-ing locks + the no-motion-moved sweep) · pocket +
+rest + slot + round-trip **81/81** with **POCKET E0 `goldenDiffs: 0`** — the untouched pre-E0 capture still matching
+byte-for-byte is the real proof no G-code moved, far stronger than anything I could assert in a new file · contour
+family **12/12** · **IRON RULE 11/11, same list, no growth** · smoke **71/71**.
