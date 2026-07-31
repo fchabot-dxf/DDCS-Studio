@@ -9,7 +9,7 @@ SYSDISK (overwrite), run the slib-g patcher, power-cycle, verify.
 ### Gantry homing — A slaves to Y (factory homes A independently → racks the gantry)
 - **fndzero.nc** — Find-Zero button: home Z/X/Y, then sync A to Y (`#883=#881`) + mark A homed (`#1518=1`).
 - **fndY.nc** — Y-axis home: same A→Y sync (A follows Y).
-- **sysstart.nc** — boot: `M115` homing, then the same A→Y sync.
+- **sysstart.nc** — boot: `M115` homing, then the A→Y sync, and **zero B in place** (`#884=0` + `#1519=1` — declares B homed at 0, no homing move; also keeps B out of the "unhomed" state that crawled the probe).
 
 ### K-buttons (K1–K7)
 - **key-1.nc** — TOOL SETTER: `#1502=2` / `M98P502` → runs the fixed tool-setter path (needs the slib-g patch below).
