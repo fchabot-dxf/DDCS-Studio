@@ -11048,3 +11048,94 @@ the new spec **8/8** (two built-in round trips through a real page RELOAD at the
 custom op · the probe exclusion · edit-in-place both ways · the backup row · the affordance through the real Settings
 panel) · wizard + settings + backup + workspace **48/48** · two wizard families + blocks/op-params **24/24** · smoke
 **71/71**.
+
+## t1440 (seat A) — THE PAIRED SURFACING-EMIT ACT: the helix ceiling RULED, and the work declarations swept as a class
+
+Both parts landed. Part 2 found considerably more than the instance it was dispatched for, and one of the findings
+was on the **wrong side of safe**.
+
+### PART 1 — FUP WINS, ON THE GEOMETRY, AND THE INCUMBENCY IS IRRELEVANT
+
+`pitch` is millimetres of descent per revolution — the **axial engagement of a helical entry**, which is the quantity
+that loads the tool. So it is a **CEILING, not a target**: asking for 1mm/rev asks for *no more than* 1mm per
+revolution. Both directions measured, because the decision rests on the asymmetry rather than the sizes:
+
+    NEAREST-ROUND (the literal)   can EXCEED the ceiling, by up to ~2.1% — worst just over one revolution
+                                  (1.0207 rev rounds to 24 segments = 1.000 rev → 2.07% steeper than asked)
+    FUP (the atom)                can only FALL SHORT, by up to 50% (just over one rev rounds to two)
+
+The magnitudes favour nearest-round and the DIRECTIONS decide it: **a bound you are allowed to cross is not a bound**,
+and the cost of falling short is TIME, not tool load. FUP stands — and it stands on that, not on having got here first.
+The literal's nearest-round is the loser and its history line sits in `helixLines`; the frozen reference stays frozen
+(a reference that gets improved stops being one, as its own header says), and the t1406 test that recorded the split
+as "pre-existing, NOT fixed here" now reads as **the FIX**, with the divergence region named: they agree exactly when
+stepdown/pitch is a whole number of revolutions, and outside that the atom is always the FINER descent — which is the
+ceiling being honoured, now asserted as a DIRECTION rather than only as two sampled pitches.
+
+**A THIRD RULE EXISTS AND I DID NOT TAKE IT — surfaced for a ruling.** Ceiling at the SEGMENT level
+(`FUP[revs * 24]` instead of `FUP[revs] * 24`) also never exceeds the pitch and undershoots by at most one segment
+(~4%/rev) instead of up to 50%. It dominates FUP on both stated criteria and costs one thing: the descent ends
+MID-revolution, so the helix does not close its circle at the final depth. That is an emit-shape change with its own
+bridge, and the ruling asked me to decide between the two that exist — so it is recorded in the atom, not shipped.
+
+### PART 2 — THE DECLARATIONS COUNTED WHAT YOU CAN SEE, NOT WHAT THE CONTROLLER RUNS
+
+**That is the class, and it is why the sweep found four things instead of one.** `@work` declares EXECUTED lines. The
+declarations were built by counting the emitted BODY — and a walk's body is full of forks, only one arm of which
+executes per pass. The both-ways row is **20 lines and 13 steps**.
+
+**THE METHOD MATTERS AND IT IS NOT COUNTING.** The cap override only ever RAISES the guard (`traceCap` takes a max),
+so the count cannot be found by squeezing it. Instead the engine's own `_executeStep` is instrumented and the body run
+to completion; then two AREAS at one depth difference out the per-pass term, and two DEPTHS at one area difference out
+the per-level term and the header. Nine (strategy × direction × entry) configs, all agreeing a header of 16.
+
+    walk                per pass  was      per level (plunge)  was
+    parallel/bothways      13      20              12           12
+    parallel/oneway        11      11 ✓             6           12
+    concentric             12      14               9           12
+
+`11` for the one-way row was RIGHT — the one number t1418 derived by counting what EXECUTES rather than what is
+written — and the audit confirms it untouched, which is the best evidence the method is the thing that mattered.
+
+**THE MODEL CHANGED SHAPE, not just its numbers.** The level overhead is per-WALK (a both-ways level does more
+branching) while the descent cost is walk-INDEPENDENT (+0 plunge / +6 ramp / +11 per helix segment — measured
+identical across all three walks). One flat `PER_LEVEL = 8` could not express that, which is why it was absorbing the
+error. Plunge and ramp now come out EXACT, which is what makes this a measured structure rather than a curve fitted to
+a few points.
+
+**TWO WERE ON THE WRONG SIDE OF SAFE, and neither had ever surfaced because the 4× margin was absorbing them:**
+- the HELIX's per-segment cost — `* 10` against a measured 10.46 — so a deep helix declared LESS work than it does.
+- the WALL's header — 6 against a measured 9. My own, from t1433, and the differencing caught it.
+
+Over-declaring is safe (the cap draws more than needed); UNDER-declaring is the t1383 defect itself, a preview
+silently drawing a fraction of the toolpath. Both are corrected upward, measured then rounded UP.
+
+**HOLECYCLE WAS AUDITED AND NEEDED NO CHANGE** — asserted in the same test as the wall's corrections rather than
+claimed here, because a sweep that only reports what it changed is indistinguishable from one that only looked where
+it expected to find something. ⚠ Honest limit: my probe exercised the PECK cycle; `bore-step` and `helical` did not
+engage under the params I drove and are therefore UNMEASURED, not cleared.
+
+**A TEST WAS ENFORCING THE CONFUSION.** t1418's declared-work check asserted `declared >= emitted LINE count` — the
+exact conflation that made the numbers wrong. It now compares against the ENGINE's executed count, with the line count
+kept as CONTEXT: for the ring the two coincide (12 = 12), and that coincidence is precisely what made "count the body"
+look like a valid method for years.
+
+### THE GOLDEN MOVED, AND THE DIFF SHAPE IS THE PROOF NOTHING ELSE DID
+
+14 in scope (`rect × pocketRidesRaster` — spiral pockets carry a `surfaceraster` header too, so the scope is WIDER
+than t1433's raster-only 14), 14 changed, ZERO outside. And the per-key line counts are **[1×7, 2×7]**: one changed
+line per spiral key, two per raster key — the `@work` token in each parametric header and nothing else. **No emitted
+motion moved anywhere**, which is the claim that matters for an act that touches the surfacing emit.
+
+### NO SCREENSHOT, AND THE REASON
+
+The dispatch asked for one only if a preview visibly changes. None does: a cap only truncates when executed work
+exceeds 4× the declaration, the corrections are all within 1.15×, and the two under-declarations were 6% and 33% —
+far inside the margin, so nothing was truncating before and nothing is now. Said rather than skipped.
+
+### GATE
+
+surfacing + pocket + drill + raster + rest + CAM + round-trip **200/200** · smoke **71/71** · CAM radius **28/28**.
+Iron rule **11/11**, same list, no growth. New spec `declared-work-calibration-1440` 3/3 — it holds every declaring
+config to *never under, never more than 1.15× over*, which is far tighter than the 4× margin and is what turns this
+from a shrug into a calibration.
