@@ -12307,3 +12307,74 @@ BETWEEN them instead, which is the structure that actually exists rather than a 
 `depth-entry-everywhere-842` **6/6**, and **MUTATION-TESTED**: re-emitting the chords as `G3` (an arc carrying a Z)
 turns it RED, so the restated test pins the conversion rather than merely tolerating it. Contour family +
 `helical-arc-evidence-1472` **23/23**. Smoke **71/71**. No source changed this turn — the fix was the test.
+
+## t1478 (seat A) — THE SLOT CAPABILITY ARC: SCOUT + DESIGN. No product code. And the scout found the design's own premise was wrong.
+
+### THE DESIGN IS DATA — `web/data/slotCapabilityArc.js`
+
+Four capabilities, each with what CHANGES, what STAYS (the larger half, and the reason each step is bridgeable at
+all), its bridge, its register cost, the envelope rows it earns, and its gate. Plus the CAM inheritance table and
+the one neighbour that stays OUT. `tests/slot-capability-arc-1478.spec.js` re-checks every claim about the CURRENT
+shape of things against the real kernels, so a design written in one act and built over four cannot rot in between.
+
+### ⚠ THE MAIN FINDING: THE INHERITED EQUALITY CLAIM DOES NOT REPRODUCE, and correcting it changed the arc
+
+t1442's boundary says the two row sets "coincide EXACTLY when (width − tool) is a whole multiple of the stepover
+(measured identical at 18×Ø6@40%, 13.2×Ø6@40%, 20×Ø8@50%)". The C1 bridge rests on that equality arm, so I
+re-measured it instead of citing it. **The RAW atom coincides with the slot NOWHERE** — not at those widths, not at
+any width. Its rows sit exactly half a stepover off:
+
+    18×Ø6@40%   slot [−6, −3.6, −1.2, 1.2, 3.6, 6]      raw atom [−4.8, −2.4, 0, 2.4, 4.8]     ← 5 rows vs 6 passes
+
+The coincidence is real but it belongs to the **PHASE-CORRECTED** atom (rows starting ON the wall), which t1442
+describes one sentence later — the equality was measured there and the summary sentence lost which arm it applied
+to. Phase-corrected, the three cited widths ARE byte-identical. **And everywhere the multiple is not whole, the
+phased atom's LAST row lands PAST the far wall — +1.20mm at 12×Ø6@40%, +1.20 at 16.8, +0.60 at 15, every one in the
+OVERSIZE direction.**
+
+**SO C1 IS TWO TEACHINGS THAT CANNOT BE SPLIT.** The PHASE (rows on the wall) and the CLAMP (the forced final pass)
+are not a step and a refinement — the phase ALONE is destructive, worse than shipping neither. They land in one act
+or the capability ships a gouge. That is the difference between a four-step arc and a five-step one, and it only
+surfaced because the equality arm was re-measured rather than inherited.
+
+### THE OTHER TWO FINDINGS THAT SET THE ORDER
+
+**THE REGISTER BAND IS FULL ON BOTH SIDES.** `#34–#49` is boxed in by camMacroKit's kit band at `#27–#33` and the
+probe temps at `#50–#61` — no adjacent room. So the costing is the binding constraint, not bookkeeping, and the arc
+was designed against it: **the whole arc costs +1 register** (the ramp's second run component, taking `#35` inside
+the descent band that ramp and helix already share by mutual exclusion). Every other capability costs ZERO in its
+baked form.
+
+**ONE CAPABILITY PAYS TWICE, AND IT IS THE SMALLEST.** C4 (the declared run vector) is also t1339's own answer for
+the pendant-true ramp — *"needs no square root at all"* — so it collapses `SURFACE_RASTER_BAKES`'s two ramp rows,
+the improvement-remainder item otherwise waiting on V13. It leads the arc for that as much as for its size.
+
+**AND ONE IS EVIDENCE-GATED IN HALF ITS FORMS.** A BAKED bearing is two build-time constants: no registers, no
+gate. A LIVE bearing needs COS/SIN of a runtime angle — trig, V13's decision. C3 is LAST so the arc cannot stall on
+a machine visit while three teachable capabilities wait behind it; and its baked half is what a slot actually needs
+anyway, since a bearing is geometry the operator drew, not a knob they turn at the machine.
+
+### THE ORDER, and why it is this one
+
+    1. C4 declared run vector    smallest · pays twice · touches only the descent · bridge = byte-identity outside it
+    2. C2 two-axis inset         next smallest · the single-inset case must stay byte-identical
+    3. C1 phase + clamp          needs C2 first: rows anchor to the walked span, so a row bug and an inset bug are
+                                 indistinguishable in the output until the span is right
+    4. C3 bearing                needs 2+3: a bearing bug and a row bug look identical too. Null case (bearing 0)
+                                 reproducing the unrotated emit byte-for-byte is this step's strongest assert
+
+### WHAT THE CAM GENERATOR INHERITS — not one event
+
+The width gate lifts in TWO stages, declared: **C2+C1 → axis-aligned slots of any width** (the atom walks the true
+channel, so the generator packs the atom's macro instead of its own centreline body); **C3 → slots at any angle**.
+**C4 unlocks nothing for the gate** — it is a descent capability, and that row exists so nobody expects the gate to
+move when the first act lands.
+
+### GATE (fast tier)
+
+new spec `slot-capability-arc-1478` **6/6** — four PREMISE locks (the band still full on both sides · the atom still
+has the four shapes the design describes · the slot kernel already declaring runX/runY/maxHelixR, which is what makes
+C4 the smallest step · the CAM width gate still keyed on width>tool and still naming the wizard exit) plus the
+FINDING re-measured in the spec itself and a DESIGN lock (ordered, costed, each step declaring what must NOT move,
+exactly one gate and it is last). `slot-parametric-boundary-1442` **11/11**, untouched. **IRON RULE 11/11, same
+list, no growth.** Smoke **71/71**. **No product code** — one data module, one spec.
