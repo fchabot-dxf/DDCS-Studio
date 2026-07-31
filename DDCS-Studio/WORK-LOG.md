@@ -11139,3 +11139,100 @@ surfacing + pocket + drill + raster + rest + CAM + round-trip **200/200** · smo
 Iron rule **11/11**, same list, no growth. New spec `declared-work-calibration-1440` 3/3 — it holds every declaring
 config to *never under, never more than 1.15× over*, which is far tighter than the 4× margin and is what turns this
 from a shrug into a calibration.
+
+## t1442 (seat A) — T4's SLOT: MEASURED, AND IT DOES NOT RE-POINT. The boundary declared; the CAM audit found worse
+
+The dispatch asked me to measure FIRST and only then decide. The measurement says no — four times, and **the one the
+dispatch predicted is not among them**.
+
+### THE ARC-ENDS HYPOTHESIS IS REFUTED, NOT AVOIDED
+
+The fallback clause guessed the blocker would be rounded ends ("arc ends = a DIFFERENT walk"). `slotPath` emits **zero
+G2/G3 at any width** (measured at 6, 12, 20mm) and every pass runs the full centreline extent [0,60]. The ends are round
+because the TOOL is round; no arc move exists to disagree about. Said with the number rather than passed over, because
+a guessed blocker that quietly turns out false is how the next act inherits a wrong reason.
+
+### WHAT ACTUALLY BLOCKS IT — four, measured on both real walks through the real engine
+
+**1. THE ROW RULE IS A DIFFERENT RULE, and it is the one that cuts a different part.** `slotPath` anchors its passes ON
+the wall (`offs` runs ±(width−tool)/2) and FORCES a final pass clamped to the far wall, so the channel is exactly the
+`width` typed whatever the stepover leaves over. The atom counts *rows that FIT*: uniform, the first half a stepover
+INSIDE the walked edge, the last wherever it lands. That is right for its own two jobs — surfacing lets the tool
+overhang, a pocket has a wall-finish pass behind it — and a slot has neither. On 60×12, Ø6 @40%:
+
+    slotPath   4 passes at y = -3, -0.6, 1.8, 3   -> a 12.0mm channel, the width that was typed
+    the atom   3 rows   at y = -1.8, 0.6, 3       -> 10.8mm: 1.2mm NARROW
+
+⚠ And phase-correcting the seeding (walk a rect one stepover taller so the rows start on the wall) does not rescue it —
+it flips the miss to the **destructive** side: the last row lands at **4.2**, 1.2mm PAST the wall. Undersize or
+oversize, pick one; neither is the slot that was asked for.
+
+**THE DIVERGENCE REGION IS NAMED, because the row rule alone CAN be dialled past.** The two sets coincide EXACTLY when
+(width − tool) is a whole multiple of the stepover — measured identical at 18×Ø6@40%, 13.2×Ø6@40%, 20×Ø8@50% and
+different at 12, 16.8, 15. That is asserted as a property in the spec, which is what stops the boundary from being a
+claim a lucky config disproves — and it is why the boundary rests on the three below instead.
+
+**2. THE INSET IS ANISOTROPIC.** A slot is held tool/2 inside across its WIDTH and not at all along its LENGTH — the
+tool centre runs the full centreline, A to B. The atom's `inset` moves BOTH axes, so tool/2 walks a 60mm slot from
+**x=3 to x=57**: a 54mm channel where 60 was asked. Measured, not reasoned.
+
+**3. THE AXIS.** A slot has a BEARING (measured 30.000° on a 30° slot, its step-overs at 120°); the atom's rows run ∥X
+or ∥Y. Only `rotAngle` could express it, and that socket already means the PROGRAM's declared rotation.
+
+**4. THE DESCENT IS ANCHORED TO DIFFERENT GEOMETRY.** The slot declares its run vector — ramps ALONG the length
+(measured (0,−3)→(28.622,−3), pure along-axis) and helixes at the ENTRY END clamped to the slot WIDTH (centre (1,−3)).
+The atom bakes ramp-toward-AREA-CENTRE ((0,−1.8)→(28.57,−0.086) — a diagonal drifting across the channel) and a helix at
+the AREA CENTRE ((32,0) — the middle of the slot, which it then cuts back out of).
+
+### SO IT IS DECLARED, NOT HALF-BUILT — and the declaration says which KIND of boundary it is
+
+`SLOT_RASTER_GAP` + `slotRasterGap(p)` in `slot.js`, keyed on the SAME degenerate test the kernel branches on (a
+zero-length slot is a single plunge → '' , there is no walk to port) and never on the numbers. Shape copied from
+`REST_PARAMETRIC_GAP` deliberately, including its consumption: rest's is read only by its own lock spec too, so this
+matches the precedent rather than inventing a pattern.
+
+**⚠ BUT IT IS A DIFFERENT KIND OF BOUNDARY AND THE DECLARATION SAYS SO.** Rest's obstruction is SQRT on an unverified
+controller — only machine evidence lifts it. These four are things the atom COULD be taught (a wall-anchored row rule,
+a two-axis inset, the slot's bearing, the declared run vector `rampLines`' own TODO already names). That makes the slot
+a **capability arc to be opened deliberately, with a bridge per step — not a re-point that can ride the t1406 recipe**.
+Conflating the two is exactly how a "port" ships a geometry change, so the distinction is written into the header.
+
+### THE CAM AUDIT FOUND SOMETHING WORSE THAN THE POCKET'S, AND IT IS NOT A GREYED-ROW LIE
+
+There is no `slotSlot`; the generator is `slotFromOp('slot')` in `opToSlot.js`, and `camTypeOf` routes **every** slot to
+it **unconditionally** — no width gate, no pattern gate. Its fields are exactly
+`[ax, ay, bx, by, depth, stepdown, feed, clearance, rpm]`. Measured drops: **width · toolDia · stepoverPct · entry ·
+rampAngle · helixDia · helixPitch · plunge · pattern**.
+
+    the wizard cuts   a 12.0mm channel (4 offset passes)      <- the width the operator typed
+    the packed slot   a 6.0mm channel  (ONE centreline pass)  <- the tool Ø
+
+The op's **defining dimension** is dropped, silently, and the macro's own comment admits it: *"For width > tool, add
+perpendicular offset passes."* The Z descent also rides `F#7`, the CUT feed — the plunge feed has no field either.
+
+**AND THERE IS NOWHERE TO DECLARE IT, WHICH IS WHY I DID NOT.** `GENERATOR_IGNORES` surfaces only on ENUM rows, and a
+row exists only for a BUILD enum or a declared BAKED pick. `width`/`stepoverPct`/`plunge` are numeric bindings — no row.
+`entry` is a VALUE enum (`blockIndex: 3`) with no BAKES_PICK row — no row either. Writing IGNORES entries anyway would
+have produced sentences nothing renders, and this file's own note already rules on that: *"a sentence nothing reads is
+worse than no sentence, because it looks handled."* So the audit lands as MEASURED FACTS under a LOCK instead
+(`cam-row-honesty`'s job, pointed at a drop), and the fix is a GATE — see the pass-back's A/B/C.
+
+### THE MIDDLE PREMISE IS FALSE — flagged, not worked around
+
+Step 3 routes a non-re-point to "the MIDDLE wizard's measurement instead (its boss/centre clears — same question, same
+recipe)". `middleWizard.js` is a **PROBE**: 385 lines of two-pass wall probing averaged to a centre, with no raster, no
+fill, no stepover and no toolpath — its only "clear" hits are *jog clear* / *traverse over* / *clearance*. There is no
+clearing walk to re-point, so the instruction is unexecutable as written. Logged rather than silently substituted with
+some other wizard, which is the plan's call and not mine (ROADMAP's own frontier map already lists `middle` under
+"Unportable — conditional structure dominates").
+
+### GATE (fast tier) + WHY NO SCREENSHOT
+
+New spec `slot-parametric-boundary-1442` **5/5** (the row rule with its numbers · the agreement region as a property ·
+the inset/bearing/descent clauses + the arcs refutation · nothing-can-dial-past-it · the CAM audit). Slot family +
+round-trip **13/13** with **IRON RULE 11/11, same list, no growth**. Surfacing + pocket + raster + rest + declared-work
++ CAM **175/175**. Smoke **71/71**.
+
+No screenshot, and the reason rather than silence: the diff is **+73 lines in `slot.js` and ZERO deletions** — a
+declaration plus a function read only by the spec. No emit changed, no wizard field changed, no CAM row appeared. There
+is no pixel to photograph, which is a different statement from "I did not look".
