@@ -17,9 +17,9 @@
  * exactly this reason and has no standard replacement; `setRangeText` does not enter the undo stack either. The
  * fallback (assignment) exists only for a host without it — noted rather than silent, since undo is the thing lost.
  */
-import { INDENT, INDENT_WIDTH, indentBlock } from '../data/indentStyle.js';
+import { INDENT, INDENT_WIDTH, indentBlock, commentBlock, COMMENT_MARK } from '../data/indentStyle.js';
 
-export { INDENT, INDENT_WIDTH };
+export { INDENT, INDENT_WIDTH, COMMENT_MARK };
 
 /** The editor textarea, or null when the editor is not mounted (a wizard-only screen). */
 const editorEl = () => document.getElementById('editor');
@@ -29,9 +29,22 @@ const editorEl = () => document.getElementById('editor');
  * Returns true when bytes actually changed, so a caller can skip the re-render and the toolbar can stay honest.
  */
 export function indentEditor(dir = 1, ed = editorEl()) {
+    return applyBlock(ed, (v, s, e) => indentBlock(v, s, e, dir));
+}
+
+/**
+ * t1452 — COMMENT / UNCOMMENT the selected lines, as a toggle. Shares `applyBlock` with indent, so both operations
+ * take the same one undoable path: a second copy of that surgery is how one of them would quietly lose undo.
+ */
+export function commentEditor(ed = editorEl()) {
+    return applyBlock(ed, (v, s, e) => commentBlock(v, s, e));
+}
+
+/** Run a pure block operation against the editor and write it back UNDOABLY. The one place bytes are replaced. */
+function applyBlock(ed, op) {
     if (!ed) return false;
-    const r = indentBlock(ed.value, ed.selectionStart, ed.selectionEnd, dir);
-    if (!r.changed) return false;                       // outdent on already-flush lines: do nothing, quietly
+    const r = op(ed.value, ed.selectionStart, ed.selectionEnd);
+    if (!r.changed) return false;                       // e.g. outdent on already-flush lines: do nothing, quietly
     ed.focus();
     ed.setSelectionRange(r.blockStart, r.blockEnd);
     let ok = false;
@@ -61,7 +74,13 @@ export function installEditorIndent() {
         e.preventDefault();                              // never let Tab move focus out of the editor
         indentEditor(e.shiftKey ? -1 : 1, ed);
     });
-    for (const [id, dir] of [['editor-indent', 1], ['editor-outdent', -1]]) {
+    // t1452 — Ctrl+/ is the comment toggle every editor has. Same one implementation as the button and the menu.
+    ed.addEventListener('keydown', (e) => {
+        if (e.key !== '/' || !(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        commentEditor(ed);
+    });
+    for (const [id, dir] of [['editor-indent', 1], ['editor-outdent', -1], ['editor-comment', 0]]) {
         const b = document.getElementById(id);
         if (!b || b.dataset.indentWired === '1') continue;
         b.dataset.indentWired = '1';
@@ -73,7 +92,7 @@ export function installEditorIndent() {
          * `preventDefault` on mousedown is the standard cure: the click still fires, the caret never moves.
          */
         b.addEventListener('mousedown', (e) => e.preventDefault());
-        b.addEventListener('click', () => indentEditor(dir, ed));
+        b.addEventListener('click', () => (dir === 0 ? commentEditor(ed) : indentEditor(dir, ed)));
     }
 }
 
@@ -81,4 +100,5 @@ export function installEditorIndent() {
 export const indentMenuItems = () => [
     { label: `⇥ Indent (${INDENT_WIDTH} spaces)`, fn: () => indentEditor(1) },
     { label: '⇤ Outdent', fn: () => indentEditor(-1) },
+    { label: `${COMMENT_MARK} Comment / uncomment`, fn: () => commentEditor() },
 ];

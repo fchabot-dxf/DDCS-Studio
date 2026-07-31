@@ -803,7 +803,8 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     /* t1450 — the ⇥/⇤ indent pair is ONE more slot in the same declared stack (32px above ✚ Make), so it rides
        the open drawer exactly as its neighbours do instead of carrying a magic offset of its own. */
     .editor-container:has(.viz3d-drawer.open) #editor-indent,
-    .editor-container:has(.viz3d-drawer.open) #editor-outdent { bottom: calc(var(--viz3d-size, 50%) + 76px) !important; }
+    .editor-container:has(.viz3d-drawer.open) #editor-outdent,
+    .editor-container:has(.viz3d-drawer.open) #editor-comment { bottom: calc(var(--viz3d-size, 50%) + 76px) !important; }
 }
 .op-edit-chip[hidden] { display: none; }
 
@@ -4515,7 +4516,7 @@ svg [id$="_wcs"] { display: none; }
     /* t1450 — …and the ⇥/⇤ indent pair takes the next slot up (another 32px) on the SAME --kbd-clear signal.
        Joining the declared stack rather than picking a bottom: the inline values are overridden here, which is
        exactly how a hand-picked offset came to overlap ✚ Make at wide viewports (measured, then fixed here). */
-    #editor-indent, #editor-outdent { bottom: calc(var(--kbd-clear, 42px) + 72px) !important; }
+    #editor-indent, #editor-outdent, #editor-comment { bottom: calc(var(--kbd-clear, 42px) + 72px) !important; }   /* t1452 — the comment toggle shares the pair's row */
 }
 
 /* Variables tab — search row + Filters button */

@@ -35,6 +35,50 @@ function item(m, label, fn, disabled) {
 }
 
 /**
+ * ── t1452 — LONG-PRESS IS RIGHT-CLICK, DECLARED ONCE ─────────────────────────────────────────────────────────────
+ *
+ * The user tests on a phone, where there is no right button — so every context menu in the app would be unreachable
+ * on the surface they actually use it on. That makes long-press not an enhancement but the OTHER HALF of the gesture,
+ * and it is written down once rather than six times: six hand-rolled press timers is six chances to disagree about
+ * how long a press is, how far a finger may drift, and whether a scroll counts.
+ *
+ * IT SYNTHESISES A REAL `contextmenu` EVENT rather than calling the handler, and that is the whole design: every
+ * surface keeps ONE listener, written for the mouse, and neither knows nor cares which input opened it. A parallel
+ * touch path per surface is how the two drift — a menu gains an entry on desktop and silently lacks it on the phone.
+ *
+ * THE THRESHOLDS ARE THE PLATFORM'S, not invented: 500ms is the long-press interval Android and iOS both use, and
+ * 10px of slop is what distinguishes a press from the start of a SCROLL — without it, flicking a list would fire
+ * menus. A second touch (pinch/zoom) cancels, for the same reason.
+ */
+export const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
+export function attachLongPress(el, opts = {}) {
+    if (!el || el.dataset.lpWired === '1') return;
+    el.dataset.lpWired = '1';
+    let timer = null, sx = 0, sy = 0, target = null;
+    const cancel = () => { if (timer) clearTimeout(timer); timer = null; target = null; };
+    el.addEventListener('touchstart', (e) => {
+        if (!e.touches || e.touches.length !== 1) return cancel();
+        const t = e.touches[0];
+        sx = t.clientX; sy = t.clientY; target = e.target;
+        timer = setTimeout(() => {
+            timer = null;
+            // The synthesized event carries the touch point, so a handler that positions the menu at
+            // (clientX, clientY) — all of them do — puts it under the finger with no extra code.
+            (target || el).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: sx, clientY: sy }));
+            if (typeof opts.onFire === 'function') opts.onFire();
+        }, opts.ms || LONG_PRESS_MS);
+    }, { passive: true });
+    el.addEventListener('touchmove', (e) => {
+        if (!timer || !e.touches || !e.touches[0]) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - sx) > LONG_PRESS_SLOP || Math.abs(t.clientY - sy) > LONG_PRESS_SLOP) cancel();   // it is a scroll
+    }, { passive: true });
+    for (const ev of ['touchend', 'touchcancel']) el.addEventListener(ev, cancel, { passive: true });
+}
+
+/**
  * t1450 — OPEN AN ARBITRARY MENU in this same element: `[{ label, fn, disabled }]` at (x, y).
  *
  * Exported because the editor's indent/outdent entries are NOT op actions — they act on a text selection that may

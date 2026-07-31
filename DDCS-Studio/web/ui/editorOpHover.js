@@ -7,7 +7,7 @@
  * params are the single source of truth; ddcsEditOp seeds the wizard from them and replaceOp rebuilds the op.
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
-import { showOpMenu, showGroupMenu, hideOpMenu, openMenu } from './opContextMenu.js';
+import { showOpMenu, showGroupMenu, hideOpMenu, openMenu, attachLongPress } from './opContextMenu.js';
 import { indentMenuItems, installEditorIndent } from './editorIndent.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
 import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
@@ -248,4 +248,8 @@ export function initEditorOpHover() {
     });
     editor.addEventListener('scroll', hideOpMenu);
     installEditorIndent();   // t1450 — Tab / Shift+Tab + the toolbar buttons (idempotent; the menu path is above)
+    // t1452 — LONG-PRESS = right-click. The user tests on a phone, where there is no right button, so without
+    // this the editor menu simply does not exist on the surface it is most needed. It synthesises a real
+    // `contextmenu` event, so the ONE handler above serves both inputs and they can never drift apart.
+    attachLongPress(editor);
 }

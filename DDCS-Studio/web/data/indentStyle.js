@@ -69,6 +69,65 @@ export function applyIndentStyle(T, settings = {}) {
  * OUTDENT REMOVES UP TO ONE LEVEL AND NEVER MORE, and never touches a line that has no leading whitespace — so
  * repeated outdent lands flush and stops, instead of eating a line's first characters.
  */
+/**
+ * ── t1452 — THE COMMENT MARK, AND WHY IT IS `;` AND NOT `( … )` ──────────────────────────────────────────────────
+ *
+ * G-code's usual comment is a parenthesis pair, and on THIS controller it cannot be used to comment out an arbitrary
+ * line: **DDCS refuses a nested `( … ( … ) )`** with "Unrecognized characters" (the export path already strips parens
+ * for exactly this reason). Wrapping a line that already carries a comment — which is most emitted lines, since every
+ * parametric body annotates itself — would produce a line the machine rejects. Nesting is not a rare case here; it is
+ * the common one.
+ *
+ * SO THE MARK IS A LEADING SEMICOLON, and that is EVIDENCE rather than preference: **189 lines in the captured
+ * factory corpus begin with `;`**. It is demonstrated on the controller, it needs no closing token, and it cannot
+ * nest — so commenting is total (any line, whatever it contains) and uncommenting is exact.
+ *
+ * THE MARK GOES AT THE LINE'S INDENT, not at column 0: a commented line keeps its place in the structure, so
+ * commenting a loop body and uncommenting it round-trips to the identical bytes. That is asserted, not assumed.
+ */
+export const COMMENT_MARK = ';';
+
+/** Is every non-blank line in this block already commented? (Blank lines do not vote — else one empty line in a
+ *  selection would flip the whole block's meaning, and a user cannot see why.) */
+const allCommented = (lines) => {
+    const real = lines.filter((l) => l.trim() !== '');
+    return real.length > 0 && real.every((l) => l.trimStart().startsWith(COMMENT_MARK));
+};
+
+/**
+ * Comment / uncomment the selected lines — a TOGGLE, like every editor: comment unless the block is already fully
+ * commented, in which case uncomment. Same block/selection rules as `indentBlock`, and BLANK LINES ARE LEFT ALONE
+ * (a `;` on an empty line is noise the user then has to clean up by hand).
+ */
+export function commentBlock(text, selStart, selEnd) {
+    const B = blockOf(text, selStart, selEnd);
+    const lines = B.block.split('\n');
+    const off = allCommented(lines);
+    const out = lines.map((ln) => {
+        if (ln.trim() === '') return ln;
+        const lead = (ln.match(/^[ \t]*/) || [''])[0];
+        if (!off) return lead + COMMENT_MARK + ln.slice(lead.length);
+        const rest = ln.slice(lead.length);
+        return rest.startsWith(COMMENT_MARK) ? lead + rest.slice(COMMENT_MARK.length) : ln;
+    });
+    const replacement = out.join('\n');
+    return { ...B, replacement, commented: !off, changed: replacement !== B.block,
+        text: text.slice(0, B.blockStart) + replacement + text.slice(B.blockEnd),
+        start: B.blockStart, end: B.blockStart + replacement.length };
+}
+
+/** The whole-line block a selection covers — shared by both operations so they can never disagree about it. */
+function blockOf(text, selStart, selEnd) {
+    const src = String(text == null ? '' : text);
+    const a = Math.max(0, Math.min(src.length, selStart | 0));
+    const b = Math.max(a, Math.min(src.length, selEnd | 0));
+    const from = src.lastIndexOf('\n', a - 1) + 1;
+    let to = src.indexOf('\n', b);
+    if (to === -1) to = src.length;
+    const end = (b > a && b === from) ? b : to;
+    return { blockStart: from, blockEnd: end, block: src.slice(from, end), a, b };
+}
+
 export function indentBlock(text, selStart, selEnd, dir = 1) {
     const src = String(text == null ? '' : text);
     const a = Math.max(0, Math.min(src.length, selStart | 0));

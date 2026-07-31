@@ -11509,3 +11509,76 @@ Shift+Tab incl. repeat · undo · the right-click menu · the whitespace-only sw
 round-trip + blocks **46/46** with **IRON RULE 11/11, same list, no growth** · emit-path specs **104/104** · smoke
 **71/71**. Screenshots in `test-results/t1450-shots/` and **eyeballed**: the menu open over a live selection, and the
 three selected lines carrying their two real spaces with the button stack clean.
+
+## t1452 (seat A) — THE CONTEXT-MENU PASS: the MECHANISM + the EDITOR surface. PARKED at 1 of 6, deliberately.
+
+**I did not land six surfaces, and that is the report rather than an apology.** The dispatch's own instruction is
+"park fresh rather than half-land", and the survey turned the size of this pass into a measured fact rather than an
+estimate. What landed is complete and verified: the mechanism every other surface will reuse, and one surface
+finished properly.
+
+### THE MECHANISM — long-press is right-click, declared ONCE
+
+`attachLongPress(el)` in `opContextMenu.js`. The user tests on a phone, where there is no right button, so this is
+not an enhancement — it is the OTHER HALF of the gesture, and without it every menu in this pass would be
+unreachable on the surface it is most needed.
+
+**It synthesises a real `contextmenu` event rather than calling the handler**, and that is the whole design: each
+surface keeps ONE listener, written for the mouse, and neither knows nor cares which input opened it. A parallel
+touch path per surface is precisely how the two drift — a menu gains an entry on desktop and silently lacks it on
+the phone. Thresholds are the platform's, not invented: 500ms (Android/iOS), and 10px of slop to tell a press from
+the start of a SCROLL. Without the slop, flicking a list fires menus; that is asserted as its own test.
+
+### THE EDITOR SURFACE — and RULE 1 turned an "entry" into a FEATURE
+
+Rule 1 says an entry only shortcuts an action that already exists somewhere visible. So I checked instead of
+assuming, and **comment/uncomment existed NOWHERE** — no button, no shortcut, no code. A menu-only action is exactly
+what the rule forbids, so it arrived as a feature: a visible `;` button, Ctrl+/, and the menu entry, all calling one
+implementation through the one undoable path indent already used (`applyBlock`). `edit-this-op` needed nothing — the
+hover ✎ chip and `showOpMenu`'s Edit entry already existed.
+
+### ⚠ THE COMMENT MARK IS AN EVIDENCE DECISION, AND THE OBVIOUS CHOICE WAS WRONG
+
+G-code's usual comment is `( … )`. On THIS controller it cannot comment out an arbitrary line: **DDCS refuses a
+nested `( … ( … ) )`** — the export path already strips parens for exactly that reason — and most emitted lines
+already carry a comment, so nesting is the COMMON case here, not a corner. Wrapping would have produced lines the
+machine rejects, on the majority of a real program.
+
+So the mark is a **leading `;`**, and that is evidence rather than taste: **189 lines of the captured factory corpus
+begin with one.** It needs no closing token and cannot nest, so commenting is total (any line, whatever it contains)
+and uncommenting is exact. The mark goes at the line's INDENT, so a commented loop body keeps its place and
+round-trips to identical bytes. The spec asserts the consequence directly: after commenting a line that already has
+a `( comment )`, **no line carries a second open-paren**.
+
+### WHAT THE SURVEY FOUND — the five remaining surfaces, measured
+
+Reported so the next seat starts from facts rather than from the dispatch's list:
+
+    BLOCKS canvas      NO contextmenu listener exists today. `showOpMenu` is imported by editorOpHover ONLY — the
+                       module's own header claims the Blocks code panel and the Blockly blocks use it too, and that
+                       is now STALE. Needs: an op-identifying hit-test on the canvas + rule-1 checks for
+                       edit/duplicate/delete/show-G-code.
+    CAM slot list      no menu wiring found; the slot rows are rendered by macrosApp. Needs a row→slot identity.
+    WIZARD BAR         the bar is built by commandDeck/dockManager into `.dock-header .header-center`; the wizard
+                       library manager lives in settings (`set_tab_wizards`). "Reset remembered values" DOES exist
+                       visibly (t1437 put it in Settings), so that entry is rule-1 clean; the others need checking.
+    WORKSPACE rows     spread across several ui/ modules — needs a survey before any wiring.
+    3D PREVIEW         needs the 2-3 governing settings tabs identified and the leanness cap respected.
+
+Each needs discovery, rule-1 verification, wiring, a real-gesture spec and a screenshot. Rushing five of those is how
+a menu ends up offering an action that exists nowhere else — the one thing this pass's rules forbid.
+
+### ⚠ A NAMING WART I DID NOT RESTRUCTURE
+
+`ui/editorIndent.js` now holds BOTH block operations (indent and comment), so its name is narrower than its contents.
+A rename is a `git mv` restructure — a gate — so it is flagged rather than taken. `editorTextOps.js` is the obvious
+target if the advisor wants it.
+
+### GATE (fast tier)
+
+new spec `context-menu-pass-1452` **7/7** (rule 1 asserted as *every entry has a visible button* · long-press opens
+the same menu · a scroll does NOT · the comment toggle's real `;` bytes with blank lines left alone · the
+nested-paren consequence · Ctrl+/ and undo · the menu entry acting at the pixel) · `editor-indent-1450` **8/8**
+still green · editor family + round-trip + blocks **36/36** with **IRON RULE 11/11, same list, no growth** · smoke
+**71/71**. Screenshots in `test-results/t1452-shots/` and **eyeballed**: the menu open over a live selection, and the
+two commented lines carrying real semicolons with the blank line untouched and the button row clean.
