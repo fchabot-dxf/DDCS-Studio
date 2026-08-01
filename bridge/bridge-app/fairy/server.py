@@ -35,6 +35,58 @@ from . import oauth   # desktop (loopback) Google OAuth — see oauth.py
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("text/javascript", ".mjs")
 
+# ── gateway CSRF guard (t1115) ──────────────────────────────────────────────────────────────────────────────
+# The state-changing POST routes answer with Access-Control-Allow-Origin: * — so a page on ANY origin the user
+# visits could drive them from the browser (a drive-by CSRF: queue a job, rewrite config, delete a file). Guard:
+# require X-DDCS-Local: 1. It is a CUSTOM request header, so a cross-origin page can only add it by first passing a
+# CORS preflight — and do_OPTIONS grants ONLY Content-Type in Access-Control-Allow-Headers (X-DDCS-Local is
+# deliberately absent; NEVER add it there), so the browser refuses to send a cross-origin POST carrying it. A forged
+# POST therefore either omits the header (refused 403 here) or is blocked at the preflight.
+# DIFFERENT from the /api/update/* guard (loopback AND header): here the header ALONE is the guard, because LAN
+# job-queueing is an INTENDED feature (Settings > LAN ACCESS + QR) and a LAN Studio client is SAME-ORIGIN with the
+# gateway, so it CAN set the header (a same-origin request needs no preflight). ONE-SOURCE: _has_local_header is the
+# shared predicate; the update route composes it with a loopback check. (On merge, unify this LOCAL_HEADER with the
+# update branch's UPDATE_LOCAL_HEADER — same value — and let update_request_allowed call _has_local_header.)
+LOCAL_HEADER = "X-DDCS-Local"
+LOCAL_VALUE = "1"
+
+
+def _has_local_header(headers):
+    """True iff the request carries the non-CORS-able X-DDCS-Local: 1 header — the CSRF guard's shared predicate."""
+    return headers.get(LOCAL_HEADER) == LOCAL_VALUE
+
+
+# ── the ORIGIN ALLOWLIST — which cross-origin pages may pass the guarded-route preflight (t1141) ─────────────────
+# The header guard alone makes mode (c) UNUSABLE: the HOSTED page (https://ddcs-studio.pages.dev) pointed at a local/LAN
+# gateway is CROSS-ORIGIN, so its custom X-DDCS-Local header needs a CORS preflight — which do_OPTIONS refuses for every
+# origin. So a KNOWN-TRUSTED DDCS origin is allowlisted: its preflight IS granted X-DDCS-Local (see do_OPTIONS), so it
+# CAN set the header. This does NOT weaken the guard — the header stays REQUIRED (a simple cross-origin POST still lands
+# but cannot READ the reply, and forging the state change needs the header); the allowlist only lets a trusted origin
+# THROUGH the preflight. The official hosted origin ships in; a self-hoster adds their own Studio origin via the
+# DDCS_TRUSTED_ORIGINS env var (comma-separated). A NON-allowlisted origin is unchanged: Content-Type only → no header.
+def _load_trusted_origins():
+    origins = {"https://ddcs-studio.pages.dev"}
+    for o in os.environ.get("DDCS_TRUSTED_ORIGINS", "").split(","):
+        o = o.strip()
+        if o:
+            origins.add(o)
+    return frozenset(origins)
+
+
+TRUSTED_ORIGINS = _load_trusted_origins()
+
+
+# SENSITIVE GET routes — reads a cross-origin page must NOT be able to make. With Access-Control-Allow-Origin: * any
+# site the user visits could fetch these:
+#   /api/oauth/google/token  — the user's Google Drive ACCESS TOKEN (a live credential → account takeover)
+#   /api/oauth/google/status — their Google connection state (info disclosure)
+#   /api/file, /api/sysfile  — their CNCDISK / SYSDISK FILE CONTENTS (their G-code / macros → data disclosure)
+# Guard them with the SAME non-CORS-able header (a simple cross-origin GET carries no header → 403; adding it forces a
+# preflight that grants only Content-Type → blocked). Every OTHER GET is an innocuous local read and stays open. Scoped
+# by set (declared, one line to extend) rather than a blanket do_GET guard, so a legit read is never accidentally locked
+# out. (path is query-stripped before the check, so ?name=… on /api/file / /api/sysfile still matches.)
+_GUARDED_GETS = frozenset({"/api/oauth/google/token", "/api/oauth/google/status", "/api/file", "/api/sysfile"})
+
 _PLACEHOLDER = (
     b"<!doctype html><meta charset=utf-8><title>DDCS Bridge gateway</title>"
     b"<body style='font:14px system-ui;margin:3em;max-width:40em'>"
@@ -84,15 +136,27 @@ class _Handler(BaseHTTPRequestHandler):
 
     # -- routing --------------------------------------------------------------
     def do_OPTIONS(self):
+        # A TRUSTED DDCS origin (mode c: the hosted page pointed at this gateway) gets its origin reflected + X-DDCS-Local
+        # granted, so its preflight passes and it CAN set the guard header. EVERY other origin keeps the old answer —
+        # Allow-Origin * + Content-Type ONLY — so it still cannot set X-DDCS-Local and the CSRF guard holds. NEVER grant
+        # X-DDCS-Local to * / an unknown origin: that would let any site forge the guarded POSTs/GETs. The header is NOT
+        # dropped; the allowlist only lets a KNOWN origin through the preflight (a simple cross-origin POST still lands
+        # but cannot read the reply, and forgery needs the header, which a non-trusted origin still cannot set).
+        origin = self.headers.get("Origin", "")
+        trusted = origin in TRUSTED_ORIGINS
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", origin if trusted else "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-DDCS-Local" if trusted else "Content-Type")
+        self.send_header("Vary", "Origin")   # the response depends on the request Origin → caches must not share it
         self.end_headers()
 
     def do_GET(self):
         u = urlparse(self.path)
         path, q = u.path, parse_qs(u.query)
+        # CSRF guard for the SENSITIVE reads (the Google Drive token + status) — same non-CORS-able header as the POSTs.
+        if path in _GUARDED_GETS and not _has_local_header(self.headers):
+            return self._send_json({"error": "forbidden — this endpoint requires the X-DDCS-Local header (CSRF guard)"}, 403)
         if path == "/api/descriptor":
             return self._send_json(self.ops.descriptor())
         if path == "/api/profile":
@@ -187,6 +251,10 @@ class _Handler(BaseHTTPRequestHandler):
         return self._serve_static(path)
 
     def do_POST(self):
+        # CSRF guard (fail-closed): every POST route here is state-changing, so require the non-CORS-able local
+        # header on ALL of them (see _has_local_header). Header-only — NOT loopback — so LAN Studio clients still work.
+        if not _has_local_header(self.headers):
+            return self._send_json({"error": "forbidden — this endpoint requires the X-DDCS-Local header (CSRF guard)"}, 403)
         if self.path == "/api/jobs":
             b = self._read_body()
             if not b.get("name") or "nc" not in b:

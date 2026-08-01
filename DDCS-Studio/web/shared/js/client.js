@@ -41,8 +41,11 @@ export function makeClient(opts = {}) {
     if (!r.ok) throw new Error(`${path} -> HTTP ${r.status}`);
     return r.json();
   }
+  // X-DDCS-Local: 1 satisfies the gateway CSRF guard (server.py) — a custom header a cross-origin page can't set
+  // (its preflight is refused), while this same-origin Studio client (loopback OR LAN) sets it freely. One seam for
+  // every state-changing POST (jobs/config/sysfile/deletes).
   const postJSON = (path, body) =>
-    call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    call(path, { method: "POST", headers: { "Content-Type": "application/json", "X-DDCS-Local": "1" }, body: JSON.stringify(body) });
 
   return {
     mode: base ? "remote" : "local",
@@ -53,12 +56,12 @@ export function makeClient(opts = {}) {
     listHistory: (limit = 100) => call("/api/history?limit=" + limit),
     getStatus: (id) => call("/api/status?id=" + encodeURIComponent(id)),
     listFiles: () => call("/api/files"),
-    readFile: (name) => call("/api/file?name=" + encodeURIComponent(name)),
+    readFile: (name) => call("/api/file?name=" + encodeURIComponent(name), { headers: { "X-DDCS-Local": "1" } }),   // CSRF-guarded (leaks CNCDISK file content); same-origin Studio sends it
     deleteFile: (name) => postJSON("/api/files/delete", { name }),
     submitJob: (name, nc, map) => postJSON("/api/jobs", { name, nc, map }),
     getConfig: () => call("/api/config"),
     setConfig: (updates) => postJSON("/api/config", updates),
-    readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name)),                  // SYSDISK macro file (key-N.nc / slib-m.nc)
+    readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name), { headers: { "X-DDCS-Local": "1" } }),   // SYSDISK macro file (key-N.nc / slib-m.nc); CSRF-guarded, same-origin sends it
     writeSysfile: (name, content, mode = "write") => postJSON("/api/sysfile", { name, content, mode }),   // backed-up write/append
     deleteSysfile: (name) => postJSON("/api/sysfiles/delete", { name }),
   };

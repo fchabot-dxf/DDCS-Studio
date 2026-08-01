@@ -67,7 +67,7 @@ async function addSelfUpdate(bar, tag) {
     const was = btn.textContent;
     btn.textContent = 'Downloading and verifying…';
     let r = null;
-    try { r = await (await fetch('/api/update/apply', { method: 'POST' })).json(); } catch (e) { r = { ok: false, error: String(e) }; }
+    try { r = await (await fetch('/api/update/apply', { method: 'POST', headers: { 'X-DDCS-Local': '1' } })).json(); } catch (e) { r = { ok: false, error: String(e) }; }   // X-DDCS-Local: gateway CSRF guard (same-origin, direct fetch bypasses client.postJSON)
     if (r && r.ok) { btn.textContent = 'Updated — restarting…'; return; }
     // a NAMED refusal, and the release page as the way forward — never a silent failure, never an unverified install
     btn.disabled = false; btn.textContent = was;

@@ -68,7 +68,7 @@ async function silentRefresh() {
     // fresh access token (bridge/bridge-app/fairy/oauth.py). Pull it and cache it for api().
     if (window.pywebview && window.pywebview.api) {
         let t = {};
-        try { t = await (await fetch('/api/oauth/google/token')).json(); } catch (e) { /* */ }
+        try { t = await (await fetch('/api/oauth/google/token', { headers: { 'X-DDCS-Local': '1' } })).json(); } catch (e) { /* */ }   // X-DDCS-Local: the token GET is CSRF-guarded (a Drive credential); same-origin Studio sends it
         if (t.access_token) { try { localStorage.setItem(TOK, t.access_token); } catch (e) { /* */ } return; }
         throw new Error('silent-fail');
     }
