@@ -227,7 +227,7 @@ export function slotDataDef() {
     def.bindingSpecs = SLOT_BINDING_SPECS;   // t1500 — re-derive the value sockets BY IDENTITY over the PRUNED stack each build
     /**
      * t1500 — `_para`: does THIS slot's clearing ride `surfaceraster`? GEOMETRY-, ENTRY- and ENVELOPE-derived (the
-     * zero band, the helix's entry-end clamp, the ramp over a partial last bite, a pattern, and finally the atom's
+     * zero band, the helix's entry-end clamp, a pattern, and finally the atom's
      * OWN declared envelope), so it cannot be a plain param guard. The predicate is `slotStackArmGap`'s — the SAME
      * one source the concrete build reads — so the twin and the wizard can never disagree about which arm a given
      * slot is on. That agreement IS the byte-identity claim, not a separate thing tested beside it.

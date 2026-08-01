@@ -44,7 +44,8 @@ export function slotPath(p) {
     const so = Math.max(0.2, tool * num(p.stepoverPct, 40) / 100);
     const depth = num(p.depth, 4);
     const clr = num(p.clearance, 5), feed = num(p.feed, 2000), plunge = num(p.plunge, 150);
-    const levels = depthLevels(depth, num(p.stepdown, 1.5));
+    const sd = num(p.stepdown, 1.5);
+    const levels = depthLevels(depth, sd);
     const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
     const L = [];   // program-level clearance is provided by the enclosing program (emitMapped header)
 
@@ -65,7 +66,24 @@ export function slotPath(p) {
     const entry = p.entry || 'plunge';
     const wantR = num(p.helixDia, 0) > 0 ? num(p.helixDia, 0) / 2 : tool / 2;
     const helixMaxR = width / 2 - tool / 2, helixR = Math.max(0.2, Math.min(wantR, helixMaxR));
-    let prevD = 0;
+    /**
+     * ── t1506 — THE DESCENT'S STARTING FLOOR IS THE NOMINAL ONE, converging the family (ruled) ────────────────────
+     *
+     * This kernel used to hand `entryOrPlunge` the REAL previous level (`-prevD`), which made it the only descent in
+     * the corpus that ramped the ACTUAL remaining bite on a clamped final level. t1504 measured the whole family and
+     * the split was three-to-one the other way: `stepover.js` (pocket, surfacing) and `contourfill.js` (contour) both
+     * pass `z + by`, and so does the parametric `surfaceraster` atom. The slot was the outlier.
+     *
+     * ⚠ SAFE BY DIRECTION, WHICH IS WHY THE NOMINAL FORM IS THE ONE TO CONVERGE ON. `z + sd` is at or ABOVE the true
+     * floor — never below it — so the descent starts in air the previous level already cleared and can only cut LESS,
+     * never more. Measured across depths 3/4/5/2/3.2 by stepdowns 1.5/0.75/0.8: every kernel ends at EXACTLY the
+     * asked depth (overshoot 0.0000), no material is left, and the level's own passes then clear the area. The whole
+     * cost is a longer approach — cosmetic, and the payoff is that the ramp becomes expressible by the atom, so
+     * `SLOT_RAMP_PARTIAL_GAP` retires and the slot wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5) go parametric.
+     *
+     * It is set ONCE for every entry, exactly as the other three call sites do it — the helix reads the same `prevZ`,
+     * and giving the two descents different floors is the kind of split this act exists to close.
+     */
     for (const d of levels) {
         const z = -d;
         L.push(`( level Z${r3(z)} )`);
@@ -74,7 +92,7 @@ export function slotPath(p) {
             let sx = x0 + nx * o, sy = y0 + ny * o, ex = x1 + nx * o, ey = y1 + ny * o;
             if (dir < 0) { [sx, ex] = [ex, sx];[sy, ey] = [ey, sy]; }
             if (first) {
-                const ctx = { entry, z, prevZ: -prevD, rampAngle: num(p.rampAngle, 3), feed,
+                const ctx = { entry, z, prevZ: z + sd, rampAngle: num(p.rampAngle, 3), feed,
                     runX: ex - sx, runY: ey - sy, runLen: len,                                   // ramp along the pass (the slot length)
                     helixR, helixPitch: num(p.helixPitch, 1), maxHelixR: helixMaxR,
                     cx: sx + helixR * (ex - sx) / len, cy: sy + helixR * (ey - sy) / len };       // helix centred R into the slot (stays inside)
@@ -86,7 +104,6 @@ export function slotPath(p) {
             dir = -dir;
         }
         L.push(`G0 Z${clr}`);
-        prevD = d;
     }
     return L;
 }
@@ -201,54 +218,31 @@ export function slotBearingDeg(p = {}) {
 }
 
 /**
- * Is the LAST depth level a FULL bite? The ramp's divergence turns on exactly this, and nothing else (measured below).
+ * ── t1506 — THE THIRD GATE IS RETIRED, AND THIS IS WHERE IT STOOD ────────────────────────────────────────────────
  *
- * `depthLevels` clamps its final level to the total depth, so a depth that is not a whole multiple of the stepdown
- * ends on a PARTIAL bite — 4mm at 1.5 gives 1.5 / 3.0 / 4.0, a last drop of 1.0.
+ * t1498 found a boundary the arc's inventory never named: a RAMP entry over a PARTIAL last depth level. The slot
+ * kernel ramped the ACTUAL remaining drop (a 1.0mm last bite = a 19.08mm run at 3°) while the shared atom ramped a
+ * NOMINAL full stepdown (28.62mm), so the descent entered the material `(stepdown − lastBite)/tan(rampAngle)`
+ * further along — 9.54mm on the wizard's OWN defaults. Every ramp config with a partial last bite diverged and no
+ * other config did, so those slots were routed literal.
+ *
+ * t1504 measured the whole family and found the split ran the OTHER way: `stepover.js` (pocket, surfacing),
+ * `contourfill.js` (contour) and the atom itself all ramp the nominal stepdown. **The slot kernel was the outlier**,
+ * and the boundary was not a capability the atom lacked — it was one kernel disagreeing with three.
+ *
+ * So the slot converged on the nominal form (see `slotPath`) and the boundary CEASED TO EXIST. It is not narrowed,
+ * not deferred, and not gated on evidence: there is no longer a divergence for a gate to describe. `SLOT_HELIX_GAP`
+ * and the zero band still stand on their own measurements; this one has no subject left.
+ *
+ * ⚠ THE RULING THAT MADE IT SAFE, recorded because it is what a future reader will want: the nominal floor
+ * (`z + stepdown`) is at or ABOVE the true floor and never below it, so a nominal descent starts in air the previous
+ * level already cleared and can only cut LESS, never more — safe by DIRECTION rather than by margin. Measured across
+ * depths 3/4/5/2/3.2 by stepdowns 1.5/0.75/0.8: every kernel ends at exactly the asked depth (overshoot 0.0000) and
+ * leaves no material. The cost is a longer approach; the payoff is that the SHIPPED-DEFAULT ramping slot is now
+ * expressible by the atom. The more-correct actual-drop form is shelved as a family-wide efficiency act — it is a
+ * real improvement, it is simply not this one, and doing it here would have moved every ramped literal emit in the
+ * corpus for a benefit measurement puts at zero.
  */
-function slotLastBiteIsFull(p = {}) {
-    const stepdown = Math.max(0.01, num(p.stepdown, 1.5));
-    const lv = depthLevels(num(p.depth, 4), stepdown);
-    const last = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
-    return Math.abs(last - stepdown) < 1e-9;
-}
-
-/**
- * ⚠ THE THIRD GATE, MEASURED THIS TURN AND NOT IN THE ARC'S INVENTORY — A RAMP OVER A PARTIAL LAST BITE ───────────
- *
- * The arc named two things that keep the slot literal (a dialled bearing, the helix's entry-end clamp). There is a
- * THIRD, it is not trig, and it is not a capability the atom lacks — it is a genuine behavioural difference in the
- * descent that only appears when the last level is a partial bite:
- *
- *     the slot kernel   ramps the ACTUAL drop      — `entryOrPlunge` gets prevZ and z, so a 1.0mm last bite ramps
- *                                                    1.0mm at the asked angle: a 19.08mm run at 3 degrees
- *     the atom          ramps a NOMINAL stepdown   — its run is one full `stepdown`: 28.62mm at 3 degrees
- *
- * MEASURED, on the frozen kernel, across widths x bearings x stepovers x depths: EVERY divergence outside the zero
- * band is `entry:'ramp'` with a partial last bite, and EVERY ramp config with a partial last bite diverges — no
- * false positives and no false negatives on the whole sweep. The size is exactly the run the two disagree about,
- * `(stepdown − lastBite) / tan(rampAngle)`, projected on the slot's bearing:
- *
- *     depth 4  @ 1.5  (last bite 1.0)   9.540mm      depth 3.5 @ 0.8 (last 0.3)   9.541mm
- *     depth 5  @ 1.5  (last bite 0.5)  19.080mm      depth 7   @ 2.5 (last 2.0)   9.541mm
- *     …and at a bearing: 9.540 · cos30 = 8.262, · cos45 = 6.746 — the same run, turned.
- *
- * ⚠ AND THE SHIPPED DEFAULTS LAND IN IT: the slot wizard defaults to depth 4 / stepdown 1.5, so the DEFAULT slot
- * with a ramp entry is precisely the diverging case. That is why this is routed rather than rounded past — a 9.5mm
- * error in where a ramp enters the material is not a quantum, it is a different descent.
- *
- * IT IS THE ATOM'S RAMP THAT WOULD HAVE TO MOVE, AND IT IS **NOT** MOVED HERE. Teaching the atom to ramp the real
- * remaining drop is arguably the more correct reading — but that atom is SHARED, and every surfacing and pocket
- * program in the corpus rides its ramp. Changing it under cover of the slot's re-point is exactly the silent
- * behaviour move this whole arc is built to prevent, so the slot narrows and the atom is left alone. Lifting it is
- * its own act, with its own bridge, on the ops that own it.
- */
-export const SLOT_RAMP_PARTIAL_GAP = 'a RAMP entry over a PARTIAL last depth level: the slot kernel ramps the ACTUAL '
-    + 'remaining drop (a 1.0mm last bite ramps 1.0mm — a 19.08mm run at 3 degrees) and the shared raster atom ramps a '
-    + 'NOMINAL full stepdown (28.62mm), so the descent enters the material somewhere else entirely — measured at '
-    + '(stepdown - lastBite)/tan(rampAngle), 9.54mm on the wizard\'s OWN defaults (depth 4 at stepdown 1.5), turned by '
-    + 'the bearing. Every ramp config with a partial last bite diverges and no other config does. The atom\'s ramp is '
-    + 'SHARED with surfacing and every pocket, so it is not moved to suit the slot; this slot stays literal instead';
 
 /**
  * THE HELIX, which the arc already named and which stays exactly where it was.
@@ -357,7 +351,10 @@ export function slotRasterArmGap(p = {}) {
     if (width - tool < 1e-6) return 'a slot exactly its tool\'s width has a ZERO band — the kernel cuts one centreline pass, and the atom refuses a span its insets collapse to nothing (its collapsed-inset guard), emitting no motion at all';
     const entry = String(p.entry || 'plunge');
     if (entry === 'helix') return SLOT_HELIX_GAP;
-    if (entry === 'ramp' && !slotLastBiteIsFull(p)) return SLOT_RAMP_PARTIAL_GAP;
+    // t1506 — THE RAMP CLAUSE IS GONE, not disabled. It refused a partial last bite because this kernel ramped the
+    // ACTUAL remaining drop where the atom ramped a nominal stepdown; the kernel now uses the nominal floor the rest
+    // of the family already used, so the two agree at every bite and there is no divergence left to gate on. The
+    // wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5, ramp) pass here now — see the retirement note above `slotPath`.
     // …and finally the atom's OWN envelope, asked in its own words, so this gate can never claim a coverage the
     // atom does not declare (the pocket asks the identical question at the identical point).
     const probe = slotRasterParams(p);

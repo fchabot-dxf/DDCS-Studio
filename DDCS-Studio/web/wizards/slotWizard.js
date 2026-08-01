@@ -92,7 +92,7 @@ export const SLOT_PATTERN_GAP = 'a PATTERNED slot stamps its op through an `arra
  * WIZARD's words, so the form path, the twin's `_para` guard and the CAM table's why-column all read ONE predicate.
  *
  * The measured domain is `slotRasterArmGap`'s (t1498: the zero band, the helix's entry-end clamp, the ramp over a
- * partial last bite, and finally the atom's own envelope); this adds the one clause only the stack can see.
+ * and finally the atom's own envelope); this adds the one clause only the stack can see.
  */
 export function slotStackArmGap(params = {}) {
     if (slotPatterned(params)) return SLOT_PATTERN_GAP;

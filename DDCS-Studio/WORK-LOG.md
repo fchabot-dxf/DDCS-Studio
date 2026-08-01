@@ -13467,3 +13467,82 @@ three literal kernels under cover of an examination.
 - ⚠ For whichever branch is ruled: `slot-repoint-domain-1498`'s THIRD GATE test asserts the partial-bite divergence
   in both directions and against its predicted size. Under (B) or (C) that boundary CEASES TO EXIST, so that test is
   evidence of a fact that would no longer be true and must be restated in the same act — it is not a follow-up.
+
+## t1506 (seat A) — THE FAMILY CONVERGES. One line in the slot kernel, and the THIRD GATE RETIRES — the first boundary this arc has ever closed.
+
+Ruled (C) from t1504's measurement: converge on the NOMINAL descent floor. The change is one expression; the act is
+everything that had to be restated so no assertion outlived its fact.
+
+### THE CHANGE
+
+    slot.js   ctx = { entry, z, prevZ: -prevD, … }     the lone outlier — the REAL previous level
+              ctx = { entry, z, prevZ: z + sd,  … }     what stepover.js / contourfill.js / the atom already pass
+
+`prevD` died with it (its declaration was in the block the edit replaced, so leaving the assignment behind would have
+been a ReferenceError in a module — caught by reading the diff, not by a test).
+
+**Why the nominal form is the safe one to converge on, recorded because it is the ruling's whole basis:** `z + sd` is
+at or ABOVE the true floor and never below it, so the descent starts in air the previous level already cleared and
+can only cut LESS, never more — safe by DIRECTION rather than by margin. Measured across depths 3/4/5/2/3.2 by
+stepdowns 1.5/0.75/0.8: every kernel ends at exactly the asked depth (overshoot 0.0000) and leaves no material.
+
+**And it is set ONCE for every entry**, exactly as the other three call sites do it — the helix reads the same
+`prevZ`. Giving the two descents different floors would have been a new split inside the act that closes one.
+
+### WHAT RETIRED, AND WHAT THAT BOUGHT
+
+`SLOT_RAMP_PARTIAL_GAP` is **deleted, not disabled** — the declaration, the gate clause, and the `slotLastBiteIsFull`
+helper that fed it. A retired boundary that leaves its sentence behind reads as a live gate to the next reader and to
+the CAM table's why-column, so it goes in full, with a retirement note where it stood.
+
+**THE PAYOFF: the slot wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5, ramp) now cut the parametric atom.** That was
+the config the gate refused — the most common slot there is. Driven on the real form and asserted there.
+
+The arc's rows record it: `gates` goes FOUR → **THREE**, and says the fourth RETIRED rather than quietly dropping it.
+This is the only boundary the whole capability arc has ever closed; the zero band and the helix clamp still stand on
+their own measurements.
+
+### THE RESTATEMENTS — four specs, none deleted, all in this act as flagged
+
+- **THE THIRD GATE → THE CONVERGENCE.** It proved a divergence; it now proves agreement at every bite (≤0.0015mm)
+  AND still measures the frozen pre-t1506 kernel diverging by exactly the predicted 9.54mm. Keeping that second half
+  is what makes this a CHANGE rather than a no-op — a convergence test that cannot show what it converged from is
+  indistinguishable from a test of nothing.
+- **THE FROZEN REFERENCE — no longer a character-for-character copy, and saying so precisely mattered more than
+  relaxing it.** The freeze is the t1496 kernel; t1506 deliberately moved the live one. It now asserts the
+  divergence's SHAPE in BOTH directions — identical everywhere, different exactly where the descent moved — so a
+  drift anywhere else still fails loudly, which is the property the original spec existed for.
+  ⚠ IT CAUGHT A REAL REFINEMENT: "entry is not plunge" was too broad. A slot narrower than its tool REFUSES with no
+  motion, and a ramp whose run will not fit DEGRADES to a plunge; both ask for a ramp and neither has a descent that
+  could move. The predicate now reads the emitted `( ramp )` / `( helix )` marker instead of re-deriving those rules
+  inside the kernel's own test.
+- **THE BRIDGE** compares against the LIVE kernel now (the frozen copy is pre-change). Not vacuous: `slotPath` is a
+  separate body of arithmetic from `surfaceRasterLines`, so it is still two implementations agreeing.
+- **THE DOMAIN GREW, AS A NUMBER.** The bridge counts the newly-eligible slice — ramp-over-partial-bite configs that
+  were refused before this act and now reproduce the kernel move for move (>50 in the sweep).
+
+### ⚠ THE TEST THAT WOULD HAVE PASSED FOR THE WRONG REASON
+
+The payoff test first drove the BUILT-IN slot form. That form has no depth-entry control at all — `grep id="sl_`
+finds no `sl_entry`, because the entry cluster was added at t842 as BINDINGS. So it set nothing, left the entry at
+`plunge`, and would have "proved" the payoff without ever asking for a ramp. The surface an operator actually picks
+Ramp on is the twin's form (`Slot (data)`), which is where it is driven now — asserting both controls existed, that
+they were set, and that depth/stepdown are still sitting on the shipped defaults rather than having drifted.
+
+### GATES
+
+- **Full suite 2330 passed / 0 failed / 6 skipped** (2336 total, 18.2 min). The extra test over t1502's 2335 is the
+  new default-ramping-slot payoff.
+- Family risk surface **340/340** (slot · pocket · surfacing · raster · contour · depth-entry · work-calibration).
+- `@work` needed NO change on this branch: the nominal ramp is the form the calibration was measured against, and
+  the slot kernel is literal (uncounted). The 6 → 7 step re-measurement belonged to the shelved (B).
+- Iron rule unmoved. **Released V2026.08.01.1** — the slot default going parametric is user-facing.
+
+### WHAT IS SHELVED, AND IT IS A REAL IMPROVEMENT
+
+Converging on the ACTUAL remaining drop (option B) is still the more correct descent — shorter, no air travel, and
+it is what a reader expects a ramp angle to mean on the final level. It is shelved as a family-wide efficiency act
+with its own bridge: it needs `stepover.js` + `contourfill.js` + a StepDown scope contract that declares the floor
+each level starts from, and it moves every ramped literal emit in the corpus. t1504 already built and measured its
+atom half (`V.prevZ = #35`, free by mutual exclusion, band unchanged; whole bites byte-for-byte unmoved; `@work`
+6 → 7 per level), so re-landing it is cheap when it is its own act.

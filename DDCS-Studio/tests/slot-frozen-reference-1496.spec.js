@@ -28,11 +28,26 @@ const boot = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 };
 
-test('THE FREEZE IS A COPY — 2376 configs, character for character against the live kernel', async ({ page }) => {
+/**
+ * ⚠ t1506 — THE FREEZE IS NO LONGER A CHARACTER-FOR-CHARACTER COPY, BY DESIGN, AND THIS TEST NOW SAYS SO EXACTLY.
+ *
+ * The freeze is a snapshot of the kernel AS IT STOOD AT t1496. t1506 deliberately moved the live kernel: its descent
+ * used to start from the REAL previous level and now starts from the NOMINAL floor (`z + stepdown`), converging with
+ * `stepover.js`, `contourfill.js` and the parametric atom, which all pass the nominal floor. That was the whole act,
+ * so a spec asserting the two are identical would be asserting the act did not happen.
+ *
+ * IT IS NOT RELAXED TO "MOSTLY EQUAL". The divergence is PREDICTED — it can only be a descent that starts on a
+ * PARTIAL last bite — and the test asserts that shape in BOTH directions: every config outside it is still identical
+ * character for character, and every config inside it differs. A freeze that drifted anywhere else still fails, which
+ * is the property the original spec existed to protect (a baseline that drifts silently makes every downstream bridge
+ * prove the wrong thing CONFIDENTLY).
+ */
+test('THE FREEZE IS THE t1496 KERNEL — identical everywhere except the ONE descent t1506 deliberately moved', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const live = await import('/wizards/ops/slot.js');
         const frozen = await import('/_test/frozenSlotPath.js');
+        const { depthLevels } = await import('/wizards/clearing.js');
         const NL = String.fromCharCode(10);
         let count = 0; const differ = [];
         for (const width of [4, 6, 6.5, 7, 12, 13.2, 15, 16.8, 18, 20, 60])
@@ -46,16 +61,33 @@ test('THE FREEZE IS A COPY — 2376 configs, character for character against the
                                 const p = { x0: 0, y0: 0, x1: 60 * Math.cos(rad), y1: 60 * Math.sin(rad), width, tool,
                                     stepoverPct: pct, depth, stepdown: 1.5, feed: 2000, plunge: 150, clearance: 5,
                                     entry, rampAngle: 3, helixDia: 4, helixPitch: 1 };
-                                if (live.slotPath(p).join(NL) !== frozen.frozenSlotPath(p).join(NL)) {
-                                    differ.push({ width, tool, entry, ang, depth, pct });
-                                }
+                                /**
+                                 * The ONLY shape allowed to differ: a REAL descent over a PARTIAL last bite.
+                                 *
+                                 * ⚠ "entry is not plunge" is NOT enough, and the sweep proved it — a slot narrower
+                                 * than its tool REFUSES with no motion, and a ramp whose run will not fit DEGRADES to
+                                 * a plunge. Both ask for a ramp and neither has a descent that could move. Rather
+                                 * than re-derive those rules here (which would put a second copy of the kernel's
+                                 * logic in its own test), the emitted text is asked: a descent happened iff the
+                                 * kernel wrote its `( ramp )` / `( helix )` marker.
+                                 */
+                                const lv = depthLevels(depth, 1.5);
+                                const lastBite = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
+                                const partial = Math.abs(lastBite - 1.5) > 1e-9;
+                                const was = frozen.frozenSlotPath(p).join(NL);
+                                const descended = /\( (ramp|helix) \)/.test(was);
+                                const mayDiffer = descended && partial;
+                                const same = live.slotPath(p).join(NL) === was;
+                                if (same === mayDiffer) differ.push({ width, tool, entry, ang, depth, pct, same, mayDiffer });
                             }
         return { count, differ };
     });
     // the sweep spans every arm the kernel has: the too-small refusal, the zero-band centreline, both descents,
     // the angled cases, multi-level, and the widths the arc measured its divergence region on
     expect(r.count, 'the sweep really is the whole cross-product').toBe(2376);
-    expect(r.differ, `the freeze emits what the kernel emits — ${JSON.stringify(r.differ.slice(0, 3))}`).toEqual([]);
+    // ⚠ BOTH DIRECTIONS: identical wherever the bite is whole or the entry plunges, different wherever t1506 moved it.
+    // A drift ANYWHERE else — or an unexpected agreement inside the moved region — lands in `differ` and fails here.
+    expect(r.differ, `the freeze differs from the kernel in EXACTLY the descents t1506 moved, and nowhere else — ${JSON.stringify(r.differ.slice(0, 3))}`).toEqual([]);
 });
 
 test('THE FREEZE CARRIES THE TOO-SMALL LAW, which is a refusal and not a path', async ({ page }) => {

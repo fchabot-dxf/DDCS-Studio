@@ -255,8 +255,9 @@ export const SLOT_CAM_INHERITANCE = [
  * the gate as still refusing, so the two cannot be quietly conflated.
  *
  * AND THE EXPRESSIBLE DOMAIN IS SMALLER THAN THESE ROWS IMPLY. "Slots of any width" and "slots at ANY angle" are
- * both true only outside FOUR gates that t1498/t1500 measured, one of which the arc never named (see
- * `SLOT_RAMP_PARTIAL_GAP` — a ramp over a partial last bite, which the SHIPPED DEFAULTS land in).
+ * both true only outside the gates that t1498/t1500 measured — THREE of them as of t1506, down from four: the ramp
+ * over a partial last bite RETIRED when t1504 measured the family and found the slot kernel, not the atom, was the
+ * outlier (see the retirement note in `wizards/ops/slot.js`). That is the only one that has ever closed.
  */
 export const SLOT_REPOINT_LANDED = {
     wizard: 'SHIPPED at t1500. `slotStack` forks at the PLACE on a derived `_para`: the eligible slot\'s clearing is '
@@ -267,10 +268,13 @@ export const SLOT_REPOINT_LANDED = {
     camGate: 'NOT LIFTED, deliberately. Packing the atom\'s macro into a CAM slot is `opToSlot` work with its own '
         + 'bridge; the wizard delegating does not do it. The gate still refuses a slot wider than its tool and still '
         + 'names the wizard as the exit',
-    gates: 'FOUR, not the two this arc inventoried: the ZERO BAND (width == tool), the HELIX entry-end clamp, a RAMP '
-        + 'over a PARTIAL last depth level (t1498 — NOT in the inventory, and the shipped defaults are in it), and a '
-        + 'PATTERNED slot (t1500 — an `array` is not self-framing, so a placed pattern is refused by `translateProgram` '
-        + 'and would silently lose its placement)',
+    gates: 'THREE as of t1506, and none of them is the pair this arc inventoried: the ZERO BAND (width == tool), the '
+        + 'HELIX entry-end clamp, and a PATTERNED slot (t1500 — an `array` is not self-framing, so a placed pattern is '
+        + 'refused by `translateProgram` and would silently lose its placement). A FOURTH stood between t1498 and '
+        + 't1506 — a RAMP over a PARTIAL last depth level, which the shipped defaults landed in — and it RETIRED: '
+        + 't1504 measured the whole family and the slot kernel, not the atom, was the outlier (three kernels plus the '
+        + 'atom all ramp the nominal stepdown), so the slot converged on the nominal floor and the divergence ceased. '
+        + 'THE SHIPPED-DEFAULT RAMPING SLOT IS PARAMETRIC BECAUSE OF IT',
 };
 
 /** The one thing this arc does NOT touch, restated so it cannot be folded in by accident. */

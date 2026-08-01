@@ -5,18 +5,23 @@ import { test, expect } from '@playwright/test';
  *
  * The arc closed at t1494 with a RULING left open: a baked-bearing, plunge-or-ramp slot is expressible by the raster
  * atom, so should `slotPath`'s clearing re-point onto it? This spec is what that ruling has to rest on — the domain
- * measured against the FROZEN kernel (`/_test/frozenSlotPath.js`, landed t1496), not against the live one, so the
- * bridges cannot go vacuous the day the re-point lands.
+ * measured against the kernel move for move, so the ruling rests on numbers rather than on an argument.
  *
- * ⚠ THE FINDING OF THE TURN, AND IT WAS NOT IN THE ARC'S INVENTORY: the expressible domain is SMALLER than the arc
- * recorded. The arc named two things that keep a slot literal — a DIALLED bearing (trig, V13) and the HELIX entry's
- * entry-end clamp. There is a THIRD, it is not trig, and the wizard's OWN DEFAULTS land in it: a RAMP entry over a
- * PARTIAL last depth level. The slot kernel ramps the ACTUAL remaining drop; the shared atom ramps a NOMINAL full
- * stepdown. Measured below at exactly `(stepdown − lastBite)/tan(rampAngle)`, turned by the bearing.
+ * ⚠ THE FINDING OF THAT TURN: the expressible domain was SMALLER than the arc recorded. The arc named two things
+ * that keep a slot literal — a DIALLED bearing (trig, V13) and the HELIX entry's entry-end clamp — and t1498 found a
+ * THIRD, a RAMP over a PARTIAL last depth level, which the wizard's OWN DEFAULTS landed in.
  *
- * NOTHING IS RE-POINTED IN THIS ACT — `slotStack` still builds the literal leaf, and the whole existing corpus is
- * untouched. What lands is the MEASUREMENT, the arm gate that reads it (`slotRasterArmGap`), and one latent defect
- * closed (the atom's `extent` did not turn with the bearing C3 gave it).
+ * ── t1500 / t1506 — WHAT HAS HAPPENED TO THIS SPEC SINCE, because it no longer describes the act that wrote it ────
+ *
+ * t1500 LANDED the re-point (`slotStack` forks; the eligible slot's clearing IS the atom), so the "nothing is
+ * re-pointed in this act" this header used to carry is gone.
+ *
+ * t1506 RETIRED THE THIRD GATE. t1504 measured the whole family and the premise inverted — `stepover.js` (pocket,
+ * surfacing), `contourfill.js` (contour) and the atom ALL start the descent from the nominal floor, and the SLOT
+ * kernel was the lone outlier. Converging the slot on the nominal form dissolved the boundary, so the test below
+ * that proved the divergence now proves the CONVERGENCE, and the bridge compares against the LIVE kernel (still an
+ * independent implementation) rather than the frozen pre-t1506 copy. `slot-frozen-reference-1496` holds the record
+ * of exactly what moved.
  */
 
 const boot = async (page) => {
@@ -37,20 +42,22 @@ const HARNESS = `
 /**
  * ── THE EXPRESSIBLE DOMAIN — the atom IS the kernel, move for move ────────────────────────────────────────────────
  *
- * The relationship bridge the re-point will rest on: every config the gate ACCEPTS reproduces the frozen kernel's
- * whole cut path — not just its passes, the descent too — inside the emit's own 0.001mm quantum.
+ * The relationship bridge the re-point rests on: every config the gate ACCEPTS reproduces the literal kernel's whole
+ * cut path — not just its passes, the descent too — inside the emit's own 0.001mm quantum. `slotPath` is a separate
+ * body of arithmetic from `surfaceRasterLines`, so this is two implementations agreeing, not one compared to itself.
  */
-test('THE BRIDGE — every ACCEPTED slot is the frozen kernel move for move, across the cross-product', async ({ page }) => {
+test('THE BRIDGE — every ACCEPTED slot is the literal kernel move for move, across the cross-product', async ({ page }) => {
     test.setTimeout(120000);
     await boot(page);
     const r = await page.evaluate(async (H) => {
-        const frozen = await import('/_test/frozenSlotPath.js');
+        const live = await import('/wizards/ops/slot.js');
         const m = await import('/wizards/ops/surfaceraster.js');
         const { slotRidesRaster, slotRasterParams } = await import('/wizards/ops/slot.js');
         const { traceToolpath } = await import('/engine/trace.js');
         const cuts = eval(`(() => { ${H} return cuts; })()`);
 
-        let accepted = 0, refused = 0; const differ = [];
+        let accepted = 0, refused = 0, newlyEligible = 0; const differ = [];
+        const { depthLevels } = await import('/wizards/clearing.js');
         for (const wid of [6, 6.5, 8, 10, 12, 13.2, 16.8, 18, 24])
             for (const ang of [0, 30, 45, 90, -30, 137.5, 180])
                 for (const entry of ['plunge', 'ramp', 'helix'])
@@ -63,7 +70,12 @@ test('THE BRIDGE — every ACCEPTED slot is the frozen kernel move for move, acr
                                     helixDia: 0, helixPitch: 1, feed: 2000, plunge: 150, clearance: 5 };
                                 if (!slotRidesRaster(leaf)) { refused++; continue; }
                                 accepted++;
-                                const s = cuts(frozen.frozenSlotPath(leaf));
+                                // t1506 — the slice the retired third gate used to refuse: a RAMP over a PARTIAL
+                                // last bite. Counted so "the domain grew" is a number rather than a claim.
+                                const lv = depthLevels(depth, stepdown);
+                                const lastBite = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
+                                if (entry === 'ramp' && Math.abs(lastBite - stepdown) > 1e-9) newlyEligible++;
+                                const s = cuts(live.slotPath(leaf));
                                 const a = cuts(m.surfaceRasterLines(slotRasterParams(leaf)));
                                 if (s.length !== a.length) { differ.push({ wid, ang, entry, pct, depth, tool, ns: s.length, na: a.length }); continue; }
                                 let worst = 0;
@@ -73,30 +85,54 @@ test('THE BRIDGE — every ACCEPTED slot is the frozen kernel move for move, acr
                                 }
                                 if (worst > 0.0015) differ.push({ wid, ang, entry, pct, depth, tool, worst: +worst.toFixed(4) });
                             }
-        return { accepted, refused, differ };
+        return { accepted, refused, newlyEligible, differ };
     }, HARNESS);
 
     expect(r.accepted, 'the accepted domain is substantial, not a token sample').toBeGreaterThan(400);
-    expect(r.refused, 'and the gate really does refuse a large slice (helix, zero band, partial-bite ramps)').toBeGreaterThan(200);
-    expect(r.differ, `every accepted slot matches the frozen kernel — ${JSON.stringify(r.differ.slice(0, 4))}`).toEqual([]);
+    expect(r.refused, 'and the gate really does refuse a large slice (helix + the zero band; t1506 retired the partial-bite ramps)').toBeGreaterThan(100);
+    // ⚠ t1506 — THE DOMAIN GREW, and by the exact slice the retired gate used to hold: every one of these was
+    // REFUSED before this act, and each one now reproduces the kernel move for move like the rest.
+    expect(r.newlyEligible, 'the retired third gate really did hand a substantial slice back to the atom').toBeGreaterThan(50);
+    expect(r.differ, `every accepted slot matches the literal kernel — ${JSON.stringify(r.differ.slice(0, 4))}`).toEqual([]);
 });
 
 /**
- * ── THE THIRD GATE — a RAMP over a PARTIAL last bite, which the arc's inventory did not name ──────────────────────
+ * ── ⚠ t1506 — THE THIRD GATE RETIRED, AND THIS TEST IS ITS CONVERGENCE ASSERT ─────────────────────────────────────
  *
- * Asserted in BOTH directions, because a gate that only proves its refusals is a gate nobody can trust to be tight:
- * every partial-bite ramp DIVERGES (so the refusal is earned) and every full-bite ramp AGREES (so it is not
- * over-broad). And the size is the predicted run difference, not merely "nonzero".
+ * This test used to prove a DIVERGENCE: a ramp over a partial last bite made the slot kernel and the atom cut
+ * different descents, by exactly `(stepdown − lastBite)/tan(rampAngle)`, so those slots were routed literal.
+ *
+ * t1504 measured the whole family and the premise inverted. The slot kernel was the OUTLIER, not the atom:
+ * `stepover.js` (pocket, surfacing), `contourfill.js` (contour) and the atom all start the descent from the NOMINAL
+ * floor (`z + stepdown`), and only the slot used the real previous level. t1506 converged the slot on the nominal
+ * form, and the boundary CEASED TO EXIST.
+ *
+ * So the test is restated rather than deleted — it must not outlive its fact, and the fact it now carries is the
+ * stronger one. It asserts CONVERGENCE at every bite, whole and partial, with the ex-divergence measured at zero and
+ * the wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5, the config the old gate refused) now ACCEPTED. The comparison
+ * is against the LIVE kernel, which is still an independent literal implementation — `slotPath` is a separate body of
+ * arithmetic from `surfaceRasterLines`, so this is two implementations agreeing, not a function compared to itself.
+ * (The frozen t1496 copy still guards the shape of what moved — see slot-frozen-reference-1496.)
  */
-test('THE THIRD GATE — the ramp divergence is EXACTLY the partial last bite, and exactly the predicted run', async ({ page }) => {
+test('THE CONVERGENCE — the ex-third-gate is ZERO at every bite, and the shipped defaults are ACCEPTED', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async (H) => {
+        const live = await import('/wizards/ops/slot.js');
         const frozen = await import('/_test/frozenSlotPath.js');
         const m = await import('/wizards/ops/surfaceraster.js');
         const { slotRasterParams, slotRasterArmGap } = await import('/wizards/ops/slot.js');
         const { depthLevels } = await import('/wizards/clearing.js');
         const { traceToolpath } = await import('/engine/trace.js');
         const cuts = eval(`(() => { ${H} return cuts; })()`);
+        const worstOf = (s, a) => {
+            if (s.length !== a.length) return Infinity;
+            let w = 0;
+            for (let i = 0; i < s.length; i++) {
+                const A = s[i].split(',').map(Number), B = a[i].split(',').map(Number);
+                for (let j = 0; j < 6; j++) w = Math.max(w, Math.abs(A[j] - B[j]));
+            }
+            return w;
+        };
 
         const out = [];
         for (const [depth, stepdown] of [[1.5, 1.5], [3, 1.5], [4.5, 1.5], [4, 1.5], [5, 1.5], [2, 1.5], [3.2, 0.8], [3.5, 0.8], [7, 2.5]]) {
@@ -105,34 +141,32 @@ test('THE THIRD GATE — the ramp divergence is EXACTLY the partial last bite, a
             const lv = depthLevels(depth, stepdown);
             const lastBite = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
             const full = Math.abs(lastBite - stepdown) < 1e-9;
-            const s = cuts(frozen.frozenSlotPath(leaf)), a = cuts(m.surfaceRasterLines(slotRasterParams(leaf)));
-            let worst = 0;
-            if (s.length === a.length) for (let i = 0; i < s.length; i++) {
-                const A = s[i].split(',').map(Number), B = a[i].split(',').map(Number);
-                for (let j = 0; j < 6; j++) worst = Math.max(worst, Math.abs(A[j] - B[j]));
-            }
+            const atom = cuts(m.surfaceRasterLines(slotRasterParams(leaf)));
             out.push({ depth, stepdown, lastBite: +lastBite.toFixed(6), full,
-                worst: +worst.toFixed(3), gap: slotRasterArmGap(leaf),
+                worst: +worstOf(cuts(live.slotPath(leaf)), atom).toFixed(3),        // the LIVE kernel vs the atom
+                wasWorst: +worstOf(cuts(frozen.frozenSlotPath(leaf)), atom).toFixed(3),   // what it WAS, before t1506
+                gap: slotRasterArmGap(leaf),
                 predicted: +((stepdown - lastBite) / Math.tan(3 * Math.PI / 180)).toFixed(3) });
         }
         return out;
     }, HARNESS);
 
     for (const c of r) {
-        if (c.full) {
-            expect(c.worst, `depth ${c.depth}@${c.stepdown}: a FULL last bite agrees with the kernel`).toBeLessThanOrEqual(0.0015);
-            expect(c.gap, `depth ${c.depth}@${c.stepdown}: …so the gate must NOT refuse it`).toBe('');
-        } else {
-            // ⚠ the refusal is EARNED: the divergence is real, and it is the predicted run, not a rounding
-            expect(c.worst, `depth ${c.depth}@${c.stepdown}: a PARTIAL last bite (${c.lastBite}) really does diverge`).toBeGreaterThan(1);
-            expect(c.worst, `…by exactly (stepdown − lastBite)/tan(rampAngle) = ${c.predicted}mm`).toBeCloseTo(c.predicted, 2);
-            expect(c.gap, `…and the gate refuses it in its own words`).toMatch(/PARTIAL last depth level/);
+        // ⚠ CONVERGED — whole bite or partial, the kernel and the atom now cut the same descent
+        expect(c.worst, `depth ${c.depth}@${c.stepdown} (last bite ${c.lastBite}): the kernel and the atom agree`).toBeLessThanOrEqual(0.0015);
+        expect(c.gap, `depth ${c.depth}@${c.stepdown}: …so nothing here is refused any more`).toBe('');
+        if (!c.full) {
+            // …and the boundary that USED to stand here was real: the frozen (pre-t1506) kernel still shows it,
+            // at exactly the size this spec predicted. That is what makes the convergence a change and not a no-op.
+            expect(c.wasWorst, `depth ${c.depth}@${c.stepdown}: the OLD kernel really did diverge by ${c.predicted}mm`).toBeCloseTo(c.predicted, 2);
         }
     }
-    // the wizard's OWN defaults are in the refused set — the reason this is routed rather than rounded past
+    // ⚠ THE PAYOFF, asserted by name: the wizard's OWN defaults were the refused case and are now accepted.
     const dflt = r.find((c) => c.depth === 4 && c.stepdown === 1.5);
-    expect(dflt.full, 'the shipped defaults (depth 4 @ stepdown 1.5) end on a PARTIAL bite').toBe(false);
-    expect(dflt.worst, 'and a default ramping slot would have moved 9.54mm').toBeCloseTo(9.54, 2);
+    expect(dflt.full, 'the shipped defaults (depth 4 @ stepdown 1.5) still end on a PARTIAL bite').toBe(false);
+    expect(dflt.wasWorst, 'and they DID move 9.54mm before the convergence').toBeCloseTo(9.54, 2);
+    expect(dflt.worst, '…and now they do not move at all').toBeLessThanOrEqual(0.0015);
+    expect(dflt.gap, '…so the DEFAULT ramping slot rides the atom').toBe('');
 });
 
 /**
@@ -185,7 +219,9 @@ test('THE GATE — every refusal names its own reason, and the too-small law is 
             underRefuses: s.slotTooSmall({ ...base, width: 5.9, tool: 6 }),
             bearing0: s.slotBearingDeg({ x0: 0, y0: 0, x1: 60, y1: 0 }),
             bearing30: +s.slotBearingDeg({ x0: 0, y0: 0, x1: 60 * Math.cos(Math.PI / 6), y1: 60 * Math.sin(Math.PI / 6) }).toFixed(6),
-            gapDecl: s.SLOT_RAMP_PARTIAL_GAP, helixDecl: s.SLOT_HELIX_GAP,
+            rampRetired: s.SLOT_RAMP_PARTIAL_GAP === undefined,
+            rampNowRides: s.slotRasterArmGap({ ...base, entry: 'ramp', depth: 4, stepdown: 1.5 }),
+            helixDecl: s.SLOT_HELIX_GAP,
         };
     });
     expect(r.ok, 'a plain wide plunging slot rides').toBe('');
@@ -197,7 +233,11 @@ test('THE GATE — every refusal names its own reason, and the too-small law is 
     expect(r.underRefuses, 'strictly narrower refuses').toBe(true);
     expect(r.bearing0, 'a due-east slot bears 0').toBe(0);
     expect(r.bearing30, 'and a 30° slot bears 30 — baked, from two drawn endpoints').toBeCloseTo(30, 6);
-    expect(r.gapDecl, 'the new boundary is DATA, and it names what it measured').toMatch(/9\.54mm on the wizard's OWN defaults/);
+    // t1506 — the partial-bite boundary RETIRED: its declaration is gone, not merely unused, and the config it
+    // refused (the wizard's own defaults) now rides. A retired boundary that left its sentence behind would read as a
+    // live gate to the next reader and to the CAM table's why-column.
+    expect(r.rampRetired, 'SLOT_RAMP_PARTIAL_GAP is GONE — the boundary ceased, so its declaration did too').toBe(true);
+    expect(r.rampNowRides, 'and a ramp over a partial last bite (the shipped defaults) rides the atom').toBe('');
     expect(r.helixDecl, 'as is the helix gate').toMatch(/rect inradius/);
 });
 

@@ -154,12 +154,12 @@ test('THE SWAP — an eligible slot emits registers and a loop; a refused one em
             angled: shot({ width: 16, ax: 5, ay: 5, bx: 65, by: 40 }),
             zeroBand: shot({}),                                  // width == tool
             helix: shot({ width: 14, entry: 'helix' }),
-            partialRamp: shot({ width: 14, entry: 'ramp', depth: 4, stepdown: 1.5 }),
+            partialRamp: shot({ width: 14, entry: 'ramp', depth: 4, stepdown: 1.5 }),   // t1506 — the shipped defaults; ACCEPTED now
             fullRamp: shot({ width: 14, entry: 'ramp', depth: 3, stepdown: 1.5 }),
             patterned: shot({ width: 14, pattern: 'grid', cols: 2, rows: 2 }),
         };
     });
-    for (const k of ['wide', 'angled', 'fullRamp']) {
+    for (const k of ['wide', 'angled', 'fullRamp', 'partialRamp']) {
         expect(r[k].rides, `${k}: rides the atom`).toBe(true);
         expect(r[k].gap, `${k}: …with no refusal to give`).toBe('');
         expect(r[k].hasRegs, `${k}: the program carries live registers, not an unrolled list`).toBe(true);
@@ -171,9 +171,10 @@ test('THE SWAP — an eligible slot emits registers and a loop; a refused one em
     expect(r.zeroBand.rides).toBe(false);
     expect(r.zeroBand.gap).toMatch(/ZERO band/);
     expect(r.helix.gap).toMatch(/ENTRY END/);
-    expect(r.partialRamp.gap).toMatch(/PARTIAL last depth level/);
     expect(r.patterned.gap).toMatch(/PATTERNED slot/);
-    for (const k of ['zeroBand', 'helix', 'partialRamp', 'patterned']) {
+    // ⚠ t1506 — partialRamp MOVED from this list to the accepted one above. It was the third gate, and the slot
+    // wizard's OWN DEFAULTS sat in it; converging the kernel on the family's nominal descent dissolved the boundary.
+    for (const k of ['zeroBand', 'helix', 'patterned']) {
         expect(r[k].hasGoto, `${k}: no loop — the literal kernel is an unrolled coordinate list`).toBe(false);
         expect(r[k].cutMoves, `${k}: …and it still cuts`).toBeGreaterThan(0);
     }
@@ -372,7 +373,7 @@ test('THE RECONCILER — a re-pointed slot in the real app reads back and REBUIL
  * Asserted against the REAL code — the gate really does still refuse, and the four boundaries really are declared —
  * so the record cannot rot into a claim nobody re-checked.
  */
-test('THE ARC RECORDS THE RE-POINT — the wizard delegates, the CAM gate does NOT, and four gates are named', async ({ page }) => {
+test('THE ARC RECORDS THE RE-POINT — the wizard delegates, the CAM gate does NOT, and three gates are named', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const arc = await import('/data/slotCapabilityArc.js');
@@ -385,7 +386,8 @@ test('THE ARC RECORDS THE RE-POINT — the wizard delegates, the CAM gate does N
             // the four gates, each asked of the code rather than read off the prose
             gapZero: slot.slotRasterArmGap({ ...base, width: 6 }),
             gapHelix: slot.slotRasterArmGap({ ...base, entry: 'helix' }),
-            gapRamp: slot.slotRasterArmGap({ ...base, entry: 'ramp', depth: 4, stepdown: 1.5 }),
+            gapRamp: slot.slotRasterArmGap({ ...base, entry: 'ramp', depth: 4, stepdown: 1.5 }),   // t1506 — retired: '' now
+            rampDeclGone: slot.SLOT_RAMP_PARTIAL_GAP === undefined,
             gapPattern: wiz.slotStackArmGap({ ax: 0, ay: 0, bx: 60, by: 0, width: 14, toolDia: 6, pattern: 'grid', cols: 2, rows: 2 }),
             camStillRefusesWide: /width[^\n]*>[^\n]*toolDia/.test(camSrc),
         };
@@ -394,12 +396,15 @@ test('THE ARC RECORDS THE RE-POINT — the wizard delegates, the CAM gate does N
     expect(r.landed.wizard, '…including WHY the twin had to convert with it').toMatch(/SUPERSET twin/);
     expect(r.landed.camGate, 'and records the CAM gate as deliberately NOT lifted').toMatch(/NOT LIFTED/);
     expect(r.camStillRefusesWide, '…which is true of the real gate, not just of the note').toBe(true);
-    // FOUR gates, each answering in its own words — the arc inventoried two
-    expect(r.landed.gates, 'the arc now names four gates, not two').toMatch(/FOUR, not the two/);
+    // THREE gates, each answering in its own words — the arc inventoried two, t1498 found a fourth, t1506 retired it
+    expect(r.landed.gates, 'the arc names THREE gates now').toMatch(/THREE as of t1506/);
+    expect(r.landed.gates, '…and records that the fourth RETIRED rather than quietly dropping it').toMatch(/RETIRED|retired/);
     expect(r.gapZero).toMatch(/ZERO band/);
     expect(r.gapHelix).toMatch(/ENTRY END/);
-    expect(r.gapRamp).toMatch(/PARTIAL last depth level/);
     expect(r.gapPattern).toMatch(/PATTERNED slot/);
+    // ⚠ the retired one, asserted as retired: the declaration is GONE and the config it refused now rides
+    expect(r.rampDeclGone, 'SLOT_RAMP_PARTIAL_GAP is gone, not merely unreferenced').toBe(true);
+    expect(r.gapRamp, 'and a ramp over a partial last bite — the shipped defaults — rides the atom').toBe('');
 });
 
 /**
@@ -594,4 +599,69 @@ test('THE DERIVED SOCKETS ARE LIVE — a twin built at new geometry carries it, 
     expect(r.got.bearing, 'a 30° slot really does bear 30 — the template default is 0').toBeCloseTo(30, 6);
     expect(r.hasLeaf, 'the refused arm pruned to the literal leaf').toBe(true);
     expect(r.litLeaf, 'and IT carries the resolved geometry too').toEqual({ x0: 5, y0: 5, x1: 65, width: 16, depth: 6 });
+});
+
+/**
+ * ── t1506 — THE PAYOFF OF THE RETIRED GATE, DRIVEN IN THE REAL APP ────────────────────────────────────────────────
+ *
+ * The whole point of converging the slot kernel on the family's nominal descent was that the slot wizard's OWN
+ * DEFAULTS — depth 4 at stepdown 1.5, which end on a partial 1.0mm bite — stopped being refused. Asserted through
+ * the real wizard rather than through the predicate, because "the gate returns ''" and "the operator's default slot
+ * now cuts a parametric program" are different claims and only the second one is the feature.
+ */
+test('THE DEFAULT RAMPING SLOT IS PARAMETRIC — driven in the real form, at the shipped defaults', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetBlockProgram, null, { timeout: 20000 });
+    /**
+     * ⚠ DRIVEN ON THE TWIN'S FORM, and that is not a convenience. The BUILT-IN slot form has no depth-entry control
+     * at all (`grep id="sl_` finds no `sl_entry`): the entry cluster was added at t842 as BINDINGS, so the surface an
+     * operator actually picks "Ramp" on is `Slot (data)`. Driving the built-in form here would have set nothing and
+     * passed for the wrong reason — the first cut of this test did exactly that.
+     */
+    await page.evaluate(() => window.openWiz('user_slot_data'));
+    await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz; });
+    // ONLY two edits away from the shipped defaults: a width the tool can clear, and the RAMP entry. Depth 4 and
+    // stepdown 1.5 are left exactly as the wizard ships them — they are the partial-bite case the gate refused.
+    await page.evaluate(() => {
+        const form = document.getElementById('wiz_user_form');
+        const set = (param, v) => {
+            const e = form.querySelector(`[data-param="${param}"]`);
+            if (!e) return false;
+            e.value = String(v);
+            e.dispatchEvent(new Event('input', { bubbles: true }));
+            e.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        };
+        window.__set = { width: set('width', 14), entry: set('entry', 'ramp') };
+    });
+    await page.waitForTimeout(600);
+
+    const r = await page.evaluate(async () => {
+        const { SLOT_DEFAULTS, SLOT_DATA_OPTYPE } = await import('/blocks/dataOps/slotData.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { flattenBlocks } = await import('/blocks/userOps.js');
+        const form = document.getElementById('wiz_user_form');
+        const read = (param) => { const e = form.querySelector(`[data-param="${param}"]`); return e ? e.value : null; };
+        // build through the REGISTERED twin at exactly what the form now holds
+        const p = { ...SLOT_DEFAULTS, width: Number(read('width')), entry: read('entry') };
+        const types = flattenBlocks(builderOf(SLOT_DATA_OPTYPE)(p)).map((b) => b.type);
+        return {
+            set: window.__set,
+            shippedDepth: SLOT_DEFAULTS.depth, shippedStepdown: SLOT_DEFAULTS.stepdown,
+            formEntry: read('entry'), formWidth: read('width'),
+            formDepth: read('depth'), formStepdown: read('stepdown'),
+            parametric: types.includes('surfaceraster'), literal: types.includes('slot'),
+        };
+    });
+
+    expect(r.set, 'both controls exist on the form and were set').toEqual({ width: true, entry: true });
+    // the defaults really are the partial-bite case — if they ever change, this test should say so rather than drift
+    expect(r.shippedDepth, 'the wizard still ships depth 4').toBe(4);
+    expect(r.shippedStepdown, '…at stepdown 1.5, so the last bite is a partial 1.0mm').toBe(1.5);
+    // …and the form is still sitting on those defaults; only width and entry were touched
+    expect(Number(r.formDepth), 'the form still holds the shipped depth').toBe(4);
+    expect(Number(r.formStepdown), '…and the shipped stepdown').toBe(1.5);
+    expect(r.formEntry, 'with a RAMP entry — the descent the old third gate refused').toBe('ramp');
+    expect(r.parametric, 'THE PAYOFF: the default ramping slot now cuts the PARAMETRIC atom').toBe(true);
+    expect(r.literal, '…and carries no literal slot leaf at all').toBe(false);
 });
