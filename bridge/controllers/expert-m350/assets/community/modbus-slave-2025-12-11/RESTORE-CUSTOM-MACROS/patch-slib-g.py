@@ -1,25 +1,32 @@
 #!/usr/bin/env python3
-"""patch-slib-g.py - re-apply CNC-FAIRY's slib-g.nc customizations after a firmware flash.
+"""patch-slib-g.py - re-apply CNC-FAIRY's fixed-tool-setter fixes to slib-g.nc after a firmware flash.
 
-A flash installs a fresh FACTORY slib-g.nc, wiping these edits. Run this against the freshly
-flashed slib-g.nc on SYSDISK to put them back. Targets are matched by CONTENT (not line numbers)
-so it survives a new firmware's line shuffles, and it is idempotent (safe to run twice).
+A flash installs a fresh FACTORY slib-g.nc, wiping these edits. Run this against the freshly flashed
+slib-g.nc on SYSDISK. Content-matched (survives a new firmware's line shifts) and idempotent.
 
-All three edits live in O502's FIXED-probe branch only - the floating and first-fixed probe
-paths are left untouched.
+All edits are in O502's FIXED-probe path; floating and first-fixed paths are left alone. The fixed
+signal lines stay FACTORY (`#26=#1075`, `#28=#1077`) - the port/level come from config vars
+`#1075`/`#1077` (set by SETPROBE.nc / sysstart), NOT hardcoded here (a `#28=1` literal tripped a
+DDCS parser syntax error).
 
-  1. Probe A/B jog strip:  'G53X#10Y#11A#13B#14C#15' -> 'G53X#10Y#11'
-     Factory jogs A/B toward 0 during the approach; with an unhomed B that crawls the XY move.
-  2. Fixed-probe signal -> P2 L1:  '#26 = #1075' -> '#26 = 2'  and  '#28 = #1077' -> '#28 = 1'
-     Factory #1075/#1077 config is mis-resolved on this machine, so the probe never triggers.
-  3. Tool-length write (N18):  '#[1430 + [#1300-1]] = #31' -> '#[1430 + [#1300-1]] = [#31 - #2500]'
-     #2500 = the setter-to-spoilboard reference, set once by CALIBRATE. Matched comment-less so it
-     hits N18 (regular fixed) and NOT the commented N17 (first-fixed) line.
+  1. Strip rotary from the approach XY move:  G53X#10Y#11A#13B#14C#15 -> G53X#10Y#11
+     Keeps A/B/C out of the coordinated move so it does not crawl when B is unhomed.
+  2. DELETE the rapid descent line  G53Z#637  entirely.
+     *** THIS WAS THE REAL BUG. *** The rapid dropped the tool THROUGH the setter before any G31 ran,
+     and a rapid ignores the probe input - so it never stopped. Removing it lets the G31 probe the
+     whole descent from the safe Z (#641) and stop on touch, exactly like the standalone CALIBRATE.
+  3. Tool-length write (N18):  #[1430 + [#1300-1]] = #31  ->  = [#31 - #2500]
+     #2500 = the setter->spoilboard reference (set once by CALIBRATE). Matched comment-less so it hits
+     N18 (regular fixed) and NOT the commented N17 (first-fixed).
+  4. Re-probe base:  O502's loop line  #20=#500  ->  #20=160
+     Factory re-probes from #500 (10 mm/min) halving down = a painful crawl. 160 makes the single
+     re-probe (with #631=2) land ~80 mm/min, matching CALIBRATE. Only the O502 copy (the one with a
+     trailing comment) is changed; the O501/O503 homing copies are left alone.
 
 Usage:
     python patch-slib-g.py "\\\\192.168.0.99\\SYSDISK\\slib-g.nc"
     python patch-slib-g.py S:/slib-g.nc
-Writes a one-time .prepatch backup next to the file before editing.
+Writes a one-time .prepatch backup before editing.
 """
 import sys
 import os
@@ -27,48 +34,61 @@ import shutil
 
 
 def _code(line):
-    return line.rstrip("\r\n")
+    return line.rstrip("\r\n").split(";")[0].split("//")[0].rstrip()
 
 
 def patch(path):
     lines = open(path, "rb").read().decode("latin1").splitlines(keepends=True)
     changes = []
 
-    # 1) strip the rotary jog from the fixed-probe approach
+    # 1) strip rotary from the fixed-probe approach XY move
     hits = [i for i, l in enumerate(lines) if _code(l) == "G53X#10Y#11A#13B#14C#15"]
     if hits:
         i = hits[0]
-        lines[i] = "G53X#10Y#11" + lines[i][len(_code(lines[i])):]
+        nl = lines[i][len(lines[i].rstrip("\r\n")):]
+        lines[i] = "G53X#10Y#11" + nl
         changes.append("strip rotary jog @ line %d" % (i + 1))
     elif any(_code(l) == "G53X#10Y#11" for l in lines):
         changes.append("strip rotary jog: already applied")
     else:
-        changes.append("!! strip rotary jog: target NOT FOUND (inspect manually)")
+        changes.append("!! strip rotary jog: target NOT FOUND")
 
-    # 2) fixed-probe signal/level -> P2 L1 (preserve any trailing comment)
-    for old, new, label in (("#26 = #1075", "#26 = 2", "signal"),
-                            ("#28 = #1077", "#28 = 1", "level")):
-        hits = [i for i, l in enumerate(lines) if _code(l).startswith(old)]
-        if hits:
-            i = hits[0]
-            c = _code(lines[i])
-            lines[i] = new + c[len(old):] + lines[i][len(c):]
-            changes.append("P2L1 %s @ line %d" % (label, i + 1))
-        elif any(_code(l).startswith(new + " ") or _code(l) == new for l in lines):
-            changes.append("P2L1 %s: already applied" % label)
-        else:
-            changes.append("!! P2L1 %s: target '%s' NOT FOUND" % (label, old))
-
-    # 3) N18 tool-length write -> subtract #2500 (comment-less line only = N18, not N17)
-    hits = [i for i, l in enumerate(lines) if _code(l) == "#[1430 + [#1300-1]] = #31"]
+    # 2) DELETE the rapid descent line
+    hits = [i for i, l in enumerate(lines) if _code(l) == "G53Z#637"]
     if hits:
         i = hits[0]
-        lines[i] = "#[1430 + [#1300-1]] = [#31 - #2500]" + lines[i][len(_code(lines[i])):]
+        del lines[i]
+        changes.append("deleted rapid descent (was line %d)" % (i + 1))
+    else:
+        changes.append("rapid descent: already removed")
+
+    # 3) N18 tool-length write -> subtract #2500 (comment-less line only = N18, not N17)
+    hits = [i for i, l in enumerate(lines) if _code(l) == "#[1430 + [#1300-1]] = #31"
+            and ";" not in l and "//" not in l]
+    if hits:
+        i = hits[0]
+        nl = lines[i][len(lines[i].rstrip("\r\n")):]
+        lines[i] = "#[1430 + [#1300-1]] = [#31 - #2500]" + nl
         changes.append("#2500 reference @ line %d" % (i + 1))
     elif any(_code(l) == "#[1430 + [#1300-1]] = [#31 - #2500]" for l in lines):
         changes.append("#2500 reference: already applied")
     else:
         changes.append("!! #2500 reference: target NOT FOUND")
+
+    # 4) O502 re-probe base #20=#500 -> #20=160 (the O502 copy carries a trailing ; comment;
+    #    the O501/O503 homing copies do not - leave those alone)
+    hits = [i for i, l in enumerate(lines)
+            if _code(l) == "#20=#500" and (";" in l or "//" in l)]
+    if hits:
+        i = hits[0]
+        core = lines[i].rstrip("\r\n")
+        nl = lines[i][len(core):]
+        lines[i] = "#20=160" + core[len("#20=#500"):] + nl  # keep the ; comment
+        changes.append("re-probe base 160 @ line %d" % (i + 1))
+    elif any(_code(l) == "#20=160" for l in lines):
+        changes.append("re-probe base: already applied")
+    else:
+        changes.append("!! re-probe base: target NOT FOUND")
 
     return "".join(lines).encode("latin1"), changes
 
@@ -91,9 +111,9 @@ def main():
     for c in changes:
         print("  " + c)
     if any(c.startswith("!!") for c in changes):
-        print("WARNING: one or more targets not found - inspect slib-g.nc by hand.")
+        print("WARNING: a target was not found - inspect slib-g.nc by hand.")
         sys.exit(3)
-    print("done. reboot the controller to load the patched slib-g.nc.")
+    print("done. reboot to load, then run SETPROBE.nc (port/level/feed/2-touches).")
 
 
 if __name__ == "__main__":
