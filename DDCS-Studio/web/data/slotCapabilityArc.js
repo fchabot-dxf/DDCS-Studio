@@ -318,14 +318,27 @@ export const SLOT_CAM_PACK_DESIGN = {
      * silent-substitution defect the arc exists to prevent. A format change that adds two knobs and leaves four
      * lying is worse than the gate it lifts.
      */
-    fieldListDelta: '+toolDia +stepoverPct +width (live) · -ax -ay -bx -by (baked, with the bearing and length)',
+    // t1510 CORRECTED, t1512 BUILT — `plunge` was named in `live` above and missing from this line, and the literal
+    // centreline body never had the field at all (it descends at `feed`), so it JOINS rather than being aliased away.
+    fieldListDelta: '+toolDia +stepoverPct +width +plunge (live) · -ax -ay -bx -by (baked, with the bearing and length) '
+        + '· and rampAngle rides BAKED beside them, carried from the op rather than silently dropped',
     refusalIfExposed: 'if a future caller exposes an endpoint on the packed arm, the pack must REFUSE in the table\'s '
-        + 'words rather than emit — the surfaceRasterLiveGap pattern, one surface along',
-    stillLiteral: 'helix entries, the zero band, patterns, and anything the atom\'s own envelope refuses keep the '
-        + 'centreline body and the honest row that names the wizard as the exit',
+        + 'words rather than emit — the surfaceRasterLiveGap pattern, one surface along. WIRED at t1512 '
+        + '(`SLOT_FRAME_EXPOSED_REFUSAL` in opToSlot): the arm emits a refusal and NO motion',
+    // ⚠ t1511 RESTATED, THEN t1512 MEASURED AND NARROWED IT AGAIN. The ruling was taken on "the literal arm's field
+    // vars MOVE", which is true of a COMPOSED pack and false of the common case: the local-var cursor starts at
+    // varOffset+1, so a SINGLE-PART literal slot still mints #1-#9 and is byte-identical. The first offset at which any
+    // var shifts is 25 (the ninth field goes #34 → #55, over the whole union in one step). Recorded at the strength it
+    // MEASURES rather than the strength it was ruled at, because a design row that over-claims its own cost is the same
+    // defect class as one that under-claims a capability.
+    stillLiteral: 'helix entries, the zero band, patterns, ANGLED slots (t1510) and anything the atom\'s own envelope '
+        + 'refuses keep the centreline body — same moves, same loop, same order — and the honest row that names the '
+        + 'wizard as the exit. BYTE-IDENTICAL as a single-part slot; a COMPOSED pack whose var cursor has reached the '
+        + 'thirties has its later field vars pushed over the union to #55+ (measured: first shift at varOffset 25)',
     bands: 'the packed atom writes RASTER_SCRATCH (#34-#49, #62-#64); the literal centreline body keeps #50-#54. '
-        + '`bandsFor(\'slot\')` must carry BOTH, and the probe temps #50-#61 overlap is what the collision guard has '
-        + 'to be asserted against at a HIGH varOffset',
+        + '`bandsFor(\'slot\')` carries BOTH on the ONE camType key as of t1512 — the ruled union, which is why the '
+        + 'literal arm\'s numbers moved — and the probe temps #50-#61 abut the union without crossing it, which the '
+        + 'collision guard is asserted against at a HIGH varOffset',
 };
 
 /**

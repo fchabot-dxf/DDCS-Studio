@@ -24,7 +24,9 @@ import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — 
 import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive
 import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
 import { num } from '../wizards/ops/util.js';   // t1444 — the pack gates read numbers the same way every emitter does
-import { slotTooSmall, slotToolRefusal } from '../wizards/ops/slot.js';         // t1444 — the ONE too-small boundary + its sentence, shared with the emit
+import { slotTooSmall, slotToolRefusal, SLOT_CAM_PACK_REGS } from '../wizards/ops/slot.js';         // t1444 — the ONE too-small boundary + its sentence, shared with the emit   // t1512 — SLOT_CAM_PACK_REGS: the gate asks the envelope about the LIVE body the pack will emit, not the wizard's baked one
+import { slotStackArmGap } from '../wizards/slotWizard.js';   // t1512 — the PACK arm asks the ATOM'S OWN envelope (never a bearing check here), so C5 lifts the angled case with no change to this file
+import { SLOT_ARM } from './opToSlot.js';   // t1512 — the declared arm names, so the variant string has one source
 import { pocketToolRefuses, pocketToolRefusal } from '../wizards/pocketWizard.js';   // t1444 — …and the pocket's, from the same one source
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
@@ -101,6 +103,44 @@ export const ENTRY_GATE_REASON = 'changes the entry geometry, which this descent
  * would take away knobs that are now provably safe.
  */
 export const entryHasGeometry = (params) => ((params && params.entry) || 'plunge') === 'helix';
+
+/**
+ * ── t1512 — THE SLOT'S PACK ARM, RESOLVED FROM THE ATOM'S ENVELOPE ────────────────────────────────────────────────
+ *
+ * ONE predicate, read by `camTypeOf`'s gate, by the variant the manifest stores, by the honesty rows and by the field
+ * seed — so the table an operator is looking at, the arm that gets built and the sentence that explains it cannot say
+ * three different things. It delegates to `slotStackArmGap`, which is the WIZARD's own arm question, which ends at
+ * `surfaceRasterCovers`. Nothing here knows what a bearing is, and that is the point.
+ */
+export const slotPackGap = (params) => slotStackArmGap(params || {}, SLOT_CAM_PACK_REGS);
+/** '' → the PACKED (atom) arm; anything else → the literal centreline arm, with the gap as its reason. */
+export const slotPackArm = (params) => (slotPackGap(params) ? SLOT_ARM.centreline : SLOT_ARM.atom);
+
+/**
+ * The refusal for a WIDE slot the atom cannot walk: the ATOM'S OWN reason, verbatim, plus the exit — t1444's rule,
+ * because an operator told "unsupported" with no exit does the wrong thing next.
+ *
+ * ⚠ IT ADDS NO REASON OF ITS OWN, and the first version's mistake is worth keeping written down: it appended "an ANGLED
+ * slot waits on C5" to whatever gap came back, so a PATTERNED slot got told about bearings — a true sentence answering
+ * a question nobody asked, which is how t1414's wrong-reason defect looked too. Each refusal names its own pending
+ * capability where it is declared (the atom's bearing gap does), so this only frames it and points at the exit.
+ */
+export const slotWideRefusal = (p, gap) => `this slot is ${num(p.width, 0)}mm wide, so its clearing has to be the `
+    + `parametric raster atom, and this configuration is outside what that atom can walk. ${String(gap).replace(/\s*$/, '').replace(/([^.])$/, '$1.')} `
+    + `Build this one from the Slot wizard, which emits the full walk at any width and any angle.`;
+
+/**
+ * ⚠ THE SYNTHETIC DISCRIMINATORS THAT RE-RESOLVE EACH ARM, declared BESIDE the resolver that reads them.
+ *
+ * `toManifest` drops the source op's params, so `manifestToAuthOp` re-derives just enough to land on the same arm
+ * (`CAM_SEED_PARAMS`, t1127). For the slot that means a params seed whose ARM is the stored one — and the pair below is
+ * asserted ROUND-TRIP (`slotPackArm(SLOT_ARM_SEED[a]) === a` for both arms) so a future envelope change that moved one
+ * of them onto the other arm fails a test instead of silently re-hydrating a saved slot onto the wrong body.
+ */
+export const SLOT_ARM_SEED = {
+    atom: { ax: 0, ay: 0, bx: 60, by: 0, width: 12, toolDia: 6, entry: 'plunge' },        // wide, bearing 0 → the atom walks it
+    centreline: { ax: 0, ay: 0, bx: 60, by: 0, width: 6, toolDia: 6, entry: 'plunge' },   // the ZERO BAND → one centreline pass
+};
 
 /**
  * ── t1414 — WHAT A PER-TYPE GENERATOR'S MACRO DOES **NOT** CARRY, declared ────────────────────────────────────────
@@ -228,6 +268,25 @@ export const GENERATOR_BAKES_PICK = {
         entry: (p) => (String(p && p.entry) === 'helix'
             ? 'BAKED into this slot: a Helix computes its geometry from a fixed area — the rect inradius clamps its radius — and this slot\'s area is a pendant knob, so a helix pick degrades to a plunge, and the macro SAYS so on the line where it descends.'
             : 'BAKED into this slot: the pack descends the way you pick here. A straight PLUNGE and a RAMP are both pendant-true — the ramp runs along its own pass against the live area registers, so dialling the area re-derives it (C4) — while a HELIX still bakes the inradius that clamps its radius, so a helix pick degrades to a plunge and the macro says so where it descends.'),
+    },
+    /**
+     * ── t1512 — THE SLOT'S DEPTH ENTRY, AND THE HONESTY LOCK CORRECTED MY FIRST ANSWER ────────────────────────────
+     *
+     * I first declared this pick IGNORED on the literal arm, reasoning that `STANDALONE.slot.body` plunges straight down
+     * whatever was picked — which is true of the DESCENT and false of the macro. The lock (cam-row-honesty-1414) went
+     * red and was right: the bodies genuinely DIFFER across the arms, because a HELIX pick trips `entryHasGeometry` and
+     * freezes Stepdown/Stepover into literals. So the pick reaches the macro on both arms; what differs is WHAT it
+     * reaches, and a row claiming "not carried" would have been a second lie in the space of the first.
+     *
+     * Declared BAKED on both arms with the sentence that matches the arm, keyed on the same `slotPackGap` the pack arm
+     * itself is chosen by, so the row and the built body cannot disagree. This is the shape `direction` above already
+     * uses — a disposition that is a function of the op's own params.
+     */
+    slot: {
+        entry: (p) => (slotPackGap(p)
+            ? 'BAKED into this slot: this macro cuts ONE CENTRELINE PASS per level and always plunges straight down, so a Ramp or Helix pick does not change how it descends — though a Helix does freeze the Stepdown and Stepover knobs, because the pack cannot let a pendant re-derive around a descent it baked. '
+                + `A real descent is carried by the parametric raster atom, and this slot's clearing cannot ride it: ${slotPackGap(p)} Widen the slot past its tool on a bearing of 0 and the pick starts driving the entry.`
+            : 'BAKED into this slot: its clearing IS the parametric raster atom, which carries the descent you pick here — a straight PLUNGE, or a RAMP along the slot\'s own length against the live registers (C4, so dialling the width or the stepover re-derives it). The macro contains ONE of them. A HELIX is not offered on this arm: it wants the entry end clamped to the slot width, which the atom does not do, so a helix slot keeps the wizard.'),
     },
 };
 
@@ -404,7 +463,9 @@ function genFieldsFor(camType, params) {
     const GEN = { corner: cornerSlot, edge: edgeSlot, surface: surfacingSlot, pocket: pocketSlot, cpocket: circlePocketSlot,
         zprobe: probeZSlot, inside: insideCentreSlot, boss: bossCentreSlot, align: alignmentSlot };
     if (GEN[camType]) return GEN[camType](new Set(), 0).fields;
-    if (camType === 'slot') return slotFromOp('slot', '', new Set(), 0).fields;
+    // t1512 — the slot's field list is PER ARM (the packed arm's #2600 layout gains width/toolDia/stepover%/plunge and
+    // loses the endpoints), so the arm is resolved from the op's own params rather than assumed to be the literal one.
+    if (camType === 'slot') return slotFromOp('slot', slotPackArm(params), new Set(), 0).fields;
     if (camType === 'drill' || camType === 'bore') return slotFromOp(camType, params.pattern || 'circle', new Set(), 0).fields;
     return [];
 }
@@ -450,11 +511,29 @@ export function camTypeOf(op) {
          * BUILD, so the operator hears it here rather than at the machine. Belt and braces — the wizard's own emit
          * refuses too (`slotPath`), and this is the brace.
          */
+        /**
+         * ── t1512 — THE WIDTH GATE LIFTS, FOR THE SLOTS THE ATOM CAN ACTUALLY WALK ─────────────────────────────────
+         *
+         * `slotFromOp` has a second arm now whose clearing IS `surfaceRasterLines`, so a slot wider than its tool has a
+         * correct parametric macro at last — the delegation the whole slot capability arc was built toward.
+         *
+         * ⚠ THE ELIGIBILITY QUESTION IS ASKED OF THE **ATOM'S OWN ENVELOPE**, never of a bearing or a width here, and
+         * that is the ruling's structural condition (t1511) rather than a stylistic preference. `slotPackArm` reads
+         * `slotStackArmGap` → `surfaceRasterCovers` → the live-geometry and bearing refusals. So the domain this gate
+         * enforces is whatever the atom currently declares it can do, and when C5 lands (the live-frame rotation that
+         * t1510 measured as needing no runtime trig) ANGLED slots begin packing with nothing here changed.
+         *
+         * TODAY that domain is: wide slots on a bearing of 0. An angled one is refused because the atom would DROP the
+         * bearing and cut an axis-aligned channel — measured at t1510, and the refusal now says so with C5 named as
+         * the pending capability and the wizard named as the exit, because t1444's rule stands: an operator told
+         * "unsupported" with no exit does the wrong thing next.
+         */
         case 'slot': {
             if (slotTooSmall(p)) return { unsupported: slotToolRefusal(p) };
-            if (num(p.width, 0) > num(p.toolDia, 6) + 0.001)
-                return { unsupported: `this slot is ${num(p.width, 0)}mm wide and the CAM macro cuts ONE centreline pass, so it would cut ${num(p.toolDia, 6)}mm — build it from the Slot wizard instead, which emits the offset passes` };
-            return { camType: 'slot' };
+            const gap = slotPackGap(p);
+            if (!gap) return { camType: 'slot' };   // the PACKED arm walks the true channel — the width gate is lifted for it
+            if (num(p.width, 0) > num(p.toolDia, 6) + 0.001) return { unsupported: slotWideRefusal(p, gap) };
+            return { camType: 'slot' };             // narrow enough that ONE centreline pass IS the correct program
         }
         case 'pocket': {
             const shape = p.shape || 'rect';
@@ -611,7 +690,12 @@ export function seedFromOp(op) {
             meta = { type: 'enum', enum: opts };
         } else if (derive[f.key]) { value = derive[f.key](params, toolDiaCarried); meta = { type: f.type }; }   // DERIVED (e.g. stepover from stepoverPct / the twin's flat stepover)
         else { const opVal = readParam(f.key); value = opVal !== undefined ? opVal : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
-        return { key: f.key, label: f.label, def: f.def, value, exposed: true, bakeable: !nb.includes(f.key), ...meta };
+        // t1512 — A GENERATOR FIELD MAY DECLARE ITSELF BAKE-ONLY (the packed slot's endpoints + ramp angle), and that
+        // declaration has to SURVIVE the seed or the row arrives exposed and the arm's build-time geometry becomes a
+        // pendant knob it was never allowed to be. Carried explicitly, with the reason the greyed control shows.
+        const bakeOnly = f.bakeOnly === true;
+        return { key: f.key, label: f.label, def: f.def, value, exposed: !bakeOnly, bakeable: !nb.includes(f.key), ...meta,
+            ...(bakeOnly ? { bakeOnly: true, exposable: false, _exposeTip: f._exposeTip || '' } : {}) };
     });
     // t1341 — THE ENTRY GATE, applied to the generator arm's own fields: a ramp/helix slot cannot expose the knobs
     // that move the descent's baked geometry. Grey with the reason, never hidden (postGating's rule).

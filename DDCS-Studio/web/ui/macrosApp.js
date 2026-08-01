@@ -18,7 +18,7 @@ import { openIconEditor, autoIconLayers, autoGlyphLayers, imageTileLayer } from 
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
-import { seedFromOp, camTypeOf, isCamableType, glyphForOp, buildEnumFields } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175/t1177 — glyphForOp resolves the auto-glyph default icon (camType-first, opType for universal).
+import { seedFromOp, camTypeOf, isCamableType, glyphForOp, buildEnumFields, slotPackArm, SLOT_ARM_SEED } from '../data/opCamMap.js';   // t1512 — slotPackArm/SLOT_ARM_SEED: the slot's ARM is its variant, resolved from the atom's envelope   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175/t1177 — glyphForOp resolves the auto-glyph default icon (camType-first, opType for universal).
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
 import { fieldVarCollisions, collisionMessage, maxLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
@@ -1197,7 +1197,11 @@ function homingPostIsExpert() {
     let _cbmOverlay = null;  // the modal overlay element
     let _cbmUnsupported = []; // present-but-not-CAM-able program ops (for the empty-state reasons)
     const CAM_SUPPORTED_LABEL = 'Pocket · Surface · Probe corner / edge · Slot · Drill / Bore · Probe centre (Middle)';
-    const variantForCam = (camType, params) => (camType === 'drill' || camType === 'bore') ? (params.pattern || 'circle') : defaultVariant(camType);
+    // t1512 — the SLOT's variant is its ARM (packed-atom vs literal centreline), resolved from the atom's own envelope
+    // by the ONE declared resolver. It is stored on the manifest like every other variant, so a saved slot rebuilds on
+    // the arm it was authored on rather than on whichever one an empty re-seed happens to land in.
+    const variantForCam = (camType, params) => (camType === 'drill' || camType === 'bore') ? (params.pattern || 'circle')
+        : (camType === 'slot') ? slotPackArm(params) : defaultVariant(camType);
     // S4 — a forked op whose def embeds an `opunit` (a standard sub-unit kept live) → the parts that walkParts sees, else null.
     // Recognition is a READ of the declared opunit boundary (never inferred from motion). Only user_* forks are in USER_DEFS.
     const subStackParts = (opType) => {
@@ -1239,6 +1243,12 @@ function homingPostIsExpert() {
             // unless someone deliberately asks for it. Stated POSITIVELY (exposed=false), because the generator arm's empty
             // map means all-exposed, so silence here would opt every slot into carrying every arm.
             if (f._branch) { const k = fkeyOf(f); exposed[k] = false; baked[k] = f.value; return; }
+            // t1512 — A GENERATOR FIELD MAY DECLARE ITSELF BAKE-ONLY, and it is baked at the OP'S value here. That is
+            // how the packed slot's endpoints and ramp angle reach the generator at build: they take no #11xx param and
+            // push no read-line, but their real geometry rides the manifest's `baked` map into `decl`. Stated positively
+            // (the generator arm's empty map means all-exposed, so silence would expose them), and it is the same
+            // mechanism a BUILD ENUM has always used — a bake-only row is a row, greyed with its reason, never hidden.
+            if (f.bakeOnly) { const k = fkeyOf(f); exposed[k] = false; baked[k] = f.value; return; }
             if (seed.universal) { const k = fkeyOf(f); if (f.exposable) exposed[k] = true; else { exposed[k] = false; baked[k] = f.value; } }
         });
         return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed, baked, label: op.label || op.opType, universal: !!seed.universal, defV: defVOf(op.opType) };
@@ -1252,6 +1262,10 @@ function homingPostIsExpert() {
         pocket: () => ({ shape: 'rect' }), cpocket: () => ({ shape: 'circle' }),
         inside: () => ({ twoAxis: true, featureType: 'inside' }), boss: () => ({ twoAxis: true, featureType: 'boss' }),
         drill: (v) => ({ pattern: v || 'circle' }), bore: (v) => ({ pattern: v || 'circle', method: 'helical' }),
+        // t1512 — the slot's ARM is discriminating (the packed and literal arms have DIFFERENT #2600 layouts), so it
+        // re-seeds from the declared per-arm discriminators. Round-trip-asserted against slotPackArm, so an envelope
+        // change that moved one seed onto the other arm fails a test instead of re-hydrating onto the wrong body.
+        slot: (v) => ({ ...(v === 'atom' ? SLOT_ARM_SEED.atom : SLOT_ARM_SEED.centreline) }),
     };
     // The faithful INVERSE of toManifest: a stored manifest op → an authoring op (the shape makeAuthOp produces). Re-hydrate
     // `fields` from the op-type SEED (makeAuthOp → seedFromOp/subStackToSlot, the SAME call the fresh-authoring path uses),

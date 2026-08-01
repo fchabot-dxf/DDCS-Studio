@@ -13726,3 +13726,158 @@ a full act and I can take it next wake with the domain settled.
 - Fast tier **183/0**: the new spec 5/5 · the envelope + arc + scout specs 32/32 · slot/pocket/cam-honesty family
   80/80 · smoke 71/71. Full suite NOT run — that is the advisor's merge gate.
 - No product behaviour changed for any shipping caller. Nothing released; V2026.08.01.1 from t1506 stands.
+
+---
+
+## t1512 — THE CAM LIFT, BUILT. A wide slot's CAM macro IS the parametric atom, and the t1444 width gate lifts for it
+
+Ruled A at t1511: bearing-0 packs, angled waits on C5, and the arm's eligibility must ask the ENVELOPE so that C5
+lifts the angled case with the generator untouched. All three pieces landed, plus the two accepted corrections.
+
+### THE ARM
+
+`slotFromOp` has two arms selected by the `variant` slot — `SLOT_ARM.atom` and `SLOT_ARM.centreline`. The packed arm's
+clearing is `surfaceRasterLines`, the same delegation the rect pocket took at t1429.
+
+**No frame arithmetic lives in the CAM layer, and that was the main design decision.** The obvious build was a second
+function in `opToSlot` re-deriving `x = x0 + (width/2)·sin(bearing)` with register words. That is a THIRD copy of a
+formula that already has a forward and an inverse (`slotRasterParams` / `slotFromRasterParams`) which must track each
+other — precisely the divergence this arc keeps closing. So `slotRasterParams` took an optional `regs` map instead: ONE
+formula, two renderings. `regs` absent is bit-identical by construction (`y0 + (width/2)·(−cos)` versus the original
+`y0 − (width/2)·cos` — negation is exact in IEEE-754), swept over 504 configs in PROOF 8 against the arithmetic it
+replaced, written out independently.
+
+⚠ **The general ANGLED form is written even though only bearing 0 can pack.** That is the ruling's structural condition
+taken literally rather than as advice: PROOF 6 asserts against the SOURCE that neither CAM-layer file contains a
+bearing comparison, `slotBearingDeg` call or `Math.atan2`. When C5 lands, the envelope opens and angled slots pack with
+nothing in the generator changed.
+
+### ⚠ THE DEFECT THIS ACT NEARLY SHIPPED, and it was the SAME wrong question one surface along
+
+The gate asked the atom's envelope "can you walk this slot?" — with `slotRasterParams(p)`, i.e. the WIZARD's params.
+That body is all build-time numbers, so the atom absorbs its own rotation and answers YES. **But the pack is not going
+to emit that body.** Measured: an ANGLED wide slot came back COVERED and packed, and the arm would then have built the
+live shape whose bearing t1510 proved gets silently dropped. The gate would have been asking about a program nobody
+builds — which is t1402's defect ("will what runs be what was ASKED for") in the gate rather than in the emit.
+
+Fixed by threading an optional `regs` through `slotRasterArmGap` / `slotStackArmGap` so the pack asks about the body it
+will really emit, with `SLOT_CAM_PACK_REGS` — placeholder words over exactly the keys `SLOT_CAM_LIVE_KNOBS` declares,
+DERIVED from that list so a knob added to the live set cannot be missed by the question that decides whether it may go
+live. The wizard passes nothing and reads exactly as before.
+
+### THE FORMAT CHANGE, both halves
+
+JOIN the live #2600 layout: `width` · `toolDia` · `stepoverPct` · `plunge`. LEAVE it: `ax` `ay` `bx` `by`, forced baked
+with the bearing and length they derive. `rampAngle` bakes beside them — carried from the op rather than silently
+dropped, which is what would otherwise have happened to a non-default ramp angle.
+
+The mechanism is the existing one, extended by ONE declaration rather than a new path: a generator field may now
+declare itself `bakeOnly`, and `makeAuthOp` bakes it at the op's value (the same line a BUILD ENUM has always used). So
+the endpoints are ROWS in the table — greyed, with their reason, postGating's rule — while taking no `#11xx` param and
+pushing no read-line into the macro. `refusalIfExposed` is WIRED: a decl that carries entries but not the frame is a
+caller that exposed an endpoint, and the arm emits the declared refusal and NO motion (PROOF 5 asserts zero G-moves).
+
+### THE BANDS — and I narrowed the ruling against its own measurement
+
+`bandsFor('slot')` is the union. But the ruling was taken on "the literal arm's field vars MOVE", and measured that is
+true of a COMPOSED pack and false of the common case: the cursor starts at `varOffset + 1`, so a SINGLE-PART literal
+slot still mints #1-#9 and is byte-identical. The first offset at which anything shifts is **25**, where the ninth field
+goes #34 → #55 over the whole union in one step. Recorded at the strength it measures, in `camScratch` and in
+`stillLiteral`, because a design row that over-claims its own cost is the same defect class as one that under-claims a
+capability. The guard is asserted at varOffset 33 (every var clears the union) and the allocator is swept 0..80 on both
+arms with zero self-collisions.
+
+### THREE STALE PINS WENT RED, AND ALL THREE WERE RESTATED RATHER THAN DELETED
+
+That is the whole reason they were pinned. `slot-cam-pack-scout-1508` pinned the width gate as SHUT and the slot band as
+NOT covering #34-#49 — both inverted. `slot-parametric-boundary-1442`'s CAM AUDIT pinned the wide-slot refusal; its
+subject is now the LITERAL arm only, and the drop it measures is exactly why the packed arm exists. Its "AND NOTHING
+DECLARES ANY OF IT" pair flipped too: the descent drop IS declared now.
+
+### THE HONESTY LOCK CORRECTED ME, AND THEN I FOUND A HOLE IN IT
+
+I first declared `entry` IGNORED on the literal arm, reasoning that the centreline body plunges whatever was picked.
+The lock went red and was right: the bodies genuinely DIFFER across the arms, because a HELIX pick trips
+`entryHasGeometry` and freezes Stepdown/Stepover into literals. The pick DOES reach the macro on both arms; what differs
+is what it reaches. A row claiming "not carried" would have been a second lie in the space of the first. It is declared
+BAKED on both arms instead, keyed on the same `slotPackGap` the arm itself is chosen by.
+
+⚠ **And the lock had a hole:** its `bodyAt` passed `variant: undefined`, so it measured the CENTRELINE body for every
+op — a row about a macro nobody builds, the moment the slot grew a second arm. It resolves the arm through
+`slotPackArm` now, so the lock reads the body that really ships.
+
+### A REAL DEFECT IN MY OWN REFUSAL, caught by a red spec
+
+`slotWideRefusal` appended "an ANGLED slot waits on C5" to whatever gap came back — so a PATTERNED slot, refused for an
+entirely unrelated reason, was told about bearings and angles, with two sentences run together and no punctuation.
+Exactly t1414's "1 arms would duplicate the program 1 times": broken grammar carrying a wrong reason. The fix moves the
+pending-capability clause INTO the atom's own bearing refusal, where the code knows it is about the bearing — so every
+caller inherits it and no caller can staple it to the wrong gap. `slotWideRefusal` now adds no reason of its own.
+
+### PROOF 1 WAS WEAKER THAN I CLAIMED, TWICE
+
+First cut substituted registers with a plain string replace and turned the atom's own `#47`/`#46`/`#40` into
+`47`/`46`/`40` via the `#4` prefix, then reported a mismatch that was entirely the harness's. Second cut compared only
+the `G` moves — and in a parametric walk the moves are written in the atom's OWN registers, identical on both sides by
+construction, while every dimension lives in the HEADER. It would have passed on a body whose geometry was wrong. It
+now compares the header NUMERICALLY (a small DDCS→JS evaluator; the packed side is `#41=[#1 - 2 * [#2/2]]` where the
+baked side is `#41=6` — the same quantity, and no text form in which they agree), across the walked spans, depth, bite,
+stepover and row count.
+
+PROOF 2 had the same shape of error: a text diff of the moves reported five knobs DARK that are not, because a
+parametric knob reaches the motion through the header, never through the move. It walks the DATAFLOW instead — seed the
+reachable set with every register the motion, loop bounds and guards read, close it backwards over the body's own
+assignments, and require every live field's register to be in the closure. All nine live knobs reach; zero dark.
+
+### ALSO
+
+- `@work` is OMITTED from the packed macro and that honesty is the ATOM'S, not re-implemented here:
+  `surfaceRasterWorkSteps` already returns null on live geometry (t1383 — never declare wrong). PROOF 7 asserts the
+  baked wizard body still carries a marker and the packed one carries none.
+- A unit bearing coefficient prints no multiply, so the frame reads `[0 - [#1/2]]` rather than
+  `[0 - [#1/2] * 1.000000000]` — noise in a macro an operator reads, and a multiply the controller then does.
+- NOT touched, deliberately: `SPEC.feed`'s 300 and `SPEC.depth`'s 5 defaults are poor for a slot (the wizard uses 2000
+  and 4) but they are the LITERAL arm's long-standing values and the seed overrides them from the op in every real
+  flow. Changing them would move the literal arm's emitted text for nothing anyone asked for.
+- A PATTERNED slot has always packed as a SINGLE slot on the literal arm, silently dropping the pattern. Pre-existing,
+  out of this act's scope, NAMED here rather than quietly inherited — the packed arm refuses it (the pattern gap).
+
+### GATES
+
+- New: `slot-cam-pack-1512` **8/8** (indirection chain incl. the numeric header bridge · no-knob-dark by reachability ·
+  the format delta both halves · bands + collision guard at a high varOffset · every refusal in its own words ·
+  the no-bearing-check structural condition · @work · the no-regs sweep over 504 configs) and
+  `slot-cam-pack-shots-1512` **1/1**.
+- Slot/raster/CAM family **91/0** · CAM-builder specs **31/0** · smoke **71/0**.
+- SCREENSHOTS in `test-results/t1512`: the field table with the new list (four endpoints + ramp angle greyed BAKED,
+  width/toolØ/stepover%/plunge live) and the angled refusal beneath it · the macro head · the walk. Read both.
+
+### ADDENDUM, same turn — what the FULL SUITE added to the account above
+
+The entry above was written while the full suite ran. Three things it says need amending, appended rather than edited:
+
+**1. FIVE stale pins went red, not three.** The full suite surfaced two more of the identical class, and the second is
+the most useful of the five:
+
+- `cam-op-seed.spec.js` pinned the wide-slot refusal by its exit sentence. Restated: it packs, on the slot generator.
+- `tool-fit-refusal-1444.spec.js` pinned it as *"refuses for the other reason — the centreline macro"*. That line
+  existed to stop t1442's find ("WIDER than the tool" — the centreline body would cut the tool's width) from being
+  confused with THIS spec's law ("SMALLER than the tool" — the user's ruling, no correct macro on any shape). The wide
+  half lifted; the DISTINCTION it was drawing is what still needs guarding, so it now asserts both halves — the wide
+  slot packs, AND the too-small law is untouched by the lift.
+
+**2. ⚠ THE FIRST FULL RUN REPORTED `2 failed` BEHIND EXIT CODE 0 AND A TAIL READING `2345 passed`.** Precisely the case
+where reading the tail alone ships a red suite. Then reproducing those two threw
+`Playwright Test did not expect test.use() to be called here` — which I first put down to the stale transform cache. It
+was **cause #1: cwd drift.** A `cd <repo root> && git diff` for the diff review left the shell at the root, where there
+is no local Playwright, so `npx` fetched a different version. The lesson already recorded is the right one and I did not
+follow it: put the `cd DDCS-Studio` in the SAME command as every `npx playwright` call. The two failures underneath were
+real, which is what matters; the misdiagnosis cost one detour and no wrong code.
+
+**3. The screenshots are in `verification/t1512-cam-pack/`, not `test-results/`** — Playwright wipes `test-results/` at
+the start of every run, so the first set was gone by the time the full suite finished. A shot captured for a reviewer
+does not belong in a directory the test runner owns.
+
+### FULL SUITE — GREEN
+
+**2347 passed · 0 failed · 6 skipped (18.3m).** Released **V2026.08.01.2**.

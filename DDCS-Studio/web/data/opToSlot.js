@@ -13,7 +13,9 @@
  */
 import { nextParam, mirrorVar } from './slotPack.js';
 import { nextLocalVar, bandsFor } from './camScratch.js';   // t1083 (slice B) — mint local body vars around drill/bore/slot's own scratch band
-import { spindleOn, spindleOff } from './camMacroKit.js';
+import { spindleOn, spindleOff, errorEnd } from './camMacroKit.js';   // t1512 — errorEnd: the packed arm refuses BEFORE any motion and must HALT, never fall through into the clear
+import { surfaceRasterLines } from '../wizards/ops/surfaceraster.js';   // t1512 — the packed slot's clearing IS the wizard-path atom, exactly as the rect pocket's is (t1429)
+import { slotRasterParams, SLOT_CAM_LIVE_KNOBS, SLOT_CAM_BAKED_FRAME } from '../wizards/ops/slot.js';   // t1512 — ONE source for the frame formula and for which knobs go live
 
 // Field specs: label / units / default / min / max / type (1=decimal, 0=integer). `def` may depend on method.
 const SPEC = {
@@ -45,13 +47,49 @@ const SPEC = {
     by: { label: 'B — Y', units: 'mm', def: 0, min: -99999, max: 99999, type: 1 },
     stepdown: { label: 'Stepdown', units: 'mm', def: 1.5, min: 0.1, max: 9999, type: 1 },
     rpm: { label: 'Spindle RPM', units: 'rpm', def: 8000, min: 1, max: 60000, type: 0 },
+    // t1512 — THE THREE (four, with plunge) THAT JOIN THE #2600 LAYOUT on the packed arm. `width` defaults WIDER than
+    // the tool on purpose: at width == tool the band the tool centre must sweep is zero, which is the arm's own
+    // ineligible degenerate — a default sitting on it would seed the field table from a config that cannot pack.
+    width: { label: 'Slot width', units: 'mm', def: 12, min: 0.1, max: 99999, type: 1 },
+    stepoverPct: { label: 'Stepover', units: '%', def: 40, min: 1, max: 100, type: 1 },
+    plunge: { label: 'Plunge feed', units: 'mm/min', def: 150, min: 1, max: 99999, type: 0 },
+    rampAngle: { label: 'Ramp angle', units: 'deg', def: 3, min: 0.1, max: 89, type: 1 },
 };
+
+/**
+ * ── t1512 — THE SLOT HAS TWO ARMS, AND THE ARM IS THE `variant` ────────────────────────────────────────────────────
+ *
+ * `SLOT_ARM.atom` packs the PARAMETRIC RASTER ATOM as the slot's clearing — the same delegation the rect pocket took
+ * at t1429 — so a slot WIDER than its tool finally has a correct CAM macro and the t1444 width gate lifts for it.
+ * `SLOT_ARM.centreline` is the one-pass-per-level body this file has always emitted, kept for everything the atom's
+ * envelope refuses.
+ *
+ * ⚠ WHICH ARM IS **NOT DECIDED HERE**, and not by a bearing check anywhere. `opCamMap.slotPackArm` asks the ATOM'S OWN
+ * ENVELOPE (`slotStackArmGap` → `surfaceRasterCovers` + the live-geometry/bearing refusals), which is the advisor's
+ * t1511 condition and the reason this arm needs no revisiting when C5 lands: the day the atom learns to rotate a live
+ * frame, angled slots start packing because the ENVELOPE opens, with not one line of this file changed.
+ */
+export const SLOT_ARM = { atom: 'atom', centreline: '' };
 
 // Standalone ops (not point-patterns) — each: the form fields it exposes + a parametric body builder(v).
 const STANDALONE = {
     slot: {
         label: 'Slot',
         fields: ['ax', 'ay', 'bx', 'by', 'depth', 'stepdown', 'feed', 'clearance', 'rpm'],
+        /**
+         * THE PACKED ARM'S FIELD LIST, and BOTH halves of the delta are in it (t1508's correction, t1511's ruling):
+         *   JOIN the live #2600 layout   width · toolDia · stepoverPct · plunge
+         *   LEAVE it                     ax · ay · bx · by — forced BAKED, with the bearing and length they derive
+         * `plunge` is the fourth addition the scout's own delta line omitted: the centreline body has no plunge field
+         * at all (it descends at `feed`), and the atom takes a real one, so it joins rather than being aliased away.
+         * `rampAngle` bakes for the same reason the endpoints do — build-time geometry, and carrying it is what stops
+         * a non-default ramp angle from being silently dropped on the way into the pack.
+         */
+        atom: {
+            label: 'Slot (parametric clear)',
+            fields: ['ax', 'ay', 'bx', 'by', 'rampAngle', 'width', 'toolDia', 'stepoverPct', 'depth', 'stepdown', 'feed', 'plunge', 'clearance', 'rpm'],
+            bake: [...SLOT_CAM_BAKED_FRAME, 'rampAngle'],
+        },
         body: (v) => ['( slot A->B centerline, stepping down. For width > tool, add perpendicular offset passes. )',
             '#50=0',
             `WHILE #50 LT ${v.depth} DO1`,
@@ -95,6 +133,90 @@ function cutLines(method, v, doN) {
 
 const indent = (lines, pad) => lines.map((l) => pad + l);
 
+/**
+ * WHY EACH BAKED ROW IS BAKED, in the words the operator reads on the greyed control. postGating's rule is grey and
+ * say why, never hide — an endpoint that simply vanished from the table would leave them wondering where the geometry
+ * went, and this arm's whole point is that the geometry is build-time ON PURPOSE.
+ */
+export const SLOT_FRAME_BAKE_REASON = {
+    _default: 'BAKED into this slot: build-time geometry the controller cannot recompute.',
+    ax: 'BAKED into this slot: A and B set the walk\'s BEARING (atan2 of B-A) and its LENGTH (|B-A|), and the controller cannot compute either — ATAN and SQRT are community-referenced only. Dialling an endpoint would cut the OLD angle through the NEW point. Every other value here IS a live knob; move the slot by building it from the Slot wizard.',
+    rampAngle: 'BAKED into this slot: the ramp\'s angle sets the descent length the atom lays out at build. It is carried from the op rather than dropped, but it is not a pendant knob.',
+};
+SLOT_FRAME_BAKE_REASON.ay = SLOT_FRAME_BAKE_REASON.ax;
+SLOT_FRAME_BAKE_REASON.bx = SLOT_FRAME_BAKE_REASON.ax;
+SLOT_FRAME_BAKE_REASON.by = SLOT_FRAME_BAKE_REASON.ax;
+
+/** The refusal a packed slot emits INSTEAD of a body when a caller has exposed an endpoint — `refusalIfExposed`, wired. */
+export const SLOT_FRAME_EXPOSED_REFUSAL = 'a packed slot\'s A/B endpoints must be BAKED: the walk\'s bearing is '
+    + 'atan2(B-A) and its length is |B-A|, and the controller cannot recompute either (ATAN and SQRT are '
+    + 'community-referenced only — V13_trig.nc decides them). Dial an endpoint at the pendant and the slot would cut '
+    + 'the OLD angle through the NEW point, which is clean G-code and the wrong part. Bake the endpoints, or build '
+    + 'this slot from the Slot wizard';
+
+/**
+ * ── THE PACKED BODY — the slot's clearing IS `surfaceRasterLines`, with the pendant knobs riding in as registers ────
+ *
+ * Everything geometric comes from `slotRasterParams`, called with the arm's own body vars as its `regs` map, so this
+ * function contains NO frame arithmetic of its own: the bearing, the length and the near-edge-midpoint placement are
+ * the wizard path's, read once. That is what makes the arm a DELEGATION rather than a second slot emitter — the thing
+ * two of this project's measured defects (t1412, t1442) came from not having.
+ *
+ * THE GUARDS REFUSE **FIRST**, AND THAT IS A SAFETY CONSEQUENCE OF COMPOSING THE ATOM rather than a tidy-up — the same
+ * reasoning `pocketSlot` records at t1429. The atom's own refusals (`IF #44 <= 0 GOTO91`) set `#1505` and then
+ * CONTINUE, which is right for a body that ends a wizard program and wrong inside a slot. So the slot checks before
+ * any motion and ends on `errorEnd`, which makes the atom's guards unreachable belt-and-braces.
+ *
+ * ⚠ AND THE ZERO BAND IS A **RUNTIME** GUARD HERE, not a build-time one. `width` and `toolDia` are both pendant knobs
+ * now, so the arm cannot know at build time that the operator will not dial the width down onto the tool — the very
+ * degenerate `slotRasterArmGap` routes to the literal arm at build. At run time it is one subtraction, and refusing it
+ * loudly is the honest answer.
+ */
+function slotAtomBody(v, fields, pick) {
+    const n = (w, dflt) => { const x = Number(w); return Number.isFinite(x) ? x : dflt; };
+    // the live knobs → their body vars. A key the arm BAKED is a literal here, so it is not a register and not passed.
+    const regs = {};
+    SLOT_CAM_LIVE_KNOBS.forEach((k) => { if (/^#/.test(String(v[k]))) regs[k] = String(v[k]); });
+    const clear = slotRasterParams({
+        // the BAKED frame — literals substituted for the #vars the exposed arm would have used
+        x0: n(v.ax, 0), y0: n(v.ay, 0), x1: n(v.bx, 60), y1: n(v.by, 0),
+        // the numeric fallbacks matter only where a knob is NOT live; the live ones override them by name
+        width: n(v.width, 12), tool: n(v.toolDia, 6), stepoverPct: n(v.stepoverPct, 40),
+        depth: n(v.depth, 4), stepdown: n(v.stepdown, 1.5),
+        feed: n(v.feed, 2000), plunge: n(v.plunge, 150), clearance: n(v.clearance, 5),
+        // the op's BUILD-TIME picks, read from the declaration the pack already carries (never from op.params direct)
+        entry: pick('entry', 'plunge'), rampAngle: n(v.rampAngle, 3),
+    }, regs);
+    return [
+        `( Slot A->B — the PARAMETRIC RASTER ATOM clears the channel, wall to wall, layer by layer. )`,
+        `( A (${n(v.ax, 0)}, ${n(v.ay, 0)}) -> B (${n(v.bx, 60)}, ${n(v.by, 0)}) is BAKED, with the bearing ${Number(clear.bearing).toFixed(3)} deg and the length ${Number(clear.w).toFixed(3)}mm it derives. )`,
+        `( The controller cannot recompute those (ATAN/SQRT unverified), so they are build-time — every OTHER value below is a live knob. )`,
+        ...fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`),
+        '',
+        '( guard: step / tool / clearance must be positive — a 0 stepover divides by zero, a 0 stepdown loops the Z pass forever, and a 0 clearance is not a safe retract. Clean error, not a runaway. )',
+        `IF ${v.stepoverPct} LE 0 GOTO 7`,
+        `IF ${v.stepdown} LE 0 GOTO 7`,
+        `IF ${v.toolDia} LE 0 GOTO 7`,
+        `IF ${v.clearance} LE 0 GOTO 7`,
+        '( guard: the slot must be WIDER than the tool — at equal width the band the tool centre sweeps is zero, and one centreline pass is a different program )',
+        `IF [${v.width} - ${v.toolDia}] LE 0 GOTO 8`,
+        '',
+        ...spindleOn(v.rpm),
+        ...surfaceRasterLines(clear),
+        ...spindleOff(),
+        'GOTO 9',
+        '( errors )',
+        'N7',
+        '#1505=1   ;ERROR: stepover / stepdown / tool / clearance must be > 0',
+        errorEnd('stepover / stepdown / tool / clearance must be > 0'),
+        'N8',
+        '#1505=1   ;ERROR: slot no wider than the tool',
+        errorEnd('slot no wider than the tool — one centreline pass is a different program'),
+        'N9',
+        'M30',
+    ].join('\n');
+}
+
 /** The pattern loop body (uses the var map; positions each point + inlines the per-hole cut). */
 function loopBody(pattern, v, method) {
     // single — no loop at all: rapid to the anchor, then the SAME per-hole cut every other pattern inlines. cutLines takes
@@ -133,7 +255,20 @@ function loopBody(pattern, v, method) {
  */
 export function slotFromOp(method, pattern, used = new Set(), varOffset = 0, decl) {
     const std = STANDALONE[method];
-    const order = std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance', 'rpm'];
+    // t1512 — the ARM rides the `variant` slot. Only the standalone slot has a second arm; every other method ignores it.
+    const arm = (std && std.atom && pattern === SLOT_ARM.atom) ? std.atom : null;
+    const order = arm ? arm.fields : std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance', 'rpm'];
+    /**
+     * `refusalIfExposed`, WIRED — the surfaceRasterLiveGap pattern, one surface along.
+     *
+     * A build call declares the frame BAKED (`makeAuthOp` writes it from the field's own `bakeOnly` flag, so the
+     * operator never had a control to get wrong). A decl that carries entries but NOT the four frame keys is a caller
+     * that deliberately exposed one — and the arm REFUSES in the design's words rather than emitting a slot that cuts
+     * the old angle through the new point. An ABSENT decl is the SEED call (`genFieldsFor` asks for the field list with
+     * nothing declared yet), which is not an exposure and must not refuse.
+     */
+    const frameBaked = arm && SLOT_CAM_BAKED_FRAME.every((k) => decl && decl[k] && decl[k].exposed === false);
+    const frameExposed = !!arm && !!decl && Object.keys(decl).length > 0 && !frameBaked;
     const taken = new Set(used);
     // S1a — the expose/bake hook (the inline twin of allocFieldsWith), preserving the `order` composition + the holeDia
     // default override. A BAKED param (decl[key].exposed === false) takes no #11xx param and pushes no field; its literal
@@ -147,14 +282,38 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0, dec
         // Bore needs hole Ø > tool Ø (else the cut radius is 0); drill bores at tool Ø.
         const def = key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def;
         const d = decl && decl[key];
-        if (d && d.exposed === false) { v[key] = String(d.value); return; }   // BAKED
+        /**
+         * t1512 — A FIELD THE **ARM** BAKES, which is a different fact from a field the OPERATOR baked. The four frame
+         * keys (and the ramp angle) are build-time geometry on the packed arm, not a default someone may flip: they take
+         * no #11xx param and push no field row into the macro, exactly as an operator-baked param does, but the choice
+         * is the arm's. On the SEED call there is no decl yet, so the literal falls to the SPEC default and the row is
+         * still declared to the table (`bakeOnly`) — which is what makes `makeAuthOp` bake it at the OP'S value.
+         */
+        const armBakes = !!arm && arm.bake.includes(key);
+        if (armBakes || (d && d.exposed === false)) {
+            const lit = (d && d.value != null && d.value !== '') ? d.value : def;
+            v[key] = String(lit);
+            if (armBakes) fields.push({ key, idx: null, var: null, label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type,
+                bakeOnly: true, exposable: false, _exposeTip: SLOT_FRAME_BAKE_REASON[key] || SLOT_FRAME_BAKE_REASON._default });
+            return;
+        }
         const idx = nextParam(taken); if (idx != null) taken.add(idx);        // EXPOSED — identical alloc order
         cur = nextLocalVar(cur + 1, avoid);   // t1083 — step OVER this generator's own scratch band
         fields.push({ key, idx, var: '#' + cur, label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type });
         v[key] = '#' + cur;
     });
+    // the LIVE rows only — a `bakeOnly` row is a table row with no #11xx param, so it never reaches the macro's reads
+    const liveFields = fields.filter((f) => f.idx != null);
+    if (arm) {   // t1512 — the PACKED arm: the clearing IS the parametric raster atom
+        const pick = (k, dflt) => { const d = decl && decl[k], x = d && d.value; return (x == null || x === '') ? dflt : String(x); };
+        const body = frameExposed
+            ? ['( Slot A->B — REFUSED, no motion emitted. )', `( ${SLOT_FRAME_EXPOSED_REFUSAL} )`,
+                '#1505=1   ;ERROR: a packed slot\'s endpoints must be baked', errorEnd('a packed slot\'s A/B endpoints must be baked')].join('\n')
+            : slotAtomBody(v, liveFields, pick);
+        return { name: arm.label, fields, body };
+    }
     if (std) {   // standalone op (slot) — no pattern, no shared sub
-        const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
+        const reads = liveFields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
         const body = [`( ${std.label} )`, ...reads, '', ...spindleOn(v.rpm), '', std.body(v), ...spindleOff()].join('\n');
         return { name: std.label, fields, body };
     }

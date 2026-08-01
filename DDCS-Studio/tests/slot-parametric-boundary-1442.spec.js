@@ -237,7 +237,7 @@ test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, an
     const r = await page.evaluate(async ({ H }) => {
         const h = await (eval(H))();
         const { slotFromOp } = await import('/data/opToSlot.js');
-        const { camTypeOf, GENERATOR_IGNORES, generatorIgnores } = await import('/data/opCamMap.js');
+        const { camTypeOf, GENERATOR_IGNORES, generatorIgnores, generatorBakesPick } = await import('/data/opCamMap.js');
         const gen = slotFromOp('slot', '', new Set(), 0);
         const keys = gen.fields.map((f) => f.key);
         const OP = ['ax', 'ay', 'bx', 'by', 'width', 'toolDia', 'stepoverPct', 'depth', 'stepdown', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'feed', 'plunge', 'clearance', 'pattern'];
@@ -251,6 +251,8 @@ test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, an
             camEqual: camTypeOf({ opType: 'slot', params: { width: 6, toolDia: 6 } }),
             slotIgnores: GENERATOR_IGNORES.slot || null,
             entrySentence: generatorIgnores('slot', 'entry', {}),
+            // t1512 — the drop is DECLARED now, on the arm it happens on (width 6 == tool → the literal centreline arm)
+            entryBaked: generatorBakesPick('slot', 'entry', { width: 6, toolDia: 6, ax: 0, ay: 0, bx: 60, by: 0 }),
         };
     }, { H: HARNESS });
 
@@ -260,14 +262,25 @@ test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, an
     expect(r.keys, '…and carries exactly these').toEqual(['ax', 'ay', 'bx', 'by', 'depth', 'stepdown', 'feed', 'clearance', 'rpm']);
     // WHAT IT COSTS, in millimetres: the wizard cuts the typed width, the macro cuts the tool
     expect(r.wizardWidth, 'the wizard cuts the 12mm channel that was typed').toBeCloseTo(12, 3);
-    // t1444 — …and a slot the macro would cut WRONGLY no longer reaches it: the pack refuses, by name, with the exit
-    expect(r.camRoute.camType, 'a 12mm-wide slot no longer packs the centreline generator').toBeUndefined();
-    expect(r.camRoute.unsupported, 'it is refused at PACK, in the operator\'s own terms').toContain('ONE centreline pass');
+    /**
+     * ⚠ t1512 — THIS AUDIT'S SUBJECT IS NOW THE **LITERAL ARM ONLY**, and the drop it measures above is exactly why the
+     * packed arm was built. Everything before this point still holds and is still the motive; what changed is what
+     * happens to a WIDE slot. It used to be refused because the only macro was this one. It now PACKS — onto the atom —
+     * whenever the atom can walk it, so the refusal below is a patterned slot's (this harness passes `pattern: 'grid'`,
+     * and a pattern is not self-framing), stated in the atom envelope's own words instead of the centreline body's.
+     */
+    expect(r.camRoute.camType, 'a 12mm-wide PATTERNED slot still does not pack — a pattern is not self-framing').toBeUndefined();
+    expect(r.camRoute.unsupported, 'and it is refused in the ATOM ENVELOPE\'s own words now, not the centreline body\'s').toContain('array');
     expect(r.camRoute.unsupported, '…with somewhere to go, because "unsupported" alone makes the operator guess').toContain('Slot wizard');
-    expect(r.camEqual.camType, 'and the case the macro DOES cut correctly still packs — width == tool').toBe('slot');
-    // THE PLUNGE FEED IS DROPPED TOO — the macro descends at the CUTTING feed
-    expect(r.zLine, 'the Z descent rides F#7, the cut feed — the op\'s plunge feed has no field').toBe('G1 Z[-#50] F#7');
-    // AND NOTHING DECLARES ANY OF IT
-    expect(r.slotIgnores, 'GENERATOR_IGNORES has no slot key at all — the drop is undeclared').toBeNull();
-    expect(r.entrySentence, 'so a ramp/helix pick reaches the pendant with nothing said about it').toBe('');
+    expect(r.camRoute.unsupported, '…and NOT told about bearings, which is a reason belonging to a different refusal').not.toContain('C5');
+    expect(r.camEqual.camType, 'and the case the centreline macro DOES cut correctly still packs — width == tool').toBe('slot');
+    // THE PLUNGE FEED IS DROPPED TOO — the LITERAL macro descends at the CUTTING feed (the packed arm carries a real one)
+    expect(r.zLine, 'the Z descent rides F#7, the cut feed — the literal arm\'s plunge feed has no field').toBe('G1 Z[-#50] F#7');
+    // …AND IT IS DECLARED NOW, which is the other half of what t1512 owed this audit: the drop was silent when this
+    // spec was written (no row existed at all), and a greyed row on the literal arm now says the descent pick is not
+    // honoured and which setting changes that.
+    expect(r.slotIgnores, 'GENERATOR_IGNORES still has no slot key — the pick IS carried (the helix freezes stepdown), so "ignored" would be the wrong word').toBeNull();
+    expect(r.entrySentence, '…and therefore no ignored-sentence either').toBe('');
+    expect(r.entryBaked, 'the literal arm DECLARES the descent drop as a baked pick, with what to change').toMatch(/always plunges/);
+    expect(r.entryBaked, '…and names the widening that gets a real descent').toMatch(/Widen the slot/);
 });

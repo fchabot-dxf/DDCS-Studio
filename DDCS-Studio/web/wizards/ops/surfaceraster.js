@@ -1615,11 +1615,20 @@ export function surfaceRasterLiveGap(p = {}) {
     const bearing = rasterBearingOf(p);
     const absorbs = surfaceRasterAbsorbsRotation(p);
     if (bearing && absorbs !== true) {
+        /**
+         * ⚠ t1512 — THE PENDING CAPABILITY IS NAMED **HERE**, and that placement is a correctness point rather than a
+         * courtesy. The first CAM refusal glued a "waits on C5" clause onto whatever gap came back, so a PATTERNED
+         * slot — refused for an entirely unrelated reason — was told about bearings and angles. Same class as t1414's
+         * "1 arms would duplicate the program 1 times": broken grammar carrying a wrong reason. Only the refusal that
+         * knows it is about the bearing can name what would lift it, so it says so itself and every caller inherits it.
+         */
         return `a baked bearing of ${r3(bearing)}° cannot be applied to this body — ${absorbs}. A program ROTATION `
             + `survives that refusal because the caller rewrites the text instead, but NOTHING downstream applies a `
             + `bearing, so it would be dropped and the passes would run axis-aligned through the rotated origin: the `
-            + `right G-code for a slot at a different angle than the one asked for. Bake the geometry too, or keep the `
-            + `bearing at 0`;
+            + `right G-code for a slot at a different angle than the one asked for. So a bearing of 0 is what a live `
+            + `frame can carry today; the ANGLED case waits on C5, the live-frame rotation — which needs no runtime `
+            + `trig (the baked constants multiply relative offsets that are already registers), so it is real atom `
+            + `work rather than an evidence gate. Until then: bake the geometry too, or keep the bearing at 0.`;
     }
     const live = surfaceRasterLiveInputs(p);
     if (!live.length) return '';

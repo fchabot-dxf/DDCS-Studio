@@ -37,7 +37,7 @@ const boot = async (page) => {
 test('THE SWEEP + THE LOCK — every per-type generator, every build enum, both directions', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { seedFromOp, camTypeOf, buildEnumFields, GENERATOR_IGNORES, GENERATOR_BAKES_PICK, generatorIgnores, generatorBakesPick, PARAM_ALIAS } = await import('/data/opCamMap.js');
+        const { seedFromOp, camTypeOf, buildEnumFields, GENERATOR_IGNORES, GENERATOR_BAKES_PICK, generatorIgnores, generatorBakesPick, PARAM_ALIAS, slotPackArm } = await import('/data/opCamMap.js');
         const { getUserDef } = await import('/blocks/userOps.js');
         const { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } = await import('/data/probeToSlot.js');
         const { pocketSlot, circlePocketSlot, surfacingSlot } = await import('/data/millToSlot.js');
@@ -74,11 +74,17 @@ test('THE SWEEP + THE LOCK — every per-type generator, every build enum, both 
                     .filter((v) => (camTypeOf({ opType: o.opType, params: { ...params, [e.key]: v } }).camType === t.camType));
                 if (arms.length < 2) continue;
                 // build the generator's body at each arm — decl mirrors what the pack would declare
+                // ⚠ t1512 — THE VARIANT IS PASSED NOW, and leaving it undefined was a hole in this lock rather than a
+                // simplification. The slot has TWO arms (a packed atom body and a literal centreline one) selected by
+                // the variant, so `undefined` measured the centreline body for EVERY op including the ones the operator
+                // would actually get the packed body for — a row about a macro nobody builds. `slotPackArm` is the same
+                // resolver the pack itself uses, so the lock now reads the body that really ships.
                 const bodyAt = (v) => {
-                    const s = seedFromOp({ opType: o.opType, params: { ...params, [e.key]: v } });
+                    const p2 = { ...params, [e.key]: v };
+                    const s = seedFromOp({ opType: o.opType, params: p2 });
                     const decl = {};
                     for (const f of (s.fields || [])) decl[f.key] = { exposed: f.exposed !== false, value: f.value };
-                    const g = genOf(t.camType, undefined, decl);
+                    const g = genOf(t.camType, t.camType === 'slot' ? slotPackArm(p2) : undefined, decl);
                     return g ? g.body : null;
                 };
                 const bodies = arms.map(bodyAt);

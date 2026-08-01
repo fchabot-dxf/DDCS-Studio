@@ -94,9 +94,11 @@ export const SLOT_PATTERN_GAP = 'a PATTERNED slot stamps its op through an `arra
  * The measured domain is `slotRasterArmGap`'s (t1498: the zero band, the helix's entry-end clamp, the ramp over a
  * and finally the atom's own envelope); this adds the one clause only the stack can see.
  */
-export function slotStackArmGap(params = {}) {
+export function slotStackArmGap(params = {}, regs = null) {
     if (slotPatterned(params)) return SLOT_PATTERN_GAP;
-    return slotRasterArmGap(slotLeafParams(params));
+    // t1512 — `regs` threads through to the atom's envelope question so a caller that will emit LIVE knobs is judged on
+    // the body it will really build (the CAM pack). The wizard passes nothing and reads exactly as it always has.
+    return slotRasterArmGap(slotLeafParams(params), regs);
 }
 
 /** The predicate half of `slotStackArmGap` — one source, read by the concrete build AND the twin's deriveGuards. */

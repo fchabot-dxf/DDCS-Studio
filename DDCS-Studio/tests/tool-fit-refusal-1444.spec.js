@@ -181,6 +181,13 @@ test('THE PACK REFUSES TOO — strictly smaller never becomes a CAM slot', async
     // …and the EQUAL case still packs, on both, which is the half that proves the gate is the ruling and not a blanket
     expect(r.slotEqual.camType, 'exactly tool-width still packs').toBe('slot');
     expect(r.pocketEqual.camType, '…and so does an exactly tool-sized pocket').toBe('pocket');
-    // (the WIDE slot gate is t1442's separate find — asserted in its own spec, named here so the two are not confused)
-    expect(r.slotWide.unsupported, 'a slot WIDER than its tool refuses for the other reason — the centreline macro').toContain('centreline');
+    /**
+     * ⚠ t1512 — THE WIDE-SLOT GATE LIFTED, AND THIS LINE'S JOB SURVIVES THE LIFT. It was here to keep t1442's find
+     * ("wider than the tool" — the centreline macro would cut the tool's width) from being confused with THIS spec's
+     * law ("smaller than the tool" — the user's ruling, no correct macro on any shape). The wide case now PACKS, onto
+     * the raster atom, so the assertion inverts — and the DISTINCTION it was drawing is what still needs guarding:
+     * the too-small law is untouched by the lift, and a wide slot is no longer refused at all.
+     */
+    expect(r.slotWide.camType, 'a slot WIDER than its tool now PACKS — its clearing is the raster atom (t1512)').toBe('slot');
+    expect(r.slotWide.unsupported, '…so the wide gate is gone, while the too-small law above is untouched').toBeUndefined();
 });

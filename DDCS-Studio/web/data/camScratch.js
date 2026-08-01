@@ -68,7 +68,33 @@ export const SCRATCH_BANDS = {
     align: [...PROBE_TEMPS, ...ALIGN_SPAN, ...PROBE_SIGNS],
     drill: [...OPTOSLOT_CUT, ...OPTOSLOT_PAT],
     bore: [...OPTOSLOT_CUT, ...OPTOSLOT_PAT],
-    slot: [...OPTOSLOT_CUT, ...OPTOSLOT_PAT],
+    /**
+     * ⚠ t1512 — THE SLOT CARRIES **BOTH** BANDS ON ONE KEY, AND THAT MOVES THE LITERAL ARM'S VAR NUMBERS.
+     *
+     * `slotFromOp` has two arms now: the PACKED one whose clearing IS `surfaceRasterLines`, so the atom's
+     * `RASTER_SCRATCH` (#34-#49, #62-#64) is written during a slot part exactly as it is during a pocket part; and the
+     * LITERAL centreline body, which writes only `#50-#54` and never touches the atom's registers.
+     *
+     * `bandsFor` is keyed by camType ALONE, so one key must hold the UNION — which means the LITERAL arm's field vars
+     * step over #34-#49 too, registers that arm never writes. That was the open question the t1510 pass flagged rather
+     * than took, and the ruling (t1511) is the union: pre-release there is no migration to get wrong, the read-lines
+     * that cite those numbers regenerate in the same pass as the numbers themselves so coherence holds, and a per-ARM
+     * band key would be mechanism built to preserve numbers nothing depends on.
+     *
+     * ⚠ WHAT IT COSTS, MEASURED RATHER THAN ASSERTED — and it is NARROWER than "the literal arm's numbers move", which
+     * is what the ruling was taken on and what I first wrote here. The local-var cursor starts at `varOffset + 1`, so a
+     * SINGLE-PART slot (offset 0) mints #1-#9 and is **byte-identical** — the union is below nothing it uses. The
+     * numbers only move for a COMPOSED slot whose cursor has already walked into the thirties: measured, the first
+     * offset at which any var shifts is **25**, where the ninth field goes #34 → #55 (over the whole union in one step),
+     * and from offset 33 the whole set sits at #55+. So the cost lands on multi-part packs only, and the literal arm's
+     * SHAPE is untouched in every case — same moves, same loop, same order.
+     *
+     * THE OVERLAP THAT MATTERS: the atom's band ends at #49 and the probe temps start at #50, so the union abuts
+     * `PROBE_TEMPS` without crossing it — and #62-#64 sits clear of everything. `fieldVarCollisions` is what proves a
+     * composed slot never lands a form value inside this, and the guard is asserted at a HIGH varOffset (where the
+     * cursor has walked past the low bands and the union is the only thing still pushing it up).
+     */
+    slot: [...OPTOSLOT_CUT, ...OPTOSLOT_PAT, ...RASTER_SCRATCH],
 };
 
 /** The band(s) a camType owns, or [] when we have no declaration for it (universal / substack — slice C). */

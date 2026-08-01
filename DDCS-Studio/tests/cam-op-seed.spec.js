@@ -56,6 +56,7 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
         middleSingle: seedFromOp(op('middle', { featureType: 'pocket', twoAxis: false })).unsupported,
         polygon: seedFromOp(op('pocket', { shape: 'polygon', dia: 50 })).unsupported,
         slotWide: slotWide.unsupported, slotNarrow: slotNarrow.unsupported,   // t1444 — the two slot pack gates
+        slotWideCam: slotWide.camType,   // t1512 — the wide gate LIFTED, so what matters is which arm it reaches
         pocketNarrow: seedFromOp(op('pocket', { shape: 'rect', w: 4, h: 40, toolDia: 12 })).unsupported,   // t1444 — strictly smaller than its tool
         contour: seedFromOp(op('contour', {})).unsupported,
       },
@@ -86,8 +87,11 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
   // unsupported forks
   expect(r.unsupported.middleSingle, 'middle single-axis unsupported').toContain('BOTH-AXIS');
   expect(r.unsupported.polygon, 'pocket polygon unsupported').toContain('no CAM generator');
-  // t1444 — the two "never emit a wrong slot" gates, each refusing in the operator's own terms
-  expect(r.unsupported.slotWide, 'a slot wider than its tool refuses at PACK, with somewhere to go').toContain('Slot wizard');
+  // t1444 — the two "never emit a wrong slot" gates. ⚠ t1512: ONE OF THEM LIFTED. A slot wider than its tool used to
+  // have no correct macro (the centreline body would cut the tool's width); its clearing is the raster atom now, so it
+  // PACKS — on a bearing of 0, which is what this fixture's A(0,0)→B(100,0) is. The too-small law is untouched.
+  expect(r.unsupported.slotWide, 'a slot wider than its tool is no longer refused — it packs the atom (t1512)').toBeUndefined();
+  expect(r.unsupported.slotWideCam, '…on the slot generator').toBe('slot');
   expect(r.unsupported.slotNarrow, 'a slot NARROWER than its tool refuses too — the user ruling').toContain('cannot fit');
   expect(r.unsupported.pocketNarrow, '…and so does a pocket the tool cannot fit').toContain('cannot fit');
   expect(r.unsupported.contour, 'contour unsupported').toContain('NO CAM generator');

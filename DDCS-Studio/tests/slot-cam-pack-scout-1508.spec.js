@@ -79,9 +79,11 @@ test('THE PREMISES — the bake mechanism, the atom\'s frame formula, and the ga
         return {
             bearing: +f.bearing.toFixed(6), w: +f.w.toFixed(6),
             frameX: +f.x.toFixed(6), frameY: +f.y.toFixed(6),
-            // the width gate the lift is aimed at — still refusing, in its own words
+            // the width gate the lift was aimed at — LIFTED at t1512 for the slots the atom can walk, still refusing the rest
             wideGate: camTypeOf({ opType: 'slot', params: base }),
             narrowGate: camTypeOf({ opType: 'slot', params: { ...base, width: 8 } }),
+            // an ANGLED wide slot: refused, because the atom would DROP the bearing (t1510, measured)
+            angledGate: camTypeOf({ opType: 'slot', params: { ...base, bx: 0, by: 60 } }),
             // the bake mechanism the design depends on
             hasBakeHook: /exposed === false/.test(src),
             slotBands: bandsFor('slot'), rasterBands: RASTER_SCRATCH,
@@ -90,13 +92,28 @@ test('THE PREMISES — the bake mechanism, the atom\'s frame formula, and the ga
     // the frame IS trig-derived: a 30° slot bears 30 and its length is the hypotenuse
     expect(r.bearing, 'the frame\'s bearing is atan2 of the endpoints').toBeCloseTo(30, 6);
     expect(r.w, '…and its width is the hypotenuse of them').toBeCloseTo(60, 6);
-    // the gate is still shut for a wide slot, and open for one the centreline body cuts correctly
-    expect(r.wideGate.unsupported, 'the CAM width gate still refuses a wide slot — this is what the lift opens').toMatch(/centreline pass/);
-    expect(r.wideGate.unsupported, '…and still names the wizard as the exit (t1444)').toMatch(/Slot wizard/);
+    /**
+     * ⚠ t1512 — THIS PIN WENT RED AND IS RESTATED RATHER THAN DELETED. It asserted the width gate was still SHUT,
+     * which was the whole point of pinning it: the day the lift landed, this test had to be revisited by hand instead
+     * of the scout's premise quietly rotting into a claim about a gate that had moved. The gate is open now — for the
+     * slots the atom can genuinely walk, and for no others.
+     */
+    expect(r.wideGate.camType, 'the width gate is LIFTED: a wide slot on a bearing of 0 packs the atom now').toBe('slot');
     expect(r.narrowGate.camType, 'a slot the centreline body cuts correctly still packs').toBe('slot');
+    // …and the half that did NOT lift still refuses, still names what would change it, still names the exit (t1444)
+    expect(r.angledGate.unsupported, 'an ANGLED wide slot is still refused — the atom would drop its bearing (t1510)').toBeTruthy();
+    expect(r.angledGate.unsupported, '…naming the pending capability').toMatch(/C5/);
+    expect(r.angledGate.unsupported, '…and the wizard as today\'s exit').toMatch(/Slot wizard/);
     // the machinery the design leans on exists
     expect(r.hasBakeHook, 'opToSlot already honours a BAKED param (no #11xx, no field)').toBe(true);
-    // ⚠ the band reconciliation is REAL work, not bookkeeping: today's slot band does NOT cover the atom's registers
+    /**
+     * ⚠ t1512 — THE SECOND PIN THAT WENT RED, AND ALSO RESTATED RATHER THAN DELETED. The scout asserted this band did
+     * NOT cover the atom's registers, precisely so "piece 3 is real work" could not become a claim nobody rechecked.
+     * The union landed, so the assertion inverts: the slot band must now cover BOTH the atom's registers (its clearing
+     * IS the atom on the packed arm) and the literal centreline body's own #50-#54.
+     */
     const covers = (bands, [lo, hi]) => (bands || []).some(([a, b]) => a <= lo && b >= hi);
-    expect(covers(r.slotBands, r.rasterBands[0]), 'TODAY the slot band does NOT cover the atom\'s #34-#49 — piece 3 is why').toBe(false);
+    expect(covers(r.slotBands, r.rasterBands[0]), 'the slot band now covers the atom\'s #34-#49 — the packed arm writes them').toBe(true);
+    expect(covers(r.slotBands, r.rasterBands[1]), '…and the atom\'s upper band too').toBe(true);
+    expect(covers(r.slotBands, [50, 54]), '…while still covering the literal centreline body\'s own #50-#54').toBe(true);
 });

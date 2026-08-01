@@ -270,20 +270,58 @@ export const SLOT_HELIX_GAP = 'a HELIX entry: the slot descends at the ENTRY END
  *     bearing                             C3 — the passes run on the slot's own angle
  *     entry + rampAngle                   C4 — the ramp runs along the ROW, which for a slot IS its length
  */
-export function slotRasterParams(p = {}) {
+/**
+ * ── t1512 — THE SECOND RENDERING: the same frame with the pendant knobs as REGISTER WORDS ─────────────────────────
+ *
+ * A packed CAM slot needs THIS param set with `width`/`toolDia`/`stepoverPct`/`depth`/`stepdown`/`feed`/`plunge`/
+ * `clearance` as live `#11xx`-mirror registers, and the frame (bearing, length, A) baked — the arrangement
+ * `SLOT_CAM_PACK_DESIGN` settled. The obvious way to get it is a second function in `opToSlot` that re-derives
+ * `x = x0 + (width/2)·sin(bearing)`, and that is exactly the divergence this file keeps closing: the forward formula
+ * already has an inverse (`slotFromRasterParams`) that must track it, and a third copy in the CAM layer would make
+ * three places to keep in step. So `regs` is an OPTIONAL argument here instead — ONE formula, two renderings.
+ *
+ * `regs` ABSENT is the whole existing corpus and is byte-identical BY CONSTRUCTION, not by promise: every value falls
+ * to the number it always was, `y`'s sum is `y0 + (width/2)·(−cos)` where the original wrote `y0 − (width/2)·cos`
+ * (negation is exact in IEEE-754, so the two are bit-identical), and the spec asserts it over a sweep.
+ *
+ * ⚠ THE WIDTH TERM DISAPPEARS AT A ZERO COEFFICIENT, and that is a correctness point rather than tidiness. At
+ * bearing 0 the frame's `x` does not depend on the width at all (`sin 0` is exactly 0), so emitting
+ * `[5+[#35/2]*0.000000000]` would make `x` a LIVE word that the atom's own `surfaceRasterLiveInputs` then reports as
+ * a dialled input — a register standing where a build-time constant belongs, for a term that is not there.
+ *
+ * NINE DECIMALS on the coefficient: it multiplies `width/2` ONCE per coordinate with no recurrence (t1375's
+ * derivation — six would do; nine costs nothing and matches the helix's constants), and at every bearing this arm can
+ * actually take today the coefficient is exactly 0 or ±1 anyway.
+ *
+ * ⚠ AND THE GENERAL (angled) FORM IS WRITTEN EVEN THOUGH ONLY BEARING 0 CAN PACK TODAY. That is deliberate and it is
+ * the advisor's t1511 condition: the packed arm's eligibility asks the ATOM'S ENVELOPE, never a bearing check of its
+ * own, so when C5 teaches the atom to rotate a live frame the angled case lifts by the envelope opening — with this
+ * function, and the arm that calls it, unchanged.
+ */
+export function slotRasterParams(p = {}, regs = null) {
     const tool = Math.max(0.1, num(p.tool, 6));
     const width = num(p.width, tool);
     const x0 = num(p.x0, 0), y0 = num(p.y0, 0);
     const len = Math.hypot(num(p.x1, 60) - x0, num(p.y1, 0) - y0);
     const ang = slotBearingDeg(p);
     const rad = ang * Math.PI / 180;
+    const R = regs || {};
+    // ONE formula: `base + (width/2)·coef`, as a build-time number or as the same sum around a live width register.
+    const frame = (base, coef) => {
+        if (!R.width || coef === 0) return base + (width / 2) * coef;   // no live width, or no width term at all
+        // a UNIT coefficient prints no multiply — this is the axis-aligned case, i.e. every slot that packs today, and
+        // `[0 - [#1/2] * 1.000000000]` is noise in a macro an operator reads and a multiply the controller then does
+        const mag = Math.abs(coef) === 1 ? '' : ` * ${Math.abs(coef).toFixed(9)}`;
+        return `[${base} ${coef < 0 ? '-' : '+'} [${R.width}/2]${mag}]`;
+    };
+    const knob = (k, n) => (R[k] || n);   // the live register word for a knob, else the build-time number
     return {
         // the walked rect's near-edge MIDPOINT lands on A — UNROUNDED, see above
-        x: x0 + (width / 2) * Math.sin(rad), y: y0 - (width / 2) * Math.cos(rad), z0: 0,
-        w: len, h: width,
-        insetAlong: 0, insetAcross: tool / 2, rowAnchor: 'wall', bearing: ang,
-        toolDia: tool, stepoverPct: num(p.stepoverPct, 40),
-        depth: num(p.depth, 4), stepdown: num(p.stepdown, 1.5),
+        x: frame(x0, Math.sin(rad)), y: frame(y0, -Math.cos(rad)), z0: 0,
+        w: len, h: knob('width', width),
+        insetAlong: 0, insetAcross: R.toolDia ? `[${R.toolDia}/2]` : tool / 2, rowAnchor: 'wall', bearing: ang,
+        toolDia: knob('toolDia', tool), stepoverPct: knob('stepoverPct', num(p.stepoverPct, 40)),
+        depth: knob('depth', num(p.depth, 4)), stepdown: knob('stepdown', num(p.stepdown, 1.5)),
         strategy: 'parallel', direction: 'bothways', rowAxis: 'x',
         entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
         // t1500 — THE HELIX PAIR IS CARRIED THOUGH THIS ARM CAN NEVER TAKE A HELIX, and that is deliberate. The gate
@@ -293,9 +331,38 @@ export function slotRasterParams(p = {}) {
         // is the t1319 class (absence turned into a wrong concrete value); carrying the pair costs two keys in a
         // declaration that already has fifteen and removes the reliance on "nothing can reach it".
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1),
-        feed: num(p.feed, 2000), plunge: num(p.plunge, 150), clearance: num(p.clearance, 5),
+        feed: knob('feed', num(p.feed, 2000)), plunge: knob('plunge', num(p.plunge, 150)), clearance: knob('clearance', num(p.clearance, 5)),
     };
 }
+
+/**
+ * THE KNOBS A PACKED CAM SLOT MAKES LIVE, declared here beside the function that renders them — so the generator
+ * cannot make a register for a key `slotRasterParams` does not read, and a reader sees the live set in ONE place.
+ * `SLOT_CAM_PACK_DESIGN` (data/slotCapabilityArc.js) is the WHY; this is the list the code actually uses.
+ *
+ * `width` is here and the ENDPOINTS are not, which is the whole finding of the t1508 scout: `x`/`y` need the width
+ * only as `width/2 · <baked sin>` and a baked sine is a constant, while A and B feed a bearing and a length the
+ * controller cannot recompute (atan2 / hypot are V13-gated), so they bake TOGETHER WITH the frame they derive.
+ */
+export const SLOT_CAM_LIVE_KNOBS = ['width', 'toolDia', 'stepoverPct', 'depth', 'stepdown', 'feed', 'plunge', 'clearance'];
+
+/** The four the packed arm BAKES, with the bearing and length they derive — never a pendant register. */
+export const SLOT_CAM_BAKED_FRAME = ['ax', 'ay', 'bx', 'by'];
+
+/**
+ * ⚠ A PLACEHOLDER REGISTER MAP, AND THE REASON IT EXISTS IS A DEFECT THIS ACT ALMOST SHIPPED ─────────────────────────
+ *
+ * The pack's eligibility gate asks the atom's envelope "can you walk this slot?". Asked with the WIZARD's params that
+ * question is about a body of pure build-time numbers — and the pack is not going to emit that body, it is going to
+ * emit one whose knobs are registers. Measured: an ANGLED wide slot came back COVERED and packed, because with numbers
+ * the atom absorbs its own rotation, and the arm would then have built the live shape whose bearing t1510 proved gets
+ * DROPPED. The gate would have been asking about a program nobody builds — the same wrong question, one surface along.
+ *
+ * So the gate asks with THIS map: not real var numbers (it runs before allocation and does not need them), just words
+ * `liveWordOf` reads as live, over exactly the keys `SLOT_CAM_LIVE_KNOBS` declares. DERIVED from that list rather than
+ * written out, so a knob added to the live set cannot be missed by the question that decides whether it may go live.
+ */
+export const SLOT_CAM_PACK_REGS = SLOT_CAM_LIVE_KNOBS.reduce((a, k, i) => ({ ...a, [k]: '#' + (i + 1) }), {});
 
 /**
  * ── THE INVERSE OF `slotRasterParams`, for reading a re-pointed slot back OUT of its atom (t1500) ─────────────────
@@ -334,7 +401,13 @@ export function slotFromRasterParams(a = {}) {
  * false, and every clause a NARROWING. The discipline is t1402/t1406's: the question is not "will something run",
  * it is "will what runs be what was ASKED for". Where the answer is no the slot emits exactly what it always has.
  */
-export function slotRasterArmGap(p = {}) {
+/**
+ * `regs` (t1512) — the OPTIONAL register map the caller will actually EMIT with. The clauses below are all about the
+ * slot's own geometry and read the numbers either way; only the final question — the atom's own envelope — depends on
+ * the rendering, and it must be asked about the body that will really be built. The wizard passes nothing and is
+ * unchanged; the CAM pack passes `SLOT_CAM_PACK_REGS`, which is what makes an angled slot refuse there and not here.
+ */
+export function slotRasterArmGap(p = {}, regs = null) {
     const tool = Math.max(0.1, num(p.tool, 6));
     const width = num(p.width, tool);
     // The too-small law is untouched by all of this: it refuses with NO MOTION, so there is no walk to re-point.
@@ -357,7 +430,7 @@ export function slotRasterArmGap(p = {}) {
     // wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5, ramp) pass here now — see the retirement note above `slotPath`.
     // …and finally the atom's OWN envelope, asked in its own words, so this gate can never claim a coverage the
     // atom does not declare (the pocket asks the identical question at the identical point).
-    const probe = slotRasterParams(p);
+    const probe = slotRasterParams(p, regs);
     return surfaceRasterCovers(probe) ? '' : surfaceRasterGap(probe);
 }
 
