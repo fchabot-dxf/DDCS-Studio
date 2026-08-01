@@ -292,7 +292,46 @@ export function slotRasterParams(p = {}) {
         depth: num(p.depth, 4), stepdown: num(p.stepdown, 1.5),
         strategy: 'parallel', direction: 'bothways', rowAxis: 'x',
         entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
+        // t1500 — THE HELIX PAIR IS CARRIED THOUGH THIS ARM CAN NEVER TAKE A HELIX, and that is deliberate. The gate
+        // routes every helix entry to the literal kernel, so these are unread here — but leaving them off made the
+        // atom's param set INCOMPLETE against its own declaration, and the canvas round trip then materialised the
+        // absent `helixPitch` as 0 where the block declares 1. A body whose params change by merely being looked at
+        // is the t1319 class (absence turned into a wrong concrete value); carrying the pair costs two keys in a
+        // declaration that already has fifteen and removes the reliance on "nothing can reach it".
+        helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1),
         feed: num(p.feed, 2000), plunge: num(p.plunge, 150), clearance: num(p.clearance, 5),
+    };
+}
+
+/**
+ * ── THE INVERSE OF `slotRasterParams`, for reading a re-pointed slot back OUT of its atom (t1500) ─────────────────
+ *
+ * The reverse-sync (Blocks → the wizard form) has to answer "what slot is this?" from a block that no longer says
+ * `slot` anywhere. ⚠ THIS IS READING A DECLARATION BACKWARDS, NOT INFERRING INTENT FROM OUTPUT — every line below is
+ * the algebraic inverse of the line above it in `slotRasterParams`, which is the distinction t1406 drew when pocket
+ * needed the same thing (`pocketWallOffsetFromInset`). Derive it from the emitted G-code instead and the reader
+ * becomes a parser of its own output, which is the failure mode this project keeps closing.
+ *
+ *     forward:  x = x0 + (width/2)·sin(bearing)   ·   y = y0 − (width/2)·cos(bearing)   ·   w = |B−A|   ·   h = width
+ *     inverse:  x0 = x − (width/2)·sin(bearing)   ·   y0 = y + (width/2)·cos(bearing)   ·   B = A + w·(cos,sin)
+ *
+ * The tool comes back from `insetAcross` (which the forward direction set to tool/2) — the one socket that carries
+ * it, since the atom's `toolDia` and the slot's are the same number by construction and the inset is what the walk
+ * actually rides. Asserted round-trip-exact against the forward function in tests/slot-twin-repoint-1500.spec.js.
+ */
+export function slotFromRasterParams(a = {}) {
+    const width = num(a.h, 6);
+    const ang = num(a.bearing, 0), rad = ang * Math.PI / 180;
+    const x0 = num(a.x, 0) - (width / 2) * Math.sin(rad);
+    const y0 = num(a.y, 0) + (width / 2) * Math.cos(rad);
+    const len = num(a.w, 60);
+    return {
+        x0, y0, x1: x0 + len * Math.cos(rad), y1: y0 + len * Math.sin(rad),
+        width, tool: num(a.insetAcross, num(a.toolDia, 6) / 2) * 2,
+        stepoverPct: num(a.stepoverPct, 40), depth: num(a.depth, 4), stepdown: num(a.stepdown, 1.5),
+        entry: a.entry || 'plunge', rampAngle: num(a.rampAngle, 3),
+        helixDia: num(a.helixDia, 0), helixPitch: num(a.helixPitch, 1),
+        feed: num(a.feed, 2000), plunge: num(a.plunge, 150), clearance: num(a.clearance, 5),
     };
 }
 

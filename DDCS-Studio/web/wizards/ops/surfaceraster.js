@@ -1699,7 +1699,26 @@ export const surfaceRasterBlock = {
     flowLabels: (p = {}) => {
         const out = ['errLabel', 'okLabel'];
         if (String(p.zMode || '') === 'skim') out.push('skimErrLabel', 'skimOkLabel');
-        if (liveWordOf(p.inset) || Math.max(0, num(p.inset, 0)) > 0) out.push('insetErrLabel', 'insetOkLabel');   // t1425 — a LIVE inset is an inset
+        /**
+         * ⚠ t1500 — ASKED THE WAY THE BODY ASKS IT, and the previous form was a REAL label collision waiting for its
+         * first caller. This read `p.inset` alone; the body (see `insetOn`) reads the RESOLVED PAIR through
+         * `rasterInsetAxes`. Those agree for every caller that passes one scalar — which was every caller until the
+         * slot re-point — and disagree exactly when a caller passes `insetAlong`/`insetAcross` with NO scalar, which
+         * is what a slot passes (0 along, tool/2 across).
+         *
+         * The consequence was not cosmetic. The body emitted the collapsed-inset refusal pair while this declaration
+         * withheld it, so `uniquifyFlowLabels` reserved no numbers for it and the pair fell back to the legacy 95/96
+         * — numbers the ROW walk had already been given in the same program. MEASURED on a 30° 16mm slot: `N95` and
+         * `N96` each appeared TWICE, so `IF #40 <= 0 GOTO95` (meaning "refuse") landed in the middle of the row walk
+         * and the row walk's own `GOTO95` landed on the refusal. Ambiguous on the controller exactly as in the sim,
+         * which is the defect t1408 built this whole mechanism to prevent.
+         *
+         * Byte-identical for every existing caller by construction: with one scalar inset `rasterInsetAxes` returns
+         * that same number on both axes, so the predicate below is the one it replaces.
+         */
+        const insetAx = rasterInsetAxes(p);
+        const insetOnDecl = [insetAx.x, insetAx.y].some((v) => liveWordOf(v) || Math.max(0, num(v, 0)) > 0);   // t1425 — a LIVE inset is an inset
+        if (insetOnDecl) out.push('insetErrLabel', 'insetOkLabel');
         if (String(p.strategy || '') === 'concentric') {
             out.push('ringStepLabel', 'ringCutLabel');
             // t1425 — the runtime shorter-side branch exists only when the area is dialled

@@ -243,6 +243,36 @@ export const SLOT_CAM_INHERITANCE = [
         + 'when it lands' },
 ];
 
+/**
+ * ⚠ t1500 — THE RE-POINT LANDED, AND THE TWO HALVES OF "INHERITS" CAME APART. Recorded on the design rather than
+ * left for a reader to infer, which is the discipline the `landed` rows above follow.
+ *
+ * The rows above were written as if one event lifted both halves. It did not. The WIZARD side shipped: an eligible
+ * slot's clearing IS the atom now (`slotStack` forks on `slotStackArmGap`), measured against the frozen kernel move
+ * for move across 400+ configs. **The CAM width gate did NOT move, and that is correct rather than unfinished** —
+ * lifting it means teaching `opToSlot` to pack the atom's macro instead of its own centreline body, which is
+ * generator work with its own bridge, not a consequence of the wizard delegating. `slot-capability-arc-1478` pins
+ * the gate as still refusing, so the two cannot be quietly conflated.
+ *
+ * AND THE EXPRESSIBLE DOMAIN IS SMALLER THAN THESE ROWS IMPLY. "Slots of any width" and "slots at ANY angle" are
+ * both true only outside FOUR gates that t1498/t1500 measured, one of which the arc never named (see
+ * `SLOT_RAMP_PARTIAL_GAP` — a ramp over a partial last bite, which the SHIPPED DEFAULTS land in).
+ */
+export const SLOT_REPOINT_LANDED = {
+    wizard: 'SHIPPED at t1500. `slotStack` forks at the PLACE on a derived `_para`: the eligible slot\'s clearing is '
+        + 'ONE `surfaceraster`, everything the gate refuses keeps the literal kernel byte-identically. The twin '
+        + '(`slot_data`) became a SUPERSET twin in the same act — it had to, because a frozen template seeded at the '
+        + 'zero-band defaults would have emitted the LITERAL slot where the form emitted the ATOM (t1498 measured it '
+        + 'at width 14), and two paths cutting differently for one parameter set is worse than not re-pointing',
+    camGate: 'NOT LIFTED, deliberately. Packing the atom\'s macro into a CAM slot is `opToSlot` work with its own '
+        + 'bridge; the wizard delegating does not do it. The gate still refuses a slot wider than its tool and still '
+        + 'names the wizard as the exit',
+    gates: 'FOUR, not the two this arc inventoried: the ZERO BAND (width == tool), the HELIX entry-end clamp, a RAMP '
+        + 'over a PARTIAL last depth level (t1498 — NOT in the inventory, and the shipped defaults are in it), and a '
+        + 'PATTERNED slot (t1500 — an `array` is not self-framing, so a placed pattern is refused by `translateProgram` '
+        + 'and would silently lose its placement)',
+};
+
 /** The one thing this arc does NOT touch, restated so it cannot be folded in by accident. */
 export const SLOT_ARC_NOT_INCLUDED = {
     what: 'rest machining (REST_PARAMETRIC_GAP)',

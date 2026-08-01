@@ -22,6 +22,7 @@ import { FN } from './blockly/bridge.js';   // t391 — the Blockly field name (
 import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve method (incl. legacy mode/magType) for the declared-param reconcile fallback
 import { methodRampForCycle } from '../wizards/drillWizard.js';   // t1387 — the DECLARED inverse of cycleForMethod: the merged hole block has no leaf TYPE to read method/ramp off
 import { pocketWallOffsetFromInset } from '../wizards/ops/pocketfill.js';   // t1406 — the DECLARED inverse of pocketInsetMm: the re-pointed fill carries `inset`, not `wallOffset`
+import { slotFromRasterParams } from '../wizards/ops/slot.js';   // t1500 — the DECLARED inverse of slotRasterParams: the re-pointed slot carries an atom, not a `slot` leaf
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
 // (e.g. a 'stepdown') whether or not the op is wrapped in an op-container.
 const find = (prog, type) => {
@@ -80,6 +81,30 @@ const RECONCILERS = {
         }, placeFields(prog, 'sf_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the region
     },
     slot(prog) {
+        /**
+         * ── t1500 — THE RE-POINTED ARM READS FIRST, and it is a DIFFERENT SHAPE (pocket's t1406 lesson, one op along)
+         *
+         * On the eligible arm the clearing is ONE `surfaceraster` and there is no `slot` block anywhere in the
+         * program. The reader below opens with `find(prog,'slot')`, so left alone it would DECLINE outright and an
+         * edited parametric slot would silently fail to reconcile — t1387's named failure mode: a reader that
+         * identifies an arm by a block that moved. Swept in the act that moves it, not after.
+         *
+         * The geometry comes back through `slotFromRasterParams`, the declared ALGEBRAIC INVERSE of the same one
+         * source that built the atom — not by measuring the emitted path.
+         */
+        const sr = find(prog, 'surfaceraster');
+        if (sr && sr.params) {
+            const q = slotFromRasterParams(sr.params), wb0 = find(prog, 'wcs');
+            const f0 = {
+                sl_wcs: (wb0 && wb0.params && wb0.params.wcs) || 'active',
+                sl_ax: q.x0, sl_ay: q.y0, sl_bx: q.x1, sl_by: q.y1, sl_width: q.width,
+                sl_toolDia: q.tool, sl_stepoverPct: q.stepoverPct, sl_depth: q.depth, sl_stepdown: q.stepdown,
+                sl_entry: q.entry, sl_rampAngle: q.rampAngle,
+                sl_feed: q.feed, sl_plunge: q.plunge, sl_clearance: q.clearance,
+                sl_pattern: 'single',   // the arm is single-slot by its own gate — a pattern keeps the literal kernel
+            };
+            return Object.assign(f0, placeFields(prog, 'sl_', 'offX', 'offY'));
+        }
         const s = find(prog, 'slot');
         if (!s || !s.params) return null;
         const p = s.params, wb = find(prog, 'wcs');

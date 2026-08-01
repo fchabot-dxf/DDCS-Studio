@@ -13161,3 +13161,120 @@ The domain is now MEASURED, not assumed: build the swap against `slotRidesRaster
 do the five twin steps above in order, and the bridge evidence is already written and green. The three gates that
 route a slot literal are the zero band, the helix, and the partial-bite ramp — that last one is new, so any plan
 written before this entry is one gate short.
+
+## t1500 (seat A, fresh) — THE SLOT RE-POINT LANDS. The twin converts, the swap ships — and the act found a LABEL COLLISION that would have cut a wrong slot.
+
+Dispatched to finish the re-point: convert the twin, re-land the parked swap, sweep the reconciler, take the payoff
+shot. All of that landed. But the turn's real finding is the defect the re-point made REACHABLE, so this entry leads
+with it rather than with the plumbing.
+
+### ⚠ THE FINDING — the atom DECLARED one set of flow labels and its BODY wrote another
+
+`surfaceraster` declares the flow labels it will write (`flowLabels`) and `uniquifyFlowLabels` assigns them per
+PROGRAM — the mechanism t1408 built after measuring a drill op beside a surfacing op both writing `N91`/`N92`, the
+second silently not executing. **That declaration asked `p.inset`. The body asks the RESOLVED PAIR** (`insetOn`, via
+`rasterInsetAxes`).
+
+Those two agree for every caller that passes ONE scalar inset — which was every caller in existence — and disagree
+exactly when a caller passes `insetAlong`/`insetAcross` with **no** scalar. That is precisely what a slot passes:
+`0` along, `tool/2` across. So the body emitted the collapsed-inset refusal pair, the declaration withheld it, no
+numbers were reserved, and the pair fell back to the legacy `95`/`96` — **numbers the row walk had already been
+given in the same program.**
+
+Measured on a 30 degree 16mm slot, before the fix:
+
+    N95 and N96 each appear TWICE     IF #40 <= 0 GOTO95  ("refuse")  lands INSIDE the row walk
+                                      the row walk's own GOTO95        lands on the refusal
+    traced: 2 cut moves, min Z -2.0   ...of a 24-move, -6.0mm program
+
+Ambiguous on the controller exactly as in the sim. **This is the defect class the whole `flowLabels` mechanism
+exists to prevent, reappearing through the declaration rather than through the counter.** The fix is one predicate:
+`flowLabels` now asks the question the BODY asks, from the body's own source. Byte-identical for every existing
+caller by construction — with one scalar inset `rasterInsetAxes` returns that number on both axes, so the new
+predicate IS the one it replaces — and the surfacing/pocket/raster families (318 tests) are green on it.
+
+**How it was found is the part worth keeping.** It was not found by a test I wrote for it; it was found because the
+payoff SCREENSHOT looked wrong — the sim traced two moves where it should have traced twenty-four. I nearly wrote it
+off twice as a harness problem, first as a stale animation listener and then as a viewport issue, and both of those
+were ALSO true, which is exactly what lets this kind of thing survive. The instruction to take a picture of the work
+is what caught a defect five specs did not.
+
+### WHAT LANDED — the five twin steps, in the order t1498 wrote them
+
+1. **`slotLeafParams`** — the wizard-names to leaf-names map extracted and declared ONCE. Both the stack builder and
+   the twin's guard hook read it; the byte-identity claim is that both sides ask the same question of the same
+   numbers, and two copies of the map would have been two chances to answer differently.
+2. **`slotStack(params, {superset:true})`** — both arms guarded on a derived `_para`, and the fork sits at the
+   **PLACE**, not inside one: `absorbingChild` is strict about exactly ONE child, so a guard holding two clearings in
+   a single place would stop the atom being handed its frame as params and the shift would be painted onto its macro
+   text (t1349's shear).
+3. **Identity `bindingSpecs`** — every socket named by the TYPE that carries it, `slot`-leaf rows OPTIONAL because
+   the re-pointed arm has no `slot` block at all. The form's bindings derive over a canonical stack PINNED to
+   `_para:false`, deliberately: only the literal arm carries a socket for every param, so deriving the form over the
+   parametric arm would silently drop the whole geometry cluster from the wizard.
+4. **`deriveGuards` / `postInstantiate`** — `_para` reads `slotStackRidesRaster`, the same one source the concrete
+   build asks; the atom's params are written WHOLE from `slotRasterParams`. No bindings on the atom at all, and that
+   is a decision: its slot-side inputs are an `atan2` bearing, a `hypot` length and an `A - R(bearing)(0, width/2)`
+   placement, so binding the few that copy over and deriving the rest would give one param set two sources.
+5. **THE SWAP**, re-landed — and `slot-as-data` is green BECAUSE of the twin, not despite it. The width-14 case that
+   parked it at t1498 is asserted by name, in both directions: parametric on both paths at width 14, literal on both
+   at the zero-band defaults.
+
+### A FOURTH GATE, and its stated reason was WRONG until I drove it
+
+A PATTERNED slot keeps the literal kernel. I wrote the clause from t1349's memory — "the array is not self-framing,
+so a placed pattern SHEARS" — and the test refused it. **t1353 already closed the shear**: `translateProgram`
+REFUSES a parametric body and hands it back untouched. So the real outcome is not a sheared path but an UNPLACED
+one, silently ignoring the stock-attach and offset the operator set. Quieter, no better, still refused — but the
+declaration now says what actually happens, because a refusal whose reason is only asserted in a comment is a
+refusal nobody can check.
+
+### THE FORK t1490 LEFT OPEN — answered by measurement, and it did not need the feared fix
+
+t1490 declared `insetAlong`/`insetAcross` on the block, the full suite refused it (the iron rule went 11 to 12: a
+NULLABLE field does not survive the Blockly round trip), and the pair was left emitter-only with a note: *"THE DAY A
+BLOCK MUST CARRY THEM, the nullable round trip is the thing to fix first."* This was that day — a re-pointed slot's
+block carries all four of `bearing`, `rowAnchor`, `insetAlong`, `insetAcross`.
+
+**I did not fix the nullable round trip, because measuring showed it was not the problem.** t1490's failure came
+from DECLARING the keys with null defaults; UNDECLARED keys pass through the bridge untouched. Driven on a real
+canvas (31 blocks rendered, a genuinely new object back): all four survive with their values, and `rasterInsetOf`
+still lets the PAIR win over the `inset: 0` the bridge materialises — which matters, because if that precedence ever
+flipped, an angled slot would come back walking with no tool-radius offset and cut a channel one full tool diameter
+oversize. The iron rule is **11/11, the same eleven**; `user_slot_data` did not join. The fork stays open for
+whoever really needs the pair DECLARED; this act did not.
+
+Two things caught in passing while measuring it: `helixPitch` came back `0` where the block declares `1` (the atom's
+param set was incomplete against its own declaration, so `slotRasterParams` now carries the helix pair even though
+this arm can never take a helix — a body whose params change by being LOOKED at is the t1319 class), and the
+`clearance` frontier had to close (identity specs bind the fan-out; leaving it frozen would have had the twin
+retract to 5mm while the form retracted to whatever the operator typed).
+
+### SWEPT IN-ACT
+
+- **The reconciler.** `RECONCILERS.slot` opened with `find(prog,'slot')` and would have DECLINED on an arm with no
+  such block — t1387's named failure mode. The parametric arm reads first now, through `slotFromRasterParams`, the
+  declared ALGEBRAIC INVERSE of `slotRasterParams` (asserted identity-exact at 21 bearing x size combinations).
+  Driven end-to-end in the real app: insert an angled wide slot, `replayReconcile`, and the rebuild comes back
+  parametric and socket-for-socket identical to the one the form built.
+- **The envelope rows.** `SLOT_REPOINT_LANDED` records the wizard-side delegation as shipped and the CAM width gate
+  as deliberately NOT lifted — the arc's `SLOT_CAM_INHERITANCE` rows were written as though one event did both, and
+  it did not. It also records that the gate inventory is FOUR, not the two the arc named.
+- **`@work`.** The re-pointed body declares its own work, asserted greater than 0 on every accepted config, so the
+  sim's trace cap is declared rather than guessed.
+- **Iron rule 11** — shrink-only, held at 11/11.
+
+### GATES
+
+- smoke **71/71** · surfacing + pocket + raster + slot families **318/318** · CAM + blocks + mill **206/206** ·
+  labels / declared-work / trig-lift / cam-arm / iron-rule **31/31**. Zero failures.
+- New spec `slot-twin-repoint-1500.spec.js` **11/11**; `slot-as-data.spec.js` rewritten (position to identity) **2/2**.
+- Screenshots: `scratchpad/slot_repoint_1500_{form,midplay,desktop}.png` — the angled 16mm channel with its parallel
+  passes running on the slot's own bearing, which is what the whole capability arc was for.
+
+### CAPACITY, plainly
+
+This seat had the room the act needed and used it. The label collision cost the most and was worth every minute: it
+is a wrong-cut defect on a user-facing op and it was one screenshot away from shipping. The remaining queue items
+(SQRT / V13-prep, the bottom-handle defect, the mobile CAM cleanup, true-arc helix, flake hardening) are all
+independent of this arc; none of them needs a fresh seat on account of anything left here.
