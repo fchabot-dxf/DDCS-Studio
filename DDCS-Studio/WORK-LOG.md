@@ -12877,3 +12877,90 @@ this controller, V13's decision. Its BAKED form is two build-time constants and 
 be ruled before the act starts, not during it.
 
 **Full suite on the branch: 2299 passed, 6 skipped, 0 failed.** Branch `wip/c1-phase-clamp`.
+
+## t1494 (seat A) — C3: THE BAKED BEARING. The slot capability arc CLOSES.
+
+### THE CAPABILITY, AND WHY IT ADDED NO MACHINERY
+
+A bearing is a rotation, and this atom has had a rotation since t1375. So C3 is not a new mechanism — it is
+`bearingShift`, which resolves the BEARING (about the op's declared origin) and the PROGRAM ROTATION (about the part
+datum) into **one rotation by the sum, about a shifted origin**. That is the arc row's own promise — *"two build-time
+rotations are ONE sum, so they compose for free while both are baked"* — made exact rather than assumed:
+
+    t = R(−γ)(k)     γ = rotAngle + bearing, k = the composite's image of the datum
+
+**The algebra was verified numerically before a line of emit changed** (worst 5.7e-14 over six angles × five pivots ×
+five points), including the degenerate it warns about: when the two angles cancel there is no fixed point and the
+composite is a pure TRANSLATION — which costs nothing here, because a pure translation is exactly what an origin
+shift is. That is the whole reason the composite form is expressed as *(shift the origin, rotate about zero)* rather
+than as *(find the composite pivot)*: one form covers every case, including the one with no pivot to find.
+
+### ⚠ THE ASSERT THAT EARNED THE ACT: "a bearing must be a PURE ROTATION of the atom's own unrotated path"
+
+Not against `slotPath` — against the atom ITSELF, which is what makes it able to distinguish a code defect from a
+harness defect. It caught **both** of this act's real errors, and then a third that was mine and not the code's:
+
+1. **The pivot was the WALK origin, not the DECLARED one.** The walk origin is the rect corner *after* C2's inset has
+   moved in, so rotating about it applied the inset in the UNROTATED frame — holding the walk in from the world's Y
+   instead of across the PASS. Measured against `slotPath`: 0.349mm out at 30°, 0.622 at 45°, **60.0 at 90°**.
+2. **The frame's origin was shifted while the walks still declared their affine constants from the unshifted one.**
+   `mv`'s unrotated word came from the frame; its rotated form came from the constants; they disagreed by exactly the
+   shift, so a bearing produced something that was not a rotation of anything (2.598mm at 30°, 6.0 at 90°). The fix
+   is one binding: compute the shift BEFORE `x0`/`y0` are bound, so there is ONE origin and both read it.
+3. **And one that was the harness's own**: the bridge rounded its computed op placement to the emit's 3 decimals,
+   injecting half a quantum of placement error and reporting it as a 0.0020mm code difference at 137.5°. It vanished
+   when the harness stopped rounding its own inputs. Written into the spec so the next reader does not re-diagnose
+   it as a code fault — this is the second time this act that a test's own arithmetic masqueraded as a defect.
+
+### THE THREE MEASUREMENTS
+
+- **THE NULL CASE — 864 configs, 0 differ.** The arc row calls this the strongest assert this step has, and it is
+  right. It holds by CONSTRUCTION: a zero bearing takes the untouched path entirely, because the composite form
+  picks a different pivot and shifts the origin — arithmetically identical, but it prints different intermediate
+  constants, and the identity sweep covers rotated configs.
+- **SELF-CONSISTENCY** at five angles, worst 0.0003mm — inside the emit's own quantum.
+- **THE BRIDGE** against `slotPath` at seven bearings (0 / 30 / 45 / 90 / −30 / 137.5 / 180), all within one quantum.
+
+### THE BOUNDARY: ALL FOUR CLAUSES RETIRED, AND WHAT THAT DOES AND DOES NOT MEAN
+
+`SLOT_RASTER_GAP` was four measured ways a slot is not a rect the atom walks. C4 retired the descent's ramp half,
+C2 the inset, C1 the row rule, C3 the axis. **The declaration no longer describes a walk the atom cannot do.**
+
+What it holds now is **TWO NAMED EVIDENCE GATES**, and the distinction is the one this file was written to protect:
+a DIALLED bearing needs COS/SIN of a runtime angle (trig, unverified — V13 decides), and a slot HELIX entry still
+wants the true-arc form the atom does not have, so the atom helixes in the middle of the channel clamped by the rect
+inradius rather than at the ENTRY END clamped to the slot width. A **baked-bearing, plunge-or-ramp** slot is
+expressible by the atom today — and whether to re-point the kernel onto it is **a RULING, not a capability gap.**
+The arc closed; the decision did not.
+
+### THE CAM WIDTH-GATE LIFT — MEASURED, NOT BUILT (the second half of the dispatch)
+
+**It is NOT a rider. It is its own act, comparable in size to C1 or C2.** Four things it needs, measured on the real
+generator rather than estimated:
+
+1. **A new generator arm.** Today's `slotFromOp` slot body is ten lines — one centreline pass per level. Packing the
+   atom means mapping A→B into the atom's rect plus a baked bearing (`atan2` is a build-time computation, so the
+   baked form suffices) with `insetAlong: 0`, `insetAcross: tool/2`, `rowAnchor: 'wall'`.
+2. **⚠ THE CAM SLOT'S FIELD LIST MUST GROW.** Its declared fields are `ax, ay, bx, by, depth, stepdown, feed,
+   clearance, rpm` — there is no `tool` and no `stepoverPct`, and the atom needs both. Adding them changes the
+   `#2600` layout, which is a FORMAT change for slots already packed and installed on a controller.
+3. **⚠ A REGISTER-BAND RECONCILIATION, and it is the PROOF-4 class.** Today's slot body writes `#50` as its depth
+   counter; the atom's band is `#34–#49` (+ `#62–#64`) and the probe temps sit at `#50–#61`. The slot's own local
+   field vars are allocated from `varOffset`, so the union has to be re-derived and `camScratch`'s `bandsFor('slot')`
+   re-declared. This is exactly the collision class `camScratch` exists for.
+4. **Its own bridge family** — the packed macro against `slotPath` at width > tool, plus the existing cam-arm
+   classification specs, plus the gate's refusal sentence, which must keep naming an exit for whatever stays refused
+   (t1444: an operator told "unsupported" with no exit does the wrong thing next).
+
+### CAPACITY — I passed my own tripwire, and I am saying so plainly
+
+At t1492 I set myself the condition "park at the first slip in the emit path". This act had **two** emit-path
+geometry defects. I did not park, because both were caught by my own assert before any declaration was written
+against them and the act was in a good state rather than a half-landed one — but that was my judgement overriding my
+own stated rule, and the advisor should weigh it rather than take the green suite as the whole story.
+
+**Five acts this seat.** The arc is complete and every gate is green, which makes this the natural boundary. The CAM
+lift above is a fresh-seat act on its own merits — it is a format change plus a register reconciliation, which is
+the class where a stale assumption costs the most.
+
+**Full suite on the branch: 2309 passed, 6 skipped, 0 failed.** Branch `wip/c3-baked-bearing`.
