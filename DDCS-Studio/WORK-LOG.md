@@ -13278,3 +13278,86 @@ This seat had the room the act needed and used it. The label collision cost the 
 is a wrong-cut defect on a user-facing op and it was one screenshot away from shipping. The remaining queue items
 (SQRT / V13-prep, the bottom-handle defect, the mobile CAM cleanup, true-arc helix, flake hardening) are all
 independent of this arc; none of them needs a fresh seat on account of anything left here.
+
+## t1502 (seat A) — THE THREE REDS, GROUNDED. None was a broken feature; two were a coincidence the re-point removed and one was a PREMISE that this arc deliberately changed.
+
+Dispatched to diagnose three full-suite reds before the re-point deploys, and to "restate-or-fix as the truth falls".
+All three fell the same way: the code under test is correct, and the ASSERTIONS were resting on facts that the
+re-point moved. Each is restated to what is now true, and each restatement is stronger than the line it replaces.
+
+### RED 1 + 2 — `tool-picker-1b-768` :32 and :71. The test was passing on a coincidence.
+
+Both failed with a null deref, which reads like a broken tool picker. It is not. **A mill twin's form has TWO
+legitimate gears**: the tool library's, and the WCS deep-link that EVERY twin inherits from `FIELD_LINKS` (one
+source, no per-twin declaration). The spec found "the wizard ⚙" with
+`[...form.querySelectorAll('button')].find((b) => b.textContent === '⚙')` — *whichever renders first*.
+
+MEASURED both sides by checking the previous commit's slot files out and driving the real form, rather than
+reasoning about it:
+
+    pre-change   entryX, entryY, toolNum, wcs, …    gears = [toolNum, wcs]   -> first is the TOOL gear   PASS
+    post-change  entryX, entryY, wcs, …, toolNum    gears = [wcs, toolNum]   -> first is the WCS gear     FAIL
+
+So the click opened the WCS table, no `toollib-modal` existed, and the next line dereferenced null. Targeted at the
+tool row the picker is entirely healthy: `pickmode: true, useVisible: true, boundVal: '5', closed: true`.
+
+**FIXED ON BOTH SIDES, because both were genuinely wrong.**
+
+- The SPEC's locator is ambiguous by construction — it says "the wizard ⚙" as though a wizard had one. It now anchors
+  on the `toolNum` row and additionally asserts BOTH gears exist by name. That is strictly MORE precise, not looser:
+  a genuinely broken tool gear still fails every assertion. Naming the WCS gear also means it cannot silently vanish.
+- The FORM's order was an accident either way. `toolNum` used to reach the form through `toolBindingsFor` PREPENDED
+  to the bindings array (rendering third, ahead of WCS); moving it into the specs — where it belongs, so it
+  re-derives over the pruned stack — dropped it DEAD LAST, after the entry markers and the spindle RPM. Neither
+  position was chosen. It is now SPLICED immediately before `toolDia`, the field the picker exists to fill, which is
+  the project's declared row order (identity → geometry → tool/cut) and keeps the control beside its effect.
+
+⚠ Stated plainly because it matters: the splice also happens to restore the property the old locator depended on.
+That is NOT why it was done, and it is not what makes the specs pass — the restated locator is order-independent, so
+it would pass with `toolNum` anywhere. Both changes stand on their own or neither should have been made.
+
+### RED 3 — `editor-indent-1450` :184. The one the dispatch could not name, and t1498 predicted it.
+
+The advisor's isolation run had wiped the artifact, leaving only a test-ID prefix (`678bf73e…`). That prefix is not
+reversible here — this Playwright's `--list --reporter=json` emits no `id` field — and a targeted band of 48
+slot-twin / form-invariant specs came back clean. So I ran the full suite (2335 tests, 18.2 min): **2328 passed, 1
+failed**, and the one was `editor-indent-1450:184` — exactly the second spec t1498 recorded as going red when the
+swap was first tried, and green again when it was taken back out.
+
+Its assertion: *"the literal-transcript programs carry no indentation at all"* → `['pocket circle', 'slot']`. Its
+slot case is `width: 14, toolDia: 6` — **the width-14 config, which is precisely what this arc re-pointed**. It now
+emits a nested depth/row walk: 29 of 61 lines indented. The expectation did not break; its PREMISE was deliberately
+changed by the act it is guarding.
+
+RESTATED TO KEEP BOTH FACTS rather than swapping one for the other. The sweep now carries TWO slot cases — the
+re-pointed one, and a literal one pinned by `entry: 'helix'` (a DECLARED, permanent gate, not an incidental config,
+so this row cannot quietly re-point later the way the first one did) — and asserts them as a PAIR:
+
+    slot           29/61 indented     the re-pointed arm emits real loop bodies
+    slot literal    0/145 indented    the same geometry, one knob apart, still a flat transcript
+
+Neither half can pass alone, and the literal-transcript claim the spec was written for still has a subject.
+
+### A HAZARD WORTH THE ENTRY — `git stash` IS SHARED IN THIS REPO
+
+While holding the advisor's docs back for a probe I used `git stash push … <paths>` then `git stash pop`, and the pop
+took **another agent's** entry (`On worktree-agent-…: temp: verify corner-emit fails on base too`), leaving `UU`
+conflicts in three files I have never touched (`blocksApp.js`, `bridge.js`, `styles.css`). Nothing was lost — a
+conflicted pop KEEPS the entry — and the clean undo is `git restore --staged --worktree <those paths>`, never
+`git stash drop`, which would have destroyed their work. Their stash is intact.
+
+The lesson is not "be careful with stash", it is **do not use the stash at all in a repo other agents share**: the
+stack is global and unowned. To hold files back, `git checkout <ref> -- <paths>` and `git checkout HEAD -- <paths>`
+to restore — which is what I used for the pre-change measurement above, and it is both safer and more precise.
+
+(Also re-learned the cwd rule the hard way for one command: `npx playwright` from the REPO ROOT pulls a different
+Playwright and throws the spurious `test.use()` collection error. Always cd to `DDCS-Studio` first.)
+
+### GATES
+
+- Full suite BEFORE these fixes: 2328 passed / **1 failed** / 6 skipped (the red identified above).
+- Full suite AFTER: **2329 passed / 0 failed / 6 skipped** (2335 total, 18.3 min). Same total, the one red converted
+  — no test was deleted or skipped to get there.
+- `tool-picker-1b-768` **5/5** · `editor-indent-1450` **8/8** · the slot-twin + as-data set green.
+- Nothing released this turn; V2026.07.31.15 from t1500 stands, its deploy gated on the advisor's own green.
+- Proc tree clean.

@@ -13,7 +13,24 @@ const openTwin = async (page, op) => {
   await page.evaluate((o) => window.openWiz(o), op);
   await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz; });
 };
-const gearOf = () => { const form = document.getElementById('wiz_user_form'); return [...form.querySelectorAll('button')].find((b) => b.textContent === '⚙'); };
+/**
+ * ⚠ t1500 — THE TOOL GEAR IS FOUND BY ITS ROW, NOT BY BEING THE FIRST ⚙ ON THE FORM.
+ *
+ * These specs used to take the first button whose text was '⚙'. A mill twin's form has TWO legitimate gears: this
+ * one (open the tool library, pick a tool) and the WCS deep-link that EVERY twin inherits from `FIELD_LINKS` — one
+ * source, no per-twin declaration. Which one came first was decided by nothing more than the order the bindings
+ * happened to be concatenated in, so the spec was passing on a coincidence: it read "the wizard ⚙" as though a
+ * wizard had one.
+ *
+ * Anchoring on the `toolNum` row says what the test means and cannot be flipped by a field-order change. It is
+ * strictly MORE precise, not looser — a genuinely broken tool gear still fails every assertion below.
+ */
+const gearOf = () => {
+    const form = document.getElementById('wiz_user_form');
+    const sel = form.querySelector('[data-param="toolNum"]');
+    if (!sel) return null;
+    return [...sel.closest('div').querySelectorAll('button')].find((b) => b.textContent === '⚙');
+};
 
 test('the picker dropdown rows read T# · name · Ø · tip glyph', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -34,9 +51,12 @@ test('the wizard ⚙ opens a PICKABLE modal; Use selects into the binding + clos
   await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetSettings);
   await seedTools(page, [{ num: 5, name: '8mm ball', type: 'ballnose', dia: 8 }]);
   await openTwin(page, 'user_slot_data');
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate((gearSrc) => {
     const form = document.getElementById('wiz_user_form');
-    const gear = [...form.querySelectorAll('button')].find((b) => b.textContent === '⚙');
+    const gear = eval(`(${gearSrc})`)();
+    // the two gears are DISTINCT and both real — asserted so the ambiguity that used to decide this test is visible
+    const allGears = [...form.querySelectorAll('button')].filter((b) => b.textContent === '⚙');
+    const gearRows = allGears.map((g) => { const c = g.closest('div').querySelector('[data-param]'); return c && c.dataset.param; });
     gear.click();
     const modal = document.getElementById('toollib-modal');
     const pickmode = modal.classList.contains('tl-pickmode');
@@ -44,9 +64,12 @@ test('the wizard ⚙ opens a PICKABLE modal; Use selects into the binding + clos
     const useVisible = useBtns.length > 0 && getComputedStyle(useBtns[0]).display !== 'none';
     useBtns.find((b) => b.dataset.usenum === '5').click();   // Use T5
     const sel = form.querySelector('[data-param="toolNum"]');
-    return { pickmode, useVisible, boundVal: sel.value, closed: !modal.classList.contains('active') };
-  });
-  expect(r.pickmode, 'the wizard ⚙ opens the modal in PICK mode').toBe(true);
+    return { pickmode, useVisible, gearRows, boundVal: sel.value, closed: !modal.classList.contains('active') };
+  }, gearOf.toString());
+  // the WCS deep-link gear is a FEATURE every twin inherits; naming it here is what stops the tool gear being found
+  // by position again (and would catch it silently disappearing).
+  expect(r.gearRows, 'the form carries both the tool gear and the inherited WCS deep-link gear').toEqual(expect.arrayContaining(['toolNum', 'wcs']));
+  expect(r.pickmode, 'the TOOL ⚙ opens the modal in PICK mode').toBe(true);
   expect(r.useVisible, 'the Use affordance is visible in pick mode').toBe(true);
   expect(r.boundVal, 'Use selected T5 INTO the wizard binding').toBe('5');
   expect(r.closed, 'the modal closed after the pick').toBe(true);
@@ -73,9 +96,9 @@ test('add-then-use has no dead end: add a tool in the modal, then Use it, in one
   await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetSettings);
   await seedTools(page, []);   // empty library
   await openTwin(page, 'user_slot_data');
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate((gearSrc) => {
     const form = document.getElementById('wiz_user_form');
-    [...form.querySelectorAll('button')].find((b) => b.textContent === '⚙').click();
+    eval(`(${gearSrc})`)().click();   // the TOOL row's gear (see gearOf) — not whichever ⚙ renders first
     const modal = document.getElementById('toollib-modal');
     modal.querySelector('#toollib-add').click();   // ADD a tool
     // fill a field so the new tool isn't an all-blank row (libraryTools drops those) — the real add-then-use flow
@@ -86,7 +109,7 @@ test('add-then-use has no dead end: add a tool in the modal, then Use it, in one
     added.click();   // USE the just-added tool — same visit
     const sel = form.querySelector('[data-param="toolNum"]');
     return { addedNum, boundVal: sel.value, closed: !modal.classList.contains('active') };
-  });
+  }, gearOf.toString());
   expect(r.addedNum, 'a tool was added').toBeTruthy();
   expect(r.boundVal, 'the just-added tool is now selected in the wizard (no dead end)').toBe(r.addedNum);
   expect(r.closed, 'the modal closed after Use').toBe(true);

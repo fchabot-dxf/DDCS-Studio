@@ -193,7 +193,33 @@ function slotDataStack(defaults) {
  */
 const CANONICAL_BIND = { ...SLOT_DEFAULTS, _para: false };
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(slotDataStack(SLOT_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
-export const SLOT_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), SLOT_BINDING_SPECS));
+const SLOT_DERIVED = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), SLOT_BINDING_SPECS));
+
+/**
+ * ⚠ t1500 — THE TOOL PICKER SITS BESIDE THE FIELD IT FILLS, spliced deliberately (the shape pocket uses for its
+ * `strategy` and `material` rows).
+ *
+ * `toolNum` used to reach the form through `toolBindingsFor` PREPENDED to the bindings array, which rendered it third
+ * — before the WCS row. Moving it into the specs (where it belongs, so it re-derives over the pruned stack) put it
+ * DEAD LAST, after the entry-point markers and the spindle RPM. Both positions are accidents of array order rather
+ * than decisions, and the last one is the worse accident: the picker's whole job is to FILL `toolDia`, and it ended
+ * up several fields away from it with `rpm` and two entry markers in between.
+ *
+ * So it is placed rather than left where the plumbing dropped it — immediately before `toolDia`, which is the
+ * project's declared row order (identity → geometry → tool/cut) and keeps the control next to its effect.
+ *
+ * This ALSO restores the property `tool-picker-1b-768` depends on. That spec finds "the wizard ⚙" by text, and the
+ * slot form has TWO legitimate gears — the tool library's, and the WCS deep-link every twin inherits from
+ * `FIELD_LINKS`. Its locator is ambiguous either way and is restated in the same act; this is not a fix BY ordering.
+ */
+const TOOL_ANCHOR = 'toolDia';
+export const SLOT_BINDINGS = (() => {
+    const tool = SLOT_DERIVED.find((b) => b.param === 'toolNum');
+    const rest = SLOT_DERIVED.filter((b) => b.param !== 'toolNum');
+    if (!tool) return rest;                                   // no marker in this state → nothing to place
+    const at = rest.findIndex((b) => b.param === TOOL_ANCHOR);
+    return at < 0 ? [...rest, tool] : [...rest.slice(0, at), tool, ...rest.slice(at)];
+})();
 
 /** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function slotDataDef() {

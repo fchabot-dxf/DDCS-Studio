@@ -193,7 +193,20 @@ test('THE EMIT SETTING — flush is the same program with the leading spaces gon
             ['pocket raster', pocketStack({ shape: 'rect', w: 80, h: 60, toolDia: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, feed: 600, plunge: 150, clearance: 5, strategy: 'raster' })],
             ['pocket spiral', pocketStack({ shape: 'rect', w: 80, h: 60, toolDia: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, feed: 600, plunge: 150, clearance: 5, strategy: 'spiral' })],
             ['pocket circle', pocketStack({ shape: 'circle', dia: 50, toolDia: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, feed: 600, plunge: 150, clearance: 5 })],
+            /**
+             * ⚠ t1500 — THE SLOT IS TWO CASES NOW, because the slot has two arms.
+             *
+             * This width-14 config used to be a literal transcript and is listed below as one. The re-point made it
+             * the PARAMETRIC arm — one `surfaceraster` with a nested depth/row walk — so it carries indented loop
+             * bodies like every other parametric program here. The old expectation is not "broken", its PREMISE
+             * changed, and the honest restatement keeps BOTH facts rather than swapping one for the other: a
+             * re-pointed slot indents, and a slot that the gate routes literal still does not.
+             *
+             * The literal case is pinned by `entry: 'helix'` — a declared, permanent gate (the entry-end clamp), not
+             * an incidental config — so this row cannot quietly become parametric later the way the one above did.
+             */
             ['slot', slotStack({ ax: 0, ay: 0, bx: 60, by: 0, width: 14, toolDia: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, feed: 600, plunge: 150, clearance: 5 })],
+            ['slot literal', slotStack({ ax: 0, ay: 0, bx: 60, by: 0, width: 14, toolDia: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, entry: 'helix', feed: 600, plunge: 150, clearance: 5 })],
             ['surfacing', surfacingStack({ w: 120, h: 90, toolDia: 12, depth: 1, stepdown: 0.5, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5 })],
             ['surfacing helix', surfacingStack({ w: 120, h: 90, toolDia: 12, depth: 2, stepdown: 1, stepoverPct: 60, entry: 'helix', helixDia: 8, helixPitch: 0.5, feed: 2000, plunge: 200, clearance: 5 })],
         ];
@@ -223,8 +236,15 @@ test('THE EMIT SETTING — flush is the same program with the leading spaces gon
     // ⚠ AND SOME PROGRAMS HAVE NONE, which is correct and worth stating rather than leaving as a silent pass: a
     // literal-transcript emit (the circle pocket's contour walk, the slot kernel) unrolls flat lines with no loop
     // bodies, so there is nothing to strip and flush is a no-op there.
+    // t1500 — the list is derived from the ARM rather than memorised, which is what stopped it rotting: the slot
+    // moved out of this set when its width-14 config re-pointed, and `slot literal` moved in behind it.
     expect(r.filter((c) => c.indented === 0).map((c) => c.name).sort(), 'the literal-transcript programs carry no indentation at all')
-        .toEqual(['pocket circle', 'slot']);
+        .toEqual(['pocket circle', 'slot literal']);
+    // …and the same slot geometry on the OTHER arm does indent, which is the fact that replaced the old expectation.
+    // Asserted as a PAIR so neither half can pass alone: one config, one knob apart, two emit shapes.
+    const paraSlot = r.find((c) => c.name === 'slot'), litSlot = r.find((c) => c.name === 'slot literal');
+    expect(paraSlot.indented, 'the RE-POINTED slot emits indented loop bodies (it used to be a flat transcript)').toBeGreaterThan(10);
+    expect(litSlot.indented, '…and the gate-refused slot, same geometry, still emits none').toBe(0);
 });
 
 /**
