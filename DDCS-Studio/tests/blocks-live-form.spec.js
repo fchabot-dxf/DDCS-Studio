@@ -100,10 +100,16 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   });
   // the Blocks app must be UP before the re-author call: editWizardDef's internal wait for it is capped, and under
   // load the cap could expire → the load silently skipped → the 8s formpane wait timed out as a phantom "chrome" red
+  // ⚠ t1518 — THE PRODUCT SIDE OF THAT IS FIXED: an expired cap now REFUSES out loud (alert + no editing chrome), so
+  // a future expiry surfaces as a named failure instead of a phantom red. This pre-warm STAYS — it is defence in
+  // depth, not the thing holding the spec up — and the load is asserted below rather than assumed.
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.ddcsLoadBlockStack && window.__blkws);
   await page.evaluate(() => window.ddcsEditWizardDef('user_chrome'));
   await page.waitForSelector('#blk-formpane:not([hidden])', { timeout: 8000 });
+  // t1518 — and the load REALLY happened: the pre-warm's whole purpose, asserted instead of trusted
+  expect(await page.evaluate(() => !!(window.__blkws && window.__blkws.getAllBlocks(false).length)),
+    'the re-authored stack actually loaded — a capped-wait expiry would refuse loudly now, never skip').toBe(true);
 
   // DETERMINISTIC: the formpane unhides on the projection while the chrome (glow class + chip) is applied by
   // devMode's own refresh — a sample squeezed between the two read half-applied chrome under load. Wait for the

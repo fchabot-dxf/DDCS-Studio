@@ -14184,3 +14184,100 @@ count is the generator's own default); the exact numbers are pinned in the new s
 
 **2360 passed · 0 failed · 6 skipped, exit 0, zero worker crashes.** Counted the corrected way (ANSI + NULs stripped,
 UNANCHORED pattern, cross-checked against the numbered-failure count = 0). Released **V2026.08.01.4**.
+
+---
+
+## t1518 — THE FLAKE-HARDENER'S THREE PRODUCT SUSPECTS, MEASURED. ONE WAS REAL, TWO WERE GHOSTS
+
+**The task (t1517):** the t1494-era flake-hardening pass (merge `12e8f490`) hardened the six-member ledger
+deterministically and deliberately did NOT touch the product, but left three product-side suspects in session notes.
+CONFIRM EACH BY MEASUREMENT before fixing; park what does not reproduce with a sentence saying so.
+
+Measurement first, in all three cases. A ghost costs nothing; a speculative fix costs a divergence.
+
+### SUSPECT 1 — `editWizardDef`'s CAPPED WAIT: **REAL, and worse than the note said**
+
+The note called it "a silent ~4s skip". MEASURED by holding the Blocks app down (hiding the two globals the wait polls
+for) and calling the real function:
+
+    ms: 5133 · blocksLoaded: FALSE · glow: TRUE · chip: "✎ Editing: Measured skipme" · pane hidden · visibleAlert: FALSE
+
+So it is not merely a silent skip — **it is a silent skip that CLAIMS THE OPPOSITE STATE.** The user waits five
+seconds, lands on the Blocks tab with an EMPTY canvas, and the surface tells them they are editing their wizard. The
+mechanism: the loop runs 80 × 50ms and then execution CONTINUES, and the load line is `if (window.ddcsLoadBlockStack)
+…`, so it is skipped while the editing chrome three lines above it has already been applied.
+
+⚠ **AND THE DANGEROUS EDGE IS THE NEXT CLICK.** `_editingWizard` is set, so the chip is not decorative — Save reads the
+LIVE workspace, and an operator who trusts it is one click from writing an empty op over the wizard they meant to edit.
+
+**THE FIX IS NOT A LONGER WAIT** (the dispatch's ruling, and it is the right one): four seconds is already generous, and
+a slow machine is not the failure mode — an app that never mounts is. So the cap is UNCHANGED and the give-up is what
+changed. It refuses in the surface this function ALREADY uses for its other refusal ("That wizard is no longer in your
+library") — no new affordance — and it returns BEFORE the chrome is set, so nothing claims an edit that did not happen.
+The sentence names what did not arrive, how long it waited, that the program was not changed, and what to do next
+(t1444: a refusal with no exit makes the operator guess).
+
+**ONE FUNCTION, BOTH CALLERS.** There were already TWO byte-identical copies of the wait (`editWizardDef` and
+`editWizardDefs`), so patching each would have made the fix the third copy — the declare-or-hand-roll gate, with the
+duplication already visible rather than hypothetical. The sibling's failure was the quieter one and no better:
+`editWizardDefs` CLEARS the chrome, so it never lied — it simply did nothing at all, after the user had already
+accepted a destructive-load prompt.
+
+MEASURED AFTER, same probe: `ms: 4977 · glow: FALSE · chipShown: FALSE · chipText: "" · dialog fired`.
+
+### SUSPECT 2 — `renderLiveForm`'s MICROWINDOW: **NOT REPRODUCED**
+
+The note described "a state read racing a render, the window the ledger spec had to harden around". Measured by
+sampling the four signals that spec reads — the edge-glow, the named chip, the form pane, the bound field — every 10ms
+through `editWizardDef` and every 25ms for a second after. **Every sample was `1111`.** No state was ever observed in
+which they disagreed.
+
+The reason is structural once looked at: `refreshEditingChrome()` is fully SYNCHRONOUS, and devMode's mount returns
+`onModelRender: () => { augment(); refreshEditingChrome(); }` — so the chrome is applied before the load AND re-applied
+by the load's own model render. The only way to observe half-applied chrome is for the load never to happen, which is
+**suspect 1 wearing a different hat** — and `blocks-live-form`'s own hardening comment says exactly that ("the cap
+could expire → the load silently skipped"). So there is no separate race to close at the source. PARKED, with the
+measurement pinned in PROOF 3 so the ghost cannot be re-reported.
+
+### SUSPECT 3 — `controllerSettled`'s 900ms WINDOW: **NOT REPRODUCED — already fixed at t1257**
+
+The note described "a fixed wait standing where a condition belongs". It WAS exactly that, and t1257 measured it
+(915ms of a ~930ms open) and replaced it: `variableDB` stamps `window.__ddcsVarsReadyAt` when it fires, so a re-seed
+that landed in the gap counts, and the event path stays for one still in flight. What is left of the 900ms is a
+declared never-hang BACKSTOP with its why in place, not a wait.
+
+Measured against all three paths: stamp-already-landed **0ms**, re-seed in flight **62ms** (via the event), and a
+synthetic no-re-seed case **19ms** (an event fired anyway — the app re-seeds routinely). The cap was not observed
+firing in any of them, and `loading-feedback-1257.spec.js` already gates the REAL open at `< 500ms` with the sentence
+*"the cap was 900ms and it was hit EVERY time; anything near it means the latch stopped working"*. PARKED: the fix the
+dispatch describes is the fix that already shipped, and the note predates it. **No second gate added** — duplicating an
+existing one would be the divergence this act is trying to avoid.
+
+### THE LEDGER SPEC GOT STRONGER, NEVER LOOSER
+
+`blocks-live-form`'s pre-warm STAYS — it is defence in depth, not the thing holding the spec up — but its comment said
+an expired cap means "the load silently skipped", which is no longer true. It now records that an expiry REFUSES out
+loud, so a future one surfaces as a named failure instead of a phantom red, and the spec ASSERTS the load really
+happened (`getAllBlocks(false).length`) rather than trusting the pre-warm to have guaranteed it. That assertion is the
+pre-warm's whole purpose, stated.
+
+### GATES
+
+- New: `blocks-edit-fail-loud-1518` **3/3** (the loud refusal + the chrome that no longer lies + the cap unchanged ·
+  the sibling on the same declaration · the happy path untouched, carrying suspect 2's measurement).
+- The SIX-MEMBER LEDGER + the t1257 gate + the new spec **38/0**.
+- blocks / devMode / wizard / userOps / custom-op / workspace / loading families **255/0** · smoke **71/0**.
+
+### FULL SUITE — GREEN (on the second run, and the first one's single red is named rather than argued away)
+
+**2363 passed · 0 failed · 6 skipped, exit 0, zero worker crashes.**
+
+⚠ The FIRST full run came back **2362 / 1 failed**: `controller-file-tree.spec.js:74` timed out on
+`waitForFunction(() => typeof window.showApp === 'function')` 5s after a `page.reload()` — an app-boot timeout, in a
+spec that never touches devMode. Green 2/2 in isolation, and this act's whole diff is 33 lines in ONE file reachable
+only from the two re-author entry points, with nothing running at boot. That reads as a load flake — and I re-ran
+rather than releasing on that reasoning, because a release gate wants an actually-green run and not an argued-green
+one. It did not recur. **NAMED as a flake-ledger candidate** (the ledger's own class: a boot/reload wait racing load)
+rather than left as a shrug; if it surfaces again it has a first sighting recorded here.
+
+Released **V2026.08.01.5**.

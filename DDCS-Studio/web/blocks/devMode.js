@@ -567,6 +567,36 @@ export async function reconstructUserOpBlock(opType) {
 // op-menu "Customize as blocks" (which sets the single-op chrome + fires the S4-3 defVStale round-trip that rebuilds the
 // slot). A dedicated slot-level "Editing camN" chip + an in-Blocks per-op Save selector are a flagged follow-on (t1155).
 // One op reaching here (e.g. a mixed slot with a single block-able op) delegates to the normal single-op editWizardDef.
+/**
+ * ── t1518 — WAIT FOR THE BLOCKS APP, AND SAY SO **OUT LOUD** WHEN IT NEVER ARRIVES ────────────────────────────────
+ *
+ * Both re-author entry points polled for the Blocks app for 4 seconds and then carried on regardless — the load line
+ * is `if (window.ddcsLoadBlockStack) …`, so an expired wait skipped it and returned normally.
+ *
+ * MEASURED before this was written, by holding the app down and calling the real function: **5133ms**, no stack
+ * loaded, and the surface left saying `✎ Editing: Measured skipme` with the edge-glow on and an EMPTY canvas.
+ * `visibleAlert: false` — nothing told anyone. That is worse than a silent skip: the chrome makes a CLAIM about a
+ * state the app is not in, and the next Save reads the live workspace, so an operator who trusts the chip is one
+ * click from writing an empty op over the wizard they meant to edit.
+ *
+ * ⚠ THE FIX IS NOT A LONGER WAIT. Four seconds is already generous; a slower machine is not the failure mode being
+ * handled, an app that never mounts is. So the cap is UNCHANGED and the give-up is what changes: it refuses, in the
+ * surface this function already uses for its other refusal ("That wizard is no longer in your library" — no new
+ * affordance), and it returns BEFORE the chrome is set, so nothing claims an edit that did not happen.
+ *
+ * ONE function, both callers, because there were already two identical copies of the wait — patching each would have
+ * made the fix the third copy. The sibling's failure was the quieter one and no better: `editWizardDefs` clears the
+ * chrome, so it says nothing at all after the user has already accepted a destructive-load prompt.
+ */
+async function blocksAppReady(what) {
+    const up = () => !!(window.ddcsLoadBlockStack && window.__blkws);
+    for (let i = 0; i < 80 && !up(); i++) await new Promise((r) => setTimeout(r, 50));   // 4s — the original cap, unchanged
+    if (up()) return true;
+    alert(`Could not open ${what} in Blocks — the Blocks editor did not finish loading (waited 4 seconds).\n\n`
+        + 'Your program was not changed. Open the Blocks tab and try again; if it stays blank, reload the page.');
+    return false;
+}
+
 export async function editWizardDefs(opTypes) {
     const recs = [];
     for (const t of (opTypes || [])) { const r = await reconstructUserOpBlock(t); if (r) recs.push(r); }
@@ -575,7 +605,7 @@ export async function editWizardDefs(opTypes) {
     const opCs = recs.map((r) => r.opC);
     if (!(await confirmDestructiveLoad(opCs, { label: 'before edit', what: recs.length + ' ops' }))) return;
     if (window.showApp) window.showApp('blocks');
-    for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));
+    if (!(await blocksAppReady(recs.length + ' ops'))) return;   // t1518 — refuse loudly rather than load nothing quietly
     _editingWizard = null; _editingLabel = null; refreshEditingChrome();   // multi-op: no single-op re-author chrome
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(opCs);
     await new Promise((r) => setTimeout(r, 150));
@@ -590,7 +620,8 @@ export async function editWizardDef(opType) {
     // program → no prompt). Fixes the latent silent-wipe this path had.
     if (!(await confirmDestructiveLoad([opC], { label: 'before edit', what: def.label || opType }))) return;
     if (window.showApp) window.showApp('blocks');
-    for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));   // wait for the Blocks app
+    // t1518 — …and this returns BEFORE the editing chrome below, so a failed load never leaves a chip claiming an edit
+    if (!(await blocksAppReady(def.label || opType))) return;
     // recognized fork → a FRESH op (no destructive in-place Update of the twin, which the opunit +1 shift would corrupt).
     // EXCEPT a maintained-as-data twin (corner/edge/pocket/middle, bindingSpecs): lockUpdate ALREADY blocks its Update, so keep
     // _editingWizard → its "maintained as data" guard + Save-as-new UX is unchanged. Only the NON-bindingSpecs recognized twins
