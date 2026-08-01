@@ -11,4 +11,10 @@ M98P501X1     (Home Y, has switch, A follows as slave)
 #884 = 0      (Set B machine position to 0)
 #1519 = 1     (Mark B homed)
 
+(Fixed-probe config, applied each boot so it survives resets)
+#1075 = 2     (fixed probe input port IN02)
+#1077 = 1     (fixed probe level)
+#632 = 800    (fast first-probe feed)
+#631 = 2      (two touches: fast find plus one accurate re-probe)
+
 M30
