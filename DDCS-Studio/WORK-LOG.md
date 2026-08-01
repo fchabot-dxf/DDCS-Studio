@@ -14092,3 +14092,95 @@ code) and started the next one straight away, leaving four hung Playwright worke
 
 **2355 passed · 0 failed · 6 skipped (20.4m), exit 0, zero worker crashes.** Counted with ANSI and NULs stripped and
 an UNANCHORED pattern, cross-checked against the numbered-failure count (0). Released **V2026.08.01.3**.
+
+---
+
+## t1516 — TWO HONESTY PIECES: the literal arm's silent PATTERN DROP closes, and the slot's seeds become its own
+
+**The task (t1515):** (1) rule the literal arm's patterned-slot drop into a refusal, in the table's words, naming the
+wizard as the exit; declare any pending pattern-emit lift as DATA rather than building it. (2) give the slot its
+per-method `feed`/`depth` defaults through `SPEC`'s own declared seam, moving no other op's, measured first.
+
+### 1 — THE PATTERN DROP, AND THE CONDITION IS NOT THE ONE I FIRST WROTE
+
+MEASURED on the released build, before touching anything: a slot op with `pattern: 'grid', cols: 3, rows: 2` and a
+width at or under its tool returned `camType: 'slot'` and packed. The generator emits ONE slot body. **Six drawn, one
+cut, no message** — and the seeded field table is `ax/ay/bx/by/depth/stepdown/feed/clearance/rpm`, with no pattern row
+for the operator to notice was missing. The WIDE half was already refused, but only as a SIDE EFFECT: the wizard's arm
+question hands back `SLOT_PATTERN_GAP` and `slotWideRefusal` quotes it, so a wide pattern was refused for a reason
+about self-framing `array` containers. The narrow half had no such accident to save it.
+
+**The refusal is asked FIRST, before either arm**, because a pattern is not a property of the CLEARING — neither arm's
+envelope can see it, which is exactly why one arm caught it by accident and the other not at all. Same placement the
+pocket's tool refusal already uses (before the shape fork).
+
+⚠ **AND THE CONDITION IS NOT "IS IT PATTERNED", which is measured rather than reasoned.** A pattern resolves to a POINT
+LIST, and the generator's one slot is the right part exactly when that list is a single point AT THE ORIGIN:
+
+    grid 3×2 → 6 points, first {0,0}      grid 1×1 → 1 point,  {0,0}   ← the single slot IS the part: must PACK
+    line 4   → 4 points, first {0,0}      line 1   → 1 point,  {0,0}   ← likewise
+    circle 6 → 6 points, first {40,0}     circle 1 → 1 point, {40,0}   ← ONE slot, in the WRONG PLACE: must REFUSE
+
+So a **bolt-circle of one** is a real failure a count test would have packed, and a **1×1 grid** is a real success a
+`slotPatterned` test would have refused. Refusing what the macro cuts correctly is the same defect class as packing
+what it does not — `slotRasterArmGap`'s own rule is "every clause a NARROWING", and the narrow clause is the measured
+one. I wrote the lazy predicate first and the measurement corrected it before it shipped.
+
+**Two sentences, not one** — t1414's lesson applied before it could bite. `N > 1` names what would be dropped ("cut a
+single slot and silently drop the other 5 — a different part, not a smaller one"); the single-offset case names the
+displacement instead ("draws its one slot OFF its own A→B line… the right slot in the wrong place") and carries a
+second exit (clear the pattern and move A/B). "1 slots would be dropped" is the broken grammar carrying a wrong reason
+that t1414 measured, and it is unreachable here by construction.
+
+**THE PENDING LIFT IS DECLARED AS DATA AND NOT BUILT** (t1515's ruling): `SLOT_PATTERN_PACK_GAP` records what the
+mismatch is, why a degrade was refused rather than taken, what a lift would actually be (a per-instance loop over the
+baked offsets — the shape `opToSlot`'s own drill/bore patterns already emit) and that it is **NOT trig- or V13-gated**,
+so nobody adds it to the machine visit. PROOF 3 asserts the lift is *not* built, so the declaration cannot quietly
+become a half-implementation.
+
+### 2 — THE SEEDS, THROUGH THE SEAM SPEC ALREADY PROMISED
+
+`SPEC`'s header has said "`def` may depend on method" since it was written, and exactly one case implemented it —
+inline in the field loop as `key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def`. One hand-rolled case is a
+one-off; the second is the rule-of-three's first warning, and the shape it wants is DATA. `SPEC_DEF_BY_METHOD` is a
+map the loop reads; the loop's one line changed from a comparison to a lookup, and **nothing new was built**.
+
+⚠ **ONLY WHERE THE VALUE DIFFERS**, so each number keeps one source: `drill`'s hole Ø was written out in the ternary as
+6, which IS `SPEC.holeDia.def`, so it is absent from the map and falls through rather than existing twice.
+
+MEASURED FIRST, because "give the slot its own" is only safe if nobody else moves: `feed` and `depth` are read by
+drill (every pattern), bore (every pattern) and slot (both arms) — the three methods `slotFromOp` takes. And measured
+against the wizard rather than assumed: of the slot's nine seeds, exactly **two** differ from `slotLeafParams` —
+`feed` 300 vs 2000 and `depth` 5 vs 4. `stepdown`/`clearance`/`plunge`/`stepoverPct`/`toolDia` already agreed, and
+`width`'s 12 is deliberate (t1512: a default at the tool's width sits on the arm's own ineligible degenerate). So the
+change is exactly the two the ruling named, and no third crept in.
+
+They are DRILL numbers: a peck-drill descends slowly and a hole is deep. Not a wrong CUT — every real flow overrides
+them from the op — but a wrong **PROPOSAL**, and the seed is what an operator reads in the `#2600` table before
+changing anything. A slot arriving at 300mm/min proposes a feed six times slow. PROOF 5 asserts the new seeds reach
+the macro's own read-line comment (`#6=#2605   ;Feed [mm/min] =2000`), which is the line checked against the pendant —
+a default that lives only in a returned object is a default nobody sees.
+
+### THE PIN THAT FLIPPED, restated with what it lifted from
+
+`slot-parametric-boundary-1442`'s CAM AUDIT asserted the wide patterned slot was refused "in the ATOM ENVELOPE's own
+words" and matched on `array`. That is now the wrong words — it is refused for the PATTERN's reason on both arms — so
+the assertion states the new sentence, keeps the old one in its comment, and adds `not.toContain('array')`: the arm's
+self-framing reason is a true answer to a question nobody asked, which is the shape t1512 already closed once.
+Its count matcher is `\d+` rather than a literal, because that harness names the pattern KIND but not its size (the
+count is the generator's own default); the exact numbers are pinned in the new spec, where the op declares them.
+
+### GATES
+
+- New: `slot-pattern-and-seeds-1516` **5/5** (both arms refuse for the pattern's own reason · the measured condition,
+  with both degenerates · the lift declared-not-built · every drill/bore pattern's whole seed row set unmoved · the
+  seeds reaching the read-lines an operator reads).
+- Slot/CAM/opToSlot/raster/drill/bore/pattern family **338/0** · adjacent specs that build a slot or a pattern outside
+  that family (expose-absorbed-fold, live-depth-knob, pocket-asblocks, depth-entry-everywhere, dual-units,
+  layout-placement-parity, mill-atc-in-place, mill-entry, mill-start-translate, preview-handles, preview-sweep,
+  spindle-head-inherit, stock-spill, tool-picker, tool-select) **62/0** · smoke **71/0**.
+
+### FULL SUITE — GREEN
+
+**2360 passed · 0 failed · 6 skipped, exit 0, zero worker crashes.** Counted the corrected way (ANSI + NULs stripped,
+UNANCHORED pattern, cross-checked against the numbered-failure count = 0). Released **V2026.08.01.4**.

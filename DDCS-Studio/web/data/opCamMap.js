@@ -25,7 +25,7 @@ import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps
 import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
 import { num } from '../wizards/ops/util.js';   // t1444 — the pack gates read numbers the same way every emitter does
 import { slotTooSmall, slotToolRefusal, SLOT_CAM_PACK_REGS } from '../wizards/ops/slot.js';         // t1444 — the ONE too-small boundary + its sentence, shared with the emit   // t1512 — SLOT_CAM_PACK_REGS: the gate asks the envelope about the LIVE body the pack will emit, not the wizard's baked one
-import { slotStackArmGap } from '../wizards/slotWizard.js';   // t1512 — the PACK arm asks the ATOM'S OWN envelope (never a bearing check here), so C5 lifts the angled case with no change to this file
+import { slotStackArmGap, slotPatterned, slotPatternPoints } from '../wizards/slotWizard.js';   // t1512 — the PACK arm asks the ATOM'S OWN envelope (never a bearing check here), so C5 lifts the angled case with no change to this file   // t1516 — …and the PATTERN is the wizard's own declaration too: a structure the atom cannot see, so the gate reads it rather than restating it
 import { SLOT_ARM } from './opToSlot.js';   // t1512 — the declared arm names, so the variant string has one source
 import { pocketToolRefuses, pocketToolRefusal } from '../wizards/pocketWizard.js';   // t1444 — …and the pocket's, from the same one source
 
@@ -128,6 +128,68 @@ export const slotPackArm = (params) => (slotPackGap(params) ? SLOT_ARM.centrelin
 export const slotWideRefusal = (p, gap) => `this slot is ${num(p.width, 0)}mm wide, so its clearing has to be the `
     + `parametric raster atom, and this configuration is outside what that atom can walk. ${String(gap).replace(/\s*$/, '').replace(/([^.])$/, '$1.')} `
     + `Build this one from the Slot wizard, which emits the full walk at any width and any angle.`;
+
+/**
+ * ── t1516 — THE LITERAL ARM'S SILENT PATTERN DROP, CLOSED. A DIFFERENT PART, NOT A REDUCED ONE ────────────────────
+ *
+ * MEASURED, on the released build: a slot op with `pattern: 'grid', cols: 3, rows: 2` and a width at or under its tool
+ * packed a CAM slot and returned `camType: 'slot'` — and the generator emits ONE slot body. Six slots drawn, one cut,
+ * no message, and the seeded field table shows `ax/ay/bx/by/depth/…` with no pattern row for the operator to notice
+ * was missing. It has been true since the slot generator existed, and t1512 named it rather than inheriting it
+ * quietly: the PACKED arm already refuses (a wide patterned slot gets `slotWideRefusal` carrying the pattern gap),
+ * so the hole was exactly the narrow-slot half. RULED at t1515: the literal arm refuses too.
+ *
+ * ⚠ AND THE CONDITION IS **NOT** "IS IT PATTERNED", which is the version I wrote first and then measured. A pattern
+ * resolves to a point LIST, and the generator's one slot is the right part exactly when that list is a single point
+ * AT THE ORIGIN. Measured over the four pattern kinds:
+ *
+ *     grid 3×2 → 6 points, first {0,0}      grid 1×1 → 1 point,  {0,0}   ← the single slot IS the part: no refusal
+ *     line 4   → 4 points, first {0,0}      line 1   → 1 point,  {0,0}   ← likewise
+ *     circle 6 → 6 points, first {40,0}     circle 1 → 1 point, {40,0}   ← ONE slot, and the WRONG PLACE
+ *
+ * So a bolt-circle of one is a real failure a count test would have missed, and a 1×1 grid is a real success a
+ * `slotPatterned` test would have refused. Refusing what is actually correct is the same defect class as packing what
+ * is not — "every clause a NARROWING" (slotRasterArmGap's own rule), and the narrow clause is the measured one.
+ *
+ * ⚠ THE TWO FAILURES GET THEIR OWN SENTENCES, which is t1414's lesson applied before it could bite: "1 slots would be
+ * dropped" is broken grammar carrying a wrong reason, and an offset single is not a dropped anything.
+ */
+export const slotPatternPack = (p = {}) => {
+    if (!slotPatterned(p)) return null;                 // not a pattern at all — the wizard's own predicate decides
+    const pts = slotPatternPoints(p) || [];
+    if (pts.length === 1 && !num(pts[0].x, 0) && !num(pts[0].y, 0)) return null;   // one instance, on the drawn line
+    return { n: pts.length, kind: String(p.pattern || 'pattern') };
+};
+export const slotPatternRefusal = (p) => {
+    const s = slotPatternPack(p) || { n: 0, kind: 'pattern' };
+    const exit = ' Build this one from the Slot wizard, which stamps every instance of the pattern.';
+    return s.n > 1
+        ? `this op draws ${s.n} slots in a ${s.kind} pattern, and a CAM slot's macro emits ONE. Packing it would cut a `
+            + `single slot and silently drop the other ${s.n - 1} — a different part, not a smaller one.${exit}`
+        : `this op draws its one slot OFF its own A→B line (a ${s.kind} pattern places it at the pattern's first `
+            + `point, not at A), and a CAM slot's macro emits one slot ON that line. Packing it would cut the right `
+            + `slot in the wrong place.${exit} Or clear the pattern and move A/B to where the slot belongs.`;
+};
+
+/**
+ * ⚠ THE PENDING CAPABILITY, DECLARED AS DATA AND NOT BUILT (t1515's ruling). A pattern-emitting CAM slot is a real
+ * act with its own bridge; recording what it would need costs nothing and stops the refusal above from reading as a
+ * permanent law, which is the distinction `SLOT_ARC_NOT_INCLUDED` draws between a TEACHABLE gap and an evidence-blocked
+ * one. This one is teachable — nothing here is waiting on the controller.
+ */
+export const SLOT_PATTERN_PACK_GAP = {
+    what: 'a CAM slot packs ONE slot body; a patterned slot op asks for N at declared offsets',
+    whyRefusedRatherThanDegraded: 'cutting one slot where N were drawn is a DIFFERENT PART. The gate-1 rule is that '
+        + 'clean-looking G-code cutting the wrong part is the worst failure this project has, and a silent degrade is '
+        + 'exactly that shape — the operator sees a complete-looking macro and a table with no pattern row in it',
+    whatALiftWouldNeed: 'the offsets are already declared and already build-time (`slotPatternPoints` — no controller '
+        + 'arithmetic, so this is NOT trig- or V13-gated). What is missing is an emit: the macro would wrap its body '
+        + 'in a per-instance loop over a baked offset list, which is the shape `opToSlot`\'s drill/bore patterns '
+        + 'already emit (PATTERN_FIELDS + loopBody) — so the lift is teaching the SLOT generator that same loop, with '
+        + 'the walked body inside it, plus a bridge asserting instance N lands on point N',
+    whyNotFoldedIntoThisAct: 'it is an EMIT act with its own bridge and its own register question (the loop counter '
+        + 'must clear the atom\'s band), and this one is an honesty act. t1515 ruled the refusal in and the lift out',
+};
 
 /**
  * ⚠ THE SYNTHETIC DISCRIMINATORS THAT RE-RESOLVE EACH ARM, declared BESIDE the resolver that reads them.
@@ -532,6 +594,15 @@ export function camTypeOf(op) {
          */
         case 'slot': {
             if (slotTooSmall(p)) return { unsupported: slotToolRefusal(p) };
+            /**
+             * ⚠ t1516 — THE PATTERN REFUSES BEFORE THE ARM QUESTION, and that placement is the fix. A pattern is not a
+             * property of the CLEARING, so neither arm's envelope can see it — the WIDE half was refused only as a
+             * side effect (`slotWideRefusal` carrying the pattern gap the wizard supplies), and the narrow half fell
+             * straight through to the literal arm and cut ONE slot where N were drawn. Asked here, before either arm
+             * is chosen, it is refused for its own reason on both. Same shape as the pocket's tool refusal below,
+             * which likewise lands before the shape fork.
+             */
+            if (slotPatternPack(p)) return { unsupported: slotPatternRefusal(p) };
             const gap = slotPackGap(p);
             if (!gap) return { camType: 'slot' };   // the PACKED arm walks the true channel — the width gate is lifted for it
             if (num(p.width, 0) > num(p.toolDia, 6) + 0.001) return { unsupported: slotWideRefusal(p, gap) };

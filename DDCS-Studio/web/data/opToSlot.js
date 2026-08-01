@@ -57,6 +57,34 @@ const SPEC = {
 };
 
 /**
+ * ── t1516 — "`def` MAY DEPEND ON METHOD" BECOMES A DECLARATION INSTEAD OF A TERNARY ────────────────────────────────
+ *
+ * The header above has promised this since SPEC was written, and exactly one case implemented it — inline in the field
+ * loop, as `key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def`. One hand-rolled case is a one-off; the second
+ * one is the rule-of-three's first warning, and the shape it wants is DATA: a per-method override map the loop reads.
+ * Nothing new is built for it — the loop's one line changes from a comparison to a lookup.
+ *
+ * ⚠ ONLY WHERE THE VALUE DIFFERS, so each number keeps one source. `drill`'s hole Ø was written out in the ternary as
+ * 6 — which is `SPEC.holeDia.def` — so it is absent here and falls through, rather than existing twice and inviting the
+ * two copies to drift.
+ *
+ * ── THE SLOT'S TWO SEEDS, and why they were wrong ──────────────────────────────────────────────────────────────────
+ * `SPEC.feed` (300) and `SPEC.depth` (5) are DRILL numbers: a peck-drill descends slowly and a hole is deep. A slot's
+ * are its wizard's own — `slotLeafParams` seeds feed 2000 and depth 4 — and the seeds are what an operator sees in the
+ * `#2600` field table before they change anything, so a slot arriving at 300mm/min proposes a feed six times slow. Not
+ * a wrong CUT (every real flow overrides them from the op) but a wrong PROPOSAL, and the table is a control surface.
+ *
+ * MEASURED, because "give the slot its own" is only safe if nobody else moves: `feed` and `depth` are read by drill
+ * (every pattern), bore (every pattern) and slot (both arms) — the three methods `slotFromOp` takes. The override is
+ * keyed by method, so drill and bore keep 300/5 by construction, and the spec asserts their whole seeded row sets are
+ * byte-for-byte what they were.
+ */
+const SPEC_DEF_BY_METHOD = {
+    bore: { holeDia: 12 },                    // a bore needs hole Ø > tool Ø, else the cut radius is 0 (drill bores at tool Ø)
+    slot: { feed: 2000, depth: 4 },           // the Slot wizard's own seeds — see slotLeafParams
+};
+
+/**
  * ── t1512 — THE SLOT HAS TWO ARMS, AND THE ARM IS THE `variant` ────────────────────────────────────────────────────
  *
  * `SLOT_ARM.atom` packs the PARAMETRIC RASTER ATOM as the slot's clearing — the same delegation the rect pocket took
@@ -284,8 +312,9 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0, dec
     const avoid = bandsFor(method === 'bore' ? 'bore' : (std ? 'slot' : 'drill'));   // all three share one declared band; keyed for clarity
     order.forEach((key) => {
         const s = SPEC[key];
-        // Bore needs hole Ø > tool Ø (else the cut radius is 0); drill bores at tool Ø.
-        const def = key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def;
+        // t1516 — the per-method default, READ from the declaration above rather than compared for here.
+        const over = SPEC_DEF_BY_METHOD[method];
+        const def = (over && over[key] != null) ? over[key] : s.def;
         const d = decl && decl[key];
         /**
          * t1512 — A FIELD THE **ARM** BAKES, which is a different fact from a field the OPERATOR baked. The four frame

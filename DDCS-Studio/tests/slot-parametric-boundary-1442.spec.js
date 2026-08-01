@@ -269,10 +269,22 @@ test('CAM AUDIT — the packed slot macro drops the op\'s DEFINING dimension, an
      * whenever the atom can walk it, so the refusal below is a patterned slot's (this harness passes `pattern: 'grid'`,
      * and a pattern is not self-framing), stated in the atom envelope's own words instead of the centreline body's.
      */
-    expect(r.camRoute.camType, 'a 12mm-wide PATTERNED slot still does not pack — a pattern is not self-framing').toBeUndefined();
-    expect(r.camRoute.unsupported, 'and it is refused in the ATOM ENVELOPE\'s own words now, not the centreline body\'s').toContain('array');
+    /**
+     * ⚠ t1516 — AND THE REFUSAL'S **REASON** MOVED, which is the third time this pin has been restated and the first
+     * time the sentence got better rather than just newer. Until now a patterned slot was refused only as a SIDE
+     * EFFECT: the wizard's arm question hands back a pattern gap, and `slotWideRefusal` quoted it — so a WIDE pattern
+     * was refused for a reason about self-framing, and a NARROW one was not refused at all (it packed on the literal
+     * arm and cut ONE slot where six were drawn — the silent drop this act closes). The pattern is asked about first
+     * now, before either arm, and answers for itself on both.
+     */
+    expect(r.camRoute.camType, 'a 12mm-wide PATTERNED slot still does not pack').toBeUndefined();
+    // (this harness names the pattern KIND but not its size, so the count is the generator's own default — the exact
+    //  numbers are pinned in slot-pattern-and-seeds-1516, where the op declares them)
+    expect(r.camRoute.unsupported, '…and is refused for the PATTERN\'s own reason now — it used to quote the arm gap ("array")').toMatch(/\d+ slots in a grid pattern/);
+    expect(r.camRoute.unsupported, '…naming what packing it would actually cut').toMatch(/drop the other \d+/);
     expect(r.camRoute.unsupported, '…with somewhere to go, because "unsupported" alone makes the operator guess').toContain('Slot wizard');
     expect(r.camRoute.unsupported, '…and NOT told about bearings, which is a reason belonging to a different refusal').not.toContain('C5');
+    expect(r.camRoute.unsupported, '…nor about self-framing, which is the ARM question and not this one').not.toContain('array');
     expect(r.camEqual.camType, 'and the case the centreline macro DOES cut correctly still packs — width == tool').toBe('slot');
     // THE PLUNGE FEED IS DROPPED TOO — the LITERAL macro descends at the CUTTING feed (the packed arm carries a real one)
     expect(r.zLine, 'the Z descent rides F#7, the cut feed — the literal arm\'s plunge feed has no field').toBe('G1 Z[-#50] F#7');
