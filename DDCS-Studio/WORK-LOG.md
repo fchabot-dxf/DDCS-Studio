@@ -12964,3 +12964,69 @@ lift above is a fresh-seat act on its own merits — it is a format change plus 
 the class where a stale assumption costs the most.
 
 **Full suite on the branch: 2309 passed, 6 skipped, 0 failed.** Branch `wip/c3-baked-bearing`.
+
+## t1496 (seat A) — THE FROZEN SLOT KERNEL LANDS; the re-point itself is PARKED for a fresh seat.
+
+### WHAT I DID, AND WHY THIS HALF AND NOT THE OTHER
+
+The dispatch is the largest act of the arc: re-point `slotPath`'s clearing through the atom, keep the helix arm
+literal, freeze a reference IN THE SAME ACT, relationship-bridge the t1442 four, sweep the reconciler, bind the twin
+by identity, hold the too-small law, move `@work` and the envelope rows, keep the iron rule shrink-only, and take
+screenshots of an angled slot mid-play.
+
+**I built the frozen reference and stopped there.** The order is the safe one and it is not a half-landing: the
+freeze must exist BEFORE the re-point (a reference captured afterwards freezes the NEW behaviour and the baseline is
+gone), so landing it first is strictly the correct sequence. What is parked is the emit-class half — the part that
+changes what a shipping wizard cuts.
+
+### THE FREEZE, AND THE TRAP IT CAUGHT ON THE WAY IN
+
+`/_test/frozenSlotPath.js` is `slotPath` and everything it reaches — `num`/`r3`, the too-small trio, `depthLevels`,
+`levelEntry`, `entryOrPlunge`, `helixPoints` — pulled **verbatim by script**, `export` stripped and nothing else
+touched. A hand-copied baseline that drifts by one character does not fail loudly; it makes every downstream bridge
+prove the wrong thing confidently, which is worse than having no baseline.
+
+**⚠ AND THE ASSEMBLY IMMEDIATELY EARNED THAT CAUTION.** `wizards/clearing.js` defines its OWN `num` and `r3`, and
+they are not `ops/util.js`'s:
+
+    util.js       num('', 5) → 5      an empty string falls to the default
+    clearing.js   num('', 5) → 0      Number('') is 0, which is finite
+
+My first assembly was flat and collapsed both into one definition — silently changing the descent's behaviour on
+empty inputs, in the very file whose job is to be a faithful copy. Each source now sits in its **own closure**, so a
+collision between two files' private helpers is impossible by construction rather than by my having noticed this
+one. `helix.js` and `toolFit.js` import util's pair; the scopes say so explicitly instead of relying on hoisting.
+
+**PROVEN, not asserted:** 2376 configs character-for-character against the live kernel (11 widths × 3 tools × 3
+entries × 6 bearings × 2 depths × 2 stepovers — spanning the too-small refusal, the zero-band centreline, both
+descents, angled cases and multi-level), the too-small law identical on both sides of its boundary (exactly
+tool-width is ALLOWED — t1444), and the private-helper divergence asserted directly so the scoping cannot quietly
+collapse later. Smoke 71/71, the 51 slot/arc specs green.
+
+### ⚠ WHY THE RE-POINT IS PARKED — this is the third flag, and this time I am acting on it
+
+I flagged for a fresh seat at t1490 and again at t1492. At t1492 I set myself the condition *park at the first slip
+in the emit path*; C3 (t1494) then had TWO emit-path geometry defects and I continued anyway, and I reported that
+judgement call rather than hiding it. This dispatch is the sixth act this seat and the largest, and it touches the
+**shipping slot wizard's emit** — the path that cuts real parts — plus breadth I have not touched all session
+(twin bindings, a reconciler sweep, screenshots).
+
+Continuing here would be the failure mode the protocol names explicitly: pushing through tired on emit-class work.
+So the strong move is the one taken — **main stays green, the safety net is landed and proven, and the inventory is
+named.**
+
+### THE INVENTORY, so the next seat starts at full speed
+
+- **The baseline exists and is asserted.** `/_test/frozenSlotPath.js` + `slot-frozen-reference-1496.spec.js`. Build
+  bridges against `frozenSlotPath`, never against `slotPath`, or they go vacuous the moment the re-point lands.
+- **The expressible domain is already measured** (t1494): baked bearing from `atan2(B−A)` at build, `insetAlong: 0`,
+  `insetAcross: tool/2`, `rowAnchor: 'wall'`, plunge/ramp entries. The atom reproduces `slotPath`'s passes at ten
+  widths and seven bearings — those numbers are in the t1492/t1494 entries and need no re-derivation.
+- **The inexpressible domain stays literal**, and `SLOT_RASTER_GAP` already names it: a DIALLED bearing (trig, V13)
+  and the slot HELIX entry (the atom helixes mid-channel clamped by the rect inradius, not at the ENTRY END clamped
+  to the slot width).
+- **The degenerate to watch**: at `width == tool` the band is zero — `slotPath` cuts one centreline pass and the
+  atom REFUSES via its collapsed-inset guard. Recorded on the arc's C1 row. The re-point must route that width to
+  the literal arm or the refusal will surface where a pass belongs.
+- **The CAM lift is a separate act** and my t1494 measurement stands (generator arm + a `#2600` field-list format
+  change + the `#50`-vs-`#34–#49` band reconciliation).
