@@ -13361,3 +13361,109 @@ Playwright and throws the spurious `test.use()` collection error. Always cd to `
 - `tool-picker-1b-768` **5/5** · `editor-indent-1450` **8/8** · the slot-twin + as-data set green.
 - Nothing released this turn; V2026.07.31.15 from t1500 stands, its deploy gated on the advisor's own green.
 - Proc tree clean.
+
+## t1504 (seat A) — THE PARTIAL-BITE RAMP, MEASURED. Zero overshoot everywhere — and the family already agrees 3-to-1 with the ATOM, not with the slot. ⚠ PARKED AT A GATE.
+
+Dispatched to measure the partial-bite ramp across the family, then FIX (converge on the slot kernel's actual-drop
+behaviour) or DECLARE (if the overshoot is provably harmless). The measurement answered both questions and then
+inverted the dispatch's premise, so this entry ends at a gate rather than at a ruling I had the standing to make.
+
+### THE THREE QUESTIONS, ANSWERED WITH NUMBERS
+
+Configuration: depth 4, stepdown 1.5 → levels 1.5 / 3.0 / **4.0**, a last bite of 1.0. True previous floor −3.0;
+the nominal floor (`z + stepdown`) −2.5. Ramp angle 3°.
+
+    kernel                ramp starts at    run        ends at    deepest cut
+    surfaceraster (atom)      -2.5        28.621mm      -4.0         -4.0
+    surfacing (literal)       -2.5        28.621mm      -4.0         -4.0
+    pocket (literal)          -2.5 *          *         -4.0         -4.0
+    slot (literal)            -3.0        19.081mm      -4.0         -4.0
+    (* the pocket config measured degrades its final descent to a plunge; its prevZ comes from the same
+       `stepover.js` line as surfacing's, confirmed by code and by the 1406 bridge's own failure text)
+
+1. **Does the ramp's Z overshoot the level floor?** **NO.** Measured overshoot 0.0000 on every kernel and every
+   config swept (depths 3 / 4 / 5 / 2 / 3.2 against stepdowns 1.5 / 0.75 / 0.8, whole and partial). Every ramp ends
+   at EXACTLY the asked depth, because the move's Z target is the CLAMPED level `#46`, not a nominal accumulation.
+2. **By how much?** Zero. There is nothing to size.
+3. **Does the level re-cut, or does material stay?** **Neither.** On a partial final level the nominal ramp begins
+   `(stepdown − lastBite)` ABOVE the true floor — 0.5mm here — so its first 0.5mm of descent passes through air the
+   previous level already cleared. It then cuts to the correct depth, and the level's row pass covers the whole area
+   at that depth. No material is left and nothing is re-cut in material. The rapid that positions it (`G0 Z[-z +
+   stepdown]`) lands at or ABOVE the previous floor on every level, so it never rapids into stock.
+
+**The current behaviour is provably harmless.** The cost is a longer approach, part of it in air.
+
+### ⚠ THE FINDING — THE DISPATCH'S PREMISE IS INVERTED, AND IT CHANGES WHICH FIX IS SMALL
+
+The dispatch framed the fix as "the ramp reads the actual remaining drop — the slot kernel's own behavior, so the
+family converges". **The family does not converge on the slot. It already agrees with the ATOM, three kernels to
+one.** The split is pre-existing, and nobody had named it:
+
+    NOMINAL (z + stepdown)   surfaceraster (atom) · surfacing literal · pocket literal · contour literal
+    ACTUAL  (the real floor) slot literal — ALONE
+
+The mechanism is one line per caller. `levelEntry` already computes `drop = prevZ − z`, so the shared helper is
+correct and always was; what differs is what each caller PASSES as `prevZ`:
+
+    wizards/ops/stepover.js:42     ctx.prevZ = z + num(p.by, …)     ← nominal (pocket, surfacing)
+    wizards/ops/contourfill.js:49  prevZ = z + num(p.by, …)         ← nominal (contour)
+    wizards/ops/slot.js:77         prevZ: -prevD                    ← the real previous level
+
+And `stepover.js` cannot simply be corrected in place: called per level, it knows `z` and `by` but NOT the total
+depth, so it cannot tell a clamped final level from a whole one. Converging on ACTUAL therefore needs the level walk
+to declare the floor it starts from — a StepDown scope-contract addition — plus three call sites.
+
+### WHAT I BUILT, MEASURED, AND THEN TOOK BACK OUT
+
+I implemented the atom half of the actual-drop fix before the bridges told me the premise was wrong, and the
+measurements are worth keeping because they cost nothing to re-land:
+
+- `V.prevZ = '#35'` — free by the SAME mutual exclusion that justifies `#34` (a descent is exactly one of
+  plunge / ramp / helix, so the ramp's floor and the helix's `vy` are never live together). **The band does not
+  grow**, which matters because `SLOT_ARC_BAND` records it has no adjacent room.
+- One `#35=#46` in the depth loop, emitted on the ramp path only; the run becomes `[[#46 − #35] * invTan]`.
+- **The bridge holds where every bite is whole**: traced path byte-for-byte unmoved (depth 3 @ 1.5 → descents
+  identical, run 28.621 both sides).
+- **The partial case converges exactly on the slot kernel**: run 19.081mm, ramp starting at the true −3.0 — the same
+  number `slot.js` measured independently at t1498.
+- `@work` for a ramp went **6 → 7 steps per level**, differenced from real executed counts the way t1440's constants
+  were. The calibration spec caught it at declared 307 vs executed 308 — the side that TRUNCATES a preview — so it
+  was re-measured rather than absorbed by the 4× margin.
+
+**REVERTED**, because on its own it is the one indefensible option: it would trade agreement with three kernels for
+agreement with one. The working line is green again (127/127 across the four affected specs).
+
+### THE FORK, WITH ITS PRICE — and why it is not mine to call
+
+Every option below ends at the same cut depth. None of them fixes a gouge, because there is no gouge.
+
+**(A) DECLARE.** Change nothing. Name the slot's literal kernel as the outlier and the nominal ramp as a measured,
+harmless divergence. Cost: `SLOT_RAMP_PARTIAL_GAP` stays permanent, so the slot wizard's OWN DEFAULTS (depth 4 @
+stepdown 1.5 with a ramp) stay literal forever for a reason measurement shows is cosmetic. Corpus unmoved.
+
+**(B) CONVERGE ON ACTUAL.** Atom + `stepover.js` + `contourfill.js` + a StepDown scope contract that declares the
+floor each level starts from. The most correct descent everywhere, and the slot gate retires. Cost: the emitted
+G-code of EVERY ramped literal pocket / surfacing / contour program with a partial final level moves — for a benefit
+measurement puts at zero overshoot either way.
+
+**(C) CONVERGE ON NOMINAL — my recommendation.** Change `slot.js:77` to the nominal floor. ONE call site. The whole
+family then agrees, `SLOT_RAMP_PARTIAL_GAP` retires, and the shipped-default ramping slot re-points onto the atom —
+which is a real capability, since that gate currently refuses the most common slot there is. Only the slot's own
+literal ramp emits move. **Stated against myself:** it converges on the LESS efficient descent (the extra air
+travel) and makes the slot's kernel worse in isolation; it buys a capability with a cosmetic regression rather than
+the reverse.
+
+I did not choose. This is a corpus-wide behaviour ruling on shared kernels, the dispatch's premise for it did not
+survive measurement, and t1498 set the precedent exactly here: *"changing [the shared atom] under cover of the
+slot's re-point is exactly the silent behaviour move this arc exists to prevent."* The same applies to changing
+three literal kernels under cover of an examination.
+
+### GATES
+
+- No product code changed this turn — the atom edit was reverted. `pocket-rides-raster-1406` ·
+  `raster-direction-1418` · `slot-repoint-domain-1498` · `surfacing-parametric-1329` ·
+  `declared-work-calibration-1440` **127/127**.
+- Nothing released. V2026.07.31.15 stands.
+- ⚠ For whichever branch is ruled: `slot-repoint-domain-1498`'s THIRD GATE test asserts the partial-bite divergence
+  in both directions and against its predicted size. Under (B) or (C) that boundary CEASES TO EXIST, so that test is
+  evidence of a fact that would no longer be true and must be restated in the same act — it is not a follow-up.
