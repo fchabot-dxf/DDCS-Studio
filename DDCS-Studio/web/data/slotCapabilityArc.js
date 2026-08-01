@@ -277,6 +277,57 @@ export const SLOT_REPOINT_LANDED = {
         + 'THE SHIPPED-DEFAULT RAMPING SLOT IS PARAMETRIC BECAUSE OF IT',
 };
 
+/**
+ * ── t1508 — THE CAM LIFT, SCOUTED BEFORE IT IS BUILT, because its FIELD LIST is not the one the act assumed ───────
+ *
+ * The act is to pack the ATOM's macro for eligible slots so the CAM width gate can lift. The scout found one
+ * constraint that decides the whole shape, and it is not negotiable by effort:
+ *
+ * ⚠ THE BEARING MUST BE BAKED — AND THAT FORCES THE ENDPOINTS TO BE BAKED TOO.
+ *
+ * `slotRasterParams` derives the atom's frame from A and B:
+ *
+ *     bearing = atan2(By - Ay, Bx - Ax)      w = hypot(B - A)
+ *     x = Ax + (width/2)·sin(bearing)        y = Ay - (width/2)·cos(bearing)
+ *
+ * A packed CAM slot's fields are LIVE `#2600` registers an operator dials at the pendant, so any quantity derived
+ * from them must be computable ON THE CONTROLLER. `atan2` and `hypot` are not: `data/trigEvidence.js` rates ATAN and
+ * SQRT `community-referenced` — the weakest tier — and the two places Studio already ships them (the alignment probe,
+ * the rotary 3-point fit) are OPERATOR-ATTENDED PROBING, which that file is explicit is a NARROWER precedent than it
+ * looks and not a licence for a cutting macro. So the bearing and the length are build-time constants or nothing.
+ *
+ * A BAKED BEARING BESIDE LIVE ENDPOINTS IS THE DEFECT, NOT THE COMPROMISE. Dial B at the pendant and the slot cuts
+ * the OLD angle through the NEW endpoint — clean G-code, wrong part, no error. That is exactly the class `t1425`
+ * closed for the raster (`surfaceRasterLiveGap`: a descent that bakes geometry degrades honestly rather than baking
+ * against a dial) and the class the `no-knob-dark` law exists for.
+ *
+ * SO THE PACKED SLOT'S KNOBS ARE THE ATOM'S OWN, NOT THE WIZARD'S. This is the correction the build act needs:
+ */
+export const SLOT_CAM_PACK_DESIGN = {
+    live: 'depth · stepdown · feed · plunge · clearance · rpm · toolDia · stepoverPct · WIDTH — every one of them is '
+        + 'either a direct atom register or reachable from one by arithmetic the controller does today. `width` stays '
+        + 'live because `x`/`y` need it only as `width/2 · <baked sin>`, and a baked sine is a constant',
+    baked: 'ax · ay · bx · by — and they are baked TOGETHER WITH the bearing and the length they derive, because that '
+        + 'is the only way the three cannot disagree. The existing expose/bake machinery already expresses this '
+        + '(`decl[key].exposed === false` in opToSlot/probeToSlot allocates no #11xx param and no field)',
+    why: 'atan2 + hypot are V13-gated (trigEvidence: ATAN/SQRT community-referenced), so the frame is build-time or '
+        + 'nothing; and a baked frame beside live endpoints cuts the old angle through the new point — silently',
+    /**
+     * ⚠ THE ACT AS DISPATCHED SAID "tool diameter + stepoverPct join the #2600 layout". That is right and it is not
+     * the whole change: the endpoints must LEAVE the live layout in the same act, or the new arm ships the very
+     * silent-substitution defect the arc exists to prevent. A format change that adds two knobs and leaves four
+     * lying is worse than the gate it lifts.
+     */
+    fieldListDelta: '+toolDia +stepoverPct +width (live) · -ax -ay -bx -by (baked, with the bearing and length)',
+    refusalIfExposed: 'if a future caller exposes an endpoint on the packed arm, the pack must REFUSE in the table\'s '
+        + 'words rather than emit — the surfaceRasterLiveGap pattern, one surface along',
+    stillLiteral: 'helix entries, the zero band, patterns, and anything the atom\'s own envelope refuses keep the '
+        + 'centreline body and the honest row that names the wizard as the exit',
+    bands: 'the packed atom writes RASTER_SCRATCH (#34-#49, #62-#64); the literal centreline body keeps #50-#54. '
+        + '`bandsFor(\'slot\')` must carry BOTH, and the probe temps #50-#61 overlap is what the collision guard has '
+        + 'to be asserted against at a HIGH varOffset',
+};
+
 /** The one thing this arc does NOT touch, restated so it cannot be folded in by accident. */
 export const SLOT_ARC_NOT_INCLUDED = {
     what: 'rest machining (REST_PARAMETRIC_GAP)',

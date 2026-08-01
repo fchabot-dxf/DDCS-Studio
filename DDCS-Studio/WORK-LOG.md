@@ -13546,3 +13546,81 @@ with its own bridge: it needs `stepover.js` + `contourfill.js` + a StepDown scop
 each level starts from, and it moves every ramped literal emit in the corpus. t1504 already built and measured its
 atom half (`V.prevZ = #35`, free by mutual exclusion, band unchanged; whole bites byte-for-byte unmoved; `@work`
 6 → 7 per level), so re-landing it is cheap when it is its own act.
+
+## t1508 (seat A) — THE CAM LIFT: SCOUTED, NOT BUILT. The crux changes the act's FIELD LIST, and the build wants a fresh seat.
+
+Dispatched to build the CAM lift in three pieces. I scouted it before touching emit and found that piece (1) decides
+piece (2)'s field list — and not in the direction the dispatch assumed. That is recorded, asserted, and parked. No
+product behaviour changed this turn.
+
+### ⚠ THE CRUX — A BAKED BEARING FORCES THE ENDPOINTS TO BE BAKED TOO
+
+The dispatch specified "A-to-B mapped to the rect + baked atan2 bearing" and "tool diameter + stepoverPct join the
+#2600 layout". The first is right. The second is right and INCOMPLETE, and the gap is a silent-substitution defect.
+
+`slotRasterParams` derives the atom's frame from the endpoints:
+
+    bearing = atan2(By − Ay, Bx − Ax)      w = hypot(B − A)
+    x = Ax + (width/2)·sin(bearing)        y = Ay − (width/2)·cos(bearing)
+
+A packed CAM slot's fields are LIVE `#2600` registers, so anything derived from them must be computable ON THE
+CONTROLLER. Measured against `data/trigEvidence.js`, not assumed: **ATAN and SQRT are `community-referenced`** — the
+weakest tier — and the two places Studio already ships them (the alignment probe, the rotary 3-point fit) are
+OPERATOR-ATTENDED PROBING, which that file is explicit is a narrower precedent than it looks. So the bearing and the
+length are build-time constants or nothing.
+
+**And a baked frame beside LIVE endpoints is the defect, not the compromise.** Dial B at the pendant and the slot
+cuts the OLD angle through the NEW endpoint: clean G-code, wrong part, no error. That is exactly the class t1425
+closed for the raster (`surfaceRasterLiveGap` — a descent that bakes geometry degrades honestly rather than baking
+against a dial), and precisely what the act's own no-knob-dark law forbids.
+
+So the packed slot's knobs are THE ATOM'S, not the wizard's:
+
+    LIVE    depth · stepdown · feed · plunge · clearance · rpm · toolDia · stepoverPct · WIDTH
+            (width survives because x/y need it only as width/2 · <baked sin>, and a baked sine is a constant)
+    BAKED   ax · ay · bx · by — baked TOGETHER WITH the bearing and length they derive, which is the only
+            arrangement in which the three cannot disagree
+
+    field-list delta:  +toolDia +stepoverPct +width   ·   −ax −ay −bx −by
+
+**A format change that adds two knobs and leaves four lying is worse than the gate it lifts.** The existing
+expose/bake machinery already expresses this (`decl[key].exposed === false` in opToSlot/probeToSlot allocates no
+#11xx param and no field), so the design costs no new mechanism — it costs a corrected field list.
+
+### WHAT LANDED
+
+- `SLOT_CAM_PACK_DESIGN` in `data/slotCapabilityArc.js` — inert data the build act reads: the live set, the baked
+  set, the why, the field-list delta, the refusal if an endpoint is ever exposed, what stays literal, and the band
+  reconciliation (the packed atom writes `RASTER_SCRATCH` #34-#49/#62-#64 while the literal centreline body keeps
+  #50-#54, so `bandsFor('slot')` must carry BOTH — and the probe temps #50-#61 overlap is what the collision guard
+  has to be asserted against at a high varOffset).
+- `slot-cam-pack-scout-1508.spec.js` — 3 tests. The crux asserted against `trigEvidence` RATHER THAN RESTATED, so
+  the day ATAN or SQRT is promoted on a machine visit the test changes its mind on its own instead of holding a
+  stale conclusion. The design's live/baked sets asserted key by key. And the PREMISES the build will rest on
+  measured against real code: the frame really is trig-derived (a 30° slot bears 30.000000, its length is the
+  hypotenuse), the width gate is still shut and still names the wizard as the exit, the bake hook exists — and
+  ⚠ **today's `bandsFor('slot')` does NOT cover the atom's #34-#49**, asserted, so piece 3 is proven to be real work
+  rather than bookkeeping.
+
+### WHY IT IS PARKED — capacity, stated plainly
+
+The dispatch said "park fresh rather than half-land", and this is me taking it at its word rather than as a
+formality. The act is three substantial pieces: a new generator arm with a corrected field list, a FORMAT change to
+the #2600 layout plus the honesty tables that follow it, and a band reconciliation with a collision guard. Behind
+those sit the indirection-chain bridge, the no-knob-dark proof, @work in the packed macro, refusals in the table's
+words, and screenshots.
+
+This is my fifth act in this seat (t1500 twin+swap, t1502 three reds, t1504 the ramp measurement, t1506 the
+convergence, this scout). I have the room to SCOUT well — which is what produced the finding above, and finding it
+before any emit was touched is worth more than a half-built arm — but not to do emit-class work on a user-facing CAM
+FORMAT change well. A format change is the wrong thing to push through tired: it is pre-release so there is no
+migration to get wrong, but the packs regenerate against it and the honesty sentences an operator reads are part of
+the deliverable.
+
+The next seat starts turnkey: the crux is settled, the field list is corrected and asserted, the three premises are
+pinned, and the band work is proven necessary.
+
+### GATES
+
+- No product behaviour changed. New spec **3/3**; arc + twin + cam-honesty + cam-arm-classify **27/27**.
+- Nothing released. V2026.08.01.1 from t1506 stands.
