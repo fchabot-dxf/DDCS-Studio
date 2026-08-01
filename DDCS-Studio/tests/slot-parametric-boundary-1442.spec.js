@@ -164,7 +164,11 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
     expect(r.gap, 'and records C2 as what retired it').toMatch(/C2 \(t1490\) taught it a PAIR/);
     // t1492 — C1 landed, so THE ROW RULE left this list too. What the boundary still names is THE AXIS (plus the
     // descent's helix half), and asserting the NAME rather than a count is what let this line move by one word.
-    expect(r.gap, 'while still NAMING the capability the atom does not declare').toMatch(/THE AXIS \(C3\)/);
+    // t1494 - C3 landed and the ARC CLOSED, so no clause names a capability gap any more. What the boundary
+    // still holds is TWO EVIDENCE GATES (a dialled bearing needs trig; a slot helix wants the true-arc form),
+    // and asserting THAT is what keeps this line honest as the arc finished under it.
+    expect(r.gap, 'the arc closed: every clause is retired').toMatch(/ALL FOUR CLAUSES ARE RETIRED NOW/);
+    expect(r.gap, 'and what remains is EVIDENCE, not a walk the atom cannot do').toMatch(/TWO NAMED EVIDENCE GATES/);
     expect(r.gap, 'and recording the row rule as retired by C1, not as pending').toMatch(/C1 \(t1492\) taught it the wall rule/);
 
     // 3 — THE BEARING, and the arc-ends hypothesis REFUTED rather than assumed
@@ -193,7 +197,9 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
     expect(r.gap, 'and the declared boundary records that half as retired, rather than keeping a stale reason').toMatch(/C4, t1485|retired/);
     expect(r.slotHelix[0], 'the slot helixes at the ENTRY END').toBeLessThan(10);
     expect(r.atomHelix[0], '…the atom STILL in the MIDDLE of the channel — the half of this clause that stands').toBeGreaterThan(25);
-    expect(r.gap, 'and the boundary still holds on three of its four measured ways').toMatch(/Three of the four still need a capability/);
+    // t1494 - the arc finished under this line: all four clauses are retired, so the boundary no longer holds on
+    // a COUNT of measured ways. It holds on EVIDENCE, and that is the durable form of the same claim.
+    expect(r.gap, 'the boundary now holds on evidence rather than on a count of capabilities').toMatch(/TWO NAMED EVIDENCE GATES/);
 });
 
 test('THE BOUNDARY IS ABOUT THE WALK, not about a slot\'s numbers — so nothing can dial past it', async ({ page }) => {

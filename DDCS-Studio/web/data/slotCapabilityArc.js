@@ -204,7 +204,19 @@ export const SLOT_CAPABILITIES = [
             + 'and sin at run time)',
         envelope: 'a `bearing` axis, and the composition with rotAngle declared explicitly: two build-time rotations '
             + 'are ONE sum, so they compose for free while both are baked',
-        gate: '⚠ THE LIVE FORM ONLY: a pendant-dialled bearing needs COS/SIN of a runtime angle, which is trig — '
+        /** t1494 — what landed, and the arc CLOSES here. Same `landed` shape C4 introduced at t1487. */
+        landed: 'SHIPPED at t1494, BAKED — and the arc closes with it. `rasterBearingOf` declares the angle and '
+            + '`bearingShift` resolves it WITH the program rotation into ONE rotation by the sum about a shifted '
+            + 'origin, which is this row\'s own "two build-time rotations are ONE sum" made exact: the algebra was '
+            + 'verified numerically (5.7e-14 over six angles × five pivots × five points) BEFORE any emit changed. '
+            + 'The pivot is the OP\'S DECLARED ORIGIN, not the walk\'s, so the C2 inset turns with the construction '
+            + 'and across-the-pass means across the PASS at any angle — the C2 payoff this row was promised. '
+            + 'THE NULL CASE IS BYTE-IDENTICAL over 864 configs (this row called it the strongest assert, and it is: '
+            + 'a zero bearing takes the untouched path entirely, so even rotated configs cannot move). Bridged '
+            + 'against slotPath at SEVEN bearings (0/30/45/90/-30/137.5/180) — all match within one emit quantum. '
+            + '⚠ THE LIVE HALF DID NOT SHIP and is refused in its own words: a dialled bearing needs COS/SIN of a '
+            + 'runtime angle, so it joins the V13 lift plan beside the helix.',
+        gate: '⚠ THE LIVE FORM ONLY: a pendant-dialled bearing needs COS/SIN of a runtime angle, which is trig —'
             + 'unverified on this controller (V13_trig.nc, and see data/trigEvidence.js). THE BAKED FORM IS UNGATED '
             + 'and is what a slot actually needs, since a slot\'s bearing is geometry the operator drew, not a knob '
             + 'they turn at the machine. So this capability lands baked and its live half joins the V13 lift plan',

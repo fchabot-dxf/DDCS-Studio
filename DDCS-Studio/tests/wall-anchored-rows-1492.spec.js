@@ -163,8 +163,16 @@ test('THE REMAINDER — the row rule and the inset are both retired; the AXIS is
     expect(r.gap, 'the boundary records the row rule as retired by C1').toMatch(/C1 \(t1492\) taught it the wall rule/);
     expect(r.gap, 'and the inset as retired by C2').toMatch(/C2 \(t1490\) taught it a PAIR/);
     // ⚠ THE BOUNDARY STILL STANDS, on the one capability that is left plus the helix
-    expect(r.gap, 'what stands is THE AXIS').toMatch(/THE AXIS \(C3\)/);
-    expect(r.gap, 'and an angled slot is the case that cannot be faked').toMatch(/an angled slot is the case that cannot be faked/);
+    // t1494 - C3 landed and the ARC CLOSED, so no clause names a capability gap any more. What the boundary
+    // still holds is TWO EVIDENCE GATES (a dialled bearing needs trig; a slot helix wants the true-arc form),
+    // and asserting THAT is what keeps this line honest as the arc finished under it.
+    expect(r.gap, 'the arc closed: every clause is retired').toMatch(/ALL FOUR CLAUSES ARE RETIRED NOW/);
+    expect(r.gap, 'and what remains is EVIDENCE, not a walk the atom cannot do').toMatch(/TWO NAMED EVIDENCE GATES/);
+    // t1494 — this asserted "an angled slot is the case that cannot be faked", which C3 made false three turns
+    // later by teaching the atom a BAKED bearing. What is still true, and is the sharper claim, is that the DIALLED
+    // bearing remains gated on trig evidence — so the sentence moves from a capability the atom lacks to a decision
+    // the machine has not made.
+    expect(r.gap, 'a DIALLED bearing is what still waits, and it waits on evidence').toMatch(/DIALLED bearing needs COS\/SIN of a runtime angle/);
     expect(r.landed, 'the arc records C1 as shipped, both halves together').toMatch(/SHIPPED at t1492, phase AND clamp in ONE act/);
     expect(r.landed, 'and names the degenerate where the two kernels still diverge, rather than papering it over').toMatch(/width == tool/);
 });

@@ -116,6 +116,55 @@ export function rasterRowAxisOf(p = {}) {
 }
 
 /**
+ * ── t1494 (C3) — THE WALK'S OWN BEARING, in degrees, BAKED (slot capability arc 4/4) ─────────────────────────────
+ *
+ * The atom's rows have always run parallel to X or Y. A slot's passes run on the SLOT'S BEARING — measured 30.000
+ * degrees on a 30-degree slot, its step-overs at 120 — and `rotAngle` could not express it: that socket means the
+ * PROGRAM's declared rotation, a second and unrelated quantity that the bearing has to compose WITH, not borrow.
+ *
+ * ⚠ BAKED ONLY, AND THE SPLIT IS EVIDENCE, NOT EFFORT. A bearing is geometry the operator DREW, not a knob they turn
+ * at the pendant, so the baked form is what a slot actually needs — two build-time constants, no registers, no
+ * evidence required. A LIVE (dialled) bearing would need COS/SIN of a runtime angle: trig, unverified on this
+ * controller, V13's decision (see data/trigEvidence.js). So a live bearing is REFUSED here rather than guessed, and
+ * its half joins the V13 lift plan — the same shape the helix's inradius keeps.
+ */
+export function rasterBearingOf(p = {}) {
+    return num(p.bearing, 0);
+}
+
+/**
+ * ── t1494 (C3) — THE BEARING AND THE PROGRAM ROTATION, RESOLVED INTO **ONE** ROTATION ────────────────────────────
+ *
+ * The bearing turns the walk about the OP'S DECLARED ORIGIN — before the inset moves in, so the inset offset turns
+ * with everything else and C2's across-the-pass really is across the PASS at any angle. The program rotation turns
+ * the whole program about the part datum. Two rotations about different pivots compose into ONE rotation by the SUM
+ * plus a translation — verified numerically before any of this was written (worst error 5.7e-14 over six angles by
+ * five pivots by five points) — and the translation folds into the ORIGIN, which this atom already carries.
+ *
+ *     t = R(-gamma)(k)   where gamma = rotAngle + bearing and k is the composite's image of the datum
+ *
+ * ⚠ A ZERO BEARING TAKES THE UNTOUCHED PATH. The composite picks pivot (0,0) and shifts the origin, which is
+ * arithmetically identical but prints DIFFERENT intermediate constants — and the identity sweep covers rotated
+ * configs. So the whole existing corpus is byte-identical by CONSTRUCTION, not by an argument about rounding.
+ *
+ * The degenerate the algebra warns about costs nothing here: when the two angles cancel the composite is a pure
+ * translation, and a pure translation is exactly what an origin shift is.
+ */
+export function bearingShift({ bearing = 0, rotA = 0, rotPX = 0, rotPY = 0, ox = 0, oy = 0 } = {}) {
+    if (!bearing) return { tx: 0, ty: 0, angle: rotA, pivotX: rotPX, pivotY: rotPY };
+    const rad = (d) => d * Math.PI / 180;
+    const spin = (a, vx, vy) => [vx * Math.cos(rad(a)) - vy * Math.sin(rad(a)), vx * Math.sin(rad(a)) + vy * Math.cos(rad(a))];
+    const about = (a, px, py, vx, vy) => { const [dx, dy] = spin(a, vx - px, vy - py); return [px + dx, py + dy]; };
+    const gamma = rotA + bearing;
+    const [bx, by] = about(bearing, ox, oy, 0, 0);       // the datum through the bearing…
+    const [kx, ky] = about(rotA, rotPX, rotPY, bx, by);  // …and then through the program rotation
+    const [tx, ty] = spin(-gamma, kx, ky);               // the translation, expressed before the rotation
+    return { tx, ty, angle: gamma, pivotX: 0, pivotY: 0 };
+}
+/** Is a live (register) bearing being asked for? That is the trig-gated half, and it refuses rather than guessing. */
+export const rasterBearingIsLive = (p = {}) => liveWordOf(p.bearing) != null;
+
+/**
  * ── t1492 (C1) — WHICH ROW RULE THIS WALK USES, declared in one place like the axis and the direction ────────────
  *
  * 'fit'  — rows half a stepover inside the walked edge, keeping those that land inside. Surfacing's rule (the tool
@@ -558,7 +607,16 @@ export function surfaceRasterLines(p = {}) {
     // is a word-or-number like everything else; `.n` is the number this line always produced.
     // t1490 (C2) — each axis moves in by its OWN inset; at an even pair this is the single-inset expression verbatim
     const oxT = geoSum(xT, iXT), oyT = geoSum(yT, iYT);
-    const x0 = oxT.n, y0 = oyT.n, z0 = num(p.z0, 0);
+    /**
+     * ⚠ t1494 (C3) — THE BEARING SHIFT LANDS HERE, BEFORE `x0`/`y0` ARE BOUND, and that placement is the whole
+     * correctness argument. The first cut shifted only the FRAME's origin and left the walks declaring their affine
+     * constants from the unshifted one, so `mv`'s unrotated word and its rotated form disagreed by exactly the
+     * shift and a bearing came out as something that was not a rotation of anything — measured against the atom's
+     * OWN unrotated path: 2.598mm out at 30 degrees, 6.0 at 90. ONE origin, read by both, or the two drift apart.
+     */
+    const BEAR = bearingShift({ bearing: rasterBearingOf(p), rotA: num(p.rotAngle, 0),
+        rotPX: num(p.rotPivotX, 0), rotPY: num(p.rotPivotY, 0), ox: xT.n, oy: yT.n });
+    const x0 = oxT.n + BEAR.tx, y0 = oyT.n + BEAR.ty, z0 = num(p.z0, 0);
     const confirmEvery = Math.max(0, Math.round(num(p.confirmEvery, 0)));
     const zTop = r3(z0);   // the surface this op faces from — 0 in the op's own frame, the placement's offZ when placed
 
@@ -614,9 +672,29 @@ export function surfaceRasterLines(p = {}) {
     const frameXW = skim ? SKIM_FRAME.x : oxT.w;
     const frameYW = skim ? SKIM_FRAME.y : oyT.w;
     const liveFrame = skim || oxT.live || oyT.live;
+    /**
+     * ── t1494 (C3) — THE BEARING AND THE PROGRAM ROTATION ARE **ONE** ROTATION, and here is why that is exact ─────
+     *
+     * The bearing turns the walk about its OWN ORIGIN; the program rotation turns the whole program about the part
+     * DATUM. Two rotations about different pivots compose into ONE rotation by the SUM of the angles plus a
+     * translation — verified numerically before this was written (worst error 5.7e-14 over six angles x five
+     * pivots x five points). So the frame is handed `rotAngle + bearing`, and the translation is folded into the
+     * ORIGIN, which this atom already carries as its placement frame. Nothing new is emitted and no second rotation
+     * mechanism exists: t1375's printer does the work, exactly as it does today.
+     *
+     *     t = R(-gamma)(k)  where k = the composite's image of (0,0) and gamma = rotAngle + bearing
+     *
+     * ⚠ AND IT IS SKIPPED ENTIRELY WHEN NO BEARING IS ASKED FOR. The composite form picks pivot (0,0) and shifts the
+     * origin, which is arithmetically identical but prints DIFFERENT intermediate constants — and the identity sweep
+     * covers rotated configs. So a zero bearing takes the untouched path and the whole existing corpus, rotated
+     * configs included, is byte-identical by construction rather than by a promise about rounding.
+     *
+     * The degenerate the algebra warns about is free here: when the two angles CANCEL the composite is a pure
+     * translation, and a pure translation is exactly what an origin shift is, so it needs no special arm.
+     */
     const { F, ax, ay, az, axE, ayE, azE, TM, AX, mv, rot } = affineFrame({
         x0, y0, zTop, live: liveFrame ? { x: frameXW, y: frameYW, z: skim ? SKIM_FRAME.z : String(zTop) } : null,
-        rotAngle: rotA, rotPivotX: num(p.rotPivotX, 0), rotPivotY: num(p.rotPivotY, 0),
+        rotAngle: BEAR.angle, rotPivotX: BEAR.pivotX, rotPivotY: BEAR.pivotY,
         absorbs: surfaceRasterAbsorbsRotation(p) === true,
     });
 
@@ -1498,6 +1576,20 @@ export function surfaceRasterLiveInputs(p = {}) {
  *                 feature. It is refused here instead, so a live input can never land somewhere that quietly drops it.
  */
 export function surfaceRasterLiveGap(p = {}) {
+    /**
+     * ⚠ t1494 (C3) — THE LIVE BEARING IS REFUSED, AND IT IS THE ONLY EVIDENCE-GATED THING IN THIS ARC.
+     *
+     * A BAKED bearing is two build-time constants: no registers, no evidence, and it is what a slot actually needs,
+     * because a bearing is geometry the operator DREW. A DIALLED one would need COS/SIN of a runtime angle — trig,
+     * unverified on this controller family, and V13_trig.nc is the decider (data/trigEvidence.js). Refused in its
+     * own words rather than guessed, which is the same shape the helix's inradius keeps, and checked BEFORE the
+     * live-input list so the reason names the bearing rather than whatever else happens to be dialled.
+     */
+    if (rasterBearingIsLive(p)) {
+        return 'a dialled BEARING needs COS/SIN of a runtime angle, and trig is unverified on this controller '
+            + '(V13_trig.nc decides it — see data/trigEvidence.js). A baked bearing is two build-time constants and '
+            + 'is what a drawn slot needs, so the angle must be known when the program is built';
+    }
     const live = surfaceRasterLiveInputs(p);
     if (!live.length) return '';
     if (String(p.zMode || '') === 'skim') {

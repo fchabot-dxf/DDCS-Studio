@@ -151,7 +151,11 @@ test('THE REMAINDER — C2 fixes the SPAN; the row rule inside it is still C1\'s
     // AND THE DECLARATIONS SAY BOTH HALVES — the clause C2 retires, and what still stands now C1 has landed too.
     expect(r.gap, 'the boundary records the inset clause as retired by C2').toMatch(/C2 \(t1490\) taught it a PAIR/);
     expect(r.gap, 'and the row rule as retired by C1').toMatch(/C1 \(t1492\) taught it the wall rule/);
-    expect(r.gap, 'with THE AXIS the capability that still stands').toMatch(/THE AXIS \(C3\)/);
+    // t1494 - C3 landed and the ARC CLOSED, so no clause names a capability gap any more. What the boundary
+    // still holds is TWO EVIDENCE GATES (a dialled bearing needs trig; a slot helix wants the true-arc form),
+    // and asserting THAT is what keeps this line honest as the arc finished under it.
+    expect(r.gap, 'the arc closed: every clause is retired').toMatch(/ALL FOUR CLAUSES ARE RETIRED NOW/);
+    expect(r.gap, 'and what remains is EVIDENCE, not a walk the atom cannot do').toMatch(/TWO NAMED EVIDENCE GATES/);
     expect(r.landed, 'and the arc records C2 as shipped').toMatch(/SHIPPED at t1490/);
     expect(r.landed, 'while saying plainly that it does NOT make the atom slot-ready').toMatch(/DOES NOT MAKE THE ATOM SLOT-READY/);
 });

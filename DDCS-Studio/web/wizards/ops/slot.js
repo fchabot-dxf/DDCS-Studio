@@ -150,16 +150,20 @@ export const SLOT_RASTER_GAP = 'a slot is not a rectangle the raster atom walks,
     + 'rowAnchor:wall it reproduces slotPath move for move at every width measured, whole-multiple or not. THE INSET: a slot is held tool/2 '
     + 'inside across its WIDTH and not at all along its LENGTH; the atom used to inset both axes by one number (a '
     + '60mm slot walked 3..57) and C2 (t1490) taught it a PAIR, so this clause is retired - handed (0, tool/2) the '
-    + 'atom walks the full 0..60 centreline. THE AXIS: the passes run on the slot bearing, the atom rows run parallel to X or Y. THE '
+    + 'atom walks the full 0..60 centreline. THE AXIS: the passes run on the slot bearing; the atom rows ran parallel '
+    + 'to X or Y until C3 (t1494) gave it a BAKED bearing, so this clause is retired too - handed the slot bearing it '
+    + 'reproduces slotPath at every angle measured. A DIALLED bearing is still refused: that half needs COS/SIN of a '
+    + 'runtime angle and waits on V13. THE '
     + 'DESCENT: a slot ramps ALONG its length and helixes at the ENTRY END clamped to the slot width; the atom now '
     + 'ramps along its own ROW (C4, t1485 - it used to ramp toward the AREA CENTRE, and that half of this clause is '
     + 'retired) but still helixes in the middle of the channel with the radius clamped by the rect inradius. Three of '
-    + 'the four still need a capability the atom does not declare, and they are NAMED rather than counted so this '
-    + 'cannot go stale silently as the arc lands: THE AXIS (C3), and THE DESCENT on its HELIX half - the ramp half '
-    + 'only ever agreed with a slot that happens to be axis-aligned, which THE AXIS already covers. THE ROW RULE and '
-    + 'THE INSET are both retired now (C1, C2), so what stands between this kernel and the atom is ONE capability '
-    + 'plus a helix: the passes still run parallel to X or Y rather than on the slot bearing, and an angled slot is '
-    + 'the case that cannot be faked. So the slot keeps its literal kernel until it is taught them deliberately';
+    + '⚠ ALL FOUR CLAUSES ARE RETIRED NOW (C4 t1485, C2 t1490, C1 t1492, C3 t1494), so this declaration no longer '
+    + 'describes a walk the atom cannot do. WHAT REMAINS IS NOT A WALK BUT TWO NAMED EVIDENCE GATES, and they are why '
+    + 'the slot still keeps its literal kernel: a DIALLED bearing needs COS/SIN of a runtime angle (trig, unverified '
+    + 'here - V13 decides), and a slot HELIX entry still wants the true-arc form the atom does not have, so the atom '
+    + 'helixes in the MIDDLE of the channel clamped by the rect inradius rather than at the ENTRY END clamped to the '
+    + 'slot width. A BAKED-bearing, PLUNGE-or-RAMP slot is expressible by the atom today, and whether to re-point '
+    + 'this kernel onto it is a RULING rather than a capability gap - the arc closed, the decision did not';
 
 /**
  * Why THIS slot's clearing cannot ride the parametric raster — or '' when there is no clearing walk to port at all.
