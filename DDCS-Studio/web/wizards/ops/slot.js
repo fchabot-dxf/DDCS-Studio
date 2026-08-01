@@ -11,6 +11,7 @@ import { num, r3 } from './util.js';
 import { depthLevels, entryOrPlunge } from '../clearing.js';
 import { pointsBBox } from './placement.js';
 import { toolTooLarge, toolFitRefusal, refusalLines } from './toolFit.js';   // t1444 — the ONE too-small boundary + the family's refusal form
+import { surfaceRasterCovers, surfaceRasterGap } from './surfaceraster.js';   // t1498 — the atom's OWN envelope decides whether this slot may ride it
 
 /**
  * t1444 — THE SLOT'S OWN SPAN, DECLARED: a slot offers the tool exactly its WIDTH, and nothing else about a slot
@@ -176,6 +177,156 @@ export function slotRasterGap(p = {}) {
     const len = Math.hypot(num(p.x1, 60) - num(p.x0, 0), num(p.y1, 0) - num(p.y0, 0));
     return len < 1e-6 ? '' : SLOT_RASTER_GAP;
 }
+
+/**
+ * ── t1498 — THE RE-POINT. The arc closed as a RULING; this is the ruling taken ────────────────────────────────────
+ *
+ * `SLOT_RASTER_GAP` above is the BOUNDARY — what a slot's walk needs and what the atom can express. This section is
+ * the OPERATIONAL twin of it: which slots actually ride the atom today, and the REASON, in words, for each that does
+ * not. Two names because they are two questions (the pocket keeps the same split: `POCKET_SHAPE_GAP` declares the
+ * permanent literal domain, `pocketRasterGap` picks the arm), and collapsing them would make the boundary's careful
+ * "what is left is TWO EVIDENCE GATES" reading answer a question about arithmetic it was never measuring.
+ */
+
+/**
+ * THE SLOT'S OWN BEARING, in degrees — `atan2(B − A)`, and it is BAKED by construction.
+ *
+ * A slot's angle is geometry the operator DREW, so it is known when the program is built: two build-time constants,
+ * no registers, no trig on the controller, no evidence required (C3, t1494). The DIALLED half — an operator turning
+ * the bearing at the pendant — would need COS/SIN of a runtime angle and stays V13's decision; nothing here can
+ * reach it, because this function computes a NUMBER from two drawn endpoints.
+ */
+export function slotBearingDeg(p = {}) {
+    return Math.atan2(num(p.y1, 0) - num(p.y0, 0), num(p.x1, 60) - num(p.x0, 0)) * 180 / Math.PI;
+}
+
+/**
+ * Is the LAST depth level a FULL bite? The ramp's divergence turns on exactly this, and nothing else (measured below).
+ *
+ * `depthLevels` clamps its final level to the total depth, so a depth that is not a whole multiple of the stepdown
+ * ends on a PARTIAL bite — 4mm at 1.5 gives 1.5 / 3.0 / 4.0, a last drop of 1.0.
+ */
+function slotLastBiteIsFull(p = {}) {
+    const stepdown = Math.max(0.01, num(p.stepdown, 1.5));
+    const lv = depthLevels(num(p.depth, 4), stepdown);
+    const last = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
+    return Math.abs(last - stepdown) < 1e-9;
+}
+
+/**
+ * ⚠ THE THIRD GATE, MEASURED THIS TURN AND NOT IN THE ARC'S INVENTORY — A RAMP OVER A PARTIAL LAST BITE ───────────
+ *
+ * The arc named two things that keep the slot literal (a dialled bearing, the helix's entry-end clamp). There is a
+ * THIRD, it is not trig, and it is not a capability the atom lacks — it is a genuine behavioural difference in the
+ * descent that only appears when the last level is a partial bite:
+ *
+ *     the slot kernel   ramps the ACTUAL drop      — `entryOrPlunge` gets prevZ and z, so a 1.0mm last bite ramps
+ *                                                    1.0mm at the asked angle: a 19.08mm run at 3 degrees
+ *     the atom          ramps a NOMINAL stepdown   — its run is one full `stepdown`: 28.62mm at 3 degrees
+ *
+ * MEASURED, on the frozen kernel, across widths x bearings x stepovers x depths: EVERY divergence outside the zero
+ * band is `entry:'ramp'` with a partial last bite, and EVERY ramp config with a partial last bite diverges — no
+ * false positives and no false negatives on the whole sweep. The size is exactly the run the two disagree about,
+ * `(stepdown − lastBite) / tan(rampAngle)`, projected on the slot's bearing:
+ *
+ *     depth 4  @ 1.5  (last bite 1.0)   9.540mm      depth 3.5 @ 0.8 (last 0.3)   9.541mm
+ *     depth 5  @ 1.5  (last bite 0.5)  19.080mm      depth 7   @ 2.5 (last 2.0)   9.541mm
+ *     …and at a bearing: 9.540 · cos30 = 8.262, · cos45 = 6.746 — the same run, turned.
+ *
+ * ⚠ AND THE SHIPPED DEFAULTS LAND IN IT: the slot wizard defaults to depth 4 / stepdown 1.5, so the DEFAULT slot
+ * with a ramp entry is precisely the diverging case. That is why this is routed rather than rounded past — a 9.5mm
+ * error in where a ramp enters the material is not a quantum, it is a different descent.
+ *
+ * IT IS THE ATOM'S RAMP THAT WOULD HAVE TO MOVE, AND IT IS **NOT** MOVED HERE. Teaching the atom to ramp the real
+ * remaining drop is arguably the more correct reading — but that atom is SHARED, and every surfacing and pocket
+ * program in the corpus rides its ramp. Changing it under cover of the slot's re-point is exactly the silent
+ * behaviour move this whole arc is built to prevent, so the slot narrows and the atom is left alone. Lifting it is
+ * its own act, with its own bridge, on the ops that own it.
+ */
+export const SLOT_RAMP_PARTIAL_GAP = 'a RAMP entry over a PARTIAL last depth level: the slot kernel ramps the ACTUAL '
+    + 'remaining drop (a 1.0mm last bite ramps 1.0mm — a 19.08mm run at 3 degrees) and the shared raster atom ramps a '
+    + 'NOMINAL full stepdown (28.62mm), so the descent enters the material somewhere else entirely — measured at '
+    + '(stepdown - lastBite)/tan(rampAngle), 9.54mm on the wizard\'s OWN defaults (depth 4 at stepdown 1.5), turned by '
+    + 'the bearing. Every ramp config with a partial last bite diverges and no other config does. The atom\'s ramp is '
+    + 'SHARED with surfacing and every pocket, so it is not moved to suit the slot; this slot stays literal instead';
+
+/**
+ * THE HELIX, which the arc already named and which stays exactly where it was.
+ *
+ * A slot helixes at the ENTRY END clamped to the slot WIDTH; the atom helixes in the MIDDLE of the channel clamped by
+ * the rect inradius, and then has to cut its way back out of the middle. Different geometry, not a rounding.
+ */
+export const SLOT_HELIX_GAP = 'a HELIX entry: the slot descends at the ENTRY END with its radius clamped to the slot '
+    + 'WIDTH, and the raster atom helixes in the MIDDLE of the channel clamped by the rect inradius — a different '
+    + 'place to enter the material, which is one of the two evidence gates SLOT_RASTER_GAP names as what is left';
+
+/**
+ * A slot's clearing expressed in the ATOM'S OWN WORDS — the one source, read by the stack builder AND by the bridges.
+ *
+ * ⚠ THE PLACEMENT IS THE WHOLE SUBTLETY, so it is written once here rather than re-derived per caller. The atom walks
+ * a RECT and turns it about its DECLARED origin; a slot is that rect with its near-edge MIDPOINT sitting on A. So the
+ * origin is `A − R(bearing)(0, width/2)` — and it is computed UNROUNDED, because rounding it to the emit's three
+ * decimals injects up to half a quantum of placement error that then reads as a code difference (measured at t1494,
+ * at 137.5 degrees, where it read 0.0020 until the harness stopped rounding its own inputs).
+ *
+ * The four capabilities the arc built are all here, and each is the one the slot actually needs:
+ *     insetAlong 0 / insetAcross tool/2   C2 — held a radius across the WIDTH, nothing along the LENGTH
+ *     rowAnchor 'wall'                    C1 — passes ON the wall plus the forced final one, so the channel is the
+ *                                              width that was typed
+ *     bearing                             C3 — the passes run on the slot's own angle
+ *     entry + rampAngle                   C4 — the ramp runs along the ROW, which for a slot IS its length
+ */
+export function slotRasterParams(p = {}) {
+    const tool = Math.max(0.1, num(p.tool, 6));
+    const width = num(p.width, tool);
+    const x0 = num(p.x0, 0), y0 = num(p.y0, 0);
+    const len = Math.hypot(num(p.x1, 60) - x0, num(p.y1, 0) - y0);
+    const ang = slotBearingDeg(p);
+    const rad = ang * Math.PI / 180;
+    return {
+        // the walked rect's near-edge MIDPOINT lands on A — UNROUNDED, see above
+        x: x0 + (width / 2) * Math.sin(rad), y: y0 - (width / 2) * Math.cos(rad), z0: 0,
+        w: len, h: width,
+        insetAlong: 0, insetAcross: tool / 2, rowAnchor: 'wall', bearing: ang,
+        toolDia: tool, stepoverPct: num(p.stepoverPct, 40),
+        depth: num(p.depth, 4), stepdown: num(p.stepdown, 1.5),
+        strategy: 'parallel', direction: 'bothways', rowAxis: 'x',
+        entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
+        feed: num(p.feed, 2000), plunge: num(p.plunge, 150), clearance: num(p.clearance, 5),
+    };
+}
+
+/**
+ * '' when THIS slot's clearing rides `surfaceraster`, else the REASON it keeps its literal kernel — never a bare
+ * false, and every clause a NARROWING. The discipline is t1402/t1406's: the question is not "will something run",
+ * it is "will what runs be what was ASKED for". Where the answer is no the slot emits exactly what it always has.
+ */
+export function slotRasterArmGap(p = {}) {
+    const tool = Math.max(0.1, num(p.tool, 6));
+    const width = num(p.width, tool);
+    // The too-small law is untouched by all of this: it refuses with NO MOTION, so there is no walk to re-point.
+    if (slotTooSmall({ ...p, tool, width })) return 'a slot narrower than its tool refuses with no motion at all (t1444), so there is no clearing walk to re-point';
+    const len = Math.hypot(num(p.x1, 60) - num(p.x0, 0), num(p.y1, 0) - num(p.y0, 0));
+    if (len < 1e-6) return 'a zero-length slot is a single plunged hole, not a walk';
+    /**
+     * ⚠ THE ZERO BAND, which the arc's own C1 row recorded and which would otherwise surface a REFUSAL where a pass
+     * belongs. At width == tool the band the tool centre must sweep is zero: the slot kernel cuts ONE centreline
+     * pass, and the atom — handed a span that its two insets collapse to nothing — refuses through its collapsed-
+     * inset guard and emits no motion at all (measured: 0 cut moves against the kernel's 4). So this width routes to
+     * the literal arm, and it is the FIRST thing checked after the degenerates for that reason.
+     */
+    if (width - tool < 1e-6) return 'a slot exactly its tool\'s width has a ZERO band — the kernel cuts one centreline pass, and the atom refuses a span its insets collapse to nothing (its collapsed-inset guard), emitting no motion at all';
+    const entry = String(p.entry || 'plunge');
+    if (entry === 'helix') return SLOT_HELIX_GAP;
+    if (entry === 'ramp' && !slotLastBiteIsFull(p)) return SLOT_RAMP_PARTIAL_GAP;
+    // …and finally the atom's OWN envelope, asked in its own words, so this gate can never claim a coverage the
+    // atom does not declare (the pocket asks the identical question at the identical point).
+    const probe = slotRasterParams(p);
+    return surfaceRasterCovers(probe) ? '' : surfaceRasterGap(probe);
+}
+
+/** Does this slot's clearing ride the parametric atom? (The predicate half of slotRasterArmGap — one source.) */
+export function slotRidesRaster(p = {}) { return slotRasterArmGap(p) === ''; }
 
 export const slotBlock = {
     type: 'slot', label: 'Slot', kind: 'leaf', category: 'Toolpaths',

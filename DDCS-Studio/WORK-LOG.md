@@ -13030,3 +13030,134 @@ named.**
   the literal arm or the refusal will surface where a pass belongs.
 - **The CAM lift is a separate act** and my t1494 measurement stands (generator arm + a `#2600` field-list format
   change + the `#50`-vs-`#34–#49` band reconciliation).
+
+---
+
+## t1498 (seat A, fresh) — THE RE-POINT'S DOMAIN IS MEASURED AND GATED; the SWAP itself is parked, and the reason is a THIRD boundary nobody had named.
+
+Dispatched to do the re-point proper. What I found on the way changed the act's shape, so this entry leads with the
+finding rather than the plumbing.
+
+### ⚠ THE FINDING — the expressible domain is SMALLER than the arc's inventory recorded
+
+The arc closed naming exactly two things that keep a slot literal: a DIALLED bearing (trig, V13) and the HELIX
+entry's entry-end clamp. **There is a third, it is not trig, and the shipped defaults land in it.**
+
+A **RAMP entry over a PARTIAL last depth level**. `depthLevels` clamps its final level to the total depth, so a
+depth that is not a whole multiple of the stepdown ends on a partial bite — 4mm at 1.5 gives 1.5 / 3.0 / **4.0**, a
+last drop of 1.0. Then:
+
+    the slot kernel   ramps the ACTUAL drop     - entryOrPlunge gets prevZ and z: 1.0mm at 3 deg = a 19.08mm run
+    the shared atom   ramps a NOMINAL stepdown  - one full stepdown: 28.62mm
+
+Measured against the frozen kernel across widths x bearings x stepovers x depths x tools: **every** divergence
+outside the zero band is a partial-bite ramp, and **every** partial-bite ramp diverges — no false positives and no
+false negatives on the whole sweep. The size is exactly the run the two disagree about, projected on the bearing:
+
+    depth 4  @1.5 (last 1.0)   9.540mm        depth 3.5 @0.8 (last 0.3)   9.541mm
+    depth 5  @1.5 (last 0.5)  19.080mm        depth 7   @2.5 (last 2.0)   9.541mm
+    ...and turned: 9.540*cos30 = 8.262, *cos45 = 6.746 — the same run, rotated.
+
+**The slot wizard defaults to depth 4 / stepdown 1.5, so the DEFAULT ramping slot is precisely the diverging case.**
+That is why it is routed rather than rounded past: 9.5mm is not a quantum, it is a different descent.
+
+I did NOT move the atom's ramp to suit the slot, and that was the real decision here. Ramping the true remaining
+drop is arguably the more correct reading — but that atom is SHARED, and every surfacing and pocket program in the
+corpus rides its ramp. Changing it under cover of the slot's re-point is exactly the silent behaviour move this arc
+exists to prevent. The slot narrows; the atom is left alone; lifting it is its own act on the ops that own it.
+
+### THE SECOND FINDING — a latent defect C3 left open, closed here
+
+`surfaceRasterBlock.extent` did not turn with the bearing C3 gave the walk. `liveExtent` reads that declaration **in
+preference to** placeonstock's frozen snapshot, so an angled op attached to a stock corner would have been aligned
+by a rectangle that is not its own — t1402's measured defect (a placed pocket sliding by the tool radius), one
+capability later. Nothing shipped could reach it because no caller sets a bearing yet, which is exactly why it had
+to close BEFORE the re-point rather than after it.
+
+At bearing 0 it is the previous expression exactly (cos 0 and sin 0 are exact), so every existing caller's footprint
+is unmoved by construction rather than by an argument about rounding. A DIALLED bearing returns null — the t1425
+rule, an unknowable footprint is declared as unknowable instead of computed from defaults.
+
+The cross-check that makes this more than an assertion: the atom's bearing-rotated extent equals `slotBBox` — the
+slot's own perpendicular-offset channel bbox — to six decimals at seven bearings. Two independently derived
+geometries agreeing, which also independently validates the placement formula the re-point depends on.
+
+### WHAT LANDED
+
+- `slotBearingDeg` — `atan2(B-A)`, baked BY CONSTRUCTION (it computes a number from two drawn endpoints, so the
+  trig-gated dialled half is unreachable from here rather than merely unused).
+- `slotRasterParams` — the slot's clearing in the ATOM's words, ONE source for the stack builder and the bridges.
+  The placement subtlety is written down once here: the origin is `A - R(bearing)(0, width/2)`, computed UNROUNDED
+  (rounding it injects half a quantum that then reads as a code difference — t1494 measured that at 137.5 deg).
+- `slotRasterArmGap` / `slotRidesRaster` — the arm gate, every clause a NARROWING, each refusal in its own words,
+  ending at the atom's OWN envelope so the gate can never claim coverage the atom does not declare.
+- `SLOT_RAMP_PARTIAL_GAP` + `SLOT_HELIX_GAP` — the two boundaries as DATA beside the walk they describe.
+- The `extent` fix above.
+- `slot-repoint-domain-1498.spec.js` — 5 tests. The bridge (400+ accepted configs match the frozen kernel move for
+  move, 200+ refused), the third gate asserted in BOTH directions and against its PREDICTED size, the zero band
+  measured as an empty emit, every refusal's wording, and the footprint.
+
+**Two names, not one, and that is deliberate.** `SLOT_RASTER_GAP`/`slotRasterGap` stay exactly as they were — the
+BOUNDARY (what a slot's walk needs, what the atom can express). The new pair is the OPERATIONAL twin — which slots
+ride today. Collapsing them would make the boundary's careful "what is left is TWO EVIDENCE GATES" reading answer a
+question about arithmetic it was never measuring. It is the split the pocket already keeps (`POCKET_SHAPE_GAP` vs
+`pocketRasterGap`).
+
+### ⚠ WHY THE SWAP IS PARKED — I built it, measured what it costs, and took it back out
+
+I did build the swap: `slotStack` branching to a `surfaceraster` leaf, arrays and all. It works — 27/27 eligible
+configs emitted genuinely parametric bodies, 45/45 refused stayed literal. **Then the suite told me what it breaks,
+and the answer is not a test to update.**
+
+`slot-as-data` went red. The twin's template is FROZEN and seeded from `slotStack(SLOT_DEFAULTS)` — and those
+defaults (width 6 == tool 6) are ZERO BAND, so the template stays literal. That is luck, not design: a twin at
+width 14 would emit the LITERAL slot while the form emits the ATOM. **Two paths cutting differently for one set of
+parameters** — precisely the split this whole arc exists to kill, and worse than not re-pointing at all.
+
+So the swap cannot land without the twin, and the twin is a real sub-act. I traced the whole recipe (it is the
+pocket's, and it is sound — `instantiate` re-prunes, re-derives bindings by identity and re-runs `postInstantiate`
+on EVERY build, so derived sockets stay live):
+
+1. `slotStack(params, {superset:true})` — both arms GUARDED on a derived `_para` key. ⚠ The fork must sit at the
+   **PLACE**, not inside it: `absorbingChild` is strict about exactly ONE child, so a guard holding two clearings
+   inside one place would stop the atom being handed its frame as params and the shift would be painted onto macro
+   text instead (t1349's shear). Each arm carries its own place, exactly as the pocket's `_para` fork does.
+2. `slotData.js` — bindings move from frozen `(blockIndex,key)` to identity `match:{type}` specs (`def.bindingSpecs`),
+   because a guarded template has no stable indices. This is the dispatch's "twin bindings by identity".
+3. `def.deriveGuards = (p) => ({ _para: slotRidesRaster(...) })` — reading the SAME one source the concrete build
+   asks. That shared reading IS the byte-identity claim.
+4. `def.postInstantiate` — the atom's slot-side params are ALL derived (atan2, hypot), so no static binding can drive
+   them; they are written from `slotRasterParams`, the way pocket writes `inset` from `pocketInsetMm`.
+5. One extraction worth doing first: `slotStack` inlines the wizard-names to leaf-names map (ax/ay/bx/by/toolDia to
+   x0/y0/x1/y1/tool). The twin needs the identical map. Declare it once and have both read it.
+
+I stopped there. That conversion is emit-class work on a user-facing op (it changes what "Slot (data)" cuts), it
+rewrites an existing contract spec, and behind it still sit the reconciler sweep, the envelope/@work rows and the
+screenshots. This is one act's worth of room spent on measurement and two findings; the twin conversion wants a
+seat that starts fresh on it.
+
+**So the branch carries NO behaviour change.** `slotWizard.js` is byte-identical to HEAD — I reverted it rather
+than leave a half-swap in the tree. Everything landed is either inert declaration or a footprint fix unreachable by
+any current caller. Both specs that went red with the swap in (`slot-as-data`, `editor-indent-1450`) are green again
+with it out, which is itself the evidence that the swap was their only cause.
+
+### GATES
+
+- Fast tier: smoke **71/71**, the atom + arc set **222/222** (incl. the 2376-config frozen-reference sweep, so
+  `slotPath` is provably untouched), the slot-wizard-touching set **28/28**. Zero failures.
+- Nothing released — this act ships no behaviour change, `.ver` untouched.
+- Proc tree clean, 0 flagged.
+
+### A NOTE ON THE BRANCH
+
+`feat/ddcs-workspace` is checked out in the sibling worktree `ddcs-advisor-flakes`, so git refused it here. The act
+sits on `feat/slot-repoint`, cut from the same commit (89d2988c = origin/main = feat/ddcs-workspace), a clean
+fast-forward. `wip/slot-repoint` was deleted as dispatched — it was fully contained in the working line, so nothing
+was lost.
+
+### FOR THE NEXT SEAT
+
+The domain is now MEASURED, not assumed: build the swap against `slotRidesRaster`/`slotRasterParams` as they stand,
+do the five twin steps above in order, and the bridge evidence is already written and green. The three gates that
+route a slot literal are the zero band, the helix, and the partial-bite ramp — that last one is new, so any plan
+written before this entry is one gate short.

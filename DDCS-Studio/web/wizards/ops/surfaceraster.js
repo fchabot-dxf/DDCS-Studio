@@ -1732,8 +1732,30 @@ export const surfaceRasterBlock = {
     // x/y/w/h has no build-time value, and `num(word, default)` would hand the place fold a footprint computed from
     // this atom's DEFAULTS — the exact silent substitution t1422 measured one level down. `liveExtent` already treats
     // a falsy answer as "unmeasurable" and keeps the frozen snapshot, so the honest answer is one the caller handles.
-    extent: (p) => (['x', 'y', 'w', 'h'].some((k) => liveWordOf(p[k]) != null) ? null
-        : { minX: num(p.x, 0), maxX: num(p.x, 0) + num(p.w, 100), minY: num(p.y, 0), maxY: num(p.y, 0) + num(p.h, 80) }),
+    /**
+     * ⚠ t1498 — THE BEARING TURNS THE FOOTPRINT TOO, and C3 left this half open. `rasterBearingOf` made the WALK
+     * turn about the declared origin; this declaration kept reporting the UNROTATED rect. Nothing surfaced it because
+     * no caller set a bearing until the slot re-point — and the place fold reads THIS in preference to placeonstock's
+     * frozen snapshot (`liveExtent`), so an angled op attached to a stock corner would have been aligned by a
+     * footprint that is not its own. That is t1402's measured defect exactly (a placed pocket slid by the tool
+     * radius), one capability later.
+     *
+     * At bearing 0 it is the previous expression EXACTLY — cos 0 and sin 0 are exact, so the four corners come back
+     * as themselves and every existing caller's footprint is unmoved by construction, not by rounding.
+     *
+     * The PROGRAM rotation is deliberately absent: that is a fact about the program, applied to the whole placed
+     * body, and the footprint an op declares is in its OWN frame (the same reason `rotAngle` is not a field here).
+     */
+    extent: (p) => {
+        if (['x', 'y', 'w', 'h'].some((k) => liveWordOf(p[k]) != null) || rasterBearingIsLive(p)) return null;
+        const x = num(p.x, 0), y = num(p.y, 0), w = num(p.w, 100), h = num(p.h, 80);
+        const rad = rasterBearingOf(p) * Math.PI / 180, c = Math.cos(rad), s = Math.sin(rad);
+        const xs = [], ys = [];
+        for (const [dx, dy] of [[0, 0], [w, 0], [0, h], [w, h]]) {
+            xs.push(x + dx * c - dy * s); ys.push(y + dx * s + dy * c);
+        }
+        return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    },
     lines: (p) => surfaceRasterLines(p),
     // t1359 — THE LEAF CONTRACT. blockEmitter's default leaf path calls def.emit(p, dx, dy, dialect); `lines` above is
     // the pure body other readers use. dx/dy are the STAMP offsets a container (Array/Path) applies to a child — zero
