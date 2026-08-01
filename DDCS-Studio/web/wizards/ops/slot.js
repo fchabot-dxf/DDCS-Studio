@@ -297,6 +297,11 @@ export const SLOT_HELIX_GAP = 'a HELIX entry: the slot descends at the ENTRY END
  * the advisor's t1511 condition: the packed arm's eligibility asks the ATOM'S ENVELOPE, never a bearing check of its
  * own, so when C5 teaches the atom to rotate a live frame the angled case lifts by the envelope opening — with this
  * function, and the arm that calls it, unchanged.
+ *
+ * ⚠ t1514 — THAT PAID OUT, and it is worth recording as a MEASUREMENT rather than as a nice outcome: C5 landed, the
+ * envelope opened, and this function was not touched. The general form written "for a case that could not happen yet"
+ * is the whole reason the lift cost no edit here — the alternative (writing the bearing-0 special case and reaching
+ * back for the general one later) is the divergence this file's `regs` argument exists to avoid, one act earlier.
  */
 export function slotRasterParams(p = {}, regs = null) {
     const tool = Math.max(0.1, num(p.tool, 6));
@@ -307,8 +312,23 @@ export function slotRasterParams(p = {}, regs = null) {
     const rad = ang * Math.PI / 180;
     const R = regs || {};
     // ONE formula: `base + (width/2)·coef`, as a build-time number or as the same sum around a live width register.
+    /**
+     * ⚠ t1514 — THE ZERO TEST IS ON THE **PRINTED** COEFFICIENT, AND ONLY ON THE REGISTER ARM. Two corrections in
+     * one, and the second was caught by this file's own bit-identity pin rather than by reading the code:
+     *
+     *   1. `coef === 0` is right for `sin 0` (exactly 0 — the axis-aligned case, the only one that could pack before
+     *      C5) and WRONG for `cos 90°`, which is 6.1e-17. So a CARDINAL bearing slipped past it and emitted
+     *      `[10 - [#1/2] * 0.000000000]` — precisely the failure the paragraph above names: a register standing where
+     *      a build-time constant belongs, for a term that is not there. C5 makes every bearing reachable, so it is
+     *      closed here rather than inherited.
+     *   2. ⚠ THE NUMERIC ARM MUST NOT MOVE FOR IT. The first cut rounded the coefficient for BOTH arms, which shifts
+     *      the baked frame by ~4e-16 at a cardinal bearing — invisible after `r3`, and `slot-cam-pack-1512` PROOF 8
+     *      asserts BIT-identity against the arithmetic this function replaced, so it went red and was right (it also
+     *      turned a `-0` footprint into `0`, which `slot-repoint-domain-1498` distinguishes). The rounding decides
+     *      only whether a TERM IS PRINTED; the value the numeric arm returns is the raw expression, untouched.
+     */
     const frame = (base, coef) => {
-        if (!R.width || coef === 0) return base + (width / 2) * coef;   // no live width, or no width term at all
+        if (!R.width || Number(coef.toFixed(9)) === 0) return base + (width / 2) * coef;   // no live width, or no width term at all
         // a UNIT coefficient prints no multiply — this is the axis-aligned case, i.e. every slot that packs today, and
         // `[0 - [#1/2] * 1.000000000]` is noise in a macro an operator reads and a multiply the controller then does
         const mag = Math.abs(coef) === 1 ? '' : ` * ${Math.abs(coef).toFixed(9)}`;

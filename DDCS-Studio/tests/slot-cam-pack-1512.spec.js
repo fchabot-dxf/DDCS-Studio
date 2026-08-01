@@ -4,10 +4,15 @@ import { test, expect } from '@playwright/test';
  * t1512 — THE CAM LIFT, BUILT. A slot wider than its tool packs a CAM slot whose clearing IS the parametric raster
  * atom, so the t1444 width gate lifts for it.
  *
- * The domain is the one t1510 MEASURED and t1511 RULED: a bearing of 0 packs; every other bearing keeps the literal
+ * The domain t1510 MEASURED and t1511 RULED was: a bearing of 0 packs; every other bearing keeps the literal
  * centreline body and an honest refusal, because the atom would silently drop the angle. ⚠ AND THE ARM CONTAINS NO
  * BEARING CHECK — eligibility asks the atom's own envelope, so when C5 (the live-frame rotation) lands, angled slots
  * begin packing with nothing in the generator changed. PROOF 6 is what holds that structural condition in place.
+ *
+ * ⚠ t1514 — C5 LANDED, AND THE PINS IN THIS FILE MOVED WITH IT rather than being left to rot. PROOF 5's two angled
+ * refusals are now PACKS (the payoff), and PROOF 6 asserts the condition PAID OUT: the gap emptied at the atom, the
+ * pack inherited the emptiness, and no deciding line of the CAM layer moved. Each keeps what it lifted from in its
+ * own comment — a pin that quietly becomes true reads as though nothing was ever wrong.
  */
 
 const boot = async (page) => {
@@ -248,13 +253,18 @@ test('PROOF 5 — every refusal is in its own words, and an exposed endpoint emi
     expect(r.straight.gate.camType, 'a wide bearing-0 slot packs').toBe('slot');
     expect(r.straight.arm, '…on the ATOM arm').toBe('atom');
     expect(r.ramp.arm, 'and a RAMP entry packs the atom too (C4 made the ramp pendant-true)').toBe('atom');
+    // ⚠ t1514 (C5) — THESE TWO WERE REFUSALS, and their flip is this act's whole payoff. They read
+    // `.unsupported` naming the bearing, "C5" as the pending capability and the Slot wizard as the exit; the atom
+    // learned to rotate a live frame, and they now pack on the same arm the axis-aligned slot does — with NOT ONE
+    // DECIDING LINE of opCamMap or opToSlot changed for it (PROOF 6 asserts that structurally).
+    expect(r.angled.gate.camType, '⚠ a +Y (bearing 90) wide slot PACKS since C5 — it used to be refused').toBe('slot');
+    expect(r.angled.arm, '…on the ATOM arm, the same one the axis-aligned slot takes').toBe('atom');
+    expect(r.angled.gate.unsupported, '…with no refusal left').toBeFalsy();
+    expect(r.diagonal.gate.camType, 'a 45° wide slot likewise').toBe('slot');
+    expect(r.diagonal.arm, '…likewise on the atom arm').toBe('atom');
     // what REFUSES, each in its own words
-    expect(r.angled.gate.unsupported, 'a +Y wide slot is refused').toBeTruthy();
-    expect(r.angled.gate.unsupported, '…naming the bearing that cannot be applied').toMatch(/bearing/);
-    expect(r.angled.gate.unsupported, '…the pending capability').toMatch(/C5/);
-    expect(r.angled.gate.unsupported, '…and the exit').toMatch(/Slot wizard/);
-    expect(r.diagonal.gate.unsupported, 'a 45° wide slot likewise').toBeTruthy();
     expect(r.helix.gate.unsupported, 'a wide HELIX slot is refused in the helix gap\'s own words').toMatch(/ENTRY END|entry end/);
+    expect(r.helix.gate.unsupported, '…and NOT told about bearings, which belong to a different refusal').not.toMatch(/bearing/);
     // the zero band is not a refusal at all — it is the LITERAL arm, where one centreline pass is the right program
     expect(r.zeroBand.gate.camType, 'the zero band packs, on the literal arm').toBe('slot');
     expect(r.zeroBand.arm, '…the centreline one').toBe('');
@@ -270,6 +280,11 @@ test('PROOF 5 — every refusal is in its own words, and an exposed endpoint emi
  * The ruling's condition is that eligibility asks the ENVELOPE, so that C5 lifts the angled case with the generator
  * untouched. That is a claim about the SOURCE, so it is asserted against the source: no bearing arithmetic in the
  * pack's decision path, and the refusal's words are the ATOM's, reached through the declared predicate.
+ *
+ * ⚠ t1514 — C5 LANDED AND THE CONDITION PAID OUT, so this proof now asserts the payout as well as the shape: the
+ * angled slot packs, and it does so through the identical decision path. The sentence-identity half moves to a config
+ * the atom STILL refuses (a helix), because a refusal that no longer exists cannot demonstrate that the pack quotes
+ * the atom rather than restating it — and that demonstration is the thing worth keeping.
  */
 test('PROOF 6 — eligibility asks the envelope; no bearing check lives in the CAM layer', async ({ page }) => {
     await boot(page);
@@ -280,21 +295,36 @@ test('PROOF 6 — eligibility asks the envelope; no bearing check lives in the C
         const { surfaceRasterGap } = await import('/wizards/ops/surfaceraster.js');
         const { slotRasterParams, SLOT_CAM_PACK_REGS } = await import('/wizards/ops/slot.js');
         const angled = { ax: 0, ay: 0, bx: 0, by: 60, width: 12, toolDia: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, entry: 'plunge' };
+        /**
+         * ⚠ THE SENTENCE-IDENTITY HALF NEEDS A GAP THE **ATOM** OWNS, and after C5 the pack cannot reach one through
+         * its own geometry any more (skim and the two-pivot pair are the atom's remaining refusals, and a packed slot
+         * builds neither). A helix is the wrong probe for it — that refusal is the WIZARD's `SLOT_HELIX_GAP`, which
+         * fires before the atom is asked. An unknown ENTRY passes every wizard clause and lands on the atom's own
+         * envelope table, which is exactly the delegation this proof is about.
+         */
+        const helix = { ...angled, entry: 'adaptive' };
+        const leaf = (over) => ({ x0: 0, y0: 0, x1: 0, y1: 60, width: 12, tool: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, entry: 'plunge', ...over });
         // a bearing COMPARISON or a bearing FUNCTION CALL in either CAM-layer file would be the hand-rolled check
         const bearingCheck = /bearing\s*[=!<>]=|slotBearingDeg|Math\.atan2/;
         return {
             camMapHasCheck: bearingCheck.test(camMap), toSlotHasCheck: bearingCheck.test(toSlot),
+            // ⚠ the angled slot's gap: EMPTY since C5, and it emptied because the atom's did
+            angledPackGap: slotPackGap(angled),
+            angledAtomGap: surfaceRasterGap(slotRasterParams(leaf(), SLOT_CAM_PACK_REGS)),
             // the gap the pack reports is verbatim the ATOM's own sentence for the shape the pack will emit
-            packGap: slotPackGap(angled),
-            atomGap: surfaceRasterGap(slotRasterParams({ x0: 0, y0: 0, x1: 0, y1: 60, width: 12, tool: 6, depth: 4, stepdown: 1.5, stepoverPct: 40, entry: 'plunge' }, SLOT_CAM_PACK_REGS)),
+            packGap: slotPackGap(helix),
+            atomGap: surfaceRasterGap(slotRasterParams(leaf({ entry: 'adaptive' }), SLOT_CAM_PACK_REGS)),
             // the per-arm re-hydration seeds round-trip through the SAME resolver the pack uses
             roundTrip: Object.keys(SLOT_ARM_SEED).map((a) => [a, slotPackArm(SLOT_ARM_SEED[a])]),
         };
     });
     expect(r.camMapHasCheck, 'opCamMap holds no bearing comparison of its own').toBe(false);
     expect(r.toSlotHasCheck, 'and neither does the generator').toBe(false);
+    // ⚠ t1514 — THE CONDITION PAYS OUT: the angled slot's gap emptied, and it emptied at the ATOM
+    expect(r.angledAtomGap, 'the ATOM no longer refuses the packed angled shape').toBe('');
+    expect(r.angledPackGap, '…and the pack inherits that emptiness without a line of its own').toBe('');
     expect(r.packGap, 'the pack\'s refusal IS the atom\'s sentence, not a restatement of it').toBe(r.atomGap);
-    expect(r.packGap, '…and that sentence is the live-frame bearing refusal').toMatch(/bearing of 90/);
+    expect(r.packGap, '…and that sentence is the atom\'s own envelope table, for a gap that is still real').toMatch(/no equivalence bridge/);
     // the manifest's per-arm seeds must resolve back to their own arm, or a saved slot re-hydrates on the wrong body
     expect(r.roundTrip, 'each declared arm seed resolves to that arm').toEqual([['atom', 'atom'], ['centreline', '']]);
 });

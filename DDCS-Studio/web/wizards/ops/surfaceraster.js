@@ -44,7 +44,7 @@
  * so this moves TEXT only; the bridges re-ran and the resolved motion is unchanged, which is the whole check.
  */
 import { num, val, r3 } from './util.js';   // t1399 — val() at the seeds: a #var survives to the register, so the knob is reachable   // t1425 — r3 from the one source (this file carried an identical local copy)
-import { affineFrame } from './affineFrame.js';   // t1381 — the coordinate/rotation printers, one source (drill shares them)
+import { affineFrame, d6 } from './affineFrame.js';   // t1381 — the coordinate/rotation printers, one source (drill shares them)   // t1514 — d6: the frame's own rotation-constant precision, so `geoMix` cannot round a cosine to three decimals
 import { workMarker } from '../../engine/declaredWork.js';   // t1383 — this body DECLARES how much it executes (its preview was truncating silently)
 
 /**
@@ -257,6 +257,40 @@ function geoSum(a, b, k = 1) {
 }
 
 /**
+ * ── t1514 (C5) — `base + kA·A + kB·B`, where the two coefficients are ROTATION constants ────────────────────────────
+ *
+ * `geoSum` cannot do this job and the difference is precision, not shape: its `k` is only ever ±1 or ±2 (a span holds
+ * its inset twice), so it prints the magnitude through `r3` — three decimals, right for a whole or half millimetre and
+ * WRONG for a cosine. This carries the frame's own six (affineFrame's derivation: a one-shot mix, no recurrence).
+ *
+ * It folds the same two ways `geoSum` does, for the same reasons: a coefficient of exactly 0 contributes NOTHING (the
+ * axis-aligned case must not grow a `+ 0 * #42` that makes a build-time constant read as a live word — the same
+ * correctness point `slotRasterParams` records for its own zero coefficient), and a typed input folds into the number
+ * rather than becoming a term.
+ */
+function geoMix(base, a, kA, b, kB) {
+    let n = base.live ? 0 : base.n;
+    const parts = [];
+    const add = (t, kRaw) => {
+        // ⚠ THE ZERO TEST IS ON THE **ROUNDED** COEFFICIENT, and that is not tidiness. `Math.cos(90°)` is 6.1e-17,
+        // not 0 — so a raw test lets a CARDINAL bearing through and prints `+ [#2/2] * 0.000000`: a multiply the
+        // controller then does, and a term that makes a build-time constant read as a live word to
+        // `surfaceRasterLiveInputs`. A coefficient printed at six decimals that rounds to zero IS not there.
+        const k = d6(kRaw);
+        if (!k) return;
+        if (!t.live) { n += k * t.n; return; }        // a typed inset is arithmetic, not an operand
+        const mag = Math.abs(k);
+        parts.push(`${k < 0 ? '-' : '+'} ${mag === 1 ? t.w : `${t.w} * ${mag.toFixed(6)}`}`);
+    };
+    add(a, kA); add(b, kB);
+    if (!base.live && !parts.length) return { live: false, w: String(r3(n)), n };
+    if (base.live && !parts.length && !n) return base;   // nothing to mix in — never a second bracket round the word
+    const head = base.live ? base.w : String(r3(n));
+    const mid = base.live && n ? ` ${n < 0 ? '-' : '+'} ${r3(Math.abs(n))}` : '';
+    return { live: true, w: `[${head}${mid}${parts.length ? ' ' + parts.join(' ') : ''}]`, n: 0 };
+}
+
+/**
  * THE BAND. #40–#49: clear of the mill kit's #20–#33 (camMacroKit's caller/kit split), clear of the probe temps at
  * #50–#61, and clear of the dialect/atom injections universalScratch aggregates in the low teens. Declared here as
  * data so the collision guard reads it instead of re-deriving it from the emitted text.
@@ -307,14 +341,29 @@ const FRAME_SENTINEL = '-99999';
  * skim body either. This is parity with the shipped literal emitter, not a narrowing.
  */
 export function surfaceRasterAbsorbsRotation(p = {}) {
-    // t1425 — A LIVE-GEOMETRY FRAME REFUSES ROTATION, for a mechanical reason rather than a conceptual one. The
-    // rotation printer mixes each axis's BUILD-TIME constant (`X.c`) into the other axis; when the origin is a
-    // register there is no such constant, so the rotated word would silently drop it. Skim already refuses for its
-    // own (frame-mixing) reason; this is the second way the constant can fail to exist, and it is refused the same
-    // way rather than emitted half-applied — which is precisely t1353's measurement of what a half-rewrite does.
-    if (surfaceRasterLiveInputs(p).length) {
-        return 'a dialled geometry input makes the origin a register, and a program rotation mixes the build-time '
-            + 'constant of each axis into the other — there is no such constant to mix, so the rotation cannot be baked';
+    /**
+     * ── t1514 (C5) — THE LIVE-FRAME REFUSAL LIFTS, AND WHAT IS LEFT IS ONE NARROW PAIR ────────────────────────────
+     *
+     * t1425 refused a live-geometry frame here, for a mechanical reason and not a conceptual one: the rotation
+     * printer mixes each axis's BUILD-TIME constant into the other, and a register origin has no such constant, so
+     * the rotated word would have silently dropped it. That reason was true and it was never that the rotation is
+     * unbakeable — a register is a perfectly good operand for the same affine form. `affineFrame` prints the mix
+     * with register operands now (the origin is the pivot, `[I − R]` brings it back out), so the frame turns.
+     *
+     * ⚠ WHAT DOES NOT LIFT IS **TWO PIVOTS ON ONE LIVE ORIGIN**. A bearing turns the walk about the op's own datum;
+     * a program rotation turns everything about the PART datum. t1494 composes them into one rotation by folding a
+     * translation into the origin — which needs the origin to be a NUMBER to fold into. When it is a register the
+     * two rotations stop sharing coefficients (the origin would have to ride R(rotAngle) while the walk's offsets
+     * ride R(rotAngle + bearing)), and printing one set for both is exactly the half-applied rotation t1353
+     * measured. Refused in its own words instead, narrow and named — and it is the pair no caller builds today: a
+     * packed CAM slot is its own macro and carries no program rotation, a live-geometry pocket carries no bearing.
+     */
+    if (surfaceRasterLiveInputs(p).length && num(p.rotAngle, 0) && rasterBearingOf(p)) {
+        return 'a dialled geometry input makes the origin a REGISTER, and this config asks it to carry TWO rotations '
+            + 'about two different pivots at once — a bearing about the op\'s own datum and a program rotation about '
+            + 'the part datum. Composing those into one baked rotation folds a translation into the origin, and a '
+            + 'register is not a number to fold into; the origin and the walk would need different constants and one '
+            + 'set printed for both is a half-applied rotation. Bake the geometry, or drop one of the two angles';
     }
     if (String(p.zMode || '') === 'skim') {
         return 'a skim body is measured from wherever the operator jogged to, so it has no datum frame — rotating it '
@@ -606,17 +655,53 @@ export function surfaceRasterLines(p = {}) {
     // t1425 — the WALK's origin: the op's own frame moved IN by the inset. Both may now be registers, so the origin
     // is a word-or-number like everything else; `.n` is the number this line always produced.
     // t1490 (C2) — each axis moves in by its OWN inset; at an even pair this is the single-inset expression verbatim
-    const oxT = geoSum(xT, iXT), oyT = geoSum(yT, iYT);
+    /**
+     * ── t1514 (C5) — ON A ROTATED **LIVE** FRAME THE INSET IS MIXED IN, NOT ADDED ON ──────────────────────────────
+     *
+     * A bearing turns the walk about the op's DECLARED origin — before the inset moves in, which is what makes C2's
+     * across-the-pass really run across the PASS at any angle (t1494). On a build-time frame that is free: the whole
+     * shifted origin is one number and `bearingShift` folds it. On a LIVE one the origin word IS the pivot, so the
+     * offset the pivot carries has to be pre-turned or it lands in the unrotated direction — a slot's tool-radius
+     * inset would sit half a tool off ACROSS Y instead of across its own width, which is clean G-code cutting a
+     * channel beside the one that was drawn.
+     *
+     *      W = O + R(bearing)·inset          then the walk's own offsets turn about W
+     *
+     * ⚠ AT A ZERO BEARING THIS IS `geoSum`, THE SAME CALL AS EVER — not "the same value", the same function — so the
+     * whole shipped corpus (every live-frame program built before this, all of them bearing 0) cannot take the mixed
+     * path at all. The branch is on the bearing rather than on the arithmetic for exactly that reason.
+     */
+    const bearingA = rasterBearingOf(p);
+    const liveOrigin = (xT.live || yT.live || iXT.live || iYT.live);
+    const OMIX = (bearingA && liveOrigin) ? Math.cos(bearingA * Math.PI / 180) : 1;
+    const OMIS = (bearingA && liveOrigin) ? Math.sin(bearingA * Math.PI / 180) : 0;
+    const oxT = (bearingA && liveOrigin) ? geoMix(xT, iXT, OMIX, iYT, -OMIS) : geoSum(xT, iXT);
+    const oyT = (bearingA && liveOrigin) ? geoMix(yT, iXT, OMIS, iYT, OMIX) : geoSum(yT, iYT);
     /**
      * ⚠ t1494 (C3) — THE BEARING SHIFT LANDS HERE, BEFORE `x0`/`y0` ARE BOUND, and that placement is the whole
      * correctness argument. The first cut shifted only the FRAME's origin and left the walks declaring their affine
      * constants from the unshifted one, so `mv`'s unrotated word and its rotated form disagreed by exactly the
      * shift and a bearing came out as something that was not a rotation of anything — measured against the atom's
      * OWN unrotated path: 2.598mm out at 30 degrees, 6.0 at 90. ONE origin, read by both, or the two drift apart.
+     *
+     * ⚠ t1514 — AND A LIVE ORIGIN TAKES NO SHIFT AT ALL, because the shift is the thing it cannot represent. The
+     * composite folds "turn about the op's datum" into "turn about (0,0), from a moved origin", and the move is a
+     * number computed FROM that datum — which `bearingShift` reads as `xT.n`, and `xT.n` on a register is the
+     * geoTerm default (0), i.e. a datum the program does not have. So the live arm keeps the bearing as what it
+     * already is — a turn about the frame's own origin, `pivotAtOrigin` below — and never asks for the fold.
      */
-    const BEAR = bearingShift({ bearing: rasterBearingOf(p), rotA: num(p.rotAngle, 0),
+    const BEAR = bearingShift({ bearing: bearingA, rotA: num(p.rotAngle, 0),
         rotPX: num(p.rotPivotX, 0), rotPY: num(p.rotPivotY, 0), ox: xT.n, oy: yT.n });
-    const x0 = oxT.n + BEAR.tx, y0 = oyT.n + BEAR.ty, z0 = num(p.z0, 0);
+    /**
+     * ⚠ t1514 — AND A LIVE AXIS'S NUMBER IS **ZERO**, declared. `ax()` has ignored `x0` on a live frame since t1355
+     * (the whole origin is in the word), so the number this line carried there was whatever `geoSum` had left — 0
+     * when the inset was typed, NaN when it was dialled — and nothing read it. The rotation reads it: it is the
+     * build-time half of the pivot, and on a live axis there is none. Naming it 0 is what the frame already means.
+     */
+    const liveOrg = oxT.live || oyT.live;   // the composite's translation is a build-time fold; a live origin has none
+    const x0 = liveOrg ? (oxT.live ? 0 : oxT.n) : oxT.n + BEAR.tx;
+    const y0 = liveOrg ? (oyT.live ? 0 : oyT.n) : oyT.n + BEAR.ty;
+    const z0 = num(p.z0, 0);
     const confirmEvery = Math.max(0, Math.round(num(p.confirmEvery, 0)));
     const zTop = r3(z0);   // the surface this op faces from — 0 in the op's own frame, the placement's offZ when placed
 
@@ -692,9 +777,21 @@ export function surfaceRasterLines(p = {}) {
      * The degenerate the algebra warns about is free here: when the two angles CANCEL the composite is a pure
      * translation, and a pure translation is exactly what an origin shift is, so it needs no special arm.
      */
-    const { F, ax, ay, az, axE, ayE, azE, TM, AX, mv, rot } = affineFrame({
+    /**
+     * ⚠ t1514 (C5) — AND THE **LIVE** ARM TAKES THE BEARING AS WHAT IT IS: a turn about the frame's own origin. The
+     * composite above exists to fold two pivots into one build-time number, and a register origin is the one thing
+     * that cannot be folded — so the live arm hands `affineFrame` the bearing and `pivotAtOrigin`, and the printer
+     * brings the origin back out of the mix (`[I − R]`) instead of a translation bringing it in. The pair that would
+     * need BOTH pivots at once is refused by `surfaceRasterAbsorbsRotation`, so `bearingA || rotA` is never a choice
+     * between two live angles: at most one of them is set on any config that gets this far.
+     */
+    const liveRotA = bearingA || rotA;
+    const { F, ax, ay, az, axE, ayE, azE, TM, AX, AXX, AXY, mv, rot } = affineFrame({
         x0, y0, zTop, live: liveFrame ? { x: frameXW, y: frameYW, z: skim ? SKIM_FRAME.z : String(zTop) } : null,
-        rotAngle: BEAR.angle, rotPivotX: BEAR.pivotX, rotPivotY: BEAR.pivotY,
+        rotAngle: liveOrg ? liveRotA : BEAR.angle,
+        rotPivotX: liveOrg ? (bearingA ? 0 : num(p.rotPivotX, 0)) : BEAR.pivotX,
+        rotPivotY: liveOrg ? (bearingA ? 0 : num(p.rotPivotY, 0)) : BEAR.pivotY,
+        pivotAtOrigin: liveOrg && !!bearingA,
         absorbs: surfaceRasterAbsorbsRotation(p) === true,
     });
 
@@ -721,7 +818,10 @@ export function surfaceRasterLines(p = {}) {
         rowAnchor: rasterRowAnchorOf(p),
         wT, hT, geoLive: wT.live || hT.live,   // t1425 — the ring count resolves its min at RUN time when either side is live
         liveGap: surfaceRasterLiveGap(p),      // t1425 — a descent that bakes geometry degrades honestly rather than baking against a dial
-        rot, mv, AX, TM, LBL };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
+        // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
+        // t1514 — …and a point declares WHICH FRAME its constant is in: `AXX`/`AXY` are anchored on the frame's own
+        // origin (the live case's registers ride in with them), `AX` is an already-absolute coordinate like `#47`
+        rot, mv, AX, AXX, AXY, TM, LBL };
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
     // THE SKIM PREAMBLE. Seed an impossible value, read the frame, then REFUSE if it did not arrive — before any
@@ -889,7 +989,7 @@ function descentLines(o) {
 }
 
 function rowWalk(o) {
-    const { x0, y0, w, h, feed, plunge, zClr, r3, F, ax, ay, axE, ayE, azE, stepBaked, mv, AX, TM, LBL } = o;
+    const { x0, y0, w, h, feed, plunge, zClr, r3, F, ax, ay, axE, ayE, azE, stepBaked, mv, AX, AXX, AXY, TM, LBL } = o;
     // t1418 — WHICH WALK. Anything that is not one of the two one-way words is the both-ways raster, which mirrors
     // exactly how `strategy` already resolves (anything not 'concentric' is the row walk) — the ENVELOPE is what
     // refuses an unknown word, not the emitter, so the two axes stay symmetric (the t1404 lesson).
@@ -918,6 +1018,7 @@ function rowWalk(o) {
     const alongAt = yRows ? ay : ax;       // origin + a build-time offset, on the ROW axis
     const alongE = yRows ? ayE : axE;      // origin + a runtime term, on the ROW axis
     const crossE = yRows ? axE : ayE;      // …and on the axis the rows step across (where #47 is computed)
+    const AXalong = yRows ? AXY : AXX;     // t1514 — the anchored axis FORM, picked with its printers
     /** One move's two axis forms in X,Y order — the ONLY place the row axis reaches the printer. */
     const P = (along, across) => (yRows ? mv(across, along) : mv(along, across));
     // t1418 — an `otherway` level starts at the FAR end, so that is where its descent happens and returns to. This is
@@ -933,8 +1034,11 @@ function rowWalk(o) {
     // NEAR/FAR are the row's two ends; ROW is the row's cross-axis coordinate, which the body has already computed into
     // #47 as an ABSOLUTE (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps
     // meaning exactly what it means today whether the program rotates or not.
-    const NEAR_X = () => AX(alongAt(), a0, []);
-    const FAR_X = () => AX(alongE(0, SPAN), a0, [TM(SPAN)]);
+    // t1514 — the two row ENDS are ANCHORED (their constant is measured from the frame's own origin, which on a live
+    // frame is a register); the row's cross coordinate is ABSOLUTE — the body computes `#47` as a whole coordinate,
+    // origin included, and it means exactly that whether the program rotates or not.
+    const NEAR_X = () => AXalong(alongAt(), a0, []);
+    const FAR_X = () => AXalong(alongE(0, SPAN), a0, [TM(SPAN)]);
     const ROW_Y = (word = V.y) => AX(word, 0, [TM(V.y)]);
     /**
      * ── t1485 (C4, completed) — THE DESCENT STARTS FROM THE WALK'S OWN DECLARED POINT, not from a rebuilt copy ────
@@ -983,7 +1087,7 @@ function rowWalk(o) {
      * an expression, which is the construct t1339 found the tracer read wrong. It flattens to two products of exactly the
      * kind this body already emits (`#48 * #44`), so it needs no form the controller has not already been given.
      */
-    const END_X = () => AX(null, a0, [TM(SPAN, 0.5), TM(`${SPAN} * ${V.dir}`, -0.5)]);
+    const END_X = () => AXalong(null, a0, [TM(SPAN, 0.5), TM(`${SPAN} * ${V.dir}`, -0.5)]);
     /**
      * ── t1492 (C1) — THE ROW RULE IS DECLARED, AND ITS TWO FORMS CANNOT BE SPLIT ─────────────────────────────────
      *
@@ -1230,7 +1334,7 @@ function rampLines(o) {
  * no matter how deep the descent runs. THE TWO ARE SEPARATE REQUIREMENTS: re-seeding alone still leaves 1.2e−3 at
  * 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The bound holds only with both.
  */
-function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS }) {
+function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, AXX, AXY, TM, LBL = LABEL_DEFAULTS }) {
     const SEG = 24, theta = 2 * Math.PI / SEG;
     // NINE decimals — see the derivation above. r3 would be catastrophic here for exactly the reason t1339 found
     // one level down, and 6 is not enough either.
@@ -1245,10 +1349,12 @@ function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed
     // t1375 — the helix's points. The rotating vector (#34,#35) is a VECTOR from the area centre, so under rotation its
     // two registers mix into each axis with the same coefficients everything else uses — the recurrence itself is
     // untouched, and its 9-decimal constants keep serving the only thing that compounds.
-    const ENTRY_X = AX(ax(cx + R - x0), cx + R, []), ENTRY_Y = AX(ay(cy - y0), cy, []);
-    const ARC_X = AX(axE(cx - x0, HX.vx), cx, [TM(HX.vx)]);
-    const ARC_Y = AX(ayE(cy - y0, HX.vy), cy, [TM(HX.vy)]);
-    const OUT_X = AX(ax(sx - x0), sx, []), OUT_Y = AX(ay(sy - y0), sy, []);
+    // t1514 — every one of these is a point in the frame, so all six are ANCHORED. The rotating vector is a VECTOR and
+    // stays a plain term, which is exactly the distinction that keeps the recurrence out of the frame question.
+    const ENTRY_X = AXX(ax(cx + R - x0), cx + R, []), ENTRY_Y = AXY(ay(cy - y0), cy, []);
+    const ARC_X = AXX(axE(cx - x0, HX.vx), cx, [TM(HX.vx)]);
+    const ARC_Y = AXY(ayE(cy - y0, HX.vy), cy, [TM(HX.vy)]);
+    const OUT_X = AXX(ax(sx - x0), sx, []), OUT_Y = AXY(ay(sy - y0), sy, []);
     /**
      * ── t1440 — WHOLE REVOLUTIONS, RULED ON THE GEOMETRY (the t1406 divergence, decided) ──────────────────────────
      *
@@ -1318,7 +1424,7 @@ function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed
  * a DIAGONAL CUTTING move and never lifts within a level — one plunge, like the both-ways raster.
  */
 function ringWalk(o) {
-    const { x0, y0, w, h, feed, clr, r3, F, ax, ay, axE, ayE, mv, AX, TM, LBL } = o;
+    const { x0, y0, w, h, feed, clr, r3, F, ax, ay, axE, ayE, mv, AX, AXX, AXY, TM, LBL } = o;
     void clr; void F;   // t1485 — `ax`/`ay` stopped being spare: the ring now DECLARES its descent start with them
     // t1404 — THE DESCENT THE RINGS NEVER HAD. The outer ring's corner IS where the plunge happens (at i=0 the inset
     // register is 0, so IN_X/IN_Y are exactly x0/y0), so that is the point the ramp runs from and returns to — the same
@@ -1331,14 +1437,14 @@ function ringWalk(o) {
     // i=0 the inset register is 0, which is the line above `descent` in the body below, not an unwritten invariant —
     // so these carry no term and print exactly the `X0 Y0` this descent has always printed.
     const descent = descentLines({ ...o, sx: x0, sy: y0, startLabel: 'ring corner', runSpan: V.w, runUx: 1, runUy: 0,
-        startX: AX(ax(0), x0, []), startY: AX(ay(0), y0, []) });
+        startX: AXX(ax(0), x0, []), startY: AXY(ay(0), y0, []) });
     // t1375 — a ring's four corners, declared as X/Y pairs. The inset (#47) walks INWARD on both axes at once, so
     // under rotation it lands on both with mixed coefficients — which is why the pairs are declared together rather
     // than each axis owning its own string.
-    const IN_X = () => AX(axE(0, RING_INSET), x0, [TM(RING_INSET)]);
-    const IN_Y = () => AX(ayE(0, RING_INSET), y0, [TM(RING_INSET)]);
-    const OUT_X = () => AX(axE(0, `${V.w} - ${RING_INSET}`), x0, [TM(V.w), TM(RING_INSET, -1)]);
-    const OUT_Y = () => AX(ayE(0, `${V.h} - ${RING_INSET}`), y0, [TM(V.h), TM(RING_INSET, -1)]);
+    const IN_X = () => AXX(axE(0, RING_INSET), x0, [TM(RING_INSET)]);
+    const IN_Y = () => AXY(ayE(0, RING_INSET), y0, [TM(RING_INSET)]);
+    const OUT_X = () => AXX(axE(0, `${V.w} - ${RING_INSET}`), x0, [TM(V.w), TM(RING_INSET, -1)]);
+    const OUT_Y = () => AXY(ayE(0, `${V.h} - ${RING_INSET}`), y0, [TM(V.h), TM(RING_INSET, -1)]);
     return {
         count: [
             // THE RING COUNT — how many insets fit before the SHORTER side closes. The shorter side WAS resolved here
@@ -1593,6 +1699,12 @@ export function surfaceRasterLiveGap(p = {}) {
     /**
      * ⚠ t1510 — A BAKED BEARING ON A FRAME THIS BODY CANNOT ROTATE, WHICH WAS **SILENTLY DROPPED** UNTIL HERE.
      *
+     * ── ⚠ t1514 (C5) — AND THE FRAME THIS BODY CANNOT ROTATE IS NOW A MUCH SMALLER SET ───────────────────────────
+     * This check is unchanged and it did not need changing: it asks `surfaceRasterAbsorbsRotation`, and that
+     * predicate is what C5 narrowed. Where it used to catch every live-geometry config it now catches only skim and
+     * the two-pivot pair, so the packed CAM slot at an angle passes straight through — the lift arrived here by the
+     * predicate opening, which is exactly the delegation this refusal was written to depend on.
+     *
      * MEASURED, not reasoned about: handed the CAM-pack shape (a 30° slot with `h`/`toolDia`/`stepoverPct`/`insetAcross`
      * as live registers) this atom emitted `G0 X[5+[#35/2]*0.5] Y#47` / `G1 X[… + #40]` — a pure AXIS-ALIGNED walk. The
      * same config fully baked emits both axes mixed by the rotation constants (`X[6.781086 + #40*0.866025 - #47*0.5]`).
@@ -1621,14 +1733,19 @@ export function surfaceRasterLiveGap(p = {}) {
          * slot — refused for an entirely unrelated reason — was told about bearings and angles. Same class as t1414's
          * "1 arms would duplicate the program 1 times": broken grammar carrying a wrong reason. Only the refusal that
          * knows it is about the bearing can name what would lift it, so it says so itself and every caller inherits it.
+         *
+         * ⚠ t1514 — AND THE CLAUSE IT NAMED HAS **RETIRED WITH THE BOUNDARY**, which is the whole reason it lived
+         * here: a sentence promising "the angled case waits on C5" outlives its truth the moment C5 lands, and a
+         * refusal that tells an operator to wait for something already shipped is the same defect as one that names
+         * the wrong reason. What is left is `absorbs`'s own two sentences — skim, and two pivots on one live origin —
+         * and neither of them is waiting on anything, so the exit is stated instead of a capability.
          */
         return `a baked bearing of ${r3(bearing)}° cannot be applied to this body — ${absorbs}. A program ROTATION `
             + `survives that refusal because the caller rewrites the text instead, but NOTHING downstream applies a `
             + `bearing, so it would be dropped and the passes would run axis-aligned through the rotated origin: the `
-            + `right G-code for a slot at a different angle than the one asked for. So a bearing of 0 is what a live `
-            + `frame can carry today; the ANGLED case waits on C5, the live-frame rotation — which needs no runtime `
-            + `trig (the baked constants multiply relative offsets that are already registers), so it is real atom `
-            + `work rather than an evidence gate. Until then: bake the geometry too, or keep the bearing at 0.`;
+            + `right G-code for a slot at a different angle than the one asked for. A live frame carries a bearing at `
+            + `any angle since t1514 (the rotation prints with register operands); what is refused here is the frame `
+            + `that still cannot turn. The exit: ${String(p.zMode || '') === 'skim' ? 'bake the geometry, or face this area from the part datum instead of a jogged one' : 'bake the geometry, or drop the program rotation and keep the bearing'}.`;
     }
     const live = surfaceRasterLiveInputs(p);
     if (!live.length) return '';

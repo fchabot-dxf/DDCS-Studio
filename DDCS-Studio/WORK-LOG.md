@@ -13881,3 +13881,214 @@ does not belong in a directory the test runner owns.
 ### FULL SUITE — GREEN
 
 **2347 passed · 0 failed · 6 skipped (18.3m).** Released **V2026.08.01.2**.
+
+---
+
+## t1514 (C5) — THE ATOM LEARNS TO ROTATE A LIVE FRAME, and angled slots pack because the ENVELOPE opened
+
+**The task:** teach `surfaceRasterAbsorbsRotation` the live-frame case; the packed CAM arm then takes angled slots by
+the envelope opening, with no generator change. Restate every retired boundary's sentence in the same act. Bridge it
+numerically. Full suite → release.
+
+### WHAT THE OLD REFUSAL ACTUALLY SAID, AND WHY IT WAS THE PRINTER RATHER THAN THE ARITHMETIC
+
+t1425's refusal was mechanical and honest: `mv` mixes each axis's BUILD-TIME constant (`X.c`) into the other, and a
+live frame has no such constant — the origin is a register. What it never said is that the rotation is unbakeable. A
+register is a perfectly good OPERAND for the same affine form, because the ANGLE is build-time either way: cos/sin are
+taken in JavaScript and reach the controller as literal constants that MULTIPLY the live registers.
+
+So the whole capability is one identity, and it is exact rather than approximate:
+
+    P' = [Pv + R(θ)(P − Pv)]  +  [I − R(θ)]·(O − Pv)        O = the live origin, Pv = the build-time pivot
+
+Expand and it collapses to `O + R(θ)(P − O)` — a rotation about the ORIGIN, whatever `Pv` was. The generic mix runs
+unchanged; `[I − R]` is a second pair of build-time constants that brings the origin back out of the mix it was just
+put through. On the X word the origin's own term merges to coefficient 1 (`c + (1−c)`), so it prints as a bare
+`+ <origin>` with no multiply — correct arithmetic and the readable form at once.
+
+### THE THREE THINGS THAT HAD TO BE DECLARED FOR IT (each was a missing declaration, not a patch)
+
+**1. WHICH FRAME AN AXIS FORM'S CONSTANT IS IN.** `AX(word, c, terms)` means "the absolute coordinate is `c + Σterms`".
+On a live frame that was quietly false for every origin-relative form: `c` came from `x0`, which `ax()` has ignored
+since t1355. The tell was that `x0` was **NaN** there whenever the inset was live — a number nothing read, and exactly
+the constant the rotation needs. So the frame now exposes `AXX`/`AXY`, ANCHORED forms whose `c` is measured from the
+frame's own origin and which prepend the origin word to their terms on a live frame. ⚠ On a build-time frame `AXX`
+**IS** `AX` — same arguments, same object — which is what makes every existing rotated program byte-identical by
+construction rather than by an argument about rounding. The one form that is genuinely absolute on both frames is the
+row coordinate `#47` (the body computes a whole coordinate, not an offset); it stays `AX`, and the correction handles
+it without knowing that, because the pivot is subtracted from the printed word rather than from the register's value.
+
+**2. A LIVE AXIS'S NUMBER IS ZERO.** Named, not inferred. `oxT.n` was 0 when the inset was typed and NaN when it was
+dialled; both meant "the word carries it all", and neither said so.
+
+**3. THE INSET TURNS WITH THE WALK.** ⚠ This is the one that would have cut the wrong part. A bearing pivots about the
+op's DECLARED origin, before the inset moves in (t1494) — on a baked frame `bearingShift` folds the whole thing into
+one number. On a live frame the origin word IS the pivot, so an inset merely ADDED to it lands in the unrotated
+direction: a slot's tool-radius inset would sit half a tool off across **Y** instead of across its own width. Clean
+G-code, a channel beside the one that was drawn. So the live arm builds `W = O + R(bearing)·inset` (`geoMix`, a new
+sibling of `geoSum` — `geoSum` cannot do it because its `k` is only ever ±1/±2 and it prints the magnitude through
+`r3`; a cosine at three decimals is not a cosine). **At a zero bearing the arm takes `geoSum` ITSELF, not an
+equivalent expression**, so no shipped live program can reach the mixer at all.
+
+⚠ **AND THE LIVE ARM TAKES NO `bearingShift` TRANSLATION.** The composite exists to fold two pivots into one
+build-time number, and it reads the op's datum as `xT.n` — which on a register is the geoTerm default, **0**, i.e. a
+datum the program does not have. On a MIXED frame (one axis dialled, one typed — which a bearing-90 packed slot really
+is) that would have produced a shift computed from half a real origin. The live arm keeps the bearing as what it
+already is, a turn about the frame's own origin, and never asks for the fold.
+
+### WHAT IS **STILL** REFUSED, and it is one narrow named pair
+
+Two pivots on one live origin — a bearing AND a program rotation together. Composing them folds a translation into the
+origin, and a register is not a number to fold into; the origin would have to ride `R(rotAngle)` while the walk's
+offsets ride `R(rotAngle + bearing)`, and printing one set of constants for both is precisely the half-applied rotation
+t1353 measured. Refused in its own words. No caller builds it (a packed slot is its own macro and carries no program
+rotation; a live-geometry pocket carries no bearing) — but "unreachable" is not a reason to emit something unproven,
+which is the discipline t1425 set for the skim gap. **Skim is untouched** and still refuses for its own frame-mixing
+reason.
+
+⚠ **AND THE OLD REFUSAL WAS OVER-BROAD IN A SECOND WAY I did not expect:** it fired on ANY live geometry input, so a
+config whose ORIGIN was a plain number but whose tool Ø was dialled refused a program rotation it could have absorbed
+perfectly. That case bakes now too, and its emit is the pivot arithmetic it always should have been.
+
+### ⚠ A DEFECT I FOUND IN MY OWN DIFF REVIEW, and it was already in the shipped file one layer up
+
+Reading the diff back before committing, `geoMix`'s zero test was on the RAW coefficient. `Math.cos(90°)` is
+**6.12e-17**, not 0 — so a CARDINAL bearing slipped past it and printed `+ [#2/2] * 0.000000`: a multiply the
+controller then performs, and a term that makes a build-time constant read as a LIVE word to
+`surfaceRasterLiveInputs`. Exactly the failure `slotRasterParams` documents for its own zero coefficient.
+
+⚠ **AND THEN THE SAME BUG WAS ALREADY THERE, in `slotRasterParams.frame()`, shipped at t1512.** Its test is
+`coef === 0`, which is right for `sin 0` (exactly 0 — the axis-aligned case, the only one that could pack) and WRONG
+for `cos 90°`: a +Y slot emitted `[10 - [#1/2] * 0.000000000]`. It was unreachable while an angled slot could not
+pack at all, and C5 makes every bearing reachable — so it is closed in the same act rather than inherited. Both tests
+are now on the PRINTED coefficient (a coefficient that rounds to zero at the precision it is printed at IS not there).
+
+Measured after: at bearings 0 / 90 / 180 / −90 the packed emit now agrees with the baked walk and with the analytic
+geometry to machine epsilon (0.00e+0, one case 1.8e-15), and the cardinal bodies read cleanly —
+`G0 X[10 + [[5 + [#1/2]] - [#2/2]] - #47] Y10` where they carried three dead multiplies before.
+
+⚠ **AND THE FIRST CUT OF THAT FIX WENT TOO FAR, which the FULL SUITE caught and I would not have.** I rounded the
+coefficient for BOTH arms, and the NUMERIC one must not move: it shifts the baked frame by ~4e-16 at a cardinal
+bearing — invisible after `r3`, and invisible to every measurement I had run. Two pins saw it.
+`slot-cam-pack-1512` PROOF 8 asserts BIT-identity of the no-regs frame against the arithmetic this function replaced
+(`3.0000000000000004` vs `3`), and `slot-repoint-domain-1498`'s FOOTPRINT distinguishes `-0` from `0` in the channel
+bbox. Both were right and neither is pedantry: PROOF 8 exists precisely because "one formula, two renderings" is only
+safe while the no-regs rendering is provably the old one. The rounding now decides ONLY whether a term is printed;
+the value the numeric arm returns is the raw expression, untouched.
+
+### THE MEASUREMENTS
+
+**Baked vs live, 72 bearings around the circle, every move:** worst |Δ| **4.92e-4 mm**. Under half the emit's own
+0.001mm quantum, and every bearing PACKS (0 refused).
+
+⚠ **AND THE RESIDUAL IS THE BAKED ARM'S, NOT THE LIVE ONE'S** — which is why the third measurement is against an
+INDEPENDENT truth rather than against ourselves. The slot's first pass has a closed form (A, offset across by
+`tool/2 − width/2`, turned by the bearing). Against it: the **LIVE** arm is out by **2.07e-6 mm**, the **BAKED** arm by
+**4.3e-4** — its `r3` origin quantisation, the same half-quantum t1494 named at 137.5°. The live arm is the more
+accurate of the two, and PROOF 1's tolerance is the baked side's rounding.
+
+**Live ORIGIN + live INSET vs the same frame fully baked**, 112 configs (both walks × both row axes × both anchors ×
+program rotations AND bearings × two pivots): worst **3.90e-4 mm**, 0 refused.
+
+**Byte-identity, against the previous revision:** 13,632 un-lifted configs over the atom's whole option matrix
+(strategy × entry × direction × rowAxis × rowAnchor × zMode × rotation × pivot × inset × bearing × placement × six live
+shapes) — **0 differing**. The lifted slice is excluded by construction and is the capability. Run in node against
+`git show HEAD:` copies; the spec cannot import the old module, so PROOF 7 asserts the three structural facts that make
+it hold (`AXX` IS `AX` when baked · a zero bearing takes `geoSum` itself · `rot` is null with no angle, so the affine
+forms are never even read) plus a sweep for NaN and for rotation constants in bodies that never asked for one.
+
+**Precision:** six decimals stands, and the reason was re-derived rather than assumed, because a RECURRENCE would
+change the answer. The raster's per-row offset is `#47 = origin + i·step`, recomputed from the row INDEX every row; the
+ring's is `origin + i·inset`. Neither feeds its previous value back — no recurrence meets the rotation, so each offset
+is multiplied exactly once from a fresh sum, and t1371's bound (5e-4 mm at 500mm offsets, half the emit quantum)
+holds. `[I − R]` is a second one-shot pair on the same operands: 2x the bound, still an order under the quantum. The
+only true recurrence in this family is the helix's rotating vector, which keeps its own nine decimals in `surfaceraster`
+and is not printed by this module. ⚠ The dispatch asked for nine; I measured and kept six, because moving to nine would
+change the emitted bytes of the entire rotated corpus for an error already an order of magnitude below the quantum —
+flagged rather than silently deviated from.
+
+### THE RETIRED SENTENCES, restated in the same act (t1506)
+
+- `surfaceRasterLiveGap`'s bearing refusal: the "the ANGLED case waits on C5" clause **retired with the boundary**. A
+  refusal that tells an operator to wait for something already shipped is the same defect class as one naming the wrong
+  reason. It states the exit now, and the exit is arm-specific (skim vs the two-pivot pair).
+- `SLOT_CAM_PACK_DOMAIN`: `reachableToday` leads with ANY BEARING and keeps the bearing-0 measurement it lifted from;
+  `refusedToday` became the two-pivot row and remembers what it used to say; `theCapabilityThatWouldLiftIt` records C5
+  as **LANDED**; `whyNotJustBakeMore`'s "live knobs OR a rotatable frame, not both" is marked as an artefact of the
+  printer that t1514 measured away; `dispatchCorrection` records that "unreachable" bounded the build in front of it,
+  never the arc.
+- `SLOT_CAM_INHERITANCE`'s C3 row became **C3 + C5** — C3 lifted the wizard half (its frame is baked), C5 the packed
+  half (its frame is registers).
+- `opCamMap`'s domain comment and the `entry` bake sentence ("on a bearing of 0" dropped); `opToSlot`'s and `slot.js`'s
+  "when C5 lands" predictions marked **PAID**.
+- `trigEvidence.TRIG_NOT_GATED` gained the live-frame row, so nobody re-adds this to the machine-visit plan: the
+  capability LOOKS trig-gated and is not, and the sister case (a DIALLED bearing) that IS gated is named beside it.
+
+### THE FIVE RED PINS, all restated rather than deleted (the frozen-kernel pattern)
+
+`slot-cam-bearing-domain-1510` THE DROP (`liveRotated === 0` → `=== bakedRotated`; the probe unchanged, the answer
+inverted) and THE FIX (narrowed, plus the two new refusals asserted) · `slot-cam-pack-1512` PROOF 5 (two refusals →
+two packs) and PROOF 6 · `slot-cam-pack-scout-1508`'s angled-refusal premise · `raster-live-geometry-1425` PROOF 3's
+`typeof rotLive === 'string'` → `=== true`.
+
+⚠ **AND ONE OF THEM WAS RED FOR A HARNESS REASON, not a code one.** `slot-cam-bearing-domain-1510` counts rotated moves
+with `/X\[[^\]]*#47/` — which reports a rotated LIVE word as UNROTATED the moment the origin is an expression, because
+the word closes a bracket before it reaches `#47`. Same class as t1512's `#4`-prefix substitution bug: a harness that
+reads the emit with the wrong shape in mind measures its own regex. It balances brackets now.
+
+⚠ **PROOF 6 of t1512 needed a different probe, and the reason is the lift itself.** It asserted "the pack's refusal IS
+the atom's sentence" on an angled slot — which has no refusal any more. A helix is the wrong replacement: that refusal
+is the WIZARD's `SLOT_HELIX_GAP` and fires before the atom is asked. An unknown ENTRY passes every wizard clause and
+lands on the atom's own envelope table, which is the delegation the proof is about.
+
+### GATES
+
+- New: `slot-live-frame-rotation-1514` **7/7** (the numeric sweep · the analytic truth · the packed-angled end-to-end
+  chain · not-V13-gated against `trigEvidence` with the sister case still refusing · no-knob-dark with the CROSS-TERM
+  check that each geometry knob reaches BOTH axes · @work + no deciding CAM-layer line · the by-construction identity)
+  and `slot-live-frame-shots-1514` **1/1**.
+- Family (slot/raster/surfacing/pocket/cam/rotate/drill/wallfinish, 534 specs) run before the restatements: **533
+  passed · 1 failed**, the one being `raster-live-geometry-1425` PROOF 3's rotation pin, now restated.
+- SCREENSHOTS in `verification/t1514-live-frame-rotation/`: the angled slot's field table with **no refusal beneath
+  it**, the macro head showing the cross-terms, and the WALKED SIM — the app's own execution-engine trace of that
+  macro (31 segments, 24 cutting) drawn against the slot AS DRAWN. The passes lie along the drawn channel.
+- ⚠ `verification/t1512-cam-pack/1-field-table.png` changed as a side effect: its "an ANGLED wide slot is refused" box
+  is now empty. The shot spec states the new truth in that box and points at t1514's directory, rather than leaving a
+  screenshot that says a refusal exists.
+
+### PROCESS NOTES
+
+⚠ **THE MEM-SERVER PRELOADS `web/` ONCE, AT START** — it is not just new files that 404 (the standing note), it is
+that ANY edit to a `web/` file is invisible to the suite until the server restarts. It cost one confusing red
+(`trigEvidence`'s new row "missing" while the file on disk had it) and the diagnosis was `curl localhost:3211/<path>`
+against the file. Kill the PID on 3211 and let Playwright start a fresh one after editing `web/`.
+
+⚠ **THE FAMILY RUN'S TAIL READ `533 passed` WITH `1 failed` ABOVE IT.** The standing lesson held: the failed count was
+read, not the tail.
+
+⚠ **AND THEN THE SAME LESSON GOT PAST ME ONE LAYER DOWN — `grep '^\s+[0-9]+ failed'` MISSED A `6 failed`.** Playwright's
+line reporter prefixes its summary with the ANSI cursor-move `\x1b[1A\x1b[2K`, so the count is not at the start of the
+line and an anchored pattern reports "no failures" on a red suite. **Strip ANSI before grepping the count** —
+`tr -d '\000' < log | sed 's/\x1b\[[0-9;]*[A-Za-z]//g'` — or the guard against reading the tail becomes another way of
+reading the tail. Two of those six were real (above); four were load flakes that pass in isolation (`atc-io-labeling`,
+`blocks-roundtrip-toast`, `boss-probe-collision`, `corner-data-repos-handle` — timeouts and a null, none of them
+anywhere near this act's code).
+
+⚠ **AN EARLIER FULL RUN ABORTED ON A WINDOWS RESOURCE FAILURE, not a test one:** `worker process exited unexpectedly
+(code=3221225794)` = `STATUS_DLL_INIT_FAILED`, right after a `browserContext.newPage` timeout — 957 passed, 1016 did
+not run, ZERO assertion failures. Cause was mine: I killed the previous full run mid-flight (it had preloaded pre-fix
+code) and started the next one straight away, leaving four hung Playwright workers holding the session's resources at
+85% CPU. Kill the worker tree and let the machine settle before restarting a full run.
+
+### NOT TOUCHED, and named rather than quietly inherited
+
+- The packed rotated move words are LONG — the live origin expression appears twice per word (its own axis at
+  coefficient 1, the other at the cross coefficient). Correct and precedented (`slotRasterParams` already emits a
+  bracket x constant), but an operator reads these at the pendant. Hoisting the live origin into two scratch registers
+  would collapse every word; that is a register-allocation act with its own band and collision-guard work, not this one's.
+- `SPEC.feed`'s 300 and `SPEC.depth`'s 5 defaults (flagged at t1512, unchanged, still visible in the macro head shot).
+
+### FULL SUITE — GREEN
+
+**2355 passed · 0 failed · 6 skipped (20.4m), exit 0, zero worker crashes.** Counted with ANSI and NULs stripped and
+an UNANCHORED pattern, cross-checked against the numbered-failure count (0). Released **V2026.08.01.3**.

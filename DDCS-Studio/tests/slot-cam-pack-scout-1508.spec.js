@@ -82,7 +82,7 @@ test('THE PREMISES — the bake mechanism, the atom\'s frame formula, and the ga
             // the width gate the lift was aimed at — LIFTED at t1512 for the slots the atom can walk, still refusing the rest
             wideGate: camTypeOf({ opType: 'slot', params: base }),
             narrowGate: camTypeOf({ opType: 'slot', params: { ...base, width: 8 } }),
-            // an ANGLED wide slot: refused, because the atom would DROP the bearing (t1510, measured)
+            // an ANGLED wide slot: refused at t1510 (the atom DROPPED the bearing), PACKING since t1514 (C5)
             angledGate: camTypeOf({ opType: 'slot', params: { ...base, bx: 0, by: 60 } }),
             // the bake mechanism the design depends on
             hasBakeHook: /exposed === false/.test(src),
@@ -100,10 +100,15 @@ test('THE PREMISES — the bake mechanism, the atom\'s frame formula, and the ga
      */
     expect(r.wideGate.camType, 'the width gate is LIFTED: a wide slot on a bearing of 0 packs the atom now').toBe('slot');
     expect(r.narrowGate.camType, 'a slot the centreline body cuts correctly still packs').toBe('slot');
-    // …and the half that did NOT lift still refuses, still names what would change it, still names the exit (t1444)
-    expect(r.angledGate.unsupported, 'an ANGLED wide slot is still refused — the atom would drop its bearing (t1510)').toBeTruthy();
-    expect(r.angledGate.unsupported, '…naming the pending capability').toMatch(/C5/);
-    expect(r.angledGate.unsupported, '…and the wizard as today\'s exit').toMatch(/Slot wizard/);
+    /**
+     * ⚠ t1514 — THE THIRD RED PIN OF THIS FILE, AND THE SAME TREATMENT. It asserted the ANGLED half still refused,
+     * named C5 as the pending capability and the wizard as the exit — which is exactly what it was for: the day C5
+     * landed, the scout's premise had to be revisited by hand rather than quietly rot into a claim about a boundary
+     * that had moved. C5 landed at t1514, the gate is open for the angled half too, and nothing in the CAM layer
+     * changed to open it (the gate asks the atom's envelope — `slot-cam-pack-1512` PROOF 6 asserts that structurally).
+     */
+    expect(r.angledGate.camType, 'an ANGLED wide slot PACKS since C5 — t1510 measured it refused, the atom dropping the bearing').toBe('slot');
+    expect(r.angledGate.unsupported, '…with no refusal left to make').toBeFalsy();
     // the machinery the design leans on exists
     expect(r.hasBakeHook, 'opToSlot already honours a BAKED param (no #11xx, no field)').toBe(true);
     /**

@@ -235,9 +235,13 @@ export const SLOT_CAM_INHERITANCE = [
     { when: 'C2 + C1 (two-axis inset AND wall-anchored rows)', unlocks: 'AXIS-ALIGNED slots of any width — the atom '
         + 'walks the true channel, so the generator can pack the atom\'s macro instead of its own centreline body and '
         + 'the width gate lifts for them' },
-    { when: 'C3 (bearing)', unlocks: 'slots at ANY angle — until then an angled wide slot stays wizard-only, and the '
-        + 'gate\'s sentence must keep naming the wizard as the exit (t1444: an operator told "unsupported" with no '
-        + 'exit does the wrong thing next)' },
+    // ⚠ t1514 — THE C3 ROW NEEDED **C5** TO REACH THE CAM ARM, and the row is restated rather than left standing:
+    // C3 (t1494) gave the atom a baked bearing, which lifted the WIZARD half; the packed arm's frame is live, and a
+    // live frame could not turn until C5 taught the printer to mix register operands. Both halves are in now.
+    { when: 'C3 (bearing) + C5 (live-frame rotation)', unlocks: 'slots at ANY angle, on BOTH arms. C3 alone lifted the '
+        + 'wizard\'s (its frame is fully baked); the packed CAM arm\'s frame is registers, and until C5 (t1514) an '
+        + 'angled wide slot stayed wizard-only there, with the gate\'s sentence naming the wizard as the exit (t1444: '
+        + 'an operator told "unsupported" with no exit does the wrong thing next). Since t1514 there is no such gate' },
     { when: 'C4 (declared run vector)', unlocks: 'nothing for the CAM gate on its own — it is a DESCENT capability. '
         + 'It is first in the build order for its own reasons, and this row exists so nobody expects the gate to move '
         + 'when it lands' },
@@ -367,19 +371,37 @@ export const SLOT_CAM_PACK_DESIGN = {
  * cannot be baked, and only `rotAngle` had a safety net. t1425 folded the live-GEOMETRY refusal into the envelope so
  * the delegation could ask one question; the ROTATION refusal was left outside it, and that gap was the hole.
  *
- * FIXED THIS TURN, in the atom's own words and INERT for every caller shipping today (`surfaceRasterLiveGap` now
- * refuses a non-zero bearing the body cannot absorb — the wizard slot path bakes its whole frame so `absorbs` is true,
- * and the CAM pocket's frame is live but its bearing is 0, so nothing to drop). The caller it stops is the one that
+ * FIXED AT t1510, in the atom's own words and INERT for every caller shipping then (`surfaceRasterLiveGap` refuses a
+ * non-zero bearing the body cannot absorb — the wizard slot path bakes its whole frame so `absorbs` is true, and the
+ * CAM pocket's frame is live but its bearing is 0, so nothing to drop). The caller it stopped is the one that
  * measured it.
+ *
+ * ── ⚠ t1514 (C5) — AND THE REFUSAL HAS NOW **LIFTED**, so the rows below are restated rather than left standing ────
+ *
+ * The domain the measurement above found was never a law, it was the shape of a missing capability, and this file
+ * named it as one (`theCapabilityThatWouldLiftIt`) rather than as effort. C5 landed it: `affineFrame` prints the
+ * rotation mix with REGISTER operands — the origin is the pivot and `[I − R]` brings it back out of the mix — so the
+ * live frame turns and the atom's own envelope opens. NOT ONE LINE OF DECIDING LOGIC in `opToSlot` or `opCamMap`
+ * changed for it — their whole diff this act is comments plus one operator sentence that had gone stale — which is
+ * the t1511 ruling's structural condition holding: the arm asked the ENVELOPE, so the envelope opening IS the lift.
+ *
+ * WHAT IT LIFTED FROM is kept in the rows below, deliberately (the frozen-kernel pattern): a row that quietly became
+ * true reads as though nothing was ever wrong, and the DROP this file measured is the reason the eligibility gate is
+ * shaped the way it is. `slot-cam-bearing-domain-1510.spec.js` measures both halves — the drop that WAS, and the mix
+ * that IS — against the same probe.
  */
 export const SLOT_CAM_PACK_DOMAIN = {
-    reachableToday: 'a wide slot whose BEARING IS 0 — MEASURED move-for-move identical to the fully-baked wizard path '
-        + 'with the register values substituted, so the packed arm is a true delegation for it. This is the common '
-        + 'case and the shipped default (A 0,0 → B 60,0), and it is exactly `SLOT_CAM_INHERITANCE`\'s FIRST row',
-    refusedToday: 'a wide slot at ANY OTHER bearing, including the axis-aligned +Y one. Not a caution — the atom '
-        + 'DROPS the angle and emits an axis-aligned channel, so this must refuse at pack and name the wizard as the '
-        + 'exit (t1444). `SLOT_CAM_INHERITANCE`\'s C3 row already said exactly this: "until then an angled wide slot '
-        + 'stays wizard-only, and the gate\'s sentence must keep naming the wizard as the exit"',
+    reachableToday: 'ANY BEARING, since t1514. A wide slot whose BEARING IS 0 was the t1510 domain and is still the '
+        + 'shipped default (A 0,0 → B 60,0) — MEASURED move-for-move identical to the fully-baked wizard path with the '
+        + 'register values substituted. C5 added the rest: an ANGLED packed slot agrees with the fully-baked walk to '
+        + 'better than half the emit\'s 0.001mm quantum over a full sweep of bearings, and against the ANALYTIC slot '
+        + 'geometry to 2e-6mm — closer than the baked arm itself, which carries t1494\'s named half-quantum origin '
+        + 'rounding. `SLOT_CAM_INHERITANCE`\'s first row was the bearing-0 half; its C3 row is the other',
+    refusedToday: 'a wide slot needing TWO pivots on one live origin — a bearing AND a program rotation at once, which '
+        + 'no caller builds (a packed slot is its own macro and carries no program rotation). t1510 measured this row '
+        + 'as "ANY OTHER bearing", and that was true of the atom as it stood: it DROPPED the angle and emitted an '
+        + 'axis-aligned channel, which is why the gate had to refuse and name the wizard as the exit (t1444). C5 '
+        + 'removed the cause rather than the symptom, so what is left is the one pair the composite cannot fold',
     /**
      * ⚠ THE DISPATCH SAID "axis-aligned AND angled slots of any width pack honestly, both stages together". The
      * measurement says the second half is not reachable, and THIS FILE'S OWN INHERITANCE TABLE agreed with the
@@ -387,15 +409,23 @@ export const SLOT_CAM_PACK_DOMAIN = {
      * gated on C2+C1 and on C3 respectively. So "build to the design, not to the wording" resolves it: axis-aligned
      * lifts, angled keeps its honest row.
      */
-    dispatchCorrection: 'the ANGLED half of the lift is measured-unreachable; the axis-aligned half is measured-exact',
-    whyNotJustBakeMore: 'baking the width/toolØ/stepover% back down would restore `absorbs` and let an angled slot '
-        + 'rotate — and it would leave the packed arm with NO live knob the literal body does not already have, which '
-        + 'is the whole point of the lift. The trade is not available: live knobs OR a rotatable frame, not both',
-    theCapabilityThatWouldLiftIt: 'C5, a LIVE-FRAME ROTATION — the printer mixing each axis\'s constant into the '
-        + 'other where the origin is a register. The rotation constants multiply the walk\'s RELATIVE offsets (already '
-        + 'runtime registers: the row position, the span), so it needs no runtime trig and is NOT V13-gated — it is '
-        + 'real atom work with its own bridge, in the shape of the four capabilities this file already built, and it '
-        + 'is NOT a packaging act',
+    dispatchCorrection: 'AS MEASURED AT t1510: the ANGLED half of the lift was unreachable; the axis-aligned half was '
+        + 'measured-exact. ⚠ RESOLVED at t1514 and kept for what it shows — "unreachable" was true of the atom that '
+        + 'existed, and the dispatch\'s wording was right about the DESTINATION. The correct read of the two is that a '
+        + 'measurement bounds the build in front of it, never the arc: the split cost one act (t1512 packed the '
+        + 'axis-aligned half, t1514 the rest) and shipped no wrong G-code, which is the trade that measurement buys',
+    whyNotJustBakeMore: 'RETIRED BY C5, and kept because the trade it names is the one the lift refused to take. '
+        + 'Baking the width/toolØ/stepover% back down would have restored `absorbs` and let an angled slot rotate — '
+        + 'and it would have left the packed arm with NO live knob the literal body does not already have, which is '
+        + 'the whole point of the lift. The trade read as "live knobs OR a rotatable frame, not both"; t1514 measured '
+        + 'that the OR was an artefact of the printer and not of the arithmetic, and took both',
+    theCapabilityThatWouldLiftIt: 'C5, a LIVE-FRAME ROTATION — **LANDED at t1514**. The printer mixes each axis\'s '
+        + 'constant into the other where the origin is a register: the rotation constants multiply the walk\'s '
+        + 'RELATIVE offsets (already runtime registers: the row position, the span) and the origin rides in as an '
+        + 'operand rather than as a folded constant. It needed no runtime trig and was NOT V13-gated — every '
+        + 'trigonometric quantity is still evaluated at build time and reaches the controller as a number, which the '
+        + 'bridge asserts against `trigEvidence` directly. Real atom work with its own bridge, in the shape of the '
+        + 'four capabilities this file already built, and NOT a packaging act',
     /**
      * A SECOND, SMALLER CORRECTION to the scout's field list, found the same way. `SLOT_CAM_PACK_DESIGN.live` names
      * `plunge` and its `fieldListDelta` line does not — and the literal slot body has no plunge field at all (it

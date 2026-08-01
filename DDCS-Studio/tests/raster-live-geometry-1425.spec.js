@@ -205,9 +205,13 @@ test('PROOF 3 — the remaining bakes are declared per (strategy, entry), and re
             inputs: m.surfaceRasterLiveInputs({ w: '#4', h: 60, toolDia: '#9', depth: '#7' }),
             // SKIM refuses live geometry — a pre-existing gap named rather than silently changed
             skimGap: m.surfaceRasterLiveGap({ zMode: 'skim', strategy: 'parallel', entry: 'plunge', inset: '#6' }),
-            // a live frame refuses ROTATION, because there is no build-time constant for the printer to mix
+            // ⚠ t1514 (C5) — a live frame ABSORBS the rotation now: the printer mixes register operands, and the
+            // "no build-time constant" reason this row pinned was about the printer rather than the arithmetic
             rotLive: m.surfaceRasterAbsorbsRotation({ w: '#4' }),
             rotBaked: m.surfaceRasterAbsorbsRotation({ w: 80 }),
+            // …and what is LEFT refused, which is the narrow pair: two pivots on one register origin, and skim
+            rotTwoPivots: m.surfaceRasterAbsorbsRotation({ x: '#4', rotAngle: 30, bearing: 45 }),
+            rotSkim: m.surfaceRasterAbsorbsRotation({ w: '#4', zMode: 'skim' }),
             // the DEGRADE: a directly-called ramp with dialled geometry plunges and says so, never cuts baked geometry
             rampText: m.surfaceRasterLines({ strategy: 'parallel', entry: 'ramp', depth: 3, stepdown: 1.5, feed: 1, plunge: 1, clearance: 5, ...LIVE }).join('\n'),
             rampLabels: m.surfaceRasterBlock.flowLabels({ strategy: 'parallel', entry: 'ramp', ...LIVE }),
@@ -241,9 +245,19 @@ test('PROOF 3 — the remaining bakes are declared per (strategy, entry), and re
     expect(r.inputs, 'the live-input reading is one source, and reports only what is actually dialled').toEqual(['w', 'toolDia']);
     // SKIM — the pre-existing gap, refused rather than quietly changed under cover of this act.
     expect(r.skimGap, 'a skim body refuses dialled geometry because its frame drops the op origin').toMatch(/silently ignored/);
-    // ROTATION — refused for a live frame, unchanged for a baked one.
-    expect(typeof r.rotLive, 'a live frame refuses the program rotation, with its reason').toBe('string');
+    /**
+     * ⚠ ROTATION — t1514 (C5) INVERTED THIS PIN, and it is restated rather than deleted because what it pinned was
+     * the REASON, and the reason was mechanical: "there is no build-time constant for the printer to mix". True of
+     * the printer that existed; a register is a perfectly good operand for the same affine form, and `affineFrame`
+     * prints the mix with register operands now (the origin is the pivot, `[I − R]` brings it back out). So a live
+     * frame absorbs its own rotation, and what stays refused is the narrow pair — skim, which has no datum to turn
+     * about, and TWO pivots on one live origin, which cannot share one set of baked coefficients.
+     */
+    expect(r.rotLive, 'a live frame ABSORBS the program rotation since C5 — this read `typeof === "string"`').toBe(true);
     expect(r.rotBaked, 'a baked one still absorbs it').toBe(true);
+    expect(typeof r.rotTwoPivots, 'a bearing AND a program rotation on a live origin still refuses, with its reason').toBe('string');
+    expect(r.rotTwoPivots, '…naming the two pivots rather than a missing constant').toMatch(/TWO rotations|two different pivots/);
+    expect(typeof r.rotSkim, 'and skim still refuses, for its own frame-mixing reason').toBe('string');
     // ⚠ THE HONEST DEGRADE, AND WHOSE IT IS NOW (t1483). It was belt-and-braces for BOTH descents: a direct call
     // bypasses the envelope, and a descent built from default w/h against a dialled rect would cut in the wrong
     // place. The RAMP no longer has that failure mode — it bakes no geometry, so there is nothing to be built from

@@ -197,6 +197,15 @@ export const TRIG_NOT_GATED = [
       why: 'a boundary of the raster atom\'s DECLARED AXES, not of arithmetic: a wall-anchored row rule, an '
          + 'anisotropic inset, the slot\'s own bearing and a declared run vector. All four are things the atom COULD '
          + 'be taught — a capability arc to open deliberately. V13 changes nothing here either way' },
+    { site: 'wizards/ops/affineFrame.js', decl: 'the LIVE-FRAME ROTATION (C5, t1514)',
+      why: 'a rotated live frame LOOKS trig-gated and is not, which is exactly why it is written down here. The '
+         + 'coordinates it turns are registers the machine fills in — a slot\'s width, its tool Ø, the row the walk '
+         + 'is on — so the instinct is that the controller must take their cosine. It does not: the ANGLE is known '
+         + 'when the program is built (a bearing is geometry the operator DREW), so cos/sin are evaluated in '
+         + 'JavaScript and reach the controller as literal constants that MULTIPLY those registers. Every '
+         + 'trigonometric call sits at build time; the emitted macro contains none. What IS trig-gated is the sister '
+         + 'case one row up in TRIG_LIFT_PLAN — a DIALLED bearing, where the angle itself is a register — and '
+         + 'confusing the two would make V13 look like the decider for a capability that shipped without it' },
     { site: 'wizards/ops/surfaceraster.js', decl: 'SURFACE_RASTER_BAKES helix rows',
       why: 'a helix bakes the rect inradius that CLAMPS its radius, and that radius seeds the rotating vector whose '
          + '9-decimal constants keep the descent inside one emit quantum (t1343). That is a recurrence-precision '

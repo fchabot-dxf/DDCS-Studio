@@ -54,8 +54,9 @@ test('SHOTS — the packed wide slot in the real CAM builder', async ({ page }) 
             <table style="border-collapse:collapse;min-width:900px"><thead><tr style="text-align:left;color:#8b98a9">
             <th style="padding:5px 12px">key</th><th style="padding:5px 12px">label</th><th style="padding:5px 12px;text-align:right">value</th><th style="padding:5px 12px">units</th><th style="padding:5px 12px">disposition</th>
             </tr></thead><tbody>${rows}</tbody></table>
-            <div style="margin-top:20px;padding:12px 16px;background:#1b222c;border-left:3px solid #e0a458;max-width:1100px">
-            <b>An ANGLED wide slot is refused</b><div style="margin-top:6px;color:#b9c4d1">${s.angledRefusal}</div></div>`;
+            <div style="margin-top:20px;padding:12px 16px;background:#1b222c;border-left:3px solid ${s.angledRefusal ? '#e0a458' : '#5fbf7f'};max-width:1100px">
+            <b>An ANGLED wide slot</b><div style="margin-top:6px;color:#b9c4d1">${s.angledRefusal
+                || 'PACKS, since t1514 (C5, the live-frame rotation). At t1512 this box carried a refusal — the atom could not turn a register origin, so an angled slot would have cut an axis-aligned channel. See verification/t1514-live-frame-rotation/.'}</div></div>`;
         document.body.appendChild(w);
     }, seeded);
     await page.screenshot({ path: `${SHOTS}/1-field-table.png`, fullPage: false });

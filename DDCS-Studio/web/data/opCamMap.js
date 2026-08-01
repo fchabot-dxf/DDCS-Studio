@@ -285,7 +285,7 @@ export const GENERATOR_BAKES_PICK = {
     slot: {
         entry: (p) => (slotPackGap(p)
             ? 'BAKED into this slot: this macro cuts ONE CENTRELINE PASS per level and always plunges straight down, so a Ramp or Helix pick does not change how it descends — though a Helix does freeze the Stepdown and Stepover knobs, because the pack cannot let a pendant re-derive around a descent it baked. '
-                + `A real descent is carried by the parametric raster atom, and this slot's clearing cannot ride it: ${slotPackGap(p)} Widen the slot past its tool on a bearing of 0 and the pick starts driving the entry.`
+                + `A real descent is carried by the parametric raster atom, and this slot's clearing cannot ride it: ${slotPackGap(p)} Widen the slot past its tool and the pick starts driving the entry.`
             : 'BAKED into this slot: its clearing IS the parametric raster atom, which carries the descent you pick here — a straight PLUNGE, or a RAMP along the slot\'s own length against the live registers (C4, so dialling the width or the stepover re-derives it). The macro contains ONE of them. A HELIX is not offered on this arm: it wants the entry end clamped to the slot width, which the atom does not do, so a helix slot keeps the wizard.'),
     },
 };
@@ -520,13 +520,15 @@ export function camTypeOf(op) {
          * ⚠ THE ELIGIBILITY QUESTION IS ASKED OF THE **ATOM'S OWN ENVELOPE**, never of a bearing or a width here, and
          * that is the ruling's structural condition (t1511) rather than a stylistic preference. `slotPackArm` reads
          * `slotStackArmGap` → `surfaceRasterCovers` → the live-geometry and bearing refusals. So the domain this gate
-         * enforces is whatever the atom currently declares it can do, and when C5 lands (the live-frame rotation that
-         * t1510 measured as needing no runtime trig) ANGLED slots begin packing with nothing here changed.
+         * enforces is whatever the atom currently declares it can do.
          *
-         * TODAY that domain is: wide slots on a bearing of 0. An angled one is refused because the atom would DROP the
-         * bearing and cut an axis-aligned channel — measured at t1510, and the refusal now says so with C5 named as
-         * the pending capability and the wizard named as the exit, because t1444's rule stands: an operator told
-         * "unsupported" with no exit does the wrong thing next.
+         * ⚠ t1514 — AND THAT CONDITION HAS NOW BEEN **PAID OUT**, which is the fact worth pinning rather than the
+         * prediction. C5 landed (the live-frame rotation, which needed no runtime trig exactly as t1510 measured) and
+         * ANGLED slots began packing with NO DECIDING LINE of this file or of `opToSlot` changed — their whole diff
+         * that act is comments plus the one stale sentence below. The gate moved because the ENVELOPE moved, which is
+         * the condition the ruling asked for. The domain is now: wide slots at any bearing. What still refuses is what the atom still
+         * refuses, in the atom's own sentence, with the wizard named as the exit — t1444's rule stands whatever the
+         * domain is: an operator told "unsupported" with no exit does the wrong thing next.
          */
         case 'slot': {
             if (slotTooSmall(p)) return { unsupported: slotToolRefusal(p) };

@@ -68,6 +68,11 @@ const SPEC = {
  * ENVELOPE (`slotStackArmGap` → `surfaceRasterCovers` + the live-geometry/bearing refusals), which is the advisor's
  * t1511 condition and the reason this arm needs no revisiting when C5 lands: the day the atom learns to rotate a live
  * frame, angled slots start packing because the ENVELOPE opens, with not one line of this file changed.
+ *
+ * ⚠ t1514 — **AND THAT DAY CAME.** C5 landed, angled slots pack, and this file is untouched by it — the paragraph
+ * above is a prediction that was paid rather than a hope that was kept. It stays as written because the condition it
+ * describes is a standing one: the next capability the atom learns reaches the CAM arm the same way, or the arm has
+ * grown a check of its own that nobody declared.
  */
 export const SLOT_ARM = { atom: 'atom', centreline: '' };
 
