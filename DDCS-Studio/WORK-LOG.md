@@ -13624,3 +13624,105 @@ pinned, and the band work is proven necessary.
 
 - No product behaviour changed. New spec **3/3**; arc + twin + cam-honesty + cam-arm-classify **27/27**.
 - Nothing released. V2026.08.01.1 from t1506 stands.
+
+---
+
+## t1510 — THE CAM LIFT BUILD: the first emit probe measured the act's DOMAIN false, and found a SILENT BEARING DROP in the atom
+
+**PARKED AT A GATE after landing the option-independent half.** The scout was right about the KNOBS; the build's
+first question down was whether the atom can actually WALK that shape, and for an angled slot it cannot — and it
+does not say so.
+
+### THE FINDING, MEASURED BEFORE ANY GENERATOR ARM WAS WRITTEN
+
+I did not start by writing the arm. I started by handing `surfaceRasterLines` the exact param shape the packed arm
+would build — a 30° slot with `h`/`toolDia`/`stepoverPct`/`insetAcross` as live `#` registers and the bearing baked —
+and reading the emitted text. Same config, both ways:
+
+    FULLY BAKED (the wizard path, the one C3/t1494 bridged against slotPath):
+        G0 X[6.781086 + #40 * 0.866025 - #47 * 0.5] Y[3.915064 + #40 * 0.5 + #47 * 0.866025]
+        -> both axes mixed by the rotation constants. The walk runs on the bearing.
+
+    THE PACKED SHAPE (bearing STILL baked at 30):
+        G0 X[5+[#35/2]*0.500000000] Y#47     ·     G1 X[[5+[#35/2]*0.500000000] + #40]
+        -> a pure AXIS-ALIGNED walk at the rotated origin. The 30 degrees VANISHED.
+
+Not a degrade, a disappearance: clean G-code, an axis-aligned channel where an angled one was asked for, no error.
+The scout named this exact class one level up ("a baked frame beside live endpoints cuts the old angle through the
+new point"); it turns out to bite one level DOWN as well, and from the atom rather than from the field list.
+
+⚠ **AND `surfaceRasterCovers` RETURNED TRUE FOR IT.** The envelope permitted a config whose defining angle it
+discarded — the silent-substitution defect sitting inside the predicate written to prevent silent substitution.
+
+### WHY IT WAS REACHABLE — two quantities, one rotation, only ONE safety net
+
+`surfaceRasterAbsorbsRotation` refuses a LIVE frame (the rotation printer mixes each axis's build-time constant into
+the other, and a register origin has no such constant) and a SKIM frame. For `rotAngle` that refusal is honest AND
+complete: the caller falls back to the whole-program text rewrite, so **somebody still applies it**. For a BEARING
+there is no fallback — nothing downstream applies a bearing — so `absorbs: false` means the angle is simply lost.
+
+t1494 proved the bearing and the program rotation compose into ONE rotation, which is true and is exactly what made
+this easy to miss: the two behave identically while the rotation CAN be baked, and differently the moment it cannot.
+t1425 folded the live-GEOMETRY refusal into the envelope so the delegation could ask one predicate; the ROTATION
+refusal was left outside it. That gap was the hole.
+
+### WHAT LANDED (correct under every option the gate can pick)
+
+- **`surfaceRasterLiveGap` now refuses a non-zero bearing the body cannot absorb**, in the atom's own words, and it
+  READS `surfaceRasterAbsorbsRotation` rather than restating its condition — so skim, which had the identical gap,
+  is covered by the same line rather than by a second one I would have had to remember. The refusal names the angle,
+  and says why a rotation survives where a bearing does not.
+  **It is INERT for every caller shipping today** — the wizard slot path bakes its whole frame (`absorbs` is true, so
+  angled wizard slots still ride the atom: asserted, not assumed), and the CAM pocket's frame is live but its bearing
+  is 0, so there is nothing to drop. The caller it stops is the one that measured it.
+- **`SLOT_CAM_PACK_DOMAIN`** in `data/slotCapabilityArc.js` — the measured domain as inert data, so the parked build
+  reads a fact instead of my prose: what is reachable, what must refuse, the capability that would lift it (C5, a
+  live-frame rotation), why baking more is not a way out, and two smaller corrections found on the way.
+- **`slot-cam-bearing-domain-1510.spec.js`, 5 tests.** The drop asserted on the EMITTED TEXT, not on a predicate —
+  because the predicate is what was wrong. The fix asserted in BOTH directions (the packed angled shape refuses; the
+  baked angled slot and the packed axis-aligned one stay covered, and a program rotation with no bearing is
+  untouched). The reachable arm asserted as an EXACT delegation. And the +Y route measured as a mirror.
+
+### THE TWO SMALLER CORRECTIONS, found the same way
+
+1. **`plunge` is missing from the scout's `fieldListDelta` line** (it is in its `live` sentence). The literal slot
+   body has no plunge field at all — it plunges at `feed` — and the atom takes a real one, so the delta is one key
+   longer than written: `+toolDia +stepoverPct +width +plunge`.
+2. **The band reconciliation has an unasked question in it.** `bandsFor` is keyed by camType ALONE, so putting the
+   atom's `#34-#49` on the one `slot` key makes the LITERAL arm's field vars step over registers it never writes —
+   moving their numbers and the read-lines that cite them. Pre-release that costs no migration, but it is not the
+   byte-identical literal arm `stillLiteral` implies. Either the literal arm moves (accepted) or the band is keyed
+   per ARM. A decision, so I did not take it.
+
+### THE GATE — the act's domain is narrower than dispatched, and the design file already said so
+
+The dispatch's piece 2 said *"axis-aligned AND angled slots of any width pack honestly, both stages together"*.
+Measured, the second half is not reachable. And the dispatch also said **"build to `SLOT_CAM_PACK_DESIGN`, not to my
+t1507 wording"** — which resolves it, because `SLOT_CAM_INHERITANCE` in that same file has ALWAYS carried the two
+halves as SEPARATE rows: axis-aligned gated on C2+C1, *"slots at ANY angle"* gated on C3, whose row reads
+*"until then an angled wide slot stays wizard-only, and the gate's sentence must keep naming the wizard as the exit"*.
+The measurement agrees with the design against the dispatch. I am not taking that as licence to proceed silently,
+because it changes all three pieces — the arm's eligibility test, the honesty sentences, and the refusal words.
+
+    A  BEARING-0 ONLY (my lean). The packed arm takes a wide slot bearing 0 — MEASURED move-for-move identical to
+       the baked wizard walk with the registers substituted, so it is a true delegation. Every other bearing keeps
+       the centreline body + the honest row naming the wizard. This is the design's own first inheritance row, it is
+       the shipped default slot (A 0,0 -> B 60,0), and it needs no new atom capability.
+    B  DO C5 FIRST — teach the atom to rotate a LIVE frame, then angled slots pack too. It needs NO runtime trig
+       (the constants multiply the walk's relative offsets, which are already runtime registers), so it is NOT
+       V13-gated — but it is real atom work with its own bridge, in the shape of the four capabilities this arc
+       already built, and it is a separate act from packaging.
+    C  BAKE THE GEOMETRY so angled slots can rotate. Rejected as a non-option and named as one: it leaves the packed
+       arm with no live knob the literal body does not already have, which is the entire point of the lift.
+
+### CAPACITY
+
+Honest and not a formality: I have room to continue, and the reason I stopped is the ruling, not fatigue. This is my
+first act in this seat and the probe cost little. If the ruling is A, the remaining build (arm + format + bands) is
+a full act and I can take it next wake with the domain settled.
+
+### GATES
+
+- Fast tier **183/0**: the new spec 5/5 · the envelope + arc + scout specs 32/32 · slot/pocket/cam-honesty family
+  80/80 · smoke 71/71. Full suite NOT run — that is the advisor's merge gate.
+- No product behaviour changed for any shipping caller. Nothing released; V2026.08.01.1 from t1506 stands.

@@ -328,6 +328,76 @@ export const SLOT_CAM_PACK_DESIGN = {
         + 'to be asserted against at a HIGH varOffset',
 };
 
+/**
+ * ── t1510 — THE BUILD STARTED AND MEASURED ITS OWN PREMISE FALSE. The DOMAIN is not the one the act assumed ───────
+ *
+ * The scout above settled WHICH KNOBS the packed arm carries and it is right. This is the next question down, and the
+ * first emit probe answered it the hard way: **CAN the atom actually walk a slot whose bearing is baked while its
+ * knobs are live?** For an ANGLED slot, no — and it does not say so, it silently drops the angle.
+ *
+ * MEASURED, both directions, same config (a 30° slot, width 16, Ø8, 40%):
+ *
+ *   FULLY BAKED (the wizard path, the one C3/t1494 bridged against `slotPath`):
+ *       G0 X[6.781086 + #40 * 0.866025 - #47 * 0.5] Y[3.915064 + #40 * 0.5 + #47 * 0.866025]
+ *       → both axes mixed by the rotation constants. The walk really runs on the bearing.
+ *
+ *   THE PACKED SHAPE (h/toolDia/stepoverPct/insetAcross as live #registers, bearing still baked at 30):
+ *       G0 X[5+[#35/2]*0.500000000] Y#47      ·      G1 X[[5+[#35/2]*0.500000000] + #40]
+ *       → a pure AXIS-ALIGNED walk, placed at the rotated origin. The 30° VANISHED.
+ *
+ * ⚠ AND `surfaceRasterCovers` RETURNED **TRUE** FOR IT. The envelope permitted a config whose defining angle it
+ * discarded — the exact silent-substitution class this arc exists to prevent, sitting inside the predicate written to
+ * prevent it. WHY it was reachable: `surfaceRasterAbsorbsRotation` refuses a LIVE frame (there is no build-time
+ * constant per axis for the rotation printer to mix), and for `rotAngle` that refusal is complete — the caller falls
+ * back to the whole-program text rewrite, so somebody still applies it. FOR A BEARING THERE IS NO FALLBACK. Two
+ * quantities t1494 proved compose into ONE rotation turn out to have DIFFERENT failure modes when that rotation
+ * cannot be baked, and only `rotAngle` had a safety net. t1425 folded the live-GEOMETRY refusal into the envelope so
+ * the delegation could ask one question; the ROTATION refusal was left outside it, and that gap was the hole.
+ *
+ * FIXED THIS TURN, in the atom's own words and INERT for every caller shipping today (`surfaceRasterLiveGap` now
+ * refuses a non-zero bearing the body cannot absorb — the wizard slot path bakes its whole frame so `absorbs` is true,
+ * and the CAM pocket's frame is live but its bearing is 0, so nothing to drop). The caller it stops is the one that
+ * measured it.
+ */
+export const SLOT_CAM_PACK_DOMAIN = {
+    reachableToday: 'a wide slot whose BEARING IS 0 — MEASURED move-for-move identical to the fully-baked wizard path '
+        + 'with the register values substituted, so the packed arm is a true delegation for it. This is the common '
+        + 'case and the shipped default (A 0,0 → B 60,0), and it is exactly `SLOT_CAM_INHERITANCE`\'s FIRST row',
+    refusedToday: 'a wide slot at ANY OTHER bearing, including the axis-aligned +Y one. Not a caution — the atom '
+        + 'DROPS the angle and emits an axis-aligned channel, so this must refuse at pack and name the wizard as the '
+        + 'exit (t1444). `SLOT_CAM_INHERITANCE`\'s C3 row already said exactly this: "until then an angled wide slot '
+        + 'stays wizard-only, and the gate\'s sentence must keep naming the wizard as the exit"',
+    /**
+     * ⚠ THE DISPATCH SAID "axis-aligned AND angled slots of any width pack honestly, both stages together". The
+     * measurement says the second half is not reachable, and THIS FILE'S OWN INHERITANCE TABLE agreed with the
+     * measurement rather than with the dispatch before either was written — the two halves were always separate rows,
+     * gated on C2+C1 and on C3 respectively. So "build to the design, not to the wording" resolves it: axis-aligned
+     * lifts, angled keeps its honest row.
+     */
+    dispatchCorrection: 'the ANGLED half of the lift is measured-unreachable; the axis-aligned half is measured-exact',
+    whyNotJustBakeMore: 'baking the width/toolØ/stepover% back down would restore `absorbs` and let an angled slot '
+        + 'rotate — and it would leave the packed arm with NO live knob the literal body does not already have, which '
+        + 'is the whole point of the lift. The trade is not available: live knobs OR a rotatable frame, not both',
+    theCapabilityThatWouldLiftIt: 'C5, a LIVE-FRAME ROTATION — the printer mixing each axis\'s constant into the '
+        + 'other where the origin is a register. The rotation constants multiply the walk\'s RELATIVE offsets (already '
+        + 'runtime registers: the row position, the span), so it needs no runtime trig and is NOT V13-gated — it is '
+        + 'real atom work with its own bridge, in the shape of the four capabilities this file already built, and it '
+        + 'is NOT a packaging act',
+    /**
+     * A SECOND, SMALLER CORRECTION to the scout's field list, found the same way. `SLOT_CAM_PACK_DESIGN.live` names
+     * `plunge` and its `fieldListDelta` line does not — and the literal slot body has no plunge field at all (it
+     * plunges at `feed`). The atom takes a real `plunge`, so the delta is one key longer than the line says.
+     */
+    fieldListDeltaCorrected: '+toolDia +stepoverPct +width +PLUNGE (live) · -ax -ay -bx -by (baked, with the bearing '
+        + 'and length). `plunge` is in the design\'s `live` sentence but missing from its `fieldListDelta` line, and '
+        + 'the literal body never had the field — the atom descends at a plunge feed, so it joins',
+    bandKeyingIsOpen: 'the scout said `bandsFor(\'slot\')` must carry BOTH bands, and it must — but `bandsFor` is '
+        + 'keyed by camType ALONE, so adding the atom\'s #34-#49 to the one `slot` key makes the LITERAL arm\'s field '
+        + 'vars step over registers it never writes, moving their numbers and the read-lines that cite them. Pre-'
+        + 'release that costs no migration, but it is not the byte-identical literal arm `stillLiteral` implies. Either '
+        + 'the literal arm moves (accepted, one key, both bands) or the band is keyed per ARM — a decision, not a detail',
+};
+
 /** The one thing this arc does NOT touch, restated so it cannot be folded in by accident. */
 export const SLOT_ARC_NOT_INCLUDED = {
     what: 'rest machining (REST_PARAMETRIC_GAP)',

@@ -1590,6 +1590,37 @@ export function surfaceRasterLiveGap(p = {}) {
             + '(V13_trig.nc decides it — see data/trigEvidence.js). A baked bearing is two build-time constants and '
             + 'is what a drawn slot needs, so the angle must be known when the program is built';
     }
+    /**
+     * ⚠ t1510 — A BAKED BEARING ON A FRAME THIS BODY CANNOT ROTATE, WHICH WAS **SILENTLY DROPPED** UNTIL HERE.
+     *
+     * MEASURED, not reasoned about: handed the CAM-pack shape (a 30° slot with `h`/`toolDia`/`stepoverPct`/`insetAcross`
+     * as live registers) this atom emitted `G0 X[5+[#35/2]*0.5] Y#47` / `G1 X[… + #40]` — a pure AXIS-ALIGNED walk. The
+     * same config fully baked emits both axes mixed by the rotation constants (`X[6.781086 + #40*0.866025 - #47*0.5]`).
+     * So the 30° bearing did not degrade, it VANISHED: clean G-code, an axis-aligned channel, no error. And
+     * `surfaceRasterCovers` returned TRUE for it — the envelope permitted a config whose defining angle it discarded.
+     *
+     * THE MECHANISM IS ALREADY DECLARED ONE FUNCTION UP, WHICH IS WHY THIS READS IT RATHER THAN RESTATING THE CONDITION:
+     * `surfaceRasterAbsorbsRotation` refuses a live frame (no build-time constant per axis to mix) and a skim frame. For
+     * `rotAngle` that refusal is HONEST AND COMPLETE — the caller falls back to the whole-program text rewrite, so
+     * somebody still applies it. ⚠ FOR A **BEARING** THERE IS NO SUCH FALLBACK: nothing downstream applies a bearing,
+     * so `absorbs: false` means the angle is lost. Two quantities that compose into ONE rotation (t1494) turn out to
+     * have DIFFERENT failure modes when that rotation cannot be baked, and only one of them had a safety net.
+     *
+     * t1425 folded the live-geometry refusal into this predicate so the delegation could ask ONE question; the rotation
+     * refusal was left outside it, and that gap is the hole. It closes here, in the atom's own words, and it is INERT
+     * for every caller shipping today (the wizard slot path bakes its whole frame → `absorbs` is true; the CAM pocket's
+     * frame is live but its bearing is 0 → nothing to drop). It is the FUTURE caller — a CAM slot packing this atom
+     * with pendant-live knobs — that it stops, which is the caller that measured it.
+     */
+    const bearing = rasterBearingOf(p);
+    const absorbs = surfaceRasterAbsorbsRotation(p);
+    if (bearing && absorbs !== true) {
+        return `a baked bearing of ${r3(bearing)}° cannot be applied to this body — ${absorbs}. A program ROTATION `
+            + `survives that refusal because the caller rewrites the text instead, but NOTHING downstream applies a `
+            + `bearing, so it would be dropped and the passes would run axis-aligned through the rotated origin: the `
+            + `right G-code for a slot at a different angle than the one asked for. Bake the geometry too, or keep the `
+            + `bearing at 0`;
+    }
     const live = surfaceRasterLiveInputs(p);
     if (!live.length) return '';
     if (String(p.zMode || '') === 'skim') {
