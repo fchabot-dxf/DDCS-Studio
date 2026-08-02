@@ -20,7 +20,7 @@ round-trip · verify) before any fleet port — the corner-gated-pilot rule.
 
 ---
 
-## Status: S1 BUILDING (t1532)
+## Status: S2–S4 BUILDING (t1534) · S1 DEPLOYED
 
 The scout's own stage plan, declared as data in `DDCS-Studio/web/data/portingArc.js` (the
 `slotCapabilityArc` shape) and pinned by `tests/porting-arc-scout-1530.spec.js` (9 factual claims,
@@ -30,10 +30,10 @@ all green) so the design cannot rot before it is built.
 |---|-------|-------|------------|
 | 0 | Kickoff scout | ✅ **landed** t1530 | Inverted the premise. 5 forks parked, all ruled at t1531. |
 | — | Design ruling | ✅ **landed** t1531 | See the ruling table below. |
-| S1 | **Corpus oracle** | 🔄 **building** (t1532) | The 91 factory `.nc` macros become oracles *read at runtime* — following `controller-import-one-door-1221`, which already does this for the settings corpus (the existence proof: it is a known shape, not a new mechanism). Pilot **WCS zero-at-current** (already reproduces `zeroxy.nc`/`zeroz.nc` byte-for-byte), then **corner** as second subject. Plus the residue census (below). |
-| S2 | Normalisation policy | ⏳ **unblocked** | Factory G-code is **unspaced**, Studio emits **spaced**. ✅ **SETTLED t1531 — V4.1 accepts spaced** (user-attested). The oracle still compares normalised (the corpus is unspaced, so normalisation is what makes comparison possible), but the delta is an **answered** row, not an open question. S5 confirms it for free. |
-| S3 | Caps completeness | ⏳ | 3 caps live outside `DEFAULT_CAPS`, confirmed **latent not live** (every consumer truthy-tests; zero `=== false` comparisons). |
-| S4 | Named unknowns | ⏳ | `readActiveWcs` / `hmiPrompt` / ATC tables — all fold to `[]` honestly today. |
+| S1 | **Corpus oracle** | ✅ **landed** t1532 · V2026.08.02.3 | The 91 factory `.nc` macros become oracles *read at runtime* — following `controller-import-one-door-1221`, which already does this for the settings corpus (the existence proof: it is a known shape, not a new mechanism). Pilot **WCS zero-at-current** (already reproduces `zeroxy.nc`/`zeroz.nc` byte-for-byte), then **corner** as second subject. Plus the residue census (below). |
+| S2 | Normalisation policy | 🔄 **building** (t1534) | Factory G-code is **unspaced**, Studio emits **spaced**. ✅ **SETTLED t1531 — V4.1 accepts spaced** (user-attested). The oracle still compares normalised (the corpus is unspaced, so normalisation is what makes comparison possible), but the delta is an **answered** row, not an open question. S5 confirms it for free. |
+| S3 | Caps completeness | 🔄 **building** (t1534) | 3 caps live outside `DEFAULT_CAPS`, confirmed **latent not live** (every consumer truthy-tests; zero `=== false` comparisons). |
+| S4 | Named unknowns | 🔄 **building** (t1534) | `readActiveWcs` / `hmiPrompt` / ATC tables — all fold to `[]` honestly today. |
 | S5 | Live round-trip | ⏳ **human-gated** | Cannot be agent-scheduled — needs a human at the bench to press Start. The C3-is-last discipline. |
 | — | DM500 follows | ⏳ | Same S1–S4 stages. **Guard:** rows carry their evidence tier on their face, and DM500 does **not** enter `POST_VERIFIED` on offline agreement alone. |
 | — | grbl-class | ⏳ | **UNROLL** — confirmed against caps: grbl has no `#vars` at all; grblHAL's O-word flow cannot stream. |
@@ -114,4 +114,16 @@ _(newest at the bottom: turn · release · what landed · gate result)_
   found conclusively superseded (asserted against its own map, not sampled) → **archive-tagged
   `archive/wizard-porting-work` and deleted** (advisor, t1531). Scout spec green, smoke 71/71.
 - **t1531** — _advisor ruling, no code_ — all 5 forks ruled (table above); arc renamed; residue-census
-  condition attached; S1 dispatched.
+  condition attached; S1 dispatched. The **spacing fork settled the same turn** by user attestation.
+- **t1532** — **V2026.08.02.3** — **S1 corpus oracle.** The factory `.nc` macros are oracles now:
+  the pilot (WCS zero-at-current) reproduces `zeroxy.nc`/`zeroz.nc` **byte-exact**, `zeroall.nc`'s
+  4th-axis gap asserted both directions; corner as second subject at **stated reduced fidelity** — its
+  probe/move primitives byte-tested against `probe-float.nc`/`probe-fix.nc`, while its WCS-write step is
+  asserted as a **checked structural difference** from `probe-vertex.nc` (same G92 semantic, different
+  formula — Studio writes after retract, the factory writes at the trigger point) rather than skipped.
+  **Residue census CLOSED**: all 33 Expert-literal lines individually traced to their consumer —
+  8 passthrough (chased through every call site), 15 WCS-selector passthrough (confirmed inert by
+  reading V4.1's own function body), 5 comment-only, 2 gated absences, 1 safe default, 2 in a function
+  nothing imports. **Zero actual bypasses** — so "already ported" is now a claim that can go red.
+  Scout `PREMISE 6` (asserting no factory oracle existed) went red the instant the oracle landed, exactly
+  as designed, and was restated in the same act to name the oracle. Suite 2404/0; advisor gate 0 failed.
