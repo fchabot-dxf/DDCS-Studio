@@ -14971,3 +14971,164 @@ The dispatch said pin it cheaply or leave it; it was cheap, and "nondeterministi
 - ⚠ **THE ADVISOR'S t1527 STANDARD, TAKEN:** a release wants an ACTUALLY-green run, not an argued flake. t1526 shipped
   on a ledger flake I isolate-checked and argued; this one is green with nothing to argue. The ritual is the
   protection — an argument that happens to be right still trains the habit of arguing.
+
+## t1530 — PORTING ARC SCOUT (V4.1 first): the arc is an INSTRUMENT gap, not a port
+
+**Dispatch:** 4 scout questions on the porting arc kickoff, park at the design gate, no emit changes. **Mid-flight**
+**amendment (t1529, user-driven):** add a 5th question, one row per candidate target, evidence-tiered, so the arc
+**ORDER is rulable rather than assumed — absorbed before commit, not as a follow-up.**
+
+**Q1 — the branch peek.** `wizard-porting-work@76348158` (2026-07-01, one commit, 1261 commits behind main at fork).
+Its name is a trap: "wizard porting" there means the wizards-as-data conversion, not controller porting — no
+bearing on this arc. Checked its own `WIZARD-PORTING-MAP.md` against main rather than sampling: all 11 wizards it
+lists "not ported" (pocket/contour/edge/middle/alignment/rotary×2/ATC×4) have a `blocks/dataOps/*Data.js` twin on
+main today. Superseded, conclusively. Recommend archive-tag + delete; nothing to cherry-pick — the 6 design docs'
+conclusions already live as project memories (TRAVEL-START→marker-derived traverse targets, TWO-WCS→the machine-
+frame sim spec), and `homingOrderSvg.js`/`homingOrderField.js` (a visual homing-order picker) is superseded code but
+a UX idea worth a second look under prefer-GUI-over-fields — named, not built.
+
+**Q2/Q3 — the evidence floor + dialect delta.** The dispatch's premise ("name V4.1's ground-truth equivalent or its
+absence loudly") assumed near-greenfield. Measured the opposite: V4.1 is one of exactly **two** `POST_VERIFIED`
+posts (with Expert), a full dialect module in `wizards/dialects/ddcs-v41.js` carrying turn markers back to t477,
+touched by 54 specs, with a caps table `postGating` already reads. 209 tracked files under `bridge/controllers/v4.1`
+(91 factory `.nc` macros), a live bench unit (`FINDINGS.md`) with a **proven readback channel** (uservar completion
+sentinel, confirmed both directions) stronger than Expert's static-dump-only floor.
+
+The real gap, found by asking "is the corpus wired as an oracle": **zero.** The dialect's "CONFIRMED against
+probe-fix.nc" is a code comment. 0 of 91 tracked V4.1 factory macros are read by any spec, for any target — the 54
+v41 specs are all Studio-vs-Studio. That's the same defect class as the release-bump desync: a claim true when
+written, nothing in the suite that notices it stop being true.
+
+Ran the would-be oracle offline before proposing it: `wizards/dialects/index.js`'s `wcsZeroAtCurrent` reproduces
+`zeroxy.nc`/`zeroz.nc` byte-for-byte (comment/whitespace-normalised). It's not speculative — it was executed.
+
+Sampled the ~33 Expert-literal register lines (#578/#805+/#1925/#880/#883) surviving outside `wizards/dialects/`:
+not dialect bypasses — Expert-specific semantics passed through, or explicitly gated absences (#883 dual-gantry
+slave, self-documenting "no equivalent on this controller"). Named so a later act doesn't re-litigate them as debt.
+
+**Q4 — the arc as data + pilot.** `data/portingArc.js`, in the `slotCapabilityArc` shape: 5 stages
+(corpus-oracle → normalisation-policy → caps-completeness → named-unknowns → live-roundtrip). Stage order follows
+the slot arc's C3-is-last discipline: the human-gated stage (a body has to press Start, or the unbuilt External
+Start relay) is LAST so the arc can't stall behind a machine visit. **Pilot: WCS zero-at-current** — the only op
+with a byte-level factory counterpart already tracked, bridge already green (measured above), no machine visit
+needed, and it exercises the caps delta hardest (wcsAuto/Fixed/Sync all flip true→false Expert→V4.1). Corner
+(the historical gated pilot) and edge were considered and demoted to 2nd/3rd — corner has no single-file factory
+counterpart to diff against; edge inherits an open S2 question (see below).
+
+⚠ **The pilot differential's first run found something on the first try**, and it's reported as what it is, not
+inflated: `zeroall.nc` zeroes 4 registers (X/Y/Z/A), Studio's `wcsZeroAtCurrent` zeroes 3 — **identically on both
+Expert and V4.1**. A scope difference, not a defect (the WCS wizard has no 4th-axis concept at all), recorded as a
+fork for the advisor rather than silently "fixed" or silently ignored.
+
+⚠ **A real open question, not a formality:** the factory corpus writes UNSPACED G-code (`G91G31Z-1000L#682...`),
+Studio emits SPACED (`G31 Z-1000 L#682...`). Same words, same order — but nobody has confirmed the V4.1 parser
+accepts the spaced form; the corpus only ever shows unspaced. That's S2, and it's flagged as offline-unsettleable
+(a live-roundtrip question or a human recollection), not waved past.
+
+**Q5 (t1529 amendment) — the parametric floor per target.** Kept CHEAP as instructed — did not deepen into V4.1-
+level detail. `PARAMETRIC_FLOOR` in the same file: V4.1 = PARAMETRIC (COS/SIN attested in factory macros, SQRT/ATAN
+community-referenced only — same tier Expert's own SQRT/ATAN sit at). V3/DM500 = **same trig SHAPE**, but measured
+on an 18-tracked-file installer tree vs V4.1's 209-file firmware+SMB capture — "likely parametric, unmeasured",
+named loudly rather than answered by analogy. grbl-class = UNROLL, **confirmed** against `caps` rather than
+re-derived (plain grbl has no #variables at all — definitional; grblHAL's O-word flow can't stream — an
+independent ceiling). Added a 5th fork: does DM500 follow V4.1 as stage 2, accepting the thinner evidence (the S1
+instrument itself would surface where the V4.1-analogy breaks), or does the arc pause for a real dump first.
+
+**Two of my own measurement errors, caught and corrected before commit, not after:** (1) my first oracle-count
+regex over-matched — 2 specs DO read `.nc` files, but from `expert-m350/verify/` (Studio's own diagnostic macros
+pushed to hardware for trig evidence, a different corpus), not the factory-shipped operational macros this arc is
+about. Narrowed the claim and the design doc's wording to match. (2) counted `SQRT`/`ATAN` as "used" in DM500
+because `community/NOTES.md` *mentions* them (as absent) — excluded community/NOTES files from the usage count.
+Both caught by running the spec, not by inspection — the same "measure the population, not my sample" lesson t1528
+named for the pocket-golden scope claim.
+
+**Verify:** `tests/porting-arc-scout-1530.spec.js`, 9 premises, all pin factual claims against the live registry +
+the tracked corpus (the `trig-lift-plan-1466` precedent). All 9 green. Smoke tier 71/71 green. No product code
+touched — `data/portingArc.js` + the spec are the entire diff.
+
+**Amendment absorbed** (t1529, polled before commit): Q5 landed in the same commit as Q1-Q4, not as a follow-up.
+
+**Forks parked for the advisor** (in `PORTING_FORKS`): arc-reframe (port→instrument), pilot-choice (WCS-zero vs
+corner), spacing (S2, offline-unsettleable), a-axis-wcs (scope, not a V4.1 question), arc-order-after-v41 (DM500
+next on thinner evidence, vs pausing for a real dump).
+
+**Capacity:** one scout, well within room on this seat — plenty left if the ruling comes back this session.
+
+**Proc tree:** registered clean at wake, 9 procs / 0 flagged at close, nothing left running.
+
+## t1532 — S1 LANDS: the V4.1 factory macro corpus becomes an EXECUTABLE ORACLE
+
+**Dispatch (t1531):** all 5 scout forks ruled, build S1 (corpus oracle, pilot + corner as second subject), close
+the residue census (arc-reframe's condition), declare the A-axis backlog item, full suite → release on green.
+**Mid-flight amendment (t1531, absorbed before commit):** the spacing fork's answer landed from the user —
+V4.1 accepts spaced G-code — while S1 was still open. Took it immediately rather than carrying the old assumption.
+
+**Rulings recorded, not just applied.** Every entry in `data/portingArc.js`'s `PORTING_FORKS` now carries a
+`.ruling` field alongside its `.recommend` — the record of a decision matters as much as the decision, especially
+where the advisor's own condition (arc-reframe) governs what this act was allowed to assume.
+
+**The residue census (arc-reframe's condition, closed).** The scout's "the port is done" rested on a SAMPLE — a
+handful of the ~33 Expert-literal lines outside `wizards/dialects/`, judged by eye. Turned it into a census: every
+one of the 33 lines traced to its actual consumer, not just read. The methodology mattered as much as the result —
+my first pass over-scoped: I'd folded `.status`/`.stop`/`.limit` sub-fields (e.g. `#1920`, `#1905`) into the census
+because they sit in the SAME table-definition line as a real hit (`#1925`), but those registers never matched the
+original grep pattern at all. Caught it by re-deriving the count from the original 33 lines one at a time instead
+of trusting my first classification pass — the category counts wouldn't sum to 33 until I did. Final tally: 8
+`passthrough-rawAxis` (a literal fallback register, superseded whenever `rawAxis` is set — traced the FULL chain:
+`radiuscomp.js`'s only call site is `probeSurface.js:70`, which forwards `rawAxis`, and every one of ITS 7 callers
+passes it explicitly), 15 `wcs-selector-passthrough` (confirmed inert by reading V4.1's own `setWorkOffset` body —
+the `wcsExpr` parameter is never read in the function), 5 `comment-only` (the grep hit a trailing comment, not
+code — counted honestly rather than silently dropped), 2 `gated-absence` (#883 dual-gantry, explicit degrade), 1
+`dialect-routed-safe-default`, 2 `dead-unreferenced-function` (`wizards/dialect.js`'s own `wcsBase` — a SECOND,
+unrelated function of the same name in `data/camMacroKit.js` is what every real caller actually uses; the name
+collision is worth a rename someday, not port work). **Zero actual bypasses.** The `.status`-field finding was
+demoted to a separate, smaller `V41_STATUS_FIELD_DEAD` export, explicitly kept OUT of the 33-count.
+`tests/v41-residue-census-1532.spec.js` re-runs the exact scan at runtime — all 5 assertions green on the first run.
+
+**The corpus oracle (`tests/v41-corpus-oracle-1532.spec.js`).** Pilot: WCS zero-at-current reproduces `zeroxy.nc` /
+`zeroz.nc` byte-for-byte after normalisation; `zeroall.nc`'s 4th-axis gap asserted in BOTH directions (factory
+zeroes X/Y/Z/A, Studio zeroes X/Y/Z — identically on Expert and V4.1, so it's a product-scope question, not a V4.1
+defect); the WCS-selector default proven inert by construction (three different first-argument values, one
+identical output). Second subject: corner, at reduced fidelity, stated honestly rather than forced. `probeMove` +
+`probeTrigVar` + `machineMove` are byte-tested against `probe-float.nc`/`probe-fix.nc` — these are the primitives
+corner's own probe/retract chain actually calls (confirmed by reading `probeSurfaceStack` and `safeRetractNode`,
+not assumed). The WCS-write step is explicitly NOT byte-tested against `probe-vertex.nc`: that factory macro fires
+its `G92` write AT the trigger point with a value precomputed beforehand (`G90G92Z#114+#3`), while corner writes
+AFTER retracting to a saved position, which is why `setWorkOffset` uses the position-independent `[#dro-value]`
+form instead. Two different, both-correct solutions to the same G92 semantic from different physical states — the
+spec asserts the STRUCTURAL difference (both fire G90 G92, the expressions genuinely differ) rather than silently
+skipping the comparison or forcing a false equality.
+
+**Spacing, ruled then re-ruled in the same turn.** The advisor's t1531 ruling was A+B: normalise in the oracle,
+carry the open question ("does the V4.1 parser accept Studio's spaced form?") into S5 as a named row. Before I
+could build past that, the advisor's own follow-through landed as a mid-flight amendment: the user was asked
+directly and confirmed V4.1 accepts spaced G-code. Absorbed immediately — `V41_SPACING_DELTA.status` moved from
+`OPEN` to `ANSWERED (USER-ATTESTED tier)`, the fork's `.ruling` field restates the supersession rather than
+silently overwriting the earlier text, and S5 keeps the question only as a free confirmation, not a blocker. The
+oracle's normalisation logic didn't change — the factory corpus stays unspaced regardless of what Studio may emit.
+
+**A-axis WCS-zero (ruling 4, declare-not-build).** `PILOT_FIRST_FINDING.ruling` now records BOTH halves at once:
+out of scope for this arc (confirmed not V4.1-specific — identical gap on Expert), and a genuine backlog item (a
+rotary-axis user has no WCS-wizard path to zero A on either dialect) — declared so a future act finds it already
+scoped (the FORM needs an `axisA` checkbox; both dialects' `wcsZeroAtCurrent` already know how to emit it).
+
+**`porting-arc-scout-1530.spec.js` restated in the same act (t1531's condition on S1, the trig-lift-plan-1466 LOCK
+2 precedent).** PREMISE 6 asserted the PRE-S1 state — zero specs read a factory macro as an oracle — and went red
+the instant `v41-corpus-oracle-1532.spec.js` landed, exactly as designed. Restated to assert the oracle now EXISTS
+and names it, so a design claim cannot silently keep describing a state the build already closed.
+
+**Verify:** all three porting specs together (scout + census + oracle), 21/21 green, re-run twice — once before
+and once after absorbing the spacing amendment, to confirm nothing the amendment touched broke a sibling assertion.
+Smoke tier 71/71 green.
+
+**Not started this turn:** DM500 (ruling 5 — follows through the same S1-S4 stages, guarded: it does NOT enter
+`POST_VERIFIED` on offline agreement alone), and S2 (caps-completeness)/S3/S4/S5 for V4.1 itself. S1 is V4.1-only.
+
+**Capacity:** a full build turn — census + oracle + two ruling-incorporation passes + an amendment absorbed
+mid-flight. Comfortable room remaining; proceeding to the full suite and release this same seat as dispatched.
+
+- **FULL SUITE 2404 passed · 0 failed · 6 skipped (20.9m), exit 0** — failed-count grepped with ANSI+NUL stripped
+  and cross-checked against the numbered-failure count (0). Released **V2026.08.02.3**. Bump verified with its OWN
+  version-sync-1311 run (6/6) — the t1528/t1529 lesson, applied rather than re-learned: package.json shows zero
+  diff this bump (confirmed via `git diff HEAD`, not assumed) since its Y.M.D granularity hasn't moved since the
+  last release. On branch `scout/v41-porting-1530`, unpushed — the advisor's own gate governs the merge/deploy.
