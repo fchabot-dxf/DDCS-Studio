@@ -192,6 +192,38 @@ export const TRIG_LIFT_PLAN = [
  * with the controller's maths, and folding those into the trig gate would make the machine visit look like it buys
  * more than it does — the precise error this file was written to prevent.
  */
+/**
+ * ── V4.1 SIBLING EVIDENCE (t1542) — a DIFFERENT FIRMWARE, NOT AN EXTENSION OF ANYTHING ABOVE ───────────────────────
+ * Everything above is DDCS Expert / M350 evidence. The V4.1 bench kit (`bridge/controllers/v4.1/verify/`) measured
+ * its OWN controller directly on real silicon — firmware `2025-04-04-012-NOR` — SIBLING evidence for THAT machine
+ * alone. It must never be read across to Expert: the two controllers' math-import tables already differ in the
+ * OPPOSITE direction from what might be assumed. Expert's own libm notes above (COS/SIN rows) say sqrt+atan are
+ * present, cos/sin absent. V4.1 measured the reverse gap on this specific question: SQRT confirmed present and
+ * computing correctly; no arctangent found under six tried names. Two different firmwares, two different gaps —
+ * neither licenses a conclusion about the other.
+ */
+export const V41_TRIG_EVIDENCE = {
+    firmware: '2025-04-04-012-NOR', measuredAt: 't1542', bench: 'no motors, nothing attached',
+    SQRT: {
+        tier: 'hardware-confirmed', probe: 'bridge/controllers/v4.1/verify/S5e_sqrt.nc',
+        result: 'SQRT[9]*100 returned exactly 300 — COMPUTED correctly, not merely parsed. Upgrades from '
+            + 'community-referenced (the Expert tier) to hardware-confirmed, for V4.1 specifically',
+    },
+    ATAN: {
+        tier: 'absent-so-far',
+        triedNames: ['ATAN two-operand (ATAN[y]/[x])', 'ATAN single-operand', 'ATN', 'ATAN2', 'atan lowercase'],
+        control: 'ACOS tried as a control — is ANY inverse trig present — also rejected, same as every name above',
+        result: 'every name REJECTED with Unrecognized-file-format naming the line. Each probe was structurally '
+            + 'IDENTICAL to the working SQRT line (same bracket shape, same NO MOTION single-assignment form), so '
+            + 'the FORM is proven correct and only the NAME or the function\'s existence is at issue',
+        honestPhrasing: 'ABSENT-SO-FAR, not ABSENT — the honest phrasing, not the stronger one. COS/SIN are '
+            + 'UNTESTED on this firmware (only inverse trig was probed), and the community may know a name not yet '
+            + 'tried. bridge/controllers/v4.1/assets/community/FORUM-POST-macro-questions.md is posted asking',
+    },
+    otherFindings: 'spacing, IF/GOTO, WHILE, and register-map findings from the same bench session live in '
+        + 'data/portingArc.js (PORTING_STAGES[\'live-roundtrip\'].landed) — this export carries ONLY the trig half',
+};
+
 export const TRIG_NOT_GATED = [
     { site: 'wizards/ops/slot.js', decl: 'SLOT_RASTER_GAP',
       why: 'a boundary of the raster atom\'s DECLARED AXES, not of arithmetic: a wall-anchored row rule, an '

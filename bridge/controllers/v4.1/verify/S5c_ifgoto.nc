@@ -23,7 +23,7 @@
 #191 = 0
 
 (The probe -- the exact form ddcs-v41.js emits and gotoz.nc already ships)
-IF#191==0GOTO1
+IF #191==0GOTO1
 #190 = -1
 GOTO2
 N1
