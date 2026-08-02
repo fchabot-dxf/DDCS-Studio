@@ -15364,3 +15364,36 @@ per-release gate, alongside the DM500 stage-1 work from the previous turn.
 **Capacity:** the highest-stakes turn on this seat so far — real hardware downstream, even though physically
 motion-incapable. Took the extra time for the paren-nesting re-check and the non-vacuity proof's own bug-fix
 rather than moving fast; both would have been real problems reaching an actual operator's hands otherwise.
+
+## t1540 — S5b's self-restore names its own assumption (doc-only, review response)
+
+**Dispatch (t1539):** the advisor reviewed and accepted the t1538 bench kit — no motion, comments clean of the
+nested-paren trap, register choice doubly grounded — with one real gap: `S5b_coordword.nc`'s self-restoring
+argument rests on ONE unverified assumption, that `#1508` genuinely IS work-Z. If the variable map is wrong (the
+exact "register means something else" hazard this whole arc exists to guard against), the probe line silently
+sets work-Z to whatever unrelated value `#1508` actually holds — persistent, and nothing in the original file
+would have told the operator. Two edits requested, documentation only: `S5b_coordword.nc`'s own comment block,
+and `README.md`.
+
+**What changed.** Both files now instruct the operator to note the current work-Z reading BEFORE running S5b and
+compare AFTER, with the three outcomes stated explicitly: work-Z unchanged + `#190=100` is the STRONGEST pass
+available (confirms both the parse succeeded and that the variable map is correct, not just the former); work-Z
+changed is a REAL FINDING about the variable map, framed as more valuable than the parse result, with an explicit
+instruction to reset work-Z themselves back to the noted value; a syntax error means work-Z was never touched.
+README also gained a top-line note (before the numbered steps) that S5b is the ONLY file in the kit that writes
+any controller state — the other five only touch scratch registers, a fact worth knowing before an operator picks
+which file to be most careful with.
+
+**No code changed** — the probe line itself (`G92 Z[#1508+0]`), the other five files, and every cap/tier value
+are untouched. Re-checked `S5b_coordword.nc`'s rewritten comment block against the exact same nested-paren/bracket
+rule the whole kit was verified against at t1538 (grep clean, all lines self-close).
+
+**Non-vacuity does not apply** — no test added this act, stated rather than invented one to satisfy the policy.
+
+**Verify:** all six porting specs together, 48/48 green (unaffected, as expected for a doc/comment-only change).
+Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged, alongside the DM500 and S5-kit work from
+the previous two turns, for the advisor's per-release gate.
+
+**Capacity:** small, tight act — comfortable room, exactly the scope asked for and nothing more.
