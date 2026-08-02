@@ -15200,3 +15200,8 @@ in the new spec's own "had true been chosen" test — the ruling itself is the a
 
 **Capacity:** a second full build turn on this seat (S1 at t1532, S2-S4 at t1534) — comfortable room throughout,
 including the amendment-driven rework (renaming/reshaping two exports mid-flight cost real time but landed clean).
+
+- **FULL SUITE 2415 passed · 0 failed · 6 skipped (19.2m), exit 0** — failed-count grepped with ANSI+NUL stripped
+  and cross-checked against the numbered-failure count (0). Released **V2026.08.02.4**. version-sync-1311 6/6 on
+  this bump (the standing lesson, applied again). package.json zero diff — same Y.M.D, confirmed via `git diff`.
+  On branch `scout/v41-porting-1530`, unpushed — the advisor's own gate governs the merge/deploy.
