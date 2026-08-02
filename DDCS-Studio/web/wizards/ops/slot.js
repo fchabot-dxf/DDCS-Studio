@@ -67,23 +67,32 @@ export function slotPath(p) {
     const wantR = num(p.helixDia, 0) > 0 ? num(p.helixDia, 0) / 2 : tool / 2;
     const helixMaxR = width / 2 - tool / 2, helixR = Math.max(0.2, Math.min(wantR, helixMaxR));
     /**
-     * ── t1506 — THE DESCENT'S STARTING FLOOR IS THE NOMINAL ONE, converging the family (ruled) ────────────────────
+     * ── t1524 — THE DESCENT STARTS FROM THE FLOOR THAT IS REALLY THERE, and the FAMILY came to the slot ───────────
      *
-     * This kernel used to hand `entryOrPlunge` the REAL previous level (`-prevD`), which made it the only descent in
-     * the corpus that ramped the ACTUAL remaining bite on a clamped final level. t1504 measured the whole family and
-     * the split was three-to-one the other way: `stepover.js` (pocket, surfacing) and `contourfill.js` (contour) both
-     * pass `z + by`, and so does the parametric `surfaceraster` atom. The slot was the outlier.
+     * ⚠ THE HISTORY MATTERS HERE MORE THAN USUAL, because this line has now moved twice and a reader who sees only
+     * the current form will mis-read the second move as an undo of the first.
      *
-     * ⚠ SAFE BY DIRECTION, WHICH IS WHY THE NOMINAL FORM IS THE ONE TO CONVERGE ON. `z + sd` is at or ABOVE the true
-     * floor — never below it — so the descent starts in air the previous level already cleared and can only cut LESS,
-     * never more. Measured across depths 3/4/5/2/3.2 by stepdowns 1.5/0.75/0.8: every kernel ends at EXACTLY the
-     * asked depth (overshoot 0.0000), no material is left, and the level's own passes then clear the area. The whole
-     * cost is a longer approach — cosmetic, and the payoff is that the ramp becomes expressible by the atom, so
-     * `SLOT_RAMP_PARTIAL_GAP` retires and the slot wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5) go parametric.
+     *   t1498  this kernel passed `-prevD` — the REAL previous level — and was the ONLY descent in the corpus that
+     *          ramped the actual remaining bite on a clamped final level. That made ramping slots undescribable by
+     *          the parametric atom, which is what `SLOT_RAMP_PARTIAL_GAP` refused.
+     *   t1506  t1504 measured the family and found the split was three-to-one the OTHER way, so the slot converged on
+     *          the nominal `z + sd`. The gate retired and the shipped-default ramping slot went parametric — a real
+     *          capability, bought with the less efficient descent, and t1504 said so at the time.
+     *   t1524  THE SHELVED HALF LANDS: the whole family moves to the actual floor instead — the atom (`#46 − #35`),
+     *          `stepover.js` and `contourfill.js` through the StepDown scope contract, and this kernel back to the
+     *          floor it always had. So this is NOT a revert of t1506. t1506 converged the family; this act keeps it
+     *          converged and moves the agreed value onto the more correct descent.
+     *
+     * WHAT THE ACTUAL FLOOR BUYS: on a partial final level the nominal `z + sd` sits `(stepdown − lastBite)` ABOVE
+     * the real floor, so the ramp spends that much of its descent cutting air the previous level already cleared —
+     * 9.54mm of run at the shipped defaults (depth 4 @ 1.5, 3°). Neither form ever overshoots (both end at exactly
+     * the asked depth, measured 0.0000 across depths 3/4/5/2/3.2 by stepdowns 1.5/0.75/0.8), so this is efficiency
+     * and meaning rather than safety: a ramp ANGLE should describe the drop that is actually left.
      *
      * It is set ONCE for every entry, exactly as the other three call sites do it — the helix reads the same `prevZ`,
-     * and giving the two descents different floors is the kind of split this act exists to close.
+     * and giving the two descents different floors is the kind of split this arc exists to close.
      */
+    let prevD = 0;
     for (const d of levels) {
         const z = -d;
         L.push(`( level Z${r3(z)} )`);
@@ -92,7 +101,7 @@ export function slotPath(p) {
             let sx = x0 + nx * o, sy = y0 + ny * o, ex = x1 + nx * o, ey = y1 + ny * o;
             if (dir < 0) { [sx, ex] = [ex, sx];[sy, ey] = [ey, sy]; }
             if (first) {
-                const ctx = { entry, z, prevZ: z + sd, rampAngle: num(p.rampAngle, 3), feed,
+                const ctx = { entry, z, prevZ: -prevD, rampAngle: num(p.rampAngle, 3), feed,
                     runX: ex - sx, runY: ey - sy, runLen: len,                                   // ramp along the pass (the slot length)
                     helixR, helixPitch: num(p.helixPitch, 1), maxHelixR: helixMaxR,
                     cx: sx + helixR * (ex - sx) / len, cy: sy + helixR * (ey - sy) / len };       // helix centred R into the slot (stays inside)
@@ -104,6 +113,7 @@ export function slotPath(p) {
             dir = -dir;
         }
         L.push(`G0 Z${clr}`);
+        prevD = d;   // t1524 — the floor the NEXT level starts from
     }
     return L;
 }

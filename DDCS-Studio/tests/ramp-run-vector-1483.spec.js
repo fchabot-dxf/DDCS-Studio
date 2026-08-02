@@ -27,10 +27,15 @@ const emit = (page, over) => page.evaluate(async (o) => {
     return m.surfaceRasterLines(o).join('\n');
 }, { ...BASE, ...over });
 
-/** the descent block: from the run assignment to the label that closes it (inclusive) */
+/** the descent block: from the run assignment to the label that closes it (inclusive).
+ *  t1524 — the run is now sized by the drop actually left (`[#46 − #35]`) rather than by the nominal bite `#43`, so
+ *  the locator reads the register it ASSIGNS (`#34=`) rather than the expression it assigns FROM. That is the stable
+ *  half of the line: this helper only needs to find where the descent starts, and it silently returned an EMPTY block
+ *  when the expression changed — a helper that fails open makes every assertion below it vacuous. */
 const descentOf = (text) => {
     const L = text.split('\n');
-    const a = L.findIndex((l) => /#34=\[#43 \*/.test(l));
+    const a = L.findIndex((l) => /^\s*#34=\[/.test(l));
+    if (a < 0) throw new Error('descentOf: no ramp run assignment (#34=[…]) in this program — the locator is stale, not the program');
     const b = L.findIndex((l, i) => i > a && /^\s*N\d+\s*$/.test(l) && /rampEnd|N42/.test(l + ''));
     const end = b > 0 ? b : L.findIndex((l, i) => i > a && /\( the ramp did not fit/.test(l)) + 2;
     return { block: L.slice(a, end + 1), at: a, rest: L.filter((_, i) => i < a || i > end) };
@@ -56,19 +61,35 @@ test('BRIDGE A — everything OUTSIDE the descent is BYTE-IDENTICAL to the plung
      * declaration still fails here.
      */
     const norm = (a) => a.filter((l) => l.trim() !== '').join('\n').replace(/@work \d+/g, '@work <n>');
-    expect(norm(rp), 'the walk around the descent is untouched').toBe(norm(pl));
+    /**
+     * ⚠ t1524 — AND THE SECOND THING OUTSIDE THE DESCENT THAT MUST MOVE: the FLOOR CAPTURE, `#35=#46`.
+     *
+     * The ramp now descends the drop that is ACTUALLY left (`#46 − #35`) rather than a whole nominal bite, and the
+     * floor it starts from is a property of the LEVEL, not of the descent — the depth loop is the only place that
+     * knows it, because it is the only thing that sees `#46` before the bite is added. So one line of the ramp's
+     * cost necessarily sits in the level loop rather than in the descent block this spec strips.
+     *
+     * It is NOT neutralised the way `@work` is. It is REMOVED AND COUNTED: the walk must be identical to the plunge
+     * walk after taking out EXACTLY ONE capture line, and the count is asserted, so a second one appearing (a stray
+     * seed, a duplicated capture) still fails here loudly.
+     */
+    const caps = rp.filter((l) => /^\s*#35=#46\b/.test(l));
+    expect(caps.length, 'exactly ONE floor capture rides outside the descent — a seed or a duplicate would be a second').toBe(1);
+    expect(norm(rp.filter((l) => !/^\s*#35=#46\b/.test(l))), 'the rest of the walk around the descent is untouched').toBe(norm(pl));
     // …and the count really did move, which is what makes neutralising it honest rather than convenient
     const workOf = (t) => Number((t.match(/@work (\d+)/) || [])[1]);
-    expect(workOf(ramp), 'a ramp declares MORE executed steps than a plunge — six per level').toBeGreaterThan(workOf(plunge));
+    expect(workOf(ramp), 'a ramp declares MORE executed steps than a plunge — seven per level since t1524').toBeGreaterThan(workOf(plunge));
 });
 
 test('BRIDGE B — INSIDE the descent: the angle, the drop, the start and the return are preserved', async ({ page }) => {
     await boot(page);
     const text = await emit(page, { strategy: 'parallel', entry: 'ramp', rampAngle: 3 });
     const d = descentOf(text).block.join('\n');
-    // the run is still bite / tan(angle) — the ONE thing that stayed baked, and the angle is a form field
+    // the run is still drop / tan(angle) — the tangent is the ONE thing that stayed baked, and the angle is a form field.
+    // t1524 — the DROP it is applied to is now the real remaining one (`#46 − #35`) rather than the nominal bite `#43`:
+    // on a clamped final level a whole bite over-ran the descent by `(stepdown − lastBite)/tan(angle)` and spent it in air.
     const invTan = 1 / Math.tan(3 * Math.PI / 180);
-    expect(d, 'the run is the declared angle applied to the level bite').toContain(`#34=[#43 * ${Math.round(invTan * 1000) / 1000}]`);
+    expect(d, 'the run is the declared angle applied to the drop actually left').toContain(`#34=[[#46 - #35] * ${Math.round(invTan * 1000) / 1000}]`);
     // it descends to this level's floor and returns to the row start at depth
     expect(d, 'the ramp move reaches the level Z').toMatch(/\( ramp \)/);
     expect(d, 'and comes back to the row start').toMatch(/back to the row start, now at depth/);

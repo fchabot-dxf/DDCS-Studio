@@ -488,7 +488,12 @@ test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async 
     // quantities are separated. #34 belongs to the DESCENT, and a descent is exactly one of plunge/ramp/helix, so the
     // ramp's run and the helix's rotating vector can never be live together — a sharing that mutual exclusion actually
     // justifies. The ramp's resolved motion is unchanged, which the EQUIVALENCE (ramp) bridges above assert.
-    expect(body, 'the run is computed from the live bite').toMatch(/#34=\[#43 \* [\d.]+\]/);
+    // t1524 — …AND THE QUANTITY IT IS COMPUTED FROM MOVED, so the pin moves with it rather than being relaxed to a
+    // wildcard. The run used to be the nominal bite `#43`; it is now the drop ACTUALLY left, `#46 − #35`, which is the
+    // same thing on every level but a CLAMPED final one — where a whole bite over-ran the descent and cut air.
+    // `#35` is the floor the level starts from, captured once at the top of the depth loop (it rides the helix's `vy`
+    // slot by the same mutual exclusion that lets the run ride `#34`, so the register band did not grow).
+    expect(body, 'the run is computed from the drop actually left, not from a whole bite').toMatch(/#34=\[\[#46 - #35\] \* [\d.]+\]/);
     expect(body, 'and the DIRECTION slot is no longer overwritten by it — #49 is only ever ±1').not.toMatch(/#49=\[#43 \*/);
     expect(body, 'and the tangent is baked, with the reason on the line').toMatch(/tangent is baked; the angle is a form field/);
     // THE HONEST DEGRADE survives the migration: when the run does not fit, the tool plunges and the program says so

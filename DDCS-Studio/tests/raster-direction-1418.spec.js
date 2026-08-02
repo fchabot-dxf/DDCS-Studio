@@ -191,7 +191,10 @@ for (const cfg of SWEEP) {
 
         expect(c.ok, `the same set of FILL cutting moves${isRamp ? ' OUTSIDE the descent' : ''}, at the same feeds — ${c.why}`).toBe(true);
         if (isRamp) {
-            const rel = rampDescentRelationship(r.lit.cuts, r.par.cuts, { at: (e) => e.t, bbox: cutBox(r.lit.cuts, (e) => e.t) });
+            // t1524 — `actualDrop`: the literal side is the FROZEN pre-change reference, so a CLAMPED final level
+            // legitimately starts its ramp higher there than here. Shaped allowance, both directions asserted —
+            // see the block comment in rampRelationship.js and the sibling call in pocket-rides-raster-1406.
+            const rel = rampDescentRelationship(r.lit.cuts, r.par.cuts, { at: (e) => e.t, bbox: cutBox(r.lit.cuts, (e) => e.t), actualDrop: true });
             expect(rel.ok, `and the descent holds its declared relationship to the literal — ${rel.why}`).toBe(true);
         }
         expect(c.quantised, `moves agreeing only to within the 0.001mm emit quantum: ${c.quantised} of ${r.lit.cuts.length}`).toBeLessThanOrEqual(r.lit.cuts.length);

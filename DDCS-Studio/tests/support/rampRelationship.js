@@ -98,7 +98,7 @@ export function splitRampDescent(rows, at = (r) => r) {
  *
  * @param bbox  the literal path's XY bounding box, for the `inside` property: {minX,maxX,minY,maxY}
  */
-export function rampDescentRelationship(lit, par, { at = (r) => r, bbox = null } = {}) {
+export function rampDescentRelationship(lit, par, { at = (r) => r, bbox = null, actualDrop = false } = {}) {
     const L = splitRampDescent(lit, at), P = splitRampDescent(par, at);
     const checked = [];
     const fail = (why) => ({ ok: false, why, checked });
@@ -107,11 +107,43 @@ export function rampDescentRelationship(lit, par, { at = (r) => r, bbox = null }
     if (P.pairs.length !== L.pairs.length) return fail(`count: the parametric ramps ${P.pairs.length} time(s), the literal ${L.pairs.length} — a lost descent is the t1402 defect`);
     checked.push('count');
 
+    let deepened = 0;
     for (let i = 0; i < L.pairs.length; i++) {
         const a = at(L.pairs[i].ramp), b = at(P.pairs[i].ramp);
-        if (!near(a[0], b[0]) || !near(a[1], b[1]) || !near(a[2], b[2])) return fail(`start: descent ${i} begins at (${b[0]}, ${b[1]}, ${b[2]}) — the literal starts it at (${a[0]}, ${a[1]}, ${a[2]})`);
-        if (!near(a[2] - a[5], b[2] - b[5])) return fail(`drop: descent ${i} drops ${(b[2] - b[5]).toFixed(3)}mm, the literal ${(a[2] - a[5]).toFixed(3)}mm`);
-        if (!near(hyp(a), hyp(b))) return fail(`run: descent ${i} runs ${hyp(b).toFixed(3)}mm, the literal ${hyp(a).toFixed(3)}mm — same drop and same run IS the same angle, so this is the angle claim`);
+        /**
+         * ── ⚠ t1524 — THE DECLARED DIVERGENCE: the reference ramps a NOMINAL bite, the live path the ACTUAL drop ──
+         *
+         * These bridges compare the live path against FROZEN literal references (`literalPocketFill.js` and friends),
+         * captured before t1524 moved the family's descent onto the drop that is actually left. On a CLAMPED final
+         * level the frozen side still starts its ramp `(stepdown − lastBite)` ABOVE the true floor and descends a
+         * whole bite; the live side starts on the real floor and descends only what remains. So `start`, `drop` and
+         * `run` legitimately differ — on that level and nowhere else.
+         *
+         * IT IS NOT A RELAXATION, and the shape is asserted in BOTH directions:
+         *   · the XY start is still EXACT (the ramp did not move across the part);
+         *   · the live start is at or BELOW the reference's, NEVER above — the direction that can only cut less;
+         *   · both descents END at the SAME point, which is the safety-relevant property;
+         *   · and run/drop is preserved, which IS the angle claim — the operator's declared angle is untouched, only
+         *     the length it is applied over changed.
+         * The caller passes `actualDrop: true` to declare it expects this, and gets `deepened` back so it can assert
+         * the divergence really occurred (a bridge that never reaches a clamped level would otherwise pass silently).
+         */
+        if (!near(a[0], b[0]) || !near(a[1], b[1])) return fail(`start: descent ${i} begins at XY (${b[0]}, ${b[1]}) — the literal at (${a[0]}, ${a[1]})`);
+        const startMoved = !near(a[2], b[2]);
+        if (startMoved && !actualDrop) return fail(`start: descent ${i} begins at (${b[0]}, ${b[1]}, ${b[2]}) — the literal starts it at (${a[0]}, ${a[1]}, ${a[2]})`);
+        if (startMoved) {
+            if (b[2] > a[2] + QUANTUM) return fail(`start: descent ${i} begins ABOVE the reference (Z${b[2]} vs Z${a[2]}) — the actual floor can only be at or below the nominal one`);
+            if (!near(a[5], b[5])) return fail(`end: descent ${i} ends at Z${b[5]}, the reference at Z${a[5]} — both must reach the SAME level floor`);
+            const ra = hyp(a) / (a[2] - a[5]), rb = hyp(b) / (b[2] - b[5]);
+            if (!near(ra, rb, 1e-3)) return fail(`angle: descent ${i} runs ${rb.toFixed(4)} per mm of drop, the reference ${ra.toFixed(4)} — the declared ANGLE must survive even where the drop does not`);
+            deepened++;
+        } else {
+            // the floors coincide (a whole bite), so the ORIGINAL equalities must hold exactly, declaration or not
+            if (!near(a[2] - a[5], b[2] - b[5])) return fail(`drop: descent ${i} drops ${(b[2] - b[5]).toFixed(3)}mm, the literal ${(a[2] - a[5]).toFixed(3)}mm`);
+            if (!near(hyp(a), hyp(b))) return fail(`run: descent ${i} runs ${hyp(b).toFixed(3)}mm, the literal ${hyp(a).toFixed(3)}mm — same drop and same run IS the same angle, so this is the angle claim`);
+        }
+        // …and the feed, the return and the bbox are checked on EVERY descent either way. A declared divergence in the
+        // starting floor is no reason to stop asking whether the tool comes back to where the row expects it.
         if (!near(a[6], b[6])) return fail(`feed: descent ${i} cuts at F${b[6]}, the literal at F${a[6]}`);
 
         const back = P.pairs[i].back && at(P.pairs[i].back);
@@ -126,7 +158,10 @@ export function rampDescentRelationship(lit, par, { at = (r) => r, bbox = null }
     }
     checked.push('start', 'drop', 'run', 'feed', 'return');
     if (bbox) checked.push('inside');
-    return { ok: true, why: '', checked };
+    if (actualDrop) checked.push('actual-drop');
+    // `deepened` = how many descents took the DECLARED divergence (a clamped final level). The caller asserts on it,
+    // so a bridge that never reaches one cannot quietly pass under an allowance it never needed.
+    return { ok: true, why: '', checked, deepened };
 }
 
 /** The XY box a cut list covers — the material the literal actually walks, for the `inside` property. */

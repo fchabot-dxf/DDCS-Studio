@@ -441,6 +441,18 @@ const V = {
 // / helix, so the ramp's run and the helix's rotating vector can never be live in the same program. That is a sharing
 // justified by mutual exclusion, which is what the old comment claimed and this one can actually stand behind.
 V.run = '#34';
+// t1524 — THE FLOOR THIS LEVEL STARTS FROM, and it rides #35 on EXACTLY the argument that justifies #34 above.
+// `HX.vy` is #35, and the mutual exclusion is the same one: a descent is exactly one of plunge / ramp / helix, so the
+// ramp's starting floor and the helix's rotating vector can never be live in the same program. THE BAND DOES NOT
+// GROW, which is not a nicety — `SLOT_ARC_BAND` records that it has no adjacent room, so a fix that needed a 51st
+// register would not have been this fix.
+//
+// WHY THE RAMP NEEDS IT AT ALL: the run is `drop / tan(angle)`, and until now `drop` was read as the NOMINAL bite
+// `#43`. On a clamped final level the real remaining drop is smaller than a whole bite, so the ramp began
+// `(stepdown − lastBite)` ABOVE the true floor and spent that much of its descent cutting air the previous level had
+// already cleared. Reading `#46 − #35` makes the ramp descend what is actually left — which is what a reader expects
+// a ramp ANGLE to mean on the last level, and what the literal slot kernel had always done alone.
+V.prevZ = '#35';
 // The ring walk reuses one of the same slots for its inset: a ring and a row are never walked at the same time, so
 // a separate var would be a second name for one register.
 const RING_INSET = V.y;
@@ -537,9 +549,12 @@ export function surfaceRasterWorkSteps(p = {}) {
      * declaration is 13 steps per level flat, which the assertions below pin.
      *
      * THE MODEL CHANGED SHAPE, not just its numbers: the level overhead is per-WALK (a both-ways level does more
-     * branching than a one-way one) and the descent cost is walk-INDEPENDENT (+0 plunge / +6 ramp / +11 per helix
+     * branching than a one-way one) and the descent cost is walk-INDEPENDENT (+0 plunge / +7 ramp / +11 per helix
      * segment on all three, measured identical). One flat `PER_LEVEL = 8` could not express that, which is why it
      * was absorbing the error.
+     *
+     * (t1524 — the ramp term reads 7 rather than the 6 this paragraph was written against; the actual-drop descent
+     * added one statement per level. Re-differenced, not adjusted by eye — see the constant below.)
      */
     const dirKey = concentric ? 'concentric' : (rasterIsOneWay(rasterDirectionOf(p)) ? 'oneway' : 'bothways');
     const PER_PASS = { bothways: 13, oneway: 11, concentric: 12 }[dirKey];
@@ -548,7 +563,12 @@ export function surfaceRasterWorkSteps(p = {}) {
     const entry = String(p.entry || '');
     const descent = entry === 'helix'
         ? Math.max(24, Math.ceil(stepdown / Math.max(0.001, num(p.helixPitch, 1))) * 24) * 11
-        : entry === 'ramp' ? 6 : 0;
+        // t1524 — THE RAMP IS 7, NOT 6, AND IT WAS MEASURED RATHER THAN REASONED. The actual-drop descent adds one
+        // executed statement per level (`#35=#46`, the floor capture at the top of the depth loop). Differenced from
+        // real executed counts the t1440 way: the calibration case `parallel/bothways/ramp h150 d0.5` read declared
+        // 307 against executed 308 — UNDER by one, which is the side that TRUNCATES a preview, so it could not be
+        // left to the 4× margin to absorb. 7 makes it exact again, which is what that spec asserts for plunge/ramp.
+        : entry === 'ramp' ? 7 : 0;
     return 16 + levels * (PER_LEVEL + descent + passes * PER_PASS);
 }
 
@@ -823,6 +843,7 @@ export function surfaceRasterLines(p = {}) {
         // origin (the live case's registers ride in with them), `AX` is an already-absolute coordinate like `#47`
         rot, mv, AX, AXX, AXY, TM, LBL };
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
+    const rampEntry = opts.entry === 'ramp';   // t1524 — only the ramp reads the level's starting floor (see the depth loop)
 
     // THE SKIM PREAMBLE. Seed an impossible value, read the frame, then REFUSE if it did not arrive — before any
     // motion at all. A position of 0 is perfectly legal (the operator may jog to the WCS origin), so the sentinel is
@@ -892,6 +913,12 @@ export function surfaceRasterLines(p = {}) {
         `${V.z}=0   ( the level being cut )`,
         `G0 Z${zClr}   ( clear before the first plunge )`,
         `WHILE [${V.z} < ${V.depth}] DO1   ( depth: one pass per level, the last bite clamped to the total )`,
+        // t1524 — CAPTURE THE FLOOR THIS LEVEL STARTS FROM, BEFORE THE BITE IS ADDED. It goes FIRST inside the loop
+        // and therefore needs NO SEED: on the first pass `#46` is still 0, and 0 is exactly the stock top, which is
+        // the floor the first level does start from. A seed line above the loop would be a second statement of the
+        // same fact, and the two could drift. Emitted on the RAMP path only — the plunge and helix descents do not
+        // read it, so their programs stay byte-for-byte what they were.
+        ...(rampEntry ? [`  ${V.prevZ}=${V.z}   ( the floor this level starts from — 0 on the first pass is the stock top )`] : []),
         `  ${V.z}=[${V.z} + ${V.stepdown}]`,
         `  IF ${V.z} > ${V.depth} THEN ${V.z}=${V.depth}`,
         ...walk.body,
@@ -1297,13 +1324,19 @@ function rampLines(o) {
     const START_X = o.startX, START_Y = o.startY;
     const RAMP_X = PLUS_RUN(START_X, ux), RAMP_Y = PLUS_RUN(START_Y, uy);
     return [
-        `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
+        // t1524 — THE RUN IS SIZED BY THE DROP THAT IS ACTUALLY LEFT, not by a whole bite. `#46 − #35` is the real
+        // remaining drop: a whole bite on every level but the last, and exactly the clamped remainder on a partial
+        // one. Reading `#43` there made the ramp `(stepdown − lastBite)/tan(angle)` too long on the final level — the
+        // slot kernel's 9.54mm at the shipped defaults — and spent that much of the descent in air.
+        `    ${V.run}=[[${V.z} - ${V.prevZ}] * ${r3(invTan)}]   ( ramp run = the drop actually left / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run needed is longer than the distance available
         // along the declared vector, a ramp cannot be cut and the tool plunges instead — with the reason in the
         // program, not silently. t1483 — the limit is now the LIVE span register, so a dialled area moves it too;
         // this comparison used to be against a baked number and that is the whole of what C4 changed here.
         `    IF ${V.run} > ${runSpan} GOTO${LBL.rampPlungeLabel}   ( ramp needs more run than the ${runLabel} -> plunge )`,
-        `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
+        // …and the rapid goes to that SAME floor. The comment was already true of what this line means; what changed
+        // is that `- #46 + #43` only computed it when the bite was whole, while `- #35` is it on every level.
+        `    G0 Z${azE(`- ${V.prevZ}`)}   ( down to the floor this level starts from )`,
         `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( ramp )`,
         `    G1 ${mv(START_X, START_Y)} F${feed}   ( back to the ${startLabel}, now at depth )`,
         `    GOTO${LBL.rampEndLabel}`,

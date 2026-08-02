@@ -41,15 +41,27 @@ const boot = async (page) => {
  * character for character, and every config inside it differs. A freeze that drifted anywhere else still fails, which
  * is the property the original spec existed to protect (a baseline that drifts silently makes every downstream bridge
  * prove the wrong thing CONFIDENTLY).
+ *
+ * ── ⚠ t1524 — THE IDENTITY IS BACK, AND THE PARAGRAPH ABOVE IS THE RECORD OF WHY IT WAS EVER LOST ────────────────
+ *
+ * t1506's regret is answered rather than restated. The shelved half landed and moved the WHOLE FAMILY onto the
+ * ACTUAL remaining drop — which is the floor this freeze was taken on — so the live kernel is a character-for-
+ * character match again, across the entire cross-product, with no permitted-divergence carve-out at all. That is a
+ * STRONGER assert than the shaped one it replaces, and it is the assert this file was originally built to make.
+ *
+ * The `mayDiffer` machinery is therefore gone, not disabled: no config may differ. What it used to protect — the
+ * evidence of what the descent moved FROM — did not disappear with it, it MOVED: `frozenSlotPathNominal.js` freezes
+ * the t1506 nominal-floor kernel as the DIVERGENCE witness, and `slot-repoint-domain-1498` measures it at exactly
+ * `(stepdown − lastBite)/tan(rampAngle)`. Two freezes, two jobs, both stated at both sites so neither reads as stale.
  */
-test('THE FREEZE IS THE t1496 KERNEL — identical everywhere except the ONE descent t1506 deliberately moved', async ({ page }) => {
+test('THE FREEZE IS THE t1496 KERNEL — and t1524 restored the character-for-character identity, everywhere', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const live = await import('/wizards/ops/slot.js');
         const frozen = await import('/_test/frozenSlotPath.js');
         const { depthLevels } = await import('/wizards/clearing.js');
         const NL = String.fromCharCode(10);
-        let count = 0; const differ = [];
+        let count = 0, descents = 0, partials = 0; const differ = [];
         for (const width of [4, 6, 6.5, 7, 12, 13.2, 15, 16.8, 18, 20, 60])
             for (const tool of [6, 8, 12])
                 for (const entry of ['plunge', 'ramp', 'helix'])
@@ -62,32 +74,87 @@ test('THE FREEZE IS THE t1496 KERNEL — identical everywhere except the ONE des
                                     stepoverPct: pct, depth, stepdown: 1.5, feed: 2000, plunge: 150, clearance: 5,
                                     entry, rampAngle: 3, helixDia: 4, helixPitch: 1 };
                                 /**
-                                 * The ONLY shape allowed to differ: a REAL descent over a PARTIAL last bite.
+                                 * t1524 — NO CONFIG MAY DIFFER ANY MORE. Between t1506 and t1524 exactly one shape
+                                 * was permitted to (a REAL descent over a PARTIAL last bite), and identifying it
+                                 * needed care: "entry is not plunge" was NOT enough, because a slot narrower than
+                                 * its tool REFUSES with no motion and a ramp whose run will not fit DEGRADES to a
+                                 * plunge — both ask for a ramp and neither has a descent that could move.
                                  *
-                                 * ⚠ "entry is not plunge" is NOT enough, and the sweep proved it — a slot narrower
-                                 * than its tool REFUSES with no motion, and a ramp whose run will not fit DEGRADES to
-                                 * a plunge. Both ask for a ramp and neither has a descent that could move. Rather
-                                 * than re-derive those rules here (which would put a second copy of the kernel's
-                                 * logic in its own test), the emitted text is asked: a descent happened iff the
-                                 * kernel wrote its `( ramp )` / `( helix )` marker.
+                                 * That carve-out is gone with the divergence it described. The two counters below
+                                 * keep what it taught, though: they prove the sweep still REACHES real descents over
+                                 * partial bites, so this identity assert cannot pass by never entering the region
+                                 * where the kernels once disagreed. The `( ramp )` / `( helix )` marker is still
+                                 * what is asked, rather than re-deriving the kernel's rules inside its own test.
                                  */
                                 const lv = depthLevels(depth, 1.5);
                                 const lastBite = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
                                 const partial = Math.abs(lastBite - 1.5) > 1e-9;
                                 const was = frozen.frozenSlotPath(p).join(NL);
                                 const descended = /\( (ramp|helix) \)/.test(was);
-                                const mayDiffer = descended && partial;
-                                const same = live.slotPath(p).join(NL) === was;
-                                if (same === mayDiffer) differ.push({ width, tool, entry, ang, depth, pct, same, mayDiffer });
+                                if (descended) descents++;
+                                if (descended && partial) partials++;
+                                if (live.slotPath(p).join(NL) !== was) differ.push({ width, tool, entry, ang, depth, pct });
                             }
-        return { count, differ };
+        return { count, differ, descents, partials };
     });
     // the sweep spans every arm the kernel has: the too-small refusal, the zero-band centreline, both descents,
     // the angled cases, multi-level, and the widths the arc measured its divergence region on
     expect(r.count, 'the sweep really is the whole cross-product').toBe(2376);
-    // ⚠ BOTH DIRECTIONS: identical wherever the bite is whole or the entry plunges, different wherever t1506 moved it.
-    // A drift ANYWHERE else — or an unexpected agreement inside the moved region — lands in `differ` and fails here.
-    expect(r.differ, `the freeze differs from the kernel in EXACTLY the descents t1506 moved, and nowhere else — ${JSON.stringify(r.differ.slice(0, 3))}`).toEqual([]);
+    // ⚠ NOT VACUOUS: the sweep really does reach real descents, and really does reach them over PARTIAL last bites —
+    // which is the exact region where the live kernel and this freeze disagreed from t1506 until t1524. Without these
+    // two counters, "identical everywhere" could pass by never getting there.
+    expect(r.descents, 'the sweep reaches real descents (ramp/helix that were actually cut)').toBeGreaterThan(200);
+    expect(r.partials, '…and reaches them over a PARTIAL last bite — the ex-divergence region').toBeGreaterThan(100);
+    // ⚠ CHARACTER FOR CHARACTER, WITH NO CARVE-OUT. t1524 put the family back on this freeze's own floor, so the
+    // identity this file was built to assert is restored. A drift ANYWHERE now fails, which is strictly stronger
+    // than the shaped assert it replaces. (What moved FROM is witnessed by frozenSlotPathNominal.js — see 1498.)
+    expect(r.differ, `the freeze IS the live kernel again, everywhere — ${JSON.stringify(r.differ.slice(0, 3))}`).toEqual([]);
+});
+
+/**
+ * t1524 — THE SECOND FREEZE IS AN EXTRACTION OF THE FIRST, AND THIS IS WHAT KEEPS IT ONE.
+ *
+ * `frozenSlotPathNominal.js` was generated from `frozenSlotPath.js` by changing exactly ONE expression — the descent's
+ * starting floor, `prevZ: -prevD` → `prevZ: z + stepdown`, verbatim what t1506 shipped. Its whole value as a
+ * divergence witness rests on that being the ONLY difference: a copy that drifted somewhere else would measure the
+ * drift and report it as the descent, confidently and wrongly. So the same anti-drift property the t1496 freeze has
+ * against the LIVE kernel is asserted here between the two freezes.
+ */
+test('THE TWO FREEZES DIFFER IN THE DESCENT AND NOWHERE ELSE — the nominal copy is one expression, not a fork', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const frozen = await import('/_test/frozenSlotPath.js');
+        const nominal = await import('/_test/frozenSlotPathNominal.js');
+        const { depthLevels } = await import('/wizards/clearing.js');
+        const NL = String.fromCharCode(10);
+        let count = 0, moved = 0; const wrong = [];
+        for (const width of [4, 6, 7, 12, 15, 20, 60])
+            for (const tool of [6, 12])
+                for (const entry of ['plunge', 'ramp', 'helix'])
+                    for (const ang of [0, 30, 90, -30])
+                        for (const depth of [1.5, 4, 5]) {
+                            count++;
+                            const rad = ang * Math.PI / 180;
+                            const p = { x0: 0, y0: 0, x1: 60 * Math.cos(rad), y1: 60 * Math.sin(rad), width, tool,
+                                stepoverPct: 40, depth, stepdown: 1.5, feed: 2000, plunge: 150, clearance: 5,
+                                entry, rampAngle: 3, helixDia: 4, helixPitch: 1 };
+                            const lv = depthLevels(depth, 1.5);
+                            const lastBite = lv.length > 1 ? lv[lv.length - 1] - lv[lv.length - 2] : lv[0];
+                            const partial = Math.abs(lastBite - 1.5) > 1e-9;
+                            const a = frozen.frozenSlotPath(p).join(NL);
+                            const b = nominal.frozenNominalSlotPath(p).join(NL);
+                            const descended = /\( (ramp|helix) \)/.test(a);
+                            const mayDiffer = descended && partial;   // the one expression can only bite here
+                            if (mayDiffer) moved++;
+                            if ((a !== b) !== mayDiffer) wrong.push({ width, tool, entry, ang, depth, same: a === b, mayDiffer });
+                        }
+        return { count, moved, wrong };
+    });
+    expect(r.count, 'the sweep is a real cross-product').toBeGreaterThan(400);
+    // NOT VACUOUS: the one expression really does bite somewhere in this sweep, or "differs only there" is empty talk.
+    expect(r.moved, 'the sweep reaches descents over a partial bite — where the changed expression can act').toBeGreaterThan(40);
+    // BOTH DIRECTIONS: identical wherever the floor cannot matter, different wherever it can. Anything else is drift.
+    expect(r.wrong, `the nominal freeze differs from the t1496 freeze in EXACTLY the descent — ${JSON.stringify(r.wrong.slice(0, 3))}`).toEqual([]);
 });
 
 test('THE FREEZE CARRIES THE TOO-SMALL LAW, which is a refusal and not a path', async ({ page }) => {

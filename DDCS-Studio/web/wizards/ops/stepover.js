@@ -39,7 +39,12 @@ export function fillStrategy(p, z) {
     // previous cleared floor (this level's z + the StepDown step `by`); centre + a tool-clamped helix radius from the region.
     ctx.entry = p.entry || 'plunge';
     if (ctx.entry !== 'plunge') {
-        ctx.prevZ = z + num(p.by, Math.abs(z));   // by from the enclosing StepDown scope; standalone → the whole depth
+        // t1524 — THE DECLARED FLOOR, with the nominal form kept as the STANDALONE fallback. Inside a StepDown the
+        // scope declares the floor this level actually starts from, which is the only place that knows: this function
+        // sees `z` and `by` but not the total depth, so it cannot tell a CLAMPED final level from a whole one — and on
+        // a clamped one `z + by` sits above the true floor, so the ramp descends through air the last level cleared.
+        // A StepOver used on its own has no level list and no previous floor, so it keeps `z + by` (→ the whole depth).
+        ctx.prevZ = p.prevZ != null ? num(p.prevZ, z) : z + num(p.by, Math.abs(z));
         ctx.cx = rg.cx != null ? rg.cx : (rg.x + rg.w / 2);
         ctx.cy = rg.cy != null ? rg.cy : (rg.y + rg.h / 2);
         ctx.rampAngle = num(p.rampAngle, 3);

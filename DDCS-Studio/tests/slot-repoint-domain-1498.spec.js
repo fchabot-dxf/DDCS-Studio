@@ -112,13 +112,32 @@ test('THE BRIDGE — every ACCEPTED slot is the literal kernel move for move, ac
  * the wizard's OWN DEFAULTS (depth 4 @ stepdown 1.5, the config the old gate refused) now ACCEPTED. The comparison
  * is against the LIVE kernel, which is still an independent literal implementation — `slotPath` is a separate body of
  * arithmetic from `surfaceRasterLines`, so this is two implementations agreeing, not a function compared to itself.
- * (The frozen t1496 copy still guards the shape of what moved — see slot-frozen-reference-1496.)
+ *
+ * ── ⚠ t1524 — THE CONVERGENCE STANDS; ITS AGREED VALUE MOVED, AND SO DID ITS WITNESS ─────────────────────────────
+ *
+ * The shelved half landed: the whole family now descends from the ACTUAL remaining drop — the atom via `#46 − #35`,
+ * `stepover.js` and `contourfill.js` via the StepDown scope contract, and the slot kernel back to the floor it had
+ * before t1506. The family is still converged; what changed is WHICH descent it is converged ON.
+ *
+ * THAT BROKE THIS TEST'S WITNESS, AND THE BREAK IS THE INTERESTING PART. `wasWorst` compared the frozen t1496 kernel
+ * against the atom, and the frozen t1496 kernel IS the actual-drop descent — so once the family converged onto that
+ * floor, the frozen copy AGREED with the atom and could no longer show what had changed. A convergence test that
+ * cannot show what it converged from is indistinguishable from a test of nothing (t1506's own words), so the witness
+ * had to move rather than be dropped, and it had to stay a SECOND IMPLEMENTATION rather than become arithmetic this
+ * spec supplies itself.
+ *
+ * So the two freezes now carry different jobs, and both are asserted here:
+ *   frozen t1496 (actual)   → the IDENTITY reference: the live kernel matches it byte for byte again (`nowMatches`).
+ *   frozen t1506 (nominal)  → the DIVERGENCE witness: what t1524 lifted the family FROM, still diverging by exactly
+ *                             `(stepdown − lastBite)/tan(rampAngle)` on a partial level (`wasWorst`).
+ * The 9.54mm at the shipped defaults survives on the new copy with its provenance intact.
  */
 test('THE CONVERGENCE — the ex-third-gate is ZERO at every bite, and the shipped defaults are ACCEPTED', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async (H) => {
         const live = await import('/wizards/ops/slot.js');
-        const frozen = await import('/_test/frozenSlotPath.js');
+        const frozen = await import('/_test/frozenSlotPath.js');            // t1496 — the ACTUAL-drop kernel: the identity reference
+        const nominal = await import('/_test/frozenSlotPathNominal.js');    // t1506 — the NOMINAL-floor kernel: the divergence witness
         const m = await import('/wizards/ops/surfaceraster.js');
         const { slotRasterParams, slotRasterArmGap } = await import('/wizards/ops/slot.js');
         const { depthLevels } = await import('/wizards/clearing.js');
@@ -144,7 +163,10 @@ test('THE CONVERGENCE — the ex-third-gate is ZERO at every bite, and the shipp
             const atom = cuts(m.surfaceRasterLines(slotRasterParams(leaf)));
             out.push({ depth, stepdown, lastBite: +lastBite.toFixed(6), full,
                 worst: +worstOf(cuts(live.slotPath(leaf)), atom).toFixed(3),        // the LIVE kernel vs the atom
-                wasWorst: +worstOf(cuts(frozen.frozenSlotPath(leaf)), atom).toFixed(3),   // what it WAS, before t1506
+                // t1524 — the witness is the NOMINAL freeze now: what the family cut between t1506 and t1524.
+                wasWorst: +worstOf(cuts(nominal.frozenNominalSlotPath(leaf)), atom).toFixed(3),
+                // …and the t1496 freeze became the IDENTITY reference — the live kernel is back on its floor.
+                nowMatches: +worstOf(cuts(frozen.frozenSlotPath(leaf)), cuts(live.slotPath(leaf))).toFixed(3),
                 gap: slotRasterArmGap(leaf),
                 predicted: +((stepdown - lastBite) / Math.tan(3 * Math.PI / 180)).toFixed(3) });
         }
@@ -155,17 +177,25 @@ test('THE CONVERGENCE — the ex-third-gate is ZERO at every bite, and the shipp
         // ⚠ CONVERGED — whole bite or partial, the kernel and the atom now cut the same descent
         expect(c.worst, `depth ${c.depth}@${c.stepdown} (last bite ${c.lastBite}): the kernel and the atom agree`).toBeLessThanOrEqual(0.0015);
         expect(c.gap, `depth ${c.depth}@${c.stepdown}: …so nothing here is refused any more`).toBe('');
+        // t1524 — …and the floor they agree ON is the t1496 one: the live kernel is byte-for-byte the frozen
+        // actual-drop kernel again. t1506 recorded losing this identity with regret; the shelved half restored it.
+        expect(c.nowMatches, `depth ${c.depth}@${c.stepdown}: the live kernel IS the frozen t1496 kernel again`).toBeLessThanOrEqual(0.0015);
         if (!c.full) {
-            // …and the boundary that USED to stand here was real: the frozen (pre-t1506) kernel still shows it,
-            // at exactly the size this spec predicted. That is what makes the convergence a change and not a no-op.
-            expect(c.wasWorst, `depth ${c.depth}@${c.stepdown}: the OLD kernel really did diverge by ${c.predicted}mm`).toBeCloseTo(c.predicted, 2);
+            // …and the descent this act LIFTED THE FAMILY FROM is still measurable, at exactly the size this spec
+            // predicted, on the frozen NOMINAL kernel. That is what makes the move a change and not a no-op —
+            // and it is a second implementation saying so, not this spec's own arithmetic.
+            expect(c.wasWorst, `depth ${c.depth}@${c.stepdown}: the NOMINAL descent really does differ by ${c.predicted}mm`).toBeCloseTo(c.predicted, 2);
+        } else {
+            // On a whole bite the nominal and actual floors ARE the same floor, so the witness must agree here —
+            // which is what stops it from being a copy that diverges everywhere for some unrelated reason.
+            expect(c.wasWorst, `depth ${c.depth}@${c.stepdown}: whole bite — nominal and actual are the same floor`).toBeLessThanOrEqual(0.0015);
         }
     }
     // ⚠ THE PAYOFF, asserted by name: the wizard's OWN defaults were the refused case and are now accepted.
     const dflt = r.find((c) => c.depth === 4 && c.stepdown === 1.5);
     expect(dflt.full, 'the shipped defaults (depth 4 @ stepdown 1.5) still end on a PARTIAL bite').toBe(false);
-    expect(dflt.wasWorst, 'and they DID move 9.54mm before the convergence').toBeCloseTo(9.54, 2);
-    expect(dflt.worst, '…and now they do not move at all').toBeLessThanOrEqual(0.0015);
+    expect(dflt.wasWorst, 'and the nominal descent they used to cut ran 9.54mm longer').toBeCloseTo(9.54, 2);
+    expect(dflt.worst, '…and now the kernel and the atom do not differ at all').toBeLessThanOrEqual(0.0015);
     expect(dflt.gap, '…so the DEFAULT ramping slot rides the atom').toBe('');
 });
 

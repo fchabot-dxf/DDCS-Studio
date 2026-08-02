@@ -235,6 +235,12 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const out = [];
         levels.forEach((L, i) => {
             const child = Object.create(scope); child.z = -L; child.by = by;   // t804 — expose `by` too: the fill's depth-entry (ramp/helix) descends exactly one level
+            // t1524 — …AND THE FLOOR THIS LEVEL STARTS FROM, which `by` alone cannot express. A per-level caller knows
+            // `z` and the nominal bite but NOT the total depth, so it cannot tell a CLAMPED final level from a whole
+            // one — and on a clamped one `z + by` is above the true floor, so the descent ramps through air the
+            // previous level already cleared. The walk that owns the level list is the only thing that knows, so it
+            // DECLARES it: the previous level's floor, and 0 (the stock top) before the first.
+            child.prevZ = i ? -levels[i - 1] : 0;
             out.push(tag(`( ${def.label} z=${r3(-L)} )`, own));
             (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect, ctx)));
             // t1031 — pause & confirm after every Nth pass, but NOT after the last (the op is done → no point pausing)
@@ -247,6 +253,12 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'fill') {                 // STEP OVER: clear the region at the current depth (auto-cut, or run a per-pass body)
         const p = resolveParams(block.params, scope);
+        // t1524 — THE DECLARED FLOOR COMES FROM THE SCOPE, NEVER FROM A BUILDER-WRITTEN PARAM, and that is the whole
+        // safety of this contract. `by` and `z` reach here because pocketWizard.js hand-writes `by: 'by', z: 'z'` into
+        // every fill leaf's params; if the floor joined that list, any builder that FORGOT it would silently keep the
+        // old nominal descent — a fresh split manufactured by the act that exists to close one. Being inside a
+        // StepDown IS the contract, so it is read from the scope and a block may still override it by naming one.
+        if (p.prevZ === undefined && scope.prevZ !== undefined) p.prevZ = scope.prevZ;
         const z = num(p.z, 0);
         const out = [tag(`( ${p.strategy ? p.strategy + ' fill' : def.label} z=${r3(z)} )`, own)];
         if ((block.children || []).length && def.segments) {           // body present → run it once per pass with {x0,y0,x1,y1} in scope

@@ -201,7 +201,12 @@ for (const cfg of SWEEP) {
 
         expect(c.ok, `the same set of FILL cutting moves${isRamp ? ' OUTSIDE the descent' : ''}, at the same feeds — ${c.why}`).toBe(true);
         if (isRamp) {
-            const rel = rampDescentRelationship(r.litLevels.cuts, r.parLevels.cuts, { at: (e) => e.t, bbox: cutBox(r.litLevels.cuts, (e) => e.t) });
+            // t1524 — `actualDrop`: the literal reference here is FROZEN (literalPocketFill.js, captured before the
+            // family's descent moved onto the drop that is actually left), so on a CLAMPED final level it still ramps
+            // a whole nominal bite from `z + stepdown` while the live path ramps the remainder from the real floor.
+            // The allowance is shaped, not blanket — same XY start, live start never ABOVE the reference's, both
+            // ending at the SAME floor, and run-per-mm-of-drop (the declared ANGLE) preserved. See rampRelationship.js.
+            const rel = rampDescentRelationship(r.litLevels.cuts, r.parLevels.cuts, { at: (e) => e.t, bbox: cutBox(r.litLevels.cuts, (e) => e.t), actualDrop: true });
             expect(rel.ok, `and the descent holds its declared relationship to the literal — ${rel.why}`).toBe(true);
         }
         // THE QUANTUM IS A BOUND, NOT A BLIND EYE. Where the two differ at all they differ by ONE unit of the emit's

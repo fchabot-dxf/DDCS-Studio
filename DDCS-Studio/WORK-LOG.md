@@ -14568,3 +14568,114 @@ is complete and durable, and the build behind it is mechanical — but it is emi
 judgement on the evidence design, not typing, and that is the class where being tired is the failure mode. The gate
 is real regardless of capacity; I would have parked at it fresh. With the ruling in hand a fresh seat can land this
 turnkey from this entry alone.
+
+---
+
+## t1524 — SHELVED (B) LANDS: the ramp descends the drop that is ACTUALLY left, everywhere. And the frozen reference came home.
+
+Ruled (A) at t1523 from the gate t1522 raised. The descent change is small; the act is the evidence around it.
+
+### THE CHANGE, IN THREE PLACES BECAUSE THE LEVEL WALK LIVES IN THREE PLACES
+
+| where | how it learns the floor |
+|---|---|
+| `surfaceraster` (atom) | walks levels in the MACRO → captures it in a register: `#35=#46` |
+| `stepover.js` · `contourfill.js` | called PER LEVEL → the StepDown SCOPE declares it |
+| `slot.js` | walks its own levels in JS → reads the previous level directly |
+
+**The atom.** `V.prevZ = '#35'`, free by the same mutual exclusion that frees `#34` (the helix's `vy` can never be
+live with a ramp), so `SLOT_ARC_BAND` does not grow — which is the constraint that made this fit at all. Then:
+
+```
+#34=[#43 * 19.081]        ->  #34=[[#46 - #35] * 19.081]     the drop actually left
+G0 Z[0 - #46 + #43]       ->  G0 Z[0 - #35]                  the floor it really starts from
+```
+
+⚠ **THE CAPTURE NEEDS NO SEED, and that is a finding rather than a detail.** `#35=#46` goes FIRST inside the depth
+loop, *before* `#46=[#46 + #43]`. On the first pass `#46` is still 0 — and 0 is exactly the stock top, which is the
+floor the first level does start from. A seed above the loop would be a second statement of the same fact and the two
+could drift. So it really is ONE line, and it is emitted on the RAMP path only: plunge and helix programs are
+byte-for-byte untouched (asserted, including that a helix never captures — `#35` IS its `vy`).
+
+**The scope contract.** `blockEmitter`'s depth fold declares `child.prevZ = i ? -levels[i-1] : 0` beside `z` and `by`,
+and the FILL fold passes it into the resolved params. ⚠ **From the SCOPE, never as a builder-written param** — the
+design call t1523 affirmed for the record. `pocketWizard.js:200` hand-writes `by: 'by', z: 'z'` into every fill leaf;
+had the floor joined that list, any builder that FORGOT it would have silently kept the old descent — a fresh split
+manufactured by the act that exists to close one. Being inside a StepDown IS the contract. The nominal form survives
+as the STANDALONE fallback, because a StepOver used on its own genuinely has no previous floor.
+
+### ⚠ THE FROZEN REFERENCE CAME HOME, WHICH IS WHY t1522 STOPPED
+
+The gate was: the dispatch asked the frozen pre-t1506 reference to keep a divergence-shape assert "meaningful under
+the new floor", but `frozenSlotPath.js` (t1496) IS the actual-drop kernel — so (B) did not move the family to a NEW
+floor, **it moved the family onto the frozen reference's own floor**. Measured after the change: `frozenVsLive = 0`
+on every config in the sweep. The freeze is a character-for-character match again, which t1506 recorded losing with
+regret; `slot-frozen-reference-1496` now asserts full identity with NO carve-out — strictly stronger than the shaped
+assert it replaces, and the assert that file was originally built to make.
+
+That cost the convergence spec its WITNESS: `wasWorst` compared the frozen kernel to the atom, and once the atom
+moved onto that same floor the frozen copy agreed and could no longer show what changed. Ruled (A): **freeze the
+t1506 NOMINAL kernel as a second reference.** Measured — `nominalVsAtom` is 0 on whole bites and exactly `predicted`
+on partial ones (9.541 at the shipped defaults, 19.082 where the last bite is 0.5). The 9.54mm survives with its
+provenance, and the witness stays a second IMPLEMENTATION rather than becoming arithmetic the spec supplies itself.
+
+**Both freezes' jobs are declared at both sites**, since a reader's natural guess (the older one is stale) is exactly
+backwards: t1496 = the ACTUAL-drop kernel, now the IDENTITY reference; t1506-nominal = the DIVERGENCE witness.
+
+⚠ The nominal freeze is an **extraction of an extraction, not a transcription** — generated from `frozenSlotPath.js`
+by replacing exactly one expression and renaming the export, matching the original's own anti-drift discipline. And a
+new test asserts the two freezes differ ONLY in the descent, in both directions, so it cannot quietly stop being that
+one change.
+
+### @work 6 → 7, DIFFERENCED, NOT ADJUSTED BY EYE
+
+The calibration spec was run BEFORE the constant moved, and reproduced t1504's exact case: `parallel/bothways/ramp
+h150 d0.5` declared **307** against executed **308** — UNDER by one, the side that TRUNCATES a preview. That is the
+`#35=#46` line, one executed statement per level. 7 makes it exact again (that spec asserts equality, not a margin,
+for plunge and ramp), so it was never left to the 4× cap to absorb.
+
+### THE BLAST RADIUS, AS A NUMBER
+
+**10 of 36** swept literal configs move their emitted bytes — and the RULE is asserted in both directions rather than
+just counted: bytes move IFF the entry ramps AND the final level is clamped. A plunge program moving, or a whole-bite
+level moving, fails the same test. Nothing overshoots either way (t1504 measured 0.0000 across the grid); what
+changed is efficiency and meaning, since a ramp ANGLE should describe the drop that is actually left.
+
+### THE RESTATEMENTS — six specs, none deleted
+
+- **`slot-repoint-domain-1498`** — convergence stands, its agreed value moved, its witness moved to the nominal
+  freeze, and it now also asserts the t1496 IDENTITY (`nowMatches`). Whole-bite rows assert the witness AGREES, so
+  a copy that diverged for some unrelated reason would fail.
+- **`slot-frozen-reference-1496`** — identity restored, carve-out deleted. Two counters were added so "identical
+  everywhere" cannot pass by never REACHING a real descent over a partial bite (>200 descents, >100 partial).
+- **`ramp-run-vector-1483`** — the run pin flips with its provenance. ⚠ Its `descentOf` helper located the descent by
+  matching the OLD expression and **returned an empty block when it stopped matching**, which made every assertion
+  under it vacuous rather than red. It now locates by the register it ASSIGNS and THROWS if it finds nothing: a
+  helper that fails open is worse than one that fails.
+  Its BRIDGE A ("everything outside the descent is byte-identical to the plunge walk") now removes and COUNTS the one
+  capture line rather than neutralising it — the ramp's cost genuinely has one line in the level loop now, because
+  the floor is a property of the LEVEL, and asserting `=== 1` keeps a stray seed or duplicate loud.
+- **`surfacing-parametric-1329`** — the run pin moved with the quantity rather than being relaxed to a wildcard.
+- **`pocket-rides-raster-1406` · `raster-direction-1418`** — these compare against FROZEN literal references captured
+  before the descent moved, so a clamped final level legitimately differs. `rampDescentRelationship` gained a
+  DECLARED `actualDrop` allowance.
+
+### ⚠ THE ALLOWANCE IS THE ONE COMPARISON THIS ACT LOOSENED, SO THE ALLOWANCE ITSELF IS TESTED
+
+An allowance nobody probes is a hole that could swallow a real regression on every bridge using it. It is shaped, not
+blanket — same XY start, live start never ABOVE the reference's (the actual floor can only be at or below the
+nominal), both descents ending at the SAME floor, and run-per-mm-of-drop preserved (the operator's declared ANGLE
+survives even where the drop does not). Feed, return and bbox are still checked on every descent either way; the
+first cut of this used `continue` and would have skipped the RETURN check, which is safety-relevant — caught by
+reading the diff.
+
+Five direct probes assert it ACCEPTS this act's shape and REJECTS: a start above the reference, a different end
+depth, a changed angle, the same divergence when UNDECLARED, and a whole-bite level held to exact equality even with
+the declaration. It also reports `deepened` so a caller can tell the allowance fired.
+
+### GATES
+
+- New `actual-drop-descent-1524` **5/5** (the atom's one-line capture · byte-identity where bites are whole · the
+  blast radius both directions · the allowance probe · the scope contract driven through a real StepDown).
+- Family risk surface **161/0** (1406 · 1418 · 1483 · 1490 · 1500 · 1329 · 1496 · 1498 · 1440 · 1524).
+- Full suite: recorded in the pass-back.

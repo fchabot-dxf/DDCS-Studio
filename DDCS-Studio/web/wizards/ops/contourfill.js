@@ -46,7 +46,11 @@ export const contourFillBlock = {
         // t842 — depth entry: ramp along the first segment (polyline) / a helical lead-in (circle). Plunge default = byte-
         // identical. A contour has NO helix (it would gouge the profile interior) — coerce anything but ramp to plunge, so a
         // stray helix from the global Blockly dropdown can't reach the fill-only helix path (no cx/cy in a contour ctx).
-        const entry = p.entry === 'ramp' ? 'ramp' : 'plunge', prevZ = z + num(p.by, Math.abs(z)), rampAngle = num(p.rampAngle, 3);
+        // t1524 — `prevZ` is THE DECLARED FLOOR from the enclosing StepDown scope, with the nominal `z + by` kept as the
+        // standalone fallback (same contract as stepover.js): per level this kernel knows the bite but not the total
+        // depth, so it cannot recognise a CLAMPED final level, and the nominal floor sits above the real one there.
+        const entry = p.entry === 'ramp' ? 'ramp' : 'plunge', rampAngle = num(p.rampAngle, 3);
+        const prevZ = p.prevZ != null ? num(p.prevZ, z) : z + num(p.by, Math.abs(z));
         return rg.kind === 'circle'
             ? circleTrace(rg, z, clr, feed, plunge, entry, prevZ, rampAngle)
             : contourLevel(rg.contour, { z, clr, feed, plunge, entry, prevZ, rampAngle });
