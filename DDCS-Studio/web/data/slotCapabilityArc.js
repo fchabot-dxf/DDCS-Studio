@@ -342,7 +342,11 @@ export const SLOT_CAM_PACK_DESIGN = {
     bands: 'the packed atom writes RASTER_SCRATCH (#34-#49, #62-#64); the literal centreline body keeps #50-#54. '
         + '`bandsFor(\'slot\')` carries BOTH on the ONE camType key as of t1512 — the ruled union, which is why the '
         + 'literal arm\'s numbers moved — and the probe temps #50-#61 abut the union without crossing it, which the '
-        + 'collision guard is asserted against at a HIGH varOffset',
+        + 'collision guard is asserted against at a HIGH varOffset. t1526 puts the ANGLED pack\'s live origin in '
+        + '#62/#63 (read once, before the walk, instead of riding every move word) and the band DID NOT GROW for it: '
+        + 'those two are the same pair skim reads its frame into, one meaning — where the frame origin is — and the '
+        + 'two claimants cannot collide because a skim origin is already a bare register and only a COMPOUND word '
+        + 'is ever hoisted',
 };
 
 /**

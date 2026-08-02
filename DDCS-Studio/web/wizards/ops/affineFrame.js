@@ -58,6 +58,12 @@
  * evaluated at BUILD time and reaches the controller as a number (data/trigEvidence.js is untouched by this, and the
  * bridge asserts it) — what is live is only the operands those numbers multiply.
  *
+ * ⚠ t1526 — AND THIS MODULE NEVER LOOKS INSIDE THE ORIGIN WORD, which is what lets the caller shorten it. `ORG` and
+ * `pivotBack` treat it as an opaque operand, so `surfaceraster` may HOIST a long live origin into a scratch register
+ * and hand `#62` where it used to hand `[[5 + [#1/2] * 0.498] - [#2/2] * 0.498]`; the printed constants are the same
+ * numbers and the walk is identical move for move. Nothing here changed for it, and that is the proof rather than a
+ * side effect — see `raster-origin-hoist-1526`.
+ *
  * A form declares which frame its constant is measured in: `AX` is ABSOLUTE (its `c` is the coordinate) and `AXX`/
  * `AXY` are ANCHORED (its `c` is the offset from the frame's own origin, and on a live frame the origin word joins
  * its terms). On a build-time frame the two are the same function — `AXX` IS `AX`, same arguments, same arithmetic —

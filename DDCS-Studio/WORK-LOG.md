@@ -14679,3 +14679,162 @@ the declaration. It also reports `deepened` so a caller can tell the allowance f
   blast radius both directions · the allowance probe · the scope contract driven through a real StepDown).
 - Family risk surface **161/0** (1406 · 1418 · 1483 · 1490 · 1500 · 1329 · 1496 · 1498 · 1440 · 1524).
 - Full suite: recorded in the pass-back.
+
+---
+
+## t1526 — THE PACKED ROTATED SLOT'S MOVE WORDS COLLAPSE: the live origin is READ ONCE. And a first cut MOVED THE TOOL 5mm.
+
+The act t1514 named and did not take, in its own words: *"the packed rotated move words are LONG — the live origin
+expression appears twice per word… hoisting the live origin into two scratch registers would collapse every word;
+that is a register-allocation act with its own band and collision-guard work."* Taken here. **PAID** is marked in
+`slotCapabilityArc`'s bands row, `holecycle`'s occupancy map and `affineFrame`'s header.
+
+### MEASURED FIRST, as dispatched — the t1514 angled config (A(5,10)→B(45,33), bearing 29.899°)
+
+| the ATOM BODY | before | after | |
+|---|---|---|---|
+| move words | 10 | 10 | the geometry does not move |
+| characters in those words | 1233 | **548** | −55.6% |
+| average move word | 123.3 | 54.8 | −68.5 chars |
+| longest single word | 175 | **84** | −52% |
+| multiplies in the move words | 60 | **30** | −50% (6.0 → 3.0 per word) |
+| whole body, comments stripped | 2221 | 1503 | −32.3% |
+| multiplies in the whole body | 69 | 37 | −46.4% |
+| lines | 54 | 56 | +2, the hoist |
+| **moves that shrink** | | **10 of 10** | every move word |
+
+(The screenshot's chips are the WHOLE MACRO — 2830 → 2112 chars, 88 → 90 lines — a different denominator, stated as
+such in both files so the two cannot read as a disagreement.)
+
+⚠ **AND THE DISPATCH'S "TWICE PER WORD" IS RIGHT IN SPIRIT AND NOT IN SHAPE, which is why measuring came first.** The
+X word carries the X origin at coefficient 1 AND the Y origin at the cross coefficient; the Y word carries only the Y
+origin (the X origin's two contributions — the generic mix's `+s` and `[I − R]`'s `−s` — CANCEL exactly). The row seed
+`#47` and its far-wall clamp carry the Y origin four more times. Twenty-two occurrences of two 48-character
+expressions across the body; the hoist leaves **one each**, which is the rule PROOF 2 pins.
+
+### THE SHAPE: a substitution at the frame's INPUT, so the printer is untouched
+
+`affineFrame` never looks inside the origin word — it is an opaque operand to `ORG` and `pivotBack` — so the hoist is
+done entirely on the caller's side: `surfaceraster` computes the origin word as it always did, assigns it to a
+register, and hands `affineFrame` `#62` where it used to hand the expression. **Zero lines of the shared printer
+changed**, which is what makes "pure factoring" a property of the construction rather than a claim to be argued (and
+it keeps the drill family, which shares that printer, provably out of the blast radius).
+
+### THE BAND QUESTION — the answer is that the act needs NO new register
+
+`RASTER_SCRATCH` has declared **#62-#64** since t1355 for the skim frame, and the meaning is the same one: *where
+this body's frame origin is*. So the pair is renamed `SKIM_FRAME` → `FRAME_ORIGIN` with both claimants written down —
+skim READS it from #790/#791/#792 behind a sentinel, a rotated live-geometry frame COMPUTES it from the pendant
+knobs — and the band, the allocator and `bandsFor('slot')` are all unchanged. That matters beyond tidiness:
+`SLOT_ARC_BAND` records that the #34-#49 block has no adjacent room, so an act that needed a 51st register would not
+have been this act.
+
+⚠ **THE NO-COLLISION ARGUMENT IS STRUCTURAL, NOT A REFUSAL.** I did not want it resting on "skim + live geometry is
+refused", because a later act can lift a refusal. It rests on the hoist's own rule instead: **only a COMPOUND word is
+hoisted, a bare register is its own hoist** — and a skim frame's origin word already IS `#62`. So the hoist can never
+write a register the frame is already reading, whatever the envelope decides later. That one rule also delivers the
+un-rotated byte-identity and leaves a `#20`-verbatim live frame alone.
+
+Swept both arms as t1512 did: no field var of the packed OR the literal arm lands in the raster band at varOffset
+0/10/25/33/60; `fieldVarCollisions` SEES a field var placed on #62 or #63; `nextLocalVar` steps 62/63/64 → 65 and
+leaves **#61 unmoved** (the probe temps are not a slot's band — the step-over is this band, not a blanket).
+
+### ⚠ THE DEFECT MY FIRST CUT SHIPPED INTO THE PROOF, AND IT MOVED THE TOOL
+
+The first rule was "hoist any word that is not already one register". At a **cardinal** bearing one axis folds to a
+plain NUMBER — at 180° the X origin is `5`, because the width term's coefficient rounds to zero — so it emitted
+`#62=5` and turned a **build-time constant into a live word**. `affineFrame`'s `ORG` then moved it out of the axis
+constant and into the terms, and the walk came out **5.000mm across**: clean G-code cutting a channel beside the drawn
+one. Caught by the numeric identity, at bearing 180, on the first run of it — not by reading the code.
+
+The fix is that an axis is hoistable only if it is **itself live** (`.live`, which `geoSum`/`geoMix` set false ONLY
+when they folded the whole axis to a number — so it is the predicate and not a proxy for it). PROOF 4 asserts the
+cardinals hoist exactly ONE axis, that no origin register is ever assigned a bare numeral, and that the walk still
+agrees with the fully baked rendering. Same class as the dead-multiply points `geoMix` and `slotRasterParams` each
+record for their own zero coefficients — reached from a third direction, so it is now tested for from that direction.
+
+### THE PROOFS (`raster-origin-hoist-1526`, 7/7)
+
+1. **PURE FACTORING, EXACT.** The hoist is REVERSED textually — each register substituted back into every word that
+   reads it, the assignment removed — and both walks evaluated with the pendant registers seeded. 288 configs (72
+   bearings × 2 entries × 2 directions), 11 moves each: worst |Δ| **0**. Not a tolerance: every other bridge in this
+   family carries one because the two sides round differently, and here they are the same expression with a name in
+   front of part of it. The spec also asserts the substitution really happened, so "identity" cannot be two copies of
+   one text.
+   ⚠ **The inverse was checked against the REAL previous emit**: the generated "before" is character-for-character
+   what `git show HEAD:` of this arm emitted for this op (run in node against a checkout, which a browser spec cannot
+   import — same limitation and same answer as t1514 PROOF 7).
+2. **THE PAYOFF AS A RULE, then as numbers.** Each origin expression appears EXACTLY ONCE in the whole body, and
+   every move word carries a frame-origin register — re-inline the origin and this fails whatever the counts are.
+   The measured numbers sit beside it as a ratchet.
+3. **BEARING 0 EMITS NOTHING** — no hoist, and its body never mentions #62/#63 at all; every other bearing hoists.
+   Both directions, because "it does not fire" and "it fires only where it should" are different claims.
+4. **THE CARDINAL/NUMERIC GUARD** — above.
+5. **THE BAND** — above.
+6. **SKIM UNTOUCHED** — four skim configs (plain · live geometry · rotated · live+rotated) still read #790/#791/#792
+   behind three sentinels, hoist nothing, and still refuse to absorb a rotation in their own words.
+7. **@work, DIFFERENCED.** Declared and executed each grow by exactly **2**; an inset-free body is still EXACT
+   (559 = 559). The header term reads `rasterOriginFrame(p).hoist.length`, the same derivation the emitter uses, so
+   the declaration cannot claim a hoist the body does not emit.
+
+### THE EXTRACTION that made @work possible without a second copy
+
+`surfaceRasterWorkSteps` needs to know whether two assignments execute, and re-deriving the origin there would have
+been a second copy of the mix (`geoMix` at a bearing, `geoSum` without one) — the divergence this file spends its
+comments closing. So the derivation moved OUT of `surfaceRasterLines` into `rasterOriginFrame(p)` and both read it.
+Pure move: same terms, same order, and the 15,552-config identity sweep is what says so.
+
+### ⚠ A PRE-EXISTING UNDER-DECLARATION FOUND WHILE MEASURING @work — NAMED AND PINNED, NOT FIXED
+
+A body with a **non-zero inset** executes four statements the work model does not count: t1404's two `IF <span> <= 0`
+header guards plus the `GOTO`/label pair that skips their refusal. Measured with no hoist anywhere near it —
+`inset 0` declares 559 against an executed 559 (exact, which t1440's calibration asserts and still does), while the
+same body at `inset 3` declares **520 against an executed 524**.
+
+It is on the **wrong side** (under-declaring truncates a preview — the defect t1383 exists to prevent), it has been
+there since t1404, and t1440's audit missed it because its whole matrix runs at `inset: 0`. It is **not this act's**:
+closing it moves `ring-descent-1404`'s "an inset declares exactly what the equivalent bare rect declares" — a claim
+about the AREA that would become `+ 4` — which is a decision about a different declaration. So PROOF 7 PINS it at its
+measured value in both directions (`real − declared === 4` with the hoist and without), which proves this act neither
+caused it nor widened it, and means the day it is closed the test says so. **Flagged for dispatch.**
+
+### THE RESTATEMENTS (nothing deleted — the frozen-kernel pattern)
+
+- `slot-live-frame-rotation-1514` **PROOF 1**'s origin pin asserted the width register's expression inside the move
+  word. The CLAIM is unchanged — this walk carries the origin LIVE rather than folded to a constant — and the hoist
+  splits it across two lines, so it is asserted at BOTH ends. Strictly stronger: a `#62` in a word with no assignment
+  behind it is a DARK register (the tool moving to whatever it happened to hold), and the old pin could not have
+  caught that.
+- **PROOF 5**'s cross-term check pattern-matched the knob register inside both axis words. It is a **forward dataflow
+  closure** now (knob → scratch → … → the word), which is the same claim on the emit that actually exists. Two
+  assertions added so the closure alone cannot weaken it: the **Y-origin register rides the X word** (that IS the
+  `[I − R]` cross-term — half-apply the rotation and it is the term that disappears), and both hoisted origins are
+  computed FROM live knobs.
+- `slot-live-frame-shots-1514`'s macro-head caption said every word carries "the live origin expression". Reworded
+  and pointed at the new shot.
+- `holecycle`'s occupancy map and `slotCapabilityArc.bands` — both said "#62-#64 surfaceraster's skim frame", which
+  is what a future act reads to decide what is free.
+
+### GATES
+
+- New `raster-origin-hoist-1526` **7/7** and `raster-origin-hoist-shots-1526` **1/1**.
+- Identity sweep in node against a `git archive HEAD` checkout: **15,552** configs over the atom's option matrix
+  (strategy × direction × entry × rowAxis × rowAnchor × zMode × rotation × bearing × pivot × inset × live/baked) —
+  13,824 identical, 1,728 moved, and **moved &rArr; hoisted and back exactly** (0 moved without hoisting, 0 hoisted
+  without moving). Packed arm over 72 bearings: bearing 0 byte-identical, all 71 rotated bearings hoist and move.
+- Family risk surface (slot/raster/surfac/pocket/cam/rotat/drill/wallfinish/work/scratch — 113 spec files):
+  **576 passed · 0 failed.**
+- SCREENSHOTS in `verification/t1526-origin-hoist/`: the macro head **before → after** side by side with the
+  measurement on it, and the WALKED SIM of the hoisted macro against the slot AS DRAWN (31 segments, 24 cutting —
+  the same trace t1514 shot, which is the point).
+
+### PROCESS
+
+- ⚠ **MY OWN SWEEP'S FIRST RULE WAS WRONG TWICE, and both were the instrument rather than the code.** It detected the
+  hoist with `/^#6[23]=/`, which the SKIM preamble also matches — so 7,776 configs read as "hoisted but unchanged".
+  And it asserted that a CARDINAL pack must not move, on the assumption that cardinal means unrotated. It does not:
+  only bearing 0 is unrotated, and 90/180/270 are rotations whose origin still rides every word. Both fixed before
+  any conclusion was drawn from them; a harness that measures its own regex is the t1512/t1514 lesson, twice.
+- ⚠ Two verification PNGs under `t1512-cam-pack/` were **already dirty in the working tree when this turn started**
+  (they are in the session-start `git status`, before any edit of mine). t1512's shots are bearing-0, which this act
+  leaves byte-identical, so they are not this act's output. Restored to HEAD rather than swept into this commit.

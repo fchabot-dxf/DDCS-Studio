@@ -53,7 +53,8 @@ import { toolFitRefusal, refusalLines } from './toolFit.js';   // t1444 — the 
  * inside it the free runs are small. What is taken, and by whom:
  *
  *     #20–#33  the mill kit (millToSlot + camMacroKit's raster)      #50–#61  probeToSlot's results/temps
- *     #34–#49  surfaceraster                                        #62–#64  surfaceraster's skim frame
+ *     #34–#49  surfaceraster                                        #62–#64  surfaceraster's FRAME ORIGIN (t1526:
+ *                                                                           the skim read AND the hoisted live one)
  *     #70–#74  wcsBase / alignment span / writeAxis                 #79–#80  corner + alignment temps
  *     #90–#97  probeToSlot's signs and targets (camScratch)          #95  saferetract's saved machine Z (inside it)
  *     #99      the G53 staging var

@@ -85,7 +85,8 @@ test('SHOTS — an ANGLED wide slot, packed, and the path it really walks', asyn
             : /^\s*G[01] |^\s*G0 /.test(l) ? '#7fd1a0' : /^#\d+=/.test(l.trim()) ? '#9ec5ff' : '#dfe6ef';
         w.innerHTML = `<h2 style="margin:0 0 4px">${esc(m.name)} — the packed ANGLED macro (t1514)</h2>
             <div style="color:#8b98a9;margin-bottom:14px">${lines.length} lines. Blue = register assignment · green = motion · amber = guard/flow · grey = comment.
-            Every motion word now carries CROSS-TERMS: the live origin expression and the row register, each multiplied by a BUILD-TIME cosine.</div>
+            Every motion word carries CROSS-TERMS: the frame-origin registers and the row register, each multiplied by a BUILD-TIME cosine.
+            <b>t1526:</b> the origin is READ ONCE into #62/#63 at the top — it used to ride every word as a full expression (see verification/t1526-origin-hoist/1-macro-head-before-after.png).</div>
             <pre style="margin:0;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre">${lines.map((l) => `<span style="color:${colour(l)}">${esc(l) || ' '}</span>`).join('\n')}</pre>`;
         window.scrollTo(0, 0);
     }, macro);

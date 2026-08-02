@@ -83,7 +83,7 @@ test('PROOF 1 — the rotated LIVE walk is the BAKED walk, move for move, at eve
         const { walk } = Function(instrument + 'return { walk };')();
         const seed = {};
         for (const k of Object.keys(SLOT_CAM_PACK_REGS)) seed[SLOT_CAM_PACK_REGS[k]] = op[k];
-        let worst = 0, refused = 0, tested = 0, sample = null, moves = 0, worstAt = null, dead = null;
+        let worst = 0, refused = 0, tested = 0, sample = null, moves = 0, worstAt = null, dead = null, hoist = [];
         for (let deg = 0; deg < 360; deg += 5) {
             const rad = deg * Math.PI / 180;
             const leaf = { x0: op.ax, y0: op.ay, x1: op.ax + 40 * Math.cos(rad), y1: op.ay + 40 * Math.sin(rad),
@@ -109,9 +109,9 @@ test('PROOF 1 — the rotated LIVE walk is the BAKED walk, move for move, at eve
                 const d = Math.abs(B[i][ax] - L[i][ax]);
                 if (d > worst) { worst = d; worstAt = [deg, i, ax]; }
             }
-            if (deg === 30) sample = L.find((m) => m.x != null).line;
+            if (deg === 30) { sample = L.find((m) => m.x != null).line; hoist = liveText.split('\n').filter((l) => /^#6[23]=/.test(l)); }
         }
-        return { worst, tested, refused, moves, sample, worstAt, dead };
+        return { worst, tested, refused, moves, sample, worstAt, dead, hoist };
     }, { op: OP, instrument: INSTRUMENT });
     expect(r.lengthMismatch, 'both renderings emit the same number of moves').toBeUndefined();
     expect(r.wordMismatch, 'and the same axis words are present on each').toBeUndefined();
@@ -122,7 +122,17 @@ test('PROOF 1 — the rotated LIVE walk is the BAKED walk, move for move, at eve
     expect(r.dead, `no dead multiply anywhere in the sweep — a cardinal bearing must not print a 0.000000 coefficient (${JSON.stringify(r.dead)})`).toBe(null);
     // …and the live word really carries the CROSS-TERMS: register operands multiplied by baked constants
     expect(r.sample, 'the rotated live X word mixes the row register in').toMatch(/#47 \* 0\.\d{6}/);
-    expect(r.sample, '…and carries the origin as an EXPRESSION, not a folded constant').toMatch(/\[#1\/2\]/);
+    /**
+     * ⚠ t1526 — THE ORIGIN PIN MOVED WITH THE ORIGIN, and the claim it makes is UNCHANGED: this walk carries the
+     * origin LIVE, as an expression of the pendant knobs, rather than folded to a build-time constant. The hoist
+     * splits that across two lines instead of repeating it in every word — so it is asserted at BOTH ends, which is
+     * strictly stronger than the single pattern it replaces. A `#62` in a move word with no assignment behind it
+     * would be a DARK register (the tool moving to wherever that register happened to hold), and the old pin could
+     * not have caught that; this one fails on it.
+     */
+    expect(r.sample, '…and carries the origin as the frame-origin REGISTER').toMatch(/#6[23]\b/);
+    expect(r.hoist.length, 'both axes of the angled origin are hoisted').toBe(2);
+    expect(r.hoist.join('\n'), '…and the hoist is where the EXPRESSION went — the knobs, not a folded constant').toMatch(/\[#1\/2\]/);
 });
 
 /**
@@ -288,11 +298,32 @@ test('PROOF 5 — every live knob reaches the motion, and the geometry knobs rea
         const cut = lines.filter((l) => /^\s*G1 .*X.*Y/.test(l)).map((l) => l.replace(/\s*\(.*$/, ''));
         const byKey = {};
         for (const f of live) byKey[f.key] = f.var;
-        const inBoth = (v) => cut.some((l) => String(wordAt(l, 'X')).includes(v) && String(wordAt(l, 'Y')).includes(v));
+        /**
+         * ⚠ t1526 — THE CROSS-TERM CHECK IS A **FORWARD DATAFLOW** NOW, not a substring of the word. The origin
+         * hoist puts the knobs' contribution in `#62`/`#63` and the word then carries the register, so looking for
+         * `#1` inside the X word measured the un-hoisted TEXT rather than the thing the proof is about — whether
+         * dialling the knob moves BOTH axes. So the knob is closed FORWARDS through the assignments (knob →
+         * scratch → … → the word), which is the same claim on the dataflow the emit actually has.
+         */
+        const assignedFrom = (v) => { const s = new Set([v]);
+            for (let pass = 0; pass < 12; pass++) for (const l of lines) {
+                const m = String(l).replace(/\s*\(.*$/, '').match(/^\s*(#\d+)\s*=\s*(.+)$/);
+                if (m && regs(m[2]).some((x) => s.has(x))) s.add(m[1]);
+            }
+            return s; };
+        const inBoth = (v) => { const s = assignedFrom(v);
+            return cut.some((l) => regs(wordAt(l, 'X')).some((x) => s.has(x)) && regs(wordAt(l, 'Y')).some((x) => s.has(x))); };
+        // …and the MECHANISM the forward closure alone would not pin: the Y origin appearing in the X word IS the
+        // `[I − R]` cross-term. Half-apply the rotation and this is the term that disappears.
+        const ORG = { x: '#62', y: '#63' };
+        const hoistLines = lines.filter((l) => /^#6[23]=/.test(l));
         return {
             dark: live.filter((f) => !seed.has(f.var)).map((f) => f.key),
             liveKeys: live.map((f) => f.key),
             crossX: ['width', 'toolDia'].map((k) => [k, inBoth(byKey[k])]),
+            originCross: cut.some((l) => String(wordAt(l, 'X')).includes(ORG.y)),
+            hoistFromKnobs: hoistLines.length === 2
+                && hoistLines.every((l) => regs(l.split('=')[1].replace(/\s*\(.*$/, '')).some((x) => Object.values(byKey).includes(x))),
             cutMoves: cut.length,
         };
     }, { op: OP, instrument: INSTRUMENT });
@@ -301,6 +332,9 @@ test('PROOF 5 — every live knob reaches the motion, and the geometry knobs rea
     expect(r.cutMoves, 'the angled walk really writes both axis words on its cutting moves').toBeGreaterThan(0);
     // ⚠ the rotation-specific half: a geometry knob must move BOTH axes, or the tool half-moved
     expect(r.crossX, 'width and toolØ reach the X AND the Y word of a cutting move — the cross-terms').toEqual([['width', true], ['toolDia', true]]);
+    // t1526 — and the two halves the forward closure cannot see on its own
+    expect(r.originCross, 'the Y-origin register rides the X word — the [I − R] cross-term survived the hoist').toBe(true);
+    expect(r.hoistFromKnobs, 'both hoisted origins are computed FROM live knobs, so neither is a dark register').toBe(true);
 });
 
 /**

@@ -321,9 +321,29 @@ export const RASTER_SCRATCH = [[34, 49], [62, 64]];
  * the G-code FORM of every cutting move, where a controller that mis-executes it does so with the tool down.
  * A bad read is detectable; a mis-executed cutting form is not. Gate 1 (safety) decides, and it decides for the WCS.
  */
-const SKIM_FRAME = { x: '#62', y: '#63', z: '#64' };
+/**
+ * ── t1526 — THE FRAME'S ORIGIN REGISTERS, WITH **TWO** CLAIMANTS THAT CANNOT COLLIDE ────────────────────────────────
+ *
+ * This pair was `SKIM_FRAME` while skim was the only way a frame could be live. It is renamed for what it MEANS —
+ * where this body's frame origin is — because the origin hoist below writes the same pair in a program that never
+ * skims, and a constant called SKIM_FRAME appearing in a packed slot is the wrong-name defect class this file keeps
+ * closing. Same numbers, same band (`RASTER_SCRATCH` already declares #62-#64), so nothing moves and no allocator
+ * question opens: the act needs NO new register.
+ *
+ *   SKIM               reads it from the machine (#790/#791/#792), at the top, behind a sentinel.
+ *   A ROTATED LIVE     computes it from the pendant knobs, once, before the walk (`rasterOriginFrame`).
+ *   GEOMETRY FRAME
+ *
+ * ⚠ THE TWO CANNOT COLLIDE, and the argument is STRUCTURAL rather than a refusal that could be lifted later. On a
+ * skim frame the origin word already IS `#62` — a bare register — and the hoist's rule is that it only ever hoists a
+ * COMPOUND word (a bare register is its own hoist). So the hoist can never write a register the frame is already
+ * reading, whatever the envelope decides about skim + live geometry in future.
+ */
+const FRAME_ORIGIN = { x: '#62', y: '#63', z: '#64' };
 const FRAME_SRC = { x: '#790', y: '#791', z: '#792' };
 const FRAME_SENTINEL = '-99999';
+/** A word that is ALREADY one register — nothing to hoist, and the structural half of the no-collision argument. */
+const BARE_REG = /^#\d+$/;
 
 /**
  * t1375 — WHEN THIS ATOM CAN ABSORB A DECLARED PROGRAM ROTATION, and the REASON when it cannot.
@@ -370,6 +390,77 @@ export function surfaceRasterAbsorbsRotation(p = {}) {
             + 'about the part datum would mix two frames (the literal skim path is G91 and was never rotated either)';
     }
     return true;
+}
+
+/**
+ * ── t1526 — WHERE THIS BODY'S FRAME ORIGIN IS, AND HOW IT IS PRINTED. One derivation, three readers ─────────────────
+ *
+ * The origin was derived inline in `surfaceRasterLines` and nowhere else, which was right while nothing else needed
+ * it. The hoist gives it a SECOND reader — `surfaceRasterWorkSteps`, which has to know whether two assignment lines
+ * execute — and a third, the specs that assert the band. Re-deriving it there would be three copies of the mix
+ * (`geoMix` at the bearing, `geoSum` without one) and the divergence this file spends its comments closing, so it is
+ * extracted rather than restated. Pure: same inputs, same terms, in the same order the body computed them.
+ *
+ * ── THE HOIST, and it is a pure FACTORING of a constant subexpression ──────────────────────────────────────────────
+ *
+ * On a rotated LIVE frame the origin is the pivot, so `affineFrame` prints it in EVERY move word — its own axis at
+ * coefficient 1 and, through `[I − R]`, the OTHER axis's origin beside it. Measured on the t1514 angled slot: ten
+ * move words carrying 1233 characters and 60 multiplies, the longest word 175 characters, with the same two 48-
+ * character origin expressions repeated 22 times across the body. An operator reads those at the pendant and the
+ * controller re-evaluates them on every move.
+ *
+ * The origin's contribution is CONSTANT for the whole program — the pendant knobs behind it are read into their
+ * registers before the body starts and nothing writes them mid-run — so it is computed ONCE into the frame's own
+ * registers and every word then carries the register in place of the expression. Nothing about the geometry moves:
+ * `affineFrame` never looks inside the origin word (it is an opaque operand to `ORG`/`pivotBack`), so substituting
+ * `#62` for the expression it stood for is a factoring the printer cannot tell apart, which is why the proof is a
+ * numeric identity move-for-move rather than an argument.
+ *
+ * ⚠ IT HOISTS A **COMPOUND** WORD ONLY, and that rule does three jobs at once. A bare register is its own hoist, so
+ * (1) an un-rotated pack emits nothing at all — no rotation, no cross-terms, no reason, and two dead assignments in
+ * every straight slot would be the quiet cost nobody asked for; (2) a SKIM frame — whose origin word already IS
+ * `#62` — can never have that register overwritten, which is the structural no-collision argument stated at
+ * `FRAME_ORIGIN`; and (3) a live-geometry frame with no inset and no mix (`#20` verbatim) stays exactly as it was.
+ */
+function rasterOriginFrame(p = {}) {
+    const insetW = rasterInsetAxes(p);
+    const iXT = geoTerm(insetW.x, 0, 0), iYT = geoTerm(insetW.y, 0, 0);
+    const xT = geoTerm(p.x, 0), yT = geoTerm(p.y, 0);
+    const bearingA = rasterBearingOf(p);
+    const liveOrigin = (xT.live || yT.live || iXT.live || iYT.live);
+    const OMIX = (bearingA && liveOrigin) ? Math.cos(bearingA * Math.PI / 180) : 1;
+    const OMIS = (bearingA && liveOrigin) ? Math.sin(bearingA * Math.PI / 180) : 0;
+    const oxT = (bearingA && liveOrigin) ? geoMix(xT, iXT, OMIX, iYT, -OMIS) : geoSum(xT, iXT);
+    const oyT = (bearingA && liveOrigin) ? geoMix(yT, iXT, OMIS, iYT, OMIX) : geoSum(yT, iYT);
+    const liveOrg = oxT.live || oyT.live;   // the composite's translation is a build-time fold; a live origin has none
+    const skim = String(p.zMode || '') === 'skim';
+    const liveFrame = skim || liveOrg;
+    const xW0 = skim ? FRAME_ORIGIN.x : oxT.w;
+    const yW0 = skim ? FRAME_ORIGIN.y : oyT.w;
+    // the frame turns AND its origin is live — the only shape in which the origin rides every word
+    const turns = liveOrg && !!(bearingA || num(p.rotAngle, 0)) && surfaceRasterAbsorbsRotation(p) === true;
+    /**
+     * ⚠ AN AXIS IS HOISTABLE ONLY IF IT IS ITSELF **LIVE**, and the first cut of this tested only "not already one
+     * register", which is not the same thing and MOVED THE TOOL. `liveOrg` is either axis; at a cardinal bearing the
+     * OTHER axis folds to a plain number (bearing 180: the X origin is `5`, because the width term's coefficient
+     * rounds to zero). Hoisting that emitted `#62=5` and made a BUILD-TIME CONSTANT into a live word — whereupon
+     * `affineFrame`'s `ORG` moved it out of the axis constant and into the terms, and the walk came out 5mm across:
+     * clean G-code, a channel beside the drawn one. Measured at 5.000mm on the 180° pack by the numeric identity
+     * below, not by reading the code. It is the same correctness point `slotRasterParams` and `geoMix` each record
+     * for their own zero coefficients — a register standing where a build-time constant belongs — reached from a
+     * third direction, so it is tested for in both directions here.
+     *
+     * `.live` is exactly the right predicate and not a proxy: `geoSum`/`geoMix` return `live: false` ONLY when they
+     * folded the whole axis to a number, so a non-live term's word is always a plain numeral.
+     */
+    const hoistable = (t, w) => t.live && !BARE_REG.test(w);
+    const hoist = !turns ? [] : [
+        ...(hoistable(oxT, xW0) ? [{ reg: FRAME_ORIGIN.x, word: xW0, axis: 'X' }] : []),
+        ...(hoistable(oyT, yW0) ? [{ reg: FRAME_ORIGIN.y, word: yW0, axis: 'Y' }] : []),
+    ];
+    const hoisted = (axis, w) => (hoist.find((h) => h.axis === axis) || { reg: w }).reg;
+    return { insetW, iXT, iYT, xT, yT, bearingA, oxT, oyT, liveOrg, liveFrame, skim,
+             hoist, xW: hoisted('X', xW0), yW: hoisted('Y', yW0) };
 }
 
 /**
@@ -569,7 +660,20 @@ export function surfaceRasterWorkSteps(p = {}) {
         // 307 against executed 308 — UNDER by one, which is the side that TRUNCATES a preview, so it could not be
         // left to the 4× margin to absorb. 7 makes it exact again, which is what that spec asserts for plunge/ramp.
         : entry === 'ramp' ? 7 : 0;
-    return 16 + levels * (PER_LEVEL + descent + passes * PER_PASS);
+    /**
+     * ── t1526 — THE HEADER IS 16 PLUS THE ORIGIN HOIST, and it is DIFFERENCED rather than reasoned ────────────────
+     *
+     * A hoisted origin adds one assignment per hoisted axis at the top of the header — executed once, before the
+     * depth loop, so it lands on the header term and nowhere else. It is read from `rasterOriginFrame`, the same
+     * derivation the emitter uses, so this cannot declare a hoist the body does not emit.
+     *
+     * ⚠ IT IS ALSO THE NARROWEST REACHABLE TERM IN THIS FUNCTION, and that is worth naming rather than leaving to be
+     * rediscovered: the marker is OMITTED whenever the area, depth, tool or either inset is live, and the packed CAM
+     * slot — the only shipped caller that hoists — makes all of them live. So the config this term is FOR is a live
+     * ORIGIN with everything else typed, which the atom's envelope permits and no wizard builds today. Declared to
+     * the rule rather than to the caller list, exactly as the live-input check above it is.
+     */
+    return 16 + rasterOriginFrame(p).hoist.length + levels * (PER_LEVEL + descent + passes * PER_PASS);
 }
 
 export function surfaceRasterLines(p = {}) {
@@ -606,9 +710,10 @@ export function surfaceRasterLines(p = {}) {
      * `rasterInsetAxes` hands the SAME word to both axes, so `iXT` and `iYT` are the same term and every expression
      * below folds exactly as it did. That is the design's own stay-clause, and the identity sweep asserts it.
      */
-    const insetW = rasterInsetAxes(p);
-    const iXT = geoTerm(insetW.x, 0, 0), iYT = geoTerm(insetW.y, 0, 0);
-    const xT = geoTerm(p.x, 0), yT = geoTerm(p.y, 0);
+    // t1526 — the inset pair, the op's origin and the frame they make are ONE derivation now (`rasterOriginFrame`),
+    // because the work declaration reads it too. Same terms, same order; the body just stopped being their only home.
+    const ORIGIN = rasterOriginFrame(p);
+    const { insetW, iXT, iYT, xT, yT } = ORIGIN;
     const wT0 = geoTerm(p.w, 100), hT0 = geoTerm(p.h, 80);
     const toolT = geoTerm(p.toolDia, 12, 0.1);
     // the WALKED rect: the declared one held its own inset inside on each axis
@@ -691,12 +796,7 @@ export function surfaceRasterLines(p = {}) {
      * whole shipped corpus (every live-frame program built before this, all of them bearing 0) cannot take the mixed
      * path at all. The branch is on the bearing rather than on the arithmetic for exactly that reason.
      */
-    const bearingA = rasterBearingOf(p);
-    const liveOrigin = (xT.live || yT.live || iXT.live || iYT.live);
-    const OMIX = (bearingA && liveOrigin) ? Math.cos(bearingA * Math.PI / 180) : 1;
-    const OMIS = (bearingA && liveOrigin) ? Math.sin(bearingA * Math.PI / 180) : 0;
-    const oxT = (bearingA && liveOrigin) ? geoMix(xT, iXT, OMIX, iYT, -OMIS) : geoSum(xT, iXT);
-    const oyT = (bearingA && liveOrigin) ? geoMix(yT, iXT, OMIS, iYT, OMIX) : geoSum(yT, iYT);
+    const { bearingA, oxT, oyT } = ORIGIN;
     /**
      * ⚠ t1494 (C3) — THE BEARING SHIFT LANDS HERE, BEFORE `x0`/`y0` ARE BOUND, and that placement is the whole
      * correctness argument. The first cut shifted only the FRAME's origin and left the walks declaring their affine
@@ -718,7 +818,7 @@ export function surfaceRasterLines(p = {}) {
      * when the inset was typed, NaN when it was dialled — and nothing read it. The rotation reads it: it is the
      * build-time half of the pivot, and on a live axis there is none. Naming it 0 is what the frame already means.
      */
-    const liveOrg = oxT.live || oyT.live;   // the composite's translation is a build-time fold; a live origin has none
+    const { liveOrg } = ORIGIN;
     const x0 = liveOrg ? (oxT.live ? 0 : oxT.n) : oxT.n + BEAR.tx;
     const y0 = liveOrg ? (oyT.live ? 0 : oyT.n) : oyT.n + BEAR.ty;
     const z0 = num(p.z0, 0);
@@ -739,7 +839,7 @@ export function surfaceRasterLines(p = {}) {
      * ring inset and the rotation constants are the same numbers wherever the origin sits. That is what makes this a
      * substitution rather than a second emitter.
      */
-    const skim = String(p.zMode || '') === 'skim';
+    const { skim } = ORIGIN;
 
     /**
      * ── t1375 — THE PROGRAM ROTATION, ABSORBED ───────────────────────────────────────────────────────────────────
@@ -774,9 +874,14 @@ export function surfaceRasterLines(p = {}) {
      * skims), so it is recorded as a named pre-existing gap and REFUSED in the live-geometry envelope rather than
      * quietly changed here. Preserving it keeps proof 1 — the baked path byte-identical — an honest claim.
      */
-    const frameXW = skim ? SKIM_FRAME.x : oxT.w;
-    const frameYW = skim ? SKIM_FRAME.y : oyT.w;
-    const liveFrame = skim || oxT.live || oyT.live;
+    /**
+     * ⚠ t1526 — AND THESE TWO ARE THE **HOISTED** WORDS. On a rotated live frame `ORIGIN.xW` is `#62` rather than the
+     * expression it stands for, and `ORIGIN.hoist` carries the assignment that puts the expression there — emitted at
+     * the top of the header, once, before anything reads it. Everywhere else this is the word it always was.
+     */
+    const frameXW = ORIGIN.xW;
+    const frameYW = ORIGIN.yW;
+    const { liveFrame } = ORIGIN;
     /**
      * ── t1494 (C3) — THE BEARING AND THE PROGRAM ROTATION ARE **ONE** ROTATION, and here is why that is exact ─────
      *
@@ -807,7 +912,7 @@ export function surfaceRasterLines(p = {}) {
      */
     const liveRotA = bearingA || rotA;
     const { F, ax, ay, az, axE, ayE, azE, TM, AX, AXX, AXY, mv, rot } = affineFrame({
-        x0, y0, zTop, live: liveFrame ? { x: frameXW, y: frameYW, z: skim ? SKIM_FRAME.z : String(zTop) } : null,
+        x0, y0, zTop, live: liveFrame ? { x: frameXW, y: frameYW, z: skim ? FRAME_ORIGIN.z : String(zTop) } : null,
         rotAngle: liveOrg ? liveRotA : BEAR.angle,
         rotPivotX: liveOrg ? (bearingA ? 0 : num(p.rotPivotX, 0)) : BEAR.pivotX,
         rotPivotY: liveOrg ? (bearingA ? 0 : num(p.rotPivotY, 0)) : BEAR.pivotY,
@@ -850,15 +955,15 @@ export function surfaceRasterLines(p = {}) {
     // a value no axis can hold rather than a falsy test: the thing being detected is "the read did not happen".
     const preamble = !skim ? [] : [
         '( ---- SKIM: the frame is READ from the machine, never assumed ---- )',
-        `${SKIM_FRAME.x}=${FRAME_SENTINEL}   ( sentinel: no axis can be here, so an unread frame is visible )`,
-        `${SKIM_FRAME.y}=${FRAME_SENTINEL}`,
-        `${SKIM_FRAME.z}=${FRAME_SENTINEL}`,
-        `${SKIM_FRAME.x}=${FRAME_SRC.x}   ( live work X — wherever the operator jogged to )`,
-        `${SKIM_FRAME.y}=${FRAME_SRC.y}   ( live work Y )`,
-        `${SKIM_FRAME.z}=${FRAME_SRC.z}   ( live work Z — the touched surface )`,
-        `IF ${SKIM_FRAME.x} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}   ( no frame -> refuse, with the tool still up )`,
-        `IF ${SKIM_FRAME.y} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}`,
-        `IF ${SKIM_FRAME.z} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}`,
+        `${FRAME_ORIGIN.x}=${FRAME_SENTINEL}   ( sentinel: no axis can be here, so an unread frame is visible )`,
+        `${FRAME_ORIGIN.y}=${FRAME_SENTINEL}`,
+        `${FRAME_ORIGIN.z}=${FRAME_SENTINEL}`,
+        `${FRAME_ORIGIN.x}=${FRAME_SRC.x}   ( live work X — wherever the operator jogged to )`,
+        `${FRAME_ORIGIN.y}=${FRAME_SRC.y}   ( live work Y )`,
+        `${FRAME_ORIGIN.z}=${FRAME_SRC.z}   ( live work Z — the touched surface )`,
+        `IF ${FRAME_ORIGIN.x} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}   ( no frame -> refuse, with the tool still up )`,
+        `IF ${FRAME_ORIGIN.y} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}`,
+        `IF ${FRAME_ORIGIN.z} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}`,
         '',
     ];
     const refusal = !skim ? [] : [
@@ -881,6 +986,12 @@ export function surfaceRasterLines(p = {}) {
         // wizard produced it. Keyed on `inset > 0` so the surfacing path is untouched and asserted byte-identical.
         `( ---- ${insetOn ? 'AREA CLEARING' : 'SURFACING'}, parametric. Every var below speaks; change one and the loops re-derive.`
             + `${surfaceRasterWorkSteps(p) == null ? '' : ' · ' + workMarker(surfaceRasterWorkSteps(p))} ---- )`,
+        // ── t1526 — THE ORIGIN, READ ONCE. It goes FIRST, above the area seeds, because every line below it that
+        // names a coordinate reads it — the row seed `#47`, its far-wall clamp, and every move word. The knobs it is
+        // computed from (`#1`, `#2`, …) are already in their registers: the pack's field reads run before this body.
+        // The FIRST one carries the why and the rest are terse, which is this header's own convention (`area X`
+        // explains the inset, `area Y` is one word) — the sentence is about the pair, not about an axis.
+        ...ORIGIN.hoist.map((h, i) => `${h.reg}=${h.word}   ( frame origin ${h.axis}${i ? '' : ' — every move below turns about it, and nothing writes these knobs mid-program, so it is read once'} )`),
         `${V.w}=${wT.w}   ( area X — ${insetOn ? `the tool-CENTRE sweep, held ${insetHeld} inside the declared edge` : 'the tool-CENTRE sweep, so the tool overhangs the edge'} )`,
         `${V.h}=${hT.w}   ( area Y )`,
         // ── t1399 — THE TWO LIVE KNOBS, and the seed is a WORD-OR-NUMBER rather than a plain val() ─────────────────
