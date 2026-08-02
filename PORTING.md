@@ -20,7 +20,7 @@ round-trip · verify) before any fleet port — the corner-gated-pilot rule.
 
 ---
 
-## Status: S2–S4 BUILDING (t1534) · S1 DEPLOYED
+## Status: V4.1 OFFLINE ARC **CLOSED** (S1–S4) · DM500 stage 1 MEASURED · only S5 (human-gated) remains
 
 The scout's own stage plan, declared as data in `DDCS-Studio/web/data/portingArc.js` (the
 `slotCapabilityArc` shape) and pinned by `tests/porting-arc-scout-1530.spec.js` (9 factual claims,
@@ -31,11 +31,11 @@ all green) so the design cannot rot before it is built.
 | 0 | Kickoff scout | ✅ **landed** t1530 | Inverted the premise. 5 forks parked, all ruled at t1531. |
 | — | Design ruling | ✅ **landed** t1531 | See the ruling table below. |
 | S1 | **Corpus oracle** | ✅ **landed** t1532 · V2026.08.02.3 | The 91 factory `.nc` macros become oracles *read at runtime* — following `controller-import-one-door-1221`, which already does this for the settings corpus (the existence proof: it is a known shape, not a new mechanism). Pilot **WCS zero-at-current** (already reproduces `zeroxy.nc`/`zeroz.nc` byte-for-byte), then **corner** as second subject. Plus the residue census (below). |
-| S2 | Normalisation policy | 🔄 **building** (t1534) | Factory G-code is **unspaced**, Studio emits **spaced**. ✅ **SETTLED t1531 — V4.1 accepts spaced** (user-attested). The oracle still compares normalised (the corpus is unspaced, so normalisation is what makes comparison possible), but the delta is an **answered** row, not an open question. S5 confirms it for free. |
-| S3 | Caps completeness | 🔄 **building** (t1534) | 3 caps live outside `DEFAULT_CAPS`, confirmed **latent not live** (every consumer truthy-tests; zero `=== false` comparisons). |
-| S4 | Named unknowns | 🔄 **building** (t1534) | `readActiveWcs` / `hmiPrompt` / ATC tables — all fold to `[]` honestly today. |
+| S2 | Normalisation policy | ✅ **landed** t1534 | Factory G-code is **unspaced**, Studio emits **spaced**. ✅ **SETTLED t1531 — V4.1 accepts spaced** (user-attested). The oracle still compares normalised (the corpus is unspaced, so normalisation is what makes comparison possible), but the delta is an **answered** row, not an open question. S5 confirms it for free. |
+| S3 | Caps completeness | ✅ **landed** t1534 | 3 caps live outside `DEFAULT_CAPS`, confirmed **latent not live** (every consumer truthy-tests; zero `=== false` comparisons). |
+| S4 | Named unknowns | ✅ **landed** t1534 | `readActiveWcs` / `hmiPrompt` / ATC tables — all fold to `[]` honestly today. |
 | S5 | Live round-trip | ⏳ **human-gated** | Cannot be agent-scheduled — needs a human at the bench to press Start. The C3-is-last discipline. |
-| — | DM500 follows | ⏳ | Same S1–S4 stages. **Guard:** rows carry their evidence tier on their face, and DM500 does **not** enter `POST_VERIFIED` on offline agreement alone. |
+| — | DM500 stage 1 | ✅ **measured** t1536 · tier ruled t1537 | Same S1–S4 stages. **Guard:** rows carry their evidence tier on their face, and DM500 does **not** enter `POST_VERIFIED` on offline agreement alone. |
 | — | grbl-class | ⏳ | **UNROLL** — confirmed against caps: grbl has no `#vars` at all; grblHAL's O-word flow cannot stream. |
 
 ## The t1531 rulings
@@ -127,3 +127,52 @@ _(newest at the bottom: turn · release · what landed · gate result)_
   nothing imports. **Zero actual bypasses** — so "already ported" is now a claim that can go red.
   Scout `PREMISE 6` (asserting no factory oracle existed) went red the instant the oracle landed, exactly
   as designed, and was restated in the same act to name the oracle. Suite 2404/0; advisor gate 0 failed.
+
+- **t1534** — **V2026.08.02.4** — **S2 + S3 + S4, the V4.1 offline arc CLOSED.** `V41_ORACLE_NORMALISATIONS`
+  (built by reading what the oracle *actually* does — strip-CRLF, drop-blank-comment, collapse-whitespace,
+  each with its evidence tier; two candidate normalisations **refused** and kept as a named export),
+  `V41_NAMED_ABSENCES` (the `hmiPrompt` row corrected by reading the file rather than its name: it is
+  compiled GUI-builder C source, so the lift is narrower than "confirm the syntax"), and `DEFAULT_CAPS`
+  completed with `inputRead` / `atc` / `helicalArc`. Two drifted copies of the normaliser de-duplicated.
+  ⭐ **The seat corrected the advisor**: my amendment said default these to the Expert-full value (`true`);
+  measured, that flips 6 posts on `inputRead` and 4 on `atc` from `undefined` to `true` — a real behaviour
+  change that fails the neutrality test my own dispatch demanded. It shipped `false`, proved it, and
+  explicitly left the ruling to me. **Ruled t1537: `false` stands as correct design** — `DEFAULT_CAPS` now
+  holds two patterns, full-by-default for the original seven (Expert is the richest common case, lesser
+  posts opt out) and **safe-floor for rare/uncertain caps**, where an undeclared key means *nobody has
+  said* and the honest reading of that is not *yes*.
+- **t1536** — _no release (measurement only)_ — **DM500 stage 1.** `DM500_ORACLE_FINDINGS`, one row per
+  factory file, run against the dialect rather than reasoned from memory. See the ruling below.
+
+## The t1537 ruling — DM500's evidence tier
+
+**Measured (t1536), against the 8-file `install/` corpus — 2 of which are empty:**
+
+| Idiom | Result |
+|---|---|
+| probeMove · readMachine · ifGoto · dwell · spindleOff · label · goto · endProgram | ✅ **byte-exact after normalisation** — verified by *running* the dialect against corpus text (and `ifGoto` matches across *both* of the corpus's own inconsistent spacing styles) |
+| `setWorkOffset` | ⚠ **structural difference** — Studio's position-independent `[#dro-value]` form vs `defprobe.nc`'s precomputed-sum form. Same class as V4.1's corner finding, not a new problem |
+| `probe.nc`'s `#402/#403/#404` auto-datum triplet | **no Studio equivalent** (already scoped out in the dialect's own comment) |
+| `gotoz` · `safez` · `slib` — the M98-into-firmware-O-number canned-cycle library | **no Studio equivalent** — Studio computes inline (confirmed: zero `M98`/`O9xxx` references in `holecycle.js`) |
+| `m30.nc` · `null.nc` | **empty files** — named as unknowns, not guessed |
+
+**RULING — tier: `corpus-attested (thin)`. DM500 does NOT enter `POST_VERIFIED`.**
+
+The upgrade from the scout's *"likely parametric, unmeasured"* is real and earned: eight core idioms now
+reproduce **byte-exact against the factory's own macros**, which is a stronger claim than any amount of
+manual-reading. But three things bound it, and all three are visible above: the corpus is an **installer
+tree, not a live capture** (8 files vs V4.1's 91 and Expert's 335); **a quarter of it is empty**; and
+nothing here is hardware-confirmed. `POST_VERIFIED` is a promise to someone standing at a machine, and
+offline agreement — however exact — is not that promise. The guard from the t1531 ruling holds unchanged.
+
+### ⚠ Flagged for a future act, NOT taken here: the flow-cap may UNDER-declare
+
+`slib.nc` uses `WHILE`/`DO`/`END`, but the dialect declares `caps.flow: 'goto'`. So Studio could not
+reproduce that macro byte-for-byte even if it tried — and more importantly, **the factory itself
+demonstrates flow richer than we credit the controller with**. That is a caps *under*-declaration, which
+is the opposite of the over-claim the arc has been guarding against, and it is exactly the kind of thing
+that must not stay in prose.
+
+**Not changed here, deliberately**: raising a flow cap changes what Studio *emits* for DM500 — emit-class
+work with its own bridge, its own act, and a heavier seat. It is recorded as a declared finding with the
+evidence (`slib.nc`) named, so whoever picks up DM500 stage 2 starts from it.
