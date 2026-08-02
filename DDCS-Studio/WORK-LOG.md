@@ -15240,3 +15240,56 @@ loaded and passed cleanly, an unplanned but useful control confirming the isolat
 **Numbers, as required:** S3's two new claims fail 2/2 against pre-change; S3's four invariant-pinning tests are
 named as legitimately non-failing (0/4, by design, reasons stated above); S2's and S4's tests fail at the
 whole-file level (effectively all of their new assertions, since the exports they reference are wholly new).
+
+## t1536 — DM500 STAGE 1: factory corpus measured, MEASUREMENT ONLY
+
+**Dispatch (t1535, exact scope):** run the S1 oracle mechanism against the DM500 factory corpus — exactly 8 files
+at `bridge/controllers/dm500/install/`. Three deliverables named precisely (a new spec, `DM500_ORACLE_FINDINGS`
+with an exact 5-field shape, reuse `normaliseGcode`). Explicit DO-NOT: no verdict on DM500's evidence tier, no
+`POST_VERIFIED` change, no DM500 cap-value change, no verified/unverified declaration — that ruling is the
+advisor's on the measurements as reported. **Part 1 of the same dispatch, no code needed:** the advisor ruled
+S3's `inputRead`/`atc` true-vs-false conflict — `false` STANDS, ratified as the correct design (verified my counts
+independently), not merely as what happened to pass the acceptance test. Reasoning recorded on
+`PORTING_STAGES['caps-completeness'].landed`.
+
+**The measurement itself.** Read all 8 files and the full `ddcs-v3-dm500.js` dialect module before writing
+anything, then verified every byte-exact/differs claim by actually RUNNING the dialect functions against the
+corpus text (a small Node script), not reasoning from memory — the same discipline as t1532's V4.1 pilot. Result:
+`probeMove`, `readMachine`, `ifGoto` (both of the corpus's own inconsistent spacing styles — `probe.nc` unspaced,
+`defprobe.nc` spaced — collapse to the same normalised form), `dwell`, `spindleOff`, `label`, `goto`, `endProgram`
+are all byte-exact after normalisation. `setWorkOffset` differs structurally — Studio's `[#dro-value]`
+position-independent form vs the factory's precomputed-sum form with no DRO reference — the SAME class of
+difference as V4.1's corner-vs-probe-vertex finding at t1532, not a new class of problem. `probe.nc`'s
+`#402/#403/#404` "auto-datum" register triplet has no Studio equivalent at all — the dialect's own EXISTING
+comment already scoped this out correctly, confirmed rather than newly discovered. `gotoz.nc`/`safez.nc`/
+`slib.nc`'s canned-cycle library (M98 calls into firmware O-numbers) has no Studio equivalent — confirmed by
+grepping `holecycle.js` for zero M98/O9xxx references (Studio computes its own drill cycles inline). `slib.nc`
+also surfaces a genuine capability ceiling worth naming for a future act: its drill cycles use WHILE/DO/END, but
+the dialect declares `caps.flow: 'goto'` only — Studio could never reproduce one of these byte-for-byte even if it
+wanted to. `m30.nc`/`null.nc` are genuinely empty (0 bytes) — named as unknowns, not guessed at.
+
+**Two of my own assertions were wrong on the first spec run, both real bugs in my OWN test code, not the design.**
+A raw substring check (`toContain('G04 P0')`) failed against `probe.nc`'s lines, which carry trailing GBK-garbled
+comments fused with NO separating space (`G04P0;停0s...`) — fixed to compare normalised text. A raw multi-line
+containment check failed against `defprobe.nc` because the corpus files are CRLF and my literal string used `\n`
+— fixed by stripping `\r` before comparing. Both caught by running the spec, not by inspection.
+
+**Non-vacuity (standing policy, t1533 amendment 2), and a near-miss worth recording.** Backed up the working file,
+reverted `data/portingArc.js` to the commit immediately before this act, ran the new spec: **11/11 tests fail to
+even load** (`SyntaxError: does not provide an export named 'DM500_ORACLE_FINDINGS'`) — maximally strong evidence,
+since the whole export is new this act. Restoring afterward, I first ran `git checkout HEAD` out of habit instead
+of copying back the saved scratch file — since the DM500 work was still uncommitted at that point, HEAD did not
+contain it either, and the checkout briefly discarded my own uncommitted edits. Caught immediately (grep showed
+0 occurrences where there should have been 1) and corrected from the scratch backup before any further action —
+nothing was lost, but it's a real near-miss worth naming: reverting a file that has UNCOMMITTED changes needs the
+uncommitted copy restored, not `HEAD`, which only helps once the work is actually committed.
+
+**Verify:** all five porting specs together, 43/43 green (PREMISE 6 widened again, same self-red-ing pattern, to
+name a third factory-corpus reader). Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** The advisor is now gating per-release rather than per-act
+to save cost — this is parked staged on the branch for the advisor's own gate run to cover alongside whatever
+else lands before the next release.
+
+**Capacity:** comfortable — the DM500 measurement was smaller in scope than S1's V4.1 build, as expected from an
+8-file corpus vs 91. The restore near-miss cost a few minutes of attention but no rework.
