@@ -160,14 +160,15 @@ test('PREMISE 6 — the settings corpus AND the factory macro corpus are both wi
 
     // the factory MACRO corpus is now ALSO an oracle — v41-corpus-oracle-1532 diffs Studio's V4.1 emit against the
     // tracked .nc files directly (excluding expert-m350/verify/, Studio's own diagnostic macros, a different corpus).
-    // v41-caps-completeness-1534 (S2) reads the same corpus too, to keep the two REFUSED normalisations honest —
-    // a second, narrower reader, not a duplicate oracle
+    // v41-caps-completeness-1534 (S2) reads the same corpus too, to keep the two REFUSED normalisations honest — a
+    // second, narrower reader, not a duplicate oracle. dm500-corpus-oracle-1536 (t1536) is a THIRD, the same S1
+    // mechanism run against the (much thinner) DM500 corpus
     const readsFactoryMacro = readsCorpus.filter((f) => {
         const src = readFileSync(join(testsDir, f), 'utf8');
         return /['"][^'"]*\.nc['"]/.test(src) && !/expert-m350['",\s/\\]*verify/.test(src);
     });
-    expect(readsFactoryMacro.sort(), 'the two specs that now use the factory corpus as an oracle')
-        .toEqual(['v41-caps-completeness-1534.spec.js', 'v41-corpus-oracle-1532.spec.js']);
+    expect(readsFactoryMacro.sort(), 'the three specs that now use a factory corpus as an oracle')
+        .toEqual(['dm500-corpus-oracle-1536.spec.js', 'v41-caps-completeness-1534.spec.js', 'v41-corpus-oracle-1532.spec.js']);
 });
 
 /**
