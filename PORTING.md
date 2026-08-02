@@ -188,7 +188,7 @@ move) was connected over SMB. The kit ran; the user read the screen, and results
 | **Spaced G-code** | ✅ **bench-confirmed** | ran to completion — Studio's emit format is legal. Upgrades the t1531 user-attested row. |
 | **`SQRT`** | ✅ **works** | `[SQRT[9] * 100]` returned exactly **300** — computed, not merely parsed |
 | **Inverse trig** | ❌ **absent so far** | `ATAN` (both forms), `ATN`, `ATAN2`, `atan`, and `ACOS` as a control — all rejected, `Unrecognized file format` + line number |
-| **`IF`/`GOTO`** | ✅ works — **needs the space** | `IF #191==0GOTO1` branches; `IF#191==0GOTO1` **freezes the controller**, power-cycle only |
+| **`IF`/`GOTO`** | ✅ works — **Studio's emitted form is correct** | `IF #191==0GOTO1` branches. A hand-written test with the space missing (`IF#191==0GOTO1`) **froze the controller** — no error, no reset, power-cycle only. That is a hazard of the TARGET, not a defect in Studio: every dialect's `ifGoto` already emits the working form. |
 | **`WHILE`** | ⚠ **recognised, does not open a loop** | 4 variants; body runs once, then `The loop instruction WHILE is incomplete: L<n>[END1]` |
 | **`#a=#a+1`** | ✅ works | bare form, no brackets |
 | Error reporting | ✅ **names the offending line** | every failure — a good diagnostic surface for this target |
@@ -220,6 +220,17 @@ This is sibling evidence for the M350 and nothing stronger.
    untested entirely.
 
 `assets/community/FORUM-POST-macro-questions.md` carries both questions with reproducible cases.
+
+### ⚠ A false alarm, recorded because the correction matters
+
+The recording act first logged this as an **urgent defect in shipped emit** — that `ifGoto` produced
+the freezing unspaced form. It does not: every dialect's `ifGoto` template begins `IF ` with the
+space, and `ddcs-v41.js` renders exactly the form the bench proved works. The claim was inferred
+from the symptom without reading the emitter; one grep settled it. Corrected before it hardened.
+
+**The rule it re-teaches:** a defect claim about *shipped* code deserves the same evidence bar as a
+capability claim — arguably higher, because it triggers work. Measure the emitter, don't infer it
+from a failure whose cause was a hand-written test file.
 
 ### Process notes worth keeping
 
