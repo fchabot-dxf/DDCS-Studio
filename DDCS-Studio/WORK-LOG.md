@@ -15205,3 +15205,38 @@ including the amendment-driven rework (renaming/reshaping two exports mid-flight
   and cross-checked against the numbered-failure count (0). Released **V2026.08.02.4**. version-sync-1311 6/6 on
   this bump (the standing lesson, applied again). package.json zero diff — same Y.M.D, confirmed via `git diff`.
   On branch `scout/v41-porting-1530`, unpushed — the advisor's own gate governs the merge/deploy.
+
+## t1534 addendum — VACUOUSNESS PROOF (t1533 amendment 2, new standing requirement)
+
+**New requirement, absorbed after the release had already landed:** every new/changed test must be proven to FAIL
+against the pre-change tree, reported as a number, never argued. Ran this retroactively against t1534's own work,
+using `git checkout 84832a51 -- <path>` (the commit immediately before this act) on the two touched product files,
+one at a time, then restored both to HEAD (`git checkout HEAD -- <path>`) and reconfirmed 32/32 green before
+proceeding — the working tree never left a dirty/broken state between checks.
+
+**Isolation 1 — `wizards/dialects/index.js` reverted, `data/portingArc.js` kept at HEAD (isolates S3):**
+`porting-arc-scout-1530.spec.js` + `v41-caps-completeness-1534.spec.js` run together, 20 tests, **2 failed**:
+PREMISE 3 (restated) and "the completeness invariant" — both real, both new-this-act claims about `DEFAULT_CAPS`.
+The other 4 S3 tests in the new spec (behaviour-neutral proof, the real-consumer latency proof, the "had true been
+chosen" count, the POST_VERIFIED guard) **legitimately did not fail** — each pins a property that holds on BOTH
+sides of the change by construction: behaviour-neutrality is specifically testing that nothing broke (so it must
+hold before AND after), the latency proof constructs its own synthetic dialect objects independent of
+`DEFAULT_CAPS` entirely, the "had true been chosen" count reads each dialect's OWN caps object (never
+`DEFAULT_CAPS`), and `POST_VERIFIED` is untouched by S3 by design. Per the amendment's own carve-out ("if a test
+CANNOT be made to fail because it pins something already true, that is legitimate — say so"): named here.
+
+**Isolation 2 — `data/portingArc.js` reverted, `wizards/dialects/index.js` kept at HEAD (isolates S2/S4):**
+all three files that import the new exports (`v41-caps-completeness-1534.spec.js`, `porting-arc-scout-1530.spec.js`,
+`v41-corpus-oracle-1532.spec.js`) **failed to load at all** — `SyntaxError: does not provide an export named
+'V41_NAMED_ABSENCES'` / `'normaliseGcode'`. Maximally strong non-vacuous evidence (0/N could even execute without
+the new code) but coarser than a per-assertion count, so stated precisely rather than inflated: this proves the
+new EXPORTS are load-bearing, not that every individual assertion inside is independently meaningful — that finer
+claim is true by construction here, since `V41_NAMED_ABSENCES`/`V41_ORACLE_NORMALISATIONS` did not exist at all
+pre-t1534, so every assertion referencing them is trivially non-vacuous (there is no "pins an already-true
+invariant" case for brand-new data, unlike S3's `DEFAULT_CAPS` additions). `v41-residue-census-1532.spec.js` —
+which imports only `V41_RESIDUE_CENSUS`/`V41_STATUS_FIELD_DEAD`, both landed at t1532, before this revert point —
+loaded and passed cleanly, an unplanned but useful control confirming the isolation was accurate, not over-broad.
+
+**Numbers, as required:** S3's two new claims fail 2/2 against pre-change; S3's four invariant-pinning tests are
+named as legitimately non-failing (0/4, by design, reasons stated above); S2's and S4's tests fail at the
+whole-file level (effectively all of their new assertions, since the exports they reference are wholly new).
