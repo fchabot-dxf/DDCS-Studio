@@ -1,10 +1,17 @@
 /**
- * data/portingArc.js — THE V4.1 PORTING ARC, DESIGNED AS DATA (t1530 scout, t1531 ruled, t1532 S1 landed).
+ * data/portingArc.js — THE V4.1 PORTING ARC, DESIGNED AS DATA (t1530 scout, t1531 ruled, t1532 S1, t1534 S2-S4,
+ * t1536 DM500 stage 1 measured).
  *
  * ── STATUS ───────────────────────────────────────────────────────────────────────────────────────────────────────
  * All 5 forks in `PORTING_FORKS` are RULED (t1531) — read each `.ruling` field, not just `.recommend`. S1
- * (`corpus-oracle` in `PORTING_STAGES`) LANDED at t1532: `tests/v41-corpus-oracle-1532.spec.js` (pilot + second
- * subject) and `tests/v41-residue-census-1532.spec.js` (the arc-reframe condition). S2-S5 not started.
+ * (`corpus-oracle`) LANDED at t1532: `tests/v41-corpus-oracle-1532.spec.js` (pilot + second subject) and
+ * `tests/v41-residue-census-1532.spec.js` (the arc-reframe condition). S2 (normalisation-policy), S3
+ * (caps-completeness), S4 (named-unknowns) LANDED at t1534: `tests/v41-caps-completeness-1534.spec.js`. S3's
+ * inputRead/atc true-vs-false fork was RULED at t1535 (advisor): `false` STANDS, ratified as the correct design
+ * (not merely as what passes the neutrality test) — `DEFAULT_CAPS` needed no further change. The V4.1 offline
+ * arc is CLOSED to S5 (human-gated, unscheduled). DM500 STAGE 1 (measurement only, ruling 5's guard) landed at
+ * t1536: `DM500_ORACLE_FINDINGS` + `tests/dm500-corpus-oracle-1536.spec.js`. ⚠ NO VERDICT ON DM500 lives anywhere
+ * in this file — `POST_VERIFIED` is untouched, no DM500 cap value changed. The verdict is the advisor's, pending.
  *
  * ── WHAT THIS IS ────────────────────────────────────────────────────────────────────────────────────────────────
  * The standing plan opened the porting arc with "port the emit corpus to other controllers, DDCS V4.1 FIRST, with
@@ -184,10 +191,57 @@ export const V41_EVIDENCE_TIERS = {
     },
     unmapped: {
         tier: 'unmapped', strength: 'none — declared unknowns', automatable: 'no',
-        what: 'the dialect names its own three: readActiveWcs (TO CONFIRM) · hmiPrompt (MarcoDialog "*.rc", #1505 '
-            + 'unconfirmed) · the #1300/#1330 ATC tables (vars.atc = null, "generic system parameter area" in the dump)',
-        note: 'probe-float.nc/probe-fix.nc DO show `MarcoDialog "probe-float.rc"`, so the HMI MECHANISM is attested '
-            + 'even though its scripting surface is not. That is a narrower unknown than "HMI unknown"',
+        what: 'the dialect names its own three — see V41_NAMED_UNKNOWNS for the full declared form (S4, t1534)',
+    },
+};
+
+/**
+ * ── S4 — THE NAMED UNKNOWNS (t1534) ─────────────────────────────────────────────────────────────────────────────
+ * `readActiveWcs` / `hmiPrompt` / the ATC tables already fold to `[]` honestly today — this does not change that.
+ * What changes: each is now a full declared row (the t1533 amendment's exact 5-field shape: what / todayBehaviour /
+ * whyAbsent / liftNeeds / blocked), not three lines in a comment, so an operator reading the post's honesty surface
+ * and a future act both find the SAME sentence. `tests/v41-caps-completeness-1534.spec.js` asserts each row
+ * against the dialect's actual fold-to-[] behaviour, so a row cannot claim an unknown the code has since resolved.
+ */
+export const V41_NAMED_ABSENCES = {
+    readActiveWcs: {
+        what: 'reading which WCS is currently active on V4.1',
+        todayBehaviour: 'folds to [] — an honest absence, not a guess. Any op needing "read active WCS" degrades to '
+            + 'nothing rather than emitting a wrong read',
+        whyAbsent: 'not a missing IMPLEMENTATION — a missing CONCEPT in V4.1\'s own firmware model. `vars.activeWcs: '
+            + 'null` and `caps.wcsAuto/wcsFixed/wcsSync` are all false because V4.1 has no per-WCS-index register at '
+            + 'all — it works ACTIVE-ONLY (#1506-1509 IS "the" work offset; there is no numbered G54..G59 table to '
+            + 'have an active INDEX into)',
+        liftNeeds: 'proof V4.1 has a per-WCS active-index register somewhere unexplored in its variable space',
+        blocked: 'evidence-blocked — neither the tracked corpus nor FINDINGS.md\'s bench notes show such a register. '
+            + 'Until found, there is nothing to read; this may simply not exist on this firmware',
+    },
+    hmiPrompt: {
+        what: 'in-program, Studio-authored operator prompts (arbitrary blocking messages/confirmations)',
+        todayBehaviour: 'folds to [] on V4.1 — and on DM500/grbl/rs274ngc/grblhal too; only Expert and centroid '
+            + 'declare `hmi: true`',
+        whyAbsent: 'THE MECHANISM IS ATTESTED, THE SURFACE IS NARROWER THAN IT LOOKS. probe-float.nc/probe-fix.nc/'
+            + 'probe-vertex.nc all call `MarcoDialog "probe-float.rc"` — real, factory-proven. But reading the actual '
+            + '.rc file (t1534 — probe-float.rc, tracked in the firmware corpus) shows it is COMPILED emWin '
+            + 'GUI-Builder C SOURCE ("C-file generated by GUI_Builder for emWin version 5.12"), not a runtime-'
+            + 'authorable payload. `MarcoDialog` can only INVOKE a pre-existing, pre-compiled dialog shipped with '
+            + 'the firmware — it cannot construct one from a G-code-side string',
+        liftNeeds: 'at most, Studio could emit `MarcoDialog "<existing-name>.rc"` to invoke ONE of the firmware\'s '
+            + 'ALREADY-SHIPPED dialogs (if a generically-reusable one exists among them) — never an arbitrary '
+            + 'operator message the way Expert\'s `hmi: true` implies. A full lift (custom prompt text) needs NEW '
+            + 'FIRMWARE, outside Studio\'s reach as a G-code generator',
+        blocked: 'evidence-blocked for anything beyond the capped case above — which of the firmware\'s existing '
+            + '.rc dialogs, if any, is generic enough to reuse is unconfirmed',
+    },
+    atcTables: {
+        what: 'tool-changer register addresses (tool-table offsets, tool-length compensation) on V4.1',
+        todayBehaviour: '`vars.atc: null`, `caps.atc: false` — every ATC wizard degrades honestly on V4.1',
+        whyAbsent: 'the #1300/#1330 range Expert uses for its ATC tables reads, in the V4.1 dump, as a generic '
+            + '"system parameter area" — no ATC-specific structure visible at those addresses on THIS firmware image',
+        liftNeeds: 'observing what registers a real V4.1 tool-change macro touches',
+        blocked: 'evidence-blocked — the bench unit (FINDINGS.md) is motorless and toolless by design (the safe '
+            + 'sandbox) and cannot demonstrate this. Needs either a V4.1 unit WITH an actual ATC attached, or a '
+            + 'community-referenced macro from an owner who has one',
     },
 };
 
@@ -232,6 +286,76 @@ export const V41_SPACING_DELTA = {
 };
 
 /**
+ * ── S2 — THE NORMALISATION POLICY (t1534, t1533 amendment shape) ───────────────────────────────────────────────
+ * The S1 oracle was already normalising (comment/blank-line stripping, then spacing) — but the LOGIC lived twice,
+ * duplicated near-identically in two spec files, with no single place that said WHY each step is safe. An
+ * undeclared normalisation is a comparison that can silently stop testing something, so this is the policy as
+ * DATA — ONLY the normalisations `normaliseGcode()` (and therefore v41-corpus-oracle-1532.spec.js) actually
+ * performs, verified against that function rather than invented. `tests/v41-caps-completeness-1534.spec.js`
+ * asserts every entry here is one the oracle really applies, and that none has an empty `safeBecause`.
+ */
+export const V41_ORACLE_NORMALISATIONS = [
+    {
+        transform: 'strip-carriage-returns', why: 'the factory macros are CRLF, Studio emits LF — the comparison '
+            + 'would fail on every line otherwise, for a reason unrelated to G-code content',
+        safeBecause: 'a controller parses program TEXT; line-ending is a file-encoding artifact of whatever tool '
+            + 'last wrote the file, not a token its G-code parser sees',
+        evidenceTier: 'factory-corpus',   // every tracked V4.1 factory macro `file`-checks as CRLF (verified on zeroxy.nc, probe-fix.nc)
+    },
+    {
+        transform: 'drop-blank-and-comment-lines', why: 'either side may add or omit a blank line or a `(`/`;` '
+            + 'comment without changing what the controller executes — comparing them would fail the assertion for '
+            + 'a reason that says nothing about correctness',
+        safeBecause: 'G-code parsers ignore blank lines outright, and DDCS `(`/`;` comments carry no executable '
+            + 'meaning by the language\'s own syntax — this is a property of the grammar, not a per-controller fact',
+        evidenceTier: 'assumption',   // general G-code comment/blank-line convention — not specifically cited from a V4.1 manual section; named honestly rather than upgraded without a citation
+    },
+    {
+        transform: 'collapse-whitespace', why: 'the factory writes every line unspaced; Studio emits spaced '
+            + '(words.js\'s shared policy) — without this the oracle would fail on spacing alone, never reaching '
+            + 'whether the WORDS and VALUES actually match',
+        safeBecause: 'the user-attested fact that V4.1 accepts spaced G-code (V41_SPACING_DELTA) — proven in BOTH '
+            + 'directions: the factory\'s unspaced form ran on real hardware to be captured, and Studio\'s spaced '
+            + 'form has now been confirmed to run on real V4.1 hardware too. Two forms, both proven to execute',
+        evidenceTier: 'user-attested',
+    },
+];
+
+/**
+ * What was CONSIDERED and REFUSED — not part of the required deliverable shape, kept alongside it so a future
+ * reader finds the omission recorded as a decision, not rediscovers it as a gap. Both would be `evidenceTier:
+ * assumption` if added, and t1533's own instruction is to name rather than silently add an unjustified one.
+ */
+export const V41_NORMALISATIONS_REFUSED = [
+    {
+        considered: 'case-folding — treating g31/G31 (and other lowercase G/M-words) as equivalent',
+        why: 'NO EVIDENCE EITHER SIDE EVER VARIES: zero lowercase G/M-words across all 91 tracked V4.1 factory '
+            + 'macros, and Studio never emits one (words.js has no case-folding at all). Normalising away a '
+            + 'difference neither side has ever produced would bless an untested equivalence, not remove noise — '
+            + 'exactly the actual-bypass shape this arc exists to avoid creating BY ACCIDENT, inside its own tool',
+    },
+    {
+        considered: 'leading-zeros — treating Z-01000/Z-1000 as equivalent',
+        why: 'NO EVIDENCE EITHER SIDE EVER VARIES: zero leading-zero numerics across the tracked corpus, and '
+            + 'Studio never pads one (words.js has no padStart). Refused for the identical reason as case-folding, '
+            + 'not merely because it happened not to be needed yet',
+    },
+];
+
+/**
+ * The ONE implementation of V41_ORACLE_NORMALISATIONS, in order. Both v41-corpus-oracle-1532.spec.js and
+ * porting-arc-scout-1530.spec.js's PREMISE 5 import this rather than each declaring their own — the duplication
+ * S2 was dispatched to close.
+ */
+export function normaliseGcode(text) {
+    return text.replace(/\r/g, '').split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('(') && !l.startsWith(';'))
+        .map((l) => l.replace(/\s+/g, ''))
+        .join('\n');
+}
+
+/**
  * ── THE STAGES ──────────────────────────────────────────────────────────────────────────────────────────────────
  * Smallest independently-bridgeable steps first, each with a bridge that does not depend on the ones after it —
  * the SLOT_CAPABILITIES shape. `gate` is '' when nothing external blocks the step.
@@ -271,11 +395,12 @@ export const PORTING_STAGES = [
             + 'ORACLE is entitled to ignore, and records why',
         bridge: 'the diff must pass on the 3 confirmed-identical forms (probe read, WCS zero, IF/GOTO) and must FAIL '
             + 'if a word is added, dropped, or reordered — proved by mutating each in the spec',
-        gate: '⚠ A REAL QUESTION, NOT A FORMALITY: nobody has confirmed the V4.1 PARSER accepts the spaced form. '
-            + 'The dialect header says CONFIRMED live, but the factory corpus only ever shows unspaced. If spacing '
-            + 'is normalised away silently, the oracle would bless a form the controller may never have been shown. '
-            + 'This is a live-roundtrip question (tier 4) or a human recollection — it is NOT settleable offline',
-        landed: '',
+        gate: '', // CLOSED mid-flight (t1531 amendment): the user confirmed V4.1 accepts spaced G-code. See V41_SPACING_DELTA.
+        landed: 't1534 — V41_ORACLE_NORMALISATIONS (the t1533 amendment\'s exact 4-field array shape: transform/why/'
+            + 'safeBecause/evidenceTier) + V41_NORMALISATIONS_REFUSED (case-folding, leading-zeros — both unevidenced '
+            + 'either direction in the tracked corpus, named rather than silently added or silently omitted). '
+            + 'normaliseGcode() is now the ONE implementation, imported by both v41-corpus-oracle-1532 and '
+            + 'porting-arc-scout-1530\'s PREMISE 5 — the duplicated inline copy that existed in each is gone',
     },
     {
         id: 'caps-completeness', order: 3, label: 'S3 — close the caps table so a new post cannot be silently undeclared',
@@ -283,7 +408,16 @@ export const PORTING_STAGES = [
             + 'gets an explicit declared default instead of undefined',
         stays: 'every current behaviour — see `latent`. This is a declaration completeness fix, not a bug fix',
         bridge: 'getCaps(id)[cap] is a boolean for all 7 posts x all 13 caps, and no post\'s effective behaviour moves',
-        gate: '', landed: '',
+        gate: '', landed: 't1534 — DEFAULT_CAPS in wizards/dialects/index.js gains inputRead/atc/helicalArc, all '
+            + 'FALSE, flagged for ruling rather than silently resolved (a conflict between the t1533 amendment\'s '
+            + 'literal instruction, inputRead:true/atc:true, and its own behaviour-neutrality acceptance test, '
+            + 'which true would have failed — proved directly by tests/v41-caps-completeness-1534.spec.js\'s "had '
+            + 'true been chosen" test). ⚠ RULED at t1535: FALSE STANDS — the advisor verified the counts '
+            + 'independently and ratified false as the CORRECT DESIGN, not merely as what passes the test. '
+            + 'Reasoning on record: DEFAULT_CAPS now holds two patterns — Expert-full-by-default for the original '
+            + 'ten (Expert is the richest COMMON case, lesser posts opt OUT explicitly), safe-floor-by-default for '
+            + 'a RARE/UNCERTAIN capability (an undeclared key means nobody has said, and nobody-has-said is not '
+            + 'yes-it-has-it). No code change needed — the ruling ratifies what was already shipped',
         latent: '⚠ NOT A LIVE BUG, AND THE ARC SHOULD NOT PRETEND OTHERWISE. inputRead is declared by 1 post of 7 '
             + 'and atc by 3 of 7; the rest read back `undefined`. Every consumer truthy-tests (`!!caps.x`, '
             + '`d.caps && d.caps.inputRead`) and there is not one `=== false` comparison against a cap anywhere, so '
@@ -297,7 +431,11 @@ export const PORTING_STAGES = [
         stays: 'the emit — all three already fold to [] honestly, which is the correct behaviour and stays correct',
         bridge: 'each row names the artefact that settles it; the spec asserts the row still matches the dialect\'s '
             + 'actual fold-to-[] behaviour, so a row cannot claim an unknown the code has since resolved',
-        gate: '', landed: '',
+        gate: '', landed: 't1534 — V41_NAMED_ABSENCES (the t1533 amendment\'s exact 5-field shape: what/'
+            + 'todayBehaviour/whyAbsent/liftNeeds/blocked). The hmiPrompt row carries a real correction found while '
+            + 'building it: probe-float.rc (tracked, read directly) is compiled emWin GUI-Builder C source, not a '
+            + 'runtime-authorable payload — MarcoDialog can only invoke a PRE-EXISTING firmware dialog, never an '
+            + 'arbitrary Studio-authored prompt. A narrower, capped lift than "confirm the syntax and ship it"',
     },
     {
         id: 'live-roundtrip', order: 5, label: 'S5 — close the loop on real silicon',
@@ -479,7 +617,9 @@ export const PORTING_FORKS = [
         ruling: 't1531 — A, DM500 follows V4.1 through the SAME S1-S4 stages. ⚠ WITH A GUARD: DM500\'s rows carry '
             + 'their evidence TIER on their face (already true — see PARAMETRIC_FLOOR), and DM500 does NOT enter '
             + 'POST_VERIFIED on offline agreement alone — that set is a promise to a user standing at a machine, and '
-            + 'only hardware-grade evidence may extend it. Not yet started — S1 landed for V4.1 only at t1532',
+            + 'only hardware-grade evidence may extend it. DM500 STAGE 1 (measurement only) landed at t1536 — see '
+            + 'DM500_ORACLE_FINDINGS. The guard held: no cap value changed, POST_VERIFIED untouched, no verdict '
+            + 'declared. The advisor\'s own verdict on what the 8-file findings mean is still pending',
     },
 ];
 
@@ -508,6 +648,116 @@ export const V41_BRANCH_DISPOSITION = {
     alsoNote: 'the branch carries committed .proc/turn.json + 6 .claude/worktrees/ entries — the split-brain '
         + 'artefacts the handoff protocol later learned to refuse. Another reason not to merge it anywhere',
 };
+
+/**
+ * ── DM500 STAGE 1 — MEASUREMENT ONLY (t1536, advisor's ruling 5 with a guard) ───────────────────────────────────
+ * The S1 oracle mechanism built for V4.1, run against the DM500 factory corpus — exactly the S1 approach applied
+ * to a SECOND, much thinner target. THE CORPUS IS EXACTLY 8 FILES (bridge/controllers/dm500/install/) — compare:
+ * V4.1 has 91, Expert has 335. The thinness is a FINDING, not an obstacle, per the arc's own framing.
+ *
+ * ⚠ NO VERDICT LIVES HERE. This measures and reports; it does NOT rule on DM500's evidence tier, does NOT touch
+ * POST_VERIFIED, does NOT change any DM500 cap value, and does NOT declare the port verified or unverified — that
+ * ruling belongs to the advisor once this reports back. `tests/dm500-corpus-oracle-1536.spec.js` re-runs every
+ * claim below against the real corpus and the real dialect, using the SAME `normaliseGcode` S1 already built (no
+ * second normaliser).
+ */
+export const DM500_ORACLE_FINDINGS = [
+    {
+        file: 'defprobe.nc',
+        demonstrates: 'a multi-axis edge/plate-thickness probe: probeMove (M101/G91 G01/M102), IF/GOTO flow with '
+            + 'LT comparisons, N-labels, bare GOTO, and MULTIPLE G92 work-offset writes',
+        studioEmits: 'differs',
+        detail: 'probeMove, ifGoto, goto, and label are ALL byte-exact after normalisation (verified directly: '
+            + 'dialect.ifGoto(\'#2004\',\'<\',\'0\',1) produces the identical normalised text to the factory\'s '
+            + '`IF #2004LT0 GOTO1`). But the G92 lines differ structurally: the factory writes a PRECOMPUTED SUM at '
+            + 'the moment of contact (`G90 G92 Z#2003`, `G90 G92 X#2000/2+#2001`, plain arithmetic, no DRO '
+            + 'reference), while Studio\'s setWorkOffset emits the POSITION-INDEPENDENT `[#dro-value]` form '
+            + '(verified: `G90G92Z[#866-#2003]` vs the factory\'s `G90G92Z#2003`) — the exact same class of '
+            + 'difference as the V4.1 corner-vs-probe-vertex finding at t1532, not a new problem',
+        confidence: 'structural',
+    },
+    {
+        file: 'gotoz.nc',
+        demonstrates: 'a bare subroutine call, `M98 P100`, invoking O100 (defined in slib.nc: pick a per-tool-slot '
+            + 'Z-clearance register via #516, then move there in the work frame)',
+        studioEmits: 'no-equivalent',
+        detail: 'Studio has NO primitive that emits a bare M98 subroutine call, on any dialect — confirmed by '
+            + 'reading the full dialect module (no such method) and grepping wizards/ + blocks/ for M98 emission. '
+            + 'Studio\'s own machineMove/safeRetract compute their target inline rather than delegating to '
+            + 'firmware-resident O100 — a different, self-contained approach to the same GOAL (a safe Z move), '
+            + 'not a gap in what Studio can DO',
+        confidence: 'structural',
+    },
+    {
+        file: 'm30.nc',
+        demonstrates: 'nothing — the file is EMPTY (0 bytes), an unused override hook',
+        studioEmits: 'no-equivalent',
+        detail: 'Studio emits a literal `M30` for endProgram() on every dialect, matching the dialect module\'s own '
+            + 'existing comment ("m30.nc empty -> controller default"). An empty file carries zero evidence either '
+            + 'way about what the controller does when the hook IS populated — there is nothing here to byte-diff',
+        confidence: 'unverifiable-from-corpus',
+    },
+    {
+        file: 'null.nc',
+        demonstrates: 'nothing — the file is EMPTY (0 bytes); purpose unconfirmed beyond "an unused hook"',
+        studioEmits: 'no-equivalent',
+        detail: 'no content, no idiom, nothing to compare Studio\'s emit against. Unlike m30.nc there is no existing '
+            + 'dialect comment explaining its purpose — named as a genuine unknown rather than guessed',
+        confidence: 'unverifiable-from-corpus',
+    },
+    {
+        file: 'pause.nc',
+        demonstrates: 'the PAUSE-button hook: one line, `G91G0Z#589` — an incremental rapid Z lift by a configured '
+            + 'pause-height register',
+        studioEmits: 'no-equivalent',
+        detail: 'Studio has no op that emits a firmware pause-hook macro — Studio generates PROGRAM content the '
+            + 'controller executes, it does not author firmware customization files like pause.nc. Matches the '
+            + 'dialect\'s own existing hmiPrompt comment ("pause hook = a Z-lift only"), which already read this '
+            + 'exact file when it was written',
+        confidence: 'structural',
+    },
+    {
+        file: 'probe.nc',
+        demonstrates: 'the Z-touch auto-datum macro: G04 P0 dwell, M5 spindle-off, reading #864/#865/#866 into '
+            + 'scratch vars, an IF/GOTO mode check, the M101/G91 G01/M102 probe move, then writing a #402/#403/#404 '
+            + '"auto-datum" register triplet followed by a controlled-feed Z move',
+        studioEmits: 'differs',
+        detail: 'dwell(0), spindleOff(), readMachine (all 3 axes), the probe-move triplet, and the IF/GOTO form '
+            + 'are ALL byte-exact after normalisation (verified directly against `#20=#864` / `IF#571EQ0GOTO1` / '
+            + '`M101 G91G01Z-100F100 M102`). The #402/#403/#404 auto-datum-flag sequence and the trailing '
+            + '`G91G01Z#575F#578` have NO Studio equivalent at all — Studio\'s setWorkOffset always emits a direct '
+            + 'G92, never writes to this flag triplet. The dialect\'s own existing comment already scoped this out '
+            + '("a DIFFERENT, probed flow... NOT part of this no-probe zero-at-current") — confirmed correct, not '
+            + 'newly discovered',
+        confidence: 'structural',
+    },
+    {
+        file: 'safez.nc',
+        demonstrates: 'a bare subroutine call, `M98 P101`, invoking O101 (slib.nc\'s "safez" sub — same per-tool-'
+            + 'slot Z-clearance selection as O100/gotoz.nc, a near-identical twin)',
+        studioEmits: 'no-equivalent',
+        detail: 'identical finding to gotoz.nc — no M98 primitive anywhere in Studio; safeRetract computes its own '
+            + 'target rather than calling this subroutine. The dialect\'s own comment already names M98 P101 as '
+            + 'the dump\'s safe-Z form and flags direct G53 as "TO CONFIRM" rather than dump-grounded',
+        confidence: 'structural',
+    },
+    {
+        file: 'slib.nc',
+        demonstrates: 'DM500\'s canned-cycle + subroutine library: fixed drill cycles (G81/G82/G83/G73 as O9081/'
+            + 'O9082/O9083/O9073), bolt-hole/facing/pocket cycles (O9102/O9103/O9110/O9111/O9112), a machine-limit '
+            + 'homing routine (G28 as O9028), AND — the structurally significant part — WHILE/DO/END loop flow, '
+            + 'used throughout the drill cycles',
+        studioEmits: 'no-equivalent',
+        detail: 'Studio never emits an M98 call into any of these O-numbers (confirmed: wizards/ops/holecycle.js '
+            + 'has zero references to M98, O9xxx, or dm500 — Studio\'s own drill/hole-cycle emit is a self-'
+            + 'contained inline computation, entirely separate from this library). More significant than the '
+            + 'unused canned cycles: the dialect DECLARES `caps.flow: \'goto\'` — it has no WHILE/DO/END construct '
+            + 'at all, so Studio could not reproduce one of these cycles byte-for-byte even if it wanted to. This '
+            + 'is a genuine capability ceiling, not merely an unused library — named here should a future act ever '
+            + 'consider calling into DM500\'s own canned cycles rather than computing inline',
+        confidence: 'structural',
+    },
+];
 
 /** The one thing this arc does NOT touch, restated so it cannot be folded in by accident. */
 export const PORTING_ARC_NOT_INCLUDED = {
