@@ -4,6 +4,9 @@
 work-coordinate redefinition (`G92` — which *renames* the current position, it does not move to one). There is
 no `G0`/`G1`/`G2`/`G3`, no spindle-start, no tool change, anywhere in this folder.
 
+**`S5b_coordword.nc` is the ONLY file in this kit that writes any controller state.** The other five compute
+into scratch registers and touch nothing else. See the extra step under `S5b` in section 2 before running it.
+
 ## 1. Copy the files over
 
 Copy all 6 `.nc` files to the controller's **work disk** share: `\\10.0.0.50\cncdisk` (the G-code share —
@@ -17,11 +20,24 @@ move to the next file.
 | # | File | Tests |
 |---|---|---|
 | 1 | `S5a_spaced.nc` | Studio's SPACED multi-word style (vs the factory's unspaced) |
-| 2 | `S5b_coordword.nc` | An expression inside a coordinate word (`G92 Z[...]`) |
+| 2 | `S5b_coordword.nc` | An expression inside a coordinate word (`G92 Z[...]`) — ⚠ **writes controller state, see below** |
 | 3 | `S5c_ifgoto.nc` | IF/GOTO actually branches (not just parses) |
 | 4 | `S5d_while.nc` | WHILE/DO/END — ⚠ if the screen hangs >15s, that's a finding: press STOP/RESET |
 | 5 | `S5e_sqrt.nc` | SQRT — the prize, run before S5f |
 | 6 | `S5f_atan.nc` | ATAN — the prize |
+
+### Before running `S5b_coordword.nc` — one extra step
+
+This file's self-restore only works **if the register it reads genuinely is work-Z**, which is an assumption,
+not a certainty. **Write down the current work-Z reading from the controller's own screen before running it.**
+After it finishes, compare:
+
+- **Work-Z unchanged AND `#190 = 100`** — the strongest pass available: it confirms both that the form parsed
+  *and* that the register really is work-Z.
+- **Work-Z changed** (`#190 = 100` either way) — the form parsed, but the register is **not** work-Z. This is a
+  real finding, more valuable than the parse result — write down both values, then **reset work-Z yourself**
+  back to what you noted before running the file.
+- **Syntax error, sentinel unchanged** — the form was rejected; work-Z was never touched.
 
 ## 3. Reading the result — register `#190`
 
