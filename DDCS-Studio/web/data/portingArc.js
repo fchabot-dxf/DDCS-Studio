@@ -9,9 +9,13 @@
  * motors) — see `V41_S5_RUN_RESULTS` for the full measured set and `PORTING_STAGES['live-roundtrip'].landed` for
  * the summary. HEADLINES: spacing CONFIRMED, SQRT HARDWARE-CONFIRMED (see also `trigEvidence.js`'s
  * `V41_TRIG_EVIDENCE`), `caps.flow:'goto'` CONFIRMED CORRECT (WHILE parses but never opens at top level — closes
- * the DM500 under-declaration theory too). ⚠⚠ THE URGENT ONE: `ddcs-v41.js`'s `ifGoto` CURRENTLY EMITS THE FORM
- * THAT FREEZES REAL HARDWARE (no space after IF) — a defect in ALREADY-SHIPPED emit, flagged not fixed here (an
- * emit change is its own act). Two open questions remain, named not concluded: arctangent under an untried name,
+ * the DM500 under-declaration theory too). ⚠ t1543 CORRECTION — t1542 recorded here that ddcs-v41.js's ifGoto
+ * emits the unspaced, hardware-freezing IF form. THAT WAS FALSE, caught before it could cause any harm: ifGoto
+ * (line 83) emits `IF ${lhs}...` — the space is IN the template literal — and this was verified directly against
+ * the source, not re-inferred, before writing this correction. The freeze traced to a TYPO in a hand-written test
+ * file (the original S5c_ifgoto.nc), not to Studio's emit. See `V41_S5_RUN_RESULTS.ifgoto-branches` for the
+ * corrected finding and the standing lesson it now carries. Two open questions remain, named not concluded:
+ * arctangent under an untried name,
  * whether WHILE works inside an M98/macro-subprogram context. DM500 STAGE 1 (measurement only) landed at t1536:
  * `DM500_ORACLE_FINDINGS`. ⚠ NO VERDICT ON DM500 lives anywhere in this file — `POST_VERIFIED` is untouched
  * (still exactly `{expert-m350, v41}`), no cap value changed anywhere by this act. PORTING.md is the advisor's.
@@ -474,11 +478,18 @@ export const PORTING_STAGES = [
             + 'DM500 under-declaration theory this same finding had raised. Spacing CONFIRMED. SQRT '
             + 'HARDWARE-CONFIRMED. Two open questions remain, named not concluded: arctangent under an untried '
             + 'name (community asked), and whether WHILE works inside an M98/firmware-macro context specifically. '
-            + '⚠⚠ THE MOST URGENT FINDING, NOT YET ACTIONED: ddcs-v41.js\'s ifGoto CURRENTLY EMITS THE UNSPACED '
-            + 'FORM, and the unspaced form FREEZES REAL V4.1 HARDWARE — no error, no reset, power-cycle only. '
-            + 'The spaced form works correctly. This is a defect in ALREADY-SHIPPED emit on the only other '
-            + 'hardware-verified post besides Expert, not a new-capability question — flagged loudly, not fixed '
-            + 'in this act (an emit change is its own act per the DM500 precedent at t1536)',
+            + '⚠ t1543 CORRECTION of a t1542 FALSE ALARM: this stage originally recorded here that ddcs-v41.js\'s '
+            + 'ifGoto emits the unspaced, freezing form. It does not — verified directly against the source '
+            + '(line 83, `IF ${lhs}...`, the space is in the template literal) — and Studio\'s ACTUAL emitted form '
+            + 'is the one the bench confirmed WORKS. The freeze traced to a typo in a hand-written test file (the '
+            + 'original S5c_ifgoto.nc), never to shipped emit. WHAT STAYS TRUE AND WORTH RECORDING: a malformed '
+            + 'IF line — no space after IF — hangs this controller with NO error and NO reset, power-cycle only. '
+            + 'That is a real hazard for anyone hand-writing V4.1 macros (this arc\'s own bench-kit authors '
+            + 'included), even though it never touched shipped emit. WHY THE FALSE ALARM HAPPENED, recorded '
+            + 'because it is the same class this arc keeps closing: the claim was inferred from a symptom without '
+            + 'reading the emitter — one grep of the dialect would have settled it before writing it down. A '
+            + 'defect claim about shipped code gets the SAME evidence bar as a capability claim, arguably higher, '
+            + 'because it triggers work',
     },
 ];
 
@@ -503,13 +514,22 @@ export const V41_S5_RUN_RESULTS = {
                 + 'that specific confirmation is not separately itemised in the reported results',
         },
         {
-            id: 'ifgoto-branches', probe: 'S5c_ifgoto.nc', outcome: 'CONFIRMED, WITH A SEVERE CAVEAT',
+            id: 'ifgoto-branches', probe: 'S5c_ifgoto.nc', outcome: 'CONFIRMED, WITH A CONTROLLER-HAZARD CAVEAT',
             finding: 'IF/GOTO WORKS and branches correctly — but ONLY WITH A SPACE AFTER "IF". "IF #191==0GOTO1" '
-                + 'branches correctly; "IF#191==0GOTO1" (the form ddcs-v41.js\'s ifGoto CURRENTLY EMITS, and the '
-                + 'form the original S5c_ifgoto.nc shipped with at t1538) FREEZES THE CONTROLLER — no error, no '
-                + 'reset, power-cycle only. The advisor edited the tracked S5c_ifgoto.nc to the spaced form '
-                + 'directly after this was found. THIS IS A DEFECT IN ALREADY-SHIPPED EMIT, not a new-capability '
-                + 'question — see the urgent flag on PORTING_STAGES[\'live-roundtrip\'].landed',
+                + 'branches correctly; "IF#191==0GOTO1" FREEZES THE CONTROLLER — no error, no reset, power-cycle '
+                + 'only. ⚠ t1543 CORRECTION: t1542 wrongly attributed the unspaced form to ddcs-v41.js\'s own '
+                + 'ifGoto and called it a shipped-emit defect. VERIFIED DIRECTLY AGAINST THE SOURCE before writing '
+                + 'this correction — ifGoto (line 83) emits `IF ${lhs}...`, the space IS in the template literal, '
+                + 'and Studio\'s ACTUAL emitted form is the spaced one the bench proved works. The unspaced form '
+                + 'that froze the controller was a TYPO in the original hand-written S5c_ifgoto.nc, never Studio\'s '
+                + 'emit. The advisor fixed the tracked file to the spaced form directly after finding the freeze; '
+                + 'no dialect code was ever wrong. WHAT STAYS TRUE: a hand-written IF line missing the space is a '
+                + 'real, named hazard for this controller — no error, no reset — worth recording for anyone '
+                + 'writing V4.1 macros by hand, this arc\'s own future acts included. WHY THE FALSE ALARM '
+                + 'HAPPENED, recorded because it is the same class this arc keeps closing: a claim about shipped '
+                + 'code was inferred from a symptom without reading the emitter first — one grep would have '
+                + 'settled it. A defect claim earns the SAME evidence bar as a capability claim, arguably higher, '
+                + 'since it triggers work',
         },
         {
             id: 'while-recognised-not-functional', probe: 'S5d_while.nc + S5h/S5j/S5l/S5m follow-ups',

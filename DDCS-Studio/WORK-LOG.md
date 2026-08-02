@@ -15473,3 +15473,53 @@ three turns, for the advisor's per-release gate.
 **Capacity:** a dense recording turn — a large, varied result set to get precisely right (six distinct findings,
 each needing its own honest phrasing), plus real rework on the existing spec rather than a trivial extension, plus
 a genuine safety re-check that found a real bug. Comfortable room throughout; nothing rushed.
+
+## t1544 — CORRECTION: t1542's "ifGoto ships the freezing form" was a false alarm
+
+**Dispatch (t1543):** the advisor caught a real error in the t1542 entry above. That entry recorded, with maximum
+prominence, that `ddcs-v41.js`'s `ifGoto` currently emits the unspaced, hardware-freezing IF form, and called it
+a defect in already-shipped emit. **That claim was false.** The advisor verified every IF emit form in every
+dialect — all begin with `IF ` (a space). The freezing form used in the ORIGINAL `S5c_ifgoto.nc` was a typo in a
+hand-written test file, not Studio's emit; it was fixed and the retest passed, which is exactly what the earlier
+diff-note in this same session ("S5c_ifgoto.nc was modified... intentional") already showed without me drawing
+the right conclusion from it at the time.
+
+**Verified independently before touching anything**, per the same discipline being asked of me: read
+`ddcs-v41.js:83` directly. `ifGoto: (lhs, op, rhs, label) => [\`IF ${lhs}${op}${rhs}GOTO${label}\`]` — the
+template literal's leading text is `IF ` with a trailing space, so `ifGoto('#191', '==', '0', 1)` produces
+`"IF #191==0GOTO1"` — the SPACED form, exactly the one the bench proved works. Confirmed, not taken on the
+advisor's word alone.
+
+**Found and fixed every place the false claim was recorded, all in `data/portingArc.js`** (WORK-LOG entries are
+append-only and cannot be edited — this entry is the correction record for the one above, which stays as written):
+the file's own top-level status header, the urgent-flag paragraph on `PORTING_STAGES['live-roundtrip'].landed`,
+and the `ifgoto-branches` result entry inside `V41_S5_RUN_RESULTS`. All three restated to the truth: Studio's
+emitted form is the one that works; the freeze traced to a hand-written test typo. **What stays true and worth
+keeping, per the advisor's own instruction**: a malformed IF line — missing the space — hangs this controller
+with no error and no reset, power-cycle only. That's a real, controller-specific hazard worth recording for
+anyone hand-writing V4.1 macros, this arc's own future bench-kit authors very much included, even though it never
+touched shipped emit. Grepped `trigEvidence.js` and every spec for the same false claim — none found; the trig
+evidence and the bench-kit spec were never touched by this error, so nothing there needed correcting.
+
+**Why it happened, recorded because the advisor is right that it's the same class this arc keeps closing on
+other people's claims**: I inferred a defect in shipped code from a symptom (the freeze) without reading the
+emitter that supposedly produced it. One grep of `ddcs-v41.js` at the moment I wrote the t1542 finding would have
+settled it before it ever got written down with "maximum prominence." The advisor's framing is the right one to
+carry forward: a defect claim about shipped code earns the SAME evidence bar as a capability claim — arguably
+higher, since a defect claim triggers work (an emit-fix act) that a correct one wouldn't need. "Measured, not
+assumed" applies to a regression claim exactly as much as it applies to a capability claim, and I held it for the
+capability claims this whole arc (SQRT, ATAN, WHILE) while skipping it for this one.
+
+**Non-vacuity does not apply** — no spec assertion embedded the false claim (grepped `tests/*.spec.js` for
+`ifGoto`; the only real hits are `dm500-corpus-oracle-1536.spec.js` testing DM500's *own* ifGoto, an unrelated
+dialect, and a comment mention elsewhere), so no test needed to change, and none was invented to manufacture one.
+
+**Verify:** syntax-checked `portingArc.js` by importing it directly (still 19 exports, loads clean). Re-ran the
+full porting/trig spec set.
+
+**Everything else from t1542 stands, per the advisor's own confirmation**: the paren LOCK, the `S5g_atan1.nc` fix
+their spot-fix missed, the sibling-only scoping of `V41_TRIG_EVIDENCE`, the ABSENT-SO-FAR phrasing, the sentinel-
+spec split for the WHILE-counter files, and the DM500 cross-reference all stay untouched.
+
+**Capacity:** a small, focused correction — comfortable room, no rush, but treated with the same care as any
+finding going into a durable record, since the whole point of this fix is that durable records need to be right.
