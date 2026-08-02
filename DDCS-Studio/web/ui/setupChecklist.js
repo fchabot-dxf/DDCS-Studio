@@ -224,8 +224,18 @@ export function showSetupBubble() {
     document.body.appendChild(b);
     _bubble = { el: b, timer: setTimeout(dismissBubble, 10000) };   // momentary: gone after 10s
     b.querySelector('.sb-x').addEventListener('click', (e) => { e.stopPropagation(); dismissBubble(); });
-    b.addEventListener('click', () => { dismissBubble(); openSetupChecklist(); });   // click → full health check
-    window.ddcsTrack && window.ddcsTrack('feature', 'setup-bubble');
+    // t1546 — 'shown' (an IMPRESSION, fires every time the bubble displays) is tracked separately from 'opened'
+    // (an ACTION, fires only if the user clicks it) so the shown:opened ratio says whether the nudge works at
+    // all — collapsing them back into one event would silently answer a different question than either alone.
+    // Fired BEFORE openSetupChecklist() so the two events land in a deterministic order. openSetupChecklist()
+    // still fires its own 'setup-checklist' event regardless of entry point (bubble or menu) — that stays; this
+    // one narrows it to specifically "opened FROM THE BUBBLE". A general impressions-vs-actions category is the
+    // fuller fix and belongs to the analytics dashboard's own owner, not this call site.
+    b.addEventListener('click', () => {
+        window.ddcsTrack && window.ddcsTrack('feature', 'setup-bubble-opened');
+        dismissBubble(); openSetupChecklist();
+    });   // click → full health check
+    window.ddcsTrack && window.ddcsTrack('feature', 'setup-bubble-shown');
 }
 
 // Called on load (index.html). Shows the bubble unless the user dismissed the checklist (Don't show again) — and
