@@ -15523,3 +15523,46 @@ spec split for the WHILE-counter files, and the DM500 cross-reference all stay u
 
 **Capacity:** a small, focused correction — comfortable room, no rush, but treated with the same care as any
 finding going into a durable record, since the whole point of this fix is that durable records need to be right.
+
+## t1546 — analytics: the setup bubble's DISPLAY was tracked as a click
+
+**Dispatch (t1545):** a small, unrelated analytics-honesty fix — one event was lying in the dashboard.
+`web/ui/setupChecklist.js:228` fired `ddcsTrack('feature', 'setup-bubble')` when the nudge bubble DISPLAYED, not
+when anyone interacted with it, so it topped the user's Top Features Used chart at 127 — above `tab:blocks` and
+`tab:studio` — measuring something nobody chose to do. The advisor surveyed every `ddcsTrack('feature', ...)` call
+site first and confirmed this was the ONLY impression mixed into a set of otherwise-deliberate user actions.
+
+**Two changes, exactly as scoped.** The display-time event renamed to `setup-bubble-shown`. A new
+`setup-bubble-opened` event added to the bubble's own click handler, firing BEFORE `openSetupChecklist()` so the
+two land in a deterministic order. `openSetupChecklist()`'s own pre-existing `'setup-checklist'` event (fires on
+ANY entry point, bubble or menu) stays untouched — the new event narrows specifically to "opened FROM THE BUBBLE",
+and the shown:opened ratio is the number that actually matters: it says whether the nudge works at all. Left a
+comment at the call site explaining the reasoning, per the dispatch's own instruction, so a future reader doesn't
+"tidy" the pair back into one event — and noted plainly that a full impressions-vs-actions tracking taxonomy is
+the fuller fix and belongs to the analytics dashboard's own owner (a different agent sharing this repo), not this
+call site.
+
+**Confirmed no restate was needed** before writing anything: grepped every spec referencing `ddcsTrack` or
+`setup-bubble` — `analytics-kv-guard.spec.js` and `rate-prompt.spec.js` both stub `ddcsTrack` generically for
+unrelated features, neither asserts the literal old event name. No spec needed changing.
+
+**Verified live in the real app**, not just read — a throwaway spec (deleted immediately after, never committed)
+confirmed the actual sequence: `showSetupBubble()` fires exactly `['feature', 'setup-bubble-shown']`; clicking the
+rendered bubble then fires `setup-bubble-opened` BEFORE `setup-checklist`, exact deterministic order confirmed by
+inspection of the captured event array, not assumed from reading the code alone.
+
+**Nothing else touched** — the diff is exactly the two-line change the dispatch specified, plus the explanatory
+comment: bubble appearance timing, the 10-second auto-dismiss, the `healthSignalsOn` gate, and the webdriver
+suppression are byte-for-byte unchanged.
+
+**Non-vacuity:** did not apply in the "prove a new assertion fails pre-change" sense — no spec assertion was added
+or changed (none existed to restate, and the dispatch didn't ask for a new automated check for this rename). The
+verification instead was direct, live confirmation that the new/renamed events actually fire as designed.
+
+**Verify:** the three analytics/setup-adjacent specs (`rate-prompt`, `analytics-kv-guard`, `setup-sheet-850`),
+18/18 green. Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged, alongside the porting-arc work from the
+last several turns, for the advisor's per-release gate.
+
+**Capacity:** small, precisely-scoped fix — comfortable room, no rush, exactly the two changes asked for.
