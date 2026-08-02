@@ -34,6 +34,26 @@ round-trip · verify) before any fleet port — the corner-gated-pilot rule.
    declared as a caps/post table the existing postGating reads, not prose.
 4. **Arc-as-data + pilot** — stage structure the way `slotCapabilityArc.js` carried the slot arc;
    a nominated pilot op family with the argument for it.
+5. **Cross-target breadth pass** _(added by amendment, user-driven)_ — ONE row per candidate target
+   against the parametric FLOOR (`#vars` · expressions in coordinate words · `IF`/`WHILE` · trig+SQRT
+   · free-register band), verdict **PARAMETRIC vs UNROLL**, every row tagged by evidence tier
+   (attested dump / manual / community-referenced / unknown). Cheap and shallow on purpose — it exists
+   so the **arc ORDER** is ruled on evidence rather than on the assumption that V3/DM500 is closest.
+   An honest `unknown` beats a guess; name what would settle it.
+
+### The parametric floor (why a target may or may not take the macros)
+
+```
+ has #vars + expressions in coord words + IF/WHILE ?
+   YES → parametric ports; the delta is DIALECT (bands, syntax, feature subset)
+   NO  → UNROLL: same toolpath, emitted as literal G-code computed at build time
+ side conditions that SHAPE a port without blocking it:
+   · no trig/SQRT      → geometry bakes at build (the V13-gate lesson: the slot's bearing baked)
+   · small free band   → less can stay live on the pendant
+```
+
+Either way there is a floor: a controller that cannot do parametric still gets the **same toolpaths**,
+just as fixed G-code rather than pendant-editable macros.
 
 ## Sizing expectation (advisor estimate, pre-scout)
 
