@@ -263,7 +263,27 @@ test('INSET — @work declares the work over the INSET area, not the given one',
         };
     });
     expect(r.insetted, 'an inset shrinks the declared work — it walks a smaller area').toBeLessThan(r.given);
-    expect(r.insetted, 'and it declares exactly what the equivalent bare rect declares').toBe(r.equivalent);
+    /**
+     * ── t1528 — THIS CLAIM WAS ABOUT THE **AREA**, and it now says so, because the two are no longer equal ────────
+     *
+     * It read `insetted === equivalent`: an inset of 6 on an 80×60 rect declares what a bare 68×48 rect declares.
+     * The claim it was making — and still makes — is that the inset is honoured in the AREA the work is counted
+     * over, which is what t1404 landed and what a declaration reading the GIVEN rect would get wrong by two insets'
+     * worth of rows on every consumer.
+     *
+     * What it also asserted, silently, was that an insetted body costs NOTHING EXTRA — and that was false. A
+     * declared inset brings four executed statements of its own: this file's two `IF <span> <= 0` guards and the
+     * `GOTO`/label pair that carries the good path past their error message. They are the INSET'S OWN COST, not the
+     * area's, and the model never counted them, so every insetted program declared four steps too few — the
+     * TRUNCATING direction (t1383's whole reason for existing). Measured by differencing these two exact configs,
+     * whose only difference IS the machinery: +4 executed, identical across 48 configs, closed at t1528.
+     *
+     * So the equality becomes the AREA claim plus the machinery, named separately. Written as `+ MACHINERY` rather
+     * than as a literal so the number cannot drift out of the sentence that explains it.
+     */
+    const INSET_MACHINERY = 4;   // two span guards + the GOTO/label pair — see above
+    expect(r.insetted - INSET_MACHINERY, 'the AREA claim, unchanged: an inset declares over the rect it WALKS, exactly as the equivalent bare rect does').toBe(r.equivalent);
+    expect(r.insetted - r.equivalent, '…and the difference is the inset\'s OWN machinery, nothing else').toBe(INSET_MACHINERY);
     // t1399's rule, applied to the new key the moment it exists rather than two turns later: an input that cannot be
     // known at build time means the declaration is OMITTED, never written wrong.
     expect(r.liveInset, 'a live inset makes the count unknowable → declare nothing').toBeNull();

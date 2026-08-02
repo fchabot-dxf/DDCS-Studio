@@ -383,18 +383,21 @@ test('PROOF 6 — a skim body still reads its frame and never hoists', async ({ 
  * does). The case this term is FOR is a live ORIGIN with everything else typed — which the atom's envelope permits
  * and no wizard builds today, so it is declared to the RULE rather than to the caller list.
  *
- * ⚠⚠ AND MEASURING IT FOUND A **PRE-EXISTING** UNDER-DECLARATION, WHICH IS NAMED HERE RATHER THAN QUIETLY FIXED.
- * A body with a NON-ZERO INSET executes four statements the model does not count: the two `IF <span> <= 0` guards
- * t1404 added to the header, and the `GOTO`/label pair that skips their refusal. Measured, with no hoist anywhere
- * near it — `inset 0` declares 559 against an executed 559 (EXACT, which is what t1440's calibration asserts and
- * still does), while the same body at `inset 3` declares 520 against an executed 524.
+ * ⚠⚠ AND MEASURING IT FOUND A **PRE-EXISTING** UNDER-DECLARATION, which t1526 pinned at its measured value rather
+ * than fixing (it was a decision about a different declaration) and **t1528 CLOSED**.
  *
- * It is on the WRONG side (under-declaring truncates a preview), it has been there since t1404, and t1440's audit
- * did not see it because its whole matrix runs at `inset: 0`. It is NOT this act's to fix: closing it moves
- * `ring-descent-1404`'s "an inset declares exactly what the equivalent bare rect declares" — a claim about the
- * AREA that would become `+ 4` — and that is a decision about a different declaration. So it is PINNED at its
- * measured value here, in both directions, so that the day it is closed this test says so and points at the fix,
- * and so that this act cannot be read as having caused it or widened it.
+ * A body with a NON-ZERO INSET executes four statements the model did not count: the two `IF <span> <= 0` guards
+ * t1404 added to the header, and the `GOTO`/label pair that skips their refusal. Measured with no hoist anywhere
+ * near it — `inset 0` declared 559 against an executed 559 (EXACT, which t1440's calibration asserts and still
+ * does), while the same body at `inset 3` declared 520 against an executed 524. On the WRONG side, since t1404,
+ * invisible to t1440's audit because its whole matrix ran at `inset: 0`.
+ *
+ * The pin below is why the fix could be exact rather than approximate, so it stays — FLIPPED to the closed value.
+ * It read `real − declared === 4` in both directions (with the hoist and without), which is what proved this act
+ * neither caused the gap nor widened it; it reads **0** now, in the same two directions, which is what proves the
+ * fix is the whole gap and not most of it. What closed it: the `insetOn ? 4 : 0` header term in
+ * `surfaceRasterWorkSteps`, differenced against two EQUIVALENT rects so the pass count cancels, plus the matrix
+ * rows in `declared-work-calibration-1440` that keep the dimension exercised.
  */
 test('PROOF 7 — the declared work grows by exactly the hoist, and matches the engine', async ({ page }) => {
     await boot(page);
@@ -435,9 +438,10 @@ test('PROOF 7 — the declared work grows by exactly the hoist, and matches the 
     expect(r.realHoisted.n - r.realFlat.n, 'and the ENGINE executes exactly two more statements — differenced, not reasoned').toBe(2);
     // ── THE INSET-FREE CONTROL: still EXACT, so the model itself is unmoved by this act ───────────────────────────
     expect(r.declaredClean, `an inset-free body is still EXACT (declared ${r.declaredClean} vs executed ${r.realClean.n})`).toBe(r.realClean.n);
-    // ── ⚠ THE PRE-EXISTING GAP, PINNED AT ITS MEASURED VALUE (see the header): t1404's two inset guards plus their
-    //    GOTO/label pair, four statements the model has never counted. Unmoved by the hoist — the SAME 4 on both
-    //    sides — which is the point: this act neither caused it nor widened it.
-    expect(r.realFlat.n - r.declaredFlat, 'PRE-EXISTING: an insetted body executes 4 statements the model does not count').toBe(4);
-    expect(r.realHoisted.n - r.declaredHoisted, '…and the hoist does not widen it by so much as one').toBe(4);
+    // ── THE GAP t1526 PINNED AND t1528 CLOSED (see the header). It read 4 in both directions, which proved the
+    //    hoist neither caused it nor widened it; it reads 0 in the same two directions, which proves the inset
+    //    term is the WHOLE gap rather than most of it. Kept rather than deleted — the pin is what made the fix
+    //    exact, and a 0 asserted from both sides is a stronger statement than the assertion it replaces.
+    expect(r.realFlat.n - r.declaredFlat, 'CLOSED at t1528: an insetted body declares its own machinery — no gap without the hoist').toBe(0);
+    expect(r.realHoisted.n - r.declaredHoisted, '…and none with it either').toBe(0);
 });

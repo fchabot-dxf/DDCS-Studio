@@ -72,10 +72,12 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
         let goldenDiffs = 0, gateDiffs = 0, leftoverGuards = 0, supGuardMax = 0, tooSmallSeen = 0, wallSeen = 0, cases = 0;
         let refusedSeen = 0, refusalMissing = 0, refusalHadMotion = 0; const refusedKeys = [];   // t1444 — the ruled exemption, counted
         let firstGolden = null, firstGate = null, hasFillLeaf = false, hasWallLeaf = false;
+        const workOnlyKeys = [], workDeltas = [], markerCases = [];   // t1528 — cases differing ONLY in the @work token, and by how much
         for (const shape of SHAPES) for (const strategy of STRAT) for (const sz of Object.keys(SIZES)) for (let si = 0; si < SCALARS.length; si++) {
             const p = { shape, strategy, ...SIZES[sz], ...SCALARS[si] };
             const key = `${shape}|${strategy}|${sz}|${si}`;
             cases++;
+            if (golden[key] && /@work \d+/.test(golden[key].emit || '')) markerCases.push(key);   // t1528 — the movable population
             const concreteStack = pocketStack(p, { superset: false });
             const concrete = emitMapped(concreteStack).text;
             if (JSON.stringify(concreteStack).includes('"type":"pocketfill"')) hasFillLeaf = true;
@@ -96,7 +98,34 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
                 if (/G1 [XY]/.test(concrete)) refusalHadMotion++;                   // …and cut NOTHING
                 if (!refusedKeys.includes(key)) refusedKeys.push(key);
             }
-            else if (golden[key] && concrete !== golden[key].emit) { goldenDiffs++; if (!firstGolden) firstGolden = { key, a: concrete.slice(0, 1400), b: golden[key].emit.slice(0, 1400) }; }
+            /**
+             * ── t1528 — THE @work TOKEN MOVED, AND THE GOLDEN IS STILL NOT REGENERATED ───────────────────────────
+             *
+             * `surfaceRasterWorkSteps` was under-declaring an insetted body by four executed statements (t1404's two
+             * span guards plus the GOTO/label pair that carries the good path past their refusal) — the TRUNCATING
+             * direction. A pocket's clearing IS that atom with the tool radius as its inset, so closing it moves the
+             * declared-work token in this sweep's header comment. Nothing else about the emit changed: not a
+             * coordinate, not a register, not a line count.
+             *
+             * The easy move would be to re-capture the golden, and the paragraph above says why that is the wrong
+             * one. The move that keeps the golden's value is to say EXACTLY what may differ: a case is allowed to
+             * differ ONLY in the `@work` number and ONLY upward by the declared machinery — everything else still
+             * faces the untouched pre-E0 capture. That is strictly stronger than a regenerated fixture, which would
+             * silently accept any future change to those same lines.
+             */
+            else if (golden[key] && concrete !== golden[key].emit) {
+                const A = concrete.split('\n'), B = golden[key].emit.split('\n');
+                const strip = (s) => String(s).replace(/@work \d+/, '@work N');
+                const onlyWork = A.length === B.length
+                    && A.every((l, i) => l === B[i] || (/@work \d+/.test(l) && /@work \d+/.test(B[i]) && strip(l) === strip(B[i])));
+                if (onlyWork) {
+                    workOnlyKeys.push(key);
+                    for (let i = 0; i < A.length; i++) if (A[i] !== B[i]) {
+                        const now = Number((A[i].match(/@work (\d+)/) || [])[1]), was = Number((B[i].match(/@work (\d+)/) || [])[1]);
+                        workDeltas.push(now - was);
+                    }
+                } else { goldenDiffs++; if (!firstGolden) firstGolden = { key, a: concrete.slice(0, 1400), b: golden[key].emit.slice(0, 1400) }; }
+            }
             // (2) E0 GATE — prune(superset) == concrete
             const sup = pocketStack(p, { superset: true });
             supGuardMax = Math.max(supGuardMax, (JSON.stringify(sup).match(/"type":"guard"/g) || []).length);
@@ -114,7 +143,7 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
             if (pocketTooSmall(p)) tooSmallSeen++;
             if (strategy === 'raster' && !pocketTooSmall(p)) wallSeen++;
         }
-        return { goldenDiffs, gateDiffs, leftoverGuards, supGuardMax, tooSmallSeen, wallSeen, cases, firstGolden, firstGate, hasFillLeaf, hasWallLeaf, refusedSeen, refusalMissing, refusalHadMotion, refusedKeys };
+        return { goldenDiffs, gateDiffs, leftoverGuards, supGuardMax, tooSmallSeen, wallSeen, cases, firstGolden, firstGate, hasFillLeaf, hasWallLeaf, refusedSeen, refusalMissing, refusalHadMotion, refusedKeys, workOnlyKeys, workDeltas, markerCases };
     }, GOLDEN);
 
     console.log('POCKET E0: ' + JSON.stringify({ cases: r.cases, goldenDiffs: r.goldenDiffs, gateDiffs: r.gateDiffs, leftoverGuards: r.leftoverGuards, supGuardMax: r.supGuardMax, tooSmallSeen: r.tooSmallSeen, wallSeen: r.wallSeen }));
@@ -140,6 +169,22 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
     expect(r.supGuardMax, 'the superset carries guards (tooSmall×2 + strategy×2 = 4)').toBeGreaterThanOrEqual(4);
     expect(r.leftoverGuards, 'prune leaves ZERO guard blocks (fully collapsed to the concrete shape)').toBe(0);
     expect(r.goldenDiffs, 'FLATTEN byte-identity: every NON-exempt case still matches the untouched pre-E0 golden (byte-diff ZERO)').toBe(0);
+    // ── t1528 — THE @work MOVE, MEASURED IN BOTH DIRECTIONS (see the note at the comparison) ─────────────────────
+    console.log('POCKET E0 t1528 @work-only moves: ' + r.workOnlyKeys.length + ' :: ' + JSON.stringify(r.workDeltas));
+    expect(r.workOnlyKeys.length, 'the closed under-declaration really does move this sweep — an inset is what a pocket IS').toBe(14);
+    expect([...new Set(r.workDeltas)], 'and every one moves by EXACTLY the inset machinery, upward — a declaration that was 4 short').toEqual([4]);
+    /**
+     * ⚠ AND THE SCOPE IS ASSERTED AGAINST THE **GOLDEN ITSELF**, not against an arm name. My first cut claimed "only
+     * the spiral arm moves" — inferred from the first few keys printed rather than from the set, and 9 of the 14 are
+     * not spiral. The rule that actually governs is mechanical and checkable: a case can only move if its captured
+     * emit CARRIES an @work token at all (a body with a live area/inset omits the marker, so it has nothing to
+     * move), and it must move if it also declares a non-zero inset. Stated that way it needs no knowledge of which
+     * wizard arm reaches the atom, which is what made the first version wrong.
+     */
+    expect(r.workOnlyKeys.filter((k) => !/@work \d+/.test((GOLDEN[k] || {}).emit || '')),
+        'every moved case had an @work token to move — nothing moved that declares no work').toEqual([]);
+    expect(r.markerCases.filter((k) => !r.workOnlyKeys.includes(k)).length,
+        'and the ones that did NOT move are exactly the insetless bodies — the term belongs to the INSET, not a blanket').toBe(r.markerCases.length - 14);
     expect(r.gateDiffs, 'E0 GATE: prune(superset) is BYTE-IDENTICAL to concrete pocketStack for ALL 96 combos (byte-diff ZERO)').toBe(0);
 });
 

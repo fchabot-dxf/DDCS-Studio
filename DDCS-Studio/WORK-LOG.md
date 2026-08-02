@@ -14838,3 +14838,136 @@ caused it nor widened it, and means the day it is closed the test says so. **Fla
 - ⚠ Two verification PNGs under `t1512-cam-pack/` were **already dirty in the working tree when this turn started**
   (they are in the session-start `git status`, before any edit of mine). t1512's shots are bearing-0, which this act
   leaves byte-identical, so they are not this act's output. Restored to HEAD rather than swept into this commit.
+
+---
+
+## t1528 — THE TWO PINNED FINDINGS CLOSE. And measuring the first one found a THIRD, bigger, on the shipped path.
+
+Both ruled TAKE at t1527. Small closing act for this seat — and it did not stay small, because the same measurement
+that closed finding 1 exposed a second under-declaration of the identical class.
+
+### (1) THE @work INSET UNDER-DECLARATION — CLOSED, differenced against EQUIVALENT rects
+
+A declared inset brings four executed statements of its own: t1404's two `IF <span> <= 0 GOTO<insetErr>` header
+guards, and the `GOTO<insetOk>` + two labels that carry the non-refusing path past its error message. All four run
+ONCE, outside the depth loop, so they belong beside the header's 16.
+
+**Isolated by differencing two EQUIVALENT rects** — `{100×80, inset 3}` against `{94×74, inset 0}`, which walk the
+identical area, so the pass count cancels and what is left is the machinery alone. **+4 executed, every time**, over
+48 configs (strategy × direction × entry × rowAnchor × two sizes) with **zero variation**. That is what makes it a
+term rather than a fudge: an inset changes the AREA (which the model already tracked) *and* carries a fixed cost
+(which it did not).
+
+`insetOn` reads `inX`/`inY` — the same two numbers the area above it is held in by — rather than re-deriving them, so
+the term and the area can never disagree about whether there IS an inset.
+
+### (2) ⚠ AND THE SAME MEASUREMENT FOUND A SECOND ONE, LARGER, ON THE ARM EVERY PACKED SLOT USES
+
+The probe printed `gapEq` per bucket and one column would not go to zero: a **WALL-anchored** row walk was under by
+`levels × passes` exactly. C1's far-wall clamp (`IF <row> > <far wall> THEN <row>=<far wall>`, t1492) does not merely
+add a PASS — it runs on **every** pass — and `surfaceRasterWorkSteps` carried ONE per-pass constant for both anchors.
+
+Differenced the t1440 way (two areas at one depth, so the per-pass term is isolated from the header and the level
+overhead):
+
+| walk | declared | measured |
+|---|---|---|
+| bothways / **fit** | 13 | 13 ✓ (gap 0 at both areas) |
+| oneway / **fit** | 11 | 11 ✓ |
+| bothways / **wall** | 13 | **14** |
+| oneway / **wall** | 11 | **12** |
+
+Exactly one, on both — the single clamp line, not a curve fitted to a gap. Fit is untouched and still exact, which is
+what says the correction belongs to the ANCHOR rather than to the walk. **`rowAnchor: 'wall'` is what
+`slotRasterParams` sets, so every packed CAM slot was under-declaring** — the truncating direction, on the shipped
+path, since t1492.
+
+⚠ **IT IS BEYOND THE DISPATCH'S LETTER and I took it anyway**, for three reasons stated so it can be reverted in one
+line if that is wrong: it is the *same class* the advisor had just ruled TAKE on (a term that went dark because the
+calibration matrix never varied the dimension); it is one term, differenced, not estimated; and the dispatch's own
+instruction — *"t1440's calibration matrix gains at least one non-zero-inset row so the class cannot go dark again"* —
+cannot be honoured honestly while a second dark dimension in the same function stays dark. The `wallAnchored` term is
+one expression in `surfaceRasterWorkSteps`.
+
+### THE RESULT, SWEPT: 24 buckets × 6 configs, and the model is EXACT wherever it ever claimed to be
+
+144 configs over strategy × direction × entry × rowAnchor × inset(0/3/6) × two sizes. **Zero buckets under-declare.**
+Every `plunge` and `ramp` bucket is **0..0 — exact** — including the wall-anchored and insetted ones it had never
+been measured on. Only the helix buckets over-declare (13..39), which is t1440's own documented, deliberate residual.
+
+### THE RESTATEMENTS
+
+- **`declared-work-calibration-1440`** — the matrix gains its two dark dimensions: non-zero-inset rows, wall-anchored
+  rows, and a row carrying **both at once** (two terms added in one act could have been one fudge covering both; a
+  row with both says they are independent). Plus two assertions that the matrix still *contains* those rows, so an
+  edited-down row list cannot pass silently.
+- **`ring-descent-1404`** — "an inset declares exactly what the equivalent bare rect declares" was a claim about the
+  **AREA**, and it silently also asserted that an insetted body costs nothing extra, which was false. It now states
+  the area claim (`insetted − MACHINERY === equivalent`) and the machinery separately, with the constant named rather
+  than inlined so the number cannot drift out of the sentence that explains it.
+- **`raster-origin-hoist-1526` PROOF 7** — the pin FLIPS from 4 to **0**, in the same two directions. It read 4 to
+  prove the hoist neither caused the gap nor widened it; it reads 0 to prove the fix is the *whole* gap and not most
+  of it. Kept rather than deleted — the pin is what made the fix exact.
+- **`wall-anchored-rows-1492`** — its `@work` assertion followed the clamp's extra PASS and not its extra STATEMENT,
+  which is the half that was missing for four turns. It now asserts the difference exceeds the pass count, so it pins
+  the per-pass structure rather than this config's arithmetic.
+
+### ⚠ THE POCKET GOLDEN MOVED — AND IS STILL NOT REGENERATED
+
+A pocket's clearing IS this atom with the tool radius as its inset, so closing the term moved `pocket-e0-superset`'s
+frozen pre-E0 golden: **14 of 96 cases**, and measured before deciding what to do about it — **every diff is the
+`@work` token alone**, same line count, same everything else, `+4` on all fourteen.
+
+Re-capturing the golden was the easy move and this file's own header says why it is the wrong one. So the comparison
+now states exactly what may differ: a case may differ ONLY in the `@work` number and ONLY upward by the declared
+machinery; everything else still faces the untouched capture. **Strictly stronger than a regenerated fixture**, which
+would silently accept any future change to those same lines.
+
+⚠ **AND MY FIRST SCOPE CLAIM WAS WRONG BECAUSE I READ A TRUNCATED SAMPLE.** I asserted "ONLY the spiral arm moves"
+from the first four keys my probe printed; 9 of the 14 are not spiral. The scope is asserted against the **golden
+itself** now — a case can only move if its captured emit carries an `@work` token at all — which needs no knowledge
+of which wizard arm reaches the atom, and that ignorance is exactly what made the first version wrong.
+
+### (3) THE MACRO-WALK SHOT BECOMES A WALK
+
+`verification/t1512-cam-pack/3-macro-walk.png` was **byte-identical to `2-macro-head.png`** and had never shown a
+walk. The cause: it did `window.scrollTo(0, 620)` then screenshot again — but the shot surface is a
+`position:fixed; inset:0; overflow:auto` overlay, so scrolling the window does nothing to it. Found with `cmp`, which
+is the tell: a shot nobody compares is a caption nobody checks.
+
+It is the real sim now, driven exactly as t1526's walk shot drives it (`traceToolpath`, the one toolpath source every
+preview uses, with the pendant mirrors prepended). 31 segments, 24 cutting — the same structure the angled case
+traces, which is the point. And the bearing-0 claim is **asserted**, not merely drawn: not one cutting move is
+diagonal.
+
+⚠ **MY FIRST ASSERTION THERE WAS WRONG AND THE WALK SAID SO.** I asserted "every cutting move holds Y constant",
+which is false: the step-over between rows happens AT DEPTH — that is the whole point of the both-ways walk, one
+plunge per level — so it is a G1, it cuts, and it moves in Y. The emit was right; the assertion was not. Corrected to
+"no cutting move is diagonal", which is the claim bearing-0 actually makes.
+
+### (4) THE PNGs WERE **STALE, NOT NONDETERMINISTIC** — the opposite of what they looked like
+
+They turned up dirty after every suite run, so the working assumption (mine, in the t1526 pass-back) was font/AA/
+frame-timing noise. Measured instead: **two consecutive runs produce byte-identical files.** Then diffed the macro
+this shot renders against the revision the PNG was committed at (`5bcb19fa`) — and the change names itself to the
+line:
+
+```
+was: #4=#2603   ;Depth [mm] =5 [0~9999]      (t1514, when the PNG was committed)
+now: #4=#2603   ;Depth [mm] =4 [0~9999]      (t1516 gave the slot its own seeds)
+```
+
+The committed image had been advertising a default the code stopped emitting two acts ago. Refreshed, and the cause
+recorded in the spec — a screenshot that drifts from its subject is the same defect class as a comment that does.
+The dispatch said pin it cheaply or leave it; it was cheap, and "nondeterministic" was simply the wrong diagnosis.
+
+### GATES
+
+- Touched families (slot/raster/surfac/pocket/cam/rotat/drill/wallfinish/work/scratch/ring): **614 passed · 0 failed.**
+- The 144-config declared-vs-executed sweep above, run as a scratch probe and deleted after: zero under-declaring
+  buckets, every plunge/ramp bucket exact.
+- **FULL SUITE 2383 passed · 0 failed · 6 skipped (18.7m), exit 0** — failed-count grepped with ANSI+NULs stripped
+  and cross-checked against the numbered-failure count (0), not read off the tail. Released **V2026.08.02.1**.
+- ⚠ **THE ADVISOR'S t1527 STANDARD, TAKEN:** a release wants an ACTUALLY-green run, not an argued flake. t1526 shipped
+  on a ledger flake I isolate-checked and argued; this one is green with nothing to argue. The ritual is the
+  protection — an argument that happens to be right still trains the habit of arguing.

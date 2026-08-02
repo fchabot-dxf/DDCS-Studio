@@ -648,7 +648,24 @@ export function surfaceRasterWorkSteps(p = {}) {
      * added one statement per level. Re-differenced, not adjusted by eye — see the constant below.)
      */
     const dirKey = concentric ? 'concentric' : (rasterIsOneWay(rasterDirectionOf(p)) ? 'oneway' : 'bothways');
-    const PER_PASS = { bothways: 13, oneway: 11, concentric: 12 }[dirKey];
+    /**
+     * ── t1528 — AND THE PER-PASS TERM HAS A SECOND DIMENSION: the ROW ANCHOR ──────────────────────────────────────
+     *
+     * A WALL-anchored row walk emits one statement a fit-anchored one does not — C1's far-wall clamp
+     * (`IF <row> > <far wall> THEN <row>=<far wall>`, t1492), which runs on EVERY pass. The model carried one
+     * `PER_PASS` for both anchors, so every wall-anchored program declared one step per pass too few: **the
+     * truncating direction**, and `rowAnchor: 'wall'` is what every packed CAM slot uses (`slotRasterParams` sets
+     * it), so this was the SHIPPED path.
+     *
+     * DIFFERENCED the t1440 way, two areas at one depth so the per-pass term is isolated from the header and the
+     * level overhead: both-ways measured **14** against a declared 13, one-way **12** against 11 — exactly one, on
+     * both, which is the single clamp line and not a curve fitted to a gap. Fit-anchored is unchanged and still
+     * exact (13 / 11, gap 0 at both areas), which is what says the correction belongs to the ANCHOR and not to the
+     * walk. It went dark for the same reason the inset term below did: t1440's calibration matrix never varied the
+     * dimension, so `wall-anchored-rows-1492` added the capability without the audit ever seeing its cost.
+     */
+    const wallAnchored = rasterRowAnchorOf(p) === 'wall' && !concentric;   // a ring walk has no rows to clamp
+    const PER_PASS = { bothways: 13, oneway: 11, concentric: 12 }[dirKey] + (wallAnchored ? 1 : 0);
     const PER_LEVEL = { bothways: 12, oneway: 6, concentric: 9 }[dirKey];
     // THE DESCENT is per LEVEL, not per pass, and only the helix is large: it is a 24-segment-per-revolution polyline.
     const entry = String(p.entry || '');
@@ -672,8 +689,29 @@ export function surfaceRasterWorkSteps(p = {}) {
      * slot — the only shipped caller that hoists — makes all of them live. So the config this term is FOR is a live
      * ORIGIN with everything else typed, which the atom's envelope permits and no wizard builds today. Declared to
      * the rule rather than to the caller list, exactly as the live-input check above it is.
+     *
+     * ── t1528 — AND THE INSET'S OWN MACHINERY, which the header term never counted ─────────────────────────────────
+     *
+     * A declared inset brings FOUR statements with it, all of them outside the depth loop: t1404's two
+     * `IF <span> <= 0 GOTO<insetErr>` guards in the header, and the `GOTO<insetOk>` + two labels that carry the
+     * non-refusing path past its error message. They execute ONCE, so they belong beside the 16 and nowhere else.
+     *
+     * MEASURED BY DIFFERENCING TWO *EQUIVALENT* RECTS — `{100×80, inset 3}` against `{94×74, inset 0}`, which walk
+     * the identical area — so the pass count cancels and what is left is the machinery alone: **+4 executed, every
+     * time**, over 48 configs (strategy × direction × entry × rowAnchor × two sizes) with no variation at all. That
+     * is what makes it a term and not a fudge: an inset changes the AREA (which the model already tracks through
+     * `w`/`h` above) *and* brings a fixed cost (which it did not).
+     *
+     * ⚠ IT WAS ON THE TRUNCATING SIDE and it went dark for a structural reason worth writing down: t1440's whole
+     * calibration matrix runs at `inset: 0`, so the audit that found and fixed four other terms could not have seen
+     * this one. The matrix carries non-zero-inset AND wall-anchored rows now, which is the actual repair — a
+     * constant nobody exercises goes wrong again the next time the emit grows a line.
      */
-    return 16 + rasterOriginFrame(p).hoist.length + levels * (PER_LEVEL + descent + passes * PER_PASS);
+    // `inX`/`inY` are the same two numbers the area above is held in by — read, not re-derived, so the term and the
+    // area it belongs to can never disagree about whether there IS an inset. (A LIVE inset returned null already.)
+    const insetOn = inX > 0 || inY > 0;
+    return 16 + (insetOn ? 4 : 0) + rasterOriginFrame(p).hoist.length
+        + levels * (PER_LEVEL + descent + passes * PER_PASS);
 }
 
 export function surfaceRasterLines(p = {}) {

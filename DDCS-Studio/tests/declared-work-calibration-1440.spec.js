@@ -62,10 +62,27 @@ test('THE SURFACING FAMILY — declared work matches the engine, per walk and pe
         for (const strategy of ['parallel', 'concentric']) {
             for (const direction of (strategy === 'parallel' ? ['bothways', 'oneway'] : ['bothways'])) {
                 for (const entry of ['plunge', 'ramp', 'helix']) {
-                    for (const [h, depth] of [[150, 0.5], [150, 2.0], [40, 1.0]]) {
-                        const p = { ...BASE, h, depth, stepdown: 0.5, strategy, direction, entry };
+                    /**
+                     * ── t1528 — THE MATRIX GAINS ITS TWO DARK DIMENSIONS: the INSET and the ROW ANCHOR ────────────
+                     *
+                     * Every row of this audit ran at `inset: 0` and at the default anchor, and BOTH hid a term that
+                     * was on the truncating side. An inset brings four executed statements of its own machinery
+                     * (t1404's two span guards plus the GOTO/label pair); a WALL-anchored row emits C1's far-wall
+                     * clamp on EVERY pass, so its per-pass cost is one higher than the fit walk's — and `wall` is
+                     * what every packed CAM slot uses, so that one was the shipped path. Neither could be seen by a
+                     * matrix that never varied the dimension, which is the real lesson of both: a constant nobody
+                     * exercises goes wrong again the next time the emit grows a line. Varied here so the class
+                     * cannot go dark a third time.
+                     */
+                    for (const [h, depth, inset, rowAnchor] of [
+                        [150, 0.5, 0, 'fit'], [150, 2.0, 0, 'fit'], [40, 1.0, 0, 'fit'],
+                        [150, 0.5, 6, 'fit'], [150, 2.0, 6, 'wall'], [40, 1.0, 0, 'wall'],
+                        [150, 1.0, 6, 'wall'],   // both at once — the terms must be independent, not one fudge
+                    ]) {
+                        const p = { ...BASE, h, depth, stepdown: 0.5, strategy, direction, entry, inset, rowAnchor };
                         const r = steps(surfaceRasterLines(p).join(String.fromCharCode(10)));
-                        out.push({ k: `${strategy}/${direction}/${entry} h${h} d${depth}`, declared: surfaceRasterWorkSteps(p), real: r.n, capped: r.capped });
+                        out.push({ k: `${strategy}/${direction}/${entry} h${h} d${depth} i${inset} ${rowAnchor}`,
+                                   declared: surfaceRasterWorkSteps(p), real: r.n, capped: r.capped });
                     }
                 }
             }
@@ -81,9 +98,14 @@ test('THE SURFACING FAMILY — declared work matches the engine, per walk and pe
     }
     // …and the PLUNGE + RAMP rows are EXACT, which is what makes the model's shape (per-walk level overhead, a
     // walk-independent descent cost) a measured structure rather than a curve fitted to a few points.
+    // t1528 — and they are exact over the INSET and ANCHOR dimensions too, which is the stronger claim: two terms
+    // added in one act could have been one fudge covering both, and a row carrying BOTH at once says they are not.
     for (const r of rows.filter((x) => /plunge|ramp/.test(x.k))) {
         expect(r.declared, `${r.k}: exact — the model is the structure, not a fit`).toBe(r.real);
     }
+    // the matrix really does exercise what it claims to (a row list edited down to nothing would pass silently)
+    expect(rows.filter((x) => / i6 /.test(x.k)).length, 'the matrix carries non-zero-inset rows').toBeGreaterThan(8);
+    expect(rows.filter((x) => / wall$/.test(x.k)).length, '…and wall-anchored rows').toBeGreaterThan(8);
 });
 
 /**

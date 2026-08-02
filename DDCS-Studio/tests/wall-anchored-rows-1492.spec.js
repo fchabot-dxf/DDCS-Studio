@@ -98,6 +98,19 @@ for (const c of WIDTHS) {
         }
         // @WORK FOLLOWS THE CLAMP'S EXTRA PASS — a declaration still reading the fit rule would under-count this job
         expect(r.declared, 'the wall walk declares more work than the fit walk on the same span').toBeGreaterThan(r.declaredFit);
+        /**
+         * ⚠ t1528 — IT FOLLOWED THE EXTRA **PASS** AND NOT THE EXTRA **STATEMENT**, and that half was missing here
+         * for four turns. The clamp this test is about (`IF <row> > <far wall> THEN <row>=<far wall>`) does not only
+         * add a pass — it runs on EVERY pass, so a wall-anchored walk costs one executed statement per pass more
+         * than a fit walk does. `surfaceRasterWorkSteps` carried ONE per-pass constant for both anchors, so every
+         * wall-anchored program under-declared by exactly (levels × passes): the truncating direction, on the arm
+         * every packed CAM slot uses. Differenced the t1440 way (two areas at one depth) it measured 14 against a
+         * declared 13 both-ways and 12 against 11 one-way — one, on both — and the term is anchor-aware now.
+         * Asserted as the RATIO rather than as two magnitudes, so it pins the per-pass structure and not this
+         * config's arithmetic.
+         */
+        expect(r.declared - r.declaredFit, 'the wall walk declares the clamp per PASS, not merely one extra pass')
+            .toBeGreaterThan(r.atom.length);
     });
 }
 
