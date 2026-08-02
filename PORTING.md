@@ -176,3 +176,56 @@ that must not stay in prose.
 **Not changed here, deliberately**: raising a flow cap changes what Studio *emits* for DM500 — emit-class
 work with its own bridge, its own act, and a heavier seat. It is recorded as a declared finding with the
 evidence (`slib.nc`) named, so whoever picks up DM500 stage 2 starts from it.
+
+## S5 — THE LIVE ROUND-TRIP, RUN ON HARDWARE (2026-08-02)
+
+A **V4.1 bench unit** (firmware `2025-04-04-012-NOR`, no motors or drives attached — nothing could
+move) was connected over SMB. The kit ran; the user read the screen, and results came back through
+`sysdisk\uservar`. This is the stage the arc always said could not be agent-scheduled, and it is done.
+
+| Probe | Verdict | Evidence |
+|---|---|---|
+| **Spaced G-code** | ✅ **bench-confirmed** | ran to completion — Studio's emit format is legal. Upgrades the t1531 user-attested row. |
+| **`SQRT`** | ✅ **works** | `[SQRT[9] * 100]` returned exactly **300** — computed, not merely parsed |
+| **Inverse trig** | ❌ **absent so far** | `ATAN` (both forms), `ATN`, `ATAN2`, `atan`, and `ACOS` as a control — all rejected, `Unrecognized file format` + line number |
+| **`IF`/`GOTO`** | ✅ works — **needs the space** | `IF #191==0GOTO1` branches; `IF#191==0GOTO1` **freezes the controller**, power-cycle only |
+| **`WHILE`** | ⚠ **recognised, does not open a loop** | 4 variants; body runs once, then `The loop instruction WHILE is incomplete: L<n>[END1]` |
+| **`#a=#a+1`** | ✅ works | bare form, no brackets |
+| Error reporting | ✅ **names the offending line** | every failure — a good diagnostic surface for this target |
+| `#490/#491/#492` | machine coordinates | confirmed against the screen's Mach column |
+
+### What it settles
+
+- **The CAM slot's baked bearing is now justified by hardware.** The t1508 scout ruled it on the
+  weakest evidence tier; the controller cannot compute `atan2` under any name we tried, so the
+  decision stands on a machine saying no rather than on inference.
+- **`caps.flow: 'goto'` is CORRECT** for what Studio emits. The DM500 "we may be under-declaring"
+  theory (t1537) is closed — and closed with an error message behind it, not a freeze.
+- **`SQRT` working** is the function three shipped boundaries were waiting on (raster ramp
+  distance-to-centre, rest-machining corner clip, pocketfill's rest half) — on this controller.
+
+### ⚠ Scope of the claim
+
+All of the above is **attested for V4.1 only**. The M350 is a different firmware build, and which
+math functions are linked is a build decision, not a family trait — the Expert's own notes record
+its imports as including `sqrt` **and** `atan` while *lacking* `cos`/`sin`, the opposite pattern.
+This is sibling evidence for the M350 and nothing stronger.
+
+### Open questions — posted to the community, deliberately not chased
+
+1. **Does `WHILE` work inside an `M98`/firmware-macro context?** The factory's own
+   `macroMillCylinder.nc` uses it freely. Untested, and academic for us either way — Studio emits
+   user programs, where it demonstrably does not work.
+2. **Is there an arctangent under a name we did not try?** Five were tested. `COS`/`SIN` remain
+   untested entirely.
+
+`assets/community/FORUM-POST-macro-questions.md` carries both questions with reproducible cases.
+
+### Process notes worth keeping
+
+- Every wrong conclusion this session came from **one test with a confound**, and each was corrected
+  by the user pushing back: ATAN was overstated before the single-operand retest isolated it, and
+  `WHILE` was called both "unsupported" and "under-declared" before four variants settled it.
+- Two runs were wasted on **nested parentheses inside comments** — the trap the worker's own kit was
+  explicitly checked against, reintroduced by advisor-generated files that skipped that check. The
+  check belongs in the generator, not in the reviewer's memory.
