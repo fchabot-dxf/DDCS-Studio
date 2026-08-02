@@ -14445,3 +14445,126 @@ cover (they wrote the three `set` calls), so it was the weaker option.
 
 Run 1: 2368 / 1 / 6 (the red above — a real find, fixed at its cause).
 Run 2 (after the spec fix): recorded in the pass-back.
+
+---
+
+## t1522 — SHELVED (B), SCOUTED TO TURNKEY. ⚠ PARKED AT A GATE: the act's prescribed RESTATEMENT is not achievable, because (B) restores the frozen reference to IDENTITY rather than to a new divergence.
+
+Dispatched to re-land the shelved (B) — the ramp reads the ACTUAL remaining drop everywhere — with a named
+restatement plan. I scouted the whole act to turnkey before touching emit, and one piece of that plan rests on a
+premise that does not survive reading the frozen module. **No product code changed this turn.**
+
+### THE MECHANISM, VERIFIED LINE BY LINE (so the build is turnkey for whoever lands it)
+
+**The atom** (`surfaceraster.js`). The depth loop is:
+
+```
+#46=0                                  ( the level being cut )
+WHILE [#46 < #42] DO1
+  #46=[#46 + #43]
+  IF #46 > #42 THEN #46=#42
+```
+
+⚠ **AND THE CAPTURE NEEDS NO SEED, which t1504's note did not say.** Placing `#35=#46` as the FIRST line inside the
+loop — *before* the increment — makes it correct on every iteration including the first, because `#46` is still 0
+there and 0 is exactly the stock top. A seed line outside the loop would be a second statement of the same fact.
+So it really is ONE line, ramp-path only (plunge/helix stay byte-identical).
+
+The ramp itself (`rampLines`, currently lines 1300 / 1306):
+
+```
+  #34=[#43 * invTan]                          ->  #34=[[#46 - #35] * invTan]
+  G0 Z[- #46 + #43]                           ->  G0 Z[- #35]
+     ( down to the floor this level starts from — the comment is already true of the new form )
+```
+
+`V.prevZ = '#35'` is free by the SAME mutual exclusion that justifies `V.run = '#34'`: `HX = { vx:'#34', vy:'#35', … }`,
+and a descent is exactly one of plunge / ramp / helix, so the ramp's floor and the helix's `vy` are never live
+together. **`SLOT_ARC_BAND` does not grow** — which is the constraint that made this fit at all.
+
+**The scope contract + the three call sites.** The level walk lives in the StepDown fold for two of them and in JS
+for the third, which is why they cannot be fixed the same way:
+
+```
+blockEmitter.js:237   child.z = -L; child.by = by;        + child.prevZ = -(i ? levels[i-1] : 0)
+stepover.js:42        ctx.prevZ = z + num(p.by, |z|)      -> the declared floor, nominal as the STANDALONE fallback
+contourfill.js:49     prevZ = z + num(p.by, |z|)          -> same
+slot.js:95            prevZ: z + sd                       -> -prevD (it walks its own levels; it knows the true floor)
+```
+
+⚠ **The fill fold must pass the scope's floor into the resolved params** (`blockEmitter.js:249`), NOT the wizard
+builders. `pocketWizard.js:200` writes `by: 'by', z: 'z'` into the leaf's params by hand, and if `prevZ` joined that
+list then every builder that forgot it would silently keep the old descent — a new divergence created by the act that
+closes one. Reading it from the scope makes it a property of being inside a StepDown, which is what "scope contract"
+should mean.
+
+### ⚠ THE GATE — THE PRESCRIBED RESTATEMENT ASSUMES A DIVERGENCE THAT (B) CLOSES
+
+The dispatch says: *"the frozen pre-t1506 reference's divergence-shape assert keeps BOTH directions meaningful under
+the new floor (state what the frozen kernel now measures AGAINST)."* That assumes the frozen kernel still diverges
+from the live one after (B). **It does not — it becomes IDENTICAL.**
+
+`tests/support/served/frozenSlotPath.js` is the **t1496** kernel, and it carries, at lines 237 / 246 / 258:
+
+```
+let prevD = 0;   …   prevZ: -prevD   …   prevD = d;
+```
+
+That is the ACTUAL floor. It is character-for-character what `slot.js` held before t1506 (checked against
+`git show ec4feb5d^`). So (B) does not move the family to a *new* floor — **it moves the family onto the frozen
+reference's own floor.** After (B), `live.slotPath` and `frozenSlotPath` agree byte for byte again.
+
+Two asserts stop being true, and neither is a wording fix:
+
+- `slot-frozen-reference-1496.spec.js` — its "identical everywhere, DIFFERENT exactly where the descent moved" half
+  has nothing left to measure. The freeze returns to the character-for-character identity it was built as, which
+  t1506's own note recorded losing with regret. **That direction is not weakened by (B); it is restored.**
+- `slot-repoint-domain-1498.spec.js` — `wasWorst` (frozen vs atom) goes to ~0, so
+  `expect(c.wasWorst).toBeCloseTo(c.predicted, 2)` and the named `expect(dflt.wasWorst).toBeCloseTo(9.54, 2)` both
+  fail. **The convergence spec loses its WITNESS**: the frozen slot kernel can no longer show what changed, because
+  it is now the thing everything converged onto.
+
+That last one is the gate. t1506 stated the rule this collides with, in its own words: *"a convergence test that
+cannot show what it converged from is indistinguishable from a test of nothing."* Under (B) the existing witness
+evaporates, and choosing its replacement is choosing what evidence the family's descent behaviour stands on — which
+the dispatch reserved to itself by prescribing the shape.
+
+### THE OPTIONS, WITH THEIR PRICES
+
+**(A) FREEZE THE NOMINAL KERNEL AS A SECOND REFERENCE — my recommendation.** Add a test-only frozen copy of the
+t1506 nominal-floor slot kernel beside the t1496 one. Then both directions are real *and* both are second
+implementations: frozen-t1496 **==** live (identity restored, asserted), and frozen-t1506-nominal **diverges** by
+exactly `(stepdown − lastBite)/tan(angle)` — the witness moves to the new copy and the 9.54mm number survives with
+its provenance intact. Cost: one more test-only module, and the corpus then carries two frozen slot kernels whose
+distinct jobs must be stated so a reader does not think one is stale.
+
+**(B) THE WITNESS BECOMES THE FORMULA.** Drop the frozen-vs-atom comparison and assert the predicted divergence
+against the computed nominal descent (`(stepdown − lastBite) * invTan`, already in the spec as `predicted`). No new
+module. Cost: the "what it lifted from" evidence stops being a second implementation and becomes arithmetic the spec
+supplies itself — weaker in exactly the way this project keeps refusing.
+
+**(C) RETIRE THE DIVERGENCE HALF.** Restore the frozen reference to a full identity check, drop `wasWorst`, keep the
+history in prose. Cheapest and the most honest about what is now true — but it is the shape t1506 explicitly argued
+against, so it should not be chosen by default.
+
+Every option ships the SAME G-code. This is a choice about evidence, not about the cut.
+
+### WHAT IS NOT BLOCKED BY THE GATE
+
+The measurement plan needs no ruling and is specified: `@work` ramp **6 → 7 steps per level**, differenced from real
+executed counts the t1440 way (t1504's calibration spec caught 307 vs 308 — the side that TRUNCATES a preview — so it
+must not be absorbed by the 4× margin); byte-identity where every bite is whole (run 28.621 both sides); convergence
+on 19.081 where partial; and the corpus blast radius reported as a NUMBER of configs in the sweep that move.
+
+### GATES
+
+- No product code changed. Nothing released; V2026.08.01.7 stands (this session's t1520, deployed by the advisor).
+- Scouting only — no suite run, and none was warranted for a read-only turn.
+
+### CAPACITY, PLAINLY
+
+This is my second act of the session; t1520 spent about half the seat including two full suites. The scouting above
+is complete and durable, and the build behind it is mechanical — but it is emit-surface work whose remaining risk is
+judgement on the evidence design, not typing, and that is the class where being tired is the failure mode. The gate
+is real regardless of capacity; I would have parked at it fresh. With the ruling in hand a fresh seat can land this
+turnkey from this entry alone.
