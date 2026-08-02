@@ -123,6 +123,8 @@ test('AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trip
     // …and CORNER — the op this turn was about — is byte-identical end to end. Middle carries a traverse too and
     // keeps every block now, but its TEXT still differs for a reason of the pre-existing class below; it is counted
     // there rather than claimed here, because the structural loss is what this turn fixed.
+    // (t1520 — middle's text difference is CLOSED: it was the stylus-comp sign, cause 1 below. It is byte-identical
+    // now, and the count it was counted in is 0. The wording above is left as the record of what this turn owned.)
     const corner = r.find((x) => x.op === 'user_corner_data');
     expect(corner.same, `the corner op round-trips byte-identically: ${JSON.stringify(corner)}`).toBe(true);
     expect(r.find((x) => x.op === 'user_middle_data').kept, 'and middle keeps every block, which it did not before').toBe(63);
@@ -140,6 +142,20 @@ test('AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trip
     // t1385 — PRINT THE NUMBER, always. The iron rule is "may only SHRINK from 11", and a rule about a trend is useless if
     // the value is only visible when it breaks: a turn that shrank it had no way to say so, and a turn that left it at the
     // ceiling looked the same as one that fixed something. Logged so the count and its members are in every run's output.
-    console.log(`IRON RULE — round-trip text differences: ${differs.length}/11 :: ${JSON.stringify(differs)}`);
-    expect(differs.length, `pre-existing text differences, unchanged in kind: ${JSON.stringify(differs)}`).toBeLessThanOrEqual(11);
+    //
+    // ⇩ t1520 — THE CEILING CAME DOWN 11 → 0, AND IT CAME DOWN BY CLOSING CAUSES. Taken one at a time to their root, the
+    // eleven were THREE (value-fidelity-1520.spec.js carries each with its own symptom asserted):
+    //   · SIX were one enum-vocabulary collision — the bridge resolved a dropdown's options from a table keyed by BARE
+    //     FIELD NAME, and a value outside a dropdown's options cannot be held by the field. `-` became `cw` (emit: `+`),
+    //     so a probed surface landed on the wrong side of the trigger by twice the stylus radius; `single` became `grid`,
+    //     so a one-hole drill came back a six-hole grid. Closed by letting the atom DECLARE its own vocabulary.
+    //   · FOUR were `confirm.mode` — an ENUM declared as a NUMBER, so its absence materialised as the shadow's 0, and
+    //     the operator gate came home reading `#1505=0`, the value ESC writes to CANCEL. Closed the same way.
+    //   · ONE was an explicit '' read as absence, so comm's deliberately-empty banner came back saying "check setup".
+    // NOTHING WAS LOOSENED to get here: the assert below TIGHTENED from `<= 11` to `=== 0`, and the proof the change is
+    // confined to the CANVAS is that all 32 ops emit byte-identically to the pre-change tree (measured against a clean
+    // origin/main worktree — the wizards were never wrong). The rule is unchanged in kind: this may only ever SHRINK,
+    // and it is now at the floor, so any regression is a hard red naming the op that broke.
+    console.log(`IRON RULE — round-trip text differences: ${differs.length}/0 :: ${JSON.stringify(differs)}`);
+    expect(differs, `a round-trip text difference is a REGRESSION now, not a pre-existing class: ${JSON.stringify(differs)}`).toEqual([]);
 });

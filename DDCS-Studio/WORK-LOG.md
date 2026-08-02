@@ -14281,3 +14281,167 @@ one. It did not recur. **NAMED as a flake-ledger candidate** (the ledger's own c
 rather than left as a shrug; if it surfaces again it has a first sighting recorded here.
 
 Released **V2026.08.01.5**.
+
+---
+
+## t1520 — VALUE-FIDELITY: the iron rule's ELEVEN pinned round-trip diffs were THREE causes, and all three closed. 11 → 0
+
+**Dispatch:** take each of the 11 permanent wizard→blocks→wizard value diffs to its ROOT CAUSE and classify —
+(a) CLOSABLE at the source, or (b) IRREDUCIBLE, declared as data beside the pin. Shrink-only and honest: the count
+goes down only by closing causes, never by loosening an assert. 0 is not the target unless the causes say so.
+
+**The causes said so.** The count is 0, no assert was widened, and the assert itself TIGHTENED (`<= 11` → `=== []`).
+
+### MEASURE FIRST — and the first measurement was of my own harness
+
+The 1319 sweep reuses one workspace across all 32 ops. My first probe copied that loop and drill/bore came back
+looking like they had turned into *each other* — bore's "after" was byte-for-byte drill's "after". That reads like
+cross-op contamination, so before diagnosing anything I added `ws.clear()` per op. **The count stayed at exactly 11
+and the members were identical**, which is the useful result: the leak was real in my probe but not load-bearing in
+the sweep (`stackToWorkspace` → `serialization.load` clears anyway), and drill/bore really were reverting to another
+op's parameters. Worth recording because "the two ops swapped identities" was the single most misleading signal of
+the act and it was one `ws.clear()` away from being read as a bridge bug.
+
+Then the measurement that actually decided everything: **diff at the PARAM level, not the text level.** The emit diff
+says "line 34 changed"; the param walk says *which field of which atom instance lost which value*. That collapsed 11
+op-level symptoms into 3 field-level causes in one run.
+
+### THE THREE CAUSES
+
+**(a) CAUSE 1 — AN ENUM VOCABULARY COLLISION. Six of the eleven, one root.**
+`optionsFor` resolved a dropdown's options from `SELECTS`, a table keyed by **bare field name** — so one field name
+means one enum across the entire registry. Field names collide, and the file's own header warns about exactly this
+hazard for *type* classification while the dropdown table never got the same scoping:
+
+| atom | field | its real vocabulary | what the shared table gave it |
+|---|---|---|---|
+| `radiuscomp` | `dir` | `+` / `-` (stylus-comp SIGN) | `cw` / `ccw` (spindle) |
+| `probecheck` | `dir` | `+` / `-` (probe travel sign) | `cw` / `ccw` |
+| `holecycle` | `pattern` | `single` + 4 | the array block's 4 — **no `single`** |
+| `holecycle` | `cycle` | `peck`/`bore-step`/`bore-helix` | the canned-cycle words |
+
+A value outside a dropdown's options **cannot be held by the field** — Blockly keeps `option[0]` — so the canvas
+silently rewrote `-` to `cw`, which every emit reads as `+`. **This is not cosmetic.** `#52=[#1925-#6]` became
+`#52=[#1925+#6]`: a probed surface on the WRONG SIDE of the trigger by twice the stylus radius. `single` to `grid`
+turned a one-hole drill into a **six-hole grid on a 20mm pitch the operator never asked for**, and `bore-step` to
+`drill` turned a bore into a peck cycle.
+
+CLOSED by a **declaration, not a special case**: an atom may now declare `selects: { field: [...] }` beside its
+defaults, read FIRST in `optionsFor`. The hand-rolled alternative was another `if (def.type === …)` arm in the chain
+that already has eight of them — the fourth copy of a pattern is where the declaration should have been.
+
+**(b) CAUSE 2 — A NUMERIC SOCKET CANNOT SAY "ABSENT". Four ops, five occurrences.**
+`confirm.mode` is an ENUM (`#1505=<mode>`: 1 = OK/Cancel, 3 = binary, per the Expert dialect) that was **declared as
+a number**. Every caller that omitted it — the ATC and rotary confirms, all wanting the declared default 1 — had it
+materialised on the canvas as the `math_number` shadow's `Number(undefined) || 0`. **The operator gate came home
+reading `#1505=0`, which is the value ESC writes to CANCEL.**
+
+⚠ **I nearly took the wrong fix here, and the note is the point.** The obvious move is the kernel one: make absent
+numerics resolve to `def.defaults[f]`. `stackBridge`'s own comment explains why that was deferred (progstart's `rpm`
+defaults to 12000 but its emit falls back to 0 = no spindle line, so filling the default would ADD lines a program
+never had) — and per the dispatch, a kernel change was the thing to PARK. But the kernel change is only needed if
+`mode` is genuinely a number. **It never was.** Declaring the vocabulary it always had makes it a *choice*, and a
+choice already takes its atom's default when absent (t1319's rule) — so the 1 comes back for free, `mode=7` becomes
+unrepresentable, and the numeric-absence kernel is **untouched**. Same declaration as cause 1, second use.
+
+**(c) CAUSE 3 — AN EMPTY STRING IS A VALUE. One of the eleven.**
+`isAbsent` folds `''` in with `undefined`. Right for a dropdown (no empty state, so `''` can only mean "nothing was
+said"); wrong for free TEXT, where `''` is representable and MEANT. comm declares an empty operator message
+(`COMM_DEFAULTS.msg = ''`), and the canvas substituted the `message` atom's own default — the program came home
+saying **"check setup" where the op had deliberately said nothing**. Narrowed to `undefined`/`null` for `k === 'text'`
+only; dropdowns and checkboxes keep t1319's rule exactly.
+
+### IRREDUCIBLE: none. And two latent members of cause 1's class, closed while the declaration was open
+
+The audit that generalises cause 1 — *no atom's declared default may sit outside its own dropdown's options* — named
+**five** offenders, not three. `setworkoffset.wcs` and `wcswrite.wcs` both default to `#578` (the firmware active-WCS
+register), which the `wcs` dropdown cannot hold. They are NOT among the 11 because for `setworkoffset` the coercion is
+harmless (`resolveWcsIndex('active') === '#578'` — the resolver declares them equal). **For `wcswrite` it is not
+harmless:** its non-Expert arm passes `wcs` STRAIGHT to `setWorkOffset` with no `resolveWcsIndex`, so a G92-datum post
+would have received the word `active`. That is a latent defect of the same class, found by the audit rather than by
+the symptom, and closed by the same one-line declaration.
+
+⚠ Note it took a de-duplication rather than adding one: the WCS vocabulary now lives **once**, in `setworkoffset.js`
+beside `resolveWcsIndex` where its meaning is defined (`WCS_SELECTORS` / `WCS_SELECTORS_REG`), and the bridge IMPORTS
+it instead of keeping a second hand-typed copy.
+
+### VERIFIED TWO WAYS, and the second way is what makes the 0 trustworthy
+
+A `before === after` sweep going to zero proves the round trip is a fixed point — **it does not prove either side is
+right.** Both sides being wrong-but-equal passes it. So:
+
+1. **Assert the VALUE, against an independent truth.** The spec drives `user_middle_data`, which probes BOTH walls of
+   a pocket and therefore emits one comped line EACH WAY (`#51=[#1925+#6]` and `#52=[#1925-#6]`). The bug made them
+   AGREE — a centre computed from two surfaces pushed the same direction, wrong by a stylus diameter, with nothing in
+   the text looking broken. **The pair disagreeing IS the property.**
+2. **The wizards must not have moved.** Dumped all 32 registered ops' wizard-side emits from a clean `origin/main`
+   worktree (short path — `C:/dd-base`; the scratchpad path blew the Windows filename limit) and from this tree, and
+   diffed: **0 of 32 moved, byte for byte.** So the whole fix is provably confined to the CANVAS. The wizards were
+   never wrong; the round trip was.
+3. **NON-VACUITY, proven not argued.** The new spec run against that same pre-change tree: **6 of 6 FAIL.** Every test
+   catches the regression it was written for, including the invariant test (which names all five offenders there).
+
+### THE PIN, RESTATED — showing what it lifted FROM (the frozen-kernel pattern)
+
+`roundtrip-whole-program-1319.spec.js` keeps its history and gains the resolution: the log line reads `0/0`, the
+assert went from `toBeLessThanOrEqual(11)` to `toEqual([])`, and the comment records what each of the three causes
+did to a program so the number is a list of understood facts rather than a trend nobody can audit. The stale line
+claiming middle's text "still differs" is corrected in place with a dated note rather than deleted.
+
+New spec `value-fidelity-1520.spec.js` (6 tests) carries the invariant + each cause with its own symptom asserted.
+
+### GATES
+
+- New `value-fidelity-1520` **6/6** · against the pre-change tree **6/6 FAIL** (non-vacuity).
+- `roundtrip-whole-program-1319` **4/4**, logging `IRON RULE — round-trip text differences: 0/0 :: []`.
+- Touched families (blocks · blockly · atc · rotary · lathe · comm · drill/bore/hole · probe · wcs · middle · corner)
+  **615 passed / 0 failed / 2 skipped**.
+- Full suite: recorded at the end of this entry.
+
+### SCAFFOLDING REMOVED
+
+Two throwaway probe specs (`zz-measure-fidelity`, `zz-dump-emits`) and their JSON dumps deleted; the `C:/dd-base`
+worktree removed (its mem-server on 3213 killed first — the worktree refused to delete while a process held its cwd).
+
+### ⚠ THE FULL SUITE FOUND A TEST THAT HAD BEEN PASSING ON THE BUG — and that is the strongest evidence the fix is real
+
+First full run: **2368 passed / 1 failed / 6 skipped**. The red was
+`place-on-stock-block.spec.js:61` — *"editing the PlaceOnStock attach corner in Blockly re-emits the placed G-code"* —
+expecting a max cut X of **40** and getting **0**. It reproduced **2/2 in isolation**, so it is not a flake and I did
+not treat it as one.
+
+**Diagnosis, and it inverts the usual reading of a red.** The test opens the drill wizard and does:
+
+```js
+set('d_cols', 3); set('d_rows', 1); set('d_dx', 20); …          // ← grid knobs
+```
+
+…but it never selects the **pattern**. The drill wizard defaults to a SINGLE hole — `pattern: params.pattern ||
+'single'`, commented *"t848 — default = a single hole (the CAM expectation); patterns are opt-in"* — and the grid
+knobs are declared `when: { param: 'pattern', is: 'grid' }`, so at `single` **`d_cols`/`d_rows`/`d_dx` are not in the
+DOM at all** and the helper's `if (e)` skipped all three SILENTLY.
+
+So where did its three holes come from? **From the bug.** The canvas rewrote `pattern` single→grid (cause 1: `single`
+is absent from the shared `pattern` list), and `holecycle` then supplied its OWN `cols: 3` / `dx: 20` defaults — which
+happen to be exactly the numbers the test had tried and failed to set. **The test passed for four hundred turns on a
+value it never produced, matching by coincidence.** Closing the corruption made the single hole a single hole, its
+span went to 0, and the assertion finally spoke.
+
+**Fixed by making the test say what it means** — select the pattern first, then fill the knobs that now exist — and
+hardened so it can never drift back: it now ASSERTS ON THE CANVAS that the grid is the one it asked for
+(`pattern: 'grid', cols: 3`) before measuring the span. The `40` is once again the span of a named grid rather than a
+number the round trip manufactured. `place-on-stock-block` **4/4**.
+
+⚠ **I changed a test's setup, not its expectation** — worth the advisor's eye, since "the fix broke a test so I edited
+the test" is the shape of a bad move. The distinction: the `before`/`after` assertions (100 → 40) are UNTOUCHED, and
+the property under test (an attach-corner edit in Blockly re-emits the placed G-code) is unchanged and now genuinely
+exercised. What changed is that the test finally builds the grid it always claimed to. The alternative reading — keep
+the single hole and expect `0` — would have quietly dropped the multi-hole translation the author clearly meant to
+cover (they wrote the three `set` calls), so it was the weaker option.
+
+**No other spec in 2375 depended on the corruption**, which is a useful bound on the blast radius.
+
+### FULL SUITE
+
+Run 1: 2368 / 1 / 6 (the red above — a real find, fixed at its cause).
+Run 2 (after the spec fix): recorded in the pass-back.

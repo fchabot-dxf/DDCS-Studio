@@ -129,6 +129,10 @@ const d9 = (n) => Number(n.toFixed(9));
 
 /** The declared cycles. `bore-step` and `bore-helix` are the literal `helicalBore`'s two ramp modes. */
 export const CYCLES = ['peck', 'bore-step', 'bore-helix'];
+/** The declared patterns — the five `holePatternPoints` actually walks, `single` (the default) included. t1520: the
+ *  Blockly bridge used to reach for the ARRAY block's four-member `pattern` list, which has no `single`, so a one-hole
+ *  drill came back from the canvas as a six-hole grid. Declared here, where the point generator defines them. */
+export const PATTERNS = ['single', 'grid', 'line', 'circle', 'rect'];
 export const cycleOf = (v) => (CYCLES.includes(v) ? v : 'peck');
 
 /** The bore's cut RADIUS at build values — (hole Ø − tool Ø) / 2, the literal's own derivation. */
@@ -586,6 +590,7 @@ export const holeCycleBlock = {
         w: 100, h: 80, nx: 2, ny: 2, skip: '',
     },
     fields: ['pattern', 'cycle', 'depth', 'peck', 'feed', 'clearance'],
+    selects: { pattern: PATTERNS, cycle: CYCLES },   // t1520 — this atom's OWN vocabularies (the shared by-name lists are the array/canned-cycle ones)
     // The Blocks view carries EVERY pattern + cycle field so all of them round-trip; a Blockly extension toggles which
     // are visible per `pattern`, exactly as the `array` block already does.
     allFields: ['pattern', 'cycle', 'x', 'y', 'z0', 'x0', 'y0', 'depth', 'peck', 'pitch', 'holeDia', 'toolDia', 'feed', 'clearance',

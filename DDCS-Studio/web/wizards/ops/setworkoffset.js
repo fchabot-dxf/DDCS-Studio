@@ -21,9 +21,18 @@ export function resolveWcsIndex(wcs) {
     return wcs;   // already resolved (#578 / index / expression / #var) → unchanged (idempotent)
 }
 
+/** THE WCS SELECTOR VOCABULARY, declared where the resolver above defines its meaning — the ONE list, imported by the
+ *  Blockly bridge for its `wcs` dropdown instead of a second hand-typed copy. `WCS_SELECTORS` is the selector form a
+ *  wizard offers; `WCS_SELECTORS_REG` adds the already-resolved active-WCS REGISTER `#578`, which the two atoms that
+ *  default to it must be able to hold (t1520 — a dropdown that cannot represent its own atom's default silently
+ *  rewrites it on the way through the canvas). */
+export const WCS_SELECTORS = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59P1', 'G59P2', 'G59P3', 'G59P4', 'G59P5', 'G59P6', 'G59P7', 'G59P8', 'G59P9', 'G59P10'];
+export const WCS_SELECTORS_REG = ['#578', ...WCS_SELECTORS];
+
 export const setWorkOffsetBlock = {
     type: 'setworkoffset', label: 'Set WCS Offset', kind: 'leaf', category: 'Coordinates',
     defaults: { wcs: '#578', axis: 'X', value: '#50' }, fields: ['wcs', 'axis', 'value'],
+    selects: { wcs: WCS_SELECTORS_REG },   // t1520 — its own default `#578` is IN the vocabulary it offers
     scratch: [[50, 50]],   // t1085 — the default value var it READS (#578 is the firmware active-WCS reg)
     emit: (p, dx, dy, dialect) => dialect.setWorkOffset(resolveWcsIndex(p.wcs || '#578'), p.axis || 'X',
         (p.value === '' || p.value == null) ? 0 : (typeof p.value === 'number' ? num(p.value, 0) : p.value)),

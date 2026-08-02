@@ -11,6 +11,7 @@
  *                 Expert-only value with no cross-post equivalent (the #883 dual-gantry sync → honest comment off-Expert).
  */
 import { num } from './util.js';
+import { WCS_SELECTORS_REG } from './setworkoffset.js';   // the ONE wcs vocabulary, declared beside resolveWcsIndex
 
 export const wcsBaseIntoBlock = {
     type: 'wcsbaseinto', label: 'WCS Base', kind: 'leaf', category: 'Coordinates',
@@ -26,6 +27,9 @@ export const wcsWriteBlock = {
     type: 'wcswrite', label: 'WCS Write', kind: 'leaf', category: 'Coordinates',
     defaults: { axis: 'X', wcs: '#578', offset: 0, addrVar: '', addrNote: '', value: '', note: '', rawAxis: '', radius: '#6', compDir: '-', offComment: '', direct: false },
     fields: ['axis', 'wcs', 'offset', 'addrVar', 'addrNote', 'value', 'note', 'rawAxis', 'radius', 'compDir', 'offComment', 'direct'],
+    // t1520 — the non-Expert arm passes `wcs` STRAIGHT to setWorkOffset (no resolveWcsIndex), so `#578` and `active` are
+    // NOT interchangeable here: the dropdown has to be able to hold the default it declares.
+    selects: { wcs: WCS_SELECTORS_REG },
     scratch: [[6, 6], [70, 70]],   // t1085 — READS the tool-radius var (#6) and the base address (#70) the paired wcsbaseinto set
     emit: (p, dx, dy, dialect) => {
         // resolve the value: a radius-comped TRIGGER (rawAxis, per post) or the given literal

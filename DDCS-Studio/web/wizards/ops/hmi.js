@@ -54,6 +54,14 @@ export const hmiConfirmBlock = {
 export const confirmBlock = {
     type: 'confirm', label: 'Confirm', kind: 'leaf', category: 'Control',
     defaults: { msg: 'Press Enter to continue', cancel: 2, mode: 1, pauseOnDegrade: false }, fields: ['msg', 'cancel', 'mode', 'pauseOnDegrade'],
+    // t1520 — `mode` IS AN ENUM, not a free number: the Expert prompt reads `#1505=<mode>` with exactly two meanings
+    // (1 = OK/Cancel, 3 = binary choice — ddcs-expert-m350.js:154), and communicationWizard passes only those two.
+    // Declared as its vocabulary because a NUMERIC socket cannot express "absent": every caller that omits `mode` (the
+    // ATC + rotary confirms, which want the default 1) had it materialised on the canvas as the shadow's `Number(
+    // undefined)||0` = 0 — an UNDEFINED prompt mode. Five of the iron rule's eleven pinned diffs were this one line,
+    // and the operator gate came back from Blocks as `#1505=0`, which is the value ESC writes to CANCEL. A choice
+    // takes its atom's default when absent (t1319), so declaring the vocabulary is also what restores the 1.
+    selects: { mode: [['OK / Cancel', '1'], ['Binary choice', '3']] },
     // Operator OK/Cancel gate: the controller's blocking prompt (dialect.hmiPrompt → Expert `#1505=<mode>(msg)`, mode 1=OK/Cancel,
     // 3=binary) PLUS an ESC→cancel jump to <cancel>. PROFILE-AWARE: on controllers with no scripted prompt (V4.1/DM500 hmiPrompt →
     // []) the gate degrades. `mode` (default 1) + `pauseOnDegrade` (default false) DEFAULT TO THE PRIOR BEHAVIOUR so every existing

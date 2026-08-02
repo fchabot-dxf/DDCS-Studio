@@ -249,6 +249,12 @@ function recToJson(rec) {
         // so applying the default there would ADD lines the program never had. Where a number's absence is meaningful
         // the atom declares it `absentable` (t1317) and the socket stays empty.
         } else if (k === 'checkbox') fields[name] = !!(isAbsent(v) ? def.defaults[f] : v);
+        // t1520 — …AND A TEXT FIELD'S EMPTY STRING IS A VALUE, not an omission. `isAbsent` folds '' in with undefined,
+        // which is right for a dropdown (it has no empty state, so '' can only mean "nothing was said") but wrong for a
+        // free-text field, where '' is representable and MEANT: comm declares an empty operator message, and the canvas
+        // was handing back the `message` atom's own default — the program came home saying "check setup" where the op
+        // had deliberately said nothing. Only a genuinely missing value (undefined/null) takes the default here.
+        else if (k === 'text') fields[name] = String((v === undefined || v === null ? def.defaults[f] : v) ?? '');
         else fields[name] = String((isAbsent(v) ? def.defaults[f] : v) ?? '');
     }
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) → `data`, so they survive a block edit.

@@ -16,6 +16,7 @@
  * mouth; everything else → a statement (prev/next). Requires window.Blockly (vendored UMD).
  */
 import { PALETTE, CATEGORIES } from '../../wizards/ops/index.js';
+import { WCS_SELECTORS } from '../../wizards/ops/setworkoffset.js';   // the ONE wcs vocabulary, declared beside resolveWcsIndex
 import { installCornerGridField } from './cornerGridField.js';
 import { installRegionPickField } from './regionPickField.js';
 import { installCoordListField } from './coordListField.js';
@@ -31,7 +32,7 @@ const SELECTS = {
     axis: ['X', 'Y', 'Z', 'A', 'B', 'C'],
     axisDir: ['pos', 'neg'],
     featureType: ['boss', 'pocket', 'bore'],
-    wcs: ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59P1', 'G59P2', 'G59P3', 'G59P4', 'G59P5', 'G59P6', 'G59P7', 'G59P8', 'G59P9', 'G59P10'],
+    wcs: WCS_SELECTORS,
     slave: [['A', '3'], ['B', '4'], ['C', '5']],
     atcMode: ['auto', 'manual'],
     testMode: ['current', 'all'],
@@ -141,6 +142,17 @@ const DESCRIPTIONS = {
 const getDesc = (f) => DESCRIPTIONS[f.toLowerCase()] || `The ${f} parameter`;
 
 const optionsFor = (def, field) => {
+    // t1520 — THE ATOM'S OWN VOCABULARY WINS. `SELECTS` below is keyed by BARE FIELD NAME, so one field name means one
+    // enum across the whole registry — and field names collide: `dir` is the spindle's cw/ccw on progstart/spindle but the
+    // stylus-compensation SIGN (+/-) on radiuscomp/probecheck; `pattern`/`cycle` name a wider vocabulary on holecycle than
+    // the array block's. A value outside a dropdown's options CANNOT BE HELD BY THE FIELD: Blockly keeps option[0], so the
+    // canvas silently rewrote `-` to `cw` (→ the emit's `+`) and `single` to `grid`. That put the probed surface on the
+    // WRONG SIDE of the trigger by twice the stylus radius, and turned a one-hole drill into a six-hole grid — six of the
+    // iron rule's eleven pinned round-trip diffs, all one cause. An atom that declares `selects: { field: [...] }` beside
+    // its defaults now states its OWN vocabulary, and it is read FIRST — the collision is unrepresentable rather than
+    // patched per case. The invariant it restores is asserted in value-fidelity-1520.spec.js: no atom's declared default
+    // may sit outside its own dropdown's options.
+    if (def.selects && def.selects[field]) return def.selects[field];
     if (field === 'op') return (def.type === 'compare' || def.type === 'ifgoto') ? ['<', '>', '<=', '>=', '==', '!='] : ['+', '-', '*', '/', '%'];
     if (field === 'mode') {
         if (def.type === 'pathmode') return ['blend', 'exact'];

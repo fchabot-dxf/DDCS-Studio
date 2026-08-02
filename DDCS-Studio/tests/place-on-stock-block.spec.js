@@ -64,15 +64,30 @@ test('editing the PlaceOnStock attach corner in Blockly re-emits the placed G-co
   await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = Object.assign(s.stock || {}, { x: 100, y: 80, z: 20, show: true, datum: 'nnp' }); });
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
+  // t1520 — ASK FOR THE GRID, then fill it. The drill wizard defaults to a SINGLE hole ("patterns are opt-in",
+  // drillWizard.js:77) and the grid knobs are gated `when pattern is grid`, so until the pattern is chosen `d_cols`
+  // /`d_rows`/`d_dx` are not in the DOM and this helper's `if (e)` skipped them SILENTLY. The three holes this test
+  // measures were therefore never the ones it asked for: they came from the canvas rewriting `pattern` single→grid
+  // (the value-fidelity bug t1520 closed — `single` was missing from the shared dropdown list), after which holecycle
+  // supplied its OWN cols/dx defaults, which happen to be the 3 and 20 set here. So the test passed on a number it
+  // did not produce. Selecting the pattern first makes the grid REAL and the 40 below the span of the grid it named.
   await page.evaluate(() => {
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = String(v); };
+    set('d_pattern', 'grid');
+    window.ddcsStudio.wizardManager.update();          // renders the pattern-gated knobs
     set('d_cols', 3); set('d_rows', 1); set('d_dx', 20); set('d_originX', 0); set('d_originY', 0); set('d_stockAttach', 'pp');
     window.ddcsStudio.wizardManager.update();
   });
-
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(150);
+  // …and PROVE, ON THE CANVAS, that the grid is the one asked for — so this can never again pass on a pattern nobody
+  // selected, and so the 40 below is the span of a grid rather than a number the round trip happened to manufacture.
+  const holes = await page.evaluate(() => {
+    const b = window.__blkws.getAllBlocks().find((x) => x.type === 'holecycle');
+    return b ? { pattern: b.getFieldValue('PATTERN'), cols: Number(b.getInput('COLS').connection.targetBlock().getFieldValue('NUM')) } : null;
+  });
+  expect(holes, 'the canvas carries the 3-column grid the form asked for').toEqual({ pattern: 'grid', cols: 3 });
   const before = await maxCutX(page);
 
   // Change the attach corner to Front-left in Blockly (the snapshot — stock dims/bbox — must ride along for it to work).

@@ -35,6 +35,9 @@ export const probeCheckBlock = {
     //      probeSurface. NOTE: a real touch inside the LAST `eps` of travel reads as a miss — inherent to DRO-compare (eps default 0.05mm).
     //  (3) NEITHER (grbl/rs274/centroid) → an HONEST comment, never a guessed register.
     defaults: { axis: 'Z', goto: 1, dir: '+', seek: '', eps: 0.05 }, fields: ['axis', 'goto', 'dir', 'seek', 'eps'],
+    // t1520 — `dir` is the PROBE TRAVEL SIGN (which way the DRO comparison faces), not a spindle direction. Declared so
+    // the canvas keeps a '-'; it used to fall back to the shared cw/ccw list and invert the miss test on the way through.
+    selects: { dir: ['+', '-'] },
     emit: (p, dx, dy, dialect) => {
         const axis = p.axis || 'Z';
         const goto = Math.max(0, Math.round(num(p.goto, 1)));
