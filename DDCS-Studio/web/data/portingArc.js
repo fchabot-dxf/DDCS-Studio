@@ -1,6 +1,6 @@
 /**
  * data/portingArc.js — THE V4.1 PORTING ARC, DESIGNED AS DATA (t1530 scout, t1531 ruled, t1532 S1, t1534 S2-S4,
- * t1536 DM500 stage 1 measured).
+ * t1536 DM500 stage 1 measured, t1538 S5 bench kit delivered).
  *
  * ── STATUS ───────────────────────────────────────────────────────────────────────────────────────────────────────
  * All 5 forks in `PORTING_FORKS` are RULED (t1531) — read each `.ruling` field, not just `.recommend`. S1
@@ -8,10 +8,13 @@
  * `tests/v41-residue-census-1532.spec.js` (the arc-reframe condition). S2 (normalisation-policy), S3
  * (caps-completeness), S4 (named-unknowns) LANDED at t1534: `tests/v41-caps-completeness-1534.spec.js`. S3's
  * inputRead/atc true-vs-false fork was RULED at t1535 (advisor): `false` STANDS, ratified as the correct design
- * (not merely as what passes the neutrality test) — `DEFAULT_CAPS` needed no further change. The V4.1 offline
- * arc is CLOSED to S5 (human-gated, unscheduled). DM500 STAGE 1 (measurement only, ruling 5's guard) landed at
- * t1536: `DM500_ORACLE_FINDINGS` + `tests/dm500-corpus-oracle-1536.spec.js`. ⚠ NO VERDICT ON DM500 lives anywhere
- * in this file — `POST_VERIFIED` is untouched, no DM500 cap value changed. The verdict is the advisor's, pending.
+ * (not merely as what passes the neutrality test) — `DEFAULT_CAPS` needed no further change. S5's gate OPENED at
+ * t1538 — a bench unit is now connected — and the kit itself LANDED (`bridge/controllers/v4.1/verify/`, 6
+ * no-motion probes + README, see `PORTING_STAGES['live-roundtrip'].landed`); running it and ruling on the result
+ * is still ahead. DM500 STAGE 1 (measurement only, ruling 5's guard) landed at t1536: `DM500_ORACLE_FINDINGS` +
+ * `tests/dm500-corpus-oracle-1536.spec.js`. ⚠ NO VERDICT ON DM500 lives anywhere in this file — `POST_VERIFIED`
+ * is untouched, no DM500 cap value changed. Both the DM500 verdict and the S5 bench results are the advisor's,
+ * pending.
  *
  * ── WHAT THIS IS ────────────────────────────────────────────────────────────────────────────────────────────────
  * The standing plan opened the porting arc with "port the emit corpus to other controllers, DDCS V4.1 FIRST, with
@@ -445,7 +448,26 @@ export const PORTING_STAGES = [
         gate: '⚠ HUMAN-PRESENCE GATED. Needs either a person at the bench to press Start, or the unbuilt External '
             + 'Start relay. Not schedulable by an agent, and it is LAST for exactly that reason: the four stages '
             + 'above must not be able to stall behind a machine visit (the C3-is-last discipline from the slot arc)',
-        landed: '',
+        landed: 't1538 — THE GATE OPENED: the user has a V4.1 bench unit connected over SMB, no motors, nothing '
+            + 'attached. bridge/controllers/v4.1/verify/ carries 6 no-motion probe macros (S5a-S5f) + README.md, '
+            + 'mirroring expert-m350/verify/\'s exact shape (one risky form per file — a syntax error aborts the '
+            + 'WHOLE file — self-closing single-line comments only, no nested parens or brackets, which every one '
+            + 'of the 6 files got wrong on the FIRST draft and was caught by re-reading before commit, the same '
+            + 'mistake Expert\'s own V13_trig.nc made and fixed at t1466). Register band: #190/#191 (ddcs-v41.js\'s '
+            + 'own verified-free scratch), doubly grounded — outside the firmware\'s #0-148/#490-536 write range '
+            + 'AND inside uservar\'s #100-499 SMB-readable range (FINDINGS.md). No on-screen popup mechanism is '
+            + 'corpus-confirmed for V4.1 (grepped: zero -5000-style message sentinel anywhere in 91 tracked files) '
+            + '— the README gives the uservar/SMB readback as the CONFIRMED path, the on-screen page as the '
+            + 'expected-but-unconfirmed one. THE SIX PROBES, each argued from the corpus rather than assumed: (a) '
+            + 'spaced multi-word parse — upgrades V41_SPACING_DELTA from user-attested to bench-confirmed-pending; '
+            + '(b) an expression inside a coordinate word via G92, self-restoring by construction (reads the live '
+            + 'work-Z, adds zero, writes it back — no second restore file needed); (c) IF/GOTO actually BRANCHES, '
+            + 'not just parses — two separate exit paths so a wrong branch can\'t be masked by a shared fallthrough '
+            + 'tail; (d) WHILE/DO/END — V4.1\'s OWN factory corpus (slib.nc, macroMillCylinder.nc, macroMillRect.nc) '
+            + 'already uses this, so caps.flow:\'goto\' may be under-declaring, found by grepping rather than by '
+            + 'assumption; (e)/(f) SQRT and ATAN alone, split per the one-risky-form-per-file rule, mirroring '
+            + 'V13c/V13d exactly. THIS ACT SHIPS NO TIER OR CAP CHANGE — the bench results and the ruling on them '
+            + 'are the advisor\'s, on whatever the operator reports back',
     },
 ];
 

@@ -159,13 +159,16 @@ test('PREMISE 6 — the settings corpus AND the factory macro corpus are both wi
         .toContain('controller-import-one-door-1221.spec.js');
 
     // the factory MACRO corpus is now ALSO an oracle — v41-corpus-oracle-1532 diffs Studio's V4.1 emit against the
-    // tracked .nc files directly (excluding expert-m350/verify/, Studio's own diagnostic macros, a different corpus).
+    // tracked .nc files directly (excluding ANY verify/ directory — expert-m350/verify/ and, since t1538,
+    // v4.1/verify/ — Studio's OWN diagnostic/bench-kit macros, a different corpus from factory-shipped ones).
     // v41-caps-completeness-1534 (S2) reads the same corpus too, to keep the two REFUSED normalisations honest — a
     // second, narrower reader, not a duplicate oracle. dm500-corpus-oracle-1536 (t1536) is a THIRD, the same S1
-    // mechanism run against the (much thinner) DM500 corpus
+    // mechanism run against the (much thinner) DM500 corpus. v41-bench-kit-nomotion-1538 (t1538) ALSO reads .nc
+    // files and mentions 'verify', but only its OWN kit's .nc files under v4.1/verify/ — excluded for the same
+    // reason expert-m350/verify/ always was, not counted as a fourth factory-macro oracle
     const readsFactoryMacro = readsCorpus.filter((f) => {
         const src = readFileSync(join(testsDir, f), 'utf8');
-        return /['"][^'"]*\.nc['"]/.test(src) && !/expert-m350['",\s/\\]*verify/.test(src);
+        return /['"][^'"]*\.nc['"]/.test(src) && !/['",\s/\\]verify['",\s/\\]/.test(src);
     });
     expect(readsFactoryMacro.sort(), 'the three specs that now use a factory corpus as an oracle')
         .toEqual(['dm500-corpus-oracle-1536.spec.js', 'v41-caps-completeness-1534.spec.js', 'v41-corpus-oracle-1532.spec.js']);
@@ -234,8 +237,10 @@ test('PREMISE 8 — DM500\'s trig floor is the SAME SHAPE as V4.1\'s (COS/SIN at
     const usesFn = (files, fn) => files.filter((f) => {
         try { return new RegExp(`\\b${fn}\\b`).test(readFileSync(f, 'utf8')); } catch (e) { return false; }
     }).length;
-    // exclude community/NOTES commentary — it MENTIONS SQRT/ATAN as absent, which must not be counted as usage
-    const factoryOnly = (files) => files.filter((f) => !/community|NOTES/i.test(f));
+    // exclude community/NOTES commentary (mentions SQRT/ATAN as absent, not usage) AND verify/ (t1538 — Studio's
+    // OWN bench-kit probe macros, which literally probe SQRT/ATAN by name; not factory-shipped, same exclusion
+    // class as expert-m350/verify/ elsewhere in this file)
+    const factoryOnly = (files) => files.filter((f) => !/community|NOTES|[\\/]verify[\\/]/i.test(f));
     const v41Factory = factoryOnly(v41Files), dm500Factory = factoryOnly(dm500Files);
 
     for (const [label, files] of [['V4.1', v41Factory], ['DM500', dm500Factory]]) {
