@@ -15126,3 +15126,9 @@ Smoke tier 71/71 green.
 
 **Capacity:** a full build turn — census + oracle + two ruling-incorporation passes + an amendment absorbed
 mid-flight. Comfortable room remaining; proceeding to the full suite and release this same seat as dispatched.
+
+- **FULL SUITE 2404 passed · 0 failed · 6 skipped (20.9m), exit 0** — failed-count grepped with ANSI+NUL stripped
+  and cross-checked against the numbered-failure count (0). Released **V2026.08.02.3**. Bump verified with its OWN
+  version-sync-1311 run (6/6) — the t1528/t1529 lesson, applied rather than re-learned: package.json shows zero
+  diff this bump (confirmed via `git diff HEAD`, not assumed) since its Y.M.D granularity hasn't moved since the
+  last release. On branch `scout/v41-porting-1530`, unpushed — the advisor's own gate governs the merge/deploy.
