@@ -15293,3 +15293,74 @@ else lands before the next release.
 
 **Capacity:** comfortable — the DM500 measurement was smaller in scope than S1's V4.1 build, as expected from an
 8-file corpus vs 91. The restore near-miss cost a few minutes of attention but no rework.
+
+## t1538 — S5 BENCH KIT FOR V4.1: 6 no-motion verify macros, ready for the operator
+
+**Dispatch (t1537):** the human-gated S5 stage becomes possible — the user has a V4.1 bench unit connected over
+SMB, no motors, nothing attached. Deliverable: 6 no-motion probe macros under `bridge/controllers/v4.1/verify/`
+plus a README, mirroring `expert-m350/verify/`'s exact shape. Register safety measured, not copied. Reporting
+mechanism determined from the corpus, not assumed. No verdict, no tier/cap change — measurement kit only.
+
+**Read the precedent first, as instructed.** `HANDOFF.md`, `V13c_sqrt.nc`, `V13_trig.nc`, `V15_indent.nc` — the
+one-risky-form-per-file discipline (safety rule 3: a syntax error aborts the WHOLE file), the sentinel-priming
+pattern so an untouched register is unmistakable, and the two-exit-path shape for a branch test that can't be
+masked by a shared fallthrough tail.
+
+**Register choice, doubly grounded.** `#190`/`#191` — `ddcs-v41.js`'s own declared verified-free scratch band.
+Confirmed against TWO independent facts, not just cited: outside the firmware's `#0-148`/`#490-536` write range
+(the dialect's own comment), and inside `uservar`'s `#100-499` SMB-readable range (`FINDINGS.md`) — meaning the
+readback path is grounded in the SAME evidence that makes the registers safe to write.
+
+**Reporting mechanism, measured not assumed.** Grepped all 91 tracked V4.1 files for Expert's `-5000`-style popup
+sentinel: zero hits. No scripted on-screen message mechanism is corpus-confirmed for V4.1. The README gives the
+CONFIRMED fallback (`\10.0.0.50\sysdisk\uservar`, `#190` at slot 90 / byte 720, little-endian float64) alongside
+the standard-but-unconfirmed on-screen variable page, rather than assuming the Expert popup convention transfers.
+
+**The six probes, each argued from the corpus:**
+- `S5a_spaced.nc` — Studio's spaced multi-word style, upgrading `V41_SPACING_DELTA` from user-attested toward
+  bench-confirmed.
+- `S5b_coordword.nc` — an expression inside a coordinate word via `G92`, the exact form `setWorkOffset`/
+  `wcsZeroAtCurrent` already ship. Designed **self-restoring by construction**: the bracketed expression reads
+  the live work-Z and adds zero, so no separate restore file is needed — the probe cannot leave a mutated state
+  even if it succeeds.
+- `S5c_ifgoto.nc` — does IF/GOTO actually BRANCH, not merely parse. Two separate exit paths (not one shared
+  tail) so a silently-wrong branch can't be masked by whatever runs after a correct one.
+- `S5d_while.nc` — WHILE/DO/END. `caps.flow` declares `'goto'` only, but grepping V4.1's OWN factory corpus
+  (`slib.nc`, `macroMillCylinder.nc`, `macroMillRect.nc`) found WHILE already in use there — a genuine possible
+  under-declaration, found by measurement, not assumed from the dispatch's own hint. Flagged as a DIFFERENT risk
+  class from the other five (an untested loop could in principle not terminate) with an explicit hang/reset
+  instruction in both the file and the README.
+- `S5e_sqrt.nc` / `S5f_atan.nc` — the two prize probes, split per the one-form-per-file rule, mirroring `V13c`/
+  `V13d` exactly.
+
+**A real catch before commit, the same mistake at a different site.** The first draft of ALL SIX files nested
+parens inside comments — exactly what Expert's own `V13_trig.nc` did and had to fix at t1466 (a DDCS comment
+closes at the first `)`; anything after parses as code). Caught by explicitly grepping every comment line against
+the rule before considering the files done, not by assuming the shape was safe because it followed the precedent
+structurally. All six rewritten with zero parens or brackets anywhere inside a comment line, re-verified by grep.
+
+**Non-vacuity, and the proof found a real bug in my OWN test.** Injected a literal `G0 X5` into `S5a_spaced.nc`
+and ran the new spec. The ALLOWLIST assertion correctly went red. The BELT-AND-BRACES regex assertion — meant as
+a second, independent check — stayed GREEN: its pattern (`\bG0?[123]\b`) requires a trailing 1/2/3 digit, and
+bare `G0` has none, so the "belt and braces" was structurally incapable of catching the exact case it existed to
+catch. Rewritten as an explicit word alternation (`G0|G00|G1|G01|...`) rather than a character class; re-ran
+against the same injection — both assertions now correctly fail. Restored `S5a_spaced.nc` from a saved scratch
+copy — NOT `git checkout HEAD`, per the exact lesson the skill picked up from t1536's near-miss, since the work
+was still uncommitted at that point — and reconfirmed 5/5 green before proceeding.
+
+**Collateral fix, surfaced by the new files' own existence, not new scope.** Two PRE-EXISTING assertions in
+`porting-arc-scout-1530.spec.js` needed widening once the new kit existed: PREMISE 6's factory-macro-oracle
+detection excluded only `expert-m350/verify/`, so the new `v4.1/verify/` kit tripped it as a false fourth oracle
+— widened to exclude any `verify/` directory. PREMISE 8's SQRT/ATAN-corpus-usage count walks the whole
+`bridge/controllers/v4.1` tree, which now includes `S5e_sqrt.nc`/`S5f_atan.nc` literally containing those words
+as text — same widening. Neither is scope creep; both are pre-existing tests catching up to a new, legitimate
+file under a directory they already walk.
+
+**Verify:** all six porting specs together, 48/48 green. Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged on the branch for the advisor's own
+per-release gate, alongside the DM500 stage-1 work from the previous turn.
+
+**Capacity:** the highest-stakes turn on this seat so far — real hardware downstream, even though physically
+motion-incapable. Took the extra time for the paren-nesting re-check and the non-vacuity proof's own bug-fix
+rather than moving fast; both would have been real problems reaching an actual operator's hands otherwise.
