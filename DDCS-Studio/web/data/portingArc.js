@@ -1,8 +1,13 @@
 /**
- * data/portingArc.js — THE V4.1 PORTING ARC, DESIGNED AS DATA (t1530 scout — no product code).
+ * data/portingArc.js — THE V4.1 PORTING ARC, DESIGNED AS DATA (t1530 scout, t1531 ruled, t1532 S1 landed).
+ *
+ * ── STATUS ───────────────────────────────────────────────────────────────────────────────────────────────────────
+ * All 5 forks in `PORTING_FORKS` are RULED (t1531) — read each `.ruling` field, not just `.recommend`. S1
+ * (`corpus-oracle` in `PORTING_STAGES`) LANDED at t1532: `tests/v41-corpus-oracle-1532.spec.js` (pilot + second
+ * subject) and `tests/v41-residue-census-1532.spec.js` (the arc-reframe condition). S2-S5 not started.
  *
  * ── WHAT THIS IS ────────────────────────────────────────────────────────────────────────────────────────────────
- * The standing plan opens the porting arc with "port the emit corpus to other controllers, DDCS V4.1 FIRST, with
+ * The standing plan opened the porting arc with "port the emit corpus to other controllers, DDCS V4.1 FIRST, with
  * per-target VERIFY INSTRUMENTS". This file is the scout that act was dispatched as, in the `slotCapabilityArc`
  * shape: inert data the build acts read — what is already true, what is missing, the order, the gate on each step,
  * and what each stage is PROVED by. `tests/porting-arc-scout-1530.spec.js` asserts every factual claim below
@@ -32,11 +37,102 @@ export const V41_PORT_STATE = {
     trackedFiles: 209,      // git-tracked under bridge/controllers/v4.1
     trackedMacros: 91,      // ...of which are .nc factory macros
     expertTrackedFiles: 768, expertTrackedMacros: 333,
-    emitResidue: 'the emit path is genuinely dialect-routed. Expert-literal registers (#578/#805+/#1925/#880/#883) '
-        + 'survive on ~33 non-comment lines across 16 files, and the sampled ones are NOT bypasses: they are '
-        + 'Expert-specific SEMANTICS passed through to the dialect (#578 = the active-WCS selector value) or '
-        + 'explicitly gated absences (#883, the dual-gantry slave DRO, which carries its own "no equivalent on this '
-        + 'controller" comment). Named so a future act does not re-litigate them as debt',
+    emitResidue: 'the emit path is genuinely dialect-routed — now a CENSUS (V41_RESIDUE_CENSUS), not a sample. '
+        + 'Zero actual bypasses found across all 33 lines',
+};
+
+/**
+ * ── THE RESIDUE CENSUS (t1531 ruling, condition on arc-reframe) ────────────────────────────────────────────────────
+ * The scout's "the port is done" rested on a SAMPLE (a handful of the Expert-literal lines, judged by eye). A
+ * sample is prose too — the arc's own thesis, turned on its own premise. This is the CENSUS: all 33 non-comment
+ * lines carrying an Expert-literal register (#578/#805+/#1925/#880/#883) across the 16 files that have any,
+ * individually traced to the atom that actually consumes each one. `tests/v41-residue-census-1532.spec.js` re-runs
+ * the same grep this table was built from and asserts the count and the file set — so "33, zero bypasses" is a
+ * claim that goes red the day a new literal lands or an old one's consumer changes.
+ *
+ * EVERY line falls into one of six honest categories. NONE is "actual-bypass": a literal that reaches emit
+ * unconditionally on a non-Expert dialect and produces wrong G-code. If the census had found one, it would BE port
+ * work and land in this arc rather than being re-litigated later — per the ruling. It did not.
+ */
+export const V41_RESIDUE_CENSUS = {
+    totalLines: 33, totalFiles: 16, actualBypasses: 0,
+    countNote: 'category counts are per MATCHED LINE (the exact grep hit), not per register mentioned nearby — a '
+        + 'table-definition line like `X: { status: \'#1920\', result: \'#1925\', ... }` matches the census pattern '
+        + 'ONLY via its `#1925`, so it is counted once, under the category that literal\'s consumer earns. The '
+        + '`.status` sub-field (#1920) never matched the pattern at all and is a separate, smaller finding — see '
+        + '`V41_STATUS_FIELD_DEAD` — kept OUT of this count so 33 stays the real number the spec can pin',
+    categories: {
+        'passthrough-rawAxis': {
+            count: 8, verdict: 'SAFE',
+            what: 'a literal Expert probe-trigger register (#1925, always the X-axis slot of a per-axis table or a '
+                + '`raw` default) declared as a FALLBACK, paired with a `rawAxis` param that — when set — asks '
+                + '`dialect.probeTrigVar(axis)` at emit time and WINS. Traced through the full chain: radiuscomp.js '
+                + '(the atom) <- probeSurface.js:70 (its only call site, forwards rawAxis) <- every one of its 7 '
+                + 'callers (corner/edge/middle/rotaryCenter/latheProbe) passes rawAxis explicitly. On V4.1 this '
+                + 'resolves to #1500+ax; the Expert literal is never reached',
+            sites: ['cornerWizard.js:25(AX table, X-row .result)', 'edgeWizard.js:19(same)', 'middleWizard.js:29(same)',
+                'probeBlocks.js:21(AXIS_VARS table, same)', 'ops/radiuscomp.js:17(defaults.raw)',
+                'ops/radiuscomp.js:29(the fallback read `p.raw || \'#1925\'`)',
+                'rotaryCenterWizard.js:81(TRIG table X entry)', 'lathe/latheProbe.js:53(.trigger, X entry)'],
+        },
+        'wcs-selector-passthrough': {
+            count: 15, verdict: 'SAFE',
+            what: 'the `wcsArgOf`/`wcsArg` idiom — `w === \'active\' ? \'#578\' : <numeric index>` — or the field '
+                + 'DEFAULT it feeds (`wcs: \'#578\'`), passed into `dialect.setWorkOffset(wcsExpr, axis, value)` / '
+                + '`wcswrite`. CONFIRMED by reading V4.1\'s own setWorkOffset (ddcs-v41.js:68): its `wcsExpr` '
+                + 'PARAMETER IS NEVER READ IN THE FUNCTION BODY. Real Expert semantics, carried as an inert argument '
+                + 'on every other dialect. wcsIndirect.js:50 confirmed the same for the wcswrite atom\'s non-Expert arm',
+            sites: ['cornerWizard.js:156', 'edgeWizard.js:53', 'lathe/faceProbe.js:37', 'lathe/odProbe.js:38',
+                'middleWizard.js:130', 'rotaryCenterWizard.js:48', 'rotaryClockWizard.js:47',
+                'dataOps/rotaryCenterData.js:106', 'dataOps/rotaryClockData.js:104',
+                'ops/setworkoffset.js:18,30,34,37(4 CODE lines)', 'ops/wcsIndirect.js:28,50(2 CODE lines)'],
+        },
+        'comment-only': {
+            count: 5, verdict: 'N/A — no code literal, nothing to classify as safe or unsafe',
+            what: 'the grep pattern hit a TRAILING comment on an otherwise unrelated code line (e.g. `return wcs;   '
+                + '// already resolved (#578 / index / ...) → unchanged`), not a register in the executed expression. '
+                + 'Counted honestly rather than silently dropped, since the census claims to cover every matched line',
+            sites: ['cornerWizard.js:212', 'ops/radiuscomp.js:21', 'ops/setworkoffset.js:21',
+                'ops/setworkoffset.js:35', 'ops/setworkoffset.js:36'],
+        },
+        'gated-absence': {
+            count: 2, verdict: 'SAFE — explicit degrade',
+            what: 'the #883 dual-gantry slave DRO has NO cross-post equivalent. wcsWriteBlock (wcsIndirect.js:47-48) '
+                + 'falls to `offComment` (a plain comment) rather than a G92 guess when `dialect.wcsWriteIndirect` is '
+                + 'absent — the exact call sites carry their own "no equivalent on this controller" comment',
+            sites: ['cornerWizard.js:379', 'middleWizard.js:344'],
+        },
+        'dialect-routed-safe-default': {
+            count: 1, verdict: 'SAFE',
+            what: '`(d && d.vars && d.vars.dro) || 880` — reads the ACTIVE dialect\'s own declared `vars.dro` first; '
+                + '880 is reached only if the dialect object itself were malformed (every registered dialect declares '
+                + 'vars.dro). Dialect-routed, with an Expert-shaped value as the unreachable-in-practice floor',
+            sites: ['atcChangeWizard.js:56'],
+        },
+        'dead-unreferenced-function': {
+            count: 2, verdict: 'DEAD, not a bypass — the function itself is never imported',
+            what: '`wcsBase()` in wizards/dialect.js (the #578/805+ arithmetic) is exported but grep-confirmed to have '
+                + 'exactly ONE importer of that module (probeBlocks.js), which imports only `ifGoto` — never `wcsBase`. '
+                + 'A same-named, unrelated `wcsBase()` in data/camMacroKit.js (CAM-slot machinery) is what every real '
+                + 'caller actually uses. Two different functions sharing a name across two files — worth a rename to '
+                + 'stop the collision reading as one function; not port work either way',
+            sites: ['wizards/dialect.js:63', 'wizards/dialect.js:65'],
+        },
+    },
+};
+
+/**
+ * A SEPARATE, SMALLER finding from the same read — the `.status` sub-field (#1920/#1921/#1922) in the per-axis
+ * AX/AXIS_VARS tables. It never matched the census pattern (status registers aren't #1925/#578/etc), so it is
+ * NOT one of the 33 lines and does not affect `actualBypasses`. Kept because it surfaced during the same
+ * investigation and would otherwise be lost: the status-var check model these fields were built for was superseded
+ * (probeSurface.js's own comment — a miss on V4.1/DM500 is caught by a pre-probe DRO compare, not a status var),
+ * and `.status` was grep-confirmed unread in its own file's emit path everywhere it is declared. Dead, not wrong —
+ * a cleanup candidate, not port work.
+ */
+export const V41_STATUS_FIELD_DEAD = {
+    sites: ['cornerWizard.js:25', 'edgeWizard.js:19', 'middleWizard.js:29', 'probeBlocks.js:21'],
+    verdict: 'declared, never read — a follow-up cleanup, not port work',
 };
 
 /**
@@ -113,6 +209,29 @@ export const V41_INSTRUMENT_GAP = {
 };
 
 /**
+ * ── THE SPACING DELTA (t1531 ruling 3: A+B) — a DECLARED row, not a regex nobody can find ─────────────────────────
+ * The factory writes UNSPACED G-code; Studio emits SPACED (words.js's shared spacing policy, identical across every
+ * post). The S1 oracle (below) NORMALISES this away so the FORM can be asserted without this open question blocking
+ * it — but the normalisation is only honest if the thing it is hiding is written down where the next person looking
+ * for "why does the oracle strip whitespace" finds it in one place, not buried in a comparison helper.
+ */
+export const V41_SPACING_DELTA = {
+    id: 'v41-word-spacing',
+    factory: 'UNSPACED — e.g. `G91G31Z-1000L#682Q1K0F#106` (probe-float.nc), `G0G53Z#102` (probe-fix.nc)',
+    studio: 'SPACED — e.g. `G91 G31 Z-1000 L#682 Q1 K0 F#106`, `G0 G53 Z#102` (words.js\'s spacing policy, shared '
+        + 'by every post, not a V4.1-specific choice)',
+    oracleHandling: 'the S1 oracle strips all whitespace between tokens before comparing — STILL true after the '
+        + 'answer below, because the factory corpus is unspaced regardless of whether spaced ALSO parses; '
+        + 'normalisation is what makes the byte-for-byte comparison possible either way',
+    status: 'ANSWERED (t1531 amendment, mid-flight) — V4.1 ACCEPTS SPACED G-code. Evidence tier: USER-ATTESTED (the '
+        + 'operator who runs these controllers) — by the trigEvidence discipline, stronger than an assumption, '
+        + 'weaker than a captured bench trace. NOT re-opened by a future act: Studio\'s spaced emit is CONFIRMED '
+        + 'legal on V4.1, so no act in this arc needs to consider emitting unspaced for this target',
+    settledBy: 'S5 (live-roundtrip) still gets this for FREE the day the live pulse happens (a spaced program either '
+        + 'runs or it does not) — but it is a CONFIRMATION now, not a blocking question the arc waits on',
+};
+
+/**
  * ── THE STAGES ──────────────────────────────────────────────────────────────────────────────────────────────────
  * Smallest independently-bridgeable steps first, each with a bridge that does not depend on the ones after it —
  * the SLOT_CAPABILITIES shape. `gate` is '' when nothing external blocks the step.
@@ -126,15 +245,22 @@ export const V41_INSTRUMENT_GAP = {
 export const PORTING_STAGES = [
     {
         id: 'corpus-oracle', order: 1, label: 'S1 — make the factory corpus an ORACLE',
-        does: 'a declared table of (factory .nc file -> the dialect form it attests) plus a spec that reads the '
-            + 'tracked macros at runtime and diffs them against what the V4.1 dialect emits. The settings door '
-            + 'already does exactly this with setting/eng/coord1 — the mechanism is proven, only the macro half is missing',
+        does: 'a spec that reads the tracked factory macros at runtime and diffs them against what the V4.1 dialect '
+            + 'emits — PLAIN readFileSync at the spec layer, the controller-import-one-door-1221 shape, not a new '
+            + 'product-code registry (t1531 ruling: do not invent a second mechanism)',
         stays: 'every emit form, every wizard, every existing spec. This stage adds an assertion and changes NOTHING '
             + 'that runs — which is why it is first and why it is safe',
-        bridge: 'ALREADY DEMONSTRATED at scout time, offline: Studio\'s V4.1 wcsZeroAtCurrent reproduces zeroxy.nc '
-            + '(#1506=0/#1507=0) and zeroz.nc (#1508=0) byte-for-byte after comment/whitespace normalisation. The '
-            + 'instrument is not speculative — it was run, and it works',
-        gate: '', landed: '',
+        bridge: 'DEMONSTRATED, not proposed: Studio\'s V4.1 wcsZeroAtCurrent reproduces zeroxy.nc/zeroz.nc byte-for-'
+            + 'byte, and the WCS-selector passthrough is confirmed inert by construction, not by sampling',
+        gate: '', landed: 't1532 — tests/v41-corpus-oracle-1532.spec.js. PILOT (WCS zero-at-current): zeroxy.nc + '
+            + 'zeroz.nc byte-exact (normalised), zeroall.nc\'s 4th-axis gap asserted in BOTH directions. SECOND '
+            + 'SUBJECT (corner, at reduced fidelity — named honestly): probeMove + probeTrigVar + machineMove '
+            + 'byte-tested against probe-float.nc/probe-fix.nc; the WCS-write step is NOT byte-tested — corner '
+            + 'writes its WCS offset from a RETRACTED position while probe-vertex.nc\'s G92 write fires AT the '
+            + 'trigger point, so the two use different but equivalent formulas (Studio\'s position-independent '
+            + '`[#dro-value]` vs the factory\'s precomputed sum) and are not expected to match byte-for-byte. '
+            + 'Also landed: the residue census (V41_RESIDUE_CENSUS, 33 lines / 0 bypasses) and the spacing-delta '
+            + 'row (V41_SPACING_DELTA) the oracle\'s normalisation implements',
     },
     {
         id: 'normalisation-policy', order: 2, label: 'S2 — declare what the differential is ALLOWED to normalise',
@@ -281,9 +407,19 @@ export const PILOT_FIRST_FINDING = {
     factory: 'zeroall.nc = #1506=0 #1507=0 #1508=0 #1509=0 (X/Y/Z/A)',
     studio: 'wcsZeroAtCurrent emits X/Y/Z only — identical limitation on ddcs-expert-m350 and ddcs-v41',
     question: 'should the WCS wizard offer a 4th-axis (A) zero on a rotary-equipped machine?',
+    ruling: 't1531 (advisor) — RULED A+B: out of scope for THIS arc (confirmed not a V4.1-specific question — the '
+        + 'gap is identical on Expert), AND a genuine BACKLOG item, declared here so a future act finds it rather '
+        + 'than rediscovering it. Why real: a user running a 4th (rotary) axis has no WCS-wizard path to zero it — '
+        + 'genuinely missing capability, not a curiosity. Scope for whoever picks it up: the WCS op\'s form would '
+        + 'need an axisA checkbox alongside axisX/axisY/axisZ, and BOTH dialects\' wcsZeroAtCurrent already know '
+        + 'how to emit it (#1509 / #86x-equivalent) — the gap is entirely in the FORM, not the emit',
 };
 
-/** The rulings that come back to the advisor rather than being decided in the build. */
+/**
+ * The forks parked for the advisor, and its t1531 rulings. Kept (not deleted) once ruled — the RECORD of a
+ * decision is worth as much as the decision, especially where the advisor's own condition (arc-reframe) or
+ * qualification (arc-order-after-v41's guard) shapes what the next act may assume.
+ */
 export const PORTING_FORKS = [
     {
         id: 'arc-reframe', question: 'The arc was dispatched as a PORT; measurement says the port is done and the '
@@ -291,6 +427,10 @@ export const PORTING_FORKS = [
         options: 'A: reframe (S1-S4 offline, S5 when a human is at the bench) · B: hold the original framing and '
             + 'find port work S1 has not surfaced · C: reframe AND widen S1 to all 7 posts at once',
         recommend: 'A — B re-does finished work, and C multiplies a mechanism that has never once been run',
+        ruling: 't1531 — A, RECORDED AS THE ARC\'S NEW NAME (owned by the advisor in ROADMAP/PORTING.md). ⚠ WITH A '
+            + 'CONDITION: "the port is done" itself rested on a SAMPLE (~33 lines, judged by eye) — the arc\'s own '
+            + 'thesis turned on its own premise. S1 must turn that into a CENSUS. Satisfied at t1532: '
+            + 'V41_RESIDUE_CENSUS, all 33 lines classified, actualBypasses: 0',
     },
     {
         id: 'pilot-choice', question: 'WCS zero-at-current as pilot, against the standing corner-gated-pilot memory?',
@@ -299,6 +439,9 @@ export const PORTING_FORKS = [
             + 'DATA port, which is COMPLETE. This is a different arc with a different bridge, and corner cannot be '
             + 'the pilot for an evidence instrument it has no evidence file for. Corner stays the pilot for op '
             + 'RICHNESS and should be S1\'s second subject',
+        ruling: 't1531 — A, ratified explicitly: an evidence-instrument pilot must be an op that HAS evidence, and '
+            + 'corner has no single-file factory counterpart. Corner is S1\'s SECOND subject, so op-richness still '
+            + 'gets proven early. Landed at t1532: tests/v41-corpus-oracle-1532.spec.js',
     },
     {
         id: 'spacing', question: 'Does the V4.1 parser accept the SPACED form Studio emits? The factory corpus is '
@@ -307,11 +450,18 @@ export const PORTING_FORKS = [
             + 'roundtrip question · C: human recollection from the 2026-06-13 session settles it now',
         recommend: 'A + B: normalise so S1 can land, and carry it as a named S5 row so the assumption is visible '
             + 'rather than dissolved into a regex',
+        ruling: 't1531 — A+B, shape stated: the oracle compares NORMALISED (implemented, V41_SPACING_DELTA), the '
+            + 'delta is a DECLARED named row (not a bare regex) carried into S5. ⚠ SUPERSEDED MID-FLIGHT (t1531 '
+            + 'amendment, same turn): the advisor asked the user directly and got an answer — V4.1 ACCEPTS SPACED '
+            + 'G-code, USER-ATTESTED tier. Option C effectively happened. C is no longer "unsettleable offline" — it '
+            + 'landed. The oracle still normalises (the factory corpus stays unspaced regardless); the delta is now '
+            + 'ANSWERED, not open. S5 keeps it as a free confirmation rather than a blocking question',
     },
     {
         id: 'a-axis-wcs', question: 'PILOT_FIRST_FINDING — should WCS zero offer a 4th-axis zero?',
         options: 'A: out of scope, record and move on · B: a real gap for rotary users, backlog it',
         recommend: 'A for this arc (it is not a V4.1 question — both dialects behave identically), B as a separate item',
+        ruling: 't1531 — A for this arc AND B as a real backlog item, both at once. Declared on PILOT_FIRST_FINDING.ruling',
     },
     {
         id: 'arc-order-after-v41', question: 'PARAMETRIC_FLOOR (t1529 amendment) — V3/DM500 reads as LIKELY '
@@ -326,6 +476,10 @@ export const PORTING_FORKS = [
         recommend: 'A — the S1 oracle mechanism this arc builds for V4.1 is exactly the tool that would turn "likely, '
             + 'unmeasured" into a measured verdict for DM500 at near-zero extra cost, so running it is more '
             + 'informative than waiting for a dump that may not come',
+        ruling: 't1531 — A, DM500 follows V4.1 through the SAME S1-S4 stages. ⚠ WITH A GUARD: DM500\'s rows carry '
+            + 'their evidence TIER on their face (already true — see PARAMETRIC_FLOOR), and DM500 does NOT enter '
+            + 'POST_VERIFIED on offline agreement alone — that set is a promise to a user standing at a machine, and '
+            + 'only hardware-grade evidence may extend it. Not yet started — S1 landed for V4.1 only at t1532',
     },
 ];
 

@@ -138,13 +138,12 @@ test('PREMISE 5 — Studio\'s V4.1 WCS-zero reproduces the factory zeroxy.nc and
 });
 
 /**
- * ── PREMISE 6 — THE INSTRUMENT GAP ITSELF ─────────────────────────────────────────────────────────────────────────
- * ⚠ THIS LOCK IS RED BY DESIGN THE MOMENT S1 LANDS, and that is the point (the trig-lift-plan LOCK 2 precedent).
- * It asserts that the factory MACRO corpus is currently inert as an oracle while the SETTINGS corpus is already
- * wired — the exact asymmetry the arc exists to close. When S1 wires the macros, this test must be restated in the
- * SAME act, which is what stops S1 from being declared done while the corpus stays unread.
+ * ── PREMISE 6 — THE INSTRUMENT GAP, RESTATED NOW THAT S1 HAS LANDED (the trig-lift-plan LOCK 2 precedent) ──────────
+ * This lock WENT RED the moment t1532's S1 build landed — exactly as designed. It originally asserted the
+ * PRE-S1 state (zero factory-macro oracles, anywhere); restating it in the SAME act that closes the gap is what
+ * stops S1 from being declared done while the assertion describing "done" still describes "not done".
  */
-test('PREMISE 6 — the settings corpus is wired as an oracle; the 91 factory MACROS are not (S1 flips this)', async () => {
+test('PREMISE 6 — the settings corpus AND the factory macro corpus are both wired as oracles (S1 landed, t1532)', async () => {
     const specs = readdirSync(testsDir).filter((f) => f.endsWith('.spec.js') && f !== 'porting-arc-scout-1530.spec.js');
     const readsCorpus = [];
     for (const f of specs) {
@@ -153,21 +152,18 @@ test('PREMISE 6 — the settings corpus is wired as an oracle; the 91 factory MA
         const code = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
         if (/bridge['"\s,)]|bridge\//.test(code) && /readFileSync|readdirSync/.test(code)) readsCorpus.push(f);
     }
-    // the settings door IS an oracle — the existence proof that S1's mechanism is known, not novel
+    // the settings door IS an oracle — the existence proof S1's mechanism followed
     expect(readsCorpus, 'the controller-import spec reads the settings corpus at runtime')
         .toContain('controller-import-one-door-1221.spec.js');
 
-    // ...but no spec reads a FACTORY-SHIPPED .nc macro as an oracle, for any target. Two specs DO read .nc files —
-    // trig-lift-plan-1466 and helical-arc-evidence-1472 — but only from expert-m350/verify/, which is a DIFFERENT
-    // corpus: Studio's OWN diagnostic macros (V13_trig.nc etc — authored here, pushed to hardware, read back), not
-    // the factory-shipped operational macros (system-backup/, firmware/) this arc's oracle would diff against.
-    // Excluding that subdirectory is what makes the remaining count meaningful rather than an artefact of the regex.
+    // the factory MACRO corpus is now ALSO an oracle — v41-corpus-oracle-1532 diffs Studio's V4.1 emit against the
+    // tracked .nc files directly (excluding expert-m350/verify/, Studio's own diagnostic macros, a different corpus)
     const readsFactoryMacro = readsCorpus.filter((f) => {
         const src = readFileSync(join(testsDir, f), 'utf8');
         return /['"][^'"]*\.nc['"]/.test(src) && !/expert-m350['",\s/\\]*verify/.test(src);
     });
-    expect(readsFactoryMacro, 'ZERO specs use a FACTORY-SHIPPED .nc as an oracle — the dialect\'s "CONFIRMED against '
-        + 'probe-fix.nc" is prose, and prose does not go red. S1 closes this and must restate this assertion').toEqual([]);
+    expect(readsFactoryMacro, 'v41-corpus-oracle-1532 is now the factory-macro oracle S1 built')
+        .toEqual(['v41-corpus-oracle-1532.spec.js']);
 });
 
 /**
