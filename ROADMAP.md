@@ -1,14 +1,36 @@
 # DDCS Studio — Roadmap
 
-## 🔁 ACTIVE LOOP QUEUE (user t1046 — run these through the handoff loop, in order)
-Finish + MERGE **CAM Builder v1** (in flight: S1d finishing → verify → `.gitattributes` eol=lf → merge feat/cam-builder → main), then the loop runs, IN ORDER, surfacing only forks/milestones:
-1. **K-button wizard** — Expert-ONLY; actions as a NEW Blocks category; #2037 nav library ground-truthed (201 codes, ddcs-expert skill). Build-plan being drafted (scratchpad/kbutton-builder-plan.md).
-2. **Auto-update the exe** — "Update now" banner (updateCheck.js) + gateway downloads from GitHub + close/swap/relaunch helper (⚠ swap testable only on a real packaged exe → user test at the end).
-3. **Google Drive reliable for OTHER USERS** — the desktop OAuth works locally; make it dependable for others.
-Each = several loop reps (design → slice → verify → release), like the CAM Builder. Universal CAM stays BACKLOG behind these.
+## 🔁 ACTIVE LOOP QUEUE (advisor-reconciled 2026-07-31 — the live order; NEXT-SESSION.md carries the current act)
+**THE MILL-PARAMETRIC ARC's WIZARD CONVERSIONS ARE DONE** (V2026.07.31.7, t1319→t1464): surfacing /
+drill family / rect pocket emit parametric macro bodies end to end (live pendant knobs, one clearing
+emitter shared by wizard + CAM, @work-declared trace caps, the too-small law); slot / non-rect /
+contour / rest are DECLARED-PERMANENT literal boundaries with self-red-ing specs (ONE obstruction:
+trig unverified — `V13_trig.nc` is the single decider — plus LIST-vs-FORMULA for ellipse/polygon);
+middle is a probe (no clearing walk). Iron rule (round-trip 11, shrink-only) held the whole arc.
+The queue now, in order:
+1. **The improvement remainder** (in flight): SQRT loud-failure diagnose/V13-prep → the
+   feature-canvas bottom-handle defect (user) → the mobile CAM-builder cleanup (user, moved from
+   seat B) → true-arc helix → flake settle-hardening (6-member ledger) → the slot capability arc
+   (scout first).
+2. **Value-fidelity** — the pinned 11 round-trip diffs shrink.
+3. **THE PORTING ARC (committed) — REFRAMED t1531: "MAKE THE EVIDENCE EXECUTABLE".** Measurement
+   (scout t1530) inverted the premise: V4.1 is **already ported** (a full dialect, one of two
+   `POST_VERIFIED` posts, 54 specs) — what is missing is the INSTRUMENT. The dialect's confirmations
+   live in code comments, and prose does not go red: 0 of 91 tracked factory `.nc` macros are read by
+   any spec. So the arc is S1 corpus-oracle → S2 spacing policy → S3 caps → S4 named unknowns → S5
+   live round-trip (human-gated), then DM500 through the same stages; grbl-class = unroll.
+   **Progress ledger: [`PORTING.md`](PORTING.md). Arc-as-data: `web/data/portingArc.js`.**
+Standing user backlog behind those (from t1046, still real): K-button wizard (Expert-only, #2037
+nav library) · exe auto-update (branch pair exists — needs a real packaged-exe test) · Google
+Drive reliable for other users (desktop OAuth live-untested).
+SEAT B (../ddcs-studio-lane-b, window never yet opened): lathe-visual turn · THE 2D RETIREMENT ·
+workspace name=filename (its rename lands → seat A's menu absence-lock flips by design).
 
-## ⚠ ONGOING (turn 101 — FRESH-ADVISOR HANDOFF for fresh eyes)
-**Probe START uses the WCS origin, not the per-pass start ①** (single-axis boss preview). The hint is correct in `opSimStarts` (`viz/opSimStarts.js:42-47`); the engine/preview just doesn't anchor the single-pass probe at it. Part of a **test-green-but-render-broken** pattern (also B0 editor-sim + the spindle/end-retract) — the prior advisor reviewed property TESTS, not the REAL render. **Fresh advisor must verify the rendered preview, human as the check, not tests.** Full detail + state in NEXT-SESSION.md.
+## ⚠ POSSIBLY-STALE note (was "ONGOING, turn 101" — ~1350 turns old; VERIFY before acting)
+An ancient fresh-advisor note claimed the single-axis boss preview anchors the probe START at the
+WCS origin instead of the per-pass start ①. The probe/preview stack has been rebuilt many times
+since (pass anchors t94/t107, marker-derived traverses, the machine-frame sim); treat as UNVERIFIED
+history, not a live defect — re-measure in the real render before touching anything.
 
 ## 🔧 Session log (2026-07-18/20) — export-header L1 bug + spindle gap + Defender FP (all resolved)
 Surfaced by inspecting a real surfacing program on the **CNC-FAIRY** controller pendant.

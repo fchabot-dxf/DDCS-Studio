@@ -1,5 +1,13 @@
 # PORTING.md — the porting arc, tracked
 
+> ⚠ **THE ARC WAS REFRAMED AT t1531 (scout t1530): "port the corpus" → "MAKE THE EVIDENCE EXECUTABLE".**
+> Measurement inverted the premise. V4.1 is **already ported** — a full dialect module, one of exactly
+> two `POST_VERIFIED` (hardware-verified) posts, touched by 54 specs, maintained continuously through
+> the whole parametric arc. What is missing is the **instrument**: the dialect's confirmations live in
+> code comments ("CONFIRMED against probe-fix.nc"), and **prose does not go red** — 0 of 91 tracked
+> factory `.nc` macros are read by any spec, for any target. That is a smaller, safer, almost entirely
+> offline arc than the one that was planned.
+
 > The living progress record for **the porting arc** (the plan's arc 3, committed).
 > Maintained by the **advisor** at each pass-back — read this file for "where is the port right now"
 > without digging through HANDOFF/WORK-LOG. The in-repo *design* record (stages, gates, caps — as
@@ -12,16 +20,51 @@ round-trip · verify) before any fleet port — the corner-gated-pilot rule.
 
 ---
 
-## Status: SCOUT IN FLIGHT (t1530)
+## Status: S1 BUILDING (t1532)
 
-| # | Stage | State | Evidence / notes |
-|---|-------|-------|------------------|
-| 0 | Kickoff scout | 🔄 **in flight** (t1530, fresh seat) | Four questions: branch peek · evidence floor · dialect delta · arc-as-data + pilot nominee. Parks at the design gate. |
-| 1 | Design ruling | ⏳ waits on scout | Advisor rules the forks: pilot op choice, caps shape, anything the measurement inverts. |
-| 2 | Pilot op end-to-end on V4.1 | ⏳ | Emit + sim + round-trip + the V4.1 verify instrument, proven on ONE op family. |
-| 3 | Fleet port (V4.1) | ⏳ | The remaining parametric ops through the proven seams — mechanical by design. |
-| 4 | Wizards follow | ⏳ | Per the arc's standing plan. |
-| 5 | Later targets | ⏳ | DM500/V3-class; grbl-class = unroll. Not started, not scoped. |
+The scout's own stage plan, declared as data in `DDCS-Studio/web/data/portingArc.js` (the
+`slotCapabilityArc` shape) and pinned by `tests/porting-arc-scout-1530.spec.js` (9 factual claims,
+all green) so the design cannot rot before it is built.
+
+| # | Stage | State | What it is |
+|---|-------|-------|------------|
+| 0 | Kickoff scout | ✅ **landed** t1530 | Inverted the premise. 5 forks parked, all ruled at t1531. |
+| — | Design ruling | ✅ **landed** t1531 | See the ruling table below. |
+| S1 | **Corpus oracle** | 🔄 **building** (t1532) | The 91 factory `.nc` macros become oracles *read at runtime* — following `controller-import-one-door-1221`, which already does this for the settings corpus (the existence proof: it is a known shape, not a new mechanism). Pilot **WCS zero-at-current** (already reproduces `zeroxy.nc`/`zeroz.nc` byte-for-byte), then **corner** as second subject. Plus the residue census (below). |
+| S2 | Normalisation policy | ⏳ | Factory G-code is **unspaced**, Studio emits **spaced**; nobody has confirmed the V4.1 parser takes spaced. Offline-unsettleable → compare normalised, carry the delta as a declared row into S5. |
+| S3 | Caps completeness | ⏳ | 3 caps live outside `DEFAULT_CAPS`, confirmed **latent not live** (every consumer truthy-tests; zero `=== false` comparisons). |
+| S4 | Named unknowns | ⏳ | `readActiveWcs` / `hmiPrompt` / ATC tables — all fold to `[]` honestly today. |
+| S5 | Live round-trip | ⏳ **human-gated** | Cannot be agent-scheduled — needs a human at the bench to press Start. The C3-is-last discipline. |
+| — | DM500 follows | ⏳ | Same S1–S4 stages. **Guard:** rows carry their evidence tier on their face, and DM500 does **not** enter `POST_VERIFIED` on offline agreement alone. |
+| — | grbl-class | ⏳ | **UNROLL** — confirmed against caps: grbl has no `#vars` at all; grblHAL's O-word flow cannot stream. |
+
+## The t1531 rulings
+
+| Fork | Ruled | Why |
+|---|---|---|
+| **arc-reframe** | **A — reframe to "make the evidence executable"** | Holding the port framing re-does finished work; widening to all 7 posts multiplies a mechanism never once run. **Condition:** the "already ported" claim itself must stop being prose — see the residue census. |
+| **pilot-choice** | **A — WCS zero-at-current** | The corner-gated-pilot rule governed the *wizards-as-data* port, which is complete. A pilot for an **evidence instrument** must be an op that *has* evidence; corner has no factory file. Corner is S1's **second subject**, so op-richness is still proven early. |
+| **spacing** | **A+B — compare normalised, carry a declared row into S5** | Offline-unsettleable. The delta lives as a named row, not a regex nobody can find, so one place flips when a bench pulse settles it. _(Open question for the user: does the 2026-06-13 bench session settle whether spaced parses?)_ |
+| **a-axis-wcs** | **A for this arc + B as a real backlog item** | Not a V4.1 question (both dialects behave identically) — but the user runs a 4th axis, so it is a genuine gap, declared as data where a future act will find it. |
+| **arc-order-after-v41** | **A — DM500 next, through the same stages** | The S1 instrument is the cheapest discriminator between "likely parametric" and "measured". Guarded by the `POST_VERIFIED` rule above. |
+
+### The residue census (the condition on the reframe)
+
+The scout's "the port is done" rested on a **sampled** residue — ~33 Expert-literal lines across 16
+files, the sampled ones judged passthrough-semantics or gated absences rather than bypasses. A sample
+is prose too. S1 turns it into a **census**: every line classified in data
+(`passthrough-semantic` / `gated-absence` / `actual-bypass`) with the count **pinned**, so
+*"already ported"* becomes a claim that can go red. Any actual bypass found **is** port work and
+lands inside this arc.
+
+## Cross-target floor (t1529 amendment, answered)
+
+| Target | `#vars` | Expressions | `IF`/`WHILE` | Trig | Verdict |
+|---|---|---|---|---|---|
+| **DDCS Expert M350** | ✅ | ✅ | ✅ | COS/SIN attested; SQRT/ATAN community-referenced (V13-gated) | **parametric** — shipped |
+| **DDCS V4.1** | ✅ | ✅ | ✅ | same shape as Expert | **parametric** — already ported, instrument pending |
+| **DDCS V3 / DM500** | likely | likely | likely | same trig shape as V4.1 | **likely parametric, UNMEASURED** — 18-file installer tree vs V4.1's 209-file firmware+SMB capture. Named loudly. |
+| **grbl / grblHAL** | ❌ none | — | O-word flow cannot stream | — | **UNROLL** (confirmed against caps, not re-derived) |
 
 ## The scout's four questions (t1529 dispatch)
 
@@ -64,4 +107,11 @@ evidence floor, and a larger-than-expected dialect distance.
 
 ## Landed acts
 
-_(none yet — filled as acts land, newest at the bottom: turn · release · what landed · gate result)_
+_(newest at the bottom: turn · release · what landed · gate result)_
+
+- **t1530** — _no release (scout, no product code)_ — the arc scouted as data (`portingArc.js`, 5 stages,
+  5 forks) + 9 claims pinned by spec. **Inverted the arc's premise.** Branch `wizard-porting-work`
+  found conclusively superseded (asserted against its own map, not sampled) → **archive-tagged
+  `archive/wizard-porting-work` and deleted** (advisor, t1531). Scout spec green, smoke 71/71.
+- **t1531** — _advisor ruling, no code_ — all 5 forks ruled (table above); arc renamed; residue-census
+  condition attached; S1 dispatched.
