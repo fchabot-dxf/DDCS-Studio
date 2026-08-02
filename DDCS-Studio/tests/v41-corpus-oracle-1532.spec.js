@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normaliseGcode } from '../web/data/portingArc.js';
 
 /**
  * t1532 — S1, THE CORPUS ORACLE. The 91 tracked V4.1 factory macros become an EXECUTABLE ORACLE, read at runtime
@@ -22,15 +23,8 @@ const boot = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 };
 
-/**
- * The oracle's normalisation, DECLARED at data/portingArc.js's V41_SPACING_DELTA rather than buried here: drop
- * comments/blank lines, then strip ALL whitespace between tokens (the factory writes zero-space, Studio spaced).
- * Anyone asking "why does this diff ignore spacing" finds the declared row, not an unexplained regex.
- */
-const norm = (s) => s.replace(/\r/g, '').split('\n')
-    .map((l) => l.trim()).filter((l) => l && !l.startsWith('(') && !l.startsWith(';'))
-    .map((l) => l.replace(/\s+/g, ''))
-    .join('\n');
+/** t1534 — the ONE normalisation policy (data/portingArc.js's V41_ORACLE_NORMALISATION), not a local copy. */
+const norm = normaliseGcode;
 
 test.describe('PILOT — WCS zero-at-current', () => {
     test('reproduces zeroxy.nc and zeroz.nc byte-for-byte (normalised)', async ({ page }) => {

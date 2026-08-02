@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normaliseGcode } from '../web/data/portingArc.js';
 
 /**
  * t1530 — THE V4.1 PORTING ARC, SCOUTED. No product behaviour changes here; what lands is the DESIGN
@@ -22,9 +23,8 @@ const boot = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 };
 
-/** Compare EMIT to a factory macro the way the S1 oracle would: drop comments/blank lines, trim each line. */
-const norm = (s) => s.replace(/\r/g, '').split('\n').map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('(') && !l.startsWith(';')).join('\n');
+/** t1534 — the ONE normalisation policy (data/portingArc.js's V41_ORACLE_NORMALISATION), not a local copy. */
+const norm = normaliseGcode;
 
 /**
  * ── PREMISE 1 — V4.1 IS ALREADY A REGISTERED, HARDWARE-VERIFIED POST ──────────────────────────────────────────────
@@ -65,27 +65,29 @@ test('PREMISE 2 — the caps delta is declared, and the rows the arc depends on 
 });
 
 /**
- * ── PREMISE 3 — THE CAPS TABLE HAS AN INCOMPLETENESS, AND IT IS LATENT, NOT LIVE ──────────────────────────────────
- * S3 is costed as a declaration fix, not a bug fix. That distinction is only honest if `undefined` really does
- * behave as `false` today — so assert BOTH halves: the hole exists, AND no consumer can currently see it.
+ * ── PREMISE 3 — THE CAPS TABLE INCOMPLETENESS, RESTATED NOW THAT S3 HAS CLOSED IT (t1534) ────────────────────────
+ * This originally asserted the LATENT gap (three caps returning `undefined`). S3 closed it — DEFAULT_CAPS now
+ * declares all 13 keys — so this test went red exactly as designed (trig-lift-plan-1466 LOCK 2 precedent) and is
+ * restated to assert the CLOSED state. The fuller before/after behaviour-neutrality proof lives in
+ * tests/v41-caps-completeness-1534.spec.js; this premise stays as the scout's own record that the gap is shut.
  */
-test('PREMISE 3 — three caps live outside DEFAULT_CAPS, and undefined is falsy so no behaviour differs today', async ({ page }) => {
+test('PREMISE 3 — S3 closed the caps-completeness gap: all 13 keys resolve to a boolean/string, never undefined', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const m = await import('/wizards/dialects/index.js');
         const ids = Object.keys(m.DIALECTS);
         const val = (c) => ids.map((id) => m.getCaps(id)[c]);
-        return { inputRead: val('inputRead'), atc: val('atc'), helicalArc: val('helicalArc'), ids };
+        return { inputRead: val('inputRead'), atc: val('atc'), helicalArc: val('helicalArc') };
     });
-    // inputRead is declared by Expert alone; the other six read back undefined rather than a declared false
-    expect(r.inputRead.filter((v) => v === true).length, 'exactly one post declares inputRead').toBe(1);
-    expect(r.inputRead.filter((v) => v === undefined).length, 'the other six are UNDECLARED, not declared-false').toBe(6);
-    // ...and atc is declared by three of seven
-    expect(r.atc.filter((v) => v === undefined).length, 'four posts leave atc undeclared').toBe(4);
-    // the latency claim: undefined is falsy, so a truthy-testing consumer cannot tell it from false
-    expect(r.inputRead.every((v) => !v || v === true), 'every value is either true or falsy — no third state').toBe(true);
-    // helicalArc is outside DEFAULT_CAPS too, but every post happens to declare it — so it is the harmless case
-    expect(r.helicalArc.filter((v) => v === undefined).length, 'helicalArc is undeclared-in-defaults but covered by all 7').toBe(0);
+    // Expert still opts IN explicitly; every other post now reads an EXPLICIT false, not undefined
+    expect(r.inputRead.filter((v) => v === true).length, 'exactly Expert declares inputRead true').toBe(1);
+    expect(r.inputRead.filter((v) => v === false).length, 'the other six now read an explicit false').toBe(6);
+    expect(r.inputRead.some((v) => v === undefined), 'no post reads undefined for inputRead anymore').toBe(false);
+    // atc: expert=true, v41/v3-dm500 were ALREADY explicitly false, +4 previously-undeclared now also false = 6
+    expect(r.atc.filter((v) => v === true).length, 'exactly Expert declares atc true').toBe(1);
+    expect(r.atc.filter((v) => v === false).length, 'the other six now read an explicit false (2 already, 4 newly)').toBe(6);
+    expect(r.atc.some((v) => v === undefined), 'no post reads undefined for atc anymore').toBe(false);
+    expect(r.helicalArc.some((v) => v === undefined), 'helicalArc likewise — never undefined').toBe(false);
 });
 
 /**
@@ -157,13 +159,15 @@ test('PREMISE 6 — the settings corpus AND the factory macro corpus are both wi
         .toContain('controller-import-one-door-1221.spec.js');
 
     // the factory MACRO corpus is now ALSO an oracle — v41-corpus-oracle-1532 diffs Studio's V4.1 emit against the
-    // tracked .nc files directly (excluding expert-m350/verify/, Studio's own diagnostic macros, a different corpus)
+    // tracked .nc files directly (excluding expert-m350/verify/, Studio's own diagnostic macros, a different corpus).
+    // v41-caps-completeness-1534 (S2) reads the same corpus too, to keep the two REFUSED normalisations honest —
+    // a second, narrower reader, not a duplicate oracle
     const readsFactoryMacro = readsCorpus.filter((f) => {
         const src = readFileSync(join(testsDir, f), 'utf8');
         return /['"][^'"]*\.nc['"]/.test(src) && !/expert-m350['",\s/\\]*verify/.test(src);
     });
-    expect(readsFactoryMacro, 'v41-corpus-oracle-1532 is now the factory-macro oracle S1 built')
-        .toEqual(['v41-corpus-oracle-1532.spec.js']);
+    expect(readsFactoryMacro.sort(), 'the two specs that now use the factory corpus as an oracle')
+        .toEqual(['v41-caps-completeness-1534.spec.js', 'v41-corpus-oracle-1532.spec.js']);
 });
 
 /**
