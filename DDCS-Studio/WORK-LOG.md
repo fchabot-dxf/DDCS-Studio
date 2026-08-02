@@ -15293,3 +15293,233 @@ else lands before the next release.
 
 **Capacity:** comfortable — the DM500 measurement was smaller in scope than S1's V4.1 build, as expected from an
 8-file corpus vs 91. The restore near-miss cost a few minutes of attention but no rework.
+
+## t1538 — S5 BENCH KIT FOR V4.1: 6 no-motion verify macros, ready for the operator
+
+**Dispatch (t1537):** the human-gated S5 stage becomes possible — the user has a V4.1 bench unit connected over
+SMB, no motors, nothing attached. Deliverable: 6 no-motion probe macros under `bridge/controllers/v4.1/verify/`
+plus a README, mirroring `expert-m350/verify/`'s exact shape. Register safety measured, not copied. Reporting
+mechanism determined from the corpus, not assumed. No verdict, no tier/cap change — measurement kit only.
+
+**Read the precedent first, as instructed.** `HANDOFF.md`, `V13c_sqrt.nc`, `V13_trig.nc`, `V15_indent.nc` — the
+one-risky-form-per-file discipline (safety rule 3: a syntax error aborts the WHOLE file), the sentinel-priming
+pattern so an untouched register is unmistakable, and the two-exit-path shape for a branch test that can't be
+masked by a shared fallthrough tail.
+
+**Register choice, doubly grounded.** `#190`/`#191` — `ddcs-v41.js`'s own declared verified-free scratch band.
+Confirmed against TWO independent facts, not just cited: outside the firmware's `#0-148`/`#490-536` write range
+(the dialect's own comment), and inside `uservar`'s `#100-499` SMB-readable range (`FINDINGS.md`) — meaning the
+readback path is grounded in the SAME evidence that makes the registers safe to write.
+
+**Reporting mechanism, measured not assumed.** Grepped all 91 tracked V4.1 files for Expert's `-5000`-style popup
+sentinel: zero hits. No scripted on-screen message mechanism is corpus-confirmed for V4.1. The README gives the
+CONFIRMED fallback (`\10.0.0.50\sysdisk\uservar`, `#190` at slot 90 / byte 720, little-endian float64) alongside
+the standard-but-unconfirmed on-screen variable page, rather than assuming the Expert popup convention transfers.
+
+**The six probes, each argued from the corpus:**
+- `S5a_spaced.nc` — Studio's spaced multi-word style, upgrading `V41_SPACING_DELTA` from user-attested toward
+  bench-confirmed.
+- `S5b_coordword.nc` — an expression inside a coordinate word via `G92`, the exact form `setWorkOffset`/
+  `wcsZeroAtCurrent` already ship. Designed **self-restoring by construction**: the bracketed expression reads
+  the live work-Z and adds zero, so no separate restore file is needed — the probe cannot leave a mutated state
+  even if it succeeds.
+- `S5c_ifgoto.nc` — does IF/GOTO actually BRANCH, not merely parse. Two separate exit paths (not one shared
+  tail) so a silently-wrong branch can't be masked by whatever runs after a correct one.
+- `S5d_while.nc` — WHILE/DO/END. `caps.flow` declares `'goto'` only, but grepping V4.1's OWN factory corpus
+  (`slib.nc`, `macroMillCylinder.nc`, `macroMillRect.nc`) found WHILE already in use there — a genuine possible
+  under-declaration, found by measurement, not assumed from the dispatch's own hint. Flagged as a DIFFERENT risk
+  class from the other five (an untested loop could in principle not terminate) with an explicit hang/reset
+  instruction in both the file and the README.
+- `S5e_sqrt.nc` / `S5f_atan.nc` — the two prize probes, split per the one-form-per-file rule, mirroring `V13c`/
+  `V13d` exactly.
+
+**A real catch before commit, the same mistake at a different site.** The first draft of ALL SIX files nested
+parens inside comments — exactly what Expert's own `V13_trig.nc` did and had to fix at t1466 (a DDCS comment
+closes at the first `)`; anything after parses as code). Caught by explicitly grepping every comment line against
+the rule before considering the files done, not by assuming the shape was safe because it followed the precedent
+structurally. All six rewritten with zero parens or brackets anywhere inside a comment line, re-verified by grep.
+
+**Non-vacuity, and the proof found a real bug in my OWN test.** Injected a literal `G0 X5` into `S5a_spaced.nc`
+and ran the new spec. The ALLOWLIST assertion correctly went red. The BELT-AND-BRACES regex assertion — meant as
+a second, independent check — stayed GREEN: its pattern (`\bG0?[123]\b`) requires a trailing 1/2/3 digit, and
+bare `G0` has none, so the "belt and braces" was structurally incapable of catching the exact case it existed to
+catch. Rewritten as an explicit word alternation (`G0|G00|G1|G01|...`) rather than a character class; re-ran
+against the same injection — both assertions now correctly fail. Restored `S5a_spaced.nc` from a saved scratch
+copy — NOT `git checkout HEAD`, per the exact lesson the skill picked up from t1536's near-miss, since the work
+was still uncommitted at that point — and reconfirmed 5/5 green before proceeding.
+
+**Collateral fix, surfaced by the new files' own existence, not new scope.** Two PRE-EXISTING assertions in
+`porting-arc-scout-1530.spec.js` needed widening once the new kit existed: PREMISE 6's factory-macro-oracle
+detection excluded only `expert-m350/verify/`, so the new `v4.1/verify/` kit tripped it as a false fourth oracle
+— widened to exclude any `verify/` directory. PREMISE 8's SQRT/ATAN-corpus-usage count walks the whole
+`bridge/controllers/v4.1` tree, which now includes `S5e_sqrt.nc`/`S5f_atan.nc` literally containing those words
+as text — same widening. Neither is scope creep; both are pre-existing tests catching up to a new, legitimate
+file under a directory they already walk.
+
+**Verify:** all six porting specs together, 48/48 green. Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged on the branch for the advisor's own
+per-release gate, alongside the DM500 stage-1 work from the previous turn.
+
+**Capacity:** the highest-stakes turn on this seat so far — real hardware downstream, even though physically
+motion-incapable. Took the extra time for the paren-nesting re-check and the non-vacuity proof's own bug-fix
+rather than moving fast; both would have been real problems reaching an actual operator's hands otherwise.
+
+## t1540 — S5b's self-restore names its own assumption (doc-only, review response)
+
+**Dispatch (t1539):** the advisor reviewed and accepted the t1538 bench kit — no motion, comments clean of the
+nested-paren trap, register choice doubly grounded — with one real gap: `S5b_coordword.nc`'s self-restoring
+argument rests on ONE unverified assumption, that `#1508` genuinely IS work-Z. If the variable map is wrong (the
+exact "register means something else" hazard this whole arc exists to guard against), the probe line silently
+sets work-Z to whatever unrelated value `#1508` actually holds — persistent, and nothing in the original file
+would have told the operator. Two edits requested, documentation only: `S5b_coordword.nc`'s own comment block,
+and `README.md`.
+
+**What changed.** Both files now instruct the operator to note the current work-Z reading BEFORE running S5b and
+compare AFTER, with the three outcomes stated explicitly: work-Z unchanged + `#190=100` is the STRONGEST pass
+available (confirms both the parse succeeded and that the variable map is correct, not just the former); work-Z
+changed is a REAL FINDING about the variable map, framed as more valuable than the parse result, with an explicit
+instruction to reset work-Z themselves back to the noted value; a syntax error means work-Z was never touched.
+README also gained a top-line note (before the numbered steps) that S5b is the ONLY file in the kit that writes
+any controller state — the other five only touch scratch registers, a fact worth knowing before an operator picks
+which file to be most careful with.
+
+**No code changed** — the probe line itself (`G92 Z[#1508+0]`), the other five files, and every cap/tier value
+are untouched. Re-checked `S5b_coordword.nc`'s rewritten comment block against the exact same nested-paren/bracket
+rule the whole kit was verified against at t1538 (grep clean, all lines self-close).
+
+**Non-vacuity does not apply** — no test added this act, stated rather than invented one to satisfy the policy.
+
+**Verify:** all six porting specs together, 48/48 green (unaffected, as expected for a doc/comment-only change).
+Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged, alongside the DM500 and S5-kit work from
+the previous two turns, for the advisor's per-release gate.
+
+**Capacity:** small, tight act — comfortable room, exactly the scope asked for and nothing more.
+
+## t1542 — S5 RAN on real V4.1 hardware: results recorded, no ruling made
+
+**Dispatch (t1541):** the user ran the bench kit on a real V4.1 (firmware 2025-04-04-012-NOR, no motors). Measured
+answers came back. Record them as data; do not chase the open questions further — a community forum post is out
+for two of them, and their answers may change what's recorded.
+
+**Committed the untracked session files, all re-checked first.** The advisor generated 11 additional probe files
+live at the bench (chasing the arctangent name and isolating WHY the WHILE probe froze/failed) plus a forum post.
+Re-checked EVERY ONE against the nested-paren-in-comment rule before committing, as instructed — not trusting
+that the advisor's own fix (they'd already found and patched the one that broke a run) meant the rest were clean.
+Found ONE still carrying it: `S5g_atan1.nc` had `[` characters inside two comment lines. Fixed before commit —
+the SAME class of mistake the canonical six made at t1538, recurring in a file I never touched, caught by running
+the same check rather than assuming the advisor's spot-fix covered the whole set.
+
+**The measured results, recorded as data, no verdict drawn on any of them:**
+- **Spacing PARSES** — `V41_SPACING_DELTA` upgraded from user-attested to bench-confirmed.
+- **SQRT WORKS**, computed correctly (300 exactly, not merely accepted syntactically).
+- **No inverse trig found** under six tried names (ATAN two-operand, ATAN one-operand, ATN, ATAN2, lowercase
+  `atan`, ACOS as a control) — every probe structurally identical to the working SQRT line, so the bracket FORM is
+  proven correct and only the name or the function's existence is open. Recorded as **ABSENT-SO-FAR**, the honest
+  phrasing the dispatch specifically asked for, not the stronger "absent" — COS/SIN remain untested, and the
+  community may know a name not yet tried.
+- **IF/GOTO branches correctly — but only WITH a space after IF.** The unspaced form — which is the form
+  `ddcs-v41.js`'s `ifGoto` CURRENTLY EMITS, and the form the original tracked `S5c_ifgoto.nc` shipped with —
+  **FREEZES THE CONTROLLER**: no error, no reset, power-cycle only. This is the single most consequential finding
+  of the session: a defect in ALREADY-SHIPPED emit on the only other hardware-verified post besides Expert, not a
+  new-capability question. Flagged with maximum prominence in both `portingArc.js`'s status header and the
+  `live-roundtrip` stage entry. **Not fixed in this act** — an emit change is its own act, the same boundary the
+  DM500 findings drew at t1536 for a wrong-vs-absent distinction.
+- **WHILE is recognised but never opens a loop at top level**, measured across four variants including the
+  factory's own exact form (variable-vs-variable, unspaced) — the parser names WHILE in its own error but the
+  body runs once and END reports nothing to close. Recorded as an **OPEN QUESTION** (may be M98/firmware-macro-
+  subprogram-only), explicitly not a conclusion, per the dispatch's own framing. This closes the DM500
+  under-declaration theory the t1538 WORK-LOG entry raised — if WHILE can't open at top level on V4.1's DDCS-
+  family firmware either, DM500's own `caps.flow:'goto'` is very likely correctly-declared, not under-declaring.
+  Added the cross-reference directly to `DM500_ORACLE_FINDINGS`'s `slib.nc` entry, named explicitly as
+  sibling-evidence inference, not new DM500-hardware measurement.
+- Bare increment confirmed working (ruling out the increment as S5d's freeze cause). Syntax errors confirmed to
+  name the specific line number across the whole session — a real diagnostic-surface fact about this target.
+  `#490`/`#491`/`#492` confirmed to mirror the machine coordinates, checked directly against the controller's own
+  screen.
+
+**Where it landed.** `trigEvidence.js` gains `V41_TRIG_EVIDENCE`, deliberately structured as its own export
+separate from the Expert-scoped `TRIG_FUNCTIONS`/`TRIG_LIFT_PLAN` — explicitly marked SIBLING evidence for V4.1
+ALONE, with the file's own comment stating it must never be read across to Expert, since Expert's own libm notes
+already show the OPPOSITE gap (sqrt+atan present, cos/sin absent) — two different firmwares, two different gaps,
+neither licenses a conclusion about the other. `portingArc.js` gains `V41_S5_RUN_RESULTS` (the complete session,
+including the two findings that aren't about trig at all) and the urgent ifGoto-freeze flag on
+`PORTING_STAGES['live-roundtrip']`.
+
+**The bench-kit spec needed real rework, not just a file-count bump.** Widened `v41-bench-kit-nomotion-1538.spec.js`
+for 6→17 files, and split the sentinel-priming assertion: three of the new WHILE probes (`S5j`/`S5l`/`S5m`)
+deliberately use `#190` as a LIVE LOOP COUNTER starting at `0`, not the sentinel-then-overwrite pattern — a real,
+considered design difference for those specific probes (the counter IS the result there), not an oversight to
+paper over by forcing every file into one shape.
+
+**Added a permanent LOCK, not asked for explicitly but directly justified by what just happened.** The exact
+nested-paren bug landed in this same directory TWICE now (the canonical six at t1538, `S5g_atan1.nc` this turn) —
+mirrored `trig-lift-plan-1466.spec.js`'s own LOCK 5 precedent and made the check permanent for this directory
+rather than relying on a manual re-read that has already missed the bug once. **Non-vacuity proven directly, not
+assumed**: re-injected the exact bracket text into `S5g_atan1.nc`, ran the new LOCK — 1/1 correctly failed.
+Restored from a saved scratch copy (NOT `git checkout HEAD` — the exact lesson from t1536's near-miss, now in the
+skill itself), reconfirmed 8/8 green before proceeding.
+
+**Rulings already made by the advisor, not remade here:** `caps.flow:'goto'` STAYS, confirmed correct for what
+Studio emits. `POST_VERIFIED` unchanged. No cap value touched anywhere in this act. `PORTING.md` is the advisor's.
+
+**Verify:** all 8 porting/trig specs together, 62/62 green. Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged, alongside everything from the previous
+three turns, for the advisor's per-release gate.
+
+**Capacity:** a dense recording turn — a large, varied result set to get precisely right (six distinct findings,
+each needing its own honest phrasing), plus real rework on the existing spec rather than a trivial extension, plus
+a genuine safety re-check that found a real bug. Comfortable room throughout; nothing rushed.
+
+## t1544 — CORRECTION: t1542's "ifGoto ships the freezing form" was a false alarm
+
+**Dispatch (t1543):** the advisor caught a real error in the t1542 entry above. That entry recorded, with maximum
+prominence, that `ddcs-v41.js`'s `ifGoto` currently emits the unspaced, hardware-freezing IF form, and called it
+a defect in already-shipped emit. **That claim was false.** The advisor verified every IF emit form in every
+dialect — all begin with `IF ` (a space). The freezing form used in the ORIGINAL `S5c_ifgoto.nc` was a typo in a
+hand-written test file, not Studio's emit; it was fixed and the retest passed, which is exactly what the earlier
+diff-note in this same session ("S5c_ifgoto.nc was modified... intentional") already showed without me drawing
+the right conclusion from it at the time.
+
+**Verified independently before touching anything**, per the same discipline being asked of me: read
+`ddcs-v41.js:83` directly. `ifGoto: (lhs, op, rhs, label) => [\`IF ${lhs}${op}${rhs}GOTO${label}\`]` — the
+template literal's leading text is `IF ` with a trailing space, so `ifGoto('#191', '==', '0', 1)` produces
+`"IF #191==0GOTO1"` — the SPACED form, exactly the one the bench proved works. Confirmed, not taken on the
+advisor's word alone.
+
+**Found and fixed every place the false claim was recorded, all in `data/portingArc.js`** (WORK-LOG entries are
+append-only and cannot be edited — this entry is the correction record for the one above, which stays as written):
+the file's own top-level status header, the urgent-flag paragraph on `PORTING_STAGES['live-roundtrip'].landed`,
+and the `ifgoto-branches` result entry inside `V41_S5_RUN_RESULTS`. All three restated to the truth: Studio's
+emitted form is the one that works; the freeze traced to a hand-written test typo. **What stays true and worth
+keeping, per the advisor's own instruction**: a malformed IF line — missing the space — hangs this controller
+with no error and no reset, power-cycle only. That's a real, controller-specific hazard worth recording for
+anyone hand-writing V4.1 macros, this arc's own future bench-kit authors very much included, even though it never
+touched shipped emit. Grepped `trigEvidence.js` and every spec for the same false claim — none found; the trig
+evidence and the bench-kit spec were never touched by this error, so nothing there needed correcting.
+
+**Why it happened, recorded because the advisor is right that it's the same class this arc keeps closing on
+other people's claims**: I inferred a defect in shipped code from a symptom (the freeze) without reading the
+emitter that supposedly produced it. One grep of `ddcs-v41.js` at the moment I wrote the t1542 finding would have
+settled it before it ever got written down with "maximum prominence." The advisor's framing is the right one to
+carry forward: a defect claim about shipped code earns the SAME evidence bar as a capability claim — arguably
+higher, since a defect claim triggers work (an emit-fix act) that a correct one wouldn't need. "Measured, not
+assumed" applies to a regression claim exactly as much as it applies to a capability claim, and I held it for the
+capability claims this whole arc (SQRT, ATAN, WHILE) while skipping it for this one.
+
+**Non-vacuity does not apply** — no spec assertion embedded the false claim (grepped `tests/*.spec.js` for
+`ifGoto`; the only real hits are `dm500-corpus-oracle-1536.spec.js` testing DM500's *own* ifGoto, an unrelated
+dialect, and a comment mention elsewhere), so no test needed to change, and none was invented to manufacture one.
+
+**Verify:** syntax-checked `portingArc.js` by importing it directly (still 19 exports, loads clean). Re-ran the
+full porting/trig spec set.
+
+**Everything else from t1542 stands, per the advisor's own confirmation**: the paren LOCK, the `S5g_atan1.nc` fix
+their spot-fix missed, the sibling-only scoping of `V41_TRIG_EVIDENCE`, the ABSENT-SO-FAR phrasing, the sentinel-
+spec split for the WHILE-counter files, and the DM500 cross-reference all stay untouched.
+
+**Capacity:** a small, focused correction — comfortable room, no rush, but treated with the same care as any
+finding going into a durable record, since the whole point of this fix is that durable records need to be right.

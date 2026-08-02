@@ -1,17 +1,24 @@
 /**
  * data/portingArc.js — THE V4.1 PORTING ARC, DESIGNED AS DATA (t1530 scout, t1531 ruled, t1532 S1, t1534 S2-S4,
- * t1536 DM500 stage 1 measured).
+ * t1536 DM500 stage 1 measured, t1538 S5 bench kit delivered, t1542 S5 RUN on real silicon).
  *
  * ── STATUS ───────────────────────────────────────────────────────────────────────────────────────────────────────
  * All 5 forks in `PORTING_FORKS` are RULED (t1531) — read each `.ruling` field, not just `.recommend`. S1
- * (`corpus-oracle`) LANDED at t1532: `tests/v41-corpus-oracle-1532.spec.js` (pilot + second subject) and
- * `tests/v41-residue-census-1532.spec.js` (the arc-reframe condition). S2 (normalisation-policy), S3
- * (caps-completeness), S4 (named-unknowns) LANDED at t1534: `tests/v41-caps-completeness-1534.spec.js`. S3's
- * inputRead/atc true-vs-false fork was RULED at t1535 (advisor): `false` STANDS, ratified as the correct design
- * (not merely as what passes the neutrality test) — `DEFAULT_CAPS` needed no further change. The V4.1 offline
- * arc is CLOSED to S5 (human-gated, unscheduled). DM500 STAGE 1 (measurement only, ruling 5's guard) landed at
- * t1536: `DM500_ORACLE_FINDINGS` + `tests/dm500-corpus-oracle-1536.spec.js`. ⚠ NO VERDICT ON DM500 lives anywhere
- * in this file — `POST_VERIFIED` is untouched, no DM500 cap value changed. The verdict is the advisor's, pending.
+ * (`corpus-oracle`) LANDED at t1532. S2/S3/S4 LANDED at t1534; S3's inputRead/atc fork RULED at t1535 — `false`
+ * STANDS, ratified as the correct design. S5 RAN on real V4.1 hardware at t1542 (firmware 2025-04-04-012-NOR, no
+ * motors) — see `V41_S5_RUN_RESULTS` for the full measured set and `PORTING_STAGES['live-roundtrip'].landed` for
+ * the summary. HEADLINES: spacing CONFIRMED, SQRT HARDWARE-CONFIRMED (see also `trigEvidence.js`'s
+ * `V41_TRIG_EVIDENCE`), `caps.flow:'goto'` CONFIRMED CORRECT (WHILE parses but never opens at top level — closes
+ * the DM500 under-declaration theory too). ⚠ t1543 CORRECTION — t1542 recorded here that ddcs-v41.js's ifGoto
+ * emits the unspaced, hardware-freezing IF form. THAT WAS FALSE, caught before it could cause any harm: ifGoto
+ * (line 83) emits `IF ${lhs}...` — the space is IN the template literal — and this was verified directly against
+ * the source, not re-inferred, before writing this correction. The freeze traced to a TYPO in a hand-written test
+ * file (the original S5c_ifgoto.nc), not to Studio's emit. See `V41_S5_RUN_RESULTS.ifgoto-branches` for the
+ * corrected finding and the standing lesson it now carries. Two open questions remain, named not concluded:
+ * arctangent under an untried name,
+ * whether WHILE works inside an M98/macro-subprogram context. DM500 STAGE 1 (measurement only) landed at t1536:
+ * `DM500_ORACLE_FINDINGS`. ⚠ NO VERDICT ON DM500 lives anywhere in this file — `POST_VERIFIED` is untouched
+ * (still exactly `{expert-m350, v41}`), no cap value changed anywhere by this act. PORTING.md is the advisor's.
  *
  * ── WHAT THIS IS ────────────────────────────────────────────────────────────────────────────────────────────────
  * The standing plan opened the porting arc with "port the emit corpus to other controllers, DDCS V4.1 FIRST, with
@@ -445,9 +452,145 @@ export const PORTING_STAGES = [
         gate: '⚠ HUMAN-PRESENCE GATED. Needs either a person at the bench to press Start, or the unbuilt External '
             + 'Start relay. Not schedulable by an agent, and it is LAST for exactly that reason: the four stages '
             + 'above must not be able to stall behind a machine visit (the C3-is-last discipline from the slot arc)',
-        landed: '',
+        landed: 't1538 — THE GATE OPENED: the user has a V4.1 bench unit connected over SMB, no motors, nothing '
+            + 'attached. bridge/controllers/v4.1/verify/ carries 6 no-motion probe macros (S5a-S5f) + README.md, '
+            + 'mirroring expert-m350/verify/\'s exact shape (one risky form per file — a syntax error aborts the '
+            + 'WHOLE file — self-closing single-line comments only, no nested parens or brackets, which every one '
+            + 'of the 6 files got wrong on the FIRST draft and was caught by re-reading before commit, the same '
+            + 'mistake Expert\'s own V13_trig.nc made and fixed at t1466). Register band: #190/#191 (ddcs-v41.js\'s '
+            + 'own verified-free scratch), doubly grounded — outside the firmware\'s #0-148/#490-536 write range '
+            + 'AND inside uservar\'s #100-499 SMB-readable range (FINDINGS.md). No on-screen popup mechanism is '
+            + 'corpus-confirmed for V4.1 (grepped: zero -5000-style message sentinel anywhere in 91 tracked files) '
+            + '— the README gives the uservar/SMB readback as the CONFIRMED path, the on-screen page as the '
+            + 'expected-but-unconfirmed one. THE SIX PROBES, each argued from the corpus rather than assumed: (a) '
+            + 'spaced multi-word parse — upgrades V41_SPACING_DELTA from user-attested to bench-confirmed-pending; '
+            + '(b) an expression inside a coordinate word via G92, self-restoring by construction (reads the live '
+            + 'work-Z, adds zero, writes it back — no second restore file needed); (c) IF/GOTO actually BRANCHES, '
+            + 'not just parses — two separate exit paths so a wrong branch can\'t be masked by a shared fallthrough '
+            + 'tail; (d) WHILE/DO/END — V4.1\'s OWN factory corpus (slib.nc, macroMillCylinder.nc, macroMillRect.nc) '
+            + 'already uses this, so caps.flow:\'goto\' may be under-declaring, found by grepping rather than by '
+            + 'assumption; (e)/(f) SQRT and ATAN alone, split per the one-risky-form-per-file rule, mirroring '
+            + 'V13c/V13d exactly. THIS ACT SHIPS NO TIER OR CAP CHANGE — the bench results and the ruling on them '
+            + 'are the advisor\'s, on whatever the operator reports back.'
+            + '\n\n⚠ t1542 — RUN, ON REAL V4.1 SILICON (firmware 2025-04-04-012-NOR, no motors attached). See '
+            + '`V41_S5_RUN_RESULTS` for the full measured set. Headline: caps.flow:\'goto\' CONFIRMED CORRECT for '
+            + 'what Studio emits (user programs) — WHILE parses but never opens a loop at top level, closing the '
+            + 'DM500 under-declaration theory this same finding had raised. Spacing CONFIRMED. SQRT '
+            + 'HARDWARE-CONFIRMED. Two open questions remain, named not concluded: arctangent under an untried '
+            + 'name (community asked), and whether WHILE works inside an M98/firmware-macro context specifically. '
+            + '⚠ t1543 CORRECTION of a t1542 FALSE ALARM: this stage originally recorded here that ddcs-v41.js\'s '
+            + 'ifGoto emits the unspaced, freezing form. It does not — verified directly against the source '
+            + '(line 83, `IF ${lhs}...`, the space is in the template literal) — and Studio\'s ACTUAL emitted form '
+            + 'is the one the bench confirmed WORKS. The freeze traced to a typo in a hand-written test file (the '
+            + 'original S5c_ifgoto.nc), never to shipped emit. WHAT STAYS TRUE AND WORTH RECORDING: a malformed '
+            + 'IF line — no space after IF — hangs this controller with NO error and NO reset, power-cycle only. '
+            + 'That is a real hazard for anyone hand-writing V4.1 macros (this arc\'s own bench-kit authors '
+            + 'included), even though it never touched shipped emit. WHY THE FALSE ALARM HAPPENED, recorded '
+            + 'because it is the same class this arc keeps closing: the claim was inferred from a symptom without '
+            + 'reading the emitter — one grep of the dialect would have settled it before writing it down. A '
+            + 'defect claim about shipped code gets the SAME evidence bar as a capability claim, arguably higher, '
+            + 'because it triggers work',
     },
 ];
+
+/**
+ * ── V41_S5_RUN_RESULTS (t1542) — THE FULL MEASURED SET FROM REAL V4.1 SILICON ──────────────────────────────────────
+ * bench-kit results, firmware 2025-04-04-012-NOR, no motors/drives attached. The trig half (SQRT/ATAN) is ALSO
+ * recorded in `data/trigEvidence.js`'s `V41_TRIG_EVIDENCE` (that file owns the trig-gate framing); this export is
+ * the complete session, including the two findings that are not about trig at all.
+ */
+export const V41_S5_RUN_RESULTS = {
+    firmware: '2025-04-04-012-NOR', bench: 'no motors, nothing attached', measuredAt: 't1542',
+    results: [
+        {
+            id: 'spaced-parse', probe: 'S5a_spaced.nc', outcome: 'CONFIRMED',
+            finding: 'spaced multi-word G-code PARSES. Studio\'s emit format is legal on this firmware. Upgrades '
+                + 'V41_SPACING_DELTA from user-attested to BENCH-CONFIRMED',
+        },
+        {
+            id: 'coordword-expr', probe: 'S5b_coordword.nc', outcome: 'ACCEPTED',
+            finding: 'G92 Z[#1508+0] was accepted — the forum post lists it under "things that do work". The '
+                + 'work-Z-unchanged self-check from the t1540 doc fix is what would confirm #1508 truly is work-Z; '
+                + 'that specific confirmation is not separately itemised in the reported results',
+        },
+        {
+            id: 'ifgoto-branches', probe: 'S5c_ifgoto.nc', outcome: 'CONFIRMED, WITH A CONTROLLER-HAZARD CAVEAT',
+            finding: 'IF/GOTO WORKS and branches correctly — but ONLY WITH A SPACE AFTER "IF". "IF #191==0GOTO1" '
+                + 'branches correctly; "IF#191==0GOTO1" FREEZES THE CONTROLLER — no error, no reset, power-cycle '
+                + 'only. ⚠ t1543 CORRECTION: t1542 wrongly attributed the unspaced form to ddcs-v41.js\'s own '
+                + 'ifGoto and called it a shipped-emit defect. VERIFIED DIRECTLY AGAINST THE SOURCE before writing '
+                + 'this correction — ifGoto (line 83) emits `IF ${lhs}...`, the space IS in the template literal, '
+                + 'and Studio\'s ACTUAL emitted form is the spaced one the bench proved works. The unspaced form '
+                + 'that froze the controller was a TYPO in the original hand-written S5c_ifgoto.nc, never Studio\'s '
+                + 'emit. The advisor fixed the tracked file to the spaced form directly after finding the freeze; '
+                + 'no dialect code was ever wrong. WHAT STAYS TRUE: a hand-written IF line missing the space is a '
+                + 'real, named hazard for this controller — no error, no reset — worth recording for anyone '
+                + 'writing V4.1 macros by hand, this arc\'s own future acts included. WHY THE FALSE ALARM '
+                + 'HAPPENED, recorded because it is the same class this arc keeps closing: a claim about shipped '
+                + 'code was inferred from a symptom without reading the emitter first — one grep would have '
+                + 'settled it. A defect claim earns the SAME evidence bar as a capability claim, arguably higher, '
+                + 'since it triggers work',
+        },
+        {
+            id: 'while-recognised-not-functional', probe: 'S5d_while.nc + S5h/S5j/S5l/S5m follow-ups',
+            outcome: 'OPEN QUESTION, not a conclusion',
+            finding: 'WHILE is RECOGNISED (the parser names it in its own error) but does NOT open a loop in a '
+                + 'top-level user program: "The loop instruction WHILE is incomplete: L<n>[END1]" — the body runs '
+                + 'ONCE then END1 reports nothing to close. Measured across FOUR variants (unspaced, space-after-'
+                + 'WHILE, spaces-both-sides, and the factory\'s exact variable-vs-variable form) — all four fail '
+                + 'identically. V4.1\'s OWN factory corpus (macroMillCylinder.nc) uses WHILE freely inside its own '
+                + 'macros. UNTESTED EXPLANATION, named as a question not a fact: WHILE may only be valid inside an '
+                + 'M98/firmware-macro subprogram context, not a plain top-level disk program',
+            closes: 'the DM500 under-declaration theory (PORTING_FORKS did not carry this by name, but the S5d '
+                + 'file\'s own comment raised it) — if WHILE cannot open at top level on V4.1\'s DDCS-family '
+                + 'firmware either, DM500\'s caps.flow:\'goto\' likely is NOT under-declaring; both targets\' '
+                + 'user-program flow model is probably genuinely goto-only, with WHILE reserved for firmware-owned '
+                + 'macro contexts',
+        },
+        {
+            id: 'increment-works', probe: 'S5i_increment.nc / S5k_incr_bare.nc', outcome: 'CONFIRMED',
+            finding: 'the bare increment #a=#a+1 works, both bracketed and unbracketed forms. Ruled out as the '
+                + 'cause of the WHILE finding above — the loop body\'s assignment executes correctly; the loop '
+                + 'CONSTRUCT itself is what does not open at top level',
+        },
+        {
+            id: 'sqrt-confirmed', probe: 'S5e_sqrt.nc', outcome: 'CONFIRMED',
+            finding: 'SQRT[9]*100 returned exactly 300 — COMPUTED, not merely parsed. See trigEvidence.js '
+                + 'V41_TRIG_EVIDENCE for the full framing',
+        },
+        {
+            id: 'atan-absent-so-far', probe: 'S5f_atan.nc + S5g/S5_ATN/S5_ATAN2/S5_atan/S5_ACOS follow-ups',
+            outcome: 'ABSENT-SO-FAR, not ABSENT',
+            finding: 'six names tried (two-operand ATAN, single-operand ATAN, ATN, ATAN2, lowercase atan, ACOS as '
+                + 'a control) — all REJECTED with Unrecognized-file-format naming the line. Every probe was '
+                + 'structurally identical to the working SQRT line, so the FORM is proven correct and only the '
+                + 'NAME or existence is at issue. A forum post is out to the community; COS/SIN remain untested. '
+                + 'See trigEvidence.js V41_TRIG_EVIDENCE for the full framing',
+        },
+        {
+            id: 'errors-name-the-line', probe: 'every probe that hit a syntax error', outcome: 'CONFIRMED, a controller fact',
+            finding: 'every syntax-error outcome across the whole session named the specific line number — a '
+                + 'genuinely good diagnostic surface on this target, worth recording independent of any single probe',
+        },
+        {
+            id: 'machine-position-mirror', probe: 'observed during the session, not a dedicated file',
+            outcome: 'CONFIRMED against the screen',
+            finding: '#490/#491/#492 mirror the MACHINE coordinates — confirmed by comparing register reads '
+                + 'against the controller screen\'s own Mach column. Not previously documented in ddcs-v41.js '
+                + 'beyond the general "#490-536 is firmware-written" note',
+        },
+    ],
+    openQuestions: [
+        'arctangent under an untried name — community forum post is out, asking',
+        'whether WHILE works inside an M98/firmware-macro subprogram context specifically (untested — the bench '
+            + 'kit only probed top-level disk programs, by design, since a subprogram context needs more setup)',
+    ],
+    rulings: {
+        capsFlowGoto: 'STAYS — CONFIRMED CORRECT for what Studio emits (user programs). No cap value changes',
+        postVerified: 'UNCHANGED',
+        dm500UnderDeclarationTheory: 'CLOSED by this evidence — see the while-recognised-not-functional result',
+    },
+};
 
 /**
  * ── Q5 (t1529 AMENDMENT) — THE PARAMETRIC FLOOR PER CANDIDATE TARGET ───────────────────────────────────────────────
@@ -754,7 +897,16 @@ export const DM500_ORACLE_FINDINGS = [
             + 'unused canned cycles: the dialect DECLARES `caps.flow: \'goto\'` — it has no WHILE/DO/END construct '
             + 'at all, so Studio could not reproduce one of these cycles byte-for-byte even if it wanted to. This '
             + 'is a genuine capability ceiling, not merely an unused library — named here should a future act ever '
-            + 'consider calling into DM500\'s own canned cycles rather than computing inline',
+            + 'consider calling into DM500\'s own canned cycles rather than computing inline.'
+            + '\n\n⚠ t1542 UPDATE — SIBLING HARDWARE EVIDENCE FROM V4.1, NOT DM500 ITSELF: the V4.1 bench kit '
+            + 'measured that WHILE is recognised but does NOT open a loop in a top-level user program on that '
+            + 'firmware (V41_S5_RUN_RESULTS), even though V4.1\'s OWN factory macros use WHILE freely — the exact '
+            + 'same shape as this DM500 finding (factory slib.nc uses WHILE; caps.flow declares goto-only). This '
+            + 'CLOSES the "caps.flow may be under-declaring" reading of this row for DM500 too: the likelier '
+            + 'explanation, on a sibling DDCS-family firmware, is that WHILE is genuinely reserved for firmware-'
+            + 'owned macro contexts on user disk programs, and `caps.flow: \'goto\'` is CORRECT, not a gap. Sibling '
+            + 'evidence only — DM500 itself remains unmeasured on hardware; this is the same-family INFERENCE the '
+            + 'advisor\'s t1542 ruling drew for V4.1\'s own caps.flow, extended here by analogy, not by new measurement',
         confidence: 'structural',
     },
 ];
