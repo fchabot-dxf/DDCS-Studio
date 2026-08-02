@@ -15397,3 +15397,79 @@ Smoke tier 71/71 green.
 the previous two turns, for the advisor's per-release gate.
 
 **Capacity:** small, tight act — comfortable room, exactly the scope asked for and nothing more.
+
+## t1542 — S5 RAN on real V4.1 hardware: results recorded, no ruling made
+
+**Dispatch (t1541):** the user ran the bench kit on a real V4.1 (firmware 2025-04-04-012-NOR, no motors). Measured
+answers came back. Record them as data; do not chase the open questions further — a community forum post is out
+for two of them, and their answers may change what's recorded.
+
+**Committed the untracked session files, all re-checked first.** The advisor generated 11 additional probe files
+live at the bench (chasing the arctangent name and isolating WHY the WHILE probe froze/failed) plus a forum post.
+Re-checked EVERY ONE against the nested-paren-in-comment rule before committing, as instructed — not trusting
+that the advisor's own fix (they'd already found and patched the one that broke a run) meant the rest were clean.
+Found ONE still carrying it: `S5g_atan1.nc` had `[` characters inside two comment lines. Fixed before commit —
+the SAME class of mistake the canonical six made at t1538, recurring in a file I never touched, caught by running
+the same check rather than assuming the advisor's spot-fix covered the whole set.
+
+**The measured results, recorded as data, no verdict drawn on any of them:**
+- **Spacing PARSES** — `V41_SPACING_DELTA` upgraded from user-attested to bench-confirmed.
+- **SQRT WORKS**, computed correctly (300 exactly, not merely accepted syntactically).
+- **No inverse trig found** under six tried names (ATAN two-operand, ATAN one-operand, ATN, ATAN2, lowercase
+  `atan`, ACOS as a control) — every probe structurally identical to the working SQRT line, so the bracket FORM is
+  proven correct and only the name or the function's existence is open. Recorded as **ABSENT-SO-FAR**, the honest
+  phrasing the dispatch specifically asked for, not the stronger "absent" — COS/SIN remain untested, and the
+  community may know a name not yet tried.
+- **IF/GOTO branches correctly — but only WITH a space after IF.** The unspaced form — which is the form
+  `ddcs-v41.js`'s `ifGoto` CURRENTLY EMITS, and the form the original tracked `S5c_ifgoto.nc` shipped with —
+  **FREEZES THE CONTROLLER**: no error, no reset, power-cycle only. This is the single most consequential finding
+  of the session: a defect in ALREADY-SHIPPED emit on the only other hardware-verified post besides Expert, not a
+  new-capability question. Flagged with maximum prominence in both `portingArc.js`'s status header and the
+  `live-roundtrip` stage entry. **Not fixed in this act** — an emit change is its own act, the same boundary the
+  DM500 findings drew at t1536 for a wrong-vs-absent distinction.
+- **WHILE is recognised but never opens a loop at top level**, measured across four variants including the
+  factory's own exact form (variable-vs-variable, unspaced) — the parser names WHILE in its own error but the
+  body runs once and END reports nothing to close. Recorded as an **OPEN QUESTION** (may be M98/firmware-macro-
+  subprogram-only), explicitly not a conclusion, per the dispatch's own framing. This closes the DM500
+  under-declaration theory the t1538 WORK-LOG entry raised — if WHILE can't open at top level on V4.1's DDCS-
+  family firmware either, DM500's own `caps.flow:'goto'` is very likely correctly-declared, not under-declaring.
+  Added the cross-reference directly to `DM500_ORACLE_FINDINGS`'s `slib.nc` entry, named explicitly as
+  sibling-evidence inference, not new DM500-hardware measurement.
+- Bare increment confirmed working (ruling out the increment as S5d's freeze cause). Syntax errors confirmed to
+  name the specific line number across the whole session — a real diagnostic-surface fact about this target.
+  `#490`/`#491`/`#492` confirmed to mirror the machine coordinates, checked directly against the controller's own
+  screen.
+
+**Where it landed.** `trigEvidence.js` gains `V41_TRIG_EVIDENCE`, deliberately structured as its own export
+separate from the Expert-scoped `TRIG_FUNCTIONS`/`TRIG_LIFT_PLAN` — explicitly marked SIBLING evidence for V4.1
+ALONE, with the file's own comment stating it must never be read across to Expert, since Expert's own libm notes
+already show the OPPOSITE gap (sqrt+atan present, cos/sin absent) — two different firmwares, two different gaps,
+neither licenses a conclusion about the other. `portingArc.js` gains `V41_S5_RUN_RESULTS` (the complete session,
+including the two findings that aren't about trig at all) and the urgent ifGoto-freeze flag on
+`PORTING_STAGES['live-roundtrip']`.
+
+**The bench-kit spec needed real rework, not just a file-count bump.** Widened `v41-bench-kit-nomotion-1538.spec.js`
+for 6→17 files, and split the sentinel-priming assertion: three of the new WHILE probes (`S5j`/`S5l`/`S5m`)
+deliberately use `#190` as a LIVE LOOP COUNTER starting at `0`, not the sentinel-then-overwrite pattern — a real,
+considered design difference for those specific probes (the counter IS the result there), not an oversight to
+paper over by forcing every file into one shape.
+
+**Added a permanent LOCK, not asked for explicitly but directly justified by what just happened.** The exact
+nested-paren bug landed in this same directory TWICE now (the canonical six at t1538, `S5g_atan1.nc` this turn) —
+mirrored `trig-lift-plan-1466.spec.js`'s own LOCK 5 precedent and made the check permanent for this directory
+rather than relying on a manual re-read that has already missed the bug once. **Non-vacuity proven directly, not
+assumed**: re-injected the exact bracket text into `S5g_atan1.nc`, ran the new LOCK — 1/1 correctly failed.
+Restored from a saved scratch copy (NOT `git checkout HEAD` — the exact lesson from t1536's near-miss, now in the
+skill itself), reconfirmed 8/8 green before proceeding.
+
+**Rulings already made by the advisor, not remade here:** `caps.flow:'goto'` STAYS, confirmed correct for what
+Studio emits. `POST_VERIFIED` unchanged. No cap value touched anywhere in this act. `PORTING.md` is the advisor's.
+
+**Verify:** all 8 porting/trig specs together, 62/62 green. Smoke tier 71/71 green.
+
+**Per the dispatch: full suite NOT run, NOT released.** Parked staged, alongside everything from the previous
+three turns, for the advisor's per-release gate.
+
+**Capacity:** a dense recording turn — a large, varied result set to get precisely right (six distinct findings,
+each needing its own honest phrasing), plus real rework on the existing spec rather than a trivial extension, plus
+a genuine safety re-check that found a real bug. Comfortable room throughout; nothing rushed.
