@@ -344,6 +344,7 @@ function addPaneSplitter(split) {
         return Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
     };
     let dragging = false, stopFollow = null, actsAsSizer = false;
+    let startBottomHeight = 0;
     const visual = split.closest('.wiz-visual');
     const heightAt = (y) => {
         if (!visual) return getVisualHeight();
@@ -352,8 +353,21 @@ function addPaneSplitter(split) {
     const onMove = (e) => { 
         if (!dragging) return; 
         e.preventDefault(); 
-        if (actsAsSizer) applyVisualHeight(heightAt(e.clientY));
-        else applyPaneRatio(ratioAt(e.clientY)); 
+        if (actsAsSizer) {
+            applyVisualHeight(heightAt(e.clientY));
+        } else {
+            let requestedTopHeight = e.clientY - visual.getBoundingClientRect().top;
+            let requestedTotalHeight = requestedTopHeight + startBottomHeight;
+            let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
+            let actualTopHeight = clampedTotalHeight - startBottomHeight;
+            const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
+            const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
+            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+            let frac = actualTopHeight / clampedTotalHeight;
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            applyVisualHeight(clampedTotalHeight);
+            applyPaneRatio(newRatio);
+        }
     };
     const onUp = (e) => {
         if (!dragging) return;
@@ -362,8 +376,21 @@ function addPaneSplitter(split) {
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
-        if (actsAsSizer) setVisualHeight(heightAt(e.clientY));
-        else setPaneRatio(ratioAt(e.clientY));                          // persist + notify (final) → survives reload, app-wide
+        if (actsAsSizer) {
+            setVisualHeight(heightAt(e.clientY));
+        } else {
+            let requestedTopHeight = e.clientY - visual.getBoundingClientRect().top;
+            let requestedTotalHeight = requestedTopHeight + startBottomHeight;
+            let clampedTotalHeight = Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), requestedTotalHeight));
+            let actualTopHeight = clampedTotalHeight - startBottomHeight;
+            const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
+            const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
+            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+            let frac = actualTopHeight / clampedTotalHeight;
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            setVisualHeight(clampedTotalHeight);
+            setPaneRatio(newRatio);
+        }
     };
     sp.addEventListener('pointerdown', (e) => {
         if (split.dataset.splitOn !== '1') return;
@@ -376,7 +403,18 @@ function addPaneSplitter(split) {
                 setPaneCollapsed(kind, false);
             }
         }
-        actsAsSizer = allPanes.length > 1 && allPanes[1].getAttribute('data-collapsed') === '1';
+        if (allPanes.length > 1) {
+            const bottomPane = allPanes[1];
+            if (bottomPane.getAttribute('data-collapsed') === '1') {
+                actsAsSizer = true;
+            } else {
+                actsAsSizer = false;
+                startBottomHeight = bottomPane.getBoundingClientRect().height;
+            }
+        } else {
+            actsAsSizer = false;
+            startBottomHeight = 0;
+        }
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
