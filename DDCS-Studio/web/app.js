@@ -470,11 +470,6 @@ class DDCSStudio {
 // Initialize application when DOM is ready
 const finishBoot = () => {
     window.ddcsStudio = new DDCSStudio();
-    const loader = document.getElementById('ddcs-boot-loader');
-    if (loader) {
-        loader.style.opacity = '0';
-        setTimeout(() => loader.remove(), 300);
-    }
 };
 
 if (document.readyState === 'loading') {

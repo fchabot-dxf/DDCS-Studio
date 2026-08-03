@@ -97,7 +97,7 @@ function showBanner(tag, dl, body, commits) {
   bar.querySelector('.upd-dl').addEventListener('click', (e) => {
     e.preventDefault();
     let w = null; try { w = window.open(dl, '_blank', 'noopener'); } catch (_) { w = null; }
-    if (!w) location.href = dl;
+    if (!w && typeof window.pywebview === 'undefined') location.href = dl;
   });
   bar.querySelector('.upd-what').addEventListener('click', () => { notes.hidden = !notes.hidden; });
   bar.querySelector('.upd-x').addEventListener('click', () => { try { localStorage.setItem('ddcs_update_dismissed', tag); } catch (_) { /* */ } bar.remove(); });

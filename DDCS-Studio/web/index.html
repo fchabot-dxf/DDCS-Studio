@@ -1898,6 +1898,11 @@
                ONE DECLARED SIGNAL instead of a guess: the flag says the deferred wiring is DONE, and the event is for
                anyone who was already waiting. */
             try {
+                const loader = document.getElementById('ddcs-boot-loader');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.remove(), 300);
+                }
                 document.documentElement.dataset.ddcsReady = '1';
                 window.dispatchEvent(new CustomEvent('ddcs:ready'));
             } catch (_) { /* the app is up either way; the signal is for observers */ }

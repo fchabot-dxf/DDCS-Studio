@@ -5813,4 +5813,6 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .editor-container { --editor-chip-inset: 46px; }   /* the chip sits 8px down and stands ~31px tall — measured, not guessed, plus breathing room */
 .editor-container #editor,
 .editor-container #editor-highlight,
-.editor-container #editor-gutter { padding-top: var(--editor-chip-inset); }
+.editor-container #editor-gutter { top: var(--editor-chip-inset); height: calc(100% - var(--editor-chip-inset)); }
+
+[data-theme="studio"] #editor-gutter { font-size: 15px; padding: 14px 8px 14px 0; }
