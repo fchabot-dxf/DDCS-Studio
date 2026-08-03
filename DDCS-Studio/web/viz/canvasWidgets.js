@@ -29,7 +29,7 @@ export const CANVAS_GESTURES = {
     // Optional anchor ax/ay makes it RELATIVE: the fields hold world − anchor (a delta, e.g. a G91 incremental
     // reposition offset from the previous pass's start). Absent anchor → absolute (back-compat: ax/ay default 0).
     point: {
-        place: (d) => ({ x: (d.ax || 0) + d.x, y: (d.ay || 0) + d.y, kind: 'move', label: d.label }),
+        place: (d) => ({ x: (d.ax || 0) + d.x, y: (d.ay || 0) + d.y, kind: 'move', label: d.label, labelDir: d.labelDir }),
         drag: (d, w) => ({ [d.fx]: w.x - (d.ax || 0), [d.fy]: w.y - (d.ay || 0) }),
     },
     // 1D LENGTH from an anchor along an axis (e.g. height). Handle at anchor + value·axis; drag → the axis distance.
@@ -53,7 +53,9 @@ export const CANVAS_GESTURES = {
     // half-extent radius), and clamps with `minw`/`minh`. A zero divisor skips that axis (e.g. a single-column grid).
     rect: {
         place: (d) => {
-            const h = { x: d.ax + d.ex, y: d.ay + d.ey, kind: 'size', label: d.label, value: d.value };
+            const vx = d.vx !== undefined ? d.vx : 1;
+            const vy = d.vy !== undefined ? d.vy : 1;
+            const h = { x: d.ax + d.ex * vx, y: d.ay + d.ey * vy, kind: 'size', label: d.label, value: d.value, labelDir: d.labelDir };
             if (d.label === 'W×H' && d.sx && d.sy) {
                 h.displayVals = [Math.abs(d.ex / d.sx), Math.abs(d.ey / d.sy)];
             }
@@ -61,8 +63,18 @@ export const CANVAS_GESTURES = {
         },
         drag: (d, w) => {
             const m = {};
-            if (d.sx) m[d.field] = clampMin((w.x - d.ax) / d.sx, d.minw);
-            if (d.sy) m[d.fieldH] = clampMin((w.y - d.ay) / d.sy, d.minh);
+            const vx = d.vx !== undefined ? d.vx : 1;
+            const vy = d.vy !== undefined ? d.vy : 1;
+            if (d.sx) {
+                const nw = clampMin((w.x - d.ax) / (d.sx * vx), d.minw);
+                m[d.field] = nw;
+                if (d.fx) m[d.fx] = d.ax - nw * d.sx;
+            }
+            if (d.sy) {
+                const nh = clampMin((w.y - d.ay) / (d.sy * vy), d.minh);
+                m[d.fieldH] = nh;
+                if (d.fy) m[d.fy] = d.ay - nh * d.sy;
+            }
             return m;
         },
     },

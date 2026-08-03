@@ -498,7 +498,14 @@ export class FeatureCanvas {
             // (Ø, W, pitch, …) keep their click-to-edit value label.
             const rawDelta = /^d[xy]$/i.test(String(h.label || ''));
             if (h.label && !rawDelta) {
-                const t = svgEl('text', { x: c.x + 10, y: c.y - 8, class: 'fc-handle-label' });
+                // Label direction: declared by the datum corner (handleScale → labelDir) so the
+                // glyph sits OUTSIDE the shape.  Default (no labelDir) = upper-right (current behaviour).
+                const lx = (h.labelDir && h.labelDir.lx) || 1;
+                const ly = (h.labelDir && h.labelDir.ly) || -1;
+                const tx = c.x + 10 * lx;
+                const ty = c.y + 8 * ly;
+                const t = svgEl('text', { x: tx, y: ty, class: 'fc-handle-label' });
+                if (lx < 0) t.setAttribute('text-anchor', 'end');
                 if (h.value != null && this.spec.onEdit) {
                     // Centroid-style: the dimension shows its VALUE and is click-to-edit (type, don't just drag).
                     t.textContent = `${h.label} ${r3(h.value)}`;
@@ -506,7 +513,7 @@ export class FeatureCanvas {
                     t.style.textDecoration = 'underline';
                     t.style.pointerEvents = 'auto';   // labels may be pointer-events:none; the editable dim must catch clicks
                     t.addEventListener('pointerdown', (e) => e.stopPropagation());   // don't let the canvas start a pan/drag
-                    t.addEventListener('click', (e) => { e.stopPropagation(); this._editDim(h, c.x + 10, c.y - 8); });   // open AFTER mouseup so focus sticks
+                    t.addEventListener('click', (e) => { e.stopPropagation(); this._editDim(h, tx, ty); });   // open AFTER mouseup so focus sticks
                 } else if (h.displayVals) {
                     t.textContent = `${h.label} ${r3(h.displayVals[0])}×${r3(h.displayVals[1])}`;
                 } else {
