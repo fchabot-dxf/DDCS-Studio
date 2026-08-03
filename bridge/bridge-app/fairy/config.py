@@ -90,6 +90,7 @@ class Config:
         c.r2_access_key = os.environ.get("R2_ACCESS_KEY", c.r2_access_key)
         c.r2_secret_key = os.environ.get("R2_SECRET_KEY", c.r2_secret_key)
         cfg_path = overrides.get("config_path") or cls.default_config_path()
+        persisted = {}
         try:
             with open(cfg_path, encoding="utf-8") as f:
                 persisted = json.load(f)
@@ -98,6 +99,37 @@ class Config:
                     setattr(c, attr, persisted[jk])
         except (OSError, ValueError):
             pass
+
+        # Seed Google OAuth if missing
+        seeded = False
+        if not c.google_client_id:
+            try:
+                bundled_oauth = os.path.join(os.path.dirname(__file__), "google_oauth.json")
+                if os.path.exists(bundled_oauth):
+                    with open(bundled_oauth, encoding="utf-8") as f:
+                        oauth_data = json.load(f)
+                    creds = oauth_data.get("web") or oauth_data.get("installed") or {}
+                    cid = creds.get("client_id", "")
+                    csec = creds.get("client_secret", "")
+                    if cid:
+                        c.google_client_id = cid
+                        c.google_client_secret = csec
+                        persisted["google_client_id"] = cid
+                        persisted["google_client_secret"] = csec
+                        seeded = True
+            except Exception:
+                pass
+
+        if seeded:
+            try:
+                d = os.path.dirname(cfg_path)
+                if d:
+                    os.makedirs(d, exist_ok=True)
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    json.dump(persisted, f)
+            except Exception:
+                pass
+
         c.config_path = cfg_path
         for k, v in overrides.items():
             if v is not None:

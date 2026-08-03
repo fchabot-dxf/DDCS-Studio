@@ -67,6 +67,7 @@ try {
         --add-data "bridge/bridge-app/web/ui${sep}console" `
         --add-data "DDCS-Studio/web${sep}studio" `
         --add-data "DDCS-Studio/web/shared${sep}shared" `
+        --add-data "bridge/bridge-app/fairy/google_oauth.json${sep}fairy" `
         --collect-submodules fairy `
         --collect-submodules pymodbus `
         --collect-all webview `
