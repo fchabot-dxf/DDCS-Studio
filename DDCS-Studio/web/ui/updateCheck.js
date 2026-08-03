@@ -76,7 +76,7 @@ async function addSelfUpdate(bar, tag) {
 
 You can download it yourself from the release page.`);
   });
-  bar.insertBefore(btn, bar.querySelector('.upd-btn[href]'));
+  bar.insertBefore(btn, bar.querySelector('.upd-dl'));
 }
 
 function showBanner(tag, dl, body, commits) {
@@ -84,7 +84,7 @@ function showBanner(tag, dl, body, commits) {
   const bar = document.createElement('div');
   bar.className = 'ddcs-update-bar';
   bar.innerHTML = `<span class="upd-msg">⬆ Update available — <b>${escapeHtml(tag)}</b></span>`
-    + `<a class="upd-btn" href="${encodeURI(dl)}" target="_blank" rel="noopener">Download</a>`
+    + `<button class="upd-btn upd-dl" type="button">Download</button>`
     + `<button class="upd-btn upd-what" type="button">What's new ▾</button>`
     + `<button class="upd-x" type="button" aria-label="Dismiss">✕</button>`
     + `<div class="upd-notes" hidden></div>`;
@@ -94,7 +94,7 @@ function showBanner(tag, dl, body, commits) {
   // ONE download path (t1185 — the anchor's target=_blank AND window.open BOTH firing = the double-download bug): preventDefault
   // the anchor, then a SINGLE window.open (routes to the system browser under pywebview, which may ignore target=_blank). Only
   // if the popup is blocked (window.open → null) fall back to location.href. Net = exactly one download in a browser AND the exe.
-  bar.querySelector('.upd-btn[href]').addEventListener('click', (e) => {
+  bar.querySelector('.upd-dl').addEventListener('click', (e) => {
     e.preventDefault();
     let w = null; try { w = window.open(dl, '_blank', 'noopener'); } catch (_) { w = null; }
     if (!w) location.href = dl;
