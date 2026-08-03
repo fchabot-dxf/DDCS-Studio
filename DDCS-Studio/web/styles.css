@@ -2221,6 +2221,9 @@ button.primary:hover {
    (a status line, a legend, two canvases), so the surface declines to be selected and a near-miss does nothing at
    all instead of doing something alarming. The FORM keeps its selectable text; this is scoped to the visual. */
 .wiz-visual { user-select: none; -webkit-user-select: none; }
+@media (min-width: 861px) {
+    .wiz-visual { height: var(--viz-explicit-h, auto); }
+}
 .viz-pane-splitter:focus-visible { outline: none; }
 .viz-pane-splitter:focus-visible .viz-pane-splitter-grip { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 
@@ -2256,6 +2259,8 @@ button.primary:hover {
     /* t790 — the ratio splits that total so the splitter works stacked AND collapsing still frees the form. */
     .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5)); }
     .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
+    /* t1468 (fix) — When one pane collapses, the survivor takes the full stacked height. */
+    .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
     .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
     /* Lock the preview at the top: it stays pinned while the form scrolls under it (single-column view). */
     .wiz-2pane > .wiz-visual {

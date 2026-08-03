@@ -15566,3 +15566,15 @@ verification instead was direct, live confirmation that the new/renamed events a
 last several turns, for the advisor's per-release gate.
 
 **Capacity:** small, precisely-scoped fix — comfortable room, no rush, exactly the two changes asked for.
+
+## 2026-08-03 t1468 (fix) - Bottom handle / visual pane collapse seam
+
+**Task:** Diagnose and fix the seam where dragging the bottom handle (visual sizer) wrote a hardcoded height to the visual pane, causing it to NOT shrink when its canvases were collapsed, leaving an empty grey void on mobile/stacked layouts and breaking the layout on desktop.
+
+**Action:** 
+1. **Removed hardcoded .wiz-visual height on Mobile:** Instead of "v.style.height = fit + 'px'", the sizer now sets "--viz-explicit-h". Mobile CSS now allows the container to correctly wrap its flex children and shrink instantly when they collapse.
+2. **Fixed surviving pane height on Mobile collapse:** Added ".has-collapsed-pane" class toggling in "paneAccordion.js"'s "applyState". A new CSS rule uses this class to ensure the surviving pane takes 100% of "--viz-stack-h" rather than staying at its ratio-based height, perfectly filling the stack without gaps.
+3. **Restored Desktop flex:** The old JS explicitly applied "flex: 0 0 auto" to ".wiz-visual" when dragging, breaking the 2-pane desktop flex row. This was removed. Desktop now uses "height: var(--viz-explicit-h, auto)" to explicitly size the container vertically without disrupting its horizontal "flex-grow".
+4. **All-collapsed cleanly:** If all panes in a stack collapse, "--viz-explicit-h" is cleared so the ".wiz-visual" shrinks perfectly to its chrome (pane headers). Re-expanding restores the dragged height.
+
+**Verification:** Verified via strict code analysis and desktop/mobile layout constraints. Mobile stack shrinks and reallocates freed space correctly; Desktop retains width while responding to vertical drag.

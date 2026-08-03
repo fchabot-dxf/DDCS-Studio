@@ -81,6 +81,31 @@ export function applyState(pane, collapsed, animate) {
     pane.setAttribute('data-collapsed', collapsed ? '1' : '0');
     if (bar) bar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
 
+    const split = pane.closest('.viz-split');
+    if (split) {
+        const allPanes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
+        const collapsedCount = allPanes.filter(p => p.getAttribute('data-collapsed') === '1').length;
+        if (collapsedCount > 0 && collapsedCount < allPanes.length) {
+            split.classList.add('has-collapsed-pane');
+        } else {
+            split.classList.remove('has-collapsed-pane');
+        }
+        
+        const visual = split.closest('.wiz-visual');
+        if (visual) {
+            if (collapsedCount === allPanes.length) {
+                visual.style.removeProperty('--viz-explicit-h');
+            } else if (!visual.style.getPropertyValue('--viz-explicit-h') && getVisualHeight() != null) {
+                applyVisualHeight(getVisualHeight());
+            }
+        }
+        
+        if (animate && !reduced()) {
+            const stopAll = followPanelResize(split);
+            setTimeout(() => stopAll(), (tk.dur || 200) + 50);
+        }
+    }
+
     if (!animate || reduced()) {                        // snap
         body.style.transition = 'none';
         body.style.height = collapsed ? '0px' : '';
@@ -224,7 +249,7 @@ function applyVisualHeight(h) {
     const px = h === undefined ? getVisualHeight() : h;
     let healed = null;
     document.querySelectorAll('.wiz-visual').forEach((v) => {
-        if (px == null) { v.style.removeProperty('height'); v.style.removeProperty('flex'); v.style.removeProperty('--viz-stack-h'); return; }
+        if (px == null) { v.style.removeProperty('--viz-explicit-h'); v.style.removeProperty('--viz-stack-h'); v.style.removeProperty('height'); v.style.removeProperty('flex'); return; }
         // THE STORED VALUE HEALS. A 900 persisted before this fix (or saved on a taller window, or on a screen that
         // has since been resized) must not reopen every wizard with its handle buried — so a visual that cannot take
         // the stored height takes what it can, and the smallest such fit is written back below. Reopening broken is
@@ -234,8 +259,7 @@ function applyVisualHeight(h) {
         if (fit < px) healed = healed == null ? fit : Math.min(healed, fit);
         // derive the stacked share from the CLAMPED height (never the request), BEFORE the write moves the rects
         const chrome = stackChrome(v);
-        v.style.height = fit + 'px';
-        v.style.flex = '0 0 auto';   // an explicit height only means something once it stops flexing
+        v.style.setProperty('--viz-explicit-h', fit + 'px');
         if (chrome != null) v.style.setProperty('--viz-stack-h', Math.max(0, fit - chrome) + 'px');
     });
     // Persist the heal AFTER the layout pass, and only from a measurable visual. setVisualHeight no-ops on an
