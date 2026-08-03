@@ -279,8 +279,23 @@ function addVisualSizer(split) {
 
     // The ceiling is asked of the container at DRAG TIME, not read from a constant — see visualMaxHeight.
     const heightAt = (y) => Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
-    let dragging = false, stopFollow = null;
-    const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyVisualHeight(heightAt(e.clientY)); };
+    let dragging = false, stopFollow = null, startTopHeight = 0;
+    const onMove = (e) => { 
+        if (!dragging) return; 
+        e.preventDefault(); 
+        let clampedTotalHeight = heightAt(e.clientY);
+        applyVisualHeight(clampedTotalHeight);
+        
+        const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
+        if (panes.length > 1) {
+            let frac = startTopHeight / Math.max(1, clampedTotalHeight);
+            const a = panes[0];
+            const b = panes[1];
+            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            applyPaneRatio(newRatio);
+        }
+    };
     const onUp = (e) => {
         if (!dragging) return;
         dragging = false;
@@ -288,7 +303,19 @@ function addVisualSizer(split) {
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
-        setVisualHeight(heightAt(e.clientY));   // persist + notify (final), like the ratio
+        
+        let clampedTotalHeight = heightAt(e.clientY);
+        setVisualHeight(clampedTotalHeight);
+        
+        const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
+        if (panes.length > 1) {
+            let frac = startTopHeight / Math.max(1, clampedTotalHeight);
+            const a = panes[0];
+            const b = panes[1];
+            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+            let newRatio = Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+            setPaneRatio(newRatio);
+        }
     };
     sp.addEventListener('pointerdown', (e) => {
         const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
@@ -299,6 +326,11 @@ function addVisualSizer(split) {
                 applyState(bottomPane, false, true);
                 setPaneCollapsed(kind, false);
             }
+        }
+        if (panes.length > 1) {
+            startTopHeight = panes[0].getBoundingClientRect().height;
+        } else {
+            startTopHeight = 0;
         }
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
