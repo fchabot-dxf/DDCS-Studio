@@ -178,7 +178,7 @@ function applyPaneRatio(r) {
 // The splitter only means something with BOTH panes open + visible → toggle its inertness off collapse / display state.
 function updateSplitOn(split) {
     const panes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
-    const ok = panes.length === 2 && panes.every((p) => p.offsetParent !== null && p.getAttribute('data-collapsed') !== '1');
+    const ok = panes.length === 2 && panes.every((p) => p.offsetParent !== null);
     split.dataset.splitOn = ok ? '1' : '0';
 }
 
@@ -291,6 +291,15 @@ function addVisualSizer(split) {
         setVisualHeight(heightAt(e.clientY));   // persist + notify (final), like the ratio
     };
     sp.addEventListener('pointerdown', (e) => {
+        const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
+        if (panes.length > 0) {
+            const bottomPane = panes[panes.length - 1];
+            if (bottomPane.getAttribute('data-collapsed') === '1') {
+                const kind = bottomPane.dataset.vizPane;
+                applyState(bottomPane, false, true);
+                setPaneCollapsed(kind, false);
+            }
+        }
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
@@ -298,6 +307,15 @@ function addVisualSizer(split) {
         sp.addEventListener('pointermove', onMove); sp.addEventListener('pointerup', onUp); sp.addEventListener('pointercancel', onUp);
     });
     sp.addEventListener('keydown', (e) => {
+        const panes = [...visual.querySelectorAll('.viz-split > [data-viz-pane]')];
+        if (panes.length > 0) {
+            const bottomPane = panes[panes.length - 1];
+            if (bottomPane.getAttribute('data-collapsed') === '1') {
+                const kind = bottomPane.dataset.vizPane;
+                applyState(bottomPane, false, true);
+                setPaneCollapsed(kind, false);
+            }
+        }
         const step = e.shiftKey ? 40 : 12;
         if (e.key === 'ArrowUp') { e.preventDefault(); setVisualHeight((getVisualHeight() || visual.getBoundingClientRect().height) - step); }
         if (e.key === 'ArrowDown') { e.preventDefault(); setVisualHeight((getVisualHeight() || visual.getBoundingClientRect().height) + step); }
@@ -325,8 +343,18 @@ function addPaneSplitter(split) {
         const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
         return Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
     };
-    let dragging = false, stopFollow = null;
-    const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyPaneRatio(ratioAt(e.clientY)); };   // live, unpersisted
+    let dragging = false, stopFollow = null, actsAsSizer = false;
+    const visual = split.closest('.wiz-visual');
+    const heightAt = (y) => {
+        if (!visual) return getVisualHeight();
+        return Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
+    };
+    const onMove = (e) => { 
+        if (!dragging) return; 
+        e.preventDefault(); 
+        if (actsAsSizer) applyVisualHeight(heightAt(e.clientY));
+        else applyPaneRatio(ratioAt(e.clientY)); 
+    };
     const onUp = (e) => {
         if (!dragging) return;
         dragging = false;
@@ -334,10 +362,21 @@ function addPaneSplitter(split) {
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
-        setPaneRatio(ratioAt(e.clientY));                          // persist + notify (final) → survives reload, app-wide
+        if (actsAsSizer) setVisualHeight(heightAt(e.clientY));
+        else setPaneRatio(ratioAt(e.clientY));                          // persist + notify (final) → survives reload, app-wide
     };
     sp.addEventListener('pointerdown', (e) => {
-        if (split.dataset.splitOn !== '1') return;                 // inert while a pane is collapsed / hidden
+        if (split.dataset.splitOn !== '1') return;
+        const allPanes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
+        if (allPanes.length > 0) {
+            const topPane = allPanes[0];
+            if (topPane.getAttribute('data-collapsed') === '1') {
+                const kind = topPane.dataset.vizPane;
+                applyState(topPane, false, true);
+                setPaneCollapsed(kind, false);
+            }
+        }
+        actsAsSizer = allPanes.length > 1 && allPanes[1].getAttribute('data-collapsed') === '1';
         dragging = true; e.preventDefault();
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
@@ -347,13 +386,30 @@ function addPaneSplitter(split) {
     // keyboard a11y — arrows nudge the ratio (the separator role invites it)
     sp.addEventListener('keydown', (e) => {
         if (split.dataset.splitOn !== '1') return;
-        const d = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -0.05 : (e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 0.05 : 0);
-        if (!d) return;
-        e.preventDefault();
-        const a = split.querySelector(':scope > [data-viz-pane="preview3d"]'), b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
-        const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
-        setPaneRatio(getPaneRatio() + (threeDTop ? -d : d));       // ArrowDown grows the bottom pane, regardless of which it is
-        hostsResizeOnce(split);
+        const allPanes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
+        if (allPanes.length > 0) {
+            const topPane = allPanes[0];
+            if (topPane.getAttribute('data-collapsed') === '1') {
+                const kind = topPane.dataset.vizPane;
+                applyState(topPane, false, true);
+                setPaneCollapsed(kind, false);
+            }
+        }
+        actsAsSizer = allPanes.length > 1 && allPanes[1].getAttribute('data-collapsed') === '1';
+        
+        if (actsAsSizer) {
+            const step = e.shiftKey ? 40 : 12;
+            if (e.key === 'ArrowUp') { e.preventDefault(); setVisualHeight((getVisualHeight() || visual.getBoundingClientRect().height) - step); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setVisualHeight((getVisualHeight() || visual.getBoundingClientRect().height) + step); }
+        } else {
+            const d = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -0.05 : (e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 0.05 : 0);
+            if (!d) return;
+            e.preventDefault();
+            const a = split.querySelector(':scope > [data-viz-pane="preview3d"]'), b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
+            const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+            setPaneRatio(getPaneRatio() + (threeDTop ? -d : d));       // ArrowDown grows the bottom pane, regardless of which it is
+            hostsResizeOnce(split);
+        }
     });
 
     updateSplitOn(split);
