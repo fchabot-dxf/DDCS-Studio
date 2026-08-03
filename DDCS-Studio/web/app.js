@@ -468,12 +468,19 @@ class DDCSStudio {
 })();
 
 // Initialize application when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        window.ddcsStudio = new DDCSStudio();
-    });
-} else {
+const finishBoot = () => {
     window.ddcsStudio = new DDCSStudio();
+    const loader = document.getElementById('ddcs-boot-loader');
+    if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 300);
+    }
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', finishBoot);
+} else {
+    finishBoot();
 }
 
 export default DDCSStudio;
