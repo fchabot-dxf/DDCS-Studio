@@ -52,7 +52,13 @@ export const CANVAS_GESTURES = {
     // offset back to each field through a per-axis DIVISOR `sx`/`sy` (1 = literal W/H · `cols-1` = grid pitch · 0.5 =
     // half-extent radius), and clamps with `minw`/`minh`. A zero divisor skips that axis (e.g. a single-column grid).
     rect: {
-        place: (d) => ({ x: d.ax + d.ex, y: d.ay + d.ey, kind: 'size', label: d.label, value: d.value }),
+        place: (d) => {
+            const h = { x: d.ax + d.ex, y: d.ay + d.ey, kind: 'size', label: d.label, value: d.value };
+            if (d.label === 'W×H' && d.sx && d.sy) {
+                h.displayVals = [Math.abs(d.ex / d.sx), Math.abs(d.ey / d.sy)];
+            }
+            return h;
+        },
         drag: (d, w) => {
             const m = {};
             if (d.sx) m[d.field] = clampMin((w.x - d.ax) / d.sx, d.minw);

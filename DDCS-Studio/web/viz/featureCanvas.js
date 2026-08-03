@@ -507,6 +507,8 @@ export class FeatureCanvas {
                     t.style.pointerEvents = 'auto';   // labels may be pointer-events:none; the editable dim must catch clicks
                     t.addEventListener('pointerdown', (e) => e.stopPropagation());   // don't let the canvas start a pan/drag
                     t.addEventListener('click', (e) => { e.stopPropagation(); this._editDim(h, c.x + 10, c.y - 8); });   // open AFTER mouseup so focus sticks
+                } else if (h.displayVals) {
+                    t.textContent = `${h.label} ${r3(h.displayVals[0])}×${r3(h.displayVals[1])}`;
                 } else {
                     t.textContent = h.label;
                 }
