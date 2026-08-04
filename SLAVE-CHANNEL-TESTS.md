@@ -55,6 +55,15 @@ bridge/controllers/expert-m350/assets/community/modbus-slave-2025-12-11/README.m
 - [ ] **SMB while polling:** drive capture over SMB during active Modbus polling — any interference?
 - [ ] **Reboot persistence:** do P279/P267 survive power cycles cleanly (expected yes — verify once).
 
+## TIER 5 — GATEWAY TAB INTEGRATIONS (The "MSETDATA Retirement" Arc)
+*Now that the controller is a Modbus Slave, we are the Master and can poll it directly, meaning we might be able to retire the MSETDATA bridge-beacons entirely.*
+
+- [ ] **Files / Send Tab — Remote File Execution:** If we push `job.nc` over SMB, can we execute `M98 P"job.nc"` via G-code injection (Reg 3000) to start it remotely? Or must we use Virtual Keys to navigate the file menu?
+- [ ] **Tracking Tab — Active Tool & Line Number:** While running an air program, do any Modbus registers (known or undocumented) expose the currently loaded tool (T#) or the executing G-code line number? If we can poll the line number directly, we don't need tracking beacons at all.
+- [ ] **Tracking Tab — Macro Variable Polling:** If the line number isn't exposed, can we read standard macro variables (e.g., `#100-#199`) via Modbus? (If yes, we just inject normal `#199 = X` lines into the G-code and poll them over Modbus to track progress, which is natively supported without needing the master-mode `MSETDATA`).
+- [ ] **Status Tab — Active WCS & Overrides:** Can we read the active WCS (e.g., is G54 active?) directly? Can we read the Feed/Spindle override percentages? Can we *write* to them directly, or only bump them via Virtual Keys?
+- [ ] **Console Tab — Execution Feedback:** If an injected G-code line (Reg 3000) causes an alarm or out-of-bounds error, does the controller return a specific error code in register 10002 or as an exception that we can print to the Console?
+
 ## While you're there (from MACHINE-DAY.md)
 - [ ] The V-series copies (bridge/controllers/expert-m350/verify/ → CNCDISK) and runs: V13a–d ·
       V14 · V15 · V16 · V7 — each names its three outcomes in its header.
