@@ -105,6 +105,13 @@ DDCS Studio treats **localStorage as a temporary buffer** and a **file you own a
 
 ---
 
+## FAQ
+
+**If I remove a `form field param` block from a custom wizard's Parameter Group, does it delete the parameter from the program?**
+No. Removing a field block from the `Parameter Group` strictly removes it from the user-facing form. The underlying execution blocks (e.g., `Surface Raster` or `Drill`) still preserve their value sockets (like `feed` or `depth`) and keep their baked defaults. If you need to edit a hidden parameter on a specific job, you can always insert your wizard and then click **Customize as blocks** to edit the raw execution blocks directly.
+
+---
+
 ## Supported controllers
 
 - **DDCS Expert / M350** — the primary, fully-verified target (its captured firmware dump is the reference for the whole dialect system).
