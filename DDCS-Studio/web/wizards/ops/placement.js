@@ -159,8 +159,8 @@ export function handleScale(params, prefix, ox, oy, w, h) {
         pos: { ax: px, ay: py, labelDir: posLd },
         size: {
             ax: ox + px, ay: oy + py,
-            ex: x === 'p' ? -w : (x === 'c' ? w / 2 : w),
-            ey: y === 'p' ? -h : (y === 'c' ? h / 2 : h),
+            ex: x === 'c' ? w / 2 : w,
+            ey: y === 'c' ? h / 2 : h,
             vx: x === 'p' ? -1 : 1, vy: y === 'p' ? -1 : 1,
             sx: x === 'c' ? 0.5 : 1, sy: y === 'c' ? 0.5 : 1,
             fx: x === 'n' ? null : prefix + 'originX',

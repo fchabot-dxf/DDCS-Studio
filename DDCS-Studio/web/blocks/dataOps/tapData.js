@@ -60,15 +60,18 @@ export const TAP_DATA_OPTYPE = 'user_tap_data';
 
 const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
 
+import { handleScale } from '../../wizards/ops/placement.js';
+
 /** t778 — DECLARED preview geometry: the tapped hole as a thread-O ring at (x,y) + a pos handle. Placement-parity: the tap
  *  emit's hole rides the placement offset (offX/offY), 0-relative like drill, so the drawn bbox is the hole point. */
 export function tapPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0);
     const r = Math.max(1.5, _n(p.pitch, 1) * 3);   // a display ring scaled off the pitch (a visible thread-O, not to scale)
     const ring = []; for (let i = 0; i <= 16; i++) { const a = 2 * Math.PI * i / 16; ring.push({ x: ox + r * Math.cos(a), y: oy + r * Math.sin(a) }); }
+    const hs = handleScale(p, '', ox, oy, 0, 0);
     return {
         paths: [{ pts: ring, cls: 'fc-guide' }],
-        handles: [{ type: 'point', id: 'tap_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }],
+        handles: [{ type: 'point', id: 'tap_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }],
         bbox: { minX: ox, maxX: ox, minY: oy, maxY: oy },
     };
 }

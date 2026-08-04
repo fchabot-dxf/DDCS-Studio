@@ -247,21 +247,22 @@ const _pbb = (ps) => { let b = null; for (const p of (ps || [])) for (const q of
  *  (circle/polygon → radial Ø; rect/ellipse → rect W×H). Mirrors the built-in pocketView.buildPocketSpec. Preview-side → emit unaffected. */
 export function pocketPreviewGeometry(p) {
     const ox = _pn(p.originX, 0), oy = _pn(p.originY, 0), shape = p.shape || 'rect';
-    const paths = [], handles = [{ type: 'point', id: 'pk_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }];
+    const hs = handleScale(p, '', ox, oy, _pn(p.w, 80), _pn(p.h, 60));
+    const paths = [], handles = [{ type: 'point', id: 'pk_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
     if (shape === 'circle') {
         const R = _pn(p.dia, 50) / 2;
         paths.push(_circlePath(ox, oy, R));
-        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: R, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
     } else if (shape === 'polygon') {
         try { const ring = (regionDesc({ shape: 'polygon', x: ox, y: oy, w: _pn(p.dia, 50), sides: _pn(p.sides, 6) }).contour || [])[0] || []; if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); } catch (_) { /* degenerate */ }
-        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: _pn(p.dia, 50) / 2, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: _pn(p.dia, 50) / 2, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
     } else if (shape === 'ellipse') {
         try { const ring = (regionDesc({ shape: 'ellipse', x: ox, y: oy, w: _pn(p.w, 80), h: _pn(p.h, 60) }).contour || [])[0] || []; if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); } catch (_) { /* degenerate */ }
-        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _pn(p.w, 80) / 2, ey: _pn(p.h, 60) / 2, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W×H' });
+        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
     } else {
         const w = _pn(p.w, 80), h = _pn(p.h, 60);
         paths.push({ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' });
-        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
+        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });
     }
     // t718 — the origin-inclusive boundary bbox: the twin's pocket geometry emits 0-relative (origin rides the placement
     // offX), so the layout consumer places against THIS drawn-frame bbox → the pocket frames the traced clearing passes.

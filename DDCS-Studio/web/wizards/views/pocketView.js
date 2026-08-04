@@ -4,7 +4,7 @@ import { PocketWizard, pocketBBox } from '../pocketWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
-import { placementSpec, placementParams } from '../ops/placement.js';
+import { placementSpec, placementParams, handleScale } from '../ops/placement.js';
 import { regionDesc } from '../ops/region.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
@@ -36,12 +36,13 @@ function buildPocketSpec(params, stock) {
     // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`; the size handle is a `rect` corner
     // (rect/ellipse — ellipse drags a half-extent, so divisor 0.5 → full W/H) or a radius-only `radial` (circle/polygon,
     // Ø = 2·distance). Each still drives a wizard PARAMETER via setFields() — never freeform geometry.
-    const decls = [{ type: 'point', id: 'origin', fx: 'p_originX', fy: 'p_originY', x: ox, y: oy, label: 'pos' }];
+    const hs = handleScale(params, 'p_', ox, oy, num(params.w, 80), num(params.h, 60));
+    const decls = [{ type: 'point', id: 'origin', fx: 'p_originX', fy: 'p_originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
 
     if (params.shape === 'circle') {
         const R = num(params.dia, 50) / 2;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
-        decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+        decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a });
     } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
         // No SVG primitive for polygon/ellipse — draw the boundary ring from the region kernel's contour.
         const rg = regionDesc(params.shape === 'polygon'
@@ -51,15 +52,15 @@ function buildPocketSpec(params, stock) {
         if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
         if (params.shape === 'polygon') {
             const R = num(params.dia, 50) / 2;
-            decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+            decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a });
         } else {
             const rx = num(params.w, 80) / 2, ry = num(params.h, 60) / 2;
-            decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', ax: ox, ay: oy, ex: rx, ey: ry, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W × H' });
+            decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', minw: 1, minh: 1, label: 'W × H', ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
         }
     } else {
         const w = num(params.w, 80), h = num(params.h, 60);
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W × H' });
+        decls.push({ type: 'rect', id: 'size', field: 'p_w', fieldH: 'p_h', minw: 1, minh: 1, label: 'W × H', ...hs.size });
     }
 
     const { handles, onDrag, onEdit } = buildCanvasWidgets(decls, setFields);

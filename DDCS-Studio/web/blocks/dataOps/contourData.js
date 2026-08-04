@@ -94,22 +94,24 @@ function _regionParams(p) {
  *  layoutSpecFromOp guessing: the twin KNOWS p.shape, so it returns the right boundary + size-handle FOR THAT KIND. The
  *  boundary ring + the OFFSET toolpath (what's cut) come from the SAME kernels the emit uses → the 2D can't diverge from
  *  the G-code. Handles write the TWIN params (originX/originY pos; w/h or dia size). Preview-side → emit unaffected. */
+import { handleScale } from '../../wizards/ops/placement.js';
 export function contourPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0), shape = p.shape || 'rect';
     const rp = _regionParams(p);
     const brg = regionDesc(rp);
-    const paths = [], handles = [{ type: 'point', id: 'ct_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }];
+    const hs = handleScale(p, '', ox, oy, _n(p.w, 80), _n(p.h, 60));
+    const paths = [], handles = [{ type: 'point', id: 'ct_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
     // the BOUNDARY you type (a closed guide ring, straight from the region kernel — correct for every shape)
     for (const ring of (brg.contour || [])) { if (ring && ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); }
     // the OFFSET toolpath (tool-centre) — the SAME contourRegion the emit folds, so 2D == cut
     try { const rg = contourRegion({ region: brg, side: p.side || 'outside', tool: _n(p.toolDia, 6) }); for (const ring of (rg.contour || [])) { if (ring && ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-path' }); } } catch (_) { /* degenerate size → skip the offset ring */ }
     // the SIZE handle, PER KIND (declared, not sniffed): circle/polygon → radial Ø; rect/ellipse → rect W×H (ellipse = half-extent)
     if (shape === 'circle' || shape === 'polygon') {
-        handles.push({ type: 'radial', id: 'ct_size', field: 'dia', cx: ox, cy: oy, r: _n(p.dia, 50) / 2, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+        handles.push({ type: 'radial', id: 'ct_size', field: 'dia', cx: ox, cy: oy, r: _n(p.dia, 50) / 2, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
     } else if (shape === 'ellipse') {
-        handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _n(p.w, 80) / 2, ey: _n(p.h, 60) / 2, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W×H' });
+        handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
     } else {
-        handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _n(p.w, 80), ey: _n(p.h, 60), sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
+        handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });
     }
     // t718 — the origin-inclusive OFFSET-toolpath bbox (the drawn fc-path): the twin's contourfill geometry is FROZEN at 0
     // (originX rides the placement offX, unlike the built-in wizard), so the layout consumer places against THIS drawn-frame

@@ -4,7 +4,7 @@ import { DrillWizard, patternPoints } from '../drillWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { toolOptionsHTML, getTool } from '../toolPicker.js';
-import { placementSpec, placementParams, pointsBBox } from '../ops/placement.js';
+import { placementSpec, placementParams, pointsBBox, handleScale } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
@@ -53,28 +53,40 @@ function buildDrillSpec(params, stock) {
     // DECLARE the handles via reusable gestures (not hand-rolled): the position is a `point`; each pattern's size
     // handle is a `rect` (2D corner, optionally per-axis-divided for grid pitch) or a `radial` (Ø/pitch + angle).
     // Every handle still drives a wizard PARAMETER via setFields() — never freeform geometry.
-    const decls = [{ type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos' }];
-    const items = [];
+    const hs = handleScale(params, 'd_', ox, oy, num(params.cols, 3) * num(params.dx, 20), num(params.rows, 3) * num(params.dy, 20)); // Will override below based on pattern
+    const decls = [{ type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos' }]; // Wait, let me check the pattern-specific logic
 
     if (pat === 'circle') {
+        const hsC = handleScale(params, 'd_', ox, oy, num(params.dia, 50), num(params.dia, 50));
+        decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsC.pos };
         const R = num(params.dia, 50) / 2, a0 = num(params.startAngle, 0) * Math.PI / 180;
         items.push({ kind: 'circle', cx: ox, cy: oy, r: R });
         decls.push({ type: 'radial', id: 'ring', field: 'd_dia', fieldA: 'd_startAngle', cx: ox, cy: oy, r: R, a: a0, rScale: 2, editMin: 0, label: 'Ø', value: num(params.dia, 50) });
     } else if (pat === 'grid') {
         const cols = Math.max(1, Math.round(num(params.cols, 3))), rows = Math.max(1, Math.round(num(params.rows, 3)));
         const dx = num(params.dx, 20), dy = num(params.dy, 20);
-        items.push({ kind: 'rect', x: ox, y: oy, w: (cols - 1) * dx, h: (rows - 1) * dy });
+        const w = (cols - 1) * dx, h = (rows - 1) * dy;
+        const hsG = handleScale(params, 'd_', ox, oy, w, h);
+        decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsG.pos };
+        items.push({ kind: 'rect', x: ox, y: oy, w, h });
         // Signed pitch (no min) — drag left/down for a -X/-Y grid; a single col/row (divisor 0) leaves that axis alone.
-        decls.push({ type: 'rect', id: 'size', field: 'd_dx', fieldH: 'd_dy', ax: ox, ay: oy, ex: (cols - 1) * dx, ey: (rows - 1) * dy, sx: cols - 1, sy: rows - 1, editMin: 0, label: 'dx', value: dx });
+        decls.push({ type: 'rect', id: 'size', field: 'd_dx', fieldH: 'd_dy', sx: cols - 1, sy: rows - 1, editMin: 0, label: 'dx', value: dx, ...hsG.size });
     } else if (pat === 'rect') {
         const w = num(params.w, 100), h = num(params.h, 80);
+        const hsR = handleScale(params, 'd_', ox, oy, w, h);
+        decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsR.pos };
         items.push({ kind: 'rect', x: ox, y: oy, w, h });
-        decls.push({ type: 'rect', id: 'size', field: 'd_w', fieldH: 'd_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, editMin: 1, label: 'W', value: w });
+        decls.push({ type: 'rect', id: 'size', field: 'd_w', fieldH: 'd_h', minw: 1, minh: 1, editMin: 1, label: 'W', value: w, ...hsR.size });
     } else if (pat === 'line') {
         const n = Math.max(1, Math.round(num(params.count, 3))), s = num(params.spacing, 20), a = num(params.angle, 0) * Math.PI / 180;
         const ex = ox + (n - 1) * s * Math.cos(a), ey = oy + (n - 1) * s * Math.sin(a);
+        const hsL = handleScale(params, 'd_', ox, oy, Math.abs(ex - ox), Math.abs(ey - oy));
+        decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsL.pos };
         items.push({ kind: 'line', x1: ox, y1: oy, x2: ex, y2: ey });
         decls.push({ type: 'radial', id: 'end', field: 'd_spacing', fieldA: 'd_angle', cx: ox, cy: oy, r: (n - 1) * s, a, rScale: n > 1 ? 1 / (n - 1) : null, minR: 0, editMin: 0, label: 'pitch', value: num(params.spacing, 20) });
+    } else {
+        const hsS = handleScale(params, 'd_', ox, oy, 0, 0);
+        decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsS.pos };
     }
 
     const skip = parseSkip(params.skip);

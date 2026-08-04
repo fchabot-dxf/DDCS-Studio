@@ -4,7 +4,7 @@ import { SurfacingWizard, surfacingBBox } from '../surfacingWizard.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
-import { placementSpec, placementParams } from '../ops/placement.js';
+import { placementSpec, placementParams, handleScale } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
@@ -32,11 +32,13 @@ function applyTool() {
 function buildSurfacingSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const w = num(params.w, 100), h = num(params.h, 80);
+    const hs = handleScale(params, 'sf_', ox, oy, w, h);
     // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`, the face area = a `rect` corner.
     const { handles, onDrag, onEdit } = buildCanvasWidgets([
-        { type: 'point', id: 'origin', fx: 'sf_originX', fy: 'sf_originY', x: ox, y: oy, label: 'pos' },
-        { type: 'rect', id: 'size', field: 'sf_w', fieldH: 'sf_h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W × H' },
+        { type: 'point', id: 'origin', fx: 'sf_originX', fy: 'sf_originY', x: ox, y: oy, label: 'pos', ...hs.pos },
+        { type: 'rect', id: 'size', field: 'sf_w', fieldH: 'sf_h', minw: 1, minh: 1, label: 'W × H', ...hs.size },
     ], setFields);
+    console.log('buildSurfacingSpec handles:', handles, 'hs:', hs);
     const pl = placementSpec(params, surfacingBBox(params), 'sf_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,

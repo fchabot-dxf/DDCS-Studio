@@ -7,7 +7,7 @@
 import { num } from './util.js';
 import { scanlineFill, fillLevelMoves } from '../clearing.js';
 import { textContours, layoutText } from '../textGeometry.js';
-import { pointsBBox } from './placement.js';
+import { pointsBBox, handleScale } from './placement.js';
 import { toolFitRefusal, refusalLines } from './toolFit.js';   // t1444 — the ONE too-small boundary + the family's refusal form
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
@@ -67,13 +67,15 @@ export const fillTextBlock = {
     // text is the first consumer; per-feature handles for other ops ride this same hook later. Returns FeatureCanvas
     // `paths` (the real letter centrelines) + canvasWidget handle DECLS keyed by the op's PARAM names (x/y/rotation),
     // so a drag routes through the twin's form field → update → re-render (the writer round-trip).
+
     previewGeometry: (p) => {
         const lay = layoutText(p);
         const paths = [...lay.strokes, ...(lay.serialPreview || [])].map((poly) => ({ pts: poly.map(([x, y]) => ({ x, y })), cls: 'fc-path' }));   // t764 — show the {SN} placeholder digits in the 2D layout
         const ox = num(p.x, 0), oy = num(p.y, 0), rot = num(p.rotation, 0);
         const r = Math.max(4, lay.lineW || 10);   // the ↻ handle rides the rotated baseline end (grab it to swing the label)
+        const hs = handleScale(p, '', ox, oy, lay.lineW || 0, lay.lineH || 0);
         const handles = [
-            { type: 'point', id: 'txt_pos', fx: 'x', fy: 'y', x: ox, y: oy, label: 'pos' },
+            { type: 'point', id: 'txt_pos', fx: 'x', fy: 'y', x: ox, y: oy, label: 'pos', ...hs.pos },
             { type: 'radial', id: 'txt_rot', fieldA: 'rotation', cx: ox, cy: oy, r, a: rot * Math.PI / 180, label: '↻' },
         ];
         return { paths, handles };

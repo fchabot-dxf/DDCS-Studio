@@ -7,6 +7,7 @@ import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.j
 import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
 import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
+import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
@@ -18,6 +19,11 @@ export default {
 
   mount(ctx) {
     let file = { name: '', text: '' };
+    let previewPanel = null;
+
+    ctx.root.style.display = 'flex';
+    ctx.root.style.flexDirection = 'column';
+    ctx.root.style.height = '100%';
 
     const drop = el('div', { class: 'drop' }, '⤓  Drop a .nc here, or click to choose');
     const input = el('input', { type: 'file', accept: '.nc,.tap,.txt,.gcode', style: 'display:none' });
@@ -41,12 +47,23 @@ export default {
 
     const btn = el('button', { class: 'primary', disabled: '' }, 'Send (tracked)');
     const info = el('div', { class: 'hint' });
+    const previewContainer = el('div', { style: 'flex: 1; min-height: 300px; margin-top: 15px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column;' });
 
     const accept = (name, text) => {
       file = { name, text };
       nameField.value = name;
       drop.textContent = `✓ ${name} (${text.length} bytes)`;
       btn.disabled = !text;
+      
+      if (!previewPanel) {
+        previewPanel = createPreviewPanel(previewContainer, {
+          getGcode: () => file.text,
+          getStock: () => ({ x: 0, y: 0, z: 0 })   // no stock in the send preview — this is foreign G-code, the workspace stock doesn't apply
+        });
+        previewPanel.setActive(true);
+      } else {
+        if (previewPanel.refresh) previewPanel.refresh();
+      }
     };
     const sync = () => {
       settings.classList.toggle('hidden', !beacons.checked);
@@ -155,7 +172,7 @@ export default {
       for (const elm of [drop, useStudio, nameField, beacons, count, pacing, varN, markerV, markerN]) elm.disabled = false;
     };
 
-    ctx.root.append(el('section', { class: 'block' },
+    const block = el('section', { class: 'block', style: 'flex-shrink: 0' },
       el('div', { class: 'section-label' }, 'Send a program'),
       banner,
       drop, input,
@@ -167,7 +184,8 @@ export default {
       info,
       el('div', { class: 'wiz-usage' },
         'Beacons ON instruments the job for progress tracking; OFF = deliver-only (probe / util macros). '
-        + 'The operator presses Cycle Start at the machine.')));
+        + 'The operator presses Cycle Start at the machine.'));
+    ctx.root.append(block, previewContainer);
     sync();
     this.applyState(ctx.desc !== undefined ? ctx.desc : (ctx.status && ctx.status.descriptor));
   },

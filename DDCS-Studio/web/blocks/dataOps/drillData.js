@@ -156,23 +156,33 @@ const _holeRing = (cx, cy, r) => { const pts = []; for (let i = 0; i <= 12; i++)
  *  a pos handle (originX/originY) + the pattern SIZE handle PER KIND (grid dx/dy · circle Ø/angle · line pitch/angle · rect
  *  W/H). Bore (boreDia=true) ALSO gets a draggable hole-DIAMETER handle (holeDia). Mirrors drillView.buildDrillSpec; handles
  *  write the TWIN params directly (preview-side → emit unaffected). SHARED by drillData + boreData (bore imports it). */
+import { handleScale } from '../../wizards/ops/placement.js';
+
 export function drillPatternGeometry(p, boreDia) {
     const pattern = p.pattern || 'single';   // t848 — the view fallback tracks the default (twin-default rule)
     const ox = _dn(p.originX, 0), oy = _dn(p.originY, 0);
     const holeR = boreDia ? Math.max(0.5, _dn(p.holeDia, 12) / 2) : 3;   // bore = the real bore Ø; drill = a small display dot
     const pts = patternPoints({ ...p, cx: ox, cy: oy, x0: ox, y0: oy }) || [];   // patternPoints reads cx/cy or x0/y0 per pattern
     const paths = pts.map((pt) => _holeRing(pt.x, pt.y, holeR));
-    const handles = [{ type: 'point', id: 'dr_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }];
+    
+    // Calculate effective width/height for handleScale based on pattern
+    let w = 0, h = 0;
+    if (pattern === 'grid') { w = (Math.max(1, Math.round(_dn(p.cols, 3))) - 1) * _dn(p.dx, 20); h = (Math.max(1, Math.round(_dn(p.rows, 2))) - 1) * _dn(p.dy, 20); }
+    else if (pattern === 'rect') { w = _dn(p.w, 100); h = _dn(p.h, 80); }
+    else if (pattern === 'circle') { w = _dn(p.dia, 50); h = _dn(p.dia, 50); }
+    else if (pattern === 'line') { w = (Math.max(1, Math.round(_dn(p.count, 3))) - 1) * _dn(p.spacing, 20); h = w; }
+    
+    const hs = handleScale(p, '', ox, oy, w, h);
+    const handles = [{ type: 'point', id: 'dr_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
     if (pattern === 'circle') {
-        handles.push({ type: 'radial', id: 'dr_ring', field: 'dia', fieldA: 'startAngle', cx: ox, cy: oy, r: _dn(p.dia, 50) / 2, a: _dn(p.startAngle, 0) * Math.PI / 180, rScale: 2, minR: 0, label: 'Ø' });
+        handles.push({ type: 'radial', id: 'dr_ring', field: 'dia', fieldA: 'startAngle', cx: ox, cy: oy, r: _dn(p.dia, 50) / 2, a: hs.size.a + _dn(p.startAngle, 0) * Math.PI / 180, rScale: 2, minR: 0, label: 'Ø' });
     } else if (pattern === 'grid') {
-        const cols = Math.max(1, Math.round(_dn(p.cols, 3))), rows = Math.max(1, Math.round(_dn(p.rows, 2))), dx = _dn(p.dx, 20), dy = _dn(p.dy, 20);
-        handles.push({ type: 'rect', id: 'dr_grid', field: 'dx', fieldH: 'dy', ax: ox, ay: oy, ex: (cols - 1) * dx, ey: (rows - 1) * dy, sx: cols - 1, sy: rows - 1, label: 'pitch' });   // signed pitch (no min)
+        handles.push({ type: 'rect', id: 'dr_grid', field: 'dx', fieldH: 'dy', minw: null, minh: null, label: 'pitch', ...hs.size, sx: Math.max(1, Math.round(_dn(p.cols, 3))) - 1, sy: Math.max(1, Math.round(_dn(p.rows, 2))) - 1 });   // signed pitch (no min)
     } else if (pattern === 'rect') {
-        handles.push({ type: 'rect', id: 'dr_rect', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _dn(p.w, 100), ey: _dn(p.h, 80), sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
+        handles.push({ type: 'rect', id: 'dr_rect', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });
     } else if (pattern === 'line') {
         const n = Math.max(1, Math.round(_dn(p.count, 3))), s = _dn(p.spacing, 20);
-        handles.push({ type: 'radial', id: 'dr_line', field: 'spacing', fieldA: 'angle', cx: ox, cy: oy, r: (n - 1) * s, a: _dn(p.angle, 0) * Math.PI / 180, rScale: n > 1 ? 1 / (n - 1) : null, minR: 0, label: 'pitch' });
+        handles.push({ type: 'radial', id: 'dr_line', field: 'spacing', fieldA: 'angle', cx: ox, cy: oy, r: (n - 1) * s, a: hs.size.a + _dn(p.angle, 0) * Math.PI / 180, rScale: n > 1 ? 1 / (n - 1) : null, minR: 0, label: 'pitch' });
     }
     if (boreDia) handles.push({ type: 'radial', id: 'dr_dia', field: 'holeDia', cx: (pts[0] && pts[0].x) || ox, cy: (pts[0] && pts[0].y) || oy, r: holeR, a: 0, rScale: 2, minR: 0.5, label: 'Ø' });
     // t718 — the origin-inclusive hole-CENTRES bbox (NOT the rings, which inflate by holeR): the drill emit's pattern

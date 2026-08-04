@@ -120,15 +120,18 @@ const SURFACING_STRUCT = [
 export const SURFACING_DATA_OPTYPE = 'user_surfacing_data';
 
 const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+import { handleScale } from '../../wizards/ops/placement.js';
+
 /** t716 — DECLARED preview geometry (twin-level): the face-area rectangle (the region extent, at the placement origin) as
  *  a path + a pos handle (originX/originY) + a size handle (w/h). Mirrors the built-in surfacingView.buildSurfacingSpec;
  *  handles write the TWIN params directly (preview-side → emit unaffected). */
 export function surfacingPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0), w = _n(p.w, 100), h = _n(p.h, 80);
     const paths = [{ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' }];
+    const hs = handleScale(p, '', ox, oy, w, h);
     const handles = [
-        { type: 'point', id: 'sf_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' },
-        { type: 'rect', id: 'sf_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' },
+        { type: 'point', id: 'sf_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos },
+        { type: 'rect', id: 'sf_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size },
     ];
     // t718 — the origin-inclusive region bbox: the twin's surfacing geometry emits 0-relative (origin rides the placement
     // offX), so the layout consumer places against THIS drawn-frame bbox → the region coincides with the raster trace.
