@@ -18,7 +18,7 @@
  * dragged out of the palette emits what the wizard emits, by construction rather than by a copy kept in step; and
  * because the stack is real atoms, editing a field in it moves the program exactly as editing the wizard would.
  */
-import { listUserOps, defaultParams } from './userOps.js';
+import { listUserOps, defaultParams, materializeParamGroup } from './userOps.js';
 import { builderOf } from './opBuilders.js';
 import { stackToFlyoutBlock } from './blockly/stackBridge.js';
 import { getLibrary } from './wizardLibrary.js';
@@ -61,7 +61,14 @@ export function opToolboxCategories(opts = {}) {
         const contents = list.map((def) => {
             try {
                 const build = builderOf(def.opType);
-                const stack = build ? build(defaultParams(def)) : null;
+                let stack = build ? build(defaultParams(def)) : null;
+                // t1111 (S5.3) — dynamically materialize the param_group for the palette so built-in wizards
+                // don't present an empty form when dragged onto the canvas.
+                if (stack && stack.length && stack[0] && stack[0].type === 'user_root') {
+                    const tempDef = { opType: def.opType, template: stack, bindings: def.bindings, bindingSpecs: def.bindingSpecs };
+                    materializeParamGroup(tempDef);
+                    stack = tempDef.template;
+                }
                 const blk = stack && stack.length ? stackToFlyoutBlock(stack) : null;
                 // …a family entry is the op's own stack, so what lands on the canvas IS what the wizard inserts
                 return blk;

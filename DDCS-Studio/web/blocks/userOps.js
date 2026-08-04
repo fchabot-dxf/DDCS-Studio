@@ -373,7 +373,19 @@ export function paramFieldsFromStack(template) {
  * consumes it yet). Returns null when the def has no value bindings.
  */
 export function paramGroupFromBindings(def, group = 'Settings') {
-    const valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
+    let valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
+    
+    // t1111 (fallback) — if a wizard has no explicit blockIndex bindings (e.g., a literal twin like Pocket that uses bindingSpecs),
+    // derive the initial form group from its declarative specs, deduplicating by param (to handle fan-out like originX).
+    if (!valueBindings.length && def && def.bindingSpecs) {
+        const seen = new Set();
+        valueBindings = def.bindingSpecs.filter((s) => {
+            if (!s || !s.match || !s.param || seen.has(s.param)) return false;
+            seen.add(s.param);
+            return true;
+        });
+    }
+    
     if (!valueBindings.length) return null;
     const children = valueBindings.map((b) => {
         const wc = b.widgetConfig || {};
@@ -402,11 +414,20 @@ export function materializeParamGroup(def) {
     if (!def || !Array.isArray(def.template)) return def;
     const root = def.template.find((b) => b && b.type === 'user_root');
     if (!root) return def;
-    if (flattenBlocks(def.template).some((b) => b && b.type === 'param_group')) return def;   // already has one — idempotent
+    const existing = flattenBlocks(def.template).find((b) => b && b.type === 'param_group');
+    if (existing && existing.children && existing.children.length > 0) return def;   // already has a populated one — idempotent
+
     const pg = paramGroupFromBindings(def);
     if (!pg) return def;   // no value bindings — nothing to declare
+    
     const flatBefore = flattenBlocks(def.template);
-    root.uiChildren = [pg, ...(root.uiChildren || [])];
+    
+    if (existing) {
+        existing.children = pg.children;
+    } else {
+        root.uiChildren = [pg, ...(root.uiChildren || [])];
+    }
+    
     const flatAfter = flattenBlocks(def.template);
     (def.bindings || []).forEach((b) => {
         if (!b || b.blockIndex == null) return;
@@ -698,6 +719,11 @@ export function registerUserOp(def) {
     }
     const errs = validateUserOp(def);
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
+    
+    // t1111 (S5.3) — dynamically materialize the param_group at registration so built-in wizards
+    // don't present an empty form when their op block is reconstructed in the Blocks tab.
+    materializeParamGroup(def);
+
     const builder = (params) => {
         const resolved = params || defaultParams(def);
         if (typeof def.build === 'function') return def.build(resolved);

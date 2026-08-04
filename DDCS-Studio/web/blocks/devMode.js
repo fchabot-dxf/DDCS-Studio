@@ -539,9 +539,10 @@ export function maybeMaterializeCamTable(def) {
 export function maybeMaterializeParamGroup(def) {
     try {
         if (!def || !def.opType || !Array.isArray(def.template)) return def;
-        if (!(def.bindings || []).some((b) => b && b.blockIndex != null)) return def;     // needs value bindings to declare
-        if (flattenBlocks(def.template).some((b) => b && b.type === 'param_group')) return def;   // idempotent — already has a form group
-        if (!hasParamPills(def.template)) return def;                                     // PILL-derivable only (literal twins → S6)
+        const hasVal = (def.bindings || []).some((b) => b && b.blockIndex != null);
+        if (!hasVal && (!def.bindingSpecs || !def.bindingSpecs.some((s) => s && s.match))) return def;
+        const existing = flattenBlocks(def.template).find((b) => b && b.type === 'param_group');
+        if (existing && existing.children && existing.children.length > 0) return def;   // idempotent — already has a populated form group
         materializeParamGroup(def);
     } catch (_) { /* leave the op unmaterialized on any doubt — the fallback path is always correct */ }
     return def;
@@ -553,7 +554,7 @@ export function maybeMaterializeParamGroup(def) {
 // atoms in an opunit (t1069 — keeps the standard sub-unit live), then makeOp the template. Returns { opC, def, recognized }
 // or null (def gone / build failed). NO surface side effects (no guard / showApp / load).
 export async function reconstructUserOpBlock(opType) {
-    const def = listUserOps().find((d) => d.opType === opType);
+    const def = getUserDef(opType);
     if (!def) return null;
     maybeMaterializeCamTable(def);
     maybeMaterializeParamGroup(def);
@@ -660,10 +661,11 @@ function openSaveDialog(init, onConfirm) {
         <div class="bds">
             <h3>Save as custom wizard</h3>
             <div class="blk-dev-editnote blk-dev-hint" hidden></div>
-            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} knob${init.knobs === 1 ? '' : 's'} exposed.` : 'No knobs exposed — saves a fixed (parameterless) wizard. Tick a value’s “knob” on the blocks to add one.'}</div>
+            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} form field${init.knobs === 1 ? '' : 's'} declared.` : 'No form fields declared — saves a fixed (parameterless) wizard. Use a “Parameter Group” block to add them.'}</div>
             <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
             <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
                 <option value="form3d">Form + 3D preview</option>
+                <option value="form3d+2d">Form + 3D preview + 2D layout</option>
                 <option value="form2d">Form + 2D layout</option>
                 <option value="form">Form only</option>
             </select></label>
