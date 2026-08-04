@@ -660,6 +660,7 @@ function openSaveDialog(init, onConfirm) {
         .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>
         <div class="bds">
             <h3>Save as custom wizard</h3>
+            <div class="blk-dev-hint" style="margin-bottom:8px;">Saved directly into your current workspace. <span style="opacity:0.75">(Export later via Settings → Wizard Bar to share)</span></div>
             <div class="blk-dev-editnote blk-dev-hint" hidden></div>
             <div class="blk-dev-hint">${init.knobs ? `${init.knobs} form field${init.knobs === 1 ? '' : 's'} declared.` : 'No form fields declared — saves a fixed (parameterless) wizard. Use a “Parameter Group” block to add them.'}</div>
             <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
