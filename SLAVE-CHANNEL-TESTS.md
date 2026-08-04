@@ -63,6 +63,8 @@ bridge/controllers/expert-m350/assets/community/modbus-slave-2025-12-11/README.m
 - [ ] **Tracking Tab — Macro Variable Polling:** If the line number isn't exposed, can we read standard macro variables (e.g., `#100-#199`) via Modbus? (If yes, we just inject normal `#199 = X` lines into the G-code and poll them over Modbus to track progress, which is natively supported without needing the master-mode `MSETDATA`).
 - [ ] **Status Tab — Active WCS & Overrides:** Can we read the active WCS (e.g., is G54 active?) directly? Can we read the Feed/Spindle override percentages? Can we *write* to them directly, or only bump them via Virtual Keys?
 - [ ] **Console Tab — Execution Feedback:** If an injected G-code line (Reg 3000) causes an alarm or out-of-bounds error, does the controller return a specific error code in register 10002 or as an exception that we can print to the Console?
+- [ ] **Status Tab — "Screen Vision" (Screenshot Polling):** If the Tier 2 "UNKNOWN-KEYCODE HUNT" successfully finds the key combo for a native screen capture (saving a BMP to CNCDISK), can we rapidly trigger it and pull the image over SMB to provide a live "Screen Vision" mirror on the Gateway?
+- [ ] **Console Tab — Error String Extraction:** When the controller alarms out, state 10002 likely just says "ALARM". Are there undocumented string/char registers that hold the actual alarm text (e.g., "Hard Limit X")? If not, can we use the "Screen Vision" screenshot mechanism to OCR the red error bar directly off the screen image?
 
 ## While you're there (from MACHINE-DAY.md)
 - [ ] The V-series copies (bridge/controllers/expert-m350/verify/ → CNCDISK) and runs: V13a–d ·
