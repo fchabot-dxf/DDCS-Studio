@@ -48,6 +48,18 @@ jobs:
       - name: Install build deps
         run: python -m pip install --upgrade -r desktop/requirements-build.txt
 
+      - name: Inject Google OAuth config
+        shell: pwsh
+        env:
+          GOOGLE_OAUTH_JSON: ${{ secrets.GOOGLE_OAUTH_JSON }}
+        run: |
+          if ($env:GOOGLE_OAUTH_JSON) {
+            Write-Host "Injecting GOOGLE_OAUTH_JSON from GitHub Secrets..."
+            $env:GOOGLE_OAUTH_JSON | Out-File -Encoding utf8 "bridge/bridge-app/fairy/google_oauth.json"
+          } else {
+            Write-Host "Warning: GOOGLE_OAUTH_JSON secret is not set!"
+          }
+
       - name: Build the exe
         shell: pwsh
         run: ./desktop/build_fairy.ps1
