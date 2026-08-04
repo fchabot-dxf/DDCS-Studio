@@ -61,20 +61,28 @@ function Invoke-ExeSign([string]$Path) {
 Push-Location $root
 try {
     $sep = ";"   # Windows PyInstaller --add-data "SRC;DEST" separator
-    python -m PyInstaller --noconfirm --clean --onefile --noupx --name $Name `
-        --icon "desktop/ddcs.ico" `
-        --paths "bridge/bridge-app" `
-        --add-data "bridge/bridge-app/web/ui${sep}console" `
-        --add-data "DDCS-Studio/web${sep}studio" `
-        --add-data "DDCS-Studio/web/shared${sep}shared" `
-        --add-data "bridge/bridge-app/fairy/google_oauth.json${sep}fairy" `
-        --collect-submodules fairy `
-        --collect-submodules pymodbus `
-        --collect-all webview `
-        --hidden-import serial `
-        --exclude-module boto3 `
-        --exclude-module botocore `
-        desktop/fairy_gateway.py
+    $pyArgs = @(
+        "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noupx", "--name", $Name,
+        "--icon", "desktop/ddcs.ico",
+        "--paths", "bridge/bridge-app",
+        "--add-data", "bridge/bridge-app/web/ui${sep}console",
+        "--add-data", "DDCS-Studio/web${sep}studio",
+        "--add-data", "DDCS-Studio/web/shared${sep}shared"
+    )
+    if (Test-Path "bridge/bridge-app/fairy/google_oauth.json") {
+        $pyArgs += "--add-data"
+        $pyArgs += "bridge/bridge-app/fairy/google_oauth.json${sep}fairy"
+    }
+    $pyArgs += @(
+        "--collect-submodules", "fairy",
+        "--collect-submodules", "pymodbus",
+        "--collect-all", "webview",
+        "--hidden-import", "serial",
+        "--exclude-module", "boto3",
+        "--exclude-module", "botocore",
+        "desktop/fairy_gateway.py"
+    )
+    & python $pyArgs
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed ($LASTEXITCODE)" }
     # A running exe can't be overwritten OR deleted on Windows - but it CAN be renamed. So if an instance
     # is open, move the old exe aside (it keeps running the renamed image) and drop the new build in place;
