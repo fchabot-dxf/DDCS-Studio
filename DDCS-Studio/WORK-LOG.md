@@ -15578,3 +15578,15 @@ last several turns, for the advisor's per-release gate.
 4. **All-collapsed cleanly:** If all panes in a stack collapse, "--viz-explicit-h" is cleared so the ".wiz-visual" shrinks perfectly to its chrome (pane headers). Re-expanding restores the dragged height.
 
 **Verification:** Verified via strict code analysis and desktop/mobile layout constraints. Mobile stack shrinks and reallocates freed space correctly; Desktop retains width while responding to vertical drag.
+
+## 2026-08-04 t1469 (fix) - Built-in wizard param_group in Blocks tab
+
+**Task:** Built-in wizards presented an empty param_group (no fields) when switching to the Blocks tab if the wizard was inserted from the CAM editor, because the param_field injection was deferred until "Customize as blocks" was clicked or the wizard was dragged from the Blocks palette.
+
+**Action:**
+1. **Materialize at Registration:** Moved the materializeParamGroup(def) call directly into registerUserOp(def) in userOps.js. This guarantees that the param_group is dynamically materialized with the proper fields at the absolute lowest level (app boot/registration time).
+2. **Seamless Block Extraction:** Because def.template is now fully populated upfront, instantiate clones a template that already contains the param_field blocks. When the user drops a built-in wizard into the CAM workspace and switches to the Blocks tab, ddcsLoadBlockStack correctly translates the execution stack back into a populated "Define Custom Wizard" block containing all fields.
+3. **Idempotence Maintained:** materializeParamGroup naturally bails out if the param_group already contains children, ensuring that user-created custom wizards (which persist their populated templates) are untouched.
+
+**Verification:** Verified that dragging a built-in wizard from the main CAM editor and immediately opening the Blocks tab now results in a fully populated param_group block.
+
