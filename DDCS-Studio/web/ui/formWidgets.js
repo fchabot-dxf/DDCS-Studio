@@ -1037,6 +1037,30 @@ export function renderOpForm(host, bindings) {
     return readers;
 }
 
+/**
+ * t1561 — the visible stand-in for a `node.type` renderUiTree does not (yet) know how to render. Named so the
+ * class is grep-able in a spec: `.unwired-block` + `data-block-type`. Same "not wired yet" phrasing already used
+ * elsewhere in this codebase for the same class of gap (editorOpHover.js).
+ */
+function unwiredPlaceholder(type) {
+    const row = document.createElement('div');
+    row.className = 'unwired-block';
+    row.dataset.blockType = type;
+    row.style.cssText = 'margin:4px 0; padding:8px 10px; border:1px dashed #d9822b; border-radius:6px;'
+        + ' background:rgba(217,130,43,0.08); color:#d9822b; font-size:12px; font-family:monospace;';
+    row.textContent = `⚠ "${type}" — not wired yet`;
+    return row;
+}
+
+/** t1561 — every child a mouth-object holds, regardless of mouth NAME (DO/TABS/LEFT/RIGHT/...). An array passes
+ *  through unchanged; anything falsy returns []. Used only where the caller does NOT already know its own block's
+ *  mouth names (the unwired-type fallback) — every other branch above still addresses its own mouth by name. */
+function allMouthChildren(obj) {
+    if (!obj) return [];
+    if (Array.isArray(obj)) return obj;
+    return Object.values(obj).flatMap((v) => (Array.isArray(v) ? v : []));
+}
+
 export function renderUiTree(host, uiTree, bindings, byParam = {}) {
     const readers = [];
 
@@ -1121,29 +1145,112 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
                 container.appendChild(pnlBox);
                 if (node.uiChildren) traverse(Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []), container);
                 if (node.children) traverse(Array.isArray(node.children) ? node.children : (node.children.DO || []), container);
+            } else if (node.type === 'group_box') {
+                // t1561 STEP 2 — a titled card. Collapsible per its own `collapsible` param; REUSES the exact
+                // form-sec fold mechanism `section` already uses (same classes, same applyFold call) rather than
+                // a second collapse implementation. `collapsedDefault` seeds the FIRST render only, via
+                // isSectionCollapsed's fallback param — after that the user's own fold choice (keyed by title,
+                // same as any other section) takes over, same as every other form-sec.
+                const gTitle = (node.params && node.params.title) || 'Group';
+                const collapsible = !(node.params && node.params.collapsible === false);
+                const box = document.createElement('div'); box.className = 'form-sec'; box.dataset.section = gTitle;
+                const body = document.createElement('div'); body.className = 'wiz-pane-body';
+                if (collapsible) {
+                    const hdr = document.createElement('button'); hdr.type = 'button'; hdr.className = 'form-sec-hdr';
+                    hdr.innerHTML = `${SEC_CHEVRON}<span class="form-sec-title">${escHtml(gTitle)}</span>`;
+                    box.append(hdr, body); container.appendChild(box);
+                    const collapsedDefault = !!(node.params && node.params.collapsedDefault);
+                    applyFold(box, isSectionCollapsed(gTitle, collapsedDefault), false);
+                    hdr.addEventListener('click', () => { const now = !(box.getAttribute('data-collapsed') === '1'); applyFold(box, now, true); setSectionCollapsed(gTitle, now); });
+                } else {
+                    const hdr = document.createElement('div'); hdr.className = 'form-sec-hdr';
+                    hdr.innerHTML = `<span class="form-sec-title">${escHtml(gTitle)}</span>`;
+                    box.append(hdr, body); container.appendChild(box);
+                }
+                const gChildren = node.children ? (Array.isArray(node.children) ? node.children : (node.children.DO || [])) : [];
+                traverse(gChildren, body);
+            } else if (node.type === 'grid_container') {
+                // t1561 STEP 2 — a plain CSS grid; columns/gap come straight from the block's own params.
+                const gridBox = document.createElement('div');
+                const columns = Number((node.params && node.params.columns) || 2) || 2;
+                const gap = (node.params && node.params.gap) || '16px';
+                gridBox.style.cssText = `display:grid; grid-template-columns: repeat(${columns}, 1fr); gap:${gap}; width:100%;`;
+                container.appendChild(gridBox);
+                const gcChildren = node.children ? (Array.isArray(node.children) ? node.children : (node.children.DO || [])) : [];
+                traverse(gcChildren, gridBox);
+            } else if (node.type === 'tab_group') {
+                // t1561 STEP 2 — a tab strip + panes. Only direct `tab_page` children are meaningful here (a
+                // tab_page appearing outside a tab_group falls to the unwired-placeholder branch, correctly —
+                // it has no strip to render into). `activeTab` selects the first-shown pane; out-of-range clamps.
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'display:flex; flex-direction:column; width:100%; min-height:0;';
+                const strip = document.createElement('div');
+                strip.className = 'wiz-tab-strip';
+                strip.style.cssText = 'display:flex; gap:2px; border-bottom:1px solid var(--border,#333); margin-bottom:10px; flex-wrap:wrap;';
+                const panesBox = document.createElement('div');
+                panesBox.style.cssText = 'flex:1; min-height:0;';
+                wrap.append(strip, panesBox);
+                container.appendChild(wrap);
+
+                const tabNodes = (node.children && (Array.isArray(node.children) ? node.children : node.children.TABS)) || [];
+                const activeIdx = Math.max(0, Math.min(tabNodes.length - 1, parseInt((node.params && node.params.activeTab) || '0', 10) || 0));
+                const panes = [];
+                tabNodes.forEach((tabNode, i) => {
+                    if (!tabNode || tabNode.type !== 'tab_page') return;
+                    const tTitle = (tabNode.params && tabNode.params.title) || `Tab ${i + 1}`;
+                    const tIcon = (tabNode.params && tabNode.params.icon) || '';
+                    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'wiz-tab-btn';
+                    btn.style.cssText = 'padding:6px 12px; border:1px solid var(--border,#333); border-bottom:none; border-radius:6px 6px 0 0;'
+                        + ' background:var(--panel,transparent); color:var(--text-dim,inherit); cursor:pointer; font-size:12px;';
+                    btn.textContent = tIcon ? `${tIcon} ${tTitle}` : tTitle;
+                    const pane = document.createElement('div'); pane.style.display = i === activeIdx ? '' : 'none';
+                    strip.appendChild(btn); panesBox.appendChild(pane);
+                    const setActive = (j) => {
+                        panes.forEach((p, k) => {
+                            p.pane.style.display = k === j ? '' : 'none';
+                            p.btn.style.color = k === j ? 'var(--text-main,inherit)' : 'var(--text-dim,inherit)';
+                            p.btn.style.background = k === j ? 'var(--bg,transparent)' : 'var(--panel,transparent)';
+                        });
+                    };
+                    btn.addEventListener('click', () => setActive(i));
+                    panes.push({ btn, pane });
+                    const pageChildren = tabNode.children ? (Array.isArray(tabNode.children) ? tabNode.children : (tabNode.children.DO || [])) : [];
+                    traverse(pageChildren, pane);
+                });
+                if (panes[activeIdx]) { panes[activeIdx].btn.style.color = 'var(--text-main,inherit)'; panes[activeIdx].btn.style.background = 'var(--bg,transparent)'; }
             } else {
-                if (node.uiChildren) {
-                    const childNodes = Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []);
-                    traverse(childNodes, container);
-                }
-                if (node.children) {
-                    const childNodes = Array.isArray(node.children) ? node.children : (node.children.DO || []);
-                    traverse(childNodes, container);
-                }
+                // t1561 — REFUSE, don't silently flatten. A block type this function does not (yet) know how to
+                // render used to fall through here and traverse straight into the PARENT container — the block's
+                // own structure vanished with no trace, and a wizard author has no oracle to catch it (unlike
+                // G-code, there is no dump to diff against). A visible placeholder makes the gap SEEN instead;
+                // children still traverse (nothing is LOST), just without the container the author actually built.
+                container.appendChild(unwiredPlaceholder(node.type));
+                // MOUTH-NAME-AGNOSTIC on purpose: an unwired block's children may live under ANY mouth key (DO,
+                // TABS, LEFT/RIGHT, ...) — not just DO, which every OTHER branch above can assume because it
+                // already knows its own block's mouth names. Collect every array-valued key so a block with an
+                // unfamiliar mouth name still loses nothing, not just the ones that happen to use DO.
+                traverse(allMouthChildren(node.uiChildren), container);
+                traverse(allMouthChildren(node.children), container);
             }
         }
     }
 
     traverse(uiTree, host);
 
-    // Fallback safety: append any parameter rows that were not explicitly attached during tree traversal
+    // Fallback safety: append any parameter rows that were not explicitly attached during tree traversal. t1561 —
+    // made OBSERVABLE: a correct layout (every param placed by the tree) and a broken one (the tree lost a row,
+    // caught only by this net) used to look IDENTICAL — both just show a form. `readers.orphanCount` lets a spec
+    // assert zero for a well-formed tree, so a regression that starts relying on this fallback goes red.
+    let orphanCount = 0;
     for (const key of Object.keys(byParam)) {
         const p = byParam[key];
         if (p && p.row && !p.row.parentElement) {
             host.appendChild(p.row);
             readers.push(p.read);
+            orphanCount++;
         }
     }
+    readers.orphanCount = orphanCount;
 
     for (const b of (bindings || [])) {
         if (!b || !b.sourceField) continue;

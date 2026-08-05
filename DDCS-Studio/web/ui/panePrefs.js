@@ -158,8 +158,10 @@ let _fsec = null;
 const _fsecSubs = new Set();
 function _fsecLoad() { let o = {}; try { const raw = localStorage.getItem(FSEC_KEY); if (raw) { const p = JSON.parse(raw) || {}; for (const k in p) if (typeof p[k] === 'boolean') o[k] = p[k]; } } catch (_) { /* defaults */ } return o; }
 
-/** True if the form section KIND (its title) is currently collapsed (unknown → false = expanded). */
-export function isSectionCollapsed(kind) { if (!_fsec) _fsec = _fsecLoad(); return !!_fsec[kind]; }
+/** True if the form section KIND (its title) is currently collapsed (unknown → `fallback`, default false = expanded).
+ *  `fallback` lets a consumer with its OWN declared initial state (e.g. group_box's `collapsedDefault` param) seed
+ *  the first render correctly, without inventing a second persistence mechanism. */
+export function isSectionCollapsed(kind, fallback = false) { if (!_fsec) _fsec = _fsecLoad(); return Object.prototype.hasOwnProperty.call(_fsec, kind) ? !!_fsec[kind] : !!fallback; }
 
 /** Fold/unfold a form section KIND; persists + notifies (every open long form re-applies). */
 export function setSectionCollapsed(kind, collapsed) {
