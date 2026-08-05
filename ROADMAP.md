@@ -20,6 +20,9 @@ The queue now, in order:
    any spec. So the arc is S1 corpus-oracle → S2 spacing policy → S3 caps → S4 named unknowns → S5
    live round-trip (human-gated), then DM500 through the same stages; grbl-class = unroll.
    **Progress ledger: [`PORTING.md`](PORTING.md). Arc-as-data: `web/data/portingArc.js`.**
+   - **DDCS V4.1 Firmware Execution Insights (Attested for V4.1 only by Yt Liu):**
+     - *Macro Parser Mode (#122 / `macro_` prefix):* Standard G-code mode lacks loop stacks for `WHILE` and freezes on unspaced `IF` tokens. Unlocked by setting parameter `#122 = 1` or prefixing the filename with `macro` (e.g., `macro_test.nc`, matching factory `macroMillCylinder.nc`).
+     - *Comma-Separated `ATAN[dy, dx]` Syntax:* `ATAN` on DDCS V4.1 strictly requires two arguments separated by a comma (e.g., `#190 = ATAN[1, 1]`, returning 45° in degrees).
 Standing user backlog behind those (from t1046, still real): K-button wizard (Expert-only, #2037
 nav library) · exe auto-update (branch pair exists — needs a real packaged-exe test) · Google
 Drive reliable for other users (desktop OAuth live-untested).
