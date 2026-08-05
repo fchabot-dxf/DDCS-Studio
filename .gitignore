@@ -34,6 +34,8 @@ output/
 # NEVER committed or shipped. Keep the downloaded JSON here, ignored.
 /secrets/
 client_secret_*.json
+google_oauth.json
+**/google_oauth.json
 
 # advisor/worker handoff — local per-session marker state
 .handoff/
