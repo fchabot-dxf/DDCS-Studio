@@ -26,6 +26,11 @@ These are blocks that work perfectly well being dragged and dropped. They do not
 ### 2. Entrypoint Blocks (Require Dedicated GUI Editors)
 These are blocks that represent highly complex, interactive GUI features. You **cannot** comfortably author these using standard Blockly blocks. Instead, the block serves as an **entrypoint**—it sits on the canvas as a "Save Slot", and you click an "Edit" button on it to open a dedicated visual editor. 
 
+> ⚠ **READ THE "WHAT COUNTS AS COMPLEX" SECTION BELOW BEFORE BUILDING ANY OF THE FOUR CATEGORIES.**
+> Most of what looks complex decomposes into ordinary Schema Blocks. Reaching for a bespoke editor
+> should be the *last* move, not the first — and the categories below were written before that test
+> existed.
+
 We can categorize the required Entrypoint Blocks into four specific types based on the editor they need to launch:
 
 #### Category A: 2D Coordinate Lists (The Point Picker)
@@ -49,6 +54,71 @@ We can categorize the required Entrypoint Blocks into four specific types based 
 #### Category D: Structural Pruning (Shape-Shifting Logic)
 * **Affected Wizards:** Corner (Auto vs Manual), Pocket (Shape dropdown)
 * **The Missing Piece:** We need a `structural_guard` block. This is a block with a dropdown and a statement "mouth". It doesn't need a complex modal editor, but it acts as a special entrypoint for logic: any G-code blocks placed inside its mouth are only emitted if the dropdown value matches. The engine already supports this pruning; we just need the UI block to expose it.
+
+---
+
+## What Counts as a "Complex GUI" — and What To Do About It
+
+*(Added after review, 2026-08-05. The four categories above were written before this test existed.
+Apply this section first; it dissolves most of them.)*
+
+### The principle
+
+> **A GUI should RENDER a declaration, never be the only way to AUTHOR one.**
+
+If the modal is where the data lives, the data is trapped in the modal — invisible on the canvas,
+undiffable, and unreachable by anything except that one editor. If **blocks declare the data** and the
+GUI is a comfortable editor *for those declarations*, you get both: the convenience of the visual
+editor and the blocks remaining the single source of truth.
+
+This is the existing `declared-seam-before-the-declaring-GUI` rule, applied to wizard authoring.
+
+### The test: is it actually complex, or just visual?
+
+Ask these in order. The first **yes** decides it.
+
+| # | Question | If yes |
+|---|---|---|
+| 1 | Can the thing be described by a **fixed set of named parameters**? | **Schema blocks.** Not complex — just visual. A canvas may *render* it, but params author it. |
+| 2 | Is it a **finite composition** of such parameter sets (a source, a transform, a filter)? | **Several schema blocks**, one per concern. Still not complex. |
+| 3 | Is the data **irreducibly unstructured** — an arbitrary list or an imported blob with no parametric form? | **Entrypoint block.** Genuinely complex. The block holds the data; an editor edits it. |
+| 4 | Does authoring require **live spatial feedback to be possible at all** (not merely nicer)? | **Entrypoint block**, and say why in the block's own comment. |
+
+**"It has a picture" is not complexity.** The wizard tab already redraws a preview whenever a parameter
+changes; that loop is free and applies equally to block-derived params.
+
+### Applying the test to the four categories
+
+| Category | Verdict | Decomposition |
+|---|---|---|
+| **A · Point lists** (drill, bore, hole cycle) | **Mostly Q1/Q2 → schema blocks** | `pattern_grid{cols,rows,dx,dy}` · `pattern_circle{dia,start,n}` · `point_skip{list}`. The drill wizard is *already* parametric this way. Only a hand-clicked or imported point cloud reaches Q3. |
+| **B · Feature canvas** (pocket, surfacing, contour) | **Mostly Q1 → schema blocks. Category largely dissolves.** | These are **parametric features, not drawings**: `feature_rect{x,y,w,h}` · `feature_circle{cx,cy,r}` · `corner_radius{r}`. `viz/featureCanvas.js` already renders exactly this from params. The `draw_rect`/`draw_line` + mini-Blockly build treats a parametric problem as a freeform one. |
+| **C · 3D anchor** (corner, edge, middle) | **Q1/Q2 → schema blocks** | `anchor_from{stock-corner\|feature-centre\|wcs}` + `anchor_offset{x,y,z}`. Declared intent instead of inferred trigonometry. The 3D view becomes a convenience for setting two numbers — not the source. Consistent with `datum-model-physical-derived-offset`. |
+| **D · Structural guard** | **Not a GUI question at all** | Already an ordinary block. ⚠ And it is **not a UI block**: it prunes emitted G-code, while every other block in this family is inert (`emit: () => []`). File it with flow control so nobody inherits the "emits nothing" assumption. |
+
+**Net effect: four categories of bespoke editor collapse to one** — genuinely arbitrary geometry
+(an imported DXF contour, a hand-clicked point cloud). That case is irreducible precisely *because*
+the data has no structure to decompose into parameters.
+
+### Why the decomposed form is better, beyond saving work
+
+- **Inspectable.** You can see on the canvas that a pocket is 80×60 with 5 mm corners, rather than it
+  being opaque inside a modal.
+- **Diffable.** Comparing declared params is trivial; comparing serialized modal state is not — and the
+  lossless round-trip invariant depends on being able to compare.
+- **Reusable.** A `pattern_grid` block serves drill, bore, and hole-cycle. A drill-specific point-picker
+  modal serves one wizard.
+
+### The costs — decided, not discovered later
+
+1. **Several blocks now describe one visual thing**, so the canvas must render their *combination* live
+   while the author edits. The wizard tab already does this (params change → preview redraws); point the
+   existing loop at block-derived params rather than building a second one.
+2. **A larger vocabulary.** This trades a few big builds for many small blocks, and vocabulary has real
+   costs: discoverability, naming, palette crowding. **Open question to settle early:** do these live in
+   one "Feature" category, or grouped per wizard family?
+3. **A decomposition can be wrong.** If a parameter set turns out not to describe the real cases, the
+   fix is revising a declaration — which is cheap, and is exactly why declaring beats building.
 
 ---
 
