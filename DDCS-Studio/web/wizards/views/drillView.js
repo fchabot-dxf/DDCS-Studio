@@ -54,7 +54,8 @@ function buildDrillSpec(params, stock) {
     // handle is a `rect` (2D corner, optionally per-axis-divided for grid pitch) or a `radial` (Ø/pitch + angle).
     // Every handle still drives a wizard PARAMETER via setFields() — never freeform geometry.
     const hs = handleScale(params, 'd_', ox, oy, num(params.cols, 3) * num(params.dx, 20), num(params.rows, 3) * num(params.dy, 20)); // Will override below based on pattern
-    const decls = [{ type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos' }]; // Wait, let me check the pattern-specific logic
+    const decls = [{ type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos' }];
+    const items = [];
 
     if (pat === 'circle') {
         const hsC = handleScale(params, 'd_', ox, oy, num(params.dia, 50), num(params.dia, 50));
