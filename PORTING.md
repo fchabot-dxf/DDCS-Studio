@@ -187,9 +187,9 @@ move) was connected over SMB. The kit ran; the user read the screen, and results
 |---|---|---|
 | **Spaced G-code** | ✅ **bench-confirmed** | ran to completion — Studio's emit format is legal. Upgrades the t1531 user-attested row. |
 | **`SQRT`** | ✅ **works** | `[SQRT[9] * 100]` returned exactly **300** — computed, not merely parsed |
-| **`ATAN` Inverse Trig** | ✅ **works (two-arg format)** | Strictly requires comma-separated two-argument syntax: `ATAN[dy, dx]` (e.g., `#190 = ATAN[1, 1]` returns 45°). Single-arg or `/` division forms throw `Unrecognized file format`. (Attested: Yt Liu) |
-| **`IF`/`GOTO`** | ✅ **works** | `IF #191==0GOTO1` branches. Unspaced `IF#191==0GOTO1` freezes standard mode — requires Macro Mode (parameter `#122` enabled or `macro_` filename prefix, e.g., `macroMillCylinder.nc`). |
-| **`WHILE`** | ✅ **works in Macro Mode** | Standard G-code mode lacks loop stack. Enabled by parameter `#122` or `macro_` filename prefix (e.g., `macro_test.nc`). |
+| **`ATAN` Inverse Trig** | ✅ **works (DDCS V4.1 only, two-arg format)** | Strictly requires comma-separated two-argument syntax: `ATAN[dy, dx]` (e.g., `#190 = ATAN[1, 1]` returns 45°). Single-arg or `/` division forms throw `Unrecognized file format`. (Attested for DDCS V4.1: Yt Liu) |
+| **`IF`/`GOTO`** | ✅ **works** | `IF #191==0GOTO1` branches. Unspaced `IF#191==0GOTO1` freezes standard mode — requires Macro Mode (DDCS V4.1 parameter `#122` enabled or `macro_` filename prefix, e.g., `macroMillCylinder.nc`). |
+| **`WHILE`** | ✅ **works in Macro Mode** | Standard G-code mode lacks loop stack. Enabled on DDCS V4.1 via parameter `#122` or `macro_` filename prefix (e.g., `macro_test.nc`). |
 | **`#a=#a+1`** | ✅ works | bare form, no brackets |
 | Error reporting | ✅ **names the offending line** | every failure — a good diagnostic surface for this target |
 | `#490/#491/#492` | machine coordinates | confirmed against the screen's Mach column |
