@@ -73,6 +73,32 @@ editor and the blocks remaining the single source of truth.
 
 This is the existing `declared-seam-before-the-declaring-GUI` rule, applied to wizard authoring.
 
+### ⚠ TWO ORTHOGONAL AXES — do not conflate them (user ruling, 2026-08-05)
+
+An earlier draft of this section read as *"avoid complex editors"*. That is **not** the rule, and the
+correction matters because it makes the architecture more permissive without weakening the guarantee:
+
+| Axis | Rule |
+|---|---|
+| **Is the parameter DECLARED?** | **Mandatory.** The value lives in the block. Non-negotiable. |
+| **Which WIDGET edits it?** | **The wizard author's free choice** — text field, stepper, slider, dropdown, 3×3 grid, a drag handle on a canvas, or a full modal editor. |
+
+> **"Trapped" means the VALUE DOES NOT LIVE IN THE BLOCK — not that the editor is complex.**
+
+A modal that serializes a point list into a declared param traps nothing: the value is on the canvas,
+diffable, and reachable by every other consumer. The real failure is a modal whose state lives
+*elsewhere* — localStorage, a side file, a closure — with the block holding only a reference.
+
+**So an author may absolutely choose a complex modal for their own param.** Two consequences worth
+having on purpose:
+
+- **The same param can wear different widgets in different wizards.** A diameter is a number: one
+  wizard gives it a text field, another a slider, another a drag handle on a circle. The data model
+  never changes. (This is the `widget-library-custom-op-wizards` idea, falling out for free once the
+  axes are kept separate.)
+- **Do not force a widget onto every param, and do not force a param into one widget.** The engine
+  should render a sensible default and let the author override it — never require the override.
+
 ### The test: is it actually complex, or just visual?
 
 Ask these in order. The first **yes** decides it.
@@ -92,7 +118,7 @@ changes; that loop is free and applies equally to block-derived params.
 | Category | Verdict | Decomposition |
 |---|---|---|
 | **A · Point lists** (drill, bore, hole cycle) | **Mostly Q1/Q2 → schema blocks** | `pattern_grid{cols,rows,dx,dy}` · `pattern_circle{dia,start,n}` · `point_skip{list}`. The drill wizard is *already* parametric this way. Only a hand-clicked or imported point cloud reaches Q3. |
-| **B · Feature canvas** (pocket, surfacing, contour) | **Mostly Q1 → schema blocks. Category largely dissolves.** | These are **parametric features, not drawings**: `feature_rect{x,y,w,h}` · `feature_circle{cx,cy,r}` · `corner_radius{r}`. `viz/featureCanvas.js` already renders exactly this from params. The `draw_rect`/`draw_line` + mini-Blockly build treats a parametric problem as a freeform one. |
+| **B · Feature canvas** (pocket, surfacing, contour) | **Mostly Q1 → schema blocks. Category largely dissolves as CORE MACHINERY** — though an author may still attach a drawing widget to their own declared params (see the two axes above). | These are **parametric features, not drawings**: `feature_rect{x,y,w,h}` · `feature_circle{cx,cy,r}` · `corner_radius{r}`. `viz/featureCanvas.js` already renders exactly this from params. The `draw_rect`/`draw_line` + mini-Blockly build treats a parametric problem as a freeform one. |
 | **C · 3D anchor** (corner, edge, middle) | **Q1/Q2 → schema blocks** | `anchor_from{stock-corner\|feature-centre\|wcs}` + `anchor_offset{x,y,z}`. Declared intent instead of inferred trigonometry. The 3D view becomes a convenience for setting two numbers — not the source. Consistent with `datum-model-physical-derived-offset`. |
 | **D · Structural guard** | **Not a GUI question at all** | Already an ordinary block. ⚠ And it is **not a UI block**: it prunes emitted G-code, while every other block in this family is inert (`emit: () => []`). File it with flow control so nobody inherits the "emits nothing" assumption. |
 
