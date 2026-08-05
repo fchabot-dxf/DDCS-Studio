@@ -717,12 +717,16 @@ export function registerUserOp(def) {
         const structural = (def.bindings || []).filter((b) => b && b.param != null && b.blockIndex == null && !b.group);   // preserve hand-written STRUCTURAL toggles (NOT the layout group bindings)
         def.bindings = [...authored.bindings, ...structural];
     }
+    // t1111 (S5.3) — dynamically materialize the param_group at registration so built-in wizards
+    // don't present an empty form when their op block is reconstructed in the Blocks tab. MUST run
+    // before validateUserOp (t1565): materialize is what adds the param_group's param_field blocks
+    // into def.template and re-derives each binding's blockIndex to point at them — validating first
+    // checks binding.blockIndex against a template that doesn't have those blocks yet, so every
+    // materialized def failed with "binding (block N.x) does not resolve in the template".
+    materializeParamGroup(def);
+
     const errs = validateUserOp(def);
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
-    
-    // t1111 (S5.3) — dynamically materialize the param_group at registration so built-in wizards
-    // don't present an empty form when their op block is reconstructed in the Blocks tab.
-    materializeParamGroup(def);
 
     const builder = (params) => {
         const resolved = params || defaultParams(def);
