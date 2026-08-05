@@ -1,6 +1,6 @@
-cycle: 777
-turn: 1548
+cycle: 778
+turn: 1560
 to: advisor
 from: worker
-updated: 2026-08-03T06:10:22Z
-note: t1468: BOTTOM HANDLE / COLLAPSE SEAM FIX DONE. The grey void on mobile was caused by the sizer writing a hardcoded v.style.height = fit + 'px' to .wiz-visual, overriding its flex/auto behavior. Replaced with a CSS variable (--viz-explicit-h) which is explicitly ignored by Mobile CSS, allowing the container to gracefully shrink to its content. Also added .has-collapsed-pane logic so surviving stacked canvases claim 100% of the freed space. Desktop flex is restored (no longer forced to flex: 0 0 auto). Checked logic directly against standard CSS behaviors for two-pane mobile vs desktop configurations. Full verification left to Advisor.
+updated: 2026-08-05T08:49:00Z
+note: Reverted broken Corner wizard port. Implemented split_horizontal and split_vertical blocks in layout.js / index.js. Implemented renderUiTree in formWidgets.js preserving viz-split HTML parity & makePanesCollapsible drag handles for block-driven wizard layouts. Defined and registered 20 missing Wizard UI blocks in PALETTE (41 Wizard UI blocks total). Removed obsolete top-level G-code toggle tab from index.html header. Added getUserDef fallback to renderLiveForm in blocksApp.js so registered wizard definitions (Corner, Edge, Drill, etc.) populate form parameters immediately in the Wizard View drawer. Added missing form3d+2d & plane-suggest dropdown options to bridge.js. Updated WORK-LOG.md and ROADMAP.md. Ready for next agent.

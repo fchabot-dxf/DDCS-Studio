@@ -8,3 +8,21 @@ export const layoutBlock = {
     fields: ['kind'],
     emit: () => [],   // metadata only — produces no G-code
 };
+
+export const splitHorizontalBlock = {
+    type: 'split_horizontal', label: 'split horizontal', category: 'Wizard UI',
+    defaults: { ratio: '1:1' },
+    fields: ['ratio'],
+    selects: { ratio: [['1:1', '1:1'], ['2:1', '2:1'], ['1:2', '1:2']] },
+    mouths: [{ name: 'LEFT', label: 'Left Pane' }, { name: 'RIGHT', label: 'Right Pane' }],
+    emit: (params, children) => children || [],
+};
+
+export const splitVerticalBlock = {
+    type: 'split_vertical', label: 'split vertical', category: 'Wizard UI',
+    defaults: { ratio: '1:1' },
+    fields: ['ratio'],
+    selects: { ratio: [['1:1', '1:1'], ['2:1', '2:1'], ['1:2', '1:2']] },
+    mouths: [{ name: 'TOP', label: 'Top Pane' }, { name: 'BOTTOM', label: 'Bottom Pane' }],
+    emit: (params, children) => children || [],
+};

@@ -23,6 +23,10 @@ The queue now, in order:
 Standing user backlog behind those (from t1046, still real): K-button wizard (Expert-only, #2037
 nav library) · exe auto-update (branch pair exists — needs a real packaged-exe test) · Google
 Drive reliable for other users (desktop OAuth live-untested).
+4. **Wizards-as-Data Architecture & Layout Splitters:**
+   - **Intention:** Provide declarative, block-driven wizard layouts (`split_horizontal`, `split_vertical`, `grid_container`, `tab_group`, `group_box`, `corner_grid_picker`, etc.) that allow custom wizard authoring in the Blocks tab without hardcoding HTML.
+   - **Live Wizard View Drawer Integration:** The right-hand drawer in the Blocks tab serves as the single, full-height **Wizard View** (replacing standalone 3D/Gcode panels), continuously rendering a live 1:1 calculated Generator Modal preview as blocks change.
+   - **Parity Principle & Status:** Every block-rendered visual container (`sim_3d_box`, `layout_2d_canvas`) MUST preserve 100% feature parity with the built-in 2-pane HTML — including `viz-split`, drag handles, and collapsible pane splitters via `makePanesCollapsible`. Built-in wizards (like `Corner`) remain baseline-protected on their native 2-pane renderer for full stability, while custom block-authored wizards utilize the new `split_horizontal` / `split_vertical` layout engine. Porting built-in wizards over to block templates is deferred to a future session.
 SEAT B (../ddcs-studio-lane-b, window never yet opened): lathe-visual turn · THE 2D RETIREMENT ·
 workspace name=filename (its rename lands → seat A's menu absence-lock flips by design).
 

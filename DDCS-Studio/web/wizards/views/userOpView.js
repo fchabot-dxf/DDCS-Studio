@@ -9,7 +9,7 @@
  * The manager routes any `user_*` type to this single view + panel (see wizardManager._userView / open()).
  */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { renderOpForm, formBindings } from '../../ui/formWidgets.js';   // S5.2 — formBindings consumes the def's param_field rows when present
+import { renderOpForm, formBindings, renderUiTree } from '../../ui/formWidgets.js';   // S5.2 — formBindings consumes the def's param_field rows when present
 import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
@@ -238,17 +238,59 @@ function applyPanel() {
     if (vis) vis.style.display = panelType(_def && _def.panel).viz ? '' : 'none';
 }
 
+function hasTreeLayout(template) {
+    if (!Array.isArray(template)) return false;
+    const root = template.find((b) => b && b.type === 'user_root');
+    if (!root || !Array.isArray(root.uiChildren) || root.uiChildren.length === 0) return false;
+    function checkNodes(nodes) {
+        if (!nodes) return false;
+        const list = Array.isArray(nodes) ? nodes : (typeof nodes === 'object' ? Object.values(nodes).flat() : []);
+        for (const n of list) {
+            if (!n) continue;
+            if (n.type === 'split_horizontal' || n.type === 'split_vertical') return true;
+            if (n.children && checkNodes(n.children)) return true;
+            if (n.uiChildren && checkNodes(n.uiChildren)) return true;
+        }
+        return false;
+    }
+    return checkNodes(root.uiChildren);
+}
+
 function render() {
     const host = el('wiz_user_form');
     if (!host || !_def) return;
     host.innerHTML = '';
+    const isTree = hasTreeLayout(_def.template);
+    
     // seed: override each binding's default with the op's param when editing (so the widgets show its values). S5.2 —
     // formBindings supplies the param_field-driven order/presentation when a param_group is present (else the bindings,
     // unchanged); the seed value then wins for the shown default, exactly as before.
     const binds = formBindings(_def).map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b);
-    _readers = _def.bindings && _def.bindings.length
-        ? renderOpForm(host, binds)
-        : (host.appendChild(Object.assign(document.createElement('div'), { textContent: 'No parameters — inserts as-is.', style: 'opacity:.6;margin:8px 0;' })), []);
+    
+    const controls = host.closest('.wiz-controls');
+    const vis = host.closest('.wiz-2pane')?.querySelector('.wiz-visual');
+    if (isTree) {
+        if (vis) vis.style.display = 'none';
+        if (controls) { controls.style.flex = '1 1 100%'; controls.style.maxWidth = 'none'; }
+        const userRoot = _def.template.find((b) => b && b.type === 'user_root');
+        
+        const byParam = {};
+        const tempHost = document.createElement('div');
+        const readers = renderOpForm(tempHost, binds) || [];
+        tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
+            if (!inp || !inp.dataset || !inp.dataset.param) return;
+            const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement;
+            byParam[inp.dataset.param] = { row, read: readers[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
+        });
+        
+        _readers = renderUiTree(host, userRoot ? userRoot.uiChildren : [], _def.bindings || [], byParam);
+    } else {
+        if (vis) vis.style.display = panelType(_def && _def.panel).viz ? '' : 'none';
+        if (controls) { controls.style.flex = ''; controls.style.maxWidth = ''; }
+        _readers = _def.bindings && _def.bindings.length
+            ? renderOpForm(host, binds)
+            : (host.appendChild(Object.assign(document.createElement('div'), { textContent: 'No parameters — inserts as-is.', style: 'opacity:.6;margin:8px 0;' })), []);
+    }
     // one delegated listener: any widget input/change (incl. canvas pickers, which dispatch a bubbling input) re-runs update().
     // t808 — a focused form field emitting 'input' (a held stepper / live typing = a continuous gesture) THROTTLES the heavy
     // recompute (leading-edge, one per window + trailing); a COMMIT ('change'/blur) or a non-focused synthetic input (a canvas

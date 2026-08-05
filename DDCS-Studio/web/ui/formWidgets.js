@@ -1036,3 +1036,119 @@ export function renderOpForm(host, bindings) {
     }
     return readers;
 }
+
+export function renderUiTree(host, uiTree, bindings, byParam = {}) {
+    const readers = [];
+
+    function traverse(nodes, container) {
+        if (!nodes || !Array.isArray(nodes)) return;
+        for (const node of nodes) {
+            if (!node) continue;
+            if (node.type === 'split_horizontal' || node.type === 'split_vertical') {
+                const isHoriz = node.type === 'split_horizontal';
+                const box = document.createElement('div');
+                box.style.cssText = `display:flex; flex-direction:${isHoriz ? 'row' : 'column'}; gap:16px; width:100%; height:100%; min-height:0;`;
+                const ratio = (node.params && node.params.ratio) || '1:1';
+                const parts = ratio.split(':').map(Number);
+                const flex1 = parts[0] || 1, flex2 = parts[1] || 1;
+                
+                const pane1 = document.createElement('div');
+                pane1.style.cssText = `flex: ${flex1}; display:flex; flex-direction:column; ${isHoriz ? 'min-width:0;' : 'min-height:0;'}`;
+                const pane2 = document.createElement('div');
+                pane2.style.cssText = `flex: ${flex2}; display:flex; flex-direction:column; ${isHoriz ? 'min-width:0;' : 'min-height:0;'}`;
+                
+                box.append(pane1, pane2);
+                container.appendChild(box);
+                
+                if (node.children) {
+                    traverse(isHoriz ? (node.children.LEFT || node.children.left || []) : (node.children.TOP || node.children.top || []), pane1);
+                    traverse(isHoriz ? (node.children.RIGHT || node.children.right || []) : (node.children.BOTTOM || node.children.bottom || []), pane2);
+                }
+            } else if (node.type === 'section') {
+                const s = (node.params && (node.params.title || node.params.name)) || 'Section';
+                const sec = document.createElement('div'); sec.className = 'form-sec'; sec.dataset.section = s;
+                const hdr = document.createElement('button'); hdr.type = 'button'; hdr.className = 'form-sec-hdr';
+                hdr.innerHTML = `${SEC_CHEVRON}<span class="form-sec-title">${escHtml(s)}</span>`;
+                const body = document.createElement('div'); body.className = 'wiz-pane-body';
+                sec.append(hdr, body); container.appendChild(sec);
+                applyFold(sec, isSectionCollapsed(s), false);
+                hdr.addEventListener('click', () => { const now = !(sec.getAttribute('data-collapsed') === '1'); applyFold(sec, now, true); setSectionCollapsed(s, now); });
+                
+                if (node.children) {
+                    const childNodes = Array.isArray(node.children) ? node.children : (node.children.DO || []);
+                    traverse(childNodes, body);
+                }
+            } else if (node.type === 'formfield' || node.type === 'param_field') {
+                const paramName = node.params && node.params.param;
+                if (paramName && byParam[paramName]) {
+                    container.appendChild(byParam[paramName].row);
+                    readers.push(byParam[paramName].read);
+                }
+            } else if (node.type === 'sim') {
+                const simBox = document.createElement('div');
+                simBox.className = 'wiz-visual';
+                simBox.style.cssText = 'width:100%; height:100%; min-height:300px; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
+                
+                // IMPORTANT: Construct the viz-split structure exactly as it is in index.html for Corner
+                simBox.innerHTML = `
+                <span class="section-label">VISUALIZATION</span>
+                <div class="viz-split">
+                    <div class="viz-container" id="userViz3dBox_tree" data-viz-pane="preview3d" style="display:none">
+                        <div id="userViz3dStatus_tree" class="viz-status"></div>
+                        <div id="userViz3dContainer_tree" class="viz-canvas"></div>
+                    </div>
+                    <div class="viz-container" data-viz-pane="layout2d">
+                        <div id="userVizStatus_tree" class="viz-status"></div>
+                        <div id="userVizContainer_tree" class="viz-canvas"></div>
+                    </div>
+                </div>`;
+                
+                container.appendChild(simBox);
+                import('./paneAccordion.js').then(m => m.makePanesCollapsible(simBox)).catch(() => {});
+            } else if (node.type === 'panel') {
+                const pnlBox = document.createElement('div');
+                pnlBox.className = 'wiz-visual';
+                pnlBox.style.cssText = 'width:100%; height:100%; min-height:300px; display:flex; flex-direction:column; position:relative; flex: 1 1 100%;';
+                
+                pnlBox.innerHTML = `
+                <span class="section-label">FEATURE CANVAS</span>
+                <div class="viz-split">
+                    <div class="viz-container" data-viz-pane="layout2d">
+                        <div id="userVizStatus_tree" class="viz-status"></div>
+                        <div id="userVizContainer_tree" class="viz-canvas"></div>
+                    </div>
+                </div>`;
+                container.appendChild(pnlBox);
+                if (node.uiChildren) traverse(Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []), container);
+                if (node.children) traverse(Array.isArray(node.children) ? node.children : (node.children.DO || []), container);
+            } else {
+                if (node.uiChildren) {
+                    const childNodes = Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []);
+                    traverse(childNodes, container);
+                }
+                if (node.children) {
+                    const childNodes = Array.isArray(node.children) ? node.children : (node.children.DO || []);
+                    traverse(childNodes, container);
+                }
+            }
+        }
+    }
+
+    traverse(uiTree, host);
+
+    // Fallback safety: append any parameter rows that were not explicitly attached during tree traversal
+    for (const key of Object.keys(byParam)) {
+        const p = byParam[key];
+        if (p && p.row && !p.row.parentElement) {
+            host.appendChild(p.row);
+            readers.push(p.read);
+        }
+    }
+
+    for (const b of (bindings || [])) {
+        if (!b || !b.sourceField) continue;
+        const inp = host.querySelector(`[data-param="${b.param}"]`);
+        if (inp) decorateInputEl(inp, b.sourceField, { gate: true });
+    }
+    return readers;
+}

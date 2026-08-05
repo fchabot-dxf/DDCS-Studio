@@ -167,12 +167,12 @@ const optionsFor = (def, field) => {
     // surfaces can't drift. (The import closes a benign cycle — this list is read lazily here, never at module-eval.)
     if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
     // FORM value-field block (composable-authoring): the form-widget + the binding value-type dropdowns.
-    if (field === 'widget' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list'];   // t1105 — param_field shares formfield's widget/type vocab
+    if (field === 'widget' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', 'tool-library', 'thread-preset', 'declared-io', 'stepper'];   // t1105 — param_field shares formfield's widget/type vocab
     if (field === 'type' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'int', 'enum', 'bool', 'string', 'list'];
     // LAYOUT-2D widget block (composable GUI): the anchor KIND + the coordinate FRAME (v1 = point / stock-min).
     if (field === 'anchor' && def.type === 'layoutwidget') return ['point'];
     if (field === 'frame' && def.type === 'layoutwidget') return ['stock-min', 'datum'];
-    if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
+    if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form3d+2d', 'form'];   // the GUI panel-type declaration
     if (field === 'kind' && def.type === 'layout') return ['none', 'corner'];
     if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)
     return SELECTS[field] || null;

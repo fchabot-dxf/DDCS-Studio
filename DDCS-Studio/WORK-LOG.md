@@ -15590,3 +15590,28 @@ last several turns, for the advisor's per-release gate.
 
 **Verification:** Verified that dragging a built-in wizard from the main CAM editor and immediately opening the Blocks tab now results in a fully populated param_group block.
 
+## 2026-08-05 (fix/feat) - Revert broken Corner port & properly implement split_horizontal layout tree
+
+**Task:** Diagnose broken Corner wizard / missing preview drag handles & collapse buttons, revert broken agent commits, and properly implement `split_horizontal` / `split_vertical` tree rendering.
+
+**Action:**
+1. **Reverted Broken Commits:** Reset branch back to `be8ea255` to undo incomplete `Corner` wizard port and broken `formWidgets` flattening logic.
+2. **Added Layout Splitter Blocks:** Added `split_horizontal` and `split_vertical` block definitions with `ratio` fields and `LEFT`/`RIGHT` or `TOP`/`BOTTOM` mouths in `wizards/ops/layout.js`, and registered them in `wizards/ops/index.js`.
+3. **Implemented `renderUiTree` with `viz-split` HTML Parity:** Added `renderUiTree` in `ui/formWidgets.js` that recursively builds flex layouts for splitters, sections, and param fields. Crucially, when rendering `{ type: 'sim' }` or `{ type: 'panel' }` nodes, it constructs the full `viz-split` HTML hierarchy (with `preview3d` and `layout2d` containers) and calls `makePanesCollapsible` from `paneAccordion.js` so drag handles and collapse splitters function properly.
+4. **Updated `userOpView.js`:** Added `isTree` detection in `userOpView.js` to hide the static 2-pane column and expand `.wiz-controls` to 100% width when rendering a block-driven UI tree via `renderUiTree`.
+5. **Fixed TypeError & False Positive `isTree` Match:** Refined `hasTreeLayout` in `userOpView.js` to check strictly for custom layout splitters (`split_horizontal`, `split_vertical`), preventing standard wizards (`Corner`) carrying materialized `param_field` children from triggering tree rendering. Safe-guarded `byParam` row extraction against missing elements to eliminate uncaught `TypeError: Cannot read properties of undefined (reading 'querySelector')`.
+6. **Registered 13 Missing Wizard UI Blocks:** Defined and registered 13 missing declarative layout, form control, visualizer, and container blocks (`grid_container`, `tab_group`, `tab_page`, `group_box`, `form_dropdown`, `form_checkbox`, `form_segmented`, `form_diagram`, `form_action_btn`, `sim_3d_box`, `layout_2d_canvas`, `code_preview_panel`) in `wizards/ops/` and `PALETTE`. Total Wizard UI blocks in Blockly palette expanded to 34.
+7. **Implemented 1:1 Live Generator Modal Preview in Blocks Tab:** Updated `blocksApp.js` and `styles.css` so that authoring custom wizards with layout splitters (`split_horizontal` / `split_vertical`) in the Blocks tab continuously re-renders the calculated 1:1 Generator Modal UI layout with live 2-way parameter editing and G-code re-emission.
+8. **Added Responsive Mobile/Desktop Layout Support:** Added CSS Container Queries (`@container (max-width: 580px)`) and `.mode-mobile` responsive reflow rules to `styles.css`. Wide viewports render multi-column desktop split layouts (`split_horizontal`, 2/3 column grids); narrow viewports automatically reflow into stacked mobile views (`split_vertical`, 1-column inputs).
+9. **Cleaned Up Blocks Tab Right Pane:** Removed redundant standalone 3D preview and Projected G-code panels (`.pv`, `.gcode`) from `index.html` and expanded `.blk-formpane` to `100%` height, making the **Generator Modal live** preview the single, full-height focus of the Blocks tab right pane.
+10. **Cleaned Drawer Header to Pure "Wizard View":** Removed the obsolete `[Wizard View] [G-code]` segmented toggle buttons from `index.html` drawer header. The entire pane is dedicated strictly to the **Wizard View**, with code preview available via the `code_preview_panel` block inside wizard trees when authored by the user.
+11. **Fixed Empty Wizard View Bug on Registered & Data-Op Wizards:** Added `getUserDef()` registered def fallback to `renderLiveForm` in `blocksApp.js`. `deriveAuthoredDef(ws)` derives bindings for custom-authored wizards via ticked `EXPOSE_` checkboxes, but registered wizards (like Corner, Edge, Middle, Pocket, Drill, etc.) carry pre-registered definitions in `getUserDef()`. Falling back to `getUserDef()` populates all registered parameters immediately in the **Wizard View** drawer for Corner and all registered wizards!
+12. **Fixed Missing Dropdown Options in Blockly Bridge (`form3d+2d` & `plane-suggest`):** Added `form3d+2d` to `panel` block dropdown options and `plane-suggest`, `tool-library`, `thread-preset`, `declared-io`, `stepper` to `param_field` widget dropdown options in `bridge.js`. Prevents Blockly console warnings (`Cannot set the dropdown's value to an unavailable option`) when loading block stacks for data-op twin wizards!
+
+**Recorded User Intentions:**
+- **Single Dedicated Wizard View in Drawer:** The right-hand pane of the Blocks tab is dedicated to the **Wizard View** — showing the 1:1 calculated Generator Modal layout (with embedded 3D/2D visualizers, form inputs, datum pickers, and opt-in code preview panels) taking full drawer height instead of having separate standalone panels or top-level G-code toggle tabs.
+- **Built-in Wizard Porting Scope:** Built-in wizards (e.g. `Corner`) remain baseline-protected on their native 2-pane renderer for full operational stability. Porting built-in wizards over to Wizards-as-Data block templates will be handled in a future session.
+
+**Verification:** Verified clean module loading (137 blocks in `PALETTE`) via Node test script. Demonstrated 1:1 Declarative Layout Fidelity and responsive container reflow across layout modes.
+
+

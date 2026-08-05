@@ -16,9 +16,10 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
-import { renderOpForm, formBindings } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present
+import { renderOpForm, formBindings, renderUiTree } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present; renderUiTree for block layouts
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
+import { getUserDef } from './userOps.js';
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -151,7 +152,7 @@ async function buildWorkspace() {
   const topbar = document.createElement('div'); topbar.className = 'blk-topbar';
   const host = document.createElement('div'); host.className = 'blk-bk-host';
   wsHost.append(topbar, host);
-  const out = document.getElementById('blk-gcode');
+  const out = document.getElementById('blk-gcode') || document.createElement('div');
   // t756 (R-C) — per-pass sim-start HINTS from the DECLARED source (opSimStarts), read off the whole block program —
   // the SAME registry the editor + wizard previews use, so the Blocks preview seats each pass identically. Retires the
   // legacy WIZARDS[type].inferStart start-source (the imperative per-wizard guess).
@@ -167,7 +168,7 @@ async function buildWorkspace() {
   };
   // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
   const blkPanelHost = document.getElementById('blk-preview-panel');
-  const panel = createPreviewPanel(blkPanelHost, {
+  const panel = blkPanelHost ? createPreviewPanel(blkPanelHost, {
     getGcode: () => getProjection().text,
     // The DECLARED start source (opSimStarts) — pass 0 begins at the inferred start, matching the editor + wizard.
     getStart: () => (blkStartHints() || [])[0] || null,
@@ -175,7 +176,7 @@ async function buildWorkspace() {
     // Route the sim's EXECUTING line to the projected G-code view: glow the emitting line (+ a fading comet-tail),
     // mirroring the read-only editor panel — so watching a run in the Blocks tab lights the very code the blocks emit.
     onLine: (i) => setExecLine(i),
-  });
+  }) : { setGcode: () => {}, setActive: () => {}, refresh: () => {}, setHighlights: () => {}, draw: () => {} };
   if (blkPanelHost) blkPanelHost.__panel = panel;   // expose for inspection/tests (mirrors wizardManager's host.__panel)
 
   // Grid lines follow the theme's border tone (best-effort: the grid colour is an inject option, so it's set
@@ -376,13 +377,53 @@ async function buildWorkspace() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
     let def = null;
-    try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ return; }
-    // Show the live form while EDITING a saved wizard, OR whenever the current stack EXPOSES knobs — so a hand-built
-    // stack (bare atoms or an inserted op, never saved) is form-editable too (#12). No knobs + not editing → nothing
-    // to show. (deriveAuthoredDef now derives a bare top-level atom stack via authoringBody, not just an op wrapper.)
-    const show = def && (editingWizardType() || (def.bindings && def.bindings.length));
-    if (!show) { pane.hidden = true; formHost.innerHTML = ''; formHost.__sig = null; return; }
+    try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ }
+    
+    const stack = getStack() || [];
+    const opBlock = stack.find((b) => b && (getUserDef(b.type) || (b.params && getUserDef(b.params.opType))));
+    if ((!def || !def.bindings || !def.bindings.length) && opBlock) {
+      const regDef = getUserDef(opBlock.type) || (opBlock.params && getUserDef(opBlock.params.opType));
+      if (regDef) def = regDef;
+    }
+
+    const userRoot = stack.find((b) => b && b.type === 'user_root') || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
+    
+    function checkLayoutNodes(nodes) {
+      if (!nodes) return false;
+      const list = Array.isArray(nodes) ? nodes : (typeof nodes === 'object' ? Object.values(nodes).flat() : []);
+      for (const n of list) {
+        if (!n) continue;
+        if (['split_horizontal', 'split_vertical', 'grid_container', 'tab_group', 'group_box', 'section', 'sim', 'panel'].includes(n.type)) return true;
+        if (n.children && checkLayoutNodes(n.children)) return true;
+        if (n.uiChildren && checkLayoutNodes(n.uiChildren)) return true;
+      }
+      return false;
+    }
+    const hasTree = userRoot && checkLayoutNodes(userRoot.uiChildren);
+
+    const show = hasTree || (def && (editingWizardType() || (def.bindings && def.bindings.length)));
     pane.hidden = false;
+    if (!show) {
+      formHost.innerHTML = '<div class="blk-form-empty" style="opacity:0.6;padding:12px;font-style:italic;">Add a "Define Custom Wizard" block or tick a knob to view live Generator Modal layout.</div>';
+      formHost.__sig = null;
+      return;
+    }
+
+    if (hasTree) {
+      formHost.__sig = null;
+      formHost.innerHTML = '';
+      const byParam = {};
+      const tempHost = document.createElement('div');
+      const readers = renderOpForm(tempHost, formBindings(def || {})) || [];
+      tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
+        if (!inp || !inp.dataset || !inp.dataset.param) return;
+        const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement;
+        byParam[inp.dataset.param] = { row, read: readers[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
+      });
+      renderUiTree(formHost, userRoot.uiChildren, (def && def.bindings) || [], byParam);
+      return;
+    }
+
     const sig = formSig(def.bindings);
     if (formHost.__sig === sig && formHost.querySelector('[data-param]')) {        // structure unchanged → value-sync only
       for (const b of def.bindings) {

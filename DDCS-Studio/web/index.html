@@ -1792,33 +1792,20 @@
             <div class="blk-col-resize" aria-hidden="true" title="Drag to resize the preview"></div>
             <!-- Mobile-only: drag the top edge to resize the preview drawer -->
             <div class="blk-drawer-resize" aria-hidden="true"></div>
-            <!-- Mobile-only drawer header: grip + Preview/G-code toggle + close -->
+            <!-- Mobile-only drawer header: grip + Wizard View title + close -->
             <div class="blk-drawer-head">
                 <span class="blk-grip" aria-hidden="true"></span>
-                <div class="blk-seg">
-                    <button id="blkSegPv" class="on" type="button">Preview</button>
-                    <button id="blkSegCode" type="button">G-code</button>
-                </div>
+                <span class="blk-drawer-title" style="font-weight: 700; font-size: 14px; color: var(--fg); font-family: var(--font);">Wizard View</span>
                 <button id="blkDrawerClose" class="blk-drawer-x" type="button" aria-label="Close preview">✕</button>
             </div>
-            <!-- Live FORM view — shown only while editing a custom op; the wizard's form as a live view of its blocks -->
-            <div class="blk-formpane" id="blk-formpane" hidden>
-                <h3 class="pane-h">Form <span class="blk-form-live" title="The form is a live view of the blocks — no save needed">live</span></h3>
+            <!-- Live Generator Modal View — 1:1 pixel-perfect wizard form preview -->
+            <div class="blk-formpane" id="blk-formpane">
+                <h3 class="pane-h">Generator Modal <span class="blk-form-live" title="The form is a live view of the blocks — no save needed">live</span></h3>
                 <div id="blk-form" class="blk-form-body"></div>
-            </div>
-            <div class="pv">
-                <h3 class="pane-h">Preview</h3>
-                <div class="pv-body"><div id="blk-preview-panel"></div></div>   <!-- the shared createPreviewPanel mounts here -->
-            </div>
-            <!-- Desktop: drag to resize the Preview pane vs the Projected G-code pane below it -->
-            <div class="blk-row-resize" aria-hidden="true" title="Drag to resize Preview vs G-code"></div>
-            <div class="gcode">
-                <h3 class="pane-h">Projected G-code</h3>
-                <pre id="blk-gcode"></pre>
             </div>
         </div>
         <!-- Mobile-only: bottom-centre pull-tab opens the preview drawer -->
-        <button id="blkDrawerHandle" class="blk-drawer-handle" type="button" aria-expanded="false">▲ Preview</button>
+        <button id="blkDrawerHandle" class="blk-drawer-handle" type="button" aria-expanded="false">▲ Wizard View</button>
     </div>
 
     <!-- Global tooltip -->
