@@ -16,7 +16,8 @@
     "bump-version": "node scripts/bump-version.cjs",
     "test:e2e": "playwright test",
     "test:smoke": "playwright test -c playwright.smoke.config.js",
-    "test:changed": "playwright test --only-changed"
+    "test:changed": "playwright test --only-changed",
+    "lint": "eslint web"
   },
   "keywords": [
     "cnc",
@@ -39,7 +40,9 @@
     "web/wizards/"
   ],
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.58.2",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0"
   },
   "dependencies": {
     "blockly": "^12.5.1",
