@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative, sep } from 'path';
 

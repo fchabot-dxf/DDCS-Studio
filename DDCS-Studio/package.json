@@ -15,6 +15,7 @@
     "build:standalone": "npm run bump-version && npm run generate-vars && npm run bundle",
     "bump-version": "node scripts/bump-version.cjs",
     "test:e2e": "playwright test",
+    "test:node": "node --import ./tests/node/support/register.mjs --test \"tests/node/*.test.mjs\"",
     "test:smoke": "playwright test -c playwright.smoke.config.js",
     "test:changed": "playwright test --only-changed",
     "lint": "eslint web"

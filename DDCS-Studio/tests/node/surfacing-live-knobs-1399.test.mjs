@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1399 STEP 0 — SURFACING'S KNOBS BECOME REACHABLE, and every numeric program stays byte-identical.

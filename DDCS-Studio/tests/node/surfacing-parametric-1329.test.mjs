@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { rampDescentRelationship, splitRampDescent, cutBox } from './support/rampRelationship.js';
+import { test, expect } from './support/harness.mjs';
+import { rampDescentRelationship, splitRampDescent, cutBox } from '../support/rampRelationship.js';
 
 /**
  * t1329 — THE SURFACING PILOT: the emit becomes PARAMETRIC, and the migration proves itself safe before anything dies.

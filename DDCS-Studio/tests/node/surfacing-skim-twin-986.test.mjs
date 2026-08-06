@@ -3,7 +3,7 @@
 // MUST hold on the twin too. Normal stays byte-identical.
 // t1361 — the guard's GATE was G91 and is now the frame read + its sentinel refusal; the rule it enforces (no Z move
 // before the op's reference exists) is the same one, restated to what establishes that reference today.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 test('twin Skim == built-in Skim byte-identical; crash-guard holds (no Z before the frame is read); Normal byte-identical', async ({ page }) => {
   await page.goto('http://localhost:3211');

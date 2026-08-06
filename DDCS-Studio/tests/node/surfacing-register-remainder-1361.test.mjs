@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * t1361 STEP 4 — THE REGISTER REMAINDER, each item named and MEASURED rather than assumed. These are the consequences

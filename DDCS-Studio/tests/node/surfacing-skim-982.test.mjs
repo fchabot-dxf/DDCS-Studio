@@ -12,7 +12,7 @@
 //
 // The op now READS the live work position into its own registers and emits ORDINARY ABSOLUTE moves in that frame.
 // Every assertion below is this file's original assertion, carried across to the seam that replaced the one it named.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 const emit = (page, params) => page.evaluate(async (params) => {
   const { surfacingStack } = await import('/wizards/surfacingWizard.js');
