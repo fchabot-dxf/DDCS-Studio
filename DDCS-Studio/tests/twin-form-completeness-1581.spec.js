@@ -9,25 +9,25 @@ import { test, expect } from '@playwright/test';
  * 22 fields gone from middle's form). Fixed at the one consumer: `formBindings()` now unions row-less bindings
  * back in at their declared position. This spec is the regression tripwire so that class cannot return silently.
  *
- * DATA-DRIVEN, not a hand-typed parallel list: iterates `app.js`'s `SEED_BUILDERS` — the SAME registry the app
- * itself uses for boot-seeding every workspace and for each wizard's "Restore to factory" action (t1107). A newly
- * registered twin is covered the day it's added there, with no second place to remember to update.
+ * DATA-DRIVEN, not a hand-typed parallel list: `app.js`'s `SEED_BUILDERS` is the SAME registry the app itself uses
+ * for boot-seeding every workspace and for each wizard's "Restore to factory" action (t1107) — read it only for
+ * the opType strings (calling each builder is a pure, side-effect-free factory call), never used to register.
  *
- * A handful of twins fail their OWN construction (`registerUserOp` throws — a binding whose `match` doesn't
- * resolve in the template) — a pre-existing, SEPARATE defect, upstream of `formBindings` entirely (it never gets
- * called). Confirmed pre-existing for `user_atc_warmup_data` via its own dedicated, already-red
- * `atc-warmup-as-data.spec.js`; the 6 lathe ones show the identical error shape, not independently root-caused
- * (out of scope — see WORK-LOG t1581). Named and skipped explicitly rather than silently: the skip list itself is
- * asserted, so it can only shrink (a future fix) or change with a visible diff in this file, never grow unnoticed.
+ * t1583/t1585 — DO NOT REGISTER MANUALLY. `app.js`'s `init()` already calls `seedDefaultPortedUserOps()` on every
+ * page load, which registers all 32 twins via `createUserOp`/`updateUserOp` before this test's own code ever runs.
+ * A test that ALSO calls `registerUserOp`/`createUserOp` on the same opType a second time in the same page session
+ * is a REDUNDANT re-registration — and for 7 of the 32 twins (atc_warmup + the 6 lathe turning/probe ops) that
+ * second call throws (a stale/colliding block-index derivation), even though the FIRST, real, boot-time
+ * registration succeeded cleanly every time (confirmed: 15/15 fresh boots, real `openWiz()` opens + G-code emits
+ * clean for all 7, and 4 of the 6 lathe ops have their OWN dedicated, already-passing tests exercising this exact
+ * twin+emit path). The original version of this spec manually re-registered and asserted those 7 as a permanent
+ * "known construction failure" set — a false claim the spec's own bug produced. Fixed by reading the ALREADY
+ * boot-seeded def (`listUserOps()`) instead of building and registering a second one. THE CLASS, for the next
+ * person writing a twin test: if your test's own `registerUserOp`/`createUserOp` call predates
+ * `seedDefaultPortedUserOps` (or you're just not sure), don't register manually at all — resolve the boot-seeded
+ * def/builder instead; a redundant registration is harmless for most twins but silently throws for a few.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
-
-// t1581 — construction failures unrelated to formBindings (see header). Update ONLY when you've confirmed WHY a
-// twin moved on/off this list (a new WORK-LOG entry, not a silent edit).
-const KNOWN_CONSTRUCTION_FAILURES = [
-    'user_atc_warmup_data',
-    'user_lathe_centerdrill', 'user_lathe_faceprobe', 'user_lathe_facing', 'user_lathe_odprobe', 'user_lathe_odturn', 'user_lathe_parting',
-].sort();
 
 test('every registered data twin: the form presents every declared binding (formBindings drops none)', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -36,32 +36,28 @@ test('every registered data twin: the form presents every declared binding (form
     const r = await page.evaluate(async () => {
         const A = await import('/app.js');
         const U = await import('/blocks/userOps.js');
+        const OB = await import('/blocks/opBuilders.js');
         const FW = await import('/ui/formWidgets.js');
         const perTwin = [];
         for (const fn of A.SEED_BUILDERS) {
-            let def;
-            try { def = fn(); } catch (e) { perTwin.push({ opType: '(unbuildable)', constructError: String(e) }); continue; }
-            try {
-                U.registerUserOp(def);   // runtime-only, federated user layer — mirrors how the real opensAs flow registers a built-in twin
-            } catch (e) {
-                perTwin.push({ opType: def.opType, constructError: String(e) });
-                continue;
-            }
-            const fb = FW.formBindings(def);
-            const rawParams = def.bindings.map((b) => b.param).filter((p) => p != null);
+            const opType = fn().opType;   // pure factory call, just to read the opType string — never registered
+            const stored = U.listUserOps().find((d) => d.opType === opType);   // the ALREADY boot-seeded def
+            if (!stored) { perTwin.push({ opType, error: 'not found in the boot-seeded registry' }); continue; }
+            if (!OB.builderOf(opType)) { perTwin.push({ opType, error: 'no working builder wired for a registered def' }); continue; }
+            const fb = FW.formBindings(stored);
+            const rawParams = stored.bindings.map((b) => b.param).filter((p) => p != null);
             const fbParams = new Set(fb.map((b) => b.param));
             const missing = rawParams.filter((p) => !fbParams.has(p));
-            perTwin.push({ opType: def.opType, rawCount: rawParams.length, formCount: fb.length, missing });
+            perTwin.push({ opType, rawCount: rawParams.length, formCount: fb.length, missing });
         }
         return perTwin;
     });
 
-    const constructFailed = r.filter((t) => t.constructError).map((t) => t.opType).sort();
-    expect(constructFailed, 'the KNOWN construction-failure set is exactly this — a change here is itself news (a fix landed, or a NEW twin broke construction) and needs its own WORK-LOG entry, not a silent list edit').toEqual(KNOWN_CONSTRUCTION_FAILURES);
+    const problems = r.filter((t) => t.error);
+    expect(problems, 'every twin in the registry must actually be boot-seeded with a working builder').toEqual([]);
 
-    const checkable = r.filter((t) => !t.constructError);
-    expect(checkable.length, 'sanity: most of the registry should be checkable, not skipped').toBeGreaterThan(20);
+    expect(r.length, 'the full registry, not a subset').toBe(32);
 
-    const withMissing = checkable.filter((t) => t.missing.length > 0);
-    expect(withMissing, 'every checkable twin\'s form must present every declared binding — if this fails, formBindings() (or whatever the current form-assembly seam is) is dropping params again').toEqual([]);
+    const withMissing = r.filter((t) => t.missing.length > 0);
+    expect(withMissing, 'every twin\'s form must present every declared binding — if this fails, formBindings() (or whatever the current form-assembly seam is) is dropping params again').toEqual([]);
 });
