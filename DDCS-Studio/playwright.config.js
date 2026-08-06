@@ -11,7 +11,12 @@ export default defineConfig({
   // t1587 — this exclusion means `npx playwright test` / `npm run test:e2e` alone SKIPS these tests silently; the
   // merge gate must run `npm test` (both tiers, fails if either does), never `test:e2e` on its own.
   testIgnore: ['node/**'],
-  workers: 4,  // t836 — the mem-server killed the fs-contention (was 21min@w2 on http-server); w4 is the RELIABLY-GREEN point (~11.5min, measured 3x consecutive 0-fail). w6 shaved ~1min but CPU-contended → flaked ~1 load-sensitive test/run (perf/race/boot), not server-fixable.
+  workers: 6,  // t1593 (2026-08-06) — re-measured on the i7-13700F (16c/24t/32GB): w4=1158s/73fail, w6=975s/73fail (same set, ±2 within
+               // the existing flake class), w8=897s/82fail (+10 NEW beyond baseline, only 1 healed — a real contention ceiling; backed
+               // off per the "new failures → back off one step" rule, so w12 was not run). The t836 baseline this replaces was itself
+               // contaminated by the (now-fixed) formBindings bug's deterministic failures being misread as load sensitivity.
+               // NOTE: the 73-count baseline itself is NOT zero — it's a separate, pre-existing mouse/hover-event class (drag/canvas
+               // tests) confirmed present on main HEAD too (0 flaky across retries); unrelated to worker count, not investigated here.
   timeout: 60_000,   // t1197 — per-test cap; lenient (a slow load-flake gets more time, never turns a passing test red)
   expect: { toHaveTimeout: 5000 },
   use: {
