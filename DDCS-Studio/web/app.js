@@ -96,7 +96,9 @@ import { initSaveStates } from './blocks/saveStates.js';
 
 // t1107 — the factory data-twin builders, the ONE source shared by the boot seed (seedDefaultPortedUserOps) AND the per-wizard
 // Restore-to-factory action (wizardManagerPanel). A built-in wizard's opensAs twin is reset to factory by re-running its builder.
-const SEED_BUILDERS = [
+// t1581 — exported so a test can sweep the REGISTRY itself (every ported twin's form presents every declared binding),
+// rather than a hand-typed parallel list that a new twin could silently fall out of.
+export const SEED_BUILDERS = [
     atcWarmupDataDef, atcLengthDataDef, atcCheckDataDef, atcTestDataDef, atcChangeDataDef, atcTableDataDef,
     drillDataDef, tapDataDef, boreDataDef, slotDataDef, surfacingDataDef, contourDataDef, pocketDataDef, wcsDataDef, textDataDef,
     cornerDataDef, edgeDataDef, middleDataDef, rotaryCenterDataDef, rotaryClockDataDef, alignmentDataDef,
