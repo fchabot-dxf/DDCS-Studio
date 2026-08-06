@@ -278,6 +278,17 @@ export class PathAnimator {
     console.debug(`PathAnimator: pace = ${this.pxPerSec} px/sec`);
 
     // Chain steps using transitionend — each step waits for previous stroke to finish
+    //
+    // t1567 PARKED FINDING (not fixed) — the executor below only destructures `resolve`, never `reject`, but 4 call
+    // sites further down (the abort paths: "if stopped or session mismatch") call reject(new Error('aborted')).
+    // Broken since this function's own introduction (dc9d3a4b, 2026-06-10, a repo restructure — this content may be
+    // older still), not a later regression; the same commit introduced both the signature and the reject() calls
+    // together. Only reachable on the abort path (an animation interrupted mid-play), which is why it has never
+    // shown up as a test failure. Parked alongside gcodeViz3d.js's #4 finding rather than mechanically adding a
+    // `reject` param: unlike a missing import, this one needs someone to decide what SHOULD happen on abort (does
+    // the caller actually want a rejected promise here, or does resolve() with a stopped-flag check already cover
+    // it, given every call site already checks this._stopped before calling reject?) — a behavioral question, not
+    // a declaration fix. See t1567 WORK-LOG entry.
     const runStep = (idx) => {
       return new Promise((resolve) => {
         if (this._stopped) { _setAnimState('stopped'); return resolve(); }
@@ -359,7 +370,7 @@ export class PathAnimator {
             try { el.removeAttribute('mask'); } catch (e) {}
             try { mask.remove(); } catch (e) {}
             if (jogFallback) { clearTimeout(jogFallback); this._timers.delete(jogFallback); }
-            if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }
+            if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }   // eslint-disable-line no-undef -- t1567 parked finding, see above   // eslint-disable-line no-undef -- t1567 parked finding, see above
             console.debug(`PathAnimator: step ${idx} finished (jog reveal) dur=${duration}ms`, step.selector);
             resolve();
           };
@@ -370,7 +381,7 @@ export class PathAnimator {
             try { el.removeAttribute('mask'); } catch (e) {}
             try { mask.remove(); } catch (e) {}
             this._timers.delete(jogFallback);
-            if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }
+            if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }   // eslint-disable-line no-undef -- t1567 parked finding, see above   // eslint-disable-line no-undef -- t1567 parked finding, see above
             console.warn('PathAnimator: jog reveal fallback triggered', step.selector);
             resolve();
           }, duration + 120);
@@ -393,7 +404,7 @@ export class PathAnimator {
         const onEnd = (e) => {
           if (e.propertyName !== 'stroke-dashoffset') return;
           el.removeEventListener('transitionend', onEnd);
-          if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }
+          if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }   // eslint-disable-line no-undef -- t1567 parked finding, see above
           console.debug(`PathAnimator: step ${idx} finished (${step.type}, step${step.stepNum}) dur=${duration}ms`, step.selector);
           resolve();
         };
@@ -401,7 +412,7 @@ export class PathAnimator {
 
         const fallback = setTimeout(() => {
           el.removeEventListener('transitionend', onEnd);
-          if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }
+          if (this._stopped || mySession !== this._sessionId) { _setAnimState('stopped'); return reject(new Error('aborted')); }   // eslint-disable-line no-undef -- t1567 parked finding, see above
           resolve();
         }, duration + 100);
         this._timers.add(fallback);
