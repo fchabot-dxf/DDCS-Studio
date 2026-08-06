@@ -15590,8 +15590,6 @@ last several turns, for the advisor's per-release gate.
 
 **Verification:** Verified that dragging a built-in wizard from the main CAM editor and immediately opening the Blocks tab now results in a fully populated param_group block.
 
-<<<<<<< HEAD
-=======
 ## 2026-08-05 (fix/feat) - Revert broken Corner port & properly implement split_horizontal layout tree
 
 **Task:** Diagnose broken Corner wizard / missing preview drag handles & collapse buttons, revert broken agent commits, and properly implement `split_horizontal` / `split_vertical` tree rendering.
@@ -15620,7 +15618,6 @@ last several turns, for the advisor's per-release gate.
 **Verification:** Verified clean module loading (137 blocks in `PALETTE`) via Node test script. Demonstrated 1:1 Declarative Layout Fidelity and responsive container reflow across layout modes.
 
 
->>>>>>> 8a345a15 (docs(firmware): record Yt Liu insights on macro mode (#122 / macro_ prefix) and ATAN[dy, dx] syntax)
 
 ## 2026-08-05 t1567 (investigation, report-before-fixing) - Hunt the corruption systematically: install a linter, find 5 suspects, none fixed yet
 
