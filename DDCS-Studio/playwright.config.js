@@ -8,6 +8,8 @@ export default defineConfig({
   testDir: 'tests',
   // tests/node/ is the BROWSER-FREE tier (`npm run test:node`) — the same assertions with no app boot. Playwright
   // would otherwise collect its *.test.mjs files and run them a second time, which is the opposite of the point.
+  // t1587 — this exclusion means `npx playwright test` / `npm run test:e2e` alone SKIPS these tests silently; the
+  // merge gate must run `npm test` (both tiers, fails if either does), never `test:e2e` on its own.
   testIgnore: ['node/**'],
   workers: 4,  // t836 — the mem-server killed the fs-contention (was 21min@w2 on http-server); w4 is the RELIABLY-GREEN point (~11.5min, measured 3x consecutive 0-fail). w6 shaved ~1min but CPU-contended → flaked ~1 load-sensitive test/run (perf/race/boot), not server-fixable.
   timeout: 60_000,   // t1197 — per-test cap; lenient (a slow load-flake gets more time, never turns a passing test red)
