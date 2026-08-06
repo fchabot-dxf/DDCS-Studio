@@ -365,8 +365,6 @@ function augment() {
             if (blk.type === 'regionpick') { augmentRegionPick(blk); if (blk.queueRender) blk.queueRender(); continue; }   // ✎ regions affordance
             if (blk.type === 'coordlist') { augmentCoordList(blk); if (blk.queueRender) blk.queueRender(); continue; }     // ✎ positions affordance
             if (!isAtom(blk)) continue;
-            // DISABLING QUICK-EXPOSE CHECKBOXES TO REDUCE CLUTTER (migrated to explicit param_group authoring)
-            /*
             for (const f of numericFields(blk)) {
                 const inputName = 'DECL_' + FN(f);
                 if (blk.getInput(inputName)) continue;                                   // idempotent
@@ -389,7 +387,6 @@ function augment() {
                     .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f));
                 restoreExpose(blk, FN(f));   // #13: re-apply a persisted exposure after a round-trip rebuilt the block
             }
-            */
             if (blk.queueRender) blk.queueRender();
         }
     } finally { B.Events.enable(); }
