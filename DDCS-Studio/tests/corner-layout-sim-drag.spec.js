@@ -13,7 +13,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 //     AND, as the reposition datum (t297), RE-DERIVES #21-#24 so the emit CHANGES (walls hold — asserted in corner-start-datum-drag).
 test('(1) Layout sim ◇ is DRAGGABLE — writes userStarts AND recomputes the emit (the reposition datum, t297)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js');
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());
@@ -56,7 +56,7 @@ test('(1) Layout sim ◇ is DRAGGABLE — writes userStarts AND recomputes the e
 //     move-handles; a pointer drag at that point must route to the EMITTING handle's onDrag, not the sim one.
 test('(2) degenerate overlap: the emitting handle still wins the hit (sim marker yields, no crash)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   const r = await page.evaluate(async () => {
     const { FeatureCanvas } = await import('/viz/featureCanvas.js');
     const cont = document.createElement('div'); cont.style.cssText = 'width:320px;height:260px;position:relative'; document.body.appendChild(cont);

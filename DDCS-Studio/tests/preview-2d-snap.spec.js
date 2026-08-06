@@ -7,7 +7,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 test('2D readout snaps to a stock corner', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = { x: 100, y: 80, z: 20, shape: 'boss', show: true, datum: 'nnp', pin: 'origin' }; });
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });

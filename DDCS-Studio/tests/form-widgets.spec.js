@@ -17,7 +17,7 @@ const BINDINGS = [
 
 test('form widgets: typed bindings render the right control + Insert reads each value', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
 
   await page.evaluate(async ({ TEMPLATE, BINDINGS }) => {
     localStorage.removeItem('ddcs_user_ops');
@@ -57,7 +57,7 @@ test('form widgets: typed bindings render the right control + Insert reads each 
 
 test('form widgets: corner-grid datum picker renders + reads its [X][Y] code', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
 
   await page.evaluate(async () => {
     localStorage.removeItem('ddcs_user_ops');
@@ -85,7 +85,7 @@ test('form widgets: corner-grid datum picker renders + reads its [X][Y] code', a
 
 test('form widgets: xy-pad canvas picker — group of bindings → one canvas, drag drives both params', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
 
   await page.evaluate(async () => {
     localStorage.removeItem('ddcs_user_ops');
@@ -153,7 +153,7 @@ test('form widgets: xy-pad canvas picker — group of bindings → one canvas, d
 
 test('form widgets: rect canvas picker reads x/y/w/h at defaults', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
 
   await page.evaluate(async () => {
     localStorage.removeItem('ddcs_user_ops');
@@ -183,7 +183,7 @@ test('form widgets: rect canvas picker reads x/y/w/h at defaults', async ({ page
 
 test('form widgets: stepperSide:left renders the spinner on the LEFT; default fields unchanged; no emit change', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
 
   await page.evaluate(async () => {
     localStorage.removeItem('ddcs_user_ops');

@@ -9,7 +9,7 @@ test('2D start handle is draggable and updates the start the wizard reads', asyn
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());

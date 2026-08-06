@@ -12,7 +12,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 async function openAtcTab(page) {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetSettings && window.ddcsStudio && window.ddcsStudio.wizardManager);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => {
     const s = window.ddcsGetSettings();
     s.machine = { x: 600, y: 400, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
@@ -93,7 +93,7 @@ test('dragging a firmware push-station point writes the settings.atc.firmwareSta
 
 test('the firmware sim station renders from the firmwareStation store (var-seed kills untaught-0)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetSettings && window.ddcsStudio && window.ddcsStudio.wizardManager);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => {
     const s = window.ddcsGetSettings();
     s.machine = { x: 600, y: 400, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };

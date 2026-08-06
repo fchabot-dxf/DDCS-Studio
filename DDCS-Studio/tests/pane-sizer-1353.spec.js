@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 const openTwin = async (page) => {
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await page.evaluate(() => window.openWiz('user_surfacing_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);

@@ -8,7 +8,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 // ── Unit: the generic probeVector gesture (cardinal snap → axis+dir enums + reach) — the widget itself is unchanged ─────
 test('probeVector gesture: place from axis/dir/dist; drag snaps to the nearest cardinal + maps the reach', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   const r = await page.evaluate(async () => {
     const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
     const decl = (axis, dir, dist) => [{ type: 'probeVector', id: 'p', cx: 50, cy: 40, axis, dir, dist, fieldAxis: 'p_axis', fieldDir: 'p_dir', field: 'p_dist', minR: 1, label: 'reach', value: dist }];
@@ -34,7 +34,7 @@ test('probeVector gesture: place from axis/dir/dist; drag snaps to the nearest c
 // ── Integration: TRAVEL-START inc1 — the ① START marker (the "reach") is DECOUPLED from MAX PROBE ────────────────────
 test('edge wizard: MAX PROBE is editable; dragging the ① start moves the start (sim) WITHOUT touching MAX PROBE; it persists', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('edge'));
   await page.waitForSelector('#wiz_edge', { state: 'visible' });
   await page.waitForFunction(() => document.querySelector('#edgeLayoutCanvas .fc-handle'));

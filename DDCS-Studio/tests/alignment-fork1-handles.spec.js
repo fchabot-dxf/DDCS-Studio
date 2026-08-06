@@ -10,7 +10,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor (sim-only); B drag → the SPAN field', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 200, y: 120, z: 30, shape: 'box', show: true } }); });
     await page.evaluate(() => window.openWiz('user_alignment_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });

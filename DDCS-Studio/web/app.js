@@ -472,6 +472,13 @@ class DDCSStudio {
 // Initialize application when DOM is ready
 const finishBoot = () => {
     window.ddcsStudio = new DDCSStudio();
+    // t1601 — ADDITIVE, not a replacement for ddcs:ready (index.html, t1279): that signal means "the deferred
+    // header/menu/editor wiring below the import chain is DONE" and stays exactly where it is — the header/menu
+    // race it closed stays closed because we are not touching it. This one means something narrower and earlier:
+    // the wizard/canvas surface (wizardManager + its panels) is usable THE MOMENT DDCSStudio exists, well before
+    // any of those deferred imports even start. Tests that drag a canvas handle never needed to wait for the menu.
+    document.documentElement.dataset.ddcsInteractive = '1';
+    window.dispatchEvent(new CustomEvent('ddcs:interactive'));
 };
 
 if (document.readyState === 'loading') {

@@ -10,7 +10,7 @@ test('dragging the 2D start handle re-runs the sim from the new start', async ({
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => { window.ddcsGetSettings().preview.autoLoop = false; });   // no auto-play → the run can only come from the drag
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });

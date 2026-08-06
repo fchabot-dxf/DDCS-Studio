@@ -1826,6 +1826,19 @@
 
     <!-- IMPORTANT: Load the modular JavaScript with diagnostic logging -->
     <script type="module">
+        // t1601 — registered BEFORE the app.js import so it cannot miss the event, however fast finishBoot() runs.
+        // ADDITIVE: dismisses the loader on ddcs:interactive (wizard/canvas usable) instead of waiting for ddcs:ready
+        // (deferred header/menu/editor wiring done, further below, UNCHANGED) — recovers the gap between the two for
+        // every real user. The ddcs:ready block still dismisses the loader too, as a no-op fallback if this one
+        // somehow doesn't fire (the `if (loader)` guard there is already safe against an already-removed element).
+        window.addEventListener('ddcs:interactive', () => {
+            const loader = document.getElementById('ddcs-boot-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                loader.style.pointerEvents = 'none';
+                setTimeout(() => loader.remove(), 300);
+            }
+        }, { once: true });
         (async () => {
             try {
                 const mod = await import('./app.js?cb=' + Date.now());

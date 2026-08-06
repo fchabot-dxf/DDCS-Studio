@@ -15,7 +15,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 //     are HAND-derived from the geometry (dirsOf/axesOf/own/opp, td=50), NOT read back from cornerReposOffsets (no tautology).
 test('(1) sim markers chain off their anchor by the reposition — both probeZ states, FL/YX + BR/XY (independent truth)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   const r = await page.evaluate(async () => {
     const { opSimStarts } = await import('/viz/opSimStarts.js');
     const { cornerDataDef, CORNER_DEFAULTS, CORNER_DATA_OPTYPE } = await import('/blocks/dataOps/cornerData.js');
@@ -61,7 +61,7 @@ test('(1) sim markers chain off their anchor by the reposition — both probeZ s
 // (2) PART 1 — the chaining is PREVIEW-ONLY: the hoist (dirsOf/axesOf → module scope) + the provider never change the emit.
 test('(2) emit byte-parity: marker chaining + geometry hoist never touch the G-code (across combos + probeZ)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   const passes = await page.evaluate(async () => {
     const { cornerStack } = await import('/wizards/cornerWizard.js');
     const { cornerDataDef, CORNER_DEFAULTS, CORNER_DATA_OPTYPE } = await import('/blocks/dataOps/cornerData.js');
@@ -80,7 +80,7 @@ test('(2) emit byte-parity: marker chaining + geometry hoist never touch the G-c
 // (3) PART 2 — the sim-only start handle renders on the Layout FeatureCanvas as a HOLLOW circle ○ (t81; distinct from the filled emitting handles).
 test('(3) Layout canvas: the Start marker is a filled AMBER circle (second renderer of the userStarts seam)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
     const CD = await import('/blocks/dataOps/cornerData.js');
@@ -111,7 +111,7 @@ test('(3) Layout canvas: the Start marker is a filled AMBER circle (second rende
 //     (t87: the sim ◇ is itself draggable now — covered by corner-layout-sim-drag; here we just guard the emitting handle.)
 test('(4) the emitting reposition handle owns its own drag (writes cross1_x); the separated sim ◇ does not steal it', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
     const CD = await import('/blocks/dataOps/cornerData.js');

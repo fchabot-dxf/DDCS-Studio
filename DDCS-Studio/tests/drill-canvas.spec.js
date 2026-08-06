@@ -9,7 +9,7 @@ test('drill 2D layout canvas: renders + drag handle drives a field', async ({ pa
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
 
   // Open the drill wizard (global helper used by the command-deck button).
   await page.evaluate(() => window.openWiz('drill'));
@@ -59,7 +59,7 @@ test('drill 2D layout canvas: zoom + pan are view-only, drag still works after',
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.openWiz('drill'));
   await page.waitForSelector('#drillLayoutCanvas svg.feature-canvas');
   // t851 — the drill default is now a single hole (no dx pitch / size handle); this test exercises the GRID pattern

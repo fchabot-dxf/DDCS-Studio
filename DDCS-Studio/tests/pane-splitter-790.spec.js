@@ -24,7 +24,7 @@ test.describe('desktop', () => {
 
   test('the splitter shows between both panes, is a ≥44px grab, and DRAG rebalances live (no snap) + persists', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.setPaneRatio(0.5); });
     await openBoth(page, 'contour');
 
@@ -58,7 +58,7 @@ test.describe('desktop', () => {
     const stored = await page.evaluate(() => localStorage.getItem('ddcs_pane_ratio'));
     expect(Number(stored), 'the ratio persisted to ddcs_pane_ratio').toBeCloseTo(Number(rAfter), 2);
     await page.reload();
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await openBoth(page, 'contour');
     expect(Number(await ratio(page)), 'the ratio survived reload').toBeCloseTo(Number(rAfter), 2);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.setPaneRatio(0.5); });
@@ -66,7 +66,7 @@ test.describe('desktop', () => {
 
   test('the splitter goes INERT (hidden) when either pane is collapsed', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); m.setPaneRatio(0.5); });
     await openBoth(page, 'contour');
     // collapse the 3D via its chevron strip
@@ -88,7 +88,7 @@ test.describe('mobile 390px', () => {
 
   test('the splitter rebalances the stacked panes via touch-drag; the total stays (collapse still frees the form)', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); m.setPaneRatio(0.5); });
     await openBoth(page, 'contour');
     const totalBefore = (await bodyH(page, 'contour', 'preview3d')) + (await bodyH(page, 'contour', 'layout2d'));
@@ -122,7 +122,7 @@ test.describe('the two handles are distinct controls', () => {
 
   test('the RATIO handle sits between the panes; the SIZER sits below them; both are addressable', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
     await openBoth(page, 'contour');
 
     const r = await page.evaluate(() => {
