@@ -1901,6 +1901,7 @@
                 const loader = document.getElementById('ddcs-boot-loader');
                 if (loader) {
                     loader.style.opacity = '0';
+                    loader.style.pointerEvents = 'none';   // t1597 — a fading-out overlay must never intercept input; it was still swallowing clicks/drags for its whole 300ms exit
                     setTimeout(() => loader.remove(), 300);
                 }
                 document.documentElement.dataset.ddcsReady = '1';
