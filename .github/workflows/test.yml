@@ -1,0 +1,81 @@
+name: Test suite (report-only)
+
+# t1607 — CI is the only observer that sees every push, across three workstations and however many agent
+# sessions. This closes that hole: run the FULL gate (both tiers, `npm test` from t1587 — the same combined
+# command a local session runs, not a re-invented one) on every push and PR.
+#
+# ⚠ REPORT-ONLY, DELIBERATELY, FOR NOW. 24 tests currently fail (a pre-existing residual under active triage —
+# see WORK-LOG.md), so a blocking gate would stop ALL work immediately, on every branch, for failures nobody
+# pushing right now caused. `continue-on-error` on the test step keeps the JOB green regardless of the test
+# result, while the step's own `outcome` (not `conclusion`) still drives the artifact upload and the summary
+# below — so a run that fails is still visibly flagged, just not blocking.
+#
+# THE CONDITION TO FLIP THIS BLOCKING: once the residual reaches zero (a genuinely green `npm test` on this
+# workflow), remove `continue-on-error: true` from the "Run npm test" step below. Until then, treat a red run
+# here as a real signal to read, not noise to ignore — a NEW failure appearing in a diff against WORK-LOG's
+# last-known count is exactly the kind of push-from-anywhere regression this workflow exists to catch.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: DDCS-Studio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: DDCS-Studio/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Playwright's own npm package is covered by setup-node's npm cache above; the browser BINARIES it
+      # downloads on first `npx playwright install` are not (they live outside node_modules) and are the
+      # slow part of a cold run — several minutes. Keyed on the OS + the exact @playwright/test version
+      # (via package-lock.json's hash), so a version bump invalidates it automatically instead of silently
+      # testing against a stale browser build.
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\ms-playwright
+          key: windows-playwright-${{ hashFiles('DDCS-Studio/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      # REPORT-ONLY: continue-on-error keeps the job (and the commit status) green even on a red run, on
+      # purpose — see the header comment. `outcome` still reflects the real result for the steps below.
+      - name: Run npm test
+        id: run_tests
+        continue-on-error: true
+        run: npm test
+
+      - name: Upload Playwright report
+        if: steps.run_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: DDCS-Studio/playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          if ("${{ steps.run_tests.outcome }}" -eq "failure") {
+            "### :warning: Test suite: FAILURES (report-only, not blocking)" >> $env:GITHUB_STEP_SUMMARY
+            "See the full \`npm test\` output above for pass/fail counts, and the **playwright-report** artifact for the HTML report." >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            "### :white_check_mark: Test suite: all green" >> $env:GITHUB_STEP_SUMMARY
+          }

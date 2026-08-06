@@ -11,6 +11,9 @@ export default defineConfig({
   // t1587 — this exclusion means `npx playwright test` / `npm run test:e2e` alone SKIPS these tests silently; the
   // merge gate must run `npm test` (both tiers, fails if either does), never `test:e2e` on its own.
   testIgnore: ['node/**'],
+  // t1607 — CI needs an HTML report to upload as a diagnosable artifact on a red run; local runs keep the
+  // terse 'list' output unchanged (this only takes effect under GitHub Actions' own CI=true).
+  reporter: process.env.CI ? [['dot'], ['html', { open: 'never' }]] : 'list',
   workers: 6,  // t1593 (2026-08-06) — re-measured on the i7-13700F (16c/24t/32GB): w4=1158s/73fail, w6=975s/73fail (same set, ±2 within
                // the existing flake class), w8=897s/82fail (+10 NEW beyond baseline, only 1 healed — a real contention ceiling; backed
                // off per the "new failures → back off one step" rule, so w12 was not run). The t836 baseline this replaces was itself
