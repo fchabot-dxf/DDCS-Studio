@@ -468,6 +468,11 @@ export function installBlockly(Blockly) {
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 
+/** t1570 — the DECLARED catch-all palette group. A block whose category is not in CATEGORIES lands here rather
+ *  than vanishing: visible and draggable, and obviously wrong to anyone looking, which is the point. Named once
+ *  so the toolbox builder and the invariant spec cannot drift on the string. */
+export const UNCATEGORISED = 'Uncategorised';
+
 /** A value input's shadow (an editable default number) for the toolbox. */
 const shadow = (v) => ({ shadow: { type: 'math_number', fields: { NUM: Number(v) || 0 } } });
 
@@ -484,6 +489,19 @@ export function buildToolbox(extraCategories = []) {
     const cats = CATEGORIES.filter((c) => byCat[c]).map((c) => ({
         kind: 'category', name: c, categorystyle: catSlug(c) + '_cat', contents: byCat[c],
     }));
+    // t1570 — NO BLOCK MAY VANISH FOR LACKING A LISTED CATEGORY. This line used to be the whole story, and it
+    // iterates CATEGORIES: a def whose `category` is absent from that list (a new block, a typo, a category added
+    // to a def but not to the list) was silently dropped from the toolbox — present in BLOCKS, draggable from
+    // nowhere. Nothing currently triggers it, which is exactly why it would have gone unnoticed the first time a
+    // regroup landed. Anything unlisted now lands in a visible catch-all instead of disappearing; the invariant
+    // spec asserts the palette-reachable SET, so this can never silently regress.
+    const unlisted = Object.keys(byCat).filter((c) => !CATEGORIES.includes(c)).sort();
+    if (unlisted.length) {
+        cats.push({
+            kind: 'category', name: UNCATEGORISED, categorystyle: catSlug(UNCATEGORISED) + '_cat',
+            contents: unlisted.flatMap((c) => byCat[c]),
+        });
+    }
     // Tree sidebar: the per-category atom blocks live under a collapsible "⚛ Atoms" parent; the caller's groups
     // (the learner library — Snippets / Complete Programs) are siblings. So the rail reads Atoms · Snippets · Programs.
     const atoms = { kind: 'category', name: '⚛ Atoms', expanded: 'true', contents: cats };
