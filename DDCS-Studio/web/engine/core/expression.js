@@ -50,7 +50,11 @@ function lex(s) {
             toks.push(Number.parseFloat(num));
             continue;
         }
-        if (c === '#' || c === '[' || c === ']' || c === '+' || c === '-' || c === '*' || c === '/') {
+        // t1583 — the COMMA is a token ONLY so a function call can separate its arguments. It is deliberately
+        // NOT given any meaning in the grammar outside that position: `[1, 2]` parses `1`, then finds `,` where
+        // it needs `]`, and the trailing-token check added at t1573 makes the whole expression unresolvable.
+        // Adding the token does not add leniency back — the one place it is consumed is parseFactor's call arm.
+        if (c === '#' || c === '[' || c === ']' || c === '+' || c === '-' || c === '*' || c === '/' || c === ',') {
             toks.push(c);
             i += 1;
             continue;
@@ -122,8 +126,25 @@ export function evalExpr(str, vars, opts = {}) {
             if (peek() !== '[') return null;
             p += 1;
             const arg = parseExpr();
-            if (peek() === ']') p += 1;
             if (arg === null) return null;
+            // t1583 — TWO-ARGUMENT ATAN, COMMA FORM: `ATAN[a, b]`. Hardware-attested, not inferred — bench probe
+            // S5o ran `#190 = ATAN[1, 1] * 100` on the V4.1 and read back 4500, i.e. 45 DEGREES (not radians, not
+            // a 0-1 fraction). The sim used to reject this outright because its lexer had no comma, which made it
+            // STRICTER THAN THE MACHINE — the opposite failure to everything else in this arc, and the one that
+            // matters most next: the send gate refuses what the parser refuses, so shipping the gate first would
+            // have blocked a legitimate job on day one. A false warning is a nuisance; a false refusal stops work.
+            //
+            // Only ATAN takes two arguments; a comma in any other call is an arity error, not a tolerated extra.
+            if (peek() === ',') {
+                if (t.fn !== 'ATAN') return null;
+                p += 1;
+                const argB = parseExpr();
+                if (argB === null) return null;
+                if (peek() !== ']') return null;   // the closing bracket is REQUIRED here — no leniency reintroduced
+                p += 1;
+                return Math.atan2(arg, argB) * 180 / Math.PI;
+            }
+            if (peek() === ']') p += 1;
             // Fanuc/DDCS two-operand arctangent: ATAN[a]/[b] = atan2(a, b) in DEGREES (quadrant-correct).
             // Only the bracketed `/[…]` form is atan2; `ATAN[a]/2` stays a plain division of the single-arg result.
             if (t.fn === 'ATAN' && peek() === '/' && toks[p + 1] === '[') {

@@ -54,6 +54,13 @@ test('every .nc file in the directory is accounted for — no untracked surprise
         // or tolerate it? S6c probes a DWELL argument, not an axis word, so the kit's no-motion invariant stays
         // absolute; the direct axis-word form lives in ../verify-motion/ instead, off this allowlist by design.
         'S6a_badvar.nc', 'S6b_trailing.nc', 'S6c_badword.nc',
+        // t1583 — TWO more, and the lock earned its keep catching both. `S6e_partial.nc` (the partial-execution
+        // probe whose result is quoted throughout t1573-t1581) has been on disk undeclared since it was written;
+        // `S6f_unclosed.nc` is new here, probing the LAST known place the sim is more lenient than the machine —
+        // an unclosed bracket, which the sim still evaluates to 3. That one matters for the send gate: the gate
+        // refuses what the parser refuses, so a sim that is too STRICT causes a false refusal and a sim that is
+        // too LENIENT waves through a file the controller will reject.
+        'S6e_partial.nc', 'S6f_unclosed.nc',
     ].sort());
 });
 
