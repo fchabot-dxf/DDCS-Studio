@@ -54,3 +54,12 @@ __pycache__/
 *.exe.old
 DDCS-Studio/tests/*.png
 DDCS-Studio/scratchpad/
+
+# ── Loop coordination state — NEVER track these ──────────────────────────────
+# HANDOFF.md carries the LIVE turn counter and the ball. Tracking it means every
+# merge or branch switch overwrites the live counter with whatever that branch last
+# committed — which silently breaks both waiters (they only fire on a HIGHER turn).
+# Happened 2026-08-07: a main->branch merge reset the counter 1617 -> 1561 and
+# stalled the loop. Same for .handoff/ (the per-role waiter bookmarks).
+HANDOFF.md
+.handoff/
