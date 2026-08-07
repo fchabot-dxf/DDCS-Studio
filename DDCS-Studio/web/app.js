@@ -96,7 +96,9 @@ import { initSaveStates } from './blocks/saveStates.js';
 
 // t1107 — the factory data-twin builders, the ONE source shared by the boot seed (seedDefaultPortedUserOps) AND the per-wizard
 // Restore-to-factory action (wizardManagerPanel). A built-in wizard's opensAs twin is reset to factory by re-running its builder.
-const SEED_BUILDERS = [
+// t1581 — exported so a test can sweep the REGISTRY itself (every ported twin's form presents every declared binding),
+// rather than a hand-typed parallel list that a new twin could silently fall out of.
+export const SEED_BUILDERS = [
     atcWarmupDataDef, atcLengthDataDef, atcCheckDataDef, atcTestDataDef, atcChangeDataDef, atcTableDataDef,
     drillDataDef, tapDataDef, boreDataDef, slotDataDef, surfacingDataDef, contourDataDef, pocketDataDef, wcsDataDef, textDataDef,
     cornerDataDef, edgeDataDef, middleDataDef, rotaryCenterDataDef, rotaryClockDataDef, alignmentDataDef,
@@ -470,6 +472,13 @@ class DDCSStudio {
 // Initialize application when DOM is ready
 const finishBoot = () => {
     window.ddcsStudio = new DDCSStudio();
+    // t1601 — ADDITIVE, not a replacement for ddcs:ready (index.html, t1279): that signal means "the deferred
+    // header/menu/editor wiring below the import chain is DONE" and stays exactly where it is — the header/menu
+    // race it closed stays closed because we are not touching it. This one means something narrower and earlier:
+    // the wizard/canvas surface (wizardManager + its panels) is usable THE MOMENT DDCSStudio exists, well before
+    // any of those deferred imports even start. Tests that drag a canvas handle never needed to wait for the menu.
+    document.documentElement.dataset.ddcsInteractive = '1';
+    window.dispatchEvent(new CustomEvent('ddcs:interactive'));
 };
 
 if (document.readyState === 'loading') {

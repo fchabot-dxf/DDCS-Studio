@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { rampDescentRelationship, splitRampDescent, cutBox } from './support/rampRelationship.js';
+import { test, expect } from './support/harness.mjs';
+import { rampDescentRelationship, splitRampDescent, cutBox } from '../support/rampRelationship.js';
 
 /**
  * t1375 — THE PROGRAM ROTATION IS ABSORBED BY THE ATOM, so a surfacing program can be aligned again.

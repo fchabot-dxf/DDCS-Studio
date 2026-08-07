@@ -17,7 +17,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 async function openCorner(page, probeZ) {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js');
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());

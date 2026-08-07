@@ -917,7 +917,7 @@ export function formBindings(def) {
     const valueBindings = (def && def.bindings) || [];
     if (!rows.length) return valueBindings;                   // FALLBACK — unchanged, byte-identical to today
     const byParam = {}; valueBindings.forEach((b) => { if (b && b.param != null) byParam[b.param] = b; });
-    return rows.map((row) => {
+    const out = rows.map((row) => {
         const b = byParam[row.param];
         if (!b) return null;   // a row naming a param with no binding → dangling, skip
         // CANVAS GROUPING is WIRING, not presentation: a binding in a canvas group (group/role, e.g. an xy-pad's x/y) keeps
@@ -936,6 +936,23 @@ export function formBindings(def) {
             ...(row.section != null ? { section: row.section } : {}),
         };
     }).filter(Boolean);
+    // t1579 — paramGroupFromBindings only makes a row for a SOCKET-bound binding (blockIndex!=null): a param_field
+    // labels ONE emit socket, and a structural/gating binding (e.g. corner's probeZFirst — no single socket, it
+    // prunes which branch of a guarded superset survives) genuinely has none to label. That filter is correct on
+    // its own terms, but this consumer used to just drop those row-less bindings once ANY param_group existed —
+    // they render fine on a fresh, never-materialized def (the FALLBACK above returns every binding), then vanish
+    // the moment materialization runs. UNION them back in here: each lands right after its nearest PRECEDING
+    // sibling (by DECLARED order) that did get a row, or at the very front if none did — declared order decides
+    // where a row-less field lands; row order (which a user CAN reorder via the block editor) is left untouched
+    // for everything that already has one.
+    const rowParams = new Set(rows.map((r) => r.param));
+    let insertAfter = -1;   // index into `out`; -1 = insert at the very front
+    for (const b of valueBindings) {
+        if (!b || b.param == null) continue;
+        if (rowParams.has(b.param)) { insertAfter = out.findIndex((o) => o.param === b.param); continue; }
+        out.splice(insertAfter + 1, 0, b); insertAfter++;
+    }
+    return out;
 }
 
 export function renderOpForm(host, bindings) {

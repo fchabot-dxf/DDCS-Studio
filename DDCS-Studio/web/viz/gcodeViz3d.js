@@ -1006,11 +1006,24 @@ export class GcodeViz3D {
     }
 
     // t along axisDir (unit) from lineOrigin to the point closest to the pointer ray
+    //
+    // t1567 PARKED FINDING (not fixed) — w0/b/c below are never assigned; this is the standard closest-point-
+    // between-two-skew-lines formula (a=axisDir·axisDir=1, b=axisDir·rayDir, c=rayDir·rayDir, w0=lineOrigin-ray.origin,
+    // d=axisDir·w0, e=rayDir·w0, t=(b*e-c*d)/(a*c-b*b)) with three of those six terms missing — broken since this
+    // function's own introduction (dc9d3a4b, 2026-06-10, a repo restructure — this content may be older still), not a
+    // later regression. Reachable at runtime from live axis-drag code (called at ~2588/2664). Parked rather than
+    // mechanically patched because guessing at the missing assignments risks a silent WRONG answer, not a crash —
+    // this needs someone who will verify the drag math against the actual dot-product convention this class uses
+    // elsewhere, not a declaration fix. See t1567 WORK-LOG entry.
     _closestAxisT(ray, lineOrigin, axisDir) {
+        // eslint-disable-next-line no-undef
         const d = axisDir.dot(w0);
+        // eslint-disable-next-line no-undef
         const e = ray.direction.dot(w0);
+        // eslint-disable-next-line no-undef
         const denom = c - b * b; // a = axisDir·axisDir = 1
         if (Math.abs(denom) < 1e-9) return 0;
+        // eslint-disable-next-line no-undef
         return (b * e - c * d) / denom;
     }
 

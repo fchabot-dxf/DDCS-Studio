@@ -2,19 +2,16 @@
  * blocks/devMode.js — the Blocks-tab AUTHORING surface: the keystone of the wizard-maker.
  *
  * Form / Block / Editor all EDIT an op; the Blocks tab is also the only rung that DEFINES one. Authoring is ALWAYS
- * ON (no normal/dev toggle — the Blocks tab IS the author/learner surface; operators stay in the wizards): each
- * atom's numeric values grow an inline "expose as knob" affordance (a dim marker + a checkbox + a name + a widget
- * pick — standard Blockly fields, so the block itself draws it), quiet by default and lit when exposed. Tick the
- * values you want as knobs, name them, name the op, and "Save wizard…" registers a reusable custom wizard (template
- * + bindings) into the library + bar — the fork-the-5%-delta flow.
+ * ON (no normal/dev toggle — the Blocks tab IS the author/learner surface; operators stay in the wizards).
  *
- * Exposure rule (from the density taxonomy): the candidates are NUMERIC value fields (fieldKind 'value' = a
- * math_number socket) — exactly the `tuning` role (feed/depth/count/offset/…) — plus the inline non-numeric fields.
- *
- * Blockly v13 notes (see vendor/blockly/API-NOTES.md): augment inside Events.disable()/enable() so the workspace
- * change listener doesn't reproject the dev-only fields away; flush with renderManagement.triggerQueuedRenders().
- * The dev fields (EXPOSE_ / PNAME_ / WIDGET_ / XMARK_ prefixes) aren't in fieldsOf(def), so stackBridge.toRecord
- * ignores them — they never pollute the op's params or the emitted G-code.
+ * t1610 — the per-atom inline "expose as knob" checkbox (a dim marker + checkbox + name + widget pick grown on
+ * every value field of every atom) was removed by explicit user instruction (2026-08-04, 867135c0; finished here
+ * after t1604 restored it on a stale premise — see the memory this corrected). It cost constant visual clutter for
+ * a rarely-used capability, and `formfield` (wizards/ops/formField.js) is the confirmed, measured, working
+ * replacement: a DECLARED block — `param` + `matchvar` + `key` + `widget` + `label` — placed in the user_root
+ * Presentation mouth, authored deliberately rather than discovered by ticking a box on a value already in front of
+ * you. `param_group`'s GUI param-pill path is the other surviving authoring route. "Save wizard…" still registers
+ * a reusable custom wizard (template + the bindings `formfield`/`param_group` declare) into the library + bar.
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
@@ -40,7 +37,8 @@ function preorderAtoms(first, out = []) {
     }
     return out;
 }
-// the numeric (math_number socket) fields on a leaf/wrap atom block — the exposable params.
+// the numeric (math_number socket) fields on a leaf/wrap atom block — used by collectAuthoring (live workspace,
+// now permanently empty — see the t1610 docstring above) and deriveGroupDef (a hand-built group's STORED _expose).
 function numericFields(block) {
     const def = BLOCKS[block.type];
     if (!def) return [];
@@ -53,19 +51,12 @@ function getInlineFields(block) {
 }
 function isAtom(blk) {
     if (!(blk && !blk.isShadow() && blk.type !== 'op' && !blk.type.endsWith('_op') && blk.type !== 'progstart' && blk.type !== 'progend')) return false;
-    // t148 — a `section`'s title is AUTHORING METADATA (the section's name), NOT an exposable wizard value, so it must not
-    // get the "expose as knob" kit (it read as "? knob false title" noise on the concern headers). Same for the panel
-    // block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not values).
-    // Value-bearing atoms (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
+    // t148 — a `section`'s title is AUTHORING METADATA (the section's name), NOT an exposable wizard value. Same for the
+    // panel block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not
+    // values). Value-bearing atoms (assign / param / move / …) are untouched.
     const def = BLOCKS[blk.type];
     return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'cam_field'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit + t1093 cam_table/cam_field: authoring/boundary/pendant-declaration metadata, not exposable values
 }
-
-// the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
-// number/slider are single-param; the canvas pickers are MULTI-param and fold their ROLE into the choice
-// (XY pad · X / · Y, Rect · X/Y/W/H) — so the role is DECLARED here, not inferred from pool order (audit #6-B).
-// buildBindings groups them via groupCanvasBindings (a repeated role starts a new canvas).
-const WIDGET_CHOICES = [['#', 'number'], ['slider', 'slider'], ...CANVAS_ROLE_WIDGETS];
 
 // The authoring BODY for the live form / save: the op's children when there's an op wrapper, else the BARE top-level
 // atom stack (a program hand-built directly in Blocks — #12: a hand-built stack is form-editable too). Returns
@@ -102,9 +93,10 @@ function inlineExposure(def, f, pname, blockIndex, defaultVal) {
     return bind;
 }
 
-// Read the ticked exposures off the LIVE workspace → { opRec, exposures, varErr }. opRec is the active op (live
-// params); exposures are { param, blockIndex, key, default, widget } in pre-order; varErr names the first exposed
-// field that has a #var/expression plugged in (not a plain number) so the caller can refuse.
+// Read the ticked exposures off the LIVE workspace → { opRec, exposures, varErr }. t1610 — the EXPOSE_ checkbox this
+// reads no longer exists anywhere (augment() no longer creates it), so `exposures` is always []; kept rather than
+// removed because deriveAuthoredDef still needs opRec/varErr from authoringBody, and removing this would require
+// restructuring that still-live function for a change scoped to the knob's UI, not its callers.
 function collectAuthoring(ws) {
     const body = authoringBody(ws);
     if (!body) return null;
@@ -178,21 +170,20 @@ export function deriveAuthoredDef(ws) {
 const FRAMING_KNOBS = { progstart: ['rpm', 'clearance'], progend: ['retractZ'] };
 
 /** Increment 2 — derive a wizard def from a GROUP op's STORED children: the OFF-RECORDS analogue of
- *  deriveAuthoredDef (which reads live workspace EXPOSE_ fields). Each child record carries its knobs in
- *  `record._expose` ({ FN(field): { p:name, w:widget } }, persisted by #13 and round-tripped by stackBridge), so the
- *  editor hover-chip can open a hand-built group's form WITHOUT the Blocks tab. Bindings index into
- *  flattenBlocks(children) — the SAME pre-order opSession.setGroupChildParams writes back through. Returns a def
- *  { opType:'group', label, bindings, children, panel:'form' } (panel:'form' = no preview pane; the group has no
- *  builder — its children ARE the program). */
+ *  deriveAuthoredDef. Each child record can carry knobs in `record._expose` ({ FN(field): { p:name, w:widget } },
+ *  round-tripped by stackBridge — see opSession.seedKnobExpose, the t391 provenance writer), so the editor hover-chip
+ *  can open a hand-built group's form WITHOUT the Blocks tab. Bindings index into flattenBlocks(children) — the SAME
+ *  pre-order opSession.setGroupChildParams writes back through. Returns a def { opType:'group', label, bindings,
+ *  children, panel:'form' } (panel:'form' = no preview pane; the group has no builder — its children ARE the
+ *  program). */
 export function deriveGroupDef(groupOp) {
     const children = (groupOp && groupOp.children) || [];
     const flat = flattenBlocks(children);
     const exposures = [], used = new Set();
     flat.forEach((rec, i) => {
         // FRAMING parity: progstart/progend carry the spindle/clearance/retract the user expects as knobs (a built-in
-        // op's form exposes them). They have no _expose (devMode.augment's isAtom skips them, so they can't be ticked
-        // in Blocks), so auto-surface a FIXED set by type. The writeback (setGroupChildParams) reaches them by the same
-        // blockIndex/key as any other binding.
+        // op's form exposes them). They have no _expose (isAtom skips them), so auto-surface a FIXED set by type. The
+        // writeback (setGroupChildParams) reaches them by the same blockIndex/key as any other binding.
         const framing = rec && FRAMING_KNOBS[rec.type];
         if (framing) {
             if (!rec.params) return;
@@ -258,10 +249,9 @@ export function writeAuthoredValue(ws, param, value) {
     return false;
 }
 
-/** Mount the ALWAYS-ON authoring surface: a "Save wizard…" button + the per-atom "expose as param" affordances grow
- *  on every render. There is no normal/dev toggle — the Blocks tab IS the author/learner surface (operators stay in
- *  the wizards); the affordances are quiet by default and styling, not a mode, keeps the code glanceable. The wizard
- *  metadata (name / panel / preview-rig) is collected in a Save DIALOG at save time. Returns { onModelRender }. */
+/** Mount the ALWAYS-ON authoring surface: a "Save wizard…" button, grown on every render. There is no normal/dev
+ *  toggle — the Blocks tab IS the author/learner surface (operators stay in the wizards); the wizard metadata
+ *  (name / panel / preview-rig) is collected in a Save DIALOG at save time. Returns { onModelRender }. */
 export function mountDevMode(ws, B, hostEl) {
     _ws = ws; _B = B;
 
@@ -286,18 +276,6 @@ export function mountDevMode(ws, B, hostEl) {
         window.ddcsEditWizardDefs = (opTypes) => editWizardDefs(opTypes);   // S4-5 — load a MULTI-op concat into Blocks (composed CAM slot)
     }
 
-    // Light up a field's marker the moment its EXPOSE checkbox is ticked (the only dynamic emphasis — the dim base
-    // is a construction-time class, reliable across the async render queue; the lit class rides the live <text>).
-    ws.addChangeListener((e) => {
-        if (!e || e.type !== B.Events.BLOCK_CHANGE || e.element !== 'field') return;
-        const n = typeof e.name === 'string' ? e.name : '';
-        if (n.indexOf('EXPOSE_') !== 0 && n.indexOf('PNAME_') !== 0 && n.indexOf('WIDGET_') !== 0) return;
-        const blk = ws.getBlockById(e.blockId);
-        if (!blk) return;
-        if (n.indexOf('EXPOSE_') === 0) refreshExposeMark(blk, n.slice(7));   // 'EXPOSE_'.length
-        saveExpose(blk);   // #13: mirror the exposure into block.data so it survives a reprojection
-    });
-
     hostEl.append(_savebtn, _editChip);
     augment(); refreshEditingChrome();           // a program may already be loaded at mount
     return { onModelRender: () => { augment(); refreshEditingChrome(); } };   // re-apply on every rebuild
@@ -314,48 +292,10 @@ function refreshEditingChrome() {
     }
 }
 
-// Sync a field's expose MARKER to its EXPOSE state: lit (accent, bold) when exposed, dim otherwise. Toggles the lit
-// class on the marker's live <text> (rendered by the time a user ticks the box); the dim base class is set at
-// construction so it survives the async render queue (the Blockly v13 Class-B render trap).
-function refreshExposeMark(blk, vk) {
-    const mark = blk.getField && blk.getField('XMARK_' + vk);
-    const g = mark && mark.getSvgRoot && mark.getSvgRoot();
-    const textEl = g && (g.tagName.toLowerCase() === 'text' ? g : g.querySelector('text'));
-    if (textEl) textEl.classList.toggle('blk-expose-lit', blk.getFieldValue('EXPOSE_' + vk) === 'TRUE');
-}
-
-// ── #13: persist knob exposure across a reprojection ──────────────────────────────────────────────────────────
-// The EXPOSE_/PNAME_/WIDGET_ dev fields aren't in fieldsOf(def), so the round-trip (workspaceToStack→stackToWorkspace)
-// rebuilds the block WITHOUT them → a ticked knob (and the live form) vanishes. Fix: mirror the exposure into the
-// block's `data._expose` (which DOES round-trip — stackBridge routes it out of params), save it whenever the user
-// edits an EXPOSE/PNAME/WIDGET field, and restore it in augment() when the (re)built block grows its expose row.
-function exposeBlobOf(blk) {
-    const x = {};
-    for (const input of blk.inputList) for (const field of input.fieldRow) {
-        const n = field.name || '';
-        if (n.indexOf('EXPOSE_') !== 0 || blk.getFieldValue(n) !== 'TRUE') continue;
-        const vk = n.slice(7), entry = { p: blk.getFieldValue('PNAME_' + vk) || '' };
-        if (blk.getField('WIDGET_' + vk)) entry.w = blk.getFieldValue('WIDGET_' + vk) || 'number';   // numeric fields only
-        x[vk] = entry;
-    }
-    return x;
-}
-function saveExpose(blk) {
-    let d = {}; try { d = blk.data ? JSON.parse(blk.data) : {}; } catch (_) { /* keep none */ }
-    const x = exposeBlobOf(blk);
-    if (Object.keys(x).length) d._expose = x; else delete d._expose;
-    blk.data = Object.keys(d).length ? JSON.stringify(d) : null;
-}
-function restoreExpose(blk, vk) {
-    let d = {}; try { d = blk.data ? JSON.parse(blk.data) : {}; } catch (_) { return; }
-    const e = d._expose && d._expose[vk]; if (!e) return;
-    blk.setFieldValue('TRUE', 'EXPOSE_' + vk);
-    if (e.p != null && blk.getField('PNAME_' + vk)) blk.setFieldValue(e.p, 'PNAME_' + vk);
-    if (e.w != null && blk.getField('WIDGET_' + vk)) blk.setFieldValue(e.w, 'WIDGET_' + vk);
-    refreshExposeMark(blk, vk);
-}
-
-// grow each atom with an inline "knob [☐] <name> [#]" expose row per numeric/inline field (Events.disable → no reproject).
+// grow each atom's "✎ regions"/"✎ positions" affordances where they apply (Events.disable → no reproject).
+// t1610 — the per-atom inline expose-as-knob row this used to also grow (XMARK_/EXPOSE_/PNAME_/WIDGET_ fields,
+// restoreExpose, the change-listener that persisted them across a reprojection) is REMOVED, by explicit user
+// instruction; formfield is the replacement authoring path (see the file's top docstring).
 function augment() {
     const B = _B, ws = _ws;
     if (!ws) return;
@@ -365,31 +305,6 @@ function augment() {
             if (blk.type === 'regionpick') { augmentRegionPick(blk); if (blk.queueRender) blk.queueRender(); continue; }   // ✎ regions affordance
             if (blk.type === 'coordlist') { augmentCoordList(blk); if (blk.queueRender) blk.queueRender(); continue; }     // ✎ positions affordance
             if (!isAtom(blk)) continue;
-            // DISABLING QUICK-EXPOSE CHECKBOXES TO REDUCE CLUTTER (migrated to explicit param_group authoring)
-            /*
-            for (const f of numericFields(blk)) {
-                const inputName = 'DECL_' + FN(f);
-                if (blk.getInput(inputName)) continue;                                   // idempotent
-                const valIn = blk.getInput(FN(f));
-                const tgt = valIn && valIn.connection && valIn.connection.targetBlock();
-                if (!tgt || !tgt.isShadow()) continue;                                    // only plain-number sockets are exposable
-                blk.appendDummyInput(inputName)
-                    .appendField(new B.FieldLabel('knob', 'blk-expose-mark'), 'XMARK_' + FN(f))   // dim marker; lights up when exposed
-                    .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
-                    .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f))
-                    .appendField(new B.FieldDropdown(WIDGET_CHOICES), 'WIDGET_' + FN(f));   // how it renders in the form
-                restoreExpose(blk, FN(f));   // #13: re-apply a persisted exposure after a round-trip rebuilt the block
-            }
-            for (const f of getInlineFields(blk)) {
-                const inputName = 'DECL_' + FN(f);
-                if (blk.getInput(inputName)) continue;
-                blk.appendDummyInput(inputName)
-                    .appendField(new B.FieldLabel('knob', 'blk-expose-mark'), 'XMARK_' + FN(f))   // dim marker; lights up when exposed
-                    .appendField(new B.FieldCheckbox('FALSE'), 'EXPOSE_' + FN(f))
-                    .appendField(new B.FieldTextInput(f), 'PNAME_' + FN(f));
-                restoreExpose(blk, FN(f));   // #13: re-apply a persisted exposure after a round-trip rebuilt the block
-            }
-            */
             if (blk.queueRender) blk.queueRender();
         }
     } finally { B.Events.enable(); }
@@ -746,13 +661,14 @@ export function isMaintainedAsData(def) {
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
 // → bindings → userOpFromStack → createWizard (into the library + bar). No exposures just means a parameterless
-// wizard (tick a value's knob to add one). Called by the 💾 Save button + the ⌄ quick menu.
+// wizard (add form fields via a formfield/param_group block to add them). Called by the 💾 Save button + the ⌄ quick
+// menu.
 function saveAsCustomOp() {
     if (!_ws) { alert('Open an op in the Blocks tab first, then save it as a wizard.'); return; }
     // Read the LIVE workspace SYNCHRONOUSLY here — BEFORE the Save dialog awaits user input — so the bindings/defaults
     // freeze at save-initiation. Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value edited just
-    // before Save hasn't reprojected yet; capturing now (collectAuthoring uses workspaceToStack, ignoring the dev-only
-    // EXPOSE_/PNAME_/WIDGET_ fields) keeps the saved default = the LIVE value, not a stale-model revert during the dialog.
+    // before Save hasn't reprojected yet; capturing now keeps the saved default = the LIVE value, not a stale-model
+    // revert during the dialog.
     const a = collectAuthoring(_ws);
     if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
     if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }

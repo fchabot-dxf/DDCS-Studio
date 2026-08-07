@@ -23,7 +23,7 @@ test('slot 2D canvas: width (projLength) + endpoint (point) handles drive their 
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.openWiz('slot'));
   await page.waitForSelector('#wiz_slot', { state: 'visible' });
   await page.waitForSelector('#slotLayoutCanvas svg.feature-canvas', { timeout: 5000 });

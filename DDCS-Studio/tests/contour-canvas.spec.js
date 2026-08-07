@@ -24,7 +24,7 @@ test('contour 2D canvas: rect / circle / ellipse size handles each drive their f
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.openWiz('contour'));
   await page.waitForSelector('#wiz_contour', { state: 'visible' });
   await page.waitForSelector('#contourLayoutCanvas svg.feature-canvas', { timeout: 5000 });

@@ -32,7 +32,7 @@ const cutXs = (page, code) => page.evaluate(async (text) => {
 
 async function setup(page) {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
 }

@@ -30,6 +30,7 @@ import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true
 import { pocketInsetRegion, stepoverMm, pocketInsetMm } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit); t1406 — the inset NUMBER for the re-pointed arm's derived socket
 import { concentricRings } from '../../wizards/ops/contour.js';   // t802 — the inward offset rings the concentric emit cuts (draw them in the 2D preview)
 import { restValid, restRegion, restGreyReason } from '../../wizards/ops/restmachining.js';   // t871 — REST MACHINING: the _rest guard + the corner-sliver preview + the grey-out reason
+import { handleScale } from '../../wizards/ops/placement.js';   // t1567 — e6e681e8 wired this into pocketPreviewGeometry's handle placement but never added the import
 
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {

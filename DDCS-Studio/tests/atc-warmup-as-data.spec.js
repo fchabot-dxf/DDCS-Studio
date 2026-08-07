@@ -21,14 +21,18 @@ test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep 
 
   const r = await page.evaluate(async () => {
     const { atcWarmupStack } = await import('/wizards/atcWarmupWizard.js');
-    const { atcWarmupDataDef, ATC_WARMUP_DEFAULTS, ATC_WARMUP_DATA_OPTYPE, ATC_WARMUP_BINDINGS } = await import('/blocks/dataOps/atcWarmupData.js');
+    const { ATC_WARMUP_DEFAULTS, ATC_WARMUP_DATA_OPTYPE, ATC_WARMUP_BINDINGS } = await import('/blocks/dataOps/atcWarmupData.js');
     const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
-    const { registerUserOp, flattenBlocks } = await import('/blocks/userOps.js');
+    const { flattenBlocks } = await import('/blocks/userOps.js');
     const { builderOf, BUILDERS } = await import('/blocks/opBuilders.js');
     const { SCHEMA } = await import('/blocks/opSchema.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
 
-    registerUserOp(atcWarmupDataDef());
+    // t1585 — do NOT registerUserOp here: app.js's init() already auto-seeds every SEED_BUILDERS twin (incl. this
+    // one) via seedDefaultPortedUserOps() before this test's own code runs. Registering it a SECOND time in the
+    // same page session throws ("binding does not resolve in the template" — a stale block-index derivation
+    // colliding with the first, already-successful registration), which is exactly what made this test red. Resolve
+    // the builder against the ALREADY boot-seeded def instead.
     const dataBuilder = builderOf(ATC_WARMUP_DATA_OPTYPE);   // === instantiate(def, …): an INDEPENDENT path from atcWarmupStack
 
     const base = ATC_WARMUP_DEFAULTS;

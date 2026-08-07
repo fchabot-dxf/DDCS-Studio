@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/harness.mjs';
 
 /**
  * WIZARDS-AS-DATA — Stage 5, the 3rd port: SURFACING (facing), the first FILL-family op. Its { template, bindings }

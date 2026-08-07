@@ -3337,7 +3337,12 @@ function wireSettingsOverlay(ov) {
                 // because a kind is a setting a person toggles while working out what they have.
                 try { renderMachineGui(); } catch (_) {}
                 try { renderHomingGui(); } catch (_) {}
-                try { renderIdentityBand(); } catch (_) { /* the band redraws with the kind */ }
+                // t1567 — renderIdentityBand is declared inside buildSettingsOverlay's scope, not reachable from here
+                // (wireSettingsOverlay, a sibling top-level function) -- a ReferenceError the try/catch silently ate
+                // since 2026-07-27 (82915886). Removed rather than reached-across: the event dispatched right below
+                // is ALREADY what redraws the band correctly -- buildSettingsOverlay registers its own
+                // 'ddcs:settings-changed' listener (line ~2019) that calls the properly-scoped renderMachineLine()
+                // -> renderIdentityBand(). This call was dead weight duplicating that path, badly.
                 window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
             });
             paintKind();

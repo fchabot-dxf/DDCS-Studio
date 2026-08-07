@@ -8,7 +8,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 test('drag ② on the feature canvas → the probe pass follows (engine + markers) and persists', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
   await page.waitForSelector('#wiz_middle', { state: 'visible' });
 

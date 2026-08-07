@@ -1,6 +1,6 @@
 {
   "name": "ddcs-studio",
-  "version": "2026.8.3",
+  "version": "2026.8.6",
   "description": "Modular G-code Generator for DDCS Expert M350 CNC Controller",
   "type": "module",
   "main": "app.js",
@@ -14,9 +14,12 @@
     "build:exe": "pwsh ../build_fairy.ps1",
     "build:standalone": "npm run bump-version && npm run generate-vars && npm run bundle",
     "bump-version": "node scripts/bump-version.cjs",
+    "test": "node scripts/test-all.cjs",
     "test:e2e": "playwright test",
+    "test:node": "node --import ./tests/node/support/register.mjs --test \"tests/node/*.test.mjs\"",
     "test:smoke": "playwright test -c playwright.smoke.config.js",
-    "test:changed": "playwright test --only-changed"
+    "test:changed": "playwright test --only-changed",
+    "lint": "eslint web"
   },
   "keywords": [
     "cnc",
@@ -39,7 +42,9 @@
     "web/wizards/"
   ],
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.58.2",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0"
   },
   "dependencies": {
     "blockly": "^12.5.1",

@@ -819,8 +819,8 @@ export function initMacrosApp() {
             
             for (const file of SYNC_FILES) {
                 // Only pull advstart or sysstart depending on dialect
-                if (isV41 && file === 'sysstart.nc') continue;
-                if (!isV41 && file === 'advstart.nc') continue;
+                if (isV41Post() && file === 'sysstart.nc') continue;
+                if (!isV41Post() && file === 'advstart.nc') continue;
                 
                 try {
                     const res = await makeClient().readSysfile(file);
@@ -918,7 +918,7 @@ export function initMacrosApp() {
             // build if it was never seeded (e.g. Deploy opened before the sysstart panel migrated it).
             const syscode = String(getSettings().autostartBody != null ? getSettings().autostartBody : buildAutostartBody());
             if (syscode.trim() && syscode.trim() !== 'M30') {
-                const file = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
+                const file = (homingPostIsExpert() || isV41Post()) ? 'advstart.nc' : 'sysstart.nc';
                 currentSyncFiles[file] = syscode;
                 html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="${file}" checked> ${file}</label>`;
             }
@@ -1018,7 +1018,7 @@ export function initMacrosApp() {
     if (q('sysstart_push')) {
         q('sysstart_push').addEventListener('click', async () => {
             const code = String(getSettings().autostartBody || '');   // t656 — send EXACTLY the STORED body (the editor IS the source of truth), not a re-emit
-            const filename = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
+            const filename = (homingPostIsExpert() || isV41Post()) ? 'advstart.nc' : 'sysstart.nc';
             if (!await dlgConfirm(`Write ${filename} to the controller?\n\nThe existing ${filename} will be backed up.`)) return;
             try {
                 const res = await makeClient().writeSysfile(filename, code, 'write');
@@ -1036,6 +1036,22 @@ function homingPostIsExpert() {
         if (ap && ap !== 'auto') return ap === 'ddcs-expert-m350';
         return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350';
     } catch (_) { return true; }
+}
+
+// t1567 — the `isV41` this file's advstart/sysstart-file decisions read (4 call sites, all pre-existing) never had
+// a module-level declaration reaching them: a `const isV41` local existed briefly in ONE function (2026-06-24),
+// used correctly there, but a refactor (2026-07-10) removed that whole block without noticing these OTHER, already
+// out-of-scope call sites still needed it — pure ReferenceError, every time any of them ran. Declared here as a
+// function (hoisted, module-level, same pattern as homingPostIsExpert right above) so every call site reaches it
+// regardless of which function it's in. Reads the SAME localStorage keys homingPostIsExpert reads (the active-post
+// override, else the controller profile) — checked against the CURRENT canonical V4.1 id ('ddcs-v41'; the original
+// 2026-06-24 code checked 'ddcs-v4.1', a dotted string that predates today's id convention in controllerProfiles.js).
+function isV41Post() {
+    try {
+        const ap = localStorage.getItem('ddcs_active_post');
+        if (ap && ap !== 'auto') return ap === 'ddcs-v41';
+        return (localStorage.getItem('ddcs_controller_profile') || '') === 'ddcs-v41';
+    } catch (_) { return false; }
 }
 
 // t656 — renderHomingSummary REMOVED: the homing-summary recap section was dropped from the Macros → sysstart panel
