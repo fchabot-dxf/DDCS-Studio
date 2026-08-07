@@ -26,6 +26,11 @@ These are blocks that work perfectly well being dragged and dropped. They do not
 ### 2. Entrypoint Blocks (Require Dedicated GUI Editors)
 These are blocks that represent highly complex, interactive GUI features. You **cannot** comfortably author these using standard Blockly blocks. Instead, the block serves as an **entrypoint**—it sits on the canvas as a "Save Slot", and you click an "Edit" button on it to open a dedicated visual editor. 
 
+> ⚠ **READ THE "WHAT COUNTS AS COMPLEX" SECTION BELOW BEFORE BUILDING ANY OF THE FOUR CATEGORIES.**
+> Most of what looks complex decomposes into ordinary Schema Blocks. Reaching for a bespoke editor
+> should be the *last* move, not the first — and the categories below were written before that test
+> existed.
+
 We can categorize the required Entrypoint Blocks into four specific types based on the editor they need to launch:
 
 #### Category A: 2D Coordinate Lists (The Point Picker)
@@ -49,6 +54,135 @@ We can categorize the required Entrypoint Blocks into four specific types based 
 #### Category D: Structural Pruning (Shape-Shifting Logic)
 * **Affected Wizards:** Corner (Auto vs Manual), Pocket (Shape dropdown)
 * **The Missing Piece:** We need a `structural_guard` block. This is a block with a dropdown and a statement "mouth". It doesn't need a complex modal editor, but it acts as a special entrypoint for logic: any G-code blocks placed inside its mouth are only emitted if the dropdown value matches. The engine already supports this pruning; we just need the UI block to expose it.
+
+---
+
+## Built-ins are DATA, but they are NOT EDITABLE (ruled 2026-08-06)
+
+Two things that sound alike and are not:
+
+| | verdict |
+|---|---|
+| **Built-in wizards become data** (layout as blocks) | ✅ **essential** — it is the one-source-of-truth win, and it is what makes fork-to-custom lossless |
+| **Editing a built-in in place** (override layer) | ❌ **no** |
+
+**Fork-to-custom is the path.** Open a built-in, change it, save it as yours. The built-in stays
+pristine and keeps receiving app updates.
+
+### Why not in-place editing
+
+1. ⚠ **Safety, and this one is specific to what this app drives.** A presentation edit that hides or
+   reorders `safe Z`, `clearance`, or a probe direction is one click from a crash — and whoever made
+   that edit months ago will not remember. A general-purpose app can tolerate that; a CNC app cannot.
+2. **It manufactures an update problem that fork-to-custom does not have.** Ship a fix to a built-in
+   and every in-place edit either blocks it, silently loses it, or conflicts. That is precisely why an
+   override layer would need provenance, reset, and conflict display — machinery for a problem we can
+   simply decline to create.
+3. **Nobody has asked.** Building a layering model for an unproven need is the speculative machinery
+   this project's own principles warn against. Declare liberally; build reluctantly.
+
+### What people usually actually want
+
+- *"start from corner and make MY version"* → **fork-to-custom**, already implied by built-ins-as-data.
+- *"stop showing me fields I never use"* → **personalisation** (collapse / reorder / favourites): a
+  non-destructive, resettable VIEW preference that never removes a field. Cheap, safe, and available
+  later if the annoyance actually shows up.
+
+### The trigger to revisit
+
+If the maintainer finds themselves repeatedly forking a built-in **just to change one label**, that is
+real evidence and this ruling should be reconsidered. Until then, built-ins are immutable.
+
+---
+
+## What Counts as a "Complex GUI" — and What To Do About It
+
+*(Added after review, 2026-08-05. The four categories above were written before this test existed.
+Apply this section first; it dissolves most of them.)*
+
+### The principle
+
+> **A GUI should RENDER a declaration, never be the only way to AUTHOR one.**
+
+If the modal is where the data lives, the data is trapped in the modal — invisible on the canvas,
+undiffable, and unreachable by anything except that one editor. If **blocks declare the data** and the
+GUI is a comfortable editor *for those declarations*, you get both: the convenience of the visual
+editor and the blocks remaining the single source of truth.
+
+This is the existing `declared-seam-before-the-declaring-GUI` rule, applied to wizard authoring.
+
+### ⚠ TWO ORTHOGONAL AXES — do not conflate them (user ruling, 2026-08-05)
+
+An earlier draft of this section read as *"avoid complex editors"*. That is **not** the rule, and the
+correction matters because it makes the architecture more permissive without weakening the guarantee:
+
+| Axis | Rule |
+|---|---|
+| **Is the parameter DECLARED?** | **Mandatory.** The value lives in the block. Non-negotiable. |
+| **Which WIDGET edits it?** | **The wizard author's free choice** — text field, stepper, slider, dropdown, 3×3 grid, a drag handle on a canvas, or a full modal editor. |
+
+> **"Trapped" means the VALUE DOES NOT LIVE IN THE BLOCK — not that the editor is complex.**
+
+A modal that serializes a point list into a declared param traps nothing: the value is on the canvas,
+diffable, and reachable by every other consumer. The real failure is a modal whose state lives
+*elsewhere* — localStorage, a side file, a closure — with the block holding only a reference.
+
+**So an author may absolutely choose a complex modal for their own param.** Two consequences worth
+having on purpose:
+
+- **The same param can wear different widgets in different wizards.** A diameter is a number: one
+  wizard gives it a text field, another a slider, another a drag handle on a circle. The data model
+  never changes. (This is the `widget-library-custom-op-wizards` idea, falling out for free once the
+  axes are kept separate.)
+- **Do not force a widget onto every param, and do not force a param into one widget.** The engine
+  should render a sensible default and let the author override it — never require the override.
+
+### The test: is it actually complex, or just visual?
+
+Ask these in order. The first **yes** decides it.
+
+| # | Question | If yes |
+|---|---|---|
+| 1 | Can the thing be described by a **fixed set of named parameters**? | **Schema blocks.** Not complex — just visual. A canvas may *render* it, but params author it. |
+| 2 | Is it a **finite composition** of such parameter sets (a source, a transform, a filter)? | **Several schema blocks**, one per concern. Still not complex. |
+| 3 | Is the data **irreducibly unstructured** — an arbitrary list or an imported blob with no parametric form? | **Entrypoint block.** Genuinely complex. The block holds the data; an editor edits it. |
+| 4 | Does authoring require **live spatial feedback to be possible at all** (not merely nicer)? | **Entrypoint block**, and say why in the block's own comment. |
+
+**"It has a picture" is not complexity.** The wizard tab already redraws a preview whenever a parameter
+changes; that loop is free and applies equally to block-derived params.
+
+### Applying the test to the four categories
+
+| Category | Verdict | Decomposition |
+|---|---|---|
+| **A · Point lists** (drill, bore, hole cycle) | **Mostly Q1/Q2 → schema blocks** | `pattern_grid{cols,rows,dx,dy}` · `pattern_circle{dia,start,n}` · `point_skip{list}`. The drill wizard is *already* parametric this way. Only a hand-clicked or imported point cloud reaches Q3. |
+| **B · Feature canvas** (pocket, surfacing, contour) | **Mostly Q1 → schema blocks. Category largely dissolves as CORE MACHINERY** — though an author may still attach a drawing widget to their own declared params (see the two axes above). | These are **parametric features, not drawings**: `feature_rect{x,y,w,h}` · `feature_circle{cx,cy,r}` · `corner_radius{r}`. `viz/featureCanvas.js` already renders exactly this from params. The `draw_rect`/`draw_line` + mini-Blockly build treats a parametric problem as a freeform one. |
+| **C · 3D anchor** (corner, edge, middle) | **Q1/Q2 → schema blocks** | `anchor_from{stock-corner\|feature-centre\|wcs}` + `anchor_offset{x,y,z}`. Declared intent instead of inferred trigonometry. The 3D view becomes a convenience for setting two numbers — not the source. Consistent with `datum-model-physical-derived-offset`. |
+| **D · Structural guard** | **Not a GUI question at all** | Already an ordinary block. ⚠ And it is **not a UI block**: it prunes emitted G-code, while every other block in this family is inert (`emit: () => []`). File it with flow control so nobody inherits the "emits nothing" assumption. |
+
+**Net effect: four categories of bespoke editor collapse to one** — genuinely arbitrary geometry
+(an imported DXF contour, a hand-clicked point cloud). That case is irreducible precisely *because*
+the data has no structure to decompose into parameters.
+
+### Why the decomposed form is better, beyond saving work
+
+- **Inspectable.** You can see on the canvas that a pocket is 80×60 with 5 mm corners, rather than it
+  being opaque inside a modal.
+- **Diffable.** Comparing declared params is trivial; comparing serialized modal state is not — and the
+  lossless round-trip invariant depends on being able to compare.
+- **Reusable.** A `pattern_grid` block serves drill, bore, and hole-cycle. A drill-specific point-picker
+  modal serves one wizard.
+
+### The costs — decided, not discovered later
+
+1. **Several blocks now describe one visual thing**, so the canvas must render their *combination* live
+   while the author edits. The wizard tab already does this (params change → preview redraws); point the
+   existing loop at block-derived params rather than building a second one.
+2. **A larger vocabulary.** This trades a few big builds for many small blocks, and vocabulary has real
+   costs: discoverability, naming, palette crowding. **Open question to settle early:** do these live in
+   one "Feature" category, or grouped per wizard family?
+3. **A decomposition can be wrong.** If a parameter set turns out not to describe the real cases, the
+   fix is revising a declaration — which is cheap, and is exactly why declaring beats building.
 
 ---
 
