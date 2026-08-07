@@ -68,7 +68,14 @@ function resolve(params, scope, def, add) {
             const r = tryEval(v, scope);
             if (!('err' in r)) { out[k] = r.v; continue; }
             out[k] = v;   // unchanged: the raw value still flows on, so emitted G-code is untouched
-            if (add && isExprField(def, k) && !CONTROLLER_TOKEN.test(v)) add(`${k} = "${v}": ${r.err} — using the default instead`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR);
+            // t1575 — THE MESSAGE HAS TO MATCH WHAT THE EMIT NOW DOES. This said "using the default instead",
+            // which was true when a failed expression was laundered into the declared default (a coordinate
+            // became X0 — a legal line, wrong place, silent). The emit now writes the author's text out
+            // verbatim so the controller refuses it by name, so the old wording would be the warning lying
+            // about the file sitting next to it. The two OTHER call sites are unchanged and still accurate:
+            // a Set block's value really does still default to 0, and a broken loop bound really does still
+            // fall back (verified by emitting each).
+            if (add && isExprField(def, k) && !CONTROLLER_TOKEN.test(v)) add(`${k} = "${v}": ${r.err} — emitted as written, so the controller will refuse this line`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR);
         } else out[k] = v;
     }
     return out;

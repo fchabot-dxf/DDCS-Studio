@@ -50,7 +50,12 @@ const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 function resolveValue(v, scope) {
     if (v == null || v === '') return 0;
     if (typeof v === 'number') return v;
-    if (typeof v === 'string') { try { return evalExpr(v, scope); } catch { return NaN; } }
+    // t1575 — COLLAPSE THE DISAGREEMENT. This used to return NaN, which `util.num(v, d)` then turned into the
+    // caller's DECLARED DEFAULT — so a typo'd identifier in a coordinate emitted `X0`: a legal line the machine
+    // runs, at the wrong place, with the mistake laundered out. `resolveParams` twenty lines below has always
+    // kept the raw string instead, and that is the correct half of the disagreement: the author's text is the
+    // only thing that can reach the controller's error message. Both paths now keep it.
+    if (typeof v === 'string') { try { return evalExpr(v, scope); } catch { return v; } }
     const def = BLOCKS[v.type];                              // a reporter pill plugged into the socket
     return def && def.reduce ? def.reduce(v.params || {}, scope, (c) => resolveValue(c, scope)) : 0;
 }
