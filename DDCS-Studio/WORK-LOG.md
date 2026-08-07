@@ -16233,3 +16233,53 @@ Unrolling once stays rejected on safety: body lines that never reference the ind
 5. **The corpus diff still only proves the negative** — no twin has a broken bound, so it confirms "unaffected" and nothing about the refusal behaviour, which rests on the spec.
 
 **Capacity:** comfortable.
+
+
+## 2026-08-07 t1581 (fix) - IF conditions: the last of the family, and BOTH precedents were needed
+
+**Task (dispatch):** gap (4). `resolveBool` catches to `false`, so an unresolvable condition silently takes the else-branch — the original defect in its purest form, and the worst of the family because **both branches are plausible complete programs**: the file looks right, runs clean, cuts the wrong thing, and nothing says why. ⚠ FIRST determine which precedent applies — a controller-emitted IF (coordinate precedent) or a Studio-unrolled one (loop-bound precedent). Say which. **If BOTH, handle each with its own.**
+
+### It is BOTH — and not by dialect, which is what I had expected the split to be
+
+Two different BLOCKS, each already shipping a different mechanism:
+
+| block | mechanism | precedent |
+|---|---|---|
+| `if` — `iff.js`, `kind:'cond'` | Studio **UNROLLS** it; the condition is consumed at emit time and only the taken branch reaches the G-code | loop-bound: refusal line + ERROR |
+| `ifgoto` — `flow.js` | emits a **REAL controller** `IF … GOTO`; the branch survives into the file and the MACHINE reads it | coordinate: emit verbatim |
+
+The dispatch guessed the split might be per-dialect. It is not — the dialects all render `ifGoto` the same way; the divide is which block you used.
+
+### Measured first, and it was three defects rather than one
+
+```
+   if      cond='dpeth > 5'   ->  "( If false )"           SILENT else-branch, and NO lint row at all
+   ifgoto  goto='nosuch'      ->  "IF #1920!=2 GOTO1"      SILENT jump to a real but WRONG label
+                                                            …while the lint said "emitted as written" — FALSE
+   ifgoto  rhs='dpeth'        ->  "IF #1920!=dpeth GOTO1"  already correct (t1575's collapse), but unlinted
+```
+
+**The `if` case was DOUBLY silent.** Not only did it choose a branch, the lint said nothing — `cond`'s default is a string (it is a boolean socket), so `isExprField`'s numeric-default discriminator skipped it. Reported at the `cond` site rather than by widening that discriminator: widening is exactly what would reintroduce the 1172-row flood measured at t1566.
+
+**And the `ifgoto` label was a SECOND lying warning.** The lint already announced `emitted as written` for a broken jump target while the emitter quietly rewrote it to `GOTO1`. The warning and the file disagreed, and the warning was the one describing the intent. Now `GOTOnosuch` emits and the message is true. That makes five occasions this arc where a message had to move with the behaviour — the reason to check them every time is that four of the five were only found by running the thing, not by reading it.
+
+### Declared behaviour, deliberately untouched and pinned
+
+- An **empty condition is false BY DESIGN** (`iff.js` says so explicitly) — not a failure, not reported.
+- A **`#var` condition stays exempt** as a runtime value. Fourth act running that this carve-out has held.
+
+### Verification
+
+**Real app** (`verification/t1581-if-refuses.png`): line 13 `( If: condition did not resolve — neither branch can be chosen )`, line 14 `dpeth > 5`, and the badge row naming `unknown var: dpeth` at line 13. **The IF body's cut move (`X99 Y99 Z-9`) is absent from the file** — the point of the fix is visible as an absence, so it is worth stating explicitly rather than leaving to the eye.
+
+**Named goldens: corpus 0 of 32 moved; suite ZERO moved.** 40 e2e failed / 2320 passed / 6 skipped + 1 node-tier = **41, against t1579's 43** — two fixed (`alignment-correction-840:106`, `blocks-live-form:166`, both the flakes from the previous run). Spec fails 3/3 against the pre-change tree. Lint 0 errors.
+
+### What this does NOT cover
+
+1. **`ifgoto`'s `lhs`/`rhs` are still UNLINTED.** They emit the author's text correctly, but no warning accompanies them, because their defaults are strings. The emit is right and the reporting is missing — the mirror image of the `goto` bug just fixed. Fixing it means finding a declared discriminator for "expression-bearing but string-defaulted" (`sockets` is a candidate for `cond`; `ifgoto` declares none), which is the same predicate question the whole lint rests on and deserves its own act rather than a guess here.
+2. **An IF's CHILDREN are never linted at all.** `walk` recurses into `loop`, `container` and `path` — not `cond`. So motion-safety warnings inside any IF body have never been reported. Pre-existing, unrelated to this defect, and out of scope, but it is a real hole and I would rather name it than let it sit.
+3. **No hardware has been handed `dpeth > 5` or `GOTOnosuch`.** Same `Unrecognized file format` class as the probed forms by construction; still an inference.
+4. **The corpus diff still only proves the negative** — no twin contains a broken condition.
+5. **The send gate remains unwired** (gap 1, next act).
+
+**Capacity:** comfortable, and the work is unaffected. Worth naming for planning only: this is the ninth consecutive act in one seat and the send gate is a new subsystem rather than another member of this family, so it is a natural boundary if the advisor would prefer a fresh seat for it. I am not asking for one.
