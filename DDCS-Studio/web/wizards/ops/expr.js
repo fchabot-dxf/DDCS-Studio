@@ -1,17 +1,65 @@
 /**
  * wizards/ops/expr.js — tiny arithmetic evaluator for parametric fields (the "Math" backbone).
  *
- * Supports  + - * / %, unary ±, parentheses, decimals, and variable names resolved against a
- * `scope` object (Set blocks + the Count loop index). Pure recursive descent — no eval/Function,
- * no dependencies. Throws on a parse error or an unknown variable; callers treat a throw as
- * "this isn't an expression" and keep the raw value (e.g. a select like 'grid').
+ * Supports  + - * / %, unary ±, parentheses, decimals, a ternary, the functions below, and variable
+ * names resolved against a `scope` object. Pure recursive descent — no eval/Function, no dependencies.
+ * Throws on a parse error or an unknown variable; callers treat a throw as "this isn't an expression"
+ * and keep the raw value (e.g. a select like 'grid'). Since t1566, `blocks/lint.js` turns that throw
+ * into a NAMED, block-tagged warning for fields that are actually meant to compute, so a typo is no
+ * longer indistinguishable from a deliberate value.
+ *
+ * ONE SCOPE, CONTENTS FROM THE CALLER (t1566 ruling). The `scope` object is populated by whoever calls:
+ * Set blocks and the Count loop index today, wizard params when that face lands. Deliberately NOT two
+ * lookup rules — a second resolution path is the duplicated-inference trap that caused t1562. If a
+ * wizard param ever collides with a Set-block name that is a REAL collision and belongs in the lint,
+ * not partitioned away behind separate namespaces.
+ *
+ * ⚠ NO CONTROL FLOW, by ruling — guard blocks own that and keep owning it. The ternary is a VALUE
+ * selector, not a branch.
+ *
+ * ⚠ NO COMPARISON OPERATORS, and this is a deliberate reading of the spec (t1566 listed exactly:
+ * refs, arithmetic, min/max/abs/round, a ternary). A ternary needs a condition, and rather than invent
+ * `< > ==` beyond the listed set, the condition follows the convention this codebase ALREADY declares
+ * for expressions in boolean position — `blockEmitter.resolveBool`: "a number/expression is truthy when
+ * ≠ 0". So `x ? a : b` selects `a` when x is non-zero. min/max cover most pick-one-of-two needs without
+ * comparisons; if real use wants `<`/`>` that is a separate, deliberate widening.
  */
+
+/**
+ * The DECLARED function table — name → arity + implementation. Adding a function is a data edit here,
+ * not new parser code. Lowercase on purpose: the DDCS macro language has its OWN uppercase ABS/ROUND/
+ * SQRT set (engine/core/expression.js) which is a different language for a different consumer, and
+ * accepting both spellings here would blur two things that must stay separate. A wrong case therefore
+ * lands as "unknown function: ABS", which the error names explicitly.
+ */
+const FUNCS = {
+    abs:   { min: 1, max: 1, fn: (a) => Math.abs(a) },
+    round: { min: 1, max: 1, fn: (a) => Math.round(a) },
+    min:   { min: 2, max: Infinity, fn: (...a) => Math.min(...a) },
+    max:   { min: 2, max: Infinity, fn: (...a) => Math.max(...a) },
+};
+export const EXPR_FUNCTIONS = Object.keys(FUNCS);   // one source for docs/authoring surfaces
+
 export function evalExpr(src, scope = {}) {
     if (typeof src === 'number') return src;
     const s = String(src);
     let i = 0;
     const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; };
 
+    // ternary sits BELOW add in precedence (loosest) and is right-associative, so `a ? b : c ? d : e`
+    // reads as `a ? b : (c ? d : e)` — the conventional shape. Condition truthiness is ≠ 0 (see header).
+    function ternary() {
+        const cond = add();
+        ws();
+        if (s[i] !== '?') return cond;
+        i++;
+        const thenV = ternary();
+        ws();
+        if (s[i] !== ':') throw new Error('expected : in ternary');
+        i++;
+        const elseV = ternary();
+        return cond !== 0 ? thenV : elseV;
+    }
     function add() {
         let v = mul();
         for (;;) { ws(); const c = s[i];
@@ -37,16 +85,43 @@ export function evalExpr(src, scope = {}) {
     }
     function primary() {
         ws();
-        if (s[i] === '(') { i++; const v = add(); ws(); if (s[i] !== ')') throw new Error('expected )'); i++; return v; }
+        if (s[i] === '(') { i++; const v = ternary(); ws(); if (s[i] !== ')') throw new Error('expected )'); i++; return v; }
         const n = /^\d*\.?\d+(?:e[-+]?\d+)?/i.exec(s.slice(i));
         if (n) { i += n[0].length; return parseFloat(n[0]); }
         const id = /^[A-Za-z_]\w*/.exec(s.slice(i));
-        if (id) { i += id[0].length; if (id[0] in scope) return Number(scope[id[0]]); throw new Error('unknown var: ' + id[0]); }
+        if (id) {
+            i += id[0].length;
+            ws();
+            if (s[i] === '(') {   // a CALL — an identifier is only a function when it is applied
+                i++;
+                const args = [];
+                ws();
+                if (s[i] === ')') i++;
+                else {
+                    for (;;) {
+                        args.push(ternary());
+                        ws();
+                        if (s[i] === ',') { i++; continue; }
+                        if (s[i] === ')') { i++; break; }
+                        throw new Error('expected , or ) in ' + id[0] + '()');
+                    }
+                }
+                const f = Object.prototype.hasOwnProperty.call(FUNCS, id[0]) ? FUNCS[id[0]] : null;
+                if (!f) throw new Error('unknown function: ' + id[0] + ' (known: ' + EXPR_FUNCTIONS.join(', ') + ')');
+                if (args.length < f.min || args.length > f.max) {
+                    const want = f.max === Infinity ? `at least ${f.min}` : `${f.min}`;
+                    throw new Error(`${id[0]}() takes ${want} argument${f.min === 1 && f.max === 1 ? '' : 's'}, got ${args.length}`);
+                }
+                return f.fn(...args);
+            }
+            if (id[0] in scope) return Number(scope[id[0]]);
+            throw new Error('unknown var: ' + id[0]);
+        }
         throw new Error('unexpected: ' + (s[i] ?? 'end'));
     }
 
     ws(); if (i >= s.length) throw new Error('empty expression');
-    const v = add(); ws();
+    const v = ternary(); ws();
     if (i < s.length) throw new Error('trailing input: ' + s.slice(i));
     if (!Number.isFinite(v)) throw new Error('not a finite number');
     return v;
