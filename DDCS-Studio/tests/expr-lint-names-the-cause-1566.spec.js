@@ -60,14 +60,21 @@ test('a broken expression names its cause; selects, controller tokens and valid 
     // The run-time fork is ruled: an unresolvable expression will REFUSE to emit. Declaring the slot now
     // means that act flips ONE value; it does not retrofit a severity onto every call site and consumer.
     expect(r.vocab, 'the severity vocabulary is declared, not spelled out at each site').toEqual({ WARN: 'warn', ERROR: 'error' });
-    expect(r.exprSeverityConst, 'today an unresolvable expression is a WARN — behaviour unchanged').toBe('warn');
+    // t1579 — THE FLIP THE SLOT WAS DECLARED FOR, and it cost exactly one line here, which was the point. When
+    // t1566 added `severity` the value was WARN and the emit still laundered a broken expression into a plausible
+    // default. It no longer does: the author's text goes out verbatim, the controller REFUSES the file by name
+    // (bench-confirmed), and execution is PARTIAL — the ops before it cut, then the machine halts with the tool
+    // in the material. That is an error about the FILE, not a warning about a preference. Had severity been
+    // spelled out at each call site instead of declared once, this would have been a sweep across every reporter
+    // and every consumer rather than one constant and this assertion.
+    expect(r.exprSeverityConst, 'an unresolvable expression is an ERROR: the controller will refuse the file').toBe('error');
     expect(r.records.length, 'the broken expression produced a record to carry it').toBeGreaterThan(0);
     for (const rec of r.records) {
         // t1568 added `kind` as the second declared axis so a CONSUMER (the pre-flight badge) can select the
         // expression records without matching message text. Both axes are pinned here for the same reason the
         // severity slot was: a declared field that nothing asserts quietly rots back into a literal.
         expect(Object.keys(rec).sort(), 'every record carries blockId + msg + severity + kind').toEqual(['blockId', 'kind', 'msg', 'severity']);
-        expect(rec.severity, 'and it is the declared value, not a literal').toBe('warn');
+        expect(rec.severity, 'and it is the declared value, not a literal').toBe('error');
         expect(rec.kind, 'an expression failure is declared as its own kind, distinct from motion-safety').toBe('unresolvable-expr');
     }
 });
