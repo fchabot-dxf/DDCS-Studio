@@ -22,6 +22,17 @@ export const gotoBlock = {
 export const ifGotoBlock = {
     type: 'ifgoto', label: 'If Goto', kind: 'leaf', category: 'Control',
     defaults: { lhs: '#1920', op: '!=', rhs: '2', goto: 1 }, fields: ['lhs', 'op', 'rhs', 'goto'],
-    emit: (p, dx, dy, dialect) => dialect.ifGoto(p.lhs || '#1920', p.op || '!=', String(p.rhs ?? '0'),
-        Math.max(0, Math.round(num(p.goto, 1)))),
+    // t1581 — THE OTHER conditional, and it takes the OTHER precedent. This emits a REAL controller `IF … GOTO`,
+    // so the branch survives into the G-code and the machine is the thing that reads it — the coordinate case.
+    // `lhs`/`rhs` already ride out verbatim (they are interpolated as strings, so t1575's collapse carries the
+    // author's text). The LABEL did not: `num(p.goto, 1)` turned an unresolvable jump target into `GOTO1` — a
+    // silent jump to a real but WRONG label, which is the same class of laundering, and the lint was announcing
+    // "emitted as written" about it, which was simply false. An unresolvable label now rides out as the author
+    // wrote it, so the controller refuses the line instead of jumping somewhere nobody asked for.
+    emit: (p, dx, dy, dialect) => {
+        const g = (typeof p.goto === 'string' && p.goto.trim() !== '' && !Number.isFinite(Number(p.goto)))
+            ? p.goto.trim()
+            : Math.max(0, Math.round(num(p.goto, 1)));
+        return dialect.ifGoto(p.lhs || '#1920', p.op || '!=', String(p.rhs ?? '0'), g);
+    },
 };

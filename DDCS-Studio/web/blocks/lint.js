@@ -169,6 +169,19 @@ function walk(blocks, scope, out) {
         }
         if (CHECKS[b.type]) CHECKS[b.type](p).forEach(add);
 
+        // t1581 — THE IF CONDITION reported NOTHING. `cond`'s default is a string (a boolean socket), so the
+        // numeric-default discriminator skipped it — and this was the one case where silence was most expensive,
+        // because an unresolvable condition silently took the else-branch and both branches are plausible whole
+        // programs. Reported at its own site for the same reason the bounds are: this block knows what actually
+        // happens to its condition, and the generic reporter does not.
+        if (def.kind === 'cond') {
+            const raw = b.params.cond;
+            if (typeof raw === 'string' && raw.trim() !== '' && !CONTROLLER_TOKEN.test(raw)) {
+                const rc = tryEval(raw, scope);
+                if ('err' in rc) add(`condition "${raw.trim()}": ${rc.err} — emitted as written, so the controller will refuse this line (neither branch is chosen)`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR);
+            }
+        }
+
         if (def.kind === 'loop') {
             const name = b.params.var || 'i';
             // t1566 — the loop bounds are the third swallow site: a broken `from`/`to`/`by` silently became the

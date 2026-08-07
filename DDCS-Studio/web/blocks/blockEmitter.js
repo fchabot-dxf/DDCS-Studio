@@ -276,6 +276,26 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     }
 
     if (def.kind === 'cond') {                 // IF: run the body once, only when the condition resolves true
+        // t1581 — THE WORST MEMBER OF THE FAMILY. `resolveBool` catches to false, so an unresolvable condition
+        // SILENTLY took the else-branch: `IF dpeth > 5` simply never fired, forever. A bound at least fails toward
+        // emptiness, which a person might notice; here BOTH BRANCHES ARE PLAUSIBLE COMPLETE PROGRAMS, so the file
+        // looks right, runs clean, cuts the wrong thing, and nothing anywhere says why. The lint said nothing
+        // either, because `cond`'s default is a string and the numeric-default discriminator skipped it.
+        //
+        // The IF is UNROLLED here — Studio consumes the condition and only the taken branch reaches the G-code —
+        // so this is the loop-bound precedent, not the coordinate one: a refusal line carrying the author's own
+        // text, and NEITHER branch emitted. Choosing a branch on a condition we could not read is the automatic
+        // correction this whole arc removes. (The OTHER conditional, `ifgoto`, emits a real controller IF and
+        // therefore takes the coordinate precedent instead — see flow.js.)
+        const rawCond = block.params.cond;
+        if (typeof rawCond === 'string' && rawCond.trim() !== '' && !CONTROLLER_TOKEN_BOUND.test(rawCond)) {
+            let condOk = true;
+            try { evalExpr(rawCond, scope); } catch { condOk = false; }
+            if (!condOk) return [
+                tag(`( ${def.label}: condition did not resolve — neither branch can be chosen )`, own),
+                tag(rawCond.trim(), own),
+            ];
+        }
         const on = resolveBool(block.params.cond, scope);
         const out = [tag(`( ${def.label} ${on ? 'true' : 'false'} )`, own)];
         if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
