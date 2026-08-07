@@ -16283,3 +16283,51 @@ The dispatch guessed the split might be per-dialect. It is not — the dialects 
 5. **The send gate remains unwired** (gap 1, next act).
 
 **Capacity:** comfortable, and the work is unaffected. Worth naming for planning only: this is the ninth consecutive act in one seat and the send gate is a new subsystem rather than another member of this family, so it is a natural boundary if the advisor would prefer a fresh seat for it. I am not asking for one.
+
+
+## 2026-08-07 t1583 (fix) - The sim learns the COMMA, before the gate is built on it
+
+**Task (dispatch, reordered ahead of the send gate):** my own t1573 finding, still live — the sim's lexer had no comma token, so it REJECTED `ATAN[1, 1]`, which the hardware PROVED works (`S5o`: `#190 = ATAN[1, 1] * 100` → **4500**). The reorder's reasoning, which is the whole point of the act: the gate refuses what the parser refuses; the parser refuses a form the controller ACCEPTS; so building the gate first would have **blocked a legitimate job on day one**. A false warning is a nuisance; a false REFUSAL on the send path stops real work. ⚠ Narrow: comma ONLY as a function-argument separator, keep the Fanuc slash form, pin 4500 citing `S5o`.
+
+### The fix, and why it cannot leak leniency back
+
+The comma is a token so that a call can separate its arguments, and it is consumed in **exactly one place** — `parseFactor`'s call arm. Everywhere else it is as fatal as any other stray token, and not because a check says so: t1573's trailing-token rule does it structurally. `[1, 2]` parses `1`, finds a comma where it needs `]`, returns with tokens unconsumed, and the whole expression is unresolvable. Only `ATAN` takes two arguments — a comma in any other call is an arity error. The closing bracket is required.
+
+**The Fanuc `ATAN[a]/[b]` slash form is KEPT.** No hardware says the V4.1 rejects it, and removing an untested path on a hunch is the opposite of what this arc has been doing.
+
+Measured after the change — the accepted set and, more importantly, the still-rejected set:
+
+| form | value | |
+|---|---|---|
+| `ATAN[1, 1] * 100` | **4500** | the S5o number, off the machine |
+| `ATAN[1, 1]` / `ATAN[1,1]` / `ATAN[#52, #53]` | 45 | degrees |
+| `ATAN[-1, 1]` | −45 | quadrant-correct (atan2, not a ratio) |
+| `ATAN[1]/[1]`, `ATAN[1]` | 45 | unchanged |
+| `[1, 2]`, `1, 2`, `ABS[1, 2]`, `ATAN[1, ]`, `ATAN[1, 1` | **null** | comma has no meaning outside a call |
+| `#191k8`, `[1 + 2 k 8]`, `widht` | **null** | t1573 not undone |
+| `#500` | null / 0 / valid | the VALUE-vs-syntax separation still holds |
+
+### The probe — and the guard caught two real things while I wrote it
+
+Wrote `S6f_unclosed.nc` for the third divergence (an unclosed bracket still evaluates to 3) rather than guessing the machine's behaviour. It matters for the gate in the *other* direction: a parser too STRICT causes a false refusal, one too LENIENT waves through a file the controller will reject.
+
+**The bench-kit guard then caught two things, one of them mine:**
+
+1. **My own probe had square brackets inside its comments.** The V4.1 aborts on a bracket in a comment, so the probe would have failed on its own HEADER and been read as a rejection of the test line — a false result that looks exactly like a real one. This is precisely the latent false-negative the advisor fixed in `S5o_atan_comma.nc`, and I reproduced it independently within one turn of it being fixed. Rewritten with an explicit note in the file saying why there are no brackets in the comments.
+2. **`S6e_partial.nc` has been on disk UNDECLARED since it was written** — and its result (execution is PARTIAL) is the single fact quoted most across t1573–t1581 to justify these fixes. The declaration lock is exactly the "surprise file" mechanism its own comment describes, and it had a hole. Both probes now declared.
+
+### Named goldens
+
+**Corpus: 0 of 32 moved — emitted text AND parsed envelope trace both identical.** (The trace matters more than the text here: this changes a parser the preview runs on, so text-only would have been the too-narrow check I flagged at t1573.)
+
+**Suite: 41 e2e failed / 2320 passed / 6 skipped + 1 node-tier = 42, against t1581's 41.** One REAL fix — `v41-bench-kit-nomotion-1538:43`, from declaring the two probes. Two moved, both flakes at **12/12 isolated** (`import-safety-1219:47`, and `spike-shot:3`, a June Phase-0 spike spec unrelated to anything here). Spec fails 3/3 against the pre-change tree. Lint 0 errors.
+
+### What this does NOT cover
+
+1. **The unclosed bracket is still lenient** — deliberately. `[1 + 2` still evaluates to 3; the probe is written and waiting, not run. Changing it before the hardware answers would be guessing, and the guess could go either way: too strict causes a false refusal on the send path, too lenient waves a bad file through.
+2. **`S6f` is unrun, so its own premise is untested.** I am asserting the sim's behaviour, not the machine's.
+3. **No hardware confirmation that the comma form works in a WORD position** — `S5o` proved it in an assignment (`#190 = ATAN[1, 1] * 100`). Whether `X ATAN[1, 1]` parses the same is an inference from the same grammar, not a probe result.
+4. **`atan2` argument ORDER is assumed to match Fanuc's** (`ATAN[a, b]` = atan2(a, b)). `S5o` used `ATAN[1, 1]`, where both arguments are equal, so it **cannot distinguish the order**. A probe with unequal arguments (e.g. `ATAN[1, 2]` vs `ATAN[2, 1]`) would settle it; I have not written one, and the quadrant test in the spec pins Studio's convention, not the machine's.
+5. **The corpus diff still only proves the negative.**
+
+**Capacity:** comfortable, unchanged. The seat boundary the advisor named (the merge point after the gate) still looks right to me.
