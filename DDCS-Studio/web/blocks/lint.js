@@ -8,6 +8,7 @@
  * the index at its first value. Each warning is tagged with the producing block id (like the source map).
  */
 import { BLOCKS, evalExpr } from '../wizards/ops/index.js';
+import { UNRESOLVED } from '../wizards/ops/expr.js';   // t1577 — a Set binding whose own value failed propagates, it does not default
 import { num } from '../wizards/ops/util.js';
 
 /**
@@ -72,9 +73,9 @@ function resolve(params, scope, def, add) {
             // which was true when a failed expression was laundered into the declared default (a coordinate
             // became X0 — a legal line, wrong place, silent). The emit now writes the author's text out
             // verbatim so the controller refuses it by name, so the old wording would be the warning lying
-            // about the file sitting next to it. The two OTHER call sites are unchanged and still accurate:
-            // a Set block's value really does still default to 0, and a broken loop bound really does still
-            // fall back (verified by emitting each).
+            // about the file sitting next to it. (t1577 — the Set-block site has since stopped defaulting too and
+            // its message moved with it; the LOOP-bound site still genuinely falls back, so that one is unchanged.
+            // Each was re-checked against the real emit rather than swept along with this one.)
             if (add && isExprField(def, k) && !CONTROLLER_TOKEN.test(v)) add(`${k} = "${v}": ${r.err} — emitted as written, so the controller will refuse this line`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR);
         } else out[k] = v;
     }
@@ -132,12 +133,20 @@ function walk(blocks, scope, out) {
             // t1566 — this site ALREADY warned, but its bare `catch` discarded the evaluator's named reason, so a
             // typo'd reference read the same as any other bad formula. Keep the message, add the cause.
             const r = tryEval(b.params.value, scope);
-            if ('err' in r) { scope[b.params.name] = 0; add(`"${b.params.name}" = ${b.params.value}: ${r.err} — defaults to 0`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR); }
+            // t1577 — the message HAD to change with the behaviour, again: this said "defaults to 0", which was
+            // true until the Set binding stopped defaulting. It now propagates the failure, so every line that
+            // READS this name fails too and emits verbatim — which is where the machine finally sees it.
+            if ('err' in r) { scope[b.params.name] = UNRESOLVED; add(`"${b.params.name}" = ${b.params.value}: ${r.err} — every line using ${b.params.name} is emitted as written, so the controller will refuse it`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR); }
             else scope[b.params.name] = r.v;
             continue;
         }
 
-        const p = resolve(b.params, scope, def, add);
+        // t1577 — a LOOP/DEPTH bound is reported by its OWN site below, which knows the real fallback. Letting the
+        // generic resolve() report it too produced TWO rows for one typo with CONTRADICTORY messages ("emitted as
+        // written" — untrue for a bound, which Studio consumes — and "using 0"). One problem, one row, and the row
+        // that survives is the one telling the truth about what happens.
+        const boundsReportedBelow = def.kind === 'loop' || def.kind === 'depth';
+        const p = resolve(b.params, scope, def, boundsReportedBelow ? null : add);
         if (CHECKS[b.type]) CHECKS[b.type](p).forEach(add);
 
         if (def.kind === 'loop') {

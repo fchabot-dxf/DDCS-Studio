@@ -21,6 +21,7 @@
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
+import { UNRESOLVED } from '../wizards/ops/expr.js';   // t1577 — the failure sentinel a Set binding carries when its own value did not resolve
 import { firstRapidXY } from '../wizards/ops/entry.js';   // t726 P2b — THE ONE cut-entry source for the entry fold (shared with the marker)
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
@@ -205,9 +206,15 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (!def) return [tag(`( unknown block ${block.type} )`, own)];
 
     if (def.kind === 'var') {                  // SET: bind a variable in the current scope
-        let val; try { val = evalExpr(block.params.value, scope); } catch { val = 0; }
-        scope[block.params.name] = val;
-        return [tag(`( ${block.params.name} = ${r3(val)} )`, own)];
+        // t1577 — PROPAGATE THE FAILURE, DO NOT SUBSTITUTE. Binding 0 here reproduced t1575's bug one hop
+        // upstream: `w = widht / 2` bound 0 and every `G0 Xw` downstream emitted `G0 X0`, laundered a second
+        // time. Binding the sentinel instead means each consuming line fails and emits VERBATIM, which puts the
+        // error on a line the machine can refuse — a Set block has no machine-side line of its own to carry it.
+        // The comment keeps the author's TEXT rather than a number that was never computed.
+        let val, ok = true;
+        try { val = evalExpr(block.params.value, scope); } catch { ok = false; }
+        scope[block.params.name] = ok ? val : UNRESOLVED;
+        return [tag(`( ${block.params.name} = ${ok ? r3(val) : String(block.params.value)} )`, own)];
     }
 
     if (def.kind === 'loop') {                 // COUNT: run the sub-stack once per step, exposing the index

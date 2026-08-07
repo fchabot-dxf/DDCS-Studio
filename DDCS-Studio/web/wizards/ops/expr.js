@@ -32,6 +32,24 @@
  * accepting both spellings here would blur two things that must stay separate. A wrong case therefore
  * lands as "unknown function: ABS", which the error names explicitly.
  */
+/**
+ * t1577 — THE FAILURE SENTINEL. A scope binding whose own expression did not resolve.
+ *
+ * A Set block used to bind `0` when its value failed to parse, which reproduced the very bug t1575 fixed one
+ * hop upstream: `w = widht / 2` bound 0, and every `G0 Xw` downstream emitted `G0 X0` — a legal line, wrong
+ * place, silent, with the typo laundered out a second time. A coordinate has a machine-side line that can
+ * carry the error; a Set value does not, because Studio consumes it before any G-code exists.
+ *
+ * So the failure PROPAGATES instead of being substituted: the name is still bound (it WAS declared — this is
+ * not an unknown variable), but bound to this sentinel, and any expression that reads it fails with a message
+ * naming the identifier. Downstream that failure reaches the consuming line, which emits verbatim — landing
+ * the error back in front of the machine, on a line there IS something to refuse.
+ *
+ * A frozen object rather than NaN: NaN would be indistinguishable from arithmetic that merely overflowed, and
+ * the whole point is that this state is DECLARED and recognisable at the one place identifiers are resolved.
+ */
+export const UNRESOLVED = Object.freeze({ __unresolved: true });
+
 const FUNCS = {
     abs:   { min: 1, max: 1, fn: (a) => Math.abs(a) },
     round: { min: 1, max: 1, fn: (a) => Math.round(a) },
@@ -114,7 +132,13 @@ export function evalExpr(src, scope = {}) {
                 }
                 return f.fn(...args);
             }
-            if (id[0] in scope) return Number(scope[id[0]]);
+            if (id[0] in scope) {
+                // t1577 — the name IS bound, but to a failure. Distinct from "unknown var": the author declared
+                // it, so saying it does not exist would send them looking in the wrong place. Name the binding
+                // and let the failure propagate to whatever line consumes it.
+                if (scope[id[0]] === UNRESOLVED) throw new Error(id[0] + ' did not resolve');
+                return Number(scope[id[0]]);
+            }
             throw new Error('unknown var: ' + id[0]);
         }
         throw new Error('unexpected: ' + (s[i] ?? 'end'));
