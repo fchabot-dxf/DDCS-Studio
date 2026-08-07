@@ -6,6 +6,7 @@
 
 import { onChange } from '../blocks/programModel.js';
 import { checkEnvelope } from '../engine/envelopeCheck.js';
+import { blockLintViolations } from './preflightBlockLint.js';   // t1568 — the BLOCK-side contributor to this same surface
 
 let _mgr = null;
 let badge = null, label = null, pop = null;
@@ -46,7 +47,9 @@ function renderPop(res) {
     pop.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'preflight-pop-head';
-    const nv = res.violations.length;
+    // t1568 — the RED headline counts ENVELOPE breaches only: an unresolved expression is not a move that "leaves
+    // the machine travel", it is a move we could not place at all. It gets its own row in the list below.
+    const nv = res.violations.filter((v) => v.kind !== 'unresolved-expr').length;
     const hasStock = res.violations.some((v) => v.kind === 'through-stock');   // t937 — a mixed/through-stock verdict softens the envelope-specific wording
     head.textContent = res.status === 'red' ? (hasStock ? `${nv} pre-flight issue${nv > 1 ? 's' : ''}` : `${nv} move${nv > 1 ? 's' : ''} ${nv > 1 ? 'leave' : 'leaves'} the machine travel`)
         : res.status === 'amber' ? 'Pre-flight could not verify' : 'Pre-flight: fits the envelope';
@@ -62,7 +65,8 @@ function renderPop(res) {
             li.className = 'preflight-row'; li.setAttribute('data-line', v.line == null ? '' : v.line);
             // t1323 — a travel-extent breach belongs to the WHOLE PROGRAM (no anchor → no guilty line), so it reads as a
             // fact about the program and is not clickable-to-a-line. Every other kind keeps its line, unchanged.
-            li.textContent = v.kind === 'travel-extent' ? `the whole program · needs ${fmt(v.needed)} mm of ${v.axis} travel, the machine has ${fmt(v.span)} mm`
+            li.textContent = v.kind === 'unresolved-expr' ? (v.line == null ? `could not resolve · ${v.msg}` : `line ${v.line} · could not resolve · ${v.msg}`)
+                : v.kind === 'travel-extent' ? `the whole program · needs ${fmt(v.needed)} mm of ${v.axis} travel, the machine has ${fmt(v.span)} mm`
                 : v.kind === 'no-spindle' ? `line ${v.line} · cuts with the spindle OFF (no M3)` : v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : v.kind === 'soft-limit' ? `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over${res.softLimitsEnforced === false ? ' · UNGUARDED — the machine will NOT stop' : ''}` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
             if (v.line != null) {
                 li.title = 'Jump to this line';
@@ -99,7 +103,9 @@ function renderAnnotations(res) {
         if (!span) continue;
         const a = document.createElement('span');
         a.className = 'preflight-annot';
-        const parts = vs.map((v) => v.kind === 'no-spindle' ? 'spindle OFF · no M3' : v.kind === 'through-stock' ? 'crosses the stock' : `${v.axis} ${fmt(v.overshoot)}mm over`);
+        // t1568 — an unresolved expression has no axis/overshoot (that is the whole point: the number never existed),
+        // so it needs its own branch or it would render as "undefined NaNmm over" on a red program that also has one.
+        const parts = vs.map((v) => v.kind === 'unresolved-expr' ? 'could not resolve' : v.kind === 'no-spindle' ? 'spindle OFF · no M3' : v.kind === 'through-stock' ? 'crosses the stock' : `${v.axis} ${fmt(v.overshoot)}mm over`);
         // t973 — the UNGUARDED escalation rides the line ONCE (a line can breach two edges; don't repeat it per-edge).
         const unguarded = res.softLimitsEnforced === false && vs.some((v) => v.kind === 'soft-limit');
         a.textContent = parts.join(' · ') + (unguarded ? ' · UNGUARDED' : '');
@@ -114,6 +120,25 @@ function render() {
     if (!prog || !prog.trim()) { badge.hidden = true; pop.hidden = true; renderAnnotations(null); return; }
     let res;
     try { res = checkEnvelope(prog, settings()); } catch (_) { badge.hidden = true; renderAnnotations(null); return; }
+    // t1568 — SECOND CONTRIBUTOR, same surface. An unresolvable expression means a coordinate never became a
+    // number, so the envelope check on that line was never actually performed — which is precisely what amber
+    // ("can't verify") declares. It can only RAISE green → amber; a red verdict is a stronger claim that stands
+    // on its own and keeps its per-line annotations. Contributes nothing when the block→line map is stale.
+    const exprViol = blockLintViolations();
+    if (exprViol.length) {
+        res = { ...res, violations: [...res.violations, ...exprViol] };
+        // The reason states the CLASS; the rows below carry the detail (which identifier, which line). Repeating the
+        // message here read as the same sentence twice in the popover when there was only one.
+        const mine = exprViol.length === 1
+            ? 'an expression did not resolve, so that move’s position could not be checked'
+            : `${exprViol.length} expressions did not resolve, so those moves’ positions could not be checked`;
+        if (res.status === 'green') { res.status = 'amber'; res.reason = mine; }
+        // Already amber for its own reason (no envelope, no WCS table) — say BOTH. Our sentence must not be
+        // swallowed just because something else got there first; they are independent reasons it cannot verify.
+        else if (res.status === 'amber') res.reason = [res.reason, mine].filter(Boolean).join(' · ');
+        // RED stands on its own: "outside the envelope" is a stronger, separately-earned claim. The rows are still
+        // appended above so the unresolved expression is visible, but it never softens or re-colours a red verdict.
+    }
     lastResult = res;
     if (res.status === 'red') {
         // RED — the per-line inline annotations ARE the diagnostic (one per bad line), so normally no chip.

@@ -63,7 +63,11 @@ test('a broken expression names its cause; selects, controller tokens and valid 
     expect(r.exprSeverityConst, 'today an unresolvable expression is a WARN — behaviour unchanged').toBe('warn');
     expect(r.records.length, 'the broken expression produced a record to carry it').toBeGreaterThan(0);
     for (const rec of r.records) {
-        expect(Object.keys(rec).sort(), 'every record carries blockId + msg + severity').toEqual(['blockId', 'msg', 'severity']);
+        // t1568 added `kind` as the second declared axis so a CONSUMER (the pre-flight badge) can select the
+        // expression records without matching message text. Both axes are pinned here for the same reason the
+        // severity slot was: a declared field that nothing asserts quietly rots back into a literal.
+        expect(Object.keys(rec).sort(), 'every record carries blockId + msg + severity + kind').toEqual(['blockId', 'kind', 'msg', 'severity']);
         expect(rec.severity, 'and it is the declared value, not a literal').toBe('warn');
+        expect(rec.kind, 'an expression failure is declared as its own kind, distinct from motion-safety').toBe('unresolvable-expr');
     }
 });
