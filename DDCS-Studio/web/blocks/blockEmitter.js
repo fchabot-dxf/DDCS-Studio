@@ -46,6 +46,43 @@ export function newBlock(type) {
 // comment when the active post lacks that cap (e.g. the ATC pneumatic/drawbar M-codes carry cap:'atc'). Only leaf emit tags a cap.
 const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 
+/**
+ * t1579 — AN UNRESOLVABLE LOOP / STEP-DOWN BOUND, and why it needs its own shape.
+ *
+ * A coordinate carries its failure to the machine by emitting the author's text (t1575) and a Set value carries
+ * its failure downstream to the line that uses it (t1577). A BOUND can do neither: Studio consumes it to decide
+ * how many times to unroll, and the iterations that would have carried the error are exactly what fails to exist.
+ * Measured, both misbehave and NOT in the same way:
+ *     COUNT     to='nosuch'  ->  fallback 0  ->  ZERO iterations  ->  the operation vanishes from the file
+ *     STEP DOWN to='nosuch'  ->  fallback 5  ->  FIVE levels      ->  it CUTS to a depth nobody asked for
+ * Both are automatic corrections — Studio deciding what the author meant — and the Step Down one emits real
+ * motion, so it is the more dangerous of the two.
+ *
+ * Unrolling once with the failure in scope was rejected on safety: body lines that never reference the index
+ * would emit real motion, and because execution is PARTIAL (hardware probe S6e) those lines CUT before the
+ * machine ever reached the refusal.
+ *
+ * So the bound emits the AUTHOR'S OWN TEXT as a line of its own, in place of the body. Nothing is invented —
+ * this is the same transformation as the coordinate case, just placed where the machine will read it — and it
+ * is deliberately NOT an assignment like `#100=nosuch`, which would author a controller-variable write that no
+ * one asked for. Everything before it emits normally (which is what the machine does anyway), and the file
+ * stops being a file that silently machines the wrong part.
+ *
+ * Returns null when every bound resolves. A CONTROLLER TOKEN is never a failure here, same carve-out as
+ * everywhere else in this arc: `#100` as a bound is a runtime value Studio cannot unroll at build time, which
+ * is a real limitation but not a malformed program, so it keeps its existing behaviour.
+ */
+const CONTROLLER_TOKEN_BOUND = /^\s*[#[]/;
+function unresolvableBounds(block, fields, scope) {
+    const bad = [];
+    for (const f of fields) {
+        const raw = block.params[f];
+        if (typeof raw !== 'string' || raw.trim() === '' || CONTROLLER_TOKEN_BOUND.test(raw)) continue;
+        try { evalExpr(raw, scope); } catch { bad.push({ field: f, raw: raw.trim() }); }
+    }
+    return bad.length ? bad : null;
+}
+
 /** Resolve a value socket → a number: a literal, a scalar/expression string, or a Reporter record
  *  (Variable/Math) evaluated recursively via its def's `reduce` (Math operands resolve through `rc`). */
 function resolveValue(v, scope) {
@@ -219,6 +256,12 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'loop') {                 // COUNT: run the sub-stack once per step, exposing the index
         const name = block.params.var || 'i';
+        // t1579 — a bound that did not resolve emits the author's text instead of silently contributing NOTHING.
+        const badLoop = unresolvableBounds(block, ['from', 'to', 'by'], scope);
+        if (badLoop) return [
+            tag(`( ${def.label} ${name}: ${badLoop.map((b) => b.field).join(', ')} did not resolve — the loop cannot be unrolled )`, own),
+            ...badLoop.map((b) => tag(b.raw, own)),
+        ];
         const ev = (x, d) => { try { return evalExpr(x, scope); } catch { return d; } };
         const from = ev(block.params.from, 1), to = ev(block.params.to, 0), by = ev(block.params.by, 1) || 1;
         const steps = by > 0 ? Math.floor((to - from) / by) + 1 : (by < 0 ? Math.floor((from - to) / -by) + 1 : 0);
@@ -240,6 +283,13 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     }
 
     if (def.kind === 'depth') {                // STEP DOWN: run the body once per Z level, exposing scope `z` (negative)
+        // t1579 — measured to be WORSE than the loop's silent drop: an unresolvable `to` fell back to 5 and cut five
+        // levels to a depth nobody specified. Same treatment, and for a stronger reason — this one emits real motion.
+        const badDepth = unresolvableBounds(block, ['to', 'by', 'confirmEvery'], scope);
+        if (badDepth) return [
+            tag(`( ${def.label}: ${badDepth.map((b) => b.field).join(', ')} did not resolve — the depth walk cannot be built )`, own),
+            ...badDepth.map((b) => tag(b.raw, own)),
+        ];
         const ev = (x, d) => { try { return evalExpr(x, scope); } catch { return d; } };
         const to = ev(block.params.to, 5), by = ev(block.params.by, 1) || 1;
         const confirmEvery = Math.max(0, Math.round(ev(block.params.confirmEvery, 0)) || 0);   // t1031 — pause & confirm every N passes (0 = off)

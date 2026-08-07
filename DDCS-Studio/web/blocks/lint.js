@@ -40,8 +40,14 @@ import { num } from '../wizards/ops/util.js';
  */
 export const LINT_SEVERITY = { WARN: 'warn', ERROR: 'error' };
 
-/** The severity an UNRESOLVABLE EXPRESSION reports at. THIS is the single value the run-time-safety act flips. */
-export const UNRESOLVABLE_EXPR_SEVERITY = LINT_SEVERITY.WARN;
+/**
+ * The severity an UNRESOLVABLE EXPRESSION reports at — and t1579 is the act that flips it, exactly as the slot
+ * was declared for. It is no longer a "maybe": with the emit now writing the author's text out verbatim, a file
+ * containing an unresolvable expression is one the controller REFUSES (bench-confirmed) and PARTIALLY executes
+ * — the ops before it cut, then the machine halts with the tool in the material. That is an error about the
+ * file, not a warning about a preference, and one declared value carries it to every consumer.
+ */
+export const UNRESOLVABLE_EXPR_SEVERITY = LINT_SEVERITY.ERROR;
 
 /**
  * t1568 — KIND is the second declared axis, and it exists so a CONSUMER can select without reading messages.
@@ -141,12 +147,26 @@ function walk(blocks, scope, out) {
             continue;
         }
 
-        // t1577 — a LOOP/DEPTH bound is reported by its OWN site below, which knows the real fallback. Letting the
-        // generic resolve() report it too produced TWO rows for one typo with CONTRADICTORY messages ("emitted as
-        // written" — untrue for a bound, which Studio consumes — and "using 0"). One problem, one row, and the row
-        // that survives is the one telling the truth about what happens.
+        // t1577/t1579 — a LOOP/DEPTH bound is reported HERE, once, by the block that owns it. Letting the generic
+        // resolve() report it too gave two rows for one typo with contradictory messages. t1579 also fixes two
+        // things that turn: the message ("using 0" stopped being true the moment the emit started writing the
+        // author's text out instead of guessing), and DEPTH — lint has no depth branch, so t1577's routing had
+        // silenced Step Down's bounds entirely. One reporter, both kinds, saying what actually happens.
         const boundsReportedBelow = def.kind === 'loop' || def.kind === 'depth';
         const p = resolve(b.params, scope, def, boundsReportedBelow ? null : add);
+        let badBounds = null;
+        if (boundsReportedBelow) {
+            const fields = def.kind === 'loop' ? ['from', 'to', 'by'] : ['to', 'by', 'confirmEvery'];
+            const found = [];
+            for (const f of fields) {
+                const raw = b.params[f];
+                if (typeof raw !== 'string' || raw.trim() === '' || CONTROLLER_TOKEN.test(raw)) continue;
+                const rr = tryEval(raw, scope);
+                if ('err' in rr) found.push({ f, raw: raw.trim(), err: rr.err });
+            }
+            found.forEach((bb) => add(`${bb.f} = "${bb.raw}": ${bb.err} — emitted as written, so the controller will refuse this line`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR));
+            badBounds = found.length ? found : null;
+        }
         if (CHECKS[b.type]) CHECKS[b.type](p).forEach(add);
 
         if (def.kind === 'loop') {
@@ -154,15 +174,13 @@ function walk(blocks, scope, out) {
             // t1566 — the loop bounds are the third swallow site: a broken `from`/`to`/`by` silently became the
             // fallback, so "runs 0 times" was reported without ever saying the bound was a typo. Name it here too;
             // a controller token in a bound is not ours to evaluate, same carve-out as resolve().
-            const ev = (x, d, which) => {
-                const r = tryEval(x, scope);
-                if (!('err' in r)) return r.v;
-                if (typeof x === 'string' && x !== '' && !CONTROLLER_TOKEN.test(x)) add(`${which} = "${x}": ${r.err} — using ${d}`, UNRESOLVABLE_EXPR_SEVERITY, LINT_KIND.UNRESOLVABLE_EXPR);
-                return d;
-            };
-            const from = ev(b.params.from, 1, 'from'), to = ev(b.params.to, 0, 'to'), by = ev(b.params.by, 1, 'by') || 1;
+            const ev = (x, d) => { const r = tryEval(x, scope); return ('err' in r) ? d : r.v; };   // bounds are reported above
+            const from = ev(b.params.from, 1), to = ev(b.params.to, 0), by = ev(b.params.by, 1) || 1;
             const steps = by > 0 ? Math.floor((to - from) / by) + 1 : (by < 0 ? Math.floor((from - to) / -by) + 1 : 0);
-            if (steps <= 0) add(`runs 0 times (from ${from} to ${to} by ${by})`);
+            // t1579 — "runs 0 times" was a CONSEQUENCE of the fallback, and the fallback is gone: an unresolvable
+            // bound no longer unrolls to zero, it emits the author's text for the machine to refuse. Reporting a
+            // zero-iteration count for a loop that never got that far would be the same stale-warning failure.
+            if (steps <= 0 && !badBounds) add(`runs 0 times (from ${from} to ${to} by ${by})`);
             if (!(b.children || []).length) add('empty loop — add a block to repeat');
             const child = Object.create(scope); child[name] = from;
             walk(b.children || [], child, out);
