@@ -46,6 +46,14 @@ test('every .nc file in the directory is accounted for — no untracked surprise
         'S5a_spaced.nc', 'S5b_coordword.nc', 'S5c_ifgoto.nc', 'S5d_while.nc', 'S5e_sqrt.nc', 'S5f_atan.nc',
         'S5g_atan1.nc', 'S5h_while_zero.nc', 'S5i_increment.nc', 'S5j_while_factory.nc', 'S5k_incr_bare.nc',
         'S5l_while_sp1.nc', 'S5m_while_sp2.nc',
+        // t1569 — the two probes the bench session ended on, still unrun: the macro-parser-mode WHILE and the
+        // comma-form ATAN. Both existed on disk for several turns without being declared here, which is exactly
+        // the surprise this lock is for.
+        'macro_S5n_while.nc', 'S5o_atan_comma.nc',
+        // t1569 — the S6 malformed-input set: does a controller REJECT a line carrying a value it cannot read,
+        // or tolerate it? S6c probes a DWELL argument, not an axis word, so the kit's no-motion invariant stays
+        // absolute; the direct axis-word form lives in ../verify-motion/ instead, off this allowlist by design.
+        'S6a_badvar.nc', 'S6b_trailing.nc', 'S6c_badword.nc',
     ].sort());
 });
 
