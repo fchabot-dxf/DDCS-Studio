@@ -15880,3 +15880,65 @@ Subsuming #1 is clean and is obviously right. But three of the dispatch's own sh
 - **C — B, plus the AST + per-string cache** as literally specified. Correct if the advisor wants the stated shape regardless; it is the only option that rewrites a live emit-path function, so it wants its own byte-identical gate.
 
 I recommend **B**, and explicitly NOT touching `engine/core/expression.js`. Nothing was built this turn — no source file changed.
+
+
+## 2026-08-07 t1566 (fix + feature) - Option B: name the cause, then widen the mouth
+
+**Task (dispatch):** Option B ruled after the t1564 survey. Two commits IN ORDER — (1) route the parse / unknown-identifier error into the existing lint channel so it says `unknown var: fedrate`, THEN (2) add `min`/`max`/`abs`/`round` + a ternary. Backwards would land the extension on a silent substrate. One evaluator, ONE scope whose contents the caller supplies (not two lookup rules — that is the t1562 duplicated-inference trap one layer up). AST/cache dropped. **Byte-identity is a PROOF, not a claim** — if any byte moves, stop and report.
+
+### Commit 1 — `6e4b1895`, name the cause
+
+Three sites discarded the evaluator's named error. All three now keep it: `resolve()` (every leaf op's params), the Set block (which already warned, but a bare `catch` threw the reason away, so a typo read like any other bad formula), and the loop bounds (a broken `from`/`to`/`by` silently became the fallback, so "runs 0 times" was reported without ever saying why).
+
+**The hard half was staying QUIET, and it needed measuring, not reasoning.** `evalExpr` throws for selects BY DESIGN — "not an expression, keep the raw value" — so a naive "warn on any throw" would have fired on ~1172 params across the corpus and trained everyone to ignore the lint. The discriminator I chose is the block def's OWN default: a field whose default is a number holds a number, so a string sitting in it is meant to compute. Read from `def.defaults` rather than importing `fieldKind` from the Blockly bridge — that module states it "requires window.Blockly", and lint runs on the emit path where that must not be dragged in. One declared carve-out: `CONTROLLER_TOKEN` (`#7`, `[#5+1]`) — DDCS variable/expression references that ride to the controller verbatim and are not ours to evaluate.
+
+**Measured before writing the rule**, across every registered twin stack: **1172** string params throw, **47** sit on numeric-defaulted fields, and **ALL 47** are controller tokens → a clean corpus warns **exactly 0 times**. The lint only speaks when something is genuinely broken.
+
+### Commit 2 — `5dca52f7`, the functions and the ternary
+
+`FUNCS` is a DECLARED table (name → arity + impl), so adding a function is a data edit, not new parser code; `EXPR_FUNCTIONS` exports the set as one source for error messages and any future authoring surface. The ternary sits below `add` in precedence and is right-associative (`a ? b : c ? d : e` = `a ? b : (c ? d : e)`); parenthesised sub-expressions and call arguments accept a full ternary.
+
+**Two judgement calls, both named rather than buried:**
+
+1. **No comparison operators.** A ternary needs a condition, and the dispatch listed exactly refs / arithmetic / min,max,abs,round / a ternary. Rather than invent `< > ==` beyond that set, the condition follows the convention this codebase ALREADY declares for an expression in boolean position — `blockEmitter.resolveBool`: *"a number/expression is truthy when ≠ 0"*. So `x ? a : b` selects `a` when x is non-zero, and `min`/`max` cover most pick-one-of-two needs. If real use wants `<`/`>` that is a separate, deliberate widening — flagged, not assumed.
+2. **Lowercase function names only.** The DDCS macro language has its own UPPERCASE `ABS`/`ROUND`/`SQRT` set in `engine/core/expression.js` — a different language for a different consumer, which t1564 established must stay separate. Accepting both spellings here would blur exactly that boundary. `ABS(4)` therefore fails as `unknown function: ABS (known: abs, max, min, round)`, which names the problem and the fix in one line.
+
+### Commit 3 — the mid-flight amendment: severity is a DECLARED SLOT
+
+Polled the mailbox at the commit boundary and caught an amendment: give the lint record a DECLARED `severity` (warn|error) instead of hardcoding warn, set to warn for now. Reason given: the run-time fork is now ruled — an unresolvable expression will REFUSE to emit — so the next act flips one declared value instead of retrofitting a severity onto every call site and every consumer.
+
+Absorbed before passing. `LINT_SEVERITY = { WARN, ERROR }` is the vocabulary; `UNRESOLVABLE_EXPR_SEVERITY` is the ONE constant the run-time act flips, and the three expression sites report at it. `add(msg, severity = LINT_SEVERITY.WARN)` gives every pre-existing motion-safety check the same slot without touching any of them. Today every record is `'warn'`, so nothing observable changes — which is the point: the slot exists before it is needed. Pinned in the spec (the vocabulary, the flippable constant, and that EVERY record carries exactly `blockId`/`msg`/`severity`), so the declaration cannot rot back into a literal.
+
+Per the gate-tiering rule an absorbed amendment re-gates at the FAST tier, not a second full suite: both t1566 specs green, lint 0 errors, and byte-identity re-proven against the same pristine baseline (`cmp` clean) rather than argued from "lint cannot affect emit".
+
+### Byte-identity — proven, not asserted
+
+Built a corpus harness that emits G-code for every registered twin and dumped it at three points: a PRISTINE baseline (both `lint.js` and `expr.js` reverted to HEAD), after commit 1, and after commit 2. **`cmp` clean at every step — 44303 bytes, 0 bytes moved.** This was the real risk and not a formality: introducing `?`/`:` and call syntax means strings that previously threw (and fell back to the declared default) could suddenly parse and evaluate to something else. They do not — because the only corpus strings that throw are selects and controller tokens, neither of which the new grammar accepts.
+
+### Verification
+
+**Probe table re-run** (the t1564 table, plus the new forms):
+
+| expression | emit | lint |
+|---|---|---|
+| `10 + 5` | `G0 X15` | silent |
+| `nosuchparam * 2` | `G0 X0` (unchanged) | `x = "nosuchparam * 2": unknown var: nosuchparam — using the default instead` |
+| `3 +` | `G0 X0` | `unexpected: end` |
+| `1/0` | `G0 X0` | `not a finite number` |
+| `round(9 / 3)` NEW | `G0 X3` | silent |
+| `1 ? 7 : 9` NEW | `G0 X7` | silent |
+| `sqr(4)` NEW | `G0 X0` | `unknown function: sqr (known: abs, max, min, round)` |
+
+**Non-vacuity:** `expr-lint-names-the-cause-1566.spec.js` fails **3/3** against the pre-change tree. The functions/ternary spec pins the error paths as hard as the happy ones — typo'd function name, wrong case, both arity directions, unknown var, a ternary missing its `:`, an unclosed call, trailing input — plus the guarantees that must NOT regress (non-finite still an error, plain arithmetic untouched, a select still throws so callers keep the raw value).
+
+**Full suite: 43 e2e failed / 2307 passed / 6 skipped + 1 node-tier (98 pass / 1 fail) = 44, against t1562's 42.** The +2 are `import-safety-1219:62` (a flake already identified at t1617 and t1562) and `pane-sizer-1353:100`. Classified rather than assumed: run isolated, **21/21 passed** (7 tests x 3 repeats). Full-suite contention, and neither has any mechanism connecting it to `lint.js` or `expr.js`. Zero real regressions. Lint: 0 errors.
+
+### ⚠ GATE — the channel this act routes into is not wired to anything
+
+**`blocks/lint.js` has NO production consumer.** `lintProgram` is called from nowhere in `web/`; the only importers are the spec I added this turn and a comment. Checked all history: it arrived in `df942314` and has never had a caller. So the dispatch's premise — "the EXISTING lint channel… already tags per block id" — is true of the CODE and false of the WIRING.
+
+The consequence is that the dispatch's own verify item, *"the warning is visible where an author would see it — say where"*, **has no honest answer: nowhere.** The cause is now named at the channel, correctly and provably, and no surface renders the channel. I am reporting that rather than doing either dishonest thing — claiming a visible warning that does not exist, or quietly inventing a warnings UI nobody asked for (a new panel is a real design question: inline on the block vs a list, and whether it belongs with the existing preflight-badge precedent).
+
+**Options:** (A) wire `lintProgram` into the Blocks tab as its own act, with the surface chosen deliberately; (B) leave it dead and treat the named message as groundwork that pays off when the surface lands; (C) reconsider whether the emit-time path (not lint) should carry the signal — but that collides with the run-time safety fork the dispatch explicitly reserved for its own act. Recommend **A as a separate act**, since the whole value of naming the cause is that a human eventually reads it.
+
+**Capacity:** comfortable. The expensive parts were the two things that could have shipped a lie: measuring the false-positive rate before choosing the warn rule (1172 → 47 → 0), and building a real before/after corpus diff for byte-identity instead of arguing that lint cannot affect emit.
