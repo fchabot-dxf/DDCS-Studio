@@ -15988,3 +15988,49 @@ Screenshots: `DDCS-Studio/verification/t1568-badge-amber-popover.png` (+ `-full`
 ⚠ **Worth a decision, not from me:** that bench-kit spec exists to catch untracked surprises in the probe directory, and it is now permanently red because the workflow deliberately parks in-flight probe files there. It is doing its job and being ignored, which is how a guard dies. Either those files get committed, or the spec learns about an in-flight staging area. Reporting, not choosing.
 
 **Capacity:** comfortable.
+
+
+## 2026-08-07 t1570 (partial — invariant landed, regroup GATED) - `category` IS the axis, and "Shapes" has no members on it
+
+**Task (dispatch):** organise the block palette BY ROLE — Inputs / Layout / Shapes / Previews. First decide whether the existing `category` field IS that axis or a different one, and REPORT which; do not silently add a second field meaning the same thing. The role goes ON the block def, read by the palette, never a name list in the UI. HARD invariant: the SET of palette-reachable blocks is identical before and after; a block lacking the field must never be filtered out.
+
+### The first question, answered: `category` IS this axis
+
+`CATEGORIES` (`wizards/ops/index.js:137`) is a DECLARED, ORDERED list of 16 group names, and `buildToolbox` (`blockly/bridge.js`) groups the palette by `def.category` against exactly that list. So the palette's grouping axis already exists, is already declared on the def, and is already read by the palette — the three properties the dispatch asks for. **Adding a `role` field would be a second field meaning the same thing.**
+
+The distinguishing test I applied: does the proposed vocabulary vary INDEPENDENTLY of category, or is it a finer cut of it? Inputs / Layout / Previews describe the **`Wizard UI`** category — 33 of the 133 palette-visible blocks, by far the largest group. They are not orthogonal to category; they are category at a finer grain. A `move` or `feed` atom is none of the four, so the roles are not a total partition of the palette either. That is a re-grouping, not a second axis.
+
+### ⚠ And the finding that gates the rest: **"Shapes" has no members on this axis**
+
+Reading all 33 `Wizard UI` labels, the set partitions cleanly into three, not four:
+
+- **Inputs** (~15) — `formfield`, `param`, `form_dropdown`, `form_checkbox`, `form_segmented`, `slider_field`, `stepper_field`, `coordlist`, `corner_grid_picker`, `declared_io_picker`, `region_pick_field`, `regionpick`, `thread_preset_picker`, `tool_library_picker`, `form_action_btn`
+- **Layout** (~11) — `user_root`, `section`, `group_box`, `grid_container`, `tab_group`, `tab_page`, `split_horizontal`, `split_vertical`, `layout`, `layoutwidget`, `layout_2d_canvas`
+- **Previews** (~6) — `sim`, `sim_3d_box`, `simstart`, `panel`, `code_preview_panel`, `form_diagram`
+- **Shapes — ZERO.** Nothing in `Wizard UI` is a shape.
+
+Worse, the name is already taken: **`Shapes` is an existing top-level category** holding `region` — a program/geometry atom, not a wizard-UI block. So "Shapes" as a fourth wizard group would either be empty or would collide with a live category of a different meaning. Either way it cannot be delivered as asked, which is why the regroup itself is not in this commit: re-categorising 33 blocks along a partition that does not fit is exactly the work that gets redone.
+
+**Naming consequence, if the regroup proceeds:** the repo already has the `Wizard <X>` convention (`Wizard UI`, `Wizard Form`), so `Wizard Inputs` / `Wizard Layout` / `Wizard Previews` fit the existing namespace and keep the geometry `Shapes` unambiguous.
+
+### What DID land — `960e7fc8`, the invariant and the hazard it guards
+
+Independent of which grouping wins, so it was finished rather than parked.
+
+`buildToolbox` ended at `CATEGORIES.filter((c) => byCat[c])` — it iterates the declared LIST, so **any def whose `category` is absent from that list was silently dropped from the toolbox**: present in `BLOCKS`, emittable, draggable from nowhere. Measured the current state first: 137 blocks, 133 palette-visible, 4 hidden, **133 reachable, 0 missing** — nothing triggers it today. That is exactly why it matters: the bug ships WITH the reorganisation, not before it, and a missing block renders as nothing at all, so no one sees it go.
+
+Unlisted categories now land in a declared catch-all (`UNCATEGORISED`, named once so the builder and the spec cannot drift on the string) — visible and draggable, and obviously wrong to a human, which is the point.
+
+**The invariant** asserts the reachable SET in BOTH directions (nothing vanished; nothing appeared the registry does not expose) — as a set, not a count, since a count survives swapping one block for another. It also asserts hidden defs stay hidden, so the catch-all cannot resurrect a deliberately-hidden atom. **Its durable half uses a SYNTHETIC def carrying a category nobody declared**, so it keeps failing for a FUTURE block added without a listed category, not merely for today's 133 — which is what "write it so it fails for a future block too" requires. Removed from `PALETTE` in a `finally` so it cannot leak into another assertion.
+
+**Non-vacuity:** fails **3/3** against the pre-change builder, on exactly the `must never be filtered out for lacking the field` assertion.
+
+### Options for the advisor
+
+- **A (recommend) — three groups, `Wizard Inputs` / `Wizard Layout` / `Wizard Previews`**, splitting `Wizard UI` on the existing `category` axis. No second field. Drops "Shapes" as having no members here; the existing top-level `Shapes` already covers geometry for program atoms. Honest to what the blocks actually are.
+- **B — four groups, inventing `Wizard Shapes`** from the canvas/diagram blocks (`form_diagram`, `layout_2d_canvas`, `sim_3d_box`). Delivers the requested four names, but splits Previews on a distinction the blocks do not really have — those three ARE previews, they just happen to draw geometry.
+- **C — the roles are meant as a NEW top-level organisation over all 133 blocks**, not a cut of `Wizard UI`. Much larger act, and it leaves ~98 program atoms (Move / Toolpaths / Control / …) belonging to none of the four, so it needs a fifth-and-beyond vocabulary before it can start.
+
+I recommend **A**, and I did not pick it silently because the user named four groups and A delivers three.
+
+**Capacity:** comfortable. Nothing was re-categorised; the only source change is the vanish fix.
