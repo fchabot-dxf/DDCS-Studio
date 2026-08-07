@@ -53,6 +53,40 @@
 - **Untestable on the bench:** whether `error.nc` or any hook fires on a *hardware* alarm
   (limit / E-stop / servo) — a bare unit with no switches can't produce one. `[TO TEST w/ hardware]`
 
+### Expression / macro-syntax acceptance — RESULTS (tested 2026-08-07, 5 probes on the bench V4.1) ⭐
+
+What the controller ACCEPTS as an expression, run as real files on the unit. Probe sources live in
+`verify/` (no-motion) and `verify-motion/`. The on-screen error strings are transcribed verbatim.
+
+| probe | line sent | result |
+|---|---|---|
+| `S6a` | `#190 = #191k8` | **REJECTED** — `Unrecognized file format: L11[#190 = #191k8]` |
+| `S6b` | `#190 = [1 + 2 k 8]` | **REJECTED** — `Unrecognized file format: L9[#190 = [1 + 2 k 8]]` |
+| `S6c` | `G04 Pwidht` | **REJECTED** — `Unrecognized file format: L29[G04 Pwidht]` |
+| `S5o` | `ATAN[1, 1] * 100` | **WORKS** — ran to `M30`, `#190 = 4500` |
+| `S6e` | partial-execution check | **PARTIAL EXECUTION** — `#191 = 5678` |
+
+- **Trailing garbage after a valid prefix is a LOADER rejection, not a truncation.** `[CONFIRMED]`
+  `#191k8` is not read as `#191`, and `[1 + 2 k 8]` is not read as `3` — the controller refuses the whole
+  file. Same `Unrecognized file format` class as the `ZZZZ` loader rejection above.
+- **`ATAN[a, b]` — the COMMA form WORKS, and returns DEGREES.** `[CONFIRMED]` This closes a question that
+  had been open for weeks. `ATAN[1, 1] * 100` → `4500`, i.e. `ATAN[1,1]` = **45**, degrees, not radians and
+  not a 0-1 fraction. (The bracketed `ATAN[a]/[b]` form was already known-good.)
+- **⚠ A rejected program is NOT inert — execution is PARTIAL.** `[CONFIRMED]` `S6e` shows every line BEFORE
+  the offending line executes, then the machine stops; `S6a` left its pre-fault assignment behind in CONT
+  mode too. **So a typo in op 5 means ops 1-4 cut for real and the machine halts with the tool in the
+  material.** This is why an unresolvable expression is a send-time hazard, not a cosmetic one.
+- **Studio consequence, fixed 2026-08-07 (t1573):** `engine/core/expression.js` used to parse as far as it
+  could and DROP the remainder, so the sim silently accepted `S6a`/`S6b` and showed a clean preview for a
+  file the machine refuses. It now rejects trailing tokens, matching the controller. `S6c`'s bare-word form
+  was already rejected. Pinned by `tests/sim-rejects-what-machine-rejects-1573.spec.js` using these exact
+  strings.
+- **Still divergent, NOT yet fixed:** the sim REJECTS `ATAN[1, 1]`, which the hardware ACCEPTS (`S5o`) — its
+  lexer has no `,` token. Opposite direction to the above (the sim is stricter than the machine here), so it
+  hides a working form rather than blessing a broken one. `[TO FIX — separate act]`
+- **Also divergent:** an UNCLOSED bracket (`[1 + 2`) still evaluates to `3` in the sim. Not among the probed
+  forms, so not changed here; the machine's behaviour on it is untested. `[TO TEST + FIX]`
+
 ### Detecting syntax errors over Ethernet — RESULTS (tested 2026-06-06)
 1. **Completion sentinel + checkpoints** `[CONFIRMED both directions]` — write a start-marker near the
    top, numbered checkpoint vars between sections, and a completion-sentinel as the *last* line. PC

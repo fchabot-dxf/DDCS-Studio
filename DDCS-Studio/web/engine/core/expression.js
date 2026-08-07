@@ -155,7 +155,26 @@ export function evalExpr(str, vars, opts = {}) {
         return null;
     }
 
-    return parseExpr();
+    // t1573 — TRAILING INPUT IS A MALFORMED LINE, and the controller says so. Bench-run on the V4.1:
+    //   S6a  `#190 = #191k8`      -> Unrecognized file format: L11[#190 = #191k8]
+    //   S6b  `#190 = [1 + 2 k 8]` -> Unrecognized file format: L9[#190 = [1 + 2 k 8]]
+    // The parser used to return whatever it had managed to consume and drop the rest, so `#191k8` read as
+    // `#191` and `[1 + 2 k 8]` read as `3` — a clean-looking preview for a file the machine REFUSES to run.
+    // That is the sim lying in the most dangerous direction, "everything is fine", and it is not academic:
+    // probe S6e proved execution is PARTIAL — every line before the fault runs, then the machine halts with
+    // the tool in the material. Leftover tokens now make the whole expression unresolvable, which is exactly
+    // how the controller treats them. It also settles a disagreement that already existed: the WIZARD
+    // evaluator (wizards/ops/expr.js) has always thrown on `trailing input`; the sim never did. One
+    // behaviour, three agreeing parties — machine, sim, wizard.
+    //
+    // ⚠ THIS IS SYNTAX, NOT VALUE. An UNSET variable is a different and CORRECT concern that this must not
+    // touch: `#500` with no value still reads as `unsetValue` (0 for the execution engine, null for the
+    // preview). That path lives inside parseFactor's `#` branch and is untouched — the check below is purely
+    // "did the grammar consume every token", asked once, at the top.
+    const v = parseExpr();
+    if (v === null) return null;
+    if (p < toks.length) return null;   // tokens the grammar could not account for → malformed, like the machine
+    return v;
 }
 
 /**
