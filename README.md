@@ -6,6 +6,8 @@
 
 ---
 
+> **Working in this repo — human or agent? Read [`AGENTS.md`](AGENTS.md) first.**
+
 ## Why this exists
 
 A DDCS controller is a capable, standalone CNC brain — but authoring anything past basic motion means **hand-writing `#`-variable G-code in a plain text editor** (Notepad, on a PC): no undo, no picture of what it does, no simulation, and quirky flow control plus a half-there `G10` to work around. Then you USB it over and *find out whether it works by running it on real metal* — the controller yacc-errors to a screen your PC can't even read. The community's classic disaster is full-replacing the controller's `eng` menu file and bricking the CAM page.
