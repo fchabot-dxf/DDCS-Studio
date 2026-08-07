@@ -240,7 +240,12 @@ test('PREMISE 8 — DM500\'s trig floor is the SAME SHAPE as V4.1\'s (COS/SIN at
     // exclude community/NOTES commentary (mentions SQRT/ATAN as absent, not usage) AND verify/ (t1538 — Studio's
     // OWN bench-kit probe macros, which literally probe SQRT/ATAN by name; not factory-shipped, same exclusion
     // class as expert-m350/verify/ elsewhere in this file)
-    const factoryOnly = (files) => files.filter((f) => !/community|NOTES|[\\/]verify[\\/]/i.test(f));
+    // t1573 — FINDINGS.md joins the same exclusion class. The claim under test is about what the VENDOR'S
+    // factory-shipped files use; `community`, `NOTES` and `verify/` were already excluded because they are
+    // OUR commentary and OUR probe macros ABOUT the controller. FINDINGS.md is the same thing — the research
+    // log — and it now names ATAN because the 2026-08-07 bench run CONFIRMED `ATAN[a, b]` works and returns
+    // degrees. Recording that hardware answer must not be able to falsify a claim about the factory corpus.
+    const factoryOnly = (files) => files.filter((f) => !/community|NOTES|FINDINGS|[\\/]verify(-motion)?[\\/]/i.test(f));
     const v41Factory = factoryOnly(v41Files), dm500Factory = factoryOnly(dm500Files);
 
     for (const [label, files] of [['V4.1', v41Factory], ['DM500', dm500Factory]]) {

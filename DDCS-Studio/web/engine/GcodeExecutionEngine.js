@@ -10,7 +10,7 @@
 import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState, setLimitSwitches } from './virtualIO.js';
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
-import { evaluateCondition, validateCondition } from './core/condition.js';
+import { evaluateCondition, validateCondition, stripWrappingBrackets } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
@@ -198,7 +198,7 @@ export class GcodeExecutionEngine {
 
             const whileMatch = stripped.match(/^WHILE\s+(.+?)\s+DO\s*[123]\s*$/i);
             if (whileMatch) {
-                if (!validateCondition(whileMatch[1].trim().replace(/^\[|\]$/g, ''))) {
+                if (!validateCondition(stripWrappingBrackets(whileMatch[1]))) {
                     reportError(lineIndex, 'Invalid WHILE condition syntax');
                 }
                 return;
@@ -210,7 +210,7 @@ export class GcodeExecutionEngine {
 
             const ifThenMatch = stripped.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
             if (ifThenMatch) {
-                if (!validateCondition(ifThenMatch[1].trim().replace(/^\[|\]$/g, ''))) {
+                if (!validateCondition(stripWrappingBrackets(ifThenMatch[1]))) {
                     reportError(lineIndex, 'Invalid IF condition syntax');
                 }
                 return;
@@ -353,7 +353,7 @@ export class GcodeExecutionEngine {
             const wm = line.match(/^WHILE\b\s*(.+?)\s*\bDO\s*([123])\b\s*$/i);
             if (wm) {
                 s.whileN = Number(wm[2]);
-                s.whileCond = wm[1].trim().replace(/^\[|\]$/g, '');
+                s.whileCond = stripWrappingBrackets(wm[1]);
                 stacks[s.whileN].push(i);
                 continue;
             }
@@ -845,7 +845,7 @@ export class GcodeExecutionEngine {
         // IF <cond> THEN <assignment|GOTO> — inline conditional (distinct from the IF…GOTO form below).
         const ifThen = line.match(/^IF\s+(.+?)\s+THEN\s+(.+)$/i);
         if (ifThen) {
-            if (this._evaluateCondition(ifThen[1].trim().replace(/^\[|\]$/g, ''))) {
+            if (this._evaluateCondition(stripWrappingBrackets(ifThen[1]))) {
                 const stmt = ifThen[2].trim();
                 const g = stmt.match(/^GOTO\s*(\d+)$/i);
                 if (g && this.labels.has(Number.parseInt(g[1], 10))) { this.ip = this.labels.get(Number.parseInt(g[1], 10)); return false; }
@@ -859,7 +859,7 @@ export class GcodeExecutionEngine {
         // probe-h.nc:7); the old `\s+GOTO` never matched it, so V4.1 branches (incl. the probe-miss check) silently no-op'd in the sim.
         const ifMatch = line.match(/^IF\s+(.+?)\s*GOTO\s*(\d+)$/i);
         if (ifMatch) {
-            const conditionText = ifMatch[1].trim().replace(/^\[|\]$/g, '');
+            const conditionText = stripWrappingBrackets(ifMatch[1]);
             const targetLabel = Number.parseInt(ifMatch[2], 10);
             if (this._evaluateCondition(conditionText) && this.labels.has(targetLabel)) {
                 this.ip = this.labels.get(targetLabel);

@@ -25,6 +25,38 @@ export function normalizeCondition(expr) {
 }
 
 /**
+ * t1573 — strip ONE outer bracket pair, but ONLY when it genuinely WRAPS the whole condition.
+ *
+ * The callers used to do `.replace(/^\[|\]$/g, '')`, an ALTERNATION: it strips a leading `[` and a trailing `]`
+ * INDEPENDENTLY, so a condition whose comparison sits OUTSIDE the bracket lost its opening `[` and kept the
+ * matching `]`:
+ *     IF [#14 / 2 - FIX[#14 / 2]] > 0.001 GOTO61     (the wall-finish "every Nth level" pause gate)
+ *   →   #14 / 2 - FIX[#14 / 2]] > 0.001              ← unbalanced
+ * That parsed only because the expression evaluator used to ignore trailing tokens; the stray `]` was silently
+ * dropped and the condition happened to come out right. The moment the evaluator started rejecting trailing
+ * input (matching the V4.1, which refuses such lines outright) the LHS became unresolvable and the branch
+ * silently stopped firing — the wall's last-level pause-skip inverted. A latent defect, not a new one.
+ *
+ * Bracket-matching, not anchors: the pair is removed only when the FIRST `[` closes at the LAST character.
+ *   "[#100 > 5]"                → "#100 > 5"    (wrapped — strip)
+ *   "[#14/2 - FIX[#14/2]] > 0"  → unchanged     (comparison outside — the LHS is a valid bracketed expression)
+ *   "[a] > [b]"                 → unchanged     (first bracket closes early)
+ */
+export function stripWrappingBrackets(expr) {
+    const t = String(expr == null ? '' : expr).trim();
+    if (!t.startsWith('[') || !t.endsWith(']')) return t;
+    let depth = 0;
+    for (let i = 0; i < t.length; i += 1) {
+        if (t[i] === '[') depth += 1;
+        else if (t[i] === ']') {
+            depth -= 1;
+            if (depth === 0) return i === t.length - 1 ? t.slice(1, -1).trim() : t;
+        }
+    }
+    return t;   // unbalanced — leave it alone and let the evaluator refuse it
+}
+
+/**
  * Evaluate a condition like "#1922!=2" or "[#100+#200]>50".
  * @param {string} expr - raw condition text (brackets around the whole
  *   condition should already be removed by the caller)
