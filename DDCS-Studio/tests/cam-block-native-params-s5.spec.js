@@ -53,13 +53,24 @@ test('S5.1 — paramGroupFromBindings: one param_field per value-binding in PRE-
         const pg = paramGroupFromBindings(def);
         // and the reader round-trips the materializer output
         const back = paramFieldsFromStack([{ type: 'user_root', params: {}, uiChildren: [pg], children: [] }]);
-        return { type: pg.type, rows: pg.children.map((c) => ({ type: c.type, param: c.params.param, label: c.params.label, widget: c.params.widget, dflt: c.params.dflt })), back };
+        // t1562 — the CONTROL each read-back row resolves to, named via the app's own registry (no parallel table here)
+        const FW = await import('/ui/formWidgets.js');
+        const nameOf = (fn) => (Object.entries(FW.FORM_WIDGETS).find(([, v]) => v === fn) || ['<unregistered>'])[0];
+        const control = back.map((row) => nameOf(FW.resolveFormWidget(row)));
+        return { type: pg.type, rows: pg.children.map((c) => ({ type: c.type, param: c.params.param, label: c.params.label, widget: c.params.widget, dflt: c.params.dflt })), back, control };
     });
     expect(r.type).toBe('param_group');
-    expect(r.rows, 'one param_field per binding, in pre-order, label/default/widget from the binding').toEqual([
-        { type: 'param_field', param: 'frate', label: 'Feed rate', widget: 'number', dflt: '200' },
-        { type: 'param_field', param: 'mz', label: 'Plunge Z', widget: 'number', dflt: '-3' },
+    // t1562 — these two bindings declare NO `widget` (only `type: 'number'`), so the materialized row carries '' —
+    // INHERIT — and the control is derived from the type. This used to read 'number', which is what the assertion
+    // pinned; that literal fallback WAS the t1562 defect (an explicit widget beats the type-derived default in
+    // resolveFormWidget, so baking it flattened every enum/bool/string binding into a number box). Nothing observable
+    // changed for THIS case — type 'number' still resolves to the number widget — which is why the assertion below now
+    // pins the resolved CONTROL rather than the internal spelling, the property the spec actually cares about.
+    expect(r.rows, 'one param_field per binding, in pre-order, label/default/widget from the binding (empty widget = inherit from type)').toEqual([
+        { type: 'param_field', param: 'frate', label: 'Feed rate', widget: '', dflt: '200' },
+        { type: 'param_field', param: 'mz', label: 'Plunge Z', widget: '', dflt: '-3' },
     ]);
+    expect(r.control, 'an inheriting row still RENDERS as a number box for a number-typed binding').toEqual(['number', 'number']);
     expect(r.back.map((x) => x.param), 'the reader reads the materialized rows back in order').toEqual(['frate', 'mz']);
     expect(r.back[0].default, 'and their form defaults').toBe(200);
 });

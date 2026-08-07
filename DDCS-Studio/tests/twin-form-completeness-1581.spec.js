@@ -61,3 +61,64 @@ test('every registered data twin: the form presents every declared binding (form
     const withMissing = r.filter((t) => t.missing.length > 0);
     expect(withMissing, 'every twin\'s form must present every declared binding — if this fails, formBindings() (or whatever the current form-assembly seam is) is dropping params again').toEqual([]);
 });
+
+/**
+ * t1562 — THE SIBLING HALF OF THE SAME INVARIANT: present is not enough, it must be the RIGHT CONTROL.
+ *
+ * The test above can only see a binding that VANISHES. It is blind to one that survives with its widget mangled, which
+ * is exactly what t1562 found: `paramGroupFromBindings` baked `widget: b.widget || 'number'`, turning "no widget
+ * declared, derive it from `type`" into an explicit 'number' — and an explicit widget BEATS the type-derived default in
+ * `resolveFormWidget`. 13 bindings across 7 twins collapsed into number boxes: corner's `clearMode` enum, wcs's four
+ * axis toggles, and every string field (text's `text`, pauseConfirm's `msg`, comm's 4 slots, drill/bore `skip`) — a
+ * text field you could not type text into. Same source and same shape as t1579, one layer further in.
+ *
+ * THE PROPERTY: form assembly is PRESENTATION-NEUTRAL. Materializing a param_group must never change which control a
+ * binding resolves to. Asserted with the app's OWN `resolveFormWidget` rather than a hand-typed type→widget table in
+ * the test — a parallel copy here would drift from `DEFAULT_BY_TYPE` the moment someone adds a type, and would then
+ * pass while the app was wrong. Identity of the resolved widget function is the check; FORM_WIDGETS is scanned only to
+ * turn that function back into a readable name for the failure message.
+ *
+ * Scope is deliberately the 32 BOOT-SEEDED twins, whose param_group is machine-materialized from their own bindings. A
+ * human editing a `param_field` block MAY legitimately choose a different control — that is what the authoring surface
+ * is for — so this invariant is about the materializer being neutral, not about forbidding overrides.
+ */
+test('every registered data twin: materialization preserves each binding\'s CONTROL (widget/type fidelity)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram, undefined, { timeout: 20_000 });
+
+    const r = await page.evaluate(async () => {
+        const A = await import('/app.js');
+        const U = await import('/blocks/userOps.js');
+        const FW = await import('/ui/formWidgets.js');
+        const nameOf = (fn) => (Object.entries(FW.FORM_WIDGETS).find(([, v]) => v === fn) || ['<unregistered>'])[0];
+        const perTwin = [];
+        for (const fn of A.SEED_BUILDERS) {
+            const opType = fn().opType;
+            const stored = U.listUserOps().find((d) => d.opType === opType);
+            if (!stored) { perTwin.push({ opType, error: 'not found in the boot-seeded registry' }); continue; }
+            const byParam = {};
+            for (const b of FW.formBindings(stored)) if (b && b.param != null) byParam[b.param] = b;
+            const mangled = [];
+            for (const b of (stored.bindings || [])) {
+                if (!b || b.param == null) continue;
+                const after = byParam[b.param];
+                if (!after) continue;   // absence is the OTHER test's job — do not double-report it here
+                if (FW.resolveFormWidget(b) !== FW.resolveFormWidget(after)) {
+                    mangled.push({ param: b.param, declared: nameOf(FW.resolveFormWidget(b)), rendered: nameOf(FW.resolveFormWidget(after)) });
+                }
+                if ((after.type || 'number') !== (b.type || 'number')) {
+                    mangled.push({ param: b.param, declaredType: b.type || 'number', renderedType: after.type || 'number' });
+                }
+            }
+            perTwin.push({ opType, mangled });
+        }
+        return perTwin;
+    });
+
+    const problems = r.filter((t) => t.error);
+    expect(problems, 'every twin in the registry must actually be boot-seeded').toEqual([]);
+    expect(r.length, 'the full registry, not a subset').toBe(32);
+
+    const withMangled = r.filter((t) => t.mangled.length > 0);
+    expect(withMangled, 'materializing a param_group must not change which control a binding renders as — an enum must stay a dropdown, a bool a toggle, a string a text field').toEqual([]);
+});
