@@ -6,6 +6,7 @@ import { contractFor, isUnreachable } from '../state.js';   // t1327 — the dec
 import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.js';
 import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
+import { GcodeExecutionEngine } from '../../../engine/GcodeExecutionEngine.js';   // t1585 — the send gate reads the FILE, with the same parser the sim runs
 import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
 import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
 
@@ -106,6 +107,58 @@ export default {
             return;   // the finally block re-enables the button
           }
         } catch (_) { /* no gateway answer → nothing to compare; the other guards still apply */ }
+
+        // t1585 THE SEND GATE — REFUSE WHAT THE CONTROLLER WOULD REFUSE, JUDGED FROM THE FILE.
+        //
+        // Runs BEFORE the envelope check on purpose: a file whose coordinates do not parse cannot be meaningfully
+        // envelope-checked, and an unreadable line is a definite fault rather than a judgement call. Bench-confirmed
+        // on the V4.1: the controller answers `Unrecognized file format: L<n>[<line>]` — and probe S6e proved it
+        // executes every line BEFORE the fault first. So sending one of these does not merely fail: the operations
+        // ahead of it CUT, then the machine halts with the tool still in the material.
+        //
+        // JUDGED FROM THE FILE, never from Studio's memory of having built it. This view pushes an ARBITRARY file —
+        // imported, hand-edited, or authored elsewhere — so block-side knowledge does not apply and would be absent
+        // in the case that matters most. `defaultSyntaxVerify` is the same parser the sim runs, which is what makes
+        // "what the controller would refuse" a claim worth standing behind.
+        //
+        // ⚠ THE TOLERANCE IS ASYMMETRIC AND SET DELIBERATELY LOOSE. Too STRICT is a FALSE REFUSAL that stops real
+        // work; too LENIENT waves through a file the controller rejects, which is merely where we already were. So
+        // it ships on the parser as it stands, with one KNOWN leniency named rather than guessed tight: an unclosed
+        // bracket still parses, and probe S6f is written and waiting to settle what the machine does with it.
+        // Tightening on a guess risks the one failure we cannot accept. It is also why the comma form landed first
+        // (t1583): before that, this gate would have refused `ATAN[1, 1]` — which the hardware ACCEPTS — on day one.
+        //
+        // A RUNTIME TOKEN IS NOT A FAULT: `#500`, `#1512`, a probe result `#5063`, `[#100 + 5]` all verified to pass.
+        // Fifth act running for that carve-out.
+        //
+        // ASKS rather than hard-blocks, matching the envelope gate below and for the reason stated there: the machine
+        // is the USER'S. This makes the consequence impossible to miss; it does not take the decision away.
+        try {
+          const syn = GcodeExecutionEngine.defaultSyntaxVerify(file.text);
+          if (syn && syn.valid === false && syn.errors.length) {
+            // ONE ROW PER LINE. The word tokeniser emits a separate error per LETTER of an unreadable word, so
+            // `G0 Xwidht / 2` arrives as six errors for one line — six rows about one mistake reads as noise and
+            // buries the line number, which is the one thing the operator actually needs.
+            const byLine = new Map();
+            for (const e of syn.errors) if (!byLine.has(e.lineIndex)) byLine.set(e.lineIndex, e);
+            const shown = [...byLine.values()].slice(0, 5).map((e) => `line ${e.lineIndex + 1}: ${String(e.line || '').trim()}`);
+            const more = byLine.size > 5 ? [`…and ${byLine.size - 5} more`] : [];
+            const msg = [
+              `This file has ${byLine.size} line${byLine.size > 1 ? 's' : ''} the controller cannot read:`,
+              '',
+              ...shown, ...more,
+              '',
+              'It will refuse the file with "Unrecognized file format", naming that line — but NOT before running',
+              'every line ahead of it, so the earlier operations cut for real and the machine then halts with the',
+              'tool still in the material.',
+              '',
+              'Send to the controller anyway?',
+            ].join('\n');
+            const ok = await dlgConfirm(msg,
+              { title: 'The controller cannot read this file', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
+            if (!ok) return;   // the finally block re-enables the button
+          }
+        } catch (_) { /* advisory — a checker fault must never block a send */ }
 
         // t838 PRE-FLIGHT ENVELOPE CHECK — warn before pushing a program that would leave the machine travel. The machine
         // is the USER's, so we ASK (an explicit confirm), never silently block. Fires only on RED (declared placement +
