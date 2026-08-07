@@ -16682,3 +16682,130 @@ node**. **All 9 gated failures are green through their real gestures.** Zero gol
 
 **Capacity:** comfortable.
 
+
+## 2026-08-07 t1591 (half landed, half GATED) - The fork carries no bindings at all. 32 of 32.
+
+**Task:** Two halves. (a) Fork parity â€” a built-in and its saved-as-custom copy must have the same FORM, keep
+NON-DEFAULT VALUES, and emit the same G-code. (b) Palette sufficiency â€” every block type any registered wizard
+uses is reachable in the palette.
+
+**Outcome:** (b) is landed and tripwired. (a) is NOT built, because measuring it first turned up something bigger
+than the defect it was written to catch, and landing a 32-red invariant is a merge decision, not mine.
+
+### (a) THE FINDING â€” the fork drops every binding of every built-in
+
+The dispatch anticipated "if the fork silently drops a piece, the copy looks complete and is not." It does not
+drop a piece. Measured across the whole registry:
+
+```
+   SEED_BUILDERS twins                     32
+   twins whose fork recovers SOME binding   0
+   twins whose fork recovers NOTHING       32      â† 549 declared bindings, zero carried
+```
+
+**The mechanism, traced not guessed.** `saveAsCustomOp` derives the copy's bindings from
+`extractParamBlocks(...)` â€” the **param-PILL** extractor. Not one of the 32 shipped twins has a single pill in its
+template: they declare bindings literally or via `bindingSpecs`. So the extractor returns `[]` for all of them and
+the copy is registered with no bindings â€” no form fields, no values, nothing to keep.
+
+This is a KNOWN limit, recorded in the source, never surfaced as a parity failure: `maybeMaterializeParamGroup` is
+documented "PILL-derivable only (the same no-pill save limit S4b found for literal twins â†’ S6)", and
+`maybeMaterializeCamTable` names "a pre-existing no-pill save limitation â€¦ SKIPPED (gated to S6)". Those comments
+scope it to *materialisation*. Nobody had asked what it does to a **fork**, and the answer is: the fork of any
+shipped wizard is an empty shell.
+
+**What each half of the parity claim actually measures today** (corner, via the Customize route, off-defaults set):
+
+```
+   FORM     23 declared fields  â†’   0 in the copy
+   VALUES   13 off-defaults set â†’   0 survive (there are no bindings to hold them)
+   EMIT     byte-identical on the PLACED route (values are baked into the template at instantiate),
+            108 lines â†’ 36 on the Customize route
+```
+
+âš  **Two of my own probes were wrong before this was right,** and both would have produced a confident wrong
+answer:
+1. The first used the PLACED-op route (`makeOp` over `instantiate`). `instantiate` resolves pills to numbers by
+   design, so that route has no pills *legitimately* â€” measuring it says nothing about the fork the user performs.
+2. The second used the Customize route but never actually SET the off-defaults, then reported "values dropped".
+   Every value would have been reported lost even on a perfect fork.
+
+Recording that because the corrected result is severe, and the way to trust it is knowing what it took to get it.
+
+**Why I stopped here rather than writing the invariant.** The spec is easy; what it should DO is not. It would be
+red for all 32, which blocks the merge on a limitation the project deliberately gated to a future stage. That is a
+gate under the loop's step 5, and there are three shapes and I should not pick:
+
+- **A â€” land it RED (32 failing).** Honest and maximally visible; blocks the merge until the fork is fixed.
+- **B â€” land it PINNED to the known-empty set** (the t1585 "pin the leniency" pattern you praised): green today,
+  fails the moment a fork gets better OR a 33rd wizard arrives, so the debt is visible and dated without blocking.
+- **C â€” fix the fork first** (bindings from `def.bindings`/`bindingSpecs`, not only from pills), then land the
+  invariant green. Biggest, and the only one where the foundation is actually sound.
+
+I lean **C then B's tripwire**, but it is a real fork in scope and cost, and this act had already spent its runway
+getting the measurement right.
+
+### (b) LANDED â€” palette sufficiency (`palette-sufficient-1591.spec.js`)
+
+`palette-no-block-vanishes-1570` asserts the reachable SET does not CHANGE. It compares the palette against the
+palette's own registry, so it can hold perfectly while the palette is missing a block every wizard depends on.
+This asserts the set is **SUFFICIENT**: data-driven over `SEED_BUILDERS`, every block type in every seeded twin's
+template must be draggable.
+
+It fired on the first run â€” and the first version of it was **over-broad**, which is worth recording. It reported
+`safetraverse`, `safehop`, `clearlift` and `op` as "draggable from nowhere". Reading the defs rather than trusting
+my own red:
+
+- `op` is a bridge-level container (`makeOpDef('op','op')`), minted by PLACING a wizard, never dragged â†’
+  STRUCTURAL, declared as an exclusion alongside Blockly's shadow primitives rather than silently skipped.
+- the other three carry `hidden: true` **by choice, with recorded reasoning** â€” safetraverse's is explicitly
+  temporary: *"HIDDEN from the DRAGGABLE palette until P2.5 makes it standalone-functional (a childless drop is
+  inert; no broken affordance ships)"*.
+
+So the honest invariant is two claims, not one:
+
+1. **The tripwire** â€” no wizard may depend on a block unreachable for NO DECLARED REASON. That is the t1570 shape
+   one layer up, and it is what would catch a future regression.
+2. **The pin** â€” the hidden-but-load-bearing set is EXACTLY `clearlift(corner)`, `safehop(middle)`,
+   `safetraverse(corner, middle)`. âš  This is a real limit worth stating plainly: **corner and middle cannot be
+   rebuilt by hand today**, because three of the atoms they are built from are deliberately undraggable. The
+   north star's "forkable default library" is true for code and false for a person, for exactly those two wizards.
+   Pinning it as a set means when P2.5 lands, or a FOURTH load-bearing block gets hidden, a decision is visibly
+   owed instead of the gap quietly growing.
+
+**Non-vacuous, both assertions, each against a mutant of its own claim:**
+
+| mutation | expected | result |
+|---|---|---|
+| un-hide `safetraverse` (simulating P2.5 landing) | the PIN notices the set shrinking | **failed** |
+| drop `safeRetractBlock` from the PALETTE export list | the TRIPWIRE notices a load-bearing block go unreachable | **failed** |
+
+Both mutations reverted; `web/` is byte-clean and **no source file changed** â€” the whole diff is one new spec.
+
+### Named goldens
+
+Fast tier, which is the right gate for a source-free act: all four palette specs green
+(`palette-sufficient-1591`, `palette-no-block-vanishes-1570`, `palette-categories`, `palette-search`). Lint **0
+errors** (the 2 pre-existing `middleVizAnimator` warnings, untouched). No full run this turn â€” the change adds one
+test file and touches nothing the other 2300 tests read; the 21-failure baseline from t1589 stands unmoved.
+
+### What this does NOT cover
+
+1. **Fork parity is NOT tested.** That was half the dispatch and it is not done â€” see the gate above. What exists
+   is the measurement, not the invariant.
+2. **The 32/32 result is measured at the BINDING-EXTRACTOR seam**, i.e. what `extractParamBlocks` recovers from
+   each stored template. I verified the end-to-end consequence (form/values/emit) for `corner` only; the other 31
+   are inferred from the same zero-recovery cause, not individually driven through the save dialog.
+3. **No real-app fork screenshot.** The dispatch asked for a built-in and its copy side by side; with the copy
+   coming out empty for every wizard, the shot would document the bug, not the parity, and it belongs with
+   whichever of A/B/C is chosen.
+4. **Palette sufficiency reads TEMPLATES, not emitted stacks.** A block a builder introduces at instantiate time
+   (rather than one stored in the template) is out of its reach.
+5. **The `hidden` exclusion is trusted, not audited.** The spec accepts any `hidden: true` as deliberate. Its pin
+   is what stops that from becoming a loophole, but a newly-hidden block that is NOT load-bearing passes silently.
+
+**Capacity:** honestly, this act ran long â€” three substantial turns in one seat, and this one needed three probes
+before the measurement was trustworthy, on emit-class work. The palette half is solid and I stand behind it. The
+fork half wants a FRESH seat: it needs a ruling on A/B/C first, and if the answer is C it is a source change to
+the save path, which is exactly the kind of work that should not start on a tired context.
+
