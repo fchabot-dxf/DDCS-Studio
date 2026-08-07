@@ -16131,3 +16131,57 @@ I spent several rounds convinced I had blanked the G-code pane — screenshot af
 **Real-app verification:** `verification/t1575-emit-and-warning.png` — the pane shows `9  G0 Xwidht / 2 Y20 Z-5` and the badge row reads `line 9 · could not resolve · x = "widht / 2": unknown var: widht — emitted as written, so the controller will refuse this line`. Same line number in both. The file and the warning are one story.
 
 **Capacity:** comfortable.
+
+
+## 2026-08-07 t1577 (fix + survey) - Set values propagate their failure; loop bounds surfaced, NOT built
+
+**Task (dispatch):** my own gaps (1) and (2) from t1575. A broken Set value still laundered to 0 and **reproduced the bug just fixed, one hop upstream**; a broken loop bound silently empties the program. ⚠ Key difference named by the advisor and it decides the fix: a coordinate has a machine-side line that can carry the error, a Set value and a loop bound do NOT — Studio consumes them before any G-code exists. So propagate the FAILURE into scope rather than substituting, and let it emit verbatim at the CONSUMING line. Loop bounds: surface the shape + a recommendation BEFORE building; ship the Set half alone if the loop half is not clean.
+
+### The Set half — `66a8b00c`, shipped
+
+A failed binding now holds a declared `UNRESOLVED` sentinel instead of `0`. The name stays **bound** — it WAS declared, so reporting "unknown variable" would send the author looking in the wrong place — and any expression reading it fails with `w did not resolve`. That failure travels to the consuming line, which emits verbatim, putting the error in front of the machine on a line there is something to refuse.
+
+```
+   BEFORE   ( w = 0 )            G0 Xw  ->  G0 X0     laundered twice, silent
+   AFTER    ( w = widht / 2 )    G0 Xw             the machine refuses it, at that line
+```
+
+**It genuinely PROPAGATES rather than special-casing the first hop:** `h = w * 2` inherits `w`'s failure and passes it on, so the error still arrives at the line that finally uses `h`. Three lint rows trace the chain. Pinned by the spec, because a one-hop-only fix would look identical in the simple case.
+
+**A frozen object rather than `NaN`:** NaN is indistinguishable from arithmetic that merely overflowed, and this state has to be recognisable at the one place identifiers resolve.
+
+**A contradictory duplicate the change exposed, also fixed:** a loop bound was reported by BOTH the generic `resolve()` and its own site — two rows for one typo, saying `emitted as written` (untrue for a bound; Studio consumes it) and `using 0`. One problem, one row, and the row that survives is the one telling the truth.
+
+**And the message trap again, twice:** the Set-block lint said `defaults to 0`, which my own change made false — reworded. The t1575 comment that justified leaving it alone (*"a Set block's value really does still default to 0"*) also became false and was corrected. The loop-bound message really does still describe a fallback, so it is unchanged. Each was re-checked against the real emit rather than swept along.
+
+### The loop half — NOT built, and this is the shape
+
+`COUNT i from 1 to nosuch` → the bound fails → fallback 0 → `steps = 0` → **nothing emitted at all**.
+
+**Why the Set fix does not transfer.** For a Set I could propagate into scope because there IS a downstream line to receive the failure. A loop bound has no consumer: the iterations that would have carried it are exactly what fails to exist. The failure has nowhere to land.
+
+| option | approach | why it is not clean |
+|---|---|---|
+| **A** | unroll once with the sentinel in scope | **actively dangerous.** Body lines that do NOT reference the index emit real motion the author never asked for — and because execution is PARTIAL (probe `S6e`), those lines CUT before the machine reaches the one it refuses. |
+| **B** | emit a single refusal line where the loop was | needs a malformed line Studio invents. `#100=nosuch` writes a controller variable (a side effect we would be authoring); a bare `nosuch` line is refused cleanly but is still a token no author wrote. |
+| **C** | keep zero iterations; flip the severity to ERROR and gate the SEND | no emit change and no invented G-code, but the FILE stays silently empty. |
+
+**Recommendation: C.** The `LINT_SEVERITY.ERROR` slot already exists for exactly this (declared at t1566 against a fork the advisor had already ruled), send-gating is already established as the run-time path, and it is the only option that invents no G-code. A silently empty program is bad; a program that CUTS something unrequested before halting is worse, and A risks precisely that. B is defensible if the machine should refuse — it just means Studio authoring a line no author wrote, which is a different principle from "emit what the author wrote".
+
+### Named goldens
+
+**Corpus: 0 of 32 twins moved, byte-identical.** **Suite: exactly ONE golden shifted — `homing-inplace-e3.spec.js:52` — cleared on two independent grounds**, not on flake history: (1) **9/9 passed in isolation** (3 tests × 3 repeats); (2) **no mechanism — the homing stack contains ZERO Set blocks**, measured, so the change cannot reach it. Two previously-failing specs went green (`import-safety-1219:99`, `middle-superset:35`, both known flakes).
+
+**Counts: 40 e2e failed / 2318 passed / 6 skipped + 1 node-tier = 41, against t1575's 42.** Lint 0 errors. Spec fails 3/3 against the pre-change tree.
+
+### ⚠ What this does NOT cover
+
+1. **Loop bounds are untouched** — still silently empty, by design this turn. Recommendation above.
+2. **`depth` (Step Down) has the same fallback shape as the loop** and was NOT examined beyond removing its duplicate lint row. Its `to`/`by` use the identical `ev(x, d)` pattern, so it very likely shares the loop's defect; I did not measure it, so I am not claiming it does.
+3. **A CONTROLLER TOKEN bound through a Set is not carried through.** `w = #500` is treated as unresolved like any other unparseable value, so the consumer emits `Xw`, not `X#500`. NOT a regression — it emitted `X0` silently before, so it moved from silently wrong to loudly wrong — but it is NOT the "runtime values keep working" guarantee that holds for a `#var` written DIRECTLY into a coordinate. Carrying a token through a binding needs textual substitution at the consumer, a separate act. **I initially wrote this spec's assertion in wording that IMPLIED it works; caught it and reworded to state the limit.** A green test that implies a capability it does not have is the same failure as a stale warning.
+4. **No hardware has been handed a `G0 Xw`.** Same inference as t1575's gap (4), still an inference.
+5. **The corpus diff still only proves the negative** — zero twins contain a broken Set, so it can confirm "unaffected" and nothing more. The positive case rests on the new spec and the screenshot.
+
+**Real-app verification:** `verification/t1577-set-chain.png` — line 1 `( w = widht / 2 )` with the badge naming `unknown var: widht`, and **line 14 `G0 Xw Y20 Z-5`** with the badge naming `w did not resolve`. Both line numbers match their rows; the root cause and the consequence are both visible in one frame.
+
+**Capacity:** comfortable.
