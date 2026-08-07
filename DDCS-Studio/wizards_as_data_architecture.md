@@ -57,6 +57,44 @@ We can categorize the required Entrypoint Blocks into four specific types based 
 
 ---
 
+## Built-ins are DATA, but they are NOT EDITABLE (ruled 2026-08-06)
+
+Two things that sound alike and are not:
+
+| | verdict |
+|---|---|
+| **Built-in wizards become data** (layout as blocks) | ✅ **essential** — it is the one-source-of-truth win, and it is what makes fork-to-custom lossless |
+| **Editing a built-in in place** (override layer) | ❌ **no** |
+
+**Fork-to-custom is the path.** Open a built-in, change it, save it as yours. The built-in stays
+pristine and keeps receiving app updates.
+
+### Why not in-place editing
+
+1. ⚠ **Safety, and this one is specific to what this app drives.** A presentation edit that hides or
+   reorders `safe Z`, `clearance`, or a probe direction is one click from a crash — and whoever made
+   that edit months ago will not remember. A general-purpose app can tolerate that; a CNC app cannot.
+2. **It manufactures an update problem that fork-to-custom does not have.** Ship a fix to a built-in
+   and every in-place edit either blocks it, silently loses it, or conflicts. That is precisely why an
+   override layer would need provenance, reset, and conflict display — machinery for a problem we can
+   simply decline to create.
+3. **Nobody has asked.** Building a layering model for an unproven need is the speculative machinery
+   this project's own principles warn against. Declare liberally; build reluctantly.
+
+### What people usually actually want
+
+- *"start from corner and make MY version"* → **fork-to-custom**, already implied by built-ins-as-data.
+- *"stop showing me fields I never use"* → **personalisation** (collapse / reorder / favourites): a
+  non-destructive, resettable VIEW preference that never removes a field. Cheap, safe, and available
+  later if the annoyance actually shows up.
+
+### The trigger to revisit
+
+If the maintainer finds themselves repeatedly forking a built-in **just to change one label**, that is
+real evidence and this ruling should be reconsidered. Until then, built-ins are immutable.
+
+---
+
 ## What Counts as a "Complex GUI" — and What To Do About It
 
 *(Added after review, 2026-08-05. The four categories above were written before this test existed.
