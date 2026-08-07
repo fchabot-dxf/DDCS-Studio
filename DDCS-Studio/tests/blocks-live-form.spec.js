@@ -66,11 +66,13 @@ test('form→block writeback: editing the live form writes the value back to the
   await page.waitForSelector('#blk-formpane:not([hidden]) #blk-form [data-param="depth"]', { timeout: 8000 });
 
   // sanity: the projected G-code starts at Z-5
-  await expect.poll(() => page.evaluate(() => document.getElementById('blk-gcode').textContent)).toContain('Z-5');
+  // t1587 — read the projection from the MODEL: 0bd8b38c deleted the `#blk-gcode` pane from the Blocks shell.
+  // The writeback claim (form edit → block → emit) is untouched; only the readout channel moved.
+  await expect.poll(() => page.evaluate(() => window.ddcsGetBlockGcode())).toContain('Z-5');
 
   // EDIT THE FORM: depth -5 → -8 → it writes back to the block, so the projected G-code reflects Z-8
   await page.locator('#blk-form [data-param="depth"]').fill('-8');
-  await expect.poll(() => page.evaluate(() => document.getElementById('blk-gcode').textContent)).toContain('Z-8');
+  await expect.poll(() => page.evaluate(() => window.ddcsGetBlockGcode())).toContain('Z-8');
 
   // the form field still shows -8 (the smart sync didn't clobber the field that was edited)
   expect(await page.locator('#blk-form [data-param="depth"]').inputValue()).toBe('-8');
@@ -213,13 +215,21 @@ test('non-destructive save: "Update" overwrites the re-authored wizard in place 
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
-test('the live form pane is hidden when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
+// t1587 — the pane no longer HIDES itself. 0bd8b38c made `#blk-formpane` the Blocks tab's one permanent right
+// column ("the Generator Modal live preview … full-height focus"), so on the normal path it stays mounted and
+// shows its empty-state prompt instead. The GUARANTEE this test was written for is untouched and is what it
+// still asserts: just building a program must not conjure a wizard form — NO param controls appear.
+test('no wizard form is conjured when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws);
   await page.evaluate(() => window.ddcsLoadBlockStack([{ type: 'move', params: { x: 0, y: 0, z: -5, mode: 'feed' } }]));
   await page.waitForTimeout(500);
-  const hidden = await page.evaluate(() => document.getElementById('blk-formpane').hidden);
-  expect(hidden, 'no form pane when just building a program (not editing a wizard)').toBe(true);
+  const r = await page.evaluate(() => ({
+    controls: document.querySelectorAll('#blk-form [data-param]').length,
+    prompt: (document.getElementById('blk-form').textContent || '').trim(),
+  }));
+  expect(r.controls, 'no param controls when just building a program (not editing a wizard)').toBe(0);
+  expect(r.prompt, 'the pane says why it is empty rather than showing a phantom form').toMatch(/Define Custom Wizard|tick a knob/i);
 });

@@ -21,9 +21,13 @@ test('Blocks tab opens the active cutting op (surfacing) as Blockly blocks with 
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());   // → recordOp('surfacing', …)
 
   await openBlocks(page);
+  // t1587 — read the projection from the MODEL (`ddcsGetBlockGcode`), not from the `#blk-gcode` pane. 0bd8b38c
+  // deleted that pane from the Blocks shell on purpose (the right column is the Generator Modal view now), so the
+  // old readout is gone. The CLAIM here is unchanged and is about the projection, which the model still owns —
+  // whether a standing pane displays it is a separate, still-open question (see the t1587 log).
   const r = await page.evaluate(() => ({
     types: window.__blkws.getAllBlocks().map((b) => b.type),
-    code: document.getElementById('blk-gcode').textContent,
+    code: window.ddcsGetBlockGcode(),
   }));
   // t1361 — surfacing is ONE atom now: `stepdown{ surfacefill }` collapsed into `surfaceraster`, which carries the
   // depth loop and the row walk itself. The Blocks tab renders it like any other atom (it is in the PALETTE, so it
@@ -43,7 +47,7 @@ test('Blocks tab opens a snippet op (WCS) emitted bare — no program framing', 
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
 
   await openBlocks(page);
-  const code = await page.evaluate(() => document.getElementById('blk-gcode').textContent);
+  const code = await page.evaluate(() => window.ddcsGetBlockGcode());   // t1587 — model, not the deleted `#blk-gcode` pane
   expect(code).toMatch(/#\d/);                         // a #-register write present
   expect(code).not.toContain('M30');                  // bare: no End Program
   expect(code).not.toContain('( clearance )');        // bare: no Program Start

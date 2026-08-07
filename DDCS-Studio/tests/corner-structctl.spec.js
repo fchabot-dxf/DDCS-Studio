@@ -66,7 +66,10 @@ test('(2) the STRUCTURAL section shows the 7 controls at their defaults', async 
 // (3) DRIVES-GUARDS LIVE + keeps its value — toggling probeZFirst reprunes the preview (Z arm appears) and stays set
 test('(3) toggling probeZFirst reprunes the preview live and the control keeps its value', async ({ page }) => {
   await openCornerBlocks(page);
-  const gcode = () => page.evaluate(() => (document.getElementById('blk-gcode') || {}).textContent || '');
+  // t1587 — read the projection from the MODEL: 0bd8b38c deleted the `#blk-gcode` pane. The `|| {}` fallback made
+  // this read '' once the pane went, which silently turned the "no Z-Surface yet" half into a vacuous pass — the
+  // exact failure mode a null-tolerant readout invites. `ddcsGetBlockGcode()` is the projection itself, no fallback.
+  const gcode = () => page.evaluate(() => window.ddcsGetBlockGcode() || '');
   const before = await gcode();
   expect(/Z Surface/i.test(before), 'default (probeZ off) has no Z-Surface').toBeFalsy();
   await page.evaluate(() => { const b = window.__blkws.getAllBlocks().find((x) => x.type === 'sc_probezfirst'); b.setFieldValue('TRUE', 'VALUE'); });
@@ -125,7 +128,10 @@ test('(4) the structural controls emit nothing (byte-parity preserved)', async (
 //     replaceOp-ing from stale op.data. Without the isOpBlockEdited/mergeOpBlocks guard, the value edit reverts (spec RED).
 test('(5) a value-socket edit survives a structural toggle (merge, not clobber)', async ({ page }) => {
   await openCornerBlocks(page);
-  const gcode = () => page.evaluate(() => (document.getElementById('blk-gcode') || {}).textContent || '');
+  // t1587 — read the projection from the MODEL: 0bd8b38c deleted the `#blk-gcode` pane. The `|| {}` fallback made
+  // this read '' once the pane went, which silently turned the "no Z-Surface yet" half into a vacuous pass — the
+  // exact failure mode a null-tolerant readout invites. `ddcsGetBlockGcode()` is the projection itself, no fallback.
+  const gcode = () => page.evaluate(() => window.ddcsGetBlockGcode() || '');
   // edit the #1 (Max probe distance) value socket: 500 → 250 (a live value edit that marks the op edited)
   const edited = await page.evaluate(() => {
     const ws = window.__blkws;

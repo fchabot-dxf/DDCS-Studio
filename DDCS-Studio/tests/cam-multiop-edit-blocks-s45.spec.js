@@ -42,7 +42,9 @@ test('Edit a MULTI-op universal slot loads BOTH ops into Blocks (the composed sl
     await page.waitForFunction(() => (window.ddcsGetBlockProgram() || []).filter((b) => b.type === 'op').length === 2, { timeout: 12000 });
     expect(await page.evaluate(() => (window.ddcsGetBlockProgram() || []).filter((b) => b.type === 'op').length),
         'both universal ops loaded into Blocks as a concat').toBe(2);
-    expect(await page.evaluate(() => !!document.querySelector('.cam-auth-overlay')), 'the pendant modal opened too').toBe(true);
+    // t1587 — AWAIT the modal (same race as s44): `editCamSlot` awaits `ddcsEditWizardDefs` before opening it, so
+    // the overlay lands after the Blocks load this test already waited on, not with it.
+    await expect(page.locator('.cam-auth-overlay'), 'the pendant modal opened too').toBeVisible({ timeout: 15000 });
 
     await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });

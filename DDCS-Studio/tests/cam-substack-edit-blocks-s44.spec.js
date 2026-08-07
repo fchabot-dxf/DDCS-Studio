@@ -45,8 +45,12 @@ test('Edit a SUBSTACK slot loads its opunit-wrapped op into the editor (Blocks s
         'the opunit (standard sub-unit, kept LIVE) loaded in the Blocks workspace').toBe(true);
     expect(await page.evaluate(() => (window.ddcsGetBlockProgram() || []).some((b) => b.type === 'op')),
         'the substack op loaded into the editor program').toBe(true);
-    expect(await page.evaluate(() => !!document.querySelector('.cam-auth-overlay')),
-        'the pendant modal opened too (Edit still opens the modal)').toBe(true);
+    // t1587 — AWAIT the modal, don't sample for it. `editCamSlot` does `await ddcsEditWizardDef(...)` and only THEN
+    // `openCamAuthoring()`, so the overlay lands strictly after the Blocks load this test already waited on. Once the
+    // palette grew (the wizards-as-data UI blocks), that load crossed the sampling instant and this read false — a
+    // race in the assertion, not a break: measured, the overlay does appear, ~1-2s after the click.
+    await expect(page.locator('.cam-auth-overlay'), 'the pendant modal opened too (Edit still opens the modal)')
+        .toBeVisible({ timeout: 15000 });
 
     await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });

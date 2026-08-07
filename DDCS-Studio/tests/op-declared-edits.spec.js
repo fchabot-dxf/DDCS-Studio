@@ -20,14 +20,18 @@ async function seedAndOpen(page, wiz) {
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length > 0, { timeout: 8000 });
   await page.waitForTimeout(400);
-  // steady state: panel ancestry ids == workspace ids (the round-trip/reproject has settled, so the drift is applied)
+  // steady state: emitted-line ancestry ids == workspace ids (the round-trip/reproject has settled, so the drift is
+  // applied). t1587 — the SAME condition, read off the projection map instead of the `#blk-gcode` spans: 0bd8b38c
+  // deleted that pane from the Blocks shell. `emitMapped(...).map` is where those spans got their `data-src` from,
+  // so this is the same ids compared the same way, one layer nearer the source. The assertions below were always
+  // model-side (opGlow reads recorded edits, never the DOM), so nothing about the claim moves.
   await page.waitForFunction(() => {
-    const ws = window.__blkws, out = document.getElementById('blk-gcode');
-    if (!ws || !out) return false;
-    const gls = [...out.querySelectorAll('.gl')];
-    if (!gls.length) return false;
+    const ws = window.__blkws;
+    if (!ws || !window.ddcsEmitMapped || !window.ddcsGetBlockProgram) return false;
+    const map = window.ddcsEmitMapped(window.ddcsGetBlockProgram()).map || [];
+    if (!map.length) return false;
     const wsIds = new Set(ws.getAllBlocks(false).map((b) => b.id));
-    const srcIds = [...new Set(gls.flatMap((sp) => (sp.dataset.src || '').split(',')).filter(Boolean))];
+    const srcIds = [...new Set(map.flatMap((src) => src || []).filter(Boolean))];
     return srcIds.length > 0 && srcIds.every((id) => wsIds.has(id));
   }, { timeout: 8000 });
 }

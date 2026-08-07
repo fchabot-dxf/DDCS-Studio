@@ -16383,3 +16383,171 @@ Worth recording as a pattern: two specs, one for *is it right* and one for *does
 5. **`ifgoto`'s unlinted operands and the unlinted IF children** (t1581's gaps) are untouched and still queued.
 
 **Capacity:** comfortable. This is the act the advisor named as the last before the MERGE POINT, and I agree it is the right seat boundary — the pivot to wizards-as-data is a genuine topic change rather than another member of this family.
+
+## 2026-08-07 t1587 (triage + 11 spec repairs; 9 REAL, gated) - The 23 are one deleted pane, one inverted default, and one race
+
+**Task:** Classify the 23 failures the branch adds over `origin/main` â€” STALE SPEC (the Blocks rework changed the
+structure on purpose) vs REAL BREAK (the Blocks tab does not work) â€” with evidence per group. Fix what is clearly
+stale; report anything real with its shape.
+
+### The answer: three causes, and only two of them are stale
+
+Reproduced by running the 17 named spec files together: **21 failures**, of which 20 are on the advisor's list of 23
+(3 more did not reproduce â€” see below â€” and one, `drill-switch-shots-1385:119`, is a pre-existing failure shared with
+`main`, not one of the 23: the branch does not touch `exposeClassifier.js`, `drillData.js` or that spec).
+
+```
+   CAUSE 1  commit 0bd8b38c deleted three panes from the Blocks shell        14 of 23
+            #blk-gcode Â· #blk-preview-panel Â· #blkSegPv/#blkSegCode
+              1a  the spec only READ the projection through the pane   -> STALE, repaired (7)
+              1b  the spec tests the pane's own BEHAVIOUR              -> REAL,  gated  (9)   â† see below
+
+   CAUSE 2  the same commit inverted #blk-formpane's default: hidden -> always mounted   2 of 23
+                                                                       -> STALE, repaired (2)
+
+   CAUSE 3  Edit-a-CAM-slot: the pendant modal is AWAITED, the spec SAMPLED  2 of 23
+                                                                       -> STALE, repaired (2)
+
+   NOT REPRODUCED (passed in isolation)  op-params-complete:65 Â· middle-superset:35 Â·
+                                         import-safety-1219:47                          3 of 23
+```
+
+`0bd8b38c` ("41 wizard UI blocks, renderUiTree layout engine, clean Wizard View drawer") removed `.pv`
+(3D/2D preview), `.gcode` (`<pre id="blk-gcode">`) and the `Preview | G-code` segmented toggle from
+`#blocks-app .right`, and expanded `#blk-formpane` to be the column's only occupant. **That removal was deliberate
+and is recorded** â€” its WORK-LOG entry carries a *"Recorded User Intentions"* section: *"The right-hand pane of the
+Blocks tab is dedicated to the Wizard View â€¦ taking full drawer height instead of having separate standalone panels
+or top-level G-code toggle tabs."* So the DOM change is not the bug, and I have not treated it as one.
+
+### âš  But the removal left tenants behind â€” this is the part that is REAL
+
+I opened the tab and looked, because the source read the same either way (`verification/t1587-blocks-tab-now.png`).
+The canvas is **fine** â€” blocks render, values are real (`w 123`), and the projection is correct (`#40=123`). The
+right column is not:
+
+```
+  #blocks-app                                                    what a spec asked for
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚  Blockly canvas â€” HEALTHY  â”‚  GENERATOR MODAL      [LIVE] â”‚
+  â”‚  progstart                 â”‚                              â”‚
+  â”‚   Surfacing                â”‚  "Add a "Define Custom       â”‚  â† the WHOLE right column,
+  â”‚    Surface Raster w=123    â”‚   Wizard" block or tick a    â”‚    on the NORMAL path
+  â”‚  progend                   â”‚   knob to view live          â”‚
+  â”‚                            â”‚   Generator Modal layout."   â”‚
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                  â–²
+                                  â””â”€ was: [3D preview] + [Projected G-code]
+```
+
+The recorded intention describes the pane **while authoring a wizard tree**. On the normal path â€” stack blocks, make
+a program â€” nothing was put in the removed panes' place. And the code that drove them was never retired with them:
+
+- `blocksApp.js:155` â€” `const out = document.getElementById('blk-gcode') || document.createElement('div')`. With the
+  pane gone, `out` is a **detached div**. Everything from ~512-610 still runs into it every render: `setExecLine`
+  (the sim's executing line + comet-tail), `.warm` hover, `.thot` value-token boxing, `has-sel` selection, and the
+  click handler. ~100 lines of live machinery writing to a node that is not in the document.
+- `styles.css:5389-5409` â€” the matching `#blk-gcode` rules can never match.
+- `blocksApp.js:171` â€” `blkPanelHost` is null, so the shared preview panel is replaced by the
+  `{ setGcode(){}, setActive(){}, refresh(){} }` **stub**. `window.__blkPanel` still exists and is that stub.
+
+So four shipped capabilities are **unreachable in the app**, not merely untested. That is a capability loss, made
+silently, and no one has ruled on it. It is what the remaining 9 failures are reporting, correctly:
+
+| lost surface | failures still red | what the user can no longer do |
+|---|---|---|
+| `#blk-gcode` | `blocks-exec-glow:11`, `blocks-hover:54/:99/:120`, `context-menu-blocks-1454:86` | watch the sim light the emitting line; hover a block to see its lines; box a value's emitted token; "Show G-code" selecting the op |
+| `#blk-preview-panel` | `blocks-rotary-rig:14`, `whole-program-intent-756:47`, `drill-switch-shots-1385:40` | see the toolpath / the 4th-axis rig without leaving the tab |
+| `#blkSegPv` / `#blkSegCode` | `blocks-mobile-drawers:8` | the mobile Preview â‡„ G-code toggle |
+
+**Mitigating fact, measured not assumed:** the projection itself is intact and still *visible* â€” `programModel.js`
+`projectToEditor()` mirrors it into the STUDIO editor, so the G-code is one tab away. What is gone is the Blocks-tab
+line-level surface, not the code.
+
+**I did not touch these nine.** Editing them to agree would make the loss permanent and invisible, which is the one
+thing the dispatch ruled out. They are a gate: restoring a code/preview surface is a source change against a
+recorded user intention, and that is the advisor's call, not mine. Options, cheapest first:
+
+- **A â€” accept the loss.** Retire the orphaned machinery (`setExecLine`, hover/`.thot`/`has-sel`, the CSS, the stub
+  panel) and delete the 9 specs with it. Honest, and the tab gets smaller. Costs four features the user has.
+- **B â€” re-home the features into the Wizard View.** The recorded intention already names `code_preview_panel` as
+  the opt-in code surface; wire `out` to it when present. Keeps the features, keeps the new layout, biggest build.
+- **C â€” restore the panes behind the empty state.** When the pane has no wizard tree to show (the normal path), show
+  the old Preview + Projected G-code there instead of the placeholder. Smallest change that loses nothing.
+
+I lean **C** â€” it is the only option where the normal path stops showing a 27%-wide placeholder, and it makes the
+recorded intention true rather than contradicting it (the Wizard View still wins whenever there IS a tree).
+
+### What I repaired (11), and how each was proven
+
+Every repair keeps the original claim and moves only the channel it is read through. None of them blesses the
+removed surface.
+
+1. **The projection re-points (5)** â€” `studio-to-blocks:14/:38`, `blocks-live-form:52`, `corner-structctl:67/:126`
+   read the emit out of `#blk-gcode.textContent`; they now read `window.ddcsGetBlockGcode()`, the model the pane was
+   a view of. âš  `corner-structctl` used `(document.getElementById('blk-gcode') || {}).textContent || ''` â€” the
+   null-tolerant fallback turned its "no Z-Surface yet" half into a **vacuous pass** the moment the pane went. That
+   is the failure mode this project keeps naming; the fallback is gone.
+2. **The `op-declared-edits` settle (2)** â€” its assertions were always model-side (`opGlow` reads recorded edits,
+   never the DOM); only its *steady-state wait* counted `#blk-gcode .gl` spans. Same condition now reads
+   `ddcsEmitMapped(...).map`, which is where those spans got their `data-src` in the first place.
+3. **The formpane default (2)** â€” `blocks-live-form:216` and `hand-built-form:66` asserted `#blk-formpane.hidden`.
+   The pane is permanently mounted now (intention #9/#10 of that commit). Both keep the guarantee they were written
+   for â€” *no phantom form on the normal path* â€” by asserting **zero `[data-param]` controls** instead of a hidden
+   pane, and `blocks-live-form` additionally pins the empty-state prompt so "empty" stays distinguishable from
+   "absent".
+4. **The CAM race (2)** â€” `cam-substack-s44:11` / `cam-multiop-s45:33` are NOT a break. `editCamSlot` does
+   `await ddcsEditWizardDef(...)` and *then* `openCamAuthoring()`, so the overlay lands strictly after the Blocks
+   load the specs already waited on. Measured with a MutationObserver over the click: `[false,false,false,true,true]`
+   â€” **the overlay does open**, ~1-2s later than the bare `expect` sampled. Both now `await` it. This one was worth
+   the measurement: it looked exactly like a broken feature and was a sampling instant.
+
+**â­ Proven non-vacuous â€” 11/11 fail against a mutant of the exact thing each claims** (app mutated, specs untouched,
+mutations reverted, `web/` clean):
+
+| mutation | expected | result |
+|---|---|---|
+| `window.ddcsGetBlockGcode = () => ''` + `ddcsEmitMapped -> { map: [] }` | the 5 re-points + 2 settles die | **7/7 failed** |
+| `.cam-auth-overlay` class renamed | both CAM awaits die | **2/2 failed** |
+| a phantom `<input data-param>` injected into the empty state | both formpane tests die | **2/2 failed** |
+| the empty-state prompt text blanked | `blocks-live-form` prompt half dies | **1/1 failed** (`hand-built-form` correctly survives â€” it does not claim the text) |
+
+### Named goldens
+
+**No golden moved, and no source file changed** â€” the entire diff is 7 spec files, `web/` is byte-clean (verified
+after reverting every mutant). Lint **0 errors** (2 pre-existing warnings in `middleVizAnimator.js`, untouched).
+
+**Suite: 28 e2e failed / 2337 passed / 6 skipped + 1 node-tier = 29**, against the advisor's 41 branch baseline.
+The ID diff accounts for every one of the 23, with nothing left unexplained:
+
+```
+   41  advisor's branch baseline
+  âˆ’11  repaired this act                        -> green
+  âˆ’ 2  op-params-complete:65, import-safety-1219:47 -- passed in BOTH my runs (known flake class)
+  = 28 e2e  (+1 node)
+       â”œâ”€â”€ 18  none of them in the 23 -> the shared-with-main set, matching the advisor's 18 exactly
+       â”œâ”€â”€  9  the REAL group, deliberately left red (the gate above)
+       â””â”€â”€  1  middle-superset:35 -- see below
+```
+
+The 1 node-tier failure (`surfacing-as-data: byte-identical â€¦ across a param sweep`) is the same one t1585 reported.
+Unmoved.
+
+### What this classification does NOT cover
+
+1. **The 3 that did not reproduce in isolation are NOT classified â€” they are load-sensitive, which is a different
+   thing from stale or broken.** All three PASSED when I ran the 17 named files together. In the full run,
+   `middle-superset:35` came back RED while `op-params-complete:65` and `import-safety-1219:47` stayed green. So
+   contention, not structure, decides them â€” which is exactly why I could not classify them from a failure. All
+   three are budget-sensitive by construction (two sharded with explicit time budgets, one dialog-driven). My
+   hypothesis, **unproven**: the branch's larger palette (137 blocks) slows boot enough to push a sharded budget
+   over under full-suite contention. Proving it needs a boot-time measurement branch-vs-main, which I did not do,
+   and it would be the honest next step if the advisor wants these off the board rather than tolerated.
+2. **`drill-switch-shots-1385:119`** (`feed` classified `geometry`, expected `value`) is a **shared** failure, not
+   one of the 23 â€” the branch does not touch the classifier, the data-op or the spec. Out of scope here, still red.
+3. **I did not measure whether the 9 real failures ever passed on this branch.** I classified them by what the app
+   does now, not by bisecting when each stopped.
+4. **No ruling was sought from the user** on A/B/C â€” this is reported to the advisor as a gate, as the loop requires.
+5. **The Wizard View path itself is only lightly exercised** â€” I verified the empty state on the normal path and
+   that `blocks-live-form`'s authoring tests pass. Whether the 1:1 Generator Modal layout is *correct* for a real
+   wizard tree is a separate question this triage did not open.
+
