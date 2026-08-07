@@ -28,6 +28,20 @@ import { num } from '../wizards/ops/util.js';
  * before choosing this rule: 1172 string params throw, 47 sit on numeric fields, and ALL 47 are these tokens —
  * so on a clean corpus the rule fires exactly 0 times and only speaks when something is genuinely broken.
  */
+/**
+ * t1566 (amendment) — SEVERITY IS A DECLARED SLOT, not a hardcoded literal.
+ *
+ * Every lint record carries `severity`. Today every one of them is 'warn', so behaviour and emitted G-code
+ * are unchanged — the point is that the slot EXISTS. The run-time fork is already ruled: an unresolvable
+ * expression will REFUSE to emit rather than substitute a default. When that act lands it flips ONE declared
+ * value below, instead of retrofitting a severity onto every call site and every consumer of the channel.
+ * A declaration is near-free; the retrofit is not.
+ */
+export const LINT_SEVERITY = { WARN: 'warn', ERROR: 'error' };
+
+/** The severity an UNRESOLVABLE EXPRESSION reports at. THIS is the single value the run-time-safety act flips. */
+export const UNRESOLVABLE_EXPR_SEVERITY = LINT_SEVERITY.WARN;
+
 const CONTROLLER_TOKEN = /^\s*[#[]/;
 const isExprField = (def, k) => typeof ((def && def.defaults) || {})[k] === 'number';
 
@@ -44,7 +58,7 @@ function resolve(params, scope, def, add) {
             const r = tryEval(v, scope);
             if (!('err' in r)) { out[k] = r.v; continue; }
             out[k] = v;   // unchanged: the raw value still flows on, so emitted G-code is untouched
-            if (add && isExprField(def, k) && !CONTROLLER_TOKEN.test(v)) add(`${k} = "${v}": ${r.err} — using the default instead`);
+            if (add && isExprField(def, k) && !CONTROLLER_TOKEN.test(v)) add(`${k} = "${v}": ${r.err} — using the default instead`, UNRESOLVABLE_EXPR_SEVERITY);
         } else out[k] = v;
     }
     return out;
@@ -85,7 +99,7 @@ const CHECKS = {
     },
 };
 
-/** Lint a program → [{ blockId, msg }] (all warnings; nothing blocks). */
+/** Lint a program → [{ blockId, msg, severity }] (today all 'warn'; nothing blocks). */
 export function lintProgram(blocks) {
     const out = [];
     walk(blocks || [], Object.create(null), out);
@@ -95,13 +109,13 @@ export function lintProgram(blocks) {
 function walk(blocks, scope, out) {
     for (const b of blocks) {
         const def = BLOCKS[b.type]; if (!def) continue;
-        const add = (msg) => out.push({ blockId: b.id, msg });
+        const add = (msg, severity = LINT_SEVERITY.WARN) => out.push({ blockId: b.id, msg, severity });
 
         if (def.kind === 'var') {   // Set: bind the scope (and warn on a broken formula)
             // t1566 — this site ALREADY warned, but its bare `catch` discarded the evaluator's named reason, so a
             // typo'd reference read the same as any other bad formula. Keep the message, add the cause.
             const r = tryEval(b.params.value, scope);
-            if ('err' in r) { scope[b.params.name] = 0; add(`"${b.params.name}" = ${b.params.value}: ${r.err} — defaults to 0`); }
+            if ('err' in r) { scope[b.params.name] = 0; add(`"${b.params.name}" = ${b.params.value}: ${r.err} — defaults to 0`, UNRESOLVABLE_EXPR_SEVERITY); }
             else scope[b.params.name] = r.v;
             continue;
         }
@@ -117,7 +131,7 @@ function walk(blocks, scope, out) {
             const ev = (x, d, which) => {
                 const r = tryEval(x, scope);
                 if (!('err' in r)) return r.v;
-                if (typeof x === 'string' && x !== '' && !CONTROLLER_TOKEN.test(x)) add(`${which} = "${x}": ${r.err} — using ${d}`);
+                if (typeof x === 'string' && x !== '' && !CONTROLLER_TOKEN.test(x)) add(`${which} = "${x}": ${r.err} — using ${d}`, UNRESOLVABLE_EXPR_SEVERITY);
                 return d;
             };
             const from = ev(b.params.from, 1, 'from'), to = ev(b.params.to, 0, 'to'), by = ev(b.params.by, 1, 'by') || 1;

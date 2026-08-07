@@ -26,9 +26,14 @@ test('a broken expression names its cause; selects, controller tokens and valid 
     await page.waitForFunction(() => window.ddcsGetBlockProgram, undefined, { timeout: 20_000 });
 
     const r = await page.evaluate(async () => {
-        const { lintProgram } = await import('/blocks/lint.js');
+        const L = await import('/blocks/lint.js');
+        const { lintProgram } = L;
         const msgs = (stack) => lintProgram(stack).map((w) => w.msg);
         return {
+            // t1566 amendment — severity is a DECLARED slot, not a hardcoded literal
+            vocab: L.LINT_SEVERITY,
+            exprSeverityConst: L.UNRESOLVABLE_EXPR_SEVERITY,
+            records: lintProgram([{ id: 'b0', type: 'move', params: { mode: 'rapid', x: 'fedrate * 2', y: 0, z: 0, feed: 500 } }]),
             unknownVar: msgs([{ id: 'b1', type: 'move', params: { mode: 'rapid', x: 'fedrate * 2', y: 0, z: 0, feed: 500 } }]),
             syntax: msgs([{ id: 'b2', type: 'move', params: { mode: 'rapid', x: '3 +', y: 0, z: 0, feed: 500 } }]),
             validMaths: msgs([{ id: 'b3', type: 'move', params: { mode: 'rapid', x: '10 + 5', y: 0, z: 0, feed: 500 } }]),
@@ -50,4 +55,15 @@ test('a broken expression names its cause; selects, controller tokens and valid 
     // ── and a clean program stays QUIET (the half that keeps the lint worth reading) ──────────────────────
     expect(r.validMaths, 'valid arithmetic warns about nothing').toEqual([]);
     expect(r.controllerToken, 'DDCS #vars / [expr] ride through to the controller — not ours to evaluate').toEqual([]);
+
+    // ── the DECLARED severity slot (t1566 amendment) ─────────────────────────────────────────────────────
+    // The run-time fork is ruled: an unresolvable expression will REFUSE to emit. Declaring the slot now
+    // means that act flips ONE value; it does not retrofit a severity onto every call site and consumer.
+    expect(r.vocab, 'the severity vocabulary is declared, not spelled out at each site').toEqual({ WARN: 'warn', ERROR: 'error' });
+    expect(r.exprSeverityConst, 'today an unresolvable expression is a WARN — behaviour unchanged').toBe('warn');
+    expect(r.records.length, 'the broken expression produced a record to carry it').toBeGreaterThan(0);
+    for (const rec of r.records) {
+        expect(Object.keys(rec).sort(), 'every record carries blockId + msg + severity').toEqual(['blockId', 'msg', 'severity']);
+        expect(rec.severity, 'and it is the declared value, not a literal').toBe('warn');
+    }
 });
