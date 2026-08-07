@@ -16331,3 +16331,55 @@ Wrote `S6f_unclosed.nc` for the third divergence (an unclosed bracket still eval
 5. **The corpus diff still only proves the negative.**
 
 **Capacity:** comfortable, unchanged. The seat boundary the advisor named (the merge point after the gate) still looks right to me.
+
+
+## 2026-08-07 t1585 (feat) - THE SEND GATE: refuse what the controller would refuse, judged from the FILE
+
+**Task (dispatch):** gap (1), the close of the arc. Wire the send gate G-code-side, from the file — `send.js` pushes an ARBITRARY file, so it must judge what the CONTROLLER would refuse, read from the file itself, not from Studio's memory of building it. ⚠ The asymmetry sets the tolerance: **too STRICT is a false refusal that stops real work; too LENIENT leaves us where we already were.** Ship on the parser as it stands, with the unclosed-bracket leniency KNOWN and NAMED rather than guessed tight. Must NOT refuse a runtime token or a clean file — *and assert it, because a gate that refuses everything looks like it works.*
+
+### The seam already existed
+
+`GcodeExecutionEngine.defaultSyntaxVerify(text)` — static, file-text-side, returning `{ valid, errors:[{lineIndex, line, message}] }`, built on the same parser the sim runs. So "what the controller would refuse" is a claim with something behind it, and no second detector was needed. Placed BEFORE the envelope check: a file whose coordinates do not parse cannot be meaningfully envelope-checked, and an unreadable line is a definite fault rather than a judgement call.
+
+**Measured the whole tolerance before wiring anything** — the must-not-refuse half first, since that is the half that can break real work:
+
+| file | verdict | |
+|---|---|---|
+| clean mill program | **passes** | a gate that refuses everything only *looks* like it works |
+| `G0 X#500 Y10`, `G1 Z#1512` | **passes** | runtime tokens — fifth act for this carve-out |
+| `#100 = #5063`, `G0 Z[#100 + 5]` | **passes** | a probe result with arithmetic over it |
+| `#190 = ATAN[1, 1] * 100` | **passes** | ⚠ and this is *why* t1583 came first |
+| comments | **passes** | |
+| `G0 Xwidht / 2` | refuses, **line 3** | the emit this whole arc now produces |
+| `#190 = #191k8` (S6a), `[1 + 2 k 8]` (S6b) | refuses | the forms the V4.1 refused on the bench |
+| bare `nosuch` | refuses, **line 3** | what an unresolvable bound / IF condition now emits |
+| `#190 = [1 + 2` | **passes** | the KNOWN leniency, named not guessed |
+
+**The reorder is demonstrated rather than argued:** `ATAN[1, 1]` passes. Built before t1583, this gate would have refused a hardware-attested form on day one.
+
+### Two judgement calls, deliberately visible
+
+1. **It ASKS; it does not hard-block.** The dispatch said "REFUSES", but `send.js` declares *"the machine is the USER's, so we ASK (an explicit confirm), never silently block"*, and hard-blocking here would be the first place Studio overrides the operator. Matched the existing danger-confirm idiom (`Cancel` / `Send anyway`, cancel default). One line to change if the advisor wants a true block — flagged rather than silently decided either way.
+2. **One row per LINE.** The word tokeniser emits an error per *letter* of an unreadable word, so `G0 Xwidht / 2` arrives as **six** errors for one line. Six rows about one mistake reads as noise and buries the line number, which is the single thing the operator needs. Deduped by line index; the row quotes the line back the way the controller does.
+
+### ⚠ I nearly shipped a detector that never runs
+
+The first spec proved the detector precisely — and would have passed identically if the gate were never called. Driving the REAL Send view found something a direct call could not: **`send.js:222` disables the Send button whenever no machine is answering** (`btn.disabled = out || !file.text` — "staging stays usable; SENDING is what needs a machine"). So the dialog is unreachable in the app without hardware, and every "real app" attempt silently did nothing.
+
+Lifted **only** that connection flag — orthogonal to the gate, and unsatisfiable without a machine — and stubbed nothing else: the click, the handler, the parser, the dedupe and the dialog are all real. The result is committed as a second spec, `send-gate-wiring-1585.spec.js`, which **fails when `send.js` is reverted**, so it is testing the wiring and not the lift. Screenshot: `verification/t1585-send-gate.png`.
+
+Worth recording as a pattern: two specs, one for *is it right* and one for *does it run*, because the first cannot see the second's failure at all.
+
+### Named goldens
+
+**Corpus untouched by construction** — this act changes only `send.js`, which no twin emits through. **Suite: 39 e2e failed / 2326 passed / 6 skipped + 1 node-tier = 40, against t1583's 42. ZERO goldens moved**; two fixed (`import-safety-1219:47`, `spike-shot:3` — the two flakes from the previous run). Lint 0 errors.
+
+### What this does NOT cover
+
+1. **The unclosed bracket still passes the gate.** Deliberate: `S6f` is written and waiting, and guessing tight risks the false refusal — the one failure this gate cannot have. The spec PINS the leniency so the day S6f returns, a decision is visibly owed.
+2. **No hardware has been handed any of these files.** The refusal is what the parser predicts the controller does; every prediction rests on the S6a/S6b/S6c transcriptions, not on a probe of these exact programs.
+3. **The gate cannot be reached in the app without a machine**, so its real behaviour on a live send is untested end-to-end — the button is disabled before it. The wiring spec proves the handler chain, not a completed push.
+4. **A file that is unreadable for a reason the parser does not model still sends.** The gate is only as good as `defaultSyntaxVerify`; anything the V4.1 rejects that Studio's grammar accepts passes silently. That is the too-lenient direction, chosen on purpose.
+5. **`ifgoto`'s unlinted operands and the unlinted IF children** (t1581's gaps) are untouched and still queued.
+
+**Capacity:** comfortable. This is the act the advisor named as the last before the MERGE POINT, and I agree it is the right seat boundary — the pivot to wizards-as-data is a genuine topic change rather than another member of this family.
