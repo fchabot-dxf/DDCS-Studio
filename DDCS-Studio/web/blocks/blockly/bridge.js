@@ -167,7 +167,13 @@ const optionsFor = (def, field) => {
     // surfaces can't drift. (The import closes a benign cycle — this list is read lazily here, never at module-eval.)
     if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
     // FORM value-field block (composable-authoring): the form-widget + the binding value-type dropdowns.
-    if (field === 'widget' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', 'tool-library', 'thread-preset', 'declared-io', 'stepper'];   // t1105 — param_field shares formfield's widget/type vocab
+    // t1562 — param_field's widget is OPTIONAL: empty = derive the control from `type` (enum→dropdown, bool→toggle,
+    // string→text), which is what a binding that declares no widget means. The author surface has to be able to SAY
+    // that, or the only way to express "inherit" would be to leave a wrong value in place. [label, value] pair so the
+    // empty value still reads as a real choice in the dropdown. Scoped to param_field: formfield has its own reader,
+    // which has no inherit semantics, so its vocab is left exactly as it was.
+    if (field === 'widget' && def.type === 'param_field') return [['(from type)', ''], 'number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', 'tool-library', 'thread-preset', 'declared-io', 'stepper'];
+    if (field === 'widget' && def.type === 'formfield') return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list', 'plane-suggest', 'tool-library', 'thread-preset', 'declared-io', 'stepper'];   // t1105 — param_field shares formfield's widget/type vocab
     if (field === 'type' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'int', 'enum', 'bool', 'string', 'list'];
     // LAYOUT-2D widget block (composable GUI): the anchor KIND + the coordinate FRAME (v1 = point / stock-min).
     if (field === 'anchor' && def.type === 'layoutwidget') return ['point'];

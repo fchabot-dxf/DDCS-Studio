@@ -17,7 +17,7 @@ export const paramFieldBlock = {
     defaults: {
         param: '',        // which def value-binding this row is (matches binding.param) — the ROUTING KEY, read-only chip
         label: '',        // the form label (empty = inherit binding.label / the param name)
-        widget: 'number', // the form widget registry key (number/slider/dropdown/…)
+        widget: '',       // the form widget registry key (number/slider/dropdown/…); EMPTY = inherit, i.e. derive from `type` (t1562)
         type: 'number',   // the value type (number/int/enum/bool/string)
         dflt: '',         // the form default (empty = inherit binding.default)
         section: '', help: '',

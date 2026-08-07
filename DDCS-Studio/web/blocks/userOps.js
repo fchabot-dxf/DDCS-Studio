@@ -350,13 +350,23 @@ export function camFieldsFromStack(template) {
 export function paramFieldsFromStack(template) {
     return flattenBlocks(template).filter((b) => b && b.type === 'param_field').map((b) => {
         const p = b.params || {};
-        const row = { param: String(p.param || ''), widget: String(p.widget || 'number'), type: BINDING_TYPES.has(p.type) ? String(p.type) : 'number' };
+        // t1562 — widget '' means INHERIT (the file's own "empty strings inherit the binding" convention, which every
+        // OTHER field here already honours). The renderer's contract is that `widget` is OPTIONAL: resolveFormWidget
+        // returns the binding's widget when set, ELSE derives one from `type` (enum→dropdown, bool→toggle, string→text).
+        // Writing a literal 'number' here would DESTROY that absence — an explicit 'number' beats the type-derived
+        // default — so a row that inherits must leave `widget` UNSET, not set it to the type-agnostic fallback.
+        const row = { param: String(p.param || ''), type: BINDING_TYPES.has(p.type) ? String(p.type) : 'number' };
+        if (p.widget !== '' && p.widget != null) row.widget = String(p.widget);
         if (p.label !== '' && p.label != null) row.label = String(p.label);
         if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) row.default = Number(p.dflt);   // else inherit binding.default
         if (p.section) row.section = String(p.section);
         if (p.help) row.help = String(p.help);
         const wc = {};
-        if ((p.widget === 'dropdown' || p.widget === 'segmented') && p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
+        // t1562 — carry a DECLARED options list whenever one is present, not only when the widget is spelled out as
+        // dropdown/segmented. An INHERITING row (widget '') on an `enum` renders as a dropdown and needs its options;
+        // gating the parse on the literal widget name dropped them for exactly that case. Options are inert for a
+        // number widget, so carrying them unconditionally cannot mis-render anything.
+        if (p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
         if (p.widget === 'number' || p.widget === 'slider') {
             for (const [k, fk] of [['min', 'nmin'], ['max', 'nmax'], ['step', 'nstep']]) if (p[fk] !== '' && p[fk] != null && Number.isFinite(Number(p[fk]))) wc[k] = Number(p[fk]);
             if (p.units) wc.units = String(p.units);
@@ -390,7 +400,13 @@ export function paramGroupFromBindings(def, group = 'Settings') {
     const children = valueBindings.map((b) => {
         const wc = b.widgetConfig || {};
         return { type: 'param_field', params: {
-            param: b.param, label: b.label || '', widget: b.widget || 'number', type: BINDING_TYPES.has(b.type) ? b.type : 'number',
+            // t1562 — a binding that declares NO widget must materialize as '' (INHERIT), never as a literal 'number'.
+            // `widget` is optional by the renderer's own contract (resolveFormWidget: explicit widget wins, else derive
+            // from `type`), so baking the fallback here turned "unspecified, infer from type" into "explicitly a number
+            // box" — which then BEAT the type-derived control. That silently flattened 13 bindings across 7 twins:
+            // corner's clearMode enum, wcs's 4 axis toggles, and every string field (text's `text`, pauseConfirm's `msg`,
+            // comm's 4 slots, drill/bore `skip`) became number boxes you could not type into.
+            param: b.param, label: b.label || '', widget: b.widget || '', type: BINDING_TYPES.has(b.type) ? b.type : 'number',
             dflt: (b.default != null ? String(b.default) : ''), section: b.section || '', help: b.help || '',
             options: (wc.options ? wc.options.map(([l, v]) => (String(l) === String(v) ? String(v) : `${l}=${v}`)).join(', ') : ''),
             nmin: (wc.min != null ? String(wc.min) : ''), nmax: (wc.max != null ? String(wc.max) : ''), nstep: (wc.step != null ? String(wc.step) : ''),
