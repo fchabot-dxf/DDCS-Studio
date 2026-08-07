@@ -15942,3 +15942,49 @@ The consequence is that the dispatch's own verify item, *"the warning is visible
 **Options:** (A) wire `lintProgram` into the Blocks tab as its own act, with the surface chosen deliberately; (B) leave it dead and treat the named message as groundwork that pays off when the surface lands; (C) reconsider whether the emit-time path (not lint) should carry the signal — but that collides with the run-time safety fork the dispatch explicitly reserved for its own act. Recommend **A as a separate act**, since the whole value of naming the cause is that a human eventually reads it.
 
 **Capacity:** comfortable. The expensive parts were the two things that could have shipped a lie: measuring the false-positive rate before choosing the warn rule (1172 → 47 → 0), and building a real before/after corpus diff for byte-identity instead of arguing that lint cannot affect emit.
+
+
+## 2026-08-07 t1568 (feat) - The cause finally gets a reader: the pre-flight badge, not a new panel
+
+**Task (dispatch):** Option A, but into `ui/preflightBadge.js` rather than the Blocks tab — it is already the declared "warn BEFORE motion" surface, already wired at `app.js:138`, already has severity + a violation list + a row-click that jumps to the line. Building a second warnings surface beside it is the duplication north-star #4 exists to stop. Use AMBER ("can't verify"), never red. ⚠ Named obstacle: the badge is G-code-side (reads editor text, runs `checkEnvelope`), `lintProgram` is block-side — **if joining them cleanly is not possible, STOP and report the shape rather than forcing it.**
+
+**The join went cleanly, so I did not stop — and the reason it was clean is that BOTH seams already existed.** `programModel` exports `getProjection()` (the cached `{text, lines, map}`, `map[i]` = the block ANCESTRY of line i), `linesForOp(blockId)`, and `editorMatchesProjection()` — the app's OWN "is that map currently valid" guard, already gating `ddcsOpAtLine`/`ddcsLooseRunAtLine`. So block id → line and "may I trust it" were both already declared; the contributor is ~40 lines of translation, not a new mechanism.
+
+**The trap I avoided by reusing them:** my first instinct was to call `emitMapped(stack)` to rebuild the map. `emitMapped` starts with `uniquifyFlowLabels(blocks)`, which **MUTATES the stack** — a read-only badge render would have had a side effect on the program, on every keystroke-debounced re-check. Reusing the cached projection has no such cost.
+
+**`ui/preflightBlockLint.js` (new, ~40 lines)** is the contributor: it returns block-side violations already in the badge's OWN vocabulary (`{kind:'unresolved-expr', line, msg, severity}`, `line` 1-based like `checkEnvelope`'s), so the badge aggregates rather than learning lint's internals. **It returns [] whenever `editorMatchesProjection()` is false** — with hand-edited G-code the map is stale, and a warning carrying a confidently WRONG line is worse than no warning; the user is looking at code they typed, not at the blocks. Pinned by its own test.
+
+**Amber, and it is not a fudge.** Amber's declared meaning is "can't verify (why)". For this case that is literally what happened: if a coordinate never resolved, the envelope check on that line was never performed *on a real number*. Red means "outside the envelope" — a stronger claim that needs the very value we do not have. So the contribution can only RAISE green → amber; a red verdict stands on its own and keeps its per-line annotations. When the badge is ALREADY amber for its own reason (no envelope configured / no WCS table pulled), both reasons are stated — ours must not be swallowed just because something else got there first.
+
+**`LINT_KIND` — the second declared axis (`motion` | `unresolvable-expr`).** The badge takes only the expression records: the motion-safety checks are a different conversation and would flood a surface whose entire value is that a clean program says nothing. Selecting them by matching message TEXT would be inferring intent back out of output — the exact habit this session keeps getting burned by — so the consumer filters on a declared field. Pinned alongside the `severity` slot, because a declared field nothing asserts quietly rots back into a literal.
+
+### Three defects the spec would NOT have caught, found by reading the render path
+
+1. `renderAnnotations` maps every violation to `` `${v.axis} ${fmt(v.overshoot)}mm over` ``. An unresolved expression has neither (that is the point — the number never existed), so a RED program that also had one would have rendered **"undefined NaNmm over"** on the line. Given its own branch.
+2. The RED headline counts `res.violations.length` — my rows would have inflated *"N moves leave the machine travel"*. An unresolved expression is not a move that leaves the travel; it is a move we could not place at all. The headline now counts envelope breaches only; the expression keeps its own row.
+3. The popover said the same sentence twice when there was exactly one violation (the reason repeated the message the row already carried). The reason now states the CLASS, the rows carry the detail.
+
+### Verification — real app, screenshotted
+
+| program (machine declared, WCS table present) | badge |
+|---|---|
+| clean arithmetic | **GREEN**, silent |
+| `#7` (a DDCS controller var) | GREEN — rides to the controller, not ours to resolve |
+| `fedrate * 2` | **AMBER** "⚠ can't verify" · row `line 2 · could not resolve · x = "fedrate * 2": unknown var: fedrate` · **row-click lands the caret on line 2** |
+
+Screenshots: `DDCS-Studio/verification/t1568-badge-amber-popover.png` (+ `-full`).
+
+**TWO TEST FIXTURES WERE WRONG, AND I FIXED THE FIXTURES RATHER THAN THE ASSERTIONS — both would have let a false pass through.** (a) My first stack put the move at Z+5 against a machine whose Z runs 0..−120, so the program was a genuine RED envelope breach and the "amber" assertion failed honestly. (b) Before that, with no machine declared, the badge was ALREADY amber ("placement not declared — no WCS table pulled") — so asserting "a typo makes it amber" would have PASSED without my code doing anything. Declaring a real machine is what makes GREEN reachable, and therefore what makes the green→amber escalation a real observation instead of a coincidence.
+
+**The quiet half survives the wiring, measured end-to-end:** all **32/32** registered twins loaded for real through `ddcsLoadBlockStack` contribute **0** badge rows. t1566's 1172 → 47 → 0 holds after the join, which was the dispatch's explicit condition.
+
+**Non-vacuity:** the badge spec fails **6/6** with only `preflightBadge.js` reverted to HEAD (restored from my own scratch copy, not `git checkout HEAD --`, which would have destroyed the uncommitted work).
+
+**Full suite: 44 e2e failed / 2308 passed / 6 skipped + 1 node-tier (98 pass / 1 fail) = 45, against t1566's 44.** Attributed by ID diff, all three new ones cleared:
+- `persistence-intentional-save:76` — **flake**, 9/9 passed isolated (3 tests × 3 repeats).
+- `v41-bench-kit-nomotion-1538:52` and `:61` — **the ADVISOR'S OWN new files**, not my change: `S6a_badvar.nc`, `S6b_trailing.nc`, `S6c_badword.nc`, the three deliberately-malformed probes written this session for today's hardware test, sitting untracked in `bridge/controllers/v4.1/verify/`. Proven by parking them (spec drops from 4 failures to 2) and restoring byte-identical (`cmp` clean) — they are needed today, so they went straight back. The remaining 2 (`:43`, `:102`) are the SAME two older untracked files from the t1617 finding, still unaddressed.
+- Two known flakes went green this run (`import-safety-1219:62`, `pane-sizer-1353:100`), so the headline +1 is noise in both directions.
+
+⚠ **Worth a decision, not from me:** that bench-kit spec exists to catch untracked surprises in the probe directory, and it is now permanently red because the workflow deliberately parks in-flight probe files there. It is doing its job and being ignored, which is how a guard dies. Either those files get committed, or the spec learns about an in-flight staging area. Reporting, not choosing.
+
+**Capacity:** comfortable.
