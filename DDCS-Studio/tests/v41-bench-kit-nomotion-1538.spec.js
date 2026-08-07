@@ -60,7 +60,9 @@ test('every .nc file in the directory is accounted for — no untracked surprise
         // an unclosed bracket, which the sim still evaluates to 3. That one matters for the send gate: the gate
         // refuses what the parser refuses, so a sim that is too STRICT causes a false refusal and a sim that is
         // too LENIENT waves through a file the controller will reject.
-        'S6e_partial.nc', 'S6f_unclosed.nc',
+        // t1584 — S6g settles ATAN's ARGUMENT ORDER, which S5o could not: it used ATAN[1, 1], both args equal,
+        // so 45 degrees comes out the same either way. Studio's quadrant convention is currently an assumption.
+        'S6e_partial.nc', 'S6f_unclosed.nc', 'S6g_atan_order.nc',
     ].sort());
 });
 
