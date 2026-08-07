@@ -16034,3 +16034,50 @@ Unlisted categories now land in a declared catch-all (`UNCATEGORISED`, named onc
 I recommend **A**, and I did not pick it silently because the user named four groups and A delivers three.
 
 **Capacity:** comfortable. Nothing was re-categorised; the only source change is the vanish fix.
+
+
+## 2026-08-07 t1573 (fix, hardware-grounded) - Make the sim reject what the machine rejects — and the latent bug that was hiding behind the leniency
+
+**Task (dispatch):** five probes were run on the bench V4.1. Three malformed forms were REFUSED by the controller; Studio's sim parsed each as far as it could and dropped the rest, so the preview showed a clean program for a file the machine will not run. Make the sim evaluator reject trailing input, pin it with the exact three strings, record all five results in `FINDINGS.md`. ⚠ Do NOT widen: `unsetValue` and the unresolvable-`#var` path are a DIFFERENT and CORRECT concern; if they cannot be separated cleanly, STOP and report.
+
+### The separation is clean, and I pinned it rather than asserting it
+
+The trailing-token check is a single top-level question — *did the grammar consume every token* — asked once after `parseExpr()`. `unsetValue` lives inside `parseFactor`'s `#` branch and is never touched. Proven by test, not by reading: after the change, `#500` with no value still reads **null** in preview, **0** on the execution engine, and **validates as syntactically fine**. Malformed syntax and unknown value stayed apart.
+
+### Two corrections to the dispatch's premise, both found by probing rather than reasoning
+
+1. **It was TWO forms, not three.** `S6c`'s bare word (`G04 Pwidht` → the value `widht`) was ALREADY rejected — an unknown identifier hits `MACRO_FUNCTIONS[t.fn] → undefined → null`. The shipped defect was `S6a` (`#191k8` read as **42**) and `S6b` (`[1 + 2 k 8]` read as **3**). `S6c` is pinned anyway so it cannot regress.
+2. **The sim REJECTS `ATAN[1, 1]`, which the hardware ACCEPTS.** Probe `S5o` confirmed the comma form works and returns degrees (`ATAN[1,1]*100 = 4500`). The sim's lexer has no `,` token, so it returns null. This is the sim being STRICTER than the machine — the opposite direction to the reported defect, so it hides a working form rather than blessing a broken one. NOT fixed here (the dispatch said do not widen); recorded in `FINDINGS.md` as `[TO FIX — separate act]`, together with a third divergence: an unclosed `[1 + 2` still evaluates to 3, and the machine's behaviour on it is untested.
+
+### ⚠ My first commit introduced a REGRESSION. The suite caught it, not me.
+
+`32e74941` broke `declared-work-calibration-1440` — the wall-finish program's executed step count went **70 → 74**. Not a flake: 3/3 in isolation.
+
+**Attribution, done by bisecting my own commit rather than guessing.** I reverted ONLY `expression.js` and left `FINDINGS.md` in place; that single run split the two failures onto different causes — the calibration one went green (so: my code), `porting-arc-scout` stayed red (so: my documentation). Then I diffed the executed-step SEQUENCE and the evaluated-condition VERDICTS between parser versions to find the exact construct. That mattered: reading the code had already given me two confident wrong hypotheses — first the `<` in `WHILE [#13 < #11]` (no: `evaluateCondition` splits on the comparator and evaluates each side separately), then the `GOTO61` suffix (no: the engine's regex already excludes it).
+
+**The actual cause — a latent defect the leniency had been hiding:**
+
+```
+IF [#14 / 2 - FIX[#14 / 2]] > 0.001 GOTO61      the wall's "every Nth level" pause gate
+engine strips brackets with  .replace(/^\[|\]$/g, '')   ← an ALTERNATION
+  leading [ removed ✓   trailing ] NOT removed ✗ (the line ends in 0.001)
+  →   #14 / 2 - FIX[#14 / 2]] > 0.001            ← UNBALANCED
+```
+
+The stray `]` was silently dropped by the old evaluator, so the condition came out right **by accident**. The moment trailing input became a rejection the LHS went unresolvable, `evaluateCondition` returned false, and the last-level pause-skip inverted — the final level started pausing too.
+
+**Fix — `27e08a2b`:** `stripWrappingBrackets`, declared once in `condition.js` (the canonical IF-condition home) and used by all **five** sites that had the same anchor-based strip. It removes the pair only when the FIRST `[` closes at the LAST character, so `[#100 > 5]` strips while `[expr] > 0.001` and `[a] > [b]` are left alone as valid bracketed operands.
+
+**Restored, verified three ways rather than one:** 70 executed steps again; the 17 evaluated conditions return **identical verdicts** to the pre-change engine (now with balanced brackets); and the corpus sim-trace — emitted text AND parsed envelope for all 32 twins — is byte-identical to the pristine baseline captured before any edit.
+
+### The second failure was my own documentation invalidating a spec
+
+`porting-arc-scout-1530` asserts the V4.1 **factory** corpus does not attest `ATAN`. My `FINDINGS.md` entry names ATAN precisely because the bench run confirmed it. The spec already excluded `community`, `NOTES` and `verify/` as *our commentary and our probe macros about the controller*; `FINDINGS.md` is the same class and simply was not listed. Widened the filter (also covering the new `verify-motion/`) rather than softening the claim: recording a hardware answer must not be able to falsify a statement about the vendor's own files. Grep-verified that `FINDINGS.md` was the ONLY file tripping it, so the exclusion is exact and not a blanket.
+
+### Evidence recorded
+
+`bridge/controllers/v4.1/FINDINGS.md` gains a dated results section with all five probes, the verbatim on-screen error strings, and three conclusions: trailing garbage is a LOADER rejection (not a truncation); `ATAN[a, b]` WORKS and returns DEGREES — closing a question open for weeks; and ⚠ **execution is PARTIAL** (`S6e`), so a typo in op 5 means ops 1–4 cut for real and the machine halts with the tool in the material. That last one is why an unresolvable expression is a send-time hazard rather than a cosmetic one.
+
+**Full suite: 40 e2e failed / 2315 passed / 6 skipped + 1 node-tier = 41, against t1568's 45. ZERO new failures by ID diff**; four went green (the three `v41-bench-kit` the advisor fixed, plus the `persistence-intentional-save` flake). Lint 0 errors.
+
+**Capacity:** comfortable. The expensive and correct part of this turn was refusing to accept the first green: my own fix regressed a real behaviour, and only the ID-level suite diff plus a step/condition trace found it. The dispatch's "no corpus movement" check passed the whole time — my corpus harness (32 twins through `checkEnvelope`) simply did not exercise a WHILE/IF macro, which is exactly the blind spot the full suite covered.
