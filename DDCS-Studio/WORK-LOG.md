@@ -16081,3 +16081,53 @@ The stray `]` was silently dropped by the old evaluator, so the condition came o
 **Full suite: 40 e2e failed / 2315 passed / 6 skipped + 1 node-tier = 41, against t1568's 45. ZERO new failures by ID diff**; four went green (the three `v41-bench-kit` the advisor fixed, plus the `persistence-intentional-save` flake). Lint 0 errors.
 
 **Capacity:** comfortable. The expensive and correct part of this turn was refusing to accept the first green: my own fix regressed a real behaviour, and only the ID-level suite diff plus a step/condition trace found it. The dispatch's "no corpus movement" check passed the whole time — my corpus harness (32 twins through `checkEnvelope`) simply did not exercise a WHILE/IF macro, which is exactly the blind spot the full suite covered.
+
+
+## 2026-08-07 t1575 (feat) - EMIT VERBATIM: stop laundering the author's mistake into a legal line
+
+**Task (dispatch):** the original defect, still live. `X position = widht / 2` emitted `G0 X0`. The hardware proved the author's design instinct right — the controller REFUSES a line it cannot read, names it, quotes it back, and never executes it — so Studio must emit what the author wrote. `blockEmitter.resolveValue` catches to `NaN` and `util.num(v, d)` returns the declared default; `resolveParams` in the same file already keeps the raw string, **so the two paths already disagree — collapse them, do not add a third**. ⚠ Predicate NARROW: malformed syntax or an UNDECLARED identifier only; an unresolvable RUNTIME value must keep working. ⚠ Byte-identity breaks HERE on purpose: the verification is *exactly these N goldens moved, each because it contains an unresolvable expression, and every golden that does not is untouched* — named individually. And say what the check does NOT cover.
+
+### The change — collapse, don't extend
+
+`resolveValue` now returns the raw string on a failed parse, matching `resolveParams`. That is the correct half of the disagreement: the author's text is the only thing that can reach the controller's error message. `val()` then carries any non-numeric, non-empty string out verbatim, alongside the `#var`/`[expr]` branch it already had — so the mechanism is one branch wider, not a new one.
+
+**The predicate lands exactly where the dispatch drew it, and for a structural reason rather than a filter.** A RUNTIME value (`#500`, a probe result, `#1512` after an alignment) is a controller token and leaves through `val()`'s pre-existing `#`/`[` branch, untouched — the machine's read-as-0 is correct for those. The new branch only ever sees a string that ALREADY failed `evalExpr`, i.e. malformed syntax or an identifier absent from Studio's own declared parameter list. No new test decides the split; the two cases were never in the same branch.
+
+**Known limit, shared with the pre-existing token branch:** a verbatim word cannot carry the placement `off`set — there is no number to add it to. A placed op whose coordinate is broken emits the author's text unplaced, which the machine rejects anyway, so the offset is moot. Recorded in the code.
+
+### ⚠ My own change would have made the WARNING lie
+
+The lint said `— using the default instead`. That was true when a failed expression became the declared default; it is now false, and it would have sat directly beside a file that does the opposite. **Checked each of the three messages against what the emit actually does before rewording, rather than sweeping all three:**
+
+| path | emit with a broken expression | old wording |
+|---|---|---|
+| leaf op param | `G0 Xwidht / 2` — verbatim | **wrong → reworded** |
+| Set block value | `( w = 0 )`, downstream `X0` | still accurate, unchanged |
+| loop bound | empty program (0 iterations) | still accurate, unchanged |
+
+The leaf message now reads `— emitted as written, so the controller will refuse this line`.
+
+### The named-goldens verification
+
+**Corpus: 0 of 32 twins moved, byte-identical.** None contains a bad expression, so the "every golden that does NOT contain one is untouched" half is proven — for the corpus.
+
+**Full suite: exactly ONE golden moved — `import-safety-1219.spec.js:99`.** It is NOT a regression, and I checked rather than assumed, because the dispatch is explicit that a shifted golden without a bad expression is a real regression wearing a passing test. Three independent reasons: (1) the test is about an exported bundle taking its identity from the machine record — no G-code, no expression, no emit; (2) **12/12 passed in isolation** (3 tests × 4 repeats); (3) there is no mechanism — the change touches `val()`, `resolveValue` and one lint string, none of which `profileStore`/`controllerProfiles` reach. The same file has now flaked twice before this session (`:62` at t1617 and t1562).
+
+So: **goldens moved BECAUSE of this change = 0**; goldens that SHOULD have moved were not present in either corpus or suite, which is itself the finding below.
+
+**Counts: 41 e2e failed / 2316 passed / 6 skipped + 1 node-tier = 42, against t1573's 41.** The +1 is that flake. Lint 0 errors.
+
+### ⚠ What this verification does NOT cover
+
+1. **A broken Set-block value is still laundered.** `#w = widht / 2` emits `( w = 0 )` and every downstream consumer silently receives `0`. This act only covers the value-WORD path through `val()`. Verified by emitting it, not assumed.
+2. **A broken loop bound silently empties the program.** `to = nosuch` → the loop runs zero times → no G-code at all, with nothing louder than a lint row to say why. Arguably worse than the defect just fixed, because there is no line for the machine to refuse.
+3. **The corpus diff can only ever prove the negative.** Zero of the 32 twins contains a bad expression, so it confirms "unaffected" and can say nothing about the verbatim behaviour itself. That rests entirely on the new spec and the screenshot — which is exactly the blind spot shape the advisor's own byte-identity instruction had at t1573, so it is worth naming rather than counting the clean diff as evidence.
+4. **No hardware confirmation of THIS emit.** The V4.1 was proven to refuse `#191k8` and `[1 + 2 k 8]`; it has not been handed a `G0 Xwidht / 2`. It is the same `Unrecognized file format` class by construction, but that is an inference, not a probe result.
+
+### One false alarm worth recording
+
+I spent several rounds convinced I had blanked the G-code pane — screenshot after screenshot showed an empty editor with the program present in the DOM. I had not. The badge popover was sitting on top of lines 1–2. What settled it was rendering a CLEAN program and comparing (it was equally blank under the popover), rather than reasoning about the syntax highlighter. Third time this session that a side-by-side comparison beat reading the code; the pattern is now explicit enough to trust as a first move rather than a fallback.
+
+**Real-app verification:** `verification/t1575-emit-and-warning.png` — the pane shows `9  G0 Xwidht / 2 Y20 Z-5` and the badge row reads `line 9 · could not resolve · x = "widht / 2": unknown var: widht — emitted as written, so the controller will refuse this line`. Same line number in both. The file and the warning are one story.
+
+**Capacity:** comfortable.
