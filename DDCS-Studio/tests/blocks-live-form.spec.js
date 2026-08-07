@@ -215,10 +215,11 @@ test('non-destructive save: "Update" overwrites the re-authored wizard in place 
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
-// t1587 — the pane no longer HIDES itself. 0bd8b38c made `#blk-formpane` the Blocks tab's one permanent right
-// column ("the Generator Modal live preview … full-height focus"), so on the normal path it stays mounted and
-// shows its empty-state prompt instead. The GUARANTEE this test was written for is untouched and is what it
-// still asserts: just building a program must not conjure a wizard form — NO param controls appear.
+// t1587/t1589 — the pane no longer hides ITSELF; the column decides which of its two faces to wear. With no wizard
+// tree there is no Generator Modal to show, so the column gives the space to Preview + Projected G-code and the form
+// pane stands down. The GUARANTEE this test was written for is untouched and is what it still asserts: just building
+// a program must not conjure a wizard form — NO param controls appear. It now also pins where the space went, since
+// "the form is absent" was true of the placeholder era too, and that era was the bug.
 test('no wizard form is conjured when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);
@@ -226,10 +227,19 @@ test('no wizard form is conjured when NOT editing a custom op (normal Blocks use
   await page.waitForFunction(() => window.__blkws);
   await page.evaluate(() => window.ddcsLoadBlockStack([{ type: 'move', params: { x: 0, y: 0, z: -5, mode: 'feed' } }]));
   await page.waitForTimeout(500);
-  const r = await page.evaluate(() => ({
-    controls: document.querySelectorAll('#blk-form [data-param]').length,
-    prompt: (document.getElementById('blk-form').textContent || '').trim(),
-  }));
+  const r = await page.evaluate(() => {
+    const shown = (s) => { const el = document.querySelector(s); return !!el && getComputedStyle(el).display !== 'none'; };
+    return {
+      controls: document.querySelectorAll('#blk-form [data-param]').length,
+      wizardView: document.querySelector('#blocks-app .right').classList.contains('wizard-view'),
+      formShown: shown('#blk-formpane'),
+      gcodeShown: shown('#blocks-app .gcode'),
+      gcodeLines: document.querySelectorAll('#blk-gcode .gl').length,
+    };
+  });
   expect(r.controls, 'no param controls when just building a program (not editing a wizard)').toBe(0);
-  expect(r.prompt, 'the pane says why it is empty rather than showing a phantom form').toMatch(/Define Custom Wizard|tick a knob/i);
+  expect(r.wizardView, 'no wizard tree → the column is not wearing the Wizard View face').toBe(false);
+  expect(r.formShown, 'so the form pane stands down entirely — not an empty pane holding the column').toBe(false);
+  expect(r.gcodeShown, 'and the projected G-code has the space instead').toBe(true);
+  expect(r.gcodeLines, 'with the program actually in it').toBeGreaterThan(0);
 });

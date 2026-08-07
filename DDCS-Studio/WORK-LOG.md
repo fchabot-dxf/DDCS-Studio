@@ -16551,3 +16551,134 @@ Unmoved.
    that `blocks-live-form`'s authoring tests pass. Whether the 1:1 Generator Modal layout is *correct* for a real
    wizard tree is a separate question this triage did not open.
 
+
+## 2026-08-07 t1589 (feat â€” option C) - The right pane gets a second FACE, and the four capabilities get a spec that can see them
+
+**Task:** Option C â€” give the ordinary Blocks path back the Preview + Projected G-code panes that `0bd8b38c`
+removed, WITHOUT reintroducing the segmented toggle it rejected, and verify each of the four orphaned capabilities
+individually in the app rather than declaring victory when 9 specs go green.
+
+### The shape: one predicate, two faces, no new control
+
+The tempting build is a toggle. The ruling forbids one, and it would also be a second source of truth for a thing
+the app already knows. `renderLiveForm` was ALREADY computing `show` â€” "is there a Wizard View to render?" â€” and
+throwing it away on a placeholder. So `show` becomes the column's declared face, written once:
+
+```
+  #blocks-app .right
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚  .wizard-view   â†’ Generator Modal [LIVE]        â”‚  a wizard tree / ticked knobs exist
+  â”‚  (no class)     â†’ Preview  +  Projected G-code  â”‚  the ordinary path (was: a 27% placeholder)
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â–²
+         â””â”€â”€ setRightFace(!!show), from the SAME predicate that decides the form.
+             Not a toggle: nothing the user clicks, nothing that can disagree with the form.
+```
+
+Both faces stay MOUNTED and are switched with CSS. That is not incidental â€” `blocksApp` binds `out` and the shared
+preview panel at **build time**, so a face that left the DOM would put us straight back to writing into a detached
+node. The bug that started this arc was DOM absence; presence is now the invariant and visibility is the variable.
+
+The two mobile labels (`.blk-drawer-title`, `#blkDrawerHandle`) are written from that same call rather than
+hard-coded, so the drawer cannot announce "Wizard View" over a G-code pane.
+
+**Files:** `index.html` (the two panes back, no toggle), `styles.css` (the face switch + the mobile stack),
+`blocksApp.js` (`setRightFace`, and the DEAD `blkSegPv`/`blkSegCode`/`showPane` wiring deleted â€” it had been calling
+`getElementById` on nothing since `0bd8b38c` and the ruling means it is never coming back).
+
+### âš  How I told "9 green specs" from "four working capabilities"
+
+This is the whole point of the act, and the dispatch was right to make it the bar. The capability specs
+(`blocks-exec-glow`, `blocks-hover` Ã—3, `context-menu-blocks-1454`) assert **classes** â€” and a class applies just as
+happily to a node outside the document, which is precisely how this shipped. They are structurally blind to it.
+
+So `blocks-code-panel-live-1589.spec.js` asserts the one thing they cannot: that the highlight is **PAINTED**. Each
+capability drives its real gesture, then compares the computed style of a highlighted span against a plain sibling
+on the same panel, plus its laid-out box.
+
+**Then I mutated the app to the exact bug one layer up â€” panes PRESENT, face `display:none` â€” and ran both:**
+
+| under "panes present, face hidden" | result |
+|---|---|
+| `blocks-hover` Ã—3 (class-level) | **still PASSED** â€” the failure mode, reproduced on demand |
+| `blocks-code-panel-live-1589` | **4/5 failed** |
+
+âš  **And that run found a hole in my own spec.** CAPABILITY 3/4 (selection) *survived* the mutation, because
+`getComputedStyle` still reports the cascaded `.3` / `1` opacity on a hidden node â€” an opacity comparison is a
+CASCADE proof, not a PAINT proof. I had written the same class of test I was criticising. Added the layout
+assertions (`visible`, `hot.h > 0`); it now fails **5/5** under that mutation. Worth recording because reasoning
+would never have found it â€” only mutating did.
+
+**Both directions proven:**
+
+| | result |
+|---|---|
+| the 5 new tests against the PRE-CHANGE tree (index.html at HEAD, panes absent) | **5/5 failed** |
+| the 5 new tests against the hidden-face mutant | **5/5 failed** |
+| the 5 new tests against this act | **5/5 passed** |
+
+### The four capabilities, observed individually in the app
+
+Four separate gestures, four screenshots, not one picture of a populated pane:
+
+| | evidence | shot |
+|---|---|---|
+| sim exec line + comet tail | stepped the sim 8Ã— via `.pp-step`; `#4=50` lit, the 3 lines above fading | `t1589-2-exec-line.png` |
+| hover warming | hovered `Place on Stock`; its whole cutting body tints, header + footer do not | `t1589-3-hover-warm.png` |
+| value-token boxing | hovered a `math_number`; `.thot` spans present with real width | `t1589-5-value-token.png` |
+| selection | clicked Program Start; its 4 lines stay lit, the rest dim to `.3` | `t1589-4-selection.png` |
+
+`styles.css:5389-5409` matches again (the selection test reads `.3` vs `1` off those very rules) and
+`blocksApp.js:171` mounts the real `createPreviewPanel` â€” `__panel.setView` is a function now, not the stub. The
+ordinary path shows a real toolpath (`22 cuts Â· 5 rapids`) over the projected program: `t1589-1-ordinary-path.png`.
+
+### The one thing I could NOT make green by fixing the app â€” flagged, not smuggled
+
+`blocks-mobile-drawers:8` clicks `#blkSegCode`. The ruling retires that control. So this is the single assertion in
+the nine whose claim the fix deliberately invalidates, and it is a different KIND of repair from the other eight â€”
+stale **by ruling**, not stale because the app moved underneath it. Saying so plainly matters more than the edit.
+
+What replaced it is strictly more capability, and that is what it asserts now: the drawer STACKS Preview over
+G-code, so on a phone both are open at once and neither is behind anything (`.pane-h` comes back on mobile â€” with
+two panes and no toggle naming them, the headings are the only thing saying which is which).
+
+### Named goldens
+
+**Two full runs, because one was not honest evidence.** Run 1 came back with **5 failures that had never failed
+before** â€” 4 of them boot-readiness waits at the FIRST `page.goto`, before any Blocks tab exists. All 18 passed in
+isolation, but "it passes alone" is the argument shape t1587 flagged, so I re-ran the whole suite instead of
+reasoning:
+
+```
+   run 1   24 failed  =  18 shared-with-main  +  middle-superset:35  +  5 churn
+   run 2   21 failed  =  18 shared-with-main  +  middle-superset:35  +  2 churn
+                                                   â†‘ ALL FIVE of run 1's new reds gone;
+                                                     two DIFFERENT ones (homing-g31-output:14,
+                                                     homing-limit-trip:75) in their place.
+```
+
+The churn set moves between runs and the stable core does not, which is what says the 5 were the pre-existing
+load class rather than this change. Against the advisor's **41** baseline and t1587's **29**: now **21 e2e + 1
+node**. **All 9 gated failures are green through their real gestures.** Zero goldens moved. Lint **0 errors**.
+
+### What this does NOT cover
+
+1. **The `show` predicate's BOUNDARY is inherited, not audited.** I read it, wired the face to it, and changed
+   nothing about when it is true. Observed while shooting the exec-line screenshot: a stack carrying a `Define
+   Custom Wizard` block with a `panel form3d+2d` node still resolved to `show = false` and got the Preview face.
+   That may be right (a user stepping a sim wants the code) or may be a gap in `deriveAuthoredDef` / the `userRoot`
+   lookup â€” it predates this act, it was showing the placeholder before, and retuning it is a separate question I
+   deliberately did not open.
+2. **I did not measure the cost of making the preview panel real.** It was a no-op stub; every Blocks build now
+   mounts a 3D canvas. My hypothesis for run 1's boot-gate timeouts was exactly this, and run 2 did not support it
+   â€” but "not supported by one run" is not "measured". If the suite's load class is ever chased properly, this act
+   is a variable to control for.
+3. **Desktop only, at two viewports.** The four capability observations ran at 1400Ã—1000 and the drawer at 390Ã—800.
+   No tablet width, no real touch device.
+4. **The `.thot` check asserts boxes with real width, not that the box is around the RIGHT token** â€” that claim
+   belongs to `blocks-hover:99`, which passes and owns it. This spec deliberately only asks whether it renders.
+5. **Nothing here touches the three load-sensitive specs** (`op-params-complete:65`, `middle-superset:35`,
+   `import-safety-1219:47`); the advisor parked them and they stay parked.
+
+**Capacity:** comfortable.
+

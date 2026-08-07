@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// Mobile Blocks tab (≤860px): canvas fills the tab; the Preview is a bottom drawer (G-code behind its toggle)
-// and the Blockly palette is a left drawer collapsed via the toolbox's setVisible() so the canvas reclaims the
-// width. Guards the responsive UX added for phone editing.
+// Mobile Blocks tab (≤860px): canvas fills the tab; the right column is a bottom drawer (Preview STACKED over the
+// projected G-code since t1589 — no toggle) and the Blockly palette is a left drawer collapsed via the toolbox's
+// setVisible() so the canvas reclaims the width. Guards the responsive UX added for phone editing.
 test.use({ viewport: { width: 390, height: 800 } });
 
 test('mobile: palette collapses (canvas reclaims width), preview + palette drawers toggle', async ({ page }) => {
@@ -41,13 +41,19 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   await page.waitForFunction(() => document.querySelector('#blocks-app .right').classList.contains('open'), null, { timeout: 5000 });
   expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('open'))).toBeTruthy();
 
-  // toggle to G-code, back to Preview — await each class flip (deterministic, no implicit settle)
-  await page.click('#blkSegCode');
-  await page.waitForFunction(() => document.querySelector('#blocks-app .right').classList.contains('show-code'), null, { timeout: 5000 });
-  expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('show-code'))).toBeTruthy();
-  await page.click('#blkSegPv');
-  await page.waitForFunction(() => !document.querySelector('#blocks-app .right').classList.contains('show-code'), null, { timeout: 5000 });
-  expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('show-code'))).toBeFalsy();
+  // t1589 — the `Preview | G-code` segmented toggle is RETIRED, by ruling, not by accident: 0bd8b38c deleted the
+  // buttons, and the act that brought the two panes back was told explicitly not to reintroduce a toggle competing
+  // with the Wizard View. So this is the one assertion here that could NOT be made green by fixing the app — the
+  // control it drove is gone on purpose. What replaced it is strictly more capability, and that is what is asserted
+  // now: on a phone BOTH panes are in the drawer at once, so neither is behind anything.
+  const panes = await page.evaluate(() => {
+    const seen = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect();
+      return { h: Math.round(r.height), shown: getComputedStyle(el).display !== 'none' && r.height > 20 }; };
+    return { pv: seen('#blocks-app .pv'), gcode: seen('#blocks-app .gcode'), seg: !!document.getElementById('blkSegCode') };
+  });
+  expect(panes.seg, 'no segmented Preview|G-code toggle — retired by ruling, not hidden').toBe(false);
+  expect(panes.pv && panes.pv.shown, 'the Preview pane is open in the drawer').toBe(true);
+  expect(panes.gcode && panes.gcode.shown, 'and the Projected G-code is too — no toggle, nothing behind anything').toBe(true);
 
   // close preview drawer
   await page.click('#blkDrawerClose');

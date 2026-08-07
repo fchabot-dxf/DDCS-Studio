@@ -373,6 +373,20 @@ async function buildWorkspace() {
   //    (writeAuthoredValue), surgically — which reprojects, updating the G-code + preview too. The smart sync here
   //    absorbs that echo (the edited field is focused, so it's skipped), so there's no loop and no focus loss.
   const formSig = (bs) => (bs || []).map((b) => `${b.param}:${b.widget || b.type || 'number'}:${b.group || ''}:${b.role || ''}`).join('|');
+  // t1589 — the column's face, written from ONE predicate. `.wizard-view` = the Generator Modal; no class = Preview
+  // over Projected G-code. Both mobile labels are derived here rather than hard-coded, so they cannot name a face
+  // the column is not wearing. Re-fit the preview when it becomes visible (a canvas sized while display:none is 0×0).
+  let rightFace = null;
+  function setRightFace(wizard) {
+    const right = root.querySelector('.right');
+    if (!right || rightFace === wizard) return;
+    rightFace = wizard;
+    right.classList.toggle('wizard-view', wizard);
+    const name = wizard ? 'Wizard View' : 'Preview';
+    const title = right.querySelector('.blk-drawer-title'); if (title) title.textContent = name;
+    const handle = document.getElementById('blkDrawerHandle'); if (handle) handle.textContent = `▲ ${name}`;
+    if (!wizard) setTimeout(() => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } }, 60);
+  }
   function renderLiveForm() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
@@ -403,6 +417,10 @@ async function buildWorkspace() {
 
     const show = hasTree || (def && (editingWizardType() || (def.bindings && def.bindings.length)));
     pane.hidden = false;
+    // t1589 — `show` is the ONE source for which face this column wears; write it once, let CSS and both mobile
+    // labels read it. Wizard View when there IS one (0bd8b38c's intention, intact); Preview + Projected G-code when
+    // there is not, instead of the placeholder that used to sit in 27% of the tab doing nothing.
+    setRightFace(!!show);
     if (!show) {
       formHost.innerHTML = '<div class="blk-form-empty" style="opacity:0.6;padding:12px;font-style:italic;">Add a "Define Custom Wizard" block or tick a knob to view live Generator Modal layout.</div>';
       formHost.__sig = null;
@@ -772,15 +790,18 @@ async function buildWorkspace() {
   } catch (_) { /* */ }
 
   // ---- mobile drawers (CSS-gated ≤860px; harmless no-ops on desktop) ----
-  // Canvas fills the tab; Preview = bottom drawer (G-code behind its toggle), palette = left drawer over canvas.
-  // Preview drawer translates (keeps its size off-screen) → re-render on open. Palette uses the toolbox's own
-  // setVisible() so the canvas actually reclaims the width when collapsed.
+  // Canvas fills the tab; the right column = bottom drawer, palette = left drawer over canvas. The drawer translates
+  // (keeps its size off-screen) → re-render on open. Palette uses the toolbox's own setVisible() so the canvas
+  // actually reclaims the width when collapsed.
+  // t1589 — the `blkSegPv` / `blkSegCode` segmented toggle and its `showPane` wiring are GONE, not merely unbound.
+  // 0bd8b38c deleted the buttons and this code has been calling `document.getElementById` on nothing ever since;
+  // the ruling that brought the panes back explicitly does not bring the toggle back, so the drawer stacks both
+  // panes instead of hiding one behind a control. Which FACE the column wears is setRightFace's business, and it
+  // reads the same `show` predicate as the form — it is not a thing the user toggles.
   (function wireDrawers() {
     const right = root.querySelector('.right');
     const handle = document.getElementById('blkDrawerHandle');
     const closeBtn = document.getElementById('blkDrawerClose');
-    const segPv = document.getElementById('blkSegPv');
-    const segCode = document.getElementById('blkSegCode');
     const toolsHandle = document.getElementById('blkToolsHandle');
     if (!right) return;
 
@@ -788,15 +809,6 @@ async function buildWorkspace() {
     const openPv = (on) => { right.classList.toggle('open', on); if (handle) handle.setAttribute('aria-expanded', String(on)); if (on) setTimeout(refit, 260); };
     handle && handle.addEventListener('click', () => openPv(true));
     closeBtn && closeBtn.addEventListener('click', () => openPv(false));
-
-    const showPane = (code) => {
-      right.classList.toggle('show-code', code);
-      segPv && segPv.classList.toggle('on', !code);
-      segCode && segCode.classList.toggle('on', code);
-      if (!code) setTimeout(refit, 60);                 // back to Preview → re-fit the now-visible canvas
-    };
-    segPv && segPv.addEventListener('click', () => showPane(false));
-    segCode && segCode.addEventListener('click', () => showPane(true));
 
     // Drag the top edge to resize the preview drawer. Height lives in --blk-pv-h (only the mobile rule reads it,
     // so desktop is untouched) and persists across sessions.

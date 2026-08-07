@@ -5379,6 +5379,15 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* Live Generator Modal View pane — takes full 100% height of right pane in Blocks tab. */
 #blocks-app .blk-formpane { flex:1; height:100%; max-height:100%; overflow:auto; background:var(--screen); }
 #blocks-app .blk-formpane[hidden] { display:none; }
+/* t1589 — THE FACE SWITCH. One class on .right, written by blocksApp's setRightFace from the same `show` predicate
+   that decides whether a Wizard View exists. Exactly one face is displayed; there is no user-facing toggle between
+   them (0bd8b38c rejected a G-code toggle competing with the Wizard View, and that ruling stands). Both faces stay
+   in the DOM either way, because blocksApp binds its code-panel machinery to #blk-gcode / #blk-preview-panel at
+   build time — a face that vanished from the DOM would put us straight back to writing into a detached node. */
+#blocks-app .right:not(.wizard-view) .blk-formpane { display:none; }
+#blocks-app .right.wizard-view .pv,
+#blocks-app .right.wizard-view .gcode,
+#blocks-app .right.wizard-view .blk-row-resize { display:none; }
 #blocks-app .blk-form-body { padding:8px 12px 12px; color:var(--screen-ink); }
 #blocks-app .blk-form-live { margin-left:6px; padding:1px 6px; border-radius:8px; font:700 9px/1.6 inherit; letter-spacing:.04em; color:#fff; background:var(--accent,#3b82f6); }
 #blocks-app .blk-form-empty { font-size:11px; color:var(--screen-dim); padding:6px 2px; }
@@ -5498,7 +5507,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         cursor:ns-resize; touch-action:none; z-index:3;
     }
     #blocks-app .blk-col-resize { display:none; }   /* desktop-only column resize off in the mobile drawer layout */
-    #blocks-app .blk-row-resize { display:none; }   /* mobile uses the Preview/G-code toggle, not a split */
+    /* t1589 — the drawer STACKS Preview over G-code and scrolls; it does not split, and (since the segmented
+       Preview|G-code toggle is not coming back) it no longer hides one behind the other either. */
+    #blocks-app .right:not(.wizard-view) .blk-row-resize { display:none; }
     #blocks-app .right .pv { height:auto; }         /* drawer layout controls the preview height itself */
 
     #blocks-app .blk-drawer-head {
@@ -5509,23 +5520,19 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         position:absolute; top:4px; left:50%; transform:translateX(-50%);
         width:38px; height:4px; border-radius:3px; background:var(--screen-dim); opacity:.5;
     }
-    #blocks-app .blk-seg { display:flex; gap:4px; }
-    #blocks-app .blk-seg button {
-        font:600 11px/1 inherit; padding:6px 12px; border-radius:7px; cursor:pointer;
-        border:1px solid var(--line); background:transparent; color:var(--screen-dim);
-    }
-    #blocks-app .blk-seg button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
     #blocks-app .blk-drawer-x {
         margin-left:auto; width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:14px;
         border:1px solid var(--line); background:transparent; color:var(--screen-dim);
     }
 
-    /* one pane at a time inside the drawer — Preview prioritised, G-code behind the toggle */
-    #blocks-app .right .pane-h { display:none; }
-    #blocks-app .right .pv { height:auto; flex:1; min-height:0; }
-    #blocks-app .right .gcode { display:none; }
-    #blocks-app .right.show-code .pv { display:none; }
-    #blocks-app .right.show-code .gcode { display:flex; flex-direction:column; flex:1; }
+    /* t1589 — BOTH panes live in the drawer now, Preview over G-code, each taking half and scrolling its own
+       overflow. This replaces the one-at-a-time `.show-code` split: that arrangement only existed to serve the
+       segmented toggle, and the toggle is not returning, so hiding `.gcode` by default would simply make the
+       projected G-code unreachable on a phone. `.pane-h` comes BACK on mobile — with two panes stacked and no
+       toggle naming them, the headings are the only thing saying which is which. */
+    #blocks-app .right .pv { height:auto; flex:1 1 50%; min-height:0; }
+    #blocks-app .right .gcode { flex:1 1 50%; min-height:0; overflow:auto; border-top:1px solid var(--line); }
+    #blocks-app .right.wizard-view .pane-h { display:none; }   /* the Wizard View is one pane — its heading is noise */
 
     /* bottom-centre pull-tab opens the preview drawer (hidden once open) */
     #blocks-app .blk-drawer-handle {

@@ -63,9 +63,10 @@ test('a hand-built bare stack with an exposed knob → FORM [LIVE] shows + write
   expect(Number(wrote), 'editing the form wrote the knob value back into the hand-built block').toBe(99);
 });
 
-// t1587 — 0bd8b38c made `#blk-formpane` permanently mounted (the tab's one right column), so "hidden" is no longer
-// how the no-knobs case is expressed; the pane shows its empty-state prompt. The no-false-positive claim is the
-// point of this test and is what it still asserts: zero bindings derived → zero param controls rendered.
+// t1587/t1589 — `#blk-formpane` is permanently MOUNTED (blocksApp binds to it at build time) and the column decides
+// which face to display, so the `hidden` attribute is no longer how the no-knobs case is expressed. The
+// no-false-positive claim is the point of this test and is what it still asserts: zero bindings derived → zero param
+// controls rendered.
 test('a hand-built stack with NO exposed knobs → FORM [LIVE] renders no controls (no false-positive)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
@@ -87,6 +88,6 @@ test('a hand-built stack with NO exposed knobs → FORM [LIVE] renders no contro
     };
   });
   expect(r.bindings, 'no knobs exposed on the bare stack').toBe(0);
-  expect(r.hasPane, 'the pane is the tab’s permanent right column').toBe(true);
+  expect(r.hasPane, 'the pane stays mounted (blocksApp binds to it at build time)').toBe(true);
   expect(r.controls, 'no knobs + not editing → no param controls are rendered').toBe(0);
 });
