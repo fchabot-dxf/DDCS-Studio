@@ -15831,3 +15831,52 @@ By kind: 8 string->number, 4 bool->number, 1 enum->number. Worth naming plainly:
 - **One NEW failure, and it is a flake too (1):** `middle-superset:35` appeared in this run and did not exist at t1617. Rather than assume, ran it isolated: **18/18 passed** (6 tests x 3 repeats). Full-suite contention, not a regression — and `middle` was not among the 7 twins this change touched, so there was no mechanism for it to be one.
 
 **Capacity:** comfortable. The one judgement call worth the advisor's eye is the `cam-block-native-params-s5.spec.js` expectation change above — editing a test to match my own code is normally the anti-pattern, which is why it was made STRONGER (asserting the resolved control) rather than merely relaxed, and why it is called out here rather than buried in the diff. If the advisor would rather that spec stayed red and flagged, it is a one-line revert.
+
+
+## 2026-08-07 t1564 (SURVEY — gate, nothing built) - The expression evaluator already exists. Twice.
+
+**Task (dispatch):** a minimal expression evaluator for wizards-as-data — param refs, arithmetic, `min`/`max`/`abs`/`round`, a ternary, NO control flow. With an explicit gate BEFORE building: *"if the codebase already has an ad-hoc formula/expression/computed-default mechanism anywhere, the job is for this evaluator to SUBSUME it, not to become the second one… survey first, report what you find, and say plainly whether you are creating the one source or a rival."*
+
+**Answer: I would have been building the THIRD. Reporting instead of shipping, per the gate.**
+
+### What exists
+
+**1. `web/wizards/ops/expr.js` — `evalExpr(src, scope)`. This IS the thing the task describes, ~80% built.**
+Pure recursive descent, no `eval`/`Function`, no deps. Already has: variable refs resolved against a `scope`, `+ - * / %`, unary ±, parentheses, decimals + exponent notation. Already has the two error properties the dispatch asks for and calls out as important — **an unknown identifier THROWS** (`'unknown var: ' + id`, line 44), it is not silently zero; and a **non-finite result THROWS** (line 51), it is not passed through. Consumers: exactly TWO — `blocks/blockEmitter.js` and `blocks/lint.js`. Missing versus the ask: `min`/`max`/`abs`/`round`, the ternary, and any AST/caching (it parses and evaluates in one pass, per call).
+
+**2. `web/engine/core/expression.js` — also `evalExpr`, and NOT a rival.** This one models the **DDCS/Fanuc MACRO language**: `#N` direct and `#[expr]` indirect variable refs, `[ ]` grouping, and `MACRO_FUNCTIONS` (ABS/SQRT/ROUND/FIX/FUP/LN/EXP and trig **in degrees**). Its contract is different on purpose — it returns `null` for "unresolvable" rather than throwing, with an `unsetValue` knob so the preview parser can skip moves it cannot resolve while the execution engine reads unset vars as 0 like the real controller. Consumers are the sim/engine stack (`GcodeExecutionEngine`, `GcodeSimulator`, `gcodeParser`, `core/condition.js`). **This is a fidelity model of the controller's own language, not an authoring-time calculator.** Folding it into a wizard-param evaluator would couple controller fidelity to authoring convenience and is the wrong move; recommend leaving it strictly alone.
+
+**3. Not rivals, checked and cleared.** `when` / `whenAll` / `gate` / `optionGate` are STRUCTURED data predicates (`{param, is|in|not}`), not a string formula language — no parser, nothing to subsume. No CAM-slot expression mechanism exists. `core/condition.js` parses string conditions but is part of #2's DDCS layer (IF/GOTO), not the wizard face.
+
+### The finding that changes the task
+
+The dispatch warns against "a poison number… a bad value becoming a ~1e6 sentinel that exploded the emit". **Probed it end-to-end rather than reasoning about it** — built a one-move stack whose X is a bad expression and read the emitted G-code:
+
+| expression | emitted |
+|---|---|
+| `10 + 5` (valid) | `G0 X15 Y0 Z0` |
+| `nosuchparam * 2` (unknown identifier) | `G0 X0 Y0 Z0` |
+| `3 +` (syntax error) | `G0 X0 Y0 Z0` |
+| `1/0` (non-finite) | `G0 X0 Y0 Z0` |
+
+**No poison number reaches the emit** — so that specific fear is unfounded, and I am correcting my own first hypothesis here: I initially expected `NaN` to flow through, and it does not. The chain is `evalExpr` throws → `blockEmitter.resolveValue` catches and returns `NaN` (line 53) → `util.num(v, d)` sees `isNaN` and returns the caller's DECLARED DEFAULT. So the "fall back to the declared default" half of the dispatch's requirement is ALREADY the behaviour.
+
+**What is actually wrong is the silence.** A typo'd parameter name is indistinguishable from a deliberate value, at three separate swallow sites (`blockEmitter.js:53` → NaN, `blockEmitter.js:75` → keeps the raw string, `lint.js:17` → keeps the raw string). And because a move coordinate's declared default IS 0, a misspelled param silently emits **a real rapid to X0**. That is the dispatch's own "an unknown identifier is an ERROR, never silently zero" — violated today, in the shipped emit path, by the evaluator that already exists.
+
+**And the surfacing channel the fix needs also already exists:** `blocks/lint.js` is exactly "WARN, never block… the lint just makes it visible", already runs over the same resolved params with the same `evalExpr` and the same scope, and already tags every warning with the producing block id. It currently reports the CONSEQUENCE ("depth 0 ≤ 0 — nothing is cut") without ever naming the CAUSE (the expression that failed to parse).
+
+### Why I stopped rather than extended
+
+Subsuming #1 is clean and is obviously right. But three of the dispatch's own shape rulings collide with the existing design, and each is a contract change on the **emit path**, where this repo's stated safety argument is byte-identical G-code (`blockEmitter.js:396` — *"asserted byte-identical… because 'the same numbers' is the whole safety argument"*). Guessing wrong means rewriting that path twice:
+
+- **AST + cache vs direct eval.** The ruling says "parsed to an AST, cached per unique string". The existing evaluator has no AST — it is a single-pass recursive descent. That is a rewrite of a function on the emit path, for a caching win nobody has measured.
+- **Scope model.** The ruling says "Scope = params only". The existing scope is Set-block variables + the Count loop index — a DIFFERENT scope from wizard params. The wizard-param face is genuinely new; what is undecided is whether it is the same scope widened, or a second scope through the same evaluator.
+- **Error contract.** Making failures named and surfaced changes behaviour at three swallow sites that currently absorb them silently, i.e. it changes what a malformed program emits.
+
+### Options for the advisor
+
+- **A — Extend in place, minimum diff.** Add `min`/`max`/`abs`/`round` + ternary to `wizards/ops/expr.js`; keep direct eval, no AST, no cache; leave the error contract alone. Smallest blast radius, satisfies the feature ask, leaves the silent-zero defect live.
+- **B — A, plus name the error (my recommendation).** Same evaluator change, and route parse/unknown-identifier failures into the EXISTING `lint.js` channel so a bad expression is a visible, block-tagged warning instead of a silent fallback. Emitted values are unchanged (still the declared default), so the byte-identical invariant holds — this adds a warning, it does not move a coordinate. Delivers the dispatch's "named, surfaced authoring error / never silently zero" using the mechanism already built for it.
+- **C — B, plus the AST + per-string cache** as literally specified. Correct if the advisor wants the stated shape regardless; it is the only option that rewrites a live emit-path function, so it wants its own byte-identical gate.
+
+I recommend **B**, and explicitly NOT touching `engine/core/expression.js`. Nothing was built this turn — no source file changed.
