@@ -16185,3 +16185,51 @@ A failed binding now holds a declared `UNRESOLVED` sentinel instead of `0`. The 
 **Real-app verification:** `verification/t1577-set-chain.png` — line 1 `( w = widht / 2 )` with the badge naming `unknown var: widht`, and **line 14 `G0 Xw Y20 Z-5`** with the badge naming `w did not resolve`. Both line numbers match their rows; the root cause and the consequence are both visible in one frame.
 
 **Capacity:** comfortable.
+
+
+## 2026-08-07 t1579 (fix) - Bounds refuse with the author's text; and Step Down was NOT the defect I predicted
+
+**Task (dispatch):** loop bounds — **B grafted onto C**, not C alone. A is dead on my own safety argument, but C silently DROPS an operation, which is the automatic correction this whole arc exists to remove. My objection to B was about INVENTING a token — and that dies if the token is the AUTHOR'S OWN unresolved text, which is the emit-verbatim mechanism already shipped. Not a controller-variable write. Take C's severity + send gate too. **Also: MEASURE Step Down, do not leave "very likely" standing.**
+
+### Measuring Step Down changed the act — I was wrong about it
+
+I had written that Step Down "very likely shares the loop's defect" and declined to claim it without measuring. Measured, it does **not** — and the difference matters:
+
+```
+   COUNT      to='nosuch'  ->  fallback 0  ->  ZERO iterations  ->  the operation VANISHES from the file
+   STEP DOWN  to='nosuch'  ->  fallback 5  ->  FIVE levels      ->  it CUTS to a depth nobody specified
+```
+
+Step Down does not drop the operation; it **invents a 5 mm deep cut and machines it**, because its fallback is `5`. That is the more dangerous of the two and it is not the defect I predicted. Had I shipped on "very likely the same", the fix would have carried the wrong rationale for the worse case.
+
+### The fix — B, with nothing invented
+
+Both kinds now emit the author's OWN text as a line in place of the body: `( Count i: to did not resolve — the loop cannot be unrolled )` then `nosuch`. Same transformation as the coordinate case, placed where the machine reads it. Deliberately NOT `#100=nosuch` — authoring a controller-variable write would be a side effect nobody asked for, and the spec asserts no `#N=` appears.
+
+Unrolling once stays rejected on safety: body lines that never reference the index would emit real motion, and with PARTIAL EXECUTION confirmed on hardware those lines CUT before the machine reaches the refusal.
+
+**C's severity, flipped:** `UNRESOLVABLE_EXPR_SEVERITY` → `ERROR`. This is the value the slot was declared for at t1566, and the flip is the receipt for declaring it: **one constant in `lint.js` plus two assertions in the spec.** Had severity been spelled out at each call site it would have been a sweep across every reporter and consumer.
+
+### Two more things that had turned — and one regression of my own
+
+- **`using 0` went false** the moment the emit stopped guessing. Reworded.
+- **`runs 0 times` became a stale CONSEQUENCE** of a fallback that no longer happens — the loop never gets that far now. Suppressed rather than reworded, because there is nothing true to say.
+- ⚠ **A regression I introduced at t1577 and caught here:** routing loop/depth bounds to "their own site below" was correct for `loop` — but **lint has no `depth` branch**, so Step Down's bounds reported to nobody at all for one turn. One reporter now serves both kinds. This is the second time this act that measuring instead of reasoning caught something I had asserted.
+
+### Named goldens
+
+**Corpus: 0 of 32 twins moved, byte-identical.**
+
+**Suite, first run: 3 moved, and ONE was real** — `expr-lint-names-the-cause-1566:24`, my own spec pinning `severity === 'warn'` with the message *"today an unresolvable expression is a WARN"*. Correct when written, false once the emit stopped laundering. Updated, with the reasoning recorded in the spec: that is the declared slot being USED, not a test bent to fit a change.
+
+**Suite, clean re-run after that fix: 42 e2e failed / 2317 passed / 6 skipped + 1 node-tier = 43, against t1577's 41.** Three moved (`alignment-correction-840:106`, `blocks-live-form:166`, `middle-superset:35`), one fixed (`homing-inplace-e3:52`). **All three moved pass 3/3 in isolation** — and the isolation run instead failed `blocks-live-form:52`/`:216`, which are PRE-EXISTING failures that did not fail in the suite run. The failing set churns by roughly ±3 between runs in both directions; the ID diff, not the total, is the signal, and it shows **zero real regressions**. Spec fails 3/3 against the pre-change tree. Lint 0 errors.
+
+### What this does NOT cover
+
+1. **The SEND GATE is not wired, and cannot be from here.** `gateway/views/send.js` calls `checkEnvelope(file.text)` — it is G-code-side and operates on an arbitrary FILE, so the block-side `ERROR` severity has no path to it. The severity flip landed; gating the send needs a G-code-side detection of unparseable lines (which the t1573 parser can now do). Reported, not built.
+2. **A CONTROLLER TOKEN as a bound is still silently dropped.** `to = #100` is a runtime value Studio cannot unroll at build time — not a malformed program — so it keeps the token carve-out this arc has held throughout, and the loop contributes nothing. Pinned in the spec so the exemption is not mistaken for a fix. It is the bound-shaped sibling of the queued `w = #500` gap.
+3. **No hardware has been handed a bare `nosuch` line.** It is the same `Unrecognized file format` class as the probed `#191k8` by construction, but that remains an inference.
+4. **`cond` (IF) was not examined.** `resolveBool` catches to `false`, so an unresolvable condition silently takes the else-branch — the same automatic-correction shape. I did not measure it, so I am not claiming it, but it is the obvious next place to look.
+5. **The corpus diff still only proves the negative** — no twin has a broken bound, so it confirms "unaffected" and nothing about the refusal behaviour, which rests on the spec.
+
+**Capacity:** comfortable.
