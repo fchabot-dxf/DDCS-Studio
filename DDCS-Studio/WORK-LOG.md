@@ -17834,3 +17834,31 @@ read showed it and the repair closed the style string before the consts. Reporte
 **Capacity:** SIXTH act this seat. This one was small and completed cleanly, but the seat is long past
 the fresh-seat line the advisor drew — the Wizard Manager act (the next, substantial one) should NOT
 start here. Parking that judgement where the advisor already put it.
+
+
+## t1617 — the Wizard Manager: DECLINED BY THIS SEAT, per the ruled capacity protocol (turn 1617)
+
+The dispatch is addressed to a FRESH seat ("fresh seat -- THE WIZARD MANAGER") and the t1613
+NEXT-SESSION ruling said the same ("AFTER THIS: the WIZARD MANAGER (fresh seat -- it is the substantial
+one)"). It reached THIS seat because the waiter is a machine and the human has not yet opened a new
+worker session. This is the seat's SEVENTH act; both t1613 and t1615 pass-backs flagged that the Wizard
+Manager must not start here. Per the capacity rule (refusing is the strong move; pushing through tired
+on a substantial, registry-mutating act with file I/O is the named failure), this seat executes NOTHING
+of t1617: no code touched, no files created, the working tree left exactly at df29c59b.
+
+**The act remains fully specified** in NEXT-SESSION.md (the ruled shape: workspace-manager idiom;
+list/rename/duplicate/delete; forkedFrom provenance; Import/Export .wizard via the proven two tabs —
+granted FSA folder + Drive app folder, REUSING workspaceManager's mechanisms; built-ins read-only with
+Fork as the one action; the RULED duality — workspace EMBEDS/authoritative, library SHELVES, crossing is
+an explicit COPY, no references, no auto-sync, no update-from-source in v1; the verify standard — the
+full round trip THROUGH FILES: fork → rename → export → delete → import back → emit byte-identical,
+t1593 parity).
+
+**What the fresh seat should know beyond the spec** (this seat's parting pointers): the save-path now
+has three declaration-reading precedents to imitate (t1593 fork inheritance, t1607 codec, t1615 dialog);
+`forkedFrom` already rides defs (t1593) so the provenance column is a read, not a migration;
+`isMaintainedAsData` (devMode.js) decides which defs the manager must treat as template-edited;
+the scratch-worktree rig on port 3213 is the proven non-vacuity harness for save-path acts; and the
+standing failure set is 19 e2e + 1 node with the churn members named in the last three entries.
+
+Ball passed back so the advisor can hold the dispatch for the fresh seat.
