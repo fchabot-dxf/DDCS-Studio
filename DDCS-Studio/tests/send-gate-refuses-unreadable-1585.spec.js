@@ -74,14 +74,20 @@ test('⚠ the gate must NOT refuse: a clean file, or one using RUNTIME values', 
     expect(comments.valid, 'comments are not code').toBe(true);
 });
 
-test('the KNOWN leniency is named, not silently assumed away', async ({ page }) => {
+test('the ONE-TIME leniency is CLOSED: S6f came back, and the gate refuses the unclosed bracket', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram, undefined, { timeout: 20_000 });
 
-    // An unclosed bracket still PARSES, so the gate lets it through. That is deliberate, not an oversight: probe
-    // S6f is written and waiting to say what the machine does, and guessing tight would risk a false refusal —
-    // the one failure mode this gate cannot have. Pinned so the day S6f comes back, this assertion is the
-    // reminder that a decision is owed here.
+    // This assertion used to PIN the leniency (`.toBe(true)`, "S6f will settle it") — deliberately, because
+    // tightening on a guess risked the false refusal. S6f settled it on the bench (2026-08-07): the V4.1
+    // REFUSED `#190 = [1 + 2` with `Unrecognized file format: L20[M30]` — it consumed everything after the
+    // unclosed `[` hunting for its close, hit EOF, and blamed the LAST line (photo:
+    // bridge/controllers/v4.1/verify/S6f-result-L20-M30.jpg). So the pin flips: same verdict as the machine,
+    // and DELIBERATELY stricter blame — Studio validates per line, so the refusal names the line holding the
+    // OPENING bracket, not the hardware's EOF-blame. That divergence is in reporting only, and it is the
+    // line the operator actually needs.
     const unclosed = await verify(page, '#190 = [1 + 2\nM30');
-    expect(unclosed.valid, 'KNOWN LENIENCY: an unclosed bracket still passes — S6f will settle it').toBe(true);
+    expect(unclosed.valid, 'S6f: the hardware refused the unclosed bracket, so the gate refuses it').toBe(false);
+    expect(unclosed.lines, 'blamed at the OPENING bracket\'s line — not the machine\'s EOF-blame (L2 here)').toEqual([1]);
+    expect(unclosed.rows[0], 'and the row quotes the offending line back').toContain('#190 = [1 + 2');
 });

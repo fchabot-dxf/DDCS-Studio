@@ -17264,3 +17264,87 @@ out in a shared run immediately after passing in isolation. Reported per the dis
 4. **The mid-edit sentences are asserted by their text**, so they are only as correct as the words. Nothing checks
    that following the instruction actually produces a form.
 5. **Desktop viewport only.** The drawer title is asserted, but no mobile-width run of the new states.
+
+## 2026-08-07 t1601 (fix + record) - The sim refuses an unclosed bracket, and today's three bench results go on the record
+
+**Task:** two halves. (1) `[1 + 2` evaluated to 3 in the sim; bench probe S6f proved the V4.1 REFUSES it —
+make the evaluator refuse it too, blamed at the OPENING bracket's line, and flip the send-gate spec's pinned
+leniency from passes-known to refuses. (2) Record S6d/S6f/S6g in `bridge/controllers/v4.1/FINDINGS.md` with
+the exact on-screen strings, register values and the photo, and flip the emit-verbatim "still an inference"
+caveats to hardware-confirmed.
+
+### The fix — four bracket sites, one rule
+
+`engine/core/expression.js` had FOUR places that accepted a missing `]` silently: the group `[expr]`, a
+function call `FN[arg]`, the ATAN `…/[b]` arm, and the indirect `#[expr]`. (The t1583 comma arm already
+required its close.) All four now `return null` when the close is absent. The line-blame needed NO new
+machinery: `defaultSyntaxVerify` validates per LINE, so once the evaluator refuses, the error lands on the
+line holding the opening bracket automatically. That divergence from the hardware (it blames EOF — S6f's
+`L20[M30]` names the file's LAST line) is deliberate, noted in the code and asserted in the specs: same
+verdict, stricter blame, the line the operator needs. `unsetValue` and the unresolvable-#var path untouched —
+the separation t1573 established holds (asserted again in the new spec).
+
+### Verification
+
+- **Fast tier:** 1601 + 1585 + 1573 + 1583 + 1575 = 10/10 green.
+- **Non-vacuous, as numbers:** reverted `expression.js` to HEAD (scratch copy saved FIRST, restored from it
+  after — not from HEAD) and re-ran: the two changed-claim specs fail **2/2 pre-change**, each on its own
+  claim (`[1 + 2` read as 3 and was valid; the gate waved the file through). The corpus-sweep test PASSES
+  pre-change **by design** — it pins something already true (see below) and exists to stop this fix breaking
+  the corpus; also proven pre-change by direct node run: `evalExpr('[1 + 2')` → 3, `validateExpression` → true.
+- **S6g pins argument ORDER, not just the comma form:** `ATAN[1, 2] * 100` asserted ≈ 2656.505 beside S5o's
+  4500. Equal arguments structurally cannot distinguish atan2(a,b) from atan2(b,a); unequal ones can, and the
+  machine's 2656.505 = atan2(y=1, x=2)°×100 matches Studio's existing `Math.atan2(arg, argB)` exactly.
+- **Zero goldens move, asserted two ways:** the emit path uses the WIZARD evaluator (`wizards/ops/expr.js`),
+  a separate language — bytes cannot change; and the new corpus sweep emits EVERY registered twin at defaults
+  and runs it through the tightened `defaultSyntaxVerify` — no new rejection.
+- **Full suite: 21 failed / 2360 passed / 6 skipped (17.9 min, both tiers; counted by grepping the
+  ANSI-stripped failed COUNT, not the tail).** vs t1599's 20: GONE — t1599's own churn pair
+  (`blocks-edit-fail-loud-1518:124`, `blocks-hover:120`). NEW — `wizard-face-1599:60` and
+  `middle-superset:35` red in the shared run, both PASS in isolation (contention class; the VS Code
+  `playwright test-server` PID 55024 is STILL alive and contending). Three others that looked most like mine
+  (`drill-as-data:13`, `preflight-badge-838:124`, `roundtrip-whole-program-1319:96`) fail in isolation — so I
+  ran exactly those three against the PRE-change tree: the SAME three fail, same IDs. Pre-existing standing
+  members (t1593's entry names the binding/drill/round-trip set as the standing class). No failure in the run
+  is attributable to this change; none of this act's tests are red.
+
+### ⚠ DISCOVERED, REPORTED, NOT FIXED: the send gate falsely refuses a shipped lathe program TODAY
+
+The corpus sweep was written as "the tightened parser must reject NOTHING the corpus ships" — and it
+immediately rejected `user_lathe_odturn`: its emit carries
+`#137=[0-[#125*[#120-#122]/[#128-#122]]]`, and `validateExpression`'s dummy vars all read 1, so the
+denominator `[#128-#122]` evaluates to 0 and the division "fails". A VALUE artefact of validation answering a
+SYNTAX question — the dummy-read-as-1 comment in the code exists to prevent exactly this and cannot for a
+difference of two vars. **Verified pre-existing against expression.js@HEAD: the same line was already
+invalid before this act.** So the shipped t1585 send gate would show the scary refuse-dialog for a legitimate
+lathe OD-turn program right now — the false-refusal failure mode that gate's own spec calls the one it cannot
+have. Scope discipline: NOT absorbed here (it is a value/validation defect, not bracket syntax). Pinned BY
+NAME in `unclosed-bracket-refuses-1601.spec.js` so it shrinks visibly, exactly as the gate spec once pinned
+the unclosed-bracket leniency. The advisor owes a decision (likely: division-by-zero during VALIDATION is not
+a syntax error).
+
+### FINDINGS.md (bridge/controllers/v4.1)
+
+Table now carries all 8 probes with verbatim strings: S6d `G0 Xwidht` → `Unrecognized file format:
+L23[G0 Xwidht]` (rejected at its OWN line, real axis word, motorless bench); S6f `#190 = [1 + 2` →
+`Unrecognized file format: L20[M30]` (EOF-blame, photo linked: `verify/S6f-result-L20-M30.jpg`, committed
+with this act); S6g `ATAN[1, 2] * 100` → `#190 = 2656.505`. Three caveat flips, where each caveat lived:
+the ATAN divergence bullet is now FIXED+CONFIRMED with the order pin; the unclosed-bracket bullet is now
+CONFIRMED+fixed with the reporting-divergence note; the emit-verbatim chain bullet states the S6c-based
+"same class by construction, still an inference" is CLOSED by S6d — the axis-word form itself was probed.
+The stale "S6f is written and waiting" comments in `send.js` and the 1585 spec are rewritten to the
+hardware-confirmed story (messages rot with behaviour; nothing untrue left standing).
+
+### What this does NOT cover
+
+1. **The real Send dialog was not re-driven end-to-end** — the gate verdict is asserted through
+   `defaultSyntaxVerify` (the same function the dialog reads); the dialog chrome itself was proven in t1585
+   and only its input flipped.
+2. **The lathe false refusal is reported, not fixed** — a user pressing Send on an OD-turn program still gets
+   the refuse-dialog today.
+3. **`[TO TEST]`/`[HYPOTHESIS]` items elsewhere in FINDINGS are untouched** — only the three probed rows and
+   their dependent caveats changed.
+4. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** fourth act in this seat but a contained one — comfortable. The queued renderUiTree/param_group
+act is a fresh feature and would start cleanest in a fresh seat, as already noted at t1599.

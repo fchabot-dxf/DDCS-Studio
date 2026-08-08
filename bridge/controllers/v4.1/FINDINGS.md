@@ -53,7 +53,7 @@
 - **Untestable on the bench:** whether `error.nc` or any hook fires on a *hardware* alarm
   (limit / E-stop / servo) — a bare unit with no switches can't produce one. `[TO TEST w/ hardware]`
 
-### Expression / macro-syntax acceptance — RESULTS (tested 2026-08-07, 5 probes on the bench V4.1) ⭐
+### Expression / macro-syntax acceptance — RESULTS (tested 2026-08-07, 8 probes on the bench V4.1) ⭐
 
 What the controller ACCEPTS as an expression, run as real files on the unit. Probe sources live in
 `verify/` (no-motion) and `verify-motion/`. The on-screen error strings are transcribed verbatim.
@@ -65,6 +65,9 @@ What the controller ACCEPTS as an expression, run as real files on the unit. Pro
 | `S6c` | `G04 Pwidht` | **REJECTED** — `Unrecognized file format: L29[G04 Pwidht]` |
 | `S5o` | `ATAN[1, 1] * 100` | **WORKS** — ran to `M30`, `#190 = 4500` |
 | `S6e` | partial-execution check | **PARTIAL EXECUTION** — `#191 = 5678` |
+| `S6d` | `G0 Xwidht` (real axis word, motorless bench) | **REJECTED at its own line** — `Unrecognized file format: L23[G0 Xwidht]` |
+| `S6f` | `#190 = [1 + 2` (unclosed bracket) | **REJECTED, blamed at EOF** — `Unrecognized file format: L20[M30]` (photo: [`verify/S6f-result-L20-M30.jpg`](verify/S6f-result-L20-M30.jpg)) |
+| `S6g` | `#190 = ATAN[1, 2] * 100` | **WORKS** — `#190 = 2656.505`, i.e. atan2(y=1, x=2) in degrees — argument ORDER confirmed |
 
 - **Trailing garbage after a valid prefix is a LOADER rejection, not a truncation.** `[CONFIRMED]`
   `#191k8` is not read as `#191`, and `[1 + 2 k 8]` is not read as `3` — the controller refuses the whole
@@ -81,11 +84,26 @@ What the controller ACCEPTS as an expression, run as real files on the unit. Pro
   file the machine refuses. It now rejects trailing tokens, matching the controller. `S6c`'s bare-word form
   was already rejected. Pinned by `tests/sim-rejects-what-machine-rejects-1573.spec.js` using these exact
   strings.
-- **Still divergent, NOT yet fixed:** the sim REJECTS `ATAN[1, 1]`, which the hardware ACCEPTS (`S5o`) — its
-  lexer has no `,` token. Opposite direction to the above (the sim is stricter than the machine here), so it
-  hides a working form rather than blessing a broken one. `[TO FIX — separate act]`
-- **Also divergent:** an UNCLOSED bracket (`[1 + 2`) still evaluates to `3` in the sim. Not among the probed
-  forms, so not changed here; the machine's behaviour on it is untested. `[TO TEST + FIX]`
+- **ATAN comma-form divergence — FIXED (t1583):** the sim used to REJECT `ATAN[1, 1]`, which the hardware
+  ACCEPTS (`S5o`) — its lexer had no `,` token. It now resolves the comma form in degrees. `S6g` then settled
+  the remaining question, argument ORDER: `ATAN[1, 2] * 100` → `2656.505` = atan2(**1**, 2)°×100, so the
+  FIRST argument is y — exactly Studio's `Math.atan2(arg, argB)` convention. `[CONFIRMED]` What had been an
+  assumption is now a machine number, and with unequal arguments it pins the order, which `S5o`'s equal
+  arguments structurally could not.
+- **Unclosed bracket — REJECTED by hardware (`S6f`), sim fixed (t1601):** `#190 = [1 + 2` refuses with
+  `Unrecognized file format: L20[M30]` — the parser consumed everything after the unclosed `[` hunting for
+  its close, hit EOF, and blamed the **LAST line** of the file (photo:
+  [`verify/S6f-result-L20-M30.jpg`](verify/S6f-result-L20-M30.jpg)). `[CONFIRMED]` The sim used to close the
+  bracket silently (`[1 + 2` read as `3`); it now refuses too — blaming the line holding the OPENING bracket,
+  a DELIBERATE reporting divergence (stricter than the machine's EOF-blame, same verdict, the line the
+  operator needs). This was the last KNOWN place the sim was more lenient than the machine. Pinned by
+  `tests/unclosed-bracket-refuses-1601.spec.js`.
+- **The emit-verbatim chain is CLOSED by hardware (`S6d`):** `G0 Xwidht` — a real AXIS word, the exact form
+  Studio's emit-the-author's-text arc (t1575/t1585) produces for a typo'd identifier — is **REJECTED at its
+  own line** (`L23[G0 Xwidht]`), run motorless so the motion block was safe on the bench. `[CONFIRMED]`
+  Until now that claim rested on `S6c` (`G04 Pwidht`, a dwell word): "same `Unrecognized file format` class
+  by construction, still an inference". No longer an inference — the axis-word form itself was probed, and
+  the controller refuses it exactly where Studio's gate says it will.
 
 ### Detecting syntax errors over Ethernet — RESULTS (tested 2026-06-06)
 1. **Completion sentinel + checkpoints** `[CONFIRMED both directions]` — write a start-marker near the

@@ -113,10 +113,25 @@ export function evalExpr(str, vars, opts = {}) {
         const t = peek();
         if (t === '+') { p += 1; return parseFactor(); }
         if (t === '-') { p += 1; const f = parseFactor(); return f === null ? null : -f; }
+        // t1601 — AN UNCLOSED BRACKET IS UNRESOLVABLE, and the hardware said so. Bench probe S6f ran
+        //   `#190 = [1 + 2`  ->  Unrecognized file format: L20[M30]
+        // (photo: bridge/controllers/v4.1/verify/S6f-result-L20-M30.jpg). The controller consumed everything
+        // after the unclosed `[` hunting for its close, hit EOF, and blamed the LAST line. This parser used to
+        // CLOSE the bracket silently — `[1 + 2` read as 3, a clean preview for a file the machine refuses, and
+        // (probe S6e) refuses only AFTER running every line ahead of the fault. Third member of the t1573
+        // family (trailing tokens, the stray comma, now this), and the last KNOWN place the sim was more
+        // lenient than the machine. Every bracket-closing site below now requires its `]`.
+        //
+        // BLAME DIVERGES FROM THE HARDWARE ON PURPOSE: expressions are validated per LINE, so the refusal
+        // lands on the line holding the OPENING bracket — stricter reporting than the machine's EOF-blame,
+        // same verdict, and the line the operator actually needs.
+        // ⚠ SYNTAX, NOT VALUE (same separation as t1573): an unset #var still reads as `unsetValue`.
         if (t === '[') {
             p += 1;
             const v = parseExpr();
-            if (peek() === ']') p += 1;
+            if (v === null) return null;
+            if (peek() !== ']') return null;   // unclosed group — S6f
+            p += 1;
             return v;
         }
         if (t && typeof t === 'object' && t.fn) {
@@ -144,14 +159,16 @@ export function evalExpr(str, vars, opts = {}) {
                 p += 1;
                 return Math.atan2(arg, argB) * 180 / Math.PI;
             }
-            if (peek() === ']') p += 1;
+            if (peek() !== ']') return null;   // t1601 — an unclosed call bracket is as fatal as an unclosed group
+            p += 1;
             // Fanuc/DDCS two-operand arctangent: ATAN[a]/[b] = atan2(a, b) in DEGREES (quadrant-correct).
             // Only the bracketed `/[…]` form is atan2; `ATAN[a]/2` stays a plain division of the single-arg result.
             if (t.fn === 'ATAN' && peek() === '/' && toks[p + 1] === '[') {
                 p += 2;                       // consume '/' and '['
                 const arg2 = parseExpr();
-                if (peek() === ']') p += 1;
                 if (arg2 === null) return null;
+                if (peek() !== ']') return null;   // t1601
+                p += 1;
                 return Math.atan2(arg, arg2) * 180 / Math.PI;
             }
             return fn(arg);
@@ -162,7 +179,8 @@ export function evalExpr(str, vars, opts = {}) {
             if (peek() === '[') {
                 p += 1;
                 idx = parseExpr();
-                if (peek() === ']') p += 1;
+                if (peek() !== ']') return null;   // t1601 — indirect #[expr] requires its close too
+                p += 1;
             } else if (typeof peek() === 'number') {
                 idx = toks[p++];
             } else {

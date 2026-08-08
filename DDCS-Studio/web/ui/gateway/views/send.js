@@ -121,12 +121,12 @@ export default {
         // in the case that matters most. `defaultSyntaxVerify` is the same parser the sim runs, which is what makes
         // "what the controller would refuse" a claim worth standing behind.
         //
-        // ⚠ THE TOLERANCE IS ASYMMETRIC AND SET DELIBERATELY LOOSE. Too STRICT is a FALSE REFUSAL that stops real
-        // work; too LENIENT waves through a file the controller rejects, which is merely where we already were. So
-        // it ships on the parser as it stands, with one KNOWN leniency named rather than guessed tight: an unclosed
-        // bracket still parses, and probe S6f is written and waiting to settle what the machine does with it.
-        // Tightening on a guess risks the one failure we cannot accept. It is also why the comma form landed first
-        // (t1583): before that, this gate would have refused `ATAN[1, 1]` — which the hardware ACCEPTS — on day one.
+        // ⚠ THE TOLERANCE IS ASYMMETRIC. Too STRICT is a FALSE REFUSAL that stops real work; too LENIENT waves
+        // through a file the controller rejects. Every tightening here is hardware-attested, never guessed: the
+        // one leniency this shipped with (an unclosed bracket parsed) was PINNED until probe S6f returned, and it
+        // returned REFUSED (t1601) — the parser now rejects it like the machine, blaming the OPENING bracket's
+        // line where the hardware blames EOF. The mirror case is why the comma form landed first (t1583): before
+        // it, this gate would have refused `ATAN[1, 1]` — which the hardware ACCEPTS — on day one.
         //
         // A RUNTIME TOKEN IS NOT A FAULT: `#500`, `#1512`, a probe result `#5063`, `[#100 + 5]` all verified to pass.
         // Fifth act running for that carve-out.
