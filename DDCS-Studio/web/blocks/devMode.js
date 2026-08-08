@@ -148,6 +148,13 @@ function buildBindings(exposures) {
 
 let _ws = null, _B = null, _savebtn = null, _editChip = null;
 let _editingWizard = null, _editingLabel = null;   // opType + friendly label being re-authored, or null = a fresh op
+// t1599 — WHICH WIZARD THE CANVAS IS CUSTOMIZING, which is NOT the same fact as `_editingWizard` above. That one
+// answers "may this wizard be Updated in place?", and editWizardDef deliberately clears it for the fork-only twins
+// (surfacing / slot / drill / bore) so a recognized fork cannot destructively overwrite its twin. The right pane
+// then had nothing left to ask, and showed the Preview face while a Define Custom Wizard block sat on the canvas.
+// So the second fact is DECLARED here rather than inferred from the stack's shape — which cannot work, because a
+// PLACED data-op twin's body carries a `user_root` too and an ordinary program must keep its Preview + G-code.
+let _authoringWizard = null;
 
 /** Derive a LIVE wizard def from the workspace WITHOUT saving — the same bindings saveAsCustomOp computes (inline
  *  exposures + GUI param pills), so the Blocks tab can render the op's form as a live VIEW of its blocks (the form is
@@ -223,6 +230,9 @@ export function deriveGroupDef(groupOp) {
 
 /** The opType being re-authored (the "editing a saved wizard" context), or null = building/authoring fresh. */
 export function editingWizardType() { return _editingWizard; }
+/** t1599 — the opType this canvas was opened to CUSTOMIZE, or null. Set for every Customize, including the fork-only
+ *  twins `editingWizardType` deliberately reports null for. The right pane reads it to decide its face. */
+export function authoringWizardType() { return _authoringWizard; }
 
 /** Write a form VALUE back to the block it's bound to — the live round-trip's form→block direction. Maps the
  *  binding's (blockIndex, key) to the live Blockly socket and sets the number SURGICALLY (a math_number shadow, or a
@@ -525,7 +535,7 @@ export async function editWizardDefs(opTypes) {
     if (!(await confirmDestructiveLoad(opCs, { label: 'before edit', what: recs.length + ' ops' }))) return;
     if (window.showApp) window.showApp('blocks');
     if (!(await blocksAppReady(recs.length + ' ops'))) return;   // t1518 — refuse loudly rather than load nothing quietly
-    _editingWizard = null; _editingLabel = null; refreshEditingChrome();   // multi-op: no single-op re-author chrome
+    _editingWizard = null; _editingLabel = null; _authoringWizard = null; refreshEditingChrome();   // multi-op: no single-op re-author chrome (t1599 — and no single wizard is being customized either)
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(opCs);
     await new Promise((r) => setTimeout(r, 150));
 }
@@ -547,6 +557,7 @@ export async function editWizardDef(opType) {
     // (surfacing/slot/drill/bore, previously Updatable) need the new fork-only protection.
     const forkOnly = recognized && !isMaintainedAsData(def);
     _editingWizard = forkOnly ? null : opType; _editingLabel = forkOnly ? null : (def.label || opType);
+    _authoringWizard = opType;   // t1599 — set for EVERY Customize, fork-only included: the face asks this, not the Update lock
     refreshEditingChrome();   // glow + "✎ Editing: <name>" chip (the editing-context UI)
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([opC]);
     await new Promise((r) => setTimeout(r, 150));   // let it project + render (authoring affordances grow automatically)
@@ -756,7 +767,7 @@ function saveAsCustomOp() {
         } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
         if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
-        _editingWizard = null; _editingLabel = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
+        _editingWizard = null; _editingLabel = null; _authoringWizard = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
         alert(update ? `Updated “${meta.name}”.` : `Saved “${meta.name}” as a new wizard — it's a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
     });
 }

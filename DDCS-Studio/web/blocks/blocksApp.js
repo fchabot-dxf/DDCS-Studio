@@ -14,12 +14,12 @@ import { suggestNext, recordProgram } from './suggest.js';   // next-block sugge
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
-import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back
+import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { renderOpForm, formBindings, renderUiTree } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present; renderUiTree for block layouts
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
-import { getUserDef } from './userOps.js';
+import { getUserDef, flattenBlocks } from './userOps.js';
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -400,8 +400,19 @@ async function buildWorkspace() {
       if (regDef) def = regDef;
     }
 
-    const userRoot = stack.find((b) => b && b.type === 'user_root') || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
-    
+    // ── t1599 — IS A WIZARD BEING AUTHORED HERE? Two ways, and both are facts, not shape-guesses ─────────────────
+    // (1) a Define Custom Wizard block the user put at the TOP LEVEL — a hand-built wizard;
+    // (2) the Customize route is open, which devMode DECLARES (`authoringWizardType`) and which is still true of
+    //     this stack, checked so a stale session cannot claim a program it no longer describes.
+    // ⚠ NOT "a user_root anywhere in the flattened stack" — I wrote that first and it was worse than the bug: a
+    // PLACED data-op twin's body carries a user_root too, so merely inserting Corner into a program turned the whole
+    // right pane into the wizard face and took the sim's Preview + G-code away from it.
+    const authoredHere = stack.find((b) => b && b.type === 'user_root');
+    const customizing = !!(authoringWizardType() && stack.some((b) => b && b.type === 'op' && b.opType === authoringWizardType()));
+    const userRoot = authoredHere
+      || (customizing ? flattenBlocks(stack).find((b) => b && b.type === 'user_root') : null)
+      || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
+
     function checkLayoutNodes(nodes) {
       if (!nodes) return false;
       const list = Array.isArray(nodes) ? nodes : (typeof nodes === 'object' ? Object.values(nodes).flat() : []);
@@ -415,14 +426,30 @@ async function buildWorkspace() {
     }
     const hasTree = userRoot && checkLayoutNodes(userRoot.uiChildren);
 
-    const show = hasTree || (def && (editingWizardType() || (def.bindings && def.bindings.length)));
+    // ── t1599 — A DEFINE CUSTOM WIZARD BLOCK ON THE CANVAS MEANS THE WIZARD FACE. FULL STOP. ────────────────────
+    // The predicate used to be a disjunction of three PROXIES for that — a layout tree under the root, an editing
+    // context, a non-empty binding list — and each could be false while a wizard was plainly being authored:
+    //   · the layout tree was looked for at the TOP LEVEL only, so the Customize route (root inside an `op`) never
+    //     matched it;
+    //   · `editingWizardType()` is deliberately null for the fork-only twins (surfacing / slot / drill / bore);
+    //   · a stack mid-authoring has no bindings yet, which is the ordinary state of a wizard you are still building.
+    // Corner survived on the second term alone. Surfacing had none of the three and showed Preview with the block
+    // right there on the canvas — the reported gap. The two authoring facts above are what actually answer it.
+    //
+    // ⚠ ADDED TO the old terms, NOT substituted for them. "A Define Custom Wizard block means the wizard face" is
+    // SUFFICIENT, never NECESSARY: a plain saved custom op whose template is a bare atom stack with a param pill has
+    // no user_root at all, and swapping the predicate wholesale sent it to the Preview face — five blocks-live-form
+    // tests said so within the minute.
+    const show = !!authoredHere || customizing || hasTree || (def && (editingWizardType() || (def.bindings && def.bindings.length)));
     pane.hidden = false;
     // t1589 — `show` is the ONE source for which face this column wears; write it once, let CSS and both mobile
     // labels read it. Wizard View when there IS one (0bd8b38c's intention, intact); Preview + Projected G-code when
     // there is not, instead of the placeholder that used to sit in 27% of the tab doing nothing.
     setRightFace(!!show);
     if (!show) {
-      formHost.innerHTML = '<div class="blk-form-empty" style="opacity:0.6;padding:12px;font-style:italic;">Add a "Define Custom Wizard" block or tick a knob to view live Generator Modal layout.</div>';
+      // No wizard block at all → this column IS the Preview face, and the message that used to sit here told the
+      // reader to add a block while the other face was already showing them the program. Nothing to say.
+      formHost.innerHTML = '';
       formHost.__sig = null;
       return;
     }
@@ -439,6 +466,22 @@ async function buildWorkspace() {
         byParam[inp.dataset.param] = { row, read: readers[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
       });
       renderUiTree(formHost, userRoot.uiChildren, (def && def.bindings) || [], byParam);
+      return;
+    }
+
+    // t1599 — MID-EDIT: the face is the wizard's, so it must SAY WHAT IS MISSING rather than fall through to a form
+    // with nothing in it. Two distinct absences, named separately because the next move differs: a wizard with no
+    // Presentation content at all has no layout to render, and one with content but no bound fields has nothing to
+    // put in it. (`def` can also be null when a mid-edit derive throws — same face, same kind of message.)
+    // SCOPED to a stack that actually carries a Define Custom Wizard block: an op that reached this face by one of
+    // the other terms has no Presentation mouth to be told about, and its own "No knobs yet" line below still fits.
+    if (userRoot && !hasTree && !(def && def.bindings && def.bindings.length)) {
+      const root = userRoot || {};
+      const hasPresentation = Array.isArray(root.uiChildren) && root.uiChildren.length > 0;
+      formHost.__sig = null;
+      formHost.innerHTML = hasPresentation
+        ? '<div class="blk-form-empty">This wizard has no fields yet — add a <b>Form field</b> block, or a <b>Parameter Group</b>, to the Presentation mouth.</div>'
+        : '<div class="blk-form-empty">This wizard is empty — drop a <b>Panel</b> and a <b>Form field</b> block into its <b>Presentation (UI &amp; Sim)</b> mouth to give it a form.</div>';
       return;
     }
 

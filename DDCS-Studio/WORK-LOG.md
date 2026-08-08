@@ -17138,3 +17138,129 @@ in isolation and can only reduce the count.
    by fork-parity-1593 as before, unchanged by this turn.
 
 **Capacity:** comfortable. Two acts in this seat (t1593 + t1595) and both landed with room to spare.
+
+## 2026-08-07 t1599 (fix) - Authoring a wizard shows the wizard - and the obvious version of that rule breaks every placed twin
+
+**Task:** the Blocks right pane showed the PREVIEW face while a Define Custom Wizard block, a FORM, a `panel` and a
+full Parameter Group sat on the canvas. User-ruled with a screenshot: authoring a wizard should show the wizard.
+Trace it, do not guess — the named candidates were `deriveAuthoredDef` failing on that shape, or the `userRoot`
+lookup taking a path this stack does not match.
+
+### Traced — and it was neither candidate
+
+`deriveAuthoredDef` did not throw (`derr: null` on every route) and the lookup did not take a wrong branch. It only
+ever searched **the stack's TOP LEVEL**, and on the Customize route the wizard root sits INSIDE an `op` container.
+So `hasTree` was structurally false for every Customize that ever happened, and the face rested entirely on a
+different term — `editingWizardType()` — which `editWizardDef` **deliberately clears** for the fork-only twins so a
+recognized fork cannot destructively Update its twin. Corner survived on that accident. Surfacing had none of the
+three terms and showed Preview.
+
+| route | hasTree | editing | bindings | face BEFORE |
+|---|---|---|---|---|
+| Customize corner (bindingSpecs) | false | `user_corner_data` | 0 | wizard — on the second term alone |
+| **Customize surfacing (fork-only)** | false | **null** | 0 | **PREVIEW** ← the reported gap |
+| hand-built + panel + param_group | true | null | 0 | wizard |
+| **bare Define Custom Wizard** | false | null | 0 | **PREVIEW** ← mid-edit |
+| plain program | false | null | 0 | Preview ✓ |
+
+So the gap is not one wizard: it is **surfacing, slot, drill and bore** — every twin `editWizardDef` marks
+fork-only — plus every half-built wizard before its first field exists.
+
+### ⚠ THE OBVIOUS FIX IS WRONG, AND I SHIPPED IT INTO THE TEST RUN BEFORE CATCHING IT
+
+The ruling reads as one line — *a Define Custom Wizard block on the canvas means the wizard face* — so I wrote it as
+one line: `hasWizardRoot(stack)`, a flatten looking for a `user_root` anywhere. Two things went wrong, in order:
+
+1. **It was too NARROW as a replacement.** I substituted it for the three old terms instead of adding to it. A plain
+   saved custom op whose template is a bare atom stack with a param pill has no `user_root` at all — five
+   `blocks-live-form` tests went red within the minute. The rule is SUFFICIENT, never NECESSARY.
+2. **And then too BROAD.** `blocks-code-panel-live-1589` caught the real one: **every data-op twin's instantiated
+   body is `[user_root{…}]`**, so merely INSERTING Corner into an ordinary program flipped the whole right pane to
+   the wizard face and took the sim's Preview + projected G-code away from it. A placed op is a program, not an
+   authoring session — and no amount of looking at the stack's SHAPE can tell those apart, because they have the
+   same shape.
+
+### The fix: DECLARE the authoring session, don't infer it
+
+`_editingWizard` was carrying two different facts, and the fork-only clear is what pulled them apart:
+
+```
+   _editingWizard      "may this wizard be Updated in place?"     ← cleared for fork-only, ON PURPOSE
+   _authoringWizard    "is this canvas customizing a wizard?"     ← NEW; set by EVERY Customize
+```
+
+The right pane reads the second, checked against the stack still holding that op so a stale session cannot claim a
+program it no longer describes. The three old terms survive as additional SUFFICIENT conditions, and the top-level
+`user_root` covers the hand-built case:
+
+```js
+show = topLevelUserRoot || customizing || hasTree || (def && (editingWizardType() || def.bindings.length))
+```
+
+The flatten-for-`userRoot` — which is what lets the Customize route render its declared layout — is scoped to
+`customizing` for exactly the same reason.
+
+### Mid-edit says what is missing
+
+The face is the wizard's, so it must not fall through to an empty form. Two absences, two sentences, because the
+next move differs: no Presentation content at all ("drop a Panel and a Form field into its Presentation mouth")
+versus content that declares no layout and binds no field ("no fields yet — add a Form field, or a Parameter
+Group"). Scoped to a stack that actually carries the block; an op that reached the face by another term keeps its
+own "No knobs yet" line. And the old message on the PREVIEW face — *"Add a Define Custom Wizard block or tick a
+knob"* — is deleted rather than reworded: it told the reader to add a block while the other face was already
+showing them their program.
+
+### Non-vacuous
+
+The four tests against the pre-change tree, three runs each:
+
+| claim | result |
+|---|---|
+| customizing a fork-only twin shows the WIZARD face | **failed 3/3** — `user_surfacing_data`, expected true, got false |
+| a plain program's form host carries no stale advice | **failed 3/3** — got *"Add a \"Define Custom Wizard\" block…"* |
+| a bare Define Custom Wizard is a wizard being authored | **failed 3/3** — expected true, got false |
+| a PLACED twin keeps Preview | **passed** — it pins something already true, and exists to stop the FIX breaking it |
+
+That last one is not decoration: my intermediate flatten-anywhere version made `blocks-code-panel-live-1589` red on
+precisely that condition, which is how the trap was found. It is asserted here so the next person meets it as a test
+rather than as a bug.
+
+### Named goldens
+
+`wizard-face-1599` (4) · `blocks-code-panel-live-1589` (5) · `blocks-live-form` (6) · `blocks-mobile-drawers` ·
+`panel-types` · `fork-parity-1593` (2) · `guard-roundtrip-1595` (2) — 19 green together, and all 4 of mine green in
+isolation. Lint 0 errors on the three changed files. Real-app shots: `t1599-customize-surfacing.png` (the reported
+gap, now GENERATOR MODAL), `t1599-customize-corner.png`, `t1599-midedit-bare.png` (the empty-state sentence),
+`t1599-plain-program.png` (Preview + projected G-code intact).
+
+### The ID diff
+
+**Full suite: 20 failed / 2359 passed / 6 skipped (18.2 min, both tiers)** — back to the standing baseline of 20,
+with none of this act's tests in it.
+
+| vs t1595's 21 | |
+|---|---|
+| GONE (3) | `blocks-load-guard-s41:65`, `blocks-rotary-rig:14` (load class, healed) and **`fork-parity-1593:68`** — the registry-boot split from last act, confirmed in a full run |
+| NEW (2) | `blocks-edit-fail-loud-1518:124` and `blocks-hover:120` — both pass in isolation (6/6 green together), the same churn class |
+
+`blocks-edit-fail-loud-1518:124` is the one I checked hardest rather than waving through: it asserts the re-author
+chrome's four signals settle together, and the re-author chrome is exactly what this act added a field to. It passes
+alone in 1.9s.
+
+⚠ The VS Code `playwright test-server` (PID 55024) is still up and still contending: one of my four tests boot-timed
+out in a shared run immediately after passing in isolation. Reported per the dispatch rather than argued away.
+
+### What this does NOT cover
+
+1. **The wizard face for a customized twin is right but its CONTENT is not complete.** The surfacing shot shows
+   `⚠ "param_group" — not wired yet` beside empty Feature-Canvas and Visualization boxes: `renderUiTree` handles the
+   layout node types and does not render a `param_group`'s rows. That is a gap in the tree RENDERER, not in the
+   face predicate this act fixed, and I did not touch it.
+2. **`_authoringWizard` is cleared on save, on the multi-op route, and by the stack check** — not by "the user
+   navigated away". Loading an unrelated program clears it in effect (the op is gone from the stack), but there is
+   no explicit lifecycle beyond that.
+3. **Only the Customize entry point sets it.** A wizard opened into Blocks by some future third route would need the
+   same declaration; nothing enforces that a new entry point remembers to make it.
+4. **The mid-edit sentences are asserted by their text**, so they are only as correct as the words. Nothing checks
+   that following the instruction actually produces a form.
+5. **Desktop viewport only.** The drawer title is asserted, but no mobile-width run of the new states.
