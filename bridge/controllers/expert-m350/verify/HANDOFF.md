@@ -65,7 +65,9 @@ This file is the quick "where are we / how to resume" sheet.
 | **V17d** unclosed `[` | `[1 + 2` with no close → CLOSE / truncate / ALARM? | `V17d_unclosed.nc` — **3**=closed (sim matches) · **none**=alarmed (sim too lenient → tighten gate) · other=third way. |
 | **V17e** divide-by-zero | literal `/0` → rejected at load or tolerated? | `V17e_divzero.nc` — **none**=rejected at load (tighten gate) · **-99999**=inert · other=firmware computed something for 1/0. |
 
-> ℹ **Mirror of V4.1 `S6f/S6g/S6h` (added 2026-08-08).** `S6a/b/c` already have twins (`V17a/b/c`); `S6e` partial is settled (Expert whole-file-rejects, rule 3); WHILE (`S5n`) is already `[CONFIRMED]` in FINDINGS (factory `WHILE…DOn…ENDn`, both spacings). These 3 are the remaining V4.1 edge probes with no Expert answer yet.
+> ℹ **Mirror of V4.1 `S6f/S6g/S6h` (added 2026-08-08).** `S6a/b/c` already have twins (`V17a/b/c`); `S6e` partial is settled (Expert whole-file-rejects, rule 3); WHILE (`S5n`) is already `[CONFIRMED]` in FINDINGS (factory `WHILE…DOn…ENDn`, both spacings). `V17d`/`V17e` still open.
+
+> ✅ **V13 ATAN RESOLVED 2026-08-08 (see FINDINGS `V13 RESULT`).** `V13_trig` aborted on the **slash** ATAN line; `V13f_atan_comma` returned **2657** ⇒ two-operand ATAN works via the **COMMA form `ATAN[y, x]`**, order correct (dy-over-dx). **`V13d`/`V13e` are superseded** (both use the rejected slash form). **DEFECT logged:** `probeToSlot.js:538` + `alignmentWizard.js:158` emit the slash form → unparseable on the Expert; fix = comma emit (desk task, needs the suite). **COS/SIN/SQRT still open** → run `V13c_sqrt`, `V13a_cos`, `V13b_sin`.
 
 > ⚠ **t1466 — a comment can fake a failure, and it nearly did.** Safety rule 1 below is not cosmetic: `V13_trig.nc`
 > carried five bracketed comment lines and V12/V14/V15 carried more. A parse abort caused by a *comment* reads

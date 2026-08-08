@@ -513,6 +513,22 @@ slib-g.nc `P1.0`=1 s reading and the dialect's old "a decimal P would be seconds
 ⇒ **dialect:** keep emitting integer-ms (correct); **linter:** WARN on a decimal `G04 P<x.y>` — it is ~`x` ms
 (near-instant), never `x` seconds. To dwell N seconds, emit `G04 P<N*1000>` (integer ms).
 
+## ⚠️ V13 RESULT — two-operand ATAN uses the COMMA form; Studio's SLASH emit is REJECTED `[CONFIRMED on machine 2026-08-08, fw V1.1]`
+Ran `verify/V13_trig.nc` → **aborted: `syntax error!:L53 [#605 = [ATAN[1] / [1] * 100]]`** on the ATAN line. Whole-file
+reject (safety rule 3) blinded COS/SIN/SQRT — they remain UNTESTED. Then `verify/V13f_atan_comma.nc` (the V4.1 comma
+form, unequal operands 1,2) → popup **`ATANC=2657`**. So:
+- **Two-operand ATAN EXISTS and is quadrant-correct**, but the accepted syntax is the **COMMA form `ATAN[y, x]`**, NOT
+  the Fanuc slash form `ATAN[y]/[x]`. `ATAN[1, 2] = 26.565°` ⇒ **argument order is dy-over-dx, CORRECT (not mirrored).**
+- **DEFECT: Studio emits the SLASH form**, which this controller rejects — `data/probeToSlot.js:538` and
+  `wizards/alignmentWizard.js:158` both emit `#54=ATAN[#52]/[#53]`. ⇒ **the alignment probe's angle macro has been
+  UNPARSEABLE on the Expert** (`Unrecognized file format` on the ATAN line → the whole file never runs). This is the
+  `onNo` branch of `trigEvidence.js` `alignment-atan`, and the *which* is now known: **unparseable, not wrong-angle.**
+- **Fix (desk task — needs the Playwright suite + golden regen, do NOT half-apply):** switch both emit sites to
+  `#54=ATAN[#52, #53]` (comma works on BOTH — V4.1 per S5o/t1583, Expert per V13f). Resolve `trigEvidence.js`
+  `alignment-atan`, and flip the emit-asserting specs (`alignment-superset.spec.js`, `cam-slot-sim.spec.js`:
+  `ATAN\[#52\]/\[#53\]` → comma). The engine already PARSES comma (`expression.js` t1583), so only the EMIT changes.
+- **Still open:** COS / SIN / SQRT on the Expert (the `V13_trig` abort ate them) ⇒ run `V13c_sqrt`, `V13a_cos`, `V13b_sin`.
+
 ### CORE_TRUTH (skill) vs factory-firmware reality — discrepancies the linter exposed
 - **G10:** skill says "G10 is broken." **V1 (above) CONFIRMS broken + dangerous on this fw** (`G10 L20 P6 X25`
   emitted motion, wrote no offset). Factory `key-5.nc`/`key-6.nc`/`3D PROBE G55.nc` *use* `G10 L20 P2` — so
