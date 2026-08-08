@@ -17494,3 +17494,69 @@ all 7 face tests green after, including under the full-suite load.
    writes the string "undefined"); no spec asserts that corner case either way.
 
 **Capacity:** first act this seat, fresh and comfortable.
+
+
+## t1607 — the enum options codec carries STRING values (turn 1607)
+
+**The dispatch:** my own t1605 observation promoted — stockAttach/pathDatum render a label-only option +
+unmatched value on BOTH faces. The declared truth is the binding's TYPE: string-typed enums keep string
+values through the options round-trip; numeric parsing only where the type is numeric. Promoted ahead of
+Z-mode because Z-mode is itself a string enum (normal/skim) and would ship into the same breakage.
+
+### The corruption, traced exactly
+
+stockAttach declares `[['Follow stock datum',''], ['Front Left','nn'], …]`. The serializer
+(paramGroupFromBindings) writes `"Follow stock datum=, Front Left=nn, …"` — correct. The numeric-only
+parse then did two wrong things at once: `Number('')` is **0**, so the follow option survived as the
+corrupted `['Follow stock datum', 0]`; and `Number('nn')` is NaN, so the nine real corners were DROPPED.
+One surviving entry means the row's widgetConfig REPLACED the binding's full list — a one-option select
+whose value matched nothing. stockDatum looked healthy only because ALL its options dropped, which leaves
+the binding's own widgetConfig standing: working by total failure, not by design.
+
+### The fix — the type picks the codec, one parser
+
+`parseParamOptions(str, type)`: numeric types (number/int — and NO type, the GUI param pill's
+numeric-socket contract, unchanged) coerce and drop as before; every other type keeps the declared string
+verbatim, empty value included. Both readers pass their declared type through: `paramFieldsFromStack`
+(param_field rows — row.type) and `bindingsFromStack` (formfield blocks — spec.type). The serializer needed
+nothing: `label=value` already round-trips byte-for-byte once the parse stops coercing. Rendering is
+behaviourally identical for numeric-valued enums (comm's statusMode 1/−3000): a select's option values and
+its read() pass through String in both directions — asserted by the every-twin control-fidelity sweep
+(twin-form-completeness-1581:85, green).
+
+### ⚠ ONE EXPECTATION CHANGED WITH THE RULED CODEC — called out, not smuggled
+
+`cam-block-native-params-s5.spec.js:35` asserted an ENUM row's `"Rect=0, Circle=1"` parses to numeric 0/1 —
+the exact coercion this act's ruling removes. Updated to `'0'/'1'` with a comment citing the rule and the
+corruption the old behaviour caused. Same shape as the t1617 precedent: an expectation edit beside its
+justification, one-line revert if the advisor rules otherwise.
+
+### Verification
+
+- **Non-vacuous: 3/3 new tests fail against the pre-change tree**, each on its own claim — the codec
+  round-trip (the diff even prints the corrupted `['Follow stock datum', 0]`), the BLOCKS wizard-view face
+  (1 option, wrong value), the FLAT Generator-Modal face (same). The face tests assert the select's VALUE,
+  not its label — a broken select silently shows its first option, so a label assertion would pass pre-fix.
+- **Both faces driven + photographed:** `verification/t1607-blocks-face.png` (Customize Surfacing, both
+  placement selects showing "Follow stock datum") and `t1607-modal-face.png` (the real Generator Modal via
+  wizardManager.open, same rows, 3D+2D preview live).
+- **Fast tier (9 files, 29 tests): 25 green + 4 triaged** — cam-s5:10 was the ruled expectation change
+  (above, green after); cam-s52:25 + s53:78 the documented pre-existing pair; one boot timeout under
+  6-worker contention (passed isolated twice).
+- **Full suite: 19 failed / 2370 passed / 6 skipped e2e + 1 node (17.9 min; ANSI-stripped count).** vs
+  t1605's 19/2367/6: passed +3 = exactly this act's three tests. ID churn: GONE fork-parity-1593:107 +
+  guard-roundtrip-1595:115; NEW homing-start-marker-frame:48 + homing-sysstart-real:55, BOTH pass in
+  isolation — the homing flap is t1593's recorded churn family. The 1 node red is the same standing
+  surfacing-as-data member (reproduced on unmodified HEAD last turn). None of this act's tests red.
+
+### What this does NOT cover
+
+1. **String DEFAULTS are the adjacent gap, not fixed here:** a param_field/formfield `dflt` is still
+   numeric-only (paramFieldsFromStack:361, bindingsFromStack:302) — an enum row cannot DECLARE a string
+   default and relies on inheriting the binding's. Same declaration-codec family; flagged for the advisor
+   (Z-mode's row will inherit its binding default 'normal', so the queued act is not blocked).
+2. **Non-numeric write-back** unchanged (t1605 note): enum selects read live, do not write back to blocks.
+3. **Labels containing commas/equals** remain outside the codec's grammar (none exist in the corpus).
+4. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** second act this seat, small and contained — comfortable.

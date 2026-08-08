@@ -32,7 +32,13 @@ test('S5.1 — paramFieldsFromStack reads the param_field rows IN ORDER; the emi
     });
     expect(r.rows.length, 'two param_field rows in mouth order').toBe(2);
     expect(r.rows[0], 'row 1 = feed, number widget, with the form label + range').toEqual({ param: 'feed', widget: 'number', type: 'number', label: 'Feed rate', default: 200, widgetConfig: { min: 1, max: 9999, units: 'mm/min' } });
-    expect(r.rows[1], 'row 2 = shape, dropdown widget with parsed options').toEqual({ param: 'shape', widget: 'dropdown', type: 'enum', label: 'Shape', widgetConfig: { options: [['Rect', 0], ['Circle', 1]] } });
+    // t1607 — EXPECTATION CHANGED WITH THE RULED CODEC (called out, not smuggled): an ENUM row keeps its declared
+    // STRING values through the options parse — numeric coercion belongs to numeric types only (the GUI pill's
+    // socket contract, asserted unchanged in gui-param-typed-widgets + enum-options-codec-1607). '0'/'1' here were
+    // 0/1 before; the select is behaviourally identical (option values and reads pass through String both ways),
+    // and the old coercion is what corrupted every string-valued enum (stockAttach's ['Follow stock datum','']
+    // parsed to a single [label, 0] entry and DROPPED the other nine options).
+    expect(r.rows[1], 'row 2 = shape, dropdown widget with parsed options (enum → string values)').toEqual({ param: 'shape', widget: 'dropdown', type: 'enum', label: 'Shape', widgetConfig: { options: [['Rect', '0'], ['Circle', '1']] } });
     // BYTE-NEUTRAL: param_group is transparent and param_field emits [] → adding the form blocks changes nothing
     expect(r.emitWith, 'the FORM blocks change not one byte of G-code').toBe(r.emitNo);
     expect(r.emitWith, 'and the real atoms still emit').toContain('F300');

@@ -73,18 +73,28 @@ export function flattenBlocks(blocks, out = [], currentGroup = null) {
 }
 
 // Parse a param block's `options` string ("Rough=500, Finish=1500", or newline-separated) → [[label, value], …].
-// Values must be NUMERIC (a param knob lands in a numeric socket → valid by construction); non-numeric presets are
-// dropped. A bare "500" yields ['500', 500]. Exported so the form widget + tests share one parser.
-export function parseParamOptions(str) {
+// t1607 — the binding's TYPE decides the value codec. NUMERIC types (number/int — and no type at all: the GUI
+// param pill lands in a numeric socket, valid by construction) keep the original contract: coerce, DROP what
+// isn't a number, a bare "500" self-labels as ['500', 500]. Every OTHER type (enum/string/bool/list) keeps the
+// declared STRING value verbatim — "Front Left=nn" is ['Front Left','nn'] and "Follow stock datum=" keeps its
+// EMPTY value (the numeric path read that as Number('') === 0 and turned a shipped twin's placement dropdown
+// into one corrupted option while dropping the nine real ones). Exported so the form widget + tests share one parser.
+export function parseParamOptions(str, type) {
+    const numeric = type == null || type === 'number' || type === 'int';
     const out = [];
     for (const tok of String(str || '').split(/[,\n]/)) {
         const t = tok.trim();
         if (!t) continue;
         const eq = t.indexOf('=');
         const label = (eq >= 0 ? t.slice(0, eq) : t).trim();
-        const val = Number((eq >= 0 ? t.slice(eq + 1) : t).trim());
-        if (!Number.isFinite(val)) continue;
-        out.push([label || String(val), val]);
+        const raw = (eq >= 0 ? t.slice(eq + 1) : t).trim();
+        if (numeric) {
+            const val = Number(raw);
+            if (!Number.isFinite(val)) continue;
+            out.push([label || String(val), val]);
+        } else {
+            out.push([label || raw, raw]);
+        }
     }
     return out;
 }
@@ -305,7 +315,7 @@ export function bindingsFromStack(children) {
         if (p.section) spec.section = String(p.section);
         if (p.widget && p.widget !== 'number') spec.widget = String(p.widget);   // 'number' = the default widget → omitted
         const wc = {};
-        if ((p.widget === 'dropdown' || p.widget === 'segmented') && p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
+        if ((p.widget === 'dropdown' || p.widget === 'segmented') && p.options) { const o = parseParamOptions(p.options, spec.type); if (o.length) wc.options = o; }   // t1607 — the declared type picks the value codec (string enums keep string values)
         if (p.widget === 'number' || p.widget === 'slider') {
             for (const [k, fk] of [['min', 'nmin'], ['max', 'nmax'], ['step', 'nstep']]) if (p[fk] !== '' && p[fk] != null && Number.isFinite(Number(p[fk]))) wc[k] = Number(p[fk]);
             if (p.units) wc.units = String(p.units);
@@ -366,7 +376,7 @@ export function paramFieldsFromStack(template) {
         // dropdown/segmented. An INHERITING row (widget '') on an `enum` renders as a dropdown and needs its options;
         // gating the parse on the literal widget name dropped them for exactly that case. Options are inert for a
         // number widget, so carrying them unconditionally cannot mis-render anything.
-        if (p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
+        if (p.options) { const o = parseParamOptions(p.options, row.type); if (o.length) wc.options = o; }   // t1607 — the declared type picks the value codec (string enums keep string values)
         if (p.widget === 'number' || p.widget === 'slider') {
             for (const [k, fk] of [['min', 'nmin'], ['max', 'nmax'], ['step', 'nstep']]) if (p[fk] !== '' && p[fk] != null && Number.isFinite(Number(p[fk]))) wc[k] = Number(p[fk]);
             if (p.units) wc.units = String(p.units);
