@@ -114,18 +114,14 @@ test('ZERO goldens move: every shipped twin\'s default emit still passes the tig
 
     expect(r.length, 'the sweep actually enumerated the registry').toBeGreaterThan(20);
 
-    // ⚠ ONE PRE-EXISTING FALSE REFUSAL, exposed by this sweep and NOT caused by t1601 — pinned so it shrinks
-    // visibly, the same way the gate spec once pinned the unclosed-bracket leniency. `user_lathe_odturn`
-    // emits `#137=[0-[#125*[#120-#122]/[#128-#122]]]`: validateExpression's dummy vars all read 1, so the
-    // denominator [#128-#122] evaluates to 0 and the division "fails" — a VALUE artefact of validation
-    // answering a SYNTAX question, which its own dummy-read-as-1 comment exists to prevent and cannot for a
-    // difference of two vars. VERIFIED PRE-EXISTING against expression.js@HEAD (pre-t1601): the same line was
-    // already invalid — so the shipped send gate (t1585) would falsely refuse a lathe OD-turn program TODAY.
-    // Reported to the advisor as its own defect; a decision is owed there, not silently absorbed here.
-    const KNOWN_FALSE_REFUSAL = ['user_lathe_odturn'];
+    // THE STANDING INVARIANT (ruled at t1603): no shipped wizard's own emit is EVER refused by the gate. On
+    // its first run this sweep pinned exactly one rejection by name — `user_lathe_odturn`, whose
+    // `#137=[0-[#125*[#120-#122]/[#128-#122]]]` false-failed because validation's dummy vars all read 1,
+    // making the denominator 0 (pre-existing at HEAD, not a t1601 effect). t1603 ruled that a division's
+    // arithmetic outcome on dummy values is not a syntax verdict, validation now treats /0 as benign, and
+    // the pin flips to the empty set: any name appearing here again is a NEW false refusal, the failure
+    // mode the send gate's own spec calls the one it cannot have.
     const rejected = r.filter((x) => x.valid !== true);
-    expect(rejected.map((x) => x.opType).sort(),
-        'the TIGHTENING may reject nothing new — only the pre-existing division-by-zero false refusal, pinned by name').toEqual(KNOWN_FALSE_REFUSAL);
-    expect(rejected[0].badLines.join(' '),
-        'and it fails on the KNOWN line for the KNOWN reason (division under dummy-1s) — not an unclosed bracket').toContain('#137=');
+    expect(rejected.map((x) => `${x.opType} → ${x.badLines.join(' | ')}`),
+        'no shipped wizard\'s own emit is ever refused — the t1585 gate must not false-refuse the corpus').toEqual([]);
 });

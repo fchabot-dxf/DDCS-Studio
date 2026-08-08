@@ -17348,3 +17348,64 @@ hardware-confirmed story (messages rot with behaviour; nothing untrue left stand
 
 **Capacity:** fourth act in this seat but a contained one — comfortable. The queued renderUiTree/param_group
 act is a fresh feature and would start cleanest in a fresh seat, as already noted at t1599.
+
+## 2026-08-07 t1603 (fix) - Division-by-zero during VALIDATION is not a syntax error - the gate stops falsely refusing a shipped lathe program
+
+**Task:** fix the false refusal t1601's registry sweep exposed, this act, same seat. The validator's own
+comment promised "dummy vars read 1 so valid divisions don't false-fail on /0" and the mechanism could not
+keep it: any subtraction of two dummies is 0, so `user_lathe_odturn`'s `/[#128-#122]` denominator false-failed
+and the SHIPPED t1585 send gate refused a legitimate lathe OD-turn program.
+
+### The fix — one declared knob, three lines of code
+
+`evalExpr` gains `divByZero` (default null = unresolvable — the RUNTIME meaning, byte-for-byte today's):
+`parseTerm`'s division becomes `r !== 0 ? v / r : divByZero`. `validateExpression` passes `divByZero: 1`
+beside its existing `unsetValue: 1` — validation asks a SYNTAX question, and an arithmetic outcome on dummy
+values is not a syntax verdict. Nothing else widened: trailing tokens, stray commas, unclosed brackets,
+unknown functions are GRAMMAR verdicts reached before any arithmetic, all asserted still refusing.
+Deliberate and commented: a LITERAL `1/0` also validates now (no hardware probe of a real /0 exists; the
+gate's asymmetric doctrine says never guess tight), while the runtime still resolves it to null on both
+`unsetValue` readings.
+
+### The symptom, driven for real, both directions
+
+`verification/t1603-send-dialog-before.png` — pre-fix tree (expression.js@HEAD): the real Gateway → Send →
+"Use current Studio program" → Send (tracked) chain on the OD-turn twin's own emit raises **"The controller
+cannot read this file … line 36: #137=[0-[#125*[#120-#122]/[#128-#122]]]"** — the false alarm, photographed.
+`verification/t1603-send-clean-after.png` — same chain, fixed tree: no dialog, the lathe preview rendering.
+The drive used the send-gate-wiring-1585 pattern with its one documented lift (the connection-contract
+`disabled` flag; staging needs no machine) — parser, handler, dialog all the shipped chain.
+
+### Verification
+
+- Fast tier: 1603 (2) + 1601 (2) + 1585 pair (4) + 1573 (2) + 1583 (1) = 11/11 green.
+- **Non-vacuous as numbers: 3/3 changed-claim tests fail against the pre-change tree**, each on its own
+  claim — the evaluator test (lathe rhs invalid pre-change), the REAL-dialog test (the refuse-dialog
+  appears), and the 1601 corpus sweep now flipped to the standing invariant (it still pinned
+  `user_lathe_odturn` pre-change). The 4th test in that run (t1601's evaluator claims) passes both trees by
+  design — it pins t1601 behaviour this act must not disturb.
+- Runtime untouched, asserted with REAL values: the lathe rhs with a genuinely-zero denominator is null on
+  the engine reading; with non-zero values it computes (−10 for the chosen set); `1/0` null on both readings.
+- **The corpus sweep is now the standing invariant:** ZERO twins refused — "no shipped wizard's own emit is
+  ever refused by the gate". Its comment records the history (one pin found at t1601, ruled and closed here).
+- **Full suite: 21 failed / 2362 passed / 6 skipped (17.8 min; counted by grepping the ANSI-stripped
+  COUNT).** vs t1601's 21: GONE — `import-safety-1219:47`, `wizard-face-1599:60` (last run's churn pair,
+  healed). NEW — `blocks-live-form:168`, `pane-splitter-790:25`, BOTH pass in isolation (contention class;
+  the pane-splitter file's other two rows are standing members and stay). Net: the same standing set,
+  churning at the edges under the still-alive VS Code test-server (PID 55024). None of this act's tests red;
+  +2 passed = this act's two new tests.
+
+### What this does NOT cover
+
+1. **The machine's behaviour on a REAL division by zero is unprobed** — no bench probe sends `#190 = 1/0`.
+   Validation now deliberately passes it (asymmetric doctrine); if a future probe shows the controller
+   REFUSES it at load, that would justify a tightening with hardware behind it, exactly like S6f.
+2. **The dialog drive stops at the gate** — the gateway is dead in the test rig, so the post-gate path
+   (envelope check → instrument → submitJob) ran only as far as it does against no machine.
+3. **Other validation-vs-runtime gaps of the same class may exist** (e.g. an expression whose dummy value
+   overflows) — the corpus sweep is the net that catches the ones that reach a shipped emit.
+4. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** fifth act this seat, all in one engine file's orbit — still comfortable, but the queued
+renderUiTree/param_group feature act should start in a FRESH seat as already agreed (re-stated so the note
+survives the seat).

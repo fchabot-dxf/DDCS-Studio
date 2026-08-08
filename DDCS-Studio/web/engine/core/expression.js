@@ -74,11 +74,18 @@ function lex(s) {
  * Evaluate a macro expression.
  * @param {string} str
  * @param {Map<number, number>} vars
- * @param {{unsetValue?: number|null}} [opts]
+ * @param {{unsetValue?: number|null, divByZero?: number|null}} [opts]
  * @returns {number|null} value, or null if unresolvable
  */
 export function evalExpr(str, vars, opts = {}) {
     const unsetValue = opts.unsetValue === undefined ? null : opts.unsetValue;
+    // t1603 — what a division by zero yields. null (default): unresolvable — the runtime meaning, unchanged.
+    // A finite number: VALIDATION mode. Validation asks a SYNTAX question with a value-shaped evaluator, and
+    // its dummy vars all read 1 — so any denominator that SUBTRACTS two vars (`/[#128-#122]`, shipped by the
+    // lathe OD-turn twin) evaluates to 0 and the division "failed", which made the t1585 send gate falsely
+    // refuse a legitimate lathe program. An arithmetic outcome on dummy values is not a syntax verdict; the
+    // dummy-read-as-1 comment below always promised this and could not keep it alone.
+    const divByZero = opts.divByZero === undefined ? null : opts.divByZero;
     if (str == null) return null;
     const s = String(str).trim();
     if (s === '') return null;
@@ -105,7 +112,7 @@ export function evalExpr(str, vars, opts = {}) {
             const op = toks[p++];
             const r = parseFactor();
             if (r === null) return null;
-            v = op === '*' ? v * r : (r !== 0 ? v / r : null);
+            v = op === '*' ? v * r : (r !== 0 ? v / r : divByZero);   // t1603 — /0: null at runtime, dummy in validation
         }
         return v;
     }
@@ -227,6 +234,11 @@ export function validateExpression(str) {
     if (s === '') return false;
     // Dummy vars read as 1 (not 0) so syntactically-valid divisions like
     // ATAN[#52/#53] don't false-fail on division-by-zero during validation.
+    // t1603 — dummy-1s alone cannot keep that promise: a denominator that subtracts two vars still lands on
+    // 0. So validation also declares divByZero benign — a division's arithmetic outcome is a RUNTIME concern,
+    // and the runtime default (null, unresolvable) is untouched. Everything the t1573/t1583/t1601 family
+    // refuses — trailing tokens, stray commas, unclosed brackets, unknown functions — stays refused: those
+    // are grammar verdicts, reached before any arithmetic.
     const dummy = { get: () => 1 };
-    return evalExpr(s, dummy, { unsetValue: 1 }) !== null;
+    return evalExpr(s, dummy, { unsetValue: 1, divByZero: 1 }) !== null;
 }
