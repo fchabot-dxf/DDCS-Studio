@@ -648,9 +648,9 @@ function openSaveDialog(init, onConfirm) {
 // STRIP the derive mechanism (+ relTo/when/group/role/section/help/sourceField). So such a def REFUSES the visual
 // Update, and its template is edited at the source. Plain user-op defs (no bindingSpecs) are unaffected. Exported so
 // the save flow + tests read ONE declared rule.
-// t1593 — this used to add "the non-destructive Save as new (a copy) stays the path", and a copy no longer strips the
-// specs (forkInheritance carries them). For a GUARDED def that copy is refused instead, because the Blocks canvas
-// cannot render a guard's children — so neither route edits corner today; its source is where it changes.
+// t1593/t1595 — the non-destructive "Save as new" (a copy) is again the path, and it is now a BETTER one than when
+// that sentence was first written: the copy no longer strips the specs (forkInheritance carries them) and the canvas
+// renders a guard's arms, so a copy of corner is a working wizard rather than the empty shell it used to be.
 export function isMaintainedAsData(def) {
     if (!(def && Array.isArray(def.bindingSpecs) && def.bindingSpecs.length)) return false;
     // LOCK LIFTS (composable-authoring PILOT 1): once every bindingSpec is authored as a `formfield` block in the def's

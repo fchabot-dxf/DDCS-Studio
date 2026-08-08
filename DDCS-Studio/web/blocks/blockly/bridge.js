@@ -257,7 +257,7 @@ function jsonDef(def) {
         block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
     };
     if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
-    else if (def.kind === 'param_group' || isSection || def.kind === 'opunit' || def.kind === 'cam_table') addMouth('DO');   // t1069 — opunit renders as a titled transparent container; t1093 — cam_table is a titled metadata container (a DO mouth holding cam_field rows)
+    else if (def.kind === 'param_group' || isSection || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'guard') addMouth('DO');   // t1069 — opunit renders as a titled transparent container; t1093 — cam_table is a titled metadata container (a DO mouth holding cam_field rows); t1595 — guard holds ONE ARM of a structural fork, and without a mouth recToJson wrote it childless and DISCARDED that arm
     else if (isWrap(def)) addMouth('DO');
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)

@@ -7,9 +7,16 @@ import { test, expect } from '@playwright/test';
  * per-binding metadata. The guard BLOCKS Update (disabled button + a why message); a PLAIN user op (no bindingSpecs)
  * is unaffected. See devMode.isMaintainedAsData.
  *
- * t1593 — "Save as new stays the non-destructive path" USED to end that sentence, and for a GUARDED def it is no
- * longer true: such a copy cannot survive the Blocks canvas, so it is refused rather than saved as a wizard that
- * emits a different program. Update is still blocked, and the escape is still to edit the wizard at its source.
+ * ⚠ THIS TEST'S POST-SAVE HALF HAS NOW SAID THREE DIFFERENT THINGS, AND EACH WAS THE TRUTH AT THE TIME.
+ *   originally  "the copy is a plain op (no derive mechanism) — the very reason Update is blocked"
+ *               — which described the EMPTY SHELL every fork was, and read that absence as design intent.
+ *   t1593       the fork learned to inherit its source's declarations, but a GUARDED def still could not survive the
+ *               Blocks canvas, so its copy was REFUSED rather than saved as a wizard emitting a different program.
+ *   t1595       the canvas learned to render a guard, the refusal went silent, and Save-as-new works for corner —
+ *               with the derive mechanism CARRIED, which is the exact opposite of the original claim.
+ *
+ * What the test has owned throughout, and still asserts: Update is disabled for a maintained-as-data def, the note
+ * says why, and the original def is byte-unchanged by the attempt. Only the fate of the COPY moved.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -20,7 +27,7 @@ async function freshApp(page) {
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); });
 }
 
-test('a maintained-as-data def (corner) BLOCKS Update; the copy is REFUSED + leaves the original byte-unchanged', async ({ page }) => {
+test('a maintained-as-data def (corner) BLOCKS Update; Save-as-new copies it WITH its derive mechanism, original byte-unchanged', async ({ page }) => {
   await freshApp(page);
 
   // register corner-as-data (bindingSpecs def) into the user library
@@ -40,7 +47,10 @@ test('a maintained-as-data def (corner) BLOCKS Update; the copy is REFUSED + lea
 
   // re-author it → loads its template into Blocks + dev mode
   await page.evaluate(() => window.ddcsEditWizardDef('user_corner_data'));
-  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });
+  // t1595 — the `{timeout: 8000}` here was passed as the page-function's ARGUMENT, not as options, so the real cap
+  // was the config's 5s actionTimeout the whole time. Harmless while corner rendered 111 blocks; it started failing
+  // the moment the canvas began rendering all 1852 of them.
+  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, null, { timeout: 60000 });
   await expect(page.locator('.blk-dev-savebtn')).toBeVisible();
 
   // open the Save dialog → Update is BLOCKED (disabled) + the note explains WHY; Save-as-new stays available
@@ -50,41 +60,39 @@ test('a maintained-as-data def (corner) BLOCKS Update; the copy is REFUSED + lea
   await expect(page.locator('.blk-dev-savedlg .blk-dev-editnote')).toContainText('maintained as data');
   await expect(page.locator('.blk-dev-savedlg .blk-dev-save')).toHaveText('Save as new');
 
-  // ── t1593 — WHAT SAVE-AS-NEW DOES FOR CORNER CHANGED, AND THIS SPEC ASSERTED THE OLD ANSWER ────────────────────
-  // It read: "a copy was added" (count 2) and "the copy is a plain op (no derive mechanism) — the very reason Update
-  // is blocked". Both described the EMPTY SHELL. Measured across the registry: 32 twins, 549 declared bindings, zero
-  // recovered by a fork — the copy had no bindings at all, so of course it had no specs, and this line read that
-  // absence as a design intent. What it actually pinned was the defect.
-  //
-  // A fork now INHERITS its source's declarations (userOps.forkInheritance), and a guarded wizard like corner is
-  // REFUSED outright: the Blocks canvas cannot render a guard's children, so the copy would keep one structural arm
-  // and emit a different program. The refusal rides the save path's existing alert. See fork-parity-1593.spec.js,
-  // which pins both halves — the 18 guard-free twins fork byte-identically, the 14 guarded ones refuse and say why.
-  //
-  // The claims this test OWNS are untouched and still asserted above: Update is disabled for a maintained-as-data
-  // def, the note says why, and the original def is byte-unchanged by the attempt.
-  const refusal = [];
-  page.on('dialog', (d) => refusal.push(d.message()));
+  // ── Save-as-new: a real copy, CARRYING the derive mechanism (see the header for the three answers this had) ─────
+  // The original line here asserted `copyHasSpecs === false` and called that "the very reason Update is blocked".
+  // It is now the opposite, and the opposite is the point: a copy that keeps its bindingSpecs is a wizard that emits
+  // the same program, which is what makes forking a built-in an editing path rather than a way to lose one.
+  const alerts = [];
+  page.on('dialog', (d) => alerts.push(d.message()));
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Corner Copy');
   await page.click('.blk-dev-savedlg .blk-dev-save');
-  await page.waitForTimeout(800);
+  await page.waitForFunction(() => !document.querySelector('.blk-dev-savedlg'));   // dialog closed → save committed
 
   const after = await page.evaluate(async () => {
     const { listUserOps } = await import('/blocks/userOps.js');
     const ops = listUserOps();
     const orig = ops.find((x) => x.opType === 'user_corner_data');
+    const copy = ops.find((x) => x.opType !== 'user_corner_data');
     return {
       count: ops.length,
       origJson: JSON.stringify(orig),
       origHasSpecs: !!(orig && Array.isArray(orig.bindingSpecs) && orig.bindingSpecs.length),
-      copies: ops.filter((x) => x.opType !== 'user_corner_data').map((x) => x.opType),
+      copyLabel: copy && copy.label,
+      copyHasSpecs: !!(copy && Array.isArray(copy.bindingSpecs) && copy.bindingSpecs.length),
+      copyBindings: copy ? (copy.bindings || []).length : -1,
+      copyForkedFrom: copy && copy.forkedFrom,
     };
   });
-  expect(after.copies, 'a guarded wizard produces NO copy — a fork of it would emit a different program').toEqual([]);
-  expect(after.count, 'the library still holds only the original').toBe(1);
+  expect(after.count, 'a copy was added, original kept').toBe(2);
   expect(after.origJson, 'the original corner def is BYTE-UNCHANGED (nothing stripped)').toBe(beforeJson.json);
   expect(after.origHasSpecs, 'bindingSpecs still intact on the original').toBe(true);
-  expect(refusal.join(' '), 'the refusal names the reason rather than failing silently').toMatch(/structural fork arms/);
+  expect(after.copyLabel, 'the copy saved under the new name').toBe('Corner Copy');
+  expect(after.copyHasSpecs, 'THE INVERSION: the copy KEEPS the derive mechanism (t1593 forkInheritance)').toBe(true);
+  expect(after.copyBindings, 'and its form fields — corner declares 23').toBe(23);
+  expect(after.copyForkedFrom, 'and it records the wizard it came from').toBe('user_corner_data');
+  expect(alerts.join(' '), 'no refusal — the guarded fork saves cleanly now that the canvas renders arms').not.toMatch(/structural fork arms/);
 
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); });
 });

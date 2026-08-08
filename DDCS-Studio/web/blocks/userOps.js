@@ -691,35 +691,29 @@ export function validateUserOp(def) {
         const blk = flat[b.blockIndex];
         if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
     }
-    // ── t1593 — A FORK OF A GUARDED WIZARD IS REFUSED, AND THE REASON IS THE CANVAS ───────────────────────────────
+    // ── t1593 — A FORK MUST NOT COME BACK WITH FEWER FORK ARMS THAN ITS SOURCE ────────────────────────────────────
     //
     // A `guard` holds ONE arm of a structural fork and is UNWRAPPED or DROPPED at build (whenGuard.pruneGuards) — it
-    // is what makes a structural toggle re-authorable data instead of JS-locked structure. But the Blockly bridge has
-    // no mouth for it: `isWrap` does not list 'guard', so recToJson writes a guard as a CHILDLESS block and every arm
-    // inside it is discarded on render. Measured on Corner: the Customize route hands the canvas its full 1157-block
-    // template and gets 98 blocks back, 371 guards down to 30 — and the reproject writes that loss into the program.
+    // is what makes a structural toggle re-authorable data instead of JS-locked structure. The Blockly bridge had no
+    // mouth for it, so `recToJson` wrote a guard CHILDLESS and every arm inside it was discarded on render: Corner
+    // handed the canvas 1157 blocks and got 98 back, 371 guards down to 30, and the reproject wrote that into the
+    // live program. Fourteen twins could not be forked; t1595 taught the canvas to render a guard and they all can.
     //
-    // So the copy carries ONE ARM. Its inherited form still offers the structural knobs (Corner's probe order, Homing's
-    // per-axis toggles), and they do nothing: the arms they would select are gone. Measured across the registry, the
-    // partition is EXACT — 18 guard-free twins fork with byte-identical emit, and all 14 guarded ones diverge, four by
-    // throwing at build and ten silently. That is the wrong half to be quiet about.
-    //
-    // ⚠ REFUSING IS THE SAFE DIRECTION, not the tidy one. Before this turn every fork was an empty shell, so nothing
-    // was lost that worked; a copy whose form now looks complete while its emit is a different program is worse than
-    // one that plainly had nothing. The save path already alerts on a thrown register ("Save failed: …"), so this
-    // refuses in a surface that exists rather than inventing one. It lifts the moment the canvas can render a guard.
-    // SCOPED to forks (`forkedFrom`) — the shipped seeds are untouched and byte-identical.
+    // ⚠ THIS CHECK STAYS, AND IS EXPECTED TO BE SILENT. It is what noticed the loss in the first place, and it is
+    // data-driven — it compares arm blocks, not a list of known-bad wizards — so it is exactly what would catch the
+    // canvas losing arms again for a new reason. fork-parity-1593 asserts it never fires, which is how we know the
+    // silence is real rather than the check having quietly stopped working. SCOPED to forks (`forkedFrom`).
     if (def && def.forkedFrom) {
         const src = USER_DEFS.get(def.forkedFrom);
-        // COUNT THE ARMS, NOT THE GUARDS. A guard survives the canvas as a CHILDLESS block, so counting guards misses
-        // exactly the twins whose forks came back with every guard present and every arm inside them gone (measured:
-        // atc test/change/table, rotary clock, homing). What the arms ARE is the blocks a guard contains.
+        // COUNT THE ARMS, NOT THE GUARDS. A guard survived the old canvas as a CHILDLESS block, so counting guards
+        // missed exactly the twins whose forks came back with every guard present and every arm inside them gone
+        // (measured: atc test/change/table, rotary clock, homing). What the arms ARE is the blocks a guard contains.
         const armBlocks = (t) => flattenBlocks(t || []).reduce((n, b) => n + ((b && b.type === 'guard' && b.children) ? flattenBlocks(b.children).length : 0), 0);
         const want = src ? armBlocks(src.template) : 0, got = armBlocks(def.template);
         if (want && got < want) {
             errs.push(`“${(src && src.label) || def.forkedFrom}” builds ${want} blocks across its structural fork arms and this copy `
-                + `came back with ${got} — the Blocks canvas cannot yet render a guard's contents, so the copy would keep only one `
-                + 'arm and emit a different program. Fork a wizard without structural options, or edit this one at its source.');
+                + `came back with ${got} — the copy would keep only one arm and emit a different program. `
+                + 'Re-open the wizard in Blocks and save again; if it keeps happening, edit it at its source.');
         } else if (Array.isArray(def.bindingSpecs) && def.bindingSpecs.length) {
             // The general backstop: a spec resolves BY IDENTITY against the stack it is asked about, so a copy whose
             // template lacks a socket its specs name registers happily and THROWS the first time anything builds it.

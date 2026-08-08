@@ -16954,3 +16954,187 @@ only caught it by grepping `t1593` in the restored file. Re-applied.
    `opunit` insertion. A fork with a user-added atom takes the fail-closed path; that path is reasoned, not driven.
 6. **The `.wiz` file now carries `forkedFrom` and non-derivable `bindingSpecs`.** The round-trip specs pass, but I
    did not drive an export→import of a FORK specifically.
+
+## 2026-08-07 t1595 (fix — option A) - The canvas can carry a structural fork; all 32 twins fork, and 152 arm flips emit byte-identically
+
+**Task:** option A — teach the Blocks canvas to render a `guard`, so the 14 wizards t1593 had to refuse become
+forkable. Two traps named up front, and the verification that closes it: flip every STRUCTURAL param on all 14 and
+assert source/fork emit byte-identically.
+
+### The defect, both halves of it
+
+A `guard` was invisible to Blockly in two ways at once, and either alone would have been fatal:
+
+```
+   no C-mouth      recToJson wrote every guard CHILDLESS  →  the ARM inside it was discarded on render
+   no fields       `when` had nowhere to ride             →  the PREDICATE could not round-trip either
+```
+
+Corner: **1157 blocks handed to the canvas, 98 back, 371 guards down to 30** — and the reproject wrote that loss
+into the live program. Three lines fix the first half (`guard` joins the DO-mouth kinds in `jsonDef`, and both
+directions of `stackBridge`). The predicate is the part that needed a decision.
+
+### Trap 1 — `when` is an OBJECT, and I did not smuggle it
+
+`recToJson`'s `data` path excludes objects deliberately: a nested value-socket reporter is an object too, and it
+belongs in `inputs`, not as a second copy in `data`. A declared guard predicate does not need that exclusion
+weakened — as a FIELD it never touches that path at all — so the rule is exactly as it was.
+
+⚠ **THREE FIELDS, AND THE THIRD IS THE WHOLE ARGUMENT.** The sibling seams (`simstart`, `formfield`) serialize a
+`when` with two text fields and INFER the type: `'true'`/`'false'` become booleans, everything else stays a string.
+Copying that idiom would have been the consistent-looking choice and it would have been wrong. Measured over all
+**645 guards in the registry**:
+
+| `when.is` type | count | what two-field inference does |
+|---|---|---|
+| string | 505 | fine (no value in the registry looks numeric or boolean) |
+| boolean | 138 | fine — this is the case the idiom was built for |
+| **number** | **2** | `user_comm_data` gates `_popupMode` on **1** and on **3** → become `'1'`/`'3'`, and `whenOk` compares with `===`, so **both arms vanish silently** |
+
+A smarter inference (also parse numerics) would work *today* and break the first time someone guards a text param
+on the value "2". `whentype` states the type outright, so nothing is ever guessed. Proven, not argued — see the
+mutant below.
+
+The RECORD shape is untouched: `params.when` stays the one thing `pruneGuards` reads and the 14 GUARD builders still
+write it. The fields are its SERIALIZATION, converted at the bridge boundary by one exported pair in `guard.js` and
+nowhere else, so each side holds exactly one representation and they cannot drift.
+
+### The round trip, measured
+
+| twin | blocks | guards | arm blocks | predicates |
+|---|---|---|---|---|
+| corner | 1157 → **1157** | 371 → **371** | 2956 → **2956** | identical, with types |
+| middle | 1043 → 1043 | 166 → 166 | 4434 → 4434 | identical |
+| edge / pocket / homing / … | lossless | lossless | lossless | identical |
+
+### THE SWEEP THAT CLOSES IT — 152 structural flips, 14 twins, zero divergence
+
+Byte-identity at off-default NUMERIC values (t1593) passed for 18 twins while the other 14 were losing arms — a
+guard chooses an ARM and arms are selected by STRUCTURAL params, so the numeric sweep structurally cannot see this
+defect. The new sweep flips the structural params and asks the same question. **152 flips, every one byte-identical
+between the wizard and its fork.** corner 21 · middle 29 · comm 14 · homing 14 · rotary 25 · edge 11 · atc 21 · …
+
+⚠ **MY FIRST VERSION OF THAT SWEEP QUIETLY MISSED FIVE OF THE FOURTEEN.** I took the flip values from the guards
+themselves — every `when.is` in the template, which is by definition a value some arm exists for. It is a good
+source and it is not sufficient: a guard may key on a DERIVED key that `def.deriveGuards` COMPUTES from a param with
+a different name. `atc_change`, `atc_table`, `homing`, `io_step` and `slot` are keyed entirely that way, so they got
+**zero flips** — the sweep sailed past the wizards it should have tested hardest, and reported green. Flipping
+`run_z` is what moves `_runZ`. The fix takes values from BOTH sources: every `when.is`, and every STRUCTURAL binding
+through its own declared values. One twin (`user_slot_data`) still has no directly-settable structural param; that
+is pinned as an exact set so it cannot grow quietly, and the 20 derived keys are logged by name rather than hidden.
+
+### Trap 2 — the UI measurement, reported not pre-empted
+
+Round trip fixed first, then measured. Corner, at the real Customize gesture:
+
+```
+   editWizardDef  2556 ms      canvas settles  5125 ms      1852 Blockly blocks      371 guards, all with arms
+   homing          222 ms                      1032 ms        47 blocks
+```
+
+`verification/t1595-customize-corner.png` (the form group as blocks) and `t1595-customize-corner-arms.png` (guards
+at 0.62 zoom, each reading `Guard (when) whenparam corner whenis BL whentype text` over the arm it holds).
+
+**My read, as an observation and not a decision:** it works and each guard is legible, but Corner is a wall — 1852
+blocks, ~7.7s to open, and the wcs×corner cross-product repeats in long visually-identical runs; at 1:1 zoom the
+nesting pushes atoms so far right that the guard headers leave the viewport. Homing, at 47 blocks, is pleasant. No
+collapsing/lazy-arm machinery built — that is a design call with a user in it.
+
+### Non-vacuous
+
+| mutation | claim it targets | result |
+|---|---|---|
+| the three source files at HEAD (no mouth, no fields) | the whole change | **failed 3/3** — `atc_test`: 54 blocks expected, 6 received |
+| **`whentype` ignored, type INFERRED like `simstart`/`formfield`** | the third field is load-bearing | **failed** — predicates came back `_popupMode="1"` / `"3"`, **and the SWEEP's byte-identity assertion fired on `user_comm_data`**: the arms really do diverge |
+
+The second is the one worth having. It fails on the emit, not on a field comparison, so it proves the sweep detects
+the wrong program that inference would have shipped — the exact defect the extra field exists to prevent.
+
+### Specs whose premise A changed
+
+- **`fork-parity-1593`** pinned the refused set as EXACTLY the 14 guarded twins, *so that it would shrink visibly
+  rather than quietly*. It shrank to zero, so the spec went red — the pin doing its job. Inverted: every registered
+  twin must fork, and the refused set is asserted EMPTY.
+- **`rich-def-update-guard`**'s post-save half has now said three different things, each true at the time: the copy
+  is a plain op with no derive mechanism (the empty shell, read as design intent) → the copy is refused (t1593) →
+  the copy is created and KEEPS its bindingSpecs, 23 bindings, `forkedFrom` recorded. Recorded as that sequence in
+  the file, because the third answer is the exact inverse of the first and the reader deserves to know why.
+- The `validateUserOp` refusal is **kept and asserted SILENT**, not deleted. It is data-driven (it compares arm
+  blocks, not a list of known-bad wizards), so it is what would catch the canvas losing arms again for a new reason;
+  a spec asserting it never fires is how we know the silence is real rather than the check having stopped working.
+  Its message no longer says "the canvas cannot yet render a guard's contents" — that is no longer why.
+
+### The Save-dialog copy (advisor's rider)
+
+"Save as new keeps the original and saves a copy" was false for 9 of the 11 maintained-as-data twins under B. It is
+**true again**, verified through the real dialog on corner — a guarded, maintained-as-data twin: the copy is
+created, carries 23 bindings and its bindingSpecs, and no refusal alert fires. Noted rather than edited, as asked.
+
+### The cost, and the specs it broke — including two of mine
+
+⚠ **RENDERING THE ARMS MADE THE CANVAS 17× BIGGER FOR CORNER, AND THAT BROKE WAITS THAT HAD ALWAYS PASSED.** The
+first full run came back **25 failed** with four of them mine, and every one was a TIMEOUT, not an assertion: fixed
+`waitForTimeout(2200)` sleeps tuned when a guarded twin put 111 blocks on the canvas, and `page.fill` on the save
+dialog under the config's 5s actionTimeout. Replaced with condition-based waits (open → wait for the op to have
+children AND the block count to stop changing) and explicit generous timeouts. The sweep got FASTER as a result:
+1.1m → 35s, because it now proceeds the moment the canvas settles instead of always sleeping the worst case.
+
+Two findings worth keeping:
+
+- **`rich-def-update-guard` had a latent wait bug this exposed.** `page.waitForFunction(fn, {timeout: 8000})` passes
+  the options object as the page-function's ARGUMENT — the real cap was the config's 5s the whole time. Harmless
+  while corner rendered 111 blocks; a failure the moment it rendered 1852. Fixed with the options in the right
+  position. The same shape existed in my own t1593 spec and is fixed there too.
+- **My partition test was waiting on a canvas it never looks at.** It only reads registered defs, but it used the
+  shared boot, so mounting Blockly under a loaded suite cost it the whole 60s per-test cap. Split into a REGISTRY
+  boot and a CANVAS boot; the test now runs in 750ms.
+
+### Named goldens + the ID diff
+
+Fast tier: `guard-roundtrip-1595` (2) · `fork-parity-1593` (2) · `rich-def-update-guard` (2) ·
+`cam-substack-save-fork` (5) · `blocks-live-form` (6) · `palette-sufficient-1591` (1) · `blocks-load-guard-s41` (2)
+· `blocks-rotary-rig` (1) — all green. Lint 0 errors across the five changed source files.
+
+**Full suite: 21 failed / 2354 passed / 6 skipped (20.0 min, both tiers), against the 20-failure baseline.**
+
+| vs t1593's 20 | |
+|---|---|
+| shared (18) | the same pre-existing set t1593 verified by checking its own sources out to HEAD and re-running them |
+| GONE (2) | `blocks-hover:120`, `import-safety-1219:62` — the churn class, healed |
+| NEW (3) | `blocks-load-guard-s41:65` + `blocks-rotary-rig:14` (pass in isolation → load class), and **`fork-parity-1593:68`, which was MINE** |
+
+The one that was mine is the partition test, and its failure was instructive: it reads registered defs and nothing
+else, but it used the shared boot, so it sat waiting for Blockly to mount under a loaded suite and spent the whole
+60s per-test cap on a canvas it never looks at. Split into a REGISTRY boot and a CANVAS boot — 750ms now. Verified
+green in isolation together with the two load-class specs above (9 tests, all pass).
+
+⚠ **THE CONFIRMATORY RE-RUN IS NOT USABLE AND I AM REPORTING IT RATHER THAN THE NUMBER IT PRODUCED: 109 failed.**
+That is a mass red with only TWO timeouts in it, and a 14-test sample of the newly-failing specs (`blocks-live-form`
+×6, `alignment-superset`, `atc-table-superset`, `bore-as-data`, `axis-labels-config`, `blocks-mmb-pan`) passes
+CLEANLY in isolation on the same tree. A live `playwright test-server` (PID 55024, started outside my process tree,
+running the same config) was contending for browsers — 19 chrome processes alive. Not my tree, so not mine to reap.
+So the honest state is: 21 on the source as committed, minus the one spec-only fix made after it, which is verified
+in isolation and can only reduce the count.
+
+### What this does NOT cover
+
+1. **The 20 DERIVED guard keys are not swept directly.** `_tooSmall`, `_runZ`, `_arm` and 17 others are computed by
+   `def.deriveGuards`, so there is no param to set; they move only because the params they derive from are flipped.
+   Logged by name in the spec output. `user_slot_data` has no directly-settable structural param at all and is
+   pinned as that exact set.
+2. **Structural params are flipped ONE AT A TIME from the defaults, not in combination.** A dropped arm shows up
+   under the single flip of the param that guards it, which is what this probe is for; an arm that only exists
+   under a COMBINATION (corner=BL *and* probeZFirst=false) is reached only if some guard names it directly.
+   `middle-superset`'s 14336-combo sweep is the spec that owns cross-products, and it is unchanged by this turn.
+3. **The UI is measured, not judged.** 1852 blocks and ~7.7s to open Corner is reported with a screenshot; whether
+   that is acceptable, and whether arms should collapse or load lazily, is a design decision I deliberately left.
+4. **A guard is now a fully-fielded, mouthed block in the palette** — it always was reachable (the t1591 palette
+   spec requires it), but it was inert. Nothing here tests what happens when a user DRAGS one into a stack and
+   types a predicate by hand; the round-trip machinery supports it, the authoring UX for it is unexamined.
+5. **`whentype` is written from `typeof when.is` and read back literally.** A hand-authored guard whose `whentype`
+   disagrees with its value (a user types `bool` over `FL`) resolves to `is: false` rather than refusing. That is
+   the same permissiveness every other dropdown field has, and it is not defended here.
+6. **No lathe or non-guarded twin was re-verified beyond the existing specs** — the 18 guard-free twins are covered
+   by fork-parity-1593 as before, unchanged by this turn.
+
+**Capacity:** comfortable. Two acts in this seat (t1593 + t1595) and both landed with room to spare.

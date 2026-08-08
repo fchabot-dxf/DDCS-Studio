@@ -18,19 +18,52 @@ import { test, expect } from '@playwright/test';
  * Deliberately NOT asserted, because they differ legitimately: the copy's `user_` NAME, its EDITABILITY (the whole
  * point), and the STACK SHAPE (the fork wraps the run in an opunit sub-stack by design — t1075).
  *
- * ⚠ THE SECOND CLAIM IS THE BOUNDARY, AND IT IS THE MORE IMPORTANT ONE. A guarded wizard cannot survive the Blocks
- * canvas: `isWrap` has no 'guard', so recToJson writes each guard CHILDLESS and every structural arm inside it is
- * discarded on render (Corner: 1157 blocks in, 98 back). Such a fork is REFUSED at save rather than saved as a copy
- * whose form looks complete and whose emit is a different program. This spec pins BOTH sides — the forkable set is
- * exactly the guard-free twins and it works, the guarded set is exactly the refused ones and it says so — so the
- * boundary shrinks visibly when the canvas learns to render a guard, and a 33rd wizard cannot land outside it.
+ * ⚠ THE SECOND CLAIM USED TO BE A BOUNDARY, AND t1595 DISSOLVED IT. A guarded wizard could not survive the Blocks
+ * canvas — `isWrap` had no 'guard', so recToJson wrote each guard CHILDLESS and every structural arm inside it was
+ * discarded on render (Corner: 1157 blocks in, 98 back) — so 14 twins were REFUSED at save rather than saved as a
+ * copy whose form looked complete and whose emit was a different program. The set was pinned as EXACTLY those 14 so
+ * that it would shrink visibly rather than quietly. It shrank to zero: the guard now declares its predicate as
+ * fields and renders its arm through a DO mouth, and this spec asserts the refused set is EMPTY.
+ *
+ * The pin stays, inverted: EVERY registered twin must fork, so a future change that re-breaks any of them fails
+ * here rather than shipping a wizard whose copy is a different program. The arms themselves are proven by the
+ * structural-flip sweep in guard-roundtrip-1595.spec.js — off-default NUMERIC values cannot see a dropped arm.
  */
 
+// ⚠ t1595 — EVERY WAIT EXPLICIT. `waitForFunction(fn, {timeout})` passes the options object as the page-function's
+// ARGUMENT, so the option is silently ignored and the config's 5s actionTimeout applies — the second line below used
+// to read exactly that way. It mattered from t1595 on, because rendering a guard's arms took Corner's canvas from
+// 111 blocks to 1852 and this spec opens all 32 twins in one test.
+// The REGISTRY boot: the app, no Blocks canvas. The partition test below only READS registered defs, and mounting
+// Blockly for it cost the whole test its 60s cap under a loaded suite — a pure-data claim should not wait on a
+// canvas it never looks at.
+const bootRegistry = async (page) => {
+    await page.goto('/', { timeout: 60000 });
+    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });
+};
+// …and the CANVAS boot, for the tests that perform the real gesture.
 const boot = async (page) => {
-    await page.goto('/');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef);
+    await bootRegistry(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
-    await page.waitForFunction(() => !!window.__blkws, { timeout: 20000 });
+    await page.waitForFunction(() => !!window.__blkws, null, { timeout: 60000 });
+};
+
+/** Open a wizard to customize and wait for the CANVAS TO SETTLE — not for a fixed sleep that was tuned when the
+ *  biggest guarded wizard put 111 blocks on the canvas instead of 1852. */
+const customize = async (page, opType) => {
+    await page.evaluate(() => window.ddcsLoadBlockStack([]));
+    await page.evaluate((x) => window.ddcsEditWizardDef(x), opType);
+    await page.waitForFunction(() => {
+        const op = (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op');
+        return !!(op && (op.children || []).length) && window.__blkws.getAllBlocks().length > 0;
+    }, null, { timeout: 60000 });
+    let last = -1;
+    for (let i = 0; i < 120; i++) {
+        const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);
+        if (n === last && n > 0) return;
+        last = n;
+        await page.waitForTimeout(250);
+    }
 };
 
 // Everything about a form field a copy must reproduce: which params, in what ORDER, and how each renders.
@@ -40,7 +73,7 @@ const FORM_KEY_SRC = `(d) => (d.bindings || [])
     .map((b) => b.param + ':' + b.type + ':' + (b.widget || '') + ':' + (b.group || '') + ':' + (b.role || '') + ':' + b.default).join('|')`;
 
 test('the registry PARTITIONS on guards, and the inheritance rule covers every twin', async ({ page }) => {
-    await boot(page);
+    await bootRegistry(page);
     const r = await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         const rows = [];
@@ -71,7 +104,7 @@ test('the registry PARTITIONS on guards, and the inheritance rule covers every t
         'a twin with value-socket bindings AND guards must declare bindingSpecs (its indices move with the arms)').toEqual([]);
 });
 
-test('THE REAL GESTURE — fork every shipped twin: guard-free ones keep form + emit BYTE FOR BYTE, guarded ones REFUSE', async ({ page }) => {
+test('THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, and nothing is refused', async ({ page }) => {
     test.setTimeout(300_000);
     const alerts = [];
     page.on('dialog', (d) => { alerts.push(d.message()); d.accept(); });
@@ -85,15 +118,13 @@ test('THE REAL GESTURE — fork every shipped twin: guard-free ones keep form + 
     const results = [];
     for (let i = 0; i < twins.length; i++) {
         alerts.length = 0;
-        await page.evaluate(() => window.ddcsLoadBlockStack([]));   // empty program → the destructive-load guard stays silent
-        await page.waitForTimeout(150);
-        await page.evaluate((x) => window.ddcsEditWizardDef(x), twins[i]);   // ← the real "Customize as blocks" route
-        await page.waitForTimeout(1100);
+        await customize(page, twins[i]);                                    // ← the real "Customize as blocks" route
         await page.evaluate(() => window.ddcsSaveAsWizard());               // ← the real "Save wizard…" gesture
-        await page.waitForTimeout(150);
-        await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Fk' + i);
-        await page.click('.blk-dev-savedlg .blk-dev-save');
-        await page.waitForTimeout(400);
+        const field = page.locator('.blk-dev-savedlg .blk-dev-opname');
+        await field.waitFor({ state: 'visible', timeout: 30000 });
+        await field.fill('Fk' + i, { timeout: 30000 });
+        await page.click('.blk-dev-savedlg .blk-dev-save', { timeout: 30000 });
+        await page.waitForFunction(() => !document.querySelector('.blk-dev-savedlg'), null, { timeout: 30000 });
         const r = await page.evaluate(async ([src, n, key]) => {
             const U = await import('/blocks/userOps.js');
             const s = U.getUserDef(src), c = U.getUserDef('user_fk' + n);
@@ -127,13 +158,14 @@ test('THE REAL GESTURE — fork every shipped twin: guard-free ones keep form + 
         results.push(r);
     }
 
-    const forkable = results.filter((r) => r.guards === 0);
+    // t1595 — the set that used to be excluded. Kept as a NAMED subset rather than folded away, because "the guarded
+    // twins fork too" is the claim that closed this arc and it should stay legible if one of them ever regresses.
     const guarded = results.filter((r) => r.guards > 0);
-    expect(forkable.length, 'there are guard-free twins to fork').toBeGreaterThanOrEqual(18);
-    expect(guarded.length, 'there are guarded twins to refuse').toBeGreaterThanOrEqual(14);
+    expect(results.length, 'every registered twin is forked here').toBeGreaterThanOrEqual(32);
+    expect(guarded.length, 'the guarded twins — the ones that were refused until t1595 — are among them').toBeGreaterThanOrEqual(14);
 
-    // ── CLAIM 1: a guard-free twin forks to an IDENTICAL wizard ─────────────────────────────────────────────────
-    for (const r of forkable) {
+    // ── CLAIM 1: EVERY twin forks to an IDENTICAL wizard ────────────────────────────────────────────────────────
+    for (const r of results) {
         expect(r.saved, `${r.opType}: a guard-free twin must fork (alert: ${r.alert})`).toBe(true);
         // ORDER MATTERS HERE: the two headline claims are asserted FIRST, so a pre-change run fails ON THEM rather
         // than on a provenance field that simply did not exist yet — a red that only proves the test is new.
@@ -148,14 +180,15 @@ test('THE REAL GESTURE — fork every shipped twin: guard-free ones keep form + 
         expect(r.forkedFrom, `${r.opType}: the copy records the wizard it came from`).toBe(r.opType);
     }
     // The measurement that made this turn: at least one twin proves it on a substantial form, not a one-knob op.
-    const biggest = forkable.reduce((a, b) => (b.off > a.off ? b : a));
+    const biggest = results.reduce((a, b) => (b.off > a.off ? b : a));
     expect(biggest.off, 'the strongest case moves at least 25 values off their defaults').toBeGreaterThanOrEqual(25);
 
-    // ── CLAIM 2: a guarded twin is REFUSED, and says why ────────────────────────────────────────────────────────
-    // Not "it fails somehow" — the canvas cannot render a guard's children, so a saved copy would keep one arm and
-    // emit a different program. Refusing is the safe direction; passing quietly is the one that reaches a machine.
+    // ── CLAIM 2: NOTHING IS REFUSED ANY MORE ────────────────────────────────────────────────────────────────────
+    // The refusal is still in `validateUserOp` and still data-driven (it fires when a copy comes back with fewer
+    // blocks inside its guards than its source declares). It is asserted to be SILENT, not deleted: it is the thing
+    // that would catch the canvas losing arms again, and an assertion that it never fires is how we know it isn't.
+    expect(results.filter((r) => !r.saved).map((r) => r.opType), 'the refused set is EMPTY — every twin forks').toEqual([]);
     for (const r of guarded) {
-        expect(r.saved, `${r.opType}: a guarded twin must NOT save a copy that emits a different program`).toBe(false);
-        expect(r.alert, `${r.opType}: the refusal names the reason`).toMatch(/structural fork arms/);
+        expect(r.alert, `${r.opType}: a guarded fork saves without warning about lost arms`).not.toMatch(/structural fork arms/);
     }
 });

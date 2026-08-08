@@ -7,6 +7,7 @@
  */
 import { BLOCKS } from '../../wizards/ops/index.js';
 import { FN, fieldKind, fieldsOf, isWrap, getBlockly, OP_BLOCKS } from './bridge.js';
+import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wizards/ops/guard.js';   // t1595 — the guard predicate's DECLARED serialization (its `when` is an object; the data path excludes objects by design)
 
 const HAS_CUSTOM_OP = {};
 OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
@@ -118,12 +119,19 @@ function toRecord(b) {
         const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
         r.uiChildren = pBlk ? chain(pBlk) : [];
         r.children = eBlk ? chain(eBlk) : [];
-    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table') {   // t130 — section round-trips its DO mouth → children, like param_group; t1069 — opunit too; t1093 — cam_table (its cam_field rows)
+    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'guard') {   // t130 — section round-trips its DO mouth → children, like param_group; t1069 — opunit too; t1093 — cam_table (its cam_field rows); t1595 — guard (the arm it holds)
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         if (first) r.children = chain(first);
     } else if (isWrap(def)) {
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         if (first) r.children = chain(first);
+    }
+    // t1595 — a guard's three declared fields collapse back into the ONE `when` predicate pruneGuards reads, so the
+    // record world holds exactly one representation of the condition and the canvas holds exactly one. See guard.js.
+    if (def.kind === 'guard') {
+        const when = guardWhenFromFields(r.params);
+        for (const f of GUARD_FIELDS) delete r.params[f];
+        if (when) r.params.when = when;
     }
     if (b.isCollapsed && b.isCollapsed()) r.collapsed = true;
     return r;
@@ -226,8 +234,11 @@ function recToJson(rec) {
     const def = BLOCKS[rec.type], node = { type: rec.type, id: rec.id };
     if (!def) return node;
     const fields = {}, inputs = {};
+    // t1595 — the guard's ONE `when` predicate, projected into the three fields the canvas can hold. Computed here
+    // rather than stored on the record: `when` stays the single source, this is only how it is written down.
+    const params = (def.kind === 'guard') ? { ...rec.params, ...guardFieldsFromWhen(rec.params && rec.params.when) } : rec.params;
     for (const f of fieldsOf(def)) {
-        const k = fieldKind(def, f), name = FN(f), v = rec.params[f];
+        const k = fieldKind(def, f), name = FN(f), v = params[f];
         if (k === 'value' || k === 'region' || k === 'boolean') {
             if (v && typeof v === 'object' && v.type) inputs[name] = { block: recToJson(v) };   // nested reporter
             // a #var / [expr] string in a numeric socket → a Variable reporter pill (a math_number shadow would
@@ -267,7 +278,7 @@ function recToJson(rec) {
     if (def.kind === 'user_root') {
         if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
         if (rec.children && rec.children.length) inputs.EXECUTION = { block: chainToJson(rec.children) };
-    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table') {   // t130 — section writes its children into the DO mouth; t1069 — opunit too; t1093 — cam_table (its cam_field rows)
+    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'guard') {   // t130 — section writes its children into the DO mouth; t1069 — opunit too; t1093 — cam_table (its cam_field rows); t1595 — guard (the arm it holds — without this the arm was DISCARDED)
         if (rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     } else if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     if (Object.keys(fields).length) node.fields = fields;
