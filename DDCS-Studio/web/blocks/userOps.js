@@ -903,7 +903,12 @@ export function updateUserOp(def) {
     // which sets no defV) bumps PAST the stored version — its placed instances are now stale (the def-change→rebuild
     // signal). NEVER a body-hash (declare, don't infer). Seeds never hit this (they arrive declared → no boot-bump).
     if (def.defV == null) def.defV = (Number(defs[i].defV) || 1) + 1;
-    def.savedAt = new Date().toISOString();   // t1617 — an update IS a save; the manager's date column stays honest
+    // t1617→t1621 — savedAt follows defV's OWN rule: a caller that DECLARES it (the manager's rename, devMode's
+    // explicit Update — acts that mean "the user saved this") is respected; an undeclared incoming def KEEPS the
+    // stored stamp. It was an unconditional restamp for one turn, and that was a RELEASE-BLOCKING regression:
+    // seedDefaultPortedUserOps() runs this for every twin on EVERY BOOT, so the store's bytes churned on every
+    // reload and a saved workspace woke up dirty (persistence-file-indicator:116 caught it).
+    if (def.savedAt == null) def.savedAt = (defs[i].savedAt != null) ? defs[i].savedAt : new Date().toISOString();
     registerUserOp(def);            // overwrite the live user-layer builder/spec/label
     defs[i] = def;
     writeStore(defs);

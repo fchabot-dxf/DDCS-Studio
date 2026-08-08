@@ -805,7 +805,9 @@ function saveAsCustomOp() {
         };
         try {
             if (update) {
-                updateUserOp(authorFork(_editingWizard, meta.name));
+                const d = authorFork(_editingWizard, meta.name);
+                d.savedAt = new Date().toISOString();   // t1621 — an explicit Update IS a save, declared at the caller (updateUserOp preserves when undeclared — the boot reseed must not restamp)
+                updateUserOp(d);
             } else {
                 const slug = meta.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
                 const existing = new Set(listUserOps().map((d) => d.opType));

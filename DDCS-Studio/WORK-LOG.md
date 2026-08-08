@@ -17978,3 +17978,33 @@ references / no auto-sync ever); no update-from-source in v1.
 5. **Desktop viewport only; the exe shell was not run.**
 
 **Capacity:** first act this seat — clean, with room to spare.
+
+
+## t1621 — the savedAt boot-restamp regression: traced to the reseed, fixed at the source (turn 1621)
+
+**The dispatch:** persistence-file-indicator:116 ("dirty persists across reload, and Save survives") red in
+isolation on 418724d7, green on its parent — release held on it. Hypothesis offered: the savedAt stamping.
+
+**The trace (not the hypothesis trusted, though it was right in substance):** the exact path is
+`app.js seedDefaultPortedUserOps()` — it runs on EVERY boot and calls `updateUserOp(seed)` for every twin
+already present (the in-place upgrade mechanism). t1619's updateUserOp restamped `savedAt` UNCONDITIONALLY,
+so every reload rewrote 32+ twins' stamps → `ddcs_user_ops` bytes churned every boot → the per-store
+watermark never matched again → a SAVED workspace woke up dirty on every reload. Pre-t1619 the reseed was
+byte-stable because seeds are deterministic.
+
+**The fix — savedAt follows defV's OWN declared-respected rule (the pattern was already on the shelf,
+one line above):** updateUserOp stamps only what the CALLER declares; an undeclared incoming def KEEPS the
+stored stamp (byte-stable reseed). The two acts that mean "the user saved this" declare it explicitly:
+the manager's Rename and devMode's explicit Update each set `savedAt` at the call site. createUserOp is
+unchanged (stamps only when absent — an imported file's own date survives, the round trip stays honest).
+
+**Verification:** persistence-file-indicator 3/3 green (the regression test was the pre-existing spec —
+it failed 1/1 isolated pre-fix, the strongest non-vacuity there is: an existing claim caught it). Re-gated
+the whole savedAt blast radius serialized: wizard-manager-1617 (7), library-sources-1247 (the harsh
+deep-equal — the file's stamp still rides and survives import), save-dialog-declared-1615,
+blocks-live-form (the devMode Update path this touched), fork-parity-1593 — 29/29 green.
+
+**Not covered:** the date column's "an update IS a save" restamp (rename/Update) is asserted by no spec —
+the round-trip spec pins date = def.savedAt, not that the two gestures refresh it; candidate small assert
+for a future act. Full suite not re-run this turn (the fix is three lines in the stamped seam; the fast
+tier above IS the blast radius) — the advisor's release gate re-run will be the counted proof.

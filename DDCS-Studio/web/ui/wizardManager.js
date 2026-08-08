@@ -113,6 +113,7 @@ async function renameWizard(opType) {
     if (!name || !name.trim() || name.trim() === src.label) return false;
     const d = copy(src);
     d.label = name.trim();
+    d.savedAt = new Date().toISOString();   // a rename IS a save — declared HERE (updateUserOp preserves when undeclared)
     updateUserOp(d);   // defV is declared on the stored def → respected as-is: a rename does not stale placed instances
     // ONE-NAME: a bar-designer label override would keep showing the OLD name over the renamed def — clear it so the
     // def (the source) is what every surface shows.
