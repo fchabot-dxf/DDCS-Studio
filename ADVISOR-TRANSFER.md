@@ -46,7 +46,10 @@ mouse/update-check deterministic class + churn. The NEXT worker seat starts FRES
 
 ## 3 · The queue (dispatch one act per turn, review each from the DIFF)
 
-1. Whatever t1632 leaves: real breaks it reported get rulings/acts.
+1. ⚠ NEW, from the Expert bench (merged at transfer): the Fanuc SLASH-form ATAN emit is REJECTED by
+   the Expert (4ba142ed calls it a DEFECT — read that FINDINGS entry first). t1583 kept the slash form
+   in the sim precisely pending a hardware verdict; the verdict is in. Likely act: emit the comma form
+   (hardware-proven on BOTH controllers) and align the sim — but read the FINDINGS evidence first.
 2. Corner's 3 `simstart` placeholders (separate unwired type in renderUiTree, correctly refused today).
 3. Materialize derived rows on the tree face (passes has no param_field row; lands via the orphan net).
 4. Shape-field typo lint hook (t1566's lint discipline reaching shapes — today a typo skips silently).
