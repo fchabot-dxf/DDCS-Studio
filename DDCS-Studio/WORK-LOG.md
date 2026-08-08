@@ -17626,3 +17626,54 @@ plus the act-level baseline, **3/3 fail against the pre-act tree** (no field at 
 4. **Desktop viewport only; the exe shell was not run.**
 
 **Capacity:** third act this seat — comfortable; SHARED_LABELS next is small and well-scoped.
+
+
+## t1611 — SHARED_LABELS: the placement family gets friendly names, declared once (turn 1611)
+
+**The dispatch:** user-ruled ("make the names more friendly"). The twin forms rendered raw param names —
+stockAttach, pathDatum, offZ, w — because no twin declares labels for the placement family and no shared
+label source existed.
+
+### What landed — one declaration, one resolver
+
+`SHARED_LABELS` in ui/formWidgets.js, directly beside FIELD_HELP (the missing sibling, as dispatched):
+originX/originY → Origin X/Y · offZ → Z offset · stockAttach → Stock attach · pathDatum → Path anchor ·
+stockDatum → Stock datum · stockW/H/Z → Stock width/height/thickness · w/h → Width/Height. Resolution is
+the exported `labelFor(b)`: explicit binding `label` → SHARED_LABELS[param] → raw name. `labelSpan` (the
+single point every widget renders its label through) now calls it — so BOTH binding-driven faces (the twin
+Generator Modal and the Blocks Wizard View) agree with zero per-face code. Scoped to the family the ruling
+named; the map grows per-CONCEPT, never per-wizard.
+
+### Verification
+
+- **Non-vacuous: 3/3 fail against the pre-change tree** (no map, no resolver, raw labels on both faces).
+- Every spec expectation is READ FROM THE IMPORTED DECLARATION in-page (the t1609 anti-drift shape): the
+  resolver chain asserted directly (shared / explicit-wins / raw-fallback), then both real faces assert
+  their rendered label text — the label span's first text node, so a units suffix cannot mask a raw name —
+  equals SHARED_LABELS[param]. The explicit-label case is pinned on surfacing's own `confirmEvery`
+  ('Confirm every N passes' — unchanged).
+- **Screenshots:** verification/t1611-modal-labels.png + t1611-blocks-labels.png — the rows that read
+  `stockAttach` / `pathDatum` / `offZ` / `w` in the t1607 screenshots now read their friendly names.
+- **Fast tier (9 files, 29 tests): 28 green + the documented pre-existing cam-s52:25** (same ID, same
+  claim, pre-dates this arc).
+- **Full suite: 20 failed / 2376 passed / 6 skipped e2e + 1 node (18.7 min; ANSI-stripped count).** vs
+  t1609's 21/2372: +3 = this act's tests, one net churn heal. GONE — blocks-rotary-rig:14,
+  import-safety-1219:62, middle-superset:35 (last run's churn, healed). Re-churned/persisting —
+  homing-sysstart-real:55, op-params-complete:65:3, and NEW-this-run wizard-face-1599:119: ALL THREE
+  isolate green, and both newcomers' shared-run failures are 60s boot-readiness timeouts at page load
+  (the recorded contention class; VS Code test-server PID 55024 still alive). The 1 node red is the
+  standing surfacing-as-data member. None of this act's tests red.
+
+### What this does NOT cover
+
+1. **Only the binding-driven faces** — the hand-coded modal forms (static HTML labels: OFFSET X, WORK
+   WCS, …) keep their own text; they never rendered raw param names, so the ruling's symptom never
+   applied there.
+2. **The CAM pendant table's row labels** resolve through camField's own label fallback, not labelFor —
+   same concept, different face; a candidate follow-up if the advisor wants the pendant aligned.
+3. **Params outside the ruled family stay raw** where undeclared (toolDia, stepoverPct, depth, stepdown
+   render their param names + units on the twin faces today) — candidates for the same map if ruled.
+4. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** fourth act this seat, the smallest of the four — comfortable. The queued derived/writes
+`passes` act is the seat-sized one; fresh-seat judgement belongs to the advisor.

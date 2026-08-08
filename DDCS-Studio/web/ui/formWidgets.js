@@ -64,7 +64,7 @@ const hintText = (mm, kind) => {
 
 function labelSpan(b) {
     const span = document.createElement('span');
-    span.textContent = b.label || b.param;
+    span.textContent = labelFor(b);   // t1611 — the ONE label resolver (explicit → SHARED_LABELS → raw), both faces
     // DECLARED HELP SLOT (1a): an optional `help` string on the binding renders as a native tooltip on the field
     // label — ONE declaration, every renderOpForm surface (the ported wizard form + the Blocks-tab form pane) shows
     // it for free. Dumb by design (native title=, no positioning framework); fields without `help` are unchanged.
@@ -852,6 +852,21 @@ export function linkGear(link) {
     g.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openFieldLink(link); });
     return g;
 }
+
+// t1611 — DECLARED SHARED LABELS, the missing sibling of FIELD_HELP below (user-ruled: "make the names more
+// friendly"). Params that recur across twins with the SAME meaning declare their display name ONCE here; a
+// binding's explicit `label` always wins (wizard-specific phrasing), an unlisted param falls back to its raw
+// name. Resolved by `labelFor` — the ONE resolver labelSpan renders through, so both binding-driven faces
+// (the twin Generator Modal + the Blocks Wizard View) agree for free. Scoped to the placement family the
+// ruling named; grow it per-concept, never per-wizard.
+export const SHARED_LABELS = {
+    originX: 'Origin X', originY: 'Origin Y', offZ: 'Z offset',
+    stockAttach: 'Stock attach', pathDatum: 'Path anchor', stockDatum: 'Stock datum',
+    stockW: 'Stock width', stockH: 'Stock height', stockZ: 'Stock thickness',
+    w: 'Width', h: 'Height',
+};
+/** The label a binding renders under: explicit `label` → SHARED_LABELS → the raw param name. */
+export function labelFor(b) { return (b && b.label) || (b && SHARED_LABELS[b.param]) || (b && b.param) || ''; }
 
 // t798 P5 — DECLARED FIELD HELP. A binding's `help` is the field tooltip; params that recur across twins with the SAME
 // meaning declare it ONCE here (a binding's explicit `help` always wins). The help title now goes on the WHOLE ROW
