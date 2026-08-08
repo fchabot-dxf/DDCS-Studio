@@ -17862,3 +17862,23 @@ the scratch-worktree rig on port 3213 is the proven non-vacuity harness for save
 standing failure set is 19 e2e + 1 node with the churn members named in the last three entries.
 
 Ball passed back so the advisor can hold the dispatch for the fresh seat.
+
+
+## t1617/t1619 — the OLD seat's account: duplicate execution caught, withdrawn, standing down (turn 1619)
+
+The advisor re-passed the Wizard Manager after this seat's t1617 decline, and this seat's still-armed
+waiter consumed turn 1619 and began executing — while the INTENDED fresh seat was simultaneously building
+the same act in this same checkout (its module `ui/wizardManager.js`, its rewrite of
+`tests/wizard-manager-1617.spec.js`, its devMode managewiz link and headerPost row landed mid-flight,
+and its suite passed 5/5 against its own surface). Two live workers on one turn is the split-brain the
+protocol exists to prevent; this seat was the duplicate.
+
+**Withdrawn (all of it, verified):** my parallel module `ui/wizardManagerUi.js` (deleted), my
+`window.openWizardManager` wiring in workspaceManager.js (reverted to HEAD), my two headerPost additions
+(removed — the fresh seat's `wizards` row stands alone). `git status` now shows ONLY the fresh seat's
+work; its spec re-ran 5/5 green after the surgery.
+
+**Standing down.** The "never kill your watcher" rule assumes ONE worker window; with the fresh seat
+live and armed, this seat's waiter is itself the hazard (every future pass would wake two executors). So
+this window does NOT re-arm and does NOT pass — turn 1619's completion belongs to the fresh seat that is
+actually building t1617. Only the human should ever run one worker window per role.
