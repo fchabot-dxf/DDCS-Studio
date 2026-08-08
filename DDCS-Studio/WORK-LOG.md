@@ -18403,3 +18403,52 @@ pre-fix HEAD, all red isolated — genuine fallout, chased to two shapes:
 2. `paramGroupFromBindings`' spec-derived fallback rows (b95540d9's (b)) have no dedicated unit pin of
    their own beyond s53's flip.
 3. The `_group` transient and `flattenBlocks` side-effect (named at t1625) remain the standing candidate.
+
+## t1620 — surfacing SKIM rendered NOTHING: a flow-label collision, fixed in BOTH build paths (logged out of sequence — the fix predates this entry; captured turn 1634)
+
+> Ordering note: this lands below t1632 because it is being written down now, but its task id is **t1620** —
+> the number stamped in the code (`programFraming.js`, `dataOps/skimStructure.js`, `surfacing-skim-982.test.mjs`).
+> Grep `t1620` to find the code and this record together.
+
+**The symptom (human t1620): "the skim mode doesn't show anything in simulation."** The sim drew only the
+stock box + a single plunge — no carve, no sweep.
+
+**Root cause — a flow-label COLLISION, not a geometry bug.** Skim's refusal-guard pair `skimErrLabel`/
+`skimOkLabel` is only reserved by `surfaceraster.flowLabels` when it can SEE `zMode==='skim'` on the block.
+But `uniquifyFlowLabels` (blockEmitter) runs BEFORE the emitter injects `zMode` onto the surfaceraster child
+(~blockEmitter.js:400), so at uniquify time the pair fell back to the `LABEL_DEFAULTS` **93/94** — the exact
+numbers the raster's own row-walk had already taken. Result: after the first plunge the raster's post-plunge
+`GOTO` landed on the **skim-OK** label instead of continuing the sweep → the whole row-walk was skipped. One
+plunge, no carve — precisely the "only the stock box" render.
+
+**The fix — stamp `zMode:'skim'` on the absorbing child at BUILD time**, before uniquify runs, so it reserves
+93/94 for the skim pair and pushes the row labels to 95+. Applied in **BOTH** build paths (they must stay in
+sync — see [[wizards-as-data-port]]):
+- **built-in:** `web/blocks/programFraming.js` `makeSkim` — `absorbingChild(b.children)` → set `zMode:'skim'`.
+- **data-twin:** `web/blocks/dataOps/skimStructure.js` `swapPlaceToSkim` — same stamp on the absorber after
+  `skim.children = b.children`.
+
+**Why the first attempt looked done but wasn't.** Editing only the twin path left `surfacing-skim-982` green
+(that node test drives the built-in `surfacingStack`→`makeSkim` path, so it never exercised the twin) while
+the built-in path was still broken — and vice-versa. The lesson: a structural skim fix has TWO homes; the node
+test only covers one. Fixed both, then re-verified.
+
+### Verification
+- **New guard in `tests/node/surfacing-skim-982.test.mjs`:** a no-duplicate-flow-label assertion — every `N`
+  label emitted exactly once. It RED-lit the dupes `["93","94"]` before the fix and is green after; it would
+  have caught this class on day one.
+- **Node tier: 99 pass / 0 fail.**
+- Committed **af391806**, pushed to `origin/main`.
+
+### What this does NOT cover
+1. **Playwright/golden tier NOT run here.** The node tier is browser-free and covers the emit + byte-identity,
+   which is strong, but the `.spec.js` tier (real browser + goldens) was not exercised in this session.
+   **Recommend a full `npm test` pass before considering skim fully shipped.**
+2. **Start-position GUI (human t1620, second half: "skim mode can use the start position GUI we use in probe
+   wizards") — NOT built, staged as a separate follow-up.** Now that the raster actually renders, the sim
+   should show it WHERE the operator will jog, not at the origin. Plan (SIM-ONLY, zero emit change):
+   - add a `surfacing` provider in `web/wizards/opSimStarts.js` (mirror the probe-wizard providers),
+   - a draggable start marker in `web/wizards/surfacingView.js`,
+   - seed `#790/#791/#792` via `previewVarSeed` as a sim-only anchor (the emitted program is untouched — it
+     still READs the live frame; this only tells the PREVIEW where "live" is).
+   This is a feature increment, deliberately deferred from the render fix.
