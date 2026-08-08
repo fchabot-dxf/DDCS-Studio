@@ -238,24 +238,32 @@ export function authoringWizardType() { return _authoringWizard; }
  *  binding's (blockIndex, key) to the live Blockly socket and sets the number SURGICALLY (a math_number shadow, or a
  *  GUI param pill's value) — only that value changes, no stack regenerate. Fires normally so the reproject updates
  *  the G-code + preview. Returns true if written. (preorderAtoms aligns index-for-index with the flattened children,
- *  the same alignment deriveAuthoredDef's blockIndex uses.) */
+ *  the same alignment deriveAuthoredDef's blockIndex uses.) When NO derived binding names the param (the Customize
+ *  route — t1605), falls back to writing the canvas param_field's dflt: the declaration row is the value there. */
 export function writeAuthoredValue(ws, param, value) {
     ws = ws || _ws;
     if (!ws || !Number.isFinite(value)) return false;
     const def = deriveAuthoredDef(ws);
     const b = def && def.bindings.find((x) => x.param === param);
-    if (!b || b.blockIndex == null || b.key == null) return false;
-    const body = authoringBody(ws);                                                        // op DO-chain OR a bare stack head
-    const blk = (body && body.first ? preorderAtoms(body.first) : [])[b.blockIndex];
-    const sock = blk && blk.getInput(FN(b.key));
-    const tgt = sock && sock.connection && sock.connection.targetBlock();
-    if (!tgt) return false;
-    if (tgt.type === 'math_number') { tgt.setFieldValue(String(value), 'NUM'); return true; }   // a direct value socket
-    if (tgt.type === 'param') {                                                                  // a GUI param pill → set its value
-        const vin = tgt.getInput(FN('value'));
-        const vt = vin && vin.connection && vin.connection.targetBlock();
-        if (vt && vt.type === 'math_number') { vt.setFieldValue(String(value), 'NUM'); return true; }
+    if (b && b.blockIndex != null && b.key != null) {
+        const body = authoringBody(ws);                                                        // op DO-chain OR a bare stack head
+        const blk = (body && body.first ? preorderAtoms(body.first) : [])[b.blockIndex];
+        const sock = blk && blk.getInput(FN(b.key));
+        const tgt = sock && sock.connection && sock.connection.targetBlock();
+        if (tgt && tgt.type === 'math_number') { tgt.setFieldValue(String(value), 'NUM'); return true; }   // a direct value socket
+        if (tgt && tgt.type === 'param') {                                                                  // a GUI param pill → set its value
+            const vin = tgt.getInput(FN('value'));
+            const vt = vin && vin.connection && vin.connection.targetBlock();
+            if (vt && vt.type === 'math_number') { vt.setFieldValue(String(value), 'NUM'); return true; }
+        }
+        return false;
     }
+    // t1605 — the CUSTOMIZE route: a twin's bindings live in the REGISTRY, not on its canvas (no knobs, no pills),
+    // so no derived binding names this param. The canvas's own declaration row IS the writable value there: the
+    // param_field block naming this param. Writing its dflt field is the exact two-way pair of the wizard-view face
+    // READING row dflts (formBindings over the canvas template) — edit a form row, the row's own block shows it.
+    const pf = ws.getAllBlocks().find((blk) => blk && blk.type === 'param_field' && String(blk.getFieldValue(FN('param'))) === String(param));
+    if (pf) { pf.setFieldValue(String(value), FN('dflt')); return true; }
     return false;
 }
 

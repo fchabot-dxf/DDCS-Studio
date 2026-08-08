@@ -373,6 +373,20 @@ async function buildWorkspace() {
   //    (writeAuthoredValue), surgically — which reprojects, updating the G-code + preview too. The smart sync here
   //    absorbs that echo (the edited field is focused, so it's skipped), so there's no loop and no focus loss.
   const formSig = (bs) => (bs || []).map((b) => `${b.param}:${b.widget || b.type || 'number'}:${b.group || ''}:${b.role || ''}`).join('|');
+  // Structure unchanged → push the bindings' current defaults into the NON-focused fields (the focused one is the
+  // user's own echo — clobbering it is how a live form eats your typing). t1605 — extracted so the tree face shares
+  // the flat face's sync instead of copying it; a null default is skipped rather than written as the string 'undefined'.
+  function syncFormValues(formHost, binds) {
+    for (const b of (binds || [])) {
+      if (!b || b.default == null) continue;
+      const f = formHost.querySelector(`[data-param="${window.CSS ? CSS.escape(b.param) : b.param}"]`);
+      if (f && f !== document.activeElement && String(f.value) !== String(b.default)) {
+        f.value = b.default;
+        const echo = f.type === 'range' && f.parentElement && f.parentElement.querySelector('span');   // keep a slider's readout in step
+        if (echo) echo.textContent = f.value;
+      }
+    }
+  }
   // t1589 — the column's face, written from ONE predicate. `.wizard-view` = the Generator Modal; no class = Preview
   // over Projected G-code. Both mobile labels are derived here rather than hard-coded, so they cannot name a face
   // the column is not wearing. Re-fit the preview when it becomes visible (a canvas sized while display:none is 0×0).
@@ -409,6 +423,17 @@ async function buildWorkspace() {
     // right pane into the wizard face and took the sim's Preview + G-code away from it.
     const authoredHere = stack.find((b) => b && b.type === 'user_root');
     const customizing = !!(authoringWizardType() && stack.some((b) => b && b.type === 'op' && b.opType === authoringWizardType()));
+    // t1605 — the Customize route renders from the REGISTERED def: a twin's bindings live in the registry, not on
+    // its canvas (no knobs, no pills), so the derived def is binding-less and the wizard view got an EMPTY byParam —
+    // a param_group placeholder and zero rows where Surfacing's fields belong. Gated on the DECLARED authoring fact
+    // (authoringWizardType — the t1599 doctrine), NEVER on the stack merely holding a twin: the first cut of this
+    // adopted the registered def whenever a top-level op's `opType` was registered, and a PLACED twin in an ordinary
+    // program then inherited the registered template's user_root → hasTree → the wizard face stole the sim's
+    // Preview — the exact trap the wizard-face spec pins.
+    if (customizing && (!def || !def.bindings || !def.bindings.length)) {
+      const regDef = getUserDef(authoringWizardType());
+      if (regDef) def = regDef;
+    }
     const userRoot = authoredHere
       || (customizing ? flattenBlocks(stack).find((b) => b && b.type === 'user_root') : null)
       || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
@@ -455,11 +480,26 @@ async function buildWorkspace() {
     }
 
     if (hasTree) {
-      formHost.__sig = null;
+      // t1605 — the rows must be LIVE: prefer the CANVAS's own user_root as the template, so the param_field
+      // declarations the form consumes (formBindings reads rows off def.template) are the ones actually on the
+      // canvas — a canvas dflt edit reaches the form, and the form face shows what the author is building, not
+      // the registry's stored snapshot. When userRoot already came from def.template this is the same object.
+      const liveDef = def ? { ...def, template: [userRoot] } : {};
+      const binds = formBindings(liveDef);
+      // t1605 — the tree face gets the SAME structure-unchanged value sync the flat face below has. Without it,
+      // every canvas echo (including the one a form edit itself triggers) rebuilt the whole pane and the field
+      // being typed in lost focus per keystroke. The sig covers the binds shape PLUS the layout tree minus block
+      // ids and dflt values — so a value edit syncs in place and a structure/presentation edit rebuilds.
+      const treeSig = formSig(binds) + '||' + JSON.stringify(userRoot.uiChildren, (k, v) => ((k === 'id' || k === 'dflt') ? undefined : v));
+      if (formHost.__sig === treeSig && formHost.querySelector('[data-param]')) {
+        syncFormValues(formHost, binds);
+        return;
+      }
+      formHost.__sig = treeSig;
       formHost.innerHTML = '';
       const byParam = {};
       const tempHost = document.createElement('div');
-      const readers = renderOpForm(tempHost, formBindings(def || {})) || [];
+      const readers = renderOpForm(tempHost, binds) || [];
       tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
         if (!inp || !inp.dataset || !inp.dataset.param) return;
         const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement;
@@ -487,14 +527,7 @@ async function buildWorkspace() {
 
     const sig = formSig(def.bindings);
     if (formHost.__sig === sig && formHost.querySelector('[data-param]')) {        // structure unchanged → value-sync only
-      for (const b of def.bindings) {
-        const f = formHost.querySelector(`[data-param="${window.CSS ? CSS.escape(b.param) : b.param}"]`);
-        if (f && f !== document.activeElement && String(f.value) !== String(b.default)) {
-          f.value = b.default;
-          const echo = f.type === 'range' && f.parentElement && f.parentElement.querySelector('span');   // keep a slider's readout in step
-          if (echo) echo.textContent = f.value;
-        }
-      }
+      syncFormValues(formHost, def.bindings);
       return;
     }
     formHost.__sig = sig;                                                          // structure changed → rebuild

@@ -1162,6 +1162,14 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
                 container.appendChild(pnlBox);
                 if (node.uiChildren) traverse(Array.isArray(node.uiChildren) ? node.uiChildren : (node.uiChildren.DO || []), container);
                 if (node.children) traverse(Array.isArray(node.children) ? node.children : (node.children.DO || []), container);
+            } else if (node.type === 'param_group') {
+                // t1605 — a param_group IS its rows. TRANSPARENT on purpose, exactly like the flat form path
+                // (formBindings treats it as row-order metadata, never chrome): each param_field child picks its
+                // pre-rendered row out of byParam via the param_field branch above — the ONE materialization the
+                // caller already produced by consuming renderOpForm(formBindings(def)). No second derivation here
+                // (t1562's rule): this branch decides only WHERE the rows land, never what they contain.
+                const pgKids = node.children ? (Array.isArray(node.children) ? node.children : (node.children.DO || [])) : [];
+                traverse(pgKids, container);
             } else if (node.type === 'group_box') {
                 // t1561 STEP 2 — a titled card. Collapsible per its own `collapsible` param; REUSES the exact
                 // form-sec fold mechanism `section` already uses (same classes, same applyFold call) rather than
@@ -1258,10 +1266,14 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
     // made OBSERVABLE: a correct layout (every param placed by the tree) and a broken one (the tree lost a row,
     // caught only by this net) used to look IDENTICAL — both just show a form. `readers.orphanCount` lets a spec
     // assert zero for a well-formed tree, so a regression that starts relying on this fallback goes red.
+    // t1605 — "unattached" must mean NOT IN THIS HOST, not parentless: byParam rows arrive PRE-RENDERED in the
+    // caller's scratch container, so an unplaced row still HAS a parent (the scratch div) and the old
+    // `!parentElement` test skipped every one of them — corner's 7 structural bindings (no param_field row to
+    // place them: corner/probeSeq/probeZFirst/travelApproach/travelShape/wcs/syncA) silently vanished from the face.
     let orphanCount = 0;
     for (const key of Object.keys(byParam)) {
         const p = byParam[key];
-        if (p && p.row && !p.row.parentElement) {
+        if (p && p.row && !host.contains(p.row)) {
             host.appendChild(p.row);
             readers.push(p.read);
             orphanCount++;

@@ -17409,3 +17409,88 @@ The drive used the send-gate-wiring-1585 pattern with its one documented lift (t
 **Capacity:** fifth act this seat, all in one engine file's orbit — still comfortable, but the queued
 renderUiTree/param_group feature act should start in a FRESH seat as already agreed (re-stated so the note
 survives the seat).
+
+
+## t1605 — renderUiTree renders a `param_group`'s rows (turn 1605)
+
+**The dispatch:** the Wizard-View face t1599 built showed `⚠ "param_group" — not wired yet` where
+Surfacing's parameter rows belong. Render the rows by CONSUMING the one-source row path (formBindings /
+renderOpForm), never re-deriving them (t1562's rule).
+
+### What was actually broken — THREE faults, found by driving, not reading
+
+Probing the live Customize Surfacing route (the placeholder screenshot's exact state) showed the canvas
+param_group carries its 28 param_field children fine — the rows died elsewhere, twice over:
+
+1. **`renderUiTree` has no `param_group` branch** — the node fell to the unwired-placeholder else.
+2. **The right pane's registered-def fallback never fired on the Customize route** — it looked for
+   `b.params.opType`, but an op block carries `opType` TOP-LEVEL (opBuilders.makeOp). So `def` stayed the
+   DERIVED one, whose bindings are [] for a twin (no knobs, no pills on its canvas) → `formBindings` joined
+   28 rows against zero bindings → an EMPTY byParam → zero rows even where the else-branch traversed them.
+3. **The orphan net tested the WRONG absence** (`!row.parentElement`): byParam rows arrive PRE-RENDERED in
+   the caller's scratch container, so an unplaced row still HAS a parent and the net skipped every one.
+   Corner surfaced this: its 7 STRUCTURAL bindings (corner/probeSeq/probeZFirst/travelApproach/travelShape/
+   wcs/syncA — no blockIndex → no materialized param_field row to place them, the t1579 class) vanished
+   silently. 16 of 23 rendered until the predicate became `!host.contains(row)`.
+
+### The fix is consumption, three seams
+
+- `formWidgets.js` — `param_group` branch: TRANSPARENT, exactly like the flat form path treats it. Its
+  param_field children pick their pre-rendered row out of byParam via the existing param_field branch; the
+  branch decides only WHERE rows land, never what they contain. Plus the orphan-net predicate fix above.
+- `blocksApp.js` — the Customize route adopts the REGISTERED def, gated on the DECLARED authoring fact
+  (`authoringWizardType()`, the t1599 doctrine — see the regression below for why the gate is load-bearing).
+  The tree face renders from a `liveDef` whose template is the CANVAS's own user_root, so the rows the form
+  consumes are the ones being authored. And the tree face gains the SAME structure-unchanged value-sync the
+  flat face has (extracted `syncFormValues`, shared not copied): sig = binds shape + the uiChildren tree
+  minus ids/dflt values, so a value edit syncs in place (no per-keystroke rebuild/focus loss) and a
+  structure edit rebuilds.
+- `devMode.js` — `writeAuthoredValue` falls back to writing the canvas param_field's `dflt` field when no
+  derived binding names the param: on the Customize route the declaration row IS the writable value, the
+  exact two-way pair of the face reading row dflts.
+
+### ⚠ A REAL regression caught by the fast tier, and the ruled trap it re-proved
+
+My first cut found the registered def via top-level `opType` unconditionally — and `wizard-face-1599`'s
+"PLACED twin keeps Preview" went red: a placed twin's registered template carries a user_root → hasTree →
+the wizard face stole the sim's Preview. That is byte-for-byte the trap the t1599 spec exists to pin ("the
+obvious fix is wrong"). Re-gated on `authoringWizardType()` (ask the declared fact, not the stack's shape);
+all 7 face tests green after, including under the full-suite load.
+
+### Verification
+
+- **Non-vacuous as numbers: 3/3 new tests fail against the pre-change tree**, each on its own claim
+  (placeholder present ×2; no depth row for the live-both-ways drive).
+- **The real symptom, driven both directions:** `verification/t1605-surfacing-before.png` (placeholder, zero
+  rows) → `t1605-surfacing-rows.png` + `t1605-corner-rows.png` (the rows, real widgets + labels + values,
+  corner's group_box cards + plane-suggest button rendering). Live both ways driven as the real gesture:
+  fill depth 2.5 → the canvas param_field's dflt reads 2.5; setFieldValue stepdown 0.75 on the canvas →
+  the form row shows 0.75, and the earlier edit survives (no stale-rebuild clobber).
+- **Fast tier (10 spec files, 43 tests): 39 green + 4 triaged** — 1 real regression (fixed above), 1
+  contention boot-timeout (passed isolated twice), 2 pre-existing (`cam-s52:25`, `cam-s53:78` — documented
+  in the t1617-era note as boot-materialization expectation drift; reproduced red in isolation on this tree
+  AND described identically pre-change).
+- **Full suite: 19 failed / 2367 passed / 6 skipped e2e + 1 node (17.5 min; counted by grepping the
+  ANSI-stripped COUNT).** vs t1603's 21/2362/6: GONE — `blocks-live-form:168`, `pane-splitter-790:25`
+  (t1603's churn pair, both green now). NEW — none. The arithmetic closes exactly: 2362 + 2 healed churn +
+  3 new tests = 2367. The 1 node red (`surfacing-as-data` byte-identity) was REPRODUCED ON THE UNMODIFIED
+  HEAD TREE (files checked out to HEAD, run, restored from my own copies — not from HEAD) and matches
+  t1593's recorded "21 e2e + 1 node" standing shape. None of this act's tests red anywhere.
+
+### What this does NOT cover
+
+1. **Corner's three `simstart` placeholders remain** — a separate unwired node type in its uiChildren, out
+   of this dispatch's scope (the same visible-refusal mechanism holds for them, correctly).
+2. **Non-numeric write-back stays gated** — the form→block listener converts to Number and skips the rest,
+   so dropdown/toggle/text rows read live but do not write back (the pane's pre-existing contract; surfacing
+   is numbers-heavy so the drive exercised the numeric path).
+3. **Observed, pre-existing, NOT touched:** surfacing's `stockAttach`/`pathDatum` selects render with one
+   label-only option and an unmatched value ("" selected) — the materialized row's `options` string codec is
+   numeric-only (parseParamOptions), so enum presets with string values lose their value half. Identical in
+   the FLAT path (both faces consume the same registered rows), so it is a t1562-family declaration-codec
+   gap, not a tree-render one. Candidate next act if the advisor agrees.
+4. **Desktop viewport only; the exe shell was not run.**
+5. The `syncFormValues` extraction changes the flat path's loop only by skipping a null default (was:
+   writes the string "undefined"); no spec asserts that corner case either way.
+
+**Capacity:** first act this seat, fresh and comfortable.
