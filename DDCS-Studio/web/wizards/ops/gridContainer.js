@@ -3,7 +3,7 @@
  * Declares a multi-column CSS Grid container for form controls. Emits children in order.
  */
 export const gridContainerBlock = {
-    type: 'grid_container', label: 'grid container', category: 'Wizard UI',
+    type: 'grid_container', label: 'grid container', category: 'Wizard Layout',
     defaults: { columns: '2', gap: '16px' },
     fields: ['columns', 'gap'],
     selects: {

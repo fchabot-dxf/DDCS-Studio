@@ -10,7 +10,7 @@
  * anchor needs (the ddcs_dynfields extension), so the block stays readable.
  */
 export const simStartBlock = {
-    type: 'simstart', label: 'sim start', category: 'Wizard UI',
+    type: 'simstart', label: 'sim start', category: 'Wizard Previews',
     dynamic: 'anchor',
     defaults: { anchor: 'centre', axis: 'X', wall: '@dir1', out: '@outset', fx: 0.5, fy: 0.5, sign: '+', rad: '@R', zplane: 'probe', whenparam: '', whenis: '' },
     allFields: ['anchor', 'axis', 'wall', 'out', 'fx', 'fy', 'sign', 'rad', 'zplane', 'whenparam', 'whenis'],

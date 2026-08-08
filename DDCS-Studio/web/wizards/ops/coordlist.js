@@ -6,7 +6,7 @@
  * The first list-valued instance of the parametric-canvas atom on the block side.
  */
 export const coordListBlock = {
-    type: 'coordlist', label: 'positions', category: 'Wizard UI',
+    type: 'coordlist', label: 'positions', category: 'Wizard Inputs',
     defaults: { pts: '{"points":[],"z":0}' },   // JSON of { points:[{x,y}], z } — rendered as the inline preview
     fields: ['pts'],
     emit: () => [],   // metadata only — produces no G-code

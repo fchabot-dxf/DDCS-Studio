@@ -14,7 +14,7 @@
  * byte-identical). Drag-only, absolute (NO relTo/incremental, NO click-to-place — the clean pilot with no implicit derivation).
  */
 export const layoutWidgetBlock = {
-    type: 'layoutwidget', label: 'point pick', category: 'Wizard UI', kind: 'layoutwidget',
+    type: 'layoutwidget', label: 'point pick', category: 'Wizard Layout', kind: 'layoutwidget',
     help: 'A draggable 2D POINT on the layout canvas, bound to two params (fx, fy). Emits nothing (sim/form-only): dragging the point writes the params, typing them moves the point. anchor point + frame stock-min = an absolute physical point (stock min-XY).',
     defaults: { fx: 'px', fy: 'py', anchor: 'point', frame: 'stock-min', xval: '50', yval: '50', label: 'pt' },
     fields: ['fx', 'fy', 'anchor', 'frame', 'xval', 'yval', 'label'],

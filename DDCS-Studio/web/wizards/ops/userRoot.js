@@ -12,7 +12,7 @@
 export const userRootBlock = {
     type: 'user_root',
     label: 'Define Custom Wizard',
-    category: 'Wizard UI',
+    category: 'Wizard Layout',
     kind: 'user_root',
     defaults: {},
     fields: [],
@@ -24,7 +24,7 @@ export const userRootBlock = {
 export const paramGroupBlock = {
     type: 'param_group',
     label: 'Parameter Group',
-    category: 'Wizard Form',   // t1105 (S5.1) — the FORM family (param_group + param_field) shares ONE colour, distinct from the cam-pendant pink AND the Wizard-UI fuchsia (opunit/section/formfield)
+    category: 'Wizard Inputs',   // t1623 — the ROLE axis: param_group/param_field are input declarations, one group (and one colour) with formfield & friends
     kind: 'param_group',
     defaults: { group: 'Settings' },
     fields: ['group'],
@@ -39,7 +39,7 @@ export const paramGroupBlock = {
 export const sectionBlock = {
     type: 'section',
     label: 'Section',
-    category: 'Wizard UI',
+    category: 'Wizard Layout',
     kind: 'section',
     defaults: { title: 'Section' },
     fields: ['title'],
@@ -55,7 +55,7 @@ export const sectionBlock = {
 export const opUnitBlock = {
     type: 'opunit',
     label: 'Op Unit',
-    category: 'Wizard UI',
+    category: 'Wizard Layout',
     kind: 'opunit',
     hidden: true,   // created PROGRAMMATICALLY at fork/load-wrap (a boundary around a recognized op's atoms), never dragged from the palette — a bare opunit has no opType
     defaults: { opType: '', defV: 0 },

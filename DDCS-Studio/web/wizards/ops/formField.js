@@ -15,7 +15,7 @@
  * inferred — the composable substrate that lifts isMaintainedAsData (a spec authored as blocks round-trips losslessly).
  */
 export const formFieldBlock = {
-    type: 'formfield', label: 'form field', category: 'Wizard UI', kind: 'formfield',
+    type: 'formfield', label: 'form field', category: 'Wizard Inputs', kind: 'formfield',
     help: 'A wizard FORM field bound to a macro var (the composable BINDING_SPEC). Lives in the Presentation mouth, emits nothing; the form + emit read it. Default empty = the template socket holds (an expression default).',
     dynamic: 'widget',
     defaults: {

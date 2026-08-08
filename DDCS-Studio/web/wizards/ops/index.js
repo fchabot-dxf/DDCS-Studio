@@ -134,7 +134,7 @@ export const PALETTE = [
 /** Canonical palette-grouping order (the toolbox category order). Categories with no blocks don't render. Each
  *  block declares its own `category` (the single source of truth — no remap); this list is just the display order.
  *  Geometry → toolpaths → patterns → machine state/setup → probing → logic/data → low-level signals → authoring. */
-export const CATEGORIES = ['Shapes', 'Move', 'Toolpaths', 'Transforms', 'Spindle & Feed', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Wizard UI', 'Wizard Form', 'CAM Pendant', 'Mark Up'];
+export const CATEGORIES = ['Shapes', 'Move', 'Toolpaths', 'Transforms', 'Spindle & Feed', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Wizard Inputs', 'Wizard Layout', 'Wizard Previews', 'Wizard Shapes', 'CAM Pendant', 'Mark Up'];
 
 /** type → definition, for emit dispatch and field lookup. (Reporters — Variable/Math — are in PALETTE too;
  *  dragging one drops it into a value socket rather than onto the canvas.) */

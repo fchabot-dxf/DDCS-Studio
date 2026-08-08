@@ -5467,6 +5467,13 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* Outline the toolbox/sidebar's canvas-facing edge with the SAME theme-aware token as the handle's border (--line),
    so the sidebar reads as an outlined panel too (human t211). box-sizing keeps Blockly's measured width stable. */
 #blocks-app .blk-ws .blocklyToolbox { border-right:1px solid var(--line); box-sizing:border-box; }
+/* t1623 — the BLACK INNER-ELBOW marks (user-circled: under the last formfield row, under 3D-SIM's mouth, at
+   Execution's corner). Cause traced to the geras renderer, not our CSS: geras draws every block's path a second
+   time, offset (1,1), in a dark shade (.blocklyPathDark) BEHIND the main path — and at a statement mouth's INSIDE
+   corner that dark arc pokes out past the main path as a black wedge. Verified live: zeroing DARK_PATH_OFFSET and
+   hiding the dark path both clear the wedge; the light highlight path is untouched, so blocks keep their bevel
+   edge without the black elbow. One line, all Blockly surfaces. */
+.blocklyPathDark { display: none; }
 /* open: park as a close tab on the toolbox's right edge, vertically centred (matches the closed "Blocks" tab) */
 #blocks-app.tools-open .blk-tools-handle {
     /* offset 1px LEFT so the handle (same --panel2 background) overlaps + HIDES the toolbox's right-edge outline where

@@ -18008,3 +18008,82 @@ blocks-live-form (the devMode Update path this touched), fork-parity-1593 — 29
 the round-trip spec pins date = def.savedAt, not that the two gestures refresh it; candidate small assert
 for a future act. Full suite not re-run this turn (the fix is three lines in the stamped seam; the fast
 tier above IS the blast radius) — the advisor's release gate re-run will be the counted proof.
+
+
+## t1623 — the palette BY ROLE (four groups, the empty one kept) + the black inner-elbow fix (turn 1623)
+
+**The dispatch (the t1572 ruling, held since):** four groups on the EXISTING `category` axis — Wizard
+Inputs / Wizard Layout / Wizard Previews / Wizard Shapes — Shapes DECLARED AND EMPTY, skipped by the
+general empty-group rule, auto-appearing with its first member; role on the block def, read by the
+palette; the t1570 no-vanish invariant across the regroup. Bundled: the user-circled black inner-elbow
+marks.
+
+### The regroup
+
+Pure re-declaration — the palette machinery needed NOTHING new: `buildToolbox` already skips empty
+groups generally (`CATEGORIES.filter((c) => byCat[c])`), so "declared and empty" was one CATEGORIES
+entry. The ruling's 32 named blocks land exactly as ruled (~15 Inputs / 11 Layout / 6 Previews — counts
+match the t1572 table). **Four blocks the ruling did not name, homed by role and REPORTED as the residue
+call:** `param_group` + `param_field` (the old 'Wizard Form' pair) → **Inputs** — they are form-input
+declarations, and the t1105 "form family is a separate colour" distinction dissolves BY the role axis;
+`opunit` → **Layout** (a structural boundary; palette-hidden by design, so only its colour shows);
+the `structctl` set → **Inputs** (per-param structural controls). Both old categories ('Wizard UI',
+'Wizard Form') are GONE from the axis — replaced, not kept beside.
+
+**Colours ([[mind-block-color]], one per family):** Inputs = the form family's indigo #6366f1 (the pair
+keeps its exact hue; every input joins it); Layout = the historical authoring fuchsia #d946ef
+(user_root/section/splits/tabs unchanged); Previews = gold #eab308 (new family, free hue); Shapes = deep
+blue #2563eb, kin to the geometry Shapes group it will feed — declared now, invisible while empty.
+
+### The elbow (traced, not guessed)
+
+Reproduced at 2.4× on the wrapper mouths: the black wedge is the geras renderer's **dark path** —
+geras draws every block's outline a second time, offset (1,1), dark, BEHIND the main path
+(`.blocklyPathDark`, `DARK_PATH_OFFSET: 1` in the live constant provider), and at a statement mouth's
+INSIDE corner that dark arc pokes past the main path as the black elbow. NOT our CSS (we had no Blockly
+path styling at all — checked first, as dispatched). Verified by live experiment before fixing: hiding
+the dark path and zeroing DARK_PATH_OFFSET both clear the wedge; the light highlight path is untouched.
+Fix = ONE CSS line (`.blocklyPathDark { display:none }`) with the trace in the comment — chosen over a
+renderer-constants override because it needs no renderer subclass and reads as what it is. Honest
+residual: the whole canvas loses the 1px dark bevel everywhere (the light bevel stays) — a slightly
+flatter geras, uniform, no black marks. A faint canvas-coloured hairline at the elbow (the child's
+rounded corner vs the mouth's inside arc) remains in both before and after — it is geometry, reads as a
+seam only at high zoom, and was not the circled defect.
+
+### Verification
+
+- **palette-by-role-1623.spec.js (4 tests), all four RED pre-change ON THEIR CLAIMS** (worktree at
+  b861cc73 served on 3211; the app boots there — these are assertion reds, not boot timeouts):
+  membership (toolbox groups == registry-derived sets, both old names absent), AUTO-APPEAR (a throwaway
+  def declaring 'Wizard Shapes' renders the group WITH the block in it — not the catch-all — and
+  removing it vanishes the group; this is what stops the empty declaration rotting), one-colour-per-role
+  (param_field/param_group == formfield; layout ≠ inputs ≠ previews), and the elbow fix at the DOM
+  (dark paths exist AND all display:none).
+- **The t1570 no-vanish invariant green across the regroup** — reachable set identical both directions,
+  synthetic-unlisted lands in the catch-all. palette-categories / palette-search /
+  palette-sufficient-1591 / ui-tree-unwired-1561 / blocks-render / cam-block-native-params-s5 (the
+  colour asserts: pg==pf, ≠cam, ≠opunit — all survive the new colours) — 22/23 first run; the one red
+  was MY spec's anchor list wrongly including palette-hidden `opunit`, fixed in the spec (the toolbox↔
+  registry equality had already passed — the anti-drift held; only my prose list was wrong). 4/4 after.
+- **Screenshots:** t1623-palette-by-role.png (sidebar: three populated groups + colour chips, no Wizard
+  Shapes; the Inputs flyout open, all indigo) · t1623-elbow-before.png / t1623-elbow-after.png (the same
+  mouth corner at 2.4×, wedge gone).
+- **Full suite: 20 failed / 2396 passed / 6 skipped e2e + 1 node (18.8 min)** vs t1619's 20/2390/6 + 1:
+  +4 passed = exactly this act's tests, +2 churn heals, count unchanged. GONE — import-safety-1219:62
+  (churned green) and **persistence-file-indicator:116 — the t1621 blocker fix CONFIRMED in a counted
+  run**. NEW — blocks-rotary-rig:14 + wizard-face-1599:119, both CHASED: 5/5 green isolated serialized
+  (contention churn, not this act — neither touches the category axis). The rest are the standing set
+  (the five deterministic emit-shaped members proven pre-change in t1619, the cam-s52/s53 pair,
+  middle-superset:35, the mouse/hover class, update-check x2). None of this act's tests red; node red =
+  the standing surfacing-as-data member.
+
+### What this does NOT cover
+
+1. The four unnamed homings (param_group/param_field/opunit/structctl → Inputs/Layout) are MY residue
+   call under the ruling's silence — named here for a cheap amend if the advisor rules otherwise.
+2. The dark-bevel loss is global (uniform, light bevel kept) — if the flatter look is unwanted, the
+   alternative is a geras constants subclass; the trace comment names it.
+3. The remaining hairline seam at inner corners (canvas-coloured, high-zoom only) — geometry, untouched.
+4. Colour choices for Previews/Shapes (gold/deep blue) are aesthetic candidates — data, trivially
+   revisable in theme.js CAT.
+5. Desktop viewport only; the exe shell was not run.

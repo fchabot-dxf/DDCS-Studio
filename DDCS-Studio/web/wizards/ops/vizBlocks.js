@@ -3,21 +3,21 @@
  * Declares 3D toolpath simulation, 2D interactive feature canvas, and G-code output boxes.
  */
 export const sim3dBoxBlock = {
-    type: 'sim_3d_box', label: '3D toolpath box', category: 'Wizard UI',
+    type: 'sim_3d_box', label: '3D toolpath box', category: 'Wizard Previews',
     defaults: { minHeight: '300px', showControls: true },
     fields: ['minHeight', 'showControls'],
     emit: () => [],
 };
 
 export const layout2dCanvasBlock = {
-    type: 'layout_2d_canvas', label: '2D feature canvas', category: 'Wizard UI',
+    type: 'layout_2d_canvas', label: '2D feature canvas', category: 'Wizard Layout',
     defaults: { minHeight: '250px', showRuler: true },
     fields: ['minHeight', 'showRuler'],
     emit: () => [],
 };
 
 export const codePreviewPanelBlock = {
-    type: 'code_preview_panel', label: 'G-code preview', category: 'Wizard UI',
+    type: 'code_preview_panel', label: 'G-code preview', category: 'Wizard Previews',
     defaults: { title: 'Code Preview', maxHeight: '150px' },
     fields: ['title', 'maxHeight'],
     emit: () => [],

@@ -12,9 +12,14 @@ const CAT = {
   shapes: '#3b82f6', move: '#14b8a6', toolpaths: '#22c55e', transforms: '#a855f7',
   // machine state/setup, split into granular semantic groups (each block declares its own category)
   spindlefeed: '#f97316', coordinates: '#0ea5e9', program: '#64748b', probing: '#e11d48', signals: '#8b5cf6',
-  control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', wizardui: '#d946ef', markup: '#94a3b8',
-  campendant: '#ec4899',   // block-native-params: the CAM pendant-field family (cam_table/cam_field) — a warm pink, ONE family colour, distinct from the fuchsia Wizard-UI authoring blocks (opunit/section/formfield)
-  wizardform: '#6366f1',   // block-native-params S5.1: the FORM-field family (param_group/param_field) — indigo, distinct from the pendant pink AND the Wizard-UI fuchsia
+  control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', markup: '#94a3b8',
+  campendant: '#ec4899',   // block-native-params: the CAM pendant-field family (cam_table/cam_field) — a warm pink, ONE family colour, distinct from the wizard-authoring groups
+  // t1623 — the palette BY ROLE ([[mind-block-color]]: one colour per family, category-consistent). INPUTS inherit
+  // the form family's indigo (param_group/param_field keep their exact hue; every input declaration joins them);
+  // LAYOUT keeps the historical authoring fuchsia (user_root/section/splits/tabs unchanged); PREVIEWS get gold (the
+  // lens — free of the amber control group's darker orange); SHAPES a deep blue, kin to the geometry Shapes group
+  // it will feed — declared now, invisible while the group is empty (empty groups skip at render).
+  wizardinputs: '#6366f1', wizardlayout: '#d946ef', wizardpreviews: '#eab308', wizardshapes: '#2563eb',
   // t1315 — THE LATHE FAMILY'S ONE COLOUR ([[mind-block-color]]): a warm amber-bronze, the colour of turned brass.
   // Legible on both the light and dark canvases, and taken by no other family — the nearest are the orange
   // spindle/feed group and the amber control group, and it sits clear of both so a turning op never reads as either.

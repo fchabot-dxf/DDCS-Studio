@@ -21,8 +21,8 @@ export const structCtlType = (param) => 'sc_' + String(param).toLowerCase();
 // (structCtl.js deliberately does NOT import corner data — the layering), with corner-structctl.spec asserting it
 // matches, so the string can't drift (the one-source-via-assertion guarantee, same as label/options). bridge.jsonDef
 // renders it as the block tooltip; a def with no help keeps the default "<label> (<category>)".
-const bool = (param, label, dflt, help) => ({ type: structCtlType(param), label, help, category: 'Wizard UI', kind: 'structctl', structParam: param, defaults: { value: !!dflt }, fields: ['value'], _options: null, emit: () => [] });
-const enu = (param, label, dflt, options, help) => ({ type: structCtlType(param), label, help, category: 'Wizard UI', kind: 'structctl', structParam: param, defaults: { value: dflt }, fields: ['value'], _options: options, emit: () => [] });
+const bool = (param, label, dflt, help) => ({ type: structCtlType(param), label, help, category: 'Wizard Inputs', kind: 'structctl', structParam: param, defaults: { value: !!dflt }, fields: ['value'], _options: null, emit: () => [] });
+const enu = (param, label, dflt, options, help) => ({ type: structCtlType(param), label, help, category: 'Wizard Inputs', kind: 'structctl', structParam: param, defaults: { value: dflt }, fields: ['value'], _options: options, emit: () => [] });
 
 /** One control block per struct binding — MUST match CORNER_STRUCT_BINDINGS (param/options/label/help, asserted). Bool → checkbox; enum → dropdown. */
 export const STRUCT_CTL_BLOCKS = [

@@ -3,14 +3,14 @@
  * right in the stack. Emits NOTHING — it's metadata read at SAVE/RUNTIME time.
  */
 export const layoutBlock = {
-    type: 'layout', label: 'layout', category: 'Wizard UI',
+    type: 'layout', label: 'layout', category: 'Wizard Layout',
     defaults: { kind: 'none' },
     fields: ['kind'],
     emit: () => [],   // metadata only — produces no G-code
 };
 
 export const splitHorizontalBlock = {
-    type: 'split_horizontal', label: 'split horizontal', category: 'Wizard UI',
+    type: 'split_horizontal', label: 'split horizontal', category: 'Wizard Layout',
     defaults: { ratio: '1:1' },
     fields: ['ratio'],
     selects: { ratio: [['1:1', '1:1'], ['2:1', '2:1'], ['1:2', '1:2']] },
@@ -19,7 +19,7 @@ export const splitHorizontalBlock = {
 };
 
 export const splitVerticalBlock = {
-    type: 'split_vertical', label: 'split vertical', category: 'Wizard UI',
+    type: 'split_vertical', label: 'split vertical', category: 'Wizard Layout',
     defaults: { ratio: '1:1' },
     fields: ['ratio'],
     selects: { ratio: [['1:1', '1:1'], ['2:1', '2:1'], ['1:2', '1:2']] },

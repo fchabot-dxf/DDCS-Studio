@@ -12,7 +12,7 @@
  * the FORM RENDERER consuming these (ui/formWidgets.js — the widget registry) is a later slice.
  */
 export const paramFieldBlock = {
-    type: 'param_field', label: 'form field', category: 'Wizard Form', kind: 'param_field',
+    type: 'param_field', label: 'form field', category: 'Wizard Inputs', kind: 'param_field',
     help: 'One wizard FORM field for a value binding: the form label, widget, type, default, and (for a number widget) the min/max/step/units. `param` is the def value-binding it declares (read-only routing key). Metadata only — emits no G-code.',
     defaults: {
         param: '',        // which def value-binding this row is (matches binding.param) — the ROUTING KEY, read-only chip

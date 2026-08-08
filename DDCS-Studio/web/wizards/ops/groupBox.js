@@ -3,7 +3,7 @@
  * Titled visual card container block with optional collapse capability.
  */
 export const groupBoxBlock = {
-    type: 'group_box', label: 'group box', category: 'Wizard UI',
+    type: 'group_box', label: 'group box', category: 'Wizard Layout',
     defaults: { title: 'Group', collapsible: true, collapsedDefault: false },
     fields: ['title', 'collapsible', 'collapsedDefault'],
     mouths: [{ name: 'DO', label: 'Group Content' }],
