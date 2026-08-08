@@ -18174,3 +18174,97 @@ so a mock chrome has no seat left; the real modal's own responsive layout answer
 4. The container-query reflow question is answered by the real modal's own responsive layout, not
    demonstrated at a dragged-narrow width in a spec.
 5. Desktop viewport only; the exe shell was not run.
+
+
+## t1627 — the FOUR SHAPE PRIMITIVES: Wizard Shapes gets its contents (turn 1627)
+
+**The dispatch:** survey featureCanvas + the shipped 2D previews FIRST; the four should COVER what
+exists; the declaration designed as if a MODAL will emit it (the user's standing ruling); a genuine
+granularity fork = STOP with options; an obvious set = build.
+
+### The survey, and why no stop was needed
+
+The FeatureCanvas's item vocabulary IS four kinds and has been all along: `hole` / `line` / `circle` /
+`rect` (featureCanvas.js draws exactly these; `paths` is a separate seam). The shipped previews produce
+them two ways today — panelTypes' role-name SNIFFS (x/y/w/h→rect, x/y/dia→circle, the slot's three
+lines, the parallelogram's four) and the `previewGeometry` CODE hook (t708 — text's letters). Both
+dispatch-named forks answered OBJECTIVELY by the survey: a parametric-path primitive would duplicate the
+previewGeometry seam (which stays the code escape hatch); transforms don't exist in the item model
+(placement is the emit's placeShift machinery) and inventing them would be new engine for no consumer.
+The four fixed shapes ARE the canvas's own model → built, as the dispatch's "obvious set" arm directs.
+
+### The format (a modal could emit it without translation)
+
+One block per shape, flat WORK-coordinate fields, each a number OR an expression over the wizard's
+params ('width / 2'), evaluated per render by the ONE evaluator (ops/expr.js; params = the caller-
+populated scope, the t1566 rule). `shape_rect{x,y,w,h}` · `shape_circle{cx,cy,dia}` (dia → r at render —
+forms speak diameter) · `shape_line{x1,y1,x2,y2}` · `shape_marker{x,y}` (the drill-dot). An unresolved
+field skips ITS shape only. `SHAPE_2D_TYPES` is the ONE membership set (vizBlocks.js).
+
+### What landed
+
+- Four defs, `category: 'Wizard Shapes'` — the t1623 empty declaration auto-appeared exactly as pinned.
+- `layout_2d_canvas` grew a DO mouth via a NEW declared kind `uibox` (a UI container that HOLDS
+  declarations, never emits children) — the t1595 guard precedent: added to bridge's mouth row +
+  BOTH stackBridge round-trip directions. First cut used the dead `mouths:` field (nothing reads it —
+  groupBox's is dead too, noted below) and the child was DISCARDED exactly as t1595 documents; the
+  round-trip probe caught it before any spec existed.
+- CONSUMPTION in `layoutSpecFromOp` (the ONE 2D spec builder every face routes through): flattenBlocks
+  over the template (mouth-agnostic), evaluate, push as canvas items behind features/handles.
+- ui-tree walker: shapes are a CONSUMED type (their rendering IS the canvas) — a skip branch above the
+  t1561 placeholder, so they neither placeholder nor flatten.
+- **Two opener fixes found by driving the hand-built path** (t1625's openLiveAsModal, this act's verify
+  vehicle): a builder-less derived def now travels AS 'group' (userOpView.update refuses unknown
+  builders — the _openGroupForEdit route is the sanctioned no-registry path), and a def with no `panel`
+  reads the stack's own panel block (the save path's exact read). Without these, a hand-built wizard's
+  preview opened empty — pre-existing gaps in a two-turn-old feature, surfaced by the first real use.
+
+### Verification
+
+- **wizard-shapes-1627.spec.js (3):** DECLARED→DRAWN (mouth round-trips all four through the Blockly
+  canvas — the t1595 discard trap guarded; layoutSpecFromOp's items match the declaration verbatim,
+  dia→r included; the REAL modal draws them), EXPRESSIONS over live params THROUGH THE REAL REGISTERED
+  PATH (formfield+assign authoring → binding derived at registration; width 80 → cx 40/r 10, width 120 →
+  cx 60/r 15 — the same declaration re-evaluates), and the unresolved-field skip (bad rect skipped, its
+  healthy sibling draws). **All red pre-change** (worktree rig) **plus both edited t1623 claims red on
+  their claims** (membership + the inverted empty-skip pin); the colour + elbow tests correctly stayed
+  green (unchanged claims).
+- **The t1623 auto-appear pin is FULFILLED and repointed:** membership now asserts the four; the
+  empty-skip MECHANISM is pinned by INVERSION (pull the four → the group vanishes; restore → returns).
+- **Fast tier: 14 files serialized — 35/36**, incl. fork-parity-1593 + guard-roundtrip-1595 (the
+  bridge/stackBridge blast radius: corner's own template carries a layout_2d_canvas, now mouth-bearing —
+  parity held byte-identical). The 1: open-as-modal:98, which recurred ISOLATED — chased, not filed:
+  the t1625 spec's fixed 1500ms settle was tuned for a smaller canvas and corner GREW a mouth this turn
+  (the t1595 wait-class, relearned); replaced with the settle loop + an explicit visibility wait.
+  Post-fix: 6 of 7 serialized runs fully green; the residual single flake matches the documented
+  modal-boot contention class.
+- **Screenshots:** t1627-shapes-palette.png (Wizard Shapes auto-appeared, four blocks in the declared
+  deep blue) · t1627-shapes-modal.png (a hand-built wizard's declared rect/circle/line/marker drawn in
+  the REAL modal chrome, PREVIEW banner, CANCEL-only).
+- **Full suite: 20 failed / 2402 passed / 6 skipped e2e + 1 node (19.0 min)** vs t1625's 22/2397/6 + 1:
+  +3 total = exactly this act's tests, and the count came DOWN two. GONE — open-as-modal:44/:98 +
+  wizard-manager-1617:344 (t1625's chased modal-boot churn, healed — :98 also by this turn's settle-loop
+  fix) and blocks-live-form:168 (the recorded churn member). NEW — palette-by-role-1623:116 (MY elbow
+  test) + enum-options-codec-1607:49, both CHASED: 7/7 green isolated serialized TWICE — the documented
+  modal-boot / wizard-view contention classes. The standing deterministic members are unchanged; node
+  red = the standing surfacing-as-data member. None of this act's tests red in isolation.
+- **The RESUME dispatch (turn 1628, epoch 1) was absorbed MID-FLIGHT:** the advisor's stall timer fired
+  two hours into this heavy debugging turn and re-passed with assess-the-tree instructions; the seat was
+  the same one, actively iterating (the uncommitted tree was this turn's own verified work). Epoch 1
+  adopted, turn re-marked, RESUMED — nothing restarted, nothing lost. Pacing note for the advisor: a
+  debugging-heavy act can look stalled from outside; the WORK-LOG trail is the liveness signal.
+
+### What this does NOT cover
+
+1. Shape expressions are typed as TEXT on the canvas (string fields); a typo lands as skip-the-shape,
+   not a named lint — the t1566 lint hook for shape fields is a candidate follow-up.
+2. The DRAWER's tree-face 2D canvas pane is not live-wired (pre-existing: `userVizContainer_tree` has no
+   renderLayout2D caller) — shapes show in the MODAL (and every registered wizard's panel); the drawer
+   face renders the pane chrome only.
+3. A live UNSAVED formfield row doesn't render in the drawer/modal form until saved (pre-existing:
+   formBindings needs the registered binding for wiring) — the expression proof goes through the real
+   save path for exactly that reason.
+4. `groupBox`'s dead `mouths:` field (nothing reads it; its ui-tree branch reads children the canvas
+   never round-trips) — a pre-existing latent gap, named not fixed.
+5. Handles on declared shapes (drag-to-edit an expression is not meaningful); shapes are draw-only.
+6. Desktop viewport only; the exe shell was not run.

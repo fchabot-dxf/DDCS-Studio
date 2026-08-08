@@ -25,7 +25,17 @@ const customizeCorner = async (page) => {
         const op = (window.ddcsGetBlockProgram() || []).find((x) => x && x.type === 'op');
         return !!(op && (op.children || []).length);
     }, null, { timeout: 60000 });
-    await page.waitForTimeout(1500);
+    // t1627 — the SETTLE loop, not a fixed sleep (the t1595 lesson, relearned here the day corner's canvas grew a
+    // mouth): wait until the block count stops moving, then until the door is actually visible. A 1500ms sleep was
+    // tuned for a smaller canvas and left the click racing the tail of corner's render.
+    let last = -1;
+    for (let i = 0; i < 120; i++) {
+        const n = await page.evaluate(() => window.__blkws.getAllBlocks().length);
+        if (n === last && n > 0) break;
+        last = n;
+        await page.waitForTimeout(250);
+    }
+    await expect(page.locator('#blkOpenModal')).toBeVisible({ timeout: 30000 });
 };
 
 const snapshot = (page) => page.evaluate(async () => {

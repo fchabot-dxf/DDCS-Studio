@@ -26,6 +26,7 @@ import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t
 import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUSE the accordion motion engine (theme drawer tokens), not a duplicate
 import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE mm<->inch conversion leaf (shared with the tool-library editor + catalog picker)
 import { evalExpr } from '../wizards/ops/expr.js';   // t1613 — the ONE expression evaluator (wizard params are now a caller-populated scope, as its header planned)
+import { SHAPE_2D_TYPES } from '../wizards/ops/vizBlocks.js';   // t1627 — shape declarations render on the 2D CANVAS (layoutSpecFromOp), not as form rows
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -1372,6 +1373,10 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
                     traverse(pageChildren, pane);
                 });
                 if (panes[activeIdx]) { panes[activeIdx].btn.style.color = 'var(--text-main,inherit)'; panes[activeIdx].btn.style.background = 'var(--bg,transparent)'; }
+            } else if (SHAPE_2D_TYPES.has(node.type)) {
+                // t1627 — a declared 2D shape is WIRED, and its rendering IS the feature canvas (layoutSpecFromOp
+                // consumes it from the template). It has no form-row body, so the tree face renders nothing here —
+                // this is a consumed type, not an unwired one, and must not wear the t1561 placeholder.
             } else {
                 // t1561 — REFUSE, don't silently flatten. A block type this function does not (yet) know how to
                 // render used to fall through here and traverse straight into the PARENT container — the block's

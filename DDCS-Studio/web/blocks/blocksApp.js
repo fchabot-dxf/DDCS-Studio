@@ -459,6 +459,18 @@ async function buildWorkspace() {
     // template blocks in place (`_group` et al.) — through the shared reference that rewrote the canvas stack.
     // Measured, not guessed: the round-trip spec's byte-compare caught +16KB of annotations on close.
     const modalDef = { ...def, template: JSON.parse(JSON.stringify(userRoot ? [userRoot] : (def.template || []))) };
+    // t1627 — a HAND-BUILT stack's derived def has an opType with no registered builder, and userOpView.update()
+    // deliberately refuses those (`!isGroup && !builderOf(opType)` — the guard that keeps a stale def from running
+    // a wrong builder). The group route is the sanctioned no-registry path (deriveGroupDef defs run instantiate on
+    // the def directly), so a builder-less preview def travels AS a group — same as _openGroupForEdit's own defs.
+    const { builderOf } = await import('./opBuilders.js');
+    if (!modalDef.opType || !builderOf(modalDef.opType)) modalDef.opType = 'group';
+    // …and a hand-built def carries no `panel` either (only the save dialog / registry set it) — read the stack's
+    // own panel block, the SAME read the save path commits (blocks always win). Absent → the form3d default stands.
+    if (!modalDef.panel) {
+        const pb = flattenBlocks(modalDef.template || []).find((x) => x && x.type === 'panel');
+        if (pb && pb.params && pb.params.panel) modalDef.panel = pb.params.panel;
+    }
     // The #wizard overlay is position:fixed but was born INSIDE #studio-app, so from the Blocks tab it opened
     // invisibly behind a display:none ancestor. Every other modal in this app (wsm, app-dialog, library) lives on
     // document.body for exactly this reason — adopt it there once, lazily; fixed positioning renders identically

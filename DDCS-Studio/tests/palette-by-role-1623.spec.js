@@ -57,12 +57,17 @@ test('FOUR role groups on the category axis — three populated (membership from
     // (opunit also declares Wizard Layout but is palette-hidden by design — created programmatically at fork/load-wrap)
     expect(r.layout).toEqual(expect.arrayContaining(['user_root', 'section', 'group_box', 'split_horizontal', 'layoutwidget', 'layout_2d_canvas']));
     expect(r.previews).toEqual(expect.arrayContaining(['sim', 'sim_3d_box', 'simstart', 'panel', 'code_preview_panel', 'form_diagram']));
-    // Shapes: nothing declares it, so it must NOT render — the general empty-group skip, not a special case
-    expect(r.byCat.shapes, 'no def declares Wizard Shapes yet').toBeUndefined();
-    expect(r.groups, 'the declared-but-empty group is skipped at render').not.toContain('Wizard Shapes');
+    // t1627 — Wizard Shapes has its CONTENTS now (the four primitives): the group renders, membership from the registry
+    expect(r.byCat.shapes, 'the four shape primitives declare the group').toEqual(['shape_circle', 'shape_line', 'shape_marker', 'shape_rect']);
+    expect(r.groups, 'the once-empty group now renders — the auto-appear this spec was holding the door for').toContain('Wizard Shapes');
 });
 
-test('AUTO-APPEAR — the first def declaring Wizard Shapes makes the group render; removing it makes it vanish', async ({ page }) => {
+test('THE EMPTY-GROUP SKIP, pinned by INVERSION — remove every member and the group vanishes; restore and it returns', async ({ page }) => {
+    // t1627 — the original auto-appear claim ("the first declaring def makes the empty group render") is FULFILLED:
+    // the four shipped primitives populate Wizard Shapes now, so "empty → absent" is no longer this registry's state.
+    // The MECHANISM it pinned (a declared category with no members renders nothing — generally, not specially) is
+    // still the thing that must not rot, so the same test runs INVERTED: strip the four out, the group goes; put
+    // them back, it returns with its members in place.
     await boot(page);
     const r = await page.evaluate(async () => {
         const OPS = await import('/wizards/ops/index.js');
@@ -76,31 +81,20 @@ test('AUTO-APPEAR — the first def declaring Wizard Shapes makes the group rend
             })(tb.contents);
             return out;
         };
-        const inGroup = (tb, group, type) => {
-            let found = false;
-            (function walk(node, parent) {
-                if (Array.isArray(node)) return node.forEach((n) => walk(n, parent));
-                if (node && node.kind === 'block' && node.type === type && parent === group) found = true;
-                if (node && node.contents) walk(node.contents, node.name || parent);
-            })(tb.contents, null);
-            return found;
-        };
-        const SYNTH = { type: '__shape_pilot__', label: 'shape pilot', category: 'Wizard Shapes', kind: 'leaf', defaults: {}, fields: [], emit: () => [] };
         const before = names(BR.buildToolbox([]));
-        OPS.PALETTE.push(SYNTH);
-        let withShape, landsInShapes;
-        try {
-            const tb = BR.buildToolbox([]);
-            withShape = names(tb);
-            landsInShapes = inGroup(tb, 'Wizard Shapes', SYNTH.type);
-        } finally { OPS.PALETTE.splice(OPS.PALETTE.indexOf(SYNTH), 1); }
-        const after = names(BR.buildToolbox([]));
-        return { before, withShape, landsInShapes, after, uncat: BR.UNCATEGORISED };
+        const pulled = [];
+        for (let i = OPS.PALETTE.length - 1; i >= 0; i--) {
+            if (OPS.PALETTE[i] && OPS.PALETTE[i].category === 'Wizard Shapes') pulled.unshift(...OPS.PALETTE.splice(i, 1));
+        }
+        let emptied;
+        try { emptied = names(BR.buildToolbox([])); } finally { OPS.PALETTE.push(...pulled); }
+        const restored = names(BR.buildToolbox([]));
+        return { before, emptied, restored, pulledCount: pulled.length };
     });
-    expect(r.before, 'empty → absent').not.toContain('Wizard Shapes');
-    expect(r.withShape, 'the FIRST declaring def makes the group appear, by itself').toContain('Wizard Shapes');
-    expect(r.landsInShapes, 'and the block lands IN it, not in the catch-all — the declaration is live, not rotting').toBe(true);
-    expect(r.after, 'removing the def removes the group again').not.toContain('Wizard Shapes');
+    expect(r.pulledCount, 'the four shipped primitives were the members pulled').toBe(4);
+    expect(r.before, 'populated → present').toContain('Wizard Shapes');
+    expect(r.emptied, 'no members → the declared group is skipped at render (the general rule, still alive)').not.toContain('Wizard Shapes');
+    expect(r.restored, 'members back → the group returns').toContain('Wizard Shapes');
 });
 
 test('ONE COLOUR PER ROLE — the inputs family shares a colour; layout keeps the authoring fuchsia; they differ', async ({ page }) => {

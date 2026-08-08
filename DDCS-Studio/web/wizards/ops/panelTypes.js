@@ -17,7 +17,9 @@ import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js'; 
 import { partZeroShift } from '../../viz/sceneFrame.js';   // t586 PREVIEW-PARITY E2c — THE ONE frame source: the layout stock rides part-zero (the stock PIN) exactly like the 3D, no local WCS math
 import { BLOCKS } from './index.js';   // t708 — the block-def registry (type → def), to resolve an atom's DECLARED previewGeometry
 import { builderOf } from '../../blocks/opBuilders.js';   // t708 — build the op's stack to find its geometry atom + its live params
-import { getUserPreviewGeometry } from '../../blocks/userOps.js';   // t712 — a twin's DECLARED preview-geometry hook (slot/contour per-feature handles)
+import { getUserPreviewGeometry, flattenBlocks } from '../../blocks/userOps.js';   // t712 — a twin's DECLARED preview-geometry hook (slot/contour per-feature handles); t1627 — flattenBlocks: collect declared 2D shapes from the template
+import { SHAPE_2D_TYPES } from './vizBlocks.js';   // t1627 — the ONE "is this a 2D shape declaration" set
+import { evalExpr } from './expr.js';   // t1627 — shape fields take numbers OR expressions over the wizard's params (the ONE evaluator)
 import { placeShiftOfStack } from '../../blocks/blockEmitter.js';
 import { latheLayoutSpec } from '../../viz/latheProfileCanvas.js';   // t1273 — a LATHE op draws its half-profile here; the mill XY-stock layout has nothing to say about a bar on centres   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
 
@@ -210,6 +212,39 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // render + the probe-stop (ONE source, no hardcoded inset). Only inside cavities draw; an outer boss/solid has none →
     // unchanged for corner/edge. Drawn first (behind the handles/glyphs).
     try { items.push(...(workpieceBackdrop(getWorkpiece(), { ox: stock.ox || 0, oy: stock.oy || 0 }).items || [])); } catch (_) { /* no workpiece → no cavity */ }
+    /**
+     * ── t1627 — DECLARED SHAPE PRIMITIVES → canvas items (CONSUMED from the declaration, never re-derived) ─────
+     * The template's shape blocks (Wizard Shapes: rect/circle/line/marker — wherever they sit, mouth-agnostic:
+     * flattenBlocks walks every mouth) draw as the canvas's own item kinds. Each field is a number OR an
+     * expression over the LIVE params (the ONE evaluator, params as scope — the t1566 caller-populated rule);
+     * a field that resolves to nothing skips ITS shape only — an unfinished declaration never breaks the canvas.
+     * Pushed here, early: declared shapes sit BEHIND the role-derived features and every handle, like the backdrop.
+     */
+    {
+        const num1627 = (v) => {
+            if (v == null || v === '') return NaN;
+            const n = Number(v);
+            if (Number.isFinite(n)) return n;
+            try { const r = evalExpr(String(v), params || {}); return Number.isFinite(r) ? r : NaN; } catch (_) { return NaN; }
+        };
+        const shapes = (def && Array.isArray(def.template)) ? flattenBlocks(def.template).filter((b) => b && SHAPE_2D_TYPES.has(b.type)) : [];
+        for (const b of shapes) {
+            const P = b.params || {}, n = (k) => num1627(P[k]);
+            if (b.type === 'shape_rect') {
+                const x = n('x'), y = n('y'), w = n('w'), h = n('h');
+                if ([x, y, w, h].every(Number.isFinite)) items.push({ kind: 'rect', x, y, w, h });
+            } else if (b.type === 'shape_circle') {
+                const cx = n('cx'), cy = n('cy'), dia = n('dia');
+                if ([cx, cy, dia].every(Number.isFinite)) items.push({ kind: 'circle', cx, cy, r: dia / 2 });
+            } else if (b.type === 'shape_line') {
+                const x1 = n('x1'), y1 = n('y1'), x2 = n('x2'), y2 = n('y2');
+                if ([x1, y1, x2, y2].every(Number.isFinite)) items.push({ kind: 'line', x1, y1, x2, y2 });
+            } else if (b.type === 'shape_marker') {
+                const x = n('x'), y = n('y');
+                if ([x, y].every(Number.isFinite)) items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // the drill-pattern dot size (panelTypes' own convention)
+            }
+        }
+    }
     for (const gid in groups) {
         // ③ — a `when`-gated group (e.g. corner's `start` #21/#22, gated on probeZFirst) renders its handle ONLY when the
         // guard passes: its socket is pruned away in the other state, so a handle there would be dead / write a stale param.
