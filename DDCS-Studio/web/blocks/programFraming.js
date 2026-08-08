@@ -5,7 +5,7 @@
  * Lives here (not in ops/program.js) because it needs newBlock from blockModel, which would cycle through
  * ops/index back into ops/program.
  */
-import { newBlock } from './blockEmitter.js';
+import { newBlock, absorbingChild } from './blockEmitter.js';
 import { num } from '../wizards/ops/util.js';
 
 /** Program Start from wizard params: spindle (rpm/dir/spin-up) + clearance. */
@@ -56,6 +56,12 @@ export function makeSkim(params = {}, children) {
     const b = newBlock('skim');
     b.params = { clearance: num(params.clearance, 5) };
     b.children = Array.isArray(children) ? children : [children];
+    // t1620 — stamp zMode:'skim' on the absorbing child at BUILD time so uniquifyFlowLabels reserves its skimErr/skimOk
+    // labels. Without it those fall back to 93/94 (already taken by the row-walk) and the raster's post-plunge GOTO
+    // lands on the skim-OK label → the sweep never runs (the sim showed one plunge, no carve). Twin path is fixed the
+    // same way in dataOps/skimStructure.js swapPlaceToSkim.
+    const absorber = absorbingChild(b.children);
+    if (absorber) absorber.params = { ...(absorber.params || {}), zMode: 'skim' };
     return b;
 }
 

@@ -9,7 +9,7 @@
  * surfacingStack(skim) shape (parallel indices: skim sits where placeonstock did, wcs kept). Normal → a no-op (byte-
  * identical). Compose AFTER spindleHeadPatch. See wizards/ops/skim.js + data/rotateProgram.relativizeProgram.
  */
-import { newBlock } from '../blockEmitter.js';
+import { newBlock, absorbingChild } from '../blockEmitter.js';
 import { flattenBlocks } from '../userOps.js';
 import { num } from '../../wizards/ops/util.js';
 
@@ -23,6 +23,15 @@ function swapPlaceToSkim(nodes, clearance) {
             const skim = newBlock('skim');
             skim.params = { clearance };
             skim.children = b.children || [];   // keep the (socket-filled) cutting body — the skim atom relativizes it
+            // t1620 — STAMP zMode:'skim' ON THE ABSORBING CHILD NOW, at BUILD time. uniquifyFlowLabels (blockEmitter.js)
+            // runs BEFORE the emitter injects zMode onto the child (blockEmitter.js ~400), and surfaceraster.flowLabels
+            // only reserves skimErrLabel/skimOkLabel when it can SEE zMode==='skim'. Without this stamp those two fall
+            // back to the LABEL_DEFAULTS 93/94 — numbers the row-walk already took — so the raster's post-plunge GOTO
+            // lands on the skim-OK label and the sweep never runs (the sim showed one plunge and no carve). Stamping it
+            // here lets uniquify reserve 93/94 for the skim pair and push the row labels to 95+. The emitter still
+            // re-sets zMode at emit time (harmless); Normal mode never reaches here, so it stays byte-identical.
+            const absorber = absorbingChild(skim.children);
+            if (absorber) absorber.params = { ...(absorber.params || {}), zMode: 'skim' };
             nodes[i] = skim;
             return true;
         }

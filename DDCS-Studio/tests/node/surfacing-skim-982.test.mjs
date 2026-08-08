@@ -68,4 +68,12 @@ test('Skim is ABSOLUTE in a frame the machine supplies — no G91, a REAL lift, 
   // the G53 safe-Z retract is still there, still machine-frame, still after the body
   const g53 = lines.findIndex((l) => /\bG53\b/.test(l));
   expect(g53, 'the G53 retract is still the machine-frame footer').toBeGreaterThan(guardAt);
+
+  // t1620 — NO DUPLICATE FLOW LABELS. The render-nothing bug was skimErr/skimOk (93/94) COLLIDING with the row-walk
+  // labels: uniquifyFlowLabels could not see zMode:'skim' on the surfaceraster block yet, so the raster's post-plunge
+  // GOTO jumped to the skim-OK label and the sweep never ran (one plunge, no carve — the sim showed only the stock
+  // box). Every N-label must be emitted exactly once, or that ambiguity is back on both the sim and the controller.
+  const nLabels = lines.map((l) => (l.match(/^N(\d+)\b/) || [])[1]).filter(Boolean);
+  const dupes = [...new Set(nLabels.filter((n, i) => nLabels.indexOf(n) !== i))];
+  expect(dupes, 'no duplicate flow labels — the skim refusal must not reuse the row-walk numbers').toEqual([]);
 });
