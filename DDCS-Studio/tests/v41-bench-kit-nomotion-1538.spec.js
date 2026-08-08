@@ -63,6 +63,9 @@ test('every .nc file in the directory is accounted for — no untracked surprise
         // t1584 — S6g settles ATAN's ARGUMENT ORDER, which S5o could not: it used ATAN[1, 1], both args equal,
         // so 45 degrees comes out the same either way. Studio's quadrant convention is currently an assumption.
         'S6e_partial.nc', 'S6f_unclosed.nc', 'S6g_atan_order.nc',
+        // t1603 — the literal-divide-by-zero probe: the gate now passes a /0 on the asymmetric doctrine
+        // (no hardware verdict, so no tight guess); this is the probe that would give a tightening its hardware.
+        'S6h_divzero.nc',
     ].sort());
 });
 
