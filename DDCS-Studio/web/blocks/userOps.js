@@ -691,6 +691,42 @@ export function validateUserOp(def) {
         const blk = flat[b.blockIndex];
         if (!blk || !blk.params || !(b.key in blk.params)) errs.push(`param "${b.param}": binding (block ${b.blockIndex}.${b.key}) does not resolve in the template`);
     }
+    // ── t1593 — A FORK OF A GUARDED WIZARD IS REFUSED, AND THE REASON IS THE CANVAS ───────────────────────────────
+    //
+    // A `guard` holds ONE arm of a structural fork and is UNWRAPPED or DROPPED at build (whenGuard.pruneGuards) — it
+    // is what makes a structural toggle re-authorable data instead of JS-locked structure. But the Blockly bridge has
+    // no mouth for it: `isWrap` does not list 'guard', so recToJson writes a guard as a CHILDLESS block and every arm
+    // inside it is discarded on render. Measured on Corner: the Customize route hands the canvas its full 1157-block
+    // template and gets 98 blocks back, 371 guards down to 30 — and the reproject writes that loss into the program.
+    //
+    // So the copy carries ONE ARM. Its inherited form still offers the structural knobs (Corner's probe order, Homing's
+    // per-axis toggles), and they do nothing: the arms they would select are gone. Measured across the registry, the
+    // partition is EXACT — 18 guard-free twins fork with byte-identical emit, and all 14 guarded ones diverge, four by
+    // throwing at build and ten silently. That is the wrong half to be quiet about.
+    //
+    // ⚠ REFUSING IS THE SAFE DIRECTION, not the tidy one. Before this turn every fork was an empty shell, so nothing
+    // was lost that worked; a copy whose form now looks complete while its emit is a different program is worse than
+    // one that plainly had nothing. The save path already alerts on a thrown register ("Save failed: …"), so this
+    // refuses in a surface that exists rather than inventing one. It lifts the moment the canvas can render a guard.
+    // SCOPED to forks (`forkedFrom`) — the shipped seeds are untouched and byte-identical.
+    if (def && def.forkedFrom) {
+        const src = USER_DEFS.get(def.forkedFrom);
+        // COUNT THE ARMS, NOT THE GUARDS. A guard survives the canvas as a CHILDLESS block, so counting guards misses
+        // exactly the twins whose forks came back with every guard present and every arm inside them gone (measured:
+        // atc test/change/table, rotary clock, homing). What the arms ARE is the blocks a guard contains.
+        const armBlocks = (t) => flattenBlocks(t || []).reduce((n, b) => n + ((b && b.type === 'guard' && b.children) ? flattenBlocks(b.children).length : 0), 0);
+        const want = src ? armBlocks(src.template) : 0, got = armBlocks(def.template);
+        if (want && got < want) {
+            errs.push(`“${(src && src.label) || def.forkedFrom}” builds ${want} blocks across its structural fork arms and this copy `
+                + `came back with ${got} — the Blocks canvas cannot yet render a guard's contents, so the copy would keep only one `
+                + 'arm and emit a different program. Fork a wizard without structural options, or edit this one at its source.');
+        } else if (Array.isArray(def.bindingSpecs) && def.bindingSpecs.length) {
+            // The general backstop: a spec resolves BY IDENTITY against the stack it is asked about, so a copy whose
+            // template lacks a socket its specs name registers happily and THROWS the first time anything builds it.
+            try { instantiate(def, defaultParams(def)); }
+            catch (e) { errs.push(`this copy of “${def.forkedFrom}” cannot carry that wizard's parameters — ${(e && e.message) || e}`); }
+        }
+    }
     return errs;
 }
 
@@ -711,12 +747,16 @@ const LOCAL_HOOKS = new Map();   // opType → { hookName: fn } — survives del
 /** Which code hooks this app has for `opType` (empty = it is a stranger here). */
 export const localHooksFor = (opType) => Object.keys(LOCAL_HOOKS.get(opType) || {});
 
-/** Remember a def's own hooks; give a def that arrived without them the local ones. Returns the names re-attached. */
+/** Remember a def's own hooks; give a def that arrived without them the local ones. Returns the names re-attached.
+ *  t1593 — …and a FORK names its source (`forkedFrom`), so it gets the SOURCE's hooks. Same rule one step out:
+ *  behaviour from the app, data from the def. Without this the copy of a hooked twin loses its emit corrections —
+ *  corner's header comments freeze at the defaults, a guarded twin loses the derived guard keys its prune reads — and
+ *  the fork emits a DIFFERENT program from the wizard it was forked from, which is the one thing a fork must not do. */
 function reconcileCodeHooks(def) {
     const mine = {}, reattached = [];
     for (const k of OP_CODE_HOOKS) if (typeof def[k] === 'function') mine[k] = def[k];
     if (Object.keys(mine).length) { LOCAL_HOOKS.set(def.opType, { ...(LOCAL_HOOKS.get(def.opType) || {}), ...mine }); return reattached; }
-    const known = LOCAL_HOOKS.get(def.opType);
+    const known = LOCAL_HOOKS.get(def.opType) || (def.forkedFrom ? LOCAL_HOOKS.get(def.forkedFrom) : null);
     if (known) for (const k in known) { def[k] = known[k]; reattached.push(k); }
     return reattached;
 }
@@ -867,6 +907,80 @@ export function loadUserOps() {
     let n = 0;
     for (const def of listUserOps()) { try { registerUserOp(def); n++; } catch (_) { /* skip a corrupt def */ } }
     return n;
+}
+
+/**
+ * ── t1593 — A FORK INHERITS ITS SOURCE'S DECLARATIONS ──────────────────────────────────────────────────────────
+ *
+ * Saving a built-in as custom is the ONLY path by which a shipped wizard becomes editable, and it produced an EMPTY
+ * SHELL: measured across the whole registry, 32 twins, 549 declared bindings, ZERO recovered by a fork. Corner, end
+ * to end: 23 declared form fields → 0 in the copy, 13 off-defaults set → 0 surviving.
+ *
+ * ⚠ THE CAUSE IS t1562'S ONE LAYER UP — A DERIVED VIEW READ INSTEAD OF THE DECLARED TRUTH. The save path builds the
+ * copy's bindings from `extractParamBlocks`, the param-PILL extractor, and not one shipped twin has a pill in its
+ * template: they declare their bindings literally or as `bindingSpecs`. So the extractor returns [] for all 32 and
+ * the copy registers with nothing — no fields, no values, nothing to keep. It hid because the source scopes the
+ * limit to MATERIALISATION ("PILL-derivable only", "a pre-existing no-pill save limitation"); nobody had asked what
+ * it did to a FORK.
+ *
+ * The declarations are on the source def the whole time. Reading them takes one care — the blockIndex:
+ *
+ *   bindingSpecs def         bindings + specs ride VERBATIM. A spec matches its socket by macro-var IDENTITY, so
+ *   (corner/edge/middle/…)   `resolveArm` re-derives every index over the fork's OWN pruned stack at each build —
+ *                            the frozen blockIndex is inert for these defs (validateUserOp skips it too).
+ *   structural-only          no blockIndex to map (a structural binding drives the prune, not a socket) — VERBATIM.
+ *   (atc test/change/table,
+ *    io_step, homing, comm)
+ *   value bindings, no       the fork inserts ONE `opunit` and nothing else moves, so each index is remapped by
+ *   specs (drill/bore/       ALIGNING the two flattens on their TYPE SEQUENCE — the same identity discipline
+ *   surfacing/text/lathe…)   wrapForkAtSave uses, never a blanket +1 (the shift is NON-UNIFORM: exec children shift,
+ *                            the uiChildren param_group/panel/sim do NOT).
+ *
+ * Those three cases COVER the registry with no overlap, and that is a measured fact rather than a hopeful one: every
+ * twin carrying both value-socket bindings AND guards is a bindingSpecs def, and every non-spec guarded twin has
+ * structural bindings only. See the parity spec, which asserts the partition so a 33rd wizard cannot land outside it.
+ *
+ * ⚠ IT FAILS CLOSED. Each remapped binding is CHECKED against the fork's own stack (a block at that index, of the
+ * same type, carrying the key) and ONE miss abandons the whole inheritance rather than write values into wrong
+ * sockets: an empty form is a visible disappointment, a form silently wired to the wrong sockets is a wrong program.
+ */
+export function forkInheritance(srcDef, forkChildren) {
+    if (!srcDef || !Array.isArray(srcDef.bindings) || !srcDef.bindings.length) return null;
+    const copy = (v) => JSON.parse(JSON.stringify(v));
+    const out = { forkedFrom: srcDef.opType };
+    if (Array.isArray(srcDef.bindingSpecs) && srcDef.bindingSpecs.length) out.bindingSpecs = copy(srcDef.bindingSpecs);
+    // specs re-derive the indices at every build; a structural-only binding set has none to derive → both ride verbatim
+    if (out.bindingSpecs || !srcDef.bindings.some((b) => b && b.blockIndex != null)) { out.bindings = copy(srcDef.bindings); return out; }
+    const map = alignByType(flattenBlocks(srcDef.template || []), flattenBlocks(forkChildren || []));
+    if (!map) return null;                                       // the fork was restructured — the source's indices mean nothing here
+    const forkFlat = flattenBlocks(forkChildren || []);
+    const bindings = [];
+    for (const b of srcDef.bindings) {
+        const c = copy(b);
+        if (c.blockIndex != null) {
+            const j = map[c.blockIndex];
+            const blk = (j != null && j >= 0) ? forkFlat[j] : null;
+            if (!blk || !blk.params || !(c.key in blk.params)) return null;   // FAIL CLOSED (see above)
+            c.blockIndex = j;
+        }
+        bindings.push(c);
+    }
+    out.bindings = bindings;
+    return out;
+}
+
+/** Align a reference flatten onto a fork's flatten by TYPE SEQUENCE, tolerating INSERTIONS (the fork's `opunit`).
+ *  Returns refIndex → forkIndex, or null when the reference runs past the end — i.e. the two are not the same stack.
+ *  Deliberately not a diff: any real divergence surfaces as a failed key check in forkInheritance, which fails closed. */
+function alignByType(refFlat, forkFlat) {
+    const map = new Array(refFlat.length).fill(-1);
+    let j = 0;
+    for (let i = 0; i < refFlat.length; i++) {
+        while (j < forkFlat.length && forkFlat[j].type !== refFlat[i].type) j++;
+        if (j >= forkFlat.length) return null;
+        map[i] = j++;
+    }
+    return map;
 }
 
 /** Author a def FROM a forked block stack + binding specs (the dev-panel output). Strips ids → a stable template.

@@ -16,7 +16,7 @@
  * Persistence: user-op defs live in `ddcs_user_ops` (userOps.js); the bar CUSTOMIZATION (per-entry + per-group
  * overrides) lives in `ddcs_wizard_layout`. The default catalog (BUILTINS/GROUPS) is the shipped library.
  */
-import { listUserOps, createUserOp, deleteUserOp, OP_CODE_HOOKS, localHooksFor } from './userOps.js';   // t1275 — the hook manifest: a wizard file names the code it cannot carry
+import { listUserOps, createUserOp, deleteUserOp, OP_CODE_HOOKS, localHooksFor, bindingsFromStack } from './userOps.js';   // t1275 — the hook manifest: a wizard file names the code it cannot carry; t1593 — bindingsFromStack: does the template reproduce the specs, or must the file carry them?
 import { isLathe } from '../data/workspaceMachine.js';   // t1271 — the machine kind decides which group leads
 
 // ── the shipped (default) catalog — the current wizard bar as data ───────────────────────────────────────────
@@ -245,6 +245,17 @@ export function wizardToFile(def) {
     // shared lathe wizard showing the wrong cutter, exactly the way dropping `group` once landed one in the wrong
     // dropdown. Caught by the round-trip specs the moment it was added, which is what they are for.
     if (def.latheTool) op.latheTool = def.latheTool;
+    // t1593 — a FORK's provenance rides too. `forkedFrom` names the wizard this copy was forked from, and it is the ONLY
+    // thing that lets the recipient's app re-attach that op's code hooks (the same "behaviour from the app, data from the
+    // file" rule the hooks manifest below states). Dropping it would land a shared fork emitting a different program from
+    // the wizard it was forked from — the quiet version of the loss `group` once had. Authored, never derivable.
+    if (def.forkedFrom) op.forkedFrom = def.forkedFrom;
+    // t1593 — …and so do INHERITED bindingSpecs, by the rule stated above rather than against it. "Not written because
+    // the import RE-DERIVES it" is true only while the specs come from `formfield` blocks in the template. A fork of a
+    // twin whose specs are HAND-WRITTEN has no such blocks, so there is nothing to re-derive from — writing nothing
+    // means the recipient's copy loses the socket re-derivation and emits the empty-shell program this turn removed.
+    // Still exactly one source: the file records the specs ONLY when the template cannot reproduce them.
+    if (Array.isArray(def.bindingSpecs) && def.bindingSpecs.length && !bindingsFromStack(def.template || []).length) op.bindingSpecs = def.bindingSpecs;
     // t1275 — A MANIFEST OF WHAT THE FILE CANNOT CARRY. The hooks are functions; only their NAMES travel. That is
     // enough for the recipient's import to say exactly what it could not restore, instead of losing it in silence.
     // …read from what the APP knows for this opType, not off the def object: the listed def is the PERSISTED one and

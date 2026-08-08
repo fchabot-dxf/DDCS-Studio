@@ -16809,3 +16809,148 @@ before the measurement was trustworthy, on emit-class work. The palette half is 
 fork half wants a FRESH seat: it needs a ruling on A/B/C first, and if the answer is C it is a source change to
 the save path, which is exactly the kind of work that should not start on a tired context.
 
+
+## 2026-08-07 t1593 (fix — ruling C, landed; one BOUNDARY gated) - A fork reads the DECLARED bindings; 18 of 32 now fork byte-identically, and the other 14 refuse out loud
+
+**Task:** fix the fork so saving a built-in as custom stops producing an empty shell — derive the copy's bindings
+from `def.bindings`/`bindingSpecs` rather than from the param-PILL view — then land the parity invariant green.
+
+### What was wrong, and what the fix is
+
+The cause was already traced last turn and I did not re-derive it: `saveAsCustomOp` built the copy's bindings from
+`extractParamBlocks`, the param-PILL extractor, and **not one of the 32 shipped twins has a pill** — they declare
+bindings literally or as `bindingSpecs`. So the extractor returned `[]` for every one and the copy registered with
+nothing. t1562's bug one layer up: **a DERIVED VIEW read instead of the DECLARED TRUTH.**
+
+The fix is one declared concept, `userOps.forkInheritance(srcDef, forkChildren)` — *a fork inherits its source's
+declarations* — plus the two things that ride with it and cannot be derived from a template:
+
+- **`bindingSpecs`**, verbatim. A spec matches its socket by macro-var IDENTITY, so `resolveArm` re-derives every
+  index over the fork's OWN pruned stack at each build.
+- **`forkedFrom`**, the provenance. It is what lets `reconcileCodeHooks` re-attach the SOURCE's code hooks — the
+  same "behaviour from the app, data from the def" rule the import path already states, one step out. Without it
+  the copy of a hooked twin loses its emit corrections (corner's header comments freeze at the defaults, a guarded
+  twin loses its derived guard keys) and emits a different program, which is the one thing a fork must not do.
+
+⚠ **The blockIndex is the whole difficulty, and the registry partitions cleanly on it** — measured, not hoped:
+
+| case | what the fork does | why |
+|---|---|---|
+| `bindingSpecs` def (corner/edge/middle/pocket/slot/comm/alignment/rotary×2/atc len+check) | bindings + specs VERBATIM | indices re-derived BY IDENTITY at every build; the frozen one is inert (validateUserOp skips it too) |
+| structural-only bindings (atc test/change/table, io_step, homing) | VERBATIM | no blockIndex exists to map |
+| value bindings, no specs (drill/bore/tap/surfacing/contour/text/wcs/lathe×7…) | index REMAPPED | the fork inserts one `opunit` and nothing else moves → align the two flattens on their TYPE SEQUENCE, the same identity discipline `wrapForkAtSave` uses, never a blanket +1 (the shift is NON-UNIFORM) |
+
+Every twin carrying BOTH value-socket bindings AND guards is a `bindingSpecs` def; every non-spec guarded twin has
+structural bindings only. That is a measured property of the registry, so the parity spec now **asserts the
+partition** — a 33rd wizard cannot quietly become the first counter-example.
+
+**It fails closed.** Each remapped binding is checked against the fork's own stack (a block at that index, of the
+same type, carrying the key) and one miss abandons the whole inheritance. An empty form is a visible
+disappointment; a form silently wired to the wrong sockets is a wrong program.
+
+### The measurement — 32 twins, driven through the real Customize + Save gesture
+
+```
+   BEFORE   32 twins · 549 declared bindings · 0 recovered · every copy an empty shell
+   AFTER    18 PARITY   form identical, emit BYTE-IDENTICAL at up to 30 off-default values, hooks carried
+            14 REFUSED  named, with the reason
+             0 broken   nothing saves a copy that emits a different program
+```
+
+The partition is exact and it is not the one I expected: **guards = 0 → parity (18/18). guards > 0 → not (14/14).**
+
+### ⚠ THE SECOND DEFECT — the Blocks canvas destroys a guarded template, and that is the gate
+
+Traced this turn, because the parity invariant could not go green without knowing why:
+
+```
+   editWizardDef → the FULL guarded template  1157 blocks ─┐
+                                                            ├─ Blockly render → 111 blocks
+   the reproject writes that back  ────────  98 blocks  ←──┘   371 guards → 30
+```
+
+`bridge.isWrap` does not list `'guard'`, so `recToJson` writes a guard as a CHILDLESS block and **every structural
+arm inside it is discarded on render** — then the reproject writes the loss into the live program. So the copy
+carries one damaged arm. Its inherited form still offers the structural knobs and they do nothing.
+
+I did NOT fix this. It changes what "Customize as blocks" SHOWS for 15 twins (corner would render 1157 blocks),
+touches a hot bridge seam, and needs `guard.when` — an OBJECT, which `recToJson`'s `data` path excludes by design —
+to survive the round-trip. There is also a legitimate rival design where the fork of a guarded wizard is an explicit
+SINGLE-ARM fork. That is a decision, not a detail. **Options are in the pass-back.**
+
+What I did instead is make it fail visibly, per the dispatch's own instruction: `validateUserOp` **refuses** a fork
+whose source declares structural fork arms the copy came back without, in the alert surface the save path already
+uses. ⚠ Two intermediate versions of that check were WRONG and I only found it by re-measuring, which is worth
+recording: counting **guards** missed five twins whose guards all survived as childless husks (atc test/change/
+table, rotary clock, homing — they saved and emitted a different program), and the earlier build-only check missed
+ten. Counting the blocks INSIDE guards — what the arms actually ARE — catches all 14.
+
+### Non-vacuous
+
+`fork-parity-1593.spec.js`, run against the pre-change tree (the three source files checked out to HEAD, my work
+restored from a scratch copy afterwards — never from HEAD):
+
+| claim | result against pre-change |
+|---|---|
+| the copy's FORM is the wizard's form | **failed 3/3** — `""` vs `rpm1:number::::6000\|time1…` |
+| a guarded twin REFUSES | **failed** against the mid-turn tree that had inheritance but no refusal (10 twins saved and emitted DIFF) |
+| the registry PARTITIONS on guards | **passed** — it pins something already true, which is a legitimate but different claim, and it is what stops a 33rd wizard landing outside the rule |
+
+Assertion ORDER was changed after the first non-vacuity run: it originally failed on `forkedFrom` being undefined,
+which only proves the test is new. The two headline claims are asserted first now, so the red lands on them.
+
+### Two existing specs asserted the OLD behaviour
+
+- **`rich-def-update-guard`** literally pinned the shell: *"the copy is a plain op (no derive mechanism) — the very
+  reason Update is blocked"*. The copy had no bindings at all, so of course it had no specs; the line read that
+  absence as design intent. Rewritten to the measured truth, with its own claims (Update disabled, note says why,
+  original byte-unchanged) untouched and still asserted.
+- **`cam-substack-save-fork`** pinned `flatTypes.slice(0,5)` ending in `opunit`. That slot form encoded an EMPTY
+  `param_group` — nothing refilled it when the copy inherited nothing. Now `materializeParamGroup` repopulates its
+  rows and the opunit sits one row later. Re-expressed as the ORDER the line has always CLAIMED (every uiChild
+  precedes the opunit) rather than as fixed slots. All five of that file's tests green, including `emitIdentical`.
+
+Both are premise repairs forced by the ruling, not convenience edits — and the first one is the clearest case yet
+of a green test asserting the wrong property.
+
+### Named goldens
+
+`fork-parity-1593` (2 tests) green. Fast tier, 49 tests across the 17 specs that read this save path — including
+`cam-substack-save-fork` (5), `rich-def-update-guard` (2), `blocks-live-form`, `gui-blocks-roundtrip`,
+`gui-blocks-reauthor`, `library-sources-1247`, `palette-sufficient-1591` — all green. Lint 0 errors on the three
+changed source files. Real-app shots: `verification/t1593-builtin-drill-form.png` and `t1593-fork-drill-form.png`
+— the built-in Drill and its fork, 35 fields each, identical field for field, both previewing 34 lines.
+
+### The ID diff against the 21-failure baseline
+
+**20 failed / 2353 passed / 6 skipped** (17.8 min, both tiers; counted by grepping the failed COUNT off an
+ANSI-stripped log, not read off the tail). Ten of the twenty looked like mine — every binding / drill /
+`param_group` / round-trip spec in the list — so I did not reason about them, I **checked out the three source
+files to HEAD and re-ran exactly those ten**: the SAME ten failed, same IDs, same messages. They are pre-existing.
+
+The other ten are `middle-superset:35` (named in the baseline) plus nine of the known mouse / hover / desktop load
+class (`blocks-hover:120`, `pane-splitter` ×2, `collapsible-panes`, `editor-chip-space`, `import-safety`,
+`preflight-badge`, `update-check` ×2) — `blocks-hover` passes in isolation on both trees. **No failure in the run
+is attributable to this change.**
+
+⚠ Restoring after that A/B cost me an edit and is worth recording: my scratch copy of `devMode.js` predated the
+`isMaintainedAsData` comment fix, so `git checkout HEAD --` destroyed it and the restore did not bring it back. I
+only caught it by grepping `t1593` in the restored file. Re-applied.
+
+### What this does NOT cover
+
+1. **The 14 guarded twins cannot be forked at all.** They refuse. That is safer than before and it is not parity —
+   corner, middle, edge, pocket, slot, alignment, comm, homing, io_step, rotary ×2 and atc ×3 have no editing path
+   today. It lifts when the canvas can render a guard.
+2. **The refusal removes a capability a shipped spec promised.** `rich-def-update-guard` said Save-as-new "stays the
+   non-destructive path" for a maintained-as-data def. The promise was hollow — the copy was an empty shell — but
+   it was a promise, and reversing my call is 8 lines in `validateUserOp`.
+3. **The Save dialog's copy still says "Save as new keeps the original and saves a copy"**, which for 9 of the 11
+   maintained-as-data twins now ends in a refusal. The refusal itself explains, in the same gesture. I did not build
+   conditional dialog copy at a gate.
+4. **EMIT parity is asserted over the twins' own numeric bindings.** Enum/bool/string knobs are carried and
+   compared as form fields but are not swept off their defaults through the emit.
+5. **`forkInheritance`'s type-sequence alignment is exercised only by the shipped twins' shapes** — a single
+   `opunit` insertion. A fork with a user-added atom takes the fail-closed path; that path is reasoned, not driven.
+6. **The `.wiz` file now carries `forkedFrom` and non-derivable `bindingSpecs`.** The round-trip specs pass, but I
+   did not drive an export→import of a FORK specifically.

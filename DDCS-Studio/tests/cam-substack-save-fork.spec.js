@@ -143,7 +143,15 @@ test.describe(() => {
         expect(r.opunitOpType, 'the opunit declares the source twin').toBe('user_surfacing_data');
         expect(r.opunitChildCount, 'the opunit wraps the exec run').toBeGreaterThan(0);
         // the uiChildren stay ahead of the opunit — the exec run moved inside it (the non-uniform shift, in the saved def)
-        expect(r.flatTypes.slice(0, 5), 'uiChildren keep their positions; the opunit precedes the exec run').toEqual(['user_root', 'panel', 'sim', 'param_group', 'opunit']);
+        // t1593 — asserted as the ORDER this line has always CLAIMED, not as fixed slots. The slot form pinned a
+        // param_group that came back from the canvas EMPTY: the copy inherited no bindings, so nothing refilled it and
+        // `opunit` happened to land at index 4. Now the fork inherits its source's declarations, materializeParamGroup
+        // repopulates the group's param_field rows, and the opunit sits after them — the same claim, one row later.
+        expect(r.flatTypes.slice(0, 4), 'the uiChildren keep their positions').toEqual(['user_root', 'panel', 'sim', 'param_group']);
+        expect(r.flatTypes.indexOf('opunit'), 'the opunit is present').toBeGreaterThan(-1);
+        for (const ui of ['panel', 'sim', 'param_group']) {
+            expect(r.flatTypes.indexOf(ui), `${ui} (a uiChild) precedes the opunit-wrapped exec run`).toBeLessThan(r.flatTypes.indexOf('opunit'));
+        }
         expect(r.unresolvedBindings, 'EVERY saved binding still resolves to a socket that exists (no corruption)').toBe(0);
         expect(r.emitIdentical, 'the saved wrapped op emits BYTE-IDENTICAL to the source twin (opunit transparent)').toBe(true);
         expect(r.slotHasLiveLoop, 'the saved op builds a CAM slot where the surfacing part stays a LIVE loop').toBe(true);

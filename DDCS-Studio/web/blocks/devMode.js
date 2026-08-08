@@ -15,7 +15,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate, materializeParamGroup } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate, materializeParamGroup, forkInheritance } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -646,8 +646,11 @@ function openSaveDialog(init, onConfirm) {
 // stack every build (corner's M2 mechanism). The visual knob-save CAN'T preserve that: collectAuthoring→buildBindings
 // flattens the rich bindings to plain ones and userOpFromStack drops bindingSpecs, so a visual Update would silently
 // STRIP the derive mechanism (+ relTo/when/group/role/section/help/sourceField). So such a def REFUSES the visual
-// Update — the non-destructive "Save as new" (a copy) stays the path, and its template is edited at the source. Plain
-// user-op defs (no bindingSpecs) are unaffected. Exported so the save flow + tests read ONE declared rule.
+// Update, and its template is edited at the source. Plain user-op defs (no bindingSpecs) are unaffected. Exported so
+// the save flow + tests read ONE declared rule.
+// t1593 — this used to add "the non-destructive Save as new (a copy) stays the path", and a copy no longer strips the
+// specs (forkInheritance carries them). For a GUARDED def that copy is refused instead, because the Blocks canvas
+// cannot render a guard's children — so neither route edits corner today; its source is where it changes.
 export function isMaintainedAsData(def) {
     if (!(def && Array.isArray(def.bindingSpecs) && def.bindingSpecs.length)) return false;
     // LOCK LIFTS (composable-authoring PILOT 1): once every bindingSpec is authored as a `formfield` block in the def's
@@ -682,7 +685,17 @@ function saveAsCustomOp() {
     const inlineBindings = buildBindings(a.exposures);
     // GUI param blocks plugged into value sockets ALSO declare knobs — extract them (mutates the template: pills → numbers).
     const paramBindings = extractParamBlocks(a.opRec.children, new Set(inlineBindings.map((b) => b.param)));
-    const bindings = [...inlineBindings, ...paramBindings];
+    const authoredBindings = [...inlineBindings, ...paramBindings];
+    // t1593 — A FORK INHERITS ITS SOURCE'S DECLARATIONS (see userOps.forkInheritance for the full account). Both
+    // extractors above read a DERIVED VIEW — ticked knobs and param PILLS — and a shipped twin declares its bindings
+    // literally or as bindingSpecs, so for all 32 of them they legitimately return NOTHING and the copy registered as an
+    // EMPTY SHELL: 549 declared bindings, zero recovered. Inherited rows come FIRST so the copy keeps the wizard's
+    // declared field ORDER; anything authored in the workspace is appended and WINS by param name (a pill the user just
+    // plugged in is the newer declaration for that knob). A hand-built stack (no source opType) inherits nothing.
+    const inherited = forkInheritance(getUserDef(a.opRec.opType), a.opRec.children);
+    const bindings = inherited
+        ? [...inherited.bindings.filter((b) => !authoredBindings.some((x) => x.param === b.param)), ...authoredBindings]
+        : authoredBindings;
 
     // A GUI `panel`/`sim` block in the stack WINS over the dialog choice (a declaration baked into the template) —
     // capture both now so the dialog can prefill with the truth and the commit can honour the override.
@@ -719,14 +732,26 @@ function saveAsCustomOp() {
             alert(`“${(editingDef && editingDef.label) || _editingWizard}” is maintained as data — updating it here would strip its data-driven parameters. Use “Save as new”, or edit its template.`);
             return;
         }
+        // t1593 — the inherited declarations that are NOT the bindings list: `bindingSpecs` (the fork's emit re-derives its
+        // value sockets BY IDENTITY over its own pruned stack, exactly as the source does) and `forkedFrom` (which source
+        // this copy came from — the provenance registerUserOp reads to re-attach the source's code hooks, since a function
+        // cannot be stored on a def). Both are inert DATA on the def; neither is derivable from the template.
+        const authorFork = (type, name) => {
+            const d = userOpFromStack(type, name, a.opRec.children, bindings, panel, sim);
+            if (inherited) {
+                if (inherited.bindingSpecs) d.bindingSpecs = inherited.bindingSpecs;
+                d.forkedFrom = inherited.forkedFrom;
+            }
+            return d;
+        };
         try {
             if (update) {
-                updateUserOp(userOpFromStack(_editingWizard, meta.name, a.opRec.children, bindings, panel, sim));
+                updateUserOp(authorFork(_editingWizard, meta.name));
             } else {
                 const slug = meta.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
                 const existing = new Set(listUserOps().map((d) => d.opType));
                 let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
-                createWizard(userOpFromStack(type, meta.name, a.opRec.children, bindings, panel, sim));
+                createWizard(authorFork(type, meta.name));
             }
         } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
 
