@@ -49,7 +49,7 @@ export const SCHEMA = {
     },
     surfacing: {
         toolDia: N(), stepoverPct: N(), clearance: N(), feed: N('F'), plunge: N(), rpm: N('S'), originX: N('X'),
-        originY: N('Y'), w: N(), h: N(), depth: N('Z'), stepdown: N(), strategy: Enum(), wcs: Enum(), ...PLACE,
+        originY: N('Y'), w: N(), h: N(), depth: N('Z'), stepdown: N(), strategy: Enum(), wcs: Enum(), zMode: Enum(), ...PLACE,   // t1609 — zMode ('normal'|'skim'): without the schema+bind entry, EDITING a stored Skim op silently reseeded the field to Normal
     },
     slot: {
         ax: N('X'), ay: N('Y'), bx: N('X'), by: N('Y'), width: N(), toolDia: N(), stepoverPct: N(),
@@ -150,7 +150,7 @@ export const SCHEMA = {
 // truth: SCHEMA[op][param].field); consumers read it via paramFields(). A binding whose param isn't in SCHEMA is an
 // orphan (BIND_ORPHANS) — structurally-caught drift, asserted empty by protocol-validator.spec.js.
 const FIELD_BIND = {
-    surfacing: { originX: 'sf_originX', originY: 'sf_originY', offZ: 'sf_offZ', pathDatum: 'sf_pathDatum', stockAttach: 'sf_stockAttach', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm' },
+    surfacing: { originX: 'sf_originX', originY: 'sf_originY', offZ: 'sf_offZ', pathDatum: 'sf_pathDatum', stockAttach: 'sf_stockAttach', w: 'sf_w', h: 'sf_h', strategy: 'sf_strategy', toolDia: 'sf_toolDia', stepoverPct: 'sf_stepoverPct', depth: 'sf_depth', stepdown: 'sf_stepdown', clearance: 'sf_clearance', feed: 'sf_feed', plunge: 'sf_plunge', rpm: 'sf_rpm', zMode: 'sf_zMode' },
     pocket: { shape: 'p_shape', strategy: 'p_strategy', originX: 'p_originX', originY: 'p_originY', offZ: 'p_offZ', pathDatum: 'p_pathDatum', stockAttach: 'p_stockAttach', w: 'p_w', h: 'p_h', dia: 'p_dia', sides: 'p_sides', toolDia: 'p_toolDia', stepoverPct: 'p_stepoverPct', depth: 'p_depth', stepdown: 'p_stepdown', clearance: 'p_clearance', feed: 'p_feed', plunge: 'p_plunge', rpm: 'p_rpm' },
     contour: { shape: 'ct_shape', side: 'ct_side', originX: 'ct_originX', originY: 'ct_originY', offZ: 'ct_offZ', pathDatum: 'ct_pathDatum', stockAttach: 'ct_stockAttach', w: 'ct_w', h: 'ct_h', dia: 'ct_dia', sides: 'ct_sides', wcs: 'ct_wcs', toolDia: 'ct_toolDia', depth: 'ct_depth', stepdown: 'ct_stepdown', clearance: 'ct_clearance', feed: 'ct_feed', plunge: 'ct_plunge', rpm: 'ct_rpm' },
     slot: { ax: 'sl_ax', ay: 'sl_ay', bx: 'sl_bx', by: 'sl_by', width: 'sl_width', originX: 'sl_offX', originY: 'sl_offY', offZ: 'sl_offZ', pathDatum: 'sl_pathDatum', stockAttach: 'sl_stockAttach', toolDia: 'sl_toolDia', stepoverPct: 'sl_stepoverPct', depth: 'sl_depth', stepdown: 'sl_stepdown', clearance: 'sl_clearance', feed: 'sl_feed', plunge: 'sl_plunge', rpm: 'sl_rpm' },

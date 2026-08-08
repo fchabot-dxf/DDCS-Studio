@@ -1174,6 +1174,10 @@
                     <div><span class="label">SKIM DEPTH</span><input id="sf_depth" value="0.5" title="Total material removed off the top (mm)."/></div>
                     <div><span class="label">DEPTH / PASS</span><input id="sf_stepdown" value="0.5"/></div>
                     <div><span class="label">CLEARANCE Z</span><input id="sf_clearance" value="5"/></div>
+                    <!-- t1609 — an EMPTY skeleton: label text, title, options and default are populated from the twin's
+                         declared zMode spec (surfacingData.SURFACING_STRUCT) by surfacingView, so the modal cannot drift
+                         from the declaration. -->
+                    <div><span class="label" id="sf_zModeLabel"></span><select id="sf_zMode"></select></div>
                     <div><span class="label">WORK WCS</span><select id="sf_wcs" title="Run in the Active WCS or force G54–G59. Positions are in the chosen frame."><option value="active">Active</option><option value="G54">G54</option><option value="G55">G55</option><option value="G56">G56</option><option value="G57">G57</option><option value="G58">G58</option><option value="G59">G59</option></select></div>
                     <div><span class="label">FEED</span><input id="sf_feed" value="2000"/></div>
                     <div><span class="label">PLUNGE FEED</span><input id="sf_plunge" value="200"/></div>

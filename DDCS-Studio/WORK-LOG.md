@@ -17560,3 +17560,69 @@ justification, one-line revert if the advisor rules otherwise.
 4. **Desktop viewport only; the exe shell was not run.**
 
 **Capacity:** second act this seat, small and contained — comfortable.
+
+
+## t1609 — Z-mode reaches the Surfacing MODAL, consuming the twin's declaration (turn 1609)
+
+**The dispatch:** user-asked. The capability shipped end-to-end except the knob — the emit has handled
+`zMode === 'skim'` since 8ce70873, the twin declares the dropdown + the skim-greys-WCS gate
+(surfacingData.js), and the hand-coded modal never grew the field. Rule: the modal CONSUMES the
+declaration; a copied options list is the drift this arc treats.
+
+### What landed
+
+- **surfacingData.js** — `SURFACING_STRUCT` exported (the zMode spec: options/label/help/default). The
+  paired WCS gate already rides the exported `SURFACING_BINDINGS` (the wcs binding's `gate`, carried by
+  deriveBindings since t1349).
+- **index.html** — an EMPTY skeleton cell in DEPTH & FEED beside WORK WCS: no option, label, or help text
+  in the HTML at all, so the static file cannot drift from the declaration.
+- **surfacingView.js** — `mountZMode()` populates the skeleton from the imported spec (label presentation-
+  uppercased only); update() collects `zMode` (declared default when blank) and applies the DECLARED gate
+  to sf_wcs: disabled + `data-op-gated` (the middleView clearance-plane precedent — survives postGating's
+  cap-ON re-enable) + the declared tip as the title, original title restored on un-gate.
+- **opSchema.js** — `zMode: Enum()` in the surfacing schema + `zMode: 'sf_zMode'` in FIELD_BIND. Without
+  these, EDITING a stored Skim op silently reseeded the field to Normal — and a re-save would have flipped
+  the op's emit. Found by asking how `_seedForm` restores params, not by a failing test.
+
+### ⚠ A VACUOUS TEST CAUGHT AND FIXED — reported, since trust comes from what it took
+
+The first edit-round-trip test PASSED with the opSchema entry reverted — the select simply KEPT its DOM
+value across the same-page close/reopen, so the assertion never exercised seeding at all. The test now
+DISTURBS the field (silent value write, no events) between INSERT and openForEdit, so only `_seedForm`
+can restore 'skim'. Proven discriminating as numbers: **red without the schema entry, green with it** —
+plus the act-level baseline, **3/3 fail against the pre-act tree** (no field at all).
+
+### Verification
+
+- All four claims assert against the IMPORTED declaration in-page (options/default/label/help/tip read
+  from surfacingData exports), never a copied list — a drifted second source cannot pass.
+- **Emit byte-identity, both levels:** engine — `generate({zMode:'normal'})` === `generate(no zMode)`;
+  modal — pick Skim (the real select gesture) → the preview flips to the parametric SKIM shape (the
+  live-frame read `#62=#790` behind the sentinel refuse — NOT a G91 wrap; my first marker was stale and
+  the real emit corrected me), back to Normal → byte-identical to the first render.
+- **Screenshots:** verification/t1609-modal-normal.png + t1609-modal-skim.png (the field in DEPTH & FEED,
+  the skim preview, the greyed WCS).
+- **Fast tier: 24/24 green** (zmode + surfacing-touching + this arc's specs).
+- **Full suite: 21 failed / 2372 passed / 6 skipped e2e + 1 node (17.9 min; ANSI-stripped count).** vs
+  t1607's 19/2370: the arithmetic closes — +4 new tests, −2 to the churn delta → 2372 passed, 21 failed.
+  GONE — the homing churn pair
+  (as predicted). NEW — blocks-rotary-rig:14, import-safety-1219:62, middle-superset:35,
+  op-params-complete:65 — ALL FOUR isolate green, and the op-params one's shared-run failure is a 5s
+  boot-readiness timeout at page.goto (the recorded contention class; import-safety + middle-superset are
+  both previously-named churn members). The 1 node red = the standing surfacing-as-data member.
+  None of this act's tests red. NOTE: the first full-suite launch raced my opSchema edit (stale tree) —
+  killed via TaskStop, orphan headless chrome reaped, relaunched on the final tree; the numbers above are
+  the clean run.
+
+### What this does NOT cover
+
+1. **Only surfacing consumes its declaration this way** — the other hand-coded modals still hand-copy
+   their enum lists (the full SWITCH stays parked, per the dispatch).
+2. **wizardLastValues remembers zMode now** (recordOp params carry it): a Skim insert makes Skim the
+   remembered default for the NEXT fresh open — the shipped remember-on-insert semantics applying to a new
+   param, noted rather than gated.
+3. **The disturb in test 4 is a silent DOM write**, not a full page reload — a reload-then-edit drive
+   (persistence buffer → reopen) is the even-realer gesture, not driven here.
+4. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** third act this seat — comfortable; SHARED_LABELS next is small and well-scoped.

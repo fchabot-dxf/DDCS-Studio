@@ -7,6 +7,28 @@ import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams, handleScale } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
+// t1609 — the Z-mode field CONSUMES the twin's declaration (options/label/help/default) + the declared skim-greys-WCS
+// gate. One source: a hand-copied options list here is the drift this arc treats (the emit has handled zMode since
+// 8ce70873; only the visible knob was missing).
+import { SURFACING_STRUCT, SURFACING_BINDINGS } from '../../blocks/dataOps/surfacingData.js';
+
+const ZMODE_SPEC = SURFACING_STRUCT.find((b) => b.param === 'zMode');
+const WCS_GATE = (SURFACING_BINDINGS.find((b) => b.param === 'wcs') || {}).gate || null;   // { param:'zMode', is:'skim', tip }
+
+/** Populate the empty sf_zMode skeleton from the DECLARED spec (once). The HTML carries no option/label/help text. */
+function mountZMode() {
+    const sel = el('sf_zMode'), lbl = el('sf_zModeLabel');
+    if (!sel || sel.dataset.wired) return;
+    sel.dataset.wired = '1';
+    for (const [label, value] of (ZMODE_SPEC.widgetConfig && ZMODE_SPEC.widgetConfig.options) || []) {
+        const op = document.createElement('option');
+        op.value = String(value); op.textContent = String(label);
+        sel.appendChild(op);
+    }
+    sel.value = String(ZMODE_SPEC.default);
+    sel.title = ZMODE_SPEC.help || '';
+    if (lbl) lbl.textContent = String(ZMODE_SPEC.label || 'Z-mode').toUpperCase();   // presentation case only; the text is the declaration's
+}
 
 const wizard = new SurfacingWizard();
 const layout = new FeatureCanvas();
@@ -58,7 +80,7 @@ export const surfacingView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'sf_originX', 'sf_originY', 'sf_offZ', 'sf_pathDatum', 'sf_stockAttach', 'sf_w', 'sf_h', 'sf_wcs',
+        'sf_originX', 'sf_originY', 'sf_offZ', 'sf_pathDatum', 'sf_stockAttach', 'sf_w', 'sf_h', 'sf_wcs', 'sf_zMode',
         'sf_strategy', 'sf_toolDia', 'sf_stepoverPct', 'sf_depth', 'sf_stepdown', 'sf_clearance', 'sf_feed', 'sf_plunge', 'sf_rpm',
     ],
     probeSrcFields: {},
@@ -67,6 +89,7 @@ export const surfacingView = {
     onOpen(ctx) {
         const sel = el('sf_tool');
         if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
+        mountZMode();   // t1609 — build the Z-mode dropdown from the twin's declaration (no-op after the first open)
         const st = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
         mountPathAnchor('sf_');
         if (st && st.x > 0 && st.y > 0) setFields({ sf_originX: 0, sf_originY: 0, sf_w: st.x, sf_h: st.y });
@@ -77,6 +100,7 @@ export const surfacingView = {
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         const params = {
             originX: v('sf_originX'), originY: v('sf_originY'), w: v('sf_w'), h: v('sf_h'), wcs: v('sf_wcs') || 'active',
+            zMode: v('sf_zMode') || ZMODE_SPEC.default,   // t1609 — the declared default ('normal') = byte-identical to the pre-field emit
             strategy: v('sf_strategy') || 'raster',
             toolDia: v('sf_toolDia'), stepoverPct: v('sf_stepoverPct'),
             depth: v('sf_depth'), stepdown: v('sf_stepdown'), clearance: v('sf_clearance'),
@@ -84,6 +108,18 @@ export const surfacingView = {
             spindle: s.spindle, head: s.head, endProgram: s.endProgram,
             ...placementParams('sf_', s.stock),   // placement (faced area attaches to a stock corner + offset)
         };
+
+        // t1609 — the DECLARED skim-greys-WCS gate (the same `gate` the twin's form applies): Skim faces relative to
+        // the jog start, so there is no WCS frame to pick. Grey, don't hide; data-op-gated survives postGating's
+        // cap-ON re-enable (the middleView clearance-plane precedent). The declared tip is the whole why.
+        const wcsSel = el('sf_wcs');
+        if (wcsSel && WCS_GATE) {
+            const gated = params[WCS_GATE.param] === WCS_GATE.is;
+            if (!wcsSel.dataset.origTitle) wcsSel.dataset.origTitle = wcsSel.title || '';
+            wcsSel.disabled = gated;
+            wcsSel.setAttribute('data-op-gated', gated ? 'true' : 'off');
+            wcsSel.title = gated ? WCS_GATE.tip : wcsSel.dataset.origTitle;
+        }
 
         const gcode = wizard.generate(params);
         el('wiz_surfacing_code').innerHTML = UIUtils.formatGCode(gcode);

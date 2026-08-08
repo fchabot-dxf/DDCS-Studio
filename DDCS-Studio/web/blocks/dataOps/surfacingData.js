@@ -111,7 +111,10 @@ export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack()
 
 // t986 — the STRUCTURAL Z-mode toggle (NO value socket): it drives the applySkimStructure postInstantiate fork, not a
 // block param. Grouped in a COORDINATES section with the WCS dropdown; Skim greys the WCS (structGate below → data-op-gated).
-const SURFACING_STRUCT = [
+// t1609 — EXPORTED: the hand-coded surfacing modal consumes THIS declaration for its Z-mode field (options, label,
+// help, default) — one source, no copied list in the view. The paired WCS gate rides SURFACING_BINDINGS (the wcs
+// binding's `gate`), already exported above.
+export const SURFACING_STRUCT = [
     { param: 'zMode', type: 'enum', default: SURFACING_DEFAULTS.zMode, label: 'Z-mode', section: 'COORDINATES', widget: 'dropdown',
         widgetConfig: { options: [['Normal — WCS Z0', 'normal'], ['Skim — relative', 'skim']] },
         help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-op RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
