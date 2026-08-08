@@ -37,12 +37,12 @@ min/max/abs/round/ceil, ternary, six comparators yielding 1/0 as values; guards 
 ritual (below). At transfer, the branch may carry t1630 (comparisons, commit 79d1bbb0) and t1632's
 result unreleased — check `git log origin/main..HEAD`.
 
-**IN FLIGHT at transfer: t1632** — the named-tail triage (the 5 deterministic emit-shaped reds:
-cam-slot-edit-s3:65, drill-as-data:13, drill-bindings-1385:116/:180, roundtrip-1319:96; classification
-standard = t1587's stale-spec vs real-break, with the anti-"fix a spec into agreeing with broken
-behaviour" rule). It was running on the OLD workstation. If its commits + WORK-LOG entry are present:
-review from the git diff and continue. If not: its work stayed on the old machine — re-dispatch the same
-task from WORK-LOG's account, or wait for the old machine to push.
+**NOTHING IN FLIGHT at transfer.** t1632 (the named-tail triage) LANDED (e802203e): the whole tail
+traced to ONE root — b95540d9 wrote blockIndex remaps in place through SHARED module binding objects —
+fixed at the source; eleven tests healed incl. the standing node red (node tier 0-fail, first time in
+the record); Restore-to-factory restored to its defV contract. Suite floor is now ~15 = the 7-member
+mouse/update-check deterministic class + churn. The NEXT worker seat starts FRESH regardless of act size
+(the last seat ran seven acts).
 
 ## 3 · The queue (dispatch one act per turn, review each from the DIFF)
 
@@ -76,7 +76,7 @@ the probes in `bridge/controllers/v4.1/verify/`.
   `test-results/.last-run.json` (`status` + failedTests count), NEVER a piped exit code and never the
   tail. **Copy `.last-run.json` aside immediately** — isolated runs overwrite it (lost a baseline twice
   that way).
-- **The ID diff is the signal, not the total.** Standing floor ~20 ±3. Churn members (all repeatedly
+- **The ID diff is the signal, not the total.** Standing floor ~15 (the 7-member mouse/update-check class + churn); node tier 0. Churn members (all repeatedly
   proven isolate-green): middle-superset:35, import-safety-1219 (:47/:62), op-params-complete:65:3,
   wizard-face-1599, blocks-rotary-rig:14, open-as-modal (modal-boot class), homing pairs, blocks-live-form.
   The 1 node red (surfacing-as-data) is a standing member, HEAD-reproduced. A mass-red with few timeouts
