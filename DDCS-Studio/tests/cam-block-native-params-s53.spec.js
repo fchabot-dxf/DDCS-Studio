@@ -92,7 +92,11 @@ test('S5.3 — maybeMaterializeParamGroup: a pill op materializes; a literal op 
     }, canvasDef.toString());
     expect(r.pillHas, 'a pill op gets a param_group').toBe(1);
     expect(r.idem === 1 && r.idem2 === 1, 'idempotent — a second call is a no-op').toBe(true);
-    expect(r.litHas, 'a LITERAL op (no pills) is SKIPPED (gated to S6, like S4b literal twins)').toBe(0);
+    // t1632 — the S6 gate ARRIVED EARLY, by intent: b95540d9 deleted the hasParamPills guard so LITERAL twins
+    // materialize too (the fix's stated purpose — built-in wizards presenting a populated form in Blocks). The
+    // old "SKIPPED" pin is the pre-b95540d9 world; the new pin is that the literal op materializes AND stays
+    // idempotent like the pill op.
+    expect(r.litHas, 'a LITERAL op materializes too — the S6 gate arrived early (b95540d9)').toBe(1);
 });
 
 test('S5.3 — emit is BYTE-IDENTICAL through the materialized param_group (param_field + param_group emit [])', async ({ page }) => {

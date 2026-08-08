@@ -62,12 +62,19 @@ test('atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep 
       { param: 'rpm2', blockIndex: 12, key: 'rpm' },
       { param: 'time2', blockIndex: 13, key: 'sec' },
     ];
+    // t1632 — the DATA side reads the REGISTERED def's own binding indexes: since b95540d9 the registered template
+    // carries its materialized param_field rows, so the module bindings' raw-template indexes no longer frame the
+    // builder's flatten. (They only appeared to, because the old in-place remap was corrupting the shared module
+    // objects into alignment — the bug fixed this turn.) The REF map stays hand-declared against the raw stack.
+    const { getUserDef } = await import('/blocks/userOps.js');
+    const regByParam = new Map((getUserDef(ATC_WARMUP_DATA_OPTYPE).bindings || []).filter((x) => x && x.blockIndex != null).map((x) => [x.param, x]));
     const refOf = (param) => REF_BINDINGS.find((x) => x.param === param);
-    for (const b of ATC_WARMUP_BINDINGS) {
-      const r = refOf(b.param);
-      const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: 4242 })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(atcWarmupStack(S({ [b.param]: 4242 })))[(r ? r.blockIndex : b.blockIndex)] || {}).params || {};
-      if (dataSock[b.key] !== 4242 || refSock[b.key] !== 4242) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, data: dataSock[b.key], ref: refSock[b.key] });
+    for (const m of ATC_WARMUP_BINDINGS) {
+      const b = regByParam.get(m.param) || m;
+      const r = refOf(m.param);
+      const dataSock = (flattenBlocks(dataBuilder(S({ [m.param]: 4242 })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(atcWarmupStack(S({ [m.param]: 4242 })))[(r ? r.blockIndex : m.blockIndex)] || {}).params || {};
+      if (dataSock[b.key] !== 4242 || refSock[m.key] !== 4242) wiringFails.push({ param: m.param, blockIndex: b.blockIndex, key: m.key, data: dataSock[b.key], ref: refSock[m.key] });
     }
 
     const sample = emitMapped(dataBuilder(S({ rpm1: 8000, time1: 12 }))).text;   // a fork: stage-1 rpm = 8000

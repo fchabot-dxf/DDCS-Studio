@@ -91,14 +91,20 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
       { param: 'snWidth', blockIndex: 5, key: 'snWidth' },
       { param: 'snIncrement', blockIndex: 5, key: 'snIncrement' },
     ];
+    // t1632 — the DATA side reads the REGISTERED def's own binding indexes (see atc-warmup-as-data: since b95540d9
+    // the registered template carries its materialized rows; the module indexes only APPEARED to frame the builder's
+    // flatten because the old in-place remap corrupted the shared objects into alignment — fixed this turn).
+    const { getUserDef } = await import('/blocks/userOps.js');
+    const regByParam = new Map((getUserDef(TEXT_DATA_OPTYPE).bindings || []).filter((x) => x && x.blockIndex != null).map((x) => [x.param, x]));
     const refOf = (param) => REF_BINDINGS.find((x) => x.param === param);
-    for (const b of TEXT_BINDINGS) {
-      const sent = sentinelFor(b);
-      const r = refOf(b.param);
-      const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(textStack(S({ [b.param]: sent })))[(r ? r.blockIndex : b.blockIndex)] || {}).params || {};
-      const dataOk = dataSock[b.key] === sent, refOk = refSock[b.key] === sent;
-      if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });
+    for (const m of TEXT_BINDINGS) {
+      const sent = sentinelFor(m);
+      const b = regByParam.get(m.param) || m;
+      const r = refOf(m.param);
+      const dataSock = (flattenBlocks(dataBuilder(S({ [m.param]: sent })))[b.blockIndex] || {}).params || {};
+      const refSock = (flattenBlocks(textStack(S({ [m.param]: sent })))[(r ? r.blockIndex : m.blockIndex)] || {}).params || {};
+      const dataOk = dataSock[b.key] === sent, refOk = refSock[m.key] === sent;
+      if (!dataOk || !refOk) wiringFails.push({ param: m.param, blockIndex: b.blockIndex, key: m.key, dataOk, refOk });
     }
 
     const sampleText = emitMapped(dataBuilder(sweep[0])).text;

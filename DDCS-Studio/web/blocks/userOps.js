@@ -469,11 +469,22 @@ export function materializeParamGroup(def) {
     }
     
     const flatAfter = flattenBlocks(def.template);
-    (def.bindings || []).forEach((b) => {
-        if (!b || b.blockIndex == null) return;
-        const ref = flatBefore[b.blockIndex]; const ni = ref ? flatAfter.indexOf(ref) : -1;   // BY IDENTITY
-        if (ni >= 0) b.blockIndex = ni;
-    });
+    /**
+     * t1632 — the remap writes COPIES, never the caller's binding OBJECTS. The old in-place `b.blockIndex = ni`
+     * reached through shared references: a data-op module's exported bindings (drillData's DRILL_BINDINGS et al.)
+     * are spread into each def, so the BOOT registration's remap (+the materialized row count) corrupted every
+     * LATER consumer of the same objects — a fresh `drillDataDef()` instantiated with pristine-template indexes
+     * against +34-shifted bindings landed its params NOWHERE and emitted defaults (the whole deterministic red
+     * tail this fix retires), and a re-register/reseed would have compounded the shift onto the APP's own twin.
+     * The registered def stays exactly as coherent as before (template + its OWN remapped copies).
+     */
+    if (Array.isArray(def.bindings)) {
+        def.bindings = def.bindings.map((b) => {
+            if (!b || b.blockIndex == null) return b;
+            const ref = flatBefore[b.blockIndex]; const ni = ref ? flatAfter.indexOf(ref) : -1;   // BY IDENTITY
+            return ni >= 0 ? { ...b, blockIndex: ni } : b;
+        });
+    }
     return def;
 }
 

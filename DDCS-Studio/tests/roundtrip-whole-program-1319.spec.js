@@ -127,7 +127,12 @@ test('AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trip
     // now, and the count it was counted in is 0. The wording above is left as the record of what this turn owned.)
     const corner = r.find((x) => x.op === 'user_corner_data');
     expect(corner.same, `the corner op round-trips byte-identically: ${JSON.stringify(corner)}`).toBe(true);
-    expect(r.find((x) => x.op === 'user_middle_data').kept, 'and middle keeps every block, which it did not before').toBe(63);
+    // t1632 — the pin was the literal 63 of the day it was written; b95540d9 (t1111) then grew every registered
+    // template with its materialized param_field rows, and those round-trip like any block. The CLAIM ("middle
+    // keeps every block") is what matters, so it is asserted as itself rather than as a count that moves with the
+    // form: kept == built. (The lost==[] sweep above already holds this for the whole family; this line keeps
+    // middle's historical byline without a number to go stale.)
+    { const m = r.find((x) => x.op === 'user_middle_data'); expect(m.kept, 'and middle keeps every block, which it did not before').toBe(m.blocks); }
     // A REMAINING, SEPARATE CLASS, counted rather than hidden: some ops still differ in their TEXT across a round
     // trip for reasons that predate this turn (verified by stash: the same ops differ without this change). Nothing
     // is lost — the block counts match — so it is a value-fidelity question, not a structural one. Pinned as a

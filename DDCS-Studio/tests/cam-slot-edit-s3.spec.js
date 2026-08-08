@@ -27,6 +27,16 @@ async function buildSlot(page, program) {
 }
 async function openEdit(page) {
   await page.click('#cam_slots [data-act="editslot"]');
+  // t1632 — a BLOCK-ABLE slot's Edit also loads its op into Blocks (S4-2), and since b95540d9 that load actually
+  // RESOLVES for runtime-registered defs (getUserDef, not the persisted-only listUserOps — before, it silently
+  // no-oped for this spec's fixtures). A non-empty differing program therefore meets the t1518 destructive-load
+  // confirm mid-gesture; answering it IS the real gesture now, so accept "Open (replace)" when it appears.
+  const dlg = page.locator('.app-dialog');
+  await Promise.race([
+    dlg.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {}),
+    page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 4000 }).catch(() => {}),
+  ]);
+  if (await dlg.count()) await page.keyboard.press('Enter');   // ok holds focus (dialog.js)
   await page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 8000 });
 }
 

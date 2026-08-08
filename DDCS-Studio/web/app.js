@@ -115,10 +115,16 @@ const seedBuilderFor = (opType) => SEED_BUILDERS.find((fn) => { try { return fn(
 // A built-in's opensAs twin diverges from factory when a re-author (updateUserOp with an undeclared defV) bumped its defV
 // PAST the factory seed's declared version. The blanket reset stays resetLayout; this is the per-wizard twin signal.
 window.ddcsUserOpDivergedFromFactory = (opType) => {
-    try {
-        const stored = JSON.parse(localStorage.getItem('ddcs_user_ops') || '[]');
-        return Array.isArray(stored) && stored.some(d => d.opType === opType);
-    } catch (_) { return false; }
+    // t1632 — RESTORED to the comment's own contract (the defV comparison, ef1a1cdf). b95540d9 rewrote this to a
+    // bare presence-in-store check, which contradicts the comment above and — since boot seeding PERSISTS every
+    // twin — reads "diverged" for every pristine wizard. It only ever looked right because the reseed path was
+    // simultaneously CRASHING on the shared-binding corruption (fixed this turn in materializeParamGroup) and
+    // deleting the store row on the way down; with the reseed healed, the accident-pair fell apart and the
+    // wizard-restore spec caught it. defV semantics: seeded == factory → clean; a re-author bumps past → diverged.
+    const fn = seedBuilderFor(opType); if (!fn) return false;
+    const cur = getUserDef(opType); if (!cur) return false;
+    let factory; try { factory = fn(); } catch (_) { return false; }
+    return (Number(cur.defV) || 1) > (Number(factory.defV) || 1);
 };
 // Restore ONE built-in's opensAs twin to factory IMMEDIATELY (no reboot): delete the customized store copy + re-create it from
 // the factory builder. deleteUserOp clears every registered table; createUserOp re-registers the pristine def. Returns bool.

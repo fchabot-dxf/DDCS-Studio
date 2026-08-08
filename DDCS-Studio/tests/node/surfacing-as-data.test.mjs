@@ -66,12 +66,19 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
     // emit). The `strategy` socket MAPS its input ('concentric'→concentric, else→parallel), so its sentinel must be a
     // VALID alternate value ('concentric' ≠ the 'parallel' default); pass-through enums/numbers use the generic sentinels.
     const sentinelFor = (b) => (b.type === 'number' ? 4242 : (b.param === 'strategy' ? 'concentric' : '__SENTINEL__'));
-    const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+    // t1632 — the frame moved with b95540d9 (materialized param_field rows ride the registered template), and this
+    // was THE standing node red: the data side reads the REGISTERED def's own binding indexes; the reference offset
+    // is DERIVED from where the exec run starts, not the old constant 4 (the drill-as-data treatment, verbatim).
+    const { getUserDef } = await import('/blocks/userOps.js');
+    const regBindings = (getUserDef(SURFACING_DATA_OPTYPE).bindings || []).filter((x) => x && x.blockIndex != null && SURFACING_BINDINGS.some((m) => m.param === x.param));
+    const refFlat0 = flattenBlocks(surfacingStack(S({})));
+    const execOffset = flattenBlocks(dataBuilder(S({}))).findIndex((x) => x && x.type === refFlat0[0].type);
     const wiringFails = [];
-    for (const b of SURFACING_BINDINGS) {
+    for (const b of regBindings) {
+      if (b.blockIndex < execOffset) continue;   // a uiChildren-targeted binding has no surfacingStack mirror
       const sent = sentinelFor(b);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(surfacingStack(S({ [b.param]: sent })))[b.blockIndex - WRAP_PREFIX_COUNT] || {}).params || {};
+      const refSock = (flattenBlocks(surfacingStack(S({ [b.param]: sent })))[b.blockIndex - execOffset] || {}).params || {};
       const dataOk = dataSock[b.key] === sent;   // the binding wrote the sentinel where it claims
       const refOk = refSock[b.key] === sent;     // surfacingStack ALSO routes b.param to that exact socket
       if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });

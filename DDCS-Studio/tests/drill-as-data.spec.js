@@ -77,12 +77,23 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
     // assert BOTH the data def's instantiate AND drillStack land that sentinel in the binding's (blockIndex,key)
     // socket. A mis-keyed binding fails refOk (drillStack routes the param elsewhere) or dataOk (the binding wrote elsewhere).
     const sentinelFor = (t) => (t === 'number' ? 4242 : '__SENTINEL__');   // never a drill default
-    const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
+    // t1632 — the wrap prefix is DERIVED, not the old constant 4: since b95540d9 the REGISTERED def's template
+    // carries its materialized param_field rows (t1111 — built-ins present a populated form in Blocks), so the
+    // exec run starts wherever those rows end. The registered def's OWN bindings are the coherent view (their
+    // blockIndex was remapped with the template); the module's pristine DRILL_BINDINGS stay for the count claim.
+    const { getUserDef } = await import('/blocks/userOps.js');
+    // …and only the DRILL_BINDINGS members (by param): the def also carries tool/entry bindings from its own
+    // helpers, which have no drillStack mirror to check — exactly as the original loop (over DRILL_BINDINGS) scoped it.
+    const drillParams = new Set(DRILL_BINDINGS.map((b) => b.param));
+    const regBindings = (getUserDef(DRILL_DATA_OPTYPE).bindings || []).filter((b) => b && b.blockIndex != null && drillParams.has(b.param));
+    const refFlat0 = flattenBlocks(drillStack(S({})));
+    const execOffset = flattenBlocks(dataBuilder(S({}))).findIndex((x) => x && x.type === refFlat0[0].type);
     const wiringFails = [];
-    for (const b of DRILL_BINDINGS) {
+    for (const b of regBindings) {
+      if (b.blockIndex < execOffset) continue;   // a uiChildren-targeted binding has no drillStack mirror to check
       const sent = sentinelFor(b.type);
       const dataSock = (flattenBlocks(dataBuilder(S({ [b.param]: sent })))[b.blockIndex] || {}).params || {};
-      const refSock = (flattenBlocks(drillStack(S({ [b.param]: sent })))[b.blockIndex - WRAP_PREFIX_COUNT] || {}).params || {};
+      const refSock = (flattenBlocks(drillStack(S({ [b.param]: sent })))[b.blockIndex - execOffset] || {}).params || {};
       const dataOk = dataSock[b.key] === sent;   // the binding wrote the sentinel where it claims
       const refOk = refSock[b.key] === sent;     // drillStack ALSO routes b.param to that exact socket
       if (!dataOk || !refOk) wiringFails.push({ param: b.param, blockIndex: b.blockIndex, key: b.key, dataOk, refOk });

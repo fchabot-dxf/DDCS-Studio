@@ -54,7 +54,11 @@ test('S5.2 — formBindings: a param_group drives order + label/widget/default (
         { param: 'frate', key: 'rate', label: 'Feed (custom)', widget: 'number', default: 200 },
     ]);
     expect(r.noSame, 'NO param_group → the bindings are returned UNCHANGED (same reference) → byte-identical form').toBe(true);
-    expect(r.drillSame, 'a real registered twin with no param_group → unchanged').toBe(true);
+    // t1632 — the real-twin claim FLIPPED with b95540d9 (t1111): every registered twin now carries a MATERIALIZED,
+    // populated param_group (that was the commit's whole point — no more empty forms in Blocks), so formBindings
+    // legitimately returns derived rows, not the same reference. The synthetic no-group case above still pins the
+    // untouched fallback; the real twin now pins the NEW world: rows drive, and nothing is dropped doing it.
+    expect(r.drillSame, 'a real registered twin is MATERIALIZED now (b95540d9) — rows drive, not the raw reference').toBe(false);
 });
 
 test('S5.2 — editing a param_field (label/widget/default) is reflected by formBindings; reordering rows reorders the form', async ({ page }) => {

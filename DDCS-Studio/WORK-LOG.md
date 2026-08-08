@@ -18317,3 +18317,89 @@ leading `!` still lands as the generic `unexpected: !` — noted below).
    widening would be its own ruling).
 3. Chained comparisons are left-associative like C, pinned but not warned about — a lint nicety if real
    use trips on `a < b < c`.
+
+
+## t1632 — the deterministic tail TRIAGED: one root, one real break fixed, six stale pins repointed (turn 1632)
+
+**The dispatch:** classify the 5 deterministic emit-shaped reds (+ the s52/s53 pair if the same root
+explains them) — STALE SPEC vs REAL BREAK vs third — fix the clearly stale, report real breaks, lower
+the floor honestly.
+
+### ONE root explains all seven: b95540d9 (2026-08-04)
+
+"Fix built-in wizards presenting empty param_group in Blocks tab" — a deliberate, user-visible fix that
+(a) moved `materializeParamGroup` INTO `registerUserOp` (every registered template now carries its
+materialized `param_field` rows — drill's flatten grew 5 → 45), (b) DELETED the `hasParamPills` gate
+(literal twins materialize from their specs — the commit's stated purpose), (c) populates an EMPTY
+existing param_group, and (d) switched `reconstructUserOpBlock` to `getUserDef` (runtime-registered defs
+now actually load into Blocks where they silently no-oped). Every tail member's premise predates one of
+those four moves — dated by `git log -S` per mechanism, not guessed.
+
+### THE ONE REAL BREAK, found under the staleness and fixed at the source
+
+`materializeParamGroup`'s blockIndex remap wrote **IN PLACE through shared references**: a data-op
+module's exported binding objects (DRILL_BINDINGS et al.) are spread into each def, so BOOT
+registration's remap (+34) corrupted every LATER consumer of the same objects — a fresh
+`drillDataDef()` instantiated pristine-template indexes against shifted bindings, landed its params
+NOWHERE, and emitted DEFAULTS (the "1 hole (single)" vs "12 holes (grid)" diff that made
+drill-bindings:180 red); a re-register/reseed would have COMPOUNDED the shift onto the app's own twin.
+**Fix: the remap writes copies** (`{...b, blockIndex}` — userOps.js, one mutation site in the repo).
+The registered def is exactly as coherent as before. **Non-vacuity is the strongest kind: three
+EXISTING specs were red before the fix and green after with no spec edit** — drill-bindings-1385:116,
+:180, AND drill-switch-shots:119 (a standing member nobody dispatched, healed for free).
+
+### The six stale pins, each repointed WITH the evidence of intent
+
+| spec | stale premise | the new pin |
+|---|---|---|
+| drill-as-data:13 | wrap prefix = 4 (pre-materialization) | offset DERIVED from the flatten; wiring read from the REGISTERED def's own bindings, scoped to DRILL_BINDINGS params (tool/entry rows never had a drillStack mirror) |
+| roundtrip-1319:96 | middle kept = literal 63 | kept == built (the claim itself, no number to go stale; the family-wide lost==[] sweep already held) |
+| s52:25 | "a real twin has no param_group → same reference" | a real twin IS materialized now — rows drive (the synthetic no-group case still pins the fallback) |
+| s53:78 | "a LITERAL op is SKIPPED (gated to S6)" | the S6 gate arrived early — b95540d9 deleted hasParamPills by intent; literal ops materialize + stay idempotent |
+| cam-slot-edit-s3:65 | Edit opens with no questions | the Blocks load is REAL now (getUserDef) so the t1518 destructive-load confirm fires mid-gesture; the spec answers "Open (replace)" — that IS the gesture |
+| (drill-switch-shots:119) | — | healed by the code fix alone, no edit |
+
+**Cross-proof:** the flipped s52/s53 pins run RED against a worktree at b95540d9~1 — they pin the new
+world specifically, not a tautology. The drill emit sweeps + frontiers in drill-as-data all held
+(main.pass green once the wiring premise was fixed): the corpus never moved; only the wiring CHECK's
+frame of reference had.
+
+### THE SECOND WAVE — the fix EXPOSED four more of the same class (and one accident-pair)
+
+The first counted run (14 failed — already down from 20-22) surfaced four NEW reds, all green on
+pre-fix HEAD, all red isolated — genuine fallout, chased to two shapes:
+
+- **atc-warmup-as-data:18 + text-as-data:11 + the standing NODE surfacing-as-data**: their wiring frames
+  read MODULE binding indexes against the materialized builder flatten — they only ever passed because
+  the in-place mutation was corrupting the shared module objects INTO alignment. Same treatment as
+  drill-as-data (registered-def view / derived offset). **The node tier is 99 pass / 0 fail for the
+  first time in the record — the standing surfacing member was this same class all along.**
+- **wizard-restore-default:18/:59 — an ACCIDENT-PAIR dismantled**: b95540d9 also rewrote
+  `ddcsUserOpDivergedFromFactory` from the defV comparison (its own comment's contract, ef1a1cdf) to a
+  bare presence-in-store check — which, with boot seeding persisting every twin, reads "diverged" for
+  every pristine wizard. It LOOKED right only because the reseed was simultaneously CRASHING on the
+  shared-binding corruption and deleting the store row on the way down. With the reseed healed, the
+  spec caught the pair. **Restored the checker to its documented defV contract** — seeded == factory →
+  clean; a re-author's bump → diverged; reseed → clean again, and Restore-to-factory now actually
+  RESTORES instead of deleting-until-next-boot.
+
+### Verification
+
+- All eleven touched files green serialized in one run (33 tests): the five dispatched + s52/s53 +
+  atc-warmup/text-as-data + wizard-restore-default + cam-expose-classify. Node tier 99/0.
+- Cross-proofs: the flipped s52/s53 pins RED on a pre-b95540d9 worktree; the four second-wave members
+  GREEN on pre-fix HEAD and red only with the fix (the exposure direction, both measured).
+- **Full suite: 15 failed / 2408 passed / 6 skipped e2e + node 0 FAIL (19.9 min)** vs the pre-triage
+  20-23 + 1 node: **the deterministic tail is fully drained** — none of the eleven triaged members
+  returned, and the node tier exited 0 for the first time in the record. The 15 = the standing
+  mouse/hover + update-check class (7 members) + eight boot/contention churn entries, ALL of which ran
+  green isolated serialized right after (22/23 in one sweep; the one flake was blocks-live-form:168 —
+  t1603's RECORDED churn member — 6/6 alone). The honest floor is now ~7 deterministic + churn.
+
+### What this does NOT cover
+
+1. The latent reseed-compounding path (re-register of a fresh def built from already-shifted shared
+   bindings) is fixed by construction but not driven end-to-end as a reseed gesture — candidate assert.
+2. `paramGroupFromBindings`' spec-derived fallback rows (b95540d9's (b)) have no dedicated unit pin of
+   their own beyond s53's flip.
+3. The `_group` transient and `flattenBlocks` side-effect (named at t1625) remain the standing candidate.
