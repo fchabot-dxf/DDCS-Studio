@@ -97,12 +97,14 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     // identity · workspace · Library · theme · setup sheet · checklist · settings · rate. Nothing is hidden from the
     // count by class (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
     expect(m.rowNames, 'exactly these rows, in this order').toEqual([
-        'hq-identity-line', 'hq-ws-row', 'library', 'theme', 'setupSheet', 'checklist', 'settings', 'help', 'rate',
+        'hq-identity-line', 'hq-ws-row', 'wizards', 'library', 'theme', 'setupSheet', 'checklist', 'settings', 'help', 'rate',
     ]);
     // t1245 — the count goes UP by one, and that is stated rather than quietly re-numbered: HELP came OUT of Settings
     // (FAQ + About are not settings), so the menu gained a row while Settings lost five subtabs. A diet number that
     // only ever falls would be a number kept true by not counting.
-    expect(m.rowCount, 'the diet menu is 9 rows (8 + the Help row that left Settings in t1245)').toBe(9);
+    // t1617 — up by one AGAIN, stated: the WIZARD MANAGER's entry (Wizards…) lands beside the workspace row it is
+    // the sibling of. Wizard lifecycle earned a user-facing door; the row is the door.
+    expect(m.rowCount, 'the diet menu is 10 rows (9 + the t1617 Wizards… row)').toBe(10);
 
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.

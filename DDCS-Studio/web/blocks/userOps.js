@@ -874,6 +874,9 @@ export function createUserOp(def) {
     const defs = readStore();
     if (defs.some((d) => d.opType === def.opType)) throw new Error(`user op "${def.opType}" already exists`);
     if (def.defV == null) def.defV = 1;                          // N1 — a fresh def starts at version 1 (the stamp)
+    // t1617 — WHEN it was saved, declared on the def (the manager's date column reads this, never a file mtime).
+    // CONDITIONAL: an imported .wizard carries its own savedAt, and re-stamping it would make the round trip lie.
+    if (def.savedAt == null) def.savedAt = new Date().toISOString();
     registerUserOp(def);                                         // only now install into the live user-layer builder/spec/label
     defs.push(def);
     writeStore(defs);
@@ -900,6 +903,7 @@ export function updateUserOp(def) {
     // which sets no defV) bumps PAST the stored version — its placed instances are now stale (the def-change→rebuild
     // signal). NEVER a body-hash (declare, don't infer). Seeds never hit this (they arrive declared → no boot-bump).
     if (def.defV == null) def.defV = (Number(defs[i].defV) || 1) + 1;
+    def.savedAt = new Date().toISOString();   // t1617 — an update IS a save; the manager's date column stays honest
     registerUserOp(def);            // overwrite the live user-layer builder/spec/label
     defs[i] = def;
     writeStore(defs);

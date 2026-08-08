@@ -250,6 +250,9 @@ export function wizardToFile(def) {
     // file" rule the hooks manifest below states). Dropping it would land a shared fork emitting a different program from
     // the wizard it was forked from — the quiet version of the loss `group` once had. Authored, never derivable.
     if (def.forkedFrom) op.forkedFrom = def.forkedFrom;
+    // t1617 — the save stamp rides so a file round trip returns the def IDENTICAL (the library-sources harsh test).
+    // createUserOp stamps it only when ABSENT, so an import keeps the date the wizard was actually saved.
+    if (def.savedAt) op.savedAt = def.savedAt;
     // t1593 — …and so do INHERITED bindingSpecs, by the rule stated above rather than against it. "Not written because
     // the import RE-DERIVES it" is true only while the specs come from `formfield` blocks in the template. A fork of a
     // twin whose specs are HAND-WRITTEN has no such blocks, so there is nothing to re-derive from — writing nothing

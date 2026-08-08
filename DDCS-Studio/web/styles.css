@@ -5746,6 +5746,26 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-empty { padding: 14px 10px; font-size: 12px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 6px; }
 @media (max-width: 640px) { .wsm-overlay { padding: 0; align-items: flex-start; } .wsm-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }
 
+/* ── t1617 — THE WIZARD MANAGER (ui/wizardManager.js): the workspace-manager idiom over the wizard registry. It
+   reuses the wsm-* chrome above (one design language); these rows are its own — name · provenance · saved-when +
+   the lifecycle actions, and the read-only built-in rows whose one action is Fork. ────────────────────────────── */
+.wizm-title { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+.wizm-list { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: color-mix(in srgb, var(--bg, #111) 45%, transparent); }
+.wizm-scroll { max-height: 220px; overflow: auto; }
+.wizm-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.wizm-row:last-child { border-bottom: none; }
+.wizm-ico { flex: 0 0 auto; width: 18px; text-align: center; }
+.wizm-name { flex: 1 1 32%; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wizm-prov { flex: 1 1 24%; min-width: 0; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wizm-when { flex: 0 0 74px; text-align: right; color: var(--text-dim); font-size: 11px; }
+.wizm-acts { flex: 0 0 auto; display: flex; gap: 4px; }
+.wizm-act { font: inherit; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--text-main); cursor: pointer; }
+.wizm-act:hover:not(:disabled) { background: color-mix(in srgb, var(--accent, #2d7ff9) 14%, transparent); }
+.wizm-act:disabled { opacity: .4; cursor: not-allowed; }
+.wizm-act.is-danger:hover { color: #ef4444; background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); }
+.wizm-badge { flex: 0 0 auto; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; color: #fff; background: #6b7b3a; }
+.wizm-chip { flex: 0 0 auto; font-size: 10px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
+
 /* ── t1271 — AXIS GATING. A wizard this machine cannot physically run is greyed, never hidden: hiding rewrites the
    screen and answers a question nobody asked, while leaving "can this machine do it?" unanswered. The tooltip is the
    whole explanation, exactly as postGating does it for fields. ─────────────────────────────────────────────────── */

@@ -626,7 +626,8 @@ function openSaveDialog(init, onConfirm) {
     m.innerHTML += `
         <div class="bds">
             <h3>Save as custom wizard</h3>
-            <div class="blk-dev-hint" style="margin-bottom:8px;">Saved into this workspace — rides your .ddcs file.</div>
+            <div class="blk-dev-hint" style="margin-bottom:8px;">Saved into this workspace — rides your .ddcs file.
+                <button type="button" class="blk-dev-managewiz" style="background:none;border:none;padding:0;font:inherit;font-size:11px;color:var(--accent,#3b82f6);cursor:pointer;text-decoration:underline;">Manage wizards…</button></div>
             <div class="blk-dev-editnote blk-dev-hint" hidden></div>
             <div class="blk-dev-hint">${init.knobs ? `${init.knobs} form field${init.knobs === 1 ? '' : 's'} declared.` : 'No form fields declared — saves a fixed (parameterless) wizard. Use a “Parameter Group” block to add them.'}</div>
             <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
@@ -654,6 +655,10 @@ function openSaveDialog(init, onConfirm) {
     document.addEventListener('keydown', onKey, true);
     q('.blk-dev-cancel').addEventListener('click', close);
     m.addEventListener('click', (e) => { if (e.target === m) close(); });
+    // t1617 — the wording's earned door: rename / duplicate / delete / export-to-file live in the Wizard Manager,
+    // not here. Opening it abandons this save (the dialog closes) — the stack is untouched, save again after.
+    const mw = q('.blk-dev-managewiz');
+    if (mw) mw.addEventListener('click', () => { close(); if (window.openWizardManager) window.openWizardManager(); });
 
     // Non-destructive save: when re-authoring, "Update <name>" overwrites the original (explicit, outline) while the
     // accent "Save as new" makes a separate copy (the safe default — the original is untouched unless you click Update).

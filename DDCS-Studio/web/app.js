@@ -88,6 +88,10 @@ import './ui/workspaceSave.js';
 // t1223 — THE WORKSPACE MANAGER: one modal for Save / Save As / Duplicate + the granted-folder card browser (Open).
 import './ui/workspaceManager.js';
 
+// t1617 — THE WIZARD MANAGER: the same idiom over the wizard registry (fork / rename / duplicate / delete +
+// the two .wiz library shelves). Crossing is an explicit copy — the workspace embeds, the library shelves.
+import './ui/wizardManager.js';
+
 // Anonymous, opt-out usage analytics — fires a `visit` on load; see ui/analytics.js
 import './ui/analytics.js';
 

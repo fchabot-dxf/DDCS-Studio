@@ -66,6 +66,9 @@ function runQuickAction(act) {
         // focuses the current workspace + its delta, Open focuses the granted folder's cards.
         case 'wsSave': window.openWorkspaceManager?.('save'); break;
         case 'wsOpen': window.openWorkspaceManager?.('open'); break;
+        // t1617 — the WIZARD manager, the workspace manager's sibling: wizard lifecycle (fork / rename / duplicate /
+        // delete + the .wiz library shelves). Distinct from 'wizard' above, which SAVES the current stack as one.
+        case 'wizards': window.openWizardManager?.(); break;
     }
 }
 
@@ -151,6 +154,13 @@ export function initHeaderPost() {
             + `<button type="button" class="hq-ws-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open</button>`
             + `</div>`;
 
+        // t1617 — the WIZARD MANAGER's entry, the workspace manager's sibling (same place, next row): the wizards
+        // embedded in THIS workspace + the .wiz library shelves. Lifecycle, not bar arrangement (that stays in Settings).
+        const wizardsRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="wizards">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('wizard')
+            + '<span class="hdr-quick-lbl">Wizards…</span></button>';
+
         // ── THEME ─────────────────────────────────────────────────────────────────────────────────────
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
             + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
@@ -192,6 +202,7 @@ export function initHeaderPost() {
         menu.innerHTML =
             identityRow          // t1227 — the quiet name · dialect line sits WITH the workspace buttons (save context)
             + workspaceRow
+            + wizardsRow         // t1617 — the wizard manager, beside the workspace it serves
             + '<div class="hdr-quick-sep"></div>'
             + libraryRow
             + themeSection

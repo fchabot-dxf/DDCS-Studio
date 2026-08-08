@@ -17882,3 +17882,99 @@ work; its spec re-ran 5/5 green after the surgery.
 live and armed, this seat's waiter is itself the hazard (every future pass would wake two executors). So
 this window does NOT re-arm and does NOT pass — turn 1619's completion belongs to the fresh seat that is
 actually building t1617. Only the human should ever run one worker window per role.
+
+
+## t1617/t1619 — THE WIZARD MANAGER: lifecycle gets its own door (turn 1619)
+
+**The dispatch (user-ruled, the full shape in NEXT-SESSION):** workspace-manager idiom over the wizard
+registry — customs listed (name · forkedFrom provenance · date) with Rename/Duplicate/Delete; built-ins
+read-only with FORK the one action; Import/Export `.wiz` via the PROVEN two shelves (granted FSA folder +
+Drive app folder); the duality RULED (workspace EMBEDS, library SHELVES, crossing = EXPLICIT COPY, no
+references / no auto-sync ever); no update-from-source in v1.
+
+### What landed
+
+- **ui/wizardManager.js (new)** — `openWizardManager()`, the modal in the workspace manager's own chrome
+  (wsm-* classes reused wholesale; a small wizm-* row block added to styles.css). TOP: this workspace's
+  customs + the read-only built-ins; BOTTOM: the Local/Cloud `.wiz` shelves (renderLibraryShelf reused
+  whole; the Drive tab reuses ensureRoot/list/read/write/trash + the stale-render token guard).
+- **Fork is ONE-SOURCE with the Blocks route:** the template goes through the SAME `wrapRecognizedForFork`
+  (lazy devMode import) and the declarations through the SAME `forkInheritance` the Customize→Save path
+  uses — minus the canvas, which fork-parity-1593 proved adds nothing to an untouched fork. The copy is a
+  deep copy of the PERSISTED def (the live one can carry re-attached hook fns), fresh defV/savedAt.
+- **Duplicate = the same copy mechanism; provenance kept VERBATIM** — a copy of a fork stays a fork of the
+  SAME source (pointing it at the intermediate copy would break the one-step hook lookup in
+  reconcileCodeHooks).
+- **Rename updates the DEF label** (stored defV passed through → respected as-is → placed instances do not
+  go stale over a name) and CLEARS any bar-designer label override (one-name: the def is the source).
+- **`savedAt` declared on the def (userOps):** createUserOp stamps only when ABSENT (an imported file's
+  own stamp survives — the round trip must not lie); updateUserOp restamps (an update IS a save).
+  wizardToFile carries it, so library-sources-1247's harsh deep-equal still holds.
+- **Import is ONE path** (wizardLibrary.importWizard — hooks manifest, named outcome). A collision is an
+  explicit-copy QUESTION (Replace / Cancel); Replace = delete-then-import through that same path. Never a
+  merge, never a reference.
+- **"Also in library" = a shown content MATCH** (exported-op JSON equality against the shelf listing) —
+  never acted on; divergence simply puts the chip out.
+- **Entry points:** the header quick-menu grows a "Wizards…" row beside the workspace row (the menu-diet
+  pin GROWN 9→10 and named in the spec, the t1245 precedent), and the save dialog's t1615 wording earns
+  its "Manage wizards…" link (closes the save, opens the manager; the stack is untouched).
+
+### Two wrong turns, reported
+
+1. **Escape ate the whole manager (self-caught by the new collision spec's Cancel arm):** dialog.js and
+   the modal both listen for Escape on `document` in CAPTURE, so the dialog's stopPropagation cannot
+   shield the modal — one Escape cancelled the Replace confirm AND closed the manager. Fixed: the modal's
+   onKey stands down while an `.app-dialog` is up. The workspace manager has the same latent quirk
+   (Escape over its delete confirm closes both) — NOT fixed here (surgical); flagged as a candidate
+   one-liner for a future small act.
+2. **The duplicate-seat anomaly, again (t1613's double-waiter):** the old sixth-act seat's stale waiter
+   consumed turn 1619 and built in parallel (its `wzMgr` headerPost case appeared in my tree mid-flight);
+   it caught the collision itself, WITHDREW every piece (my own diff audit after: only this seat's hunks
+   remain), logged 4cddb34b, and stood down un-armed. I re-marked proc turn 1619 and completed the act.
+
+### Verification
+
+- **Non-vacuous via the scratch-worktree rig:** all manager tests RED pre-change (worktree at c2f2f6af —
+  feature absent, boot times out: the trivial new-feature red, stated as such). The menu-diet pin proved
+  red ON ITS CLAIM (rowNames missing 'wizards') against the pre-change app served on 3211 — that spec
+  hardcodes its URL, as do several below (worth knowing about the rig). The collision test proved it can
+  fail the strongest way there is: it CAUGHT a live defect (wrong turn 1) before ever going green.
+- **THE ROUND TRIP THROUGH FILES (the t1593 standard, through the manager's own gestures):** fork Corner,
+  rename, export to the granted folder, delete from the workspace, import back from the shelf card — the
+  def returns DEEP-EQUAL and EMITS byte-identically at 10+ off-default numeric values. Anti-drift:
+  every assertion reads the registry (listUserOps/getUserDef) or the file (the fake folder's actual text /
+  the fake Drive's actual upload bytes), and the displayed row is compared against those same reads
+  (provenance = 'fork of Corner' from forkedFrom; the date column = def.savedAt).
+- **Built-ins:** the mutating actions are ABSENT from the section (absence, not disabling — the t1615
+  construction), every built-in offers Fork, none disabled (pins the all-twins state).
+- **Drive:** list (.ddcs filtered out, .wiz/.wizard in), export uploads the wizard file (multipart bytes
+  carry name + kind + opType), a row click imports as a copy.
+- **Fast tier: 48/48 serialized across 12 files** (incl. fork-parity-1593, library-sources-1247, the full
+  t1615 save-dialog suite, blocks-live-form, wizard-library, the Settings wizard-manager panel, the
+  workspace cloud tab). Ran before the Escape-guard fix; wizard-manager-1617 re-ran 7/7 green after it.
+- **Full suite: 20 failed / 2390 passed / 6 skipped e2e + 1 node (18.4 min)** vs t1615's 19/2386/6 + 1.
+  Total +5 = exactly this act's tests as counted (the suite ran while the file had 5 tests; the collision
+  + chip tests were added AFTER the counted run — the t1613 precedent — and the file then re-ran 7/7).
+  GONE — fork-parity-1593:107 (green in this turn's serialized fast tier). The five emit/round-trip reds
+  that could have implicated the savedAt stamp (cam-slot-edit-s3:65, drill-as-data:13,
+  drill-bindings-identity-1385:116/:180, roundtrip-whole-program-1319:96) were CHASED, not argued:
+  isolated twice serialized on THIS tree (same 5 red) AND isolated against the PRE-CHANGE worktree (the
+  SAME 5 red, same 5/10 split) — standing deterministic members, not this act's regression. The rest of
+  the 20 are the documented classes (cam-s52/s53 pair, middle-superset:35, import-safety, the mouse/hover
+  set, update-check x2). None of this act's tests red; node red = the standing surfacing-as-data member.
+- **Screenshots:** t1617-manager-roundtrip.png (customs + built-ins + the local shelf after the round
+  trip) · t1617-readonly-builtins.png (Fork-only rows beside a full-lifecycle custom row) ·
+  t1617-drive-shelf.png (the cloud shelf: account bar + .wiz rows). (The t1617-user_*.png files dated
+  Aug 6 are the PRIOR seat's twin screenshots, not this act's.)
+
+### What this does NOT cover
+
+1. **Drive trash for wizards** — the button + confirm ship (the WM's trash seam) but no spec drives it.
+2. **The cloud sign-in flow** and the WM's origin-mismatch guidance — deliberately NOT duplicated here
+   (one lesson lives on the WM's cloud tab); my signed-out panel is one button + the WM's error shapes.
+3. **The download fallback** (no-FSA export) — inherited verbatim from the Settings exporter; not driven.
+4. **Escape-over-dialog on the WORKSPACE manager** — the same latent quirk fixed here in the wizard
+   manager; named as a candidate follow-up, untouched this turn.
+5. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** first act this seat — clean, with room to spare.
