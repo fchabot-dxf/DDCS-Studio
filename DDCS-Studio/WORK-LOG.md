@@ -17677,3 +17677,76 @@ named; the map grows per-CONCEPT, never per-wizard.
 
 **Capacity:** fourth act this seat, the smallest of the four — comfortable. The queued derived/writes
 `passes` act is the seat-sized one; fresh-seat judgement belongs to the advisor.
+
+
+## t1613 — derived/writes fields: the `passes` stepper on every depth+stepdown wizard (turn 1613)
+
+**The dispatch (the train's last car):** `passes` derived `ceil(depth / stepdown)`, writes
+`depth + (passes − ceil(depth/stepdown)) × stepdown` — INCREMENT semantics user-ruled (preserves the
+adapted last pass; the snap alternative was REJECTED). Stepper widget (first consumer), `ceil` lowercase,
+form-side evaluation with NAMED inline errors, writes only on a user gesture, a write triggers derives
+never writes, and the formfield authoring block grows the same two sockets.
+
+### What landed
+
+- **expr.js** — `ceil` in the declared function table (a data edit, lowercase per the table's doctrine).
+  The evaluator's own header planned this consumer ("wizard params when that face lands") — this is that face.
+- **passesField.js (new)** — the ONE declaration: PASSES_FIELD (derived + writes + stepper + help) and
+  `withPassesField(bindings)` which splices it directly after the twin's `stepdown` binding, inheriting
+  that row's section. Five twins consume it: surfacing, pocket, slot, contour, text (the declared
+  criterion — both a depth and a stepdown binding — excludes drill/bore correctly).
+- **formWidgets.js** — `stepperWidget` ([▼] value [▲]; ▲▼ dispatch real input+change from the inner field,
+  so a step IS a gesture on the field) and `wireDerivedFields`, the ONE engine for both faces: renderOpForm
+  wires the flat form, renderUiTree wires again on the REAL host (rows move out of the scratch container —
+  the same reason the orphan net tests host.contains). Prior wiring is REPLACED per render (a persistent
+  #blk-form re-renders different defs; a guarded-once closure would apply stale expressions).
+- **The execution rule, by construction:** applyDerives sets values silently (no events), so any input
+  event FROM a derived field is a real gesture → writes run; a write's dispatched input re-enters as a
+  non-derived edit → derives recompute, writes never cascade. Errors render as a named `.derived-err` span
+  in the field's own row (e.g. "passes: not a finite number" at stepdown 0) — never a silent zero.
+- **formField.js + userOps.bindingsFromStack + deriveBindings.js** — the `derived`/`writes` authoring
+  sockets: derived rides verbatim; writes parses "param = expr" lines (';'/newline) into the declared map;
+  deriveBindings CARRIES both (the allow-list drop class the file itself documents).
+
+### Verification
+
+- **Non-vacuous: 6/6 fail against the pre-change tree** — driven via a scratch WORKTREE at HEAD served on
+  port 3213 (the config's own second-checkout seam), so no copy-aside dance on ten files. Each test fails
+  on its own claim.
+- **INCREMENT as numbers, the real gesture:** modal depth 1.6 / stepdown 0.5 → passes 4; ▲ → depth 2.1
+  (NOT 2.0/2.5 — the 0.1 finish survives), passes 5; ▼ → 1.6/4 (exactly reversible). Blocks face: ▲ at
+  defaults → depth 1.0 in the field AND the canvas param_field dflt follows (the t1605 writeback chain,
+  end to end). Emit-neutrality asserted per twin (with/without passes byte-identical); anti-drift: every
+  expected expression read from the imported PASSES_FIELD in-page.
+- **Screenshots:** t1613-passes-derived.png (the stepper beside stepdown, friendly labels) +
+  t1613-passes-error.png (the named red inline error at stepdown 0, value not zeroed).
+- **Fast tier (12 files, 41 tests): 38 green + 3 triaged** — the documented cam-s52/s53 pair +
+  blocks-live-form:168 (passes isolated ×2; t1603's recorded churn member).
+- **Full suite: 19 failed / 2383 passed / 6 skipped e2e + 1 node (18.1 min).** vs t1611's 20/2376: +6 =
+  this act's tests, one net churn heal. GONE — last run's 3 churn IDs. NEW — middle-superset:35 (isolates
+  green ×4 shards, named churn) and **expr-functions-ternary-1566:14 — MINE, the ruled-growth class**: it
+  pins the exact declared function set, and `ceil` joined by ruling. Expectation GROWN with a comment
+  (the pin's purpose — nothing sneaks in unlisted — unchanged); green isolated after. The suite ran before
+  that one-line expectation fix, so its red appears in the counted run — reported rather than re-run for
+  18 minutes; the advisor's merge gate gets the clean tree. The 1 node red is the standing member.
+- **⚠ A TOOLING WRONG TURN, reported:** a PowerShell regex-rewrite of four twin files mangled their UTF-8
+  (mojibake + BOM, whole-file churn). Caught in the diff stat, reverted from HEAD (they carried no other
+  edits), redone with the Edit tool. Also: expr.js briefly carried a DUPLICATE ceil entry (a concurrent
+  edit landed the same ruled line); deduped keeping the other's comment.
+
+### What this does NOT cover
+
+1. **`passes` has no param_field row** (paramGroupFromBindings materializes socket bindings only), so on
+   the blocks tree face it renders via the t1579 union + the orphan net — at the end of the form, not
+   beside stepdown. The flat modal face places it correctly. Candidate: materialize derived fields too.
+2. **The stored-op EDIT path carries no passes** (it is form-side, never in op.params by design — derived
+   on open from depth/stepdown, which is the correct semantics; noted so nobody hunts for it in params).
+3. **Writes are numeric-field-only in practice** (targets resolve by [data-param]; a dropdown target would
+   String-write — no declared consumer does).
+4. **The formfield sockets are spec-level verified** (bindingsFromStack), not driven through a full
+   author→save→reopen→gesture loop in the real app.
+5. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity (the honest note):** FIFTH act this seat, and the dispatch was addressed to a fresh seat. It
+completed with full verification, but the working context is genuinely long now — if a follow-up act is
+substantial, a fresh seat is the strong move; a small ruling-absorb act fits here fine.

@@ -46,6 +46,7 @@ import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing p
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity, re-derived over the PRUNED stack
+import { withPassesField } from './passesField.js';   // t1613 — the derived `passes` field (declared once, every depth+stepdown twin)
 import { pruneGuards } from '../whenGuard.js';
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, ENTRY_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy); t842 ENTRY_OPTIONS
 
@@ -223,7 +224,7 @@ export const SLOT_BINDINGS = (() => {
 
 /** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function slotDataDef() {
-    const def = userOpFromStack('slot_data', 'Slot (data)', slotDataStack(SLOT_DEFAULTS), SLOT_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('slot_data', 'Slot (data)', slotDataStack(SLOT_DEFAULTS), withPassesField(SLOT_BINDINGS), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
     def.bindingSpecs = SLOT_BINDING_SPECS;   // t1500 — re-derive the value sockets BY IDENTITY over the PRUNED stack each build
     /**
      * t1500 — `_para`: does THIS slot's clearing ride `surfaceraster`? GEOMETRY-, ENTRY- and ENVELOPE-derived (the

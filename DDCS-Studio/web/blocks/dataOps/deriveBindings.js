@@ -90,6 +90,8 @@ export function deriveBindings(flatStack, specs) {
         // survives postGating). Un-carried it was silently dropped and surfacing's WCS stopped greying in Skim — the
         // live-form symptom, not a spec detail, and the same allow-list class as widgetConfig and defaultLive above.
         if (s.gate) b.gate = s.gate;
+        if (s.derived) b.derived = s.derived;   // t1613 — CARRY the derived/writes declarations (the same allow-list drop class as widgetConfig/gate above); wireDerivedFields consumes them
+        if (s.writes) b.writes = s.writes;
         if (s.optionGate) b.optionGate = s.optionGate;   // t961 — CARRY the declared per-option enable predicate through the derive (else the dropdown renders no option gate — the same class of drop the widget/widgetConfig carry fixed)
         if (s.anchor) b.anchor = s.anchor;   // composable GUI (PILOT 2) — a DECLARED layout anchor {kind, frame}; layoutSpecFromOp switches on anchor.kind
         if (s.readonly) b.readonly = true;   // t389 — a DRAG-DRIVEN socket: the form field DISPLAYS it (readonly), the canvas handle is the sole editor

@@ -41,7 +41,11 @@ test('min/max/abs/round + ternary evaluate; every malformed form throws a NAMED 
         };
     });
 
-    expect(r.functions.sort(), 'the declared function set is the one source').toEqual(['abs', 'max', 'min', 'round']);
+    // t1613 — EXPECTATION GROWN WITH THE RULING (called out, not smuggled): `ceil` joined the declared table
+    // for the derived `passes` field (ceil(depth/stepdown)), lowercase per the table's doctrine — the dedicated
+    // passes-field spec asserts its behaviour + that CEIL still refuses by name. The pin's PURPOSE (the set is
+    // one declared source, nothing sneaks in unlisted) is unchanged; the ruled member joins the list.
+    expect(r.functions.sort(), 'the declared function set is the one source').toEqual(['abs', 'ceil', 'max', 'min', 'round']);
 
     expect(r.abs.v).toBe(7);
     expect(r.round.v).toBe(3);

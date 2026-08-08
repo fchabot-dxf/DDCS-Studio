@@ -321,6 +321,20 @@ export function bindingsFromStack(children) {
             if (p.units) wc.units = String(p.units);
         }
         if (Object.keys(wc).length) spec.widgetConfig = wc;
+        // t1613 — the DERIVED/WRITES sockets: `derived` rides verbatim (an expr over the form's params);
+        // `writes` parses one-or-more "param = expr" lines (';' or newline separated) into the declared map —
+        // the same shape the shipped passes field carries, consumed by formWidgets.wireDerivedFields.
+        if (p.derived != null && String(p.derived).trim() !== '') spec.derived = String(p.derived).trim();
+        if (p.writes != null && String(p.writes).trim() !== '') {
+            const m = {};
+            for (const seg of String(p.writes).split(/[;\n]/)) {
+                const eq = seg.indexOf('=');
+                if (eq <= 0) continue;
+                const k = seg.slice(0, eq).trim(), ex = seg.slice(eq + 1).trim();
+                if (k && ex) m[k] = ex;
+            }
+            if (Object.keys(m).length) spec.writes = m;
+        }
         if (p.optional === true || p.optional === 'true' || p.optional === 'TRUE') spec.optional = true;
         if (p.readonly === true || p.readonly === 'true' || p.readonly === 'TRUE') { spec.readonly = true; if (p.readonlyhint) spec.readonlyHint = String(p.readonlyhint); }
         if (p.whenparam) spec.when = { param: String(p.whenparam), is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : String(p.whenis) };

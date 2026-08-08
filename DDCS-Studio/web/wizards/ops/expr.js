@@ -53,6 +53,7 @@ export const UNRESOLVED = Object.freeze({ __unresolved: true });
 const FUNCS = {
     abs:   { min: 1, max: 1, fn: (a) => Math.abs(a) },
     round: { min: 1, max: 1, fn: (a) => Math.round(a) },
+    ceil:  { min: 1, max: 1, fn: (a) => Math.ceil(a) },   // t1613 — the derived `passes` field counts whole Z passes: ceil(depth / stepdown); lowercase per this table's doctrine
     min:   { min: 2, max: Infinity, fn: (...a) => Math.min(...a) },
     max:   { min: 2, max: Infinity, fn: (...a) => Math.max(...a) },
 };

@@ -25,6 +25,7 @@ import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t8
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
 import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUSE the accordion motion engine (theme drawer tokens), not a duplicate
 import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE mm<->inch conversion leaf (shared with the tool-library editor + catalog picker)
+import { evalExpr } from '../wizards/ops/expr.js';   // t1613 — the ONE expression evaluator (wizard params are now a caller-populated scope, as its header planned)
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -649,6 +650,39 @@ function rectPadWidget(host, primary, group) {
     return { read: () => ({ [bx.param]: r3(x), [by.param]: r3(y), [bw.param]: r3(w), [bh.param]: r3(h) }) };
 }
 
+// t1613 — the STEPPER widget: [▼] value [▲], the first consumer being the derived `passes` field. A compact
+// integer control whose ▲▼ clicks dispatch a real bubbling input+change from the inner field — so a step IS a
+// user gesture on the field, exactly what wireDerivedFields' writes rule keys on. min/step from widgetConfig.
+function stepperWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const cfg = b.widgetConfig || {};
+    const step = numOr(cfg.step, 1);
+    const min = cfg.min != null ? Number(cfg.min) : null;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = String(step); if (min != null) inp.min = String(min);
+    if (b.default != null && b.default !== '') inp.value = String(b.default);
+    inp.dataset.param = b.param;
+    inp.style.cssText = CTRL_CSS + ' width:70px; text-align:center;';
+    const mkBtn = (dir, glyph) => {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.textContent = glyph; btn.tabIndex = -1;
+        btn.style.cssText = 'padding:4px 10px; border:1px solid var(--border,#2a3340); border-radius:6px; background:var(--panel,#232833); color:inherit; cursor:pointer; flex:0 0 auto;';
+        btn.addEventListener('click', () => {
+            let v = numOr(inp.value, min != null ? min : 0) + dir * step;
+            if (min != null) v = Math.max(min, v);
+            inp.value = String(v);
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        return btn;
+    };
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex; align-items:center; gap:4px;';
+    wrap.append(mkBtn(-1, '▼'), inp, mkBtn(1, '▲'));
+    host.append(labelSpan(b), wrap);
+    return { read: () => (inp.value === '' ? {} : { [b.param]: numOr(inp.value, 0) }) };
+}
+
 // t554 — an ACTION button (contributes NO param): opens a modal declared by `b.action` (e.g. homing's 'Homing Setup…').
 // A lazy dynamic import avoids a formWidgets↔settingsPanel cycle. read() returns {} so renderOpForm's reader loop is happy.
 function actionWidget(host, b) {
@@ -802,6 +836,7 @@ export const FORM_WIDGETS = {
     'coord-list': coordListWidget,
     'xy-pad': xyPadWidget,
     rect: rectPadWidget,
+    stepper: stepperWidget,   // t1613 — first consumer: the derived `passes` field
 };
 
 // widgets that bind a GROUP of params (the form renders ONE widget for the whole group, not one per binding).
@@ -970,6 +1005,84 @@ export function formBindings(def) {
     return out;
 }
 
+/**
+ * t1613 — the DERIVED/WRITES engine, ONE implementation for both faces (renderOpForm wires it for the flat
+ * form; renderUiTree wires it after tree placement, since rows MOVE out of the flat pass's scratch host and
+ * a listener there would be inert).
+ *
+ * A binding may DECLARE:
+ *   derived: '<expr>'            — this field's VALUE is computed from the other fields (expr.js scope =
+ *                                  the live [data-param] values); recomputed on any OTHER field's input.
+ *   writes:  { param: '<expr>' } — a USER GESTURE on this field evaluates each entry (the gesture value is
+ *                                  already in scope) and writes the target field, dispatching input/change.
+ *
+ * THE EXECUTION RULE (ruled): writes fire ONLY on a user gesture on the declaring field — applyDerives sets
+ * values silently (no events), so any input event FROM a derived field is a real gesture by construction.
+ * A write's dispatched input re-enters this listener as a non-derived edit → derives recompute, other writes
+ * NEVER run (no cascade, no hidden state). Errors are NAMED inline on the field's own row — never a silent zero.
+ */
+export function wireDerivedFields(host, bindings) {
+    const derived = (bindings || []).filter((b) => b && b.param && b.derived);
+    // A persistent host (#blk-form) re-renders with DIFFERENT defs across a session: replace any prior wiring
+    // wholesale rather than guarding it once — a stale closure would apply the old def's expressions.
+    if (host.__derivedHandler) { host.removeEventListener('input', host.__derivedHandler); host.__derivedHandler = null; }
+    if (!derived.length) return;
+    const esc = (p) => (window.CSS ? CSS.escape(p) : p);
+    const fieldOf = (p) => host.querySelector(`[data-param="${esc(p)}"]`);
+    const scope = () => {
+        const s = {};
+        host.querySelectorAll('[data-param]').forEach((f) => {
+            const v = (f.type === 'checkbox') ? (f.checked ? 1 : 0) : f.value;
+            const n = Number(v);
+            s[f.dataset.param] = (v !== '' && Number.isFinite(n)) ? n : v;
+        });
+        return s;
+    };
+    const setErr = (b, msg) => {
+        const f = fieldOf(b.param); const row = f && f.closest('div');
+        if (!row) return;
+        let e = row.querySelector('.derived-err');
+        if (!msg) { if (e) e.remove(); return; }
+        if (!e) {
+            e = document.createElement('span');
+            e.className = 'derived-err';
+            e.style.cssText = 'flex:1 0 100%; margin-top:3px; font-size:11px; color:#e05555;';
+            row.appendChild(e);
+        }
+        e.textContent = msg;
+    };
+    const applyDerives = () => {
+        for (const b of derived) {
+            const f = fieldOf(b.param); if (!f) continue;
+            if (f === document.activeElement) continue;   // never clobber the field mid-gesture
+            try { f.value = String(evalExpr(b.derived, scope())); setErr(b, null); }
+            catch (e) { setErr(b, `${b.param}: ${e.message}`); }   // NAMED — never a silent zero
+        }
+    };
+    const runWrites = (b) => {
+        const sc = scope();   // the gesture value is already in the DOM → already in scope
+        for (const target in (b.writes || {})) {
+            const tf = fieldOf(target);
+            if (!tf) { setErr(b, `${b.param} writes ${target}: no such field`); continue; }
+            try {
+                const v = evalExpr(b.writes[target], sc);
+                setErr(b, null);
+                tf.value = String(Math.round(v * 1000) / 1000);
+                tf.dispatchEvent(new Event('input', { bubbles: true }));
+                tf.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (e) { setErr(b, `${b.param} → ${target}: ${e.message}`); }
+        }
+    };
+    const byParam = {}; derived.forEach((b) => { byParam[b.param] = b; });
+    host.addEventListener('input', (e) => {
+        const f = e.target && e.target.closest && e.target.closest('[data-param]');
+        const b = f && byParam[f.dataset.param];
+        if (b) { if (b.writes) runWrites(b); }
+        else applyDerives();
+    });
+    applyDerives();   // initial values — the declared expression, not a stored default
+}
+
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};
     for (const b of (bindings || [])) {
@@ -1066,6 +1179,7 @@ export function renderOpForm(host, bindings) {
         const inp = host.querySelector(`[data-param="${b.param}"]`);
         if (inp) decorateInputEl(inp, b.sourceField, { gate: true });
     }
+    wireDerivedFields(host, bindings);   // t1613 — the derived/writes engine (inert when nothing declares `derived`)
     return readers;
 }
 
@@ -1301,5 +1415,9 @@ export function renderUiTree(host, uiTree, bindings, byParam = {}) {
         const inp = host.querySelector(`[data-param="${b.param}"]`);
         if (inp) decorateInputEl(inp, b.sourceField, { gate: true });
     }
+    // t1613 — wire the derived/writes engine on the REAL host: the rows were rendered in the caller's scratch
+    // container, so renderOpForm's own wiring sits there inert once the tree extracts them (same reason the
+    // orphan net tests host.contains). Inert when no binding declares `derived`.
+    wireDerivedFields(host, bindings);
     return readers;
 }

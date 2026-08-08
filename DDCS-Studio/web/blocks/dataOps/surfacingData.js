@@ -34,6 +34,7 @@ import { applySkimStructure } from './skimStructure.js';   // t986 — the Skim 
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
 import { entryBindingsFor, toolBindingsFor, deriveBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings); t1349 — the BODY bindings are by identity too
+import { withPassesField } from './passesField.js';   // t1613 — the derived `passes` field (declared once, every depth+stepdown twin)
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_OPTIONS, ENTRY_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns); t842 ENTRY_OPTIONS
 
 /** Author defaults — match surfacingStack's own num() fallbacks (+ flat stepover/strategy) so the seeded template == the
@@ -167,7 +168,7 @@ export function buildSurfacingTwinStack() {
  *  is surfacingStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function surfacingDataDef() {
     const stack = buildSurfacingTwinStack();
-    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...toolBindingsFor(stack), ...SURFACING_STRUCT, ...surfacingBindingsFor(stack), ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, withPassesField([...toolBindingsFor(stack), ...SURFACING_STRUCT, ...surfacingBindingsFor(stack), ...entryBindingsFor(stack)]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)

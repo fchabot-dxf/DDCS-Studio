@@ -20,6 +20,7 @@ import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing p
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
 import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
+import { withPassesField } from './passesField.js';   // t1613 — the derived `passes` field (declared once, every depth+stepdown twin)
 import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, ENTRY_OPTIONS_NO_HELIX } from './wizardOptions.js';   // t722 P2a rider — one-source; t842 depth entry (no helix — a profile trace)
@@ -135,7 +136,7 @@ export function contourDataDef() {
         ],
         children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
     }];
-    const def = userOpFromStack('contour_data', 'Contour (data)', stack, [...toolBindingsFor(stack), ...CONTOUR_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('contour_data', 'Contour (data)', stack, withPassesField([...toolBindingsFor(stack), ...CONTOUR_BINDINGS, ...entryBindingsFor(stack)]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
     def.previewGeometry = contourPreviewGeometry;   // t712 — per-feature 2D handles (pos + shape size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)

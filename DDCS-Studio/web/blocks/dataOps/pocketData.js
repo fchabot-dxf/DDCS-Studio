@@ -23,6 +23,7 @@ import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRides
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';
+import { withPassesField } from './passesField.js';   // t1613 — the derived `passes` field (declared once, every depth+stepdown twin)
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b — the declared mill entry point (entryX/entryY bind via POCKET_BINDING_SPECS)
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a — the declared tool-selection marker (toolNum binds via POCKET_BINDING_SPECS)
 import { pruneGuards } from '../whenGuard.js';
@@ -336,7 +337,7 @@ export function pocketDataDef() {
         ? [...withStrategy, MATERIAL_BINDING]
         : [...withStrategy.slice(0, fdAt + 1), MATERIAL_BINDING, ...withStrategy.slice(fdAt + 1)];
     const def = userOpFromStack('pocket_data', 'Pocket (data)', pocketDataStack(POCKET_DEFAULTS),
-        orderedBindings, 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
+        withPassesField(orderedBindings), 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs); t1613 — the derived `passes` field, spliced after stepdown
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build
     // t1406 — `_para`: does this pocket's rect clearing ride `surfaceraster`? GEOMETRY- AND ENVELOPE-derived (shape,
     // tool vs size, a rest tool, direction, and the atom's own PROVEN table), so it cannot be a plain param guard. The

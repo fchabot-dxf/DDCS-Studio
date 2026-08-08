@@ -24,11 +24,14 @@ export const formFieldBlock = {
         section: '', help: '', optional: false, readonly: false, readonlyhint: '',
         whenparam: '', whenis: '',
         options: '', nmin: '', nmax: '', nstep: '', units: '',
+        // t1613 — the DERIVED/WRITES sockets (the same two slots the shipped `passes` field declares): `derived` is
+        // an expr over the form's params; `writes` is one-or-more "param = expr" lines fired on a user gesture.
+        derived: '', writes: '',
     },
-    allFields: ['param', 'widget', 'label', 'dflt', 'matchvar', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'options', 'nmin', 'nmax', 'nstep', 'units'],
+    allFields: ['param', 'widget', 'label', 'dflt', 'matchvar', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'options', 'nmin', 'nmax', 'nstep', 'units', 'derived', 'writes'],
     fieldsFor(p) {
         const w = (p && p.widget) || 'number';
-        const f = ['param', 'widget', 'label', 'dflt', 'matchvar', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis'];
+        const f = ['param', 'widget', 'label', 'dflt', 'matchvar', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'derived', 'writes'];
         if (w === 'dropdown' || w === 'segmented') f.push('options');
         else if (w === 'number' || w === 'slider') f.push('nmin', 'nmax', 'nstep', 'units');
         return f;
