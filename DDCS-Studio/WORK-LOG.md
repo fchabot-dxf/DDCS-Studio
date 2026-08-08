@@ -17750,3 +17750,87 @@ never writes, and the formfield authoring block grows the same two sockets.
 **Capacity (the honest note):** FIFTH act this seat, and the dispatch was addressed to a fresh seat. It
 completed with full verification, but the working context is genuinely long now — if a follow-up act is
 substantial, a fresh seat is the strong move; a small ruling-absorb act fits here fine.
+
+## t1613 ADDENDUM — from the DUPLICATE worker seat (protocol anomaly + two code findings)
+
+**The anomaly, reported durably:** TWO worker sessions woke on the turn-1613 pass — the seat that executed
+it (fifth act, the entry above) and a second, fresh seat (this note's author). Root cause: a stale armed
+waiter; both fired on the same pass. The fresh seat detected the collision mid-flight (the tree was
+mutating under it), STOOD DOWN — no edits beyond one `ceil` line the executing seat absorbed and deduped
+(its "concurrent edit" wrong-turn note = me), no suite runs, no commit, no pass — and reviewed the
+executing seat's diff instead. The double-waiter persists until the human closes one window; until then
+every dispatch can double-fire. The fresh seat is deliberately NOT re-armed.
+
+**Two findings from that review, verified against commit 4ca5ea55 (both dormant for the shipped `passes`
+field, both real for user-authored linked fields — the formfield sockets' stated audience):**
+
+1. **`wireDerivedFields`: `host.__derivedHandler` is removed but never ASSIGNED** (formWidgets.js — the
+   `addEventListener('input', …)` result is anonymous; the removal branch above it can never fire). The
+   header's own claim ("replace any prior wiring wholesale") is not what the code does: on the persistent
+   `#blk-form` host, handlers ACCUMULATE across def switches. Shipped-passes is self-healing (the INCREMENT
+   write is a fixed point — N firings converge), but a user-authored non-idempotent write (`counter =
+   counter + 1`) fires once per accumulated render. Fix is two tokens: name the handler, assign it.
+2. **`bindingsToBlocks` does not write the two new sockets back** (userOps.js — its params object has no
+   `derived`/`writes` keys, so both fall to the block defaults `''`). Authoring IN works
+   (bindingsFromStack parses them); re-authoring OUT silently drops the linked behaviour on the next save —
+   a one-way data loss in exactly the round-trip isMaintainedAsData celebrates.
+
+Neither warrants reopening t1613 (the shipped behaviour verifies clean); both are candidates for the next
+small act. — 🔨² (the duplicate seat, standing down)
+
+
+## t1615 — the Save dialog READS the declaration (turn 1615)
+
+**The dispatch (user-ruled; the save-path disease, third instance):** the dialog asked Panel + Preview
+rig — questions the stack already answers as blocks. Ruling: declared → read-only summary, never asked;
+bare → fallback ask; NAME always asked. Plus the honest wording.
+
+### What landed
+
+devMode.js only. `openSaveDialog` gains `declPanel`/`declSim` (the stack's own panel block / sim block,
+read by the SAME `blkPanel`/`simIntentFromStack` reads the commit path has used since presentation-as-
+blocks landed — no new derivation): when declared, the question's CONTROL IS NOT RENDERED — a read-only
+summary line shows the declared value and names its declaring block ("Form + 3D preview + 2D layout —
+declared by the stack's panel block"). commit() uses the declaration directly in that case; with no
+control in the DOM, a conflict is impossible by construction (a hidden control could still disagree;
+absence cannot). A bare stack renders the original controls; the name input is unconditional. The
+belt-and-suspenders precedence in saveAsCustomOp's confirm (blkPanel/blkSim win) is untouched. Wording:
+"Saved into this workspace — rides your .ddcs file." (the old line referenced a Settings→Wizard Bar
+export that this dialog cannot see; export-to-file belongs to the Wizard Manager act, not built here).
+
+⚠ One self-inflicted wrong turn, caught in the same minute: the first dialog edit spliced the new
+conditional rows MID-template-literal (the `<style>` block's backtick swallowed the code); the very next
+read showed it and the repair closed the style string before the consts. Reported for the trail.
+
+### Verification
+
+- **Non-vacuous via the scratch-worktree rig (port 3213, the t1613 pattern): 2/2 changed-claim tests
+  fail pre-change** (the declared-summary test on its no-control claim; the wording test). The bare-stack
+  test passes BOTH trees BY DESIGN — it pins the preserved fallback so this act cannot break it (the
+  t1601 corpus-sweep precedent, stated rather than hidden).
+- **Anti-drift:** the declared-value assertions read the CANVAS stack in-page (flattenBlocks +
+  simIntentFromStack) and compare the dialog summary AND the saved def against it — panel equal, each rig
+  flag equal. The bare-stack answers land (form2d + rotary asserted on the saved def).
+- **Screenshots:** t1615-dialog-declared.png (corner: both summaries, no questions, the honest wording,
+  Update disabled with the maintained-as-data note) + t1615-dialog-bare.png (the fallback ask).
+- **Fast tier (7 files, 23 tests): 23/23 green serialized** — including fork-parity-1593 and the full
+  blocks-live-form save/update suite.
+- **Full suite: 19 failed / 2386 passed / 6 skipped e2e + 1 node (17.8 min).** vs t1613's 19/2383: +3 =
+  exactly this act's tests, count unchanged. GONE — expr-functions-1566:14 (t1613's ruled expectation
+  growth, now committed and healed). NEW — fork-parity-1593:107 churned back (green 23/23 in THIS turn's
+  serialized fast tier, the strongest isolate evidence available) beside the usual middle-superset churn.
+  The 1 node red is the standing surfacing-as-data member. None of this act's tests red.
+
+### What this does NOT cover
+
+1. **The editing-def prefill path** (a re-authored wizard whose STACK declares nothing but whose def
+   carries panel/sim) still prefills the ASK controls from the def — correct per the ruling (the def is
+   not the stack; only blocks suppress the question), but stated so nobody reads it as an oversight.
+2. **Export-to-file / the Wizard Manager** — explicitly deferred by the dispatch; the wording no longer
+   promises it from this dialog.
+3. **The declared summary is not clickable** (no jump-to-block affordance) — a candidate nicety.
+4. **Desktop viewport only; the exe shell was not run.**
+
+**Capacity:** SIXTH act this seat. This one was small and completed cleanly, but the seat is long past
+the fresh-seat line the advisor drew — the Wizard Manager act (the next, substantial one) should NOT
+start here. Parking that judgement where the advisor already put it.

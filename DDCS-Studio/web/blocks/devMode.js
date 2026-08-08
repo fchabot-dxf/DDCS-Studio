@@ -573,8 +573,17 @@ export async function editWizardDef(opType) {
 
 // The Save DIALOG — the metadata collection surface (name / panel / DECLARED preview-rig), shown at save time and
 // dismissed after, instead of a persistent panel that lingers over the canvas. Prefilled from `init`; on Save it
-// calls onConfirm({ name, panel, sim }). The preview rig is an explicit DECLARATION (never inferred from motion —
+// calls onConfirm({ name, panel, sim, mode }). The preview rig is an explicit DECLARATION (never inferred from motion —
 // see opSimContext / [[custom-op-sim-intent-infer-vs-declare]]). Self-contained (inline styles), like blockEditNotice.
+//
+// t1615 (ruled) — THE DIALOG READS THE DECLARATION. When the stack itself declares the answer as blocks
+// (`init.declPanel` from a panel block; `init.declSim` !== undefined from a sim block), the question is not
+// asked: a read-only summary renders instead, and commit() uses the declared value — there is no control to
+// disagree with, so a conflict is impossible by construction. A bare stack (no declaration) still asks. The
+// NAME stays asked always — naming the fork is the one genuinely new fact at save time. This dialog predated
+// presentation-as-blocks and kept asking — the same second-source disease as the fork reading pills (t1593).
+const PANEL_LABELS = { form3d: 'Form + 3D preview', 'form3d+2d': 'Form + 3D preview + 2D layout', form2d: 'Form + 2D layout', form: 'Form only' };
+const RIG_LABELS = [['showRotaryRig', '4th-axis rotary'], ['forceMachine', 'Machine frame'], ['showMagazine', 'ATC magazine'], ['toolMachineFrame', 'Machine-frame tool'], ['seatAtStart', 'Seat at start'], ['probesForWcs', 'Probes the WCS']];
 function openSaveDialog(init, onConfirm) {
     const m = document.createElement('div');
     m.className = 'blk-dev-savedlg';
@@ -591,24 +600,38 @@ function openSaveDialog(init, onConfirm) {
         .blk-dev-savedlg .bds-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:2px;}
         .blk-dev-savedlg button{padding:7px 13px;font:700 12px/1 inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line,rgba(255,255,255,.18));background:transparent;color:var(--text-main,#e6edf3);}
         .blk-dev-savedlg .blk-dev-save{border:none;color:#fff;background:var(--accent,#3b82f6);}
-        .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>
-        <div class="bds">
-            <h3>Save as custom wizard</h3>
-            <div class="blk-dev-hint" style="margin-bottom:8px;">Saved directly into your current workspace. <span style="opacity:0.75">(Export later via Settings → Wizard Bar to share)</span></div>
-            <div class="blk-dev-editnote blk-dev-hint" hidden></div>
-            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} form field${init.knobs === 1 ? '' : 's'} declared.` : 'No form fields declared — saves a fixed (parameterless) wizard. Use a “Parameter Group” block to add them.'}</div>
-            <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
-            <label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
+        .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>`;
+    const panelDeclared = !!init.declPanel;
+    const simDeclared = init.declSim !== undefined;   // a sim block exists (null = it declares "no rigs" — still declared)
+    const escT = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const declRigText = () => {
+        const on = RIG_LABELS.filter(([k]) => init.declSim && init.declSim[k]).map(([, lab]) => lab);
+        return on.length ? on.join(' · ') : 'none';
+    };
+    const panelRow = panelDeclared
+        ? `<div class="blk-dev-name">Panel <span class="blk-dev-decl" data-decl-panel="${escT(init.declPanel)}" style="font-weight:400;color:var(--text-main,#e6edf3);">${escT(PANEL_LABELS[init.declPanel] || init.declPanel)} <span style="opacity:.55;">— declared by the stack's panel block</span></span></div>`
+        : `<label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
                 <option value="form3d">Form + 3D preview</option>
                 <option value="form3d+2d">Form + 3D preview + 2D layout</option>
                 <option value="form2d">Form + 2D layout</option>
                 <option value="form">Form only</option>
-            </select></label>
-            <div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
+            </select></label>`;
+    const rigRow = simDeclared
+        ? `<div class="blk-dev-name">Preview rig <span class="blk-dev-decl" data-decl-sim style="font-weight:400;color:var(--text-main,#e6edf3);">${escT(declRigText())} <span style="opacity:.55;">— declared by the stack's preview-rig block</span></span></div>`
+        : `<div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
                 <label><input type="checkbox" class="blk-dev-sim-rotary"> 4th-axis rotary (jog)</label>
                 <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>
                 <label><input type="checkbox" class="blk-dev-sim-magazine"> ATC magazine</label>
-            </div>
+            </div>`;
+    m.innerHTML += `
+        <div class="bds">
+            <h3>Save as custom wizard</h3>
+            <div class="blk-dev-hint" style="margin-bottom:8px;">Saved into this workspace — rides your .ddcs file.</div>
+            <div class="blk-dev-editnote blk-dev-hint" hidden></div>
+            <div class="blk-dev-hint">${init.knobs ? `${init.knobs} form field${init.knobs === 1 ? '' : 's'} declared.` : 'No form fields declared — saves a fixed (parameterless) wizard. Use a “Parameter Group” block to add them.'}</div>
+            <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
+            ${panelRow}
+            ${rigRow}
             <div class="bds-foot">
                 <button type="button" class="blk-dev-cancel">Cancel</button>
                 <button type="button" class="blk-dev-update" hidden>Update</button>
@@ -618,10 +641,12 @@ function openSaveDialog(init, onConfirm) {
     document.body.appendChild(m);
     const q = (s) => m.querySelector(s);
     q('.blk-dev-opname').value = init.name || '';
-    q('.blk-dev-paneltype').value = init.panel || 'form3d';
-    q('.blk-dev-sim-rotary').checked = !!(init.sim && init.sim.showRotaryRig);
-    q('.blk-dev-sim-machine').checked = !!(init.sim && init.sim.forceMachine);
-    q('.blk-dev-sim-magazine').checked = !!(init.sim && init.sim.showMagazine);
+    if (!panelDeclared) q('.blk-dev-paneltype').value = init.panel || 'form3d';
+    if (!simDeclared) {
+        q('.blk-dev-sim-rotary').checked = !!(init.sim && init.sim.showRotaryRig);
+        q('.blk-dev-sim-machine').checked = !!(init.sim && init.sim.forceMachine);
+        q('.blk-dev-sim-magazine').checked = !!(init.sim && init.sim.showMagazine);
+    }
     setTimeout(() => { try { q('.blk-dev-opname').focus(); } catch (_) { /* */ } }, 0);
 
     const close = () => { m.remove(); document.removeEventListener('keydown', onKey, true); };
@@ -652,10 +677,16 @@ function openSaveDialog(init, onConfirm) {
     const commit = (mode) => {
         const name = (q('.blk-dev-opname').value || '').trim();
         if (!name) { try { q('.blk-dev-opname').focus(); } catch (_) { /* */ } return; }   // name is required
-        const r = q('.blk-dev-sim-rotary').checked, mc = q('.blk-dev-sim-machine').checked, mg = q('.blk-dev-sim-magazine').checked;
-        const sim = (r || mc || mg) ? { showRotaryRig: r, forceMachine: mc, showMagazine: mg } : null;
+        // t1615 — a DECLARED answer has no control to read (none was rendered): the declaration IS the value.
+        let sim;
+        if (simDeclared) sim = init.declSim;
+        else {
+            const r = q('.blk-dev-sim-rotary').checked, mc = q('.blk-dev-sim-machine').checked, mg = q('.blk-dev-sim-magazine').checked;
+            sim = (r || mc || mg) ? { showRotaryRig: r, forceMachine: mc, showMagazine: mg } : null;
+        }
+        const panel = panelDeclared ? init.declPanel : (q('.blk-dev-paneltype').value || 'form3d');
         close();
-        onConfirm({ name, panel: q('.blk-dev-paneltype').value || 'form3d', sim, mode });
+        onConfirm({ name, panel, sim, mode });
     };
     q('.blk-dev-save').addEventListener('click', () => commit('new'));        // a fresh op, OR "Save as new" (a copy)
     const updBtn = q('.blk-dev-update'); if (updBtn) updBtn.addEventListener('click', () => commit('update'));   // explicit overwrite
@@ -733,6 +764,10 @@ function saveAsCustomOp() {
         name: editingDef ? (editingDef.label || '') : '',
         panel: blkPanel || (editingDef && editingDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
         sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
+        // t1615 — the STACK's own declarations (a panel block / a sim block): when present the dialog does not
+        // ask, it shows them read-only and commits them. Blocks always win; a bare stack falls back to asking.
+        declPanel: blkPanel,
+        declSim: blkSim,
         knobs: bindings.length,
         editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
         lockUpdate,   // maintained-as-data → the dialog disables Update + explains why (Save-as-new stays)
