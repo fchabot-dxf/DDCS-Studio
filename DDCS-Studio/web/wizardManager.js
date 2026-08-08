@@ -226,7 +226,14 @@ export class WizardManager {
         this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
         closeTemplatesPopover();
         this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
-        { const b = document.querySelector('.wiz-box'); if (b) b.classList.remove('editing'); }
+        // t1625 — a real open always clears the preview chrome: the class AND the banner title (nothing else ever
+        // writes #wizTitle, so the preview's banner would otherwise outlive the preview).
+        {
+            const b = document.querySelector('.wiz-box');
+            if (b) { b.classList.remove('editing'); b.classList.remove('previewing'); }
+            const t0 = el('wizTitle');
+            if (t0 && /PREVIEW/.test(t0.textContent || '')) t0.textContent = 'GENERATOR';
+        }
         // Opening a wizard leaves the Studio preview context — stop any running engine/play (every preview panel
         // + Studio's drawer) so nothing keeps executing behind the wizard and clobbers the code it inserts.
         window.dispatchEvent(new CustomEvent('ddcs:stop-previews'));

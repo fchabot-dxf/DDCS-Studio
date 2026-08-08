@@ -401,12 +401,15 @@ async function buildWorkspace() {
     const handle = document.getElementById('blkDrawerHandle'); if (handle) handle.textContent = `▲ ${name}`;
     if (!wizard) setTimeout(() => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } }, 60);
   }
-  function renderLiveForm() {
-    const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
-    if (!pane || !formHost) return;
+  /**
+   * t1625 — ONE derivation of "the wizard this canvas is showing": the drawer's live form AND "Open as modal"
+   * both read this, so the modal can never render a different wizard than the panel (the same second-source
+   * disease every recent turn has been curing). Pure read — no registry write, no canvas mutation.
+   */
+  function deriveLiveWizard() {
     let def = null;
     try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ }
-    
+
     const stack = getStack() || [];
     const opBlock = stack.find((b) => b && (getUserDef(b.type) || (b.params && getUserDef(b.params.opType))));
     if ((!def || !def.bindings || !def.bindings.length) && opBlock) {
@@ -437,6 +440,44 @@ async function buildWorkspace() {
     const userRoot = authoredHere
       || (customizing ? flattenBlocks(stack).find((b) => b && b.type === 'user_root') : null)
       || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
+    return { def, stack, authoredHere, customizing, userRoot };
+  }
+
+  /**
+   * t1625 — "OPEN AS MODAL" (user-ruled; the panel STAYS): the CURRENT canvas wizard at full size, in the REAL
+   * modal chrome, unsaved. The mechanism is the _openGroupForEdit precedent verbatim — setUserOpDef(a derived
+   * def) then open('group') — which renders #wiz_user from a def that is in NO registry: close persists nothing
+   * by construction. The def's template prefers the CANVAS's own user_root (the drawer's t1605 rule), so what
+   * the modal shows is what the author is building, not a stored snapshot. INSERT is hidden while previewing
+   * (.previewing — cleared by every real open()): the preview's one exit is close.
+   */
+  async function openLiveAsModal() {
+    const { def, userRoot } = deriveLiveWizard();
+    const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
+    if (!def || !wm) return;
+    // DEEP-COPY the template: userRoot is the live CANVAS block record, and the preview's own emit path annotates
+    // template blocks in place (`_group` et al.) — through the shared reference that rewrote the canvas stack.
+    // Measured, not guessed: the round-trip spec's byte-compare caught +16KB of annotations on close.
+    const modalDef = { ...def, template: JSON.parse(JSON.stringify(userRoot ? [userRoot] : (def.template || []))) };
+    // The #wizard overlay is position:fixed but was born INSIDE #studio-app, so from the Blocks tab it opened
+    // invisibly behind a display:none ancestor. Every other modal in this app (wsm, app-dialog, library) lives on
+    // document.body for exactly this reason — adopt it there once, lazily; fixed positioning renders identically
+    // for the Studio flows (verified: no parent-scoped selector or query depends on the old seat).
+    const overlay = document.getElementById('wizard');
+    if (overlay && overlay.parentElement !== document.body) document.body.appendChild(overlay);
+    const { setUserOpDef } = await import('../wizards/views/userOpView.js');
+    setUserOpDef(modalDef);
+    wm.open('group');
+    const box = document.querySelector('.wiz-box');
+    if (box) box.classList.add('previewing');
+    const t = document.getElementById('wizTitle');
+    if (t) t.textContent = `${modalDef.label || 'Custom wizard'} — PREVIEW (live from the blocks · nothing is saved)`;
+  }
+
+  function renderLiveForm() {
+    const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
+    if (!pane || !formHost) return;
+    const { def, stack, authoredHere, customizing, userRoot } = deriveLiveWizard();
 
     function checkLayoutNodes(nodes) {
       if (!nodes) return false;
@@ -471,6 +512,12 @@ async function buildWorkspace() {
     // labels read it. Wizard View when there IS one (0bd8b38c's intention, intact); Preview + Projected G-code when
     // there is not, instead of the placeholder that used to sit in 27% of the tab doing nothing.
     setRightFace(!!show);
+    // t1625 — the "Open as modal" door follows the wizard face: no wizard on the canvas, no door. Wired here
+    // (renderLiveForm runs on every render) so the button needs no separate init path.
+    {
+      const b = document.getElementById('blkOpenModal');
+      if (b) { b.hidden = !show; if (!b.__wired) { b.__wired = true; b.addEventListener('click', openLiveAsModal); } }
+    }
     if (!show) {
       // No wizard block at all → this column IS the Preview face, and the message that used to sit here told the
       // reader to add a block while the other face was already showing them the program. Nothing to say.

@@ -18087,3 +18087,90 @@ seam only at high zoom, and was not the circled defect.
 4. Colour choices for Previews/Shapes (gold/deep blue) are aesthetic candidates — data, trivially
    revisable in theme.js CAT.
 5. Desktop viewport only; the exe shell was not run.
+
+
+## t1625 — "Open as modal": the Wizard View at full size, in the REAL chrome (turn 1625)
+
+**The dispatch (user-ruled; the panel STAYS):** a button that opens the CURRENT unsaved canvas stack in
+the real wizard modal — the same renderUiTree path the drawer consumes — close persists nothing. FIRST
+the archaeology on styles.css's consumer-less `.blk-modal-preview-frame`.
+
+### The archaeology (reported as found)
+
+`.blk-modal-preview-frame` (12 rules) landed in 0bd8b38c (2026-08-05, the renderUiTree landing commit)
+whose WORK-LOG entry claims a "1:1 Live Generator Modal Preview" — but the classes were referenced by
+NO JS/HTML in ANY commit, ever (`git log -S` across blocksApp/index/formWidgets: zero hits). The
+commit's actual live-preview work went into the drawer (`.blk-formpane` — the Wizard View); the framed
+version — a MOCK modal chrome with its own header/preset-bar/footer (Cancel/Insert) — never got its
+consumer. Not abandoned for cause; simply never wired. Its celebrated @container reflow was ALSO inert:
+the frame held the app's only `container-type`, so the query could match nowhere. **Fate DECIDED:
+deleted** (with the account in a comment where it stood) — the ruled feature renders in the REAL chrome,
+so a mock chrome has no seat left; the real modal's own responsive layout answers the reflow question.
+
+### What landed
+
+- **blocksApp.deriveLiveWizard() — ONE derivation** of "the wizard this canvas shows": renderLiveForm's
+  def/stack/authoring-facts computation extracted whole (t1599/t1605 logic byte-identical), consumed by
+  BOTH the drawer and the new opener, so the modal can never render a different wizard than the panel.
+- **openLiveAsModal()** — the `_openGroupForEdit` precedent verbatim: `setUserOpDef(derived def)` +
+  `wizardManager.open('group')` → the REAL `#wizard` overlay + `#wiz_user` two-pane chrome renders a def
+  that is in NO registry — close persists nothing by construction. The def's template prefers the
+  CANVAS's user_root (the drawer's own t1605 rule), DEEP-COPIED.
+- **The overlay adopted onto document.body** (lazily, on first preview): `#wizard` was born inside
+  `#studio-app` and opened INVISIBLY behind the hidden Studio tab — caught live, not in review. It is
+  position:fixed, every other modal in the app already lives on body, and no selector or query depends
+  on the old seat (checked before moving).
+- **Preview chrome:** `.wiz-box.previewing` hides INSERT (the preview's one exit is close); the title
+  banner says "PREVIEW (live from the blocks · nothing is saved)". Every real open() clears both the
+  class AND the banner (nothing else ever writes #wizTitle — it would have outlived the preview, and did,
+  until the leak spec caught it).
+- The drawer header's `⧉ Open as modal` button follows the wizard face (no wizard → no door).
+
+### Three wrong turns, all caught by this turn's own verification
+
+1. A typo (`userRooot`) in my own fresh line — caught on the next read, seconds later.
+2. **The invisible modal** — flags said open, pixels said nothing: the overlay's hidden ancestor. The
+   habit "run it, don't read it" earned its keep; fixed with the body adoption.
+3. **The preview seemed to rewrite the canvas** — the round-trip byte-compare flagged +16KB. Chased with
+   setter traps and identity probes to ground truth: `flattenBlocks` writes a TRANSIENT `_group`
+   annotation onto live records on EVERY walk (the drawer's own renders included — pre-existing,
+   app-wide), and `ddcsGetBlockProgram()` serializes whatever transients exist at that instant. The spec
+   was catching annotation TIMING, not a mutation — fixed by stripping exactly `_group` (stated in the
+   spec; `_expose` and everything else stays byte-compared). The walker's side-effectful annotation is
+   flagged below as a candidate cleanup, NOT silently absorbed.
+
+### Verification
+
+- **open-as-modal-1625.spec.js (3 tests) green; 3/3 RED pre-change** (worktree on 3211): the gesture
+  end-to-end (real overlay VISIBLE from Blocks, on body, two-pane, ≥20 corner rows, side-by-side panes
+  QUANTIFIED — visual pane ≥100px right of the form at the same band — INSERT hidden, close →
+  registry/stack/dirty all byte-identical), no-wizard→no-door (with the existence pin — an absent button
+  also reads "hidden", so the count assert is what keeps this non-vacuous), and the leak test (a real
+  open after a preview: INSERT back, class cleared, banner gone — this test CAUGHT wrong turn 3's
+  sibling, the leaking title, before ever passing).
+- **Fast tier: 27/27 serialized ×8 files** (the face spec, blocks-live-form — the drawer refactor's
+  blast radius — wizard-cancel, atc-wizards, formfield-authoring, param-group-rows, save-wizard).
+- **Screenshots (the ruled side-by-side):** t1625-panel-narrow.png (the SAME tree in the drawer at panel
+  width) · t1625-modal-full.png (corner's REAL layout at full size: framed sections, real widgets, the
+  live 3D sim + 2D canvas with markers, CANCEL-only footer).
+- **Full suite: 22 failed / 2397 passed / 6 skipped e2e + 1 node (18.4 min)** vs t1623's 20/2396/6 + 1:
+  +3 total = exactly this act's tests. GONE — blocks-rotary-rig:14 + wizard-face-1599:119 (last run's
+  churn, healed back) and middle-superset:35 (churned green). NEW — **open-as-modal-1625:44/:98 +
+  wizard-manager-1617:344, MY OWN tests red in the counted run, and CHASED rather than argued: all
+  three files 19/19 green isolated serialized TWICE** — the heavy modal-boot class under 6 workers (the
+  documented boot-timeout contention family; reported plainly so the advisor can re-run or accept) —
+  plus blocks-live-form:168 (t1603's recorded churn member) and import-safety:47 (that family, another
+  line). The standing deterministic members are unchanged; node red = the standing surfacing-as-data
+  member.
+
+### What this does NOT cover
+
+1. `flattenBlocks`'s in-place `_group` annotation on live records — pre-existing, app-wide, now
+   DOCUMENTED by the spec's strip; a side-effect-free walker is a candidate small act.
+2. The preset row renders in the preview modal (mountPresetRow keyed 'group') — saving a preset from a
+   preview writes a 'group' preset; harmless but unpolished, named not hidden.
+3. The modal preview does not live-track canvas edits made WHILE it is open (it renders the stack as of
+   the click; the drawer stays live). Reopening refreshes.
+4. The container-query reflow question is answered by the real modal's own responsive layout, not
+   demonstrated at a dragged-narrow width in a spec.
+5. Desktop viewport only; the exe shell was not run.
