@@ -18268,3 +18268,52 @@ field skips ITS shape only. `SHAPE_2D_TYPES` is the ONE membership set (vizBlock
    never round-trips) — a pre-existing latent gap, named not fixed.
 5. Handles on declared shapes (drag-to-edit an expression is not meaningful); shapes are draw-only.
 6. Desktop viewport only; the exe shell was not run.
+
+
+## t1630 — comparison predicates in the ONE evaluator (turn 1630)
+
+**The dispatch:** the half t1566 deliberately deferred — `< > <= >= == !=` as expression operators,
+symbols only, 1/0 as VALUES (guards keep control flow), named errors, one-evaluator discipline,
+non-vacuous, the t1601 refusals still refuse, zero corpus movement.
+
+### What landed (ops/expr.js only, +the spec)
+
+Two conventional precedence levels inserted between the ternary and `+ -`: `equality` (== !=) looser
+than `relational` (< > <= >=), both left-associative loops exactly like add/mul. A comparison yields 1
+or 0 — a plain number that adds, multiplies, and feeds calls; the ternary's ≠0-truthy convention is
+untouched, so `w > h ? a : b` now composes on top of it rather than replacing it. `min/max` guidance in
+the header is superseded and the header rewritten (comments rot with behaviour). Misuse is NAMED at the
+parser: a single `=` says "use == to compare"; a misplaced `!` says "use != for not-equal" (a bare
+leading `!` still lands as the generic `unexpected: !` — noted below).
+
+### Verification
+
+- **expr-compare-1630.spec.js**: all six operators both ways; the precedence ladder (arith < relational
+  < equality < ternary) asserted with composed forms; 1/0-as-values proven in arithmetic AND a call
+  (`max(w > h, 5)`); left-assoc chaining documented and pinned; both named-misuse messages; the standing
+  guarantees re-asserted in the same breath (a bare word still throws → callers keep raw values; trailing
+  input still rejected). **RED pre-change** (worktree rig — comparisons threw as 'trailing input' before).
+- **The pins around it, green untouched**: expr-functions-ternary-1566 (the declared function set — no
+  growth this turn), expr-lint-names-the-cause-1566, preflight-names-unresolved-1568,
+  unclosed-bracket-refuses-1601 (the refusals all still refuse), wizard-shapes-1627 + passes-field-1613
+  (the evaluator's two newest consumers) — fast tier 16/16 serialized.
+- **Zero corpus movement** is held by the suite's own parity members (every emit-sweep twin would move if
+  a stored field like "2>1" suddenly evaluated) — the full-suite ID diff below is the assertion.
+- **Full suite: 23 failed / 2400 passed / 6 skipped e2e + 1 node (19.5 min)** vs t1627's 20/2402/6 + 1:
+  +1 total = exactly this act's one test. GONE — enum-options-codec:49 + palette-by-role:116 (last run's
+  chased churn, healed) + import-safety:47. NEW — a FIVE-member homing/cam-expose spike (homing-superset's
+  own byte-identical E0 gate among them — the zero-corpus-movement claim's own instrument) + open-as-
+  modal:54: ALL CHASED, 11/11 then 14/14 green isolated serialized TWICE — the documented boot-timeout
+  contention family (the habits' named suspect PID 55024 is dead; this run's contention was the suite's
+  own 6-worker load). The homing E0 gate green in isolation IS the zero-corpus-movement assertion: no
+  stored field moved under the new operators. Standing deterministic members unchanged; node red = the
+  standing member. None of this act's tests red anywhere.
+
+### What this does NOT cover
+
+1. A LEADING `!` (e.g. `!x`) lands as the generic `unexpected: !`, not the pointed not-equal hint — the
+   named message covers the infix case; boolean-not stays unsupported by ruling (compare `== 0`).
+2. No `&&`/`||` — deliberately out of scope (the ternary + 1/0 arithmetic compose for those needs; a
+   widening would be its own ruling).
+3. Chained comparisons are left-associative like C, pinned but not warned about — a lint nicety if real
+   use trips on `a < b < c`.

@@ -17,12 +17,12 @@
  * ⚠ NO CONTROL FLOW, by ruling — guard blocks own that and keep owning it. The ternary is a VALUE
  * selector, not a branch.
  *
- * ⚠ NO COMPARISON OPERATORS, and this is a deliberate reading of the spec (t1566 listed exactly:
- * refs, arithmetic, min/max/abs/round, a ternary). A ternary needs a condition, and rather than invent
- * `< > ==` beyond the listed set, the condition follows the convention this codebase ALREADY declares
- * for expressions in boolean position — `blockEmitter.resolveBool`: "a number/expression is truthy when
- * ≠ 0". So `x ? a : b` selects `a` when x is non-zero. min/max cover most pick-one-of-two needs without
- * comparisons; if real use wants `<`/`>` that is a separate, deliberate widening.
+ * COMPARISONS (t1630 — the deliberate widening t1566 deferred, now ruled in): `<  >  <=  >=  ==  !=`,
+ * SYMBOLS ONLY (no word forms), yielding 1/0 as VALUES — a comparison is an expression result, never a
+ * branch; guard blocks keep owning control flow. Conventional precedence: relational binds tighter than
+ * equality, both sit between the ternary and `+ -` (so `a + 1 < b ? x : y` reads ((a+1) < b) ? x : y).
+ * The ternary's condition keeps the ≠0-truthy convention (`resolveBool`'s rule) — `a < b ? x : y` now
+ * composes naturally on top of it. A bare `=` or `!` is a NAMED error pointing at `==` / `!=`.
  */
 
 /**
@@ -65,10 +65,10 @@ export function evalExpr(src, scope = {}) {
     let i = 0;
     const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; };
 
-    // ternary sits BELOW add in precedence (loosest) and is right-associative, so `a ? b : c ? d : e`
+    // ternary sits BELOW everything in precedence (loosest) and is right-associative, so `a ? b : c ? d : e`
     // reads as `a ? b : (c ? d : e)` — the conventional shape. Condition truthiness is ≠ 0 (see header).
     function ternary() {
-        const cond = add();
+        const cond = equality();
         ws();
         if (s[i] !== '?') return cond;
         i++;
@@ -78,6 +78,29 @@ export function evalExpr(src, scope = {}) {
         i++;
         const elseV = ternary();
         return cond !== 0 ? thenV : elseV;
+    }
+    // t1630 — COMPARISONS, two conventional levels: equality (== !=) looser than relational (< > <= >=),
+    // both yielding 1/0 as plain VALUES (never a branch — guards own control flow). Left-associative like
+    // add/mul. A bare `=` or `!` names its fix rather than surfacing as "trailing input".
+    function equality() {
+        let v = relational();
+        for (;;) { ws(); const two = s.slice(i, i + 2);
+            if (two === '==') { i += 2; v = (v === relational()) ? 1 : 0; }
+            else if (two === '!=') { i += 2; v = (v !== relational()) ? 1 : 0; }
+            else if (s[i] === '=') throw new Error("single '=' is not an operator (use == to compare)");
+            else if (s[i] === '!') throw new Error("'!' is not an operator (use != for not-equal; for boolean not, compare == 0)");
+            else return v;
+        }
+    }
+    function relational() {
+        let v = add();
+        for (;;) { ws(); const two = s.slice(i, i + 2);
+            if (two === '<=') { i += 2; v = (v <= add()) ? 1 : 0; }
+            else if (two === '>=') { i += 2; v = (v >= add()) ? 1 : 0; }
+            else if (s[i] === '<') { i++; v = (v < add()) ? 1 : 0; }
+            else if (s[i] === '>') { i++; v = (v > add()) ? 1 : 0; }
+            else return v;
+        }
     }
     function add() {
         let v = mul();
