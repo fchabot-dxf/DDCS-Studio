@@ -18494,3 +18494,109 @@ the advisor rather than fixing unasked.
 
 Capacity: this act stayed within the scoped 7 steps plus the amendment/retraction detour; no capacity
 concern for the next act.
+
+## t1636 — A SAVED CUSTOM WIZARD IS INERT: the real cause was NOT the bindings hypothesis (turn 1636)
+
+Fresh dispatch (same epoch 2 seat). NEXT-SESSION.md's ACT 2 scoped 5 steps around a specific hypothesis —
+"no bindings derived -> params never reach the raster -> w=0/h=0 -> zero rows -> empty body" — and asked me
+to MEASURE, not assume it. Measuring it directly is what changed the diagnosis.
+
+### Step 1-2: reproduced, and the hypothesis did not survive contact with a live measurement
+
+Drove the real code paths (not a shortcut): built the actual `surfacingStack({zMode:'skim', w:100, h:80, ...})`
+output via `page.evaluate`, compared its direct `emitMapped` text (66 lines, full raster body) against a
+LIVE Blockly round-trip through the SAME bridge the Blocks tab uses (`stackToWorkspace` -> `workspaceToStack`,
+the exact operation "open a placed op in Blocks" performs). **A bare `surfaceraster` leaf with dangling
+formfield bindings (0 matched, confirmed) still emitted its full 46-line body** — bindings being empty does
+NOT empty the template's own baked emission; that link in the advisor's chain does not hold. The skim-wrapped
+op, however, went from 66 lines to 9 on the SAME round-trip — G90/G91/clearance/M5/M9/retract/M30 and
+NOTHING else, matching the user's "11 lines, entire cutting body missing" almost exactly (my synthetic stack
+lacked their exact framing atoms, hence 9 vs 11 — same shape).
+
+### THE REAL ROOT CAUSE: `skim` was never taught the C-mouth guard.js got at t1595
+
+`wizards/ops/skim.js` (`kind:'skim'`) wraps its child op ("a wrapper that runs the wrapped op WHOLE-OP
+RELATIVE"). `blocks/blockly/bridge.js`'s block-shape generator only gives a kind a DO-mouth (the C-shaped
+socket that can hold children) via an explicit OR-chain (`param_group`/`opunit`/`cam_table`/`guard`/`uibox`)
+or the `isWrap` array (`container`/`path`/`loop`/`cond`/`depth`/`fill`/`place`/`rotate`) — **`skim` was in
+NEITHER.** `guard.js`'s own docstring names the identical bug class, already fixed there at t1595: "it had no
+C-mouth, so `recToJson` wrote it CHILDLESS and every arm inside it was discarded on render." `skim` had the
+exact same gap, unfixed, discovered here because nothing had opened a skim-mode op in Blocks and saved it
+before (or if it had, nobody connected the symptom to the mechanism).
+
+**Fix — one line, the single shared predicate both round-trip directions gate on:**
+`isWrap` (`bridge.js:70`) now includes `'skim'`. This one array is read by THREE places: bridge.js's own
+block-shape generator (gives skim its DO mouth), `stackBridge.js`'s `toRecord` (workspace -> record: reads
+children FROM the mouth), and its `recToJson` (record -> workspace: writes children INTO the mouth) — fixing
+the shared predicate fixes all three consistently, the same shape `place`/`rotate`/etc. already prove.
+
+**Non-vacuity**: reverted `bridge.js` to HEAD (scratch-copy saved first, not committed yet so HEAD = pre-fix),
+reran the new regression spec (`skim-blocks-roundtrip-1636.spec.js`) — RED (children: 1 -> 0, emit 66 lines ->
+9 lines). Restored the fix, GREEN again, byte-identical to the un-round-tripped emit.
+
+### Step 4 (declared not-optional, not blocked by step 3): the loud-failure guard, built
+
+The REAL gap this step named is genuine and separate from the skim bug: `formfieldBindings`'s `catch(_) {
+return []; }` (userOps.js) is read ONLY by the Blocks-tab LIVE PREVIEW (`devMode.deriveAuthoredDef`) — the
+actual SAVE path (`saveAsCustomOp`) never called it at all; it assembled `bindings` from ticked-knob/param-
+pill extraction only (both dead/empty for a formfield-only stack) and handed an empty array to
+`userOpFromStack`. A formfield whose Match Var (an assign `#var`) named nothing in the stack could — and, per
+the live measurement, DID — save as a wizard with NO recorded warning at the "Save wizard…" click itself
+(register-time re-derivation in `resolveBindingsMeta` would eventually throw and get caught by an alert, but
+only once the naming dialog had already been filled in and confirmed — a late, cryptic, first-error-only
+message, not the loud-at-the-click guard the dispatch asked for).
+
+Built: `matches` (deriveBindings.js) exported (was private) so a caller can count hits without risking the
+throw. `formfieldMatchReport(children)` (userOps.js) walks every declared formfield spec and reports EVERY
+unmatched one at once (not just the first, which is what `deriveBindings`'s own throw would report).
+`saveAsCustomOp` (devMode.js) now calls it immediately on the "Save wizard…" click, BEFORE the naming dialog
+even opens, and REFUSES with a full list ("N fields declared, M matched: w (Match Var #1), ...") when
+anything is unmatched — matching the dispatch's example phrasing. An `optional` spec with 0 hits is left
+alone (a legitimate prune-gated absence, not a defect — deriveBindings's own rule, reused).
+
+**Non-vacuity**: reverted `devMode.js`+`userOps.js`+`deriveBindings.js` to HEAD, reran
+`formfield-loud-mismatch-1636.spec.js` — the dangling-field test went RED (0 dialogs fired; pre-fix, the
+save dialog just opens silently) — restored, GREEN. The companion "genuinely parameterless" test (no
+formfield blocks at all) passed BOTH before and after by design (a control, not a fix-dependent assertion) —
+confirms step 5's honest-case requirement holds without a special case.
+
+### Step 3 — THE DECLARATION QUESTION: measured, and it is NOT a fork. Reporting, not building.
+
+The advisor's framing: does `formfield` need a way to name an op's own param socket, or is this a genuinely
+new declared match kind? **Measured answer: `deriveBindings`'s matcher (`blocks/dataOps/deriveBindings.js`)
+ALREADY supports this — today, with zero engine changes.** `match: { type: '<atomType>' }, key: '<param>'`
+matches a leaf atom's own params directly; this is not hypothetical, it is the SAME mechanism every shipped
+twin that wraps a real op atom already uses — `blocks/dataOps/surfacingData.js`'s own `SURFACING_BINDING_SPECS`
+binds `w`/`h`/`toolDia`/`depth`/... via `match: { type: 'surfaceraster' }, key: 'w'` (etc.), no assign blocks
+anywhere. `pocketData.js` does the same.
+
+So there is no second match KIND to invent. What's missing is purely the AUTHORING SURFACE: the `formfield`
+block (`wizards/ops/formField.js`) and its reader (`bindingsFromStack`, userOps.js:303) hard-code
+`match: { type: 'assign', var: matchvar }` — a human dragging a formfield block has no way to instead say
+"bind to THIS leaf atom's own `w` param." **Recommendation**: give `formfield` a second MODE (a declared
+toggle — "Assign Var" keeps today's `matchvar` field byte-identical for every existing formfield; "Op Param"
+swaps it for an atom-type + param-key pair, emitting `match:{type:atomType}, key:paramKey`). This is an
+additive UI extension of an existing block riding the existing engine, not a fork — but it IS a real
+authoring-surface design decision (how the atom-type list populates when a stack has several leaf atoms,
+dropdown vs free-text, disambiguating two atoms of the same type) that deserves its own scoped act rather
+than a decision folded into this one. NOT built this turn, per the stop-and-report instruction — a candidate
+for the next act if the user wants formfield authoring over a real-op leaf to actually work end-to-end (today
+it silently produces nothing — now LOUDLY, via step 4's guard, but still nothing).
+
+### Verification
+
+- Wide regression sweep beyond the two new specs: `blocks-roundtrip`, `zmode-modal-1609` (4 tests, incl. the
+  existing "Skim op re-opens as Skim" edit round-trip — a DIFFERENT path than the one that was broken, still
+  green both before and after), `surfacing-skim-form-986`, `formfield-authoring-1610`,
+  `blocks-authoring-always-on`, `save-wizard-no-devmode`, plus a 17-spec sweep of devMode/GUI-authoring/
+  fork-parity/guard-roundtrip specs — **all green**, including the two heaviest cross-checks in the suite:
+  `guard-roundtrip-1595` (every guard/arm/predicate round-trips losslessly — the SAME bridge machinery my
+  `isWrap` change touches) and `fork-parity-1593` (every one of 32 shipped twins forks byte-for-byte).
+- Smoke tier: 71/71 green, twice (once per fix).
+- Two throwaway reproduction scripts used to measure the causal chain, deleted before commit (never staged).
+
+### Capacity
+
+This act ran long and pivoted hard mid-flight — the dispatched hypothesis didn't survive measurement, and
+the actual root cause (a Blockly bridge gap, not a bindings gap) needed real live-app reproduction with two
+separate round-trip experiments to isolate. The seat is genuinely long now. The next act should start FRESH.

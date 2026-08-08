@@ -40,7 +40,7 @@ export function getUserSimGcode(opType) { return USER_SIM_GCODE.get(opType) || n
 const USER_PREVIEW_GEOMETRY = new Map();
 export function setUserPreviewGeometry(opType, fn) { if (typeof fn === 'function') USER_PREVIEW_GEOMETRY.set(opType, fn); else USER_PREVIEW_GEOMETRY.delete(opType); }
 export function getUserPreviewGeometry(opType) { return USER_PREVIEW_GEOMETRY.get(opType) || null; }
-import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
+import { deriveBindings, matches } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state); matches (t1636) — count hits without the throw, for a save-time report
 
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
@@ -576,6 +576,25 @@ export function formfieldBindings(children) {
     const specs = bindingsFromStack(children);
     if (!specs.length) return [];
     try { return deriveBindings(flattenBlocks(children), specs); } catch (_) { return []; }
+}
+
+/** t1636 — WHICH declared `formfield` specs a stack's blocks actually satisfy, and which do not. Never throws
+ *  (uses `matches` directly, not `deriveBindings`, so ONE dangling spec doesn't hide the rest — deriveBindings
+ *  aborts on the FIRST mismatch it finds). A NON-optional spec with anything but exactly 1 hit is unmatched; an
+ *  optional spec with 0 hits is a legitimate prune-gated absence, not a defect. Consumed by the save-time guard
+ *  (devMode.saveAsCustomOp) so "0 matched, saved silently as a parameterless wizard" — the shipped defect class,
+ *  the reason formfieldBindings' own silent catch-and-[] shipped unnoticed — is reported instead of hidden. */
+export function formfieldMatchReport(children) {
+    const specs = bindingsFromStack(children);
+    const flat = flattenBlocks(children);
+    const unmatched = [];
+    for (const s of specs) {
+        const hits = flat.filter((b) => matches(b, s.match)).length;
+        if (hits === 1) continue;
+        if (hits === 0 && s.optional) continue;   // a prune-gated socket genuinely absent in this structural state
+        unmatched.push({ param: s.param, matchvar: (s.match && s.match.var) || '', hits });
+    }
+    return { total: specs.length, matched: specs.length - unmatched.length, unmatched };
 }
 
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)

@@ -27,8 +27,10 @@
  */
 import { flattenBlocks } from '../userOps.js';
 
-/** Does flattened block `blk` satisfy `match`? */
-function matches(blk, match) {
+/** Does flattened block `blk` satisfy `match`? Exported (t1636) so a caller can COUNT hits without risking the
+ *  throw deriveBindings raises on a mismatch — e.g. a save-time guard that wants to REPORT every dangling spec
+ *  at once, not abort on the first. */
+export function matches(blk, match) {
     if (!blk || blk.type !== match.type) return false;
     if ('var' in match) return !!blk.params && String(blk.params.var) === String(match.var);
     if (match.params) {

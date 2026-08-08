@@ -15,7 +15,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate, materializeParamGroup, forkInheritance } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, formfieldMatchReport, getUserDef, instantiate, materializeParamGroup, forkInheritance } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer; t1593 — forkInheritance: the copy reads the source's DECLARED bindings, not the pill view
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -730,6 +730,20 @@ function saveAsCustomOp() {
     const a = collectAuthoring(_ws);
     if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
     if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
+
+    // t1636 — a `formfield` whose Match Var names no block in the stack used to save SILENTLY (formfieldBindings'
+    // own catch → [], read only by the live preview) as a wizard with NO PARAMETERS — the emitted program then runs
+    // whatever the canvas happened to hold, with no way for the operator to change it. Report every dangling field
+    // at once (not just the first — deriveBindings aborts there) and REFUSE the save, matching the loud-failure
+    // discipline every other authoring guard on this canvas already holds (varErr above, the destructive-load guard).
+    const report = formfieldMatchReport(a.opRec.children);
+    if (report.unmatched.length) {
+        const list = report.unmatched.map((u) => `${u.param} (Match Var ${u.matchvar || '—'})`).join(', ');
+        alert(`${report.total} field${report.total === 1 ? '' : 's'} declared, ${report.matched} matched: ${list} `
+            + `— Match Var must name a block that exists in THIS stack (an assign block's #var). Fix it, or tick `
+            + `"optional" if the field is meant to be absent in some states, then save again.`);
+        return;
+    }
 
     // t1075 (Part C) — a placed RECOGNIZED op opened in Blocks DIRECTLY (not via Customize) and saved would fork as
     // UNIVERSAL (its standard part baked, never live in CAM). Wrap it in the SAME opunit boundary the Customize route

@@ -67,7 +67,7 @@ const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/[^a-z0-9]+/g, '');   
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
 const REPORTER_CHECK = { boolean: 'Boolean', region: 'Region' };   // reporter return type → Blockly output check
 const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';
-export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate'].includes(def.kind);
+export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'skim'].includes(def.kind);
 // Blocks build/read ALL fields when a def lists them (so a dynamic block like array round-trips every pattern,
 // not just the default); a `dynamic` extension toggles which are visible. The wizard uses fieldsFor() directly.
 export const fieldsOf = (def, params) => (def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields)) || [];
