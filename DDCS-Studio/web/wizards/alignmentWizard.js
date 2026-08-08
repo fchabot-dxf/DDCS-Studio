@@ -155,7 +155,7 @@ export function alignmentStack(params = {}, opts = {}) {
         A('#52', '[#51-#50]', `Delta: fence wander in ${probeAxis} from A to B`);
         A('#53', 'ABS[#72]', `Absolute span along ${checkAxis}`);
         IF('#53', '==', '0', 1);                      // abort if A and B are at the same position (zero span)
-        A('#54', 'ATAN[#52]/[#53]', 'Misalignment angle (deg) = atan2(delta, span) — two-operand atan[a]/[b] form');
+        A('#54', 'ATAN[#52, #53]', 'Misalignment angle (deg) = atan2(delta, span) — comma form, the slash form is REJECTED on the Expert (FINDINGS 4ba142ed)');
         b.push(safeRetractNode({ workClear: '#19' })); DM('abs');   // t951 park-sweep — final park to MAX safe height (per-post: Expert #520 / V4.1 #190 margin; DM500 honest work-frame #19). Was safeZParkBlock relative = the compounding-Z-up crash class
 
         // ── Results ── the Expert HMI RESULT display registers (Delta/Span/Angle). Off-HMI they fold to comments that keep the

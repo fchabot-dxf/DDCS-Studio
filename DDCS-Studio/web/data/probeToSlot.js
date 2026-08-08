@@ -535,7 +535,7 @@ export function alignmentSlot(used = new Set(), varOffset = 0, _variant, decl) {
         '#52=[#51-#50]   ;delta: fence wander A→B',
         '#53=ABS[#72]   ;absolute span',
         'IF #53 EQ 0 GOTO 1',
-        '#54=ATAN[#52]/[#53]   ;angle (deg) = atan2(delta, span)',
+        '#54=ATAN[#52, #53]   ;angle (deg) = atan2(delta, span) — comma form, the slash form is REJECTED on the Expert (FINDINGS 4ba142ed)',
         `G0 Z${v.safeZ}`,
         'G90   ( absolute )',
         '#1510=#52   ;drift',

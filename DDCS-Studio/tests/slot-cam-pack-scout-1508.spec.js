@@ -29,8 +29,10 @@ test('THE CRUX — atan2 and hypot are V13-gated, so a packed slot\'s frame is b
     });
     // the registry still carries all four, and the two the slot frame would need are on the WEAKEST tier
     expect(r.keys, 'the trig registry still declares the four functions').toEqual(expect.arrayContaining(['ATAN', 'SQRT', 'SIN', 'COS']));
-    expect(r.ATAN.tier, 'ATAN — the bearing — is community-referenced, the weakest tier').toBe('community-referenced');
-    expect(r.SQRT.tier, 'SQRT — the length — likewise').toBe('community-referenced');
+    // t1634 — ATAN is hardware-confirmed now (the comma form, on both macro-var controllers); SQRT is still the
+    // weakest tier and still what this test's CRUX rests on (the packed slot needs BOTH atan2 AND hypot live).
+    expect(r.ATAN.tier, 'ATAN is hardware-confirmed as of t1634 — the comma form, proven on the Expert and V4.1').toBe('hardware-confirmed');
+    expect(r.SQRT.tier, 'SQRT — the length — is still community-referenced, the weakest tier').toBe('community-referenced');
     // …and each still names the machine test that would settle it, so the lift plan stays actionable
     expect(r.ATAN.test, 'ATAN still cites its V13 test').toMatch(/V13/);
     expect(r.SQRT.test, 'SQRT still cites its V13 test').toMatch(/V13/);

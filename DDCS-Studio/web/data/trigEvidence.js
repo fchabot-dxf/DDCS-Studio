@@ -63,13 +63,17 @@ export const TRIG_FUNCTIONS = {
             indirect: 'same sister evidence as COS, and the same absence from the M350 libm import table' },
     SQRT: { tier: 'community-referenced',   test: 'V13c_sqrt.nc', expect: 300,  seed: 0, probe: 'SQRT 9 x100',
             indirect: 'the M350 firmware libm import table DOES hold sqrt — of the four this has the strongest indirect case, which matters because the ramp needs exactly it' },
-    ATAN: { tier: 'community-referenced',   test: 'V13d_atan.nc', expect: 4500, seed: 0, probe: 'ATAN 1 over 1 x100',
-            indirect: 'the libm table holds atan, AND Studio already emits this exact two-operand form to real machines' },
+    ATAN: { tier: 'hardware-confirmed',     test: 'V13f_atan_comma.nc', expect: 2657, seed: -99999, probe: 'ATAN 1 comma 2 x100',
+            indirect: 'the libm table holds atan, and Studio now emits this exact two-operand COMMA form at both '
+                + 'sites (t1634) — `V13d_atan.nc` (the originally-planned SLASH-form probe) never independently ran: '
+                + 'the combined V13_trig.nc aborted at that identical line first. ATAN FORM IS DIALECT-SCOPED (Expert '
+                + 'and V4.1 both take the comma form; a future third macro-var target may not) — recorded here so '
+                + 'the reason is on hand, not re-derived, if that target ever arrives' },
 };
 
 /** Run order for the visit. The combined file first: one run answers all four when nothing is missing, and its ABORT
  *  is the only evidence we can get for whether an unknown function fails loud at all. */
-export const TRIG_RUN_ORDER = ['V13_trig.nc', 'V13c_sqrt.nc', 'V13a_cos.nc', 'V13b_sin.nc', 'V13d_atan.nc'];
+export const TRIG_RUN_ORDER = ['V13_trig.nc', 'V13c_sqrt.nc', 'V13a_cos.nc', 'V13b_sin.nc', 'V13f_atan_comma.nc'];
 
 /**
  * THE LIFT PLAN. One row per site that names the trig gate, with what a YES actually buys.
@@ -161,17 +165,31 @@ export const TRIG_LIFT_PLAN = [
             + 'reasons. This row is a DESIGN STATEMENT, not a deferral: nothing here is queued',
     },
     {
-        id: 'alignment-atan', kind: 'shipped-unconfirmed', needs: 'ATAN', lifts: false,
-        site: 'data/probeToSlot.js', decl: '#54=ATAN[#52]/[#53]', anchor: '#54=ATAN[#52]/[#53]', keys: [],
+        /**
+         * t1634 — THIS ROW IS CLOSED, AND THE onNo BRANCH FIRED FIRST. `V13_trig.nc` aborted at this exact line
+         * (`Unrecognized file format`, the Fanuc slash form `ATAN[a]/[b]`) — the alignment slot had never run to
+         * completion on the Expert. The follow-up `V13f_atan_comma.nc` then found the WHICH: the V4.1 comma form
+         * `ATAN[a, b]` WORKS and is quadrant-correct (ATANC=2657). Both emit sites switched to it (t1634); the
+         * row is kept as HISTORY, same treatment as raster-ramp above, not deleted.
+         */
+        id: 'alignment-atan', kind: 'closed', needs: 'ATAN', lifts: false,
+        closedBy: 't1634 — onNo fired (slash form REJECTED, V13_trig.nc abort), then V13f_atan_comma.nc found the '
+            + 'comma form WORKS; both emit sites switched to it',
+        site: 'data/probeToSlot.js', decl: '#54=ATAN[#52, #53]', anchor: '#54=ATAN[#52, #53]', keys: [],
         what: 'the alignment probe computes its fence angle with the two-operand ATAN form and SENDS IT TO REAL '
-            + 'MACHINES. Nobody has confirmed the controller accepts it. This is the tier the t1339 note calls the '
-            + 'riskiest of the three, because it looks like usage without being evidence',
-        onYes: 'confirmed. The tier moves from community-referenced to live-shipped-and-checked, and the alignment '
-             + 'angle is trustworthy for the first time',
-        onNo: '⚠ A DEFECT, NOT A DEFERRAL. Either the alignment slot has never parsed on this controller, or it has '
-            + 'been computing a wrong angle — and the correction depends on WHICH, so the reported number matters as '
-            + 'much as the yes/no. Highest-stakes row on this plan',
-        whyNotLift: 'nothing is gated behind it — the emit already ships. A YES buys confidence, not capability',
+            + 'MACHINES. It was the tier the t1339 note called the riskiest of the three, because it looked like '
+            + 'usage without being evidence — and it turned out to be exactly that: usage of a form the controller '
+            + 'never accepted',
+        onYes: 'FIRED, via the comma form rather than the originally-probed slash form: ATANC=2657 on '
+             + '`V13f_atan_comma.nc`, quadrant-correct (dy-over-dx order, same as V4.1 S6g). The tier moves from '
+             + 'community-referenced to hardware-confirmed, both emit sites carry the comma form, and the alignment '
+             + 'angle is trustworthy for the first time (t1634)',
+        onNo: 'FIRED first, on the originally-shipped slash form: `V13_trig.nc` aborted with `Unrecognized file '
+            + 'format` at this exact line. A DEFECT, NOT A DEFERRAL — the alignment slot had never run to completion '
+            + 'on the Expert; every prior result on this controller was a silent no-op, not a wrong angle. The which '
+            + 'is now known: UNPARSEABLE, fixed by switching emit to the comma form (t1634)',
+        whyNotLift: 'nothing was ever gated behind it — the emit already shipped. The visit bought confidence (and a '
+            + 'fix), not a new capability',
     },
     {
         id: 'rotary-fit-sqrt', kind: 'shipped-unconfirmed', needs: 'SQRT', lifts: false,
@@ -210,15 +228,19 @@ export const V41_TRIG_EVIDENCE = {
             + 'community-referenced (the Expert tier) to hardware-confirmed, for V4.1 specifically',
     },
     ATAN: {
-        tier: 'absent-so-far',
+        tier: 'hardware-confirmed',
+        probe: 'bridge/controllers/v4.1/verify/S5o_atan_comma.nc, S6g_atan_order.nc',
         triedNames: ['ATAN two-operand (ATAN[y]/[x])', 'ATAN single-operand', 'ATN', 'ATAN2', 'atan lowercase'],
-        control: 'ACOS tried as a control — is ANY inverse trig present — also rejected, same as every name above',
-        result: 'every name REJECTED with Unrecognized-file-format naming the line. Each probe was structurally '
-            + 'IDENTICAL to the working SQRT line (same bracket shape, same NO MOTION single-assignment form), so '
-            + 'the FORM is proven correct and only the NAME or the function\'s existence is at issue',
-        honestPhrasing: 'ABSENT-SO-FAR, not ABSENT — the honest phrasing, not the stronger one. COS/SIN are '
-            + 'UNTESTED on this firmware (only inverse trig was probed), and the community may know a name not yet '
-            + 'tried. bridge/controllers/v4.1/assets/community/FORUM-POST-macro-questions.md is posted asking',
+        control: 'ACOS was tried as a control during the original (slash-form) sweep — rejected, same as every name '
+            + 'above; ACOS was never re-tried in the comma form, so it stays UNTESTED there',
+        result: 'the six names above were all tried in the SLASH form and all REJECTED with Unrecognized-file-format '
+            + 'naming the line — each probe structurally IDENTICAL to the working SQRT line, so the FORM (not the '
+            + 'name) looked like the open question. It was: `S5o` `ATAN[1, 1] * 100` → `4500` (45°, the COMMA form '
+            + 'WORKS); `S6g` `ATAN[1, 2] * 100` → `2656.505` (atan2(1,2)°, argument order dy-over-dx CONFIRMED). The '
+            + 'function was never absent — only the six tried names/forms were the wrong syntax',
+        honestPhrasing: 'HARDWARE-CONFIRMED via the comma form — the prior ABSENT-SO-FAR reading is STALE, and was '
+            + 'only ever true of the slash/named forms actually tried, never of ATAN itself. COS/SIN remain UNTESTED '
+            + 'on this firmware (only inverse trig was probed)',
     },
     otherFindings: 'spacing, IF/GOTO, WHILE, and register-map findings from the same bench session live in '
         + 'data/portingArc.js (PORTING_STAGES[\'live-roundtrip\'].landed) — this export carries ONLY the trig half',

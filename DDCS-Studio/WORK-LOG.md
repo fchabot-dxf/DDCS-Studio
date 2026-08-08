@@ -18403,3 +18403,94 @@ pre-fix HEAD, all red isolated — genuine fallout, chased to two shapes:
 2. `paramGroupFromBindings`' spec-derived fallback rows (b95540d9's (b)) have no dedicated unit pin of
    their own beyond s53's flip.
 3. The `_group` transient and `flattenBlocks` side-effect (named at t1625) remain the standing candidate.
+
+## t1634 — the ATAN comma fix: the Expert defect, closed (turn 1634)
+
+Fresh seat (epoch 2), ACT 1 of the 3-act queue in NEXT-SESSION.md, fully scoped by the advisor from the
+hardware verdict in `bridge/controllers/expert-m350/FINDINGS.md` (commit 4ba142ed): the Expert REJECTS
+the Fanuc two-operand slash form `ATAN[a]/[b]` (`V13_trig.nc` aborted at this exact line — whole-file
+abort, safety rule 3) — the alignment probe's angle macro had never run to completion on this
+controller. `V13f_atan_comma.nc` then found the WHICH: the V4.1 comma form `ATAN[a, b]` WORKS on the
+Expert too and is quadrant-correct (`ATANC=2657` = atan2(1,2), dy-over-dx order, matching V4.1's own S6g
+result). Comma is hardware-proven on BOTH macro-var controllers now.
+
+### A mid-task amendment landed, then was retracted — the correction of a correction
+
+Right after the two literal emit-site edits, an amendment arrived: don't hardcode the comma form, build
+a `dialect.atan2()` schema slot instead (the dialects own per-controller syntax, e.g. `probeMove`). I
+started researching the shape (read SCHEMA.md, traced how `assign`-type blocks carry a literal `value`
+string straight through `emitMapped` with no dialect mapping — confirming a dialect slot WOULD have
+needed the wizard to resolve the active dialect at BUILD time, not just at final emit, a real
+architectural change) — before any dialect code was written, the amendment was RETRACTED: the ATAN line
+is already wizards-as-data (the `A()` assign-block IS the declared form, the twin renders it, Blockly
+round-trips it), and rule-of-three refuses the new machinery — both macro-var controllers take the
+IDENTICAL comma form, and no-macro-var dialects never reach this line at all, so there is no second form
+to abstract over yet. Nothing to revert (no dialect file had been touched). Carried forward instead, per
+the advisor's instruction: a note in `trigEvidence.js`'s ATAN registry entry that **ATAN FORM IS
+DIALECT-SCOPED**, so a future third macro-var target with a different accepted form has the reason on
+hand rather than re-derived.
+
+### The change, exactly as scoped
+
+1. **Emit sites → comma** (`data/probeToSlot.js:538`, `wizards/alignmentWizard.js:158`): `#54=ATAN[#52,
+   #53]`, trailing comments rewritten honestly (cite the FINDINGS commit).
+2. **Spec flips**: `alignment-superset.spec.js:69`, `cam-slot-sim.spec.js:164` — the pinned regex now
+   matches the comma form.
+3. **Evidence rows follow the behaviour** in `data/trigEvidence.js`:
+   - `TRIG_FUNCTIONS.ATAN`: tier `community-referenced` → `hardware-confirmed`; `test` now cites
+     `V13f_atan_comma.nc` (the file that actually settled it — `V13d_atan.nc`, the originally-planned
+     SLASH-form probe, never independently ran; the combined `V13_trig.nc` aborted at that identical
+     line first, so V13d was superseded before it could execute). `TRIG_RUN_ORDER` updated to match
+     (LOCK 4 in `trig-lift-plan-1466.spec.js` checks the two stay in lockstep).
+   - `TRIG_LIFT_PLAN`'s `alignment-atan` row: `kind` `shipped-unconfirmed` → `closed` (same treatment as
+     the `raster-ramp` row from t1483 — kept as HISTORY, not deleted). `decl`/`anchor` updated to the
+     comma form. `onYes`/`onNo` rewritten past-tense: onNo fired FIRST (slash form rejected — "a defect,
+     not a deferral"), onYes fired via the comma-form follow-up (hardware-confirmed).
+   - `V41_TRIG_EVIDENCE.ATAN`: tier `absent-so-far` → `hardware-confirmed`. This entry was STALE
+     independent of my emit change — the comma form was found on V4.1 (S5o/S6g) AFTER this entry was
+     written, so it documented a question that had already been answered elsewhere in the same file's
+     own sibling section. Kept the honest history of the six originally-rejected slash/named-form
+     probes; the text now says plainly that all six were the SLASH form and the comma form is the
+     seventh, untried-until-S5o, that works.
+4. **Five more specs checked** (the advisor's explicit list, none assumed): `trig-lift-plan-1466` needed
+   LOCK 2 updated (the `closed` rows list now has two entries, `alignment-atan`'s `closedBy` asserted).
+   `slot-cam-pack-scout-1508:32` needed its `ATAN.tier` pin flipped to `hardware-confirmed` (SQRT stays
+   `community-referenced` — the test's actual CRUX, atan2 AND hypot both needed live, still holds
+   because SQRT alone still gates it). `slot-capability-arc-1478`, `slot-live-frame-rotation-1514`,
+   `probe-fixes` — read, checked, genuinely unaffected: `probe-fixes.spec.js:27` tests the SIM
+   EVALUATOR's parsing of the slash form as a defensive/legacy capability, not what Studio emits — left
+   untouched on purpose.
+5. **Goldens**: grepped for the slash-form string project-wide; nothing outside the two emit sites, the
+   evidence file (now updated), and `probe-fixes.spec.js` (checked, correctly unchanged) — no stored
+   golden carries it, nothing to move.
+6. **Wizards-as-data compliance verified, not assumed**: `blocks/dataOps/alignmentData.js`'s
+   `alignmentDataStack` calls `alignmentStack()` directly — no hand-copied ATAN string, so the twin
+   inherits the fix by construction (fork parity via the ONE source, not a duplicate). Added an explicit
+   assertion in `alignment-data-emit.spec.js` (`hasCommaAtan`) rather than trusting the existing
+   byte-diff-ZERO loop implicitly — the advisor's instruction was to assert it, not infer it from a test
+   that would merely happen to also catch a divergence.
+
+### Verification
+
+- The five touched/flipped specs + the three "checked, no change" specs (46 tests total) run green
+  together.
+- **Non-vacuity, measured, not argued**: saved the three edited source files to a scratch copy,
+  `git checkout HEAD --` reverted them to the pre-t1634 tree (HEAD, since nothing was committed yet —
+  the spec edits stayed as written), reran the five touched/flipped specs. **5/5 failed** exactly on the
+  new assertions (`hasCommaAtan`, `hasAngle`, `atan2`, `ATAN.tier`, LOCK 2's closed-rows list) — restored
+  the fixed sources from the scratch copy (not from HEAD, which was now the reverted state) and reran:
+  46/46 green again.
+- Smoke tier: 71/71 green.
+
+### Not covered / noticed but out of scope
+
+`data/portingArc.js`'s `PORTING_STAGES['live-roundtrip'].landed` array has its own `atan-absent-so-far`
+entry (id, probe, outcome, finding — a historical probe-log record, separate from `trigEvidence.js`'s
+`V41_TRIG_EVIDENCE`) that is ALSO stale against the S5o/S6g comma-form finding — noticed while checking
+whether the twin had a second hand-copied ATAN source, not touched: the dispatch scoped step 3 to
+`data/trigEvidence.js` only, no spec asserts against this array's `outcome` field, and it reads as an
+append-only lab-notebook entry for that specific probe rather than a live-status registry. Flagging for
+the advisor rather than fixing unasked.
+
+Capacity: this act stayed within the scoped 7 steps plus the amendment/retraction detour; no capacity
+concern for the next act.

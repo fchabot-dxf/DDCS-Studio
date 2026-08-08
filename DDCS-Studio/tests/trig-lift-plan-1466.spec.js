@@ -50,11 +50,14 @@ test('LOCK 2 — every GATED row still cites V13_trig.nc, and every NOT-GATED si
     // follow-up act: the lock welds the emit change and the registry to the same turn. THREE now.
     const gated = TRIG_LIFT_PLAN.filter((r) => r.kind === 'gated');
     expect(gated.length, 'three declared boundaries still wait on the answer').toBe(3);
-    // and the row that left is CLOSED rather than deleted, with the road that closed it named
+    // and the rows that left are CLOSED rather than deleted, with the road that closed each one named
     const closed = TRIG_LIFT_PLAN.filter((r) => r.kind === 'closed');
-    expect(closed.map((r) => r.id), 'the ramp closed by the non-trig path').toEqual(['raster-ramp']);
+    expect(closed.map((r) => r.id), 'the ramp closed by the non-trig path; alignment-atan closed by hardware '
+        + 'confirmation (t1634)').toEqual(['raster-ramp', 'alignment-atan']);
     expect(closed[0].closedBy, 'and says what closed it, so the visit is not credited for it').toMatch(/run vector/);
     expect(closed[0].lifts, 'a closed row lifts nothing — the visit buys nothing here').toBe(false);
+    expect(closed[1].closedBy, 'the alignment row says what closed IT — the visit itself, this time').toMatch(/V13f|comma/);
+    expect(closed[1].lifts, 'it never gated anything — closing it buys confidence, not capability').toBe(false);
     for (const row of gated) {
         expect(src(row.site).includes('V13_trig.nc'), `${row.id} (${row.site}) must still name the decider — if this `
             + 'boundary stopped waiting on trig, its row has to come OFF the plan').toBe(true);

@@ -161,7 +161,7 @@ test('alignment slot: fence axis selects the probe axis; measures (no WCS write)
       const t = new GcodeExecutionEngine({ createVarStore: () => new Map(seed) }).trace(macro);
       return { capped: t.stats.capped, ax: [...new Set(t.segments.filter((g) => g.probe).map((g) => Math.abs(g.x2 - g.x1) > 1e-6 ? 'X' : 'Y'))] };
     };
-    return { fenceX: axes(0), fenceY: axes(1), atan2: /ATAN\[#52\]\/\[#53\]/.test(macro), noWcs: !/#\[#70\]=/.test(macro) };
+    return { fenceX: axes(0), fenceY: axes(1), atan2: /ATAN\[#52, #53\]/.test(macro), noWcs: !/#\[#70\]=/.test(macro) };
   });
   expect(r.fenceX.capped).toBe(false);
   expect(r.fenceX.ax, 'fence along X → probe Y').toEqual(['Y']);

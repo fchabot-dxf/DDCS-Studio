@@ -66,7 +66,7 @@ test('E0 golden + F2 restructure: #20 = [0-#19] (references the #var, NOT the [0
             has19: /^#19=10 \( Safe Z lift distance - positive \)/m.test(dfltEmit),
             has19Big: /^#19=25 \(/m.test(bigSafeZ) && /^#20=\[0-#19\] /m.test(bigSafeZ),
             // the angle compute is intact (the alignment purpose)
-            hasAngle: /#1512=#54/.test(dfltEmit) && /ATAN\[#52\]\/\[#53\]/.test(dfltEmit),
+            hasAngle: /#1512=#54/.test(dfltEmit) && /ATAN\[#52, #53\]/.test(dfltEmit),
             supFalseEqDefault: dfltEmit === sup0,
         };
     });

@@ -57,10 +57,14 @@ test('E1 byte-diff ZERO: user_alignment_data == alignmentStack across 8 structur
         // WIRING — sentinel scalars land in their sockets
         const wireDist = emitMapped(build({ ...D, dist: 99 })).text;
         const wireSafeZ = emitMapped(build({ ...D, safeZ: 99 })).text;
+        // t1634 — the twin is NOT a second source for the ATAN line (fork parity via alignmentStack), but VERIFY it
+        // rather than assume: the byte-diff loop above would already go red on a divergence, so this just names it.
+        const twinDefault = emitMapped(build(D)).text;
         return {
             structCount: structCombos.length, studioDiffs, expertDiffs, firstDiff,
             wireDist: /^#1=99 \(/m.test(wireDist),
             wireSafeZ: /^#19=99 \(/m.test(wireSafeZ) && /^#20=\[0-#19\] /m.test(wireSafeZ),   // #19 binds, #20 STAYS the ref
+            hasCommaAtan: /#54=ATAN\[#52, #53\]/.test(twinDefault),
         };
     });
     expect(r.structCount, 'the full structural sweep is 2×2×2 = 8 combos').toBe(8);
@@ -69,6 +73,7 @@ test('E1 byte-diff ZERO: user_alignment_data == alignmentStack across 8 structur
     expect(r.expertDiffs, 'EXPERT: byte-diff ZERO (source-chips #2/#3/#5 → registers, matching the built-in)').toBe(0);
     expect(r.wireDist, 'WIRING: dist=99 lands in #1').toBe(true);
     expect(r.wireSafeZ, 'WIRING: safeZ=99 lands in #19 and #20 STAYS [0-#19] (F2 — the ref tracks)').toBe(true);
+    expect(r.hasCommaAtan, 't1634: the twin emits the comma-form ATAN, not a hand-copied slash string').toBe(true);
 });
 
 test('E2 sim-starts: the twin POSITIONS + COUNT == the EXISTING BUILT_IN.alignment (2 starts A/B); emit BYTE-IDENTICAL', async ({ page }) => {
