@@ -31,6 +31,15 @@ export default defineConfig({
   webServer: {
     command: `node tests/support/mem-server.cjs ${PORT}`,   // t832 — in-memory static server (preloads web/; microsecond serves for the 346-module boot storm; NO bundle — serves the raw modules that ship)
     port: PORT,
-    reuseExistingServer: !process.env.CI,
+    // t1666 — was `!process.env.CI` (reuse locally, fresh in CI). The mem-server PRELOADS every file ONCE at
+    // startup and never re-reads them, so a leftover process from an earlier (aborted, Ctrl-C'd, force-killed)
+    // run silently served a STALE snapshot to the next `npx playwright test` invocation — three real false
+    // negatives in one session, each caught only by a human's suspicion (a non-vacuity check that stayed green
+    // against a no-op fix; a probe that read an old value after the file was already corrected on disk). FALSE
+    // unconditionally makes staleness IMPOSSIBLE rather than merely unlikely: Playwright now REFUSES to start
+    // ("port already used") the instant it would have reused a stale process, instead of silently trusting it.
+    // Costs ~57ms per invocation (measured) to always cold-start the server — a once-per-run cost, not a
+    // per-test one. Matches CI's own setting, which never had this bug.
+    reuseExistingServer: false,
   },
 });

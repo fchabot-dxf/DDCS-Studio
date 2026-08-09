@@ -20090,3 +20090,80 @@ result — collapse-by-default is real, correct, and verified, but does not solv
 aimed at. Delivered the ruled UX direction faithfully while being explicit that "the corner wall" itself needs
 a bigger, separately-sized act to actually fall. Hit the stale-mem-server trap a third time and caught it
 before trusting a false result — the pattern is now well-established enough to check for on sight.
+
+## t1666 — REVIEW OF t1664 (PASS) + THE STALE-MEM-SERVER TRAP MADE IMPOSSIBLE (turn 1666)
+
+### The t1664 review
+
+Advisor verdict: PASS. The honesty was named as the deliverable: ruled collapse-by-default and named the
+block count as the suspect, and the measurement proved that guess wrong (1852 blocks before and after, ~4%
+wall-clock reduction) — reporting a modest real result instead of a dramatic unreal one was called exactly
+right. The sizing of the real fix (lazy materialization) as a recommendation rather than a build was recorded
+as correct, with the advisor explicitly declining to rule on it themselves — putting act size to the user as
+a genuine fork.
+
+### THE ACT — kill the trap, rule of three met and then some
+
+Three real false negatives in one session, each caught only by a human's suspicion, not the harness: t1654's
+first modalPre probe, t1662's pocket label read, t1664's collapse non-vacuity check (both tests staying green
+against a no-op). The dispatch: make it impossible or loud, automatically, no procedure to remember.
+
+**Survey first.** `tests/support/mem-server.cjs` preloads every file in `web/` into a `Map` ONCE at process
+start and never re-reads them (t832's own documented design — a deliberate perf trade for a 346-module boot
+storm). `playwright.config.js`'s `webServer.reuseExistingServer` was `!process.env.CI` — locally `true`,
+meaning if a PORT WAS ALREADY OCCUPIED (a leftover process from any aborted, Ctrl-C'd, or force-killed earlier
+run), Playwright silently REUSED it instead of starting fresh — serving whatever snapshot that old process
+preloaded, regardless of any edit made since. CI already ran `reuseExistingServer: false` and never had this
+bug; only local runs were exposed.
+
+**Mechanism chosen — the dispatch's own hinted candidate, preferred over custom machinery.** Changed
+`reuseExistingServer: !process.env.CI` to `reuseExistingServer: false`, unconditionally, matching CI. This
+makes staleness IMPOSSIBLE, not merely detected: Playwright now refuses outright
+(`Error: http://localhost:3211 is already used...`) the instant a stale process would have been reused,
+rather than silently trusting it — stronger than a "loud" warning that could be scrolled past. Considered and
+rejected building a custom identity-stamp verification (compare served `Last-Modified` against the working
+tree's actual mtime, exposed via a new endpoint, checked in a `globalSetup` hook): the simpler, zero-new-code
+option was tested FIRST and found to completely satisfy the requirement, so the custom mechanism was never
+built — unasked machinery for a solved problem.
+
+### Non-vacuity — the full, real, end-to-end reproduction
+
+Reproduced the EXACT original vulnerability with hard evidence, not by inspection:
+1. Started a decoy server (simulating a leftover process) while `gcodeToStack.js` was in its normal, WORKING
+   state.
+2. Broke the file on disk (disabled the G+M raw-bail guard from t1650) WITHOUT touching the still-running
+   decoy.
+3. Ran `gcode-to-stack.spec.js`'s "falls back to raw" test with the OLD config (`!process.env.CI`) against the
+   occupied port: **the test SILENTLY PASSED against genuinely broken code** — the exact failure mode that bit
+   this session three times, reproduced on demand.
+4. Restored the FIXED config (`reuseExistingServer: false`) with the decoy still running: Playwright refused
+   outright (`port already used`) — the file was still broken, and now nothing could silently paper over it.
+5. Killed the decoy, re-ran: a fresh server started, correctly read the still-broken file, and the test
+   genuinely FAILED (`Received: "distmode"` where `Expected: "raw"`).
+6. Restored `gcodeToStack.js` from a scratch copy; reconfirmed 8/8 green.
+
+### Cost — measured, not estimated
+
+Timed a raw `spawn` of `mem-server.cjs` to its own `listening` stdout line: **~57ms**. A once-per-`npx
+playwright test`-invocation cost, not a per-test one (2450 tests still share the ONE server process for the
+whole run) — confirmed negligible against the dispatch's own bar ("a check that adds real time to every one
+of 2450 tests is a bad trade; a once-per-run check is not").
+
+### Full suite — measuring against the t1664 floor (node 99/0, e2e 2450 passed / 8 failed)
+
+node: **99/0**, clean. e2e: **2449 passed / 9 failed / 6 skipped**. Of the 9: 5 match documented churn by
+exact name (`collapsible-panes-752`, `pane-splitter-790` ×2, `update-check` ×2). Four were new/re-appeared
+names (`blocks-live-form:168`, `gateway-mismatch-gate-1229:52`, `param-group-rows-1605:52`,
+`wizard-face-1599:60`) — isolated with `--workers=1`: **19/19 passed clean** (the full files, not just the
+named tests). No ID outside the documented churn/self-contention class survived isolation — this fix
+eliminates the STALE-SERVER flake class specifically; it does not (and was never meant to) touch the SEPARATE,
+already-documented Blocks-canvas-boot-under-load class these four belong to. Restored 11 regenerated
+`verification/*.png` before staging.
+
+### Capacity
+
+The simplest possible fix for a real, repeatedly-costly bug: one config line, zero new files, zero new
+runtime machinery — found by testing the cleanest candidate FIRST rather than building the elaborate one by
+default. The weight of the turn was in PROVING it, not building it: a genuine end-to-end reproduction of the
+original bug (decoy server, real file break, real silent pass) before the fix, and a genuine end-to-end
+confirmation after. `playwright.config.js` is the only file this act touches.
