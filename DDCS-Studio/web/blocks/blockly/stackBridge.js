@@ -12,6 +12,28 @@ import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wi
 const HAS_CUSTOM_OP = {};
 OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
 
+// t1654 — A DURABLE TOP-LEVEL RECORD FIELD: something OTHER than {id,type,params,children,uiChildren,collapsed}
+// that must survive block.data → the record → back to block.data across a canvas round-trip. `_expose` was the
+// first (hand-special-cased at both ends); `modalPre` (t1652's carried modal G-word) is the second — and would
+// have been a THIRD hand-copied special case had it followed `collapsed`'s and `_expose`'s own precedent. The
+// review that found this named it exactly: t1638 collapsed four hand-maintained mouth-lists into one declared
+// field after the FIFTH silent loss; this is the same shape at the second, so declared now rather than grown by
+// hand a third time. A future field survives by being ADDED HERE — read and written generically below — not by
+// touching toRecord/recToJson's bodies again.
+const DURABLE_DATA_FIELDS = ['modalPre', '_expose'];
+// t1654 THE DURABLE HALF — every top-level key a LEAF record is allowed to carry. recToJson (below) throws if a
+// record carries anything outside this set: an undeclared top-level field would otherwise be silently dropped
+// on the canvas round-trip exactly like `modalPre` just was, and a silent drop is the failure mode t1638 already
+// ruled out for children. `collapsed` rides a native Blockly block property (not `data`), so it isn't a
+// DURABLE_DATA_FIELDS member, but it IS a legitimate top-level record field — both lists are named here, once.
+// `_group` is NOT durable — it's a TRANSIENT annotation `flattenBlocks` (userOps.js) mutates directly onto a
+// record's OWN object reference while walking a stack (a param_group's name, threaded down to its descendants),
+// recomputed fresh from tree structure every time it's needed, never meant to survive a save/reload. Tolerated
+// here (no throw) but deliberately excluded from DURABLE_DATA_FIELDS, so it is NOT written to `.data` — that
+// reproduces its exact pre-t1654 behaviour (silently ignored by the old, unchecked recToJson) rather than
+// stashing a stale copy that could disagree with a later fresh recomputation.
+const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', '_group', ...DURABLE_DATA_FIELDS]);
+
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
 /** t1317 — is this value ABSENT (no value at all), as opposed to an explicit zero? */
@@ -113,7 +135,13 @@ function toRecord(b) {
     }
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) ride in `data` — restore them WITHOUT
     // clobbering live field values, so editing the block keeps the context emit needs.
-    if (b.data) { try { const d = JSON.parse(b.data); if (d._expose) r._expose = d._expose; for (const k in d) if (k !== '_expose' && !(k in r.params)) r.params[k] = d[k]; } catch (_) { /* keep fields */ } }
+    if (b.data) {
+        try {
+            const d = JSON.parse(b.data);
+            for (const k of DURABLE_DATA_FIELDS) if (d[k] !== undefined) r[k] = d[k];   // t1654 — the declared set, generically
+            for (const k in d) if (!DURABLE_DATA_FIELDS.includes(k) && !(k in r.params)) r.params[k] = d[k];   // everything else → a non-field param snapshot
+        } catch (_) { /* keep fields */ }
+    }
     if (def.kind === 'user_root') {
         const pInp = b.getInput('PRESENTATION'), pBlk = pInp && pInp.connection && pInp.connection.targetBlock();
         const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
@@ -230,6 +258,11 @@ function recToJson(rec) {
     // ancestry doesn't match the workspace until a reproject realigns it (breaks click-selection + hover highlight).
     const def = BLOCKS[rec.type], node = { type: rec.type, id: rec.id };
     if (!def) return node;
+    // t1654 THE DURABLE HALF — a record carrying a top-level field this bridge doesn't know how to carry would
+    // otherwise be silently dropped here exactly like `modalPre` just was (t1652's carried modal G-word, found
+    // by re-driving the actual editor → canvas → emit gesture, not by inspection). FAIL LOUD instead: add the
+    // field's name to `DURABLE_DATA_FIELDS` above if it must survive the round-trip.
+    for (const k in rec) if (!KNOWN_LEAF_RECORD_FIELDS.has(k)) throw new Error(`recToJson: block "${rec.type}" carries an undeclared top-level field "${k}" — it would be silently discarded on this round-trip. Add "${k}" to DURABLE_DATA_FIELDS in stackBridge.js if it must survive.`);
     const fields = {}, inputs = {};
     // t1595 — the guard's ONE `when` predicate, projected into the three fields the canvas can hold. Computed here
     // rather than stored on the record: `when` stays the single source, this is only how it is written down.
@@ -268,9 +301,10 @@ function recToJson(rec) {
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) → `data`, so they survive a block edit.
     const fset = new Set(fieldsOf(def)), extra = {};
     for (const k in (rec.params || {})) { const v = rec.params[k]; if (!fset.has(k) && v !== undefined && (v === null || typeof v !== 'object')) extra[k] = v; }
-    // The authoring EXPOSE/PNAME/WIDGET state rides `data._expose` (NOT params — it's dev-only, never emitted), so a
-    // ticked knob survives a round-trip → the live form persists across a reprojection (#13). devMode reads it in augment.
-    if (rec._expose) extra._expose = rec._expose;
+    // t1654 — every DURABLE top-level record field (declared above), generically. Was two hand-copied special
+    // cases (`_expose` here, `modalPre` about to be a third) — now one loop; a new one survives by joining the
+    // declared list, not by another line here.
+    for (const k of DURABLE_DATA_FIELDS) if (rec[k] !== undefined) extra[k] = rec[k];
     if (Object.keys(extra).length) node.data = JSON.stringify(extra);
     if (def.kind === 'user_root') {
         if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };

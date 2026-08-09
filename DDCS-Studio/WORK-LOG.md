@@ -19549,3 +19549,118 @@ model, not an assumption), found one clean generic seam that needed zero per-ato
 halves of the mechanism (parse-side capture, emit-side replay) wrong independently before trusting either.
 Touched `blockEmitter.js` — the single most shared file in the whole emit path — so the whole-family
 round-trip test carried the real weight of this turn's regression proof, and it held at 0/0.
+
+## t1654 — REVIEW OF t1652 (PASS) + modalPre didn't survive the CANVAS round-trip: the fifth-instance shape again (turn 1654)
+
+### The t1652 review
+
+Advisor verdict: PASS. The premise-check discipline ("checked my hypothesis against the architecture instead
+of agreeing with it") and the generalization call (adding G94/95, naming it explicitly rather than sneaking it
+in) were both singled out as correct. No changes requested to t1652 itself.
+
+The advisor then independently re-ran `parseLine` on every hazard tier and every control from the pass-back
+and confirmed each one by hand before moving on — then went further: grepped `web/blocks/blockly/` and
+`programModel.js` for `modalPre` and found ZERO references. `stackBridge.js`'s `toRecord`/`recToJson` only
+ever knew about `{id,type,params,children}` — a top-level sibling field like `modalPre` had no path through
+either direction of the Blockly canvas serialization. The dispatch: verify this by driving the real gesture
+before touching anything, and if confirmed, decide whether this is a first-and-only field or the point to
+declare a registry (t1638's own precedent, at its second/third instance now).
+
+### Verify FIRST — drove the real gesture, not a unit-level guess
+
+`parseGcodeToStack('G1 G91 Z-5')` → `window.ddcsLoadBlockStack(stack)` (the real load path) →
+`window.__blkws.getAllBlocks()` (the real live workspace) → `window.ddcsGetBlockProgram()` (the real read-back)
+→ `emitMapped`. First attempt showed `modalPre` surviving into `stack2`, which looked like a false alarm — but
+the block's own `data` was `null`, and the id had changed, meaning the browser was still running a STALE
+cached copy of `stackBridge.js` from before any of this turn's edits (the mem-server preloads all `web/` files
+into memory at startup and does not watch for changes — a previously-known trap,
+[[new-file-needs-fresh-mem-server]], that turns out to apply to EDITED files too, not just new ones). Killed
+the stale server (PID on :3211), re-ran: **confirmed exactly as the advisor found it** — `stack2` carried no
+`modalPre` at all, and the re-emitted text lost the G91, reproducing the original t1652 danger by a second
+door.
+
+### The declared seam: `DURABLE_DATA_FIELDS` + `KNOWN_LEAF_RECORD_FIELDS`
+
+Surveyed `stackBridge.js` for every top-level record field already in use before deciding: `collapsed` (a
+native Blockly block property, hand-special-cased at both `toRecord`/`recToJson`) and `_expose` (an arbitrary
+value stashed in `block.data`, ALSO hand-special-cased at both ends) were already the exact same shape a THIRD
+hand-copied case (`modalPre`) would have repeated — this is t1638's own disease (four hand-maintained
+mouth-lists, collapsed after the fifth loss) at its second data-stash instance. Declared once:
+
+```
+DURABLE_DATA_FIELDS = ['modalPre', '_expose']          // generic — read once, written once, via block.data
+KNOWN_LEAF_RECORD_FIELDS = {id,type,params,children,uiChildren,collapsed, ...DURABLE_DATA_FIELDS}
+```
+
+`toRecord` (read) and `recToJson` (write) each replaced their single `_expose` special case with a loop over
+`DURABLE_DATA_FIELDS` — paying down the EXISTING hand-copied instance, not just avoiding a new one. `collapsed`
+stays separate (a genuinely different mechanism, a native Blockly property, not a `data`-stash) but is named
+in the SAME declared set so the fail-loud guard (below) knows about it too.
+
+**THE DURABLE HALF**, matching t1638's own standard: `recToJson` now throws if a leaf record carries ANY
+top-level key outside `KNOWN_LEAF_RECORD_FIELDS` — `recToJson: block "X" carries an undeclared top-level field
+"Y" — it would be silently discarded on this round-trip. Add "Y" to DURABLE_DATA_FIELDS if it must survive.`
+A future field either joins the declared list (survives) or throws (loud) — never a silent third instance.
+
+### The guard immediately proved itself — and found a real gap in my own survey
+
+Running the regression sweep, `roundtrip-whole-program-1319`'s two heaviest tests threw:
+`recToJson: block "user_root" carries an undeclared top-level field "_group"`. Traced it: `flattenBlocks`
+(`userOps.js`) mutates `b._group = g` DIRECTLY onto every block/record object it walks (a param_group's name,
+threaded down to descendants) — a genuinely pre-existing pattern my survey had missed because it's a RUNTIME
+side-effect, not something declared anywhere greppable. Confirmed it is NOT durable data: it's recomputed
+fresh from tree structure every time `flattenBlocks` runs, never meant to persist across a save/reload. Fix:
+added `_group` to `KNOWN_LEAF_RECORD_FIELDS` (tolerated, no throw) but deliberately NOT to `DURABLE_DATA_FIELDS`
+(not written to `.data`) — reproducing its EXACT pre-t1654 behavior (silently ignored by the old, unchecked
+`recToJson`) rather than stashing a copy that could go stale against a later fresh recomputation. This is
+exactly the kind of catch the advisor's "impossible-by-construction or fail loud" standard was for — it
+caught MY OWN incomplete survey before it shipped as a live regression, not after.
+
+### Verify by value + the real gesture, non-vacuity TWICE (two independent mechanisms)
+
+New spec, `modal-pre-canvas-1654.spec.js`, both tests driving the ACTUAL app (boot → `showApp('blocks')` →
+the real `window.__blkws` workspace, the same pattern `guard-roundtrip-1595` established):
+- `G1 G91 Z-5` survives editor → stack → **the real canvas** → stack → emit: the block's own `.data` on the
+  live workspace carries `{"modalPre":["G91"]}`, the read-back stack carries `modalPre:['G91']`, and the
+  re-emitted text still contains G91 (the plunge stays relative).
+- An undeclared top-level field (`somethingNoOneDeclared`) called directly against `stackToWorkspace` throws,
+  naming the field. ⚠ Note: `ddcsLoadBlockStack`'s OWN path reaches `stackToWorkspace` through
+  `programModel.js`'s `subs.forEach(fn => { try{fn()} catch(_){/* a view threw */} })` — a PRE-EXISTING swallow
+  that applies identically to t1638's own mouth-children throw, not a gap this act introduces. Tested the
+  guard directly (the deterministic way to assert it, the same layer t1638's own throw lives at) rather than
+  fighting an unrelated, already-existing infrastructure behavior.
+
+Non-vacuity, independently, both halves: reverted `DURABLE_DATA_FIELDS` to exclude `modalPre` (surgically, via
+scratch-copy) — the survival test went genuinely RED (`Received: false` where block data should carry
+`modalPre`). Restored, re-green. Separately disabled the fail-loud throw — the guard test went genuinely RED
+(`Received: false` where `threw` should be `true`). Restored, re-green.
+
+### Regression sweep — every stackBridge.js consumer, 83 tests
+
+`mouth-declaration-1638` (t1638's OWN guard still fires correctly) · `guard-roundtrip-1595` (both tests,
+including the 152-structural-flip sweep) · `roundtrip-whole-program-1319` (0/0 differences) ·
+`skim-blocks-roundtrip-1636` · `rotate-atom` · `cam-block-native-params(-s5)` · `value-fidelity-1520` ·
+`two-axis-inset-1490` · `slot-twin-repoint-1500` · `drill-switch-shots-1385` · `blocks-edit-lag-788` ·
+`transform-declared-736` · `lathe-blocks-bar-1315` · `cam-substack-fork` · `sim-socket-hide-820` ·
+`prog-marker-slot-812` · `middle-probe-z-first` · `learner-library` · `sim-start-block` · `group-edit` ·
+`op-header-edit-merge` · `blockly-port` · `coord-list-block` · `region-pick-block` · `transform-modal` —
+**83/83 green**.
+
+### Full suite — measuring against the t1652 floor (node 99/0, e2e 2440 passed / 10 failed)
+
+node: **99/0**, clean. e2e: **2440 passed / 12 failed / 6 skipped**. Of the 12: 8 match documented churn by
+exact name (`collapsible-panes-752`, `editor-chip-space-1323:60` itself, `formfield-loud-mismatch-1636`,
+`open-as-modal-1625:54`, `pane-splitter-790` ×2, `update-check` ×2). Four were new/changed names
+(`carve-live-crisp-816:27`, `open-as-modal-1625:108`, `pocket-canvas:22`, `wizard-face-1599:92`) — isolated
+individually with `--workers=1`, including `wizard-face-1599` which boots through the SAME `showApp('blocks')`
+→ `window.__blkws` path this act's own spec uses: **all 11 tests in those 4 files passed clean in isolation**.
+No ID outside the documented floor survived isolation. Restored 11 regenerated `verification/*.png` before
+staging.
+
+### Capacity
+
+A verify-first, survey-before-declare turn: reproduced the advisor's finding with the real app before writing
+a line of fix code (and caught a stale-mem-server false negative along the way, not the finding itself), then
+declared a registry that pays down TWO existing hand-copied special cases while adding the third — and the
+"fail loud" half of that declaration caught a real gap in my own survey (`_group`) during the very first
+regression run, before it could ship. That is the mechanism doing its job, not a mistake recovered from.
