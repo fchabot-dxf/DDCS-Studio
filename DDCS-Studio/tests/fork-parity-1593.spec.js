@@ -27,7 +27,14 @@ import { test, expect } from '@playwright/test';
  *
  * The pin stays, inverted: EVERY registered twin must fork, so a future change that re-breaks any of them fails
  * here rather than shipping a wizard whose copy is a different program. The arms themselves are proven by the
- * structural-flip sweep in guard-roundtrip-1595.spec.js — off-default NUMERIC values cannot see a dropped arm.
+ * structural-flip sweep in guard-roundtrip-1595.spec.js.
+ *
+ * t1660 — OFF-DEFAULTS COVERS EVERY DECLARED TYPE, not just number/int. Measured exposure before this turn: 306
+ * numeric bindings were swept, 57 (48 enum + 5 bool + 4 string) were not — moved-at-defaults-only, so a fork
+ * that silently dropped one of THOSE would have passed this spec clean. Extended by reading the declared shape
+ * (b.type + b.widgetConfig.options), not a hand-listed param per twin. Measured result: zero divergences across
+ * all 32 twins — see WORK-LOG t1660 for the full sweep + the non-vacuity proof (a deliberately broken binding
+ * was shown to fail this exact assertion before being restored).
  */
 
 // ⚠ t1595 — EVERY WAIT EXPLICIT. `waitForFunction(fn, {timeout})` passes the options object as the page-function's
@@ -130,13 +137,26 @@ test('THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, a
             const s = U.getUserDef(src), c = U.getUserDef('user_fk' + n);
             const guards = U.flattenBlocks(s.template || []).filter((b) => b && b.type === 'guard').length;
             if (!c) return { opType: src, guards, saved: false };
-            // OFF-DEFAULTS: every numeric value socket moved off its declared default, so a dropped value cannot
-            // masquerade as a kept one. Structural params stay put — they choose the ARM, which is the other claim.
+            // OFF-DEFAULTS: every value socket moved off its declared default, so a dropped value cannot masquerade
+            // as a kept one. Structural params stay put — they choose the ARM, which is the other claim.
+            // t1660 — EVERY declared TYPE, not just number/int: numeric bindings were the only ones swept until
+            // this turn (48 enum + 5 bool + 4 string bindings, across the whole registry, were invisible to this
+            // claim — moved-at-defaults-only, so a fork that silently dropped one would have passed here clean).
+            // Reads the DECLARED shape generically (b.type + b.widgetConfig.options), never a hand-listed param —
+            // the same declare-not-handroll bar this project applies everywhere else.
             const P = { ...U.defaultParams(s) };
             let off = 0;
             for (const b of (s.bindings || [])) {
                 if (b.blockIndex == null) continue;
                 if (b.type === 'number' || b.type === 'int') { P[b.param] = Number(b.default || 0) + 7; off++; }
+                else if (b.type === 'bool') { P[b.param] = !b.default; off++; }
+                else if (b.type === 'enum') {
+                    // A single-option enum (e.g. text's `font`) has no alternative to move to — not a gap, a
+                    // genuinely fixed field; skipped rather than counted as swept.
+                    const opts = (b.widgetConfig && b.widgetConfig.options) || [];
+                    const alt = opts.map(([, v]) => v).find((v) => v !== b.default);
+                    if (alt !== undefined) { P[b.param] = alt; off++; }
+                } else if (b.type === 'string') { P[b.param] = String(b.default || '') + ' [t1660 off-default]'; off++; }
             }
             const { emitProgram } = await import('/blocks/blockEmitter.js');
             let srcGcode = null, copyGcode = null, err = null;

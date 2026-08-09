@@ -19823,3 +19823,86 @@ Light, as dispatched — three independent, small, well-scoped corrections, each
 heavy act (grep-confirmed data correction, orphan cleanup checked for crash risk before deleting, non-vacuity
 proven on the one item that needed it). Flagged one adjacent staleness (`PARAMETRIC_FLOOR`) without fixing it,
 matching the turn's own instruction not to inflate it.
+
+## t1660 — REVIEW OF t1658 (PASS) + fork-parity gains enum/bool/string coverage: measured, extended, swept clean (turn 1660)
+
+### The t1658 review
+
+Advisor verdict: PASS. Floor note: e2e 8 failed / 2447 passed, all documented churn, zero new names — "the
+cleanest floor of this entire run, down from 15."
+
+### THE ACT — ENUM / BOOL / STRING FORK PARITY
+
+`fork-parity-1593.spec.js` proves every twin forks byte-identically to its wizard, but its off-default sweep
+only ever moved `number`/`int` bindings off their declared default — enum, bool and string bindings stayed at
+default in both source and copy, so a divergence in any of THEM would look identical to a perfect fork and
+this spec would never notice. Named as the same silent-divergence family as five real defects this run
+already found (a string-enum codec bug, a Z-mode declaration the modal never read, a skim wrapper losing its
+whole body).
+
+### 1. Measured the exposure first, before touching anything
+
+Across the 32-twin registry: **306 numeric bindings** already swept, **57 unswept** — 48 enum, 5 bool, 4
+string. Of the 48 enum bindings, one (`user_text_data`'s `font`) declares a SINGLE option
+(`[['Single-stroke (engraving)', 'single-stroke']]`) — structurally unable to move off its own default (no
+alternative value exists), not a coverage gap; 47 enum bindings genuinely move.
+
+### 2. Extended the sweep by reading the declaration, not hand-listing
+
+```js
+else if (b.type === 'bool') { P[b.param] = !b.default; off++; }
+else if (b.type === 'enum') {
+    const opts = (b.widgetConfig && b.widgetConfig.options) || [];
+    const alt = opts.map(([, v]) => v).find((v) => v !== b.default);
+    if (alt !== undefined) { P[b.param] = alt; off++; }
+} else if (b.type === 'string') { P[b.param] = String(b.default || '') + ' [t1660 off-default]'; off++; }
+```
+
+Reads `b.type` + `b.widgetConfig.options` — the SAME declared shape every binding spec already carries for
+its own form widget. Zero hand-listed params per twin; a future binding TYPE (the registry only has these
+four plus `list`, currently unused on any value-socket binding) joins by adding one branch here, not by
+enumerating twins.
+
+### 3. Report every divergence — the sweep found NONE
+
+Ran the REAL fork gesture (customize → Save as new, the same path the existing spec drives) across all 32
+twins with the extended off-defaults. **Zero divergences.** `emitSame: true` on every twin, no build errors,
+362 total value-socket bindings exercised off-default (306 numeric + 47 enum + 5 bool + 4 string). Nothing to
+rank by hazard because nothing diverged — reported plainly, not massaged into a finding that isn't there.
+
+### 4. Non-vacuity — proved the sweep CAN fail, since it found nothing
+
+A green sweep that cannot fail is worse than no sweep. Deliberately corrupted `stackBridge.js`'s
+dropdown/text-field write direction (`recToJson`) to always write the field's DECLARED DEFAULT regardless of
+the actual value — a realistic simulation of the exact defect class this spec exists to catch (a field
+silently reverting during the canvas round-trip). Ran the extended sweep against the corruption: **failed
+immediately, on the very first twin** (`user_atc_warmup_data`) — a real emit divergence at its off-default
+values, exactly the assertion this turn added. Restored `stackBridge.js` from a scratch copy, re-verified
+green. `cornerData.js` — considered as an alternative break site, never actually needed or touched (the
+`stackBridge.js` corruption alone was sufficient and more representative of a real regression class).
+
+### Regression sweep — stackBridge.js was touched-and-restored, confirm the restore is genuinely clean
+
+`guard-roundtrip-1595` (both tests, the 152-flip sweep) · `mouth-declaration-1638` · `roundtrip-whole-
+program-1319` (0/0) · `modal-pre-canvas-1654` (both tests) · `subscriber-error-surface-1656` (all three) —
+**12/12 green** after the restore.
+
+### Full suite — measuring against the t1658 floor (node 99/0, e2e 2447 passed / 8 failed)
+
+node: **99/0**, clean. e2e: **2443 passed / 13 failed / 6 skipped**. Of the 13: 9 match documented churn by
+exact name (`collapsible-panes-752`, `formfield-loud-mismatch-1636`, `open-as-modal-1625` ×2, `pane-
+splitter-790` ×2, `pocket-cavity-2d`, `update-check` ×2). Four were new/re-appeared names
+(`formfield-authoring-1610`, `formfield-opparam-1640`, `guard-roundtrip-1595:115`, `save-dialog-declared-
+1615:78`) — isolated with `--workers=1`: **12/13 passed clean**; `save-dialog-declared-1615:78` hit the exact
+same `!!window.__blkws` boot-timeout class this file already flaked on earlier THIS turn (a different test
+within the same file each time, always the Blocks-canvas boot under load — the same established class
+`guard-roundtrip-1595`/`wizard-face-1599` have shown all session), so re-ran the whole file alone once more:
+**3/3 clean**. No ID outside the documented churn/self-contention class survived isolation. Restored 11
+regenerated `verification/*.png` before staging.
+
+### Capacity
+
+A measure-then-build turn: sized the actual exposure before writing any extension code, so the sweep's scope
+was a measured fact (57 params) rather than an estimate, and closed with the harder non-vacuity direction —
+proving a GREEN sweep can still fail — since the happy path (zero divergences) offered no free proof that the
+new assertions do anything at all.
