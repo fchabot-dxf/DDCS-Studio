@@ -578,12 +578,13 @@ export async function editWizardDef(opType) {
 //
 // t1615 (ruled) — THE DIALOG READS THE DECLARATION. When the stack itself declares the answer as blocks
 // (`init.declPanel` from a panel block; `init.declSim` !== undefined from a sim block), the question is not
-// asked: a read-only summary renders instead, and commit() uses the declared value — there is no control to
-// disagree with, so a conflict is impossible by construction. A bare stack (no declaration) still asks. The
-// NAME stays asked always — naming the fork is the one genuinely new fact at save time. This dialog predated
-// presentation-as-blocks and kept asking — the same second-source disease as the fork reading pills (t1593).
-const PANEL_LABELS = { form3d: 'Form + 3D preview', 'form3d+2d': 'Form + 3D preview + 2D layout', form2d: 'Form + 2D layout', form: 'Form only' };
-const RIG_LABELS = [['showRotaryRig', '4th-axis rotary'], ['forceMachine', 'Machine frame'], ['showMagazine', 'ATC magazine'], ['toolMachineFrame', 'Machine-frame tool'], ['seatAtStart', 'Seat at start'], ['probesForWcs', 'Probes the WCS']];
+// asked — commit() uses the declared value, so there is no control to disagree with and a conflict is
+// impossible by construction. A bare stack (no declaration) still asks. The NAME stays asked always — naming
+// the fork is the one genuinely new fact at save time. This dialog predated presentation-as-blocks and kept
+// asking — the same second-source disease as the fork reading pills (t1593).
+// t1658 (user, verbatim: "useless") — a DECLARED row renders NOTHING, not a read-only receipt. Panel/Preview
+// rig are already visible on the canvas the operator just built; restating them back at Save time answered a
+// question nobody asked.
 function openSaveDialog(init, onConfirm) {
     const m = document.createElement('div');
     m.className = 'blk-dev-savedlg';
@@ -603,13 +604,12 @@ function openSaveDialog(init, onConfirm) {
         .blk-dev-savedlg .blk-dev-save:hover{filter:brightness(1.1);}</style>`;
     const panelDeclared = !!init.declPanel;
     const simDeclared = init.declSim !== undefined;   // a sim block exists (null = it declares "no rigs" — still declared)
-    const escT = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    const declRigText = () => {
-        const on = RIG_LABELS.filter(([k]) => init.declSim && init.declSim[k]).map(([, lab]) => lab);
-        return on.length ? on.join(' · ') : 'none';
-    };
+    // t1658 — the user, verbatim: the declared-branch rows were "useless" — a read-only receipt for something
+    // the operator just built on the canvas (Panel/Preview rig are already visible there). When the stack
+    // ALREADY declares the answer, there is no question left to render; the row is dropped, not just disabled.
+    // The non-declared branches are the REAL questions (a bare stack has no panel/sim block to read), unchanged.
     const panelRow = panelDeclared
-        ? `<div class="blk-dev-name">Panel <span class="blk-dev-decl" data-decl-panel="${escT(init.declPanel)}" style="font-weight:400;color:var(--text-main,#e6edf3);">${escT(PANEL_LABELS[init.declPanel] || init.declPanel)} <span style="opacity:.55;">— declared by the stack's panel block</span></span></div>`
+        ? ''
         : `<label class="blk-dev-name">Panel <select class="blk-dev-paneltype">
                 <option value="form3d">Form + 3D preview</option>
                 <option value="form3d+2d">Form + 3D preview + 2D layout</option>
@@ -617,7 +617,7 @@ function openSaveDialog(init, onConfirm) {
                 <option value="form">Form only</option>
             </select></label>`;
     const rigRow = simDeclared
-        ? `<div class="blk-dev-name">Preview rig <span class="blk-dev-decl" data-decl-sim style="font-weight:400;color:var(--text-main,#e6edf3);">${escT(declRigText())} <span style="opacity:.55;">— declared by the stack's preview-rig block</span></span></div>`
+        ? ''
         : `<div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
                 <label><input type="checkbox" class="blk-dev-sim-rotary"> 4th-axis rotary (jog)</label>
                 <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>

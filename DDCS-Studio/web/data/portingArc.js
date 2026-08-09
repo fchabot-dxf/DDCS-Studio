@@ -559,13 +559,16 @@ export const V41_S5_RUN_RESULTS = {
                 + 'V41_TRIG_EVIDENCE for the full framing',
         },
         {
-            id: 'atan-absent-so-far', probe: 'S5f_atan.nc + S5g/S5_ATN/S5_ATAN2/S5_atan/S5_ACOS follow-ups',
-            outcome: 'ABSENT-SO-FAR, not ABSENT',
+            id: 'atan-absent-so-far', probe: 'S5f_atan.nc + S5g/S5_ATN/S5_ATAN2/S5_atan/S5_ACOS follow-ups, then '
+                + 'S5o_atan_comma.nc + S6g_atan_order.nc (t1634)',
+            outcome: 'RESOLVED — HARDWARE-CONFIRMED via the comma form (t1634); the ABSENT-SO-FAR reading below is STALE',
             finding: 'six names tried (two-operand ATAN, single-operand ATAN, ATN, ATAN2, lowercase atan, ACOS as '
-                + 'a control) — all REJECTED with Unrecognized-file-format naming the line. Every probe was '
-                + 'structurally identical to the working SQRT line, so the FORM is proven correct and only the '
-                + 'NAME or existence is at issue. A forum post is out to the community; COS/SIN remain untested. '
-                + 'See trigEvidence.js V41_TRIG_EVIDENCE for the full framing',
+                + 'a control) — all REJECTED with Unrecognized-file-format naming the line, in the SLASH form. Every '
+                + 'probe was structurally identical to the working SQRT line, so the FORM (not the name) was the '
+                + 'open question. It was: `S5o` `ATAN[1, 1] * 100` → `4500` (45°, the COMMA form WORKS); `S6g` '
+                + '`ATAN[1, 2] * 100` → `2656.505` (atan2(1,2)°, argument order dy-over-dx CONFIRMED). ATAN was never '
+                + 'absent — only the six slash-form names tried were the wrong syntax. COS/SIN remain UNTESTED (only '
+                + 'inverse trig was probed). See trigEvidence.js V41_TRIG_EVIDENCE for the full framing',
         },
         {
             id: 'errors-name-the-line', probe: 'every probe that hit a syntax error', outcome: 'CONFIRMED, a controller fact',

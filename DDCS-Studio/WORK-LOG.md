@@ -19742,3 +19742,84 @@ this turn was in the survey and the verification, not the code: confirmed the sw
 two guards (not a wider crisis), confirmed a pattern-sibling with no current risk rather than guessing either
 way, and proved isolation survives the change with the exact same rigor as the fix itself. The guards this
 project has built are only as strong as the paths that carry their throws — this closes the one that mattered.
+
+## t1658 — REVIEW OF t1656 (PASS) + a light housekeeping sweep: three stale-text items after five heavy acts (turn 1658)
+
+### The t1656 review
+
+Advisor verdict: PASS. The restraint was named as the correctness: reported `stackToWorkspace`'s single-caller
+survey as SINGULAR rather than a systemic crisis, reported `saveStates.js`'s sibling pattern as no-current-risk
+rather than fixing it speculatively, and declined a labelled-subscriber registry with a stated reason (the
+guards' own messages already self-identify) rather than building it "because it seemed thorough."
+
+Context given, not a task: five consecutive acts each found a real defect the previous one implied (send gate
+→ G+M drop → G+G modal drop → canvas round-trip drop → swallowed guard). The branch carries 14 unreleased
+commits; the release push still waits on a user permission, unrelated to the work itself.
+
+### THE ACT — three housekeeping items, deliberately kept light
+
+**1. `portingArc.js`'s stale ATAN row.** The `atan-absent-so-far` entry (`V41_S5_RUN_RESULTS`) still described
+the pre-t1634 world — six names tried in the slash form, all rejected, "ABSENT-SO-FAR." t1634 hardware-
+confirmed the COMMA form on V4.1 (`S5o_atan_comma.nc` → 4500 = 45°; `S6g_atan_order.nc` → 2656.505 =
+atan2(1,2)°, dy-over-dx order confirmed) and already corrected the parallel entry in `trigEvidence.js`, but
+never touched this file's OWN copy of the same fact. Corrected to mirror `trigEvidence.js`'s own resolved
+wording exactly (`outcome: 'RESOLVED — HARDWARE-CONFIRMED via the comma form (t1634); the ABSENT-SO-FAR
+reading below is STALE'`), keeping the honest history (the six slash-form names + why they looked like an
+absence) rather than deleting it — the messages-rot rule this project already applies to `trigEvidence.js`.
+⚠ **Found but NOT fixed, flagged only**: `PARAMETRIC_FLOOR`'s V4.1 verdict text still reads "SQRT/ATAN
+unattested" — stale by the same fact, but a DIFFERENT judgment (an arc-order planning verdict, not the ATAN
+row itself) whose correction could ripple into the DM500 comparison text elsewhere in the same file. Out of
+this turn's "do not inflate it" scope; named for whoever picks up the porting arc next.
+
+**2. The save-dialog summary rows — user-called "useless," deleted.** `devMode.js`'s `openSaveDialog`: when
+the canvas stack already declares Panel/Preview rig as blocks, the dialog rendered a READ-ONLY receipt row
+(`data-decl-panel`/`data-decl-sim`) restating what the operator just built and can already see on the canvas.
+Deleted both declared-branch template strings (now `''` — the row renders nothing) instead of merely disabling
+them; the non-declared branches (the REAL questions, for a bare stack) are untouched. Removed `PANEL_LABELS`,
+`RIG_LABELS`, `declRigText()`, `escT()` — all four were used ONLY inside the deleted branches, orphaned by this
+change (not pre-existing dead code — mine to clean up). Verified the DOM reads at Save/Update time
+(`q('.blk-dev-paneltype')`, the sim checkboxes) were already gated by `panelDeclared`/`simDeclared` before this
+turn, so deleting the declared-branch HTML introduces no crash risk — confirmed by reading, not assumed.
+
+`save-dialog-declared-1615.spec.js` — replaced the `[data-decl-panel]`/`[data-decl-sim]` presence assertions
+(asserting the receipt rendered) with absence assertions (asserting NO "Panel"/"Preview rig" text renders at
+all when declared) — the rows are gone, not just uneditable. The "no questions" control-absence assertions and
+the saved-def assertions (the declaration actually reaching the saved wizard — "the part that still matters")
+are UNCHANGED, per the dispatch's explicit instruction not to weaken a test that still has a job.
+
+**3. `editor-chip-space-1323.spec.js:60` — the stale test, fixed to assert what ships.** Read `styles.css`
+directly: the shipped rule (~line 5864, since `c5769a20`) applies the chip inset via `top` on `#editor` and
+`#editor-highlight` (a positioning rule), not `padding-top` — confirmed empirically (`getComputedStyle().top`
+== `46px` matching the declared `--editor-chip-inset`; `paddingTop` == `14px`, an unrelated pre-existing value,
+on BOTH layers, meaning the old assertion was comparing the wrong CSS property entirely and had been failing
+identically since the mechanism changed — exactly matching the advisor's own diagnosis at turn 1647). Fixed
+the assertion to read `top` instead of `paddingTop`; the COUPLING the test actually cares about (both layers
+move together) is unchanged in shape, only the property read is corrected.
+
+### Verify + non-vacuity
+
+Items 1-2 checkable by grep/test as the dispatch allowed: `portingArc.js`'s corrected text greps clean against
+`trigEvidence.js`'s own resolved wording; `save-dialog-declared-1615.spec.js` (3/3 green) — non-vacuity proven
+by temporarily reverting the declared-branch row to render again (scratch-copy), confirming the NEW absence
+assertion goes genuinely RED (`Received: "1"` where `Expected: "0"`), restoring, re-green.
+
+Item 3, non-vacuity specifically required: `editor-chip-space-1323.spec.js` (3/3 green, including the
+previously-stale test) — reverted `styles.css` so `#editor-highlight` alone lost the inset (`top: 0` instead
+of `var(--editor-chip-inset)`, scratch-copy), confirmed the corrected assertion went genuinely RED
+(`Received: 0` where `Expected: 46` — the EXACT symptom this test exists to catch: a lone layer sitting a line
+off from its sibling). Restored, re-green.
+
+### Full suite — measuring against the t1656 floor (node 99/0, e2e 2444 passed / 11 failed)
+
+node: **99/0**, clean. e2e: **2447 passed / 8 failed / 6 skipped** — fewer failures than the floor, and
+`editor-chip-space-1323` is GONE from the failure list (the fix, as expected). All 8 remaining failures match
+documented churn by exact name (`collapsible-panes-752`, `formfield-loud-mismatch-1636`, `open-as-modal-
+1625` ×2, `pane-splitter-790` ×2, `update-check` ×2) — no new names at all, so no isolation runs were needed
+this turn. Restored 11 regenerated `verification/*.png` before staging.
+
+### Capacity
+
+Light, as dispatched — three independent, small, well-scoped corrections, each verified to the same bar as a
+heavy act (grep-confirmed data correction, orphan cleanup checked for crash risk before deleting, non-vacuity
+proven on the one item that needed it). Flagged one adjacent staleness (`PARAMETRIC_FLOOR`) without fixing it,
+matching the turn's own instruction not to inflate it.

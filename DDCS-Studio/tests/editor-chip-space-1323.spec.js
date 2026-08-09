@@ -63,11 +63,14 @@ test('the inset is DECLARED once and both editor layers take it — a lone layer
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     const r = await page.evaluate(() => {
         const box = document.querySelector('.editor-container');
-        const pad = (el) => parseFloat(getComputedStyle(el).paddingTop);
+        // t1658 — STALE: this used to read paddingTop, which the shipped rule never sets (styles.css ~5864 applies
+        // the inset via `top`, since c5769a20 — a positioning rule, not padding). paddingTop was always 0 here,
+        // so this failed identically on `main`, pinning nothing. `top` is the mechanism that actually ships.
+        const top = (el) => parseFloat(getComputedStyle(el).top);
         return {
             declared: getComputedStyle(box).getPropertyValue('--editor-chip-inset').trim(),
-            editor: pad(document.getElementById('editor')),
-            highlight: pad(document.getElementById('editor-highlight')),
+            editor: top(document.getElementById('editor')),
+            highlight: top(document.getElementById('editor-highlight')),
         };
     });
     expect(r.declared, 'the inset is one declared value on the container').toBeTruthy();

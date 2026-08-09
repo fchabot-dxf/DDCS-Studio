@@ -51,11 +51,11 @@ test('a stack that DECLARES panel + rigs: summary shown, no questions, the saved
     // No questions — the controls are NOT rendered (a hidden control could still disagree; absence cannot).
     await expect(page.locator('.blk-dev-savedlg .blk-dev-paneltype'), 'the Panel question is not asked').toHaveCount(0);
     await expect(page.locator('.blk-dev-savedlg .blk-dev-sim-rotary'), 'the rig checkboxes are not asked').toHaveCount(0);
-    // The read-only summary IS the declaration.
-    await expect(page.locator('.blk-dev-savedlg [data-decl-panel]'), 'a declared-panel summary renders').toHaveCount(1);
-    const shownPanel = await page.evaluate(() => document.querySelector('.blk-dev-savedlg [data-decl-panel]').getAttribute('data-decl-panel'));
-    expect(shownPanel, 'the summary shows the STACK declaration').toBe(decl.panel);
-    await expect(page.locator('.blk-dev-savedlg [data-decl-sim]'), 'a declared-rig summary renders').toHaveCount(1);
+    // t1658 (user, verbatim: "useless") — a DECLARED row renders NOTHING, not a read-only receipt; the value
+    // is already visible on the canvas the operator just built. Assert the row is genuinely gone, not merely
+    // uneditable — no Panel/Preview-rig label at all in the dialog.
+    await expect(page.locator('.blk-dev-savedlg', { hasText: 'Panel' }), 'no Panel row renders — declared, nothing left to say').toHaveCount(0);
+    await expect(page.locator('.blk-dev-savedlg', { hasText: 'Preview rig' }), 'no Preview rig row renders').toHaveCount(0);
     // The NAME is still asked — fill it and save (corner is maintained-as-data → "Save as new" is the path).
     await page.fill('.blk-dev-savedlg .blk-dev-opname', 'decl reader probe');
     await page.click('.blk-dev-savedlg .blk-dev-save');
