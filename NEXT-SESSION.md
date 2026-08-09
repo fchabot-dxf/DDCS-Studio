@@ -1,3 +1,152 @@
+# QUEUED (user-approved 2026-08-09) — THE DECLARED-BUT-UNREAD SWEEP
+
+**Four instances surfaced in four consecutive acts, every one found BY ACCIDENT while chasing something
+else.** That is the signal: they are not rare, we are just meeting them one user report at a time.
+
+```
+  t1638  block `mouth`        four hand-maintained kind lists, children silently discarded
+  t1654  durable record field `modalPre` dropped on the canvas round-trip
+  t1670  `emits` (solid/hollow)  DECLARED contract, read by NONE of its three renderers
+  t1674  `noSnap`             passed to buildCanvasWidgets, silently dropped by it
+```
+
+**The act — FIND THEM ON PURPOSE, do not fix them yet.**
+
+1. **Sweep for keys that are SET somewhere and READ nowhere**, across the declaration-carrying layers:
+   block defs, binding specs, handle/widget declarations, op defs (`def.*`), and the spec objects returned
+   by `layoutSpecFromOp` / `previewGeometry` / `buildCanvasWidgets`. Grep-shaped: for each key written to a
+   declaration object, is there a consumer that reads it?
+2. **REPORT A RANKED LIST, fix nothing.** Rank by what the dead declaration PROMISES, not by how easy it is
+   to fix. `emits` ranks high because it promises the operator "this marker changes your program" — a
+   safety-relevant claim nothing enforces. A cosmetic hint ranks low. Batching fixes behind a sweep is how a
+   real one gets waved through (the t1660 standard).
+3. **Say which are DEAD (delete) and which are UNIMPLEMENTED (build)** — different acts, and I want the
+   distinction made by evidence, not vibes. A declaration nobody ever wired is not the same as one whose
+   consumer was refactored away.
+4. ⚠ **THE DURABLE HALF matters more than the list.** How does a declared-but-unread key become IMPOSSIBLE
+   or LOUD? `t1638` and `t1654` both solved their instance by making the round-trip THROW on an undeclared
+   field. The generalization would be a test asserting every key present in a declaration object has a
+   reader. Say whether that is buildable and what it would cost — if it is, that single guard retires this
+   whole class, which is worth more than any individual fix below it.
+5. Non-vacuity: whatever detector you build, prove it catches a planted dead key, then remove the plant.
+
+⚠ Do NOT let this become a refactor. It is a census plus one durable guard. The fixes are separate acts,
+dispatched by rank.
+
+---
+
+# QUEUED NEXT (user defect report + screenshot, 2026-08-09) — THE CORNER TWIN'S PREVIEW IS WRONG
+
+⚠ **Corner is the GATED PILOT** (see memory: no other wizard ports until corner is perfect). A preview
+defect here outranks the rest of the queue.
+
+**User, verbatim, with a screenshot of `Corner (data) · 82 lines`:**
+1. *"corner probe path is not like the feature gui at all"*
+2. *"corner probe has both diagonal and dogleg traverse"*
+
+**What the screenshot shows** (advisor reading — verify, do not inherit):
+```
+   ┌╴╴╴╴╴┐              ● probe point (upper), well ABOVE the rectangle
+   ╎ amber dashed       ╎
+   ╎ rectangle  ╲       ╎
+   └╴╴╴╴╴╴╴╴╴╴╴╴●╺╺╺╺╺╺╺╺╺╺╺╺╺► teal, running FAR off to the right
+              ╲   probe point (lower), on the EDGE not the corner
+     ▪ 1       ╲        Mach  X 32.231  Y -738.089  Z -105.000
+         ● Start        (Start disconnected, bottom-centre)
+```
+- **TWO traverse shapes at once** — an orange DIAGONAL and a teal DOGLEG/axis-aligned run. Only one
+  strategy should be live. Note `traverse-targets-are-marker-derived`: teal drives the EMIT vars, amber is
+  sim-only — so two *colours* is expected; two *shapes* is the report. Establish which is which.
+- The teal traverse aims far outside the feature.
+- Probe points sit off the rectangle's corner rather than on it.
+- `Y -738.089` — determine whether that is the user's real machine frame or the preview rendering in the
+  WRONG FRAME. `probes-never-read-wcs` and `machine-frame-sim-spec` are the relevant declarations.
+
+**The act:**
+1. **DRIVE BOTH SURFACES and screenshot them side by side** — the Corner wizard's own 2D feature canvas,
+   and the `user_corner_data` twin's preview, at IDENTICAL settings. The divergence is the deliverable;
+   name it before touching code. (`review-eyeballs-whole-wizard`.)
+2. **Say which surface is RIGHT.** Do not assume the wizard is correct and the twin is wrong — the twin may
+   be exposing a real defect the wizard's own canvas hides.
+3. **The double traverse:** find why two shapes render. One declared strategy, one drawn path per role.
+4. **Fix at the source, one source, both faces** (standing wizards-as-data compliance ruling).
+5. **Verify by VALUE:** the probe points land ON the declared corner, the traverse target is the next
+   probe's marker (not a free-standing value), the frame is correct, and the EMIT is unchanged unless the
+   act intends to move it — say which. Non-vacuity per claim. Full suite + ID diff.
+
+⚠ Do NOT let this act drift into redesigning the corner UX. It is a divergence hunt and a fix.
+
+---
+
+# ▶ THE ACT (turn 1648) — THE START-POSITION MARKER, one coherent dispatch
+
+t1646 was re-aimed SIX times mid-flight and the worker correctly took the escape hatch rather than build
+through the churn. This is that feature, dispatched once, with every ruling folded in. **Nothing below is
+open for re-litigation — all six are the user's own words.**
+
+## The feature, in one picture
+
+```
+  ONE marker widget. Same look, same drag, in BOTH Z-modes.
+  The MODE declares what it writes to — it does NOT fork the widget.
+
+  mode = wcs   ->  writes the ORIGIN / ANCHOR OFFSET  ->  the EMIT MOVES
+  mode = skim  ->  seeds #790/#791/#792 (preview)     ->  emit BYTE-IDENTICAL
+```
+
+## The rulings (user, verbatim intent)
+
+1. **"the gui serve differently in skim or wcs but it should look the same"** — one widget, identical
+   appearance and drag. Not two markers that resemble each other.
+2. **"that start position functionnality diff is unversal for all wizard using relative or wcs mode"** —
+   the semantic is NOT surfacing-specific. Declare it ONCE, shared; surfacing is consumer #1.
+3. **"is it better to make the wizard as data now"** → YES. The declaration lives in the
+   **wizards-as-data layer**, read by BOTH faces. Not a wizard-side helper the twin later mirrors.
+4. **"probes also use start pos, it doesnt need to have both, its still the same relative gui"** — REUSE
+   the existing probe start GUI. Do not design a new widget, do not build a WCS variant.
+5. **"in wcs mode start position gui controls offset of the origin / anchor"** — in WCS the emit MOVES.
+   ⚠ An earlier dispatch told the worker to assert byte-identity in BOTH modes. That is WRONG for WCS.
+6. No clamp, no greying; `surfacingView.js:95` auto-fill stays untouched.
+
+## What t1646 already measured (do not re-measure)
+
+- **The WCS arm may already exist.** The `point` handle at `surfacingView.js:59-62` drives
+  `sf_originX`/`sf_originY` — literally the origin offset — and is PROVEN to reach the emit exactly
+  (emit shift == the field's own delta, at both full-stock and shrunk sizes). Start there.
+- **The twin has data parity but NO draggable canvas** (checked for `data-hid=origin/size` specifically).
+- **`def.simStartParams` is REAL** — used by exactly 2 twins (`alignmentData.js`, `rotaryClockData.js`),
+  and both write into REAL params the emit reads. **Fits the WCS arm; does NOT obviously cover the Skim
+  arm** (a preview-only seed). Its `userOpView.js` path is TWIN-side only; `surfacingView.js` has no bridge.
+- **`opSimStarts.js` is a COMPUTED-start registry**, genuinely distinct from a user-dragged marker.
+- **`previewVarSeed`** lives in `wizardManager.js` + `atcViews.js` — likely the Skim arm, NOT yet read.
+
+## The one real design question — answer it FIRST, in the pass-back
+
+Three partly-overlapping mechanisms above. **Pick the seam and justify it**: extend `simStartParams` to
+carry a mode-declared target, or a sibling declaration beside it? The bar is ruling 3 — it lands in the
+data layer, ONE declaration, read by both faces. If the Skim arm genuinely needs a second mechanism,
+say so plainly rather than forcing one declaration to do two unrelated jobs.
+
+## Verify (assert the VALUE, not that something changed)
+
+- **WCS**: dragging N mm moves the emitted toolpath N mm, against an independent expectation.
+- **SKIM**: dragging moves where the preview draws the raster AND the emitted text is byte-identical.
+- **Both**: the marker looks and drags identically — the user's explicit requirement, so assert it.
+- **Mode flip**: say what happens to a value set in the other arm. If it is a real question, REPORT it;
+  do not invent a rule.
+- Non-vacuity per claim (the `Object.is(NaN, NaN)` trap applies to any equality assertion).
+- Full suite + ID diff. **Floor confirmed at turn 1647: node 99/0, e2e 12 failed / 2429 passed.**
+- ⓘ `editor-chip-space-1323:60` is a STALE TEST (asserts `paddingTop`; the shipped fix applies `top`,
+  from `c5769a20` on main). It fails on main too. Not yours, queued separately — ignore it in your diff.
+
+## Deliver surfacing ONLY
+
+Do not port other wizards. Do report **which shipped wizards have a relative-or-WCS mode** (a cheap grep,
+never run) so the rollout act is sized from a measurement instead of a guess.
+
+
+---
+
 # QUEUE (rewritten 2026-08-08, turn 1641) — the head is THE PLACEMENT ANCHOR
 
 **DONE and reviewed, awaiting only the user's own save-and-insert test before the release bump:**

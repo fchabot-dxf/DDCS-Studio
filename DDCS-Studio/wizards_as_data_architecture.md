@@ -2,6 +2,38 @@
 
 This report details exactly which parts of the built-in wizards are fully "built as atoms" (blocks) today, and which parts are still hardcoded in JavaScript (and therefore lost when you save a custom wizard).
 
+---
+
+## 🧭 WHAT ACTUALLY OPENS — read this BEFORE asserting any architecture
+
+**The trap:** it is natural to assume a ported wizard means *two* surfaces exist — the built-in and its
+`(data)` twin — and that you can compare them. **For most ported wizards that is false.** The built-in
+menu slot opens the TWIN **in place**. There is one surface, not two. Reasoning about a comparison that
+cannot be made sends work down a path that does not exist. (Cost this real: an advisor dispatched
+"compare the Corner wizard's canvas against the twin's" for a Corner wizard that no longer opens.)
+
+**The declaration is `opensAs`** (`web/blocks/wizardLibrary.js`) — a built-in library entry declares which
+op it actually opens. That declaration is the source of truth; this document deliberately does **not**
+copy the list, because a copied list rots. To see the current truth:
+
+```
+grep -rn "opensAs" DDCS-Studio/web --include=*.js
+```
+
+Ported in-place via `opensAs` (as of 2026-08-09, indicative — re-grep, don't trust this line): ATC Test ·
+Tool Change · Tool Table · Bore · Contour · Pocket · WCS · Edge · Middle · Rotary Centreline · and more.
+
+**One entry goes further — Corner is fully RETIRED, not merely routed.** Its entry points were deleted,
+not redirected: `openCorner()` (`web/app.js:349`), `openCornerWiz` (`web/ui/globalFunctions.js:29`), and
+its viz listeners (`web/app.js:298`). `user_corner_data` **is** Corner. There is no built-in Corner to
+compare against, open, or fall back to.
+
+**So, before claiming two things exist to compare:** grep `opensAs` and grep for `retired` near the entry
+point. Two greps. A retired surface assumed live is the most expensive kind of wrong, because everything
+built on top of the assumption has to be thrown away.
+
+---
+
 ## ✅ What is fully built as Atoms (Blocks)
 
 1. **The Execution Logic (G-code):** 
