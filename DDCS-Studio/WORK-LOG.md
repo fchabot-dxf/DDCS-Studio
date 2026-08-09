@@ -19664,3 +19664,81 @@ a line of fix code (and caught a stale-mem-server false negative along the way, 
 declared a registry that pays down TWO existing hand-copied special cases while adding the third — and the
 "fail loud" half of that declaration caught a real gap in my own survey (`_group`) during the very first
 regression run, before it could ship. That is the mechanism doing its job, not a mistake recovered from.
+
+## t1656 — REVIEW OF t1654 (PASS) + the promoted finding: two fail-loud guards were being swallowed silent (turn 1656)
+
+### The t1654 review
+
+Advisor verdict: PASS. Driving the real gesture before writing a fix, catching the stale-mem-server false
+negative rather than drawing a false conclusion from it, and generalizing `_expose` into the same declared
+loop instead of merely avoiding a third hand-copy were all named as the right calls.
+
+### The finding, promoted
+
+t1654's pass-back noted, almost in passing, that `ddcsLoadBlockStack` reaches `stackToWorkspace` through
+`programModel.js`'s `subs.forEach((fn) => { try { fn(...) } catch (_) { /* a view threw */ } })`, and that this
+swallow applies identically to the advisor's own t1638 mouth-throw. The advisor verified it and reframed what
+it actually means: **this project has now built two fail-loud guards specifically so a silent discard becomes
+impossible, and the ONE path that matters for both (`blocksApp.js`'s `renderFromModel`, the sole caller of
+`stackToWorkspace`, registered as exactly such a subscriber) swallows both of them.** The guards don't fail on
+that path — they simply don't exist there. Promoted to this turn's act.
+
+### The fix — keep isolation, stop the silence
+
+`programModel.js:217`'s catch stays a `catch`, not a `throw`-through (one broken view must not take down every
+other view on a stack change — that isolation is real and legitimate, the advisor was explicit about this).
+Changed `catch (_) { /* a view threw */ }` to `catch (e) { console.error('[programModel] a subscriber threw:',
+e); }` — reporting, not silencing. Deliberately did NOT build a labelled-subscriber registry (six files call
+`onChange(cb)` with anonymous arrows; giving each a friendly "view identity" would mean touching all six for a
+problem the guards' OWN error messages already solve — `recToJson`'s thrown text already names the exact
+block type and field/reason, and `console.error`'s own stack trace shows the call chain down to whichever
+`onChange` site threw). Named as a possible future refinement, not built speculatively.
+
+### Sibling survey — measured, not assumed
+
+Grepped for the same bare-catch-subscriber-fan-out SHAPE. `stackToWorkspace` has exactly ONE caller
+(`blocksApp.js:654`, inside the swallowed subscriber) — no other path currently reaches either guard, so no
+other RISK-bearing instance exists for these two specific guards today. `saveStates.js:22`'s `notify()` is the
+same PATTERN (a `Set` of subscribers, bare-catch fan-out) — but its own subscribers are undo/redo UI callbacks,
+none of which touch `stackBridge.js`; its `apply()` function does call `window.ddcsLoadBlockStack`, which
+routes back through `programModel.js`'s NOW-FIXED swallow, not through its own. Reported, not fixed — a
+pattern-sibling with no measured risk, per the "do not fix what you have not measured" instruction.
+
+### Verify by value — drove the REAL `ddcsLoadBlockStack` path, not a direct `stackToWorkspace` call
+
+New spec, `subscriber-error-surface-1656.spec.js`, three tests, all through `window.ddcsLoadBlockStack` (the
+real load path an operator's paste-and-open-Blocks gesture uses):
+- t1654's field-guard: `console.error` fires, message contains `recToJson`, the offending field name, AND the
+  `[programModel] a subscriber threw` tag.
+- t1638's mouth-guard: the SAME fix surfaces it too (one seam, both guards) — `console.error` contains
+  `recToJson` and `declares no \`mouth\``.
+- **Isolation holds**: a canary `onChange` subscriber keeps firing even while the `blocksApp` subscriber
+  throws for a bad stack; loading a GOOD stack immediately after still works cleanly (`ddcsGetBlockGcode()`
+  and the editor both show the new program) — one throw does not wedge the fan-out or leave the app broken.
+
+Non-vacuity: reverted the fix (scratch-copy), confirmed the field-guard test went genuinely RED (`Received:
+undefined` where the error message should have been found). Restored, re-green.
+
+### Regression sweep
+
+`mouth-declaration-1638` (t1638's own guard still fires) · `guard-roundtrip-1595` (both tests, the 152-flip
+sweep) · `roundtrip-whole-program-1319` (0/0) · `editor-to-blocks` · `skim-blocks-roundtrip-1636` ·
+`gcode-to-stack` (all 8) · `preflight-badge-838` (all 10) — **28/28 green**.
+
+### Full suite — measuring against the t1654 floor (node 99/0, e2e 2440 passed / 12 failed)
+
+node: **99/0**, clean. e2e: **2444 passed / 11 failed / 6 skipped** — fewer failures than the floor. Of the
+11: 10 match documented churn/previously-isolate-confirmed names exactly (`collapsible-panes-752`,
+`editor-chip-space-1323:60`, `formfield-loud-mismatch-1636`, `guard-roundtrip-1595:115`, `open-as-modal-
+1625:108`, `pane-splitter-790` ×2, `pocket-cavity-2d`, `update-check` ×2). One new name, `blocks-live-
+form:168` — isolated alongside `guard-roundtrip-1595` (the test most directly touching this turn's code path):
+**8/8 passed clean**. No ID outside the documented floor survived isolation. Restored 10 regenerated
+`verification/*.png` before staging.
+
+### Capacity
+
+A one-line fix with a wide blast radius (the shared program model's own subscriber fan-out), so the weight of
+this turn was in the survey and the verification, not the code: confirmed the swallow was singular for these
+two guards (not a wider crisis), confirmed a pattern-sibling with no current risk rather than guessing either
+way, and proved isolation survives the change with the exact same rigor as the fix itself. The guards this
+project has built are only as strong as the paths that carry their throws — this closes the one that mattered.

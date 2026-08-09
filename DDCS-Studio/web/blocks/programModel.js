@@ -214,7 +214,15 @@ export function setStack(next, origin = 'api') {
     stack = Array.isArray(next) ? next : [];
     proj = emitMapped(stack, dialectOpts());
     projectToEditor();
-    subs.forEach((fn) => { try { fn({ stack, proj, origin }); } catch (_) { /* a view threw */ } });
+    // t1656 — a subscriber THROWING is isolated (one broken view must not take down every other view on a stack
+    // change — that isolation is legitimate and stays), but it must not be SILENT. This exact swallow was
+    // nullifying t1638's mouth-children guard and t1654's durable-field guard on this path: `blocksApp.js`'s
+    // `renderFromModel` (an onChange subscriber) is the ONLY caller of `stackToWorkspace`, so a thrown guard
+    // landed here and vanished — the guard fired, and no one ever saw it. console.error keeps the guard's own
+    // message + stack trace visible (which already names the exact block/field, e.g. "recToJson: block X
+    // carries an undeclared top-level field Y") without adding a labelled-subscriber registry — a bigger,
+    // unmeasured change beyond what a swallowed-silence fix needs.
+    subs.forEach((fn) => { try { fn({ stack, proj, origin }); } catch (e) { console.error('[programModel] a subscriber threw:', e); } });
 }
 
 /** Push the live projection into the editor — but never overwrite it while the user is typing there. */
