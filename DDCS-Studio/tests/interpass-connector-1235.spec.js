@@ -51,8 +51,26 @@ const routeFacts = (page) => page.evaluate(async () => {
 
 const near = (a, b, tol = 0.05) => Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0), (a.z || 0) - (b.z || 0)) <= tol;
 
-test('CORNER: a connector bridges every adjacent pass pair — runtime END → the next pass MARKER, on both shelves', async ({ page }, testInfo) => {
+// t1670 — switch corner's wall1→wall2 traverse to MANUAL: the operator jogs there by hand (a `#1505` prompt, not a
+// traced G0 move), so the connector is genuinely the ONLY thing that draws that leg — the real gap this mechanism
+// exists for. AUTO no longer belongs here: cornerData.js's cornerSimStartsProvider declares AUTO reposition passes
+// `anchorsAtPrev`, which makes passAnchorFor resolve pass p's own local frame to passEnds[p-1] — the SAME point the
+// connector would start from — so the connector's local start is always {0,0,0}, exactly where pass p's REAL traced
+// segments already begin (the engine resets pos to {0,0,0} at every REPOSITION boundary). Synthesizing a connector
+// there duplicated a route the G-code already traces: invisibly under travelShape=diagonal (identical endpoints, so
+// two exactly-overlapping segments looked like one correct line) and visibly under the default travelShape=dogleg
+// (an extra diagonal cutting across the real 2-leg L) — a user-reported preview defect, fixed in
+// viz/createPreviewPanel.js's withInterPassConnectors. MANUAL is unaffected (source stays 'manual', so
+// anchorsAtPrev is false) and is the correct fixture for what these tests are actually probing.
+async function setManualTravel(page) {
+    await page.waitForSelector('#wiz_user_form .seg-control[data-param="travelApproach"]', { timeout: 8000 });
+    await page.evaluate(() => document.querySelector('#wiz_user_form .seg-control[data-param="travelApproach"] .seg-btn[data-value="manual"]').click());
+    await page.waitForTimeout(700);
+}
+
+test('CORNER (manual travel): a connector bridges every adjacent pass pair — runtime END → the next pass MARKER, on both shelves', async ({ page }, testInfo) => {
     await openOp(page, '/blocks/dataOps/cornerData.js', 'cornerDataDef', 'user_corner_data');
+    await setManualTravel(page);
     const r = await routeFacts(page);
 
     expect(r.passes, 'corner is multi-pass (this test is meaningless otherwise)').toBeGreaterThan(1);
@@ -92,8 +110,9 @@ test('MIDDLE inherits it — no per-op work, because it is one route feed', asyn
     await page.locator('#userVizContainer').screenshot({ path: testInfo.outputPath('middle-connector.png') });
 });
 
-test('DRAG THEN PAINT: moving a start marker moves the connector with it — the vanishing traverse is gone', async ({ page }, testInfo) => {
+test('DRAG THEN PAINT (manual travel): moving a start marker moves the connector with it — the vanishing traverse is gone', async ({ page }, testInfo) => {
     await openOp(page, '/blocks/dataOps/cornerData.js', 'cornerDataDef', 'user_corner_data');
+    await setManualTravel(page);
     const before = await routeFacts(page);
     await page.locator('#userVizContainer').screenshot({ path: testInfo.outputPath('drag-before.png') });
 
@@ -121,6 +140,7 @@ test('DRAG THEN PAINT: moving a start marker moves the connector with it — the
 
 test('a MANUAL pass draws its connector in the operator-jog language, not as an auto traverse', async ({ page }) => {
     await openOp(page, '/blocks/dataOps/cornerData.js', 'cornerDataDef', 'user_corner_data');
+    await setManualTravel(page);   // t1670 — this test's own name requires manual; it never switched before (see note above)
     // the jog style is not a second code path: the 2D reads startSources[s.pass], so a manual pass's connector inherits
     // the amber arc from the DECLARED source. Assert the wiring that makes that true.
     const r = await page.evaluate(() => {

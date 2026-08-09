@@ -175,6 +175,16 @@ function withInterPassConnectors(segs, starts, passEnds) {
     const list = Array.isArray(segs) ? segs : [];
     if (!Array.isArray(starts) || starts.length < 2 || !Array.isArray(passEnds)) return list;
     const bridge = (p) => {
+        // t1670 — a pass declared anchorsAtPrev (corner's AUTO reposition) anchors its own local frame AT passEnds[p-1]
+        // (passAnchorFor, below, returns ends[p-1] for exactly this row) — so this bridge's local start (`a`) always
+        // reduces to {0,0,0}, the SAME point pass p's own real traced segments already begin at (the engine resets pos to
+        // {0,0,0} on every REPOSITION boundary). The bridge is then geometrically redundant with the real route, not a
+        // gap-filler: in diagonal mode the two exactly coincide (an invisible duplicate segment); in dogleg mode the real
+        // route is a 2-leg polyline the single-segment bridge does NOT coincide with, so both render — the double-traverse
+        // defect a user reported on the Corner (data) twin (NEXT-SESSION.md, 2026-08-09). Skip the bridge whenever the
+        // pass declares this — its connecting traverse is already a real, traced part of the route, unlike the ops this
+        // connector exists for (a self-anchored / manual pass, where the real segments never cover the inter-pass gap).
+        if (starts[p] && starts[p].anchorsAtPrev) return null;
         const from = passEnds[p - 1];
         if (!from) return null;                       // no runtime end recorded → nothing honest to draw from
         const to = markerWorldOf(starts, passEnds, p);

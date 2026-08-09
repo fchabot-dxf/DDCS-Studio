@@ -20294,3 +20294,268 @@ surfaces — each with real captured output, not inference from reading code. Th
 worked" resolved into a precise, three-surface picture with a clean plumbing/authoring split, plus one real
 (and bounded) hazard gap in a family otherwise already closed by the send-gate. Zero source files touched;
 zero risk of a diagnose-scoped turn drifting into half-built architecture.
+
+## t1670 — REVIEW OF t1668 (PASS) + THE CORNER TWIN PREVIEW: two root causes found, one fixed, one sized (turn 1670)
+
+### VERDICT LINE, per amendment 1's explicit instruction — SIM-ONLY, CONFIRMED BY VALUE
+
+**The emitted G-code is correct. Every reported symptom lives in the preview/rendering layer, not the program a
+machine would run.** Dumped `cornerStack(CORNER_DEFAULTS)` for BOTH `travelShape` values and read the text
+directly: the macro is 100% relative (`G91`) with the only absolute moves being Z-only `G53` machine-frame
+lifts — there is no absolute XY anywhere, so "probe point at the wrong place" and "start position wrong" are
+not expressible in the emit at all. The wall1→wall2 delta (`#23=#16 ( ...traverse X )`, `#24=#15 ( ...traverse
+Y )`) is non-degenerate (±50mm at defaults, never 0,0), and each `travelShape` emits EXACTLY one correct shape:
+dogleg → `G0 X#23` then `G0 Y#24` (two legs); diagonal → one combined `G0 X#23 Y#24`. Confirmed via
+`corner-travel-shape.spec.js`'s own existing byte-parity proof, plus direct reading of both dumps this turn.
+
+### The t1668 review
+
+Advisor verdict: PASS. The malformed-token hazard (`' #500;M30'` → `defaultSyntaxVerify` wrongly says `valid:
+true`) is a real defect, queued as a PREREQUISITE for any future token-authoring build — not urgent today since
+no surface can create a token yet, but must be closed before one ships. No action this turn (correctly a
+different act).
+
+### Eight amendments, digested
+
+The dispatch's original framing (compare the Corner wizard's own 2D canvas against the twin) rested on a false
+premise — amendment 5 corrected it after the user pushed back ("i dont understand its the only corner i see"):
+Corner's wizard view is fully retired (confirmed independently — see below); there is only ONE op, and the
+user's paired screenshot showed that ONE op's 3D pane disagreeing with its OWN 2D Layout pane, not two
+implementations. The symptom list grew via amendments 2/4/6/7/8 to five, user-reported and advisor-confirmed:
+1. the probe path doesn't match what the feature GUI shows,
+2. Dogleg renders BOTH the diagonal and the dogleg; Diagonal renders only the diagonal (asymmetric — a real
+   clue, not "both always draw"),
+3. the Start marker is clamped near the origin instead of the user-set position,
+4. in the 3D pane the animated tool/spindle doesn't sit on the drawn path — looks offset,
+5. marker shapes disagree 2D vs 3D (solid vs hollow, square vs square-in-circle) — a DECLARED semantic
+   (`emits` → solid = the handle edits a real emitted macro var), so a mismatch misreports which markers
+   actually touch the program.
+Amendment 6 retracted one lead (the far-right marker pair are STOCK CORNERS, expected — not a duplicate-source
+bug). Amendment 3's frame question (Mach Y −738) was answered and dropped — a real WCS offset, not a bug.
+
+### Independently confirmed: no wizard-vs-twin comparison exists
+
+`web/wizards/views/index.js:20` — "Corner wizard retired 2026-07-02 — REPLACED by the 'Corner (data)' twin."
+`wizardLibrary.js`'s `corner` entry declares `opensAs: 'user_corner_data'`; every entry point (palette,
+Wizard Manager, editing a saved block) resolves through `wizardManager.open('user_corner_data')` into
+`userOpView` — confirmed via reading `wizardManager.js`'s `open()`/`openForEdit()`. The ONE leftover gap: a
+legacy block still carrying the bare `opType:'corner'` (pre-retrofit) reports as editable (`canEdit` still
+finds a field spec) but silently renders nothing (`viewByType.get('corner')` is undefined, `#wiz_corner`'s
+markup was deleted) — a separate, minor, unreported bug, flagged here rather than fixed (out of scope, not
+part of the five symptoms).
+
+### ROOT CAUSE A — FIXED: the synthesized inter-pass connector duplicates corner's real AUTO traverse
+
+`viz/createPreviewPanel.js`'s `withInterPassConnectors` exists to fill a REAL gap for ops whose pass boundary
+consumes the connecting move (a `REPOSITION:` comment resets the trace's local position, so a SELF-anchored
+pass's own segments never show the journey TO it). It synthesizes one straight "bridge" segment per pass,
+de-duped only by exact zero-distance coincidence — never by "does a real route already connect these points."
+
+Corner's AUTO reposition passes declare `anchorsAtPrev: true` (`cornerData.js`'s `cornerSimStartsProvider`),
+which makes `passAnchorFor` (`engine/passAnchor.js:43-46`) resolve the pass's own local frame to
+`passEnds[p-1]` — the SAME point the bridge starts from. So the bridge's local start always reduces to
+`{0,0,0}` — exactly where the pass's REAL traced segments already begin (the engine resets `pos` to `{0,0,0}`
+on every `REPOSITION:` boundary). For corner, the bridge was never filling a gap; it was always a redundant
+second copy of a route that the real G-code already fully traces.
+
+**Empirically confirmed BEFORE the fix** (`panel.getSegments()`, live, default settings, stock unspecified →
+travelDist=50 defaults): dogleg pass-1 carried THREE traverse-shaped segments — a synthesized diagonal bridge
+`(0,0)→(-50,50), connector:true`, then the real leg 1 `(0,0)→(-50,0)`, then the real leg 2 `(-50,0)→(-50,50)` —
+the bridge visibly cutting across the real L-shaped route, exactly the reported symptom. Diagonal pass-1
+carried TWO segments with IDENTICAL coordinates — bridge `(0,0)→(-50,50), connector:true` and the real combined
+move `(0,0)→(-50,50), connector:false` — an exact duplicate that renders as one line only because the two
+segments perfectly coincide. **This confirms amendment 2's hypothesis (a) precisely: diagonal mode was ALSO
+wrong, just invisibly** — the "correct-looking" mode was a coincidence of two overlapping copies, not the
+absence of the bug.
+
+**Fix**: `bridge(p)` in `withInterPassConnectors` now returns `null` (skips synthesis) whenever
+`starts[p].anchorsAtPrev` is true — reading the EXISTING declared semantic rather than adding new machinery or
+a suppression flag on either travelShape branch (the dispatch's own DECLARE-OR-HANDROLL instruction: "if you
+find yourself adding a hide-this condition, stop and report instead" — this reads a declaration instead).
+`anchorsAtPrev` is set NOWHERE else in the codebase (grepped) — the fix is corner-exclusive today; every other
+op's connector behavior (the real gap-filling case this mechanism exists for) is untouched.
+
+**Verified after the fix**: dogleg pass-1 now carries exactly the 2 real legs, zero connectors; diagonal
+pass-1 carries exactly 1 real combined move, zero connectors. New permanent spec
+`corner-traverse-connector-1670.spec.js` pins both. **Non-vacuity**: scratch-copy saved, disabled the new
+early-return (`if (false && ...)`), re-ran — genuinely RED (`Received: 1` where `Expected: 0` synthesized
+connectors), restored from the scratch copy, reconfirmed green.
+
+**A real, informative regression turned up in the full suite — not a flake, and worth reporting in full.**
+`interpass-connector-1235.spec.js` (the connector mechanism's OWN original test, predating this turn) asserts
+corner's default (AUTO) configuration produces `passes-1` connectors. My corner-only regression sweep
+(`tests/corner-*.spec.js`) never matched this file's name, so it wasn't caught until the full run. Isolated it
+with `--workers=1` to rule out contention first (it reproduced 3/3, reliably — a real regression, unlike
+`guard-roundtrip-1595:115` and five other full-run names that all passed clean in isolation, confirming those
+were ordinary self-contention). Read the failing test closely rather than reverting: it opens corner at
+DEFAULTS (`travelApproach:'auto'`) — precisely the configuration Root Cause A proves no longer needs a
+connector. `anchorsAtPrev` is false whenever `travelApproach==='manual'` (`cornerSimStartsProvider`:
+`src = travelApproach==='manual' ? 'manual' : 'auto'`), so MANUAL is the case this mechanism still exists
+for — a genuine gap (the operator's jog is a `#1505` prompt, never a traced G0 move). Retargeted all three
+corner-specific tests in that file to `travelApproach:'manual'` via the real segmented control (not a source
+change) — including test 4, whose own title was already "a MANUAL pass draws its connector..." but whose body
+had never actually switched to manual, so it was only coincidentally green before (AUTO also had a connector,
+at the time). Fixing it to genuinely test manual mode is a correctness improvement on top of the regression
+fix, not just a patch to turn it green. `MIDDLE inherits it` (a different op, never declares `anchorsAtPrev`)
+was untouched and re-confirmed passing unmodified. Re-ran the full file: 4/4 pass.
+
+### ROOT CAUSE B — SIZED, NOT FIXED: the Layout (2D) pane skips the WCS-pin transform the 3D pane applies
+
+`viz/sceneFrame.js`'s own doc comment states the intended architecture: `partZeroShift()` is "THE declared
+scene transform... Every renderer... READS this ONE source instead of computing its own pin, so their frames
+can never drift." Confirmed live that the 3D pane honors this: with a stock pinned to G55 (`{x:300,y:200}`,
+offset from G54's origin) and the machine envelope shown, `partZeroShift(machine,stock,0)` returns
+`{x:300,y:200,z:0}` and the 3D scene's actual `partFrame.group.position` is `{x:300,y:200,z:20}` (z differs
+only because the live call also folds in stock-floor depth) — the shift IS applied, and because stock, route,
+markers, and tool are all children of the SAME `partFrame` THREE.js group, it applies to all four uniformly
+and self-consistently.
+
+The Layout pane does not. `wizards/ops/panelTypes.js:189-192` only computes and applies `partZeroShift` when
+`opSimContext(def.opType).toolMachineFrame` is true — a flag that governs a DIFFERENT, narrower decision
+("does this op want a machine-envelope backdrop drawn in its 2D pane," today true only for machine-frame ops
+like Homing). Confirmed live: `opSimContext('user_corner_data').toolMachineFrame` is `false` (corner's `sim`
+block declares `machine:false`), so under the identical WCS-pin scenario above, the Layout pane's `stockOut`
+falls to the plain, unshifted `stock` (`ox:0, oy:0`) — every 2D element (stock rect, traverse anchors, Start/
+wall markers, probe-point markers) draws at unshifted part-zero while the 3D pane draws the same setup shifted
+by `{300,200}`. Each pane is internally self-consistent; the two panes disagree with each other by exactly the
+pin delta, and ONLY when a WCS pin + shown envelope are both active (the common, unpinned case shows nothing
+wrong — plausibly why this shipped unnoticed). This directly explains symptom 1 (path ≠ feature GUI) and
+symptom 3 (Start doesn't track — the Layout's Start glyph reads `passStarts[0]` raw, never adjusted by any
+pin offset, so it visually "stays put" while the 3D geometry the user compares it against correctly moves with
+the machine/WCS setup).
+
+**Why this is sized, not fixed, this turn**: I looked for a safe, narrow, corner-only opt-in before accepting
+this needs a real design decision — `opSimContext` already resolves a `probesForWcs` flag, true for corner,
+that looked reusable. It is not: `probesForWcs` means "this op PRODUCES the WCS, so never render its OWN
+positions through the declared WCS table" (t1203, `createPreviewPanel.js:813`) — the *opposite* direction from
+what I need (the stock-pin shift is cosmetic scene placement, unrelated to what the probe measures; reusing
+`probesForWcs` would have coupled two unrelated concepts on a guess). No existing declared flag cleanly covers
+"this op's Layout pane should follow `partZeroShift` independent of whether it also wants an envelope
+backdrop." The real fix needs one of two decisions, and `layoutSpecFromOp` is shared by ~10 op types (drill,
+pocket, slot, text, atcWarmup, and more) — too broad a blast radius to guess at alone on the gated pilot:
+  (a) decouple the SHIFT from the BACKDROP in `panelTypes.js` (apply `partZeroShift` whenever the 3D pane
+      would, for every op, regardless of `toolMachineFrame`) — needs a full regression sweep across every op
+      that renders a Layout pane with any stock pin configured, or
+  (b) a new, narrower declared flag (e.g. `layoutFollowsPartZero`) that corner (and any other part-frame probe
+      that wants this) opts into explicitly, leaving today's behavior byte-identical for every op that doesn't.
+Per the dispatch's own item 3 and amendment 4's explicit permission ("if too big... say so... a precise
+diagnosis is a complete deliverable"), this is reported with exact file:line citations and live-measured
+values rather than guessed at.
+
+### Symptom 4 (3D tool vs. 3D path offset) — not independently confirmed; likely a side-effect of Root Cause A
+
+Read the tool-position formula (`gcodeViz3d.js:779-788`, `setToolPosition`) against the route-offset formula
+(`gcodeViz3d.js:1099-1107`) line by line for corner's actual configuration (`toolMachineFrame:false`,
+`_anchorToStart` permanently `true`, assigned once at construction and never reassigned — re-confirmed by
+grep — so the `|| this._seatAtStart` the route formula ORs in is dead code, not a real divergence). Both
+formulas reduce to the identical shape: `passAnchorFor(...) − probeXYOff() − sh`, with
+`sh={0,0,0}` for both when `toolMachineFrame` is false. No formula-level divergence found. The live-tool
+animation itself was not exercised this turn (no playback loop wired into my probe, and re-verifying it
+wasn't worth the added turn size given the formulas already match) — reported as unconfirmed, not claimed
+fixed. Best explanation on the evidence gathered: with Root Cause A's now-fixed duplicate route drawn
+alongside the correct one, the tool (which always rode the real route) would have visually appeared "off" the
+extra bridge line during dogleg's reposition specifically — plausible, not proven; flagged as a hypothesis to
+re-check once the user can compare against the fixed build, not asserted as closed.
+
+### Symptom 5 (marker solid/hollow shape 2D vs 3D) — dead code, but NOT a cross-view mismatch; sized
+
+`cornerData.js:119-124` declares the contract: `emits` (does this marker's handle edit a real emitted macro
+var, #21-#24) should decide SOLID vs HOLLOW. Traced all three renderers: 3D's `_highlightSelectedStart`
+(`gcodeViz3d.js:400-417`) picks shape from `source` (auto/manual) only — `_startEmits` is stored
+(`setStartEmits`) but never read anywhere else in the file (grepped, zero other references). The Layout's
+`toolpath2d.js` non-overlay toggle: same — `startEmits` stored, `drawStartHandles` reads only `source`.
+`featureCanvas.js`: `startManual` (its solid/hollow gate) derives from handle `color`, itself `srcCol(pass)` —
+`source`-derived; a `manual` field IS built by `panelTypes.js` but dropped before reaching the handle object
+(`canvasWidgets.js`'s `place()` never copies it through) — dead, not read anywhere.
+
+So: **both panes are internally consistent with EACH OTHER (both key shape off `source`), just neither
+implements the declared `emits` contract** — this is real messages-rot (a documented rule nothing enforces),
+not the cross-view mismatch symptom 5 describes at face value. Two honest possibilities, both left open rather
+than guessed at: either the user is observing Root Cause B's positional divergence making them compare the
+WRONG pair of markers across panes (different `source` values, correctly rendered, just spatially misaligned
+by the pin offset), or `source`/`sources` itself goes momentarily stale between the two panes' paint calls (a
+timing question I did not chase further this turn, given scope). Implementing the documented `emits` contract
+correctly touches shape-decision code in three separate files for an UNTESTED rule — sized as a real, separate,
+low-urgency follow-up rather than built speculatively this turn.
+
+### Fixed in passing: messages-rot
+
+`cornerData.js:9` still said the twin was "seeded ALONGSIDE the UNTOUCHED built-in Corner wizard" — stale
+since the retirement (2026-07-02, predates this twin's own many amendments). Corrected to state plainly that
+the twin is now the only live surface, per the same messages-rot discipline as t1658.
+
+### Verify — non-vacuity per claim
+
+Every claim in this report is either (a) read directly from unmodified source with file:line citations, cross-
+checked by a second independent pass before I trusted it (the `probesForWcs` reuse idea specifically DIED on
+this cross-check, confirming the discipline caught a real wrong turn rather than rubber-stamping a guess), or
+(b) measured live against the running app — the emit dump (both travelShape values, full text read), the
+segment dump before/after the fix (both travelShape values), the WCS-pin `partZeroShift` vs `partFrame`-vs-
+Layout comparison (real values: `{300,200,0}` computed, `{300,200,20}` applied in 3D, `{0,0}` in Layout).
+Root Cause A's fix has a full non-vacuity proof (break → genuinely red → restore → green). No source change
+was made for Root Cause B, symptom 4, or symptom 5 — nothing to break/restore; the diagnosis IS the real
+execution against unmodified code, per the same standard t1668 used for a diagnose-scoped claim.
+
+### Regression sweep + full suite
+
+**Targeted regression, before the full suite**: 112/112 (`tests/corner-*.spec.js` + `guard-roundtrip-1595` +
+`fork-parity-1593` + `corner-travel-shape`), including `guard-roundtrip-1595`'s 152-flip byte-identical sweep
+across 14 twins and `fork-parity-1593`'s full 32-twin fork gesture. Zero collateral from Root Cause A's fix.
+
+**First full run** surfaced a REAL (non-flaky, reproduced on isolation) regression:
+`interpass-connector-1235.spec.js`, the connector mechanism's own original test — see the write-up under
+ROOT CAUSE A above for the fix (retargeted corner's 3 connector-specific tests to `travelApproach:'manual'`,
+the case that still genuinely needs a connector; `MIDDLE inherits it` untouched, still passing). That file is
+now 4/4. The same run's other 5 differently-named failures (`guard-roundtrip-1595:115`,
+`formfield-loud-mismatch-1636`, `middle-superset` all 4 shards, `op-params-complete` all 4 shards,
+`subscriber-error-surface-1656` all 3) were isolated with `--workers=1` and passed clean — ordinary
+self-contention, not regressions.
+
+**Getting a trustworthy floor ran into real, sustained environmental contention this turn — worth reporting
+plainly rather than glossing over.** After the connector-test fix, a second full run reported 36 failed across
+entirely unrelated subsystems (transform-modal, tool-select, touch-reachability, trail-color — none anywhere
+near this turn's changed files) while `netstat` showed `chrome-headless-shell.exe` holding 5 simultaneous
+ESTABLISHED connections to my :3211 mem-server alongside my own suite's traffic — the classic signature of two
+Playwright suites fighting over one port ([[serialize-gate-and-worker-suites]]), not a regression. A third
+attempt's log never advanced past the webServer startup line for several minutes, the port held by a different
+PID each time I checked. A fourth attempt started 2465 tests, immediately hit four instant (0ms) failures
+across unrelated files, then the whole process died with exit code `4294967295` (killed by signal) — something
+was actively taking the port out from under a RUNNING suite. Switched to `playwright.config.js`'s own escape
+hatch (`DDCS_TEST_PORT=3213`, documented for exactly this — "a second checkout can run its suite BESIDE the
+main repo's") to rule out a same-port collision specifically: the fifth attempt died the SAME way, on the
+DIFFERENT port — ruling out simple port contention as the sole cause and pointing at something broader (most
+plausibly a process-name-based kill in whatever is running concurrently, not a port fight). A sixth check
+minutes later still showed 5 live `chrome-headless-shell.exe` processes and port 3211 held by yet another PID —
+sustained, ongoing activity, not a one-off blip. All consistent with the advisor's own standing practice of
+independently re-verifying pass-backs with real browser runs ([[advisor-verifies-two-methods]]) — legitimate
+concurrent work, not an error — but not something worth continuing to fight for a sixth clean attempt.
+
+**The floor is drawn from the one genuinely complete run this turn** (launched right after both source fixes
+landed, before the connector-test file was updated) **plus independent isolation of every one of its
+failures**, rather than a single, all-in-one clean number:
+
+- node: **99/0**.
+- e2e: **2445 passed / 14 failed / 6 skipped**. Of the 14: **3 were `interpass-connector-1235.spec.js`** (the
+  real regression, root-caused and fixed above) — separately, cleanly re-run right after the test-file fix
+  (no port contention at that moment): **4/4 pass**. The other 11 were isolated individually with
+  `--workers=1`: **5 match already-documented churn by exact name** (`collapsible-panes-752`,
+  `pane-splitter-790` ×2, `update-check` ×2) plus `open-as-modal-1625:108` (present in t1668's own floor run
+  too). **The remaining 6 — `formfield-loud-mismatch-1636`, `guard-roundtrip-1595:115`, `middle-superset`
+  (all 4 shards), `op-params-complete` (all 4 shards), `subscriber-error-surface-1656` (all 3 tests) — were
+  isolated and passed clean**, confirming self-contention, not regressions. Every one of the 14 is accounted
+  for: 3 fixed-and-reverified, 11 explained. Restored regenerated `verification/*.png` via `git checkout --`
+  after each run this turn (recurring, since several runs got far enough to regenerate them before dying);
+  `git status` is clean of them at time of writing.
+
+### Capacity
+
+A large turn, appropriately so for the gated pilot: eight amendments, five reported symptoms, two independently
+confirmed root causes (one shipped with full proof, one sized with a real design fork correctly left to the
+advisor/user rather than guessed at), one dead-code gap documented, one stale comment corrected, one minor
+unrelated leftover-block bug flagged. Two disciplines paid off directly: the one wrong turn (reusing
+`probesForWcs`) was caught by checking its actual semantic before acting on it, not after; and the full suite
+caught a real regression (`interpass-connector-1235.spec.js`) that a narrower, name-matched sweep missed
+entirely — a reminder that "run the related tests" is a weaker net than "run everything" even on a turn that
+already ran 112 targeted tests first. Three files touched for the real fix + its regression update
+(`createPreviewPanel.js`, `cornerData.js`'s comment, `interpass-connector-1235.spec.js`); one new permanent
+regression spec (`corner-traverse-connector-1670.spec.js`).

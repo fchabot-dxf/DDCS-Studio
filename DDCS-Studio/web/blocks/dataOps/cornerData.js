@@ -6,8 +6,9 @@
  * bindings are DERIVED from the flattened `user_root` stack by macro-var identity (deriveBindings.js) — valid-by-construction,
  * immune to a comment insertion AND to the `user_root` wrap offset (no `WRAP_PREFIX_COUNT` hand-count).
  *
- * ADDITIVE TWIN: this is a NEW "Corner (data)" op seeded ALONGSIDE the UNTOUCHED built-in Corner wizard (wizardLibrary
- * id:'corner'). Nothing the operator uses is disabled.
+ * ADDITIVE TWIN (historical — see t1670): this was seeded ALONGSIDE the then-untouched built-in Corner wizard
+ * (wizardLibrary id:'corner'). That built-in view is now RETIRED (web/wizards/views/index.js) — this twin is the
+ * ONLY live UI surface for Corner; `opensAs` routes every entry point here. Kept for the ADDITIVE history below.
  *
  * probeZFirst is now LIVE (② B4 step 4a): the twin SEEDs cornerStack in SUPERSET mode (both arms of the fork present, each
  * wrapped in a `guard`), and `instantiate()` prunes the guarded superset to the chosen shape — so ticking probeZFirst adds the
