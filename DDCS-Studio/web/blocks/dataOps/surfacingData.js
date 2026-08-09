@@ -162,15 +162,25 @@ import { handleScale } from '../../wizards/ops/placement.js';
  *  emit depends entirely on which param `startMarkerTarget` names, per the declared mode-target mapping above). */
 export function surfacingPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0), w = _n(p.w, 100), h = _n(p.h, 80);
-    const paths = [{ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' }];
     const hs = handleScale(p, '', ox, oy, w, h);
     const tgt = startMarkerTarget(p.zMode);
     // t1648 — SKIM: the marker is a FREE jog point (jogX/jogY), not a corner of the faced-area rect, so it carries NO
     // datum-corner anchor (ax/ay stay 0 — an absolute point). Normal/WCS: byte-identical to the original pos handle
     // (the exact same `x:ox,y:oy,...hs.pos` spread t716 always used).
     const posGeom = p.zMode === 'skim' ? { x: _n(p.jogX, 0), y: _n(p.jogY, 0), labelDir: hs.pos.labelDir } : { x: ox, y: oy, ...hs.pos };
+    // t1674 — the DRAWN path follows posGeom (mirrors surfacingView.buildSurfacingSpec, both faces): Skim's program
+    // is relative to wherever the operator jogs, so the faced area IS at the jog point — the ONE declared marker
+    // target, not a second origin-vs-jog source. handleScale's ox/oy argument (hs.size, the resize-handle anchor)
+    // and `bbox` below (the PLACEMENT-frame extent — a separate, real-emit-affecting concern, untouched by the
+    // preview-only jog) both stay on originX/originY exactly as before.
+    const px = posGeom.x, py = posGeom.y;
+    const paths = [{ pts: [{ x: px, y: py }, { x: px + w, y: py }, { x: px + w, y: py + h }, { x: px, y: py + h }, { x: px, y: py }], cls: 'fc-path' }];
+    // t1674 — noSnap for Skim (mirrors surfacingView.js, both faces): once the drawn path also tracks the jog marker,
+    // the generic itemsBBox-derived snap offsets (_snapOffsets) become self-referential to the dragged handle,
+    // widening the normal small-tolerance snap into a virtual net spanning the whole w×h rect — never intended for a
+    // marker explicitly documented as having no corner semantics.
     const handles = [
-        { type: 'point', id: 'sf_pos', fx: tgt.x, fy: tgt.y, label: 'pos', ...posGeom },
+        { type: 'point', id: 'sf_pos', fx: tgt.x, fy: tgt.y, label: 'pos', noSnap: p.zMode === 'skim', ...posGeom },
         { type: 'rect', id: 'sf_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size },
     ];
     // t718 — the origin-inclusive region bbox: the twin's surfacing geometry emits 0-relative (origin rides the placement

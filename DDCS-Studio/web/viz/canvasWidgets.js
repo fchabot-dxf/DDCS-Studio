@@ -157,7 +157,12 @@ export function buildCanvasWidgets(widgets, setFields) {
         if (!g) return;
         const id = d.id || (d.type + ':' + (d.field || d.fx || i));
         byId[id] = d;
-        handles.push({ id, color: d.color, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
+        // t1674 — noSnap is a GENERIC, gesture-independent handle property (matching id/color's treatment) — a free
+        // position with no feature-corner semantics (mirrors panelTypes.js's simMarkers, built outside this helper,
+        // which already sets it directly) opts OUT of _snapToAnchor's stock-anchor magnetism, including the itemsBBox-
+        // derived "other corners of this feature" offsets. Previously silently dropped here (only id/color passed
+        // through `g.place(d)`'s result) — the same declared-but-unread gap t1638 named for block mouths.
+        handles.push({ id, color: d.color, noSnap: d.noSnap, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
     });
     const onDrag = (id, world) => {
         const d = byId[id]; if (!d) return;

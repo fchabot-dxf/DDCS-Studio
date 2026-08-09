@@ -20721,3 +20721,169 @@ shipped a NEW divergence) and PROVING it broadly (15 ops, not 1, each independen
 than trusting the pattern would generalize. Finding the dormant `_placement` mechanism first, before writing
 any new code, is the same "test the simplest existing lever before building" discipline this run keeps paying
 off with. One function changed (`panelTypes.js`), ~10 real lines; one new permanent spec.
+
+## t1674 — REVIEW OF t1672 (PASS) + AMENDMENT 1 (t1672 CLEARED) + THE SURFACING TEAL RECT: fixed, plus a second trap the dispatch didn't name (turn 1674)
+
+### AMENDMENT 1, FIRST — a new user report on the same surface: is t1672 responsible? NO, cleared by direct A/B measurement.
+
+Mid-turn, a new user report arrived: Surfacing's 2D Layout canvas shows the stock rect, the W×H rectangle, and
+the pos handle, but NO raster path — while the 3D pane above it correctly shows the raster. The advisor named
+a specific, falsifiable suspicion rather than a ruling: a `placement` KEY COLLISION — `surfacingView.js`'s
+`buildSurfacingSpec` already returns `placement: pl.placement` (the PlaceOnStock concept); t1672 added
+`placement: {x:_pz.x, y:_pz.y}` (the WCS-pin shift, a different concept) to all three of `layoutSpecFromOp`'s
+returns. Two meanings on one key, both consumed by `_disp()`'s single `this._placement`.
+
+**Measured directly rather than reasoning it out** — the advisor's own suggested method: compare the SAME
+scenario across the exact pre-t1672 commit (`a2d42d99`) and the current tree. Did this via a cheap, safe
+temporary file-swap (`git show <commit>:<path>` into the working files, tested, restored from the scratch
+backup) rather than a full worktree, since only 4 files were in question. Checked the twin's actual raster
+render — the `.fc-anim-overlay` canvas's PAINTED PIXEL COUNT, not just DOM presence, so a silently-empty
+canvas couldn't pass as "exists":
+
+| state | default settings | WCS-pinned (G55, `partZeroShift`={300,200}) |
+|---|---|---|
+| pre-t1672 (`a2d42d99`) | **2574 painted px** | *(pin had no effect pre-t1672 — not a meaningful comparison)* |
+| t1672-only (committed) | **2574 painted px** | 1369 painted px, rect path shifted correctly |
+| t1672 + this turn's WIP | **2574 painted px** | 1369 painted px (identical to t1672-only) |
+
+The DEFAULT-settings pixel count is byte-identical across all three states — t1672 changed NOTHING for the
+common case. Under its own target scenario (a real WCS pin), the raster still paints — fewer pixels only
+because the shifted content partially exits the fixed viewport, not because it's missing. **t1672 is
+innocent** in both tested configurations; the reported symptom could not be reproduced against it. Restored
+all 4 temporarily-swapped files from scratch backups; confirmed byte-identical to my pre-investigation working
+state via `git diff --stat` before continuing.
+
+Per the dispatch's own branching: t1672 innocent → proceed with the teal-rect act as already in progress, and
+report the path-loss as a separate, NOT-yet-reproduced finding for its own act (not chased further this turn —
+my two tested scenarios don't cover every configuration, and I did not want to guess at reproduction steps
+rather than name what I actually verified).
+
+### The t1672 review
+
+Advisor verdict: PASS, "the best-executed act of this run." Named the exact enumeration discipline, the
+"read before writing" catch (shifting only the stock would have left every handle behind), and the
+`_placement` discovery as "the declare-and-reuse instinct working." Rated the self-caught datum bug highest:
+"Diagnosing the blind spot in your own test design is a level above fixing the code." Also independently
+re-verified the t1670 fix live in the real app against their own pre-fix screenshot — phantom diagonal gone.
+
+### THE ACT — the Surfacing teal dimension rectangle
+
+User-reported: Surfacing, Z-mode Skim, dragging the start marker moves the previewed toolpath but the teal
+W×H rectangle stays anchored at the origin. Advisor had already located the exact code (`surfacingView.js`:
+the marker resolves through `startMarkerTarget(zMode)`, jogX/jogY in Skim; the drawn rect and `handleScale`
+both read `originX/originY` unconditionally — the twin's `surfacingPreviewGeometry` has the identical shape)
+and already ran a throwaway trial of the naive fix (feed jog into `handleScale` too), finding it WRONG:
+`handleScale`'s W×H anchor moved, changing drag sensitivity, and `surfacing-start-position-1648` test 7 went
+red (wizard/twin seeds diverged by 4.98 against a 0.005 tolerance).
+
+**Established the anchor semantics first, per item 1.** Confirmed directly from `surfacingData.js`'s own
+comment rather than taking the advisor's reading on faith: "Skim: the program is RELATIVE to wherever the
+operator jogs, so origin has no meaning there... the emitted program is untouched (it already reads the live
+frame at the machine)." Origin is a genuinely meaningless concept in Skim — the faced area IS physically at
+the jog point. The advisor's reading holds; no pushback needed.
+
+### THE FIX — ONE declared source, `handleScale` and `bbox` untouched
+
+Both faces already compute `posGeom` (the marker's own target: `{jogX,jogY}` in Skim, `{originX,originY}`
+else) to build the `pos` handle. The drawn rect item (`surfacingView.js`'s `items`) and drawn path
+(`surfacingData.js`'s `paths`, previously computed BEFORE `posGeom` even existed in the function — reordered)
+now read `posGeom.x/y` instead of the raw `ox,oy` — the SAME value the marker itself is built from, not a
+second source. `handleScale`'s own `ox,oy` ARGUMENT (feeding `hs.size`, the resize-handle anchor) and the
+twin's separate `bbox` (the PLACEMENT-frame extent, a different, real-emit-affecting concern) both stay on
+`originX/originY` exactly as before — confirmed `hs.pos` carries no `x/y` fields of its own (only
+`ax/ay/labelDir`), so reusing `posGeom.x/y` for the rect is PROVABLY byte-identical to today in Normal mode,
+not just empirically so.
+
+### A SECOND TRAP, independently found — the itemsBBox-derived snap offsets turn self-referential
+
+Verifying against the tripwire (`surfacing-start-position-1648` test 7) surfaced a NEW divergence the dispatch
+did not name: `Received: 24.985` where `Expected: 20` on the wizard/twin cross-face seed comparison — the same
+~5mm-class symptom the advisor's own trial hit, but via a genuinely different mechanism this time.
+
+Traced it precisely (instrumented `_snapToAnchor` temporarily, non-vacuity-style: scratch-copy saved, logged,
+restored) rather than guessing: `featureCanvas.js`'s `_snapOffsets(handle)` derives EXTRA snap candidates from
+`_itemsBBox(spec)` — the DRAWN ITEMS' bounding box — relative to the DRAGGED HANDLE's own position, so that
+"any corner of a fixed-size feature" can also align to a stock anchor (built for features like a drill
+pattern or a text block, where the position handle IS genuinely one corner of something with real size).
+Once the rect's own bbox tracks the SAME handle being dragged (this turn's whole fix), the derived offsets
+collapse to the rect's own `{0,w/2,w}×{0,h/2,h}` — CONSTANT, independent of where the handle actually sits —
+turning the normal ~7px magnetic radius into a virtual net spanning the full 80×60 rect. Measured directly: a
+30,-15px drag landed the marker's snap candidate exactly on the STOCK CENTRE (100,75) via an implied
+`(w,h)=(80,60)` offset, resolving to `(20,15)` — matching the corrupted seed exactly.
+
+**Why this is a genuinely separate trap from the one the advisor found**: their trial fed the jog position
+into `handleScale`'s ARGUMENT (a static, declared-anchor concern); this one is about a GENERIC, runtime,
+position-dependent snap mechanism reacting to the drawn content's bbox now coinciding with the thing being
+dragged — a different code path, different failure shape, only sharing the surface symptom (a ~5mm cross-face
+seed divergence on this exact test).
+
+**Fix**: declared `noSnap: (zMode === 'skim')` on the marker handle in both faces — mirroring the SAME
+"free jog point, no corner semantics" treatment `surfacingData.js`'s own comment already uses to describe this
+exact marker, and the SAME treatment already applied to the alignment/rotary probe start markers elsewhere.
+Found `canvasWidgets.js`'s `buildCanvasWidgets` was silently DROPPING any declared `noSnap` — only `id`/
+`color` were passed from the declaration onto the built handle, exactly the declared-but-unread-property class
+t1638 named for block mouths (confirmed `noSnap` DOES work when handles are built directly, bypassing this
+helper — `panelTypes.js`'s `simMarkers` already uses it successfully — so this was a real, pre-existing gap in
+one specific construction path, not a made-up mechanism). Fixed the actual gap (one line, additive, safe for
+every other `buildCanvasWidgets` consumer since an absent `noSnap` stays `undefined` — falsy, matching today's
+implicit behavior) rather than routing around it.
+
+### Verify — non-vacuity per claim, both fixes proven independently
+
+New permanent spec `surfacing-skim-rect-follows-marker-1674.spec.js`:
+- **Direct-value test**: `surfacingPreviewGeometry` called directly (twin) — Normal mode's rect corner stays
+  at `originX/originY` even at wildly different jogX/jogY (999,-888); Skim's rect corner EXACTLY equals
+  jogX/jogY (two distinct value pairs checked). Emit byte-identical under changing jogX/jogY in BOTH modes
+  (confirming jog is truly preview-only, never leaks into the emit). `handleScale`'s resize anchor confirmed
+  unaffected (`hs.size.ax/ay` stay at `originX/originY`). Skim marker confirmed to declare `noSnap:true`;
+  Normal marker confirmed NOT to (unaffected).
+- **Wizard face**, verified precisely (not by pixel-guessing): calibrated the SVG's world→screen transform
+  using the STOCK rect (known world bounds 0,0–200,150) as a reference, then inverted the drawn rect's screen
+  position back to world coordinates — Normal: world (20,80) [`originX`, `originY+h`, matching the SVG's
+  top-left anchor convention]; Skim: world (55,93) [`jogX`, `jogY+h`] — both exact.
+- **Live drag test**: the exact 30,-15px gesture that previously snapped to the spurious (20,15) stock-centre
+  coincidence now lands away from it (distance > 2mm).
+- **The tripwire**: `surfacing-start-position-1648.spec.js`'s full 7 tests, including test 7 specifically, all
+  green.
+
+**Non-vacuity, both fixes independently**: (1) reverted `surfacingData.js`'s path back to raw `ox,oy` —
+genuinely RED (`Received: {x:20,y:20}` where `Expected: {x:55,y:33}`), restored, green. (2) Reverted ONLY
+`canvasWidgets.js`'s `noSnap` passthrough (leaving the main fix intact) — the direct-value test correctly
+STAYED GREEN (unaffected — proving it tests an orthogonal property) while the live-drag test went genuinely
+RED (`Received: 0`, i.e. landed EXACTLY back on the old spurious point), restored, both green again. Two
+independent proofs, correctly isolated from each other.
+
+### Regression sweep
+
+The full surfacing suite + every `canvasWidgets.js` consumer (52 tests: surfacing's 4 specs, `canvas-widgets`,
+`custom-op-canvas-handles`, `group-canvas-drag`/`knob`, `drill`/`pocket`/`slot`/`contour-canvas`,
+`corner-layout-sim-drag`, `corner-selector`, `layout-placement-parity-718`, `mill-layout-716`): **52/52 passed**.
+
+### Full suite — measuring against the t1672 floor (node 99/0, e2e 2447 passed / 16 failed / 6 skipped)
+
+node: **99/0**, exact match. e2e: **2452 passed / 13 failed / 6 skipped** (2471 total — +2 vs. t1672's 2469,
+exactly this turn's 2 new tests, both green). Of the 13: **8 match t1672's own documented churn pool** by exact
+name (`collapsible-panes-752`, `formfield-loud-mismatch-1636`, `middle-superset` shard, `open-as-modal-1625`,
+`pane-splitter-790` ×2, `update-check` ×2). **5 carried different names**, one test each
+(`form-section-collapse-820:17`, `pocket-canvas:22`, `subscriber-error-surface-1656:60`, `tap-twin-778:11`,
+`toolpath2d-anim:9`) — isolated with `--workers=1`, full files: **14/14 passed clean**, including `pocket-canvas`
+specifically (the one directly exercising `buildCanvasWidgets`, this turn's shared-helper change, checked first
+for exactly that reason — 18.9s both in this isolation run and in the earlier regression sweep, same file/line,
+confirming a naturally slow test rather than a timeout-flake). All 13 accounted for; none unexplained — consistent
+with t1672's own noted "rotating-subset" pattern, now with a second data point. (One self-inflicted false start:
+the first isolation attempt used `DDCS_TEST_PORT=3214`, but these 4 spec files hardcode `page.goto('http://
+localhost:3211')` rather than reading a configurable base URL — the override just orphaned them behind
+`ERR_CONNECTION_REFUSED`. Not a product defect; re-ran on the default port and got the clean result above. Worth
+knowing for future isolate-runs: `DDCS_TEST_PORT` is not universally honored across all specs.) Five regenerated
+`verification/*.png` restored via `git checkout --` before staging.
+
+### Capacity
+
+A dispatch that came with real groundwork (the code located, one trap already measured and warned against) —
+and still turned up a second, independently-discovered trap of the same underlying CLASS (a generic mechanism
+reacting unexpectedly once two previously-independent things start coinciding) but a genuinely different
+MECHANISM, caught only because the tripwire test was run and its failure taken seriously rather than assumed
+fixed. `canvasWidgets.js`'s `noSnap` gap is the SAME shape of bug this whole run keeps finding — a declared
+property nobody wired through — fixed at its actual source (the shared helper) rather than patched around it
+in surfacing alone. Three files touched (`surfacingView.js`, `surfacingData.js`, `canvasWidgets.js`); one new
+permanent spec.

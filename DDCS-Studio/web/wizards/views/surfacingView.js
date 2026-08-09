@@ -60,17 +60,32 @@ function buildSurfacingSpec(params, stock) {
     // identical to before (originX/originY, the same `...hs.pos` corner-anchor spread). Skim: a free jog point
     // (jogX/jogY, no corner-anchor semantics — it isn't a corner of the faced-area rect).
     const tgt = startMarkerTarget(params.zMode);
-    const posGeom = params.zMode === 'skim' ? { x: num(params.jogX, 0), y: num(params.jogY, 0), labelDir: hs.pos.labelDir } : { x: ox, y: oy, ...hs.pos };
+    const isSkim = params.zMode === 'skim';
+    const posGeom = isSkim ? { x: num(params.jogX, 0), y: num(params.jogY, 0), labelDir: hs.pos.labelDir } : { x: ox, y: oy, ...hs.pos };
     // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`, the face area = a `rect` corner.
+    // t1674 — Skim's marker is a FREE jog point, explicitly no corner semantics (see the comment above posGeom); once
+    // the drawn rect also tracks it (below), the GENERIC itemsBBox-derived snap offsets (_snapOffsets, meant to let
+    // ANY corner of a fixed-size feature align to a stock anchor) become self-referential — the rect's bbox now
+    // chases the very handle being dragged, turning the normal 7px snap tolerance into a virtual net spanning the
+    // whole w×h rect (caught live: a 30,-15px drag snapped to (20,15) instead of the raw ~25,~12.5 — a stock-centre
+    // coincidence neither user nor emit ever asked for). noSnap:true for Skim opts out cleanly, matching the SAME
+    // free-jog treatment already used for the alignment/rotary probe start markers.
     const { handles, onDrag, onEdit } = buildCanvasWidgets([
-        { type: 'point', id: 'origin', fx: 'sf_' + tgt.x, fy: 'sf_' + tgt.y, label: 'pos', ...posGeom },
+        { type: 'point', id: 'origin', fx: 'sf_' + tgt.x, fy: 'sf_' + tgt.y, label: 'pos', noSnap: isSkim, ...posGeom },
         { type: 'rect', id: 'size', field: 'sf_w', fieldH: 'sf_h', minw: 1, minh: 1, label: 'W × H', ...hs.size },
     ], setFields);
     const pl = placementSpec(params, surfacingBBox(params), 'sf_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
         placement: pl.placement,
-        items: [...workpieceFeatureItems(pl.stockOx, pl.stockOy), { kind: 'rect', x: ox, y: oy, w, h }],
+        // t1674 — the DRAWN rect follows posGeom (the ONE declared marker target: jogX/jogY in Skim, originX/originY
+        // else — the same value the 'pos' handle above is built from), not the raw originX/originY: Skim's program is
+        // relative to wherever the operator jogs, so the faced area IS physically at the jog point, and a preview
+        // anchored at a meaningless "origin" would lie about where the cut lands. handleScale's OWN ox/oy argument
+        // (feeding hs.size, the resize-handle anchor) stays untouched — that anchor is about the faced area's declared
+        // extent, not about where you happen to jog; conflating the two broke surfacing-start-position-1648 test 7 in
+        // an earlier trial (drag sensitivity/seed diverged between the wizard and twin faces).
+        items: [...workpieceFeatureItems(pl.stockOx, pl.stockOy), { kind: 'rect', x: posGeom.x, y: posGeom.y, w, h }],
         handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
