@@ -382,9 +382,14 @@ function registerDynExtension(Blockly) {
             const def = DEF_BY_TYPE[this.type];
             if (!def || !def.dynamic || !def.fieldsFor) return;
             const all = def.allFields || [];
+            // t1640 — `dynamic` may name ONE field (every prior user, e.g. array's 'pattern') or an ARRAY of them
+            // (formfield: 'bindMode' picks assign-var vs op-param, 'widget' picks the config fields, independently) —
+            // byte-identical for a bare string (wraps to a 1-element array, same single-field read as before).
+            const dynFields = Array.isArray(def.dynamic) ? def.dynamic : [def.dynamic];
             const apply = () => {
                 try {
-                    const params = { ...def.defaults, [def.dynamic]: this.getFieldValue(FN(def.dynamic)) };
+                    const params = { ...def.defaults };
+                    for (const df of dynFields) params[df] = this.getFieldValue(FN(df));
                     const show = new Set(def.fieldsFor(params).map(FN));
                     all.forEach((f) => { const inp = this.getInput(FN(f)); if (inp) inp.setVisible(show.has(FN(f))); });
                     if (this.rendered) { if (this.queueRender) this.queueRender(); else if (this.render) this.render(); }
@@ -392,7 +397,7 @@ function registerDynExtension(Blockly) {
             };
             this.setOnChange(function () {
                 if (this.isInFlyout || !this.workspace) return;
-                const v = this.getFieldValue(FN(def.dynamic));
+                const v = dynFields.map((df) => this.getFieldValue(FN(df))).join('|');
                 if (v === this._ddcsDyn) return;
                 this._ddcsDyn = v; apply();
             });

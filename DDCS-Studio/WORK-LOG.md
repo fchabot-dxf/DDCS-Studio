@@ -18713,3 +18713,121 @@ Moderate act — mechanical breadth (22 one-line declarations across 19 files) b
 investigations: the survey (confirming the two families are one), and isolating a genuine regression out of
 suite noise across two full ~20-minute runs. Comfortable to continue into the next act; not a long-seat
 situation like the run of acts before this one.
+
+## t1640 — THE FORMFIELD GAINS AN OP PARAM MODE (same seat, epoch 3)
+
+Dispatch: t1636 measured `deriveBindings`'s matcher already supports `match:{type:atomType},key:param` with
+zero engine changes — every shipped twin binding a real op atom already uses exactly that shape
+(`surfacingData.js`'s specs bind `w`/`h`/`toolDia` via `match:{type:'surfaceraster'}`). The gap was purely
+the `formfield` block's authoring UI, which hard-coded `match:{type:'assign',var:matchvar}` and offered no
+way to target a leaf atom's own param. Ruled shape (user-approved): a second declared MODE on the formfield
+block — Assign Var (today, unchanged) vs Op Param — additive, byte-identical for every existing formfield.
+Two survey questions asked FIRST, either a possible fork: how the atom-type dropdown populates, and how to
+disambiguate two atoms of the same type.
+
+### The two survey questions — answered, not guessed, and why neither is a real fork
+
+**Atom-type field — free text, not a dropdown.** No existing precedent for a Blockly field whose options are
+computed live from sibling/ancestor blocks in the same workspace (checked `registerOpunitExtension` /
+`registerCamFieldExtension` — both patterns LOCK an existing field read-only, never POPULATE one from
+workspace context). Building that would be new engine machinery for a single consumer. `matchvar` (the
+sibling field for Assign Var mode) is ALSO free text today — no dropdown enumerating existing assign blocks
+either. `atomType` mirrors that exact precedent: same authoring feel, same safety net (a typo in either is
+caught identically — `formfieldMatchReport` refuses the save by name, loudly, for both). Reversible later:
+swapping free text for a live dropdown is a strict UI enhancement that doesn't touch the underlying spec
+shape (`match:{type:atomType}`), so nothing is locked in by choosing the minimal form now.
+
+**Ambiguous same-type match — no new machinery, reuse the existing throw.** `matches()`'s `{type}`-alone
+branch already means "the sole block of that type" and `deriveBindings` already throws when hits !== 1 — 2
+hits is exactly as much an authoring error as 0 hits, and `formfieldMatchReport` (t1636) already reports
+BOTH shapes uniformly (its `hits` count tells them apart: 0 = dangling, >1 = ambiguous). No existing
+`match:{type,index}`/`nth` precedent anywhere in the registry (grepped). Building an index/nth picker now
+would be machinery for a hypothetical — rule-of-three says wait for a THIRD real case that needs two
+same-type atoms disambiguated; today's real cases (every shipped op-atom-bound spec) are all sole-instance.
+Verified this degrades safely, not silently: authored a stack with two `surfaceraster` leaves and one Op
+Param field naming `surfaceraster` — REFUSES the save with the same loud message, does not silently bind to
+the wrong instance (test 4 in the new spec).
+
+Both decisions are LOW-RISK and reversible (neither forecloses a future dropdown or disambiguator — the
+underlying spec shape is unchanged either way), so built rather than blocking a full turn on a round-trip —
+reporting the reasoning here for review rather than a pre-build stop, per "Confirm premise before
+regression-blocker."
+
+### The fix
+
+`wizards/ops/formField.js`: new `bindMode` field ('assign' | 'opparam', default 'assign' — byte-identical),
+new `atomType` field (free text, default ''). `dynamic` generalized from `'widget'` to `['bindMode',
+'widget']` so the header row shows `matchvar` OR `atomType` (never both) alongside the widget's own config
+fields — required a small engine change (below), not a formfield-only hack.
+
+`blocks/blockly/bridge.js`'s `ddcs_dynfields` extension: `def.dynamic` now accepts an ARRAY of trigger field
+names, not just one string — every prior single-string user (`array.js`'s `dynamic:'pattern'`, formfield's
+own former `dynamic:'widget'`) wraps to a 1-element array and reads byte-identically. Small, backward-
+compatible, and justified by an actual 2nd consumer needing it now (not speculative).
+
+`blocks/userOps.js`:
+- `bindingsFromStack` — `p.bindMode === 'opparam'` builds `match:{type:atomType}`; anything else (including
+  an old block serialized before this act, with no `bindMode` field at all) keeps `match:{type:'assign',
+  var:matchvar}` exactly as before.
+- `bindingsToBlocks` (the reverse) — a spec whose match has no `.var` (the op-atom shape) now renders as an
+  Op Param block (`bindMode:'opparam', atomType:s.match.type`) instead of the misleading `matchvar:'#1'`
+  fallback it would otherwise have gotten silently.
+- `formfieldMatchReport` — added a generalized `target` descriptor (`Match Var #N` / `Op Param
+  type.key`) covering both modes; `devMode.js`'s save-refusal alert now reads it instead of the
+  assign-only `Match Var` phrasing, and its guidance text mentions both modes.
+
+`blocks/opSession.js`'s `seedKnobExpose` (the "pre-tick the bound atom as a knob chip in Blocks" cosmetic,
+t391) had its own THIRD hand-copy of the assign-only lookup (`s.match.var`-only filter) — a real but minor
+gap the survey turned up: an Op Param-authored field's atom wouldn't get the pre-tick chip. Fixed by reusing
+`deriveBindings.matches()` (the shared predicate, already imported nowhere else in this file) instead of a
+bespoke var-equality check — one mechanism, not two. Display/provenance-only, no emit path — verified byte-
+identical via the existing knob specs (`group-canvas-knob`, `group-auto`, `group-edit`, `group-framing`, all
+green) rather than treated as a separate scoped act.
+
+### Verification — the user's t1636 gesture, end to end
+
+New `formfield-opparam-1640.spec.js`, 4 tests:
+1. **Model**: an Op Param spec over a bare `surfaceraster` leaf (no assign blocks at all — the exact shape
+   that derived ZERO bindings pre-fix) derives one binding, socket key `w`, default read from the matched
+   block's own baked value (100).
+2. **Lossless reverse round-trip**: `bindingsToBlocks` → `bindingsFromStack` on a real op-atom-shaped spec
+   (the exact `match:{type:'surfaceraster'}` shape `surfacingData.js`'s own binding specs use) is
+   byte-identical.
+3. **REAL APP, the full gesture**: author a `surfaceraster` leaf + one Op Param formfield (`atomType:
+   'surfaceraster', key:'w'`) via `ddcsLoadBlockStack` → open Blocks → save via the REAL `.blk-dev-savebtn` +
+   `.blk-dev-savedlg` (no refusal — the pre-fix shape of this exact stack derived nothing) → `page.reload()`
+   (genuine fresh load) → the def validates clean, exactly 1 binding, declared default 100 → `openWiz` → the
+   "width" field renders seeded 100 → **assert-the-value, not a proxy**: edit the field to 150 via real
+   input/change events, then `builderOf(opType)({...defaultParams, width:150})` and read the BUILT stack's
+   own `surfaceraster.params.w` directly (no `#var` exists here to regex out of emitted text) — 150.
+4. **The t1636 loud refusal still fires in Op Param mode**: a dangling `atomType` (names nothing in the
+   stack) refuses with `Op Param no_such_atom_type.w` in the message; an AMBIGUOUS same-type-twice stack
+   (two `surfaceraster` leaves) refuses too, proving the "no new disambiguation machinery" recommendation
+   degrades to a clear authoring error rather than a silent wrong bind.
+- **Non-vacuity**: reverted the `bindingsFromStack` mode branch only (scratch copy of `userOps.js` saved
+  first — nothing committed yet, so restoring from HEAD would have been correct here too but the scratch
+  copy was already in hand) — 3 of the 4 new tests genuinely went RED (the model test alone survived,
+  since it drives `deriveBindings` directly rather than through `bindingsFromStack`). Restored, all 4 green
+  again.
+- Every pre-existing formfield spec re-run and green, unchanged: `formfield-block.spec.js` (LOSSLESS
+  round-trip on `MIDDLE_BINDING_SPECS`, the pilot save/emit test, `isMaintainedAsData`, the Class-B render
+  guard), `formfield-authoring-1610.spec.js` (the full save/reload/edit-drives-emit cycle),
+  `formfield-loud-mismatch-1636.spec.js` (both the dangling-refusal and the honest-parameterless-saves
+  cases), `wizard-shapes-1627.spec.js`.
+- The `ddcs_dynfields` generalization + `mouthOf`-adjacent bridge machinery swept via `fork-parity-1593`
+  (all 32 twins byte-for-byte) and `guard-roundtrip-1595` (152-flip structural sweep) — both green.
+- `seedKnobExpose` generalization swept via `group-canvas-knob`, `group-auto`, `group-edit`,
+  `group-framing`, `blocks-authoring-always-on` — all green.
+- Smoke tier: 71/71 green.
+- Full suite run once (node 0/0): 14 e2e failures, ALL isolated — 7 matched ADVISOR-TRANSFER.md §4's
+  documented mouse/update-check class by name; 4 matched documented churn members (`guard-roundtrip-1595`,
+  `middle-superset`, `open-as-modal-1625`, `wizard-face-1599`) and re-ran green isolated; the remaining 3
+  were in this act's own touched area (`formfield-block.spec.js`, `formfield-loud-mismatch-1636.spec.js`,
+  `param-group-rows-1605.spec.js`) and ALL re-ran green isolated (one re-confirmed fully alone with
+  `--workers=1` — a page-boot timeout under heavy parallel contention, not a code path my changes touch).
+  No ID outside the documented floor survived isolation.
+
+### Capacity
+
+Comfortable — a real design act (two survey questions genuinely reasoned through, not rubber-stamped) but
+not a long one. Good to continue.

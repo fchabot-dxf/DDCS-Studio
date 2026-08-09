@@ -738,10 +738,11 @@ function saveAsCustomOp() {
     // discipline every other authoring guard on this canvas already holds (varErr above, the destructive-load guard).
     const report = formfieldMatchReport(a.opRec.children);
     if (report.unmatched.length) {
-        const list = report.unmatched.map((u) => `${u.param} (Match Var ${u.matchvar || '—'})`).join(', ');
+        const list = report.unmatched.map((u) => `${u.param} (${u.target})`).join(', ');
         alert(`${report.total} field${report.total === 1 ? '' : 's'} declared, ${report.matched} matched: ${list} `
-            + `— Match Var must name a block that exists in THIS stack (an assign block's #var). Fix it, or tick `
-            + `"optional" if the field is meant to be absent in some states, then save again.`);
+            + `— an Assign Var field must name an assign block's #var that exists in THIS stack; an Op Param field `
+            + `must name an atom type present exactly once in THIS stack. Fix it, or tick "optional" if the field `
+            + `is meant to be absent in some states, then save again.`);
         return;
     }
 

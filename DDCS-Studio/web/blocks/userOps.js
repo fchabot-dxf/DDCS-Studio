@@ -303,10 +303,17 @@ function resolveLayoutMeta(def) {
 export function bindingsFromStack(children) {
     return flattenBlocks(children).filter((b) => b && b.type === 'formfield').map((b) => {
         const p = b.params || {};
+        // t1640 — the DECLARED bind mode picks the match shape: 'opparam' (default '') targets an ordinary op atom
+        // by its OWN type (deriveBindings' matches() already treats `{type}` alone as "the sole block of that
+        // type" — zero engine changes); anything else (including an old block with no bindMode at all) keeps
+        // today's 'assign' shape byte-identical.
+        const match = p.bindMode === 'opparam'
+            ? { type: String(p.atomType || '') }
+            : { type: 'assign', var: String(p.matchvar || '#1') };
         const spec = {
             param: String(p.param || 'value'),
             type: BINDING_TYPES.has(p.type) ? p.type : 'number',
-            match: { type: 'assign', var: String(p.matchvar || '#1') },
+            match,
             key: String(p.key || 'value'),
         };
         if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) spec.default = Number(p.dflt);   // else socket-held (no default)
@@ -497,10 +504,18 @@ export function bindingsToBlocks(specs) {
     return (specs || []).filter((s) => s && s.match).map((s) => {
         const wc = s.widgetConfig || {};
         const w = s.when || null;
+        // t1640 — the inverse of bindingsFromStack's mode split: a spec whose match names a `var` renders as an
+        // Assign Var block (today's shape, byte-identical); a spec matching by `type` alone (no `var` — the shape
+        // every op-atom-bound twin spec already uses, e.g. surfacingData's `match:{type:'surfaceraster'}`) renders
+        // as an Op Param block instead of the misleading `matchvar:'#1'` fallback it would otherwise get.
+        const isOpParam = s.match && !('var' in s.match);
         return { type: 'formfield', params: {
             param: s.param, widget: s.widget || 'number', label: s.label || '',
             dflt: s.default === undefined ? '' : String(s.default),
-            matchvar: String((s.match && s.match.var) || '#1'), key: s.key || 'value', type: s.type || 'number',
+            bindMode: isOpParam ? 'opparam' : 'assign',
+            matchvar: isOpParam ? '#1' : String((s.match && s.match.var) || '#1'),
+            atomType: isOpParam ? String((s.match && s.match.type) || '') : '',
+            key: s.key || 'value', type: s.type || 'number',
             section: s.section || '', help: s.help || '',
             optional: !!s.optional, readonly: !!s.readonly, readonlyhint: s.readonlyHint || '',
             whenparam: w ? String(w.param) : '', whenis: w ? String(w.is) : '',
@@ -592,7 +607,12 @@ export function formfieldMatchReport(children) {
         const hits = flat.filter((b) => matches(b, s.match)).length;
         if (hits === 1) continue;
         if (hits === 0 && s.optional) continue;   // a prune-gated socket genuinely absent in this structural state
-        unmatched.push({ param: s.param, matchvar: (s.match && s.match.var) || '', hits });
+        // t1640 — a human-readable target descriptor covering BOTH bind modes (mirrors deriveBindings' own `how`
+        // message): an assign match names its var, an op-param match names the atom type + the socket key. `hits`
+        // itself already tells the two failure shapes apart (0 = dangling, >1 = ambiguous — an authoring error
+        // either way, per deriveBindings' own "need exactly 1" rule).
+        const target = ('var' in s.match) ? `Match Var ${s.match.var}` : `Op Param ${s.match.type || '—'}.${s.key}`;
+        unmatched.push({ param: s.param, matchvar: (s.match && s.match.var) || '', target, hits });
     }
     return { total: specs.length, matched: specs.length - unmatched.length, unmatched };
 }
