@@ -20887,3 +20887,87 @@ fixed. `canvasWidgets.js`'s `noSnap` gap is the SAME shape of bug this whole run
 property nobody wired through — fixed at its actual source (the shared helper) rather than patched around it
 in surfacing alone. Three files touched (`surfacingView.js`, `surfacingData.js`, `canvasWidgets.js`); one new
 permanent spec.
+
+## t1676 — REVIEW OF t1674 (PASS) + THE PATH-LOSS REPORT: NOT REPRODUCIBLE at HEAD (turn 1676)
+
+### The t1674 review
+
+Advisor verdict: PASS. Rated clearing t1672 by A/B pixel-count across three tree states with a safe file-swap
+and a verified restore as "a real reproduction attempt, not an assertion." Rated the self-found snap-offset trap
+highest: caught LIVE with a real drag, not reasoned about — and named the `noSnap` drop as a fourth instance of
+the declared-but-unread-property class this run keeps finding, fixed generically rather than special-cased.
+
+### AMENDMENT 1 — the advisor reproduced the path-loss themselves and re-aimed the turn
+
+The advisor opened the BUILT-IN wizard, found its 2D Layout pane draws no raster at any size tested, and
+proposed this as the root cause. Mid-turn, the user clarified the report was about "surface data" — the TWIN,
+not the built-in — which inverted the lead: if both the user's before-and-after screenshots are the twin, this
+is a REGRESSION IN THE TWIN, and t1674 (my own immediately-prior commit, which changed `surfacingData.js`'s
+`paths` construction directly) was named as the first suspect to check, explicitly not to defend.
+
+### STEP 1 — established the truth by direct, live reproduction, not by reasoning about the code
+
+Opened `user_surfacing_data` at HEAD (`af884dfa`) with the user's own reported W×H (73.677×58.436) and checked
+the `.fc-anim-overlay` canvas (the actual traced-toolpath raster, confirmed via `userOpView.js`/`viz/toolpath2d.js`
+— t309 — to be driven by the SAME sim trace as the 3D pane, reused via `panel.getSegments()`, "no re-trace") by
+painted-pixel count, across three independent interaction paths:
+
+| scenario | fc-path | fc-anim-overlay painted px |
+|---|---|---|
+| Normal mode, direct field write, user's exact W×H | 1 | 2413 |
+| Skim mode, direct field write, same W×H, jogX/Y=55/33 | 1 | 2390 |
+| Real drag: resize handle then move/pos handle (not a field write) | 1 | 6356 → 6373 |
+
+Screenshots for all three confirm it visually: the twin's 2D Layout pane draws the full raster (matching the 3D
+pane above it) in every scenario tried, including the exact parameter values named in the report. **The twin
+does NOT reproduce the reported symptom at HEAD.** (One self-inflicted detour: a `cd DDCS-Studio &&`-prefixed
+foreground command left my shell cwd inside `DDCS-Studio/` for several later commands, which made a `git diff
+main HEAD -- DDCS-Studio/web/...` pathspec silently match nothing — looked like an impossible zero-diff against
+a file I knew had changed. Caught it by comparing blob hashes directly, fixed by using an absolute `cd` prefix
+going forward. Did not affect the live-app reproduction, which ran through `npx playwright test` independent of
+this.)
+
+### STEP 2 — the built-in's own gap, confirmed as a separate, pre-existing architectural fact
+
+Confirmed live (screenshot) and by grep: the built-in wizard's 2D Layout pane draws the W×H boundary (via its
+own older `items`/`kind:'rect'` mechanism, not `previewGeometry`) but never the raster overlay — because
+`createToolpath2d`/`.fc-anim-overlay` is wired ONLY in `userOpView.js`, the generic TWIN renderer, and in no
+built-in view file, for any op, since its introduction (t309). This is not new, not surfacing-specific in
+mechanism, and not a regression — it is a feature the built-ins never had. My own read: extending it to the
+built-ins would be a real, separate feature addition (a generic hook in the built-in wizard shell, not a
+surfacing-only patch), not a bug fix — I did not build it, per the amendment's explicit "do not fix in this
+act unless it shares the same root," which it does not.
+
+### STEP 4 — the cheap count (paths-key asymmetry across the op family)
+
+Of the 7 ops whose twin declares a `previewGeometry` hook returning `paths` (bore, contour, drill, pocket, slot,
+surfacing, tap — grepped `.previewGeometry =` in `blocks/dataOps/`), only **2 built-in views** (`pocketView.js`,
+`contourView.js`) build their own `paths` array to match; the other 5 built-ins (bore, drill, slot, surfacing,
+tap) draw their shapes via `items` only. Surfacing's built-in is not an outlier in this count — it is the norm
+for 5 of 7. Combined with step 2's finding (the raster overlay is twin-only for ALL ops, not a paths-key
+question at all), this says the built-in/twin 2D-preview asymmetry is a broad, longstanding architectural
+pattern, not a fresh defect anywhere in it.
+
+### VERDICT — not reproducible; the leading explanation is a different build
+
+Per the dispatch's own branching: the twin draws the raster today at HEAD, in every scenario tried, including
+the user's own reported values. `main` (this branch's fork point, `14818856`) predates t1648 through t1674
+entirely for `surfacingData.js` (57-line diff, confirmed via direct blob comparison) — it has no `jogX`/`jogY`,
+no `startMarkerTarget`, no posGeom-driven path, none of this arc's work. If the user's screenshots came from a
+build other than this branch's current tip (the deployed `ddcs-studio.pages.dev` site serves `main` directly per
+the existing deploy pipeline), the divergence would be fully explained without any regression in this tree. I
+cannot determine which build the user was on from here — that's the open question for the advisor/user to close.
+No code changed this turn; nothing here needs a full-suite run.
+
+### NOT IN SCOPE, still standing
+
+The built-in's own raster-overlay gap (a real, separate feature question — mine leans toward "worth having" but
+is not my call to build unasked); symptom 4, symptom 5 (the emits contract ruling), the legacy opType corner
+block, the t1668 malformed-token gate hazard.
+
+### Capacity
+
+A diagnostic-only turn: the advisor modeled reproducing-and-killing their own hypothesis, and this turn's job
+was to do the same for theirs — check my own immediately-prior commit rather than defend it, with live evidence,
+across field-write AND real-drag interaction, before reporting a verdict. No fix shipped because no defect
+reproduced; the honest report is the deliverable.
