@@ -64,7 +64,7 @@ const CONTOUR_EXEC_BINDINGS = [
     { param: 'h', blockIndex: 4, key: 'h', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: 'GEOMETRY' },
     { param: 'dia', blockIndex: 4, key: 'dia', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'GEOMETRY' },   // t722 P2a — Ø for circle AND polygon
     { param: 'sides', blockIndex: 4, key: 'sides', type: 'number', default: CONTOUR_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: 'GEOMETRY' },
-    { param: 'toolDia', blockIndex: 4, key: 'tool', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
+    { param: 'toolDia', blockIndex: 4, key: 'tool', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.toolDia, section: 'TOOL & CUT' },   // t1662 — label from SHARED_LABELS
     // t842 — DEPTH ENTRY: plunge or ramp (NO helix — a helix would gouge inside the profile). Polyline → ramp along the first
     // segment; circle → a helical lead-in around the arc. Degrades to plunge (with a why) if the first segment is too short.
     { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: CONTOUR_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS_NO_HELIX }, label: 'Depth Entry', section: 'TOOL & CUT', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a lead-in descent at ≤ the ramp angle along the profile (degrades to plunge where the first segment is too short).' },

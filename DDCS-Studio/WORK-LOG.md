@@ -19906,3 +19906,91 @@ A measure-then-build turn: sized the actual exposure before writing any extensio
 was a measured fact (57 params) rather than an estimate, and closed with the harder non-vacuity direction —
 proving a GREEN sweep can still fail — since the happy path (zero divergences) offered no free proof that the
 new assertions do anything at all.
+
+## t1662 — REVIEW OF t1660 (PASS) + a vacuity gap one level down, plus SHARED_LABELS widened (ruled) (turn 1662)
+
+### The t1660 review
+
+Advisor verdict: PASS — measuring exposure before building, reading the declared shape with zero hand-listed
+params, reporting zero divergences plainly, and honestly flagging the single-option enum as structurally fixed
+rather than quietly counting it covered were all named as correct. The double-verified restore (restore, THEN
+re-run a 12-test regression to prove the restore was genuinely clean, not just visually clean) was called out
+specifically as "the detail most people skip."
+
+### THE FINDING — the vacuity shape one level down
+
+t1660's off-default count is asserted GLOBALLY (`biggest.off >= 25`) but NOT per twin — line 196's per-twin
+assertion (`EMIT must be byte-identical at ${r.off} off-default values`) is trivially true if `r.off` is ever
+`0`. Exactly the shape t1660 itself just closed for enum/bool/string: the type-dispatch chain is
+number/int/bool/enum/string today, but a binding type OUTSIDE that chain contributes `off += 0` with NO
+SIGNAL — a twin built entirely from a future 6th type would sweep zero values and still report PASS, the
+mechanism that let enum/bool/string hide before t1660 not actually closed, just moved one type further out.
+
+**Fix — fail loud, the advisor's own candidate, same standard as t1638/t1654**: every value-socket binding is
+now either MOVED off its default (the four typed branches) or explicitly SKIPPED for the ONE declared
+legitimate reason (a single-option enum, inside the enum branch itself) — anything else throws, naming the
+binding's param, twin, and unrecognized type. A future binding type joins by being HANDLED in the chain, not
+by being silently forgotten.
+
+**Non-vacuity**: temporarily injected a fake binding (`{ param: '__t1662_fake', type: '__unknown_type__',
+blockIndex: 99999 }`) onto the first twin's `bindings` array via a scratch-copy edit to the real spec file, ran
+it, confirmed the sweep failed EXACTLY as designed:
+`fork-parity-1593: binding "__t1662_fake" on user_atc_warmup_data has an unrecognized type "__unknown_type__"
+— it would silently sweep OFF=0 (proving nothing)...` — diffed the file against the scratch copy to confirm
+the injection was the ONLY change before removing it, restored, re-verified green.
+
+### THE ACT — SHARED_LABELS widening (ruled, not proposed)
+
+The user ruled "make the names more friendly" once (t1611, the placement family); this act applies the SAME
+ruling to `toolDia`/`stepoverPct` — a friendly name for a shared concept from ONE declared place, not
+per-wizard text. Added `toolDia: 'Tool Ø', stepoverPct: 'Stepover %'` to `SHARED_LABELS`
+(`ui/formWidgets.js`).
+
+**Found THREE private-copy sites, not the two the two param names might suggest** — checked every binding for
+both params across the registry, not assumed: `boreData.js` (`toolDia`, `holecycle` match) and
+`contourData.js` (`toolDia`, `blockIndex:4`) each carried their own `label: 'Tool Ø'`; `pocketData.js` carried
+TWO — its `leafPair()` helper generates a matched `pocketfill`/`pocketwall` pair per param, and the
+`pocketfill`-arm's `toolDia` AND its separate `stepoverPct` row both had explicit labels (the `pocketwall`-arm
+copies never did, by the helper's own design — only the primary arm carries form metadata). All three sites'
+explicit `label` removed; the friendly name now comes from `SHARED_LABELS` alone for every twin that has
+either param — `bore`, `contour`, `pocket` (unchanged text, one source now) and `slot`, `surfacing`, `text`
+(previously unlabeled — the actual widening, they get the friendly name for free).
+
+**Verify — read the resolved label for every occurrence in the registry**, not sampled: `labelFor(b)` for
+every `toolDia`/`stepoverPct` binding across all 32 twins now returns `'Tool Ø'`/`'Stepover %'` with
+`b.label === undefined` (no private copy survives) in every case. ⚠ Hit the stale-mem-server trap mid-
+verification — a debug probe reported pocket's `toolDia` still carrying its old label after the file was
+already fixed on disk (port 3211 showed no LISTENING socket, ruling out the usual "server never restarted"
+explanation; a retry of the exact same probe came back clean) — re-ran to confirm rather than trusting the
+first (stale) read, matching [[new-file-needs-fresh-mem-server]]'s own lesson generalized to edited files.
+
+**Byte-identical emit — guaranteed by construction, confirmed not assumed**: grepped `blockEmitter.js` for
+every `.label` reference — all of them read `def.label` (an ATOM's own name, e.g. `'Move'`, `'Corner'`), a
+WHOLLY different property from a `bindingSpec`'s `label` (a form-field display string `labelFor()` alone
+reads). The two share a key name and nothing else; the emit path never touches the latter. Confirmed by the
+regression sweep below rather than left as a bare architectural claim.
+
+### Regression sweep — the emit-safety net for the label change, plus the fail-loud guard's own consumer
+
+`fork-parity-1593` (both tests, with the fail-loud guard live) · `guard-roundtrip-1595` (both tests, the
+152-flip sweep) · `roundtrip-whole-program-1319` (0/0 differences) — **8/8 green**.
+
+### Full suite — measuring against the t1660 floor (node 99/0, e2e 2443 passed / 13 failed)
+
+node: **99/0**, clean. e2e: **2445 passed / 10 failed / 6 skipped** — fewer failures than the floor. Of the
+10: 7 match documented churn by exact name (`collapsible-panes-752`, `formfield-loud-mismatch-1636`,
+`open-as-modal-1625:54`, `pane-splitter-790` ×2, `update-check` ×2). Three were new/re-appeared names
+(`blocks-live-form:52`, `import-safety-1219:99`, `param-group-rows-1605:66`) — isolated with `--workers=1`:
+the first pass showed a DIFFERENT test failing within each of those same two files
+(`blocks-live-form:168`, `param-group-rows-1605:52`) than the full-suite run named, both on the SAME
+`window.showApp`/`!!window.__blkws` boot-readiness class already documented this run — a second isolated pass
+of both files came back **9/9 clean**. `import-safety-1219:99` — already isolate-confirmed clean in t1656.
+No ID outside the documented churn/self-contention class survived isolation. Restored 11 regenerated
+`verification/*.png` before staging.
+
+### Capacity
+
+Two independent, well-scoped items: closing a vacuity gap the advisor found one level down from what t1660
+already fixed (same mechanism, same fix shape, proven the same way — inject, confirm red, remove), and a
+ruled naming consistency pass that turned up more private-copy sites than a shallow grep would have shown
+(pocket's `leafPair`-generated pair). Neither touched emit; both verified that claim rather than assumed it.

@@ -89,7 +89,7 @@ const BORE_BINDING_SPECS = [
     // cut params (the helical `bore` leaf) — the DIFFERENCE from drillData: holeDia/toolDia/pitch/ramp, NOT peck
     { param: 'depth', match: { type: 'holecycle' }, key: 'depth', type: 'number', units: 'mm', default: BORE_DEFAULTS.depth, label: 'Depth', section: 'TOOL & CUT' },
     { param: 'holeDia', help: "Target bored hole Ø (mm) — must be ≥ the tool Ø.", match: { type: 'holecycle' }, key: 'holeDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.holeDia, label: 'Hole Ø', section: 'TOOL & CUT' },
-    { param: 'toolDia', match: { type: 'holecycle' }, key: 'toolDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
+    { param: 'toolDia', match: { type: 'holecycle' }, key: 'toolDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.toolDia, section: 'TOOL & CUT' },   // t1662 — label from SHARED_LABELS
     { param: 'pitch', help: "Z step per full circle (mm).", match: { type: 'holecycle' }, key: 'pitch', type: 'number', default: BORE_DEFAULTS.pitch, label: 'Pitch (Z / pass)', section: 'TOOL & CUT' },
     // t1385 — this row drives `cycle`, not a `ramp` key: the merged block folded the bore's ramp into the family's one
     // cycle knob. The param NAME stays `ramp` so every other consumer (the form, the CAM map, the wizard) is untouched.

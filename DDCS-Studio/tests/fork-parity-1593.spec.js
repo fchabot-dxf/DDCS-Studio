@@ -152,11 +152,23 @@ test('THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, a
                 else if (b.type === 'bool') { P[b.param] = !b.default; off++; }
                 else if (b.type === 'enum') {
                     // A single-option enum (e.g. text's `font`) has no alternative to move to — not a gap, a
-                    // genuinely fixed field; skipped rather than counted as swept.
+                    // genuinely fixed field; skipped rather than counted as swept. The ONE declared legitimate skip.
                     const opts = (b.widgetConfig && b.widgetConfig.options) || [];
                     const alt = opts.map(([, v]) => v).find((v) => v !== b.default);
                     if (alt !== undefined) { P[b.param] = alt; off++; }
                 } else if (b.type === 'string') { P[b.param] = String(b.default || '') + ' [t1660 off-default]'; off++; }
+                // t1662 THE DURABLE HALF — every value-socket binding is either MOVED off its default (the
+                // branches above) or explicitly SKIPPED for the ONE declared reason (a single-option enum, inside
+                // the enum branch itself). Anything else — a binding type NONE of the branches above recognize —
+                // FAILS LOUD, naming the type, instead of silently sweeping nothing: an unrecognized type used to
+                // contribute off=0 with no signal, exactly the shape that let enum/bool/string hide before t1660
+                // — a future 5th type would repeat it invisibly. Same standard as t1638's mouth guard and t1654's
+                // durable-field guard: a new type joins by being HANDLED here, not by being silently forgotten.
+                else {
+                    throw new Error(`fork-parity-1593: binding "${b.param}" on ${src} has an unrecognized type `
+                        + `"${b.type}" — it would silently sweep OFF=0 (proving nothing) instead of being moved `
+                        + `off its default. Add a branch for "${b.type}" above.`);
+                }
             }
             const { emitProgram } = await import('/blocks/blockEmitter.js');
             let srcGcode = null, copyGcode = null, err = null;

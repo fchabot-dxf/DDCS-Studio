@@ -893,13 +893,18 @@ export function linkGear(link) {
 // friendly"). Params that recur across twins with the SAME meaning declare their display name ONCE here; a
 // binding's explicit `label` always wins (wizard-specific phrasing), an unlisted param falls back to its raw
 // name. Resolved by `labelFor` — the ONE resolver labelSpan renders through, so both binding-driven faces
-// (the twin Generator Modal + the Blocks Wizard View) agree for free. Scoped to the placement family the
-// ruling named; grow it per-concept, never per-wizard.
+// (the twin Generator Modal + the Blocks Wizard View) agree for free. Grows per-concept, never per-wizard.
+// t1662 (ruled) — WIDENED to toolDia/stepoverPct: the SAME "friendly name" ruling t1611 applied to placement,
+// applied consistently rather than half-applied. bore/contourData.js and pocketData.js's pocketfill binding
+// each carried their OWN private-copy `label` for these — same text, three separate sources; collapsed to this
+// one declaration (their explicit labels removed). Every OTHER twin's toolDia/stepoverPct binding had no label
+// at all (the raw param name rendered) — those now inherit the friendly name for free, the actual widening.
 export const SHARED_LABELS = {
     originX: 'Origin X', originY: 'Origin Y', offZ: 'Z offset',
     stockAttach: 'Stock attach', pathDatum: 'Path anchor', stockDatum: 'Stock datum',
     stockW: 'Stock width', stockH: 'Stock height', stockZ: 'Stock thickness',
     w: 'Width', h: 'Height',
+    toolDia: 'Tool Ø', stepoverPct: 'Stepover %',
 };
 /** The label a binding renders under: explicit `label` → SHARED_LABELS → the raw param name. */
 export function labelFor(b) { return (b && b.label) || (b && SHARED_LABELS[b.param]) || (b && b.param) || ''; }
