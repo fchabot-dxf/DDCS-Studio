@@ -20167,3 +20167,130 @@ runtime machinery — found by testing the cleanest candidate FIRST rather than 
 default. The weight of the turn was in PROVING it, not building it: a genuine end-to-end reproduction of the
 original bug (decoy server, real file break, real silent pass) before the fix, and a genuine end-to-end
 confirmation after. `playwright.config.js` is the only file this act touches.
+
+## t1668 — REVIEW OF t1666 (PASS) + CONTROLLER TOKENS THROUGH SET AND BOUNDS: sized, not built (turn 1668)
+
+### The t1666 review
+
+Advisor verdict: PASS, "the shape of fix I want more of." The simplest candidate (an existing Playwright
+config option) was tried before any custom identity-stamp machinery and fully solved the problem, so nothing
+custom got built. Called stronger than asked: IMPOSSIBLE rather than merely loud. The reproduce-before-and-
+after discipline (decoy server + broken file + old config = silent pass; same setup + new config = refusal,
+then genuine failure) was named as the best proof of the run. The 57ms/once-per-run cost was accepted as
+negligible. The scoping note — that the remaining Blocks-canvas-boot-under-load flakes are a different,
+untouched source — was accepted as correctly separated rather than claimed.
+
+### THE ACT — CONTROLLER TOKENS THROUGH SET AND BOUNDS (diagnose-scoped)
+
+From the defects queue (`ADVISOR-TRANSFER.md:60-61`): "controller tokens through Set/bounds (w = #500 should
+emit X#500 — a never-worked workflow)." The intent: an operator should be able to feed a controller variable
+(`#500`) into a parameter instead of a literal, and have the emit carry the token rather than a baked number —
+the customization axis this project puts ahead of optimization. Per the dispatch's own explicit branching
+instruction (item 3: "If it is a build, STOP after sizing and pass back. Do not start architecture on a turn
+scoped to diagnose."), this turn establishes true behavior and sizes the gap. **No source file was touched.**
+
+### TRUE CURRENT BEHAVIOUR — five empirical tests, real emitted text, nothing inherited from the queue's claim
+
+1. **The raw atom emit — WORKS.** `emitMapped([{ type:'move', params:{ mode:'rapid', x:'#500', y:10 } }]).text`
+   → **`"G0 X#500 Y10"`**. `val()` (`wizards/ops/util.js:38-42`) passes any string containing `#`/`[` straight
+   through, untouched: `if (typeof v === 'string' && /[#[]/.test(v)) return v.trim();`.
+2. **The Blockly canvas round-trip of an EXISTING token record — WORKS.** Built a `move` record with
+   `x:'#500'` directly, ran it through `stackToWorkspace` → `workspaceToStack` → `emitMapped`: readback shows
+   `x` promoted to `{type:'variable', params:{name:'#500'}}`, final emit **`"G0 X#500 Y10"`**, byte-identical.
+   This is `stackBridge.js:276`'s existing `k === 'value' && /[#[]/.test(v)` conversion — already correct,
+   already wired — but nothing on the canvas DRIVES it from a blank/plain-number starting state.
+3. **The Blockly AUTHORING gesture (typing into the default numeric shadow) — FAILS SILENTLY.** Starting from
+   the normal state (`x:5`, a `math_number` shadow block, `isShadow:true`), called the field's own
+   `field.setValue('#500')` — the exact API a keystroke eventually reaches. Result: `setErr: null`,
+   `afterValue: 5` (unchanged), `readBackX: 5`, `emitAfter: "G0 X5 Y10"`. Blockly's native `FieldNumber`
+   rejects the token outright, with no error and no visible feedback at all.
+4. **The wizard form field (`type="text"`, Surfacing's `w`) — FAILS SILENTLY, one layer up.** The DOM itself
+   accepted the string (`domValueAfterSet: "#500"`), but the wizard view's own `num()` coercion
+   (`(val,d) => (val==='' || val==null || isNaN(Number(val))) ? d : Number(val)`) reads `Number('#500')` as
+   `NaN` and silently falls back to the field's declared default — the emitted program still carried the
+   ORIGINAL default line, `#40=100   ( area X — … )`, the token discarded before it ever reached an atom.
+5. **The twin data-op form field (`type="number"`, `user_surfacing_data`'s `originX`) — REJECTED EVEN
+   EARLIER, at the DOM.** Setting `.value = '#500'` on a native `<input type="number">` is rejected by the
+   browser itself: `domValueAfter: ""`. The twin's own JS never even sees the string — a stricter, earlier
+   failure than the wizard's text field.
+
+**Conclusion of behavior:** the underlying mechanism (atom-level emit + the canvas record round-trip) is
+already correct and already wired for an EXISTING token. What's missing is any authoring surface that lets an
+operator CREATE one from the normal starting state — every gesture on all three surfaces (Blockly numeric
+shadow, wizard text field, twin number field) discards or rejects the token before it ever reaches that
+mechanism. The queue's "never worked" is confirmed true for AUTHORING, and confirmedly false for the
+underlying plumbing — worth the distinction, since they need different remedies.
+
+### DEFECT OR UNBUILT FEATURE — unbuilt, multi-surface, not a broken declared path
+
+No declared path is broken and nothing regressed — this was never wired. Three independent authoring surfaces
+each need a DIFFERENT mechanism:
+- **Blockly**: swap the default shadow from `math_number` to the existing `variable` block type for
+  token-eligible sockets, or detect a `#`/`[` keystroke and convert the shadow in place — a real choice
+  between two mechanisms, not a default either way.
+- **Wizard view**: `num()`'s coercion needs a token-preserving branch — and the pattern is near-universal
+  across wizard views (same shape repeated per view), so the fix has to land as a shared helper change, not a
+  per-view patch.
+- **Twin form**: the `type="number"` input needs to become `type="text"` with token-aware validation, or gain
+  a parallel token-entry affordance — a UI decision, not a one-line fix.
+
+Underneath all three sits a harder, per-parameter question: which params may legitimately carry a token at
+all. A param like Surfacing's `w` feeds JS-side geometry/layout math directly, before any G-code exists — it
+cannot accept a live controller value without either deferring that math to runtime or refusing the token for
+that specific field. That is a design call per parameter, not a blanket default. This is a genuine build
+needing real decisions across three surfaces plus a per-param policy — sized and reported, nothing built, per
+the dispatch's own instruction.
+
+### THE HAZARD — watched per item 4; six of seven already closed downstream, one real gap found
+
+`val()` validates nothing about a token's shape — any string containing `#` or `[` reaches emit unchanged.
+Ran the malformed-token sweep through the REAL `emitMapped` and the send-gate's actual
+`GcodeExecutionEngine.defaultSyntaxVerify`, not by inspection:
+
+| token | emitted | send-gate `valid` |
+|---|---|---|
+| `#500` | `G0 X#500 Y10` | `true` (correct) |
+| `#abc` | `G0 X#abc Y10` | `false` (correctly refused) |
+| `#` | `G0 X# Y10` | `false` (correctly refused) |
+| `[` | `G0 X[ Y10` | `false` (correctly refused) |
+| `[unclosed` | `G0 X[unclosed Y10` | `false` (correctly refused) |
+| `#500 malicious` | `G0 X#500 malicious Y10` | `false` (correctly refused) |
+| ` #500;M30` | `G0 X#500;M30 Y10` | **`true` — wrong** |
+
+Six of seven malformed shapes are already caught downstream by the send-gate before anything reaches the
+machine — `val()`'s own lack of validation is covered in practice by an existing, separate mechanism. The
+seventh is real: a value string carrying a `;`-comment/second-statement is never bounded to where the token
+actually ends, so `X#500;M30` reads as syntactically valid when it should be refused (a trailing-garbage
+injection shape). Narrower than the "never worked" framing suggested — most of this hazard class is already
+closed — but a genuine gap. Flagged, not fixed: no source touched this turn, per the diagnose/build split.
+
+### Verify — non-vacuity per claim
+
+Every claim above is a real assertion run against the live, UNMODIFIED app — six debug specs
+(`tests/zzdebug-1668{,b,c,d,e,f}.spec.js`), each created, run against the real `emitMapped` /
+`stackToWorkspace` / `workspaceToStack` / `defaultSyntaxVerify` / live DOM, its console output captured
+verbatim (quoted above), then deleted immediately after. No source file was modified this turn, so there is no
+break/restore pair to run — the proof IS the real execution against real, unmodified code, which is what the
+dispatch's item 1 asked for (true current behavior, not a fix to verify). `git status --short` after cleanup
+shows no source diff, only the pre-existing untracked scratch files and the advisor-owned `NEXT-SESSION.md`.
+
+### Full suite — measuring against the t1666 floor (node 99/0, e2e 2449 passed / 9 failed)
+
+node: **99/0**, clean, exact match. e2e: **2450 passed / 8 failed / 6 skipped** — one BETTER than the floor by
+name-independent count. Of the 8: 5 match documented churn by exact name (`collapsible-panes-752`,
+`pane-splitter-790` ×2, `update-check` ×2). Three carried different names than the floor's own run
+(`open-as-modal-1625:54`, `open-as-modal-1625:108`, `pocket-data-emit:10`) — isolated with `--workers=1`:
+**5/5 passed clean** (both full files, not just the named tests). No ID outside the documented
+Blocks-canvas-boot-under-load churn class survived isolation — expected and unremarkable for a turn that
+touched zero source files; the differing names between this run and t1666's own confirm that class picks a
+different random subset under `w6` contention each run, exactly as t1666 itself concluded. Ten regenerated
+`verification/*.png` restored via `git checkout --` before staging.
+
+### Capacity
+
+A diagnose-scoped turn spent its full weight on establishing ground truth rather than building: six targeted
+empirical probes across the atom, the canvas round-trip, the canvas authoring gesture, and both form
+surfaces — each with real captured output, not inference from reading code. The queue's one-line "never
+worked" resolved into a precise, three-surface picture with a clean plumbing/authoring split, plus one real
+(and bounded) hazard gap in a family otherwise already closed by the send-gate. Zero source files touched;
+zero risk of a diagnose-scoped turn drifting into half-built architecture.
