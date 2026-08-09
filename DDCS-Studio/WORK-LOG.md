@@ -20971,3 +20971,206 @@ A diagnostic-only turn: the advisor modeled reproducing-and-killing their own hy
 was to do the same for theirs — check my own immediately-prior commit rather than defend it, with live evidence,
 across field-write AND real-drag interaction, before reporting a verdict. No fix shipped because no defect
 reproduced; the honest report is the deliverable.
+
+## t1678 — RELEASED (V2026.08.09.2) + THE DECLARED-BUT-UNREAD SWEEP: a ranked census, three currently-live findings, one durable guard (turn 1678)
+
+### The release, acknowledged
+
+V2026.08.09.2 shipped: t1670 (the phantom corner diagonal), t1672 (the Layout pane reading `partZeroShift`), t1674
+(Skim's rect following the jog marker + the `noSnap` passthrough) are all live on `main` and the deployed site.
+The advisor's own gate on `3ad67ea2`: node 99/0, e2e 2457 passed / 8 failed / 6 skipped — the lowest failure count
+of the whole run; isolated the 2 non-obviously-churn names (`pocket-data-emit`, `transform-declared-736`)
+themselves, both clean alone.
+
+### The path-loss mystery, closed
+
+t1676's NOT-REPRODUCIBLE verdict held — the advisor found the actual cause from a further user screenshot: the
+raster was never missing, it was drawn OFFSET by exactly the WCS pin (Root Cause B, t1672's own fix target).
+Neither test environment could see it because neither had a WCS pin configured — the lesson kept: a
+not-reproducible verdict is only as good as the configurations tried.
+
+### THE ACT — the declared-but-unread sweep, user-approved
+
+Four instances had surfaced by accident across four consecutive acts before this one: a block's own mouth
+(t1638), a durable record field `modalPre` (t1654), the `emits`→solid/hollow marker contract (t1670, corner-
+only), and `noSnap` on a canvas handle decl (t1674). Dispatched as a CENSUS plus ONE durable guard — rank by
+what the dead declaration promises, separate DEAD from UNIMPLEMENTED by evidence, fix nothing.
+
+### METHOD — five parallel sweeps, each independently grep-verified
+
+Dispatched five research passes covering the shapes the dispatch named: block-def fields (the ~90-module
+primitive-block registry), binding/struct spec fields (the `*_STRUCT`/`*_BINDINGS` arrays across ~30 dataOps
+twins), handle/widget declaration fields (`buildCanvasWidgets` call sites + bypass paths), `def.*` hooks on
+op-defs, and the output-spec fields of `layoutSpecFromOp`/`previewGeometry`/`buildCanvasWidgets`. Each pass was
+told to cite file:line for every claim and to say plainly when a shape came back clean rather than pad the
+list — most of the codebase's declared shapes DID come back clean (the `mouth`/`kind`/`scratch`/`flowLabels`/
+`absorbsPlacement` block-def mechanisms, the `deriveBindings.js` allow-list, the core `layoutSpecFromOp` →
+`FeatureCanvas` contract including the recently-added `placement` key specifically cross-checked). This is a
+codebase where the pattern has mostly been stamped out, not one riddled with it — the findings below are real,
+but they are the surviving pockets, not the norm.
+
+### THE RANKED LIST — by what the dead declaration promises, not by ease of fix
+
+**Tier 1 — broad blast radius or an explicit unenforced safety/semantic claim:**
+
+1. **`onEdit` dropped by `layoutSpecFromOp`** (`wizards/ops/panelTypes.js:450`) — `buildCanvasWidgets` returns
+   `{handles, onDrag, onEdit}`; the shared twin/data-op path destructures only `{handles, onDrag: _rawOnDrag}` —
+   `onEdit` is never even named. Confirmed directly (grepped `panelTypes.js` for the literal string `onEdit`:
+   zero matches). Effect: **every** data-op twin (corner, drill, bore, pocket, contour, slot, surfacing, tap,
+   text, middle, edge — everything routed through the shared path) and every lathe wizard loses the on-canvas
+   live-value readout and click-to-type editing on 2D dimension handles — they show a bare label (`"W"`, not
+   `"W 123.4"`) with no click affordance. The 6 older per-wizard views (still live, not dead code) keep the full
+   behavior, since each calls `buildCanvasWidgets` directly and forwards `onEdit` itself. The broadest blast
+   radius found — it lands on the architecture's own stated growth direction ("every wizard becomes a data
+   twin"), which currently has materially worse 2D editing UX than the thing it's replacing.
+
+2. **Lathe `teal: true` never read by `FeatureCanvas`** (`viz/latheProfileCanvas.js`, 14 occurrences across all
+   9 lathe spec builders) — the file's own comment states the contract plainly: "TEAL = it drives the emit...
+   amber ones are sim-only." `featureCanvas.js`'s handle-render code branches only on `h.color`, `h.simOnly`,
+   `h.kind` — confirmed zero references to `.teal` anywhere in `web/` outside the 14 declaration sites. Every
+   lathe dimension handle (allowance, shoulder Ø, blade width, bar Ø, probe touch points, polygon flats — every
+   lathe wizard) renders the plain gold default instead of the declared teal. This is the direct parallel to
+   t1670's own corner `emits` finding (symptom 5, sized not fixed) — same exact shape, same exact promise ("this
+   marker changes your program"), unenforced across a whole different op family. Ranks here per the dispatch's
+   own stated criterion almost verbatim.
+
+3. **`OP_CODE_HOOKS` is a stale fork/persistence-carry allow-list** (`blocks/userOps.js:819`) — exactly 8 names:
+   `postInstantiate, deriveGuards, simStartsProvider, previewGeometry, previewVarSeed, simGcode, statusHint,
+   normalizeParams`. Confirmed directly (read the array literal myself). Seven real, live, generically-read
+   `def.*` hooks added since — `zRuler` (t1021/1025/1026), `entryPoint` (t726), `simStartParams` (t508),
+   `armGap`, `simStock`, `latheTool`, `latheProbeAxis` — are absent from it. `devMode.js`'s `authorFork()` (the
+   Blocks-tab "Customize → Save as new/Update" path — the primary editing route for every ported wizard) builds
+   a fresh def and copies only `bindingSpecs` + `forkedFrom` from the source; `wizardManager.js`'s `copyDef()`
+   (`JSON.parse(JSON.stringify(...))`) additionally drops `armGap`/`simStock` specifically since they're
+   functions, not JSON-safe data. Effect: fork any of 11+ ops (pocket, slot, drill, bore, contour, surfacing,
+   text, tap, alignment, rotaryClock, rotaryCenter, all 7 lathe ops) via Customize, and the copy silently loses
+   its depth ruler, entry marker, draggable sim markers, CAM why-message, sim-stock, or lathe-tool-kind — byte-
+   correct emit, clean console, nothing visibly wrong until you notice the UI is missing a piece. This is the
+   single cleanest match to t1638/t1654's own mechanism found anywhere in the sweep — a hand-maintained allow-
+   list at a copy boundary, gone stale exactly the way `KNOWN_LEAF_RECORD_FIELDS` almost did.
+
+**Tier 2 — real, live, narrower blast radius:**
+
+4. **`mouths` (plural)** dead on 6 block-defs, 4 files (`layout.js`'s split-horizontal/vertical,
+   `gridContainer.js`, `tabGroup.js`'s group+page, `groupBox.js`) — `bridge.js`'s `mouthOf(def) = def.mouth`
+   (the t1638 fix) only ever reads the SINGULAR field; none of these 6 defs set it, so none of them render a
+   statement-input notch on the Blocks canvas at all, despite each one's `emit` expecting children and its own
+   doc comment describing it as a container. **Already named twice in this project's own WORK-LOG** while
+   fixing adjacent bugs ("groupBox's dead `mouths:` field... a pre-existing latent gap, named not fixed") —
+   confirmed still true at HEAD, not remediated. `web/ui/formWidgets.js`'s `renderUiTree` makes multi-pane
+   layout work at WIZARD-RUN time by independently hand-rolling the same mouth names as literal string keys —
+   a second hand-copied instance of the same fact, same shape as #1 above.
+
+5. **`rect` gesture's `displayVals`, gated on an exact-string label match only half the callers satisfy**
+   (`canvasWidgets.js:59-61`) — twins use `'W×H'` (no space), the 6 legacy built-in views they're documented to
+   mirror use `'W × H'` (with spaces) — verified byte-exact via grep, both sides. Since none of these 11 W×H-
+   labeled decls also set `value`, the built-in views' size handles show literally `"W × H"` with **no numbers
+   at all**; the twins show a static, non-click-to-edit `"W×H 80×60"`. An implicit contract carried by string
+   equality instead of a declared flag, broken by a formatting drift between two implementations meant to mirror
+   each other. Compounds with finding #1 (neither side gets real click-to-edit here either way).
+
+6. **`anchor.frame`** — the wizard-maker v2 GUI-authored `layoutwidget` block offers a real, working two-option
+   dropdown (`bridge.js`'s field editor: `['stock-min', 'datum']`), round-trips correctly through fork/canvas/
+   re-edit, but `layoutSpecFromOp` always calls its position helper with no arguments (`panelTypes.js:296-297`)
+   — always "stock-min" behavior regardless of what `frame` says. Self-documented as deferred in `layoutWidget.js`'s
+   own comment ("datum-relative display is a later slice") — a known, not silent, gap, but still reachable by a
+   real author action with no indication in the UI that "Datum" currently does nothing.
+
+**Tier 3 — confirmed, low or no current impact:**
+
+7. **`manual`** on corner's reposition marker decls — independently re-found by this census (not a new
+   instance; it re-confirms t1670's own "symptom 5" `_startEmits`/`manual` finding). Currently fully redundant
+   with `color` (`srcCol()`), which is derived from the identical condition everywhere it matters — no live
+   symptom today, but the same dead-on-arrival shape.
+8. **`widget: 'select'`** on 2 lathe probe files' `wcs` binding (`faceProbeData.js`, `odProbeData.js`) —
+   `'select'` is not a registered key in `formWidgets.js`'s widget registry; falls through to the enum default,
+   which happens to also be `'dropdown'` — renders correctly today purely by coincidence.
+9. **`pathDatum`/`onPathDatum`** — threaded from `placementSpec()` into the 6 legacy views' `FeatureCanvas`
+   specs, confirmed zero reads in `featureCanvas.js`; the real path-anchor picker is a separate, working, DOM-
+   based widget (`ui/pathAnchorField.js`) that never touches the canvas spec at all. Dead baggage, not a gap.
+
+Latent/architectural notes, not independently rankable defects: `a` (rotation) spread onto every `rect`-gesture
+decl but read by neither `place()` nor `drag()` (harmless — `rect` fully self-describes via `vx/vy/sx/sy`);
+`axis` on lathe handles (doc-only, each handle's `onDrag` hardcodes its axis by id instead); `simOnly`/
+`yieldCoincident`/`edit` currently reach `FeatureCanvas` only via hand-rolled bypass specs that skip
+`buildCanvasWidgets` entirely — not yet live drops, but the exact shape that bit `noSnap` before its fix, now
+one of the two properties this turn's guard actively watches going forward; `whenAll` absent from
+`deriveBindings.js`'s own carry allow-list (harmless today — its only current user bypasses that function).
+
+### THE DURABLE GUARD — assessed honestly, then built
+
+t1638 and t1654 solved THEIR instance with a runtime throw at a serialization round-trip boundary: a declared
+allow-list of known fields, and a loud exception the moment a WRITE carries a field outside it. **That mechanism
+does not directly generalize to this turn's findings** — worth stating plainly rather than forcing a fit. Most
+of the shapes found here are not serialized anywhere; they are plain object literals passed straight into a
+function call (a handle decl into `buildCanvasWidgets`, a spec into `FeatureCanvas.render`), so there is no
+natural "write boundary" moment to hook a throw into. More fundamentally, the failure mode is the OPPOSITE
+direction: t1638/t1654 catch "an unexpected key shows up and would be silently dropped" (protects a writer
+against typos/forgotten schema updates); this turn's bugs are "an intentional, correctly-declared key has no
+reader" (a gap in the consumer, not the producer) — checking that requires looking at the READ side, which a
+write-time allow-list throw cannot see. `OP_CODE_HOOKS` (finding #3) is the one exception — it genuinely IS the
+same allow-list-at-a-copy-boundary shape t1638/t1654 already solved, just a sibling instance nobody thought to
+re-check when it went stale.
+
+**What DOES generalize** is the underlying move, not the mechanism: declare the canonical key-set for a shape
+once, as data, and fail loud when reality stops matching the declaration. For "does the reader consume this,"
+the cheap, buildable version of that check is textual — does the key's bare name appear anywhere in its
+designated consumer file(s)? This is a heuristic, not a real static analyzer (a key read only through a fully
+dynamic `obj[computedName]` access would false-negative; a key name that coincidentally appears in an unrelated
+comment would false-positive) — accepted deliberately as a cheap, loud tripwire, not a proof, and said plainly
+in the guard's own header rather than oversold.
+
+**Built**: `tests/node/declared-key-coverage-1678.test.mjs`, five tests, two parts:
+- **Two CLEAN_SHAPES entries** (canvas-handle gesture-independent properties → `featureCanvas.js`; the keys
+  `layoutSpecFromOp` forwards into its own return → checked against `panelTypes.js`'s own text) — both pass
+  today, and exist to catch a FUTURE regression of the same shape (a new key added without updating its reader).
+- **Three KNOWN GAP tripwires** — findings #1-3 above, each asserting the CURRENT broken state on purpose. They
+  pass today (correctly documenting that the gap is still there) and will start FAILING the moment someone
+  fixes the underlying issue without also touching this file — turning "report, don't fix" into something
+  durable rather than prose that can bitrot silently. Closing a gap requires deliberately updating its tripwire
+  (moving the key into `CLEAN_SHAPES`), which is the point.
+
+**The guard caught two of my own transcription errors while I built it** — a live demonstration it does real
+work, not decoration. A first draft of the `layoutSpecFromOp` entry wrongly included `pathDatum`/`stockAttach`
+(the checker failed before I'd finished writing it, since `panelTypes.js` never actually sets either — they
+belong to `placementSpec()`'s own, separate shape, spread directly by the 6 legacy views); the first draft of
+the `OP_CODE_HOOKS` tripwire wrongly cleared `simStock` as present, because a whole-file text search found an
+unrelated, legitimate reader of that name elsewhere in the same 1081-line file — narrowed to check just the
+`OP_CODE_HOOKS` array literal's own text, which correctly confirmed `simStock`'s absence from that specific list.
+
+**Non-vacuity**: planted `t1678PlantedFakeKey` into the canvas-handle shape's key list — genuinely RED
+(`Received: ["t1678PlantedFakeKey"]` where `Expected: []`), naming the exact planted key. Restored from a
+scratch-copy backup, reconfirmed all 5 tests green.
+
+### Verify
+
+`node --test tests/node/declared-key-coverage-1678.test.mjs`: 5/5 passing (2 clean-contract + 3 known-gap
+tripwires), non-vacuity proven above. Every ranked-list claim above is grep-verified — most cross-checked
+myself directly (not just trusted from the research passes) before committing to a permanent test file, which
+is exactly what caught the two transcription errors.
+
+### Regression sweep + full suite
+
+Full suite — measuring against the advisor's own gate floor on `3ad67ea2` (node 99/0, e2e 2457 passed / 8 failed
+/ 6 skipped). node: **104/0** (99 + this turn's 5 new declared-key-coverage tests, all green). e2e: **2453
+passed / 12 failed / 6 skipped** (2471 total, unchanged — this turn added zero e2e tests, node-tier only). Of
+the 12: **7 match the floor exactly**, including `pocket-data-emit` — the advisor's own gate had already
+isolated it clean by hand (`collapsible-panes-752`, `formfield-loud-mismatch-1636`, `pane-splitter-790` ×2,
+`pocket-data-emit`, `update-check` ×2). `transform-declared-736` (the floor's other self-isolated name) did not
+reappear this run — consistent with the established rotating-subset pattern. **5 carried different names**
+(`cam-expose-classify`, `grid-envelope`, `homing-start-marker-frame`, `homing-superset`,
+`subscriber-error-surface-1656`) — isolated with `--workers=1`: **10/10 passed clean**, all 5 files. None of
+this turn's touched surface (one new node-tier test file, zero app-source changes) has any plausible connection
+to any of these five — homing/grid/CAM-classify/subscriber-error are untouched by anything this act did. All 12
+full-suite failures accounted for. Ten regenerated `verification/*.png` restored via `git checkout --` before
+staging.
+
+### Capacity
+
+A census turn, deliberately not a refactor: five parallel sweeps, most of which came back clean (the codebase's
+own declare-and-read discipline mostly holds), three real live findings ranked by what they promise rather than
+by fix cost, and one guard built to actually cover the recurring shape rather than just the four already-named
+instances — honest about the two-sub-mechanism nuance (a write-boundary throw for copy/carry allow-lists vs. a
+textual read-coverage check for everything else) rather than forcing a single story to fit. The guard finding
+two of its own author's mistakes before they shipped is the same discipline the project's fail-loud guards keep
+paying for elsewhere, working exactly as intended on itself.
