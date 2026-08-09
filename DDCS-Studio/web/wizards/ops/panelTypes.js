@@ -73,13 +73,33 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 // over those — the form widget already drags them. (The selector targets the live custom-op form.)
 const _field = (name) => (typeof document !== 'undefined') ? document.querySelector('#wiz_user_form [data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null;
 const _writable = (name) => !!_field(name);
+// t1648 — a PREVIEW-ONLY side-store for a declared handle target with NO bound form field (e.g. a Skim-mode jog
+// seed — deliberately never bound, so it never reaches the emit). Before this, `_writeParam` silently no-op'd on
+// such a name (strictly additive: nothing that has a real field is affected). Exported so the caller (userOpView's
+// update()) can merge it into `params` the same way `_simStartFracs` merges declared marker fractions — one
+// established convention, reused rather than restated. The caller clears it per fresh wizard OPEN.
+export const previewOnlyParams = {};
+/** Clear every preview-only side-store entry (a fresh wizard OPEN = undragged = byte-identical — mirrors the
+ *  _simStartFracs/_layoutSpots reset). A plain reassignment would break the exported binding other modules hold. */
+export function clearPreviewOnlyParams() { for (const k in previewOnlyParams) delete previewOnlyParams[k]; }
+// A real form field's write dispatches 'input', which the host's OWN listener re-renders on. A preview-only target
+// has no field to dispatch on, so the caller (userOpView) registers its own (throttled) update trigger here —
+// dependency injection, not a new import cycle (panelTypes.js is a lower layer than userOpView.js).
+let _onPreviewOnlyWrite = null;
+export function setPreviewOnlyWriteHandler(fn) { _onPreviewOnlyWrite = typeof fn === 'function' ? fn : null; }
 // t808 — LOOP-GUARD (stepper-runaway fix b): a handle write-back only dispatches when the value ACTUALLY changes. An
 // unchanged write (a jittery drag frame, or any render-time re-derive that lands the same number) must NOT fire a
 // synthetic 'input' — otherwise it re-triggers update() → re-render → write-back → … a self-sustaining round-trip that
 // walks/sticks the value. (Mirrors setParam's `s.value !== val` guard for the enum pickers.)
 function _writeParam(name, val) {
-    const f = _field(name); if (!f) return;
     const next = r3(val);
+    const f = _field(name);
+    if (!f) {   // no bound field → the preview-only side-store, then ask the host to re-render (no 'input' to dispatch)
+        if (previewOnlyParams[name] === next) return;   // unchanged → no re-render (the same loop-guard real fields get)
+        previewOnlyParams[name] = next;
+        if (_onPreviewOnlyWrite) _onPreviewOnlyWrite();
+        return;
+    }
     if (String(f.value) === String(next)) return;   // unchanged → no dispatch (breaks the write-back→recompute→write-back chain)
     f.value = next; f.dispatchEvent(new Event('input', { bubbles: true }));
 }

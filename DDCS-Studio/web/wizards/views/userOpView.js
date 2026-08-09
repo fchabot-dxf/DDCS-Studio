@@ -14,8 +14,8 @@ import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
-import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
-import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
+import { flattenBlocks, getUserStatusHint, getUserSimGcode, getUserPreviewVarSeed } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
+import { panelType, renderLayout2D, pinnedStartsFor, previewOnlyParams, clearPreviewOnlyParams, setPreviewOnlyWriteHandler } from '../ops/panelTypes.js';
 import { renderZRuler } from '../../viz/zRulerStrip.js';   // t1021 — the depth ruler docked down the LEFT of the 2D plan canvas
 import { depthLevels } from '../clearing.js';   // t1021 — the ONE slice source (== the emitter) for the ruler's pass ticks
 import { resolvePlacementStock } from '../ops/placement.js';   // t720 P1 (d) — fill a twin's UNSET stockW/H from the settings stock so cc-attach places on the real stock
@@ -149,6 +149,9 @@ function _throttledUpdate() {
 }
 function _inlineUpdate() { if (_uTimer) { clearTimeout(_uTimer); _uTimer = null; } _uPending = false; if (_mgr) _mgr.update(); }
 function _clearThrottle() { if (_uTimer) { clearTimeout(_uTimer); _uTimer = null; } _uPending = false; }
+// t1648 — a preview-only handle target (no bound field to dispatch 'input' on) re-renders INLINE, same as a real
+// field's synthetic (non-focused) canvas-drag write already does (t808: only a FOCUSED field's edit throttles).
+setPreviewOnlyWriteHandler(() => _inlineUpdate());
 
 /** The machine ENVELOPE reach in the WCS/stock frame (the stock corner sits at the WCS origin): a WCS coord `w` maps to
  *  machine `workOrigin + w`, reachable while `0 ≤ workOrigin + w ≤ span` → `w ∈ [-workOrigin, span - workOrigin]`. Null if
@@ -325,7 +328,7 @@ export const userOpView = {
     // before onShow→render so the seeded default shows. A fresh open (no variant) is unaffected; opensAs entries pass none.
     applyVariant(variant) { if (variant != null && variant !== '' && _def && (_def.bindings || []).some((b) => b.param === 'mode')) _seed = { ...(_seed || {}), mode: variant }; },
 
-    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; _clearThrottle(); applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too; t808 drop any pending throttled update
+    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; clearPreviewOnlyParams(); _clearThrottle(); applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too; t1648 clear the preview-only side-store too; t808 drop any pending throttled update
     onHide() { _clearThrottle(); },   // t810 — clear the throttle on CLOSE too, so a trailing update can't ghost-fire ~200ms after the modal closes
 
     update(mgr) {
@@ -336,6 +339,7 @@ export const userOpView = {
         const params = {};
         for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
         Object.assign(params, _simStartFracs);   // t508 — the dragged sim-start FRACTIONS (the declared marker→param source) → recorded + read by opSimStarts + the emit
+        Object.assign(params, previewOnlyParams);   // t1648 — a previewGeometry handle target with no bound form field (e.g. a Skim-mode jog seed) — merged the same way, never emitted (no binding reads it)
         // t720 P1 (d) — a twin's stock fields default 0; fill them from the SETTINGS stock (like the built-in views inject via
         // placementParams) so a stock-attaching op places on the REAL stock, not the origin. Only UNSET fields; recorded +
         // emitted with the resolved stock (matches the built-in's placeOnStock snapshot). No-attach ops are byte-identical.
@@ -471,6 +475,14 @@ export const userOpView = {
             const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
             if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
             mgr.preview3D(previewGcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock, _opTool);
+            // t1648 — a DECLARED, OPTIONAL sim-only var seed: lets an op seed live-frame/controller-read registers for
+            // the PREVIEW trace only (never emitted, never pushed to the controller — previewVarSeed's own contract).
+            // Read via the LIVE-fn registry (getUserPreviewVarSeed), NOT `_def.previewVarSeed` directly — a function
+            // cannot survive the localStorage JSON round-trip, so `_def` (the persisted/reloaded def) never carries it;
+            // registerUserOp re-attaches it into this registry from the app's OWN code, the same convention every
+            // other op-code hook here already follows (previewGeometry/simGcode/statusHint/…).
+            const pvs = _def && getUserPreviewVarSeed(_def.opType);
+            if (pvs) { try { mgr.previewVarSeed('userViz3dContainer', pvs(params)); } catch (_) { /* seed is optional */ } }
             applySimIntent('userViz3dContainer');   // t578 — seat the machine-frame/seat intent BEFORE the layout overlay reads the trace, so the fresh-open route connects Start→seeks→HOME (the drag's own re-feed already had the intent set)
             const c = el('userVizContainer');
             if (c) {

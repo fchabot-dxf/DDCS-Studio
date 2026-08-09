@@ -1144,6 +1144,9 @@
                     <div><span class="label">OFFSET Y</span><input id="sf_originY" value="0" title="Signed Y offset of the faced area from the stock-attach corner."/></div>
                     <div><span class="label">OFFSET Z</span><input id="sf_offZ" value="0" title="Signed Z offset of the whole pass (shifts every Z move; 0 = part-zero plane)."/></div>
                     <input id="sf_pathDatum" type="hidden" value=""/><input id="sf_stockAttach" type="hidden" value=""/>
+                    <!-- t1648 — the start-position marker's SKIM-mode target: a preview-only jog seed (never emitted, never read
+                         by the emit path) that seeds the live-frame registers for the trace only. WCS mode reuses sf_originX/Y above. -->
+                    <input id="sf_jogX" type="hidden" value=""/><input id="sf_jogY" type="hidden" value=""/>
                     <div class="pa-mount" data-prefix="sf_"></div>
                     <div><span class="label">WIDTH</span><input id="sf_w" value="100"/></div>
                     <div><span class="label">HEIGHT</span><input id="sf_h" value="80"/></div>

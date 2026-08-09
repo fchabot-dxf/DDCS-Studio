@@ -10,7 +10,7 @@ import { workpieceFeatureItems } from '../../engine/workpiece.js';
 // t1609 — the Z-mode field CONSUMES the twin's declaration (options/label/help/default) + the declared skim-greys-WCS
 // gate. One source: a hand-copied options list here is the drift this arc treats (the emit has handled zMode since
 // 8ce70873; only the visible knob was missing).
-import { SURFACING_STRUCT, SURFACING_BINDINGS } from '../../blocks/dataOps/surfacingData.js';
+import { SURFACING_STRUCT, SURFACING_BINDINGS, startMarkerTarget } from '../../blocks/dataOps/surfacingData.js';
 
 const ZMODE_SPEC = SURFACING_STRUCT.find((b) => b.param === 'zMode');
 const WCS_GATE = (SURFACING_BINDINGS.find((b) => b.param === 'wcs') || {}).gate || null;   // { param:'zMode', is:'skim', tip }
@@ -50,14 +50,20 @@ function applyTool() {
     if (Object.keys(m).length) setFields(m);
 }
 
-/** 2D layout: the face area rectangle with a place handle + a size handle. */
+/** 2D layout: the face area rectangle with a START-POSITION handle + a size handle. */
 function buildSurfacingSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const w = num(params.w, 100), h = num(params.h, 80);
     const hs = handleScale(params, 'sf_', ox, oy, w, h);
+    // t1648 — the pos handle IS the start-position marker: ONE widget, the Z-mode declares its target (the SAME
+    // mapping surfacingData.js's twin reads — `startMarkerTarget`, the wizards-as-data seam). Normal/WCS: byte-
+    // identical to before (originX/originY, the same `...hs.pos` corner-anchor spread). Skim: a free jog point
+    // (jogX/jogY, no corner-anchor semantics — it isn't a corner of the faced-area rect).
+    const tgt = startMarkerTarget(params.zMode);
+    const posGeom = params.zMode === 'skim' ? { x: num(params.jogX, 0), y: num(params.jogY, 0), labelDir: hs.pos.labelDir } : { x: ox, y: oy, ...hs.pos };
     // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`, the face area = a `rect` corner.
     const { handles, onDrag, onEdit } = buildCanvasWidgets([
-        { type: 'point', id: 'origin', fx: 'sf_originX', fy: 'sf_originY', x: ox, y: oy, label: 'pos', ...hs.pos },
+        { type: 'point', id: 'origin', fx: 'sf_' + tgt.x, fy: 'sf_' + tgt.y, label: 'pos', ...posGeom },
         { type: 'rect', id: 'size', field: 'sf_w', fieldH: 'sf_h', minw: 1, minh: 1, label: 'W × H', ...hs.size },
     ], setFields);
     const pl = placementSpec(params, surfacingBBox(params), 'sf_');
@@ -79,7 +85,7 @@ export const surfacingView = {
     large: true,
     twoPane: true,
     inputIds: [
-        'sf_originX', 'sf_originY', 'sf_offZ', 'sf_pathDatum', 'sf_stockAttach', 'sf_w', 'sf_h', 'sf_wcs', 'sf_zMode',
+        'sf_originX', 'sf_originY', 'sf_offZ', 'sf_pathDatum', 'sf_stockAttach', 'sf_jogX', 'sf_jogY', 'sf_w', 'sf_h', 'sf_wcs', 'sf_zMode',
         'sf_strategy', 'sf_toolDia', 'sf_stepoverPct', 'sf_depth', 'sf_stepdown', 'sf_clearance', 'sf_feed', 'sf_plunge', 'sf_rpm',
     ],
     probeSrcFields: {},
@@ -100,6 +106,7 @@ export const surfacingView = {
         const params = {
             originX: v('sf_originX'), originY: v('sf_originY'), w: v('sf_w'), h: v('sf_h'), wcs: v('sf_wcs') || 'active',
             zMode: v('sf_zMode') || ZMODE_SPEC.default,   // t1609 — the declared default ('normal') = byte-identical to the pre-field emit
+            jogX: v('sf_jogX'), jogY: v('sf_jogY'),   // t1648 — the Skim-mode start marker's PREVIEW-ONLY target (never emitted; see startMarkerTarget)
             strategy: v('sf_strategy') || 'raster',
             toolDia: v('sf_toolDia'), stepoverPct: v('sf_stepoverPct'),
             depth: v('sf_depth'), stepdown: v('sf_stepdown'), clearance: v('sf_clearance'),
@@ -123,6 +130,12 @@ export const surfacingView = {
         const gcode = wizard.generate(params);
         el('wiz_surfacing_code').innerHTML = UIUtils.formatGCode(gcode);
         ctx.preview3D(gcode, 'surfacingVizContainer');
+        // t1648 — SKIM ONLY: seed the live-frame registers (#790/#791/#792) the emitted body READS at the machine, so
+        // the PREVIEW traces from where the marker says the operator will jog — sim-only (previewVarSeed is never
+        // emitted, never pushed to the controller — wizardManager's own contract). Normal/WCS never seeds (null
+        // clears any stale seed from a mode flip) — the marker there drives originX/originY, a REAL param, so the
+        // emit itself already moves; nothing needs faking for the trace to follow.
+        if (ctx.previewVarSeed) ctx.previewVarSeed('surfacingVizContainer', params.zMode === 'skim' ? [[790, num(params.jogX, 0)], [791, num(params.jogY, 0)], [792, 0]] : null);
         layout.render(el('surfacingLayoutCanvas'), buildSurfacingSpec(params, s.stock));
 
         const status = el('surfacingVizStatus');

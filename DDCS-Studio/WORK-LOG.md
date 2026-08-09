@@ -19045,6 +19045,13 @@ that fact — it does not report a fix because none was needed.
 
 ### The TWIN — DATA parity confirmed, GUI parity is a real gap, reported not built
 
+⚠ **CORRECTED at t1648 — this claim was WRONG.** I checked only for the wizard's OWN handle ids
+(`data-hid="origin"`/`"size"`) and found them absent, then concluded "no 2D canvas." Direct DOM inspection at
+t1648 (`document.querySelectorAll('.fc-handle')` across all SVGs, no id assumed) showed the twin's
+`def.previewGeometry` mechanism was ALREADY rendering working draggable handles the whole time — just under
+different ids (`sf_pos`/`sf_size`, not `origin`/`size`). The "GUI parity gap" below never existed; I was
+checking for the wrong name, not for the feature's absence. See t1648 for the corrected mechanism map.
+
 `user_surfacing_data`'s generic bindings-driven form renders `originX`/`originY`/`w`/`h` as PLAIN NUMBER
 INPUTS — no 2D canvas, no draggable handle (checked specifically for the SAME `data-hid="origin"`/`"size"`
 ids the wizard uses — absent; a generic `[data-hid]` check alone would have been a false positive, since
@@ -19200,3 +19207,126 @@ test only covers one. Fixed both, then re-verified.
    - seed `#790/#791/#792` via `previewVarSeed` as a sim-only anchor (the emitted program is untouched — it
      still READs the live frame; this only tells the PREVIEW where "live" is).
    This is a feature increment, deliberately deferred from the render fix.
+
+## t1648 — THE START-POSITION MARKER: one declared seam, both faces, both Z-modes (turn 1648)
+
+Delivers the feature t1646 punted on after 6 re-aiming amendments: a start-position marker mirroring the
+probe-wizard GUI, one widget, mode-declared target, surfacing only (per ruling), reported not built for any
+other wizard.
+
+### The seam — answering the dispatch's required design question
+
+`startMarkerTarget(zMode)`, declared once in `surfacingData.js` (wizards-as-data layer):
+
+    export const START_MARKER_TARGET = {
+        normal: { x: 'originX', y: 'originY' },
+        skim:   { x: 'jogX',    y: 'jogY' },
+    };
+    export function startMarkerTarget(zMode) { return START_MARKER_TARGET[zMode] || START_MARKER_TARGET.normal; }
+
+**Neither of the dispatch's two suggested options** (`def.simStartParams` extended, or a wholly new sibling
+declaration) — a third, smaller option the investigation surfaced. Reasoning: WCS mode's target
+(`originX`/`originY`) is a REAL, already-bound field that BOTH faces already read into their own existing
+`previewGeometry`/canvas-widget mechanism (the pos handle t1646 measured is this exact control). Skim mode's
+target (`jogX`/`jogY`) is genuinely new — a preview-only field with no emit effect — but it's the SAME KIND of
+thing (a draggable point on the same canvas), so it fits as a same-shape sibling target inside the SAME
+mechanism rather than a parallel one. `simStartParams` was built for markers with NO bound field at all
+(alignment/rotaryClock's relative-reposition deltas) — a different shape than "target flips between a real
+field and a preview-only field by mode." Building on `simStartParams` would have meant either fighting that
+shape or duplicating it; declaring the target as data and letting each face's EXISTING preview-geometry hook
+read it kept the change additive and small (confirmed by the 29-test regression sweep below).
+
+One widget: both faces build their canvas-widget list with `{ type: 'point', ...(mode === 'skim' ? {x:jogX,
+y:jogY} : {x:originX, y:originY}) }` at the SAME `id`/`label` — same shape, same drag math
+(`buildCanvasWidgets`' `point` gesture), only the bound field name changes underneath it.
+
+### The Skim arm's write-back gap (a real, previously-latent bug, found and fixed)
+
+The twin's `_writeParam` (`panelTypes.js`) silently no-ops when a param has no `[data-param]` DOM element —
+true for `jogX`/`jogY` by design (preview-only, deliberately unbound). First drag test on the twin showed the
+marker snapping back after drop: a genuine bug, not a design gap. Fixed with a small additive fallback store
+(`previewOnlyParams` in `panelTypes.js` + `setPreviewOnlyWriteHandler`), read back into `params` in
+`userOpView.js`'s `update()` the same way `_simStartFracs` already is. Non-vacuity: reverted the
+`previewVarSeed` wiring in `userOpView.js`, confirmed the Skim-arm twin test went genuinely RED
+(`seed: undefined`), restored from scratch copy, re-green.
+
+### previewVarSeed for the Skim arm's sim feed — the missing registry, mirrored from an existing one
+
+`def.previewVarSeed` on a user-op def is invisible at read time: `listUserOps()` returns JSON snapshots,
+functions stripped, so `_def.previewVarSeed` is always `undefined` for a twin even when the def declares it —
+the exact same trap `previewGeometry`/`statusHint`/`simGcode` already solved with a dedicated live-function
+`Map` populated at `registerUserOp()` time. Added `USER_PREVIEW_VAR_SEED` in `userOps.js`
+(`setUserPreviewVarSeed`/`getUserPreviewVarSeed`), mirroring `USER_PREVIEW_GEOMETRY` exactly, and switched
+`userOpView.js` to read through the getter. `'previewVarSeed'` added to `OP_CODE_HOOKS`. Non-vacuity: this
+was caught BEFORE the fallback store fix, as a separate bug (`__varSeed` was `undefined`, not `null`) —
+confirmed via a debug script showing `_def` had neither `previewVarSeed` nor `previewGeometry` as own keys.
+
+### Correction to the t1646 entry
+
+t1646 reported "the twin has NO draggable 2D canvas" — that was checking only for the WIZARD's own handle ids
+(`data-hid="origin"`/`"size"`). Direct DOM inspection this turn (`.fc-handle` sweep, no id assumed) showed the
+twin's `def.previewGeometry` mechanism was already rendering working handles under DIFFERENT ids
+(`sf_pos`/`sf_size`). Corrected inline at the t1646 entry above. This simplified the whole design: no new
+canvas needed on the twin side, only the target/seed additions above.
+
+### Ruling 2 — wizard survey (measured, not guessed)
+
+Grepped every wizard view + dataOps file for `zMode`, `'skim'`, Z-mode UI labels, and `G91.*relative`.
+**Surfacing is the ONLY shipped wizard with a genuine relative(Skim)-vs-WCS(Normal) mode toggle today.**
+Other hits were false positives: `middleWizard.js`/`rotaryCenterWizard.js`/`rotaryClockWizard.js`'s `G91` hits
+are an unrelated internal safe-retract-park detail; `holecycle.js`'s `zMode==='skim'` check is a defensive
+"this cycle does not support skim" gap-reporter, not a real feature. No other wizard joins `startMarkerTarget`
+today; the declaration is shaped to extend cleanly if one does later (add a `{x,y}` pair, keyed by mode).
+
+### Verification — `surfacing-start-position-1648.spec.js` (6 new tests, real mouse drags, all green)
+
+- **WCS arm, WIZARD**: a real drag moves `sf_originX`/`sf_originY` and the emit's `maxX`/`maxY` shift by
+  EXACTLY the drag delta (assert-the-value: two independent reads, DOM field vs. traced emit, agreeing).
+- **Skim arm, WIZARD**: a real drag moves the preview seed (`host.__varSeed` on the 3D container) and leaves
+  the emitted G-code text BYTE-IDENTICAL to a no-drag bake. Seeding mechanism itself separately proven via
+  `traceToolpath(text, {createVarStore: () => new Map([[790,x],[791,y],[792,0]])})` diffed against a
+  zero-seed trace.
+- **One widget**: identical shape/kind whether Normal or Skim; dragging one mode's marker never touches the
+  other arm's field (both fields read back unchanged after a same-position, wrong-mode drag).
+- **Mode-flip behavior, MEASURED not invented**: `jogX`/`jogY` and `originX`/`originY` persist INDEPENDENTLY
+  across a mode flip — flipping to the other mode and back does not clear or cross-write either pair.
+- **WCS arm, TWIN**: same assert-the-value contract as the wizard, via `[data-param]` fields.
+- **Skim arm, TWIN**: same byte-identical + seed-persists contract as the wizard, via `host.__varSeed` on
+  `#userViz3dContainer`.
+
+Both non-vacuity proofs (write-back fallback, previewVarSeed registry) confirmed above via scratch-copy
+break/restore.
+
+### Regression sweep — shared files touched by 3 twins' worth of machinery
+
+`userOps.js`, `userOpView.js`, `panelTypes.js` are read by EVERY twin. Swept 29 tests spanning
+`alignment-fork1-handles`, `alignment-handles-independent`, `alignment-sim-starts-at-a`, `rotary-clock-handles`,
+`rotary-clock-sim-starts`, `mill-layout-716` (surfacing/pocket/drill/bore), `mill-start-translate-716`
+(contour/surfacing/pocket/drill/bore/text/slot), `layout-placement-parity-718`
+(contour/pocket/surfacing/drill/bore/slot/text) — **29/29 green**. The `previewOnlyParams` fallback and the
+`USER_PREVIEW_VAR_SEED` registry are strictly additive: zero effect on any existing `simStartParams`/
+`previewGeometry` consumer.
+
+### Full suite — isolated against the confirmed floor
+
+Floor (turn 1647): node 99/0, e2e 12 failed / 2429 passed, `editor-chip-space-1323:60` pre-excluded as a
+known stale test (fails on `main` too). This run: **node 99/0** (clean), **e2e 2432 passed / 15 failed / 6
+skipped**. Of the 15: 9 match already-documented churn members by exact name/line (`collapsible-panes-752`,
+`editor-chip-space-1323:60` itself, `formfield-loud-mismatch-1636`, `open-as-modal-1625`, `pane-splitter-790`
+×2, `preflight-badge-838`, `update-check` ×2). The remaining 6
+(`context-menu-pass-1452:112`, `formfield-authoring-1610:16`, `grid-envelope:8`, `pocket-cavity-2d:9`,
+`save-dialog-declared-1615:103`, `touch-pulse-size:13`) were new names — isolate-run individually with
+`--workers=1`: **all 6 passed clean**, none touches surfacing/userOps/userOpView/panelTypes — confirms
+parallel-worker self-contention (this suite's documented flakiness class), not a regression from this turn's
+shared-file changes. No ID outside the documented floor survived isolation. Restored 11 regenerated
+`verification/*.png` (t1512/t1514/t1526/t1589/t1617, unrelated wizards) before staging.
+
+Smoke tier: 71/71 green (run earlier, before the full-suite pass).
+
+### Capacity
+
+Long, deep, engine-touching turn: reconciled 3 overlapping preview mechanisms, found and fixed 2 real latent
+bugs (twin write-back gap, missing function-registry mirror) neither of which was the dispatch's ask but both
+blocked delivering it, touched 3 shared files read by every twin in the app, and ran a 29-test regression
+sweep plus a full-suite isolation pass to cover that blast radius. Comfortable this is solid; flagging the
+shared-file surface area explicitly per the capacity-reporting rule.

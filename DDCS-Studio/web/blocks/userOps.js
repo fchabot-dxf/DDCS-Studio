@@ -40,6 +40,13 @@ export function getUserSimGcode(opType) { return USER_SIM_GCODE.get(opType) || n
 const USER_PREVIEW_GEOMETRY = new Map();
 export function setUserPreviewGeometry(opType, fn) { if (typeof fn === 'function') USER_PREVIEW_GEOMETRY.set(opType, fn); else USER_PREVIEW_GEOMETRY.delete(opType); }
 export function getUserPreviewGeometry(opType) { return USER_PREVIEW_GEOMETRY.get(opType) || null; }
+// t1648 — the DECLARED preview-var-seed registry (a LIVE fn per op, re-attached from the seed like previewGeometry).
+// `(resolved params) => [[varNum,value],...] | null`: an op seeds live-frame/controller-read registers for the
+// PREVIEW TRACE only (never emitted, never pushed to the controller — wizardManager.previewVarSeed's own contract).
+// Surfacing's Skim-mode start marker is the first user (jogX/jogY → #790/#791/#792).
+const USER_PREVIEW_VAR_SEED = new Map();
+export function setUserPreviewVarSeed(opType, fn) { if (typeof fn === 'function') USER_PREVIEW_VAR_SEED.set(opType, fn); else USER_PREVIEW_VAR_SEED.delete(opType); }
+export function getUserPreviewVarSeed(opType) { return USER_PREVIEW_VAR_SEED.get(opType) || null; }
 import { deriveBindings, matches } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state); matches (t1636) — count hits without the throw, for a save-time report
 
 const STORE_KEY = 'ddcs_user_ops';
@@ -809,7 +816,7 @@ export function validateUserOp(def) {
  * from the file. A foreign opType has no local behaviour to restore, and the import SAYS SO rather than losing it
  * silently (the file names which hooks its author had; see wizardToFile).
  */
-export const OP_CODE_HOOKS = ['postInstantiate', 'deriveGuards', 'simStartsProvider', 'previewGeometry', 'simGcode', 'statusHint', 'normalizeParams'];
+export const OP_CODE_HOOKS = ['postInstantiate', 'deriveGuards', 'simStartsProvider', 'previewGeometry', 'previewVarSeed', 'simGcode', 'statusHint', 'normalizeParams'];
 const LOCAL_HOOKS = new Map();   // opType → { hookName: fn } — survives deleteUserOp, because the APP still knows it
 
 /** Which code hooks this app has for `opType` (empty = it is a stranger here). */
@@ -884,6 +891,7 @@ export function registerUserOp(def) {
     setUserStatusHint(def.opType, def.statusHint);   // t554 — a DECLARED in-place status HINT (homing's unset-travel warning); a LIVE fn (re-attached from the seed, like the others)
     setUserSimGcode(def.opType, def.simGcode);   // t566 — a DECLARED sim-gcode override (the ATC change choreography); a LIVE fn (re-attached from the seed, like the others)
     setUserPreviewGeometry(def.opType, def.previewGeometry);   // t712 — a DECLARED preview-geometry hook (slot/contour per-feature 2D handles); a LIVE fn (re-attached from the seed, like the others)
+    setUserPreviewVarSeed(def.opType, def.previewVarSeed);   // t1648 — a DECLARED preview-only var-seed hook (Surfacing Skim's #790-792); a LIVE fn (re-attached from the seed, like the others)
     USER_DEFS.set(def.opType, def);   // the LIVE def registry (Universal CAM reads template+bindings here); overwrite on re-author/re-seed
     return def;
 }

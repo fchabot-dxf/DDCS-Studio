@@ -121,20 +121,48 @@ export const SURFACING_STRUCT = [
         help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-op RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
 ];
 
+// t1648 — THE START-POSITION MARKER: ONE declared target, mode-dependent (user-ruled: "the gui serve differently
+// in skim or wcs but it should look the same" — one widget, the MODE picks what it writes to, never a second
+// widget). Normal/WCS: the marker IS the existing pos handle — it writes the REAL origin offset (originX/originY,
+// already bound to placeonstock.offX/offY — the emit MOVES). Skim: the program is RELATIVE to wherever the
+// operator jogs, so origin has no meaning there — the marker instead writes PREVIEW-ONLY jog coords (jogX/jogY,
+// never bound to any socket — merged into params like every other declared param, but nothing downstream reads
+// them for emit) that seed the live-frame registers (#790/#791/#792) for the TRACE preview only; the emitted
+// program is untouched (it already reads the live frame at the machine).
+//
+// DECLARED ONCE, HERE, IN THE DATA LAYER (user-ruled: "is it better to make the wizard as data now" — yes) — BOTH
+// faces read this same mapping: `surfacingPreviewGeometry` below (the twin's canvas) and `buildSurfacingSpec` in
+// `wizards/views/surfacingView.js` (the built-in's canvas) each resolve the marker's target through
+// `startMarkerTarget(zMode)`, so there is exactly one place that ever states "skim writes jogX/jogY, normal writes
+// originX/originY" — a second wizard with a relative-vs-WCS mode would export + reuse the SAME shape (see
+// WORK-LOG for the rollout survey), not restate it.
+export const START_MARKER_TARGET = {
+    normal: { x: 'originX', y: 'originY' },
+    skim: { x: 'jogX', y: 'jogY' },
+};
+export function startMarkerTarget(zMode) { return START_MARKER_TARGET[zMode] || START_MARKER_TARGET.normal; }
+
 export const SURFACING_DATA_OPTYPE = 'user_surfacing_data';
 
 const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
 import { handleScale } from '../../wizards/ops/placement.js';
 
-/** t716 — DECLARED preview geometry (twin-level): the face-area rectangle (the region extent, at the placement origin) as
- *  a path + a pos handle (originX/originY) + a size handle (w/h). Mirrors the built-in surfacingView.buildSurfacingSpec;
- *  handles write the TWIN params directly (preview-side → emit unaffected). */
+/** t716/t1648 — DECLARED preview geometry (twin-level): the face-area rectangle (the region extent, at the placement
+ *  origin) as a path + a size handle (w/h) + the START-POSITION marker (the same `sf_pos`/'pos' handle t716 always
+ *  had — ONE widget, not a second one). Mirrors the built-in surfacingView.buildSurfacingSpec; handles write the
+ *  TWIN params directly (preview-side → emit unaffected by the drag ITSELF; whether the WRITTEN param reaches the
+ *  emit depends entirely on which param `startMarkerTarget` names, per the declared mode-target mapping above). */
 export function surfacingPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0), w = _n(p.w, 100), h = _n(p.h, 80);
     const paths = [{ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' }];
     const hs = handleScale(p, '', ox, oy, w, h);
+    const tgt = startMarkerTarget(p.zMode);
+    // t1648 — SKIM: the marker is a FREE jog point (jogX/jogY), not a corner of the faced-area rect, so it carries NO
+    // datum-corner anchor (ax/ay stay 0 — an absolute point). Normal/WCS: byte-identical to the original pos handle
+    // (the exact same `x:ox,y:oy,...hs.pos` spread t716 always used).
+    const posGeom = p.zMode === 'skim' ? { x: _n(p.jogX, 0), y: _n(p.jogY, 0), labelDir: hs.pos.labelDir } : { x: ox, y: oy, ...hs.pos };
     const handles = [
-        { type: 'point', id: 'sf_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos },
+        { type: 'point', id: 'sf_pos', fx: tgt.x, fy: tgt.y, label: 'pos', ...posGeom },
         { type: 'rect', id: 'sf_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size },
     ];
     // t718 — the origin-inclusive region bbox: the twin's surfacing geometry emits 0-relative (origin rides the placement
@@ -170,6 +198,10 @@ export function surfacingDataDef() {
     const stack = buildSurfacingTwinStack();
     const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, withPassesField([...toolBindingsFor(stack), ...SURFACING_STRUCT, ...surfacingBindingsFor(stack), ...entryBindingsFor(stack)]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
+    // t1648 — SKIM ONLY: seed the live-frame registers the emitted body reads at the machine (#790/#791/#792), so the
+    // 3D preview traces from where the start marker says the operator will jog. Normal/WCS → null (no seed; the
+    // marker there drives originX/originY, a REAL param — the emit itself already moves).
+    def.previewVarSeed = (params) => (params.zMode === 'skim' ? [[790, num(params.jogX, 0)], [791, num(params.jogY, 0)], [792, 0]] : null);
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)
     // t945 spindleHeadPatch (blank progstart → live Head) THEN t986 applySkimStructure (Skim: progstart drops the absolute
