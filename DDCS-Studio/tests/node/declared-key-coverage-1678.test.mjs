@@ -63,11 +63,13 @@ const CLEAN_SHAPES = [
         name: 'layoutSpecFromOp — keys it forwards into its own returned spec',
         // Checked against panelTypes.js's OWN text (the producer), not featureCanvas.js: the question here is
         // "does this middle-layer function re-expose what it received," not "does the final renderer read it."
-        // onEdit is deliberately excluded — see the KNOWN GAP tripwire below, it is NOT currently forwarded.
+        // onEdit MOVED HERE at t1680 — it was the KNOWN GAP tripwire below until the fix landed (buildCanvasWidgets's
+        // onEdit is now destructured and threaded into all 3 of layoutSpecFromOp's returns); the tripwire is gone,
+        // per this file's own design ("closing a gap requires deliberately updating its tripwire").
         // pathDatum/stockDatum/stockAttach/onPathDatum/onStockAttach are NOT part of this shape at all — confirmed
         // by running this very checker against a first draft that wrongly included them (panelTypes.js never sets
         // them; they belong to placementSpec()'s OWN shape, spread directly by the 6 legacy per-wizard views).
-        keys: ['onDrag', 'placement', 'onCornerPick', 'onEdgePick'],
+        keys: ['onDrag', 'onEdit', 'placement', 'onCornerPick', 'onEdgePick'],
         consumers: [web('wizards/ops/panelTypes.js')],
     },
 ];
@@ -79,16 +81,12 @@ for (const shape of CLEAN_SHAPES) {
     });
 }
 
-// ── PART 2 — KNOWN GAPS. The t1678 census found these three live, evidence-backed, and reported them for their own
-// future fix-dispatch WITHOUT fixing them here (a census reports; it does not become a refactor). Each test below
-// asserts the CURRENT, broken state on purpose — it will start FAILING the moment someone fixes the underlying gap
-// without also touching this file, which is the point: closing a gap here requires deliberately updating its
-// tripwire (move the key up into CLEAN_SHAPES), not letting the fix silently rot the record of what changed. ──
-
-test('KNOWN GAP (t1678): panelTypes.js drops onEdit — every twin + lathe 2D-Layout dimension handle loses click-to-edit and its live value readout (the 6 legacy built-in views are unaffected, they call buildCanvasWidgets directly). See WORK-LOG t1678.', async () => {
-    const missing = missingReaders(['onEdit'], [web('wizards/ops/panelTypes.js')]);
-    expect(missing, 'expected onEdit to STILL be missing from panelTypes.js — if this fails, the gap was fixed: remove this test and move onEdit into CLEAN_SHAPES above').toEqual(['onEdit']);
-});
+// ── PART 2 — KNOWN GAPS. The t1678 census found three live, evidence-backed findings and reported them for their
+// own future fix-dispatch WITHOUT fixing them in that census turn. Each test below asserts the CURRENT, broken
+// state on purpose — it starts FAILING the moment someone fixes the underlying gap without also touching this
+// file, which is the point: closing a gap here requires deliberately updating its tripwire (move the key up into
+// CLEAN_SHAPES), not letting the fix silently rot the record of what changed. t1680 closed the first of the three
+// (onEdit, moved above) exactly this way — two remain. ──
 
 test('KNOWN GAP (t1678): lathe handles declare teal:true (the documented "drives the emit" convention) but FeatureCanvas never reads .teal — every lathe dimension handle renders the plain gold default instead. See WORK-LOG t1678.', async () => {
     const missing = missingReaders(['teal'], [web('viz/featureCanvas.js')]);

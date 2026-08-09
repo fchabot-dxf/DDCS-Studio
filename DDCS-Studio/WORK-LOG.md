@@ -21174,3 +21174,128 @@ instances — honest about the two-sub-mechanism nuance (a write-boundary throw 
 textual read-coverage check for everything else) rather than forcing a single story to fit. The guard finding
 two of its own author's mistakes before they shipped is the same discipline the project's fail-loud guards keep
 paying for elsewhere, working exactly as intended on itself.
+
+## t1680 — REVIEW OF t1678 (PASS) + FINDING 1 FIXED: layoutSpecFromOp now forwards onEdit (turn 1680)
+
+### The t1678 review
+
+Advisor verdict: PASS. Named the intellectual honesty as the best part — saying the t1638/t1654 throw mechanism
+does NOT generalize, rather than forcing the framing, then building something that DOES work: the shapes holding
+the discipline pinned clean, the three live gaps pinned as KNOWN-BROKEN so the guard starts failing the moment
+anyone fixes one without updating it. Also credited reporting that most of the codebase came back clean instead
+of padding the list.
+
+### THE ACT — Finding 1: layoutSpecFromOp drops onEdit. Fixed at the ONE shared source, both families.
+
+### The mill/twin path — `wizards/ops/panelTypes.js`
+
+`buildCanvasWidgets` returns `{handles, onDrag, onEdit}`; `layoutSpecFromOp` destructured only `{handles,
+onDrag: _rawOnDrag}` — confirmed directly (grepped the literal string "onEdit": zero matches pre-fix). Fixed by
+destructuring `onEdit` alongside the other two and forwarding it into all 3 of the function's return statements
+(the general branch, the simMarkers branch, the simStart branch) — one destructure, one `onEdit,` added to each
+return, no per-call-site hand-forwarding, per the census's own point.
+
+### The lathe path — `viz/latheProfileCanvas.js`
+
+A SEPARATE fix was needed here: lathe ops never reach `layoutSpecFromOp`'s `buildCanvasWidgets` call at all —
+`layoutSpecFromOp` delegates to `latheLayoutSpec` and returns EARLY (confirmed by reading the delegation point
+directly) before any of the mill-path code runs. Lathe hand-builds every handle across 9 separate spec builders,
+none of which call `buildCanvasWidgets` — so there was no "destructure and forward" fix available; each builder
+needed its own `onEdit`. Every lathe handle already sets `value` to the exact param it represents (the same
+number its own `onDrag` ultimately writes, confirmed by reading all 9), so `onEdit` never needs `onDrag`'s
+inverse geometry math (diameterOf/canvasToZ/clamps) — a small id→field map is enough. Declared ONE reusable
+`onEditFromMap(map, write)` helper (a map entry may be a function instead of a field name for the one handle —
+`odProfileSpec`'s shoulder — whose target field depends on a `taper` mode flag), used by all 7 IN-SCOPE builders:
+`latheProfileSpec` (facing — its callback takes a raw number, not a patch, so this one function's `onEdit` is a
+direct call rather than routed through the map helper), `odProfileSpec` (od-turn), `partProfileSpec` (parting),
+`drillProfileSpec` (centre-drill), `polygonProfileSpec` (polygon), `faceProbeSpec`, `odProbeSpec` — matching the
+7 lathe ops (`lathe_facing/odturn/parting/centerdrill/polygon/faceprobe/odprobe`) that actually route through
+`latheLayoutSpec`'s dispatch. `barStockSpec`/`roundBlankSpec` (also in this file) are confirmed OUT of scope —
+grepped their only caller: `ui/stockEditor.js`'s stock-shape MODAL, never reached through any lathe wizard's
+layout path at all, so "every twin and every lathe wizard" does not include them; left untouched.
+
+### A discovery mid-verification, reported honestly rather than papered over
+
+The dispatch's own two suggested "data twin" examples — corner and surfacing — turn out to have NO value-bearing
+canvas handle at all, for either. `FeatureCanvas`'s click-to-edit gate is `h.value != null && spec.onEdit` — BOTH
+halves are required. Grepped every handle declaration in `blocks/dataOps/*.js` (zero `value:` keys anywhere) and
+read `handleScale()`'s full return shape directly (its `pos`/`size` bags carry `ax/ay/ex/ey/vx/vy/sx/sy/fx/fy/a/
+labelDir` — no `value`). `onEdit` was correctly identified as dropped and is now fixed everywhere it's forwarded
+— but for the 7 previewGeometry-based twins (bore/drill/tap/surfacing/contour/slot/pocket) and for corner/
+alignment/edge/rotary's bespoke decls, `value` was ALSO never set, so this fix alone has no VISIBLE effect for
+those specific ops today — a second, separate gap the original census didn't fully surface. It is NOT missing
+for GUI-authored custom ops (the role-based w/h/dia/scale/len group mechanism, `panelTypes.js:308-344`, which
+already sets `value:` — confirmed live) or for middle's `crossAim` cross-travel handle (its gesture reads
+`d.cross` as `value`). Verified this distinction directly rather than assuming: a custom-op dia-group handle
+now genuinely click-to-edits (`onEdit` exists, writes the typed number to the real param); surfacing's own W×H
+handle still shows no number, confirmed by direct call (`sizeHandle.value` is `undefined`, exactly as before).
+
+**Why this isn't fixed here too**: adding `value:` to the 7 previewGeometry functions is separate, real work —
+and for the W×H rect handles SPECIFICALLY, simply adding `value` would REPLACE the existing two-number
+`displayVals` readout ("W×H 80×60") with a one-number click-to-edit ("W 80"), since `featureCanvas.js` checks
+`value` before `displayVals` and only one branch fires — losing the H display, unless routed through the
+DIFFERENT, more involved dual-value editor mechanism (`h.edit`/`spec.onEditDual`, confirmed to already exist,
+currently used only by `ui/stockEditor.js`'s hand-built specs). That is real design work, not a natural minor
+extension of "thread onEdit through" — reported as a refined understanding of the SAME finding, sized but not
+built, matching the "do not let this become a refactor" instruction.
+
+### Verify — per the dispatch's 7 points
+
+**1. ONE source, no hand-forwarding** — confirmed: one destructure in `panelTypes.js`, one `onEditFromMap` helper
+reused across all 7 lathe builders, no per-call-site special-casing.
+
+**2. Verify by VALUE, not presence** — a custom-op `dia`-group handle: `onEdit(id, 77.5)` writes `77.5` to the
+real `dia` form field (direct-function check). A lathe facing op, REAL DOM click: the face handle's label reads
+"face 3" (a live number), clicking it opens `.fc-dim-edit`, typing "2.25" + Enter writes `2.25` to the real
+`allowance` field — the full, real user gesture, not a mocked shortcut.
+
+**3. Both families** — a data-twin-shaped example (the custom-op role-group, the one place onEdit's effect is
+visible today for a twin) AND a lathe op (facing, end-to-end DOM click; od-turn's taper-conditional map, direct-
+function, both non-taper→targetDiameter and taper→endDiameter/targetDiameter branches checked).
+
+**4. The 6 legacy views stay byte-identical** — confirmed by grep, not assumed: zero occurrences of
+`layoutSpecFromOp` anywhere under `web/wizards/views/` — the 6 legacy views (surfacing/pocket/drill/contour/slot/
+text) never call the function this turn touched at all; they call `buildCanvasWidgets` directly and already
+forward `onEdit` themselves. Structurally impossible for this change to double-wire or affect them.
+
+**5. Emit byte-identical** — a 68-file targeted regression sweep (every `layoutSpecFromOp`/`buildCanvasWidgets`/
+`latheProfileCanvas` consumer: custom-op-canvas-handles, all 3 surfacing-position suites, mill-layout-716, all 3
+lathe suites [lathe-blocks-bar-1315, lathe-matrix's 5 op families, lathe-honest-3d-1301], corner-anim-overlay,
+corner-layout-sim-drag, canvas-widgets, drill/pocket-canvas, group-canvas-drag/knob, layout-placement-parity-718
+across all 8 op types): **68/68 passed**, including every emit-comparison assertion those suites carry.
+
+**6. The guard flips** — `declared-key-coverage-1678`'s `onEdit` KNOWN GAP tripwire is GONE; `onEdit` moved into
+the `layoutSpecFromOp` CLEAN_SHAPES entry, exactly as the file's own design intended ("closing a gap requires
+deliberately updating its tripwire"). Two KNOWN GAP tripwires remain (teal, OP_CODE_HOOKS — findings 2 and 3,
+still not this act's job). Confirmed: 4/4 tests pass post-flip.
+
+**7. Non-vacuity per claim, both fixes independently**: reverted `panelTypes.js`'s destructure only — genuinely
+RED, a real `ReferenceError: onEdit is not defined` (not a soft assertion failure — the code path itself breaks),
+restored, green. Reverted `latheProfileSpec`'s `onEdit` only — genuinely RED, the face handle's label regresses
+to the bare "face" (no number, confirming `onEdit`'s absence removes BOTH the value display AND the click
+affordance together, exactly matching the dispatch's own description), restored, green.
+
+### Regression sweep + full suite
+
+68-file targeted sweep reported above under point 5. Full suite — measuring against the advisor's own gate floor
+on `3ad67ea2` (node 99/0, e2e 2457 passed / 8 failed / 6 skipped). node: **103/0** (104 − the one KNOWN GAP
+tripwire this turn deliberately removed, per point 6). e2e: **2454 passed / 11 failed / 6 skipped** (2471 total,
+unchanged — no e2e tests added this turn). Of the 11: **6 match the floor exactly**
+(`collapsible-panes-752`, `open-as-modal-1625`, `pane-splitter-790` ×2, `update-check` ×2).
+`formfield-loud-mismatch-1636` and the floor's own two self-isolated names (`pocket-data-emit`,
+`transform-declared-736`) did not reappear — consistent with the established rotating-subset pattern. **5
+carried different names** (`gateway-mismatch-gate-1229`, `import-safety-1219`, `palette-by-role-1623`,
+`pocket-cavity-2d`, `wizard-face-1599`) — isolated with `--workers=1`: **18/18 passed clean**, all 5 files,
+including `pocket-cavity-2d` specifically (checked first and most carefully — its name plausibly touches
+`panelTypes.js`, the exact file this turn's fix changed; confirmed clean, unrelated). All 11 full-suite failures
+accounted for. Eleven regenerated `verification/*.png` restored via `git checkout --` before staging.
+
+### Capacity
+
+The dispatch scoped one function's destructure; the real shape of the fix was two independent code paths (the
+shared mill/twin function, and 7 separately hand-built lathe spec builders with no shared choke point to thread
+through) — found by reading the actual delegation point rather than assuming "thread it through" meant one
+change. The mid-verification discovery (corner/surfacing have no value-bearing handle at all, so this fix's
+visible effect is narrower than the dispatch's own two suggested examples) is exactly the kind of thing the
+"verify by value, not presence" instruction exists to catch — reported plainly rather than picking a misleading
+demo or silently expanding scope to paper over it. Two files touched for the fix itself, one for the guard flip.

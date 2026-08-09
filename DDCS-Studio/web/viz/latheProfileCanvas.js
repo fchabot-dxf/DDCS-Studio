@@ -28,6 +28,19 @@ export const canvasToZ = (x) => x;
 
 export const FACE_HANDLE_ID = 'faceLine';
 
+/** t1680 — click-to-edit for a lathe handle. Every handle below sets `value` to the exact param it represents (by
+ *  construction — the same number its own onDrag ultimately writes), so onEdit never needs onDrag's inverse
+ *  geometry math (diameterOf/canvasToZ/clamps): a small id→field map is enough. A map entry may be a function
+ *  instead of a field name for the one handle (odProfileSpec's shoulder) whose target field depends on a mode flag.
+ *  Declared once, reused by every builder in this file — this project's own "declare over hand-roll" move, applied
+ *  to the fix the t1678 census exists to enable (buildCanvasWidgets already gets this for free from its `field`
+ *  convention; the lathe family hand-builds its handles, so it needs this one small equivalent). */
+const onEditFromMap = (map, write) => (id, val) => {
+    const f = map[id];
+    if (f == null || !Number.isFinite(val)) return;
+    write(typeof f === 'function' ? f(val) : { [f]: val });
+};
+
 /**
  * Build the canvas spec for a bar.
  * @param {object} bar        {diameter, stickOut, allowance}
@@ -67,6 +80,7 @@ export function latheProfileSpec(bar, onAllowance) {
             const z = Math.max(0, canvasToZ(world.x));
             onAllowance(Math.round(z * 1000) / 1000);
         },
+        onEdit: (id, val) => { if (id === FACE_HANDLE_ID && typeof onAllowance === 'function' && Number.isFinite(val)) onAllowance(val); },
     };
 }
 
@@ -213,6 +227,10 @@ export function odProfileSpec(bar, od, onChange) {
             }
             if (id === FACE_DIA_HANDLE_ID) onChange({ targetDiameter: r3(diameterOf(insideBar(world.y))) });
         },
+        onEdit: onEditFromMap({
+            [SHOULDER_HANDLE_ID]: (v) => (taper ? { endDiameter: v } : { targetDiameter: v }),
+            [FACE_DIA_HANDLE_ID]: 'targetDiameter',
+        }, onChange),
     };
 }
 
@@ -275,6 +293,7 @@ export function partProfileSpec(bar, part, onChange) {
             // passes the centreline is a part-off wearing a groove's name.
             if (id === PART_FLOOR_HANDLE_ID) onChange({ floorDiameter: r3(diameterOf(Math.min(Math.max(0, world.y), barR - 0.001))) });
         },
+        onEdit: onEditFromMap({ [PART_POS_HANDLE_ID]: 'zFace', [PART_WIDTH_HANDLE_ID]: 'width', [PART_FLOOR_HANDLE_ID]: 'floorDiameter' }, onChange),
     };
 }
 
@@ -305,6 +324,7 @@ export function drillProfileSpec(bar, drill, onChange) {
             // depth grows into −Z, and a hole of zero depth is not a hole
             onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) });
         },
+        onEdit: onEditFromMap({ [DRILL_DEPTH_HANDLE_ID]: 'depth' }, onChange),
     };
 }
 
@@ -419,6 +439,7 @@ export function faceProbeSpec(bar, probe, onChange) {
             // probe cannot know. Dragging stops where the two coincide — the ordinary touch-off.
             onChange({ ahead: r3(Math.max(0, canvasToZ(world.x))) });
         },
+        onEdit: onEditFromMap({ [FACE_PROBE_HANDLE_ID]: 'ahead' }, onChange),
     };
 }
 
@@ -454,6 +475,7 @@ export function odProbeSpec(bar, probe, onChange) {
             // a diameter out, because a diameter went in: diameterOf is the one converter, and it runs once
             onChange({ caliperDiameter: r3(diameterOf(Math.max(0.001, world.y))) });
         },
+        onEdit: onEditFromMap({ [OD_PROBE_HANDLE_ID]: 'caliperDiameter' }, onChange),
     };
 }
 
@@ -526,5 +548,6 @@ export function polygonProfileSpec(bar, poly, onChange) {
                 onChange({ acrossFlats: r3(wantApothem * 2 * scale) });
             }
         },
+        onEdit: onEditFromMap({ [POLY_DEPTH_HANDLE_ID]: 'depth', [POLY_FLATS_HANDLE_ID]: 'acrossFlats' }, onChange),
     };
 }

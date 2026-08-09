@@ -447,7 +447,11 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
-    const { handles, onDrag: _rawOnDrag } = buildCanvasWidgets(decls, setFields);
+    // t1680 — onEdit was destructured away here and never forwarded to any of the 3 returns below, so every twin +
+    // lathe op lost buildCanvasWidgets's click-to-edit/value-readout (the 6 legacy per-wizard views never had this
+    // gap — each calls buildCanvasWidgets directly and forwards onEdit itself). Found by t1678's census, fixed here
+    // at the ONE shared source rather than per-call-site, per the census's own point.
+    const { handles, onDrag: _rawOnDrag, onEdit } = buildCanvasWidgets(decls, setFields);
     // t718 LAYOUT PLACEMENT PARITY — PLACE the previewGeometry handles: bake the shift into their RENDER position and
     // INVERSE-map their drag world (world − shift → the raw param), keyed by the previewGeometry handle ids. Role/probe
     // handles + the sim Start are untouched (the shift is 0 for probe ops anyway). Size/delta fields pass through — the
@@ -557,7 +561,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
             else if (spotOnDrag) spotOnDrag(id, world);
         };
-        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, paths: previewPaths, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
     }
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
@@ -588,9 +592,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, paths: previewPaths, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
     }
-    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
+    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
