@@ -18924,3 +18924,74 @@ in BOTH faces; default unchanged = byte-identical; the 2D marker and the emit ag
 Light on code, heavy on investigation — the real work here was refusing to build a fix for a hypothesis that
 didn't survive measurement, and proving the negative rigorously (real gestures, real clicks, both faces, the
 math) rather than declaring "seems fine" after a quick look. Comfortable to continue.
+
+## t1644 — REVIEW OF t1642 (advisor concurred) + the 2-line vacuity guard + t1635: skim, the browser half
+
+### The vacuity guard (advisor review finding, 2 lines)
+
+`placement-anchor-1642.spec.js` test 1 asserted `expect(r.near).toBe(r.far)` — `.toBe` is `Object.is`, under
+which `Object.is(NaN, NaN)` is `true`. If `traceToolpath` ever came back with no finite segments (an empty
+emit — this week's own defect family), both sides would be `NaN` and the test would pass VACUOUSLY, proving
+nothing. Added `expect(Number.isFinite(r.near)).toBe(true)` before the equality check. **Proven non-vacuous
+by simulation**: temporarily stubbed `farX` to always return `NaN` (imitating an empty trace) — the new guard
+line failed with a clear message; the OLD assertion alone would have passed. Restored the real `farX`, all 3
+tests green again.
+
+### t1635 — surfacing skim, the browser half
+
+`af391806` (t1620) fixed "Skim renders nothing — one plunge, no carve, just the stock box": `skimErrLabel`/
+`skimOkLabel` (93/94) collided with the raster's own row-walk labels because `uniquifyFlowLabels` ran before
+`zMode:'skim'` was visible to `surfaceraster.flowLabels`, so the row-walk's own GOTO landed on the skim-OK
+label and the sweep never ran. Verified NODE-TIER ONLY (label-uniqueness on the emitted text,
+`surfacing-skim-982.test.mjs`) — never against the real browser wizard, and never by actually EXECUTING the
+macro's control flow to confirm the sim genuinely traces a full raster, not merely emits text with the right
+label names.
+
+New `surfacing-skim-sim-1635.spec.js`, 4 tests — drives the real Surfacing wizard, flips Z-mode via the real
+`<select>`, and runs the emitted program through `traceToolpath` (`GcodeExecutionEngine` — follows GOTO/
+WHILE, resolves #vars; the SAME engine every toolpath preview in the app uses, not a text scanner blind to
+control flow):
+1. **The full raster, traced**: Skim's traced bounds are asserted EQUAL to Normal's own traced bounds
+   (`{minX:0,maxX:100,minY:0,maxY:75.6,...}` for a 100×80 area at 12mm tool / 60% stepover) — not a
+   near-degenerate point. Segment count asserted comparable to Normal's (>15, vs. the ~3-5 a lone plunge
+   would trace).
+2. **Normal stays byte-identical** — no G91, no `#790` frame-read, no `SKIM` marker (the fix touches Skim's
+   build path only).
+3. **The labels, exactly**: measured the REAL emitted skim program directly (not assumed from the commit
+   message) — all three frame-read guards (`IF #62/#63/#64 == -99999`) target `GOTO93`; `N93`/`N94` exist as
+   the skim-err/skim-ok landing pads (structurally at the PROGRAM'S TAIL, reached via `GOTO92→N92→GOTO94`,
+   not immediately after the guard — measured this the hard way, my first draft's label-boundary assumption
+   was wrong and the test told me so). The row-walk body (between the guard and `END1`, the depth-loop close)
+   declares its own labels — measured: `95,96,97,98,99,100` — every one `>= 95`, none colliding with 93/94.
+4. **The twin too** — `af391806` fixed BOTH build paths (`programFraming.makeSkim` for the built-in,
+   `dataOps/skimStructure.js`'s `swapPlaceToSkim` for the twin). `user_surfacing_data`'s own Skim traces the
+   same full-area bounds as its own Normal.
+
+**Non-vacuity, proven by actually reproducing the pre-fix bug**: temporarily reverted the `zMode:'skim'`
+stamp in BOTH `programFraming.js` (scratch copy saved first) and, separately, `dataOps/skimStructure.js` —
+reran. Test 1 and test 3 went RED reproducing the EXACT original symptom: traced bounds collapsed to
+`{maxX:0, maxY:3.6}` (a single plunge, not a raster) and the row-walk labels came back as `97,98,93,94,95,96`
+— 93 and 94 genuinely colliding, the identical bug the commit describes. The twin test reproduced the same
+collapsed-bounds failure when `skimStructure.js` alone was reverted. Restored both files from the scratch
+copies, all 4 (+1 re-confirm) green again.
+
+### Verification
+
+- `surfacing-skim-sim-1635.spec.js` (4 new tests) — all green, non-vacuity proven for the two source-touching
+  claims (full-raster trace, twin path).
+- `placement-anchor-1642.spec.js` (vacuity guard fix) — all 3 green, non-vacuity proven for the new guard.
+- Adjacent skim coverage swept: `surfacing-skim-form-986.spec.js`, `skim-blocks-roundtrip-1636.spec.js`,
+  node tier `surfacing-skim-982.test.mjs` + `surfacing-skim-twin-986.test.mjs` (4/4) — all green, unaffected.
+- `zmode-modal-1609.spec.js` (the Z-mode dropdown/gate/byte-identical/edit-round-trip suite) — all green.
+- Smoke tier: 71/71 green.
+- Zero net files under `web/` changed (both non-vacuity reverts were scratch-copy-restored and confirmed via
+  `git status`) — same reasoning as t1642: a test-only diff cannot regress runtime behaviour, so the full
+  ~20-minute suite was not re-run for the third act in a row with no source diff. Flagging, not silently
+  skipping — happy to run it if the advisor wants the ID diff anyway.
+
+### Capacity
+
+Light — a clean, bounded act (a 2-line fix plus one focused verification gap). The label-boundary mistake in
+my first draft (assuming N93/N94 sit right after the guard, when they're actually the program's tail block)
+is a good reminder that even a "should be quick" assertion needs driving against the REAL emitted text before
+trusting it. Comfortable to continue.

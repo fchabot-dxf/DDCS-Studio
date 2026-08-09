@@ -51,6 +51,10 @@ test('surfacing: the default-on-open area (== full stock) makes the anchor a MAT
         const far = farX(code());
         return { near, far };
     });
+    // t1644 (advisor review) — `.toBe` is `Object.is`, under which `Object.is(NaN, NaN)` is TRUE: if the trace ever
+    // came back empty (this week's exact defect family), near/far would both be NaN and this would pass VACUOUSLY,
+    // proving nothing. A real, finite toolpath extent must exist before "the two are equal" means anything.
+    expect(Number.isFinite(r.near), 'the traced toolpath has a real, finite extent to compare (not an empty/NaN trace)').toBe(true);
     expect(r.near, 'at full-stock size (the on-open default) the near/far corners trace to the SAME extent — geometrically inevitable').toBe(r.far);
 });
 
