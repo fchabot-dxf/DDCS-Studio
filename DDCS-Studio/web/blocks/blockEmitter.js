@@ -453,8 +453,13 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     // reconstructed from the text afterwards, and it rides the line RECORD so the later passes that splice lines in
     // cannot shift it out of alignment.
     const rotAbs = rotationAbsorbedBy(def, p, ctx);
-    if (rotAbs) return def.emit({ ...p, ...rotAbs }, dx, dy, dialect).map((ln) => ({ ...tag(ln, own, block.params && block.params.cap), rot: true }));
-    return def.emit(p, dx, dy, dialect).map((ln) => tag(ln, own, block.params && block.params.cap));   // leaf / move standalone (dialect = active profile; carry a declared cap requirement)
+    let lines = def.emit(rotAbs ? { ...p, ...rotAbs } : p, dx, dy, dialect);
+    // t1652 — a modal word (G90/G91/G54-59/G17-19/G94/95/G20/G21) that shared this leaf's SOURCE line (parsed by
+    // gcodeToStack.js) rides back onto the SAME re-emitted line, on the FIRST line only (every leaf atom here
+    // emits exactly one line per source line). Declared ONCE, here — no per-atom emit needs to carry this.
+    if (block.modalPre && block.modalPre.length && lines.length) lines = [`${block.modalPre.join(' ')} ${lines[0]}`, ...lines.slice(1)];
+    if (rotAbs) return lines.map((ln) => ({ ...tag(ln, own, block.params && block.params.cap), rot: true }));
+    return lines.map((ln) => tag(ln, own, block.params && block.params.cap));   // leaf / move standalone (dialect = active profile; carry a declared cap requirement)
 }
 
 /** Fold the program → { text, lines, map }. map[i] = ancestry of block ids producing line i (null = a seam).

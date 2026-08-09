@@ -83,73 +83,110 @@ export function parseLine(line, opts = {}) {
     // G53 (checked next), which deliberately carries a companion G0 — that combo already has its own home.
     if (!G(53) && /\bG0*\d+\b/i.test(code) && /\bM0*\d+\b/i.test(code)) return { type: 'raw', params: { text: raw } };
 
-    // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis.
-    if (G(53)) {
-        // t1207 — CARRY A DECLARED SIM MARKER through the round-trip. The trailing "( @returnProbeZ )" was stripped to the
-        // side-channel `comment` and dropped here, so a re-emit (the editor is re-projected from the block model via
-        // programModel setValue) produced a BARE `G53 Z#95`. The sim reads that marker off the raw line to restore the
-        // saved probe depth, so losing it silently disabled the declared save/return pairing IN THE EDITOR HOST — the
-        // G53 return degraded to the raw machine map and the next wall probed at the wrong height. The block already
-        // emits `mark` (wizards/ops/macro.js), so preserving it here closes the loop. Gated to the DECLARED markers so
-        // every other G53 comment keeps today's byte-identical emit.
-        const mk = mark(comment);
-        for (const ax of ['X', 'Y', 'Z', 'A']) {
-            const v = w(ax);
-            if (v !== undefined) return { type: 'machinemove', params: mk ? { axis: ax, to: v, mark: mk } : { axis: ax, to: v } };
+    // t1652 — MODAL WORDS RIDE ALONGSIDE A LEAF; they are not competing leaves. G90/G91 (distance mode), G54-59
+    // (WCS), G17-19 (plane) and G94/95 (feed mode) each already have their own atom for a SOLO line — but the
+    // chain below matches on the FIRST recognized word and returns, so a companion modal word sharing the line
+    // with a REAL motion leaf (or with another modal word) was silently dropped: "G1 G91 Z-5" (a RELATIVE
+    // plunge) re-projected as a bare "G1 Z-5" — an ABSOLUTE plunge. That reaches the machine; it is not
+    // cosmetic (the t1650 sibling this closes). Every modal word actually present is captured HERE, up front,
+    // independent of which branch below ends up matching. Whichever branch wins carries the OTHERS as
+    // `modalPre` — declared once, read once (blockEmitter.js's single leaf-emit call site), so no per-atom
+    // emit function needs to know this exists.
+    // G20/G21 (units) have NO atom of their own (a solo line already falls to `raw`, byte-safe) — included here
+    // anyway so a units word riding alongside a REAL leaf is captured too, instead of silently vanishing; it
+    // can never be `consumed` below (no branch recognizes it as a primary), so it always lands in `modalPre`.
+    const MODAL_RE = { G20: /\bG0*20\b/i, G21: /\bG0*21\b/i, G90: /\bG0*90\b/i, G91: /\bG0*91\b/i, G54: /\bG0*54\b/i, G55: /\bG0*55\b/i, G56: /\bG0*56\b/i, G57: /\bG0*57\b/i, G58: /\bG0*58\b/i, G59: /\bG0*59\b/i, G17: /\bG0*17\b/i, G18: /\bG0*18\b/i, G19: /\bG0*19\b/i, G94: /\bG0*94\b/i, G95: /\bG0*95\b/i };
+    const modals = Object.keys(MODAL_RE).filter((k) => MODAL_RE[k].test(code));
+
+    const rec = coreRecognize();
+    if (modals.length && rec.type !== 'raw') {
+        // The branch that actually matched may itself BE one of the modal words (e.g. G(90) matched and
+        // returned distmode) — that word is the primary, not a leftover; only attach the OTHERS.
+        const consumed = rec.type === 'distmode' ? (rec.params.dist === 'abs' ? 'G90' : 'G91')
+            : rec.type === 'wcs' ? rec.params.wcs
+            : rec.type === 'plane' ? rec.params.plane
+            : rec.type === 'feedmode' ? rec.params.fmode
+            : null;
+        const leftover = modals.filter((m) => m !== consumed);
+        // A TOP-LEVEL sibling of `params`, not a param itself — `resolveParams` (blockEmitter.js) treats any
+        // object-valued param as a reporter-pill socket and would try to resolve this array as one. Read
+        // directly off the block record (blockEmitter.js's single leaf-emit call site), never expression-evaluated.
+        if (leftover.length) rec.modalPre = leftover;
+    }
+    return rec;
+
+    // Everything below is UNCHANGED from before t1652 — the existing dispatch chain, verbatim. Wrapped in a
+    // function purely so its single result can be post-processed (above) at ONE terminal point instead of
+    // touching every return statement individually.
+    function coreRecognize() {
+        // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis.
+        if (G(53)) {
+            // t1207 — CARRY A DECLARED SIM MARKER through the round-trip. The trailing "( @returnProbeZ )" was stripped to the
+            // side-channel `comment` and dropped here, so a re-emit (the editor is re-projected from the block model via
+            // programModel setValue) produced a BARE `G53 Z#95`. The sim reads that marker off the raw line to restore the
+            // saved probe depth, so losing it silently disabled the declared save/return pairing IN THE EDITOR HOST — the
+            // G53 return degraded to the raw machine map and the next wall probed at the wrong height. The block already
+            // emits `mark` (wizards/ops/macro.js), so preserving it here closes the loop. Gated to the DECLARED markers so
+            // every other G53 comment keeps today's byte-identical emit.
+            const mk = mark(comment);
+            for (const ax of ['X', 'Y', 'Z', 'A']) {
+                const v = w(ax);
+                if (v !== undefined) return { type: 'machinemove', params: mk ? { axis: ax, to: v, mark: mk } : { axis: ax, to: v } };
+            }
+            return { type: 'raw', params: { text: raw } };
         }
-        return { type: 'raw', params: { text: raw } };
+
+        // Motion + modal G-codes (order matters: G31 before G3/G1, G2 before nothing, etc.)
+        if (G(31)) return { type: 'move', params: pick({ mode: 'probe', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
+        if (G(2)) return { type: 'arc', params: pick({ arc: 'cw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
+        if (G(3)) return { type: 'arc', params: pick({ arc: 'ccw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
+        if (G(1)) return { type: 'move', params: pick({ mode: 'cut', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
+        if (G(0)) return { type: 'move', params: pick({ mode: 'rapid', x: w('X'), y: w('Y'), z: w('Z') }) };
+        if (G(4)) { const p = w('P'); const ms = !dialect || dialect.dwellUnits !== 's'; return { type: 'dwell', params: { sec: typeof p === 'number' ? (ms ? p / 1000 : p) : p } }; }
+        for (let n = 54; n <= 59; n++) if (G(n)) return { type: 'wcs', params: { wcs: 'G' + n } };
+        if (G(17)) return { type: 'plane', params: { plane: 'G17' } };
+        if (G(18)) return { type: 'plane', params: { plane: 'G18' } };
+        if (G(19)) return { type: 'plane', params: { plane: 'G19' } };
+        if (G(90)) return { type: 'distmode', params: { dist: 'abs' } };
+        if (G(91)) return { type: 'distmode', params: { dist: 'inc' } };
+        if (G(94)) return { type: 'feedmode', params: { fmode: 'G94' } };
+        if (G(95)) return { type: 'feedmode', params: { fmode: 'G95' } };
+        if (G(28)) {   // reference return → Home; recover the referenced axes from their words
+            const axes = (code.toUpperCase().match(/[XYZA](?=[-+.\d#[])/g) || []).filter((a, i, arr) => arr.indexOf(a) === i);   // include #var / [expr] axes (the probeAxis twin) so they survive the round-trip
+            return { type: 'home', params: { axes: axes.join('') || 'Z' } };
+        }
+
+        // M-codes
+        if (M(3) || M(4)) return { type: 'spindle', params: pick({ rpm: w('S'), dir: M(4) ? 'ccw' : 'cw' }) };
+        if (M(5)) return { type: 'spindle', params: { rpm: 0, dir: 'cw' } };
+        if (M(6)) { const t = w('T'); return { type: 'tool', params: { n: t !== undefined ? t : 1 } }; }
+        if (M(8)) return { type: 'coolant', params: { flow: 'flood' } };
+        if (M(7)) return { type: 'coolant', params: { flow: 'mist' } };
+        if (M(9)) return { type: 'coolant', params: { flow: 'off' } };
+        if (M(30) || M(2)) return { type: 'endprogram', params: {} };
+        if (code === 'M0') return { type: 'stop', params: { stop: 'M0' } };   // program stop atom (exact 'M00' → pause atom, above)
+        if (code === 'M1') return { type: 'stop', params: { stop: 'M1' } };   // optional stop atom
+        if (M(98)) { const p = w('P'); if (typeof p === 'number') return { type: 'call', params: { prog: p } }; }   // numeric P only (a #var P can't round-trip through call.emit)
+        if (M(99)) return { type: 'return', params: {} };
+        // Generic M-code → M-Code atom, but ONLY when the atom can reproduce the line: a bare `M<n>` (optionally
+        // with a note). The atom emits just `M<code> ( note )`, so a line carrying ARGUMENTS (e.g. `M10 P4`,
+        // `M31 P12`) would silently lose them on re-projection — fall through to the verbatim `raw` block instead so
+        // the round-trip stays byte-exact and the sim still sees the P word.
+        const mm = code.match(/^M0*(\d+)$/i);
+        if (mm) return { type: 'mcode', params: comment ? { code: Number(mm[1]), note: comment } : { code: Number(mm[1]) } };
+
+        // Feed-only line (F with no G/M word)
+        if (/^F/i.test(code) && w('F') !== undefined) return { type: 'feed', params: { rate: w('F') } };
+
+        // 2) macro-var write `#var = expr` (dialect-independent) — AFTER the dialect probe-reads (#x=#sys) so those win.
+        if (/^#/.test(code) && code.includes('=')) {
+            const i = code.indexOf('=');
+            const v = code.slice(0, i).trim(), expr = code.slice(i + 1).trim();
+            if (v) return { type: 'assign', params: comment ? { var: v, value: expr, note: comment } : { var: v, value: expr } };
+        }
+
+        return { type: 'raw', params: { text: raw } };   // unrecognized → verbatim (never loses a line)
     }
-
-    // Motion + modal G-codes (order matters: G31 before G3/G1, G2 before nothing, etc.)
-    if (G(31)) return { type: 'move', params: pick({ mode: 'probe', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
-    if (G(2)) return { type: 'arc', params: pick({ arc: 'cw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
-    if (G(3)) return { type: 'arc', params: pick({ arc: 'ccw', x: w('X'), y: w('Y'), i: w('I'), j: w('J'), feed: w('F') }) };
-    if (G(1)) return { type: 'move', params: pick({ mode: 'cut', x: w('X'), y: w('Y'), z: w('Z'), feed: w('F') }) };
-    if (G(0)) return { type: 'move', params: pick({ mode: 'rapid', x: w('X'), y: w('Y'), z: w('Z') }) };
-    if (G(4)) { const p = w('P'); const ms = !dialect || dialect.dwellUnits !== 's'; return { type: 'dwell', params: { sec: typeof p === 'number' ? (ms ? p / 1000 : p) : p } }; }
-    for (let n = 54; n <= 59; n++) if (G(n)) return { type: 'wcs', params: { wcs: 'G' + n } };
-    if (G(17)) return { type: 'plane', params: { plane: 'G17' } };
-    if (G(18)) return { type: 'plane', params: { plane: 'G18' } };
-    if (G(19)) return { type: 'plane', params: { plane: 'G19' } };
-    if (G(90)) return { type: 'distmode', params: { dist: 'abs' } };
-    if (G(91)) return { type: 'distmode', params: { dist: 'inc' } };
-    if (G(94)) return { type: 'feedmode', params: { fmode: 'G94' } };
-    if (G(95)) return { type: 'feedmode', params: { fmode: 'G95' } };
-    if (G(28)) {   // reference return → Home; recover the referenced axes from their words
-        const axes = (code.toUpperCase().match(/[XYZA](?=[-+.\d#[])/g) || []).filter((a, i, arr) => arr.indexOf(a) === i);   // include #var / [expr] axes (the probeAxis twin) so they survive the round-trip
-        return { type: 'home', params: { axes: axes.join('') || 'Z' } };
-    }
-
-    // M-codes
-    if (M(3) || M(4)) return { type: 'spindle', params: pick({ rpm: w('S'), dir: M(4) ? 'ccw' : 'cw' }) };
-    if (M(5)) return { type: 'spindle', params: { rpm: 0, dir: 'cw' } };
-    if (M(6)) { const t = w('T'); return { type: 'tool', params: { n: t !== undefined ? t : 1 } }; }
-    if (M(8)) return { type: 'coolant', params: { flow: 'flood' } };
-    if (M(7)) return { type: 'coolant', params: { flow: 'mist' } };
-    if (M(9)) return { type: 'coolant', params: { flow: 'off' } };
-    if (M(30) || M(2)) return { type: 'endprogram', params: {} };
-    if (code === 'M0') return { type: 'stop', params: { stop: 'M0' } };   // program stop atom (exact 'M00' → pause atom, above)
-    if (code === 'M1') return { type: 'stop', params: { stop: 'M1' } };   // optional stop atom
-    if (M(98)) { const p = w('P'); if (typeof p === 'number') return { type: 'call', params: { prog: p } }; }   // numeric P only (a #var P can't round-trip through call.emit)
-    if (M(99)) return { type: 'return', params: {} };
-    // Generic M-code → M-Code atom, but ONLY when the atom can reproduce the line: a bare `M<n>` (optionally
-    // with a note). The atom emits just `M<code> ( note )`, so a line carrying ARGUMENTS (e.g. `M10 P4`,
-    // `M31 P12`) would silently lose them on re-projection — fall through to the verbatim `raw` block instead so
-    // the round-trip stays byte-exact and the sim still sees the P word.
-    const mm = code.match(/^M0*(\d+)$/i);
-    if (mm) return { type: 'mcode', params: comment ? { code: Number(mm[1]), note: comment } : { code: Number(mm[1]) } };
-
-    // Feed-only line (F with no G/M word)
-    if (/^F/i.test(code) && w('F') !== undefined) return { type: 'feed', params: { rate: w('F') } };
-
-    // 2) macro-var write `#var = expr` (dialect-independent) — AFTER the dialect probe-reads (#x=#sys) so those win.
-    if (/^#/.test(code) && code.includes('=')) {
-        const i = code.indexOf('=');
-        const v = code.slice(0, i).trim(), expr = code.slice(i + 1).trim();
-        if (v) return { type: 'assign', params: comment ? { var: v, value: expr, note: comment } : { var: v, value: expr } };
-    }
-
-    return { type: 'raw', params: { text: raw } };   // unrecognized → verbatim (never loses a line)
 }
 
 /** Parse a G-code program → an array of leaf block records (blank/seam lines are dropped).

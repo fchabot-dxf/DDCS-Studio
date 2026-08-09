@@ -178,3 +178,67 @@ test('a G-word sharing a line with an M-word falls back to raw (never silently d
   expect(r.g53AndG0StillWorks, 'the G53+G0 companion is a G+G combo, not G+M — unaffected by this guard').toEqual({ type: 'machinemove', params: { axis: 'Z', to: -5 } });
   expect(r.spindleAlone, 'a pure M-code line (no G-word) still recognizes normally — the guard requires BOTH').toEqual({ type: 'spindle', params: { rpm: 1000, dir: 'cw' } });
 });
+
+// t1652 — the sibling half of t1650's fix, named by the advisor's own review: a MODAL G-word (G90/G91 distance
+// mode, G54-59 WCS, G17-19 plane, G94/95 feed mode, G20/G21 units) sharing a line with a REAL motion leaf (or
+// with another modal word) was ALSO silently dropped — same single-dispatch cause, no M-word involved so
+// t1650's guard never caught it. Ranked by hazard (worst first, per the dispatch): G91 riding with a cut move
+// is the dangerous one — "G1 G91 Z-5" (a RELATIVE 5mm plunge) re-projected as a bare "G1 Z-5" (an ABSOLUTE
+// move to Z-5), silently changing what the machine does. Modal words now ride as `modalPre` on whichever leaf
+// matches (declared once in parseLine, read once in blockEmitter.js — no per-atom emit function changed).
+test('a modal G-word sharing a line with a real leaf (or another modal word) survives as modalPre — ranked by hazard', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { parseLine, parseGcodeToStack } = await import('/blocks/gcodeToStack.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const roundtrip = (text) => emitMapped(parseGcodeToStack(text)).text;
+    return {
+      // HAZARD 1 (worst — changes MOTION): a relative plunge must not silently become absolute.
+      relativePlunge: parseLine('G1 G91 Z-5'),
+      relativePlungeRoundtrip: roundtrip('G1 G91 Z-5'),
+      // HAZARD 2 (changes the WORK OFFSET): G54 sharing a line with a mode declaration.
+      wcsWithMode: parseLine('G90 G54'),
+      wcsWithModeRoundtrip: roundtrip('G90 G54'),
+      // HAZARD 3 (usually inert, but still real data): a rapid move sharing its line with a mode declaration.
+      rapidWithMode: parseLine('G0 G90 X10'),
+      rapidWithModeRoundtrip: roundtrip('G0 G90 X10'),
+      // HAZARD 4 (lowest — plane rarely changes behaviour on a 3-axis mill, but is still real data): plane + mode.
+      planeWithMode: parseLine('G17 G90'),
+      planeWithModeRoundtrip: roundtrip('G17 G90'),
+      // t1650's own fix stays intact: a G+M combo still bails to raw, unaffected by this modal-carry mechanism.
+      gPlusMStillRaw: parseLine('G21 G90 M3 S1000'),
+      // Unaffected controls: G53+G0 companion, a pure modal-free move, a solo modal line (no leaf at all).
+      g53Unaffected: parseLine('G53 G0 Z-5'),
+      pureMoveUnaffected: parseLine('G0 X10'),
+      soloG90Unaffected: parseLine('G90'),
+    };
+  });
+  expect(r.relativePlunge.type, 'the move leaf still recognizes (mode: cut, z: -5)').toBe('move');
+  expect(r.relativePlunge.params).toEqual({ mode: 'cut', z: -5 });
+  expect(r.relativePlunge.modalPre, 'G91 survives as a carried modal word, not silently dropped').toEqual(['G91']);
+  expect(r.relativePlungeRoundtrip, 'the re-emitted line still carries G91 — the plunge stays RELATIVE').toContain('G91');
+  expect(r.relativePlungeRoundtrip, 'and the move itself is still there').toContain('G1');
+
+  expect(r.wcsWithMode.type).toBe('wcs');
+  expect(r.wcsWithMode.params).toEqual({ wcs: 'G54' });
+  expect(r.wcsWithMode.modalPre).toEqual(['G90']);
+  expect(r.wcsWithModeRoundtrip).toContain('G90');
+  expect(r.wcsWithModeRoundtrip).toContain('G54');
+
+  expect(r.rapidWithMode.type).toBe('move');
+  expect(r.rapidWithMode.params).toEqual({ mode: 'rapid', x: 10 });
+  expect(r.rapidWithMode.modalPre).toEqual(['G90']);
+  expect(r.rapidWithModeRoundtrip).toContain('G90');
+  expect(r.rapidWithModeRoundtrip).toContain('G0');
+
+  expect(r.planeWithMode.type).toBe('plane');
+  expect(r.planeWithMode.params).toEqual({ plane: 'G17' });
+  expect(r.planeWithMode.modalPre).toEqual(['G90']);
+  expect(r.planeWithModeRoundtrip).toContain('G90');
+  expect(r.planeWithModeRoundtrip).toContain('G17');
+
+  expect(r.gPlusMStillRaw.type, 't1650s G+M raw bail is untouched by this act').toBe('raw');
+  expect(r.g53Unaffected, 'the G53+G0 companion is still its own thing, no modalPre attached').toEqual({ type: 'machinemove', params: { axis: 'Z', to: -5 } });
+  expect(r.pureMoveUnaffected.modalPre, 'a move with no companion modal word carries no modalPre at all').toBeUndefined();
+  expect(r.soloG90Unaffected, 'a solo modal line still recognizes as its own atom, unaffected').toEqual({ type: 'distmode', params: { dist: 'abs' } });
+});

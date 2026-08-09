@@ -19440,3 +19440,112 @@ A genuine root-cause act: reproduced a real symptom, traced it through TWO modul
 break, `programModel.js` → `gcodeToStack.js`) rather than patching where the symptom surfaced, and fixed a
 pre-existing, dangerous, silently-reachable production defect at its true source with a narrow, well-tested
 guard. Comfortable with the result; the G+G (non-G53) gap is real and flagged, not silently left implicit.
+
+## t1652 — REVIEW OF t1650 (PASS) + closing the G-plus-G half the review's own re-check found (turn 1652)
+
+### The t1650 review
+
+Advisor verdict: PASS, "the strongest turn of the run" — traced through the actual corruption path (an
+editor-value trap, not guesswork), correctly cleared `send.js`, correctly called it a pre-existing defect
+rather than a stale test, and the fix followed the file's own established precedent. No changes requested.
+
+The advisor then re-ran `parseLine` independently against a handful of G+G combos and found the sibling half
+of the SAME architecture problem, worse than t1650's own flag implied: `G1 G91 Z-5` — a relative 5mm plunge —
+silently re-projects as `G1 Z-5`, an ABSOLUTE plunge, once the editor's debounced reconcile round-trips it.
+Same class, reaches a machine, no M-word involved so t1650's guard never saw it.
+
+### Survey — the advisor's candidate hypothesis, verified before building
+
+Candidate: modal G-words (G90/G91 distance mode, G54-59 WCS, G17-19 plane, G20/G21 units) are not competing
+LEAVES at all — they are declared modal state a line carries ALONGSIDE its leaf, so nothing should be dropped
+because nothing was ever competing.
+
+**Holds.** Confirmed by reading how the block model already treats these exact G-words on a SOLO line: `wcs`,
+`plane`, `distmode` and `feedmode` are each their own dedicated atom (own type, own emit) — the architecture
+already agrees they are distinct DECLARATIONS, not motion. The only reason a shared line drops one is that
+`parseLine` is single-dispatch (first match returns), an implementation accident, not a semantic ruling that
+a line can carry only one G-word. `feedmode` (G94/G95) wasn't in the advisor's named list but is the identical
+shape (its own atom, same single-dispatch loss) — included in the fix and reported here, not silently folded
+in: the SAME architecture gap, closing it costs nothing extra once the mechanism is declared once.
+
+### Hazard ranking (as asked, honestly)
+
+1. **G90/G91 (distance mode)** — changes MOTION. `G1 G91 Z-5` silently becoming absolute is the dangerous one
+   named in the dispatch; a relative plunge cutting to an absolute Z can gouge the part or the table.
+2. **G54-59 (WCS)** — changes the WORK OFFSET. A dropped WCS word means the following coordinates resolve
+   against whatever offset was ACTUALLY active, not the one the line declared — wrong-location cutting.
+3. **G17-19 (plane)** — usually inert on a 3-axis mill (XY is already the default), but real data loss on any
+   arc-heavy program using a non-default plane.
+4. **G20/G21 (units)** — no dedicated atom exists (a solo line already falls to `raw`, byte-safe); dropping it
+   when it shares a line with a leaf could desync the OPERATOR's read of the program from what's declared —
+   included for completeness, not staged separately (see below).
+
+### The seam: `modalPre`, declared once in `parseLine`, read once in `blockEmitter.js`
+
+Every modal G-word actually present on a line is captured UP FRONT (independent of which branch of the
+existing chain ends up matching), via a `MODAL_RE` map keyed by canonical word. Whichever leaf/modal-atom
+branch matches keeps going exactly as before (the chain itself is UNTOUCHED, wrapped rather than rewritten,
+so every existing return statement is byte-for-byte what it was); the OTHER modal words present (i.e. `modals`
+minus whichever one the matched branch itself represents, if any) are attached as `rec.modalPre` — a
+TOP-LEVEL sibling of `params`, deliberately NOT inside `params` itself, because `blockEmitter.js`'s
+`resolveParams` treats any object-valued param as a reporter-pill socket and would try to `resolveValue()` an
+array as one. `blockEmitter.js`'s SINGLE generic leaf-emit call site (the one place every leaf atom's
+`def.emit()` result passes through, already found and used for t1648's own single-declaration seam) prepends
+`modalPre.join(' ')` to the first emitted line — one small, generic, additive change; no per-atom emit
+function was touched (move.js, wcsBlock, planeBlock, distmode.js all unchanged).
+
+A line that is PURELY modal words (e.g. `G90 G54`, no motion at all) needed no special-case: the existing
+chain's own `wcs`/`plane`/`distmode`/`feedmode` checks already recognize whichever modal word comes first in
+chain order as the primary leaf — `modals` minus that one is exactly the correct leftover, so the SAME
+post-processing step handles both "modal rides with real motion" and "modal rides with another modal" without
+a second code path.
+
+Deliberately excludes G+M lines (t1650's own raw bail already handles those, checked first, unaffected) and
+G53+G0 (the pre-existing, INTENTIONAL companion — G0 isn't in the modal set, so `modals` is empty for that
+line and the whole mechanism stays out of its way).
+
+### Verify by value + round-trip, per hazard tier
+
+New test, `gcode-to-stack.spec.js`: `G1 G91 Z-5` → `move` leaf (`{mode:'cut', z:-5}`) + `modalPre:['G91']`,
+round-trip contains `G91` AND `G1` (the plunge stays relative); `G90 G54` → `wcs` leaf + `modalPre:['G90']`,
+round-trip contains both; `G0 G90 X10` → `move` leaf + `modalPre:['G90']`, round-trip contains both; `G17 G90`
+→ `plane` leaf + `modalPre:['G90']`, round-trip contains both. Controls, all unchanged: `G21 G90 M3 S1000`
+still bails to `raw` (t1650 intact); `G53 G0 Z-5` still `machinemove`, no `modalPre` attached; a plain
+`G0 X10` carries no `modalPre` at all (`undefined`, not an empty array — no false signal on the ordinary
+case); a solo `G90` line still recognizes as its own `distmode` atom, unaffected.
+
+**Non-vacuity, TWICE, independently** (the parser claim and the emit claim are two separate mechanisms and
+were broken separately to prove each): disabled the `blockEmitter.js` prefix-prepend (scratch-copy
+save/restore) — confirmed the round-trip assertions went genuinely RED (`Received: "G1 Z-5 F2000"`, no G91 —
+reproducing the EXACT original danger). Restored, re-green. Separately disabled the `parseLine` `modalPre`
+attachment — confirmed the `modalPre` assertion itself went genuinely RED (`Received: undefined` where
+`Expected: ["G91"]`). Restored, re-green.
+
+### Regression sweep — every currently-correct parse and every leaf emit path
+
+`gcode-to-stack.spec.js` (8, all pre-existing + both new), `roundtrip-whole-program-1319`,
+`corner-step-redescend`, `safe-z-retract-822`, `editor-to-blocks`, `blocks-dialect-decode`,
+`preflight-badge-838` (t1650's own fix stays green) — **38/38 green**, including the whole-registered-family
+round-trip test logging `IRON RULE — round-trip text differences: 0/0 :: []` — confirms no shipped wizard
+emits a modal-word combo that trips this mechanism (it only ever fires on the RECONCILE path — hand-edited or
+pasted text — never on a block-authored emit, so a clean 0/0 is exactly the expected shape, not a coincidence:
+`blockEmitter.js` is read by every leaf atom in the app, and this is the most direct proof that touching it
+broke nothing).
+
+### Full suite — measuring against the t1650 floor (node 99/0, e2e 2434 passed / 15 failed)
+
+node: **99/0**, clean. e2e: **2440 passed / 10 failed / 6 skipped** — fewer failures than the floor. Of the
+10: 9 match documented churn by exact name (`collapsible-panes-752`, `editor-chip-space-1323:60` itself,
+`formfield-loud-mismatch-1636`, `open-as-modal-1625:54`, `pane-splitter-790` ×2, `pocket-cavity-2d`,
+`update-check` ×2). One new name, `import-safety-1219:47` — isolated with `--workers=1` alongside
+`pocket-cavity-2d`: **both passed clean**, neither touches `gcodeToStack.js`/`blockEmitter.js`. No ID outside
+the documented floor survived isolation. Restored 11 regenerated `verification/*.png` before staging.
+
+### Capacity
+
+A design-then-build turn: verified the advisor's hypothesis against the actual architecture before writing
+any code (confirmed each modal word already has its own atom, so "state alongside a leaf" was the right
+model, not an assumption), found one clean generic seam that needed zero per-atom changes, and proved both
+halves of the mechanism (parse-side capture, emit-side replay) wrong independently before trusting either.
+Touched `blockEmitter.js` — the single most shared file in the whole emit path — so the whole-family
+round-trip test carried the real weight of this turn's regression proof, and it held at 0/0.
