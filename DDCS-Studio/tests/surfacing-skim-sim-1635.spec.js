@@ -58,7 +58,11 @@ test('Skim mode: the REAL macro-executing sim traces the FULL raster, not one pl
     expect(skimTrace.segments.length, 'comparable segment count to Normal (same body, same walk)').toBeGreaterThan(normalTrace.segments.length - 5);
 });
 
-test('Normal mode is byte-identical (no G91, no skim frame-read markers) — the fix touched Skim only', async ({ page }) => {
+// t1646 (advisor review) — RENAMED: this test asserts the ABSENCE of three skim-specific markers, not a byte
+// comparison — the title said "byte-identical," which is a stronger claim than what's actually checked. The real
+// byte-identical-round-trip claim already has its own test (zmode-modal-1609.spec.js's "emit: byte-identical at
+// default; Skim flips to the relative shape and flips back clean") — this one stays scoped to what it measures.
+test('Normal mode carries no skim-specific artifacts (G91 wrap / live-frame read / SKIM marker) — the fix touched Skim\'s build path only', async ({ page }) => {
     await open(page);
     await setParams(page, P);
     const normalCode = await code(page);

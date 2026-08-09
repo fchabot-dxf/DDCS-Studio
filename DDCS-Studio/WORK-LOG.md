@@ -18995,3 +18995,160 @@ Light — a clean, bounded act (a 2-line fix plus one focused verification gap).
 my first draft (assuming N93/N94 sit right after the guard, when they're actually the program's tail block)
 is a good reminder that even a "should be quick" assertion needs driving against the REAL emitted text before
 trusting it. Comfortable to continue.
+
+## t1646 — REVIEW OF t1644 (small finding fixed) + the pos/dim handle investigation + 6 AMENDMENTS re-aimed the
+## act mid-flight to a bigger, different feature — punted (advisor's own offered escape hatch), reported in full
+
+### The t1644 review finding
+
+Renamed `surfacing-skim-sim-1635.spec.js`'s "Normal mode is byte-identical" test to "Normal mode carries no
+skim-specific artifacts (G91 wrap / live-frame read / SKIM marker)" — it asserts absence of three markers, not
+a byte comparison, and the title claimed the stronger thing. The genuine byte-identical-round-trip claim
+already has its own test (`zmode-modal-1609.spec.js`'s flip-to-skim-and-back), so left this one scoped to
+what it actually checks rather than duplicating that coverage.
+
+### THE ORIGINAL DISPATCH — driven with a REAL mouse drag, not a field write (the t1642 standard)
+
+⚠ **This framing turned out to be the WRONG feature** — see "THE RE-AIM" below, which landed mid-investigation.
+The work below is real, verified, and kept (non-vacuity proven, all green) — but it answers a DIFFERENT
+question than what the user actually asked for. Read it as "existing-behavior verification, useful context
+for the real feature," not as this turn's deliverable.
+
+Deleted the stray `console.log('buildSurfacingSpec handles:', ...)` at `surfacingView.js:63` — fired on every
+canvas render (every keystroke), landed in e6e681e8 alongside the handle feature and never removed.
+
+**Measured, with `page.mouse.down/move/up` on the actual SVG `.fc-handle` elements (`data-hid="origin"` /
+`data-hid="size"`)** — not a field write, not a click on the different stock-attach marker t1642 exercised:
+- **The POS handle** (`point` gesture, `surfacingView.js:60`) moves `sf_originX`/`sf_originY` ONLY, leaves W/H
+  untouched, and reaches the emit — verified at BOTH the on-open default (area == full stock, the user-ruled
+  auto-fill that stays) and a shrunk area. `traceToolpath`'s `maxX`/`maxY` shift by EXACTLY the delta the
+  DOM field itself reports after the drag (two independent reads agreeing — the real assert-the-value bar).
+- **The RECT (size) handle** (`rect` gesture, `surfacingView.js:61`) resizes `sf_w`/`sf_h` ONLY at the
+  default near-corner anchor, leaves origin untouched, and reaches the emit — the X shift is exact (a row is
+  a continuous sweep to the declared W); the Y shift is checked within one stepover step, not bit-exact,
+  because the row COUNT is stepover-quantized (the last row lands at a stepover multiple, not precisely at
+  H) — measured this the hard way (my first assertion assumed exact equality and was wrong; the real emitted
+  bounds told me the actual contract).
+- **Handles are independent**, confirmed both directions: dragging pos never touches W/H; dragging rect at
+  the default anchor never touches origin.
+- **A measurement trap worth recording**: `traceToolpath(...).bounds.minX`/`minY` ALWAYS include the tool's
+  assumed (0,0) start-position segment, regardless of where the raster actually sits — so `minX`/`minY` are
+  NOT a reliable "where does the raster start" signal (a naive "width unaffected by an origin move" assertion
+  fails even though the raster genuinely didn't change width, because `minX` stays pinned near 0 while `maxX`
+  moves). `maxX`/`maxY` are unpolluted — the same reason `placement-rollout.spec.js`/`placement-anchor-1642`
+  already only ever use `Math.max`, never a min-based width; I'd used that exact pattern myself in earlier
+  acts this session and still tripped on it here until the real emit corrected me.
+
+**NO CODE DEFECT FOUND in the wizard's own drag→field→emit chain.** Both handles already worked, in every
+scenario driven (default full-stock size, shrunk size, X-only drag, diagonal drag, resize). This spec PINS
+that fact — it does not report a fix because none was needed.
+
+### The TWIN — DATA parity confirmed, GUI parity is a real gap, reported not built
+
+`user_surfacing_data`'s generic bindings-driven form renders `originX`/`originY`/`w`/`h` as PLAIN NUMBER
+INPUTS — no 2D canvas, no draggable handle (checked specifically for the SAME `data-hid="origin"`/`"size"`
+ids the wizard uses — absent; a generic `[data-hid]` check alone would have been a false positive, since
+sim-start markers use the same attribute for unrelated ops). **DATA parity is real**: a plain field write to
+the twin's `originX` correctly shifts its own emitted bounds by exactly the written amount (measured).
+
+Building the twin a draggable canvas is a SEPARATELY-SCOPED FEATURE, not a small addition, and not built here:
+it would mean declaring `group`/`role`/`anchor` on `SURFACING_BINDING_SPECS`' rows — a mechanism
+`deriveBindings.js` already supports for a hand-written spec (not just blocks-authored ones), but the ONE
+existing user (`cornerData.js`) uses it for RELATIVE reposition deltas anchored to a previous sim-start pass
+— a materially different shape than surfacing's ABSOLUTE point + rect. Real open design questions (what
+anchor kind for an absolute drag point; whether `layoutSpecFromOp` even supports a bare rect+point today)
+that deserve their own ruling, not a guess folded into this act.
+
+### Non-vacuity, proven by breaking the actual gesture math
+
+Temporarily stubbed `canvasWidgets.js`'s `point` gesture's `drag` to return `null` (scratch copy saved
+first) — the pos-handle test went RED exactly where expected (`originX genuinely moved` failed, `Received: 0`
+— the drag silently did nothing), while the INDEPENDENT rect-handle test stayed green (it doesn't depend on
+the `point` gesture) — confirming the tests target the right mechanism and don't cross-contaminate. Restored,
+all 3 green again.
+
+### THE RE-AIM — 6 amendments landed mid-flight, and why this act stops here
+
+While the pos/dim-handle work above was in progress, 6 amendments arrived in sequence, progressively
+correcting the referent of "surfacing start position needs developed." Summarized (each superseding/refining
+the last where they conflict):
+
+1. **Wrong feature entirely.** A `git log` entry on `origin/main` (7462287d, not pulled — advisor will
+   reconcile) settled it: the ask is a START MARKER mirroring the probe wizards' GUI — tells the SIM where
+   the operator will jog, sim-only, so the preview draws the raster where the work actually is instead of at
+   the program origin. NOT the pos/dim handles.
+2. **One widget, both Z-modes**, same look/drag; the MEANING differs by mode (advisor's own inference on the
+   WCS meaning, flagged as unconfirmed — survey before building).
+3. **Universal concept** (every wizard with a relative/WCS mode), but DELIVER surfacing only — declare the
+   shared semantic once, at a shared layer, name the seam, report which shipped wizards would join it.
+4. **The shared layer is the wizards-as-data declaration layer**, not a wizard-side helper — both the
+   built-in wizard and the twin must read ONE declaration; the marker WRITES to that declared seam.
+5. **Reuse, don't invent**: the relative-mode GUI already exists in the probe wizards — `def.simStartParams`
+   (a marker→param binding, consumed by `userOpView.js`) is the strong lead to verify. Drops the WCS-meaning
+   survey (the user ruled it's the same widget regardless — no need to investigate THAT question).
+6. **Correctness-reversal**: WCS mode is NOT byte-identical — the marker there controls the actual
+   origin/anchor OFFSET, so the emit MOVES. Strong lead: this is plausibly the EXISTING pos handle
+   (`sf_originX`/`sf_originY`) — meaning the feature is ONE marker whose TARGET the mode declares (WCS →
+   writes originX/originY, emit moves; Skim → seeds `#790`/`#791`/`#792` for the preview only, emit
+   unchanged). This partly un-scopes the pos handle from "report only" — it may be the WCS arm of the real
+   feature. The advisor's own closing line: *"if the churn has made this act incoherent to build, say so,
+   finish the console.log delete plus whatever is cleanly done, and pass back."*
+
+**Taking that offer.** A bounded, READ-ONLY check (not a build) of the strongest lead before deciding:
+`def.simStartParams` is real and already used by exactly 2 twins — `alignmentData.js` (`{x:'ax',y:'ay'}` +
+a `relSpanFrom` pair) and `rotaryClockData.js` (same shape). Both write into REAL params the emit reads
+directly (`userOpView.js`'s own doc comment: "update() merges it into the op params → ... + the emit") — this
+matches the WCS arm (origin offset genuinely moving the emit) well. It does NOT obviously cover the Skim arm
+(a PREVIEW-ONLY seed with a byte-identical emit) — that half smells like the SEPARATE `previewVarSeed`
+mechanism (`wizardManager.js`, `atcViews.js`), not `simStartParams`. `opSimStarts.js` (amendment 3's named
+candidate seam) is a COMPUTED-start registry (`BUILT_IN` map + `setUserSimStarts`/`USER_STARTS` for custom
+ops) — a plausible sibling home, but distinct from a user-DRAGGED marker, exactly as amendment 3 itself
+flagged. And `userOpView.js`'s `simStartParams` path is TWIN-side only (`wiz_user_form`) — the built-in
+`surfacingView.js` is a wholly separate code path with no existing bridge to it.
+
+**So: three real, only-partly-reconciled mechanisms** (`def.simStartParams` for twin draggable→real-param,
+`opSimStarts.js` for computed/registry-based starts, `previewVarSeed` for preview-only variable seeding),
+a genuine design decision on which is the seam (or whether a new one is needed) for a MODE-DEPENDENT target
+(real param vs. preview-only seed) that BOTH the wizard and twin must read from ONE wizards-as-data
+declaration, verified with DIFFERENTLY-SHAPED assertions per mode (WCS: assert-the-value emit movement;
+Skim: assert byte-identical emit + preview movement) plus a mode-flip carry-over question the advisor
+explicitly wants surveyed, not guessed. This is a coherent, real, separately-dispatchable act — not a
+tail-end addition to a turn that already went through 6 rounds of re-aiming. Stopping here rather than
+rushing a partial build of a still-settling design, per the advisor's own explicit permission.
+
+**What's KEPT from this turn** (cleanly done, real, verified, still relevant): the stray `console.log`
+deletion (unconditionally asked for across every amendment) · the t1644 review fix · the pos/dim-handle
+verification (directly answers amendment 6's "verify WCS: dragging the marker N mm moves the emit N mm" for
+whichever mechanism the next act settles on, since the pos handle IS the current `sf_originX`/`sf_originY`
+control either way) · the twin's DATA-parity finding (a plain field write to `originX` reaches its own emit —
+relevant groundwork for whichever seam gets chosen) · the three-mechanism survey above, which directly
+answers amendment 3's "name the seam" request (answer: none of the three alone — a design call, reported not
+made) and gives the next dispatch concrete file/line starting points instead of a cold start.
+
+**NOT done, for the next act**: the actual start-marker widget (built-in + twin), the mode-dependent-target
+wizards-as-data declaration, wiring `previewVarSeed`/`#790`-`#792` for Skim, the WCS-arm wiring (whether via
+`simStartParams` or the existing pos handle directly), the mode-flip-carryover behavior, and amendment 3's
+"list which shipped wizards have a relative-or-WCS mode" (not yet measured — a cheap grep for the next
+session, flagging so it isn't forgotten).
+
+### Verification
+
+- `surfacing-pos-dim-handles-1646.spec.js` (3 new tests, real mouse drags) — all green, non-vacuity proven.
+- `surfacing-skim-sim-1635.spec.js` (renamed test) — still green.
+- Adjacent surfacing coverage swept together: `placement-anchor-1642`, `placement-rollout`, `zmode-modal-1609`
+  — 18 tests total, all green.
+- Smoke tier: 71/71 green.
+- Full suite run once (node 0/0): 13 e2e failed, ALL isolated — 7 matched the documented mouse/update-check
+  class by name; 4 matched documented churn members (`open-as-modal` x2, `blocks-live-form`, a `homing`
+  pair — `homing-inplace-e3`), isolate-green; `fork-parity-1593` and `formfield-loud-mismatch-1636` (the
+  latter re-confirmed fully alone with `--workers=1`, the third time this exact page-boot-timeout-under-
+  contention has shown up this session, always on a spec my changes never touch) both isolate-green. No ID
+  outside the documented floor survived isolation. Restored 10 regenerated verification/*.png before staging.
+
+### Capacity
+
+Moderate turn, deliberately closed early rather than pushed. The pos/dim-handle work is genuine, verified,
+non-vacuous — but it answered the wrong question, and the REAL feature that emerged across 6 amendments
+(a mode-dependent declared seam spanning at least 3 existing preview mechanisms, two consuming faces, and
+two differently-shaped verification contracts) is a fresh, substantial act that deserves a clean start rather
+than a rushed tail. Comfortable to continue into that act NEXT turn, fresh.

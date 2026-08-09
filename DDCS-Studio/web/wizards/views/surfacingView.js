@@ -60,7 +60,6 @@ function buildSurfacingSpec(params, stock) {
         { type: 'point', id: 'origin', fx: 'sf_originX', fy: 'sf_originY', x: ox, y: oy, label: 'pos', ...hs.pos },
         { type: 'rect', id: 'size', field: 'sf_w', fieldH: 'sf_h', minw: 1, minh: 1, label: 'W × H', ...hs.size },
     ], setFields);
-    console.log('buildSurfacingSpec handles:', handles, 'hs:', hs);
     const pl = placementSpec(params, surfacingBBox(params), 'sf_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
