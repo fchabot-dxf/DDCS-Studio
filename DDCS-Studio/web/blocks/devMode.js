@@ -481,6 +481,24 @@ export function maybeMaterializeParamGroup(def) {
     return def;
 }
 
+// t1664 (ruled) — THE CORNER WALL: a guard-heavy Customize surface rendered every structural arm fully
+// EXPANDED on open (Corner measured: 371 guards, 1852 canvas blocks, ~5.4s to settle — a friendliness defect
+// wearing a perf costume, on a project whose stated priority is friendliness/customization FIRST). Guards are
+// specifically what balloons a customize surface (t1595 renders every arm through a DO mouth so nothing is
+// silently discarded — that is the CORRECTNESS fix; this is the RENDER-COST fix for the same mechanism).
+// Collapsing them by default does the LEAST render work up front; expanding one guard does that guard's own
+// work then. NOTHING becomes unreachable — collapsed is the SAME native Blockly affordance (one click to
+// expand) t1654's DURABLE_DATA_FIELDS already round-trips for a USER's own later collapse choice; this only
+// sets the DEFAULT the very first time a surface opens, on a FRESH reconstruction (never overrides a value the
+// user already set and saved). Generic — every guard-carrying twin's Customize surface benefits, not just
+// Corner; Corner is the measured case, not a special case.
+function collapseGuardsByDefault(rec) {
+    if (!rec) return;
+    if (rec.type === 'guard') rec.collapsed = true;
+    (rec.children || []).forEach(collapseGuardsByDefault);
+    (rec.uiChildren || []).forEach(collapseGuardsByDefault);
+}
+
 // S4-5 — reconstruct a user op into a Blocks op (the shared step editWizardDef + the multi-op editWizardDefs both use):
 // resolve the def, opt-in MATERIALIZE its pendant fields (a pill-based op gains its cam_field/param_field blocks so they
 // are editable in Blocks — t1103/t1111, a no-op for twins/literal/already-done), wrap a RECOGNIZED generator twin's exec
@@ -494,7 +512,9 @@ export async function reconstructUserOpBlock(opType) {
     const { template: forkTpl, recognized } = wrapRecognizedForFork(def);
     try {
         const { makeOp } = await import('./opBuilders.js');
-        return { opC: makeOp(opType, defaultParams(def), forkTpl), def, recognized };   // wrap template → an op (pills round-trip)
+        const opC = makeOp(opType, defaultParams(def), forkTpl);   // wrap template → an op (pills round-trip)
+        collapseGuardsByDefault(opC);   // t1664 — the fresh reconstruction's default collapse state
+        return { opC, def, recognized };
     } catch (e) { console.warn('reconstruct op block: build failed', e); return null; }
 }
 

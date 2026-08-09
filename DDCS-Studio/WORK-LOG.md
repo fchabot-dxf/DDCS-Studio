@@ -19994,3 +19994,99 @@ Two independent, well-scoped items: closing a vacuity gap the advisor found one 
 already fixed (same mechanism, same fix shape, proven the same way — inject, confirm red, remove), and a
 ruled naming consistency pass that turned up more private-copy sites than a shallow grep would have shown
 (pocket's `leafPair`-generated pair). Neither touched emit; both verified that claim rather than assumed it.
+
+## t1664 — REVIEW OF t1662 (PASS) + THE CORNER WALL: collapse delivered and verified, the real cost named honestly (turn 1664)
+
+### The t1662 review
+
+Advisor verdict: PASS, both halves. The label sweep — checking every binding for both params across the whole
+registry instead of trusting a param count — was named as the part worth naming: it found three private-copy
+sites where a shallow grep would have found two. The byte-identical-by-construction proof (grepping every
+`.label` reference in `blockEmitter.js` first, THEN backing it with a regression sweep) was called the right
+order to establish it in.
+
+### THE ACT — THE CORNER WALL (ruled)
+
+Corner's Customize surface builds ~1852 Blockly blocks (371 guards, both structural arms fully rendered per
+t1595) and takes ~5.2-5.4s to settle. Ruled direction: collapse by default, measure before and after with the
+SAME methodology, and determine from the measurement whether collapse alone is enough.
+
+**Measured BEFORE** (the project's own established `customize()` settle-loop, unchanged): blockCount **1852**,
+msToFirstBlocks **~3820ms**, msToSettle **~5400ms**.
+
+**Implemented**: `collapseGuardsByDefault(rec)` in `devMode.js`, called once inside `reconstructUserOpBlock` —
+the SHARED reconstruction step both `editWizardDef` and `editWizardDefs` use — walks the freshly-built op
+record and sets `collapsed: true` on every `guard`-type block. Generic, not Corner-specific: every
+guard-carrying twin's Customize surface gets the same default. Never overrides a value the user already set
+and saved (this only runs on a FRESH reconstruction from the template, before any load).
+
+**Measured AFTER**: blockCount **1852** (unchanged), msToFirstBlocks **~3753ms**, msToSettle **~5179ms** — a
+**~4% wall-clock reduction**. Named as a suspect, not assumed as a cause, per the dispatch — and the
+measurement says plainly: collapse alone does NOT get there.
+
+### THE HONEST FINDING — profiled, not guessed
+
+Instrumented `editWizardDef` with `performance.now()` marks at each phase (temporary, removed after) to find
+where the real cost lives:
+- `reconstructUserOpBlock`: ~3ms
+- `stackToWorkspace` (Blockly's own `serialization.workspaces.load` deserializer): **~1.45s — the single
+  largest identified synchronous cost**, measured IDENTICAL whether guard blocks carry `collapsed:true` or
+  not (confirmed directly: block count stays 1852 either way — Blockly still INSTANTIATES every block model
+  regardless of collapse state; `collapsed` changes visual treatment of an already-built block, it does not
+  skip building it)
+- `workspaceToStack` (the read-back sync): ~3ms
+- an `applyOpGating`-shaped loop calling `setWarningText`/`setEnabled` on all 1852 blocks: ~13ms
+- `emitMapped` for the whole op: ~41ms
+
+None of these individually or summed account for the full observed wall-clock — the remainder is Blockly's
+own internal SVG/layout rendering, which happens across the render pipeline the native `collapsed` flag does
+not bypass. **The real fix would be NOT INSTANTIATING a collapsed guard's children at all** (lazy/deferred
+materialization — build the subtree only when a guard is first expanded), which is materially bigger
+architecture than "set a flag": a new declared contract for un-materialized children, an expand-time build
+step wired to Blockly's own event system, and read-direction reconciliation so `workspaceToStack` still
+reports an unexpanded guard's true children for save/emit. Reported as a SIZED RECOMMENDATION for the advisor
+to rule on, not built speculatively — the dispatch's own rule 4 ("no new affordances beyond what collapsing
+requires") draws exactly this line.
+
+### Verify — nothing unreachable, byte-identical emit
+
+New spec, `corner-wall-collapse-1664.spec.js`, three tests:
+- Every one of Corner's 371 guard blocks starts collapsed on a fresh Customize open (measured, not assumed —
+  counts guards vs collapsed guards, asserts equal).
+- Expanding a collapsed guard (`setCollapsed(false)`, the exact API a user's click triggers) reveals the SAME
+  child count that was always there — nothing dropped by collapsing, nothing hidden beyond one click.
+- Byte-identical emit: built Corner's op record twice — once with `collapsed:true` as shipped, once with
+  every `collapsed` key stripped (the counterfactual "as if this act never shipped") — `emitMapped` produces
+  IDENTICAL text both ways, confirming this is a rendering-only change (a `collapsed` block property is never
+  read anywhere in the emit path).
+
+**Non-vacuity**: temporarily reduced `collapseGuardsByDefault` to a no-op (scratch-copy saved first), ran the
+two collapse-behavior tests — both went genuinely RED (`Received: 0` where `Expected: 371`; `Received: false`
+where `Expected: true` for "starts collapsed"). ⚠ First attempt showed a FALSE negative (both tests still
+green with the no-op in place) — the stale-mem-server trap for a THIRD time this run; caught via `netstat`
+(a process was still LISTENING on :3211 from an earlier background run), killed it, re-ran, got the genuine
+red. Restored the real fix, re-verified all three green.
+
+### Regression sweep — devMode.js is central to the whole Customize/fork/save-dialog mechanism
+
+`fork-parity-1593` (both tests) · `guard-roundtrip-1595` (both tests, including the 152-flip byte-identical
+sweep across every guarded twin) · `save-dialog-declared-1615` (all 3) · `blocks-live-form` (all 6) ·
+`mouth-declaration-1638` · `param-group-rows-1605` (all 3) — **17/17 green**.
+
+### Full suite — measuring against the t1662 floor (node 99/0, e2e 2445 passed / 10 failed)
+
+node: **99/0**, clean. e2e: **2450 passed / 8 failed / 6 skipped** — matches the floor's failure COUNT exactly.
+Of the 8: 6 match documented churn by exact name (`collapsible-panes-752`, `formfield-loud-mismatch-1636`,
+`pane-splitter-790` ×2, `update-check` ×2). Two were new/re-appeared names (`modal-pre-canvas-1654:27` — t1654's
+OWN spec, boots through the same canvas-load path — and `open-as-modal-1625:108`, seen before) — isolated with
+`--workers=1` after confirming no stale server: **5/5 passed clean**. No ID outside the documented churn/
+self-contention class survived isolation. Restored 11 regenerated `verification/*.png` before staging.
+
+### Capacity
+
+A genuinely deep investigation for what looked like a simple rendering toggle: measured before assuming,
+profiled with real instrumentation rather than guessing where Blockly's cost lives, and reported the honest
+result — collapse-by-default is real, correct, and verified, but does not solve the wall-clock problem it was
+aimed at. Delivered the ruled UX direction faithfully while being explicit that "the corner wall" itself needs
+a bigger, separately-sized act to actually fall. Hit the stale-mem-server trap a third time and caught it
+before trusting a false result — the pattern is now well-established enough to check for on sight.
