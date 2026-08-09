@@ -20559,3 +20559,165 @@ entirely — a reminder that "run the related tests" is a weaker net than "run e
 already ran 112 targeted tests first. Three files touched for the real fix + its regression update
 (`createPreviewPanel.js`, `cornerData.js`'s comment, `interpass-connector-1235.spec.js`); one new permanent
 regression spec (`corner-traverse-connector-1670.spec.js`).
+
+## t1672 — REVIEW OF t1670 (PASS) + ROOT CAUSE B: RULED AND SHIPPED (turn 1672)
+
+### The t1670 review
+
+Advisor verdict: PASS. Named the regression the full suite caught (interpass-connector-1235 asserting a now-
+false assumption) as "exactly the class of vacuity we have been hunting all week," and confirmed retargeting
+its tests to MANUAL (the case that genuinely still needs a connector) as fixing the fixture, not weakening it.
+Also: **the suite contention was the advisor's own concurrent activity** (a real-browser screenshot + a
+Playwright run in a sibling worktree, while I held the ball) — acknowledged as a violation of their own
+serialize-suites rule, with a standing commitment not to run specs while I hold the ball. Not investigated
+further this turn; noted for the record.
+
+### THE RULING — Option (A), decouple the shift from the backdrop
+
+Advisor ruled directly rather than sending Root Cause B back to the user: `sceneFrame.js` already declares
+`partZeroShift` as the ONE scene transform every renderer should read; the Layout pane's gate behind
+`toolMachineFrame` (an unrelated "draw the envelope backdrop" decision) is the defect itself — two concepts
+fused into one condition. Rejected the alternative (a new `layoutFollowsPartZero` opt-in flag) explicitly as
+the hand-maintained per-op registration pattern this project has already collapsed once (t1638, at the FIFTH
+silent-drop instance for block mouths) — every op would eventually need to remember to set it, and the one
+that forgets fails exactly like corner did. Directed: read the existing declaration, verify the blast radius
+by enumerating every affected op exactly (not estimating), and stop if any op turns out to genuinely need the
+old unshifted behavior.
+
+### THE ENUMERATION, exact (per the advisor's explicit "name them, do not estimate")
+
+32 op-def files under `blocks/dataOps/` (38 total minus 6 shared helpers). Every `userOpFromStack(...)` call's
+panel-type argument read directly, cross-checked against `PANEL_TYPES`'s `mode` field:
+
+- **14 AFFECTED** (panel mode `3d2d`, non-lathe, `toolMachineFrame:false` today — confirmed live via
+  `opSimContext`, not assumed): `corner_data`, `bore_data`, `alignment_data`, `contour_data`, `drill_data`,
+  `edge_data`, `pocket_data`, `rotary_clock_data`, `rotary_center_data`, `surfacing_data`, `slot_data`,
+  `tap_data`, `text_data`, `middle_data`.
+- **1 CONTROL** — `homing_data`: `toolMachineFrame:true` already, confirmed live (my own t1670 report had
+  assumed this without checking; verifying it directly this turn caught that the assumption happened to be
+  right, not a foregone conclusion — `userOpFromStack`'s positional `sim` arg only set `{forceMachine:true}`
+  for homing, so the `toolMachineFrame:true` must come from an internal `sim`-block declaration in
+  `homingDataStack` that wins over the positional default; didn't need to trace further once confirmed live).
+- **7 EXCLUDED, separate code path** (lathe ops — `withLatheScene` sets `def.layout.kind`, which
+  `layoutSpecFromOp`'s own early return (`latheLayoutSpec`) intercepts before reaching any of this code):
+  `lathe_faceprobe`, `lathe_centerdrill`, `lathe_polygon`, `lathe_odprobe`, `lathe_odturn`, `lathe_parting`,
+  `lathe_facing`. Confirmed live — a lathe spec carries no `placement` field at all, proving it never touches
+  the changed code, not just reading it that way from the source.
+- **10 EXCLUDED, no 2D Layout pane at all** (panel mode `3d`/`form`/`commscreen` — `renderLayout2D` is never
+  meaningfully populated for these): `atc_test_data`, `atc_warmup_data`, `atc_table_data`, `atc_change_data`,
+  `atc_length_data`, `atc_check_data`, `comm_data`, `wcs_data`, `pause_confirm`, `io_step`.
+
+14 + 1 + 7 + 10 = 32. Matches the file count exactly — nothing skipped.
+
+### THE FIX — one declared value, reusing an already-proven mechanism, not touching hundreds of call sites
+
+Naive framing: "shift the stock rect." Real requirement (confirmed by reading `panelTypes.js`'s handle-
+building loop closely first): if I shifted ONLY `stockOut.ox/oy`, the STOCK would move but every HANDLE and
+MARKER — which read raw, unshifted world coordinates throughout the ~400-line function, with zero reference to
+any WCS transform — would NOT, decoupling them from the stock rather than fixing the divergence. The 3D pane
+avoids this because `partFrame` is ONE THREE.js group containing stock+route+markers+tool, so shifting the
+group shifts everything together; the 2D Layout pane has no equivalent.
+
+Found it already existed: `viz/featureCanvas.js` has `this._placement` (default `{0,0}`), read by `_disp()` —
+"pattern items/handles ride this; stock is datum-fixed" — used for drawing paths/handles/items, with a
+PROVEN, symmetric drag round-trip already wired: `pointermove` does
+`this.spec.onDrag(id, {x: w.x - p.x, y: w.y - p.y})` — subtracting the SAME placement before handing the raw
+world position to the caller. This mechanism is used for a DIFFERENT purpose today (per-op pattern placement)
+but was, critically, **never populated by `layoutSpecFromOp`** — grepped `placement:` in `panelTypes.js`
+before this turn: zero matches. A fully generic, already-tested display+drag round-trip sitting dormant.
+
+`layoutSpecFromOp` (`wizards/ops/panelTypes.js`):
+- computes `partZeroShift` UNCONDITIONALLY now (its own `r.shown` internal gate already returns `{0,0,0}` for
+  the common no-envelope case — the "unpinned is byte-identical" guarantee falls out of the shared function,
+  not a second local condition I'd have to keep in sync),
+- folds it into `stockOut.ox/oy` as before (unconditionally, not gated),
+- adds it to the returned spec as `placement: {x, y}` — a NEW field, so every handle/marker/path drawn via
+  `_disp()` (which already existed for this exact purpose) picks it up automatically, and every drag already
+  un-shifts symmetrically on write-back.
+- `machSpread` (the envelope BACKDROP) stays gated on `toolMachineFrame`, unchanged — the legitimate, separate
+  "does this op want the envelope rectangle drawn" decision the ruling explicitly preserved.
+
+One function, ~10 real lines changed, zero new machinery, zero new per-op registration.
+
+### VERIFY — per the ruling's 6-point list, each with real values
+
+**1-2. Enumerated + verified, every affected op + the control, pinned and unpinned**, via a permanent spec
+(`layout-partzero-shift-1672.spec.js`) that calls `layoutSpecFromOp` directly (not pixels — an early pixel-
+based attempt hit real auto-fit-rescale noise between reads, abandoned in favor of the SAME precise pattern
+`corner-layout-coherence.spec.js` already established: call the real function, compare real returned values):
+- **Unpinned, all 15**: `stock.ox/oy` = `placement.x/y` = exactly `0` — byte-identical to before this turn.
+- **Pinned (G55 at {300,200}, envelope shown), all 15**: `stock.ox/oy` AND `placement.x/y` both equal the
+  independently-computed `partZeroShift(...)` value exactly (`toBeCloseTo(..., 6)`) — stock and every
+  handle/marker read the identical one source, moving together by construction, not by coincidence.
+
+**3. No disagreement found** across all 15 — nothing papered over, nothing to report as a residual finding.
+
+**4. Emit byte-identical**, all 15, pinned vs unpinned — asserted directly (`unpinnedEmit === pinnedEmit`),
+not inferred: this is a rendering-only transform, confirmed by value for every op, not just corner.
+
+**5. Non-vacuity**: scratch-copy saved, re-gated `_pz` behind `machine` (the exact pre-fix condition), re-ran
+the permanent spec — genuinely RED (`Received: 0` where `Expected: 300` for corner's pinned `stock.ox`, the
+first op checked), restored from the scratch copy, reconfirmed all 3 tests green.
+
+**Beyond the ruling's list — two things worth being honest about actually checking rather than assuming:**
+- **A lathe op stays untouched**: confirmed live (no `placement` field in its spec at all), not just inferred
+  from the early-return source.
+- **The drag round-trip works live, not just in the data model**: dragged corner's real Start handle in the
+  browser while WCS-pinned — the written raw param moved a small, sane distance (≈78mm, well inside a
+  [3,150]mm sanity band) nowhere near the 300/200 pin magnitude, proving `onDrag` genuinely receives the
+  un-shifted local delta end-to-end, not just that the two numbers match in isolation.
+
+### A real bug the regression sweep caught in my OWN implementation — fixed, and the fix now has its own test
+
+The first canvas/layout-focused regression sweep (161 tests) found ONE genuine failure:
+`corner-datum-independence.spec.js` — the crosshair position changed even at a NON-DEFAULT datum with NO WCS
+pin at all (`partZeroShift` returning `{0,0,0}`, verified directly). Root cause, found by re-reading my own
+diff rather than assuming the ruling itself was wrong: `stockOut.ox = _pz.x - _dp.x` (the ORIGINAL machine-
+frame-only formula, which I'd made unconditional) subtracts the DATUM offset (`_dp`) from the stock rect for
+EVERY op now — but pre-t1672, that `_dp` subtraction only ever applied to machine-frame ops (homing); every
+other op's stock rect always sat at local `{0,0}` regardless of datum, with ONLY the crosshair (`spec.origin`,
+untouched by this turn) showing where the datum was. My unconditional formula double-applied the datum concept
+to the stock rect for every part-frame op — a real regression, not a flaw in the ruling.
+
+**Fix**: `stockOut.ox = _pz.x - (machine ? _dp.x : 0)` — the WCS-pin shift (`_pz`) now applies unconditionally
+(the actual fix), but the datum subtraction (`_dp`) stays gated on `toolMachineFrame` exactly as it always was,
+preserving the pre-existing, tested "stock rect ignores datum; only the crosshair shows it" contract for every
+non-machine-frame op. Added a fourth test to the permanent spec pinning this exact property (non-default
+datum, zero shift, every non-machine-frame op's `stock.ox/oy` stays `0`) — my OWN first three tests had all
+used the default datum (`'nnp'`, where `_dp={0,0}` by construction), which is precisely why they didn't catch
+it; the new test uses `'ppp'` specifically to close that gap. Non-vacuity: reverted to the unconditional
+formula, re-ran — genuinely red (`Received: -200` where `Expected: 0`, on the new test specifically; the other
+three stayed green, confirming they check orthogonal properties) — restored, all 4 green. The full canvas/
+layout regression sweep re-ran clean afterward.
+
+### Regression sweep
+
+The full canvas/layout-focused sweep (corner's entire suite, `guard-roundtrip-1595`'s 152-flip byte-identical
+sweep, `fork-parity-1593`'s 32-twin fork gesture, `corner-layout-coherence`, `homing-onopen-layout` — the
+existing test that already pins homing's own pin-vs-active-WCS coincidence, still exact — and every
+`*canvas*`/`*layout*`-named spec touching 8 of the 14 affected op types directly): **162/162 passed**, after
+the datum-subtraction fix above (the run that first caught the bug is superseded by this clean one).
+
+### Full suite — measuring against the t1670 floor (node 99/0, e2e 2445 passed / 14 failed, all 14 explained)
+
+node: **99/0**, exact match. e2e: **2447 passed / 16 failed / 6 skipped**. Of the 16: **9 match t1670's own
+documented churn pool** by exact name or family (`collapsible-panes-752`, `formfield-loud-mismatch-1636`,
+`middle-superset` shard, `op-params-complete` shard, `open-as-modal-1625`, `pane-splitter-790` ×2,
+`update-check` ×2). **7 carried different names** (`blocks-hover:120`, `g53-and-cut-legend:21`,
+`import-safety-1219:47`, `pocket-cavity-2d:9`, `save-dialog-declared-1615:78`, `switch-types` ×2) — isolated
+with `--workers=1`, full files: **14/14 passed clean**, including `pocket-cavity-2d` specifically (the name
+closest to this turn's actual blast radius, checked first for exactly that reason). All 16 accounted for; none
+unexplained. Notably, none of t1670's OWN churn names that were fix-adjacent reappeared this run
+(`guard-roundtrip-1595:115`, `interpass-connector-1235` ×3, `subscriber-error-surface-1656`) — consistent with
+the established rotating-subset pattern, and for `interpass-connector-1235` specifically, its absence here is
+itself a small further confirmation that t1670's fix holds under a full, unrelated run. Twelve regenerated
+`verification/*.png` restored via `git checkout --` before staging.
+
+### Capacity
+
+A ruled turn, not a diagnosed one — the design work was already done in t1670's sizing, so this turn's weight
+went into getting the IMPLEMENTATION right (the "just shift the stock" instinct would have been wrong and
+shipped a NEW divergence) and PROVING it broadly (15 ops, not 1, each independently verified by value) rather
+than trusting the pattern would generalize. Finding the dormant `_placement` mechanism first, before writing
+any new code, is the same "test the simplest existing lever before building" discipline this run keeps paying
+off with. One function changed (`panelTypes.js`), ~10 real lines; one new permanent spec.

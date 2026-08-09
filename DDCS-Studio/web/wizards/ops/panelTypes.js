@@ -180,16 +180,29 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // ('nnp') → origin {0,0} = the min-XY corner = the prior behaviour, so nothing shifts unless a non-FL datum is set.
     const _dp = datumXY({ x: stock.w, y: stock.h, datum: s && s.datum });
     // t554 — MACHINE-FRAME layout flavor (DECLARED via the op's sim{toolMachine:true} → opSimContext.toolMachineFrame; homing):
-    // draw the ENVELOPE rectangle + the declared HOME corner glyph as the backdrop (machine coords). t578 — the STOCK RIDES its
-    // WCS inside the FIXED envelope. t586 PREVIEW-PARITY E2c — read part-zero from THE ONE frame source (sceneFrame.partZeroShift,
-    // the SAME transform the 3D uses): the stock's DATUM corner lands at part-zero (min-XY = partZeroShift − datumXY), so the
-    // layout stock coincides with the 3D stock. BEHAVIOR FIX vs t578's local wcsOffsetXY (the ACTIVE WCS): a stock pinned to a
-    // NON-active WCS now follows its PIN like the 3D (before: it sat at the active WCS). Unpinned is unchanged (both = the active
-    // fallback). The homing switch-seek still IGNORES this stock for COLLISION (createPreviewPanel stk=null) — render-only here.
+    // draw the ENVELOPE rectangle + the declared HOME corner glyph as the backdrop (machine coords) — an op opts into the
+    // BACKDROP separately from the shift below (t1672 decouple; see next block).
     const machine = (def && def.opType && opSimContext(def.opType).toolMachineFrame) ? machineFrameSpec() : null;
-    const stockOut = machine
-        ? (() => { const pz = partZeroShift((typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().machine) || null, s, null); return { w: stock.w, h: stock.h, ox: pz.x - _dp.x, oy: pz.y - _dp.y }; })()
-        : stock;
+    // t1672 — PREVIEW-PARITY E2d: partZeroShift is THE ONE declared scene transform (sceneFrame.js's own doc: "Every
+    // renderer... reads this ONE source... so their frames can never drift") and the 3D pane already reads it
+    // UNCONDITIONALLY (gcodeViz3d's partFrame shifts every op's stock+route+markers+tool together, regardless of
+    // toolMachineFrame). Gating the READ behind toolMachineFrame — a flag about whether to draw the ENVELOPE BACKDROP,
+    // an unrelated decision — silently left every non-machine-frame op's Layout pane (corner, drill, pocket, ...)
+    // unshifted whenever a WCS pin was active, diverging from the 3D pane that always shifted (t1670's Corner bug,
+    // generalized). Compute it UNCONDITIONALLY — partZeroShift's own r.shown gate already returns {0,0,0} for the
+    // common case (no machine envelope configured), so the byte-identical-when-unpinned guarantee falls out of the
+    // shared function, not a second local condition here.
+    const _pz = partZeroShift((typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().machine) || null, s, null);
+    // t578 — the STOCK RIDES its WCS inside the FIXED envelope, for a MACHINE-FRAME op (homing): its DATUM corner
+    // (not necessarily min-XY) lands at part-zero (min-XY = partZeroShift − datumXY), so the layout stock coincides
+    // with the 3D stock. t1672 — every OTHER (part-frame) op keeps its pre-existing convention: the stock's min-XY
+    // corner sits at the shift alone, datum-independent (the crosshair below is what shows the datum — subtracting
+    // _dp here too would double-apply it, moving the stock rect for a non-default datum even at zero shift, a
+    // regression `corner-datum-independence.spec.js` caught: circles/crosshair diverged even fully unpinned). A
+    // stock pinned to a NON-active WCS follows its PIN like the 3D; unpinned (the common case) is unchanged (both
+    // = the active fallback, itself {0,0,0} with no envelope shown). The homing switch-seek still IGNORES this
+    // stock for COLLISION (createPreviewPanel stk=null) — render-only here.
+    const stockOut = { w: stock.w, h: stock.h, ox: _pz.x - (machine ? _dp.x : 0), oy: _pz.y - (machine ? _dp.y : 0) };
     const machSpread = machine ? { machine } : {};
     const origin = { x: (stock.ox || 0) + _dp.x, y: (stock.oy || 0) + _dp.y };
     // t120 — CORNER-MARKER INDEPENDENCE (Option A): the DATUM for the datum-relative marker spots = the CORNER position
@@ -544,7 +557,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
             else if (spotOnDrag) spotOnDrag(id, world);
         };
-        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, paths: previewPaths, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, paths: previewPaths, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
     }
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
@@ -575,9 +588,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, paths: previewPaths, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, paths: previewPaths, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
     }
-    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, ...machSpread, ...cornerPick, ...edgePick };
+    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
