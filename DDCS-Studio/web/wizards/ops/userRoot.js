@@ -25,7 +25,7 @@ export const paramGroupBlock = {
     type: 'param_group',
     label: 'Parameter Group',
     category: 'Wizard Inputs',   // t1623 — the ROLE axis: param_group/param_field are input declarations, one group (and one colour) with formfield & friends
-    kind: 'param_group',
+    kind: 'param_group', mouth: 'DO',
     defaults: { group: 'Settings' },
     fields: ['group'],
     // Emits its DO children (e.g. Set Variable assignments)
@@ -40,7 +40,7 @@ export const sectionBlock = {
     type: 'section',
     label: 'Section',
     category: 'Wizard Layout',
-    kind: 'section',
+    kind: 'section', mouth: 'DO',
     defaults: { title: 'Section' },
     fields: ['title'],
     emit: (params, children) => children || [],   // transparent — the label is authoring-only; emit order = children order
@@ -56,7 +56,7 @@ export const opUnitBlock = {
     type: 'opunit',
     label: 'Op Unit',
     category: 'Wizard Layout',
-    kind: 'opunit',
+    kind: 'opunit', mouth: 'DO',
     hidden: true,   // created PROGRAMMATICALLY at fork/load-wrap (a boundary around a recognized op's atoms), never dragged from the palette — a bare opunit has no opType
     defaults: { opType: '', defV: 0 },
     fields: ['opType', 'defV'],

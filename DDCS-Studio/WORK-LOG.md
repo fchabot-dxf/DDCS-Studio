@@ -18600,3 +18600,116 @@ it silently produces nothing — now LOUDLY, via step 4's guard, but still nothi
 This act ran long and pivoted hard mid-flight — the dispatched hypothesis didn't survive measurement, and
 the actual root cause (a Blockly bridge gap, not a bindings gap) needed real live-app reproduction with two
 separate round-trip experiments to isolate. The seat is genuinely long now. The next act should start FRESH.
+
+## t1638 — A BLOCK DECLARES ITS OWN MOUTH (epoch 3, fresh seat)
+
+Dispatch: five times (t1069 opunit · t1093 cam_table · t1595 guard · t1627 uibox · t1636 skim) a block kind
+holding children was missing from one of four hand-maintained kind-name lists (`bridge.js`'s `isWrap` array,
+its DO-mouth OR-chain, and the same OR-chain restated in `stackBridge.js`'s `toRecord`/`recToJson`), and
+`recToJson` silently wrote it CHILDLESS with no error. Asked to survey whether the two families collapse
+into one declaration, build it, and make a future sixth instance FAIL LOUD instead of silently discarding.
+
+### Step 1 — the survey: the two "families" were never two families
+
+Measured, not assumed. `isWrap` (9 kinds: container/path/loop/cond/depth/fill/place/rotate/skim) was already
+a SINGLE shared array read by all 3 of its consumers (bridge.js's shape generator, stackBridge's read AND
+write) — grepped every `isWrap` call site in `web/`, confirmed zero uses outside that mouth-decision role.
+The OTHER family (6 kinds: param_group/section/opunit/cam_table/guard/uibox) was an OR-chain of literal
+kind-name checks, independently RESTATED at three separate places (never itself collapsed the way `isWrap`
+was) — but produces the byte-identical behaviour: one `addMouth('DO')` / read `'DO'` input / write `'DO'`
+input, same as `isWrap`'s kinds. They were never two families, just one fact stated two different ways.
+**Answer: they collapse into ONE declaration.**
+
+### The fix — `mouthOf(def)` reads a per-block declaration, not a registry
+
+`bridge.js`: replaced `isWrap` with `export const mouthOf = (def) => def.mouth;`. The block-shape generator
+now does `else if (mouthOf(def)) addMouth(mouthOf(def))` (was: the OR-chain, then a separate `isWrap` check).
+`stackBridge.js`: `toRecord` (workspace→record) and `recToJson` (record→workspace) each collapsed their two
+branches into one `else if (mouthOf(def))`, reading/writing `b.getInput(mouthOf(def))` /
+`inputs[mouthOf(def)]` instead of a hardcoded `'DO'` string matched against a kind-name list.
+
+Declared `mouth: 'DO'` directly on the def, alongside its existing `kind`, for all 21 shipped mouth-holding
+kinds — `array`/`safetraverse` (container), `helix` (path), `count` (loop), `if` (cond), `stepdown` (depth),
+`fillzigzag`/`fillconcentric`/`filltext`/`surfacefill`/`stepover`/`pocketfill` (fill), `placeonstock`
+(place), `rotate` (rotate), `skim` (skim), `param_group`/`section`/`opunit` (userRoot.js), `cam_table`
+(camField.js), `guard` (guard.js), `layout_2d_canvas` (vizBlocks.js) — plus `pocketfill_ref`
+(`tests/support/served/literalPocketFill.js`, a test-only frozen reference leaf sharing `kind:'fill'`, so
+its rendered shape stays byte-identical too). `user_root` keeps its own two NAMED mouths
+(PRESENTATION/EXECUTION) — a genuinely different shape, handled separately, not part of this collapse.
+
+### Step 3 — the durable half: FAIL LOUD
+
+`recToJson`'s write direction now throws when a record carries children but its def declares no `mouth` —
+the exact silent-loss shape behind all five prior bugs. The READ direction needs no symmetric throw: since
+the block-shape generator ALSO gates on `mouthOf(def)`, a mouthless kind never gets a `DO` statement-input
+rendered in Blockly at all, so there is structurally nothing for a user to connect a child into on that
+side — only the WRITE direction can silently carry children a JS-built record supplies that the shape never
+expected (exactly t1636's shape: a wizard stack builder hands `recToJson` a record with `children`, built
+outside any Blockly interaction).
+
+**Non-vacuity** (new spec `mouth-declaration-1638.spec.js`): registered a fresh fake kind with NO `mouth`,
+giving it BOTH a JS `BLOCKS` entry and a real (mouthless) Blockly block definition of its own — so the type
+is genuinely known to Blockly, and any throw observed is provably from `recToJson` itself (which runs before
+the Blockly loader), not Blockly rejecting an unregistered type. Built a record of that type carrying
+children, called `stackToWorkspace`. With the guard in place: throws, message names the fake type and the
+word "mouth". Reverted the guard clause only (scratch copy of `stackBridge.js` saved first, this act's edits
+were not yet committed so `HEAD` does not contain them — restored from the scratch copy, not `git checkout
+HEAD`), reran: **RED** — `badThrew` came back `false`, the children silently vanished exactly like the
+pre-fix bug, proving the assertion is not vacuous. Restored the guard from the scratch copy, GREEN again. A
+genuinely mouthless control (a `comment` leaf) round-trips with no throw both times — no false positive on
+ordinary leaves.
+
+### Related finding NOT fixed — reported, not built (a real fork the survey turned up)
+
+`blockEmitter.js:40` (`newBlock`) carries a FIFTH, independently-maintained kind list —
+`['container','path','loop','cond','depth','fill','place','rotate','skim','guard']` — used only to seed
+`b.children = []` on a freshly-constructed block. It is NOT one of the four sites the dispatch named, has
+DIFFERENT (narrower) membership than the 15 mouth kinds (missing param_group/section/opunit/cam_table/
+uibox), and — measured, not assumed — never actually loses data the way the other four did: grepped every
+`newBlock()` call site in `web/`, none construct any of the 5 missing kinds, and the one caller that builds
+a `guard` with children (`edgeWizard.js`'s `GUARD` helper) overwrites `.children` immediately after
+`newBlock()` regardless of the seeded value. Left it alone rather than folding it into `mouthOf` — it's a
+different mechanism (an init convenience, not a round-trip data path) and the dispatch scoped exactly four
+sites. Flagging per the dispatch's own "STOP AND REPORT rather than guess if the survey turns up a real
+fork" instead of silently expanding scope.
+
+### A regression found and fixed mid-verification
+
+The first full-suite run surfaced ONE genuine break: `tests/rotate-atom.spec.js:31` called `br.isWrap(def)`
+directly — a real external consumer of the removed export, distinct from the 3 internal call sites already
+updated. Fixed the spec to assert `br.mouthOf(def) === 'DO'` instead (same assertion intent — "rotate
+renders as a C-block with a DO statement input" — through the new declared surface, not a scope change).
+Re-ran isolated: green. Grepped the full repo for any other `isWrap` consumer: none outside the two bridge
+files — the 5 remaining hits are historical prose in `WORK-LOG.md` and doc-comments in 4 other spec files,
+no live code depends on them.
+
+### Verification
+
+- The 14 round-trip specs the dispatch named as the heaviest cross-checks — all green: `guard-roundtrip-1595`
+  (every guard/arm/predicate round-trips losslessly, INCLUDING its 152-flip structural sweep across 14
+  guarded twins), `fork-parity-1593` (all 32 shipped twins fork byte-for-byte), `skim-blocks-roundtrip-1636`,
+  `wizard-shapes-1627` (3 tests), `blocks-roundtrip`, `zmode-modal-1609` (4 tests), `gui-blocks-roundtrip`.
+- New spec `mouth-declaration-1638.spec.js` — non-vacuity proven (see above).
+- Smoke tier: 71/71 green.
+- Full suite run TWICE (node tier 0/0 both times, unchanged). e2e first run: 11 failed — 1 was the rotate-atom
+  regression above (fixed); 3 (`blocks-load-guard-s41`, `canvas-widgets`, `open-as-modal-1625`) passed clean
+  when isolated (suite self-contention, not real); 7 matched ADVISOR-TRANSFER.md §4's documented "7-member
+  mouse/update-check class" exactly by name (`collapsible-panes-752`, `editor-chip-space-1323`,
+  `pane-splitter-790` ×2, `preflight-badge-838`'s SEND CONFIRM test, `update-check` ×2) — none reference
+  `bridge.js`/`stackBridge.js`/`mouthOf`/`isWrap` (grepped), all isolate-red on rerun (pre-existing, not
+  caused by this act). Second run (post-fix): 13 failed — the same 7 mouse/update-check members, plus
+  `middle-superset:35` and `open-as-modal-1625` (both explicitly named ADVISOR-TRANSFER churn members,
+  isolate-red confirmed), plus `guard-roundtrip-1595`/`transform-declared-736`/`wizard-face-1599` (all 3
+  isolate-GREEN — confirmed suite self-contention under the full 2400+-test run, not regressions;
+  `wizard-face-1599` is itself a named churn member independent of this). No failing ID outside the
+  documented standing floor survived isolation. `test-results/.last-run.json` copied aside after both runs
+  (scratchpad, not staged).
+- Two throwaway full-suite logs + a `stackBridge.js` scratch backup (used for the non-vacuity revert), all
+  in the session scratchpad, none staged or committed.
+
+### Capacity
+
+Moderate act — mechanical breadth (22 one-line declarations across 19 files) bookended by two real
+investigations: the survey (confirming the two families are one), and isolating a genuine regression out of
+suite noise across two full ~20-minute runs. Comfortable to continue into the next act; not a long-seat
+situation like the run of acts before this one.

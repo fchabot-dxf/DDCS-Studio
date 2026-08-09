@@ -19,7 +19,7 @@
  */
 
 export const camTableBlock = {
-    type: 'cam_table', label: 'CAM Pendant Fields', category: 'CAM Pendant', kind: 'cam_table',
+    type: 'cam_table', label: 'CAM Pendant Fields', category: 'CAM Pendant', kind: 'cam_table', mouth: 'DO',
     help: 'A group of controller (pendant) fields for a CAM slot. Each child row is one field; order in the group = pendant row order. Metadata only — emits no G-code.',
     defaults: {},
     fields: [],

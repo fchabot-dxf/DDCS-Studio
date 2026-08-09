@@ -113,7 +113,7 @@ export const POCKET_SHAPE_GAP = 'a circle / polygon / ellipse pocket is cleared 
 export function pocketShapeGap(p = {}) { return (p && (p.shape || 'rect') === 'rect') ? '' : POCKET_SHAPE_GAP; }
 
 export const pocketFillBlock = {
-    type: 'pocketfill', label: 'Pocket Fill', kind: 'fill', category: 'Toolpaths',
+    type: 'pocketfill', label: 'Pocket Fill', kind: 'fill', mouth: 'DO', category: 'Toolpaths',
     // t804 — DEPTH ENTRY: `entry` (plunge|ramp|helix) is the per-level descent to the cut Z. plunge = straight (default,
     // byte-identical); ramp = a linear descent at ≤ rampAngle°; helix = a descending helix at helixDia (pitch = mm/rev).
     // `by` reads the enclosing StepDown's step (exposed in scope) so the entry descends exactly one level.

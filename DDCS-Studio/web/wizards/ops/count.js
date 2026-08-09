@@ -7,7 +7,7 @@
  * itself lives in the emit fold (it owns the variable scope); this def just declares the fields.
  */
 export const countBlock = {
-    type: 'count', label: 'Count', kind: 'loop', category: 'Control',
+    type: 'count', label: 'Count', kind: 'loop', mouth: 'DO', category: 'Control',
     defaults: { var: 'i', from: 1, to: 4, by: 1 },
     fields: ['var', 'from', 'to', 'by'],
 };

@@ -20,7 +20,7 @@ export function helixPoints(p) {
 }
 
 export const helixBlock = {
-    type: 'helix', label: 'Helix', kind: 'path', category: 'Transforms',
+    type: 'helix', label: 'Helix', kind: 'path', mouth: 'DO', category: 'Transforms',
     defaults: { cx: 0, cy: 0, radius: 10, depth: 10, pitch: 2, startAngle: 0, seg: 24, clearance: 5 },
     fields: ['cx', 'cy', 'radius', 'depth', 'pitch', 'startAngle', 'seg', 'clearance'],
     points: helixPoints,

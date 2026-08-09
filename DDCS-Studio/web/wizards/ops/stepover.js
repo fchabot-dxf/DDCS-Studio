@@ -80,7 +80,7 @@ export function fillSegments(p) {
 }
 
 export const stepoverBlock = {
-    type: 'stepover', label: 'Step Over', kind: 'fill', category: 'Transforms',
+    type: 'stepover', label: 'Step Over', kind: 'fill', mouth: 'DO', category: 'Transforms',
     defaults: { region: null, stepover: 4, strategy: 'parallel', direction: 'bothways', z: 'z', feed: 600, plunge: 200, clearance: 5 },
     fields: ['region', 'stepover', 'strategy', 'direction', 'z', 'feed', 'plunge', 'clearance'],   // region = a Region socket; z follows the StepDown
     sockets: { region: 'region' },

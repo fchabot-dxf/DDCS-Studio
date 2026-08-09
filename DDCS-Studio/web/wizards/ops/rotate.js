@@ -8,7 +8,7 @@
  * the rotate atom and the moves un-rotate). Pivot defaults to the part datum (0,0). See data/rotateProgram.js.
  */
 export const rotateBlock = {
-    type: 'rotate', label: 'Rotate', kind: 'rotate', category: 'Transforms',
+    type: 'rotate', label: 'Rotate', kind: 'rotate', mouth: 'DO', category: 'Transforms',
     defaults: { angle: 0, pivotX: 0, pivotY: 0 },
     fields: ['angle', 'pivotX', 'pivotY'],
 };

@@ -7,7 +7,7 @@
  * condition = false (skip the body). Codeblocks' "if [ ] then".
  */
 export const ifBlock = {
-    type: 'if', label: 'If', kind: 'cond', category: 'Control',
+    type: 'if', label: 'If', kind: 'cond', mouth: 'DO', category: 'Control',
     defaults: { cond: '' },
     fields: ['cond'], sockets: { cond: 'boolean' },   // cond renders as a hexagon boolean socket, not a number input
 };

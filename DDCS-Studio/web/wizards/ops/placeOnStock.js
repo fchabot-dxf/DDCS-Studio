@@ -24,7 +24,7 @@
  * and a spec that does not qualify its match behaves exactly as it always did.
  */
 export const placeOnStockBlock = {
-    type: 'placeonstock', label: 'Place on Stock', kind: 'place', category: 'Transforms',
+    type: 'placeonstock', label: 'Place on Stock', kind: 'place', mouth: 'DO', category: 'Transforms',
     defaults: { stockAttach: '', pathDatum: '', offX: 0, offY: 0, offZ: 0, optIn: false, stockW: 0, stockH: 0, stockZ: 0, stockDatum: 'nnp', bminX: 0, bmaxX: 0, bminY: 0, bmaxY: 0, role: '' },
     fields: ['stockAttach', 'pathDatum', 'offX', 'offY', 'offZ'],   // the editable intent; the snapshot params + `role` ride along
 };

@@ -6,7 +6,7 @@
  * stack is written into the workspace for "open as blocks". block.type === op type, so it's a 1:1 walk.
  */
 import { BLOCKS } from '../../wizards/ops/index.js';
-import { FN, fieldKind, fieldsOf, isWrap, getBlockly, OP_BLOCKS } from './bridge.js';
+import { FN, fieldKind, fieldsOf, mouthOf, getBlockly, OP_BLOCKS } from './bridge.js';
 import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wizards/ops/guard.js';   // t1595 — the guard predicate's DECLARED serialization (its `when` is an object; the data path excludes objects by design)
 
 const HAS_CUSTOM_OP = {};
@@ -119,11 +119,8 @@ function toRecord(b) {
         const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
         r.uiChildren = pBlk ? chain(pBlk) : [];
         r.children = eBlk ? chain(eBlk) : [];
-    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'guard' || def.kind === 'uibox') {   // t130 — section round-trips its DO mouth → children, like param_group; t1069 — opunit too; t1093 — cam_table (its cam_field rows); t1595 — guard (the arm it holds); t1627 — uibox (the canvas's shapes)
-        const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
-        if (first) r.children = chain(first);
-    } else if (isWrap(def)) {
-        const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
+    } else if (mouthOf(def)) {   // t1638 — every child-holding kind reads back through its OWN declared mouth, one check
+        const doInput = b.getInput(mouthOf(def)), first = doInput && doInput.connection && doInput.connection.targetBlock();
         if (first) r.children = chain(first);
     }
     // t1595 — a guard's three declared fields collapse back into the ONE `when` predicate pruneGuards reads, so the
@@ -278,9 +275,14 @@ function recToJson(rec) {
     if (def.kind === 'user_root') {
         if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
         if (rec.children && rec.children.length) inputs.EXECUTION = { block: chainToJson(rec.children) };
-    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'guard' || def.kind === 'uibox') {   // t130 — section writes its children into the DO mouth; t1069 — opunit too; t1093 — cam_table (its cam_field rows); t1595 — guard (the arm it holds — without this the arm was DISCARDED); t1627 — uibox (the canvas's shapes)
-        if (rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
-    } else if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
+    } else if (mouthOf(def)) {   // t1638 — every child-holding kind writes into its OWN declared mouth, one check
+        if (rec.children && rec.children.length) inputs[mouthOf(def)] = { block: chainToJson(rec.children) };
+    } else if (rec.children && rec.children.length) {
+        // t1638 — THE DURABLE HALF: a record carrying children whose def declares no mouth would otherwise be
+        // written CHILDLESS here with no error (t1069/t1093/t1595/t1627/t1636 — five silent losses this way).
+        // FAIL LOUD instead: add `mouth: 'DO'` to the def in wizards/ops/*.js if this kind is meant to hold children.
+        throw new Error(`recToJson: block "${rec.type}" (kind "${def.kind}") carries ${rec.children.length} children but its def declares no \`mouth\` — they would be silently discarded on this round-trip. Add \`mouth: 'DO'\` to the def.`);
+    }
     if (Object.keys(fields).length) node.fields = fields;
     if (Object.keys(inputs).length) node.inputs = inputs;
     if (rec.collapsed) node.collapsed = true;

@@ -14,7 +14,7 @@ export const layout2dCanvasBlock = {
     // and never emits its children. A NEW declared kind on the existing mouth axis — the t1595 guard precedent:
     // bridge (the mouth row) + stackBridge (BOTH round-trip directions) each list it; the emitter's kind branches
     // don't know it, so it falls through to `emit: () => []` exactly like the kind-less leaf it used to be.
-    type: 'layout_2d_canvas', label: '2D feature canvas', category: 'Wizard Layout', kind: 'uibox',
+    type: 'layout_2d_canvas', label: '2D feature canvas', category: 'Wizard Layout', kind: 'uibox', mouth: 'DO',
     defaults: { minHeight: '250px', showRuler: true },
     fields: ['minHeight', 'showRuler'],
     emit: () => [],

@@ -22,7 +22,7 @@ function snMarker(p, s, z) {
 }
 
 export const fillTextBlock = {
-    type: 'filltext', label: 'Fill Text', kind: 'fill', category: 'Transforms',
+    type: 'filltext', label: 'Fill Text', kind: 'fill', mouth: 'DO', category: 'Transforms',
     defaults: {
         text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, rotation: 0, spacing: 1.2, lineSpacing: 1.6, align: 'left', x: 0, y: 0,
         strokeWidth: 2.5, toolDia: 1.5, stepoverPct: 50, z: 'z', feed: 400, plunge: 120, clearance: 4,

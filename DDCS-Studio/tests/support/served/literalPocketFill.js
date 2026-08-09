@@ -327,7 +327,7 @@ export function refDepthLevels(depth, stepdown) {
  * frozen. Registered under its own type so it can never shadow the shipping atom.
  */
 export const pocketFillRefBlock = {
-    type: 'pocketfill_ref', label: 'Pocket Fill (frozen ref)', kind: 'fill', category: 'Toolpaths',
+    type: 'pocketfill_ref', label: 'Pocket Fill (frozen ref)', kind: 'fill', mouth: 'DO', category: 'Toolpaths',
     defaults: { shape: 'rect', originX: 0, originY: 0, w: 80, h: 60, wallOffset: 0, toolDia: 6, stepoverPct: 40, strategy: 'concentric', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, by: 'by', z: 'z', feed: 2000, plunge: 150, clearance: 5 },
     fields: ['shape', 'originX', 'originY', 'w', 'h', 'wallOffset', 'toolDia', 'stepoverPct', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'by', 'z', 'feed', 'plunge', 'clearance'],
     lines: (p, z) => fillStrategy({ ...p, region: refPocketInsetRegion(p), stepover: refStepoverMm(p) }, z),

@@ -35,12 +35,13 @@ test('rotate atom is registered as a Modify wrap block', async ({ page }) => {
     const ops = await import('/wizards/ops/index.js');
     const br = await import('/blocks/blockly/bridge.js');
     const def = ops.BLOCKS.rotate;
-    return { kind: def && def.kind, cat: def && def.category, inPalette: ops.PALETTE.includes(def), isWrap: br.isWrap(def) };
+    return { kind: def && def.kind, cat: def && def.category, inPalette: ops.PALETTE.includes(def), mouth: br.mouthOf(def) };
   });
   expect(r.kind).toBe('rotate');
   expect(r.cat).toBe('Transforms');
   expect(r.inPalette).toBe(true);
-  expect(r.isWrap, 'rotate renders as a C-block with a DO statement input').toBe(true);
+  // t1638 — isWrap collapsed into the def's own declared `mouth`; rotate still renders as a C-block with a DO input.
+  expect(r.mouth, 'rotate renders as a C-block with a DO statement input').toBe('DO');
 });
 
 test('t736 — ⟳ Align writes a DECLARED program xform (flat sibling), editor shows rotated, round-trips through Blocks', async ({ page }) => {

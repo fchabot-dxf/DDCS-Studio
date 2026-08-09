@@ -67,7 +67,15 @@ const catSlug = (c) => (c || 'Ops').toLowerCase().replace(/[^a-z0-9]+/g, '');   
 export const FN = (field) => field.toUpperCase();   // Blockly input/field name from an op field
 const REPORTER_CHECK = { boolean: 'Boolean', region: 'Region' };   // reporter return type → Blockly output check
 const outputCheck = (def) => REPORTER_CHECK[def.returns] || 'Number';
-export const isWrap = (def) => ['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'skim'].includes(def.kind);
+// t1638 — A BLOCK DECLARES ITS OWN MOUTH. Was two hand-maintained kind-name lists (this array, plus an OR-chain
+// restated three more times across this file and stackBridge.js) — a kind holding children but missing from ANY
+// ONE of the four sites got written CHILDLESS by recToJson with no error (t1069 opunit · t1093 cam_table ·
+// t1595 guard · t1627 uibox · t1636 skim, the same silent loss five times). Measured: both lists produced the
+// exact same behaviour (one 'DO' statement-input mouth) — they were never two families, just one fact restated
+// four ways. Now the def itself carries it, so `wizards/ops/*.js` and `mouthOf` are the ONLY two places a new
+// child-holding kind is ever named. `user_root` keeps its own two NAMED mouths (PRESENTATION/EXECUTION) — a
+// different shape, handled separately below — not part of this collapse.
+export const mouthOf = (def) => def.mouth;
 // Blocks build/read ALL fields when a def lists them (so a dynamic block like array round-trips every pattern,
 // not just the default); a `dynamic` extension toggles which are visible. The wizard uses fieldsFor() directly.
 export const fieldsOf = (def, params) => (def.allFields || (def.fieldsFor ? def.fieldsFor(params || def.defaults) : def.fields)) || [];
@@ -247,18 +255,17 @@ function jsonDef(def) {
         style: catSlug(def.category) + '_style', tooltip: def.help || `${def.label} (${def.category})`,
     };
     // t146 — each statement-input MOUTH on its OWN row below the header (message1, message2, …), with an optional
-    // sub-label. Generalized: user_root's 2 mouths, param_group + section's DO, and every isWrap kind's DO.
+    // sub-label. Generalized: user_root's 2 named mouths, and every def.mouth kind's own mouth (t1638).
     let row = 1;
     // t152 — a sub-LABELED mouth (user_root's Presentation/Execution) puts its label on its OWN dummy row ABOVE the mouth
-    // (a full-height header row → the long label fits cleanly, not cramped beside the C-notch). Un-labeled mouths (section /
-    // param_group / isWrap — passed no `sub`) are UNCHANGED: just the statement-input row (the section blocks stay as-is).
+    // (a full-height header row → the long label fits cleanly, not cramped beside the C-notch). Un-labeled mouths (every
+    // def.mouth kind — passed no `sub`) are UNCHANGED: just the statement-input row (the section blocks stay as-is).
     const addMouth = (name, sub) => {
         if (sub) { block['message' + row] = sub + ' %1'; block['args' + row] = [{ type: 'input_dummy' }]; row++; }
         block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
     };
     if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
-    else if (def.kind === 'param_group' || isSection || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'guard' || def.kind === 'uibox') addMouth('DO');   // t1069 — opunit renders as a titled transparent container; t1093 — cam_table is a titled metadata container (a DO mouth holding cam_field rows); t1595 — guard holds ONE ARM of a structural fork, and without a mouth recToJson wrote it childless and DISCARDED that arm; t1627 — uibox (the 2D canvas holding its declared shapes)
-    else if (isWrap(def)) addMouth('DO');
+    else if (mouthOf(def)) addMouth(mouthOf(def));
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (isOpunit) block.extensions = [...(block.extensions || []), 'ddcs_opunit'];   // t1071 — friendly label from opType + lock the routing key read-only

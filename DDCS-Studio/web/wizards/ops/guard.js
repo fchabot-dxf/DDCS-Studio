@@ -64,7 +64,7 @@ export const guardBlock = {
     type: 'guard',
     label: 'Guard (when)',
     category: 'Control',
-    kind: 'guard',
+    kind: 'guard', mouth: 'DO',
     defaults: { whenparam: '', whenis: '', whentype: 'text' },
     selects: { whentype: GUARD_TYPES },   // the atom's OWN vocabulary (t1520) — not a global SELECTS key
     fields: GUARD_FIELDS,

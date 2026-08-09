@@ -8,7 +8,7 @@
  * footer — absolute machine coords, always valid regardless of the jog). See data/rotateProgram.relativizeProgram.
  */
 export const skimBlock = {
-    type: 'skim', label: 'Skim (relative)', kind: 'skim', category: 'Program',
+    type: 'skim', label: 'Skim (relative)', kind: 'skim', mouth: 'DO', category: 'Program',
     defaults: { clearance: 5 },
     fields: ['clearance'],
 };

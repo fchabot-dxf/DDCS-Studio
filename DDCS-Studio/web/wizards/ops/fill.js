@@ -32,7 +32,7 @@ export function concentricLines(p, z) {
 }
 
 export const fillZigzagBlock = {
-    type: 'fillzigzag', label: 'Fill Zigzag', kind: 'fill', category: 'Transforms',
+    type: 'fillzigzag', label: 'Fill Zigzag', kind: 'fill', mouth: 'DO', category: 'Transforms',
     defaults: { region: null, stepover: 4, angle: 0, direction: 'bothways', z: 'z', feed: 600, plunge: 200, clearance: 5 },
     fields: ['region', 'stepover', 'angle', 'direction', 'z', 'feed', 'plunge', 'clearance'],   // region = a Region socket; z follows the Step Down
     sockets: { region: 'region' },
@@ -40,7 +40,7 @@ export const fillZigzagBlock = {
 };
 
 export const fillConcentricBlock = {
-    type: 'fillconcentric', label: 'Fill Concentric', kind: 'fill', category: 'Transforms',
+    type: 'fillconcentric', label: 'Fill Concentric', kind: 'fill', mouth: 'DO', category: 'Transforms',
     defaults: { region: null, stepover: 4, order: 'outside-in', finishPass: false, z: 'z', feed: 600, plunge: 200, clearance: 5 },
     fields: ['region', 'stepover', 'order', 'finishPass', 'z', 'feed', 'plunge', 'clearance'],
     sockets: { region: 'region' },
