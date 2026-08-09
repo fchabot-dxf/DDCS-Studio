@@ -18831,3 +18831,96 @@ New `formfield-opparam-1640.spec.js`, 4 tests:
 
 Comfortable — a real design act (two survey questions genuinely reasoned through, not rubber-stamped) but
 not a long one. Good to continue.
+
+## t1642 — THE PLACEMENT ANCHOR DOESN'T APPLY IN SURFACING — MEASURED: NOT A CODE DEFECT
+
+Dispatch: user, with a screenshot, reported "surfacing start position needs developed" → "I can see it in
+the wiz but it won't apply." Advisor's leading hypothesis (t1633 trace): `liveExtent` reports nothing for
+`surfaceraster`, the place fold's `placeShiftFromParams` computes `{x:0,y:0,z:0}`, and `if (!s.x && !s.y &&
+!s.z) return inner;` silently no-ops the picker. Dispatched to confirm in the real app first, trace to the
+exact zero, fix at the source, and NOT fix upstream of the measurement.
+
+### Step 1-2 — measured, and the hypothesis did NOT survive contact with the real app
+
+Drove the REAL app end to end, not a shortcut: real DOM field writes with `dispatchEvent(new
+Event('input'))` (not `wizardManager.update()` called directly, which `placement-rollout.spec.js` already
+does and which would MASK a broken input-listener — a distinct failure mode from a broken extent), and a
+REAL `page.mouse.click()` on the actual on-canvas stock-attach marker (not just a synthetic field write).
+
+**Every link in the chain measured correctly, on both faces:**
+- `surfaceraster.extent` (t1361/t1425/t1498) returns a real, non-null, live-tracking bbox for ordinary
+  numeric x/y/w/h — not null. (Confirmed by direct effect: the emit moves.)
+- `stockAttach`, `pathDatum`, and `originX` each independently move the surfacing emit's traced toolpath
+  (measured via `traceToolpath`, the same "run it, don't read it" technique `placement-rollout.spec.js`
+  already uses for surfacing/pocket, per its own t1365/t1406 comments) — whenever the faced area is SMALLER
+  than the stock (w=50,h=40 on a 100×80 stock): near-corner far-X=50, far-corner far-X=100 — exactly the
+  declared 50mm shift.
+- The input-event auto-update wiring (`wizardManager.setupWizardInputListeners`) correctly refreshes the
+  code panel with NO explicit `update()` call — the hidden `sf_stockAttach`/`sf_pathDatum` inputs exist in
+  the DOM at listener-setup time and fire correctly.
+- A REAL mouse click on the on-canvas stock-attach marker (`featureCanvas.js`'s `_drawStockAttach`/
+  `_hitAttach`) sets the field AND moves the emit — the full user gesture, not a proxy.
+- The TWIN (`user_surfacing_data`) — its generic bindings-driven form — moves the emit identically for BOTH
+  `stockAttach` and `pathDatum`. Nothing broken there either; step 4's "does the twin need it too" answers
+  itself: both faces already had it, correctly, the whole time.
+
+### THE REAL EXPLANATION — a mathematical identity at the wizard's own DEFAULT state, not a bug
+
+`surfacingView.onOpen` sets the faced area to the FULL STOCK TOP the instant the wizard opens
+(`setFields({ sf_originX: 0, sf_originY: 0, sf_w: st.x, sf_h: st.y })`, `web/wizards/views/
+surfacingView.js:95`). At that exact size, the anchor is PROVABLY a no-op, not silently broken:
+`placementShift`'s own arithmetic (`web/wizards/ops/placement.js:47-58`) —
+`attachX = (FRAC[stockAttach] - FRAC[stockDatum]) * w`, `cornerX = FRAC[pathDatum] * w` — and `pathDatum`
+DEFAULTS to following `stockAttach` (`params.pathDatum || params.stockAttach || ...`). Substituting
+`pathDatum = stockAttach` into the shift: `attachX - cornerX = (FRAC[sa]-FRAC[sd])*w - FRAC[sa]*w =
+-FRAC[sd]*w` — the `FRAC[sa]` term CANCELS ALGEBRAICALLY, leaving a shift that is CONSTANT regardless of
+which corner is picked. Moving a rectangle's corner to the identical corner of a container the exact same
+size can never change what the container covers — this isn't a fold or an extent failing to compute
+something, it's the correct answer TO a question whose answer is always the same number at that size.
+Measured directly: at w=100,h=80 on a 100×80 stock, near-corner and far-corner traces are byte-identical.
+
+A user who opens Surfacing and tries the anchor picker before first shrinking the area below the full stock
+size will, correctly, see NOTHING move — and that is very plausibly the exact gesture behind "I can see it
+in the wiz but it won't apply." This is a UX/discoverability question (should the default area be smaller?
+should the picker say something when it's a no-op at the current size? is this simply working-as-designed
+once understood?) — a genuinely different KIND of question than the dispatched hypothesis, and one this
+worker is not ruling on unilaterally: it's a product decision, not a fix implied by any measurement.
+
+### No code change — nothing was found broken to fix
+
+Per "do NOT fix upstream of the measurement": the measurement found no broken link, so nothing was touched
+under `web/`. Building a UX affordance for a hypothesis I have not been asked to design (and that the user
+has not seen/confirmed) would be inventing a fix, not applying one — the same discipline t1636's step 3 used
+("measured... reporting, not building") when a declared engine capability turned out to already exist.
+
+**Also considered and set aside, for the record:** a non-rectangular stock shape (`stock.shape !== 'boss'`)
+might behave differently in `featureCanvas.js`'s stock-attach marker rendering — not measured here, genuinely
+possible, but speculative without more information from the user's own setup; flagging rather than chasing.
+
+### What WAS built — closing the verification gap the dispatch's own step 5 named
+
+New `placement-anchor-1642.spec.js`, 3 tests (all green), covering exactly what `placement-rollout.spec.js`
+left untested and what step 5 asked for ("each anchor corner moves the emitted program the declared amount,
+in BOTH faces; default unchanged = byte-identical; the 2D marker and the emit agree"):
+1. **The no-op is pinned explicitly** — at full-stock size, near/far traces are asserted EQUAL, by name, so
+   a future session finds this test and the comment instead of re-running the same multi-hour investigation.
+2. **`stockAttach` via a REAL mouse click** on the actual on-canvas marker (not a field write) + `pathDatum`
+   alone, smaller-than-stock area — both move the emit (pathDatum was untested anywhere before this).
+3. **The twin's `stockAttach` + `pathDatum`** — both move the emit identically to the wizard (also untested
+   anywhere before this).
+
+### Verification
+
+- `placement-anchor-1642.spec.js` (3 new tests) + `placement-rollout.spec.js` (4 existing, unaffected) — all
+  7 green.
+- Smoke tier: 71/71 green.
+- Zero files under `web/` touched — a test-only addition cannot regress emit/runtime behavior, so the full
+  ~20-minute suite was not re-run for this act (flagging the reasoning rather than silently skipping it, per
+  the gate-tiering discipline: a change with zero source diff doesn't need the same gate a behavior change
+  does). Happy to run it if the advisor wants the ID diff anyway.
+
+### Capacity
+
+Light on code, heavy on investigation — the real work here was refusing to build a fix for a hypothesis that
+didn't survive measurement, and proving the negative rigorously (real gestures, real clicks, both faces, the
+math) rather than declaring "seems fine" after a quick look. Comfortable to continue.
