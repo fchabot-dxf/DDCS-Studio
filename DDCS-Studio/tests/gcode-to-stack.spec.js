@@ -155,3 +155,26 @@ test('M350 dialect: a probe-style program decodes to proper blocks (no raw) and 
   expect(r.types).toEqual(['assign', 'label', 'move', 'probecheck', 'proberead', 'readmachine', 'ifgoto', 'goto']);
   expect(r.text2, 'M350 probe program round-trips byte-identically through the dialect recognizers').toBe(r.text1);
 });
+
+// t1650 — a real production defect (preflight-badge-838.spec.js's SEND CONFIRM test): a header line packing a
+// G-word AND an M-word ("G21 G90 M3 S1000") was recognized as ONLY the first-matching G-word (distmode), and the
+// M3 S1000 (and the G21) were silently DROPPED on re-projection through the editor⇄block-model reconcile — a
+// genuinely spindle-on program came back spindle-off. Falls back to `raw` now (verbatim, never loses data), the
+// same rule already applied to an M-code carrying arguments it can't reproduce.
+test('a G-word sharing a line with an M-word falls back to raw (never silently drops the M-word)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  const r = await page.evaluate(async () => {
+    const { parseLine } = await import('/blocks/gcodeToStack.js');
+    return {
+      distmodeAndSpindle: parseLine('G21 G90 M3 S1000'),   // the exact t838 repro line
+      rapidAndCoolant: parseLine('G0 X10 Y10 M8'),
+      g53AndG0StillWorks: parseLine('G53 G0 Z-5'),          // the intentional G53+G0 companion — unaffected
+      spindleAlone: parseLine('M3 S1000'),                  // pure M-code line — unaffected (no G-word present)
+    };
+  });
+  expect(r.distmodeAndSpindle.type, 'a G+M combo falls to raw, not a partial (data-losing) distmode match').toBe('raw');
+  expect(r.distmodeAndSpindle.params.text, 'raw preserves the WHOLE line verbatim — G21, G90 AND M3 S1000 all survive').toBe('G21 G90 M3 S1000');
+  expect(r.rapidAndCoolant.type, 'the same guard covers any G-word + M-word combo, not just distmode+spindle').toBe('raw');
+  expect(r.g53AndG0StillWorks, 'the G53+G0 companion is a G+G combo, not G+M — unaffected by this guard').toEqual({ type: 'machinemove', params: { axis: 'Z', to: -5 } });
+  expect(r.spindleAlone, 'a pure M-code line (no G-word) still recognizes normally — the guard requires BOTH').toEqual({ type: 'spindle', params: { rpm: 1000, dir: 'cw' } });
+});

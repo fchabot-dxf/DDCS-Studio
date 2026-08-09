@@ -74,6 +74,15 @@ export function parseLine(line, opts = {}) {
     const M = (n) => new RegExp('\\bM0*' + n + '\\b', 'i').test(code);
     const w = (L) => word(L, code);
 
+    // t1650 — a G-word sharing its line with an M-word (e.g. "G21 G90 M3 S1000") packs more onto one physical
+    // line than a single leaf atom's params can carry. Every branch below returns on its FIRST match, so without
+    // this guard the M-word (spindle/coolant/tool/…) is silently DROPPED on re-projection — a production defect
+    // (t838 SEND CONFIRM: a header line's M3 vanished, so a genuinely spindle-on program re-projected spindle-off
+    // and the send gate's "green sends" path never fired). Bail to `raw` instead, same rule the M-code-with-args
+    // case below already applies: can't fully reproduce the line → keep it verbatim, never lose data. Excludes
+    // G53 (checked next), which deliberately carries a companion G0 — that combo already has its own home.
+    if (!G(53) && /\bG0*\d+\b/i.test(code) && /\bM0*\d+\b/i.test(code)) return { type: 'raw', params: { text: raw } };
+
     // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis.
     if (G(53)) {
         // t1207 — CARRY A DECLARED SIM MARKER through the round-trip. The trailing "( @returnProbeZ )" was stripped to the

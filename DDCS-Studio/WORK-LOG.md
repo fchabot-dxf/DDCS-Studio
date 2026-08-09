@@ -19330,3 +19330,113 @@ bugs (twin write-back gap, missing function-registry mirror) neither of which wa
 blocked delivering it, touched 3 shared files read by every twin in the app, and ran a 29-test regression
 sweep plus a full-suite isolation pass to cover that blast radius. Comfortable this is solid; flagging the
 shared-file surface area explicitly per the capacity-reporting rule.
+
+## t1650 — REVIEW OF t1648 (one finding, fixed) + preflight-badge-838: a real production defect, found and fixed at the source (turn 1650)
+
+### The t1648 review finding — the seed shape was a SECOND SOURCE
+
+Advisor review verdict: PASS, seam choice correct — but `startMarkerVarSeed`'s `[[790,jogX],[791,jogY],[792,0]]`
+expression was hand-copied verbatim into BOTH faces (`surfacingData.js:204` and `surfacingView.js:138`,
+character-for-character identical) — exactly the "fifth instance" shape t1638 collapsed for block mouths, and
+exactly the disease this act's OWN `startMarkerTarget` closed for the marker's target field. Fixed: declared
+`startMarkerVarSeed(params)` ONCE in `surfacingData.js` (beside `startMarkerTarget`), exported it, and both
+`def.previewVarSeed` (the twin) and `surfacingView.js`'s `update()` (the built-in) now call the SAME function
+— no restatement anywhere. Non-vacuity: reverted `surfacingView.js`'s call back to a hand-copied (and
+deliberately mangled — swapped jogX/jogY) duplicate, confirmed the new cross-face equality test went
+genuinely RED (`Received: 24.985` where `Expected: 12.493`), restored, re-green.
+
+**New test** (`surfacing-start-position-1648.spec.js`, appended): a reference-equality check
+(`surfacingDataDef().previewVarSeed === startMarkerVarSeed`, proving the twin's hook IS the shared function,
+not a lookalike) plus a behavioral cross-face check (identical stock/size setup, identical pixel-delta drag on
+BOTH faces → identical seed asserted `toBeCloseTo` on both faces) — directly answers the advisor's ask to
+"assert both faces produce an identical seed for identical params."
+
+### THE ACT — preflight-badge-838:124, "SEND CONFIRM: ... green sends" — reproduced, diagnosed, fixed at the source
+
+**1. Reproduced in isolation first** (`--workers=1`, that one test alone): confirmed real and reproducible —
+not suite self-contention. The GREEN-sends half fails; the RED-confirm half (dialog appears, cancel aborts)
+passes cleanly both times.
+
+**2. Traced to the actual break, not the symptom.** Instrumented `#editor`'s value setter to log a stack trace
+on every write. The test's own `configure()` correctly writes the green program
+(`G21 G90 M3 S1000\nG1 Z-5 F100`) into the editor — but ~500ms later, BEFORE the test's next click, something
+else overwrites it to `G90   ( absolute )\nG1 Z-5 F100`, losing `G21` and `M3 S1000` entirely. The dropped
+`M3` is why the send gate (correctly) opens a "Dead spindle" confirm dialog instead of sending straight
+through — the test's real symptom was a downstream SYMPTOM of upstream data loss, not a send.js bug.
+
+**3. Named the real link.** The stack trace pointed at `blocks/programModel.js`: any edit to `#editor` schedules
+a 500ms-debounced `reconcileFromEditor()`, which parses the current text via `reconcileGcodeToStack` →
+`gcodeToStack.js`'s `parseLine`, then re-projects the resulting stack BACK into the editor (`setStack` →
+`projectToEditor` → `EditorManager.setValue`) whenever the editor isn't the focused element — exactly the
+state a programmatic `.value =` write (this test, or any external load) leaves it in. This is the SAME
+mechanism that keeps the Blocks tab in sync with the text editor; it isn't test-only machinery.
+
+**Root cause, in `gcodeToStack.js`'s `parseLine`**: the parser is single-dispatch — a chain of `if (G(n))
+return {...}` / `if (M(n)) return {...}` checks, each returning on its FIRST match, on the assumption that a
+physical line carries at most one meaningful G/M code. `G21 G90 M3 S1000` packs THREE codes onto one line; the
+`G(90)` check (line ~105, ahead of the M-code section) matches first and returns `{type:'distmode',
+dist:'abs'}` alone — G21 and `M3 S1000` are silently discarded, never even considered. This directly violates
+the module's own documented guarantee ("anything unrecognized becomes a `raw` block... so the round-trip never
+loses a line") — the line WAS partially recognized, which is worse: it looks handled while actually losing
+data.
+
+⚠ **This is a genuine, PRE-EXISTING production defect on `main`**, reachable through completely ordinary use:
+any operator typing or pasting a compact header line combining units/mode/spindle (a common convention, e.g.
+CAM-post headers), then clicking anywhere else in the app (blurring the editor), would see that line silently
+degrade — in the worst case, a spindle-start command vanishing without any visible change to what's on screen
+moments earlier. Not something this session's branch introduced; the advisor's own framing ("it has been
+failing ON MAIN, undiagnosed") was exactly right, and this is the class of defect that description warned
+about.
+
+**4. Fixed at the source, one guard, minimal scope.** Added, in `parseLine`, right before the G53 branch: if
+the code contains BOTH a G-word and an M-word and is not a G53 line, bail to `{type:'raw', params:{text:raw}}`
+— verbatim preservation, the exact rule the file already applies to an M-code carrying arguments it can't
+reproduce (`parseLine`'s own comment: "a line carrying ARGUMENTS... would silently lose them on re-projection
+— fall through to the verbatim `raw` block instead"). Deliberately narrow: only fires when BOTH a G-word AND
+an M-word are present (a pure M-code line, or a pure G-code line, is completely unaffected — checked and
+tested), and explicitly excludes G53 (which intentionally carries a companion G0 — `web/blocks/gcodeToStack.js`
+line ~77's own comment: "may carry G0 on some dialects" — that combo has its own home in the G53 branch and
+this guard does not touch it). G+G combos other than G53+G0 (e.g. `G17 G90` on one line) are UNCHANGED by this
+fix — same pre-existing behavior as before, not addressed here (flagging, not fixing — out of the reproduced
+defect's scope, and a broader redesign of the file's one-line-one-leaf architecture would be needed to cover
+it losslessly, which is a separate, larger act).
+
+**5. Verify by VALUE.**
+- `preflight-badge-838.spec.js` (all 10, unchanged file): green sends (submitJob fires), red still blocks
+  until confirm, cancel still aborts — all pass, including the previously-failing test 8.
+- New unit test, `gcode-to-stack.spec.js` (appended): `parseLine('G21 G90 M3 S1000')` → `raw`, verbatim text
+  preserved (all three codes survive); the SAME guard covers `'G0 X10 Y10 M8'` too (not just this one repro
+  line); `'G53 G0 Z-5'` still recognizes as `machinemove` (the G53+G0 companion is unaffected — G+G, not G+M);
+  `'M3 S1000'` alone still recognizes as `spindle` (a pure M-code line needs no G-word present, so the guard's
+  "both must be present" condition correctly leaves it alone).
+- Non-vacuity, TWICE: reverted the fix (scratch-copy save/restore), confirmed BOTH the e2e test
+  (`preflight-badge-838:124`, `Received: 0` where `Expected: 1`, the exact original symptom) AND the new unit
+  test (`Received: "distmode"` where `Expected: "raw"`) went genuinely RED. Restored, re-verified both green.
+- Regression sweep: `gcode-to-stack.spec.js` (all 7, including the 6 pre-existing), `roundtrip-whole-program-
+  1319`, `corner-step-redescend`, `safe-z-retract-822`, `editor-to-blocks`, `blocks-dialect-decode` — 20/20
+  green, including "AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trips block for
+  block" (logged `IRON RULE — round-trip text differences: 0/0 :: []`) — confirms no shipped wizard emits a
+  G+M combined line that would newly flip to `raw` (the fix only changes behavior for a line shape nothing in
+  the app currently emits; it only protects HAND-EDITED/pasted text, which is exactly the surface that broke).
+
+### Full suite — measuring against the t1648 floor (15 failed / 2432 passed, per the advisor's own framing)
+
+node: **99/0**, clean, matches. e2e: **2434 passed / 15 failed / 6 skipped**. Of the 15: 8 match documented
+churn by exact name (`collapsible-panes-752`, `editor-chip-space-1323:60` itself, `formfield-loud-mismatch-
+1636`, `open-as-modal-1625:54`, `pane-splitter-790` ×2, `update-check` ×2). `preflight-badge-838:124` — GONE
+from the failure list, as expected (the fix). The remaining 7 were new names since the last isolation pass
+(`cam-expose-classify:8`, `guard-roundtrip-1595:115`, `open-as-modal-1625:108`, `pocket-canvas:22`,
+`save-dialog-declared-1615:78`, `text-glow-cap:28`, `transform-declared-736:78`) — isolate-run individually
+with `--workers=1`, prioritizing the two most plausibly connected to the `gcodeToStack.js` change
+(`guard-roundtrip-1595`, a round-trip sweep; `transform-declared-736`, which drives through
+`ddcsGetBlockGcode`/`ddcsGetBlockProgram`, i.e. `programModel.js`, the same module this defect lives in): **all
+7 passed clean in isolation**, none touching the files this turn changed — confirms parallel-worker
+self-contention (documented flakiness class), not a regression. No ID outside the documented floor survived
+isolation. Restored 12 regenerated `verification/*.png` (unrelated wizards) before staging.
+
+### Capacity
+
+A genuine root-cause act: reproduced a real symptom, traced it through TWO modules (`send.js` → the actual
+break, `programModel.js` → `gcodeToStack.js`) rather than patching where the symptom surfaced, and fixed a
+pre-existing, dangerous, silently-reachable production defect at its true source with a narrow, well-tested
+guard. Comfortable with the result; the G+G (non-G53) gap is real and flagged, not silently left implicit.

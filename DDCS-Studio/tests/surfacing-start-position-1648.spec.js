@@ -213,3 +213,47 @@ test('Skim arm, TWIN: a real drag persists the jog seed and leaves the emitted t
     const jogX = seed.find((p) => p[0] === 790)[1];
     expect(Math.abs(jogX), 'the seed reflects the real drag').toBeGreaterThan(1);
 });
+
+test('t1650 review fix: the seed shape is ONE-SOURCED — the WIZARD calls the SAME startMarkerVarSeed function the TWIN\'s def.previewVarSeed is set to, not a hand-copied duplicate', async ({ page }) => {
+    // Reference-level proof: the twin's def.previewVarSeed IS startMarkerVarSeed (not a lookalike copy).
+    await page.goto('http://localhost:3211');
+    const refCheck = await page.evaluate(async () => {
+        const SD = await import('/blocks/dataOps/surfacingData.js');
+        const def = SD.surfacingDataDef();
+        return def.previewVarSeed === SD.startMarkerVarSeed;
+    });
+    expect(refCheck, 'surfacingDataDef().previewVarSeed is the exported startMarkerVarSeed itself, by reference').toBe(true);
+
+    // Behavioral proof, both faces, identical params: dragging the SAME pixel delta on the SAME stock/size setup
+    // produces the SAME seed on both faces — the cross-face equality the advisor asked to assert.
+    await openWizard(page);
+    await wizSetup(page);
+    await page.selectOption('#sf_zMode', 'skim');
+    await page.waitForTimeout(250);
+    const wc = await wizMarkerCenter(page);
+    await drag(page, wc, 30, -15);
+    const wizSeed = await page.evaluate(() => {
+        const c2 = document.getElementById('surfacingVizContainer');
+        const host = c2 && c2.parentElement && c2.parentElement.querySelector('.wiz-viz3d');
+        return host ? host.__varSeed : null;
+    });
+
+    await openTwin(page);
+    await twinSetP(page, 'w', 80); await twinSetP(page, 'h', 60); await twinSetP(page, 'originX', 20); await twinSetP(page, 'originY', 20); await twinSetP(page, 'zMode', 'skim');
+    await page.waitForTimeout(250);
+    const tc = await twinMarkerCenter(page);
+    await drag(page, tc, 30, -15);
+    const twinSeed = await page.evaluate(() => {
+        const c2 = document.getElementById('userViz3dContainer');
+        const host = c2 && c2.parentElement && c2.parentElement.querySelector('.wiz-viz3d');
+        return host ? host.__varSeed : null;
+    });
+
+    expect(wizSeed, 'wizard seed present').toBeTruthy();
+    expect(twinSeed, 'twin seed present').toBeTruthy();
+    const wJogX = wizSeed.find((p) => p[0] === 790)[1], wJogY = wizSeed.find((p) => p[0] === 791)[1];
+    const tJogX = twinSeed.find((p) => p[0] === 790)[1], tJogY = twinSeed.find((p) => p[0] === 791)[1];
+    expect(Math.abs(wJogX) + Math.abs(wJogY), 'sanity: the wizard drag genuinely moved the seed').toBeGreaterThan(1);
+    expect(tJogX, 'IDENTICAL params + IDENTICAL drag => IDENTICAL seed on both faces (jogX)').toBeCloseTo(wJogX, 2);
+    expect(tJogY, 'same for jogY').toBeCloseTo(wJogY, 2);
+});

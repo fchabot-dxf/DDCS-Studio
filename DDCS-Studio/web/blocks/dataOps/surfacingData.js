@@ -142,6 +142,14 @@ export const START_MARKER_TARGET = {
 };
 export function startMarkerTarget(zMode) { return START_MARKER_TARGET[zMode] || START_MARKER_TARGET.normal; }
 
+// t1650 review finding — this expression was hand-copied verbatim into BOTH faces (the exact "fifth instance" shape
+// t1638 collapsed for block mouths). ONE declaration: Skim seeds the live-frame registers (#790/#791/#792) from the
+// marker's jogX/jogY so the PREVIEW traces where the operator will jog; Normal/WCS seeds nothing (null clears any
+// stale seed from a mode flip — the marker there drives originX/originY, a REAL param, so the emit already moves).
+export function startMarkerVarSeed(params) {
+    return params.zMode === 'skim' ? [[790, num(params.jogX, 0)], [791, num(params.jogY, 0)], [792, 0]] : null;
+}
+
 export const SURFACING_DATA_OPTYPE = 'user_surfacing_data';
 
 const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
@@ -198,10 +206,7 @@ export function surfacingDataDef() {
     const stack = buildSurfacingTwinStack();
     const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, withPassesField([...toolBindingsFor(stack), ...SURFACING_STRUCT, ...surfacingBindingsFor(stack), ...entryBindingsFor(stack)]), 'form3d+2d', null, 'mill_datawiz');   // t1613 — the derived `passes` field, spliced after stepdown
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
-    // t1648 — SKIM ONLY: seed the live-frame registers the emitted body reads at the machine (#790/#791/#792), so the
-    // 3D preview traces from where the start marker says the operator will jog. Normal/WCS → null (no seed; the
-    // marker there drives originX/originY, a REAL param — the emit itself already moves).
-    def.previewVarSeed = (params) => (params.zMode === 'skim' ? [[790, num(params.jogX, 0)], [791, num(params.jogY, 0)], [792, 0]] : null);
+    def.previewVarSeed = startMarkerVarSeed;   // t1648/t1650 — the ONE declared seed shape (see startMarkerVarSeed above)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)
     // t945 spindleHeadPatch (blank progstart → live Head) THEN t986 applySkimStructure (Skim: progstart drops the absolute

@@ -10,7 +10,7 @@ import { workpieceFeatureItems } from '../../engine/workpiece.js';
 // t1609 — the Z-mode field CONSUMES the twin's declaration (options/label/help/default) + the declared skim-greys-WCS
 // gate. One source: a hand-copied options list here is the drift this arc treats (the emit has handled zMode since
 // 8ce70873; only the visible knob was missing).
-import { SURFACING_STRUCT, SURFACING_BINDINGS, startMarkerTarget } from '../../blocks/dataOps/surfacingData.js';
+import { SURFACING_STRUCT, SURFACING_BINDINGS, startMarkerTarget, startMarkerVarSeed } from '../../blocks/dataOps/surfacingData.js';
 
 const ZMODE_SPEC = SURFACING_STRUCT.find((b) => b.param === 'zMode');
 const WCS_GATE = (SURFACING_BINDINGS.find((b) => b.param === 'wcs') || {}).gate || null;   // { param:'zMode', is:'skim', tip }
@@ -130,12 +130,9 @@ export const surfacingView = {
         const gcode = wizard.generate(params);
         el('wiz_surfacing_code').innerHTML = UIUtils.formatGCode(gcode);
         ctx.preview3D(gcode, 'surfacingVizContainer');
-        // t1648 — SKIM ONLY: seed the live-frame registers (#790/#791/#792) the emitted body READS at the machine, so
-        // the PREVIEW traces from where the marker says the operator will jog — sim-only (previewVarSeed is never
-        // emitted, never pushed to the controller — wizardManager's own contract). Normal/WCS never seeds (null
-        // clears any stale seed from a mode flip) — the marker there drives originX/originY, a REAL param, so the
-        // emit itself already moves; nothing needs faking for the trace to follow.
-        if (ctx.previewVarSeed) ctx.previewVarSeed('surfacingVizContainer', params.zMode === 'skim' ? [[790, num(params.jogX, 0)], [791, num(params.jogY, 0)], [792, 0]] : null);
+        // t1648/t1650 — the ONE declared seed shape (startMarkerVarSeed, surfacingData.js) — the twin calls the same
+        // function for the same params; a future edit to the seed shape can no longer diverge between faces.
+        if (ctx.previewVarSeed) ctx.previewVarSeed('surfacingVizContainer', startMarkerVarSeed(params));
         layout.render(el('surfacingLayoutCanvas'), buildSurfacingSpec(params, s.stock));
 
         const status = el('surfacingVizStatus');
