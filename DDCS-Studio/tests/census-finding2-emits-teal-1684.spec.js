@@ -80,7 +80,7 @@ test('(C) corner Layout: the wall-2 reposition handle carries the DECLARED emits
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   await page.evaluate(() => { const t = document.querySelector('[data-tab="layout"], [data-viz-mode="2d"], .viz-tab-2d'); if (t) t.click(); });
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {

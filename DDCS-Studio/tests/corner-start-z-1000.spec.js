@@ -14,7 +14,7 @@ async function openCorner(page) {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   await page.waitForTimeout(300);
 }
 

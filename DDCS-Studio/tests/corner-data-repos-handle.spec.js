@@ -115,7 +115,7 @@ test('the Layout sim-only ◇ renders and is distinct from the (now correctly-pl
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });
 
   const info = await page.evaluate(() => {

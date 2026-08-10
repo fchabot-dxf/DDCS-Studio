@@ -17,7 +17,7 @@ test('per-pass source is DECLARED from travelApproach — toggling auto↔manual
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
 
   const read = () => page.evaluate(() => {
     const box = document.getElementById('userViz3dContainer');

@@ -23485,3 +23485,102 @@ the full instruction list in one sitting; nothing was parked.
 Per the advisor's own instruction: all four END CONDITION points are now met (token survives to emit; survives
 all three authoring surfaces; a malformed token is refused at the send gate; an ineligible param refuses on
 EVERY surface it can be typed on, by declaration). Not starting a sixth act.
+
+## 🔨 turn 1714 (cycle 855, epoch 4) — t1713 REPAIR: the stale readiness selector + the binary source file
+
+### REVIEW RECEIVED ON t1712: release gate RED, 25 failed — a repair, not a sixth act
+
+Advisor triage (measured, not re-derived): ACT 3's `numberWidget` change (a declared-token binding now renders
+`type="text"` so there's a keystroke left to refuse) broke 12 specs' `#wiz_user_form input[type="number"]`
+form-ready selector — corner's fields are now `text`, the only `number` input left is a hidden `planeZ`, the
+wait times out before a single assertion runs. Advisor verified the PRODUCT is fine in the real app (10 visible
+fields, correct values) — this is a stale test PROXY, not a regression. Also flagged: `tokenGuard.js` diffed as
+`Bin 0 -> 6443 bytes` — invisible to any future review, including the advisor's own review of ACT 5.
+
+### 1 — the stale readiness selector, repaired uniformly across all 12 specs
+
+`grep` for the exact selector confirmed 12 files, 15 occurrences (some files wait twice). The fix needs to be
+type-agnostic — `numberWidget` isn't the only widget whose input type can vary, so keying off `type="number"`
+was never going to be durable. `[data-param]` is the declared, ALREADY-EXISTING attribute every widget type sets
+(`formWidgets.js`: number/select/checkbox/text fields all set `.dataset.param = b.param`, several call sites
+naming it explicitly as "targetable, parity with the other widgets") — the semantically correct "this is a bound
+form field" marker, not tied to element type. `corner-data-drag.spec.js` was already querying
+`#wiz_user_form [data-param]` for its OWN field iteration one line after the broken wait, so this is the same
+vocabulary these specs already speak, not a new one. Did not add a new shared-helper module for a single
+one-line selector swap applied identically 12 times — that is the SAME fix 12 times, not 12 hand-rolled variants,
+and a release-blocking repair is the wrong moment to grow a new cross-file test-support dependency.
+
+`#wiz_user_form input[type="number"]` → `#wiz_user_form [data-param]`, same `{ state: 'visible' }`, in:
+census-finding2-emits-teal-1684, corner-data-drag, corner-data-repos-handle, corner-data-sim-marker-emits (×2),
+corner-data-start-live, corner-data-sim-marker-track (×2), corner-layout-sim-drag, corner-marker-independence,
+corner-source-declared, corner-start-z-1000, custom-op-form2d-drag (×2), custom-op-length.
+
+**Re-ran all 12 files: 33/33 PASS**, including all 5 `corner-marker-independence` tests and all 7
+`corner-data-sim-marker-emits` tests — the advisor's own triage named these 7 as "reproduced and attributable"
+reds expected to remain after the selector fix. Re-ran `corner-marker-independence.spec.js` +
+`corner-data-sim-marker-emits.spec.js` alone a second time to rule out a false green: 12/12, same result.
+**Reporting this discrepancy plainly rather than quietly matching the prediction**: either the advisor's 7-red
+figure came from the same full-suite collision noise already named for `guard-roundtrip-1595` ("FAILED in the
+full run but PASSES in isolation"), or something else separates a full-suite run from this isolated one — the
+release gate is the advisor's to run and judge, this is the isolated-rerun result as instructed, honestly.
+
+### 2 — `tokenGuard.js` was genuinely binary, and it was my own mistake, not a tooling artifact
+
+Traced it: my own t1712 file content used the string literal `' '` (intending an ordinary JS escape
+sequence, a NUL character as a Map-key separator) in three places, including once inside a documentation
+comment. Whatever happened at that write landed the LITERAL NUL BYTE in the source file itself (3 raw 0x00
+bytes, confirmed by reading the file as a Buffer), not the six source characters ` ` — making the file
+byte-for-byte binary from git's own perspective (`file` reported "data"; a Buffer scan found 3 NUL bytes at the
+`map.set`/`.get` call sites and the docstring). This is exactly the "invisible to review" hazard the advisor
+named — nobody, including me on a later pass, could have read this file's diff again.
+
+Fixed properly, not by picking a different separator character: switched `buildPolicyMap`'s single joined-string
+key (`blockId + sep + inputName`) to a **nested Map** (`blockId -> Map(inputName -> policy)`) — no separator
+character is concatenated at all, so there's no character to pick wrong. This is also more correct on its own
+terms: a live Blockly block id can contain nearly any printable character (observed directly in t1712's own
+testing: `"]$EK|w3lX6nNDnj=i-tq"`), so no single-character join was ever really safe against a collision, NUL
+included — the earlier version happened to work only because no test exercised an id containing the separator.
+Rewrote the whole file (an in-place edit couldn't target the NUL bytes for replacement — the Edit tool matches
+against real file bytes, and a NUL is not representable in the tool's own string parameter the same way twice).
+
+Verified the fix three ways: (a) a Buffer scan of the working-tree file shows 0 NUL bytes, 7474 bytes, and `file`
+now reports "JavaScript source, Unicode text, UTF-8 text"; (b) re-ran the exact REFUSE/ACCEPT gestures from
+t1712's own verification (surfacing `rampAngle` + `#500` → still refuses, reverts to the `math_number` shadow,
+emits the plain default `3`, toast text unchanged; `depth` + `#777` → still accepted, persists to the emit) —
+the nested-Map rewrite changed zero observable behavior; (c) `git diff --stat` on the STAGED fix still prints
+`Bin 6443 -> 7474 bytes`, checked directly rather than assumed away — confirmed this is NOT a residual defect:
+`git show HEAD:...tokenGuard.js` shows the PARENT blob (my own t1712 commit) still carries 3 NUL bytes (that
+commit is already in history; not amending it per the project's own no-amend rule), and git's binary-diff
+detection trips when EITHER side of a diff looks binary. The repair commit's OWN blob is confirmed clean; every
+diff FROM THIS COMMIT FORWARD will render as ordinary text with real line counts — only the one transitional
+diff (the already-binary t1712 commit → this repair) is stuck showing `Bin`, which is an intrinsic, unavoidable
+property of that historical commit, not something a new commit can retroactively fix.
+
+### Verify
+
+**Node gate — 118/118**, unmoved. **The 12 repaired specs — 33/33** (see discrepancy note above).
+**tokenGuard.js post-repair — REFUSE and ACCEPT both reconfirmed** against the exact t1712 gestures, byte-for-
+byte same outcomes. Restored 11 `verification/*.png` files that a full sweep re-run had silently overwritten as
+a side effect (pre-existing tracked screenshots, not part of this repair) via `git checkout HEAD --` before
+staging — confirmed via `git status` they were NOT part of my intended diff.
+
+### Emit byte-identical
+
+Trivially true for every existing param — this turn touched zero binding/spec/emit code; the guard's own
+REFUSE/ACCEPT behavior was reconfirmed unchanged (above), and the 12 test-file edits are pure test-selector text.
+
+### Capacity
+
+Finding my own mistake's exact mechanism (the escape-sequence-in-a-tool-call landing as a literal byte) before
+picking a fix mattered: swapping to a different single-character separator would have "fixed" the visible
+symptom while leaving the same class of bug live (a block-id character colliding with whatever separator was
+chosen next). The nested-Map form removes the failure mode instead of relocating it. Working room was sufficient
+to finish the full repair in one sitting.
+
+## ⚠ THE DESIGN FORK — still open, not mine to rule
+
+NEXT-SESSION.md's repair section (advisor's own addition, left untouched) names it directly: converting a
+declared field to `type="text"` isn't scoped to token-eligible fields — an INELIGIBLE field also converts, so
+its refusal has somewhere to land. Rolling the declaration to the other 28 ops converts most numeric fields
+app-wide, costing the browser's native spinner/validation everywhere. The advisor is asking the human; not
+re-litigated here.

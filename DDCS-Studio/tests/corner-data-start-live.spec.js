@@ -75,7 +75,7 @@ test('③(4a gate + 4b) start handle GATED on probeZFirst; the SIM-ONLY first-st
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
 
   // (4a gate) the EMITTING FeatureCanvas handles: 1 off (reposition) → 2 on (+ start), via the whenOk handle-gate.
   const gate = await page.evaluate(async () => {

@@ -23,7 +23,7 @@ test('Corner (data): dragging the reposition handle writes the CORRECT increment
   });
 
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
 
   const hasFields = await page.$$eval('#wiz_user_form [data-param]', (ns) => {
     const s = new Set(ns.map((n) => n.dataset.param));

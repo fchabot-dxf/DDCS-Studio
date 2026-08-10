@@ -41,7 +41,7 @@ test('a length param is declarable (nlen roles decode + complete group) and drag
   await page.evaluate(() => window.openWiz('user_lengthdrag'));
 
   // the form rendered the three length params as writable number fields
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   const fieldParams = await page.$$eval('#wiz_user_form [data-param]', (ns) => ns.map((n) => n.dataset.param).sort());
   expect(fieldParams, 'the form rendered the length params as writable number fields').toEqual(['ll', 'lx', 'ly']);
 

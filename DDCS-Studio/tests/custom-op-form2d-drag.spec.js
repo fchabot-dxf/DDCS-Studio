@@ -29,7 +29,7 @@ test('a real authored 2D-point op: the form2d preview handle drags and writes th
   await page.evaluate(() => window.openWiz('user_pointdrag'));
 
   // the PRODUCER fix in the real panel: two writable number fields rendered from the point group
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   const fieldParams = await page.$$eval('#wiz_user_form [data-param]', (ns) => ns.map((n) => n.dataset.param).sort());
   expect(fieldParams, 'the form rendered both point params as writable number fields').toEqual(['px', 'py']);
 
@@ -95,7 +95,7 @@ test('Stage 3: a real authored 2D-circle op — dragging the RING (radial) handl
   await page.evaluate(() => window.openWiz('user_circledrag'));
 
   // the form rendered the three circle params as writable number fields
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   const fieldParams = await page.$$eval('#wiz_user_form [data-param]', (ns) => ns.map((n) => n.dataset.param).sort());
   expect(fieldParams, 'the form rendered the circle params as writable number fields').toEqual(['cd', 'cx', 'cy']);
 

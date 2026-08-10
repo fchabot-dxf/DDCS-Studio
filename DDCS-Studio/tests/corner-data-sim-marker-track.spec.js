@@ -88,7 +88,7 @@ test('(3) Layout canvas: the Start marker is a HOLLOW amber circle (t1688 — it
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });
   const info = await page.evaluate(() => {
     const h = document.querySelector('#userVizContainer .fc-handle-sim');
@@ -123,7 +123,7 @@ test('(4) the emitting reposition handle owns its own drag (writes cross1_x); th
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 6000 });   // the sim marker renders (visual)
 
   const cx = () => page.evaluate(() => document.querySelector('#wiz_user_form [data-param="cross1_x"]').value);

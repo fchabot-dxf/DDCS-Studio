@@ -23,7 +23,7 @@ async function openCorner(page, probeZ) {
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   if (probeZ) {
     await page.evaluate(() => {
       const span = [...document.querySelectorAll('#wiz_user_form *')].find((e) => e.tagName === 'SPAN' && /Probe Z First/i.test(e.textContent || ''));

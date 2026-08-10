@@ -51,7 +51,7 @@ test('(B) end-to-end: the emits flag reaches the shared passStarts + the 3D rend
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
 
   const r = await page.evaluate(() => {
     const c = document.getElementById('userViz3dContainer');
@@ -162,7 +162,7 @@ test('(F) cross-pane agreement: the lead pass renders HOLLOW in the Layout pane,
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param]', { state: 'visible' });
   await page.evaluate(() => { const t = document.querySelector('[data-tab="layout"], [data-viz-mode="2d"], .viz-tab-2d'); if (t) t.click(); });
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {
