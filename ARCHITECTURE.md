@@ -70,7 +70,7 @@ comment survives at `ui/globalFunctions.js:29`.
 - **CORNER** (retired 2026-07-02, `wizards/views/index.js:20`). No view import, no `#wiz_corner` panel
   (`grep -c 'id="wiz_corner"' DDCS-Studio/web/index.html` → **0**), no opener. Its `BUILTINS` slot survives and
   `opensAs: 'user_corner_data'` (`wizardLibrary.js:56`). `wizards/cornerWizard.js` still exists as the legacy
-  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:47,261,342`).
+  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,231`).
 - **CIRCULAR** (retired 2026-06-23, superseded by Middle — `wizards/views/index.js:22`). Gone further: it has
   **no `BUILTINS` entry at all**, so it is not even a bar slot.
 
@@ -408,8 +408,9 @@ by **type sequence**, never a blanket `+1`.
 Guard: `userOps.js:911`, with the ordering constraint at `:900-902`.
 
 **15 · CORNER IS THE GATED PILOT — no wizard ports until corner is right.**
-A standing ruling, not a test: `NEXT-SESSION.md:186`, under **STANDING RULINGS (do not re-litigate)**. Every
-mechanism is proven once on corner; the other 31 twins inherit it. A corner defect outranks the queue.
+A standing ruling, not a test: `NEXT-SESSION.md`, under **STANDING RULINGS (do not re-litigate)** — cited by
+content, not line, because that file is rewritten wholesale each cycle and a line number would drift on the next
+rewrite. Every mechanism is proven once on corner; the other 31 twins inherit it. A corner defect outranks the queue.
 
 **16 · A RETIRED wizard has no built-in to compare against.** See Q1 and § TRAPS #1.
 
@@ -467,7 +468,7 @@ blocks/programModel.js:26   () => ({ dialect })
 blocks/opGlow.js:18         () => ({ dialect })
 blocks/opSession.js:18      () => ({ dialect })
 ```
-`applyIndentStyle` no-ops unless `settings.indentStyle === 'flush'` (`data/indentStyle.js:170`). So setting indent
+`applyIndentStyle` no-ops unless `settings.indentStyle === 'flush'` (`data/indentStyle.js:51`). So setting indent
 style to `flush` appears to change the **wizard preview panel** but not the committed program projection
 (`programModel.js:215`), the glow diff, or the exported `.nc`.
 ```bash

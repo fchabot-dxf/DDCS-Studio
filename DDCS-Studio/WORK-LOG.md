@@ -22529,3 +22529,92 @@ also ignores the pin" are the SAME general rule, not two coincidences — withou
 have been an assertion instead of a demonstrated fact. The test-authoring mistake (wrong `current` argument) cost a
 second non-vacuity round but was caught before it shipped, which is the mechanism working as intended rather than
 a failure. Room was ample for the act at this depth.
+
+## 🔨 turn 1698 (cycle 847, epoch 4) — t1698: THE MAP CHECKS ITSELF — ARCHITECTURE.md made mechanically checkable
+
+### REVIEW RECEIVED ON t1696: PASS
+
+Advisor: ruling 2's second branch was "the right kind of answer... a WCS pin answers WHICH STOCK CORNER SITS AT
+THIS REGISTER. A round bar has no corner... that distinction is the whole finding." Confirmed the blast radius
+themselves (every `web/` line in `760968d1` is a comment). Retracted last turn's `test:changed`-as-default
+instruction: "that was wrong, and your fallback... was the correct correction. Use it as a HINT, never as the
+safety net."
+
+### THE ACT — a new node-tier file, `tests/node/architecture-map-1698.test.mjs`, GENERATES what's derivable from
+ARCHITECTURE.md's own declarations and ASSERTS the rest by `{file, line(s), find}` citation.
+
+**GENERATED (Part 1):** re-derives, from the SAME source the map cites, every count Q1/REGISTRIES states in prose —
+BUILTINS entries (25) and their `opensAs` count (25) from `wizardLibrary.js:42-81`; `SEED_BUILDERS` (32) two ways
+(the array itself, AND an independent `_OPTYPE = 'user_` grep across `dataOps/*.js`, cross-checked against each
+other — the map's own "never a hand list" discipline, not one count trusted blind); `WIZARD_VIEWS` (20) from
+`views/index.js:36-57`; and the three load-bearing negatives TRAP1/TRAP5 depend on (`#wiz_corner`, `openWiz(`,
+`#c_corner` all absent from `index.html`). All five matched on the first real run — nothing here had drifted.
+
+**ASSERTED (Parts 2-4):** every TRAP (9) and every INVARIANT (17) citation, plus the 7 Q3 frame-algebra citations
+(named explicitly in the dispatch as the highest-cost defect class — t1672/t1686's ~275px split). `citationHolds`
+reads the cited file once (cached), checks `find` (a substring or regex chosen to be the smallest thing that breaks
+if the citation rots OR the claim stops being true) against every line in `[from, to]`. No `rg`/`grep` subprocess —
+confirmed absent from this environment's PowerShell PATH — `fs.readFileSync` + a regex IS "a file read plus a
+grep" for this tier's budget.
+
+### FINDINGS — two of the map's OWN citations were already wrong
+
+The first real run (5 tests, 3 green / 2 red) surfaced 6 failures. Triaged each individually against the actual
+source before deciding whether the MAP or the CHECKER was at fault, per ruling 6:
+
+1. **`cornerData.js:47,261,342` (TRAP1) was WRONG** — the import is at line 44, `cornerStack(` usage at 231; no
+   line near 47/261/342 contains either. Fixed ARCHITECTURE.md's own citation, not the checker.
+2. **`indentStyle.js:170` (TRAP4, "flush no-ops") was WRONG** — the real line is 51. Same fix: the map, not the
+   checker.
+3. `previewEmit.js:21` and `startGlyph.js:20` (TRAP4, INV12) were checker-too-strict, not map-wrong: both cite the
+   START of a small function whose relevant statement sits 3 lines down. Widened the checker's range rather than
+   editing the map — the map's citation style (cite the function, not the return statement) is legitimate.
+4. `commandDeck.js` file-not-found was MY bug (checker path missing `ui/`) — fixed the checker only. The map's own
+   citation for this file omits `ui/` everywhere it appears, consistently; judged low-harm and not worth a map-wide
+   edit for one turn's checker.
+5. `NEXT-SESSION.md:186` (INV15) file-not-found was MY bug (checker's path-resolution ternary only special-cased
+   `AGENTS.md` as repo-root; generalized to "no `/` in the path → repo-root doc").
+
+### A SIXTH, LIVE FINDING — the fix above wasn't the end of it
+
+Re-running after the path fix, INV15 went red again — NOT a leftover bug. `git diff NEXT-SESSION.md` showed the
+advisor had, in the time between my two runs, rewritten the file wholesale (a new cycle plan, uncommitted, 88 lines
+inserted at the top) — the "Corner is the gated pilot" bullet was still there, just at line 271 now, not 186. This
+is not one drifted number; it's a structural mismatch between the map's citation FORMAT (line-anchored) and this
+ONE file's nature (advisor-owned, rewritten start-to-finish every cycle, not edited in place like source). Pinning
+a line number here would drift again the next cycle regardless of who's careful. Per ruling 2 ("if the current
+format resists checking, say so and propose the minimal change that makes it checkable"): dropped the line number
+from both the map's prose (`NEXT-SESSION.md:186` → `NEXT-SESSION.md`, with a one-line note on why) and the claim,
+and taught `citationHolds` a whole-file mode (`to: Infinity`, clamped to the file's real length) for the one claim
+that needs it. Left every OTHER citation exactly as line-anchored as before — this is scoped to the one file that
+actually churns that way, not a general retreat from line numbers.
+
+### Non-vacuity
+
+Real source, not a scratch copy (the checker reads real repo paths, so pointing it at a copy would test nothing):
+inserted 2 blank lines above `cornerData.js:44`'s `cornerWizard.js` import (clean file, confirmed via `git status`
+first), ran the checker — RED, naming both `TRAP1 cornerWizard.js import` AND `TRAP1 cornerStack() usage` (the
+whole file shifted down 2 lines, so both citations correctly broke together). `git checkout HEAD --` restored the
+file exactly; re-ran — green. Proven once for the line-anchored mechanism; the whole-file mechanism proved itself
+live via finding 6 above (a real citation going red, for a real reason, mid-turn).
+
+### Verify
+
+**Node gate — 118/118** (113 prior + 5 new). **Cost — negligible**: the 5 new tests run in ~13ms of internal
+`node:test` duration combined (1.2+4.4+3.2+1.8+0.6ms); full-gate wall time before/after (1.93s → 1.80s) is within
+normal process-startup noise, not a measurable addition. Nowhere near the 1s the dispatch flagged as needing an
+explanation. **Hand-picked sweep** (not `test:changed` — nothing here is web/-source-reachable in the way that
+tool can trace, and this act touches none anyway): the two corner spec files nearest the transiently-touched
+`cornerData.js` (non-vacuity probe), `corner-data-emit.spec.js` + `corner-data-baked-frontier.spec.js`, 4/4.
+
+### Emit byte-identical
+
+N/A — no emit-path code touched. This act adds a test file and corrects prose citations in a markdown doc; the one
+transient source edit (the non-vacuity probe) was reverted and confirmed clean via `git status` before the sweep.
+
+### Capacity
+
+Straightforward mechanically, but the two genuine map-citation errors (findings 1-2) and the live NEXT-SESSION.md
+churn (finding 6) are exactly the kind of thing this act exists to catch — a map is only as trustworthy as the
+last time someone checked it, and this turn is the first time anyone did, five hours after it landed. Room was
+ample.
