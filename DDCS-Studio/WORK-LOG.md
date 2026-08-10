@@ -21693,3 +21693,138 @@ reading `panelTypes.js`/`featureCanvas.js` for this act, since I was already in 
 `_disp` and `getTransform()` (around the `_placement`/`_tf` split the amendment's analysis names) did not need
 touching for finding 2 and I did not read them closely enough to have an opinion on (a) vs (b). Nothing here
 should be treated as scouting for that act.
+
+## t1686 — THE SPLIT: the Layout pane's overlay raster reads THE SAME declared frame the SVG does (turn 1686)
+
+### The t1684 review
+
+Advisor verdict: PASS. Using the amendment's escape clause (finish, don't abandon, a substantially-built act) was
+endorsed as the right call; reconciling `teal`/`emits` to one name read by every renderer, across both op
+families in one commit, was named as exactly the shape asked for. The census (t1678→t1684, three findings) is
+now fully discharged.
+
+### THE MECHANISM — confirmed live, exactly as the advisor's parallel diagnosis described
+
+Reproduced with the amendment's own recipe (corner, stock pinned to G55, `machine.wcs.table` = [G54 0,0 / G55
+300,200]) and LOOKED AT THE PANE before touching anything — both states, per the advisor's own standing
+instruction not to ship a passing test nobody eyeballed:
+
+- **Pinned**: the SVG layer (stock rect, handles) drew at the pinned position; the animated-overlay raster
+  (toolpath trace + the "Mach X/Y/Z" readout) drew ~275px away, at the pre-pin position. Screenshot taken,
+  matches the user's own report exactly.
+- **Unpinned (negative control)**: both layers coincide, "Start" sitting exactly on the rect's own corner.
+
+**Root cause, read directly (not inferred):** `FeatureCanvas.getTransform()` (`viz/featureCanvas.js`) returned
+`{scale, cxw, cyw, cx, cy}` straight off `_tf` — the bare pan/zoom transform — with no knowledge of `_placement`
+(the WCS-pin shift `spec.placement`, t1672). Every placed SVG element (paths/items/handles) draws through
+`_disp(x,y)` = `_S(x + placement.x, y + placement.y)` — `_S` alone is the STOCK's frame (datum-fixed, no pin
+term — its `ox/oy` already carries the pin, baked in upstream in `panelTypes.js`); `_disp` is everything else's
+frame. `userOpView.js`'s `wireAnimOverlay`/`_pinFromTf` — the animation overlay's ONLY way to learn the scene's
+transform — reads `getTransform()`, so its raster was always missing exactly the pin term. Invisible for as
+long as no one had a pin active, because the term was always 0 (`git show` of the commit before t1672 confirms:
+no `placement` key existed on the spec at all — the two layers were coincident by construction, not by design).
+
+### THE FIX — one function, not two copies of a value
+
+**The one sentence the advisor asked for, verbatim what makes a third renderer impossible to get wrong:** a
+renderer added to this pane later calls `fc.getTransform()` (the SAME, only, public accessor `wireAnimOverlay`
+already uses) and is coincident automatically, because `getTransform()` is now the ONLY place that transform is
+ever computed — there is no second, partial accessor left to reach for by mistake.
+
+Implementation, entirely inside `viz/featureCanvas.js`:
+- `getTransform()` folds `_placement` into the returned `cxw`/`cyw` (`cxw - placement.x`, `cyw - placement.y`) —
+  algebraically exact: it makes the returned transform equal `_disp`'s own mapping for any world point, not an
+  approximation. Worked out on paper first (expanding `_disp(x,y)` and matching it to `_S`'s formula with a
+  shifted `cxw/cyw`) before writing it, then proven by a direct test (below) rather than trusted from the algebra
+  alone.
+- The `_onTransform` push-callback (fired on every pan/zoom/fit/resize/render — the OTHER way a subscriber
+  learns the transform) now relays `this.getTransform()` instead of the raw `this._tf` it used to pass. Before
+  this, `getTransform()` and the callback were two DIFFERENT paths to the same nominal value, one composed and
+  one not — exactly the "two copies that currently agree" shape the advisor's ruling named as the disease.
+  Now there is truly one function; the callback is a thin relay of it.
+- `userOpView.js` — **zero changes**. `wireAnimOverlay`/`_pinFromTf` already just relay whatever `getTransform()`
+  hands them; making the one function they call correct fixes every consumer, present and future, without
+  touching the consumer at all. This is the load-bearing fact behind the "impossible to get wrong" sentence
+  above — not a claim about future discipline, a fact about how few places there are left to get it wrong in.
+
+**(a) vs (b) — picked (a), teach the existing accessor, not revert t1672.** t1672's own mechanism (stock.ox/oy +
+spec.placement + `_disp`) is proven correct by its own comprehensive test suite
+(`layout-partzero-shift-1672.spec.js`, 4 tests, all still passing) across every affected op. The bug is entirely
+in `getTransform()` — a SEPARATE, never-updated accessor that predates t1672 (t309) and was simply never taught
+about the field t1672 introduced. Reverting a working, tested, general mechanism to fix an accessor that needed
+one line and zero other changes would be strictly worse: more code moved, more risk, no reduction in the actual
+defect's size. Confirmed no OTHER consumer of `getTransform()`/`onTransform()` exists anywhere in `web/`
+(grepped) — the fix's blast radius is exactly the overlay, nothing else to weigh.
+
+### The crosshair — a second, smaller defect from the same commit, confirmed and fixed
+
+The part-zero crosshair (drawn for a non-machine-frame op, e.g. corner — `machine`-frame ops like homing draw
+the envelope instead and never reach this code) read `spec.origin` through `_S`, not `_disp`. `spec.origin`
+(`panelTypes.js`: `stock.ox + _dp.x, stock.oy + _dp.y` — the RAW, pre-pin stock plus the datum offset) is
+datum-relative, the SAME raw frame items/handles declare in — it needs the SAME `_disp` shift they get. Traced
+algebraically first (origin + placement == the stock rect's own screen-frame datum-corner target, given the raw
+`stock.ox/oy` is 0 in the standard case) then confirmed by VALUE: a real corner wizard, pinned and unpinned, the
+crosshair's screen centre now equals the stock rect's own left/bottom edge to the pixel (was 229px off, pinned).
+This is what the user's own screenshot showed ("the crosshair sits with the raster") — both were drawing in the
+SAME stale, unshifted frame; now both read the SAME correct one.
+
+### The two flagged collateral items — checked, neither expanded the act
+
+1. **Double-shift risk (simStart/simMarkers/panelStarts):** none. `opSimStarts` (the sole source for every
+   sim-start marker world position) takes no `machine`/WCS argument at all — traced its full call chain
+   (`cornerSimStartsProvider` → `makeProvider` → `rowToStart`) and confirmed by a live test: forcing
+   `machine.wcs`/pin active in settings does not change `opSimStarts`'s output, because there is no channel for
+   it to read one. A marker's world position is never pre-shifted, so `_disp`'s one application of `placement`
+   is correct, not a second one stacked on an already-shifted value.
+2. **The crosshair sitting with the raster:** this WAS the second defect (above) — confirmed, fixed, not just
+   noted.
+
+### Verify by value + non-vacuity — including a vacuous test I wrote myself and caught before shipping
+
+New permanent spec `tests/layout-overlay-frame-1686.spec.js` (4 tests): (A) DIRECT — `getTransform()`'s
+`cxw/cyw` absorb `spec.placement` exactly (`_userAdjusted=true` freezes auto-fit so the assertion isolates the
+fold from the fit's own re-centring, a real trap a first draft of this test walked into); (B) REAL — the
+crosshair coincides with the stock's own datum corner, pinned and unpinned, through the real corner wizard;
+(C) NEGATIVE CONTROL — unpinned, `placement`/`stock.ox/oy` stay exactly `{0,0}`; (D) the double-shift collateral
+check. Also extended the EXISTING `corner-anim-overlay.spec.js` (INC-1, "the overlay is PIXEL-EXACT under the
+SVG") with **INC-4**, the same alignment proof with a pin active — the gap this whole bug lived in: a real,
+passing pixel-exactness test existed and simply never varied the one setting that broke it.
+
+Non-vacuity (three separate `git show HEAD:<path>` swaps, RED, restore, GREEN): the DIRECT getTransform test,
+the REAL crosshair test, and INC-4. **INC-4's first draft was itself vacuous** — it set the pin via
+`page.evaluate` BEFORE calling the `openCorner` helper, whose own `page.goto` (there is no `ddcsSetSettings`;
+settings are a plain in-memory object mutated directly, wiped by any later navigation) silently discarded the
+pin before the wizard ever opened. It PASSED against both the fixed AND the pre-fix code — caught only because
+the non-vacuity swap-in-pre-fix-code discipline is run on every claim, not skipped when a test looks obviously
+right. Fixed by giving `openCorner` an optional `beforeOpen` hook that runs after its own navigation; re-proved
+RED against pre-fix code (a genuine 275px split) before trusting it.
+
+Emit byte-identical: nothing touched writes to a param or the emit path (`getTransform`/`onTransform`/the
+crosshair are all render-only reads) — `layout-partzero-shift-1672.spec.js`'s own `emitIdentical` assertion
+(15 ops) and `corner-data-emit.spec.js`/`fork-parity-1593.spec.js`'s real-gesture fork sweep (32 twins,
+byte-for-byte) all still pass, none needed changes.
+
+Full suite: node **101/0** (unchanged). e2e: **14 failed / 6 skipped / 2463 passed** (2483 total — +5 = the
+5 new tests, A-D above plus INC-4). 9 of the 14 matched the churn pool already established across t1682/t1684
+(`collapsible-panes-752`, `homing-superset`, `middle-superset`, `open-as-modal-1625`, `pane-splitter-790` ×2,
+`pocket-cavity-2d`, `update-check` ×2). The remaining 5 (`blocks-live-form`, `corner-wall-collapse-1664`,
+`subscriber-error-surface-1656`, `sysstart-dialect`, `transform-declared-736`) — none of which touch anything
+this turn's diff reaches — all isolated clean with `--workers=1`; `subscriber-error-surface-1656` needed a
+second retry (boot-timeout on `window.__blkws`, the same failure mode as the rest of the pool) before it did,
+confirmed with `--repeat-each=2` both green. All 14 accounted for; zero regressions.
+
+### Capacity
+
+The dispatch itself did the hard analytical work (the exact mechanism, the exact line, the exact console check,
+both real screenshots already in hand from the user) — what was left was verifying it first-hand rather than
+trusting the write-up, then choosing the SHAPE of the fix the ruling demanded: one function, not a taught
+overlay carrying a second copy of the same value. The algebra (folding `_placement` into `cxw/cyw` so
+`getTransform()` becomes exactly `_disp`) was worked out on paper before touching code, which is what let the
+actual diff stay this small — `userOpView.js`, the file with the bug's visible SYMPTOM, needed no changes at
+all, because the bug was one level upstream of where it was easiest to see it. The near-miss worth naming: my
+own first non-vacuity check for the crosshair fix accidentally proved nothing (a `page.goto` inside a shared
+test helper silently wiped a pin set before calling it) and reported green against BOTH the fixed and the
+broken code — caught only because swap-in-pre-fix-and-confirm-RED is run on every claim without exception, not
+skipped when a result looks obviously right. That is twice now this session that discipline has caught a test
+that would have shipped a false confirmation (t1682's `lathe-pilot-1271.spec.js` gap, and this one) — it is
+earning its cost specifically by catching MY mistakes, not just the code's.

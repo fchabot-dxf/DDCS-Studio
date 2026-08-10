@@ -9,9 +9,14 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 1000 } });
 const OUT = 'C:\\Users\\danse\\AppData\\Local\\Temp\\claude\\c--Users-danse-APPS-ddcs-studio-project\\306b9087-a4e7-4ecb-a877-d4ad4867bab7\\scratchpad\\';
 
-async function openCorner(page) {
+// `beforeOpen` (optional) runs AFTER navigation but BEFORE the wizard opens — settings must be set here, not
+// before calling openCorner: ddcsGetSettings() returns a plain in-memory object (there is no ddcsSetSettings;
+// a mutation before this function's own page.goto is wiped by that goto, a real trap this file's own t1686
+// addition first fell into — caught only because the non-vacuity swap-in-pre-fix-code check still passed).
+async function openCorner(page, beforeOpen) {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  if (typeof beforeOpen === 'function') await beforeOpen();
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
   await page.evaluate(() => window.openWiz('user_corner_data'));
   await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
@@ -57,6 +62,31 @@ test('INC-1: the overlay is PIXEL-EXACT under the SVG (stock corners coincide) a
   expect(d(a1.tl.ovl, a1.tl.svg), 'AFTER ZOOM: overlay TL still maps onto the SVG stock TL (re-pinned via onTransform)').toBeLessThan(2);
   expect(d(a1.br.ovl, a1.br.svg), 'AFTER ZOOM: overlay BR still maps onto the SVG stock BR').toBeLessThan(2);
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
+// t1686 — the live bug this INC-1 alignment proof never actually exercised: a WCS pin active. getTransform()
+// (featureCanvas.js) returned the bare pan/zoom transform without folding in spec.placement (the pin shift,
+// t1672), so the overlay pinned itself to the OLD, unshifted frame while the SVG stock/handles (which read
+// spec.placement directly via _disp) moved to the pin — the user's reported split, reproduced here with the
+// SAME alignment() helper INC-1 already trusts, just with a pin set before the wizard opens.
+test('INC-4 (t1686): PIXEL-EXACT holds with a WCS pin active too — the overlay reads the SAME shifted frame as the SVG', async ({ page }) => {
+  await openCorner(page, () => page.evaluate(() => {
+    const s = window.ddcsGetSettings();
+    s.stock = Object.assign(s.stock || {}, { x: 200, y: 150, z: 20, show: true, datum: 'nnp', pin: 'G55' });
+    s.machine = Object.assign(s.machine || {}, { x: 800, y: 500, z: 120, show: true });
+    s.machine.wcs = s.machine.wcs || {}; s.machine.wcs.active = 1;
+    s.machine.wcs.table = [{ x: 0, y: 0, z: 0 }, { x: 300, y: 200, z: -10 }];
+  }));
+  const a0 = await alignment(page);
+  expect(a0.hasView, 'the overlay published its view (__t2view)').toBe(true);
+  expect(d(a0.tl.ovl, a0.tl.svg), `PINNED: overlay top-left still maps onto the SVG stock TL (ovl ${JSON.stringify(a0.tl.ovl)} vs svg ${JSON.stringify(a0.tl.svg)}) — the reported split, closed`).toBeLessThan(2);
+  expect(d(a0.br.ovl, a0.br.svg), 'PINNED: overlay bottom-right still maps onto the SVG stock BR').toBeLessThan(2);
+  await page.evaluate(() => {
+    const s = window.ddcsGetSettings();
+    delete s.stock.pin; s.machine = Object.assign(s.machine || {}, { show: false });
+    if (window.ddcsSetSettings) window.ddcsSetSettings(s);
+    localStorage.removeItem('ddcs_user_ops');
+  });
 });
 
 test('INC-2: the shared engine feeds MOVING live positions to the overlay head (path drawn + animates)', async ({ page }) => {

@@ -70,8 +70,20 @@ export class FeatureCanvas {
         this._onTransform = null;  // t309 — a Layout ANIMATION OVERLAY subscribes here; fired on EVERY _draw (pan/zoom/fit/resize/render), the single choke point, so an overlaid toolpath2d canvas re-pins its view from _tf and stays pixel-exact under the handles.
     }
 
-    /** t309 — the live world↔screen transform, for an overlay canvas to register 1:1 with the SVG. */
-    getTransform() { const t = this._tf; return t ? { scale: t.scale, cxw: t.cxw, cyw: t.cyw, cx: t.cx, cy: t.cy, vw: this._vw, vh: this._vh } : null; }
+    /** t309/t1686 — the live world↔screen transform, for an overlay canvas to register 1:1 with the SVG. THE ONE
+     *  declared frame this pane hands out: folds `_placement` (the WCS-pin shift, t1672) into `cxw/cyw` so the
+     *  returned transform IS `_disp` — the exact frame every placed element (paths/items/handles) already draws
+     *  in — not the bare pan/zoom `_tf` a caller would have to separately learn to shift. An overlay's own content
+     *  (a toolpath trace) is placed-frame content by definition (t309: the host owns grid/stock/handles + the
+     *  view, the overlay owns only the path), so this is the one correct answer for anything painting under/over
+     *  the SVG. A renderer added to this pane later just calls this (or `onTransform`, which now relays the SAME
+     *  composed value — see below) and is coincident automatically; there is no second, partial accessor left to
+     *  reach for by mistake. */
+    getTransform() {
+        const t = this._tf; if (!t) return null;
+        const p = this._placement || { x: 0, y: 0 };
+        return { scale: t.scale, cxw: t.cxw - (p.x || 0), cyw: t.cyw - (p.y || 0), cx: t.cx, cy: t.cy, vw: this._vw, vh: this._vh };
+    }
     /** t309 — register a callback fired on every transform change (pan/zoom/fit/resize/render) with (tf, VW, VH). */
     onTransform(cb) { this._onTransform = (typeof cb === 'function') ? cb : null; }
 
@@ -364,7 +376,10 @@ export class FeatureCanvas {
         const grid = this.gGrid, items = this.gItems, handles = this.gHandles;
         grid.replaceChildren(); items.replaceChildren(); handles.replaceChildren();
         this._placement = spec.placement || { x: 0, y: 0 };   // pattern items/handles ride this; stock is datum-fixed
-        if (this._onTransform && this._tf) this._onTransform(this._tf, VW, VH);   // t309 — re-pin the animation overlay to the current transform (this is the ONE place all pan/zoom/fit/resize/render land)
+        // t1686 — relay THE SAME composed value getTransform() returns (never the raw _tf) — this callback and a
+        // direct getTransform() call are now the SAME one source, so a subscriber can't end up with a stale/partial
+        // frame just because it happened to use the push path instead of the pull path.
+        if (this._onTransform && this._tf) this._onTransform(this.getTransform(), VW, VH);   // t309 — re-pin the animation overlay to the current transform (this is the ONE place all pan/zoom/fit/resize/render land)
 
         // --- grid ---------------------------------------------------------
         const tl = this._W(0, 0), br = this._W(VW, VH);
@@ -412,8 +427,12 @@ export class FeatureCanvas {
         } else if (!spec.machine) {
             // the part-zero crosshair sits at spec.origin (world) when set — so the stock modal's datum moves it to the
             // selected corner, matching the 3D — else at the min-XY corner (the default for wizard layouts).
+            // t1686 — _disp, not _S: spec.origin is DATUM-relative (stock.ox + the datum offset), the same raw frame
+            // items/handles are declared in — it needs the SAME placement shift they get via _disp, or a WCS-pinned
+            // stock rect (already shifted) leaves the crosshair sitting at the OLD, unshifted datum corner (the second
+            // t1672 defect: the crosshair coincided with the overlay's own stale frame, not with the stock it marks).
             const ow = spec.origin || { x: 0, y: 0 };
-            const og = this._S(ow.x || 0, ow.y || 0);
+            const og = this._disp(ow.x || 0, ow.y || 0);
             grid.appendChild(svgEl('line', { x1: og.x - 9, y1: og.y, x2: og.x + 9, y2: og.y, class: 'fc-axis-x' }));
             grid.appendChild(svgEl('line', { x1: og.x, y1: og.y - 9, x2: og.x, y2: og.y + 9, class: 'fc-axis-y' }));
         }
