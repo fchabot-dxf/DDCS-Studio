@@ -1,3 +1,107 @@
+# TODAY — the running order (2026-08-10, built with the user)
+
+```
+  RUNNING   t1698   the map's checker                        worker has it
+  THEN      RELEASE 7 commits sitting unreleased             ADVISOR does this
+            incl. the glyph fix — the last of the user's five corner symptoms
+  THEN      THE CYCLE below, 4 acts, and it ENDS
+```
+
+**The release is the advisor's, not a worker act.** Gate it (full suite, once), push, bump, verify the deploy,
+then start the cycle. Do NOT dispatch a cycle act while the release suite runs — that collision manufactured
+false reds twice on 2026-08-09.
+
+**What is waiting to reach the user:** the glyph resolver (the last corner symptom he reported), `_writable`
+declared, the preview gate's marker gap closed, 34 dead screenshot paths repointed, the lathe frame ruling,
+`ARCHITECTURE.md`, and CI disabled.
+
+---
+
+# THE NEXT LOOP — CYCLE: MACHINE VARIABLES IN WIZARD BOXES
+
+**Built 2026-08-10 with the user. A FINITE cycle: it ends when the end condition below is met, and the advisor
+runs `handoff.py done` rather than inventing a next act.**
+
+## WHAT THE USER GETS AT THE END, in his own words
+
+> Type `#500` into a wizard field and the program takes that number **from the controller** instead of a fixed
+> value — and a malformed one gets **refused** instead of quietly sent.
+
+## END CONDITION (all four, demonstrated in the real app)
+
+1. A controller token typed into a wizard field survives into the emit (`w = #500` → `X#500`, not a baked number).
+2. It survives the twin form, the built-in form, and the Blocks canvas — the three authoring surfaces.
+3. A malformed token is REFUSED LOUDLY at the send gate. `' #500;M30 '` must not pass.
+4. A param that CANNOT take a live value says so by declaration, not by silently coercing it away.
+
+---
+
+## ACT 1 — CLOSE THE HOLE FIRST (safety; prerequisite, not a follow-up)
+
+Measured at t1668 and still open: `' #500;M30 '` emits `G0 X#500;M30 Y10` and `defaultSyntaxVerify` returns
+**valid: true**. A token value is never bounded to where it ends, so an injected second statement rides through
+the send gate. Six of seven malformed shapes are already refused; this is the survivor.
+
+⚠ **Why it is act 1:** it is unreachable today ONLY because no surface can author a token. Build the surfaces
+first and the hole ships inside the feature. The user has been told and agrees the safety fix leads.
+
+- Bound the token: it ends where the token ends; anything trailing on the same word is malformed.
+- **Refuse loudly** — the standing rule for this whole defect family. Never emit something plausible.
+- Verify against the REAL gate (`defaultSyntaxVerify` + the emit path), not a unit stub, and re-run t1668's full
+  malformed sweep so the six already-refused shapes stay refused.
+
+## ACT 2 — DECLARE WHICH PARAMS CAN TAKE A LIVE VALUE (the design fork, decided before any UI)
+
+t1668's own survey named the real constraint: **params like Surfacing's `w` feed JS-side geometry math**
+(`stepover` counts, pass counts, bbox), so they cannot take a value that only exists at run time without either
+deferred math or a per-field refusal.
+
+- **DECLARE the per-param answer** — this is data, not a special case, and it belongs beside the binding spec.
+- Report the split: how many params can accept a token, how many genuinely cannot, and WHY for a representative
+  few. That count sizes act 3.
+- ⚠ A param that cannot accept one must say so **in the UI** when a token is typed — not coerce it to a default
+  silently, which is exactly what all three surfaces do today.
+
+## ACT 3 — THE AUTHORING SURFACES (may split into two acts; say so if it does)
+
+Three surfaces, three DIFFERENT silent failures, all measured at t1668:
+```
+  Blockly shadow    setValue('#500') is IGNORED — the field stays numeric
+  wizard form       num() coerces it away — falls back to the default
+  twin form         a native number input CLEARS the string at the DOM
+```
+Take them in that order of difficulty only if it helps; the deliverable is that all three accept a token for a
+param declared token-capable, and refuse it visibly for one that is not.
+
+## ACT 4 — END-TO-END, IN THE REAL APP
+
+Type it, insert it, read the emitted program, send it. All four end-condition claims demonstrated by driving the
+app — not by unit assertions. Screenshot the field and the emitted line.
+
+---
+
+## THE STANDING BARS (unchanged, do not re-litigate)
+
+- **Verification tier:** node tier + the preview gate (~2s) + a hand-picked sweep. **NOT `test:changed`** — t1696
+  proved it only follows STATIC imports and finds zero tests for `web/` changes. The full suite is the
+  advisor's release gate, not a per-act step.
+- **Replace, don't parallel.** No second code path beside the old one; no legacy shim. Nothing in this project is
+  irreplaceable — machine values re-pull from the controller.
+- **Look at the pane.** Anything on a visible surface gets opened and seen before it is claimed.
+- **Non-vacuity per claim.** Break it, watch it go red, restore it, report both.
+- **ARCHITECTURE.md is the map** — read the part your act touches before tracing, and REPAIR it in the same act
+  if your work proves a claim wrong.
+
+## AFTER THIS CYCLE (not part of it — the loop ENDS first)
+
+Retire the 20 dead built-in SCREENS (⚠ extract first: 24 twins import their BUILDERS, which are load-bearing) ·
+the §3 tail · then ARC B (validation as data) or ARC C (dialect as data — the porting arc, and the one with
+strategic weight: it decides whether Studio runs other people's machines).
+
+---
+
+<!-- ARCHIVE: prior queue -->
+
 # QUEUE — prepared 2026-08-09 (advisor). Dispatch in order, ONE act per turn.
 
 ## STATE
