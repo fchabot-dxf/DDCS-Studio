@@ -22165,3 +22165,123 @@ every file individually rather than trusting the dispatch's count, and distingui
 to be sure it wasn't `_writable` in disguise. Room was ample for the act at the lighter tier; the amendment landing
 mid-task cost nothing (the full suite was stopped before it produced anything the lighter tier didn't already
 cover, per the diff-review argument above).
+
+## 🔨 turn 1692 (cycle 844, epoch 4) — t1692: CLOSE THE GATE GAP — thread simStart/simMarkers, pin the resolver against real handles
+
+### REVIEW RECEIVED ON t1690: PASS
+
+Advisor's own words: "MY NUMBER WAS WRONG AND I PASSED IT ON WITHOUT CHECKING IT — it came from the gate builder
+report and I relayed it... you caught it by measuring." ACT 3 (suite speed) was done by the advisor directly
+(disabled the broken CI workflow reporting SUCCESS on 504 failures — reasoning written into the file, skip it).
+
+### THE GAP — specFor() hardcoded simStart/sources/simMarkers to null, seven arguments deep
+
+`layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers)` — the gate's
+`specFor` called it with ALL SEVEN non-`def`/`params` arguments as literal `null`. Two consequences, not one:
+corner's own `__simstart0` "Start" handle (t1688's whole subject) was invisible, AND alignment/rotary_clock's
+`simMarkers`-driven markers (a completely different construction branch) were too.
+
+### THE MECHANISM — opSimStarts alone reproduces the live panel's output, for an undragged state (verified, not assumed)
+
+Before writing any gate code: probed the REAL running app (corner + alignment, fresh open, no drag) for
+`panel.getPassStarts()`/`panel.getPassSources()` (the LIVE, DOM/WebGL-backed source `computePassStarts` — F2's own
+named DOM-entangled function — produces), and separately computed `opSimStarts(opType, params, stock)` directly
+(pure, no panel). **Byte-identical** for corner (x/y/z/emits/source/anchorsAtPrev, every field, every pass) and for
+alignment (x/y/z match; alignment's own rows carry no source/emits key at all, matching both sides). This is WHY:
+`computePassStarts`'s row construction is `{x,y,z, emits: hint&&hint.emits, source: hint&&hint.source, ...}` where
+`hint = hintFor(p) = host.__startHints[p]`, and `__startHints` is set from `starts = opSimStarts(...)` verbatim
+(userOpView.js:467) — for a FRESH panel with no `userStarts`/pins overriding anything, `computePassStarts`'s output
+IS `opSimStarts`'s output, just relayed through a live object. One exception found and matched: `getPassSources()`
+defaulted an undeclared `.source` to `'auto'` (the real probe showed `['auto','auto']` for alignment, whose raw rows
+carry no `.source` key at all) — copied that default into `simInputsFor`, not assumed.
+
+### THE FIX — `simInputsFor`, reproducing the TWO DOM-free branches userOpView.js already has
+
+Added `opSimStarts` to the gate's `env` (one more dynamic import in `_boot()`, pure module). New `simInputsFor(env,
+def, params)`: calls `opSimStarts` once, then branches EXACTLY as userOpView.js does — no `def.simStartParams` →
+plain `simStart = {pos: starts[0], emits: starts[0].emits}` (corner, edge, homing, rotary_center, middle's own Start
+marker); `def.simStartParams` set → `simMarkers = spb.map(...)` copied verbatim from userOpView.js:570-574 (alignment,
+rotary_clock — the SAME seam, confirmed by reading, not a second mechanism, closing ruling #4 explicitly). `specFor`
+now threads the result instead of `null,null,null,null,null,null,null`.
+
+Checked before trusting it: ALL THREE of `layoutSpecFromOp`'s return statements (the `simMarkers` early-return, the
+`simStart` branch, the plain fallback) return the IDENTICAL key set — only `.handles`/`.onDrag` differ in VALUE, not
+shape. So threading these three arguments could only ever change `.handles` in the snapshot, never `.panel .keys` —
+confirmed against the actual diff below, not assumed from reading.
+
+### THE SNAPSHOT DIFF — read whole, 7 ops affected, every line explained (not skimmed)
+
+Regenerated and reviewed `git diff` on the fixture line by line (39 insertions, 19 deletions). Every change:
+
+- **alignment, rotary_clock** — 2 new `__simstart` handles each (A/B), cyan, `manual:false`, `emits:"<undefined>"`.
+  Traced why undefined and not `false`: `alignmentData.js:137`'s `simStartsProvider` DELEGATES to the plain
+  BUILT_IN `'alignment'` function (`opSimStarts('alignment', params, stock)`), whose rows never set an `emits` key
+  at all — consistent with t1688's own backward-compat test (D), which asserts the SAME underlying `undefined`,
+  just coerced through `!!` there vs preserved raw here.
+- **corner, middle** — gained the `__simstart0` "Start" handle (amber, hollow, `manual:true`) — exactly what t1688
+  fixed, now finally IN the snapshot instead of invisible to it.
+- **edge, homing, rotary_center** — ALSO gained `__simstart0`, which I had NOT predicted (t1690's own finding said
+  these 13 ops have zero role/group bindings — true, and irrelevant here: `opSimStarts` markers don't need a bound
+  param at all, they're the operator's physical jog target regardless of whether any FIELD controls it). Edge's
+  `.items` ALSO gained a NEW line (`fc-edge-approach`) — traced to `panelTypes.js:510-518`, EXISTING, already-
+  declared code (`if (sp) items.push({...cls:'fc-edge-approach'...})`) that was simply unreachable with `simStart`
+  hardcoded null. Not a new feature I added — a real, pre-existing, correctly-declared visual the gate can finally
+  see, which is exactly the shape of gap this whole gate exists to close.
+- **corner @offdefaults** — `reposition_pos`/`start_pos` flipped `manual:false→true`, `color:null→"#ffb300"`. Traced:
+  `offDefaults()` flips `travelApproach` to `'manual'` (its only alternate enum value), and `sources` (now real,
+  previously hardcoded null) correctly reflects that in `srcCol`/`reposManual`. CORRECT — matches what the real
+  browser computes for that param combination (the source value flows through the identical `hint.source` path
+  proven byte-identical above) — but see the FINDING below for a real limit this surfaced.
+- Nothing else in the 32-twin × 2-state sweep changed by even one number — confirmed by reading the full diff, not
+  trusting the stat line.
+
+### FINDING — corner's `@offdefaults` handle SET doesn't correspond to one real browser state (documented as F2's continuation, not fixed)
+
+`offDefaults()` flips corner's `travelApproach` to `'manual'`. In the REAL browser, ANY pass with a manual source
+makes userOpView.js build `manualMarkers` — which REPLACES the byRole/`simStart` markers entirely with a different
+id set (`mkManual`'s own `__simstart0`/`__simstart1`, one per manual pass) — and requires a live
+`panel.onStartDrag`, which this tier cannot construct. So `user_corner_data @offdefaults`'s snapshot — showing
+`reposition_pos` + `start_pos` (byRole) ALONGSIDE `__simstart0` (plain simStart) together — is a combination the
+real browser never actually renders for `travelApproach:'manual'`; the real browser would show the manualMarkers
+set instead. **The PER-HANDLE glyph resolve (P5c) stays independently true regardless** — `resolveStartGlyph` is a
+pure function of whatever `(manual, emits)` it's handed, correct no matter which marker SET surrounds it — but the
+offdefaults snapshot's handle SET for corner should not be read as "what the browser shows under manual travel."
+Named in the FINDINGS block (F2's continuation) rather than built around: replicating `manualMarkers`'s
+panel-dependent construction would be a SECOND mechanism, which ruling #4 explicitly said not to build. This is the
+"vacuity trap" ruling #3 asked me to watch for — not empty rows, but a real combination that looks complete and
+isn't quite the browser's own.
+
+### THE RESOLVER PINNED AGAINST REAL HANDLES (ruling #2 was already half-done; closed the other half)
+
+P5a (from t1688) already pinned `resolveStartGlyph`'s full 6-combo truth table in ISOLATION — ruling #2's literal
+ask was already satisfied there, so I didn't redo it. What was missing: the loop never closed onto REAL,
+gate-visible handles. New **P5c**: reads corner's Start (defaults) + wall-2 reposition (defaults, then offdefaults
+— the manual-travel case) + alignment's marker A (defaults) straight out of `allHandles()`, resolves each through
+`resolveStartGlyph`, and checks the result against a HAND-CHOSEN independent expectation (never the resolver
+compared to itself, which would be tautological). Non-vacuity: disabled `simInputsFor` (returned nulls
+unconditionally), re-ran — P1 AND P5c both went RED, P5c's message naming the exact handle it couldn't find.
+Restored, re-ran green.
+
+### Verify — the lighter tier, and why a browser sweep wasn't run this time
+
+This entire act lives in `tests/node/preview-spec-gate-1688.test.mjs` — `git status` confirms zero `web/` files
+touched. No runtime code changed, so there is no app-regression surface for a targeted browser sweep to catch;
+the amendment's own escalation criteria ("the change reaches outside the preview/spec layer") doesn't fire. Ran:
+**node — 112/0** (111 + the new P5c; every gate part, including the newly-extended P1 and the new P5c, green).
+**Non-vacuity** — two separate proofs above (the threading itself, and P5c specifically), both a genuine
+disable/RED/restore/GREEN cycle, not substitute reasoning. The live-app probe taken BEFORE writing the fix is the
+verify-by-value half — an independent ground truth, not the gate checked against its own output.
+
+### Emit byte-identical
+
+Untouched by construction — every change is in test infrastructure (`tests/node/`), zero `web/` files in the diff.
+`layoutSpecFromOp` itself is unchanged; only what the GATE hands it as arguments changed.
+
+### Capacity
+
+A focused act once the live-app probe closed the "does this actually match" question early — the probe itself
+was the expensive part (verifying `getPassSources()`'s undeclared-source default before trusting it, rather than
+assuming 'auto'). The offdefaults/manualMarkers finding surfaced only because I read the FULL snapshot diff instead
+of trusting the stat line (39/19) — a skim would have missed that `manual`/`color` changed on handles I hadn't
+touched the construction of, and never asked why. Room was ample; this act closes clean with nothing deferred that
+wasn't named.

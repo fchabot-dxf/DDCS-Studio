@@ -3,7 +3,9 @@
 # encoding: keys sorted recursively · numbers rounded to 1e-4 (-0→0) · present-but-undefined → "<undefined>" (NEVER dropped) · function → "<fn/arity>"
 #
 user_alignment_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_alignment_data @defaults .handles <0 entries>
+user_alignment_data @defaults .handles <2 entries>
+user_alignment_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":60,"y":-4,"yieldCoincident":false}
+user_alignment_data @defaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":110,"y":-4,"yieldCoincident":false}
 user_alignment_data @defaults .items <0 entries>
 user_alignment_data @defaults .onDrag "<fn/2>"
 user_alignment_data @defaults .onEdit "<fn/2>"
@@ -12,7 +14,9 @@ user_alignment_data @defaults .paths null
 user_alignment_data @defaults .placement {"x":300,"y":200}
 user_alignment_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_alignment_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_alignment_data @offdefaults .handles <0 entries>
+user_alignment_data @offdefaults .handles <2 entries>
+user_alignment_data @offdefaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":211,"y":45,"yieldCoincident":false}
+user_alignment_data @offdefaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":211,"y":102,"yieldCoincident":false}
 user_alignment_data @offdefaults .items <0 entries>
 user_alignment_data @offdefaults .onDrag "<fn/2>"
 user_alignment_data @offdefaults .onEdit "<fn/2>"
@@ -294,8 +298,9 @@ user_contour_data @offdefaults .placement {"x":300,"y":200}
 user_contour_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_corner_data @defaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_corner_data @defaults .corner "FL"
-user_corner_data @defaults .handles <1 entries>
-user_corner_data @defaults .handles[0] {"color":null,"emits":true,"id":"reposition_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":-36,"y":13.125}
+user_corner_data @defaults .handles <2 entries>
+user_corner_data @defaults .handles[0] {"color":"#22d3ee","emits":true,"id":"reposition_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":-36,"y":13.125}
+user_corner_data @defaults .handles[1] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":14,"y":-36.875}
 user_corner_data @defaults .items <1 entries>
 user_corner_data @defaults .items[0] {"kind":"hole","r":2.4,"x":-36,"y":13.125}
 user_corner_data @defaults .onCornerPick "<fn/1>"
@@ -307,9 +312,10 @@ user_corner_data @defaults .placement {"x":300,"y":200}
 user_corner_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_corner_data @offdefaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_corner_data @offdefaults .corner "FR"
-user_corner_data @offdefaults .handles <2 entries>
-user_corner_data @offdefaults .handles[0] {"color":null,"emits":true,"id":"reposition_pos","kind":"move","label":"2","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":136,"y":-43.875}
-user_corner_data @offdefaults .handles[1] {"color":null,"emits":true,"id":"start_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":193,"y":13.125}
+user_corner_data @offdefaults .handles <3 entries>
+user_corner_data @offdefaults .handles[0] {"color":"#ffb300","emits":true,"id":"reposition_pos","kind":"move","label":"2","labelDir":"<undefined>","manual":true,"noSnap":"<undefined>","x":136,"y":-43.875}
+user_corner_data @offdefaults .handles[1] {"color":"#ffb300","emits":true,"id":"start_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":true,"noSnap":"<undefined>","x":193,"y":13.125}
+user_corner_data @offdefaults .handles[2] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":186,"y":13.125}
 user_corner_data @offdefaults .items <2 entries>
 user_corner_data @offdefaults .items[0] {"kind":"hole","r":2.4,"x":136,"y":-43.875}
 user_corner_data @offdefaults .items[1] {"kind":"hole","r":2.4,"x":193,"y":13.125}
@@ -434,9 +440,11 @@ user_drill_data @offdefaults .placement {"x":300,"y":200}
 user_drill_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_edge_data @defaults .panel {"keys":["edgeSel","handles","items","onDrag","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_edge_data @defaults .edgeSel {"axis":"X","dir":"pos"}
-user_edge_data @defaults .handles <0 entries>
-user_edge_data @defaults .items <1 entries>
+user_edge_data @defaults .handles <1 entries>
+user_edge_data @defaults .handles[0] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":-9,"y":75}
+user_edge_data @defaults .items <2 entries>
 user_edge_data @defaults .items[0] {"cls":"fc-edge-wall","kind":"line","x1":0,"x2":0,"y1":0,"y2":150}
+user_edge_data @defaults .items[1] {"cls":"fc-edge-approach","kind":"line","x1":-9,"x2":0,"y1":75,"y2":75}
 user_edge_data @defaults .onDrag "<fn/2>"
 user_edge_data @defaults .onEdgePick "<fn/2>"
 user_edge_data @defaults .onEdit "<fn/2>"
@@ -446,9 +454,11 @@ user_edge_data @defaults .placement {"x":300,"y":200}
 user_edge_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_edge_data @offdefaults .panel {"keys":["edgeSel","handles","items","onDrag","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_edge_data @offdefaults .edgeSel {"axis":"Y","dir":"neg"}
-user_edge_data @offdefaults .handles <0 entries>
-user_edge_data @offdefaults .items <1 entries>
+user_edge_data @offdefaults .handles <1 entries>
+user_edge_data @offdefaults .handles[0] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":163.2}
+user_edge_data @offdefaults .items <2 entries>
 user_edge_data @offdefaults .items[0] {"cls":"fc-edge-wall","kind":"line","x1":0,"x2":200,"y1":150,"y2":150}
+user_edge_data @offdefaults .items[1] {"cls":"fc-edge-approach","kind":"line","x1":100,"x2":100,"y1":163.2,"y2":150}
 user_edge_data @offdefaults .onDrag "<fn/2>"
 user_edge_data @offdefaults .onEdgePick "<fn/2>"
 user_edge_data @offdefaults .onEdit "<fn/2>"
@@ -457,7 +467,8 @@ user_edge_data @offdefaults .paths null
 user_edge_data @offdefaults .placement {"x":300,"y":200}
 user_edge_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_homing_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_homing_data @defaults .handles <0 entries>
+user_homing_data @defaults .handles <1 entries>
+user_homing_data @defaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":400,"y":300}
 user_homing_data @defaults .items <0 entries>
 user_homing_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
 user_homing_data @defaults .onDrag "<fn/2>"
@@ -467,7 +478,8 @@ user_homing_data @defaults .paths null
 user_homing_data @defaults .placement {"x":300,"y":200}
 user_homing_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_homing_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_homing_data @offdefaults .handles <0 entries>
+user_homing_data @offdefaults .handles <1 entries>
+user_homing_data @offdefaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":400,"y":300}
 user_homing_data @offdefaults .items <0 entries>
 user_homing_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
 user_homing_data @offdefaults .onDrag "<fn/2>"
@@ -660,8 +672,9 @@ user_lathe_polygon @offdefaults .paths <1 entries>
 user_lathe_polygon @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":33.971,"y":10},{"x":32.7324,"y":11.2382},{"x":31.6504,"y":12.3204},{"x":30.6851,"y":13.2855},{"x":29.8088,"y":14.1618},{"x":29.0003,"y":14.9707},{"x":28.2427,"y":15.7285},{"x":27.5224,"y":16.4482},{"x":26.8296,"y":17.1416},{"x":26.153,"y":17.8174},{"x":25.4853,"y":18.4853},{"x":24.8174,"y":19.153},{"x":24.1416,"y":19.8296},{"x":23.4482,"y":20.5224},{"x":22.7285,"y":21.2427},{"x":21.9707,"y":22.0003},{"x":21.1618,"y":22.8088},{"x":20.2855,"y":23.6851},{"x":19.3204,"y":24.6504},{"x":18.2382,"y":25.7324},{"x":17,"y":26.971},{"x":15.7618,"y":25.7324},{"x":14.6796,"y":24.6504},{"x":13.7145,"y":23.6851},{"x":12.8382,"y":22.8088},{"x":12.0293,"y":22.0003},{"x":11.2715,"y":21.2427},{"x":10.5518,"y":20.5224},{"x":9.8584,"y":19.8296},{"x":9.1826,"y":19.153},{"x":8.5147,"y":18.4853},{"x":7.847,"y":17.8174},{"x":7.1704,"y":17.1416},{"x":6.4776,"y":16.4482},{"x":5.7573,"y":15.7285},{"x":4.9997,"y":14.9707},{"x":4.1912,"y":14.1618},{"x":3.3149,"y":13.2855},{"x":2.3496,"y":12.3204},{"x":1.2676,"y":11.2382},{"x":0.029,"y":10},{"x":1.2676,"y":8.7618},{"x":2.3496,"y":7.6796},{"x":3.3149,"y":6.7145},{"x":4.1912,"y":5.8382},{"x":4.9997,"y":5.0293},{"x":5.7573,"y":4.2715},{"x":6.4776,"y":3.5518},{"x":7.1704,"y":2.8584},{"x":7.847,"y":2.1826},{"x":8.5147,"y":1.5147},{"x":9.1826,"y":0.847},{"x":9.8584,"y":0.1704},{"x":10.5518,"y":-0.5224},{"x":11.2715,"y":-1.2427},{"x":12.0293,"y":-2.0003},{"x":12.8382,"y":-2.8088},{"x":13.7145,"y":-3.6851},{"x":14.6796,"y":-4.6504},{"x":15.7618,"y":-5.7324},{"x":17,"y":-6.971},{"x":18.2382,"y":-5.7324},{"x":19.3204,"y":-4.6504},{"x":20.2855,"y":-3.6851},{"x":21.1618,"y":-2.8088},{"x":21.9707,"y":-2.0003},{"x":22.7285,"y":-1.2427},{"x":23.4482,"y":-0.5224},{"x":24.1416,"y":0.1704},{"x":24.8174,"y":0.847},{"x":25.4853,"y":1.5147},{"x":26.153,"y":2.1826},{"x":26.8296,"y":2.8584},{"x":27.5224,"y":3.5518},{"x":28.2427,"y":4.2715},{"x":29.0003,"y":5.0293},{"x":29.8088,"y":5.8382},{"x":30.6851,"y":6.7145},{"x":31.6504,"y":7.6796},{"x":32.7324,"y":8.7618},{"x":33.971,"y":10}]}
 user_lathe_polygon @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_middle_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_middle_data @defaults .handles <1 entries>
+user_middle_data @defaults .handles <2 entries>
 user_middle_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"crossAimP","kind":"size","label":"X↔","manual":"<undefined>","noSnap":"<undefined>","value":80,"x":80,"y":75}
+user_middle_data @defaults .handles[1] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":-15,"y":75}
 user_middle_data @defaults .items <0 entries>
 user_middle_data @defaults .onDrag "<fn/2>"
 user_middle_data @defaults .onEdit "<fn/2>"
@@ -670,7 +683,8 @@ user_middle_data @defaults .paths null
 user_middle_data @defaults .placement {"x":300,"y":200}
 user_middle_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_middle_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_middle_data @offdefaults .handles <0 entries>
+user_middle_data @offdefaults .handles <1 entries>
+user_middle_data @offdefaults .handles[0] {"color":"#ffb300","emits":false,"id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":75}
 user_middle_data @offdefaults .items <0 entries>
 user_middle_data @offdefaults .onDrag "<fn/2>"
 user_middle_data @offdefaults .onEdit "<fn/2>"
@@ -733,7 +747,8 @@ user_pocket_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":60.5,"y":3
 user_pocket_data @offdefaults .placement {"x":300,"y":200}
 user_pocket_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_rotary_center_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_rotary_center_data @defaults .handles <0 entries>
+user_rotary_center_data @defaults .handles <1 entries>
+user_rotary_center_data @defaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":75}
 user_rotary_center_data @defaults .items <2 entries>
 user_rotary_center_data @defaults .items[0] {"cls":"fc-rotary-axis","kind":"line","x1":0,"x2":200,"y1":75,"y2":75}
 user_rotary_center_data @defaults .items[1] {"cls":"fc-rotary-datum","cx":100,"cy":75,"kind":"circle","r":3}
@@ -744,7 +759,8 @@ user_rotary_center_data @defaults .paths null
 user_rotary_center_data @defaults .placement {"x":300,"y":200}
 user_rotary_center_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_rotary_center_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_rotary_center_data @offdefaults .handles <0 entries>
+user_rotary_center_data @offdefaults .handles <1 entries>
+user_rotary_center_data @offdefaults .handles[0] {"color":"#ffb300","emits":"<undefined>","id":"__simstart0","kind":"move","label":"Start","manual":true,"simOnly":true,"x":100,"y":75}
 user_rotary_center_data @offdefaults .items <2 entries>
 user_rotary_center_data @offdefaults .items[0] {"cls":"fc-rotary-axis","kind":"line","x1":0,"x2":200,"y1":75,"y2":75}
 user_rotary_center_data @offdefaults .items[1] {"cls":"fc-rotary-datum","cx":100,"cy":75,"kind":"circle","r":3}
@@ -755,7 +771,9 @@ user_rotary_center_data @offdefaults .paths null
 user_rotary_center_data @offdefaults .placement {"x":300,"y":200}
 user_rotary_center_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_rotary_clock_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_rotary_clock_data @defaults .handles <0 entries>
+user_rotary_clock_data @defaults .handles <2 entries>
+user_rotary_clock_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":75,"yieldCoincident":false}
+user_rotary_clock_data @defaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":95,"yieldCoincident":false}
 user_rotary_clock_data @defaults .items <3 entries>
 user_rotary_clock_data @defaults .items[0] {"cls":"fc-rotary-span","kind":"line","x1":100,"x2":100,"y1":65,"y2":85}
 user_rotary_clock_data @defaults .items[1] {"cls":"fc-rotary-touch","cx":100,"cy":65,"kind":"circle","r":3}
@@ -767,7 +785,9 @@ user_rotary_clock_data @defaults .paths null
 user_rotary_clock_data @defaults .placement {"x":300,"y":200}
 user_rotary_clock_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_rotary_clock_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_rotary_clock_data @offdefaults .handles <0 entries>
+user_rotary_clock_data @offdefaults .handles <2 entries>
+user_rotary_clock_data @offdefaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart0","kind":"move","label":"A","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":75,"yieldCoincident":false}
+user_rotary_clock_data @offdefaults .handles[1] {"color":"#39c0d8","emits":"<undefined>","id":"__simstart1","kind":"move","label":"B","manual":false,"noSnap":true,"simOnly":false,"x":100,"y":102,"yieldCoincident":false}
 user_rotary_clock_data @offdefaults .items <3 entries>
 user_rotary_clock_data @offdefaults .items[0] {"cls":"fc-rotary-span","kind":"line","x1":100,"x2":100,"y1":61.5,"y2":88.5}
 user_rotary_clock_data @offdefaults .items[1] {"cls":"fc-rotary-touch","cx":100,"cy":61.5,"kind":"circle","r":3}

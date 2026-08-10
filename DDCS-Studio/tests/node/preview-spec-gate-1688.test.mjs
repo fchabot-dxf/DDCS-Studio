@@ -28,15 +28,19 @@ import { fileURLToPath } from 'node:url';
  *                           cross-checked against app.js's own SEED_BUILDERS. Never a hand-typed list (t1678/t1682).
  *   1. SPEC SNAPSHOT      — every twin × {defaults, off-defaults}, the WHOLE returned spec captured recursively
  *                           (no hand-picked field list — a hand-picked field list is literally the t1674/t1680
- *                           defect), diffed against a checked-in text fixture. This is the drift net.
+ *                           defect), diffed against a checked-in text fixture. This is the drift net. specFor now
+ *                           threads a REAL simStart/sources/simMarkers (t1692's simInputsFor, pure — opSimStarts
+ *                           alone), so a twin's __simstart handles are finally IN this snapshot, not invisible.
  *   2. FRAME INVARIANT    — spec.placement == partZeroShift(...), and the SVG layer and the overlay raster resolve a
  *                           world point to the SAME pixel through the app's own functions. (t1672 / t1686)
  *   3. GESTURE FORWARD    — every gesture in CANVAS_GESTURES forwards every generic decl property into its built
  *                           handle. (t1674 noSnap / t1684 emits / t1688 manual)
  *   4. DECL→SPEC SURVIVAL — onEdit reaches every twin's spec; a declared noSnap survives decl→spec; the emit-driving
  *                           signal has ONE declared name. (t1680 / t1674 / t1684)
- *   5. GLYPH RESOLVER      — resolveStartGlyph's (manual, emits) truth table, by value; every renderer that draws a
- *                           start/reposition glyph still imports the ONE resolver, not a local copy. (t1688)
+ *   5. GLYPH RESOLVER      — resolveStartGlyph's (manual, emits) truth table, by value, in ISOLATION (P5a); every
+ *                           renderer still imports the ONE resolver (P5b); and now the loop closes onto REAL
+ *                           gate-visible handles (P5c, t1692) — corner's + alignment's actual (manual, emits) pairs
+ *                           resolved to a hand-chosen expected glyph, not the resolver checked against itself.
  *
  * Parts 2-4 are NAMED assertions on top of the snapshot on purpose: a snapshot diff tells you a line moved, an
  * invariant tells you which contract broke. The snapshot catches what nobody thought to name.
@@ -131,6 +135,7 @@ async function _boot() {
     const sceneFrame = await import('/viz/sceneFrame.js');
     const canvasWidgets = await import('/viz/canvasWidgets.js');
     const { FeatureCanvas } = await import('/viz/featureCanvas.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');   // t1692 — pure (params, stock) => per-pass rows; the ONE source specFor's simStart/simMarkers derivation reads (see simInputsFor)
     // t1688 — _pinFromTf is the PRODUCTION overlay pin. It is a pure one-liner that lived unexported inside a DOM
     // module; exporting it (the ONLY change this gate makes to web/ — an `export` keyword, no behaviour change) is
     // what makes the frame seam that split TWICE reachable by a gate at all.
@@ -155,7 +160,7 @@ async function _boot() {
     }
     twins.sort((a, b) => (a.def.opType < b.def.opType ? -1 : a.def.opType > b.def.opType ? 1 : 0));
 
-    return { fixture, realGetSettings, userOps, panelTypes, sceneFrame, canvasWidgets, FeatureCanvas, _pinFromTf, files, twins };
+    return { fixture, realGetSettings, userOps, panelTypes, sceneFrame, canvasWidgets, FeatureCanvas, opSimStarts, _pinFromTf, files, twins };
 }
 
 /**
@@ -180,11 +185,43 @@ function offDefaults(def, base) {
     return P;
 }
 
+/**
+ * t1692 THE GATE GAP — layoutSpecFromOp's simStart/sources/simMarkers arguments were hardcoded null here, so the
+ * __simstart handles (corner's own sim-only Start + reposition markers, the exact glyphs t1688 unified) were
+ * invisible to this gate — the resolver could grow a fourth divergent rule and nothing here would go red.
+ *
+ * Reproduces the TWO construction branches userOpView.js reaches WITHOUT a live `panel` object (opSimStarts itself
+ * is pure — no DOM, no WebGL): the plain simStart for an op with no def.simStartParams (corner), and the
+ * spb-driven simMarkers for one that declares it (alignment, rotary_clock — same seam, not a second mechanism:
+ * both read opSimStarts' output, userOpView.js:570-574's own spb.map(...) is copied verbatim here). VERIFIED
+ * byte-identical against a live-app probe of the REAL panel.getPassStarts()/getPassSources() for an undragged
+ * default state, corner AND alignment, before writing this (see WORK-LOG t1692) — not assumed from reading alone.
+ *
+ * NOT reachable here, named rather than faked: userOpView.js's `manualMarkers` (a corner pass with
+ * travelApproach:'manual') and `entryMarkers` (def.entryPoint) BOTH require `typeof panel.onStartDrag ===
+ * 'function'` — a live panel this tier genuinely cannot construct. An op/param-state that would hit those branches
+ * in the real browser still snapshots via the plain-simStart fallback here, which is the WRONG marker set for that
+ * state — a real, remaining gap, not a defect in what this DOES cover. See FINDING F5.
+ */
+function simInputsFor(env, def, params) {
+    const starts = env.opSimStarts(def.opType, params, env.fixture.stock);
+    if (!Array.isArray(starts) || !starts.length) return { simStart: null, sources: null, simMarkers: null };
+    const sources = starts.map((s) => s.source || 'auto');   // getPassSources() defaults an undeclared source to 'auto' — matched, not assumed (probed)
+    const spb = def.simStartParams;
+    if (spb) {
+        const simMarkers = spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? { pos: starts[i], label: String.fromCharCode(65 + i) } : null).filter(Boolean);
+        return { simStart: null, sources, simMarkers };
+    }
+    const pos0 = starts[0] || null;
+    return { simStart: pos0 ? { pos: pos0, emits: pos0.emits } : null, sources, simMarkers: null };
+}
+
 /** The op's 2D spec for a param state, with the module-level preview side-store cleared first. */
 function specFor(env, def, params) {
     env.panelTypes.setPreviewOnlyWriteHandler(null);
     env.panelTypes.clearPreviewOnlyParams();
-    return env.panelTypes.layoutSpecFromOp(def, params, null, null, null, null, null, null, null);
+    const { simStart, sources, simMarkers } = simInputsFor(env, def, params);
+    return env.panelTypes.layoutSpecFromOp(def, params, simStart, sources, null, null, null, null, simMarkers);
 }
 
 function casesFor(env, def) {
@@ -482,28 +519,68 @@ test('preview gate P5b: every renderer that draws a start/reposition glyph impor
         () => expect(missing).toEqual([]));
 });
 
+// t1692 — P5a pins resolveStartGlyph in ISOLATION (its own inputs, made up). This closes the loop onto the
+// GATE-VISIBLE handles specFor's simInputsFor now produces (F2's threading) — real (manual, emits) pairs this gate
+// captures, resolved to a HAND-CHOSEN independent expectation (never resolveStartGlyph compared to itself, which
+// would be tautological). Covers a declared-emits op (corner: the sim-only Start, the always-emitting wall-2
+// reposition, and wall-2 again under manual travel — the offDefaults() sweep flips corner's travelApproach, and
+// F2 above says why that combination doesn't correspond to one real browser state, but the PER-HANDLE resolve is
+// still independently correct) and an undeclared-emits op (alignment — undefined must read as filled, per t1684's
+// backward-compat guarantee).
+test('preview gate P5c: real gate-visible handles (corner + alignment) resolve to the CORRECT glyph facts', async () => {
+    const env = await boot();
+    const { resolveStartGlyph } = await import('/viz/startGlyph.js');
+    const cases = [
+        { opType: 'user_corner_data', caseName: 'defaults', id: '__simstart0', want: { shape: 'circle', fill: false, colour: '#ffb300' } },
+        { opType: 'user_corner_data', caseName: 'defaults', id: 'reposition_pos', want: { shape: 'square', fill: true, colour: '#22d3ee' } },
+        { opType: 'user_corner_data', caseName: 'offdefaults', id: 'reposition_pos', want: { shape: 'circle', fill: true, colour: '#ffb300' } },
+        { opType: 'user_alignment_data', caseName: 'defaults', id: '__simstart0', want: { shape: 'square', fill: true, colour: '#22d3ee' } },
+    ];
+    const handles = allHandles(env);
+    const wrong = [];
+    for (const c of cases) {
+        const row = handles.find(({ opType, caseName, h }) => opType === c.opType && caseName === c.caseName && h.id === c.id);
+        if (!row) { wrong.push(`${c.opType} @${c.caseName} handle "${c.id}" not found — the case list drifted from the real spec`); continue; }
+        const g = resolveStartGlyph(!!row.h.manual, row.h.emits);
+        if (g.shape !== c.want.shape || g.fill !== c.want.fill || g.colour !== c.want.colour) {
+            wrong.push(`${c.opType} @${c.caseName} "${c.id}" (manual=${J(row.h.manual)}, emits=${J(row.h.emits)}) → resolved ${J(g)}, wanted ${J(c.want)}`);
+        }
+    }
+    must('a real, gate-visible start/reposition handle resolves to the WRONG glyph — either startGlyph.js regressed, or the declared manual/emits this gate derives from opSimStarts no longer matches what the app actually computes',
+        () => expect(wrong).toEqual([]));
+});
+
 /**
  * ── FINDINGS — what this tier CANNOT gate, reported rather than shimmed ──────────────────────────────────────────
  *
- * F1. `_writable` / `_field` (panelTypes.js:74-75) — THE LOAD-BEARING ONE, and it is a declare-not-infer defect, not
- *     merely a DOM dependency. Every ROLE-derived handle is gated on
- *     `document.querySelector('#wiz_user_form [data-param=…]')`. register.mjs's document answers null, so in this
- *     tier `_writable` is false for every param and all role-derived handles vanish. Measured: 15 of 32 twins produce
- *     handles here (8 via previewGeometry: bore/contour/drill/pocket/slot/surfacing/tap/text; 7 via the lathe
- *     profile, which is fully DOM-free). The other 17 — corner, edge, middle, both rotaries, alignment, homing, wcs,
- *     comm, ioStep, pauseConfirm and the 6 ATC — snapshot `handles: <0 entries>`. Their placement/stock/origin/
- *     items/paths/onEdit rows are still live and gated; their HANDLES are not.
- *     "Is this param a settable field?" is a property of the DECLARATION (the binding's widget), and panelTypes
- *     reverse-engineers it out of rendered pixels — formWidgets.js:1100 already names it "a DOM presence used as a
- *     proxy for 'settable'". Declare it (a binding whose widget is not multi-param) and 17 more twins join this
- *     tier, including the whole corner pilot. That is a follow-up act, not a shim.
- *     Direct consequence for t1684: the corner wall-reposition decl's `emits: destEmits` forward
- *     (panelTypes.js:394) is unreachable here for this reason.
+ * F1. ✅ RESOLVED (t1690). `_writable` declared from formWidgets.js's own MULTI_WIDGETS registry instead of a DOM
+ *     query. MEASURED, not assumed from the fix's shape: only 2 of the originally-named 17 twins (corner, middle)
+ *     were actually blocked by this — the other 15 either declare zero role/group canvas bindings at all (13; no
+ *     spatial handle exists to gain, confirmed by grepping every file) or use the separate simStartParams/
+ *     simMarkers mechanism this finding's OWN F2 covers (alignment, rotary_clock — 2). The original dispatch's "17"
+ *     estimate came from the gate-builder report, relayed without independently checking it; corrected here.
  *
- * F2. `computePassStarts` lives INSIDE createPreviewPanel.js:769, a factory that does container.insertAdjacentHTML
- *     and imports GcodeViz3D. That is exactly where t1684's `emits: !!(hint && hint.emits)` tri-state coercion bug
- *     lived — a pure data transform unreachable without WebGL. Per register.mjs's rule this is a FINDING: the shared
- *     preview-spec composition should be a pure module the DOM panel consumes.
+ * F2. ✅ PARTIALLY ADDRESSED (t1692). `computePassStarts` still lives INSIDE createPreviewPanel.js:769 (a factory
+ *     that does container.insertAdjacentHTML and imports GcodeViz3D) — NOT extracted, per this finding's original
+ *     suggestion. Instead, `specFor`'s new `simInputsFor` helper reproduces the TWO branches of userOpView.js's own
+ *     simStart/simMarkers construction that are ALREADY pure (both read only `opSimStarts(opType, params, stock)` —
+ *     no live `panel` needed): the plain simStart for a non-simStartParams op (corner, edge, homing, rotary_center,
+ *     middle's Start marker), and the spb-driven simMarkers for a simStartParams op (alignment, rotary_clock — the
+ *     SAME seam, not a second mechanism, verified by reading userOpView.js:570-574 and copying its exact logic).
+ *     VERIFIED byte-identical against a live-app probe of the REAL panel's getPassStarts()/getPassSources() for an
+ *     undragged default state (corner + alignment, exact match on every field) before writing the gate code.
+ *     ⚠ REMAINING GAP, found while building this: userOpView.js's `manualMarkers` branch (built when ANY pass's
+ *     travelApproach source is 'manual') REPLACES the plain-simStart/byRole markers entirely with a different set
+ *     (mkManual's own `__simstart`-prefixed ids) — and requires a live `panel.onStartDrag`, which this tier cannot
+ *     construct. `offDefaults()` (Part 1's own off-default sweep) DOES flip corner's `travelApproach` to 'manual' —
+ *     so `user_corner_data @offdefaults`'s snapshot combination (byRole `reposition_pos`/`start_pos` handles
+ *     existing ALONGSIDE the plain-simStart `__simstart0`) is a combination the REAL browser would never actually
+ *     render for that exact param state — the real browser replaces it with manualMarkers' own set instead. The
+ *     per-handle glyph facts this gate asserts (P5c) are still independently true (resolveStartGlyph is a pure
+ *     function of whatever manual/emits IT is given, correct regardless of which marker SET surrounds it) — but the
+ *     SNAPSHOT's off-defaults handle SET for corner should not be read as "what the browser shows when travel is
+ *     manual." Not fixed here: replicating manualMarkers' panel-dependent construction is a second, separate
+ *     mechanism (this finding's own "don't build a second path" standard), not a threading gap like the other two.
  *
  * F3. Genuinely render-tier, no fix implied, the browser specs stay:
  *       · FeatureCanvas.render/_mount/_draw/_fit-against-a-real-box — ResizeObserver, createElementNS, a measured
