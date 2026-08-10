@@ -775,7 +775,11 @@ export function createPreviewPanel(container, opts = {}) {
         for (let p = 0; p < count; p++) {
             const h = userStarts[p] || (p === 0 && st) || hintFor(p) || passStarts[p] || { x: 0, y: 0, z: 0 };
             const hint = hintFor(p);   // sim-marker-distinguish (t69): `emits` (+ t83 `source`, t94 `anchorsAtPrev`) is a DECLARED property of the pass HINT (opSimStarts), not of a drag/operator override — so it survives a userStarts drag
-            const row = { x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: !!(hint && hint.emits), source: hint && hint.source, anchorsAtPrev: !!(hint && hint.anchorsAtPrev) };
+            // t1684 (census finding 2) — `emits` stays the DECLARED tri-state (undefined = an op that never declares
+            // per-pass emits, true/false = corner's own opSimStarts computation): the old `!!` coerced every non-declaring
+            // op's undefined to a hard false, which the renderers would have read as "declared sim-only" and hollowed out
+            // every other op's reposition marker. Only a genuine `false` (corner's own zsurf/pass-0) means sim-only now.
+            const row = { x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: hint ? hint.emits : undefined, source: hint && hint.source, anchorsAtPrev: !!(hint && hint.anchorsAtPrev) };
             const pin = pinned && pinned[p];   // t301 — the operator PINNED this wall (a Layout spot): its world is ABSOLUTE (stock-datum-relative). Override x/y + flag `pinned` so _markerWorld skips the passEnds relocation → the 3D marker HOLDS like the Layout (no spot → the pure-auto chain, byte-identical).
             if (pin && Number.isFinite(+pin.x) && Number.isFinite(+pin.y)) { row.x = +pin.x; row.y = +pin.y; row.pinned = true; }
             next.push(row);
@@ -928,7 +932,7 @@ export function createPreviewPanel(container, opts = {}) {
         const passSources = passStarts.map((s, p) => s.source || parsedSrc[p] || 'auto');
         lastPassSources = passSources;   // t81 — expose to the Layout canvas so its handles match the top panel's colours
         if (t2.setStartSources) t2.setStartSources(passSources);
-        if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR
+        if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR. t1684 — pass the DECLARED tri-state through undisturbed (undefined = an op that never declares per-pass emits, not "false"); coercing it here is what made the value unreadable downstream
         if (t2.setPassEnds) t2.setPassEnds(passEnds);        // t107 — an anchorsAtPrev pass anchors its route + relocates its marker to the previous pass's runtime END (machine-faithful)
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
         t2.setMachine(machineForViz());   // t744 — ENVELOPE EVERYWHERE (2D): draw the declared box regardless of anchor (the modal's `envelope` element gates it; paint reads displayOf)
@@ -969,7 +973,7 @@ export function createPreviewPanel(container, opts = {}) {
                 }
                 if (v._syncJogPos) v._syncJogPos();   // t297 — BIDIRECTIONAL pendant: refresh the jog-pendant Pos fields from the freshly-mirrored viz.starts, so EVERY drag surface (2D-top handle, Layout ◇/#-handle, 3D gizmo) writes the pendant back — not only the 3D gizmo. Kills the pendant-overrides-handle asymmetric-refresh bug (setGcode runs after every drag). syncPos skips the focused field → live typing is safe.
                 if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
-                if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour
+                if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour. t1684 — the DECLARED tri-state, undisturbed (see the 2D call site's note)
                 if (v.setPassEnds) v.setPassEnds(passEnds);   // t107 — BEFORE setSegments: the route rebuild anchors an anchorsAtPrev pass at the previous pass's runtime END + relocates its marker sprite to end+cross
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)

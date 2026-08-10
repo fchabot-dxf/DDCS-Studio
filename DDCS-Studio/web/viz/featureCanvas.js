@@ -477,6 +477,11 @@ export class FeatureCanvas {
             // handle is identifiable by its BOUND source, not by sort-by-screen-position (which misattributes when a drag crosses
             // the other handle). Additive attribute — the drag hit-test still uses the internal geometry.
             const hid = h.id != null ? { 'data-hid': String(h.id) } : null;
+            // t1684 (census finding 2) — SHAPE axis, orthogonal to colour: a decl may carry `emits` (does dragging this
+            // handle write a value that reaches the emitted G-code — corner's #21-#24 reposition, unified with lathe's
+            // former `teal`). undefined = undeclared → UNCHANGED (solid, matching every pre-existing handle); an explicit
+            // false renders HOLLOW (stroke-only) on a move/sim marker. Matches the 3D + 2D-toolpath renderers' own reading.
+            const hollow = h.emits === false;
             if (h.simOnly || h.kind === 'move') {
                 // START-MARKER glyph language (t293) — ONE language across the 3D preview, the 2D toolpath, and here:
                 // AUTO reposition (the machine drives there) = a filled CYAN SQUARE ■; MANUAL / the operator jog Start
@@ -486,11 +491,14 @@ export class FeatureCanvas {
                 let el;
                 if (startManual) el = svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', ...hid });   // circle = manual jog
                 else el = svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2, ...hid });   // square = auto reposition
-                el.style.fill = fill; el.style.stroke = fill;
+                if (hollow) { el.style.fill = 'none'; el.style.stroke = fill; el.style.strokeWidth = '2'; }
+                else { el.style.fill = fill; el.style.stroke = fill; }
                 handles.appendChild(el);
             } else {
                 const el = svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid });
-                if (col) { el.style.fill = col; el.style.stroke = col; }   // a GROUP-coloured point handle (e.g. the ATC setup canvas's blue pockets vs orange station); inline beats the .fc-handle CSS default. Uncoloured handles are unaffected.
+                const emitCol = h.emits ? '#14b8a6' : null;   // t1684 — emits:true (lathe's dimension handles) tints TEAL, the declared convention
+                const fillCol = emitCol || col;
+                if (fillCol) { el.style.fill = fillCol; el.style.stroke = fillCol; }   // a GROUP-coloured point handle (e.g. the ATC setup canvas's blue pockets vs orange station); inline beats the .fc-handle CSS default. Uncoloured handles are unaffected.
                 handles.appendChild(el);
             }
             // Raw axis-delta readouts (the grid "dx"/"dy" labels) are unhelpful clutter — the handle stays

@@ -347,7 +347,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             // wall-1→wall-2 reposition, consumed in G91): anchor the point to the op's Nth DECLARED sim-start, so the
             // handle renders at anchor+delta (the true wall position) and a drag writes world − anchor (the delta), not
             // the absolute world coord. Absent relTo → an absolute point (unchanged).
-            let ax = 0, ay = 0, destX = null, destY = null, destPass = null;
+            let ax = 0, ay = 0, destX = null, destY = null, destPass = null, destEmits;
             if (byRole.x.relTo != null) {
                 // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in BOTH
                 // probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
@@ -363,6 +363,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                     : ((ri != null) ? (opSimStarts(def.opType, params, s) || []) : []);
                 const a = src[ri], dest = src[ri + 1];
                 if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
+                if (dest) destEmits = dest.emits;   // t1684 — census finding 2: carry the DECLARED emits flag (undefined = undeclared, unchanged) through to the handle
                 if (ri != null && dest) { const mw = markerWorldOf(src, passEnds, ri + 1); destX = num(mw.x, 0); destY = num(mw.y, 0); }
                 // shift the ANCHOR to the anchor pass's RUNTIME END (passEnds[ri], post probe+retract+lift) when the destination
                 // has a programmed dog-leg — EXACTLY the markerWorldOf gate, so the emitted #23/#24 = wall − runtime-END. MANUAL
@@ -390,7 +391,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             // dot, no n) nor onto the sim-only Start ◇ (which stays 'Start', non-numeric). That is what keeps the two-"1" ghost dead.
             items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the pass number rides the handle label alone
             const reposManual = Array.isArray(sources) && sources[destPass] === 'manual';   // auto → cyan square, manual → amber circle
-            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual });   // label = the destination PASS NUMBER (1,2,…) — the SOLE owner of the number
+            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual, emits: destEmits });   // label = the destination PASS NUMBER (1,2,…) — the SOLE owner of the number; t1684 — emits (census finding 2): undeclared stays unchanged (solid), declared false renders hollow
         }
     }
     // t383 (human) — MIDDLE ② DIAGONAL-AIM (opt-in, mirror cornerPick's declared detection): an op with diagTravel + diagPrimary

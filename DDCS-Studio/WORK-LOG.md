@@ -21517,3 +21517,179 @@ was traced from a real, deterministic test failure to its precise cause before b
 via the exact "swap in the real pre-fix committed code" discipline this session has used throughout. Two files
 changed for the fix itself (`userOps.js`, `wizardLibrary.js`), two existing test files corrected
 (`fork-parity-1593.spec.js`, `lathe-pilot-1271.spec.js`), one new permanent spec, one guard file updated.
+
+## t1684 — REVIEW OF t1682 (CONFIRMED) + FINDING 2 FIXED, CENSUS CLOSED: lathe `teal` / corner `emits` reconciled to ONE declared name, read by all three renderers (turn 1684)
+
+### The t1682 review
+
+Advisor verdict: PASS, "and you did the thing I asked and then went further." Deriving `_BASE_DEF_SHAPE` by
+actually calling `userOpFromStack` rather than restating its shape as a second list was named as the correct
+form of the fix; the small named `LIFECYCLE_KEYS` set was endorsed as the right thing to leave enumerated
+(it moves with the registration architecture, not with every new declared behaviour). The self-caught
+function-only mistake was named as proof of the method: "a cleaner-sounding rule that would have silently
+missed most of the bug, caught live rather than reasoned about." All five bugs — three in my own fix — were
+credited as found-not-invented, and naming my own first-turn scoping mistake (grepping `web/` instead of the
+repo) was called out as itself part of doing it right.
+
+### A MID-TASK PRIORITY FLIP, and why finding 2 finished anyway
+
+Mid-turn, the advisor sent an amendment: a read-only parallel diagnostic had root-caused the user's live
+Surfacing 2D-split bug to t1672 (the advisor's own ruled-and-approved commit) — `wireAnimOverlay`'s overlay
+canvas never learned the `_placement`/WCS-pin shift the SVG layer got at t1672, so a pinned WCS now draws the
+raster and the stock rect in two different frames. The amendment said this outranks the census finding and to
+"park finding 2 unless you have already substantially built it."
+
+By the time the amendment landed, finding 2's full implementation was already done — vocabulary reconciled,
+all eight files edited, only verification/tripwire/full-suite/write-up remained. Abandoning a substantive,
+already-correct surgical change mid-stream to context-switch onto a different investigation is worse than
+finishing what's in hand, and the amendment's own wording carves out exactly that case. So: finished and
+verified finding 2 in this turn per the amendment's escape clause; the live WCS-split bug is next, untouched
+by me, ready for its own dispatch — see the end of this entry for what I'd want confirmed before starting it.
+
+### THE ACT — census finding 2: `teal` and `emits` are the SAME declared signal under two names, read by NEITHER renderer
+
+**1. Vocabulary reconciliation — `emits` wins, `teal` is renamed not aliased.** Lathe's `teal:true`
+(`viz/latheProfileCanvas.js`, 15 sites across 9 spec-builders — one more than the census's count of 14; a
+recount, not a discrepancy) and corner's `emits` (`blocks/dataOps/cornerData.js`'s `CORNER_SIM_STARTS` rows)
+declare the identical promise: does dragging this handle write a value that reaches the emitted G-code.
+`emits` is the semantic name and was ALREADY the cross-op convention — `viz/opSimStarts.js`'s `makeProvider`
+(the shared per-pass-start helper every declared sim-start row goes through) already computes
+`emits: pass > 0 && !!row.emits` generically, for any op, whether or not that op's own view code ever reads
+it. `teal` names an implementation detail (a colour) that would need renaming the day the palette changed.
+Renamed all 15 lathe sites to `emits: true` (mechanical — every one of those handles genuinely is a bound-param
+drag-write) rather than keeping `teal` as a second name for the same thing.
+
+**2. The three renderers, read precisely before touching anything.** t1670 (prior turn) found all three key
+shape/colour off `source`, never `emits`; this turn re-confirmed each first-hand:
+- `viz/featureCanvas.js` (Layout/2D, shared by corner AND lathe): branches on `h.color`/`h.simOnly`/`h.kind`
+  only. `buildCanvasWidgets` (`viz/canvasWidgets.js`) forwards `id`/`color`/`noSnap` from a decl into the
+  built handle but drops everything else — `emits` never survived the decl→handle hop for corner's own
+  `point`-gesture reposition handles even where `panelTypes.js` HAD the value in scope.
+- `viz/gcodeViz3d.js`'s `_highlightSelectedStart`: the SHAPE-axis texture helper already existed, fully built
+  and doctrined in its own comment ("SHAPE axis, orthogonal to colour: SIM-ONLY = hollow ○, EMITTING = filled
+  ■") — `_startGlyphTex(emits)` — and `setStartEmits`/`_startEmits` were ALREADY wired end-to-end from
+  `createPreviewPanel.js`. The bug was one line: `_highlightSelectedStart` called
+  `this._startGlyphTex(!manual)`, a stand-in derived from SOURCE, instead of reading the real
+  `this._startEmits[p]` sitting right there on `this`.
+- `viz/toolpath2d.js`'s `drawStartHandles`: same shape — a doctrine comment describing hollow-vs-filled, a
+  `startEmits` array already received via `setStartEmits`, and a paint function that reads `startSources`
+  for shape AND colour and never touches `startEmits` at all.
+
+**3. A coercion upstream had already erased the signal for every OTHER op.** `viz/createPreviewPanel.js`'s
+`computePassStarts` (the ONE function that turns a per-op `opSimStarts` hint into the shared `passStarts` both
+2D and 3D read) built each row as `emits: !!(hint && hint.emits)` — a hard boolean. Corner's own hints always
+carry a real `true`/`false` (via `makeProvider`), so this never broke corner. But NO other op (middle/edge/
+rotary/alignment/homing — all confirmed by grep: `emits:` appears nowhere else in `blocks/dataOps/`) ever
+declares `.emits` on its sim-start rows, so `hint.emits` is `undefined` for every one of them — and `!!undefined`
+is `false`. Wiring "declared false → render hollow" on TOP of that coercion would have silently hollowed out
+every multi-pass reposition marker in the app that simply hasn't adopted the `emits` convention yet — a much
+bigger regression than the bug being fixed. Fixed by preserving the tri-state (`emits: hint ? hint.emits :
+undefined`) through `computePassStarts` and both `setStartEmits` call sites in `createPreviewPanel.js`: `undefined`
+now means "this op has no opinion, render exactly as before"; only a genuine declared `false` means sim-only.
+
+**4. THE FIX — one property, read the same way by all three, discovered via the tests themselves.**
+- `viz/canvasWidgets.js`: `buildCanvasWidgets` forwards `emits` alongside `color`/`noSnap`.
+- `wizards/ops/panelTypes.js`: the wall-reposition decl (corner's `#21-#24` handles) now carries
+  `emits: destEmits`, captured from the SAME `dest` object (`opSimStarts`'s own per-pass output) the decl
+  already reads `anchorsAtPrev` from — no new data source, just reading a field that was already in scope.
+- `viz/featureCanvas.js`: a `move`-kind handle (corner's reposition markers, the Start, generic sim markers)
+  renders HOLLOW (stroke-only) only when `h.emits === false` explicitly — `undefined` is unchanged (solid); a
+  `size`-kind handle (lathe's dimension drags) tints TEAL (`#14b8a6`, an existing app colour — Tailwind
+  teal-500, already used for the "move" block category) when `h.emits` is true, falling back to its existing
+  `color` or the CSS gold default otherwise.
+- `viz/gcodeViz3d.js`: `_highlightSelectedStart` now calls `this._startGlyphTex(em === undefined ? !manual :
+  !!em)` where `em = this._startEmits[p]` — reads the real declared value, falls back to the old `!manual`
+  derivation only when an op declares no opinion.
+- `viz/toolpath2d.js`: `drawStartHandles` gets the matching `hollow = i > 0 && startEmits[i] === false` guard
+  (see point 5) and draws a stroke-only ring/square instead of a fill when true.
+
+**5. A genuine near-miss, caught by the REAL suite, not guessed at.** My first pass applied the emits→hollow
+rule uniformly, including pass 0. `corner-viz-polish.spec.js`'s existing, PASSING test (`pass-0 Start = amber`)
+went red: `t2.setStartEmits([false, true])` sets pass-0's emits to `false` (correctly — the Start never emits
+its own value), and my code read that as "declared sim-only → render hollow." But the Start marker has its own
+older, independently-established, independently-tested rule (t81→t293, three passing specs across all three
+renderers): pass-0 is ALWAYS the filled/solid amber Start glyph, regardless of emits. The doctrine comment in
+`opSimStarts.js` says exactly this ("the FIRST surviving pass is always the operator's manual start (sim-only)
+so `emits` only takes effect from pass 2 on") — I'd read the sentence and mis-implemented it as a data question
+when it's a rendering-scope question. Fixed by gating the hollow branch on `i > 0` (2D) — the 3D renderer
+turned out to need no equivalent guard: pass-0's `manual` is always `true` there, so `_startGlyphTex(!manual)`
+and `_startGlyphTex(em)` already agree at pass-0 (both `false`) for entirely separate reasons, confirmed by
+tracing both expressions rather than assumed.
+
+**6. What's still unreachable, reported rather than silently patched over (dispatch's own point 4).** Corner's
+two reachable point-decls (wall-1 under Z-first, wall-2 always) both carry `emits: true` in EVERY state the
+form can produce — `wall2`'s row is unconditional `emits:true` and is never pass-0; `wall1`'s row only gets its
+own decl (the `start` group, `relTo:{row:'zsurf'}`) when `probeZFirst` is on, which is exactly the state where
+it's pass 1, not pass 0. So the HOLLOW branch this turn wired into all three renderers has no LIVE corner state
+that reaches it today — it is exercised only by the direct/synthetic tests below. This is NOT a wrong
+declaration (corner's `emits:true` on both rows is correct for what those rows are), just an observation: the
+doctrine's "hollow, sim-only" case, for corner specifically, is currently only the Start marker itself (its own
+separate, older rule), never a `type:'point'` reposition decl. Lathe's declarations are all correct too — every
+one of its 15 handles is a genuine bound-param drag-write, confirmed by reading each `onDrag` handler.
+
+### Verification
+
+Ran the existing regression net first (28 tests across `corner-viz-polish`, `corner-data-sim-marker-emits`,
+`corner-data-sim-marker-track`, `marker-colour-by-source`, `corner-layout-sim-drag`, `corner-anim-overlay`,
+`corner-data-emit`, `per-pass-starts-2d`, `homing-start-marker-frame`, `jog-move-2nd-start`,
+`middle-traverse-lands-on-marker`, `middle-manual-markers`) — one failure (point 5 above), fixed, re-ran clean.
+
+Then closed a gap in the tests themselves: `corner-data-sim-marker-emits.spec.js`'s own docstring has promised
+"FILLED vs HOLLOW" since t69, but its test (C) only ever sampled colour, never the centre alpha that would
+prove shape — a SECOND instance of "declared but unread," this time in a test's own unchecked claim. Added
+(C2), sampling the actual centre pixel alpha for a real emits:true/false pass.
+
+New permanent spec `tests/census-finding2-emits-teal-1684.spec.js`, four tests: (A) lathe's real
+`odProfileSpec` handle, rendered through the real `FeatureCanvas`, reads TEAL not gold; (B) a direct
+`FeatureCanvas` unit proving the hollow/solid/undeclared three-way on a synthetic `move`-kind handle,
+independent of point 6's corner reachability gap; (C) the real corner wizard's Layout renders the wall-2 decl
+without throwing now that `emits` flows through it; (D) two same-source 3D passes pick genuinely different
+cached glyph textures by their declared `emits`, not by source.
+
+Non-vacuity, three separate breaks, each via `git show HEAD:<path>` swapped in over the fixed file, confirmed
+RED, restored, reconfirmed GREEN: `toolpath2d.js` (C2), `featureCanvas.js` (A + B together), `gcodeViz3d.js`
+(D).
+
+Node suite: **101/0** (was 102/0 at t1682's floor — the delta is the one intentionally-removed KNOWN GAP test,
+see below, not a regression).
+
+### THREE REAL regressions, found by the full suite, not the targeted sweep — three pre-existing tests read `.teal` directly
+
+First full e2e run: **15 failed / 6 skipped** (2478 total — +5 over t1682's 2473, matching the 5 new tests
+above). Cross-checking names against t1682's own established churn pool (`collapsible-panes-752`,
+`formfield-opparam-1640`, `middle-superset`, `pane-splitter-790` ×2, `update-check` ×2 — 7 of the 15) still left
+THREE lathe-family tests unaccounted for, and all three sit squarely in the blast radius of the rename:
+`lathe-odturn-1273.spec.js` ("THE SHOULDER CORNER"), `lathe-pilot-1271.spec.js` ("THE HALF-PROFILE CANVAS"),
+`lathe-probe-1299.spec.js` ("THE HALF-PROFILE DRAWS THE TOUCH") — each asserts `handle.teal === true` directly
+on the object `odProfileSpec`/`latheProfileSpec` returns, a pre-existing, correct assertion of the OLD name
+that the rename was always going to break. Fixed by updating each assertion to `.emits` (mechanical, matching
+the same rename discipline as the source) — same shape as t1682's `fork-parity-1593.spec.js` fix: a deliberate
+rename breaks a test that checks the literal old key, and the test gets updated, not the rename reverted.
+`pocket-cavity-2d.spec.js` (also unaccounted, also touches a file I edited) isolated clean on the first re-run
+— genuine contention noise, not a regression.
+
+Second full e2e run (after the fix): **12 failed / 6 skipped**, none of the three lathe names present. Isolated
+every remaining unaccounted name (`blocks-single-inject`, `homing-superset`, `homing-sysstart-real`,
+`op-params-complete` shard 3/4, `toolpath2d-pin`, `formfield-loud-mismatch-1636`) — all six passed clean with
+`--workers=1`, confirming ordinary large-suite worker contention (the same failure MODE as the established
+churn pool: `page.waitForFunction` timeouts on `window.ddcsStudio`/`window.__ddcsUpd`, a webserver-under-load
+symptom, not a value mismatch). The other six matched the established pool directly. All 12 accounted for; zero
+unexplained.
+
+### The t1678 tripwire — flipped, same discipline as t1682's OP_CODE_HOOKS
+
+`teal` is no longer a real property anywhere in `web/` (confirmed: `\.teal\b|teal\s*:` matches zero times
+outside comments) — so, like t1682's `OP_CODE_HOOKS`, there is no key left for a text-presence check to assert
+"still missing." Removed the KNOWN GAP test; added `'emits'` to the existing `CLEAN_SHAPES` entry for
+canvas-handle properties read by `FeatureCanvas` (the textual check now covers the `buildCanvasWidgets`→
+`FeatureCanvas` hop specifically — its own declared scope). The other two renderers (`gcodeViz3d.js`,
+`toolpath2d.js`) this turn also unified are a different shape (a per-pass array, not a canvas-handle decl) and
+get behavioural coverage instead, per this file's own stated policy for a renamed/deleted key.
+
+### For whoever picks up the WCS-split bug next
+
+Not investigated this turn (out of scope per the amendment) — flagging only what I noticed in passing while
+reading `panelTypes.js`/`featureCanvas.js` for this act, since I was already in both files: `featureCanvas.js`'s
+`_disp` and `getTransform()` (around the `_placement`/`_tf` split the amendment's analysis names) did not need
+touching for finding 2 and I did not read them closely enough to have an opinion on (a) vs (b). Nothing here
+should be treated as scouting for that act.

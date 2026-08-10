@@ -214,8 +214,10 @@ test('THE HALF-PROFILE DRAWS THE TOUCH, and the handle writes the parameter the 
     expect(r.faceTouch, 'the stylus ball sits on the face').toBe(1);
     expect(r.faceApproach, 'with the approach it came in on').toBe(1);
     expect(r.odSurfaceY, 'the OD picture draws the MEASURED radius — 24.85 across is 12.425 up').toBeCloseTo(12.425, 3);
-    // THE HANDLES ARE TEAL — the declared convention for "this drives the emit"
-    expect(r.faceHandle.teal).toBe(true); expect(r.odHandle.teal).toBe(true);
+    // THE HANDLES ARE TEAL — the declared convention for "this drives the emit". t1684 — the property is `emits`
+    // (census finding 2: teal renamed, reconciled to corner's own name for the same signal); FeatureCanvas still
+    // renders it teal-coloured, so the naming here is unchanged, only the object key underneath it.
+    expect(r.faceHandle.emits).toBe(true); expect(r.odHandle.emits).toBe(true);
     expect(r.odHandle.value, 'and the OD handle carries the DIAMETER, not a radius').toBeCloseTo(24.85, 3);
     // …AND A DRAG WRITES THE PARAMETER, which is the whole point: a handle is a second way to type a number
     expect(r.faceWrite, 'dragging the face writes how far ahead of Z0 it is').toEqual({ ahead: 4.25 });

@@ -102,6 +102,35 @@ test('(C) 2D visual: the marker COLOUR follows the SOURCE (decoupled from emits)
   expect(px.manual.r > px.manual.b && px.manual.g > px.manual.b, 'manual source → amber (despite emits=true)').toBe(true);
 });
 
+// (C2) t1684 (census finding 2) — the docstring above this file has promised "FILLED vs HOLLOW" since t69, but until now
+//     nothing ever sampled the CENTRE ALPHA to prove it: drawStartHandles never read startEmits at all (a second instance
+//     of the SAME declared-but-unread defect the census exists to end, this time in a TEST's own unchecked claim). Same
+//     colour (auto/cyan) both passes — only emits varies: pass-1 centre alpha must actually differ hollow vs filled.
+test('(C2) 2D visual: a LATER pass emits:false paints a HOLLOW centre; emits:true paints FILLED — same colour, shape is the axis', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const px = await page.evaluate(async () => {
+    const { createToolpath2d } = await import('/viz/toolpath2d.js');
+    const render = (emits1) => {
+      const canvas = document.createElement('canvas'); canvas.style.width = '240px'; canvas.style.height = '200px';
+      document.body.appendChild(canvas);
+      const t2 = createToolpath2d(canvas);
+      t2.setStock({ x: 100, y: 80, z: 20 });
+      t2.setStarts([{ x: 30, y: 40, z: 0 }, { x: 70, y: 40, z: 0 }]);
+      t2.setStartSources(['auto', 'auto']); t2.setStartEmits([false, emits1]);   // colour held constant (both auto/cyan); only pass-1's emits varies
+      t2.fit();
+      const rec = canvas.__t2starts; if (!rec || rec.length < 2) return { ok: false };
+      const dpr = window.devicePixelRatio || 1; const ctx = canvas.getContext('2d');
+      const d = ctx.getImageData(Math.round(rec[1].sx * dpr), Math.round(rec[1].sy * dpr), 1, 1).data;
+      canvas.remove(); return { ok: true, a: d[3] };
+    };
+    return { filled: render(true), hollow: render(false) };
+  });
+  expect(px.filled.ok && px.hollow.ok, 'both painted').toBe(true);
+  expect(px.filled.a, 'emits:true pass-1 centre is FILLED (opaque)').toBeGreaterThan(150);
+  expect(px.hollow.a, 'emits:false pass-1 centre is HOLLOW (the stroke-only ring leaves the centre transparent)').toBeLessThan(150);
+});
+
 // (D) BACKWARD-COMPAT — the built-in multi-pass ops (middle/alignment) declare no `emits` → every pass stays sim-only, so
 //     their markers render exactly as before (all hollow). No visual regression for edge/middle.
 test('(D) backward-compat: built-in middle/alignment start markers stay sim-only (all emits false)', async ({ page }) => {

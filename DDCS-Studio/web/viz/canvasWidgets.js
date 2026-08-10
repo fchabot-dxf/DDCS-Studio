@@ -162,7 +162,9 @@ export function buildCanvasWidgets(widgets, setFields) {
         // which already sets it directly) opts OUT of _snapToAnchor's stock-anchor magnetism, including the itemsBBox-
         // derived "other corners of this feature" offsets. Previously silently dropped here (only id/color passed
         // through `g.place(d)`'s result) — the same declared-but-unread gap t1638 named for block mouths.
-        handles.push({ id, color: d.color, noSnap: d.noSnap, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
+        // t1684 — emits is the SAME generic forward: a decl may declare "does dragging this write a value that reaches
+        // the emitted G-code" (census finding 2 — lathe's teal and corner's emits, unified); FeatureCanvas reads it.
+        handles.push({ id, color: d.color, noSnap: d.noSnap, emits: d.emits, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
     });
     const onDrag = (id, world) => {
         const d = byId[id]; if (!d) return;

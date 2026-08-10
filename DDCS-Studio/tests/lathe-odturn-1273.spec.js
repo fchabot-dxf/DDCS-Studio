@@ -271,11 +271,11 @@ test('THE SHOULDER CORNER is ONE handle with TWO outputs — and the drag moves 
         const after = read();
         // …and the clamps: a target at the bar diameter cuts air; a turn of zero length is not a turn
         spec.onDrag(V.SHOULDER_HANDLE_ID, { x: 999, y: 999 });
-        return { handleAt: { x: h.x, y: h.y }, teal: !!h.teal, handles: spec.handles.length, before, after, clamped: { ...od } };
+        return { handleAt: { x: h.x, y: h.y }, emits: !!h.emits, handles: spec.handles.length, before, after, clamped: { ...od } };
     }, CASE);
     // the handle SITS on the shoulder corner: 25 along the bar, at the finished radius
     expect(r.handleAt, 'the grab point is the corner itself — where the turned surface meets the bar').toEqual({ x: -25, y: 7 });
-    expect(r.teal, 'teal: it drives the emit (the declared convention)').toBe(true);
+    expect(r.emits, 't1684 — teal renamed to emits (census finding 2): it drives the emit (the declared convention)').toBe(true);
     expect(r.handles, 'a straight turn has ONE corner to define').toBe(1);
     // THE PROOF: re-read the EMIT. Ø8 at the corner, 40 along the bar — both from one grab.
     expect(r.before.dTarget, 'before: the typed target').toBe('14');

@@ -68,9 +68,10 @@ export function latheProfileSpec(bar, onAllowance) {
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: r },
         ],
         handles: [
-            // TEAL = it drives the emit (the declared convention: teal handles write bound parameters; amber ones are
-            // sim-only). It sits on the RAW END, because that is what moves when you decide to remove more or less.
-            { id: FACE_HANDLE_ID, x: zToCanvas(prof.allowance.z2), y: r, kind: 'size', axis: 'x', teal: true,
+            // t1684 — emits:true (the SAME declared convention corner's sim-start rows use, unified via opSimStarts.js's
+            // makeProvider) marks a handle whose drag writes a bound param that reaches the emit; featureCanvas.js reads
+            // it and tints the handle TEAL. It sits on the RAW END, because that is what moves when you decide to remove more or less.
+            { id: FACE_HANDLE_ID, x: zToCanvas(prof.allowance.z2), y: r, kind: 'size', axis: 'x', emits: true,
               label: 'face', value: b.allowance },
         ],
         onDrag: (id, world) => {
@@ -204,10 +205,10 @@ export function odProfileSpec(bar, od, onChange) {
     ];
 
     const handles = [
-        { id: SHOULDER_HANDLE_ID, x: zToCanvas(zEnd), y: endR, kind: 'size', teal: true,
+        { id: SHOULDER_HANDLE_ID, x: zToCanvas(zEnd), y: endR, kind: 'size', emits: true,
           label: taper ? 'far end' : 'shoulder', value: taper ? o.endDiameter : o.targetDiameter },
     ];
-    if (taper) handles.push({ id: FACE_DIA_HANDLE_ID, x: zToCanvas(0), y: targetR, kind: 'size', axis: 'y', teal: true,
+    if (taper) handles.push({ id: FACE_DIA_HANDLE_ID, x: zToCanvas(0), y: targetR, kind: 'size', axis: 'y', emits: true,
                               label: 'face Ø', value: o.targetDiameter });
 
     return {
@@ -274,12 +275,12 @@ export function partProfileSpec(bar, part, onChange) {
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
         ],
         handles: [
-            { id: PART_POS_HANDLE_ID, x: zToCanvas(zFace), y: barR, kind: 'size', axis: 'x', teal: true, label: 'face', value: zFace },
+            { id: PART_POS_HANDLE_ID, x: zToCanvas(zFace), y: barR, kind: 'size', axis: 'x', emits: true, label: 'face', value: zFace },
             // …the FAR WALL is the blade's width: drag it and the kerf widens. It sits at the same Z as the stop-Ø
             // handle but up on the bar's surface, so the two never fight for the same grab.
-            { id: PART_WIDTH_HANDLE_ID, x: zToCanvas(zBlade), y: barR, kind: 'size', axis: 'x', teal: true,
+            { id: PART_WIDTH_HANDLE_ID, x: zToCanvas(zBlade), y: barR, kind: 'size', axis: 'x', emits: true,
               label: 'blade', value: r3(width) },
-            ...(groove ? [{ id: PART_FLOOR_HANDLE_ID, x: zToCanvas(zBlade), y: floorR, kind: 'size', axis: 'y', teal: true,
+            ...(groove ? [{ id: PART_FLOOR_HANDLE_ID, x: zToCanvas(zBlade), y: floorR, kind: 'size', axis: 'y', emits: true,
                             label: 'stop Ø', value: o.floorDiameter }] : []),
         ],
         onDrag: (id, world) => {
@@ -317,7 +318,7 @@ export function drillProfileSpec(bar, drill, onChange) {
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
         ],
         handles: [
-            { id: DRILL_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: 0, kind: 'size', axis: 'x', teal: true, label: 'depth', value: depth },
+            { id: DRILL_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: 0, kind: 'size', axis: 'x', emits: true, label: 'depth', value: depth },
         ],
         onDrag: (id, world) => {
             if (id !== DRILL_DEPTH_HANDLE_ID || typeof onChange !== 'function') return;
@@ -359,11 +360,11 @@ export function barStockSpec(bar, onChange) {
         ],
         handles: [
             // …on the SURFACE, halfway along, because that is where a diameter is measured
-            { id: BAR_DIA_HANDLE_ID, x: zToCanvas(-b.stickOut / 2), y: r, kind: 'size', axis: 'y', teal: true, label: 'Ø', value: r3(b.diameter) },
+            { id: BAR_DIA_HANDLE_ID, x: zToCanvas(-b.stickOut / 2), y: r, kind: 'size', axis: 'y', emits: true, label: 'Ø', value: r3(b.diameter) },
             // …at the grip end: how much bar is out of the chuck
-            { id: BAR_OUT_HANDLE_ID, x: zToCanvas(prof.bounds.z1), y: r / 2, kind: 'size', axis: 'x', teal: true, label: 'stick-out', value: r3(b.stickOut) },
+            { id: BAR_OUT_HANDLE_ID, x: zToCanvas(prof.bounds.z1), y: r / 2, kind: 'size', axis: 'x', emits: true, label: 'stick-out', value: r3(b.stickOut) },
             // …and the sawn end, the same grab facing's allowance uses
-            { id: BAR_RAW_HANDLE_ID, x: zToCanvas(prof.allowance.z2), y: r, kind: 'size', axis: 'x', teal: true, label: 'raw end', value: r3(b.allowance) },
+            { id: BAR_RAW_HANDLE_ID, x: zToCanvas(prof.allowance.z2), y: r, kind: 'size', axis: 'x', emits: true, label: 'raw end', value: r3(b.allowance) },
         ],
         onDrag: (id, world) => {
             if (id === BAR_DIA_HANDLE_ID) { write({ diameter: r3(diameterOf(Math.max(0.05, world.y))) }); return; }
@@ -384,7 +385,7 @@ export function roundBlankSpec(diameter, onChange) {
     return {
         stock: { ox: -r, oy: -r, w: d, h: d },
         items: [{ kind: 'circle', cx: 0, cy: 0, r, cls: 'fc-feature-pocket' }],
-        handles: [{ id: 'blankDia', x: r, y: 0, kind: 'size', axis: 'x', teal: true, label: 'Ø', value: r3(d) }],
+        handles: [{ id: 'blankDia', x: r, y: 0, kind: 'size', axis: 'x', emits: true, label: 'Ø', value: r3(d) }],
         onDrag: (id, world) => { if (typeof onChange === 'function') onChange({ diameter: r3(Math.max(0.1, Math.abs(world.x) * 2)) }); },
     };
 }
@@ -430,7 +431,7 @@ export function faceProbeSpec(bar, probe, onChange) {
             ...touchMarker(ahead, barR * 0.55, 'z', tip),
         ],
         handles: [
-            { id: FACE_PROBE_HANDLE_ID, x: zToCanvas(ahead), y: barR, kind: 'size', axis: 'x', teal: true,
+            { id: FACE_PROBE_HANDLE_ID, x: zToCanvas(ahead), y: barR, kind: 'size', axis: 'x', emits: true,
               label: 'touched face', value: ahead },
         ],
         onDrag: (id, world) => {
@@ -467,7 +468,7 @@ export function odProbeSpec(bar, probe, onChange) {
             ...touchMarker(zTouch, measuredR, 'x', tip),
         ],
         handles: [
-            { id: OD_PROBE_HANDLE_ID, x: zToCanvas(zTouch), y: measuredR, kind: 'size', axis: 'y', teal: true,
+            { id: OD_PROBE_HANDLE_ID, x: zToCanvas(zTouch), y: measuredR, kind: 'size', axis: 'y', emits: true,
               label: 'measured Ø', value: r3(dia) },
         ],
         onDrag: (id, world) => {
@@ -532,9 +533,9 @@ export function polygonProfileSpec(bar, poly, onChange) {
         // the polygon itself, from the op's own r(angle) — a path, because that is what it is
         paths: [{ pts, cls: 'fc-path' }],
         handles: [
-            { id: POLY_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: apothem, kind: 'size', axis: 'x', teal: true, label: 'extent', value: depth },
+            { id: POLY_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: apothem, kind: 'size', axis: 'x', emits: true, label: 'extent', value: depth },
             // …on the middle of a flat, where the across-flats size IS the distance from the centre
-            { id: POLY_FLATS_HANDLE_ID, x: cx, y: cy + apothem, kind: 'size', axis: 'y', teal: true, label: 'across flats', value: across },
+            { id: POLY_FLATS_HANDLE_ID, x: cx, y: cy + apothem, kind: 'size', axis: 'y', emits: true, label: 'across flats', value: across },
         ],
         onDrag: (id, world) => {
             if (typeof onChange !== 'function') return;

@@ -216,8 +216,9 @@ export function createToolpath2d(canvas, opts = {}) {
         ctx.save(); ctx.strokeStyle = '#33d6ff'; ctx.lineWidth = 1.6; ctx.strokeRect(hx - 5, hy - 5, 10, 10); ctx.restore();
     }
     // Each per-pass operator start + a grab-ring + a NUMBERED badge (①②…), parity with the 3D markers. Coloured by reposition
-    // SOURCE (auto=cyan, manual=amber). SHAPE by emits (orthogonal): SIM-ONLY / manual-jog = a hollow CIRCLE ○; EMITTING (a drag
-    // writes a macro var) = a FILLED diamond ◆. All draggable (distinct from the RED moving head). Multi-pass → one per pass.
+    // SOURCE (auto=cyan, manual=amber). SHAPE by emits (orthogonal, t1684 census finding 2): SIM-ONLY (declared emits:false)
+    // = a hollow CIRCLE/SQUARE outline; EMITTING (undeclared, or declared true — a drag writes a macro var) = FILLED. All
+    // draggable (distinct from the RED moving head). Multi-pass → one per pass.
     function drawStartHandles(ctx) {
         for (let i = 0; i < starts.length; i++) {
             const s = markerWorld(i), hx = sptx(s.x), hy = spty(s.y);               // t107 — relocate a reposition-destination marker to its runtime dog-leg END (matches the route + probe fire)
@@ -227,9 +228,14 @@ export function createToolpath2d(canvas, opts = {}) {
             const manual = i === 0 || startSources[i] === 'manual';
             const col = manual ? '#ffb300' : '#22d3ee';
             const ringCol = manual ? 'rgba(255,179,0,0.45)' : 'rgba(34,211,238,0.45)';
+            // t1684 — pass-0 is ALWAYS the filled Start glyph (its own established rule, t293) regardless of emits — the
+            // doctrine itself (opSimStarts.js's makeProvider) says emits "only takes effect from pass 2 on". undefined
+            // (undeclared) keeps today's always-filled look; an explicit declared emits:false on a LATER pass hollows it.
+            const hollow = i > 0 && startEmits[i] === false;
             ctx.save();
             ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // a static reference, NOT red (probe) or orange (tool)
-            if (manual) { ctx.beginPath(); ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); ctx.fill(); }   // MANUAL / Start = filled AMBER CIRCLE ●
+            if (manual) { ctx.beginPath(); ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); if (hollow) ctx.stroke(); else ctx.fill(); }   // MANUAL / Start = AMBER CIRCLE ● (filled) / ○ (hollow, sim-only)
+            else if (hollow) { ctx.strokeRect(hx - 6, hy - 6, 12, 12); }           // AUTO, sim-only = hollow CYAN SQUARE ▢
             else { ctx.fillRect(hx - 6, hy - 6, 12, 12); }                           // AUTO = filled CYAN SQUARE ■
             ctx.lineWidth = 1.4; ctx.strokeStyle = ringCol; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (nearHandle's 12px hit-test)
             ctx.restore();   // no numbered badge — the top panel carries glyph + colour only; the named label lives on the Layout canvas

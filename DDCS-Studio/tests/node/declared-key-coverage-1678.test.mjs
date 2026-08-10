@@ -43,9 +43,12 @@ function missingReaders(keys, consumerPaths) {
 const CLEAN_SHAPES = [
     {
         name: 'canvas handle — gesture-independent properties read by FeatureCanvas',
-        // buildCanvasWidgets's own generic spread (id/color/noSnap) + properties set by hand-rolled bypass specs
+        // buildCanvasWidgets's own generic spread (id/color/noSnap/emits) + properties set by hand-rolled bypass specs
         // (panelTypes.js's simMarkers/markerHandles, ui/stockEditor.js) that a gesture's place() never returns.
-        keys: ['noSnap', 'labelDir', 'displayVals', 'simOnly', 'yieldCoincident'],
+        // emits ADDED at t1684 (finding 2, closing this file's last KNOWN GAP): does dragging this handle write a
+        // value that reaches the emitted G-code — buildCanvasWidgets forwards it, FeatureCanvas reads it for shape
+        // (move-kind: solid/hollow) and colour (size-kind: teal tint).
+        keys: ['noSnap', 'labelDir', 'displayVals', 'simOnly', 'yieldCoincident', 'emits'],
         consumers: [web('viz/featureCanvas.js')],
     },
     {
@@ -75,11 +78,22 @@ for (const shape of CLEAN_SHAPES) {
 // state on purpose — it starts FAILING the moment someone fixes the underlying gap without also touching this
 // file, which is the point: closing a gap here requires deliberately updating its tripwire (move the key up into
 // CLEAN_SHAPES), not letting the fix silently rot the record of what changed. ──
-
-test('KNOWN GAP (t1678): lathe handles declare teal:true (the documented "drives the emit" convention) but FeatureCanvas never reads .teal — every lathe dimension handle renders the plain gold default instead. See WORK-LOG t1678.', async () => {
-    const missing = missingReaders(['teal'], [web('viz/featureCanvas.js')]);
-    expect(missing, 'expected teal to STILL be unread by featureCanvas.js — if this fails, the gap was fixed: remove this test').toEqual(['teal']);
-});
+//
+// All three t1678 findings are now closed — this section is empty by design (not deleted: the PART 2 discipline
+// comment above still applies to whatever the NEXT census turns up).
+//
+// t1684 closed finding 2 (lathe teal / corner emits, the same declared safety signal under two vocabularies) — not
+// by teaching featureCanvas.js to read `.teal`, but by RENAMING teal:true → emits:true at all 14 latheProfileCanvas.js
+// sites (reconciled to `emits`: the pre-existing, semantic, cross-op name opSimStarts.js's makeProvider already
+// computes generically, vs `teal`, a colour name — an implementation detail — and `source`, which t1670 found the
+// renderers already key shape/colour off instead). `teal` is no longer a real property anywhere in web/ — confirmed
+// by a repo grep — so there is no key left for a text-presence check to assert "still missing." The regression
+// coverage is the `emits` entry now IN CLEAN_SHAPES above (buildCanvasWidgets forwards it, FeatureCanvas reads it)
+// plus a BEHAVIORAL suite for the parts a textual check can't reach — the SHAPE axis (solid vs hollow) and the two
+// OTHER renderers finding 2 also unified (gcodeViz3d.js, toolpath2d.js — outside this shape's featureCanvas.js-only
+// scope): tests/census-finding2-emits-teal-1684.spec.js + two added tests in tests/corner-data-sim-marker-emits.spec.js.
+// Same discipline as t1682's OP_CODE_HOOKS closure — a renamed/deleted key, not a newly-read one, gets behavioral
+// coverage instead of a promoted textual entry.
 
 // t1682 closed finding 3 (OP_CODE_HOOKS stale allow-list) — but not by moving a key into CLEAN_SHAPES above, because
 // the fix did not add the 7 missing names to the list: it deleted the list. `reconcileCodeHooks` (userOps.js) now

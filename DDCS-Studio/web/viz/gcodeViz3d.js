@@ -411,7 +411,12 @@ export class GcodeViz3D {
             // emitting AUTO square reads more solid (a real programmed reposition). Selection boosts both.
             glyph.material.opacity = manual ? (sel ? 0.8 : 0.42) : (sel ? 1 : 0.5);
             glyph.material.color.setHex(manual ? 0xffb300 : 0x22d3ee);
-            const tex = this._startGlyphTex(!manual);
+            // t1684 (census finding 2) — the SHAPE axis reads the DECLARED `_startEmits` (set by setStartEmits, fed from
+            // opSimStarts' `emits` — corner's own #21-#24 reposition truth), not a stand-in derived from `manual`/source.
+            // undefined (an op that never declares per-pass emits) falls back to the pre-existing !manual behaviour —
+            // UNCHANGED for every op but corner (the only declarer, t1678's census).
+            const em = this._startEmits && this._startEmits[p];
+            const tex = this._startGlyphTex(em === undefined ? !manual : !!em);
             if (glyph.material.map !== tex) { glyph.material.map = tex; glyph.material.needsUpdate = true; }
         }
     }

@@ -204,7 +204,7 @@ test('(3) THE HALF-PROFILE CANVAS draws the MODEL — bar, centreline, datum, al
     expect(r.band.w, 'and is as wide as the material to remove').toBe(3);
     expect(r.band.h, 'and as tall as the bar RADIUS').toBe(10);
     expect(r.handle.id).toBe('faceLine');
-    expect(r.handle.teal, 'TEAL: this handle drives the emit').toBe(true);
+    expect(r.handle.emits, 't1684 — teal renamed to emits (census finding 2, the same declared "drives the emit" signal as corner): this handle drives the emit').toBe(true);
     expect(r.handle.x, 'and it sits on the raw end — what moves when you remove more or less').toBe(3);
     expect(r.inverse, 'the frame mapping is invertible, asserted not assumed').toEqual([-7.5, 3]);
 });
