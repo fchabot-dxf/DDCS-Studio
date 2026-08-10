@@ -110,6 +110,17 @@ export function barFromSettings(fallback) {
  * THE ONE ENTRY the wizard panel calls: an op declaring the lathe layout → its half-profile spec, with every drag
  * routed to `setFields` (the same writer every other canvas handle uses, so a lathe drag and a mill drag reach the
  * form the same way). An op that does not declare it → null, and the mill layout runs untouched.
+ *
+ * t1696 — RETURNS BEFORE `panelTypes.js` computes `spec.placement` (the WCS-pin shift t1686 made universal for
+ * every mill op), and every builder below returns no `placement` key at all — DECLARED, measured against a live
+ * WCS pin, not an oversight. `placement` answers "which stock CORNER sits at this WCS register"; a lathe half-
+ * profile has no corner — it draws the bar's OWN Z-across/radius-up frame, centred on the spindle centreline by
+ * construction (see viz/latheScene.js's `latheSimStock`, `pin: 'origin'`, for the full reasoning and the probe that
+ * confirmed the 3D scene's own shift doesn't move for a WCS pin either — both panes are pin-independent for the
+ * SAME physical reason, not by two separate omissions that happen to agree today). If a lathe op is ever given a
+ * real "where does this bar sit in the machine" placement concept, it is a NEW declaration on THAT axis, not a
+ * borrowed `spec.placement` — folding it into the mill's XY-corner shift would be the second-copy mistake t1686's
+ * own ruling warned against.
  * @param {object} def       the user-op def (its layout kind + opType)
  * @param {object} params    the live form params
  * @param {(patch:object)=>void} setFields  writes {param: value} into the form fields

@@ -32,7 +32,9 @@ import { fileURLToPath } from 'node:url';
  *                           threads a REAL simStart/sources/simMarkers (t1692's simInputsFor, pure — opSimStarts
  *                           alone), so a twin's __simstart handles are finally IN this snapshot, not invisible.
  *   2. FRAME INVARIANT    — spec.placement == partZeroShift(...), and the SVG layer and the overlay raster resolve a
- *                           world point to the SAME pixel through the app's own functions. (t1672 / t1686)
+ *                           world point to the SAME pixel through the app's own functions (t1672 / t1686); lathe's
+ *                           declared, MEASURED pin-independence is pinned as its own positive claim, not a silent
+ *                           exclusion (P2c, t1696).
  *   3. GESTURE FORWARD    — every gesture in CANVAS_GESTURES forwards every generic decl property into its built
  *                           handle. (t1674 noSnap / t1684 emits / t1688 manual)
  *   4. DECL→SPEC SURVIVAL — onEdit reaches every twin's spec; a declared noSnap survives decl→spec; the emit-driving
@@ -136,6 +138,7 @@ async function _boot() {
     const canvasWidgets = await import('/viz/canvasWidgets.js');
     const { FeatureCanvas } = await import('/viz/featureCanvas.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');   // t1692 — pure (params, stock) => per-pass rows; the ONE source specFor's simStart/simMarkers derivation reads (see simInputsFor)
+    const { latheSimStock } = await import('/viz/latheScene.js');   // t1696 — pins the declared "no corner to pin" mechanism directly (P2c)
     // t1688 — _pinFromTf is the PRODUCTION overlay pin. It is a pure one-liner that lived unexported inside a DOM
     // module; exporting it (the ONLY change this gate makes to web/ — an `export` keyword, no behaviour change) is
     // what makes the frame seam that split TWICE reachable by a gate at all.
@@ -160,7 +163,7 @@ async function _boot() {
     }
     twins.sort((a, b) => (a.def.opType < b.def.opType ? -1 : a.def.opType > b.def.opType ? 1 : 0));
 
-    return { fixture, realGetSettings, userOps, panelTypes, sceneFrame, canvasWidgets, FeatureCanvas, opSimStarts, _pinFromTf, files, twins };
+    return { fixture, realGetSettings, userOps, panelTypes, sceneFrame, canvasWidgets, FeatureCanvas, opSimStarts, latheSimStock, _pinFromTf, files, twins };
 }
 
 /**
@@ -354,6 +357,42 @@ test('preview gate P2a: every twin\'s spec.placement IS partZeroShift — the ON
         () => expect(missing).toEqual([]));
     must('a twin\'s spec.placement disagrees with partZeroShift, THE one declared scene transform — the Layout pane and the 3D pane are drawing in different frames (t1672: the read was gated behind toolMachineFrame, so every non-machine-frame op sat unshifted whenever a WCS pin was active)',
         () => expect(wrong).toEqual([]));
+});
+
+// t1696 THE LATHE FRAME GAP — MEASURED (a live probe against a non-origin WCS pin: x/y stayed 0, z moved only with
+// the machine envelope, never the pin's own z) then RULED: a lathe bar has no corner to pin — X is always the
+// spindle centreline, and a shown bar's Z follows the machine-table-floor rule every shown stock uses, not a WCS
+// row. So `latheSimStock` DECLARES `pin: 'origin'` unconditionally (viz/latheScene.js) and the lathe layout builders
+// return no `placement` key at all (viz/latheProfileCanvas.js) — P2a already excludes lathe from the mill's shift
+// check; this test turns that silent skip into an ACTIVE, regression-proof claim of the CURRENT, understood state,
+// on both the downstream spec (no placement key survives) and the mechanism itself (pin stays 'origin' even when
+// fed a real, non-origin pin — the exact non-vacuity shape: this fixture's own stock.pin is 'g55', so a hardcode
+// that quietly started forwarding it would flip this red).
+test('preview gate P2c: every lathe twin declares NO placement key, and latheSimStock pins X/Y to the centreline REGARDLESS of the real WCS pin (t1696)', async () => {
+    const env = await boot();
+    const lathe = env.twins.filter((t) => t.def.layout && t.def.layout.kind === 'lathe_profile');
+    must('no lathe twins were discovered — this test would pass vacuously', () => expect(lathe.length).toBe(7));
+
+    const withPlacement = [];
+    for (const { def } of lathe) {
+        const spec = specFor(env, def, env.userOps.defaultParams(def));
+        if ('placement' in spec) withPlacement.push(`${def.opType} → ${J(spec.placement)}`);
+    }
+    must(`a lathe twin's spec now carries a placement key it didn't before — either latheLayoutSpec started computing one (a real, deliberate change: update this test AND the reasoning in viz/latheProfileCanvas.js's own docstring to match), or a mill code path is leaking in. Found: ${withPlacement.join(', ') || '(unexpected — see above)'}`,
+        () => expect(withPlacement).toEqual([]));
+
+    // the MECHANISM: latheSimStock must keep declaring pin:'origin' even when handed the fixture's REAL, non-origin
+    // pin ('g55') — proving the override is live, not merely untested because nothing ever calls it with a real pin.
+    must('the pinned fixture no longer carries a non-origin stock.pin — this claim would pass vacuously', () => expect(env.fixture.stock.pin).toBe('g55'));
+    // `current` is the REAL settings.stock (userOpView.js:374 is the live call site that feeds the 3D viz —
+    // `_fn(params, window.ddcsGetSettings().stock)`, NOT the null latheScene.js:263 uses internally for bar-only
+    // geometry). Passing null here would make the claim vacuous: `current` matched EXACTLY when this test first
+    // caught its own mistake (an earlier draft passed null, and a broken `pin: current?.pin || 'origin'` edit
+    // still passed — the fallback triggers only when current is falsy, which null always is).
+    const stock = env.latheSimStock({}, env.fixture.stock, null);
+    must(`latheSimStock stopped overriding pin to 'origin' (got ${J(stock.pin)}) — the "a lathe bar has no corner to pin" declaration (t1696, viz/latheScene.js) no longer holds structurally; this is exactly the change that would make P2a's lathe exclusion an oversight instead of a documented choice`,
+        () => expect(stock.pin).toBe('origin'));
+    must(`latheSimStock stopped declaring its centreline datum (got ${J(stock.datum)})`, () => expect(stock.datum).toBe('ccp'));
 });
 
 test('preview gate P2b: the SVG layer and the overlay raster resolve a world point to the SAME pixel (t1686)', async () => {
@@ -594,8 +633,14 @@ test('preview gate P5c: real gate-visible handles (corner + alignment) resolve t
  *         duplicated here.
  *       · The 3D pane (gcodeViz3d, THREE/WebGL).
  *
- * F4. The 7 lathe twins' specs carry NO `placement` key at all — latheLayoutSpec returns before panelTypes computes
- *     the shift. Coherent (the half-profile is a Z-across / radius-up frame, not a pinned XY footprint), and so
- *     excluded from P2a by an explicit declared branch rather than silently — but it does mean a lathe Layout pane
- *     can never ride a WCS pin. Recorded here as a question for a human; the snapshot is what makes it a question.
+ * F4. ✅ RULED (t1696). The 7 lathe twins' specs carry NO `placement` key — MEASURED, not assumed: a live probe set
+ *     a real, non-origin WCS pin (x:47, y:23, z:-35) and read the 3D scene's own computed shift directly; it stayed
+ *     {x:0,y:0} regardless, and its z moved only with the machine envelope (never the pin's z). RULING: a lathe bar
+ *     has no CORNER to pin — X is always the spindle centreline (there is no alternate X a WCS could move it to),
+ *     and a shown bar's Z resolves through the SAME `tableFloor − stockFloorZ` rule a shown mill stock uses, never
+ *     a WCS row's raw Z. So `latheSimStock` (viz/latheScene.js) declares `pin: 'origin'` unconditionally — the same
+ *     kind of declaration `datum: 'ccp'` already was — and both panes are pin-independent for ONE physical reason,
+ *     not two separate omissions that happen to agree. P2c (added this turn) pins the CURRENT state on both the
+ *     downstream spec (no twin gains a placement key) and the mechanism itself (latheSimStock keeps overriding a
+ *     real, non-origin pin), so a future change to either is a deliberate, gate-visible decision, not a silent drift.
  */

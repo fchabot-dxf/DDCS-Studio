@@ -76,6 +76,16 @@ export function latheSimStock(params, current, fallback) {
         // min-XY corner) because that is what every stock before it said, and the consequence was invisible until a
         // probe needed to collide with the bar: the collision put the bar's axis at the stock corner, so a stylus
         // coming in from +X missed it entirely and drew its full seek out through the far side of the centreline.
+        // t1696 — `pin: 'origin'` is DECLARED, not an oversight: a WCS pin (sceneFrame.partZeroShift) answers "which
+        // stock CORNER sits at this register" — a mill question. A lathe bar has no corner to pin: X is ALWAYS the
+        // spindle centreline (the line above), so there is no alternate X a WCS could move it to. Y is likewise
+        // absent (a lathe has none). Z, when a bar/stock is SHOWN (forced true, below), resolves through
+        // partZeroShift's `tableFloor − stockFloorZ` branch — the SAME rule a shown mill stock uses, and one that
+        // never reads a WCS row's raw Z either. So overriding `pin` here doesn't create the lathe/mill divergence
+        // t1686 fixed for surfacing (a mill stock's CORNER silently not following its own chosen WCS); it declares
+        // that no such corner-to-WCS choice exists for a bar in the first place. Measured, not assumed — see
+        // WORK-LOG t1696: a live probe with a non-origin pin (X/Y/Z all non-zero) confirmed the 3D scene's own
+        // shift never moves for X/Y regardless, and moves in Z only with the machine envelope, never the pin.
         datum: 'ccp', pin: 'origin', show: true,
     };
 }

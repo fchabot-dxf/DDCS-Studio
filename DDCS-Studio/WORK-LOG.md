@@ -22419,3 +22419,113 @@ zero-risk fix (34 dead screenshot paths) and three corrected, evidence-backed si
 risky sweep — a smaller, honest turn instead of a large, unverifiable one. If the advisor wants the ~152-call
 screenshot pool or the rAF-starvation-dodge hypothesis actually tested, both are sized and ready for a dedicated
 follow-up with room for the experiments this act's budget didn't have.
+
+## 🔨 turn 1696 (cycle 846, epoch 4) — t1696 ACT 5: THE LATHE FRAME GAP — measured, ruled coherent, declared
+
+### REVIEW RECEIVED ON t1694: PASS
+
+Advisor's own words: "the deflation IS the deliverable... that is the third time today you have corrected a number
+I relayed without checking... I keep supplying estimates dressed as measurements; you keep converting them back.
+Keep doing it." Confirmed `test:changed` is the new default targeted sweep going forward (used it first this turn
+— see the FINDING below on where it actually helps and where it can't).
+
+### THE QUESTION — does lathe have surfacing's bug, or a different, coherent reason to be pin-independent?
+
+The 7 lathe twins' specs carry no `placement` key; `latheLayoutSpec` returns before `panelTypes.js` computes the
+WCS-pin shift t1686 made universal. Ruling 1 was explicit: MEASURE FIRST, in the real app, before deciding which
+of the two branches (join the frame / declare a real reason) applies.
+
+**Measured, not assumed.** A live probe (temp spec, deleted after) opened the OD-turn twin with a REAL, non-origin
+WCS pin (`stock.pin:'g55'`, `table[1] = {x:47, y:23, z:-35}`) and read the 3D viz's own `_partShift()` directly
+(the exact function every renderer reads, per `sceneFrame.js`'s own docstring). Result: `{x:0, y:0, z:-110}` — the
+shift's `z` came entirely from `tableFloor(-120) − stockFloorZ(-10)` (the machine envelope vs. the bar's OWN
+radius), not from the pin's `z:-35` at all; `x`/`y` stayed exactly 0 despite the pin declaring 47/23. First pass at
+this used `stockFloorZ` naively (borrowed the mill's "stock rests on the table" semantics without checking whether
+it even applies to a bar) and had to be re-run once I understood what that value actually represents for a lathe
+(see below) — a smaller version of the same "measure, don't assume" discipline this whole session has run on.
+
+**Traced why, to the actual mechanism** (`viz/latheScene.js`'s `latheSimStock`): the SECOND positional argument the
+live render path passes is the REAL `settings.stock` (`userOpView.js:374` — `_fn(params, window.ddcsGetSettings()
+.stock)`, confirmed the ONLY call site that matters for what the 3D viz shows; a SECOND call site,
+`latheScene.js:263`'s `latheBarOf`, always passes `null` for a DIFFERENT purpose — bar-only geometry, not the
+viz's stock record). `latheSimStock` spreads that real stock (`...current`) and then OVERWRITES `pin: 'origin'`
+unconditionally, discarding whatever real pin it received. Confirmed live: `viz._stock.pin` read `'origin'` even
+though `window.ddcsGetSettings().stock.pin` was genuinely `'g55'`.
+
+### THE RULING — coherent, not the same defect, for a physical reason
+
+A WCS pin (`sceneFrame.partZeroShift`) answers "which stock CORNER sits at this register" — a question a
+rectangular mill stock has an answer to (four corners, an operator's real choice) and a round bar does not: a
+lathe's X is ALWAYS the spindle centreline, by mechanical necessity, not by a choice a WCS could move. Y is absent
+entirely (no second axis). Z — the one axis that, on a REAL lathe, a WCS row's Z DOES mean something for (part-zero
+along the spindle) — turns out not to be the question here either: `partZeroShift`'s Z, whenever a stock/bar is
+SHOWN (which `latheSimStock` forces unconditionally via `show:true`), resolves through `tableFloor − stockFloorZ`
+— the SAME rule a shown MILL stock uses — and that branch never reads a WCS row's raw Z, for either family. So
+`pin:'origin'` doesn't manufacture the lathe/mill divergence t1686 fixed (a mill stock's corner silently NOT
+following its own chosen WCS, an active disagreement between two panes); it declares that no corner-to-WCS choice
+exists for a bar in the first place. Both the 2D half-profile (never computes a shift) and the 3D viz (computes
+one, but it structurally can't move for X/Y and its Z was never pin-driven regardless) end up pin-independent for
+ONE shared physical reason — not two separate, coincidentally-agreeing omissions.
+
+**This is ruling 2's SECOND branch** ("there is a real reason a lathe pane is pin-independent, in which case
+DECLARE that reason") — not the first (join the mill's frame). Declared it at both ends of the mechanism, not just
+one: `latheSimStock`'s `pin:'origin'` line (previously uncommented, sitting beside the well-commented `datum:
+'ccp'` with no explanation of its own) now carries the full reasoning; `latheLayoutSpec`'s docstring (previously
+silent on why it returns before `placement` is computed) now cross-references it. Zero behaviour changed — every
+edit is a comment.
+
+### THE GATE — turned a silent skip into an active, regression-proof claim (ruling 4)
+
+`preview-spec-gate-1688.test.mjs`'s P2a already excluded lathe from the mill's shift check (`if (kind ===
+'lathe_profile') continue`) — correct, but silent: nothing POSITIVELY asserted the CURRENT state, so a future
+change could drift either direction unnoticed. New **P2c**: (a) every lathe twin's spec still carries no
+`placement` key (the downstream fact), AND (b) `latheSimStock`, called with the FIXTURE's own real, non-origin pin
+(`'g55'`) as its `current` argument, still returns `pin:'origin'` (the mechanism itself, not just its consequence).
+F4 in the FINDINGS block updated from "a question for a human" to "✅ RULED (t1696)" with the measured reasoning.
+
+**Non-vacuity caught a mistake in the test itself, not just the source.** First draft called `latheSimStock({},
+null, null)` — matching `latheBarOf`'s null-current call site, NOT the real one. Temporarily changed the source to
+forward a real pin (`pin: (current && current.pin) || 'origin'`) to prove P2c would catch a regression — it
+DIDN'T: `current` was `null` in the test, so `(current && current.pin)` was always falsy, and the fallback masked
+the break. Fixed the test to pass `env.fixture.stock` (the real, pinned fixture stock) as `current` — re-ran
+against the same broken source, now correctly RED (`Expected: "origin", Received: "g55"`). Restored the source,
+re-ran: green. The bug was in my OWN claim's setup, not the mechanism — caught by the same "does this test fail
+for the right reason" discipline the swap-in-pre-fix-and-confirm-RED rule exists for, just aimed at the test's own
+inputs this time rather than the source.
+
+### FINDING — `test:changed` cannot trace this class of change; used a manual sweep instead
+
+Tried `test:changed` first, per the advisor's explicit instruction last turn. It found ZERO tests for this act's
+changes (`web/viz/latheScene.js`, `web/viz/latheProfileCanvas.js`, `tests/node/preview-spec-gate-1688.test.mjs`)
+— not because nothing depends on them, but because `--only-changed`'s dependency graph is built from STATIC
+`import` edges, and nearly every `.spec.js` file reaches `web/` source through `page.evaluate(async () => { const
+{...} = await import('/viz/...') })` — a dynamic import INSIDE a string closure Playwright's static analyzer can't
+see. It worked cleanly last turn because those changes were TO the spec files themselves (trivially "this file
+changed"); it goes blind the moment the change is in `web/` and only reached through the browser-evaluate pattern
+nearly this whole suite uses. Not a broken tool — a real boundary worth knowing before trusting a green
+`--only-changed` run as "nothing else could be affected." Fell back to a hand-picked sweep instead: all 17
+`lathe-*.spec.js` files (134 tests) — chosen because they're the whole family a scene-declaration change could
+touch, not a random sample.
+
+### Verify
+
+**Node gate — 113/0** (112 + P2c), including P1 unmoved (comment-only source edits produce byte-identical specs,
+confirmed rather than assumed — the snapshot didn't need regenerating). **Targeted sweep — 134/134** (every
+`lathe-*.spec.js` file). **Non-vacuity** — above, the two-step version (source break confirmed RED, then the TEST
+ITSELF fixed once the first attempt proved it wasn't testing the real call shape, re-confirmed RED, restored,
+green). No full suite, per the tier — nothing in this diff is reachable outside the lathe family and the gate
+already proves the declared spec is unmoved.
+
+### Emit byte-identical
+
+Trivially true — every source change is a comment; the gate additions are new assertions, not new production
+code paths.
+
+### Capacity
+
+The real work here was epistemic, not mechanical: reaching a RULING (not just a measurement) required tracing
+`partZeroShift`'s Z-branch semantics precisely enough to see that "lathe ignores the pin" and "mill's shown-stock Z
+also ignores the pin" are the SAME general rule, not two coincidences — without that, "coherent, not a bug" would
+have been an assertion instead of a demonstrated fact. The test-authoring mistake (wrong `current` argument) cost a
+second non-vacuity round but was caught before it shipped, which is the mechanism working as intended rather than
+a failure. Room was ample for the act at this depth.
