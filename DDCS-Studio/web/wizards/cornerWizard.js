@@ -18,7 +18,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
 import { safeRetractNode, saveMachineZNode, clearModeOf, resolveClearMode, clearLiftNode } from './ops/safeZframe.js';   // t961 — resolveClearMode = the plane-guarantee backstop (folds plane->hop when WCS!=Active or no Z-first)   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return; t931 B2b-2c — the clearlift folding atom on the wall1->wall2 lift
-import { num } from './ops/util.js';
+import { num, val } from './ops/util.js';   // t1706 (cycle ACT 3) — val() preserves a #/[ token verbatim; used ONLY at the 11 call sites Act 2 declared tokenEligible
 import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
 const AX = {
@@ -65,9 +65,11 @@ export function cornerReposOffsets(params = {}) {
  *  infer), so twin==built-in stays byte-identical for ALL scalars, not just defaults. Must reproduce the old inline text
  *  byte-for-byte (same `num` + defaults as cornerStack). */
 export function cornerHeaderComments(params = {}) {
-    const dist = num(params.dist, 500), retract = num(params.retract, 5);
-    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50);
-    const safeZ = num(params.safeZ, 10), scanDepth = num(params.scanDepth, 5);
+    // t1706 — val() here too: a token in the same param should read the same in this summary as it does in the
+    // real assign below, not "NaNmm" (num() would silently discard it, same class of quiet lie this cycle refuses).
+    const dist = val(params.dist, 500), retract = val(params.retract, 5);
+    const fFast = val(params.f_fast, 200), fSlow = val(params.f_slow, 50);
+    const safeZ = val(params.safeZ, 10), scanDepth = val(params.scanDepth, 5);
     return [
         `Probe dist: ${dist}mm | Retract: ${retract}mm`,
         `Fast: ${fFast} | Slow: ${fSlow} | SafeZ: ${safeZ}mm | ScanDepth: ${scanDepth}mm`,
@@ -84,10 +86,16 @@ export function cornerStack(params = {}, opts = {}) {
     const probeSeq = ({ 0: 'YX', 1: 'XY', YX: 'YX', XY: 'XY' }[params.probeSeq]) || 'YX';
     const wcs = ({ 0: 'active', 1: 'G54', 2: 'G55', 3: 'G56', 4: 'G57', 5: 'G58', 6: 'G59', active: 'active', G54: 'G54', G55: 'G55', G56: 'G56', G57: 'G57', G58: 'G58', G59: 'G59' }[params.wcs]) || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
 
-    const dist = num(params.dist, 500), retract = num(params.retract, 5);
-    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
-    const level = num(params.level, 0), safeZ = num(params.safeZ, 10);
-    const travelDist = num(params.travelDist, 50), scanDepth = num(params.scanDepth, 5), radius = num(params.radius, 2.0);
+    // t1706 (cycle ACT 3) — val() at the 9 call sites verified LIVE, driving the real app (dist/retract/f_fast/
+    // f_slow/port/radius/travelDist/safeZ/scanDepth) — a #/[ string rides through to its assign, exactly like the
+    // atom-kernel already does. num() stays on `level` (not a bound param — baked-final by standing ruling) AND
+    // on hopDist/planeZ, CORRECTING Act 2: found live that saferetract.js's OWN emit (safeHopBlock/planeLiftNodes,
+    // ~:42/:124) re-coerces both via its own num()/r3() — a SECOND, atom-kernel-level discard Act 2's wizard-layer
+    // survey didn't reach. See dataOps/cornerData.js for the corrected declaration.
+    const dist = val(params.dist, 500), retract = val(params.retract, 5);
+    const fFast = val(params.f_fast, 200), fSlow = val(params.f_slow, 50), port = val(params.port, 3);
+    const level = num(params.level, 0), safeZ = val(params.safeZ, 10);
+    const travelDist = val(params.travelDist, 50), scanDepth = val(params.scanDepth, 5), radius = val(params.radius, 2.0);
     // t929 B2b-2c — the DECLARED clearance mode for the between-walls traverse lift (max default = the #520 machine margin,
     // BYTE-IDENTICAL to today). Only the WALL1 lift (followed by the repoTraverse) reads it; the WALL2 lift is the FINAL retract
     // and stays Max (the standing split — final parks are always max caution). safeZ (#19) is the PLUNGE/approach, NOT this.

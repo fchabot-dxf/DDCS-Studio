@@ -40,3 +40,21 @@ export function val(v, d = 0, off = 0) {
     if (typeof v === 'string' && v.trim() !== '' && !Number.isFinite(Number(v))) return v.trim();
     return r3(num(v, d) + off);
 }
+
+// t1706 (cycle ACT 3) — THE ONE MECHANISM every authoring surface (twin form, legacy wizard form) reads instead
+// of inventing its own rule, per the dispatch's own instruction 3. `isTokenAttempt` is the SAME shape `val()`
+// already recognizes as a live token/expression — exposed so a surface can detect "the user is attempting a
+// token" before val()/num() ever runs.
+export const isTokenAttempt = (v) => typeof v === 'string' && /[#[]/.test(v.trim());
+
+/** Given a binding's declared token policy (`tokenEligible`/`tokenRefusal`, documented once in userOps.js beside
+ *  BINDING_TYPES) and a raw typed value, decide what happens to it. Returns `null` when `raw` isn't a token
+ *  attempt at all — the caller's normal numeric/text path is completely unaffected, this only ever intercepts
+ *  a `#`/`[` value. Otherwise `{ eligible: true }` (keep `raw` verbatim, it will reach `val()` downstream) or
+ *  `{ eligible: false, refusal }` (REFUSE — show `refusal` to the user, do not let the value reach params; the
+ *  fail-closed default when a binding carries no declaration at all, matching every op not yet declared). */
+export function tokenPolicyFor(binding, raw) {
+    if (!isTokenAttempt(raw)) return null;
+    if (binding && binding.tokenEligible) return { eligible: true };
+    return { eligible: false, refusal: (binding && binding.tokenRefusal) || 'This value can\'t be read live from the controller — it hasn\'t been declared safe for a live value yet.' };
+}

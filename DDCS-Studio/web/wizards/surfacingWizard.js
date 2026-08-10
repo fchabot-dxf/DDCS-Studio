@@ -11,7 +11,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace, makeSkim } from '../blocks/programFraming.js';
-import { num } from './ops/util.js';
+import { num, val } from './ops/util.js';   // t1706 (cycle ACT 3) — val() at the call sites Act 2 declared tokenEligible
 import { stepoverPctOf } from './ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover (see its declaration)
 
 /** The faced area's footprint on the stock — shared by the stack (PlaceOnStock snapshot) + the 2D view. */
@@ -105,11 +105,21 @@ export function surfacingStack(params = {}) {
     const w = num(params.w, 100), h = num(params.h, 80);
 
     const raster = newBlock('surfaceraster');
+    // t1706 (cycle ACT 3) — val() ONLY at depth/stepdown/feed/plunge: the atom itself (surfaceraster.js) already
+    // carries a live value through these (depth/stepdown via its own geoTerm/liveWordOf; feed/plunge via its own
+    // val() at surfaceraster.js:789) — verified live, not just read, before trusting it. num() stays everywhere
+    // else: w/h/toolDia (Act 2, unchanged — decide whether ANY cutting atom exists / feed the stepover derivation)
+    // AND, CORRECTING Act 2: rampAngle/helixDia/helixPitch/confirmEvery. Act 2's survey checked only the WIZARD
+    // layer; live-testing here (driving the real app, not reading code) found the ATOM's OWN emit bakes
+    // rampAngle into a tan()-derived literal (surfaceraster.js ~1045: "the tangent is baked; the angle is a form
+    // field, not a knob"), helixPitch/helixDia into the helix's move COUNT and radius (surfaceraster.js:673,
+    // 1519-1530, Math.ceil(stepdown/helixPitch)*24 — a real loop count), and confirmEvery into a threshold branch
+    // (Math.round+Math.max, gating whether the confirm-pause mechanism exists at all) — none carry a live word.
     raster.params = {
         x: 0, y: 0, z0: 0,                       // the op's own frame; the folds pass the real one in
-        w, h, depth: num(params.depth, 0.5), stepdown: num(params.stepdown, 0.5),
+        w, h, depth: val(params.depth, 0.5), stepdown: val(params.stepdown, 0.5),
         toolDia: tool, stepoverPct: pct,
-        feed: num(params.feed, 2000), plunge: num(params.plunge, 200), clearance: num(params.clearance, 5),
+        feed: val(params.feed, 2000), plunge: val(params.plunge, 200), clearance: num(params.clearance, 5),
         strategy: (params.strategy === 'concentric') ? 'concentric' : 'parallel', direction: 'bothways',
         entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3),
         helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1),

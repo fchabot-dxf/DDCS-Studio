@@ -27,6 +27,8 @@ import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUS
 import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE mm<->inch conversion leaf (shared with the tool-library editor + catalog picker)
 import { evalExpr } from '../wizards/ops/expr.js';   // t1613 — the ONE expression evaluator (wizard params are now a caller-populated scope, as its header planned)
 import { SHAPE_2D_TYPES } from '../wizards/ops/vizBlocks.js';   // t1627 — shape declarations render on the 2D CANVAS (layoutSpecFromOp), not as form rows
+import { isTokenAttempt, tokenPolicyFor } from '../wizards/ops/util.js';   // t1706 (cycle ACT 3) — the ONE token-eligibility mechanism every authoring surface reads
+import { toast } from './gateway/util.js';   // the app's existing global toast — REFUSE LOUDLY reuses it rather than inventing a second notification path
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -48,6 +50,33 @@ const CTRL_CSS = 'padding:5px 8px; background:var(--bg,#0b0f14); color:inherit; 
 const numOr = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const r3 = (n) => Math.round(n * 1000) / 1000;
 const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
+
+/** t1706 (cycle ACT 3) — THE ONE MECHANISM (instruction 3): wire the accept/refuse behavior for a `#`/`[`
+ *  keystroke or paste onto a raw DOM input, driven ENTIRELY by `binding`'s declared `tokenEligible`/`tokenRefusal`
+ *  (tokenPolicyFor, wizards/ops/util.js) — never a rule invented per call site. `numberWidget` below is ONE
+ *  caller; a legacy hand-authored wizard view (e.g. surfacingView.js, whose fields are static HTML, not built by
+ *  this widget registry) is the OTHER — same function, so the eligibility question and the refusal TEXT can never
+ *  drift between the two authoring surfaces. No-ops if `binding` carries no token declaration at all (fail-closed:
+ *  an undeclared param's field is simply never wired, exactly its behavior before this act). */
+export function wireTokenGuard(inp, binding) {
+    if (!inp || !(binding && (binding.tokenEligible || binding.tokenRefusal))) return;
+    const refuseVisibly = (refusal) => {
+        toast(refusal, true);
+        inp.classList.add('token-refused-flash');
+        clearTimeout(inp._tokenFlashT);
+        inp._tokenFlashT = setTimeout(() => inp.classList.remove('token-refused-flash'), 1400);
+    };
+    inp.addEventListener('beforeinput', (e) => {
+        if (e.inputType !== 'insertText' || !isTokenAttempt(e.data)) return;
+        const policy = tokenPolicyFor(binding, e.data);
+        if (policy && !policy.eligible) { e.preventDefault(); refuseVisibly(policy.refusal); }
+    });
+    inp.addEventListener('paste', (e) => {
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        const policy = tokenPolicyFor(binding, text);
+        if (policy && !policy.eligible) { e.preventDefault(); refuseVisibly(policy.refusal); }
+    });
+}
 
 // ── t990 — dual mm/inch DISPLAY layer. mm is ALWAYS the authoritative, exact storage; inch/IPM is a DERIVED VIEW
 // (1 in = 25.4 mm, and IPM = mm·min⁻¹ / 25.4). The stored mm NEVER re-derives from the rounded display, so emit is
@@ -86,7 +115,14 @@ function numberWidget(host, b) {
     const cfg = b.widgetConfig || {};
     host.style.cssText = ROW_CSS;
     const inp = document.createElement('input');
-    inp.type = 'number'; inp.step = cfg.step || 'any';
+    // t1706 (cycle ACT 3) — a binding with a DECLARED token policy (either `tokenEligible` or `tokenRefusal` —
+    // Act 2, userOps.js beside BINDING_TYPES) renders as text, not `type="number"`: a native number input REJECTS
+    // a `#500` string at the DOM itself (measured at t1668), so refusing it there is silent — no gesture for the
+    // user to make, nothing to visibly refuse. A field with NO declaration (fail-closed default, the other 28
+    // ops today) is untouched — exactly `type="number"`, byte-identical to before this act.
+    const tokenDeclared = !!(b.tokenEligible || b.tokenRefusal);
+    inp.type = tokenDeclared ? 'text' : 'number'; inp.step = cfg.step || 'any';
+    if (tokenDeclared) inp.inputMode = 'decimal';
     const min = cfg.min ?? b.min, max = cfg.max ?? b.max;
     if (min != null) inp.min = min;
     if (max != null) inp.max = max;
@@ -156,6 +192,13 @@ function numberWidget(host, b) {
             inp.addEventListener('input', () => { if (document.activeElement !== shadow) mm2disp(); });   // drag / programmatic mm write → refresh the inch view
         }
     }
+    // t1706 (cycle ACT 3) — the ONE mechanism (tokenPolicyFor, wizards/ops/util.js): a `#`/`[` keystroke or paste
+    // is checked against the binding's DECLARED policy, never a rule invented here. Eligible → let it through
+    // (the SAME native text-editing gesture as any other character). Not eligible → REFUSE LOUDLY: the character
+    // never lands (preventDefault, matching the old native-number-input's silent block, but now WITH the reason),
+    // a toast names the declared `tokenRefusal` text, and the field flashes so the refusal has somewhere to be
+    // seen even if the toast is missed. Only wired when `tokenDeclared` — an undeclared field never runs this.
+    if (tokenDeclared) wireTokenGuard(inp, b);
     // An UNTOUCHED field must not inject a value that overwrites the template's own (per-structural-combo) socket:
     //   • t114 SOCKET-HELD (no spec default → the socket holds a per-combo expression, e.g. corner #21-#24 which change with
     //     corner×probeSeq): OMIT unless the user TYPED a finite number → instantiate keeps the pruned per-combo socket. This
@@ -163,6 +206,13 @@ function numberWidget(host, b) {
     //   • t109 EXPRESSION default (a #var STRING, non-numeric): also omit when empty.
     // A typed number / drag literal is a real override and passes through; plain numeric-default fields are unchanged.
     return { read: () => {
+        // t1706 — a token-shaped value is checked AGAIN here, the last line before it reaches params: the
+        // beforeinput/paste guards above refuse a live keystroke, but read() never trusts the DOM alone (a
+        // programmatic .value write bypasses both) — fail closed, exactly like every other guard this project runs on.
+        if (tokenDeclared) {
+            const policy = tokenPolicyFor(b, inp.value);
+            if (policy) return policy.eligible ? { [b.param]: inp.value.trim() } : {};
+        }
         const n = parseFloat(inp.value);
         if (Number.isFinite(n)) return { [b.param]: n };   // the user typed a value → override
         if (b.socketHeld) return {};                        // untouched socket-held → the per-combo socket holds

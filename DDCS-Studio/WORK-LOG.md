@@ -23039,3 +23039,153 @@ found, and the remaining 28 ops' classification is fully measured and citable, n
 next. Room was adequate for what shipped; a full 32-op mechanical rollout in the same turn would have traded
 verification depth for raw coverage, and the non-vacuity + six-citation self-repair discipline above is exactly
 the depth this session's own track record says not to cut.
+
+## 🔨 turn 1706 (cycle 851, epoch 4) — CYCLE ACT 3: THE AUTHORING SURFACES — and Act 2's survey depth corrected LIVE
+
+### REVIEW RECEIVED ON t1704: PASS
+
+Advisor: "the measurement is the deliverable"; requiring `tokenRefusal` whenever eligibility is absent "is the
+part I would have missed... the reason is authored WITH the decision, so every surface shows the SAME sentence
+instead of inventing three." The `deriveBindings` allow-list catch was named "the census paying for itself a
+sixth time." The 4-op pilot was ACCEPTED, deliberately, as "exactly the convention this project already runs on."
+Released V2026.08.10.3 (the send-gate fix + the Act 2 declarations); gate clean, all twelve churn isolated.
+
+### THE ACT — wire the three authoring surfaces to the ONE declaration. Two surfaces landed fully verified; the
+third (Blockly) is explicitly scoped out, per instruction 5's own permission.
+
+### THE MECHANISM — ONE function, two callers, exactly per instruction 3
+
+`tokenPolicyFor(binding, raw)` (`wizards/ops/util.js`) is the SAME function every surface calls: `null` if `raw`
+isn't a `#`/`[` attempt at all (the normal numeric path is untouched); `{eligible:true}` or `{eligible:false,
+refusal}` otherwise, reading ONLY the binding's declared `tokenEligible`/`tokenRefusal` (Act 2). `wireTokenGuard`
+(`ui/formWidgets.js`) wires it onto a real DOM input via `beforeinput` (catches the keystroke before the browser
+ever inserts it) + `paste` — REFUSE LOUDLY: `preventDefault()`, a `toast(refusal, true)` (the app's existing
+global toast, not a new notification path), and a brief red flash (`.token-refused-flash`) so the refusal has
+somewhere to be SEEN even if the toast is missed (instruction 6: "a refusal nobody can see is not a refusal").
+`numberWidget` (the twin form) calls it internally; `surfacingView.js` (the legacy wizard form) calls the SAME
+exported function on its own hand-authored fields, driven by the SAME `SURFACING_BINDINGS`/`SURFACING_STRUCT`
+arrays the twin form reads — proven identical by test: the refusal TEXT on `w` is byte-identical on both surfaces.
+
+**Scoped so an undeclared param (the other 28 ops today) is untouched**: `numberWidget` renders `type="number"`
+exactly as before UNLESS the binding carries `tokenEligible` or `tokenRefusal` — a native number input can't hold
+`#500` at the DOM at all (t1668), so a declared field renders `type="text"` (+ `inputMode="decimal"`) specifically
+so there's a gesture to accept OR refuse; an undeclared field has no such gesture change, matching instruction 4
+("fail-closed... is CORRECT for now, not a bug to work around").
+
+### THE WIZARD-LEVEL HALF — val() at the call sites Act 2 declared eligible
+
+Even with the form correctly capturing a token STRING, each wizard's own `generate()` still called `num()` on it
+(t1668's third failure mode) — swapped to `val()` (the atom-kernel's own pass-through primitive, unused at the
+wizard layer until now) at exactly the declared-eligible call sites: 9 in `cornerWizard.js`
+(dist/retract/f_fast/f_slow/port/radius/travelDist/safeZ/scanDepth — `level` stays `num()`, never bound), 4 in
+`surfacingWizard.js` (depth/stepdown/feed/plunge). Also fixed `cornerHeaderComments` (the human-readable summary,
+same params) — a token now prints AS the token there too, not "NaNmm".
+
+### THE ARCHITECTURAL WRINKLE — a shared framing function, and why it was NOT touched
+
+`originX`/`originY`/`offZ`/`stockW`/`stockH`/`stockZ` (surfacing) route through `makePlace` (`programFraming.js`),
+shared by ~20 ops. Built an opt-in `tokenKeys` parameter (default none, every existing caller byte-identical) so
+only surfacing could gain the behavior — then found, live, that it doesn't matter: see below. Left `makePlace`
+untouched in the end (the mechanism was built, tested, and reverted in the same turn once the deeper problem
+surfaced — not shipped as dead code).
+
+### THE BIG FINDING — Act 2's survey checked ONE layer; the real answer needed two more, and static reading
+missed both
+
+Instruction 6 says "verify by VALUE and BY EYE." Doing exactly that — typing a token into `sf_originX` and reading
+the ACTUAL emitted G-code, not just tracing `surfacingStack`'s own code — surfaced a class of defect Act 2's
+survey structurally could not have caught by reading `surfacingStack` alone:
+
+1. **`originX`/`originY`/`offZ`/`stockW`/`stockH`/`stockZ`** — Act 2 said VALUE-ONLY ("never touched inside
+   surfacingStack"). TRUE, and irrelevant: the `placeonstock` ATOM's own fold (`placeShiftFromParams` →
+   `placementShift`, `wizards/ops/placement.js`) computes a shift and BAKES it into every coordinate in the
+   emitted text via `translateProgram` — a text-level number rewrite that structurally cannot carry a token (it
+   needs a REAL NUMBER to shift literal digits). A THIRD local coercion function (`placement.js`'s own `numv`,
+   distinct from `util.js`'s `num`/`val` AND `formWidgets.js`'s `numOr`) silently discards it there. Confirmed
+   live: filled `#500`, the emitted `X0`/`X[0+#40]` stayed exactly at the default — the token never appeared
+   anywhere in the program.
+2. **`rampAngle`/`helixDia`/`helixPitch`** — Act 2 said VALUE-ONLY (passed straight into `raster.params`). TRUE at
+   the wizard layer, and again irrelevant: `surfaceraster.js`'s OWN emit bakes `rampAngle` into a `tan()`-derived
+   literal (`#34=[[#46-#35]*19.081]` — the comment literally reads *"the tangent is baked; the angle is a form
+   field, not a knob"*), and drives the descending helix's move COUNT (`Math.ceil(stepdown/helixPitch)*24`,
+   `surfaceraster.js:673`) and radius (`:1528`) — real trig and a real loop count, computed inside the atom, with
+   no live-word support.
+3. **`confirmEvery`** — `Math.max(0, Math.round(num(p.confirmEvery,0)))` inside the atom, gating whether the
+   confirm-pause mechanism exists at all — a threshold branch, not a passthrough value.
+4. **`hopDist`/`planeZ`** (corner) — even the SIMPLEST-seeming case wasn't safe: `saferetract.js`'s own
+   `safeHopBlock`/`planeLiftNodes` emit functions re-run `num()`/`r3()` on both, independently of
+   `cornerWizard.js`'s (correctly fixed) call site — a SECOND atom-kernel-level discard downstream of the first.
+
+**A related, striking discovery while tracing #1-2**: `surfaceraster.js` already carries SUBSTANTIAL live-value
+machinery (`liveWordOf`/`geoTerm`/`geoSum`, t1399/t1404/t1422/t1425) — built for a DIFFERENT feature (a CAM slot's
+geometry held in pendant REGISTERS, not wizard-typed tokens) that hit the *exact same defect class* this whole
+cycle exists to close ("a pendant W of 80 emitted `#40=94`... clean-looking G-code that cuts a different part").
+`depth`/`stepdown` (mine) and `feed`/`plunge` (mine, via the atom's own separate `val()` at `:789`) ride this
+PRE-EXISTING mechanism correctly — which is WHY they worked on the first try while rampAngle/helixDia/helixPitch
+did not (no `geoTerm` coverage for those). Worth knowing for whoever extends this further: check whether a target
+atom already has partial live-value support before assuming none exists.
+
+### CORRECTED — Act 2's declarations for all 10 misclassified params, with the reasoning cited at the file:line
+that proved it wrong
+
+`cornerData.js`: `hopDist`/`planeZ` → `tokenEligible` removed, `tokenRefusal` + `tokenDeferrable` added (citing
+`saferetract.js` by function name and approximate line). `surfacingData.js`: `originX`/`originY`/`offZ`/`stockW`/
+`stockH`/`stockZ`/`confirmEvery`/`rampAngle`/`helixDia` → same correction (`stockW`-family + position marked
+`tokenDeferrable` — the arithmetic itself is simple, a future symbolic-offset redesign could enable it;
+`confirmEvery`/`helixPitch` NOT marked deferrable — real branch/count decisions, never deferrable). Each entry
+names the EXACT downstream function and behavior that proved it wrong — the next person doesn't re-derive this,
+they read it. `cornerWizard.js`/`surfacingWizard.js` reverted to `num()` at the 10 corresponding call sites,
+matching the corrected declaration exactly (declaration and code never disagree, checked by the final sweep below).
+
+### Non-vacuity, folded into the discovery process itself
+
+Every accept claim in this turn is ALREADY a non-vacuity proof by construction: the FIRST version of the
+mechanism (before the wizard-level `val()` swap) would have shown the SAME "MISSING FROM EMIT" failure for EVERY
+param, not just the 10 — I watched `dist` fail this exact way before fixing `cornerWizard.js`'s call site, and
+`hopDist`/`rampAngle`/`originX` fail it AFTER the wizard-level fix (proving THEIR failure lives one layer deeper,
+not that the mechanism itself is broken). The refusal side is separately confirmed structurally: `notCancelled ===
+false` (preventDefault fired) AND `value` unchanged (the character never landed) AND a toast fired with the exact
+declared text — three independent signals, not one.
+
+### Verify
+
+**Node gate — 118/118** (two more architecture-map citations drifted from this turn's own edits — `userOps.js`'s
+INV6/13/14 doc-comment shift already fixed at t1704; `cornerData.js`'s TRAP1 `cornerStack(` line shifted AGAIN
+by the correction comments, caught and fixed the same way, third time this checker has caught its own map's
+citations drifting from real edits in three consecutive turns). **Hand-picked sweep — 45/45**: every corner/
+surfacing/homing/wcs-specific spec, `twin-form-completeness-1581` (the FULL 32-twin registry — the shared
+`formWidgets.js`/`deriveBindings.js` edits break nothing elsewhere), `field-help-798`'s full-registry help-coverage
+sweep, `field-deeplink-796`, `passes-field-1613`, and the canvas-handle specs (since `formWidgets.js` is the exact
+file t1700 also touched). **The FINAL, decisive verification** was a from-scratch Playwright probe (not committed
+— written, run, and deleted per this act's own discipline of proving before shipping): every declared-eligible
+field (9 corner, 4 surfacing) confirmed to carry an EXACT token string all the way into the real emitted G-code;
+every declared-ineligible NUMERIC field (`hopDist`, `w`/`h`/`toolDia`/`stepoverPct`/`confirmEvery`/`rampAngle`/
+`helixDia`/`helixPitch`, `originX`) confirmed to REFUSE (character blocked, toast fired, value unchanged) on BOTH
+the twin form and (for surfacing) the legacy wizard form — the SAME refusal text on both, proving "one mechanism."
+
+### Emit byte-identical
+
+For every EXISTING (non-token) value — confirmed by the full sweep above, not assumed: `twin-form-completeness`
+across all 32 twins, plus every corner/surfacing/homing/wcs emit-parity spec, all pass unchanged. The DEFAULT
+state of every touched op's declared spec is untouched (node gate's preview-spec snapshot required no
+regeneration — nothing about the DEFAULT rendering changed, only what happens on a live token attempt).
+
+### NOT done this act, named plainly
+
+**Blockly** (the third surface) — not started. t1668's own measurement (`setValue('#500')` silently rejected by
+the native `FieldNumber`) stands unchanged. This is a genuinely separate subsystem (Blockly's own field/shadow-
+block internals, not the form-widget registry this act's mechanism lives in) and deserves its own dispatch rather
+than a rushed extension of this one, per instruction 5's own explicit permission. **The other 28 ops'
+declarations** — still not mechanically rolled out (unchanged from t1704); this act's corrections (10 params) are
+now the STRONGEST argument yet for why that rollout must include the SAME atom-kernel-level tracing this act did,
+not a repeat of Act 2's wizard-layer-only pass — a survey covering all 28 the OLD way would ship the SAME class of
+wrong "eligible" declarations `originX`/`rampAngle`/`hopDist` just were.
+
+### Capacity
+
+The heaviest turn this cycle, and it earned its size: two ROUNDS of "verify by value" (surface mechanism, then a
+whole SECOND layer of atom-kernel discovery neither the dispatch nor Act 2 anticipated) is not scope creep, it's
+exactly what "type it, see it accepted, read the emitted line" (instruction 6) was written to catch, catching it.
+Every correction is cited at the exact downstream function that proved it wrong, not asserted. Stopping at two
+surfaces (not three) was the right call under the size this already reached — Blockly is a real, separately-sized
+piece of work, not a loose end dropped from fatigue.

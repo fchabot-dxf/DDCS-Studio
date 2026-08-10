@@ -483,6 +483,11 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 }
 .toast.bad { border-color: var(--danger, #ef4444); color: var(--danger, #ef4444); }
 
+/* t1706 (cycle ACT 3) — a form field's brief visible flash when a typed/pasted token was REFUSED (formWidgets.js
+   numberWidget): the toast explains WHY, this marks WHERE — persists a moment past the toast so a user scanning
+   the form after the fact still sees which field rejected their gesture. */
+.token-refused-flash { border-color: var(--danger, #ef4444) !important; box-shadow: 0 0 0 2px rgba(239,68,68,.25); }
+
 /* Live-gateway status LED (sits inside the GATEWAY tab) — always visible: unlit (grey) with no
    gateway, green when one answers, red when it reports a fault. */
 .gateway-led {

@@ -70,7 +70,7 @@ comment survives at `ui/globalFunctions.js:29`.
 - **CORNER** (retired 2026-07-02, `wizards/views/index.js:20`). No view import, no `#wiz_corner` panel
   (`grep -c 'id="wiz_corner"' DDCS-Studio/web/index.html` → **0**), no opener. Its `BUILTINS` slot survives and
   `opensAs: 'user_corner_data'` (`wizardLibrary.js:56`). `wizards/cornerWizard.js` still exists as the legacy
-  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,238`).
+  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,244`).
 - **CIRCULAR** (retired 2026-06-23, superseded by Middle — `wizards/views/index.js:22`). Gone further: it has
   **no `BUILTINS` entry at all**, so it is not even a bar slot.
 

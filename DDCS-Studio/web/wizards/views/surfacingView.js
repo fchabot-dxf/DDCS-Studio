@@ -11,9 +11,25 @@ import { workpieceFeatureItems } from '../../engine/workpiece.js';
 // gate. One source: a hand-copied options list here is the drift this arc treats (the emit has handled zMode since
 // 8ce70873; only the visible knob was missing).
 import { SURFACING_STRUCT, SURFACING_BINDINGS, startMarkerTarget, startMarkerVarSeed } from '../../blocks/dataOps/surfacingData.js';
+import { wireTokenGuard } from '../../ui/formWidgets.js';   // t1706 (cycle ACT 3) — the SAME accept/refuse mechanism the twin form uses, driven by the SAME declared bindings
 
 const ZMODE_SPEC = SURFACING_STRUCT.find((b) => b.param === 'zMode');
 const WCS_GATE = (SURFACING_BINDINGS.find((b) => b.param === 'wcs') || {}).gate || null;   // { param:'zMode', is:'skim', tip }
+
+/** t1706 — wire the declared token guard onto every field this legacy view owns, once. The DOM id convention
+ *  here is uniformly `sf_<param>` (see `inputIds` below), so no second name-mapping list is needed — the SAME
+ *  SURFACING_BINDINGS/SURFACING_STRUCT the twin form itself reads. A param with no token declaration (or no
+ *  matching `sf_` field, e.g. a structural id this view doesn't render) is silently skipped — wireTokenGuard
+ *  itself no-ops on an undeclared binding, fail-closed. */
+function mountTokenGuards() {
+    const host = el('sf_w');   // any real field in this form; used only as a dataset home for the once-guard
+    if (!host || host.dataset.tokenGuardsWired) return;
+    host.dataset.tokenGuardsWired = '1';
+    for (const b of [...SURFACING_BINDINGS, ...SURFACING_STRUCT]) {
+        const inp = b && b.param && el('sf_' + b.param);
+        if (inp) wireTokenGuard(inp, b);
+    }
+}
 
 /** Populate the empty sf_zMode skeleton from the DECLARED spec (once). The HTML carries no option/label/help text. */
 function mountZMode() {
@@ -110,6 +126,7 @@ export const surfacingView = {
         const sel = el('sf_tool');
         if (sel) { populateToolSelect(sel); if (!sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', applyTool); } }
         mountZMode();   // t1609 — build the Z-mode dropdown from the twin's declaration (no-op after the first open)
+        mountTokenGuards();   // t1706 — no-op after the first open
         const st = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
         mountPathAnchor('sf_');
         if (st && st.x > 0 && st.y > 0) setFields({ sf_originX: 0, sf_originY: 0, sf_w: st.x, sf_h: st.y });

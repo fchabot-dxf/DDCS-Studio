@@ -72,21 +72,32 @@ const SURFACING_BINDING_SPECS = [
     // else in surfacingStack) — unlike corner/middle's wcs, which forks WHICH content lands in several atoms.
     { param: 'wcs', tokenEligible: true, match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'COORDINATES',
         gate: { param: 'zMode', is: 'skim', tip: 'Skim faces RELATIVE to the jog start — there is no WCS frame to select.' } },   // t986 — grey (data-op-gated) in Skim
-    // placement scalars (placeonstock) — origin owned by the placement now (region is local-0-based). Never touched
-    // by surfacingStack's own JS — makePlace/placeonstock read every one of these straight from params.
-    { param: 'originX', tokenEligible: true, match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
-    { param: 'originY', tokenEligible: true, match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
+    // placement scalars (placeonstock) — origin owned by the placement now (region is local-0-based).
+    // t1706 CORRECTION (was wrongly `tokenEligible` under Act 2 — found live, driving the real app, Act 3):
+    // surfacingStack's OWN JS never touches these, but the placeonstock ATOM's fold does — placeShiftFromParams
+    // (wizards/ops/placement.js) feeds them into placementShift, which computes a shift and BAKES it into every
+    // coordinate in the emitted text via translateProgram (a text-level number rewrite, not a `#var` reference).
+    // That fold needs a REAL NUMBER to compute the shift and rewrite literal coordinates — a token can't survive
+    // it. Act 2's survey checked the WIZARD layer (correctly, nothing there touches these) but not this ATOM-FOLD
+    // layer one step further downstream — the gap this correction closes. Deferrable: the arithmetic itself is
+    // simple (a corner-anchor offset), so a future redesign emitting SYMBOLIC offsets instead of baked literals
+    // could make these eligible — not something the current text-shift mechanism does.
+    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
+    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
     { param: 'stockAttach', tokenEligible: true, match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
     { param: 'pathDatum', tokenEligible: true, match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
     { param: 'stockDatum', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW },
-    { param: 'stockH', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH },
-    { param: 'stockZ', tokenEligible: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
-    { param: 'offZ', tokenEligible: true, match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
+    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW },
+    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH },
+    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
+    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
     // depth pass (stepdown)
     { param: 'depth', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'depth', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
     { param: 'stepdown', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'stepdown', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
-    { param: 'confirmEvery', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    // t1706 CORRECTION (found live, driving the real app — Act 2's survey checked only the wizard layer, not
+    // this atom's own emit): surfaceraster.js's confirmEvery = Math.max(0, Math.round(num(...))) — a threshold
+    // decision (whether the confirm-pause mechanism exists at all), not a value carried through untouched.
+    { param: 'confirmEvery', tokenRefusal: 'Decides whether the confirm-and-pause step exists at all — a threshold check made before the program is built, not a value read from one field.', match: { type: 'surfaceraster' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
     // geometry + cut (the surfacefill leaf)
     // t1704 — w/h are NOT eligible: surfacingWizard.js's generate() compares `w<=0||h<=0` to decide whether ANY
     // cutting atom exists at all (an empty program vs the real stack), in ADDITION to feeding the placement bbox —
@@ -115,9 +126,15 @@ const SURFACING_BINDING_SPECS = [
     // (which forces the literal, non-raster arm when ==='helix'), surfacing's never branches which atoms get
     // built — ramp/helix descent is the atom-kernel's own internal logic, same shape as `strategy` above.
     { param: 'entry', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
-    { param: 'rampAngle', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
-    { param: 'helixDia', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
-    { param: 'helixPitch', tokenEligible: true, match: { type: 'surfaceraster' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
+    // t1706 CORRECTION (found live — Act 2's survey checked only the wizard layer, not the atom's own emit):
+    // rampAngle is baked into a tan()-derived literal inside the ramp move's macro expression (surfaceraster.js
+    // ~1045: "the tangent is baked; the angle is a form field, not a knob") — trig computed at generate time, no
+    // live-word support. helixPitch DIRECTLY drives the helix's move COUNT (surfaceraster.js:673, Math.ceil(...)
+    // *24 — a real loop count, non-deferrable). helixDia feeds the same helix's computed RADIUS baked into every
+    // winding's coordinates (surfaceraster.js:1528). None carry a live word today.
+    { param: 'rampAngle', tokenRefusal: 'The descent angle is used to compute the ramp\'s run (a trig calculation baked into the move) before the program is built.', tokenDeferrable: true, match: { type: 'surfaceraster' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
+    { param: 'helixDia', tokenRefusal: 'The helix diameter is baked into the radius of every winding move — computed before the program is built.', tokenDeferrable: true, match: { type: 'surfaceraster' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
+    { param: 'helixPitch', tokenRefusal: 'Directly decides how many windings the descending helix contains — the program\'s SHAPE depends on this number before it can be built.', match: { type: 'surfaceraster' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
 ];
 
 /** The body bindings for a surfacing twin, derived BY IDENTITY over the ALREADY-WRAPPED stack — so the
