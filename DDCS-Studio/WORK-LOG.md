@@ -22866,3 +22866,176 @@ VALUE is silently accepted because line-level comment grammar can't see word-lev
 word-boundary framing right (rather than either reverting to a G-code-unsafe read or over-engineering a
 field-level pre-validator that didn't exist yet) is what let the fix land as a one-line regex change reusing
 grammar already hardened by three prior turns, instead of new machinery.
+
+## 🔨 turn 1704 (cycle 850, epoch 4) — CYCLE ACT 2: DECLARE WHICH PARAMS CAN TAKE A LIVE VALUE
+
+### REVIEW RECEIVED ON t1702: PASS
+
+Advisor: "the best decision in it was made BEFORE any code" — checking ground truth (the ';' comment syntax) before
+assuming the line was unsafe is "what stopped this becoming a wrong fix." Verified the exact regex themselves
+against 4 cases (injection unstripped, a real comment still strips, a whole-line comment strips, a legitimate
+token untouched) and confirmed the full malformed-sweep + simulator-consumer sample. One flag carried forward, not
+mine to fix: the fix is UNRELEASED — a safety fix, going out with act 2 or 3, not sat on to the cycle's end.
+
+### THE ACT — no UI. Measure which declared params can safely carry a controller token TODAY, declare the
+answer beside each binding, make the refusal expressible.
+
+### THE RULE, established from two calibration examples before any survey
+
+A param's value only exists at run time if it's a token — so it's eligible ONLY if the wizard's OWN
+`generate()`/stack-builder never needs a resolved NUMBER for it before the program is built: no JS arithmetic
+(`+ - * /`, `Math.*`), no comparison that picks a different code path, no loop/array bound. It's not eligible if
+JS uses it to decide the program's SHAPE (how many atoms get built, which branch runs, a bbox/placement
+computation) — calibrated on `surfacingWizard.js`'s `w`/`h` (`num(params.w,100)`, then `w<=0||h<=0` branches
+whether ANY cutting atom exists, and feeds `makePlace`'s bbox — STRUCTURAL) versus the atom-kernel layer
+(`ops/move.js`, `probe.js`, etc.), the ONLY place `val(v,d,off)` already exists and passes a `#`/`[` string through
+verbatim — confirmed NOTHING at the wizard-generate layer calls it today; every wizard reads params via `num()`,
+discarding any token unconditionally. Within "not eligible," a **DEFERRABLE-CANDIDATE** sub-flag: the JS math is
+simple arithmetic (a clamp, an add/subtract) a DDCS macro expression could equally compute AT THE CONTROLLER — as
+opposed to a param that decides atom COUNT, which can never be deferred (a controller can't dynamically change how
+many G-code lines an already-generated program contains).
+
+### THE MEASUREMENT — 3 parallel research agents, one per op family, all citing real code, not param names
+
+Dispatched three `Explore` agents in parallel (mill-geometry, probe-family, ATC/control/lathe-turning), each given
+the calibrated rule + the two worked examples, each tracing every declared param's actual use inside its
+`generate()`/stack-builder — not guessing from the name. **393 declared params across all 32 registered ops,
+every one traced to a real citation:**
+
+| batch (ops) | value-only | structural | — deferrable | mixed |
+|---|---|---|---|---|
+| mill geometry (11) | 109 | 23 | 17 | 68 |
+| probe family (10) | 74 | 41 | 0 | 0 |
+| ATC/control/lathe-turning (11) | 45 | 31 | 7 | 2 |
+| **total (32)** | **228** | **95** | **24** | **70** |
+
+**24 deferrable-candidates total** — the answer to instruction 4, sizing the "defer the math to the controller"
+design option for act 3: 17 in mill geometry (mostly clamp-and-forward patterns like `Math.max(0.1, num(toolDia))`
+feeding exactly one atom field), 0 in the probe family (every structural param there is a categorical
+branch-selector — which corner, which axis, which WCS register — not a magnitude a controller could compute), 7 in
+ATC/control/lathe (already-controller-deferred loop counts' JS-side safety clamps, plus lathe OD-turn's
+clamp-and-round diameter fields).
+
+**Representative findings, one per shape, each with its consumer:**
+- Clean value-only: `tapWizard.js`'s every param (`x,y,depth,pitch,dwell,clearance,rpm`) flows straight into the
+  one `tap` atom, zero JS arithmetic anywhere (`tapWizard.js:18-23`).
+- Already-deferred, the model for what act 3 could build toward: lathe `facing.js` never unrolls its pass loop in
+  JS at all — an `IF #112>0 GOTO` loop reads the register at RUN TIME (`facing.js:121-142`); `doc` is
+  `String(v.doc)` with zero JS math.
+- Never-deferrable (categorical, not magnitude): `pocketWizard.js`'s `shape`/`dia`/`sides`/`w`/`h` pick between
+  FOUR structurally different stacks via `pocketToolRefuses`/`pocketRasterGap` (`pocketWizard.js:76-170`).
+- Never-deferrable (the DDCS macro language has no cosine): lathe `polygon.js` must unroll every A/X move in JS —
+  `sides`/`segmentsPerFace`/`acrossFlats`/`doc`/`barDiameter` are real loop bounds (`polygon.js:94-165`).
+- Same param name, opposite eligibility depending on the op's own wiring: `odTurn.js`'s `kind` forces a real
+  `rebuildOdTurn` regeneration (`dEnd` genuinely differs in CONTENT KIND — literal vs. register-ref); `parting.js`'s
+  `kind` looks identical in its OWN stack-builder but the twin never re-invokes it on edit — its only live effect
+  is a comment string (`partingData.js:67-79`). The lesson for whoever declares the rest: read the TWIN's own
+  wiring, not just the wizard file's code, before classifying.
+
+### THE DECLARATION — `tokenEligible` / `tokenRefusal` / `tokenDeferrable`, beside the binding spec, fail-closed
+
+Documented once, canonically, beside `BINDING_TYPES` (`userOps.js`) — not a separate list file, per instruction 2.
+`tokenEligible: true` present only on a verified-safe param; ABSENCE means not eligible (FAIL CLOSED, matching the
+codebase's own standing INV13 — the same direction as every other "declare, refuse loudly" guard this project
+runs on, not a new policy invented for this act). `tokenRefusal: '<text>'` — REQUIRED whenever not eligible, the
+one user-facing reason every future surface reads instead of inventing its own wording (instruction 3).
+`tokenDeferrable: true` — optional, sizes the "could this become eligible if math moved to the controller" option
+per param, for act 3. A late scope correction, made BEFORE writing WCS's declaration: `tokenEligible` is a WIZARD-
+LAYER fact, type-independent — but no `enum`/`bool` WIDGET (a dropdown, a checkbox) offers a way to TYPE a token in
+the first place, so a future UI should gate on `type === 'number' || type === 'string'` too, not on `tokenEligible`
+alone. Documented as a scope note rather than silently applying the field only to numeric params, so a bool/enum's
+declared reasoning (e.g. corner's `wcs`) stays available if that ever changes.
+
+### A REAL BUG CAUGHT BEFORE IT SHIPPED — `deriveBindings`'s allow-list would have silently dropped the new fields
+
+Before writing corner's declarations, traced how `CORNER_BINDING_SPECS` actually reaches `def.bindings`:
+`deriveBindingsFor` → `deriveBindings` (`dataOps/deriveBindings.js`), which builds each output binding as an
+EXPLICIT allow-list (`const b = {param,type,default,key,blockIndex}` then `if (s.X) b.X = s.X` per known field) —
+NOT a spread. A new field on a spec silently vanishes there unless carried through by name — exactly the
+"declared but unread" defect class this project has now hit five separate times (t1638/1654/1670/1674/1684, per
+`ARCHITECTURE.md`'s TRAP list). Added the three carry-through lines BEFORE writing any of corner's declarations,
+not after finding them broken. This is shared code (`deriveBindingsFor` also backs `entryBindingsFor`/
+`toolBindingsFor`/surfacing's own `SURFACING_BINDING_SPECS`), so the one fix covers every future op that adopts
+this derivation, not just corner.
+
+### THE PILOT — proved on 4 ops (61 of the 393 measured params), corner first as the gated pilot
+
+Per the standing ruling (corner proves every mechanism once; the other 31 twins inherit it — `NEXT-SESSION.md`
+under STANDING RULINGS), applied the full declaration to:
+- **Corner (23 params)** — 15 `tokenEligible` (dist/retract/f_fast/f_slow/port/radius/travelDist/safeZ/scanDepth/
+  hopDist/planeZ/cross1_x/cross1_y/startX/startY), 8 `tokenRefusal` (clearMode + the 7 `CORNER_STRUCT_BINDINGS`
+  categorical toggles — corner/probeSeq/probeZFirst/travelApproach/travelShape/wcs/syncA). Zero deferrable — every
+  one is a branch-selector, matching the probe-family batch's own headline finding.
+- **WCS (6 params)** — the "trivial ideal" case: `wcsStack` is a one-line function, all 6 `tokenEligible`.
+- **Homing (6 params)** — the trivial OPPOSITE case, and a genuinely different KIND of "no" than corner's: not
+  just categorical branch-selectors — no NUMBER a token could replace exists on this op's params at ALL (the real
+  seek feeds/back-off/declared-home-switch live in global `settings.homing`, read live at emit, never bound to the
+  op). All 6 `tokenRefusal`, phrased to say so.
+- **Surfacing (26 params)** — the canonical example NEXT-SESSION.md itself names. 20 `tokenEligible` (wcs,
+  originX/Y, stockAttach/pathDatum/stockDatum/stockW/H/Z, offZ, depth, stepdown, confirmEvery, strategy, feed,
+  plunge, entry, rampAngle, helixDia, helixPitch) — including 2 param NAMES (`strategy`, `entry`) that are
+  STRUCTURAL in pocket/slot but value-only here, called out inline as the same "read the twin's own wiring"
+  lesson the survey found. 6 `tokenRefusal` (w, h, zMode not deferrable; toolDia, stepoverPct, rpm marked
+  `tokenDeferrable: true` — the first 3 live deferrable-candidate examples in the actual codebase, not just the
+  survey's report).
+
+**NOT yet declared on the other 28 ops (332 of the 393 params)** — their classification is fully measured (the
+table + citations above), ready to apply the same way corner's other mechanisms got inherited. Saying this
+plainly rather than letting a partial rollout read as complete: instruction 2 asked for the declaration's SHAPE
+and PROOF, and a 4-op pilot spanning every discovered case (uniform-eligible, uniform-ineligible-no-numbers,
+uniform-ineligible-categorical, and real mixed-with-deferrable) is what proves the shape holds — mechanically
+copying it onto 28 more files is real work but not more DESIGN, and this turn's own capacity (below) argues for
+reporting that honestly rather than rushing a lower-quality version of all 32.
+
+### Architecture map — SIX more citations drifted from my own edits, all caught, all fixed
+
+Two separate rounds: (1) the `userOps.js` doc block (24 lines, ahead of `BASE_DEF_SHAPE`/`hookKeysOf`/
+`postInstantiate`/the FAIL-CLOSED `return null`) shifted `userOps.js` lines by a consistent +35 — INV6/INV13/INV14
+all went red, all three (plus the SAME lines cited five more times in ARCHITECTURE.md's own prose — the Q1
+diagram, TRAP6, INVARIANT 6/13/14, and the week-3 review note) corrected, verified the +35 offset held with a
+direct grep before trusting the arithmetic. (2) corner's/homing's own edits shifted `cornerStack(` (231→238) and
+`setup_datawiz` (161→167) — both TRAP citations, both fixed in the checker AND the one place ARCHITECTURE.md
+independently cites the same fact (TRAP1's stack-builder line, TRAP6's `homingData.js:161`). Six citations, six
+fixes, zero left stale — the checker (t1698) earning its keep for the second turn in a row.
+
+### Non-vacuity
+
+The `deriveBindings` carry-through: removed the three added lines, re-imported `CORNER_BINDINGS` fresh —
+`dist.tokenEligible` came back `undefined`, `.some(b=>b.tokenEligible)` false — the exact silent-drop the fix
+prevents, watched happening, not assumed. Restored, re-verified `true`. `git diff --stat` on the file after
+restore: `6 insertions(+)`, nothing else.
+
+### Verify
+
+**Node gate — 118/118** (unmoved beyond the map-citation fixes above — the preview gate's own snapshot is
+untouched, since these are new binding fields the layout-spec layer never reads). **Hand-picked sweep — 24/24**:
+`twin-form-completeness-1581` (both tests, across the FULL 32-twin registry — confirms the new fields didn't
+break `formBindings`/materialization for ANY twin, not just the 4 touched), plus real emit/round-trip specs for
+every touched op (`corner-data-emit`, `corner-data-baked-frontier`, `wcs-datum`, `homing-engine` ×3,
+`homing-declared-direction` ×4, `surfacing-skim-sim-1635` ×4, `surfacing-pos-dim-handles-1646` ×3). Not
+`test:changed` — per t1696. No full suite — the advisor gates at release.
+
+### NO SURFACE WORK — confirmed by diff, not by intent
+
+Every file touched is a `blocks/dataOps/*.js` binding-spec array, `blocks/userOps.js`'s doc comment, or
+`blocks/dataOps/deriveBindings.js`'s carry-through — zero files under `ui/`, `wizards/views/`, or `blocks/blockly/`
+touched. Nothing renders a token-entry field; nothing changes what a user can type today.
+
+### Emit byte-identical
+
+Confirmed, not assumed: every new field is additive-only data on a binding spec object nothing in the emit path
+reads. The hand-picked sweep's emit/round-trip specs (corner, homing, surfacing ×2 shapes) all pass unchanged, and
+`twin-form-completeness` across all 32 twins confirms no OTHER twin's form assembly was disturbed by the shared
+`deriveBindings` edit.
+
+### Capacity
+
+Heavy turn, reported plainly rather than smoothed over. Three parallel research agents (∼18 minutes combined
+background time, ~390K tokens) plus the declaration schema design (including the mid-design type-scoping
+correction, made before it shipped wrong rather than after) plus the `deriveBindings` allow-list bug (found by
+tracing the pipe, not by a test failing) plus two full rounds of architecture-map self-repair. The 4-op pilot was
+a deliberate scope decision, not a shortfall: it proves the mechanism against every shape the 393-param survey
+found, and the remaining 28 ops' classification is fully measured and citable, not re-work for whoever applies it
+next. Room was adequate for what shipped; a full 32-op mechanical rollout in the same turn would have traded
+verification depth for raw coverage, and the non-vacuity + six-citation self-repair discipline above is exactly
+the depth this session's own track record says not to cut.

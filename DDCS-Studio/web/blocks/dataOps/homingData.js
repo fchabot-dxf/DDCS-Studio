@@ -37,13 +37,19 @@ export const HOMING_DATA_OPTYPE = 'user_homing_data';
 
 /** The op params (the run-form): a per-axis RUN TICK (boolean checkbox) + the soft-limit re-enable flag. The execution ORDER
  *  + per-axis feeds/back-off/declared-home come from settings (Homing Setup) — read at emit, so the twin tracks live config. */
+// t1704 — Homing has ZERO token-eligible params, and it's a DIFFERENT kind of "no" than corner's structural
+// toggles: it's not just that these 6 booleans pick a branch — it's that NO NUMBER a token could ever replace
+// lives on this op's params at all. The real numbers (seek feeds, back-off, declared home switch) live in global
+// settings.homing, read live at emit (homeAxisBlocks) — never bound to the op. Each tick here gates whether that
+// axis's entire multi-atom, multi-line sequence is emitted at all (homingWizard.js's per-axis homeAxisBlocks
+// calls) — the canonical "a controller can't dynamically change how many G-code lines exist" case.
 export const HOMING_STRUCT_BINDINGS = [
-    { param: 'run_z', type: 'bool', default: HOMING_DEFAULTS.run_z, label: 'Home Z', help: 'Home the Z axis this run.', section: 'GEOMETRY' },
-    { param: 'run_x', type: 'bool', default: HOMING_DEFAULTS.run_x, label: 'Home X', help: 'Home the X axis this run.', section: 'GEOMETRY' },
-    { param: 'run_y', type: 'bool', default: HOMING_DEFAULTS.run_y, label: 'Home Y', help: 'Home the Y axis this run.', section: 'GEOMETRY' },
-    { param: 'run_a', type: 'bool', default: HOMING_DEFAULTS.run_a, label: 'Home A', help: 'Home the A (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
-    { param: 'run_b', type: 'bool', default: HOMING_DEFAULTS.run_b, label: 'Home B', help: 'Home the B (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
-    { param: 'softLimits', type: 'bool', default: HOMING_DEFAULTS.softLimits, label: 'Re-enable soft limits', help: 'Re-enable #655 (soft limits) after homing.', section: 'GEOMETRY' },
+    { param: 'run_z', type: 'bool', tokenRefusal: 'Turns the whole Z homing sequence on or off — changes how many lines the program contains, not a value inside one.', default: HOMING_DEFAULTS.run_z, label: 'Home Z', help: 'Home the Z axis this run.', section: 'GEOMETRY' },
+    { param: 'run_x', type: 'bool', tokenRefusal: 'Turns the whole X homing sequence on or off — changes how many lines the program contains.', default: HOMING_DEFAULTS.run_x, label: 'Home X', help: 'Home the X axis this run.', section: 'GEOMETRY' },
+    { param: 'run_y', type: 'bool', tokenRefusal: 'Turns the whole Y homing sequence on or off — changes how many lines the program contains.', default: HOMING_DEFAULTS.run_y, label: 'Home Y', help: 'Home the Y axis this run.', section: 'GEOMETRY' },
+    { param: 'run_a', type: 'bool', tokenRefusal: 'Turns the whole A homing sequence on or off — changes how many lines the program contains.', default: HOMING_DEFAULTS.run_a, label: 'Home A', help: 'Home the A (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
+    { param: 'run_b', type: 'bool', tokenRefusal: 'Turns the whole B homing sequence on or off — changes how many lines the program contains.', default: HOMING_DEFAULTS.run_b, label: 'Home B', help: 'Home the B (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
+    { param: 'softLimits', type: 'bool', tokenRefusal: 'Turns the soft-limit re-enable step on or off — adds or removes lines from the program.', default: HOMING_DEFAULTS.softLimits, label: 'Re-enable soft limits', help: 'Re-enable #655 (soft limits) after homing.', section: 'GEOMETRY' },
     // t554 — the 'Homing Setup…' button (an `action` widget; contributes no param) opens the setup modal (order + per-axis config).
     { param: '_setup', type: 'bool', widget: 'action', action: 'homingSetup', default: false, label: 'Homing Setup…', help: 'Open Homing Setup: the per-axis order, feeds, back-off + the declared home switch.', section: 'GEOMETRY' },
 ];

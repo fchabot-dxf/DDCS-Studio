@@ -100,6 +100,12 @@ export function deriveBindings(flatStack, specs) {
         if (s.readonlyHint) b.readonlyHint = s.readonlyHint;
         if (s.formHidden) b.formHidden = true;   // t792 — declared OUT of the form (stays in stack + Blocks); the stock spill
         if (s.link) b.link = s.link;             // t792 — declared deep-link slot {kind, …} → the row-end gear (carry through derive)
+        // t1704 — CARRY THE TOKEN-ELIGIBILITY DECLARATION (userOps.js, beside BINDING_TYPES) — same allow-list-drop
+        // class as widgetConfig/gate/derived above: un-carried, a spec's tokenEligible/tokenRefusal silently
+        // vanishes the moment an op (like corner) re-derives its bindings by identity.
+        if (s.tokenEligible) b.tokenEligible = true;
+        if (s.tokenRefusal) b.tokenRefusal = s.tokenRefusal;
+        if (s.tokenDeferrable) b.tokenDeferrable = true;
         out.push(b);
     }
     return out;

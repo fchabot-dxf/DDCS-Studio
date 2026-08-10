@@ -64,6 +64,41 @@ export function getUserDef(opType) { return USER_DEFS.get(opType) || null; }
 // `widget` (separate, ui/formWidgets.js) is just how it's rendered. number stays the easy default.
 export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string', 'list']);   // 'list' = a structured/array value (e.g. a coordinate-list positioner) — not a scalar socket
 
+// t1704 (cycle ACT 2) — CAN THIS PARAM ACCEPT A LIVE CONTROLLER TOKEN (`#500`) INSTEAD OF A FIXED NUMBER? Declared
+// per binding, beside its other fields, FAIL-CLOSED: absence of `tokenEligible: true` means NOT eligible — a token's
+// numeric value does not exist until the machine runs the program, so a param the wizard's own JS needs a real
+// number FOR at generate-time (to decide the program's SHAPE: how many atoms get built, which branch runs, a
+// bounding-box/placement computation) can never safely take one. Measured empirically per op (see WORK-LOG t1704
+// for the full 32-op / 393-param survey), not assumed from the param's name or type:
+//   tokenEligible: true      — the param's value only ever flows into ONE atom's params (to be emitted as one
+//                               G-code word); nothing in the wizard's generate()/stack-builder does JS arithmetic,
+//                               a comparison, or a loop/array bound with it.
+//   tokenRefusal: '<text>'   — REQUIRED whenever tokenEligible is absent/false: the user-facing reason, so every
+//                               surface that ever offers token entry shows the SAME explanation for the SAME param
+//                               (the declaration is the one source; no surface invents its own wording). Written in
+//                               the browser's own language ("the walls to probe", not "the boolean branch"), naming
+//                               WHAT the value decides, not the JS mechanism.
+//   tokenDeferrable: true    — optional, only meaningful beside a false/absent tokenEligible: the param IS
+//                               structural today, but the JS math it feeds is simple arithmetic (add/subtract/
+//                               multiply/divide of otherwise-plain values) that a DDCS macro expression could
+//                               equivalently compute AT THE CONTROLLER instead of in JS — as opposed to a param
+//                               that decides how MANY atoms/passes/lines get emitted or which BRANCH of code runs,
+//                               which can never be deferred (the program's line count is fixed once generated).
+//                               Sizes the "defer the math" design option for a future act — not itself a promise
+//                               the wizard layer does that deferral today.
+// SCOPE NOTE — `tokenEligible`/`tokenRefusal` answer "does the WIZARD LAYER need a resolved number at generate
+// time", independent of widget type: an `enum`/`bool` binding can be declared just as truthfully as a `number` one
+// (a dropdown/checkbox is STILL a categorical branch-selector at the JS layer even though it happens to render as
+// one). But no `enum`/`bool` WIDGET offers a way to TYPE a token in the first place — a future UI reading this
+// declaration to decide where to SHOW a token-entry affordance should gate on `type === 'number' || type ===
+// 'string'` as well, not on `tokenEligible` alone; the declaration on other types stays for completeness (which
+// documents WHY, if that ever changes) but isn't expected to reach a rendered field.
+// NOT yet declared on every binding in the codebase — this act proved the mechanism on a representative set
+// (corner, wcs, homing, surfacing) with the full registry measured and ready for the rest to inherit the same way
+// corner's other mechanisms did. `deriveBindings()` (dataOps/deriveBindings.js) carries these three fields through
+// its allow-list — a NEW field on a spec silently vanishes there otherwise (the exact defect class this project
+// keeps finding: a declaration written, a hand-picked spread that doesn't know to carry it).
+
 // Deterministic pre-order walk of a block stack (block, then its children) → a flat array of block REFS.
 // Exported so devMode shares ONE definition (binding.blockIndex must mean the same block in both modules).
 export function flattenBlocks(blocks, out = [], currentGroup = null) {

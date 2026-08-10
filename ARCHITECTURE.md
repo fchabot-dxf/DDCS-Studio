@@ -70,7 +70,7 @@ comment survives at `ui/globalFunctions.js:29`.
 - **CORNER** (retired 2026-07-02, `wizards/views/index.js:20`). No view import, no `#wiz_corner` panel
   (`grep -c 'id="wiz_corner"' DDCS-Studio/web/index.html` → **0**), no opener. Its `BUILTINS` slot survives and
   `opensAs: 'user_corner_data'` (`wizardLibrary.js:56`). `wizards/cornerWizard.js` still exists as the legacy
-  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,231`).
+  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,238`).
 - **CIRCULAR** (retired 2026-06-23, superseded by Middle — `wizards/views/index.js:22`). Gone further: it has
   **no `BUILTINS` entry at all**, so it is not even a bar slot.
 
@@ -113,7 +113,7 @@ In the live app: `listEntries().filter(e => e.kind === 'builtin').map(e => [e.id
                   │         ├─ flattenBlocks                                  │
                   │         └─ deriveBindings   dataOps/deriveBindings.js:50  │
                   │    └─ write each binding into flat[b.blockIndex].params   │
-                  └─ def.postInstantiate(stack, p)  userOps.js:911            │
+                  └─ def.postInstantiate(stack, p)  userOps.js:946            │
                         ▼                                                     │
                   BLOCK STACK  [{ type, params, children }]                    │
                         ▼                                                     │
@@ -159,8 +159,8 @@ Indent runs **last** because every pass above it matches line *text* — the rea
 
 1. **The template is FROZEN DATA.** `userOpFromStack` (`userOps.js:1118`) runs the legacy JS builder ONCE at
    module load and `stripIds`es the result into `def.template`. Anything needing live state at build time is a
-   declared `postInstantiate` hook (`userOps.js:911`), never an interpolation in the template.
-2. **Ordering inside `registerUserOp` is load-bearing:** `materializeParamGroup(def)` (`userOps.js:900`) MUST run
+   declared `postInstantiate` hook (`userOps.js:946`), never an interpolation in the template.
+2. **Ordering inside `registerUserOp` is load-bearing:** `materializeParamGroup(def)` (`userOps.js:935`) MUST run
    before `validateUserOp(def)` (`:902`) — materialization adds the `param_field` blocks and re-derives each
    `blockIndex`; validating first fails every materialized def.
 3. **A failed expression keeps the author's text, it does not become 0.** `resolveValue` (`blockEmitter.js:88`)
@@ -321,7 +321,7 @@ double-shifts by the pin.
 | the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:36-57` (**20**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
 | which block kinds hold children | **`def.mouth`** on each def; the reader is one line — `blocks/blockly/bridge.js:78` | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
 | which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:23`) + `KNOWN_LEAF_RECORD_FIELDS` (`:35`) | — |
-| what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:839-841`; exported as `hookKeysOf` `:846` | — |
+| what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:874-876`; exported as `hookKeysOf` `:881` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |
 | per-atom scratch vars | `def.scratch` on each atom; aggregated by `data/universalScratch.js` | — |
 | which widgets own several params | `MULTI_WIDGETS`, `ui/formWidgets.js` — read by BOTH `renderOpForm`'s `renderUnit` AND `panelTypes.js:234` | — |
@@ -364,7 +364,7 @@ accident**.
 fixing its gap erases the record of what changed.
 
 **6 · Derive membership from shape; never hand-maintain a name list that must track a growing set.**
-Guard: `userOps.js:839-841`. Break it → `OP_CODE_HOOKS`, an 8-name hand list, had gone stale by **7 live hooks**;
+Guard: `userOps.js:874-881`. Break it → `OP_CODE_HOOKS`, an 8-name hand list, had gone stale by **7 live hooks**;
 forking any of 11+ ops silently dropped one — byte-correct emit, clean console, a piece of the UI just missing.
 **The obvious replacement is also wrong:** "any function on `def`" misses 5 of the 7, because `zRuler` /
 `entryPoint` / `simStartParams` / `latheTool` / `latheProbeAxis` are plain JSON-safe **data**, not functions.
@@ -400,12 +400,12 @@ because `emits:` is declared nowhere in `blocks/dataOps/` except corner. Sibling
 pass 0 is manual **regardless** of source.
 
 **13 · FAIL CLOSED when a derived mapping cannot be proven.**
-Guard: `userOps.js:1091` (`return null; // FAIL CLOSED`), doctrine at `:1071-1073`: *an empty form is a visible
+Guard: `userOps.js:1126` (`return null; // FAIL CLOSED`), doctrine at `:1106-1108`: *an empty form is a visible
 disappointment, a form silently wired to the wrong sockets is a wrong program.* The fork remap aligns two flattens
 by **type sequence**, never a blanket `+1`.
 
 **14 · `emit` is a FROZEN template; live values go through `postInstantiate`.**
-Guard: `userOps.js:911`, with the ordering constraint at `:900-902`.
+Guard: `userOps.js:946`, with the ordering constraint at `:935-937`.
 
 **15 · CORNER IS THE GATED PILOT — no wizard ports until corner is right.**
 A standing ruling, not a test: `NEXT-SESSION.md`, under **STANDING RULINGS (do not re-litigate)** — cited by
@@ -494,7 +494,7 @@ grep -c 'id="c_corner"' DDCS-Studio/web/index.html        # → 0
 `circular` (`opSchema.js` ids `circ_*`).
 
 ### 6 · `setup_datawiz` is an undeclared group. **Read from source.**
-`blocks/dataOps/commData.js:154` and `blocks/dataOps/homingData.js:161` pass `'setup_datawiz'`, but `GROUPS`
+`blocks/dataOps/commData.js:154` and `blocks/dataOps/homingData.js:167` pass `'setup_datawiz'`, but `GROUPS`
 (`wizardLibrary.js:28-41`) declares only `probe_datawiz` / `atc_datawiz` / `mill_datawiz`. Harmless today because
 both are `opensAs` targets that `userEntries()` drops — but a **fork** copies `def.group` verbatim, so forking
 Comm or Homing puts a bar dropdown on screen whose label falls through to the raw id (`wizardLibrary.js:206`).
@@ -580,7 +580,7 @@ WORK-LOG- and test-header-reported; not re-measured.)*
   (`wizardManager.js:564`). **UNSURE whether any of these still animate anything visible.**
 - **Rule 13's partition claim** (three fork-inheritance cases cover the registry with no overlap, `userOps.js:1055-1058`)
   was read, not re-derived.
-- **Rule 14 (`postInstantiate`)** is verified as a *mechanism* at `userOps.js:911`; no violation of it was found in
+- **Rule 14 (`postInstantiate`)** is verified as a *mechanism* at `userOps.js:946`; no violation of it was found in
   this week's work-log. It is listed because the project memory names it, not because this week caught it.
 - The **lathe family's** divergences from the mill spine were not traced beyond `panelTypes.js:173-174` and the
   missing `placement` key. Two of the three files dirty at verification time are lathe viz files.
