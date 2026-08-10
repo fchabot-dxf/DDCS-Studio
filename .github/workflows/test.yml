@@ -14,10 +14,34 @@ name: Test suite (report-only)
 # workflow), remove `continue-on-error: true` from the "Run npm test" step below. Until then, treat a red run
 # here as a real signal to read, not noise to ignore — a NEW failure appearing in a diff against WORK-LOG's
 # last-known count is exactly the kind of push-from-anywhere regression this workflow exists to catch.
+#
+# ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+# 🛑 t1691 (2026-08-10, user-ruled) — DISABLED ON PUSH/PR. Manual dispatch only. It was not merely stale, it
+# was ACTIVELY MISLEADING.
+#
+# MEASURED, same commit (a6eae93c), same command:
+#     local      7 failed / 2470 passed    20 minutes
+#     here     504 failed / 1971 passed    2.6 HOURS      job conclusion: SUCCESS
+#
+# The residual above says 24. It is 504. The two numbers diverged by ~20x and nobody noticed, because
+# `continue-on-error` paints a green check over the whole thing — so the signal this workflow exists to give
+# is exactly the signal it cannot give. A green tick sitting on 504 failures is worse than no CI at all: it
+# reads as coverage to anyone glancing at the repo, including us in three months.
+#
+# WHY IT WAS NOT FIXED INSTEAD (considered, rejected on the numbers): each iteration here is a 2.6-hour
+# feedback loop; the 504 is plausibly environment-fundamental (single hosted runner under contention — this
+# suite is PROVEN to manufacture false reds that way — plus no GPU and different DPI); and the saving would be
+# ~20 min of BACKGROUND time per release. Bad trade against a queue holding real defects.
+#
+# TO TURN IT BACK ON, these must BOTH be true — do not re-enable on optimism:
+#   1. a run here reaches PARITY with the local floor (not "green" — parity; suppressing failures to reach
+#      zero would rebuild the decorative gate this disabling exists to kill), and
+#   2. `continue-on-error: true` is removed from the "Run npm test" step, so it actually blocks.
+# Until then the LOCAL full suite is the release gate (advisor runs it once per release; the worker verifies
+# per-act with the node tier + preview gate, ~2s). See NEXT-SESSION.md ACT 3.
+# ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 jobs:

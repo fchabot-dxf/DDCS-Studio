@@ -68,7 +68,24 @@ snapshot regenerated deliberately and reviewed line by line.
 
 ---
 
-## ACT 3 — SUITE SPEED (user-raised twice; all numbers measured)
+## ACT 3 — KILL THE DECORATIVE CI SIGNAL (demoted from "fix CI" — user-ruled 2026-08-10)
+
+**Measured:** `.github/workflows/test.yml` runs the full `npm test` on every push. Same sha, same command:
+local **7 failed / 2470 passed in 20 min**; CI **504 failed / 1971 passed in 2.6 HOURS** — and because it is
+`continue-on-error: true`, the job conclusion is **success**. A green check sitting on 504 reds.
+
+**FIXING it was considered and REJECTED on the numbers** (user call, and correct): each CI iteration is a
+2.6-hour feedback loop, the 504 may be environment-fundamental (hosted-runner contention, no GPU, DPI), and the
+saving is ~20 min per release of *background* time. Bad trade against a queue holding real defects.
+
+**So do the cheap half only:** delete or disable the workflow. A test job that reports success on 504 failures
+is worse than none — it reads as coverage to anyone glancing at the repo, including us in three months. If
+disabling rather than deleting, say in the file WHY it is off and what would have to be true to turn it back on
+(parity with the local floor), so the next person does not re-enable a decorative gate.
+
+⚠ Do NOT spend acts chasing CI parity. Revisit only if the local suite stops being runnable.
+
+## ACT 4 — SUITE SPEED (user-raised twice; all numbers measured)
 
 ```
   toHaveScreenshot   0        ALL 266 screenshot() calls write to scratch paths.
@@ -87,7 +104,7 @@ Distinguish *gating* from *evidence* before removing anything.
 
 ---
 
-## ACT 4 — THE LATHE `placement` GAP (surfaced by the gate build; needs measurement then a ruling)
+## ACT 5 — THE LATHE `placement` GAP (surfaced by the gate build; needs measurement then a ruling)
 
 The 7 lathe twins' specs carry **no `placement` key at all** — `latheLayoutSpec` returns early, before
 `panelTypes.js` computes the shift. So a lathe Layout pane can never ride a WCS pin, and the frame fix that
@@ -104,7 +121,7 @@ t1686 made universal for mill ops simply does not reach lathe.
 
 ---
 
-## ACT 5 — THE MALFORMED-TOKEN SEND-GATE HAZARD (ARC B's first slice; safety-adjacent)
+## ACT 6 — THE MALFORMED-TOKEN SEND-GATE HAZARD (ARC B's first slice; safety-adjacent)
 
 From t1668, measured and unfixed: `' #500;M30 '` emits `G0 X#500;M30 Y10` and `defaultSyntaxVerify` returns
 **valid: true**. A token value is never bounded to where it ends, so an injected second statement rides straight
@@ -123,7 +140,7 @@ authoring feature first and it ships with the hole.
 
 ---
 
-## ACT 6 — CONTROLLER TOKENS: THE AUTHORING SURFACES (t1668 sized it; ACT 5 gates it)
+## ACT 7 — CONTROLLER TOKENS: THE AUTHORING SURFACES (t1668 sized it; ACT 5 gates it)
 
 t1668 established this is **UNBUILT, not broken**: the plumbing already works — `move x:'#500'` emits
 `G0 X#500` and the canvas round-trip preserves it — but **no authoring surface can create a token**. Three
@@ -136,7 +153,7 @@ refusal. Decide that BEFORE building surfaces, and declare which params can acce
 
 ---
 
-## ACT 7 — THE §3 TAIL (ADVISOR-TRANSFER.md items 2-6, each small)
+## ACT 8 — THE §3 TAIL (ADVISOR-TRANSFER.md items 2-6, each small)
 
 Corner's 3 `simstart` placeholders (an unwired type, correctly refused today) · materialize derived rows on the
 tree face (`passes` has no `param_field` row) · the shape-field typo lint hook (a typo skips silently — folds
