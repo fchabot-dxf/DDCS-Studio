@@ -22,6 +22,7 @@ import { SHAPE_2D_TYPES } from './vizBlocks.js';   // t1627 — the ONE "is this
 import { evalExpr } from './expr.js';   // t1627 — shape fields take numbers OR expressions over the wizard's params (the ONE evaluator)
 import { placeShiftOfStack } from '../../blocks/blockEmitter.js';
 import { latheLayoutSpec } from '../../viz/latheProfileCanvas.js';   // t1273 — a LATHE op draws its half-profile here; the mill XY-stock layout has nothing to say about a bar on centres   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
+import { MULTI_WIDGETS } from '../../ui/formWidgets.js';   // t1690 — the ONE declared "this widget owns several params as a single control" registry (renderOpForm's own renderUnit reads it); _writable derives from the SAME set instead of a DOM query
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -68,11 +69,10 @@ export const layoutType = (id) => LAYOUT_TYPES[id] || LAYOUT_TYPES[DEFAULT_LAYOU
 const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
-// A param is WRITABLE from the 2D canvas only if the form rendered it as a settable field (data-param). Number/slider
-// fields are; multi-param canvas widgets (xy-pad) own their value internally, so we DON'T put a (dead) preview handle
-// over those — the form widget already drags them. (The selector targets the live custom-op form.)
+// A live form field is still the ONE way to actually WRITE a value back (dispatching 'input' is what drives the
+// whole update() loop) — _field/_writeParam stay a real DOM query for that reason. _writable (is a param individually
+// settable AT ALL) is declared per-call inside layoutSpecFromOp instead — see there for why.
 const _field = (name) => (typeof document !== 'undefined') ? document.querySelector('#wiz_user_form [data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null;
-const _writable = (name) => !!_field(name);
 // t1648 — a PREVIEW-ONLY side-store for a declared handle target with NO bound form field (e.g. a Skim-mode jog
 // seed — deliberately never bound, so it never reaches the emit). Before this, `_writeParam` silently no-op'd on
 // such a name (strictly additive: nothing that has a real field is affected). Exported so the caller (userOpView's
@@ -218,6 +218,23 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const srcCol = (pass) => (!Array.isArray(sources)) ? null : (sources[pass] === 'manual' ? '#ffb300' : '#22d3ee');
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
+    // t1690 DECLARE `_writable` — a param is individually settable (gets its OWN drag handle) unless it shares a
+    // GROUP with a sibling AND that group's WIDGET is one `renderOpForm`'s `renderUnit` combines into a single
+    // control the members can't be addressed through separately (formWidgets.js's own `MULTI_WIDGETS` registry —
+    // exactly the rule `renderUnit` itself applies: `unit.length > 1 && MULTI_WIDGETS.has(unit[0].widget)`). A
+    // when-gated GROUP is already skipped entirely above, before `_writable` is ever asked, by the `gWhen`/`whenOk`
+    // check each `for (const gid in groups)` loop below performs — so `_writable` needs no params/DOM/live-value
+    // check of its own: whether a param is INDIVIDUALLY addressable is a property of the BINDING'S OWN declared
+    // shape (its group + that group's widget), never of the current param values. Verified against the real DOM
+    // check it replaces: `renderOpForm` renders every declared binding's row regardless of `when` (t1303 — hidden,
+    // not removed), so `_field`/`document.querySelector` found the SAME rows this set does, for every twin measured.
+    const _unwritable = new Set();
+    for (const gid in groups) {
+        const unit = groups[gid];
+        if (unit.length > 1 && MULTI_WIDGETS.has(unit[0] && unit[0].widget)) for (const b of unit) _unwritable.add(b.param);
+    }
+    const _declaredParams = new Set((def.bindings || []).map((b) => b && b.param).filter(Boolean));
+    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name);
     const items = [], decls = [];
     // t708 — DECLARED preview geometry (the general seam): an atom may declare real vector geometry + handles. Its handle
     // decls join `decls` (so they build through the SAME setFields writer round-trip below); its paths join a `paths` array

@@ -294,7 +294,8 @@ user_contour_data @offdefaults .placement {"x":300,"y":200}
 user_contour_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_corner_data @defaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_corner_data @defaults .corner "FL"
-user_corner_data @defaults .handles <0 entries>
+user_corner_data @defaults .handles <1 entries>
+user_corner_data @defaults .handles[0] {"color":null,"emits":true,"id":"reposition_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":-36,"y":13.125}
 user_corner_data @defaults .items <1 entries>
 user_corner_data @defaults .items[0] {"kind":"hole","r":2.4,"x":-36,"y":13.125}
 user_corner_data @defaults .onCornerPick "<fn/1>"
@@ -306,7 +307,9 @@ user_corner_data @defaults .placement {"x":300,"y":200}
 user_corner_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_corner_data @offdefaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_corner_data @offdefaults .corner "FR"
-user_corner_data @offdefaults .handles <0 entries>
+user_corner_data @offdefaults .handles <2 entries>
+user_corner_data @offdefaults .handles[0] {"color":null,"emits":true,"id":"reposition_pos","kind":"move","label":"2","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":136,"y":-43.875}
+user_corner_data @offdefaults .handles[1] {"color":null,"emits":true,"id":"start_pos","kind":"move","label":"1","labelDir":"<undefined>","manual":false,"noSnap":"<undefined>","x":193,"y":13.125}
 user_corner_data @offdefaults .items <2 entries>
 user_corner_data @offdefaults .items[0] {"kind":"hole","r":2.4,"x":136,"y":-43.875}
 user_corner_data @offdefaults .items[1] {"kind":"hole","r":2.4,"x":193,"y":13.125}
@@ -657,7 +660,8 @@ user_lathe_polygon @offdefaults .paths <1 entries>
 user_lathe_polygon @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":33.971,"y":10},{"x":32.7324,"y":11.2382},{"x":31.6504,"y":12.3204},{"x":30.6851,"y":13.2855},{"x":29.8088,"y":14.1618},{"x":29.0003,"y":14.9707},{"x":28.2427,"y":15.7285},{"x":27.5224,"y":16.4482},{"x":26.8296,"y":17.1416},{"x":26.153,"y":17.8174},{"x":25.4853,"y":18.4853},{"x":24.8174,"y":19.153},{"x":24.1416,"y":19.8296},{"x":23.4482,"y":20.5224},{"x":22.7285,"y":21.2427},{"x":21.9707,"y":22.0003},{"x":21.1618,"y":22.8088},{"x":20.2855,"y":23.6851},{"x":19.3204,"y":24.6504},{"x":18.2382,"y":25.7324},{"x":17,"y":26.971},{"x":15.7618,"y":25.7324},{"x":14.6796,"y":24.6504},{"x":13.7145,"y":23.6851},{"x":12.8382,"y":22.8088},{"x":12.0293,"y":22.0003},{"x":11.2715,"y":21.2427},{"x":10.5518,"y":20.5224},{"x":9.8584,"y":19.8296},{"x":9.1826,"y":19.153},{"x":8.5147,"y":18.4853},{"x":7.847,"y":17.8174},{"x":7.1704,"y":17.1416},{"x":6.4776,"y":16.4482},{"x":5.7573,"y":15.7285},{"x":4.9997,"y":14.9707},{"x":4.1912,"y":14.1618},{"x":3.3149,"y":13.2855},{"x":2.3496,"y":12.3204},{"x":1.2676,"y":11.2382},{"x":0.029,"y":10},{"x":1.2676,"y":8.7618},{"x":2.3496,"y":7.6796},{"x":3.3149,"y":6.7145},{"x":4.1912,"y":5.8382},{"x":4.9997,"y":5.0293},{"x":5.7573,"y":4.2715},{"x":6.4776,"y":3.5518},{"x":7.1704,"y":2.8584},{"x":7.847,"y":2.1826},{"x":8.5147,"y":1.5147},{"x":9.1826,"y":0.847},{"x":9.8584,"y":0.1704},{"x":10.5518,"y":-0.5224},{"x":11.2715,"y":-1.2427},{"x":12.0293,"y":-2.0003},{"x":12.8382,"y":-2.8088},{"x":13.7145,"y":-3.6851},{"x":14.6796,"y":-4.6504},{"x":15.7618,"y":-5.7324},{"x":17,"y":-6.971},{"x":18.2382,"y":-5.7324},{"x":19.3204,"y":-4.6504},{"x":20.2855,"y":-3.6851},{"x":21.1618,"y":-2.8088},{"x":21.9707,"y":-2.0003},{"x":22.7285,"y":-1.2427},{"x":23.4482,"y":-0.5224},{"x":24.1416,"y":0.1704},{"x":24.8174,"y":0.847},{"x":25.4853,"y":1.5147},{"x":26.153,"y":2.1826},{"x":26.8296,"y":2.8584},{"x":27.5224,"y":3.5518},{"x":28.2427,"y":4.2715},{"x":29.0003,"y":5.0293},{"x":29.8088,"y":5.8382},{"x":30.6851,"y":6.7145},{"x":31.6504,"y":7.6796},{"x":32.7324,"y":8.7618},{"x":33.971,"y":10}]}
 user_lathe_polygon @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
 user_middle_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
-user_middle_data @defaults .handles <0 entries>
+user_middle_data @defaults .handles <1 entries>
+user_middle_data @defaults .handles[0] {"color":"#39c0d8","emits":"<undefined>","id":"crossAimP","kind":"size","label":"X↔","manual":"<undefined>","noSnap":"<undefined>","value":80,"x":80,"y":75}
 user_middle_data @defaults .items <0 entries>
 user_middle_data @defaults .onDrag "<fn/2>"
 user_middle_data @defaults .onEdit "<fn/2>"

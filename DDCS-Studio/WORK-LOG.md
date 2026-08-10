@@ -22026,3 +22026,142 @@ runs) in one sitting; the one place I'd flag rather than push through was the SE
 blocked by the permission classifier — reported above rather than worked around, and the confidence gap it leaves is
 narrow (two independent facts cover it) but real, and worth a human's attention if the advisor wants a stronger proof
 than "the identical mechanism was already proven broken."
+
+## 🔨 turn 1690 (cycle 843, epoch 4) — t1690 ACT 2: DECLARE `_writable` — and a finding: 2 twins gained handles, not 17
+
+### REVIEW RECEIVED ON t1688: PASS
+
+Advisor verified the resolver LIVE in the running app (three direct calls: pass0+emits:false → circle/hollow/amber;
+pass1 auto+emits:true → square/solid/cyan; pass1 auto+emits:false → square/hollow/cyan) rather than reading the diff,
+and called out the "wire that was never run" (panelTypes.js's own comment promising a hollow marker while never
+threading `emits` onto it) as the part they rated highest. V2026.08.10.1 shipped t1686 + the preview gate; t1688
+goes in the next release.
+
+### THE MECHANISM — `_writable`'s ONLY real job, once `when`-pruning is separated out
+
+Traced `panelTypes.js:74-75`'s DOM query (`_field`/`_writable`) end-to-end before touching it. Two things had to be
+established, not assumed:
+
+1. **`when`-gated GROUP pruning is ALREADY fully declarative and happens BEFORE `_writable` is ever consulted.**
+   `layoutSpecFromOp`'s own `for (const gid in groups)` loop (line ~281) does `const gWhen = groups[gid].find(b =>
+   b.when); if (gWhen && !whenOk(gWhen.when, params)) continue;` — a group whose `when` fails is skipped ENTIRELY,
+   `_writable` never runs for its members. This is NOT something I had to add; it already existed, and it means
+   `_writable` never needed to know about the CURRENT param values at all.
+2. **`renderOpForm` renders a `when`-gated field's row REGARDLESS of the `when` state** (t1303's own fix: "it hides
+   the row, it does not remove the param" — `formHidden`/`when` both just toggle CSS, the `[data-param]` element is
+   always created). Confirmed empirically, not just by reading: probed corner live with `probeZFirst` OFF —
+   `document.querySelector('[data-param="startX"]')` found the field (present, row hidden), matching the reasoning.
+
+Together these two facts mean `_writable`'s DOM query, in the CURRENT system, answers exactly ONE question a
+DECLARED check can answer just as well: **"does this binding's GROUP combine ≥2 params into ONE widget the FORM
+can't address per-member" — `formWidgets.js`'s own exported `MULTI_WIDGETS = new Set(['xy-pad','rect'])` registry**,
+the SAME set `renderOpForm`'s `renderUnit` reads (`unit.length > 1 && !MULTI_WIDGETS.has(unit[0].widget)` → each
+member gets its own row). Nothing else — no `when`, no live param value — belongs in `_writable` at all.
+
+### THE FIX
+
+`panelTypes.js` imports `MULTI_WIDGETS` from `formWidgets.js` (no circular import — checked). Inside
+`layoutSpecFromOp`, right after `groups` is built (reusing it, not a second pass over `def.bindings`), a `Set` of
+"unwritable" param names is computed ONCE per call: for each group with >1 member whose widget IS in
+`MULTI_WIDGETS`, every member's param joins the set. `_writable(name)` becomes `_declaredParams.has(name) &&
+!_unwritable.has(name)` — a Set lookup, no DOM, no `document`. The old `_writable` (module-level, DOM-based) is
+deleted; `_field`/`_writeParam` stay untouched (real DOM operations, still needed for the actual drag-write
+mechanism — declaring "is this settable" doesn't change how a settable field gets WRITTEN).
+
+### THE FINDING — the dispatch's "17 twins" was the SYMPTOM, not the verified root cause; only 2 were actually blocked by `_writable`
+
+Ruling 1 said "VERIFY that against the real cases before building on it; if the honest rule is different, say what
+it is." Regenerated the gate snapshot and read the WHOLE diff (`git diff` on the fixture) — not just skimmed it:
+
+```
+  10 lines changed total (7 insertions, 3 deletions) — not the ~50+ a 17-twin gain would produce.
+  ONLY user_corner_data and user_middle_data gained handle rows. Every other twin's snapshot line is byte-identical.
+```
+
+Traced WHY, per-op, for the other 15 named in the dispatch (edge, both rotaries, alignment, homing, wcs, comm,
+ioStep, pauseConfirm, 6 ATC):
+
+- **13 of them** (edge, rotary_center, homing, wcs, comm, ioStep, pauseConfirm, all 6 ATC ops) **declare ZERO
+  `role`/`group`-tagged bindings anywhere in their `def.bindings`** — grepped every file directly (`role:` — zero
+  matches; the `group:` hits that DID show up are all `param_group`'s unrelated wizard-maker-authoring field, a
+  same-named but semantically different concept, confirmed by reading each match). These ops have NO spatial X/Y
+  position to drag in the first place (edge probes toward a wall along ONE axis and a distance; ATC ops configure a
+  tool changer, not a probed point). `handles: <0 entries>` is CORRECT for them — always was, always will be —
+  and `_writable` was never their blocker. Declaring it leaves them at 0, exactly where they should stay.
+- **2 of them** (alignment, `rotary_clock`) declare `def.simStartParams` — a COMPLETELY SEPARATE marker mechanism
+  (memory: `[[federated-registry-and-wizards-as-data-stage4]]`) that builds handles through the `simMarkers`
+  branch of `layoutSpecFromOp` (line ~554), which never calls `_writable` at all. Their `handles: <0 entries>` in
+  THIS gate is because the gate's OWN `specFor()` test helper always calls `layoutSpecFromOp(def, params, null,
+  null, null, null, null, null, null)` — the 9th argument (`simMarkers`) is HARDCODED `null`, so the
+  `Array.isArray(simMarkers) && simMarkers.length` branch can never fire for ANY op in this tier, regardless of
+  `_writable`. This is a gate-harness gap, unrelated to today's fix, and OUT OF SCOPE for this act (a different
+  root cause deserves its own dispatch, not a silent scope-creep fix here).
+- **2 of them** (corner, middle) were GENUINELY blocked by `_writable`'s DOM gate — corner's `byRole` reposition
+  `_pos` decls (`cornerData.js`'s `cross1_x`/`cross1_y`/`startX`/`startY`), middle's `diagAim`/`crossAim` handles
+  (gated at `_writable('diagTravel')` etc., lines ~404-437). Both now produce handles; both are BYTE-IDENTICAL to
+  what the OLD DOM-based check would produce in a REAL browser — verified against a live-app probe taken BEFORE
+  writing the fix (see below), not just against my own reasoning about what "should" happen.
+
+Reporting this plainly rather than letting the dispatch's estimate stand uncorrected: the underlying "declare it"
+mechanism was still the right shape and the right fix for what `_writable` actually gated — it just gated far less
+than the symptom count suggested, because most of the 17 named twins were never blocked by it to begin with.
+
+### VERIFY BY VALUE — a live-app probe taken BEFORE the fix, to pin the byte-identical target independently
+
+Before writing the fix, probed the REAL running app (a temp spec, deleted after): `layoutSpecFromOp` for corner,
+`probeZFirst` OFF and ON, through the LIVE DOM-based `_writable` (the OLD code, unmodified at that point). Result:
+OFF → `[{id:'reposition_pos', label:'1'}]` (1 handle); ON → `[{id:'reposition_pos', label:'2'}, {id:'start_pos',
+label:'1'}]` (2 handles). Also confirmed directly: `document.querySelector('[data-param="startX"]')` finds the
+field with `probeZFirst` OFF (present, row hidden) — the empirical basis for "declare it from the binding, ignore
+`when`" above, not an assumption. After writing the fix and regenerating the gate snapshot, the NODE-TIER (DOM-free)
+output for these exact two states is byte-identical to this live-app probe — same ids, same labels, same
+`emits`/`manual` values. The declared replacement reproduces the DOM-based original exactly, for the cases that
+actually exercise it.
+
+### Non-vacuity
+
+Backed up the fixed `panelTypes.js`, `git checkout HEAD --` it (HEAD already carries t1688's committed work, so
+this isolates ONLY t1690's contribution), re-ran the node gate: P1 goes RED, and the diff is the EXACT mirror image
+of the fix's own diff — `user_corner_data`/`user_middle_data` both collapse back to `<0 entries>`, nothing else
+changes. Restored from the backup, re-ran: green again, 111/0. This one wasn't blocked by the permission classifier
+(single file, unlike t1688's broader 6-file revert) — a full, clean non-vacuity proof, not a substitute-reasoning one.
+
+### VERIFICATION TIERING — AMENDMENT absorbed mid-task, and it changes the standard going forward
+
+Mid-act, the advisor amended: full-suite runs are a RELEASE-time instrument (the advisor's own job, once per
+release), not a per-act one — the preview gate exists precisely so a preview-layer act doesn't need one. The
+STANDARD from here: node tier (now ~2s, includes the gate) as the PRIMARY instrument for any preview-layer change,
+plus a TARGETED SWEEP of the actual consumers touched, plus non-vacuity per claim (unchanged). Escalate to a full
+run only if the gate snapshot moves unexplainably, the targeted sweep surprises, or the change reaches outside the
+preview/spec layer. Absorbed before committing (a full-suite run I had already started — launched before the
+amendment landed — was STOPPED rather than let finish, on the amendment's own instruction plus the human's own
+direct confirmation mid-turn: "no need for full suite").
+
+Verification actually run, per the new tier: **node — 111/0** (includes the extended gate, P0-P5 all green except
+the ONE deliberate, reviewed snapshot move). **Targeted sweep — 33/33 passed**: every `corner-*` spec that drives a
+canvas handle (`corner-data-sim-marker-track`, `corner-marker-labels`, `corner-viz-polish`, `corner-data-repos-
+handle`, `corner-data-drag`), every `middle-*` spec that drives one (`middle-manual-markers`, `middle-repos-
+landing-963`, `middle-traverse-lands-on-marker`, `middle-trans-traverse`), and the census guard
+(`census-finding2-emits-teal-1684`, `corner-data-sim-marker-emits`) — the exact consumer set the amendment named.
+**Non-vacuity** — above. The node gate's OWN Part 1 (the full spec snapshot, EVERY twin × 2 states) is itself
+strong evidence beyond the targeted sweep: it's a byte-for-byte capture of all 32 twins' declared specs, and the
+reviewed diff shows literally nothing outside corner/middle's `.handles` moved — not one geometry number, not one
+other twin's key set. That is the closest a DOM-free tier gets to a full-suite-grade guarantee for exactly the
+layer this act touches.
+
+### Emit byte-identical
+
+Nothing touched writes to a param or the emit path — `_writable` decides whether a PREVIEW HANDLE exists, never
+what value a param holds or how it's written (`_writeParam`/`_field` are untouched). `corner-data-drag.spec.js`
+and `middle-trans-traverse.spec.js`'s round-trip test (both in the targeted sweep) cover the actual write path and
+both still pass unchanged.
+
+### Capacity
+
+Shorter act than t1688 by design (single mechanism, no multi-file threading chain) — but the "17 vs 2" verification
+took real time: confirming a NEGATIVE claim (these 13 ops have NO role bindings, ever) properly means grepping
+every file individually rather than trusting the dispatch's count, and distinguishing the 2 gate-only-gap ops
+(alignment/rotary_clock) from the 13 genuinely-featureless ones needed reading `simStartParams`'s own consumer path
+to be sure it wasn't `_writable` in disguise. Room was ample for the act at the lighter tier; the amendment landing
+mid-task cost nothing (the full suite was stopped before it produced anything the lighter tier didn't already
+cover, per the diff-review argument above).
