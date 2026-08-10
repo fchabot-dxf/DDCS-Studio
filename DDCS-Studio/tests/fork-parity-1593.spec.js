@@ -182,8 +182,13 @@ test('THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, a
                 srcLines: srcGcode ? srcGcode.split('\n').length : -1,
                 copyLines: copyGcode ? copyGcode.split('\n').length : -1,
                 forkedFrom: c.forkedFrom,
-                srcHooks: U.OP_CODE_HOOKS.filter((k) => typeof s[k] === 'function').join(','),
-                copyHooks: U.OP_CODE_HOOKS.filter((k) => typeof c[k] === 'function').join(','),
+                // t1682 — OP_CODE_HOOKS (a hand-maintained 8-name list) is gone: reconcileCodeHooks now derives "is
+                // this a hook" from the def's own shape instead of a list that had already gone stale (7 real hooks
+                // missing from it). hookKeysOf reads the SAME generic rule, so this claim now covers every hook a
+                // twin declares, not just the 8 the old list happened to name — sorted so key-enumeration ORDER
+                // can't produce a false mismatch between the source and the copy.
+                srcHooks: U.hookKeysOf(s).sort().join(','),
+                copyHooks: U.hookKeysOf(c).sort().join(','),
             };
         }, [twins[i], i, FORM_KEY_SRC]);
         r.alert = alerts.join(' ~ ');

@@ -94,7 +94,17 @@ test('(5) THE .wiz ROUND TRIP on the registered twin — export, WIPE, import, i
     });
     expect(r.wrote, 'ONE-NAME: the file is named after the wizard').toBe('Facing.wiz');
     expect(r.gone, 'the op really was wiped before the import').toBe(true);
-    expect(r.after, 'the def came back IDENTICAL — a lathe op is a library citizen like any other').toEqual(r.before);
+    // t1682 — hooksReattached is excluded from the identity comparison on purpose: it is a PER-CALL bookkeeping
+    // trail (which hook names THIS registerUserOp call had to restore), not a property of the op's own identity —
+    // `before` (registered fresh at boot) legitimately shows [], `after` (reimported) legitimately shows the
+    // reattached names, and neither is wrong. Checked explicitly instead (the positive claim this test is
+    // actually making): simStock — a real function hook facing declares, which JSON can never carry in the file
+    // itself — genuinely came back via reattachment, not just coincidentally absent on both sides the way a blanket
+    // JSON.parse(JSON.stringify(...)) comparison (this test's own `before`/`after`) would silently pass either way.
+    const { hooksReattached: beforeHooks, ...beforeRest } = r.before;
+    const { hooksReattached: afterHooks, ...afterRest } = r.after;
+    expect(afterRest, 'the def came back IDENTICAL — a lathe op is a library citizen like any other').toEqual(beforeRest);
+    expect(afterHooks, 'simStock (a function hook, invisible to any JSON-based before/after diff) genuinely came back via reattachment').toContain('simStock');
     expect(r.same, 'and it emits byte-identically: the shared file carries the RECIPE, not a snapshot').toBe(true);
 });
 

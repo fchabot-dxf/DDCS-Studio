@@ -21299,3 +21299,221 @@ change. The mid-verification discovery (corner/surfacing have no value-bearing h
 visible effect is narrower than the dispatch's own two suggested examples) is exactly the kind of thing the
 "verify by value, not presence" instruction exists to catch — reported plainly rather than picking a misleading
 demo or silently expanding scope to paper over it. Two files touched for the fix itself, one for the guard flip.
+
+## t1682 — REVIEW OF t1680 (CONFIRMED) + FINDING 3 FIXED: OP_CODE_HOOKS deleted, not appended to (turn 1682)
+
+### The t1680 review
+
+Advisor verdict: PASS, confirmed from the diff. All three of `layoutSpecFromOp`'s returns carry `onEdit` from the
+one destructure; the six legacy views are untouched (no double-wiring); the tripwire was PROMOTED into
+CLEAN_SHAPES rather than deleted, closing the gap and updating the record in one move. Also endorsed correcting
+the dispatch's own "one source, no hand-forwarding" instruction where lathe genuinely couldn't comply (a separate
+delegate returning early, hand-built handles, no shared choke point) — "scoping by what is actually reachable is
+the right instinct."
+
+### THE ACT — census finding 3: OP_CODE_HOOKS is a stale allow-list; forking silently drops 7 live hooks
+
+### 1. Establishing the real rule, before building anything
+
+`userOpFromStack` (the ONE def constructor) sets exactly 7 possible top-level properties
+(`opType/label/template/bindings/panel`, conditionally `sim`/`group`) and ZERO function-valued ones — confirmed
+by reading it directly, not assumed. `registerUserOp` and its callers add a further small, stable set
+(`layout`/`bindingSpecs`/`hooksReattached`/`defV`/`savedAt`/`forkedFrom` — registration/versioning/provenance
+bookkeeping). Every OTHER property ever found on a def got there because some `*_data.js` file deliberately
+attached a hook — checked, no exceptions found. So the answer to "is OP_CODE_HOOKS enumerable from something
+already declared": yes, but by flipping the question — the STABLE thing to name is the tiny BASE+LIFECYCLE
+shape (13 keys, changes only when the registration architecture itself changes), not the fast-growing hook set
+(16+ names and counting, one added per new op feature) that kept going stale.
+
+### 2. THE DURABLE HALF — deleted the list, did not append to it
+
+`reconcileCodeHooks` (`blocks/userOps.js`) now captures ANY key on a def that isn't in the derived base shape or
+the small named lifecycle set — function or plain data. The base shape is computed ONCE, from a real call to
+`userOpFromStack` itself (`_BASE_DEF_SHAPE = new Set(Object.keys(userOpFromStack(...)))`), so it can never drift
+from the actual constructor the way a second, hand-copied list could. `OP_CODE_HOOKS` is DELETED — confirmed via
+a repo-wide grep (not just `web/` — a mistake caught mid-turn, see below): zero live references remain anywhere,
+only comments. A future hook needs no list update at all; it is carried the moment it is declared.
+
+### 3. NOT ALL "MISSING" HOOKS ARE FUNCTIONS — a real trap in my own first attempt
+
+A first implementation filtered on `typeof def[k] === 'function'` alone, reasoning "userOpFromStack sets no
+functions, so any function is a hook." Wrong: measured directly (grepped every `def.xxx = ` assignment site),
+`zRuler`/`entryPoint`/`simStartParams`/`latheTool`/`latheProbeAxis` are all plain, JSON-safe DATA
+(`{depthParam,stepParam}`, `{x:'entryX',y:'entryY'}`, arrays of plain objects) — only `armGap`/`simStock` are
+actually functions. A function-only filter genuinely missed 5 of 7, caught live via a non-vacuity test (a probe
+def's plain-object `zRuler` came back `undefined` after a simulated fork). The denylist-of-core-shape approach
+is what actually holds for every hook shape found, not just the function-valued ones.
+
+### 4. THE FUNCTION-VALUED SUB-PROBLEM (`armGap`/`simStock`) — a design statement, not a special case
+
+They survive a JSON-based copy/fork/import through the EXACT SAME mechanism every other hook now does:
+`LOCAL_HOOKS` is an in-memory, function-capable cache populated fresh at boot from each op's live factory
+(`*_data.js`'s own module code, which always runs with real functions in memory, never through JSON). A JSON
+clone (`wizardManager.copyDef`) or a from-scratch rebuild (`devMode.authorFork`, which never even attempts a
+clone — it builds fresh via `userOpFromStack` and hand-carries only `bindingSpecs`+`forkedFrom`) can never carry
+a function directly — it never needs to, because re-attachment reads FROM `LOCAL_HOOKS`, not from the copy
+itself. No special-casing for "the function ones" — they were already the ORIGINAL 8's own shape.
+
+### Verify — per the ruling's 6 points
+
+**Point 1 (the real rule)**: stated above, with evidence (a direct read of both constructor functions, not
+assumed).
+
+**Point 2 (the durable half)**: `OP_CODE_HOOKS` deleted; `reconcileCodeHooks`'s capture is now generic.
+
+**Point 3 (the function-valued sub-problem)**: stated as a design fact, verified directly (see below).
+
+**Point 4 (verify by value on the real gesture)**: forked `user_surfacing_data` (which declares both `zRuler`
+and `entryPoint`) through the ACTUAL Blocks-tab flow — `window.ddcsEditWizardDef` → `window.ddcsSaveAsWizard` →
+fill the real save dialog → click the real Save button — then, after a genuine fresh page reload (the fork is
+persisted; a reload is both a stronger proof and sidesteps an in-session tab-switch race found while building
+this test), opened the FORK'S OWN 2D Layout pane and asserted the rendered DOM: `.viz-zruler-row` present, real
+`.zruler-z` pass-tick text elements present (not an empty shell). The ORIGINAL surfacing checked identically for
+comparison (both show it — the fork isn't coincidentally fine for an unrelated reason). This is the literal,
+reported user symptom (a missing piece of UI after Customize → Save as new), not a proxy for it.
+
+**Point 5 (the guard flips)**: `declared-key-coverage-1678`'s `OP_CODE_HOOKS` tripwire is gone — but not moved
+into `CLEAN_SHAPES` like `onEdit` was, because the fix didn't add names to a list, it deleted the list; a
+text-presence check has nothing left to inspect (confirmed: `arrayLiteralText(...,'OP_CODE_HOOKS')` would now
+throw, since the export doesn't exist). The regression coverage is necessarily behavioral, not textual — it
+lives in the new permanent `tests/hook-carry-1682.spec.js` (below). Same discipline, different mechanism,
+because the fix itself changed the mechanism being guarded.
+
+**Point 6 (non-vacuity)**: TWO independent proofs for the core mechanism, both via safe scratch-copy revert/
+restore: (a) narrowed the capture back to `typeof === 'function'` only — genuinely RED, missing exactly `zRuler`
+from the reattached set (`Received` list lacked it where `Expected` had it) — restored, green. (b) swapped in
+the ACTUAL pre-t1682 committed `userOps.js` (via `git show HEAD:...`, not a hand-edit) and ran the real-gesture
+test against it — genuinely RED, reproducing the literal reported symptom: the fork's `.viz-zruler-row` count
+was `0` where the source's was `>0` — restored, green. (b) is the strongest evidence available: the actual
+pre-fix code, the actual UI gesture, the actual reported symptom, side by side with the fix.
+
+### A THIRD, real bug — found by the regression sweep, not invented to pad the report
+
+The broader regression sweep (`fork-parity-1593.spec.js`, the most comprehensive fork-testing spec in the
+repo — forks all 32 shipped twins) threw a genuine `TypeError: Cannot read properties of undefined (reading
+'filter')`, deterministically, on the very first twin. Traced by instrumenting the actual test file directly
+(scratch-copy backed) rather than trusting a simplified reproduction that kept failing to reproduce it: the
+test itself directly references `U.OP_CODE_HOOKS.filter(...)` at two lines, building `srcHooks`/`copyHooks`
+diagnostic strings for its OWN existing assertion (`expect(copyHooks).toBe(srcHooks)`, "the copy runs the
+source's code hooks") — a consumer my earlier `web/`-scoped grep for `OP_CODE_HOOKS` never had a chance to find,
+since it's a TEST file, not app code. Confirmed via a repo-wide grep afterward (not just `web/`) that this was
+the only remaining live reference anywhere.
+
+This was a real, valuable pre-existing assertion — previously blind to the exact bug class this whole finding
+is about, since none of the 7 missing hooks were ever in the old 8-name list it read from. Fixed by exporting a
+small generic helper (`hookKeysOf(def)`, a thin wrapper over the same `isHookKey` rule `reconcileCodeHooks`
+itself uses) and pointing the test at it instead of restating a list of its own — the exact same "declare once,
+read generically" move as the fix itself, applied one level up. Re-run: all 32 twins now pass this assertion,
+which is meaningfully STRONGER than before (comparing every hook a twin declares, not just the old 8) —
+effectively a third, broad confirmation of the core fix, across the entire registry, for free.
+
+### A FOURTH, real bug — found by the FULL SUITE, one full binary/branch-vs-merge design flaw in my own fix
+
+The full-suite run (below) surfaced a second genuine, deterministic failure: `lathe-odturn-1273.spec.js`'s own
+`.wiz` round-trip spec (export → wipe → import) — `postInstantiate` (a real function hook every OD-turn def
+sets) was NOT reattached on import, `r.reattached` came back `[]` where it should have contained it. Root cause,
+traced by reading the failure directly rather than assuming it was unrelated to a lathe-sounding test name:
+`reconcileCodeHooks`'s own structure was a BINARY branch — "the incoming def already has SOME hook-shaped key →
+skip reattachment entirely" — a rule that only ever held while every hook was function-shaped, because JSON
+(a `.wiz` file) can only ever carry ALL of a def's function hooks (none, since JSON strips functions) or NONE,
+never some. Plain-data hooks broke that assumption from underneath it: `wizardToFile` explicitly exports
+`latheTool` as data (`if (def.latheTool) op.latheTool = def.latheTool;`), so an imported lathe def now genuinely
+arrives with `latheTool` present (via the file) but `postInstantiate` genuinely absent (a function, never in
+the file) — a MIXED case the binary branch had no way to express: it saw "has a hook" (`latheTool`) and
+concluded "nothing to reattach" for the WHOLE def, silently starving `postInstantiate`.
+
+Fixed by replacing the branch with a merge: always remember whatever hook-shaped keys the incoming def carries
+(harmless even when it's the full, fresh set), then separately fill in — from `LOCAL_HOOKS` — only the names the
+def doesn't already have. Correct across every case: nothing reattached on a fresh register (already has
+everything), everything reattached on a fork (has nothing), and now correctly a PARTIAL set reattached on an
+import that carries some plain data but no functions.
+
+This uncovered a SECOND, downstream instance of the exact same one-shot-binary-thinking mistake:
+`wizardLibrary.js`'s own `importWizard` computed its user-facing "what came back vs. what's missing" message as
+`wanted.filter(k => !got.includes(k))` — `got` being only the REATTACHED names, so a hook the file carried
+directly (never reattached, because it didn't need to be) was wrongly reported as "missing" the moment the
+manifest started listing plain-data hooks too. Fixed the same way: check the FINAL, fully-reconciled def
+(`!(k in def)`) rather than the reattached subset — true either way a hook actually got there, file or app code,
+which is the real question the message answers.
+
+Both non-vacuity proven independently (scratch-copy revert/restore, each producing the EXACT original failure
+message when undone): the branch-vs-merge revert reproduced `Received: []` where `postInstantiate` was expected;
+the `wizardLibrary.js` revert reproduced the exact wrong wording, verbatim, calling `latheTool` "not part of a
+wizard file" when it demonstrably is. Re-ran `lathe-odturn-1273.spec.js` (all 18) and the full targeted
+regression sweep (40/40) after both fixes — clean.
+
+### A FIFTH, real bug — the re-run of the full suite (after the session itself restarted mid-run) found one more
+
+The background full-suite run was interrupted by a session restart (no completion record; a stray mem-server
+process was still holding the port and had to be killed before restarting). The re-run surfaced 19 failures —
+most confirmed as ordinary contention flakiness from the restart itself (batch-isolated in two groups, 34/34
+and 5/5 clean) — but one, `lathe-pilot-1271.spec.js`'s own `.wiz` round-trip spec, was real and reproducible in
+isolation: `expect(r.after).toEqual(r.before)` failed on `hooksReattached` alone (`[] ` vs `['simStock']`), every
+other field matching. Root cause: `before`/`after` are both taken via `JSON.parse(JSON.stringify(listUserOps()
+.find(...)))` — a DOUBLE JSON round-trip inside the test itself — which strips `simStock` (a function) from
+BOTH sides equally, so this comparison was never actually capable of verifying that hook's VALUE survived import;
+the only thing that could ever differ was `hooksReattached` itself, a PER-CALL bookkeeping trail (which names
+THIS specific `registerUserOp` call had to restore) that is expected to legitimately differ between a
+freshly-booted def (nothing to restore) and a reimported one (now correctly showing `simStock`, restored by the
+t1682 fix) — not a property of the op's own identity. Confirmed this was the established, correct pattern
+elsewhere in the SAME test family: `lathe-part-drill-1275.spec.js` already explicitly strips `hooksReattached`
+(and `importNote`) before its own identity comparison — `lathe-pilot-1271.spec.js` was simply the one file that
+predated that convention. Fixed by matching it: exclude `hooksReattached` from the blanket comparison, and add
+the explicit positive assertion this test was actually missing (`expect(afterHooks).toContain('simStock')`) —
+which is the ONLY way this test can meaningfully verify a function hook's behavior came back, since the value
+itself never survives either side's JSON round-trip. Non-vacuity proven the same way as the others (scratch-copy
+revert reproduced the exact original diff). Re-ran the full file (8/8) and the complete regression sweep,
+now including all three lathe `.wiz`-round-trip families together (66/66) — clean.
+
+### Verify — the new permanent spec
+
+`tests/hook-carry-1682.spec.js`, 2 tests: a direct-function sweep (a synthetic probe def carrying 5 of the 7
+previously-missing hooks — deliberately mixing plain-data and function shapes — plus 2 of the original 8, all
+7+2 confirmed to survive a simulated fork via the LIVE def accessor, `getUserDef`, not `listUserOps()`'s
+persisted/JSON view where a function is `undefined` by construction) + the real-gesture UI test described above.
+Both pass reliably (checked 3× in a row for the UI test specifically, after finding and fixing one genuine
+test-timing race of my own — an in-session app-tab switch was intermittently too slow; replaced with a real
+condition wait, then with a full fresh reload, which is both more robust and a stronger proof).
+
+### Regression sweep
+
+Three passes, each after the fixes then live. First (before the full suite surfaced bug 4): 26 tests across
+every consumer of the changed mechanism — `hook-carry-1682` (both), `fork-parity-1593` (both, including the
+32-twin real gesture), `lathe-blocks-bar-1315` (6), `wizard-face-1599` (4), `import-safety-1219` (3),
+`skim-blocks-roundtrip-1636`, `guard-roundtrip-1595` (both, including the 152-structural-flip sweep across 14
+guarded twins), `transform-declared-736` (4) — 26/26 passed. Second (after the branch-vs-merge fix, bug 4): the
+same set plus `lathe-odturn-1273` (18) and `save-dialog-declared-1615` (3, confirmed as an unrelated
+boot-timing flake under full-suite load, not a regression) — 40/40 passed. Third (after bug 5, and after the
+first full-suite attempt was interrupted by a session restart mid-run): the same set plus `lathe-pilot-1271`
+(8) and `lathe-part-drill-1275` (9, confirmed already correctly excluding `hooksReattached` — the established
+pattern this turn's fix to `lathe-pilot-1271` now matches) — **66/66 passed**.
+
+### Full suite
+
+The first full-suite attempt was cut short mid-run by a session restart (no `REAL_EXIT_CODE` marker; a stray
+mem-server process was still holding the port and had to be killed before restarting). A second, complete
+attempt ran clean through node but returned an unusually noisy 19 e2e failures — batch-isolated in two rounds
+(34/34, 5/5 clean) with exactly one genuine regression among them (bug 5, above); the volume itself reads as
+residual system noise from the restart, not a code issue. A third, final run — measuring against the advisor's
+gate floor on `3ab6a254` (node 103/0, e2e 2454 passed / 11 failed / 6 skipped) — came back clean: node **102/0**
+(103 − the one KNOWN GAP tripwire t1680 already removed, same as the prior turn's floor). e2e: **2458 passed /
+9 failed / 6 skipped** (2473 total, unchanged). Of the 9: **8 match the established churn pool or were already
+confirmed clean in isolation earlier in this very turn** (`collapsible-panes-752`, `formfield-opparam-1640`,
+`import-safety-1219`, `middle-superset`, `pane-splitter-790` ×2, `update-check` ×2). **1 carried a new name**
+(`switch-glyph-declared`) — isolated with `--workers=1`: passed clean. All 9 accounted for. Eight regenerated
+`verification/*.png` restored via `git checkout --` before staging.
+
+### Capacity
+
+A dispatch that named the right precedent (t1638/t1654) and the right question (derive, don't append) — the
+actual work was in reading two constructor functions closely enough to trust a generic rule instead of a safer-
+feeling narrower one, then catching FIVE real gaps before calling it done: my own first attempt's function-only
+blind spot, a pre-existing test's own direct reference to the deleted export (found only because a repo-wide
+grep, not a `web/`-scoped one, was the right check), a genuine binary-branch design flaw in the reconcile
+logic itself that only a MIXED plain-data-plus-missing-function case could expose — its exact downstream echo
+in the human-facing import message — and one pre-existing test's own comparison gap that a fresh full-suite
+run (surviving an actual session restart mid-run) surfaced last. None of the last four were guessed at; each
+was traced from a real, deterministic test failure to its precise cause before being touched, several of them
+via the exact "swap in the real pre-fix committed code" discipline this session has used throughout. Two files
+changed for the fix itself (`userOps.js`, `wizardLibrary.js`), two existing test files corrected
+(`fork-parity-1593.spec.js`, `lathe-pilot-1271.spec.js`), one new permanent spec, one guard file updated.

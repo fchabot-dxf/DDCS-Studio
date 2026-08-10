@@ -37,17 +37,6 @@ function missingIn(keys, text) {
 function missingReaders(keys, consumerPaths) {
     return missingIn(keys, consumerPaths.map((p) => fs.readFileSync(p, 'utf8')).join('\n'));
 }
-/** Just the text of one `export const NAME = [...]` array literal — sharper than a whole-file search when the
- *  question is "is this name in THIS list," not "does this file mention it anywhere for any reason." Needed for
- *  OP_CODE_HOOKS below: `simStock` has a real, unrelated generic reader elsewhere in userOps.js (a different
- *  mechanism, a different line), which would otherwise mask its absence from THIS specific allow-list. */
-function arrayLiteralText(filePath, constName) {
-    const text = fs.readFileSync(filePath, 'utf8');
-    const m = text.match(new RegExp(`${constName}\\s*=\\s*\\[[^\\]]*\\]`));
-    if (!m) throw new Error(`arrayLiteralText: no "${constName} = [...]" found in ${filePath}`);
-    return m[0];
-}
-
 // ── PART 1 — shapes whose CURRENT contract is clean. These exist to catch a FUTURE regression: a new key added to
 // one of these declaration shapes without also updating (or at least mentioning intent in) its consumer file. ──
 
@@ -85,19 +74,20 @@ for (const shape of CLEAN_SHAPES) {
 // own future fix-dispatch WITHOUT fixing them in that census turn. Each test below asserts the CURRENT, broken
 // state on purpose — it starts FAILING the moment someone fixes the underlying gap without also touching this
 // file, which is the point: closing a gap here requires deliberately updating its tripwire (move the key up into
-// CLEAN_SHAPES), not letting the fix silently rot the record of what changed. t1680 closed the first of the three
-// (onEdit, moved above) exactly this way — two remain. ──
+// CLEAN_SHAPES), not letting the fix silently rot the record of what changed. ──
 
 test('KNOWN GAP (t1678): lathe handles declare teal:true (the documented "drives the emit" convention) but FeatureCanvas never reads .teal — every lathe dimension handle renders the plain gold default instead. See WORK-LOG t1678.', async () => {
     const missing = missingReaders(['teal'], [web('viz/featureCanvas.js')]);
     expect(missing, 'expected teal to STILL be unread by featureCanvas.js — if this fails, the gap was fixed: remove this test').toEqual(['teal']);
 });
 
-test('KNOWN GAP (t1678): OP_CODE_HOOKS (the fork/persistence-carry allow-list in userOps.js) is stale — 7 real def.* hooks silently drop when a wizard is forked via the Blocks-tab Customize path. See WORK-LOG t1678.', async () => {
-    // Checked against the OP_CODE_HOOKS array literal specifically, not the whole file: simStock has a real,
-    // unrelated generic reader elsewhere in userOps.js (a different mechanism entirely), which a whole-file search
-    // would wrongly count as "found" — this narrower check is what a first draft's whole-file version got wrong.
-    const hooksList = arrayLiteralText(web('blocks/userOps.js'), 'OP_CODE_HOOKS');
-    const missing = missingIn(['zRuler', 'entryPoint', 'simStartParams', 'armGap', 'simStock', 'latheTool', 'latheProbeAxis'], hooksList);
-    expect(missing, 'expected all 7 to STILL be absent from OP_CODE_HOOKS — if any is now present, the list was likely updated: re-check and shrink this list').toEqual(['zRuler', 'entryPoint', 'simStartParams', 'armGap', 'simStock', 'latheTool', 'latheProbeAxis']);
-});
+// t1682 closed finding 3 (OP_CODE_HOOKS stale allow-list) — but not by moving a key into CLEAN_SHAPES above, because
+// the fix did not add the 7 missing names to the list: it deleted the list. `reconcileCodeHooks` (userOps.js) now
+// derives "is this a hook" from the def's actual shape (anything beyond userOpFromStack's own base properties + a
+// small, stable lifecycle set) rather than checking membership in a hand-maintained array — confirmed: `OP_CODE_HOOKS`
+// is no longer exported at all, so there is no list left for a text-presence check to inspect. The regression
+// coverage for this finding is necessarily a BEHAVIORAL test, not a textual one — it lives in
+// tests/hook-carry-1682.spec.js (a real fork through the actual Customize path, asserting the fork's own rendered
+// UI, plus a direct-function sweep of every previously-missing hook shape). Same discipline as every tripwire here —
+// a permanent test exists forever, so this cannot silently regress — different mechanism, because the fix itself
+// changed the mechanism being guarded.

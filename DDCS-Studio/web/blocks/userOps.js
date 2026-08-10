@@ -807,7 +807,7 @@ export function validateUserOp(def) {
 
 /** Install a user-op def into the LIVE user-layer builder + spec + label registries (runtime only — no persistence). */
 /**
- * THE CODE HOOKS A `.wiz` CANNOT CARRY (t1275 — the advisor's ruling on the wizard-file gate).
+ * THE CODE HOOKS A `.wiz` CANNOT CARRY (t1275 — the advisor's ruling on the wizard-file gate; generalized t1682).
  *
  * A wizard file is DATA: template, bindings, panel, sim, group, defV. A def's BEHAVIOUR hooks are functions, and a
  * function cannot be written to a file — so a twin exported and re-imported used to come back quietly missing them
@@ -815,9 +815,36 @@ export function validateUserOp(def) {
  * on import an opType THIS APP ALREADY KNOWS gets its LOCAL hooks re-attached — behaviour from the app version, data
  * from the file. A foreign opType has no local behaviour to restore, and the import SAYS SO rather than losing it
  * silently (the file names which hooks its author had; see wizardToFile).
- */
-export const OP_CODE_HOOKS = ['postInstantiate', 'deriveGuards', 'simStartsProvider', 'previewGeometry', 'previewVarSeed', 'simGcode', 'statusHint', 'normalizeParams'];
-const LOCAL_HOOKS = new Map();   // opType → { hookName: fn } — survives deleteUserOp, because the APP still knows it
+ *
+ * t1682 — a HAND-MAINTAINED name list (`OP_CODE_HOOKS`) used to gate which properties counted as "a hook" here, and
+ * went stale exactly the way `KNOWN_LEAF_RECORD_FIELDS` almost did (t1654): 7 real, live, generically-read hooks
+ * (`zRuler`/`entryPoint`/`simStartParams`/`armGap`/`simStock`/`latheTool`/`latheProbeAxis`) were added to individual
+ * `*_data.js` files over time and never added to the list, so forking any of the 11+ ops that set one silently
+ * dropped it — byte-correct emit, clean console, a piece of the UI just missing.
+ *
+ * TRIED "any function on def is a hook" first — wrong: `zRuler`/`entryPoint`/`simStartParams`/`latheTool`/
+ * `latheProbeAxis` are all plain, JSON-safe DATA (`{depthParam,stepParam}`, `{x:'entryX',y:'entryY'}`, an array of
+ * plain objects) — only `armGap`/`simStock` are actually functions. A function-only filter genuinely missed 5 of 7
+ * (caught live: a probe def carrying a plain-object `zRuler` came back through the fork path as `undefined`).
+ *
+ * The rule that actually holds: `userOpFromStack` (the ONE def constructor) owns a small, stable BASE shape —
+ * `opType/label/template/bindings/panel/sim/group` — and `registerUserOp` + its callers add a small, equally stable
+ * set of LIFECYCLE bookkeeping (`layout`/`bindingSpecs`/`hooksReattached`/`defV`/`savedAt`/`forkedFrom` —
+ * registration/versioning/provenance, not per-feature behaviour). ANYTHING ELSE ever found on a def — function or
+ * not — is a hook, because nothing else ever puts anything else there (checked: no exceptions found). So the base
+ * shape is DERIVED (one real call to `userOpFromStack`, not restated as a second list that can drift from the
+ * first), and only the small lifecycle set is still named — it changes when the REGISTRATION architecture changes,
+ * not every time an op grows a new declared behaviour, which is the actual, much faster-moving thing that kept
+ * going stale. A new hook — function or plain data — needs no list update; it is carried the moment it is declared. */
+const _BASE_DEF_SHAPE = new Set(Object.keys(userOpFromStack('__probe__', 'probe', [], [], 'form3d', { probe: true }, 'probe')));
+const _LIFECYCLE_KEYS = new Set(['layout', 'bindingSpecs', 'hooksReattached', 'defV', 'savedAt', 'forkedFrom']);
+const isHookKey = (k) => !_BASE_DEF_SHAPE.has(k) && !_LIFECYCLE_KEYS.has(k);
+/** Every hook-shaped key a LIVE def object actually carries right now (function or plain data) — the same test
+ *  `reconcileCodeHooks` uses, exported so a caller (fork-parity-1593's own "the copy runs the source's hooks"
+ *  claim) can compare two live defs generically instead of restating a name list of its own — the exact shape
+ *  of stale list this turn exists to retire. */
+export const hookKeysOf = (def) => Object.keys(def || {}).filter(isHookKey);
+const LOCAL_HOOKS = new Map();   // opType → { hookName: value } — survives deleteUserOp, because the APP still knows it
 
 /** Which code hooks this app has for `opType` (empty = it is a stranger here). */
 export const localHooksFor = (opType) => Object.keys(LOCAL_HOOKS.get(opType) || {});
@@ -826,13 +853,29 @@ export const localHooksFor = (opType) => Object.keys(LOCAL_HOOKS.get(opType) || 
  *  t1593 — …and a FORK names its source (`forkedFrom`), so it gets the SOURCE's hooks. Same rule one step out:
  *  behaviour from the app, data from the def. Without this the copy of a hooked twin loses its emit corrections —
  *  corner's header comments freeze at the defaults, a guarded twin loses the derived guard keys its prune reads — and
- *  the fork emits a DIFFERENT program from the wizard it was forked from, which is the one thing a fork must not do. */
+ *  the fork emits a DIFFERENT program from the wizard it was forked from, which is the one thing a fork must not do.
+ *  t1682 — carries EVERY hook shape uniformly now, plain data included, not just the function-valued ones: a plain-
+ *  data hook (zRuler) is JSON-safe and could in principle survive a `copy()`-style clone on its own, but devMode's
+ *  Blocks-tab "Customize" fork route never attempts that clone — it builds a brand-new def from `userOpFromStack`
+ *  and copies only `bindingSpecs`+`forkedFrom` by hand — so plain-data hooks need the SAME LOCAL_HOOKS re-attachment
+ *  the function-valued ones (`armGap`/`simStock`) already required, or they are lost on that route regardless of
+ *  their own JSON-safety. One mechanism, one re-attachment path, for every hook shape.
+ *  t1682 — the "has any hook → skip reattach entirely" early return (still visible in git history) held only while
+ *  every hook was function-shaped: a `.wiz` FILE export/import round-trip is JSON, so an imported def could only
+ *  ever arrive with ALL its function hooks (never, since JSON strips functions) or NONE — never some. Plain-data
+ *  hooks broke that assumption: `latheTool` is explicitly exported as data (wizardLibrary's wizardToFile) and
+ *  SURVIVES import, so an imported lathe def now arrives with latheTool present but postInstantiate genuinely
+ *  missing — a MIXED case the old binary branch never anticipated, silently skipping reattachment of the missing
+ *  function hook because the def "already had a hook" (caught live: lathe-odturn-1273's own .wiz-gate spec, which
+ *  round-trips exactly this op through export→wipe→import and asserts postInstantiate comes back). Fixed by
+ *  merging rather than branching: always remember whatever hooks a def DOES carry, then fill in only the ones it's
+ *  missing from what's known — the function ones on an import, everything on a fork, nothing on a fresh register. */
 function reconcileCodeHooks(def) {
     const mine = {}, reattached = [];
-    for (const k of OP_CODE_HOOKS) if (typeof def[k] === 'function') mine[k] = def[k];
-    if (Object.keys(mine).length) { LOCAL_HOOKS.set(def.opType, { ...(LOCAL_HOOKS.get(def.opType) || {}), ...mine }); return reattached; }
+    for (const k in def) if (isHookKey(k)) mine[k] = def[k];
+    if (Object.keys(mine).length) LOCAL_HOOKS.set(def.opType, { ...(LOCAL_HOOKS.get(def.opType) || {}), ...mine });
     const known = LOCAL_HOOKS.get(def.opType) || (def.forkedFrom ? LOCAL_HOOKS.get(def.forkedFrom) : null);
-    if (known) for (const k in known) { def[k] = known[k]; reattached.push(k); }
+    if (known) for (const k in known) if (!(k in mine)) { def[k] = known[k]; reattached.push(k); }
     return reattached;
 }
 

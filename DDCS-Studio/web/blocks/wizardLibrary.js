@@ -16,7 +16,7 @@
  * Persistence: user-op defs live in `ddcs_user_ops` (userOps.js); the bar CUSTOMIZATION (per-entry + per-group
  * overrides) lives in `ddcs_wizard_layout`. The default catalog (BUILTINS/GROUPS) is the shipped library.
  */
-import { listUserOps, createUserOp, deleteUserOp, OP_CODE_HOOKS, localHooksFor, bindingsFromStack } from './userOps.js';   // t1275 — the hook manifest: a wizard file names the code it cannot carry; t1593 — bindingsFromStack: does the template reproduce the specs, or must the file carry them?
+import { listUserOps, createUserOp, deleteUserOp, localHooksFor, bindingsFromStack } from './userOps.js';   // t1275 — the hook manifest: a wizard file names the code it cannot carry; t1593 — bindingsFromStack: does the template reproduce the specs, or must the file carry them?
 import { isLathe } from '../data/workspaceMachine.js';   // t1271 — the machine kind decides which group leads
 
 // ── the shipped (default) catalog — the current wizard bar as data ───────────────────────────────────────────
@@ -263,7 +263,9 @@ export function wizardToFile(def) {
     // enough for the recipient's import to say exactly what it could not restore, instead of losing it in silence.
     // …read from what the APP knows for this opType, not off the def object: the listed def is the PERSISTED one and
     // never carries functions (they live in the side registries) — reading it produced an empty manifest every time.
-    const hooks = localHooksFor(def.opType).filter((k) => OP_CODE_HOOKS.includes(k));
+    // t1682 — localHooksFor is already exactly "what this opType has locally, generically" (no separate list to filter
+    // through — that list was the t1682 finding: it went stale and silently dropped 7 real hooks from every manifest too).
+    const hooks = localHooksFor(def.opType);
     if (hooks.length) op.hooks = hooks;
     return JSON.stringify({ kind: WIZARD_FILE_KIND, v: WIZARD_FILE_VERSION, op }, null, 2);
 }
@@ -290,8 +292,13 @@ export function importWizard(text) {
     if (!def) return null;
     // NAME THE OUTCOME. Re-attached = this app knows the op and supplied its own behaviour. Missing = the author's
     // app had code this one does not, and the wizard runs on its data alone.
+    // t1682 — MISSING must check the FINAL def, not just `got` (hooksReattached): a plain-data hook (latheTool)
+    // travels IN the file itself and is never reattached at all (nothing to reattach — it was already there), so
+    // checking only `got` wrongly called it missing the moment the manifest started listing plain-data hooks too
+    // (caught live: lathe-odturn-1273's own .wiz-gate spec). `k in def` is true either way — carried by the file
+    // or supplied by this app's own code — which is the actual question this message answers.
     const got = def.hooksReattached || [];
-    const missing = wanted.filter((k) => !got.includes(k));
+    const missing = wanted.filter((k) => !(k in def));
     def.importNote = missing.length
         ? `Its data came across in full. ${missing.length === 1 ? 'One behaviour' : missing.length + ' behaviours'} the author's app adds in code (${missing.join(', ')}) is not part of a wizard file — this build has no ${def.opType} of its own to take it from, so the op runs on its data alone.`
         : (got.length ? `Rebuilt from the file, with this app's own ${def.opType} behaviour (${got.join(', ')}) — a wizard file carries data, not code.` : '');
