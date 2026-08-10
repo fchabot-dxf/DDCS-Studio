@@ -1,3 +1,181 @@
+# QUEUE — prepared 2026-08-09 (advisor). Dispatch in order, ONE act per turn.
+
+## STATE
+
+**Shipped and live:** V2026.08.09.1 (the silent-G-code-loss family — a pasted line dropping `M3`, a dropped
+`G91` turning a relative plunge absolute, the canvas round-trip losing `modalPre`, a swallowed error nullifying
+two fail-loud guards) · V2026.08.09.2 (the phantom corner diagonal, the Layout pane reading `partZeroShift`,
+Skim's rect following the jog marker) · V2026.08.09.3 (the declared-but-unread census: `onEdit` restored to
+every twin, fork-carry derived and the stale allow-list deleted, `teal`/`emits` reconciled).
+
+**On the branch, gated and awaiting release:** t1686 THE SPLIT FIXED — `getTransform()` folds `_placement` so
+it IS `_disp`; `onTransform` relays the same composed value; the crosshair joins the placed frame. Plus THE
+PREVIEW GATE (`tests/node/preview-spec-gate-1688.test.mjs`, 109/0 in ~1.8s, browser-free, advisor-verified by
+breaking `noSnap` and watching it go red).
+
+**The user's corner report is 4 of 5 closed** — path/frame, double traverse, clamped Start, and the spindle
+offset (user-confirmed 2026-08-09). ONE survives, and it is ACT 1.
+
+---
+
+## ▶ ACT 1 — THE GLYPH RESOLVER (the last live corner symptom)
+
+**t1684 unified the VOCABULARY and left three different RULES.** Verified line by line:
+
+```
+  featureCanvas.js:508   shape ← manual ; hollow ← emits === false              (ANY pass)
+  toolpath2d.js:228      shape ← manual ; hollow ← i > 0 && emits === false     (pass 0 ALWAYS filled)
+  gcodeViz3d.js:409      shape ← emits  ; colour ← manual                       (a different input)
+```
+
+Two concrete disagreements fall out: corner's lead pass (`cornerData.js:128`, `emits:true` but forced sim-only
+at index 0 by `opSimStarts.js:284`) draws **hollow** in one pane and **filled** in another; and any auto pass
+with `emits:false` draws a square in 2D and a **ring** in 3D. This is the user's symptom 5, reported with a
+screenshot and still live.
+
+**Why it matters beyond cosmetics:** solid-vs-hollow is a DECLARED promise — *this marker's handle edits a real
+emitted macro var (`#21-#24`)*. Three rules mean at least two panes are misreporting which markers change the
+operator's program.
+
+1. **ONE resolver.** `(source, emits, pass) → {shape, fill, colour}`, pure, declared once, called by all three
+   renderers. Not three rules made to agree — one rule, three callers.
+2. **Decide the lead-pass question explicitly and say why:** corner's wall1 declares `emits:true` yet is forced
+   sim-only when it IS the lead pass. Which is the truth for the operator? Whatever you rule, it is ONE rule.
+3. ⚠ **If a declaration turns out WRONG** — a handle claims to drive the emit and does not, or vice versa —
+   that is a FINDING. Report it; do not quietly edit the declaration to match the code.
+4. **CORNER IS THE PILOT** — the only op that declares `emits` (`createPreviewPanel.js:781`: every other op's is
+   `undefined`), so it is the only place the rules can visibly disagree.
+5. **Verify by VALUE and BY EYE:** assert each marker's rendered treatment matches whether its param actually
+   reaches the emit, in all three renderers — and LOOK at the pane, both states, before claiming it.
+6. **The new preview gate must cover this** — extend `preview-spec-gate-1688` so a fourth rule cannot appear.
+   Non-vacuity per claim. Node tier + full suite + ID diff.
+
+---
+
+## ACT 2 — DECLARE `_writable` (it is a DOM query, and it blocks 17 twins from the gate)
+
+`panelTypes.js:74-75` decides whether a handle is editable by asking
+`document.querySelector('#wiz_user_form [data-param=…]')`. `formWidgets.js:1100` already calls this *"a DOM
+presence used as a proxy for 'settable'"* — the codebase knows.
+
+**Consequence, measured by the gate build:** only **15 of 32** twins produce handles browser-free. The other 17
+— corner, edge, middle, both rotaries, alignment, homing, wcs, comm, ioStep, pauseConfirm and the 6 ATC ops —
+snapshot `handles: <0 entries>`. **The whole corner pilot is invisible to the new gate.**
+
+Declare it from the binding (a binding whose widget is not multi-param is settable) and 17 twins join. Do it
+for the coverage, not the tidiness: every act after this is cheaper to verify. Byte-identical rendering, gate
+snapshot regenerated deliberately and reviewed line by line.
+
+---
+
+## ACT 3 — SUITE SPEED (user-raised twice; all numbers measured)
+
+```
+  toHaveScreenshot   0        ALL 266 screenshot() calls write to scratch paths.
+                              They gate NOTHING, cost wall-clock, AND cause the
+                              verification/*.png churn the advisor restores by hand
+                              after every single run.
+  waitForTimeout     732      ≈347s declared sleep ≈58s wall at w6 (~5% of the suite)
+  convertible        817 tests / 233 files (28%) assert pure module calls
+                              through a browser they never touch
+  test:changed       exists in package.json and has NEVER been run
+```
+
+Rank by measured saving per unit of risk; do the free ones first (the screenshots that gate nothing are free).
+⚠ Do NOT delete a screenshot that a human reads as evidence — several are deliberate verification artifacts.
+Distinguish *gating* from *evidence* before removing anything.
+
+---
+
+## ACT 4 — THE LATHE `placement` GAP (surfaced by the gate build; needs measurement then a ruling)
+
+The 7 lathe twins' specs carry **no `placement` key at all** — `latheLayoutSpec` returns early, before
+`panelTypes.js` computes the shift. So a lathe Layout pane can never ride a WCS pin, and the frame fix that
+t1686 made universal for mill ops simply does not reach lathe.
+
+1. **Measure first:** with a pin active, does a lathe Layout pane visibly disagree with its 3D — the same way
+   surfacing did? If it does, it is the same defect in a family nobody has opened yet.
+2. **Then rule:** either lathe joins the one declared frame (preferred — it is the same promise), or there is a
+   real reason a lathe pane is pin-independent, in which case DECLARE that reason so the next person does not
+   read it as an oversight. Say which and why.
+3. Same standard as t1686: one declared source, a renderer added later inherits it automatically.
+4. The preview gate covers lathe today only for the keys lathe actually has — extend it so this cannot silently
+   regress. Non-vacuity per claim.
+
+---
+
+## ACT 5 — THE MALFORMED-TOKEN SEND-GATE HAZARD (ARC B's first slice; safety-adjacent)
+
+From t1668, measured and unfixed: `' #500;M30 '` emits `G0 X#500;M30 Y10` and `defaultSyntaxVerify` returns
+**valid: true**. A token value is never bounded to where it ends, so an injected second statement rides straight
+through the send gate. Six of seven malformed shapes are already correctly refused — this is the surviving one.
+
+⚠ **It is a PREREQUISITE, not a follow-up.** It is unreachable today only because no authoring surface can
+create a controller token at all (t1668: three surfaces, three different silent failures). Build the token
+authoring feature first and it ships with the hole.
+
+1. Bound the token: a token value ends where the token ends. Anything after it on the same word is malformed.
+2. **Refuse LOUDLY** — the standing rule for this whole family. A malformed token must never emit something
+   plausible.
+3. Verify against the REAL gate (`defaultSyntaxVerify` + the emit path), not a unit stub, and re-run t1668's
+   full malformed sweep so the six already-refused shapes stay refused.
+4. Non-vacuity: prove the gate now rejects the injection and still accepts every legitimate token form.
+
+---
+
+## ACT 6 — CONTROLLER TOKENS: THE AUTHORING SURFACES (t1668 sized it; ACT 5 gates it)
+
+t1668 established this is **UNBUILT, not broken**: the plumbing already works — `move x:'#500'` emits
+`G0 X#500` and the canvas round-trip preserves it — but **no authoring surface can create a token**. Three
+surfaces, three distinct silent failures: Blockly's shadow ignores `setValue('#500')`; the wizard form's `num()`
+coerces it away; the twin's native number input clears the string at the DOM.
+
+Also recorded from that survey, and it is the real design fork: **params like Surfacing's `w` feed JS-side
+geometry math**, so they cannot take a live controller value without either deferred math or a declared per-field
+refusal. Decide that BEFORE building surfaces, and declare which params can accept a token.
+
+---
+
+## ACT 7 — THE §3 TAIL (ADVISOR-TRANSFER.md items 2-6, each small)
+
+Corner's 3 `simstart` placeholders (an unwired type, correctly refused today) · materialize derived rows on the
+tree face (`passes` has no `param_field` row) · the shape-field typo lint hook (a typo skips silently — folds
+naturally into ARC B) · the drawer's 2D pane (no `renderLayout2D` caller; shapes show in the modal, not the
+drawer) · `flattenBlocks`'s transient `_group` side-effect (app-wide, named) · `groupBox`'s dead `mouths` field
+(the t1678 census confirmed it, tier 2) · the Drive trash/sign-in/no-FSA fallback.
+
+---
+
+## THE ARCS (ROADMAP.md carries the full statement)
+
+- **Preview arc, remaining stages:** the frame is done (t1686) and the gate exists; what remains is liveness
+  (ACT 2), the glyph resolver (ACT 1), and the lathe bypass — **the 7 lathe twins carry NO `placement` key at
+  all** (`latheLayoutSpec` returns before the shift is computed), so a lathe Layout pane can never ride a WCS
+  pin. New finding, unresolved, needs a human ruling on whether that is intended.
+- **ARC B — VALIDATION AS DATA.** Every lint rule is hand-added per case. Live members: `ifgoto` lhs/rhs
+  unlinted, an `IF`'s children never linted, the shape-field typo hook, and t1668's real hazard — `' #500;M30 '`
+  emits `G0 X#500;M30` and `defaultSyntaxVerify` returns **valid**. Safety-adjacent: malformed G-code passing
+  the send gate.
+- **ARC C — DIALECT AS DATA.** Per-controller facts are hand-written per emit site; t1634's ATAN form is the
+  worked example. Pairs with the porting arc (V4.1 first).
+
+---
+
+## STANDING RULINGS (do not re-litigate)
+
+- **Surfacing:** NO clamp, NO greying; the on-open auto-fill to the whole stock top STAYS.
+- **The start marker:** ONE widget, identical in both Z-modes; the MODE declares its target — WCS writes the
+  origin offset (**the emit MOVES**), Skim seeds `#790-792` (**emit BYTE-IDENTICAL**).
+- **Corner is the gated pilot** — no wizard ports until corner is right.
+- **Advisor discipline (earned the hard way 2026-08-09):** LOOK at the app before judging anything on a visible
+  surface; a symptom is an observation, not a diagnosis; grep who declares and who consumes before relaying;
+  never run a suite while the worker holds the ball.
+
+---
+
+
+<!-- ARCHIVE below: prior queue -->
+
 # QUEUED (user-approved 2026-08-09) — THE DECLARED-BUT-UNREAD SWEEP
 
 **Four instances surfaced in four consecutive acts, every one found BY ACCIDENT while chasing something
