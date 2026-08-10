@@ -23279,3 +23279,84 @@ existing wiring, a live authoring-gesture test with a genuine test-harness false
 before being reported as a product gap) — the ACCEPT finding (mostly already works) is worth exactly as much as
 a fix would have been, and shipping a rushed, half-verified REFUSE mechanism carrying the SAME "declared but
 silently dropped" risk this whole cycle exists to close would have been worse than reporting its real cost.
+
+## 🔨 turn 1710 (cycle 853, epoch 4) — CYCLE ACT 4: END-TO-END, plus the hazard question that decides the cycle's end
+
+### REVIEW RECEIVED ON t1708: PASS
+
+Advisor: shipping zero source changes was "the right outcome, not a shortfall... you DROVE IT rather than reading
+it." Confirmed the direct-typing gap is genuinely the "needs a custom field type" case, and the Variable-reporter
+path is Blockly's own idiom, not a workaround — "ACCEPT is genuinely done." Then posed ONE question, ahead of
+Act 4 proper, framed explicitly as deciding whether this cycle ends at act 4 or needs a fifth.
+
+### THE HAZARD QUESTION, ANSWERED FIRST, EMPIRICALLY — IT IS DANGEROUS
+
+What happens today if a token lands on a socket t1706 corrected back to `tokenRefusal` — via Blockly, which has
+no refuse mechanism yet? Connected/passed a token directly to 4 real ineligible sockets across both pilot ops and
+read the ACTUAL emitted text, not the code:
+
+| socket | token | what landed in the emit |
+|---|---|---|
+| surfacing `originX` | `#911` | `G0 X0 Y#47` — the shift is silently **0** (the default), `#911` appears nowhere |
+| surfacing `rampAngle` | `#922` | `#34=[[#46-#35]*19.081]` — **19.081** is `tan(3°)` (the DEFAULT angle), baked exactly as if nothing had been typed |
+| surfacing `helixPitch` | `#933` | `#38=[FUP[#43/1]*24]` — the `1` is the DEFAULT pitch; the move count is computed from it, not the token |
+| corner `hopDist` | `#944` | `#43=[#95+15]` — **15** is the DEFAULT hop height |
+
+**Zero NaN, zero throws, zero malformed lines in all four.** Every one of `util.js`'s `num`, `placement.js`'s
+`numv`, and every atom-kernel's own local copy share the identical `isNaN(Number(v)) ? default : Number(v)`
+shape — a token fails the numeric parse and silently, deterministically resolves to THE DECLARED DEFAULT. The
+emitted program is syntactically perfect, visually unremarkable, and **completely ignores what the operator
+configured** — with no error, no warning, no visible difference from the value the operator never touched. That
+is the advisor's own naming of this project's signature defect, confirmed by value: a plausible-looking wrong
+number reaching a machine.
+
+**Per instruction 2: STOPPED. Did not build the refuse mechanism this act.** This is a real, open hazard specific
+to the Blockly surface (the other two surfaces' `wireTokenGuard` already prevents an ineligible field from ever
+holding a token-shaped value in the first place — this gap exists ONLY because Blockly has no equivalent gate
+yet). Recommending act 5.
+
+### ACT 4 PROPER — driven in the real app, every claim screenshotted, not asserted
+
+**(a)+(b) eligible token survives to emit, all 3 surfaces:**
+- Twin form: corner `dist` — typed `#500`, screenshot shows it sitting in "Max Probe Dist" as ordinary text;
+  emit line `#1=#500 ( Max probe distance )`. (`verification/t1710-act4a-twin-form-field.png`)
+- Legacy wizard form: surfacing `sf_depth` — typed `#500` into "Skim Depth"; emit line
+  `#42=#500   ( total depth to face off )`. (`verification/t1710-act4a-wizard-form-field.png`)
+- Blockly: re-confirmed from t1708 (connected a Variable block, `workspaceToStack` carries the token, the
+  projected G-code panel showed `#42=#500` live) — not re-screenshotted, the t1708 evidence stands unchanged
+  (no source touched between turns).
+
+**(c) a malformed token is refused at the send gate, in the real app instance (not a bare unit call):**
+`GcodeExecutionEngine.defaultSyntaxVerify('G0 X#500;M30 Y10')` on the LIVE page's own loaded module →
+`{valid:false, errors:[{message:'Invalid expression for X'}]}` — act 1's fix, confirmed still live and reachable
+from the running app.
+
+**(d) an ineligible param refuses visibly, on both forms where it's built, SAME sentence:**
+- Twin form: surfacing `w` — typed `#`, screenshot shows the field with a red-flash border, value stayed `100`
+  (the character never landed). Toast text: *"Width and height decide whether the program has any cutting moves
+  at all (zero degrades to an empty program)..."* (`verification/t1710-act4d-twin-form-refuse.png`)
+- Legacy wizard form: `sf_w` — identical gesture, identical red border, **byte-identical toast text** to the
+  twin form's — confirmed by string equality, not eyeballed. (`verification/t1710-act4d-wizard-form-refuse.png`)
+
+### Verify
+
+**Node gate — 118/118**, unmoved (zero source files touched — confirmed via `git status` before writing this
+entry). **Hand-picked sweep — 11/11**: `corner-data-emit`, `surfacing-skim-sim-1635` (×4), `twin-form-
+completeness-1581` (×2, full registry), `send-gate-refuses-unreadable-1585` (×3, the send-gate family act 4c
+draws on). All pre-existing, all pass, none touched.
+
+### Emit byte-identical
+
+Trivially true — no source file was modified this turn; every claim above is a live measurement of code already
+shipped in t1700/t1704/t1706.
+
+### Capacity
+
+The hazard question came first because it had to — answering it AFTER building act 4's demo would have risked
+demonstrating a feature that looks complete while leaving a live, open safety gap unreported. Getting a clean,
+unambiguous answer (four sockets, four silent-default landings, zero ambiguity) took real care: the FIRST
+attempt at the originX check returned a truncated/wrong-looking JSON slice from a Blockly-canvas probe that
+would have been easy to over-read as evidence either way — recognized as a test artifact, discarded, and redone
+with the same direct generate()+emitMapped method already proven reliable for rampAngle/hopDist, rather than
+trusted on the first pass. Four clean, unambiguous emitted lines are worth more than one clever appeal to Blockly
+internals.
