@@ -22737,3 +22737,132 @@ order in `wizardManager.js`, not by assumption — that gating the DOM check on 
 real-browser answer for every twin, not just corner/middle. The map-citation self-catch (drifted by my own edit,
 caught by last turn's own checker) was a small bonus confirmation that the checkability act is already paying for
 itself.
+
+## 🔨 turn 1702 (cycle 849, epoch 4) — CYCLE ACT 1: CLOSE THE SEND-GATE HOLE — a `;` only starts a comment at a word boundary
+
+### REVIEW RECEIVED ON t1700: PASS
+
+Advisor: the declared/rendered split "keeps both truths without reinstating the blanket DOM query t1690 correctly
+removed"; the byte-identical snapshot regenerate (confirmed by an empty `git diff`, not asserted) and the
+render-then-layout ordering trace (not assumed) were both called out. Released **V2026.08.10.2**: node 118/0, e2e
+2468/10 failing, all ten documented churn (three unfamiliar names isolated and passed clean alone) —
+`custom-op-canvas-handles` is gone from the failure list. Advisor also recorded, unprompted, that the fast tier
+structurally could not have caught the t1690 regression (the shape needs a declared-but-unrendered param, which
+neither corner nor middle has, and the node stub can't express a "rendered" fact at all) — the slow release gate
+caught it, "the tiering working as designed."
+
+This turn opens **THE CYCLE** (`NEXT-SESSION.md`, built 2026-08-10 with the user): controller-token wizard fields,
+4 acts, ends when the end condition is demonstrated live. This is Act 1, first because the safety fix must ship
+*inside* the feature, not as a followup — no authoring surface exists yet to reach it, so Acts 2-4 build the
+surfaces this fix has to already be true for.
+
+### REPRODUCE FIRST, against the real path — quoted, not assumed
+
+```
+node --input-type=module -e "
+import { GcodeExecutionEngine } from './web/engine/GcodeExecutionEngine.js';
+console.log(GcodeExecutionEngine.defaultSyntaxVerify('G0 X#500;M30 Y10'));"
+→ {"valid":true,"errors":[]}
+```
+Confirmed, unmodified code, exactly t1668's measurement.
+
+### THE MECHANISM — not a G-code grammar bug; `;` really is a legitimate DDCS comment (ground-truth checked)
+
+Before touching anything, checked whether `;`-to-EOL is actually valid DDCS syntax (`~/.claude/skills/ddcs-expert/
+gcodeSyntax.md:787`, hardware-attested): **yes** — `; comment` is a real, valid DDCS comment style, same standing
+as `( … )`. So "G0 X#500;M30 Y10", taken as a WHOLE LINE, is unambiguous, correct DDCS grammar: run `G0 X#500`,
+ignore `;M30 Y10` as comment — the controller would not execute an "injected M30". That reframes the actual
+defect: it is not that the CONTROLLER is tricked, it is that the SEND-GATE silently accepts a malformed **token
+value** (the raw string a wizard field is meant to hold) that has trailing garbage glued onto it, because
+`stripLine` (`engine/core/program.js`) strips a `;`-comment BEFORE the word-level validator ever runs, discarding
+the evidence that the WORD itself — not just the line — was malformed.
+
+Traced exactly where the evidence disappears. `tokenizeWords` (unstripped) on `"G0 X#500;M30 Y10"` splits on
+LETTER boundaries only, so `;` (not a letter) stays glued to the preceding word: `X` → value `"#500;"` — the
+semicolon is trailing garbage on the SAME WORD, exactly the shape ACT 1's own instruction names. But
+`defaultSyntaxVerify` calls `stripLine` FIRST, and stripLine's old regex (`/;.*$/`) deletes `;M30 Y10`
+UNCONDITIONALLY — by the time `tokenizeWords` runs, the string is clean `"G0 X#500"`, X validates as a perfectly
+legitimate `#500`, and the malformed evidence is already gone. The grammar that WOULD catch it
+(`evalExpr`/`validateExpression`, the t1573/t1583/t1601 family — `lex()` already returns `null` for any
+unrecognized character including `;`) never gets the chance, because comment-stripping runs upstream of it and
+throws away exactly the character that would trip it.
+
+Checked whether this codebase's OWN emit ever glues a comment directly to a value (which would make tightening
+the rule a false-positive risk): every comment-append site found (`blockEmitter.js` and siblings) writes
+`` `G0 Z${clr}   ( retract )` `` — always multiple spaces then a marker. Grepped for any `;`-comment EMISSION
+anywhere in `web/` — none; this app only ever emits `( … )` comments and only ACCEPTS `;` on input/parse. So a
+real, intentional comment in every context this engine sees is always separated from the preceding value by
+whitespace — a `;` glued directly onto a value with none is never a legitimate case to protect.
+
+### THE FIX — `;` only starts a comment at a word boundary
+
+`engine/core/program.js`, `stripLine`:
+```js
+return s.replace(/(^|\s);.*$/, ' ').trim();   // was: s.replace(/;.*$/, ' ').trim();
+```
+A `;` at the start of the string, or preceded by whitespace, still strips exactly as before (every legitimate
+comment form, glued-paren or space-then-semicolon, is untouched). A `;` glued to a value with no preceding
+whitespace is now left UNSTRIPPED — `tokenizeWords`/`validateExpression` see it as part of that word's value and
+refuse it the same way they already refuse `#abc`/bare `#`/an unclosed `[`. Reproduction, re-run: `valid: false`,
+`"Invalid expression for X"` — refused, named, exactly per instruction 3 ("a malformed token must produce a
+refusal a human reads").
+
+### RE-RAN t1668's FULL malformed sweep, through the real `emitMapped` + `defaultSyntaxVerify` — not a unit stub
+
+| token | emitted | before | after |
+|---|---|---|---|
+| `#500` | `G0 X#500 Y10` | valid | valid (unchanged) |
+| `#abc` | `G0 X#abc Y10` | refused | refused (unchanged) |
+| `#` | `G0 X# Y10` | refused | refused (unchanged) |
+| `[` | `G0 X[ Y10` | refused | refused (unchanged) |
+| `[unclosed` | `G0 X[unclosed Y10` | refused | refused (unchanged) |
+| `#500 malicious` | `G0 X#500 malicious Y10` | refused | refused (unchanged) |
+| ` #500;M30` | `G0 X#500;M30 Y10` | **valid (wrong)** | **refused, "Invalid expression for X"** |
+
+All six already-refused shapes stay refused; the seventh — the survivor — is now refused too.
+
+### LEGITIMATE FORMS STILL PASS — tested against the real gate
+
+`#500` alone, `#[500]`, `#[#100+1]` (indirect), `[#500+10]` (bracketed expression), `ATAN[#52/#53]` (the
+two-var-subtraction division-by-zero case t1603 exists for) — all `valid: true`, unchanged. Comment forms:
+`( move to start )` glued or spaced, `; move to start` (space-then-semicolon), and a whole-line `; comment` —
+all still strip and validate clean. Which forms were tested is the table above plus this paragraph, not a
+representative claim.
+
+### Non-vacuity
+
+Backed up nothing needed — a one-line regex swap, edited in place and back. Reverted `stripLine` to the exact old
+regex, re-ran the exact reproduction: `valid: true` again (the injection sails through, watched, not assumed).
+Restored the fix, re-ran: `valid: false`, same error. `git diff` on the file after restore shows exactly the
+intended change, nothing else.
+
+### Verify
+
+**Node gate — 118/118**, unmoved (this act touches no `web/` module the node-tier gate's snapshot depends on).
+**Hand-picked sweep — 28/28**: the direct send-gate/validation family (`validation-divzero-not-syntax-1603`,
+`unclosed-bracket-refuses-1601`, `send-gate-refuses-unreadable-1585`, `send-gate-wiring-1585`,
+`atan-comma-form-1583`, `sim-rejects-what-machine-rejects-1573` — the t1573/1583/1601/1585/1603 family this fix
+extends) plus a representative sample of `stripLine`'s OTHER real consumer, the simulator/execution engine
+(`engine-trace`, `engine-dro`, `engine-subprogram-760`, `homing-engine`, `homing-play-complete`) — since
+`loadProgram` (not just `defaultSyntaxVerify`) calls `stripLine` for every real sim run, not only validation.
+Two results specifically confirm zero false-positive risk: `unclosed-bracket-refuses-1601`'s "ZERO goldens move —
+every shipped twin's default emit still passes the tightened parser" and `validation-divzero-not-syntax-1603`'s
+"the real Send dialog does NOT falsely refuse the shipped lathe OD-turn program." Not `test:changed` — per t1696.
+No full suite — the advisor gates at release.
+
+### Emit byte-identical
+
+Untouched for every existing shipped program — the change only changes behaviour for a line containing a `;`
+glued directly to a value with no preceding whitespace, a shape nothing in this codebase's own emit ever
+produces (checked, not assumed — see THE MECHANISM above) and no test fixture apparently uses either (the full
+sweep's zero-goldens-moved result is the empirical confirmation).
+
+### Capacity
+
+Ample. Real cost was again epistemic: the obvious first read ("stripLine deletes evidence, just don't strip")
+would have been WRONG on its own — `;` genuinely is valid DDCS comment syntax (ground-truth checked against the
+ddcs-expert corpus, not assumed), so the actual defect isn't "the line is unsafe," it's "a single malformed FIELD
+VALUE is silently accepted because line-level comment grammar can't see word-level boundaries." Getting the
+word-boundary framing right (rather than either reverting to a G-code-unsafe read or over-engineering a
+field-level pre-validator that didn't exist yet) is what let the fix land as a one-line regex change reusing
+grammar already hardened by three prior turns, instead of new machinery.

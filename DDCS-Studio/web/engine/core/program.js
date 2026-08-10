@@ -14,7 +14,15 @@ export function stripLine(raw) {
     // Remove innermost (...) repeatedly so nested comments like "( Probe top (Z down) )" strip fully —
     // a single non-nesting pass leaves a stray ")" that reads as an unrecognizable G-code line.
     do { prev = s; s = s.replace(/\([^()]*\)/g, ' '); } while (s !== prev);
-    return s.replace(/;.*$/, ' ').trim();
+    // t1700 (ACT 1) — a `;` only STARTS a comment at a WORD BOUNDARY (line start, or preceded by whitespace) —
+    // exactly how every comment this app itself ever emits is written ("G0 X100   ( retract )", always
+    // space-then-marker; this codebase emits no `;` comments of its own at all, only accepts them on input).
+    // `;` GLUED directly onto a value with no separating space ("X#500;M30") is not a real end-of-line
+    // comment — unbounded, it is trailing garbage silently absorbed on the PRECEDING WORD, which is exactly
+    // the injection shape t1668 measured (`' #500;M30 '` -> `valid: true`, never refused). Requiring the
+    // boundary leaves it UNSTRIPPED, so tokenizeWords/validateExpression see the glued `;` as part of that
+    // word's value and refuse it the same way they already refuse every other malformed word.
+    return s.replace(/(^|\s);.*$/, ' ').trim();
 }
 
 /**
