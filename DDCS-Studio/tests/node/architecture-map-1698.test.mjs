@@ -140,7 +140,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP1 cornerStack() usage (cornerData.js:231)', file: 'web/blocks/dataOps/cornerData.js', line: 231, find: /cornerStack\(/ },
     { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
     { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', line: 173, find: /latheLayoutSpec/ },
-    { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 237, find: /_writable/ },
+    { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 250, find: /_writable/ },
     { id: 'TRAP4 activeDialectOpts declares {dialect, indentStyle}', file: 'web/wizards/previewEmit.js', line: 21, lineEnd: 24, find: /indentStyle/ },
     { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', line: 26, find: /dialect/ },
     { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', line: 18, find: /dialect/ },
@@ -155,7 +155,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1103, lineEnd: 1104, find: /z-index/ },
     { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2779, find: /attach/ },
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
-    { id: 'TRAP9 _layout is a module-level singleton', file: 'web/wizards/ops/panelTypes.js', line: 626, find: /_layout/ },
+    { id: 'TRAP9 _layout is a module-level singleton', file: 'web/wizards/ops/panelTypes.js', line: 639, find: /_layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
     { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:587)', file: 'web/wizards/views/userOpView.js', line: 587, find: /renderLayout2D|el\('userVizContainer'\)/ },
 ];

@@ -445,19 +445,26 @@ grep -n "fc-anim-overlay" DDCS-Studio/web/styles.css DDCS-Studio/web/wizards/vie
 Two elements in `#userVizContainer`: a `z-index:-1` canvas and a transparent SVG. If a coordinate looks wrong in
 the Layout pane, **ask which of the two layers is wrong first.**
 
-### 3 · A DOM query standing in for a declaration → "17 twins will gain handles". The real answer was 2.
+### 3 · A DOM query standing in for a declaration → "17 twins will gain handles". The real answer was 2 — and
+dropping the DOM query ENTIRELY (t1690) was itself a regression, caught by the release gate (t1700).
 A dispatch relayed 17. Reading the whole regenerated snapshot diff — 10 lines, 7 insertions, 3 deletions, not the
 ~50 a 17-twin gain implies — showed only `user_corner_data` and `user_middle_data` moved. Of the other 15,
 **13 declare zero role/group-tagged bindings anywhere** and have no spatial X/Y to drag at all; **2** were a
-gate-harness gap, not a product gap. The replacement declaration:
+gate-harness gap, not a product gap. t1690 replaced the DOM query wholesale with a pure declaration — which then
+put a handle over a param with NO rendered field yet (declared ≠ rendered; `tests/custom-op-canvas-handles.spec.js`
+caught it). t1700 restored the DOM check as a SECOND, conditional half:
 ```js
-// wizards/ops/panelTypes.js:237
-const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name);
+// wizards/ops/panelTypes.js:250
+const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_formHostExists || !!_field(name));
 ```
-built from `MULTI_WIDGETS` (`panelTypes.js:25,234`) — the **same registry** `renderOpForm`'s `renderUnit` reads —
-in place of a live DOM query.
+The declared half (`_declaredParams`/`_unwritable`) is still built from `MULTI_WIDGETS` (`panelTypes.js:25,232`) —
+the **same registry** `renderOpForm`'s `renderUnit` reads. The DOM half (`_field`, `panelTypes.js:75`) is skipped
+when no real form host exists at all (`_formHostExists`, `panelTypes.js:249`) — the node-tier gate's `document` is
+an inert stub whose `querySelector` always returns null, so AND-ing `_field` in unconditionally would zero out
+every twin's handles there again. A real page's `#wiz_user_form` (`index.html:849`) exists from load, so there the
+DOM half is live and a handle only appears once its own field has actually rendered.
 ```bash
-rg -n "_writable" DDCS-Studio/web/wizards/ops/panelTypes.js
+rg -n "_writable|_formHostExists" DDCS-Studio/web/wizards/ops/panelTypes.js
 ```
 
 ### 4 · A fact declared and read by nobody — the `indentStyle` split. **UNVERIFIED at runtime; strong static read.**
@@ -509,7 +516,7 @@ rg -n "\.attach\(" DDCS-Studio/web --glob '*.js'
 ```
 
 ### 9 · `renderDeclaredLayout` is an exported function with ZERO callers — and it is the shape that would break the overlay.
-`_layout` is a module-level singleton (`panelTypes.js:626`) and `FeatureCanvas._mount` wipes `container.innerHTML`
+`_layout` is a module-level singleton (`panelTypes.js:639`) and `FeatureCanvas._mount` wipes `container.innerHTML`
 when the container changes (`featureCanvas.js:92-95`). Both live call sites pass `el('userVizContainer')`
 (`userOpView.js:587,602`), so it never fires. If a second container is ever rendered, the wipe destroys
 `.fc-anim-overlay` while `container.__animOverlay` still holds the detached canvas (`userOpView.js:86`) — the

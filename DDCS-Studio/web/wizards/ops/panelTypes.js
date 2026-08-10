@@ -218,23 +218,36 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const srcCol = (pass) => (!Array.isArray(sources)) ? null : (sources[pass] === 'manual' ? '#ffb300' : '#22d3ee');
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
-    // t1690 DECLARE `_writable` — a param is individually settable (gets its OWN drag handle) unless it shares a
+    // t1690 DECLARE `_writable`'s STRUCTURAL half — a param is individually settable AT ALL unless it shares a
     // GROUP with a sibling AND that group's WIDGET is one `renderOpForm`'s `renderUnit` combines into a single
     // control the members can't be addressed through separately (formWidgets.js's own `MULTI_WIDGETS` registry —
     // exactly the rule `renderUnit` itself applies: `unit.length > 1 && MULTI_WIDGETS.has(unit[0].widget)`). A
     // when-gated GROUP is already skipped entirely above, before `_writable` is ever asked, by the `gWhen`/`whenOk`
-    // check each `for (const gid in groups)` loop below performs — so `_writable` needs no params/DOM/live-value
-    // check of its own: whether a param is INDIVIDUALLY addressable is a property of the BINDING'S OWN declared
-    // shape (its group + that group's widget), never of the current param values. Verified against the real DOM
-    // check it replaces: `renderOpForm` renders every declared binding's row regardless of `when` (t1303 — hidden,
-    // not removed), so `_field`/`document.querySelector` found the SAME rows this set does, for every twin measured.
+    // check each `for (const gid in groups)` loop below performs — so this half needs no live-value check of its
+    // own: whether a param CAN be individually addressed is a property of the BINDING'S OWN declared shape (its
+    // group + that group's widget), never of the current param values.
     const _unwritable = new Set();
     for (const gid in groups) {
         const unit = groups[gid];
         if (unit.length > 1 && MULTI_WIDGETS.has(unit[0] && unit[0].widget)) for (const b of unit) _unwritable.add(b.param);
     }
     const _declaredParams = new Set((def.bindings || []).map((b) => b && b.param).filter(Boolean));
-    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name);
+    // t1700 — REGRESSION FOUND BY THE RELEASE GATE: t1690 dropped the RENDERED half by mistake. DECLARED is not the
+    // same fact as RENDERED — a param can be individually addressable BY SHAPE and still have no live field yet (the
+    // very first paint, before `render()` has run), and a handle over it writes nowhere: a dead affordance
+    // (`tests/custom-op-canvas-handles.spec.js`'s own case for this, unchanged since before t1690). `_field` (line
+    // ~75) already answers "does a field exist for this param RIGHT NOW" — restore it as the SECOND half, but ONLY
+    // once a real form host is actually present: the node-tier gate's `document` is an INERT STUB whose
+    // `querySelector` always returns null (register.mjs's own docstring: "a document that answers structural
+    // questions with nothing"), so AND-ing `_field` in unconditionally would zero out corner/middle's handles there
+    // again — the exact node-tier gap t1690 fixed. Gating on `#wiz_user_form`'s mere EXISTENCE (not the specific
+    // field) tells the two environments apart cleanly: the node-tier stub never has one (no host → declared-only
+    // stands, matching t1690's steady-state answer there); a real page always does (`index.html`'s static
+    // `<div id="wiz_user_form">`, present from load, before any wizard opens) — so once a form host exists, a
+    // handle is writable only once ITS OWN field has actually rendered into it, restoring the exact browser
+    // behaviour `_field` gave before t1690 (verified live then; unchanged now — see WORK-LOG t1690's own probe).
+    const _formHostExists = (typeof document !== 'undefined') && !!document.querySelector('#wiz_user_form');
+    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_formHostExists || !!_field(name));
     const items = [], decls = [];
     // t708 — DECLARED preview geometry (the general seam): an atom may declare real vector geometry + handles. Its handle
     // decls join `decls` (so they build through the SAME setFields writer round-trip below); its paths join a `paths` array

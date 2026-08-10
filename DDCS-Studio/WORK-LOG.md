@@ -22618,3 +22618,122 @@ Straightforward mechanically, but the two genuine map-citation errors (findings 
 churn (finding 6) are exactly the kind of thing this act exists to catch — a map is only as trustworthy as the
 last time someone checked it, and this turn is the first time anyone did, five hours after it landed. Room was
 ample.
+
+## 🔨 turn 1700 (cycle 848, epoch 4) — t1700: THE RENDERED HALF WAS MISSING — `_writable` restored to declared-AND-rendered
+
+### REVIEW RECEIVED ON t1698: PASS
+
+Advisor redid the non-vacuity proof themselves, the hard way — their first probe (shifting every line in a cited
+file) was correctly INVALID (exactly the drift content-matching tolerates); the real one (editing content at
+`wizardLibrary.js:56`) went red naming the claim, file, line, and missing pattern. Confirmed the two genuine
+map-citation fixes were worth more than a green run, and that anchoring the `NEXT-SESSION.md` citation by content
+(not line) was "the right instinct: pin the FACT, not the coordinate."
+
+### THE REGRESSION — t1690 dropped a half, not a bug
+
+Advisor's own release gate (full suite, `3b410603`): node 118/0, e2e 2466/12 failing, five contention, ONE real:
+`tests/custom-op-canvas-handles.spec.js:46` — `expect(r.roHandles, 'no dead handle over a non-writable param').toBe(0)`.
+
+**Reproduced first**, per instruction: `npx playwright test tests/custom-op-canvas-handles.spec.js` — 1 failed / 3
+passed, `Expected: 0, Received: 1` at exactly that line. Confirmed, not assumed.
+
+t1690 replaced the OLD `_writable` (`_field(name)` — a live `document.querySelector('#wiz_user_form
+[data-param=...]')`) with a PURE declaration (`_declaredParams.has(name) && !_unwritable.has(name)`) to fix the
+node-tier gate, whose `document` is an INERT STUB (`register.mjs`: `querySelector: () => null` unconditionally) —
+the old DOM query was ALWAYS false there, hiding corner/middle's real handles from the gate regardless of what a
+real browser would show. That was the right diagnosis and the right fix for the node-tier gap. But it threw away
+the OTHER thing the DOM query was doing in a REAL browser: telling `_writable` whether a field has actually
+rendered YET. **Declared is not rendered** — a param can be individually addressable BY SHAPE (not grouped into a
+`MULTI_WIDGETS` control) and still have no live `[data-param]` element the instant `layoutSpecFromOp` runs, and a
+handle over it writes nowhere: the exact dead-affordance case `custom-op-canvas-handles.spec.js` was written
+(pre-t1690) to prevent, still true today, unchanged.
+
+### THE FIX — DECLARED-AND-RENDERED, with the DOM half gated on a real host existing at all
+
+Per instruction: fix the declaration, don't revert. `panelTypes.js:249-250`:
+```js
+const _formHostExists = (typeof document !== 'undefined') && !!document.querySelector('#wiz_user_form');
+const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_formHostExists || !!_field(name));
+```
+`_field` (pre-existing, never deleted — t1690 kept it for the actual drag-WRITE mechanism) is restored as a SECOND
+gate, but only enforced once a real form host exists at all. The discriminator is `#wiz_user_form`'s mere
+EXISTENCE, not the specific field: the node-tier stub never has one (`querySelector` always null, so
+`_formHostExists` is always false there → declared-only stands, exactly t1690's steady-state answer, unchanged);
+a real page always does (`index.html:849`, a static empty `<div id="wiz_user_form">` present from load, before
+any wizard opens) → there the DOM half is live, and a handle only appears once its own field has actually
+rendered into it. This is why an unconditional AND (`_declaredParams.has(name) && !!_field(name)`, no
+`_formHostExists` gate) was rejected first: it would have zeroed EVERY twin's node-tier handles again, reproducing
+t1690's original bug from the other side.
+
+Traced WHY this doesn't regress corner/middle's real-browser behaviour: `wizardManager.js:288,305` calls
+`view.onShow(this)` (→ `userOpView.render()`, which populates `#wiz_user_form` with every declared field) THEN
+`this.update()` (→ `renderLayout2D` → `layoutSpecFromOp`) — form-then-layout, always, in that order, for every
+real wizard open. So by the time `_writable` runs for real, `_field(name)` is already true for every declared,
+non-multi-widget param — same answer the pure declared rule gave, verified by the sweep below rather than assumed.
+
+### SIBLING SHAPE (a count, not a fix, per instruction)
+
+Are there OTHER params, beyond `MULTI_WIDGETS` members, that are declared but structurally never get a field
+(not a timing gap — a permanent one)? Traced the two mechanisms that would have to leak one: `formBindings()`
+(`formWidgets.js:971`) unions EVERY `def.bindings` entry back into its output even when a `param_group` exists
+(the t1579 fix, `formWidgets.js:1004-1010` — a row-less binding still lands, never dropped); `renderUiTree`
+(`formWidgets.js:1216`) has an orphan-catching fallback (`formWidgets.js:1404-1420`, t1605) that appends ANY
+`byParam` row the tree didn't explicitly place. No other widget type combines >1 param into one control
+(`FORM_WIDGETS` has exactly two multi-binding functions, `xyPadWidget`/`rectPadWidget`, both already in
+`MULTI_WIDGETS`); grepped for any `noForm`/`formOnly`/`skipForm`-shaped flag — none exists. Rather than trust that
+reading alone, ran the spec that already measures this empirically across the FULL registry:
+`tests/twin-form-completeness-1581.spec.js` — for all 32 boot-seeded twins, every `stored.bindings` param appears
+in `formBindings(stored)`'s output (`rawParams.filter(p => !fbParams.has(p))` must be `[]`) — 2/2 passed, fresh
+run. **Count: 0** — beyond the two known `MULTI_WIDGETS` twins (corner/middle's grouped members, already excluded
+by `_unwritable`, correctly), no twin has a param that's declared but structurally unrenderable.
+
+### Preview gate snapshot — regenerated deliberately, byte-identical
+
+`UPDATE_PREVIEW_SNAPSHOT=1 node --import ./tests/node/support/register.mjs --test
+tests/node/preview-spec-gate-1688.test.mjs` → `git diff --stat` on the snapshot: **empty, no output at all**. The
+`_formHostExists` gate is always false in the node-tier stub (no `document.querySelector` ever finds
+`#wiz_user_form` there), so `_writable` reduces to exactly the pure declared check t1690 shipped — the ENTIRE
+node-tier gate is unmoved, not just unbroken. Re-ran without the env var: 12/12 green, same as before this act.
+
+### Architecture map — two citations drifted from my OWN edit, caught by the checker I built last turn
+
+Adding the `_formHostExists`/comment block shifted two of `panelTypes.js`'s later line numbers. Running the full
+node gate after the source fix surfaced it immediately: TRAP3 (`_writable` — `237`→`250`) and TRAP9 (`_layout` —
+`626`→`639`) both went red, naming themselves. Fixed both citations in `ARCHITECTURE.md` AND rewrote TRAP3's prose
+(it previously said `_writable` was built "in place of a live DOM query" — now false; it's declared-AND-rendered,
+gated on a real host) plus its inline code snippet (was quoting the STALE t1690-only definition). Updated the
+checker's matching claim lines. Exactly the kind of drift `architecture-map-1698.test.mjs` exists to catch, on its
+very first turn of use — not hypothetical.
+
+### Non-vacuity
+
+The reproduction step (before touching source) IS the non-vacuity proof for this act: the existing, unmodified
+spec failed (1/0/3 — `Expected: 0, Received: 1`) against the pre-fix code, then passed (4/4) after the fix. Same
+discipline as authoring a new failing-then-passing test, applied to a pre-existing one that already carried it.
+
+### Verify
+
+**Node gate — 118/118** (includes the now-updated architecture-map checker, unmoved preview-gate snapshot).
+**THIS spec — 4/4** (`custom-op-canvas-handles.spec.js`, the regression's own spec). **Hand-picked sweep — 77/77**:
+every spec in the repo referencing `layoutSpecFromOp`/`_writable`/`renderLayout2D` (20 files) plus every consumer
+t1690 itself named as its targeted sweep (corner-data-sim-marker-track, middle-manual-markers,
+middle-repos-landing-963, middle-trans-traverse, census-finding2-emits-teal-1684, corner-data-sim-marker-emits,
+corner-data-drag) plus `twin-form-completeness-1581` (the sibling-shape evidence). Not `test:changed` — per my own
+t1696 finding, it can't trace a `web/`-only source change reached through `page.evaluate(() => import(...))`. No
+full suite — the advisor re-runs that at release, which is where this was caught in the first place.
+
+### Emit byte-identical
+
+Untouched — `_writable` gates whether a PREVIEW HANDLE exists, never what a param holds or how it's written
+(`_writeParam`/the actual drag-write path are unchanged). Every emit-asserting spec in the sweep above
+(`corner-data-drag`, `middle-trans-traverse`'s round-trip, `layout-placement-parity-718`'s 9-op emit-coincidence
+sweep, `rotary-datum-glyph`'s byte-identical-across-a-sweep test) still passes unchanged.
+
+### Capacity
+
+Ample. The real cost was epistemic, same shape as t1690's own "17 vs 2": tracing WHY the node-tier stub makes an
+unconditional DOM check wrong (not just noting that it is), and confirming — via the real render-then-layout call
+order in `wizardManager.js`, not by assumption — that gating the DOM check on host-existence reproduces the exact
+real-browser answer for every twin, not just corner/middle. The map-citation self-catch (drifted by my own edit,
+caught by last turn's own checker) was a small bonus confirmation that the checkability act is already paying for
+itself.
