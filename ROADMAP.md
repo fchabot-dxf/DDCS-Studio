@@ -135,6 +135,50 @@ floor: the validator guarantees the **protocol** (won't break the controller), n
 that semantics belongs to the author. Real-time loops (plasma THC) stay below the floor, delegated to the controller.
 Full essay: [`docs/archive/WIZARD-PLATFORM-VISION.md`](docs/archive/WIZARD-PLATFORM-VISION.md).
 
+### 📐 WHAT IS ACTUALLY DECLARED — the three legs, measured 2026-08-09 (advisor)
+
+The north star says *every wizard becomes data*. Measured against the live registry, that is **two-thirds true**:
+
+```
+  EMIT     32/32 declared   a block stack + bindings; fork-parity-1593 forks all 32
+                            twins byte-identically across a 152-flip structural sweep
+  FORM     32/32 declared   param · type · default · label · section · widget ·
+                            options · help — rendered generically by renderOpForm;
+                            nobody writes form HTML per wizard
+  PREVIEW   0/32 declared   hand-written renderers, each deciding independently what
+                            frame it draws in, what a handle looks like, whether a
+                            thing is drawn at all
+```
+
+**Every defect the user hit on 2026-08-09 lived in the third leg**, and the emit was correct through all of them.
+The reason it went unnoticed: `preview-only, emit unaffected` was (correctly) a *safety* argument and slid into
+meaning *needs no declaration and no gate* — and ~2450 tests assert emitted text and data structures while
+essentially **none render anything**, so a preview defect cannot turn a test red. The only detector was the user.
+
+**ARC A — PREVIEW AS DATA (next, being scoped).** One declared source per presentation fact, read by every
+renderer in a pane. ⚠ **The make-or-break is the GATE, not the declarations**: the emit port had byte-identity as
+its proof; the preview has no equivalent. If a preview-equivalent of byte-identity cannot be built cheaply, the
+arc should not start — build the gate first. Known members: the coordinate frame (t1672/t1686 — two renderers in
+one pane disagreeing), does-this-handle-drive-the-emit (t1684, `emits`/`teal`), handle affordances (t1680
+`onEdit`, t1674 `noSnap`). Cheaper alternative if the full arc is refused: frame + emit-driving contract only.
+
+**ARC B — VALIDATION AS DATA (after A).** Today every lint rule is hand-added per case, so a field is checked only
+if someone remembered — the same shape as the four declared-but-unread findings in the t1678 census. Known
+members already in the queue: `ifgoto` lhs/rhs unlinted (its own note says it *needs a declared
+expression-bearing-but-string-defaulted discriminator*), an `IF`'s children never linted (the walk skips `cond`),
+the shape-field typo hook (a typo skips silently), and t1668's real hazard — `' #500;M30 '` emits
+`G0 X#500;M30` and `defaultSyntaxVerify` returns **valid**. Safety-adjacent: the failure mode is malformed G-code
+passing the send gate. Shape: an atom DECLARES what its fields must satisfy; one validator reads it.
+
+**ARC C — DIALECT AS DATA (with the porting arc).** Per-controller facts are discovered by hardware test and then
+hand-written into each emit site. t1634 is the worked example: the Expert REJECTS the Fanuc slash form
+`ATAN[a]/[b]`, the comma form is hardware-proven on both controllers, and the fix was two hand-edited emit sites.
+`trigEvidence.js` already records that the ATAN form is *dialect-scoped* — the REASON is written down, the
+DECLARATION is not. A second target multiplies every such fact. See also `PORTING.md`.
+
+**Order is deliberate: A, then B, then C.** Three half-declared layers is worse than two finished and one not
+started — 2026-08-09 is the evidence for what a half-declared layer costs.
+
 ### ⚑ Key reframe (code-verified): the "staged engine" is largely **already built**
 The vision doc framed expressions/loops as future work. They ship today:
 - **Stage 2 — expressions in the blanks:** `wizards/ops/expr.js` `evalExpr()` (recursive-descent, no `eval`), wired through `blockEmitter` `resolveValue/resolveBool`. Any value socket already takes `depth*2`-style expressions. ✅
