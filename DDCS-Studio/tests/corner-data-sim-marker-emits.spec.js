@@ -147,6 +147,35 @@ test('(D) backward-compat: built-in middle/alignment start markers stay sim-only
   expect(r.ali.every((e) => e === false), 'every alignment pass stays sim-only (unchanged)').toBe(true);
 });
 
+// (F) t1688 THE GLYPH RESOLVER — CROSS-PANE AGREEMENT: the lead pass (pass 0 — always sim-only, opSimStarts' own
+//     makeProvider forces `emits:false` there structurally) must render HOLLOW in the LAYOUT pane too, matching the
+//     3D pane (test B above already proves vizEmits[0] === false). Before t1688 this was the reported symptom: the
+//     Layout pane's synthetic Start handle never received `emits` at all (panelTypes.js:574 → userOpView.js's
+//     `simStart`), so it always rendered FILLED regardless of the true value, disagreeing with the 3D pane.
+test('(F) cross-pane agreement: the lead pass renders HOLLOW in the Layout pane, matching the 3D (no live-emits disagreement)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+  await page.evaluate(async () => {
+    const U = await import('/blocks/userOps.js');
+    const CD = await import('/blocks/dataOps/cornerData.js');
+    localStorage.removeItem('ddcs_user_ops');
+    U.createUserOp(CD.cornerDataDef());
+  });
+  await page.evaluate(() => window.openWiz('user_corner_data'));
+  await page.waitForSelector('#wiz_user_form input[type="number"]', { state: 'visible' });
+  await page.evaluate(() => { const t = document.querySelector('[data-tab="layout"], [data-viz-mode="2d"], .viz-tab-2d'); if (t) t.click(); });
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const svg = document.querySelector('#userVizContainer svg, .wiz-layout svg');
+    const el = svg && svg.querySelector('[data-hid="__simstart0"]');
+    return el ? { found: true, fill: getComputedStyle(el).fill, tag: el.tagName.toLowerCase() } : { found: false };
+  });
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+  expect(r.found, 'the Layout renders the lead-pass Start handle (__simstart0)').toBe(true);
+  expect(r.tag, 'the lead pass is always the operator jog → a circle').toBe('circle');
+  expect(r.fill, 'the lead pass never emits (opSimStarts forces emits:false at pass 0) → HOLLOW: fill is none/transparent').toMatch(/^(none|transparent|rgba\(0, 0, 0, 0\))$/);
+});
+
 // (E) EMIT BYTE-PARITY — the emits flag is SIM-ONLY: the twin's emitted G-code stays byte-identical to cornerStack (both
 //     probeZFirst states) and the word "emits" never appears in the program. Proves the change never touched the emit path.
 test('(E) emit byte-parity: the emits flag is sim-only — no G-code change, no leak', async ({ page }) => {

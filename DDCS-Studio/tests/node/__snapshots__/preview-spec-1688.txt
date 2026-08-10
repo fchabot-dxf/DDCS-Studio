@@ -136,8 +136,8 @@ user_atc_warmup_data @offdefaults .placement {"x":300,"y":200}
 user_atc_warmup_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_bore_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_bore_data @defaults .handles <2 entries>
-user_bore_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
-user_bore_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":6,"y":0}
+user_bore_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
+user_bore_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":6,"y":0}
 user_bore_data @defaults .items <0 entries>
 user_bore_data @defaults .onDrag "<fn/2>"
 user_bore_data @defaults .onEdit "<fn/2>"
@@ -148,9 +148,9 @@ user_bore_data @defaults .placement {"x":300,"y":200}
 user_bore_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_bore_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_bore_data @offdefaults .handles <3 entries>
-user_bore_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3.5,"y":7}
-user_bore_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
-user_bore_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":13,"y":7}
+user_bore_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":7}
+user_bore_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
+user_bore_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":13,"y":7}
 user_bore_data @offdefaults .items <0 entries>
 user_bore_data @offdefaults .onDrag "<fn/2>"
 user_bore_data @offdefaults .onEdit "<fn/2>"
@@ -268,8 +268,8 @@ user_comm_data @offdefaults .placement {"x":300,"y":200}
 user_comm_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_contour_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_contour_data @defaults .handles <2 entries>
-user_contour_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3,"y":3}
-user_contour_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"ct_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":83,"y":63}
+user_contour_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3,"y":3}
+user_contour_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"ct_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":83,"y":63}
 user_contour_data @defaults .items <0 entries>
 user_contour_data @defaults .onDrag "<fn/2>"
 user_contour_data @defaults .onEdit "<fn/2>"
@@ -281,8 +281,8 @@ user_contour_data @defaults .placement {"x":300,"y":200}
 user_contour_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_contour_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_contour_data @offdefaults .handles <2 entries>
-user_contour_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":25.5,"y":29}
-user_contour_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"ct_size","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":54,"y":29}
+user_contour_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":25.5,"y":29}
+user_contour_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"ct_size","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":54,"y":29}
 user_contour_data @offdefaults .items <0 entries>
 user_contour_data @offdefaults .onDrag "<fn/2>"
 user_contour_data @offdefaults .onEdit "<fn/2>"
@@ -319,7 +319,7 @@ user_corner_data @offdefaults .placement {"x":300,"y":200}
 user_corner_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_drill_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_drill_data @defaults .handles <1 entries>
-user_drill_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_drill_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_drill_data @defaults .items <0 entries>
 user_drill_data @defaults .onDrag "<fn/2>"
 user_drill_data @defaults .onEdit "<fn/2>"
@@ -330,8 +330,8 @@ user_drill_data @defaults .placement {"x":300,"y":200}
 user_drill_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_drill_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_drill_data @offdefaults .handles <2 entries>
-user_drill_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3.5,"y":7}
-user_drill_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
+user_drill_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":7}
+user_drill_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
 user_drill_data @offdefaults .items <0 entries>
 user_drill_data @offdefaults .onDrag "<fn/2>"
 user_drill_data @offdefaults .onEdit "<fn/2>"
@@ -694,8 +694,8 @@ user_pause_confirm @offdefaults .placement {"x":300,"y":200}
 user_pause_confirm @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_pocket_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_pocket_data @defaults .handles <2 entries>
-user_pocket_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
-user_pocket_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"pk_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":80,"y":60}
+user_pocket_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
+user_pocket_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"pk_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":80,"y":60}
 user_pocket_data @defaults .items <0 entries>
 user_pocket_data @defaults .onDrag "<fn/2>"
 user_pocket_data @defaults .onEdit "<fn/2>"
@@ -718,8 +718,8 @@ user_pocket_data @defaults .placement {"x":300,"y":200}
 user_pocket_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_pocket_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_pocket_data @offdefaults .handles <2 entries>
-user_pocket_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":32,"y":35.5}
-user_pocket_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"pk_size","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":60.5,"y":35.5}
+user_pocket_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":32,"y":35.5}
+user_pocket_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"pk_size","kind":"size","label":"Ø","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":60.5,"y":35.5}
 user_pocket_data @offdefaults .items <0 entries>
 user_pocket_data @offdefaults .onDrag "<fn/2>"
 user_pocket_data @offdefaults .onEdit "<fn/2>"
@@ -776,10 +776,10 @@ user_rotary_clock_data @offdefaults .placement {"x":300,"y":200}
 user_rotary_clock_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_slot_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_slot_data @defaults .handles <4 entries>
-user_slot_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","noSnap":"<undefined>","x":30,"y":0}
-user_slot_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
-user_slot_data @defaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","noSnap":"<undefined>","x":60,"y":0}
-user_slot_data @defaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","noSnap":"<undefined>","value":"<undefined>","x":30,"y":3}
+user_slot_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","manual":"<undefined>","noSnap":"<undefined>","x":30,"y":0}
+user_slot_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
+user_slot_data @defaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":60,"y":0}
+user_slot_data @defaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":30,"y":3}
 user_slot_data @defaults .items <0 entries>
 user_slot_data @defaults .onDrag "<fn/2>"
 user_slot_data @defaults .onEdit "<fn/2>"
@@ -792,10 +792,10 @@ user_slot_data @defaults .placement {"x":300,"y":200}
 user_slot_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_slot_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_slot_data @offdefaults .handles <4 entries>
-user_slot_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","noSnap":"<undefined>","x":33.5,"y":13.5}
-user_slot_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","noSnap":"<undefined>","x":3.5,"y":13.5}
-user_slot_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","noSnap":"<undefined>","x":63.5,"y":13.5}
-user_slot_data @offdefaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","noSnap":"<undefined>","value":"<undefined>","x":33.5,"y":20}
+user_slot_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","manual":"<undefined>","noSnap":"<undefined>","x":33.5,"y":13.5}
+user_slot_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":13.5}
+user_slot_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","manual":"<undefined>","noSnap":"<undefined>","x":63.5,"y":13.5}
+user_slot_data @offdefaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":33.5,"y":20}
 user_slot_data @offdefaults .items <0 entries>
 user_slot_data @offdefaults .onDrag "<fn/2>"
 user_slot_data @offdefaults .onEdit "<fn/2>"
@@ -808,8 +808,8 @@ user_slot_data @offdefaults .placement {"x":300,"y":200}
 user_slot_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_surfacing_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_surfacing_data @defaults .handles <2 entries>
-user_surfacing_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":false,"x":0,"y":0}
-user_surfacing_data @defaults .handles[1] {"color":"<undefined>","displayVals":[100,80],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":100,"y":80}
+user_surfacing_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":false,"x":0,"y":0}
+user_surfacing_data @defaults .handles[1] {"color":"<undefined>","displayVals":[100,80],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":100,"y":80}
 user_surfacing_data @defaults .items <0 entries>
 user_surfacing_data @defaults .onDrag "<fn/2>"
 user_surfacing_data @defaults .onEdit "<fn/2>"
@@ -820,8 +820,8 @@ user_surfacing_data @defaults .placement {"x":300,"y":200}
 user_surfacing_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_surfacing_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_surfacing_data @offdefaults .handles <2 entries>
-user_surfacing_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":true,"x":0,"y":0}
-user_surfacing_data @offdefaults .handles[1] {"color":"<undefined>","displayVals":[107,87],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":114,"y":94}
+user_surfacing_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":true,"x":0,"y":0}
+user_surfacing_data @offdefaults .handles[1] {"color":"<undefined>","displayVals":[107,87],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":114,"y":94}
 user_surfacing_data @offdefaults .items <0 entries>
 user_surfacing_data @offdefaults .onDrag "<fn/2>"
 user_surfacing_data @offdefaults .onEdit "<fn/2>"
@@ -832,7 +832,7 @@ user_surfacing_data @offdefaults .placement {"x":300,"y":200}
 user_surfacing_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_tap_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_tap_data @defaults .handles <1 entries>
-user_tap_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_tap_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
 user_tap_data @defaults .items <0 entries>
 user_tap_data @defaults .onDrag "<fn/2>"
 user_tap_data @defaults .onEdit "<fn/2>"
@@ -843,7 +843,7 @@ user_tap_data @defaults .placement {"x":300,"y":200}
 user_tap_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_tap_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_tap_data @offdefaults .handles <1 entries>
-user_tap_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3.5,"y":7}
+user_tap_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":3.5,"y":7}
 user_tap_data @offdefaults .items <0 entries>
 user_tap_data @offdefaults .onDrag "<fn/2>"
 user_tap_data @offdefaults .onEdit "<fn/2>"
@@ -854,8 +854,8 @@ user_tap_data @offdefaults .placement {"x":300,"y":200}
 user_tap_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_text_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_text_data @defaults .handles <2 entries>
-user_text_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
-user_text_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","noSnap":"<undefined>","value":"<undefined>","x":42.5143,"y":0}
+user_text_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
+user_text_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":42.5143,"y":0}
 user_text_data @defaults .items <0 entries>
 user_text_data @defaults .onDrag "<fn/2>"
 user_text_data @defaults .onEdit "<fn/2>"
@@ -873,8 +873,8 @@ user_text_data @defaults .placement {"x":300,"y":200}
 user_text_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
 user_text_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
 user_text_data @offdefaults .handles <2 entries>
-user_text_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":1489.4621,"y":186.4224}
-user_text_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","noSnap":"<undefined>","value":"<undefined>","x":4452.6094,"y":550.2511}
+user_text_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"manual":"<undefined>","noSnap":"<undefined>","x":1489.4621,"y":186.4224}
+user_text_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","manual":"<undefined>","noSnap":"<undefined>","value":"<undefined>","x":4452.6094,"y":550.2511}
 user_text_data @offdefaults .items <0 entries>
 user_text_data @offdefaults .onDrag "<fn/2>"
 user_text_data @offdefaults .onEdit "<fn/2>"
@@ -935,14 +935,14 @@ user_wcs_data @offdefaults .origin {"x":0,"y":0}
 user_wcs_data @offdefaults .paths null
 user_wcs_data @offdefaults .placement {"x":300,"y":200}
 user_wcs_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
-gesture crossAim {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":19,"x":37,"y":20}
-gesture diagAim {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","noSnap":true,"x":17,"y":31}
-gesture length {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":12,"y":2}
-gesture point {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","labelDir":"<undefined>","noSnap":true,"x":4,"y":7}
-gesture probeVector {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":14,"x":18,"y":6}
-gesture projLength {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":17,"y":6}
-gesture radial {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":14.531,"y":11.7531}
-gesture rect {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","labelDir":"<undefined>","noSnap":true,"value":11,"x":8,"y":10}
-gesture scaleX {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":9,"y":2}
-gesture shear {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":2.9438,"y":12}
-gesture translate {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","noSnap":true,"x":4,"y":6}
+gesture crossAim {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":19,"x":37,"y":20}
+gesture diagAim {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","manual":true,"noSnap":true,"x":17,"y":31}
+gesture length {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":11,"x":12,"y":2}
+gesture point {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","labelDir":"<undefined>","manual":true,"noSnap":true,"x":4,"y":7}
+gesture probeVector {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":14,"x":18,"y":6}
+gesture projLength {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":11,"x":17,"y":6}
+gesture radial {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":11,"x":14.531,"y":11.7531}
+gesture rect {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","labelDir":"<undefined>","manual":true,"noSnap":true,"value":11,"x":8,"y":10}
+gesture scaleX {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":11,"x":9,"y":2}
+gesture shear {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","manual":true,"noSnap":true,"value":11,"x":2.9438,"y":12}
+gesture translate {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","manual":true,"noSnap":true,"x":4,"y":6}

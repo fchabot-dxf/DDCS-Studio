@@ -78,7 +78,7 @@ test('(2) emit byte-parity: marker chaining + geometry hoist never touch the G-c
 });
 
 // (3) PART 2 — the sim-only start handle renders on the Layout FeatureCanvas as a HOLLOW circle ○ (t81; distinct from the filled emitting handles).
-test('(3) Layout canvas: the Start marker is a filled AMBER circle (second renderer of the userStarts seam)', async ({ page }) => {
+test('(3) Layout canvas: the Start marker is a HOLLOW amber circle (t1688 — it never emits, second renderer of the userStarts seam)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => document.documentElement.dataset.ddcsInteractive === '1');
   await page.evaluate(async () => {
@@ -101,9 +101,13 @@ test('(3) Layout canvas: the Start marker is a filled AMBER circle (second rende
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
   expect(info.present, 'the Start handle renders on the Layout canvas').toBe(true);
   expect(info.tag, 'drawn as a CIRCLE (t293 — the manual-jog shape, distinct from the auto square)').toBe('circle');
-  // t293 — the Start is the operator's manual jog → a FILLED AMBER circle (was hollow cyan)
-  expect(info.fill, 'FILLED amber (the manual Start)').toBe('rgb(255, 179, 0)');
-  expect(info.stroke, 'amber stroke — the manual-jog colour').toBe('rgb(255, 179, 0)');
+  // t1688 THE GLYPH RESOLVER — the Start (pass 0) is ALWAYS sim-only: opSimStarts' own makeProvider forces
+  // `emits:false` at the lead pass structurally (dragging it can never write a value into the emitted program — the
+  // operator physically jogs there), so it renders HOLLOW, matching the 3D pane (setStartEmits already carried the
+  // same false at pass 0). Before this act the Layout's Start handle never received `emits` at all (panelTypes.js's
+  // SIM_ID handle, threaded from userOpView's simStart), so it always rendered filled regardless of the true value.
+  expect(info.fill, 'HOLLOW: the Start never emits (opSimStarts forces emits:false at the lead pass)').toBe('none');
+  expect(info.stroke, 'amber stroke — the manual-jog colour, unchanged by the fill fix').toBe('rgb(255, 179, 0)');
 });
 
 // (4) PART 2 — the EMITTING reposition handle owns its OWN drag (writes cross1_x): it sits at its destination (wall-2), clear

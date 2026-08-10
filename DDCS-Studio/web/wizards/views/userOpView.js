@@ -561,6 +561,11 @@ export const userOpView = {
                         const srcs = Array.isArray(sources) ? sources : [];
                         const mkManual = (p, label) => ({
                             pos: ps[p], label, manual: true, simOnly: true, color: '#ffb300',
+                            // t1688 — thread the pass's TRUE computed emits (opSimStarts → computePassStarts): a manual-jog
+                            // landing that DOES write a macro var (e.g. corner's wall-2 under manual travel) must still
+                            // render FILLED, and the always-sim-only lead pass (p===0) must render HOLLOW, matching the 3D
+                            // pane (which reads the same ps[]/passStarts via setStartEmits). Previously unset → always filled.
+                            emits: ps[p] && ps[p].emits,
                             onDrag: (world) => { const z = (ps[p] && ps[p].z) || 0; panel.onStartDrag({ x: world.x, y: world.y, z }, p); renderLayoutWithSim(); },
                         });
                         const manuals = [];
@@ -573,9 +578,12 @@ export const userOpView = {
                             onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow, starts)) mgr.update(); },
                         } : null).filter(Boolean)
                         : (entryMarkers || manualMarkers);
+                    // t1688 — thread pos0.emits (opSimStarts' own computed value, always false for the lead pass) onto
+                    // the sim-only Start handle: panelTypes.js's SIM_ID marker reads simStart.emits and was previously
+                    // getting undefined always, rendering FILLED regardless of the true value the 3D pane already used.
                     const simStart = (spb || epb || manualMarkers || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
-                        ? ((pos0 && !spb && !epb && !manualMarkers) ? { pos: pos0 } : null)
-                        : { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
+                        ? ((pos0 && !spb && !epb && !manualMarkers) ? { pos: pos0, emits: pos0.emits } : null)
+                        : { pos: pos0, emits: pos0.emits, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
                     const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)
                     wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)
                     renderZRulerBeside(c, _def, params);   // t1021 — the declared depth ruler down the LEFT of the plan

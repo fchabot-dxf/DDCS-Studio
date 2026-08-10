@@ -23,6 +23,7 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
 import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared preview-visibility registry ({visible,alpha}), shared with the 3D + toolpath2d
+import { resolveStartGlyph } from './startGlyph.js';   // t1688 — the ONE shape/fill/colour rule for a start/reposition marker, shared with toolpath2d.js + gcodeViz3d.js
 
 /**
  * THE EDGE GUTTER, declared once (t1275). Two places need it and they disagreed: `_followHandle` PARKS a dragged
@@ -496,22 +497,20 @@ export class FeatureCanvas {
             // handle is identifiable by its BOUND source, not by sort-by-screen-position (which misattributes when a drag crosses
             // the other handle). Additive attribute — the drag hit-test still uses the internal geometry.
             const hid = h.id != null ? { 'data-hid': String(h.id) } : null;
-            // t1684 (census finding 2) — SHAPE axis, orthogonal to colour: a decl may carry `emits` (does dragging this
-            // handle write a value that reaches the emitted G-code — corner's #21-#24 reposition, unified with lathe's
-            // former `teal`). undefined = undeclared → UNCHANGED (solid, matching every pre-existing handle); an explicit
-            // false renders HOLLOW (stroke-only) on a move/sim marker. Matches the 3D + 2D-toolpath renderers' own reading.
-            const hollow = h.emits === false;
             if (h.simOnly || h.kind === 'move') {
-                // START-MARKER glyph language (t293) — ONE language across the 3D preview, the 2D toolpath, and here:
-                // AUTO reposition (the machine drives there) = a filled CYAN SQUARE ■; MANUAL / the operator jog Start
-                // = a filled AMBER CIRCLE ●. simOnly (pass-0) is always the manual Start. Shape + colour agree.
-                const startManual = h.simOnly || col === '#ffb300';
-                const fill = col || (startManual ? '#ffb300' : '#22d3ee');
+                // t1688 THE GLYPH RESOLVER — ONE declared rule (viz/startGlyph.js), shared with toolpath2d.js +
+                // gcodeViz3d.js, replacing three independently-decided rules that could (and did — census t1684/t1688)
+                // disagree. Reads `h.manual` DIRECTLY (canvasWidgets.js's generic forward, t1688) instead of the old
+                // `col === '#ffb300'` colour-string proxy — a real handle could set `manual` with a non-amber colour
+                // and the proxy would silently mis-shape it.
+                const startManual = !!h.manual;
+                const g = resolveStartGlyph(startManual, h.emits);
+                const fillCol = col || g.colour;
                 let el;
-                if (startManual) el = svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', ...hid });   // circle = manual jog
+                if (g.shape === 'circle') el = svgEl('circle', { cx: c.x, cy: c.y, r: 7, class: 'fc-handle fc-handle-sim', ...hid });   // circle = manual jog
                 else el = svgEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, class: 'fc-handle fc-handle-move', rx: 2, ...hid });   // square = auto reposition
-                if (hollow) { el.style.fill = 'none'; el.style.stroke = fill; el.style.strokeWidth = '2'; }
-                else { el.style.fill = fill; el.style.stroke = fill; }
+                if (!g.fill) { el.style.fill = 'none'; el.style.stroke = fillCol; el.style.strokeWidth = '2'; }
+                else { el.style.fill = fillCol; el.style.stroke = fillCol; }
                 handles.appendChild(el);
             } else {
                 const el = svgEl('circle', { cx: c.x, cy: c.y, r: 6, class: 'fc-handle', ...hid });

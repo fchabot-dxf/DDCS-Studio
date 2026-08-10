@@ -37,14 +37,19 @@ test('in-axis MANUAL: amber jog markers appear (sim-only drag, emit byte-identic
 
   const st = await page.evaluate(() => {
     const host = document.querySelector('.wiz-viz3d'); const panel = host && host.__panel;
-    const hs = [...document.querySelectorAll('#userVizContainer .fc-handle')].map((h) => ({ tag: h.tagName.toLowerCase(), fill: h.style.fill, hid: h.getAttribute('data-hid') }));
+    const hs = [...document.querySelectorAll('#userVizContainer .fc-handle')].map((h) => ({ tag: h.tagName.toLowerCase(), fill: h.style.fill, stroke: h.style.stroke, hid: h.getAttribute('data-hid') }));
     return { srcs: panel.getPassSources(), hs, code: document.getElementById('wiz_user_code')?.textContent || '' };
   });
   expect(st.srcs.filter((s) => s === 'manual').length, 'manual in-axis → manual wall-2 passes').toBeGreaterThanOrEqual(2);
   const m1 = st.hs.find((h) => h.hid === '__simstart1');
   expect(m1, 'a manual jog landing marker exists').toBeTruthy();
   expect(m1.tag, 'a jog landing is a CIRCLE').toBe('circle');
-  expect(m1.fill, 'manual = AMBER').toBe('rgb(255, 179, 0)');
+  // t1688 — a manual jog landing is SIM-ONLY: middleSimStartsProvider's own makeProvider computation gives it
+  // emits:false (no row here ever declares emits:true), matching this file's own header comment verbatim
+  // ("dragging it moves the SIM and NEVER the emit"). It renders HOLLOW (amber stroke, no fill). Before this act
+  // mkManual (userOpView.js) never threaded `emits` onto this marker at all, so it always rendered filled regardless.
+  expect(m1.fill, 'manual jog landing is HOLLOW (never emits)').toBe('none');
+  expect(m1.stroke, 'amber stroke — the manual-jog colour, unchanged by the fill fix').toBe('rgb(255, 179, 0)');
   expect(st.hs.find((h) => h.hid === 'crossAimP'), 'the coded in-axis distance handle is GONE in manual (no coded traverse)').toBeFalsy();
 
   // drag a manual marker: the SIM start moves, the EMIT stays byte-identical

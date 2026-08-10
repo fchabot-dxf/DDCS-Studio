@@ -556,7 +556,10 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         // so it must NOT snap to stock corners/edges (the snap CAUGHT it at the perimeter → "can't exit the stock", the human's bug).
         // t1201 (user) — a marker may declare manual/simOnly/color (a MANUAL jog landing renders amber = the established
         // manual language, and drags sim-only); the spb param-markers keep the cyan default.
-        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: m.color || '#39c0d8', manual: !!m.manual, simOnly: !!m.simOnly, yieldCoincident: !!m.yieldCoincident }));   // t726 P2b — the entry marker yields to a coincident feature handle
+        // t1688 — forward m.emits (previously dropped here — the same gap this whole act is about, just one hop
+        // earlier): userOpView's manualMarkers/mkManual now threads the pass's true computed emits; without this
+        // forward it would die here, same as `manual`/`noSnap` died at canvasWidgets.js before their own fixes.
+        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: m.color || '#39c0d8', manual: !!m.manual, simOnly: !!m.simOnly, emits: m.emits, yieldCoincident: !!m.yieldCoincident }));   // t726 P2b — the entry marker yields to a coincident feature handle
         const onDragMarkers = (id, world) => {
             const mi = markerHandles.findIndex((h) => h.id === id);
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
@@ -571,7 +574,11 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     if (simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y)) {
         const SIM_ID = '__simstart0';
         // pass-0 is the operator's manual jog START — always a jog, so always an AMBER CIRCLE, labelled 'Start'.
-        const allHandles = [...handles, { id: SIM_ID, x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, manual: true, label: 'Start', color: '#ffb300' }];
+        // t1688 — `emits` was never threaded onto this handle (this file's own comment above already promised "a
+        // hollow ◇" — the intent existed, the wire didn't): featureCanvas.js's resolver always saw `undefined` here
+        // and drew it filled, disagreeing with the 3D pane, which DOES receive pass-0's correctly-computed
+        // `emits:false` via setStartEmits. `simStart.emits` is userOpView's own threaded pos0.emits — see there.
+        const allHandles = [...handles, { id: SIM_ID, x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, manual: true, label: 'Start', color: '#ffb300', emits: simStart.emits }];
         // t87/t120 → t297 — the Start ◇ is now the REPOSITION-CHAIN DATUM (TRAVEL-START-SPEC "START=SOURCE"), not a decorative
         // preview jog. Its drag routes to onStartDrag (writes userStarts pass-0, sim-only — the Start never emits its OWN value).
         // BUT #21-#24 are DEFINED relative to the Start, so dragging it must HOLD each wall on the physical stock and RE-DERIVE

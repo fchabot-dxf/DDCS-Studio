@@ -26,6 +26,7 @@ import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AU
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
 import { displayOf } from './displayPrefs.js';   // t738 — the ONE declared preview-visibility registry ({visible,alpha} per element)
+import { isManualStart, resolveStartGlyph } from './startGlyph.js';   // t1688 — the ONE shape/fill/colour rule for a start/reposition marker, shared with featureCanvas.js + toolpath2d.js
 
 /**
  * t1297 — WHICH AXIS LABELS A SCENE HAS, by the kind of machine it draws. A mill has an XY table; a lathe has a bed
@@ -296,19 +297,25 @@ export class GcodeViz3D {
     }
 
     // The start-glyph textures (WHITE so material.color tints them per-pass — cyan=auto / amber=manual — hi-res keeps them
-    // crisp), cached per shape. SHAPE axis (orthogonal to colour): SIM-ONLY / manual-jog = a hollow CIRCLE ○ (jog preview, never
-    // emitted); EMITTING = a FILLED SQUARE ■ (a drag writes a macro var into the program, corner #21-#24) — ONE glyph language
-    // with the 2D toolpath + the Layout handle (the old lozenge/diamond is retired).
-    _startGlyphTex(emits) {
-        const key = emits ? '_emitStartTex' : '_simStartTex';
+    // crisp), cached per (shape, fill) combo. t1688 THE GLYPH RESOLVER — SHAPE (circle/square) and FILL (hollow/solid) are
+    // now two INDEPENDENT axes, matching the Layout + 2D toolpath: shape follows manual/auto (t293), fill follows the
+    // declared `emits` (t69/t1684). Before t1688 this function had only ONE axis (emits picked BOTH shape and fill — a
+    // filled square or a hollow circle, never a hollow square or a filled circle), which is exactly the "shape from emits"
+    // defect the census named: a manual-travel reposition that DOES emit (e.g. corner's wall-2 under manual travel) could
+    // never render as the correct filled CIRCLE, only ever a filled square.
+    _startGlyphTex(shape, fill) {
+        const key = `_${shape}${fill ? 'Fill' : 'Hollow'}Tex`;
         if (this[key]) return this[key];
         const c = document.createElement('canvas');
         c.width = c.height = 128;
         const ctx = c.getContext('2d');
         ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 16; ctx.lineJoin = 'round';
-        ctx.beginPath();
-        if (emits) { ctx.fillRect(20, 20, 88, 88); }   // AUTO / emitting = FILLED SQUARE ■ (a drag writes a macro var)
-        else { ctx.arc(64, 64, 42, 0, Math.PI * 2); ctx.stroke(); }   // t722 P2a — MANUAL / Start = a HOLLOW RING ○ (the comment always promised it; it fills solid no longer) — a jog PREVIEW, never emitted
+        if (shape === 'circle') {
+            ctx.beginPath(); ctx.arc(64, 64, 42, 0, Math.PI * 2);
+            if (fill) ctx.fill(); else ctx.stroke();   // t722 P2a — hollow ring = a jog PREVIEW, never emitted
+        } else {
+            if (fill) ctx.fillRect(20, 20, 88, 88); else ctx.strokeRect(20, 20, 88, 88);   // filled square = AUTO/emitting; hollow square = AUTO/sim-only
+        }
         return (this[key] = new this.THREE.CanvasTexture(c));
     }
 
@@ -316,7 +323,7 @@ export class GcodeViz3D {
     // sim-only, filled square ■ = emitting, set live per pass). depthTest:false → always visible.
     _makeStartGlyph() {
         const THREE = this.THREE;
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._startGlyphTex(false), color: 0x22d3ee, depthTest: false, transparent: true }));   // cyan (auto) + hollow (sim-only) defaults
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._startGlyphTex('circle', false), color: 0x22d3ee, depthTest: false, transparent: true }));   // cyan (auto) + hollow (sim-only) defaults — _highlightSelectedStart corrects it immediately
         sp.scale.set(9, 9, 1);   // ~9 mm
         sp.renderOrder = 11;
         return sp;
@@ -406,17 +413,23 @@ export class GcodeViz3D {
             // t293 — ONE glyph language: AUTO reposition (machine drives there) = a CYAN SQUARE ■; MANUAL jog / the operator
             // Start = an AMBER ring ○. Shape + colour agree (matches the 2D toolpath + the Layout). Pass-0 is ALWAYS the
             // operator's first jog (the Start) → manual; every later pass follows its reposition SOURCE.
-            const manual = p === 0 || src === 'manual';
+            const manual = isManualStart(src, p);
             // t722 P2a — the sim-only manual JOG glyph (the hollow ring) is a PREVIEW → always semi-transparent (ghostly); the
             // emitting AUTO square reads more solid (a real programmed reposition). Selection boosts both.
             glyph.material.opacity = manual ? (sel ? 0.8 : 0.42) : (sel ? 1 : 0.5);
             glyph.material.color.setHex(manual ? 0xffb300 : 0x22d3ee);
-            // t1684 (census finding 2) — the SHAPE axis reads the DECLARED `_startEmits` (set by setStartEmits, fed from
-            // opSimStarts' `emits` — corner's own #21-#24 reposition truth), not a stand-in derived from `manual`/source.
-            // undefined (an op that never declares per-pass emits) falls back to the pre-existing !manual behaviour —
-            // UNCHANGED for every op but corner (the only declarer, t1678's census).
+            // t1688 THE GLYPH RESOLVER — SHAPE now follows `manual` ONLY (t293, same as the Layout + 2D toolpath), never
+            // `emits`; `emits` decides fill alone. Previously this function's shape choice WAS the emits value when
+            // declared (a manual+emitting pass — e.g. corner's wall-2 under manual travel — could only ever render a
+            // filled SQUARE, never the correct filled circle) — that conflation is what the census named "shape from
+            // emits, colour from manual: a different input entirely". undefined (an op that never declares per-pass
+            // emits — every op but corner) keeps the pre-t1684 default via the SAME manual signal already computed above:
+            // manual+undeclared => hollow (a plain jog preview), auto+undeclared => filled (a plain reposition) —
+            // algebraically identical to the old single-axis `_startGlyphTex(em === undefined ? !manual : !!em)` call,
+            // since old shape and fill were always the SAME bit. Only corner (a genuine true/false) can now diverge.
             const em = this._startEmits && this._startEmits[p];
-            const tex = this._startGlyphTex(em === undefined ? !manual : !!em);
+            const g = resolveStartGlyph(manual, em === undefined ? !manual : em);
+            const tex = this._startGlyphTex(g.shape, g.fill);
             if (glyph.material.map !== tex) { glyph.material.map = tex; glyph.material.needsUpdate = true; }
         }
     }

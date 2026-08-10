@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
  * browser tier and is named in the FINDINGS block at the bottom of this file. Per support/register.mjs's own rule, a
  * module that needs a real DOM is a FINDING, not something to shim around.
  *
- * ── THE FIVE PARTS ───────────────────────────────────────────────────────────────────────────────────────────────
+ * ── THE SIX PARTS ────────────────────────────────────────────────────────────────────────────────────────────────
  *   0. REGISTRY PARITY    — the twins are DISCOVERED (blocks/dataOps/*Data.js → every /DataDef$/ export) and
  *                           cross-checked against app.js's own SEED_BUILDERS. Never a hand-typed list (t1678/t1682).
  *   1. SPEC SNAPSHOT      — every twin × {defaults, off-defaults}, the WHOLE returned spec captured recursively
@@ -32,9 +32,11 @@ import { fileURLToPath } from 'node:url';
  *   2. FRAME INVARIANT    — spec.placement == partZeroShift(...), and the SVG layer and the overlay raster resolve a
  *                           world point to the SAME pixel through the app's own functions. (t1672 / t1686)
  *   3. GESTURE FORWARD    — every gesture in CANVAS_GESTURES forwards every generic decl property into its built
- *                           handle. (t1674 noSnap / t1684 emits)
+ *                           handle. (t1674 noSnap / t1684 emits / t1688 manual)
  *   4. DECL→SPEC SURVIVAL — onEdit reaches every twin's spec; a declared noSnap survives decl→spec; the emit-driving
  *                           signal has ONE declared name. (t1680 / t1674 / t1684)
+ *   5. GLYPH RESOLVER      — resolveStartGlyph's (manual, emits) truth table, by value; every renderer that draws a
+ *                           start/reposition glyph still imports the ONE resolver, not a local copy. (t1688)
  *
  * Parts 2-4 are NAMED assertions on top of the snapshot on purpose: a snapshot diff tells you a line moved, an
  * invariant tells you which contract broke. The snapshot catches what nobody thought to name.
@@ -207,7 +209,7 @@ function allHandles(env) {
  * for any gesture's place(). Deliberately over-supplied: a gesture reads what it needs, and the generics must survive
  * regardless of which. Driven by Object.keys(CANVAS_GESTURES), so a NEW gesture is covered the day it is registered.
  */
-const GENERIC_PROPS = { id: 'probe', color: '#abcdef', noSnap: true, emits: false };
+const GENERIC_PROPS = { id: 'probe', color: '#abcdef', noSnap: true, emits: false, manual: true };   // t1688 — manual joins noSnap/emits: the same generic-forward defect (t1674/t1684), a third time
 function gestureProbe(type) {
     return {
         type, ...GENERIC_PROPS, label: 'L',
@@ -434,6 +436,50 @@ test('preview gate P4c: the emit-driving handle signal has ONE declared name acr
     const undeclared = lathe.filter(({ h }) => h.emits !== true).map(({ opType, caseName, i, h }) => `${opType} @${caseName} handles[${i}] → emits=${J(h.emits)}`);
     must('a lathe dimension handle stopped declaring emits:true — featureCanvas.js tints a handle teal off that flag, so it silently loses its "dragging me changes the program" signal (t1684)',
         () => expect(undeclared).toEqual([]));
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// PART 5 — THE GLYPH RESOLVER (t1688): one declared rule, no third copy
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// t1684 left THREE renderer-local rules for a start/reposition marker's shape+fill+colour that could (and did)
+// disagree: featureCanvas.js kept shape=manual/hollow=(emits===false) for ANY pass; toolpath2d.js matched but
+// hard-forced pass 0 to never render hollow; gcodeViz3d.js picked SHAPE from emits and used manual only as a
+// fallback when emits was undeclared — a structurally different axis. t1688 replaces all three with viz/startGlyph.js,
+// called by every renderer. Part 5a proves the pure function's truth table; 5b proves nobody stopped calling it.
+test('preview gate P5a: resolveStartGlyph is a pure function of (manual, emits) — the declared truth table, by value', async () => {
+    const env = await boot();
+    const { isManualStart, resolveStartGlyph } = await import('/viz/startGlyph.js');
+
+    must('isManualStart(source, 0) must be true regardless of source — the FIRST surviving pass is always the operator\'s own jog (t293), even when its internal reposition source says otherwise (corner forces source:\'auto\' at index 0)',
+        () => { expect(isManualStart('auto', 0)).toBe(true); expect(isManualStart('manual', 0)).toBe(true); expect(isManualStart(undefined, 0)).toBe(true); });
+    must('isManualStart(source, p>0) must follow the declared source alone',
+        () => { expect(isManualStart('auto', 1)).toBe(false); expect(isManualStart('manual', 1)).toBe(true); });
+
+    // shape follows manual ONLY; fill follows emits ONLY (emits!==false); the two axes are independent. The
+    // manual+emits:true row is the combo that was structurally UNREACHABLE before t1688 (gcodeViz3d's old
+    // single-argument `_startGlyphTex(emits)` made emits pick shape too, so a manual pass could never render a
+    // filled CIRCLE — only ever a filled square).
+    const cases = [
+        { manual: false, emits: true, want: { shape: 'square', fill: true, colour: '#22d3ee' } },
+        { manual: false, emits: false, want: { shape: 'square', fill: false, colour: '#22d3ee' } },
+        { manual: false, emits: undefined, want: { shape: 'square', fill: true, colour: '#22d3ee' } },
+        { manual: true, emits: true, want: { shape: 'circle', fill: true, colour: '#ffb300' } },
+        { manual: true, emits: false, want: { shape: 'circle', fill: false, colour: '#ffb300' } },
+        { manual: true, emits: undefined, want: { shape: 'circle', fill: true, colour: '#ffb300' } },
+    ];
+    const wrong = cases.filter((c) => {
+        const g = resolveStartGlyph(c.manual, c.emits);
+        return g.shape !== c.want.shape || g.fill !== c.want.fill || g.colour !== c.want.colour;
+    }).map((c) => `resolveStartGlyph(${c.manual}, ${J(c.emits)}) → got ${J(resolveStartGlyph(c.manual, c.emits))}, wanted ${J(c.want)}`);
+    must('resolveStartGlyph disagrees with the declared truth table for at least one (manual, emits) combo — shape must track manual ONLY and fill must track emits ONLY, independently of each other',
+        () => expect(wrong).toEqual([]));
+});
+
+test('preview gate P5b: every renderer that draws a start/reposition glyph imports the ONE resolver — no third local copy', async () => {
+    const rendererFiles = ['viz/featureCanvas.js', 'viz/toolpath2d.js', 'viz/gcodeViz3d.js'];
+    const missing = rendererFiles.filter((f) => !/from ['"]\.\/startGlyph\.js['"]/.test(fs.readFileSync(path.join(WEB, f), 'utf8')));
+    must(`a renderer stopped importing viz/startGlyph.js and is free to re-decide the shape/fill/colour rule locally again — the exact disease t1688 fixed (three independently-maintained rules that agreed only until they didn't). Missing import in: ${missing.join(', ') || '(none)'}`,
+        () => expect(missing).toEqual([]));
 });
 
 /**

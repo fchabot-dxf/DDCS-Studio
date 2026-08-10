@@ -11,9 +11,12 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 const AUTO = '#22d3ee', MANUAL = '#ffb300';
 
-// (1) 2D — the pass-0 Start is a filled AMBER marker; a later AUTO reposition is a filled CYAN marker. Sample each
-//     marker's own drawn centre (__t2starts) → view-agnostic. (Shape square/circle is asserted on the Layout in (3).)
-test('(1) 2D: pass-0 Start = amber; a later auto reposition = cyan', async ({ page }) => {
+// (1) 2D — t1688: the pass-0 Start is now a HOLLOW amber marker (it never emits — opSimStarts forces emits:false at
+//     the lead pass structurally, and toolpath2d.js no longer discards that with its own `i > 0` override); a later
+//     AUTO reposition (emits:true, declared) is a filled CYAN marker. The Start's colour is read off its RING (the
+//     centre carries no paint once hollow); the reposition's colour is read off its filled centre, as before.
+//     (Shape square/circle is asserted on the Layout in (3).)
+test('(1) 2D: pass-0 Start = amber HOLLOW (never emits); a later auto reposition = cyan filled', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const px = await page.evaluate(async () => {
@@ -27,15 +30,18 @@ test('(1) 2D: pass-0 Start = amber; a later auto reposition = cyan', async ({ pa
     t2.fit();
     const rec = canvas.__t2starts; if (!rec || rec.length < 2) return { ok: false };
     const dpr = window.devicePixelRatio || 1; const ctx = canvas.getContext('2d');
-    const centre = (i) => { const d = ctx.getImageData(Math.round(rec[i].sx * dpr), Math.round(rec[i].sy * dpr), 1, 1).data; return { a: d[3], r: d[0], g: d[1], b: d[2] }; };
-    const out = { ok: true, start: centre(0), repos: centre(1) };
+    const at = (x, y) => { const d = ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data; return { a: d[3], r: d[0], g: d[1], b: d[2] }; };
+    const centre = (i) => at(rec[i].sx, rec[i].sy);
+    const ring = (i) => at(rec[i].sx + 6, rec[i].sy);   // the Start's hollow ring — drawn at radius 6.5, lineWidth 2.8 (drawStartHandles) — +6px lands on the stroke
+    const out = { ok: true, startCentre: centre(0), startRing: ring(0), repos: centre(1) };
     canvas.remove(); return out;
   });
   expect(px.ok, 'both markers painted').toBe(true);
-  expect(px.start.a, 'Start centre filled').toBeGreaterThan(150);
-  expect(px.repos.a, 'reposition centre filled').toBeGreaterThan(150);
-  // pass-0 Start = AMBER (red+green over blue); the auto reposition = CYAN (blue-dominant)
-  expect(px.start.r > px.start.b && px.start.g > px.start.b, 'Start is amber').toBe(true);
+  expect(px.startCentre.a, 'Start centre is HOLLOW (transparent) — it never emits').toBeLessThan(100);
+  expect(px.repos.a, 'reposition centre filled (it emits)').toBeGreaterThan(150);
+  // pass-0 Start = AMBER (red+green over blue), read off its ring; the auto reposition = CYAN (blue-dominant), read off its filled centre
+  expect(px.startRing.a, 'sanity: the ring sample actually hit paint').toBeGreaterThan(60);
+  expect(px.startRing.r > px.startRing.b && px.startRing.g > px.startRing.b, 'Start ring is amber').toBe(true);
   expect(px.repos.b, 'auto reposition is cyan (blue high)').toBeGreaterThan(150);
   expect(px.repos.b, 'cyan: blue > red').toBeGreaterThan(px.repos.r);
 });
@@ -71,9 +77,9 @@ test('(2) 2D manual jog travel arcs up (rainbow); auto travel stays straight', a
 });
 
 // (3) Layout FeatureCanvas — renders the SAME language: an AUTO reposition = a CYAN SQUARE (fc-handle-move); a MANUAL
-//     reposition = an AMBER CIRCLE (fc-handle-sim); the Start (__simstart0) is always the AMBER CIRCLE. Colour is COMPUTED
-//     (inline style beats the .fc-handle class — the t89 specificity bar).
-test('(3) Layout renders auto=cyan square / manual=amber circle; the Start is the amber circle', async ({ page }) => {
+//     reposition = an AMBER CIRCLE (fc-handle-sim); the Start (__simstart0) is always the amber circle, HOLLOW (t1688 —
+//     it never emits). Colour is COMPUTED (inline style beats the .fc-handle class — the t89 specificity bar).
+test('(3) Layout renders auto=cyan square / manual=amber circle; the Start is the amber HOLLOW circle', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => {
@@ -91,7 +97,10 @@ test('(3) Layout renders auto=cyan square / manual=amber circle; the Start is th
     const p = { ...CORNER_DEFAULTS };
     const paint = (sources) => {
       const cont = document.createElement('div'); cont.style.cssText = 'width:300px;height:240px;position:relative'; document.body.appendChild(cont);
-      new FeatureCanvas().render(cont, layoutSpecFromOp(def, p, { pos: { x: 12, y: 12 } }, sources));
+      // t1688 — emits:false explicitly, matching what the REAL app threads (userOpView's simStart carries pos0.emits,
+      // and opSimStarts' own makeProvider always computes false at the lead pass structurally). Omitting it here would
+      // silently test a synthetic case the real app never produces (undefined reads as filled, hiding the real hollow).
+      new FeatureCanvas().render(cont, layoutSpecFromOp(def, p, { pos: { x: 12, y: 12 }, emits: false }, sources));
       const repos = cont.querySelector('[data-hid="reposition_pos"]');
       const start = cont.querySelector('[data-hid="__simstart0"]');
       const csR = repos && getComputedStyle(repos), csS = start && getComputedStyle(start);
@@ -109,7 +118,7 @@ test('(3) Layout renders auto=cyan square / manual=amber circle; the Start is th
   // MANUAL reposition → amber CIRCLE
   expect(r.manual.reposTag, 'manual reposition is a circle').toBe('circle');
   expect(r.manual.reposFill, 'manual reposition is amber').toBe(MANUAL_RGB);
-  // the Start is ALWAYS the amber circle (it's always the operator jog), in both scenarios
+  // the Start is ALWAYS the amber circle (it's always the operator jog), in both scenarios — HOLLOW (t1688: it never emits)
   expect(r.auto.startTag, 'Start is a circle').toBe('circle');
-  expect(r.auto.startFill, 'Start is amber (filled)').toBe(MANUAL_RGB);
+  expect(r.auto.startFill, 'Start is amber, HOLLOW (never emits)').toBe('none');
 });

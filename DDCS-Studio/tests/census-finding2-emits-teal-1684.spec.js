@@ -94,10 +94,13 @@ test('(C) corner Layout: the wall-2 reposition handle carries the DECLARED emits
   expect(r.found, 'the Layout renders a reposition point handle for corner').toBe(true);
 });
 
-// (D) 3D — _highlightSelectedStart now reads the DECLARED `_startEmits` (set by setStartEmits) to pick the glyph
-//     TEXTURE, not a stand-in derived from `manual`/source. Two later passes, SAME source (both auto → same colour),
-//     differing only in emits: they must pick DIFFERENT cached textures (the emit tex vs the sim tex).
-test('(D) 3D: two same-source passes pick DIFFERENT glyph textures by their declared emits, not by source', async ({ page }) => {
+// (D) 3D — t1688 THE GLYPH RESOLVER: shape (circle/square) now follows manual/auto ONLY, fill (hollow/solid) follows
+//     the declared `_startEmits` ONLY — two INDEPENDENT axes. Before t1688, `_startGlyphTex(emits)` took a single bool
+//     and emits picked BOTH shape and fill at once, so a manual+emitting pass (corner's wall-2 under manual travel)
+//     could only ever render a filled SQUARE — the correct filled CIRCLE was structurally unreachable. Pass 1
+//     (auto, emits:false) proves shape stays SQUARE even when hollow; pass 2 (manual, emits:true) proves shape stays
+//     CIRCLE even when filled — the combo the old single-axis code could never produce.
+test('(D) 3D: shape follows manual/auto and fill follows emits INDEPENDENTLY — a manual pass can now render filled', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
@@ -106,17 +109,18 @@ test('(D) 3D: two same-source passes pick DIFFERENT glyph textures by their decl
   const r = await page.evaluate(() => {
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
     viz._passCount = 3; viz._ensureMarkers();
-    viz.setStartSources(['auto', 'auto', 'auto']);   // SAME source on every pass — colour is held constant
-    viz.setStartEmits([false, true, false]);         // pass 1 emits, pass 2 does not — the SHAPE axis under test
+    viz.setStartSources(['auto', 'auto', 'manual']);
+    viz.setStartEmits([false, false, true]);
     viz._highlightSelectedStart();
-    const emitTex = viz._startGlyphTex(true), simTex = viz._startGlyphTex(false);
+    const hollowSquareTex = viz._startGlyphTex('square', false);
+    const filledCircleTex = viz._startGlyphTex('circle', true);
     return {
-      m1: viz.spindleMarkers[1].children[0].material.map === emitTex,
-      m2: viz.spindleMarkers[2].children[0].material.map === simTex,
-      texturesDiffer: emitTex !== simTex,
+      m1: viz.spindleMarkers[1].children[0].material.map === hollowSquareTex,
+      m2: viz.spindleMarkers[2].children[0].material.map === filledCircleTex,
+      texturesDiffer: hollowSquareTex !== filledCircleTex,
     };
   });
-  expect(r.texturesDiffer, 'sanity: the emit/sim glyph textures are genuinely distinct cached objects').toBe(true);
-  expect(r.m1, 'pass 1 (emits:true) picks the EMIT texture').toBe(true);
-  expect(r.m2, 'pass 2 (emits:false), same source as pass 1, picks the SIM (hollow) texture').toBe(true);
+  expect(r.texturesDiffer, 'sanity: the hollow-square/filled-circle glyph textures are genuinely distinct cached objects').toBe(true);
+  expect(r.m1, 'pass 1 (auto, emits:false) renders a HOLLOW SQUARE — shape stays auto\'s square even though it does not emit').toBe(true);
+  expect(r.m2, 'pass 2 (manual, emits:true) renders a FILLED CIRCLE — shape stays manual\'s circle even though it emits (unreachable before t1688: shape used to be decided by emits alone)').toBe(true);
 });

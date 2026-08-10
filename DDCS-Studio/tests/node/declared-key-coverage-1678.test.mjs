@@ -48,7 +48,11 @@ const CLEAN_SHAPES = [
         // emits ADDED at t1684 (finding 2, closing this file's last KNOWN GAP): does dragging this handle write a
         // value that reaches the emitted G-code — buildCanvasWidgets forwards it, FeatureCanvas reads it for shape
         // (move-kind: solid/hollow) and colour (size-kind: teal tint).
-        keys: ['noSnap', 'labelDir', 'displayVals', 'simOnly', 'yieldCoincident', 'emits'],
+        // manual ADDED at t1688 (the glyph resolver): the SAME generic-forward drop as noSnap/t1674 and emits/t1684,
+        // a third time — buildCanvasWidgets was spreading id/color/noSnap/emits by hand and silently dropping manual,
+        // forcing featureCanvas.js to infer manual-ness from a `color === '#ffb300'` string match instead of reading
+        // the declared field. FeatureCanvas now reads it directly via viz/startGlyph.js's resolveStartGlyph.
+        keys: ['noSnap', 'labelDir', 'displayVals', 'simOnly', 'yieldCoincident', 'emits', 'manual'],
         consumers: [web('viz/featureCanvas.js')],
     },
     {

@@ -17,6 +17,7 @@ import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AU
 import { stockPinOffset } from './sceneFrame.js';   // t584 PREVIEW-PARITY E2b — the stock's WCS pin from THE ONE declared frame source (shared with the 3D's partZeroShift), so the 2D pin can't drift from the 3D/engine
 import { PATH_TYPES, PATH_STATE, HEAD, TOUCH_PULSE, pulsePx, hexCss } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette (type × state) + the touch-pulse token, shared with the 3D + the legend (t331 — feedRgb gradient removed)
 import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared preview-visibility registry ({visible,alpha} per element), shared with the 3D
+import { isManualStart, resolveStartGlyph } from './startGlyph.js';   // t1688 — the ONE shape/fill/colour rule for a start/reposition marker, shared with featureCanvas.js + gcodeViz3d.js
 
 // Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
 // retract=green, probe=blue(slow=light blue, dotted), feed=a blue→teal gradient by DEPTH (Z) which also surfaces the
@@ -222,20 +223,19 @@ export function createToolpath2d(canvas, opts = {}) {
     function drawStartHandles(ctx) {
         for (let i = 0; i < starts.length; i++) {
             const s = markerWorld(i), hx = sptx(s.x), hy = spty(s.y);               // t107 — relocate a reposition-destination marker to its runtime dog-leg END (matches the route + probe fire)
-            // t293 — ONE glyph language (matches the Layout + 3D): AUTO reposition (machine drives there) = a filled CYAN
-            // SQUARE ■; MANUAL jog / the operator Start = a filled AMBER CIRCLE ●. Shape + colour agree. Pass-0 is ALWAYS the
-            // operator's first jog (the Start) → manual; every later pass follows its reposition SOURCE (auto vs manual travel).
-            const manual = i === 0 || startSources[i] === 'manual';
-            const col = manual ? '#ffb300' : '#22d3ee';
+            // t1688 THE GLYPH RESOLVER — ONE declared rule (viz/startGlyph.js), shared with the Layout + 3D panes.
+            // Previously this file's own `i > 0 &&` gate discarded a genuinely-computed emits:false at pass 0 (corner's
+            // lead pass), forcing it filled here while the 3D pane (which has no such gate) correctly drew it hollow —
+            // exactly the "hollow in one pane, filled in another" census finding. opSimStarts' own makeProvider already
+            // forces emits false at pass 0 structurally; trusting startEmits[i] verbatim makes that the ONLY place it's
+            // decided, so this renderer can't re-decide it differently.
+            const manual = isManualStart(startSources[i], i);
+            const g = resolveStartGlyph(manual, startEmits[i]);
             const ringCol = manual ? 'rgba(255,179,0,0.45)' : 'rgba(34,211,238,0.45)';
-            // t1684 — pass-0 is ALWAYS the filled Start glyph (its own established rule, t293) regardless of emits — the
-            // doctrine itself (opSimStarts.js's makeProvider) says emits "only takes effect from pass 2 on". undefined
-            // (undeclared) keeps today's always-filled look; an explicit declared emits:false on a LATER pass hollows it.
-            const hollow = i > 0 && startEmits[i] === false;
             ctx.save();
-            ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // a static reference, NOT red (probe) or orange (tool)
-            if (manual) { ctx.beginPath(); ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); if (hollow) ctx.stroke(); else ctx.fill(); }   // MANUAL / Start = AMBER CIRCLE ● (filled) / ○ (hollow, sim-only)
-            else if (hollow) { ctx.strokeRect(hx - 6, hy - 6, 12, 12); }           // AUTO, sim-only = hollow CYAN SQUARE ▢
+            ctx.strokeStyle = g.colour; ctx.fillStyle = g.colour; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // a static reference, NOT red (probe) or orange (tool)
+            if (g.shape === 'circle') { ctx.beginPath(); ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); if (!g.fill) ctx.stroke(); else ctx.fill(); }   // MANUAL / Start = AMBER CIRCLE ● (filled) / ○ (hollow, sim-only)
+            else if (!g.fill) { ctx.strokeRect(hx - 6, hy - 6, 12, 12); }           // AUTO, sim-only = hollow CYAN SQUARE ▢
             else { ctx.fillRect(hx - 6, hy - 6, 12, 12); }                           // AUTO = filled CYAN SQUARE ■
             ctx.lineWidth = 1.4; ctx.strokeStyle = ringCol; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (nearHandle's 12px hit-test)
             ctx.restore();   // no numbered badge — the top panel carries glyph + colour only; the named label lives on the Layout canvas

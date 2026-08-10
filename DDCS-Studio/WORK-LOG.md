@@ -21828,3 +21828,201 @@ broken code — caught only because swap-in-pre-fix-and-confirm-RED is run on ev
 skipped when a result looks obviously right. That is twice now this session that discipline has caught a test
 that would have shipped a false confirmation (t1682's `lathe-pilot-1271.spec.js` gap, and this one) — it is
 earning its cost specifically by catching MY mistakes, not just the code's.
+
+## 🔨 turn 1688 (cycle 842, epoch 4 — NEW SEAT) — t1688 THE GLYPH RESOLVER: one declared shape/fill/colour rule replaces three that disagreed
+
+### THE MECHANISM — confirmed exactly as the dispatch's read, plus a fourth gap the dispatch's own framing didn't predict
+
+Read (not inferred) every one of the three renderers plus the data they consume:
+
+- **`opSimStarts.js`'s `makeProvider`** already computes the TRUE per-pass truth: `emits: pass > 0 && !!row.emits` — the
+  FIRST surviving pass is ALWAYS forced non-emitting, structurally, no matter what any row declares. For corner
+  (`CORNER_SIM_STARTS`): `wall1` declares `emits:true` but computes to `false` whenever it IS the lead pass
+  (`probeZFirst` off); `wall2` always computes `true`. This computed value is the ONE correct answer to "does dragging
+  this marker write into the emitted program" — nothing downstream needed to re-derive it.
+- **`featureCanvas.js`** (`hollow = h.emits === false`, ANY pass) and **`toolpath2d.js`** (`hollow = i > 0 &&
+  startEmits[i] === false`) both matched this computed truth in principle, but `toolpath2d.js`'s own `i > 0` gate threw
+  away the correctly-computed `false` at pass 0 and forced it non-hollow regardless — a SECOND, redundant re-decision
+  of the exact fact `makeProvider` already settled.
+- **`gcodeViz3d.js`** used `emits` to pick the SHAPE (circle vs square) directly (`_startGlyphTex(emits)`, one texture
+  axis) when declared, and fell back to `!manual` only when `emits` was `undefined` — a structurally different rule
+  from the other two panes' "shape follows manual, fill follows emits" convention. For corner specifically (which
+  never leaves `emits` undefined) this meant shape was ALWAYS decided by emits, never by manual — a manual-travel
+  wall-2 (source:'manual', emits:true) could only ever render a filled SQUARE, never the shape language's own filled
+  CIRCLE for a manual marker.
+- **A fourth gap, not in the dispatch's three-rule table**: corner's LEAD-PASS "Start" marker (the synthetic handle at
+  `panelTypes.js:571-578`, threaded from `userOpView.js`'s `simStart`) never received `emits` AT ALL — not "computed
+  wrong," genuinely absent from the object at every construction site. `panelTypes.js`'s own comment right above that
+  handle already promised "a hollow ◇" (t73) — the INTENT was hollow from the start; the wire to make it so was never
+  built. So the Layout pane's Start rendered FILLED unconditionally while the 3D pane (which DOES receive pass-0's
+  real computed `false` via `setStartEmits`) correctly rendered it HOLLOW — the exact "hollow in one pane, filled in
+  another" symptom, just not from the three-rule disagreement the dispatch named; from a missing wire one hop upstream
+  of the rule that would have rendered it correctly. `toolpath2d.js`'s `i > 0` gate independently produced the SAME
+  visible symptom for the top 2D panel via a different mechanism (it HAD the correct value and discarded it).
+
+### THE RESOLVER — declared, and why its signature isn't literally `(source, emits, pass)`
+
+`viz/startGlyph.js` (new): `isManualStart(source, pass)` = `pass === 0 || source === 'manual'` (t293's rule, unchanged
+— not in dispute); `resolveStartGlyph(manual, emits)` = `{shape: manual?circle:square, fill: emits!==false, colour:
+manual?amber:cyan}`. The dispatch's illustrative signature was `(source, emits, pass)`; I split it into two functions
+instead because `manual` was ALREADY correctly pre-computed at every call site before this turn (toolpath2d.js and
+gcodeViz3d.js each compute it inline from `(source, pass)`; featureCanvas.js receives it pre-resolved as `h.manual` on
+the handle, set by three different construction sites in panelTypes.js/userOpView.js). None of those manual
+computations were in dispute — only the SHAPE/FILL/COLOUR mapping from `(manual, emits)` was. Folding
+`isManualStart` into the same function would have forced featureCanvas.js to reconstruct a fake `(source, pass)` pair
+from an already-resolved boolean just to satisfy one signature. Two small pure functions, each with exactly one job,
+is the more honest "one declared source" than one function two of three callers have to fake inputs for.
+
+### THE LEAD-PASS RULING (dispatch's question 2) — trust the computed value verbatim, never re-decide it in a renderer
+
+Ruled: `emits` is ALREADY pass-aware by the time it reaches any renderer (`makeProvider`'s `pass > 0 && …`). A
+renderer's only job is `fill = emits !== false`, with NO pass-index logic of its own. This is what makes
+`toolpath2d.js`'s fix a one-line deletion (drop the `i > 0 &&` half of its `hollow` expression) rather than a rewrite:
+the data layer already encoded "pass 0 never emits" once; the bug was a renderer re-deciding it a second time, worse.
+Consequence for every OTHER (non-corner) op: `emits` stays `undefined` at every pass (no declaring row exists), and
+`undefined !== false` is `true` — filled, unchanged. Verified this is not just an assertion but an algebraic identity
+for `gcodeViz3d.js`'s old single-axis code (see below).
+
+### gcodeViz3d.js — 4 texture combos now exist; the legacy undeclared-op fallback is preserved LOCALLY, not baked into the resolver
+
+`_startGlyphTex(emits)` → `_startGlyphTex(shape, fill)`, 4 cached textures (`circleFill`/`circleHollow`/`squareFill`/
+`squareHollow`) instead of 2. `_highlightSelectedStart` now calls `resolveStartGlyph(manual, emits === undefined ?
+!manual : emits)` — the `emits === undefined ? !manual : emits` fold lives HERE, not in the shared resolver, because
+it is a one-file legacy compatibility shim (gcodeViz3d's own pre-t1684 `!manual` convention for ops that never
+declare `emits`), not a general truth the other two renderers share. Proved algebraically it reproduces the OLD
+combined behaviour bit-for-bit for every undeclared op: old code was `_startGlyphTex(em===undefined ? !manual : !!em)`
+— a SINGLE boolean deciding both shape and fill together; new code's shape is always `manual`-driven and fill is
+`(!manual)`-driven when `em` is undefined, and since manual/!manual always move together, the two achievable combos
+(auto→filled-square, manual→hollow-circle) are exactly the old code's two combos, pixel-for-pixel. Verified BY VALUE,
+not just this arithmetic: `census-finding2-emits-teal-1684.spec.js` (D) — rewritten from "two same-source passes pick
+different textures" (a weak claim: doesn't test shape independence at all) to directly proving a manual+emits:true
+pass now renders a FILLED CIRCLE and an auto+emits:false pass renders a HOLLOW SQUARE — the exact combo the old
+single-axis code could never produce (its sanity check for "these two textures are distinct" FAILS pre-fix, proven
+below).
+
+### THE THREADING CHAIN — three "declared but forwarded nowhere" gaps, same shape as t1674/t1684, found while wiring the fix
+
+1. **`canvasWidgets.js`'s generic spread** (line ~167) forwarded `id/color/noSnap/emits` but silently dropped a decl's
+   `manual` — the THIRD instance of this exact defect (t1674 noSnap, t1684 emits, now t1688 manual). This is WHY
+   `featureCanvas.js` was inferring manual-ness from `col === '#ffb300'` (a colour-string proxy) instead of reading
+   the field `panelTypes.js:394` already declares (`manual: reposManual`) — the field existed, the forward silently
+   ate it. Fixed by adding `manual: d.manual` alongside the existing generic forward — same fix shape as t1674/t1684.
+2. **`panelTypes.js`'s SIM_ID handle** (corner's lead-pass "Start") never set `emits` at all. Fixed by threading
+   `simStart.emits` onto it; `simStart` itself (`userOpView.js`, two construction sites) never carried `.emits` from
+   `pos0` (== `ps[0]`, `computePassStarts`'s own output, which HAS the correct value) — threaded `emits: pos0.emits`
+   through both.
+3. **`userOpView.js`'s `mkManual`** (the MANUAL-mode jog-landing marker factory, `t1201`) never read `ps[p].emits`
+   either — same gap, different construction site. Fixed by adding `emits: ps[p] && ps[p].emits`. **This is the fix
+   that turned out to have the WIDEST blast radius**, wider than corner alone — see the middle finding below.
+4. **`panelTypes.js`'s `markerHandles.map(...)`** (the `simMarkers`-branch, feeding BOTH `manualMarkers` from #3 above
+   AND the `def.simStartParams` ops alignment/rotary) forwarded `manual`/`simOnly` but not `emits` either. Fixed by
+   adding `emits: m.emits`. Without this, fix #3's `emits` would have died one hop later, same disease.
+
+### FINDING (unprompted — the dispatch scoped this to corner; the SAME bug reaches middle too)
+
+`middle-manual-markers.spec.js` failed after the fix, asserting a manual in-axis jog-landing marker (`__simstart1`)
+renders FILLED amber. Traced: `user_middle_data`'s `def.simStartsProvider` (`middleSimStartsProvider`,
+`middleData.js:187`) ALSO calls the shared `makeProvider(rows)` — and since none of middle's rows ever declare
+`emits:true`, EVERY pass computes `emits:false`, unconditionally, including its manual jog landings. That marker
+GENUINELY never emits — confirmed independently by the test file's OWN header docstring, unchanged since t1201:
+*"dragging it moves the SIM and NEVER the emit (a manual jog has no coded traverse)."* The test's own stated intent
+and the newly-threaded computed value agree; only the OLD rendering (filled, because `mkManual` never read `emits` at
+all) disagreed with both. Not a corner-only defect — every twin using the `manualMarkers` path inherited it silently.
+Nothing about this discovery required expanding today's fix; the SAME three threading fixes above closed it, because
+the whole point of "declare once" is that a twin nobody was thinking about that day still benefits.
+
+### THE FOUR STALE TESTS — encoded the bug's OWN output as the expected answer, not an independent truth
+
+`corner-data-sim-marker-track.spec.js` (3), `corner-marker-labels.spec.js`, `corner-viz-polish.spec.js` (1)+(3),
+`middle-manual-markers.spec.js` all asserted "FILLED amber" for a marker that (per its own surrounding file's
+docstring, in three of the four cases) was DOCUMENTED to be sim-only/never-emitting. These are exactly `assert-the-
+value-not-the-change`'s failure mode in reverse: a test that pinned the bug's own visible output instead of the
+declared truth, so it went green for years while the declared contract (`opSimStarts`' computed `emits:false`,
+`panelTypes.js`'s own "a hollow ◇" comment) said the opposite the whole time. Fixed all four to assert the value the
+data layer actually computes (`fill: 'none'`), not the shape the bug happened to draw:
+- `corner-data-sim-marker-track.spec.js` (3) & `corner-marker-labels.spec.js`: straightforward flip, `fill:'none'`.
+- `corner-viz-polish.spec.js` (1): the ORIGINAL test sampled the marker's exact CENTRE pixel for colour — once hollow,
+  the centre carries no paint, so the amber check would read `r=g=b=0` and silently pass a broken claim (`0 > 0` is
+  false, so the test would have gone red for the WRONG reason). Rewrote to sample the STROKE ring (`sx+6, sy` — the
+  circle is drawn at radius 6.5 with `lineWidth 2.8`) for colour, and the true centre for the hollow/filled alpha
+  claim, keeping both assertions meaningful instead of dropping the colour check.
+- `corner-viz-polish.spec.js` (3): this one PASSED post-fix without changes needed — but only because it calls
+  `layoutSpecFromOp` directly with a hand-built `simStart = {pos:{x,y}}` that never set `.emits`, so `undefined` read
+  as "filled," accidentally matching the old assertion despite testing a scenario the real app no longer produces
+  (the real `simStart` always carries `pos0.emits`, which is `false`). Passing-for-the-wrong-reason is the same
+  disease as a vacuous test — fixed by passing `emits:false` explicitly (matching what the real app threads) and
+  flipping the assertion to `'none'`, so the test is honest about what it's proving again.
+- `middle-manual-markers.spec.js`: flipped `m1.fill` to `'none'`; added a `stroke` capture (wasn't gathered before) so
+  the "still amber" half of the claim is asserted too, not silently dropped.
+
+### VERIFY BY VALUE + BY EYE + non-vacuity
+
+**By eye** (`review-eyeballs-whole-wizard`): opened the real corner wizard (default state, `probeZFirst` off,
+`travelApproach` auto) and screenshotted both the 3D+Layout stacked panel (corner's panel type is `form3d+2d` — both
+panes always visible together, no separate tab to click, which is why an earlier attempt to click a "Layout tab"
+selector was a silent no-op against an identical screenshot). The Start marker draws as a HOLLOW amber circle outline
+in the visible pane; the wall-1 reposition marker (label "1") draws FILLED cyan. Matches the by-value proof exactly.
+
+**Non-vacuity, the strong way** (backed up all 7 touched source files to scratch, `git checkout HEAD --` the 6
+pre-existing ones + deleted the new `startGlyph.js`, kept the NEW test assertions, re-ran):
+- `census-finding2-emits-teal-1684.spec.js` (D) and `corner-data-sim-marker-emits.spec.js` (F, new) both went RED
+  against pre-fix code — (F)'s failure message is the reported symptom verbatim: expected hollow (`none`), received
+  `rgb(255, 179, 0)` (solid amber). (D)'s sanity check ("the two textures are distinct") failed outright, since
+  pre-fix `_startGlyphTex('square', false)` / `('circle', true)` both coerce their first arg truthy → the SAME cached
+  texture. All 9 OTHER tests in those two files passed unchanged against pre-fix code (confirms they're genuinely
+  independent of this claim, not accidentally coupled to it). Restored all 7 files from the scratch backups, re-ran —
+  green again, 11/11.
+- The 4 newly-fixed stale tests were NOT independently re-proven RED the same way: a second broad revert (needed
+  because these 4 files' fixes depend on the SAME 6 source files) was BLOCKED by the auto-mode permission classifier
+  after the first revert/restore cycle, and I did not attempt to work around that boundary. Confidence instead rests
+  on two facts that don't require the blocked command: (a) `toolpath2d.js`'s fix is a pure textual deletion (`i > 0
+  &&` removed) — pre-fix, `hollow` for `i===0` was `i>0 && …` which is `false` by construction for EVERY value of
+  `startEmits[0]`, so a hollow pass-0 marker was LITERALLY UNREACHABLE pre-fix, provable by reading the deleted
+  clause alone, no run needed; (b) the other 3 fixed tests exercise the IDENTICAL `featureCanvas.js` resolver code
+  path already proven RED pre-fix by (F) above (same file, same `resolveStartGlyph` call, same `h.manual`/`h.emits`
+  wiring) — different marker instances of a mechanism already independently confirmed broken pre-fix and fixed
+  post-fix. Flagging this plainly rather than asserting a non-vacuity claim I didn't actually re-run.
+
+**Node tier**: `preview-spec-gate-1688.test.mjs` extended — `GENERIC_PROPS` gained `manual` (Part 3's existing gesture-
+forward-contract check now guards the canvasWidgets.js fix automatically); new PART 5 (P5a: `resolveStartGlyph`'s
+full truth table by value, all 6 `(manual,emits)` combos incl. the manual+emits:true row that was UNREACHABLE before
+this act; P5b: a textual cross-check that all 3 renderer files still import `startGlyph.js`, so a FOURTH local copy
+can't silently reappear — Part 0's own "textual cross-check" pattern, reused). `declared-key-coverage-1678.test.mjs`
+gained `manual` in its `CLEAN_SHAPES` entry for the same reason `emits` is there — a future removal of the read now
+fails loud. Snapshot fixture (`preview-spec-1688.txt`) regenerated deliberately (`UPDATE_PREVIEW_SNAPSHOT=1`),
+reviewed line-by-line via `git diff`: EVERY changed line is exactly one new `"manual":"<undefined>"` (real op decls,
+none of which set it) or `"manual":true` (the 11 synthetic gesture-probe rows, matching `GENERIC_PROPS`) — zero
+geometry moved, confirming the declared-spec change is scoped exactly as intended. Node: **111/0** (was 101 at the
+t1686 floor; +10 = P5a/P5b + declared-key-coverage's own existing 2 tests unchanged, plus this act's count drifted
+from other work landed between t1686 and t1688 — not solely this turn's addition).
+
+**Full suite, twice** (the second run AFTER fixing the 4 stale tests, to get a clean final count): first run — 14
+failed, 2464 passed; 4 were this act's own stale assertions (fixed, see above), the other 10 isolated clean at
+`--workers=1` (confirmed genuinely flaky under the full parallel run, not diff-caused: `formfield-loud-mismatch-1636`,
+`hook-carry-1682`, `palette-by-role-1623`, `pocket-data-emit`, `switch-glyph-declared` all green solo; the remaining
+5 — `collapsible-panes-752`, `pane-splitter-790` ×2, `update-check` ×2 — match the STANDING churn pool documented in
+t1686's own floor). Second run — **8 failed, 2470 passed**, and EVERY ONE of the 8 (`blocks-live-form`,
+`collapsible-panes-752`, `open-as-modal-1625`, `pane-splitter-790` ×2, `save-dialog-declared-1615`, `update-check`
+×2) matches the standing churn pool by name; zero touch anything this turn's diff reaches; zero repeat across the two
+runs beyond the pool itself (a different subset failed each time — the flake signature, not a diff regression).
+`corner-anim-overlay.spec.js` and `layout-overlay-frame-1686.spec.js` (t1686's own frame-split suite) both stayed
+green throughout — confirmed this turn's changes don't disturb that fix.
+
+**Emit byte-identical**: nothing touched writes to a param or the emit path — every change is render-only (shape/
+fill/colour selection) or a generic decl-property forward (`manual`, matching `emits`/`noSnap`'s own precedent, which
+already proved byte-parity-safe at their own landing). `corner-data-sim-marker-emits.spec.js` (E) and
+`corner-data-sim-marker-track.spec.js` (2) — both untouched by this act, both still pass — cover this directly.
+
+### Capacity
+
+This turn ran long: the dispatch's own three-rule table was the easy 80%; the harder 20% was tracing WHY the
+resolver's inputs (`manual`, `emits`) weren't reaching every renderer in the first place, which meant reading through
+`canvasWidgets.js`, `panelTypes.js`, and `userOpView.js`'s several parallel marker-construction paths
+(`simStart`/`manualMarkers`/`entryMarkers`/`spb`-driven `simMarkers`) to find three SEPARATE silent-drop points before
+the resolver itself could matter. The middle finding (same bug, wider reach) surfaced only because fixing #3 above
+required reading `middleData.js`'s own provider closely enough to explain a test failure I did not expect. Working
+room was adequate for the full act (investigation → fix → gate extension → 4 stale-test repairs → two full-suite
+runs) in one sitting; the one place I'd flag rather than push through was the SECOND non-vacuity revert getting
+blocked by the permission classifier — reported above rather than worked around, and the confidence gap it leaves is
+narrow (two independent facts cover it) but real, and worth a human's attention if the advisor wants a stronger proof
+than "the identical mechanism was already proven broken."

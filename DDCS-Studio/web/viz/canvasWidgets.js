@@ -164,7 +164,11 @@ export function buildCanvasWidgets(widgets, setFields) {
         // through `g.place(d)`'s result) — the same declared-but-unread gap t1638 named for block mouths.
         // t1684 — emits is the SAME generic forward: a decl may declare "does dragging this write a value that reaches
         // the emitted G-code" (census finding 2 — lathe's teal and corner's emits, unified); FeatureCanvas reads it.
-        handles.push({ id, color: d.color, noSnap: d.noSnap, emits: d.emits, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
+        // t1688 — manual joins the same generic forward: a THIRD instance of the identical drop (noSnap/t1674,
+        // emits/t1684) — panelTypes.js:394 already declares `manual: reposManual` on corner's reposition decls, and
+        // this hand-picked spread was silently discarding it, forcing FeatureCanvas to infer manual-ness from a
+        // colour-string match instead of reading the declared field (the glyph resolver, t1688, needs the real one).
+        handles.push({ id, color: d.color, noSnap: d.noSnap, emits: d.emits, manual: d.manual, ...g.place(d) });   // t81 — a decl may carry a SOURCE colour (auto/manual) for the FeatureCanvas
     });
     const onDrag = (id, world) => {
         const d = byId[id]; if (!d) return;
