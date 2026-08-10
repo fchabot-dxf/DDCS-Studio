@@ -41,7 +41,13 @@ import { latheProbeTool, latheBarOf } from '../../viz/latheScene.js';   // t1301
 // on container.__animOverlay — renderLayoutWithSim re-runs on every field/drag and self-recurses, so a fresh instance/raf
 // each call would leak). The overlay reads the SAME shared trace + starts/passEnds/anchor the top 2D panel uses, so its
 // path connects the SVG handles by construction, and pins its view from featureCanvas._tf so it registers pixel-exact.
-function _pinFromTf(tf) { return tf ? { scale: tf.scale, ox: tf.cx - tf.cxw * tf.scale, oy: tf.cy + tf.cyw * tf.scale } : null; }
+// t1688 — EXPORTED (the `export` keyword only; the body is untouched) so the frame seam that split TWICE (t1672,
+// then t1686) is reachable by a gate at all. This one line is the sole translation between FeatureCanvas.getTransform()
+// and the pixels the overlay raster paints in; until now nothing outside this file could evaluate it, so the only
+// detector for a frame split was a human opening a wizard with a WCS pin active.
+// tests/node/preview-spec-gate-1688.test.mjs asserts _pinFromTf(getTransform()) lands a world point on the SAME pixel
+// FeatureCanvas._disp puts it.
+export function _pinFromTf(tf) { return tf ? { scale: tf.scale, ox: tf.cx - tf.cxw * tf.scale, oy: tf.cy + tf.cyw * tf.scale } : null; }
 // t1021 — dock the DECLARED depth ruler as a narrow VERTICAL strip down the LEFT edge of the 2D plan (feature) canvas.
 // The plan canvas `c` is moved into a horizontal `.viz-zruler-row` (same node → featureCanvas untouched, single-fit); the
 // strip is its LEFT sibling. Present only for an op that declares def.zRuler (pocket); hidden otherwise. A grip drag writes

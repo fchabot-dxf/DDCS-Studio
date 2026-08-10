@@ -1,0 +1,948 @@
+# preview-spec gate 1688 — 32 twins × 2 param states · 11 gestures
+# fixture: stock 200×150 pin=g55 · machine 800×600×-120 · partZeroShift → {"x":300,"y":200}
+# encoding: keys sorted recursively · numbers rounded to 1e-4 (-0→0) · present-but-undefined → "<undefined>" (NEVER dropped) · function → "<fn/arity>"
+#
+user_alignment_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_alignment_data @defaults .handles <0 entries>
+user_alignment_data @defaults .items <0 entries>
+user_alignment_data @defaults .onDrag "<fn/2>"
+user_alignment_data @defaults .onEdit "<fn/2>"
+user_alignment_data @defaults .origin {"x":0,"y":0}
+user_alignment_data @defaults .paths null
+user_alignment_data @defaults .placement {"x":300,"y":200}
+user_alignment_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_alignment_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_alignment_data @offdefaults .handles <0 entries>
+user_alignment_data @offdefaults .items <0 entries>
+user_alignment_data @offdefaults .onDrag "<fn/2>"
+user_alignment_data @offdefaults .onEdit "<fn/2>"
+user_alignment_data @offdefaults .origin {"x":0,"y":0}
+user_alignment_data @offdefaults .paths null
+user_alignment_data @offdefaults .placement {"x":300,"y":200}
+user_alignment_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_change_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_change_data @defaults .handles <0 entries>
+user_atc_change_data @defaults .items <0 entries>
+user_atc_change_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_atc_change_data @defaults .onDrag "<fn/2>"
+user_atc_change_data @defaults .onEdit "<fn/2>"
+user_atc_change_data @defaults .origin {"x":0,"y":0}
+user_atc_change_data @defaults .paths null
+user_atc_change_data @defaults .placement {"x":300,"y":200}
+user_atc_change_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_change_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_change_data @offdefaults .handles <0 entries>
+user_atc_change_data @offdefaults .items <0 entries>
+user_atc_change_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_atc_change_data @offdefaults .onDrag "<fn/2>"
+user_atc_change_data @offdefaults .onEdit "<fn/2>"
+user_atc_change_data @offdefaults .origin {"x":0,"y":0}
+user_atc_change_data @offdefaults .paths null
+user_atc_change_data @offdefaults .placement {"x":300,"y":200}
+user_atc_change_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_check_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_check_data @defaults .handles <0 entries>
+user_atc_check_data @defaults .items <0 entries>
+user_atc_check_data @defaults .onDrag "<fn/2>"
+user_atc_check_data @defaults .onEdit "<fn/2>"
+user_atc_check_data @defaults .origin {"x":0,"y":0}
+user_atc_check_data @defaults .paths null
+user_atc_check_data @defaults .placement {"x":300,"y":200}
+user_atc_check_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_check_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_check_data @offdefaults .handles <0 entries>
+user_atc_check_data @offdefaults .items <0 entries>
+user_atc_check_data @offdefaults .onDrag "<fn/2>"
+user_atc_check_data @offdefaults .onEdit "<fn/2>"
+user_atc_check_data @offdefaults .origin {"x":0,"y":0}
+user_atc_check_data @offdefaults .paths null
+user_atc_check_data @offdefaults .placement {"x":300,"y":200}
+user_atc_check_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_length_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_length_data @defaults .handles <0 entries>
+user_atc_length_data @defaults .items <0 entries>
+user_atc_length_data @defaults .onDrag "<fn/2>"
+user_atc_length_data @defaults .onEdit "<fn/2>"
+user_atc_length_data @defaults .origin {"x":0,"y":0}
+user_atc_length_data @defaults .paths null
+user_atc_length_data @defaults .placement {"x":300,"y":200}
+user_atc_length_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_length_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_length_data @offdefaults .handles <0 entries>
+user_atc_length_data @offdefaults .items <0 entries>
+user_atc_length_data @offdefaults .onDrag "<fn/2>"
+user_atc_length_data @offdefaults .onEdit "<fn/2>"
+user_atc_length_data @offdefaults .origin {"x":0,"y":0}
+user_atc_length_data @offdefaults .paths null
+user_atc_length_data @offdefaults .placement {"x":300,"y":200}
+user_atc_length_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_table_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_table_data @defaults .handles <0 entries>
+user_atc_table_data @defaults .items <0 entries>
+user_atc_table_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_atc_table_data @defaults .onDrag "<fn/2>"
+user_atc_table_data @defaults .onEdit "<fn/2>"
+user_atc_table_data @defaults .origin {"x":0,"y":0}
+user_atc_table_data @defaults .paths null
+user_atc_table_data @defaults .placement {"x":300,"y":200}
+user_atc_table_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_table_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_table_data @offdefaults .handles <0 entries>
+user_atc_table_data @offdefaults .items <0 entries>
+user_atc_table_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_atc_table_data @offdefaults .onDrag "<fn/2>"
+user_atc_table_data @offdefaults .onEdit "<fn/2>"
+user_atc_table_data @offdefaults .origin {"x":0,"y":0}
+user_atc_table_data @offdefaults .paths null
+user_atc_table_data @offdefaults .placement {"x":300,"y":200}
+user_atc_table_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_test_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_test_data @defaults .handles <0 entries>
+user_atc_test_data @defaults .items <0 entries>
+user_atc_test_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_atc_test_data @defaults .onDrag "<fn/2>"
+user_atc_test_data @defaults .onEdit "<fn/2>"
+user_atc_test_data @defaults .origin {"x":0,"y":0}
+user_atc_test_data @defaults .paths null
+user_atc_test_data @defaults .placement {"x":300,"y":200}
+user_atc_test_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_test_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_test_data @offdefaults .handles <0 entries>
+user_atc_test_data @offdefaults .items <0 entries>
+user_atc_test_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_atc_test_data @offdefaults .onDrag "<fn/2>"
+user_atc_test_data @offdefaults .onEdit "<fn/2>"
+user_atc_test_data @offdefaults .origin {"x":0,"y":0}
+user_atc_test_data @offdefaults .paths null
+user_atc_test_data @offdefaults .placement {"x":300,"y":200}
+user_atc_test_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_warmup_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_warmup_data @defaults .handles <0 entries>
+user_atc_warmup_data @defaults .items <0 entries>
+user_atc_warmup_data @defaults .onDrag "<fn/2>"
+user_atc_warmup_data @defaults .onEdit "<fn/2>"
+user_atc_warmup_data @defaults .origin {"x":0,"y":0}
+user_atc_warmup_data @defaults .paths null
+user_atc_warmup_data @defaults .placement {"x":300,"y":200}
+user_atc_warmup_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_atc_warmup_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d"}
+user_atc_warmup_data @offdefaults .handles <0 entries>
+user_atc_warmup_data @offdefaults .items <0 entries>
+user_atc_warmup_data @offdefaults .onDrag "<fn/2>"
+user_atc_warmup_data @offdefaults .onEdit "<fn/2>"
+user_atc_warmup_data @offdefaults .origin {"x":0,"y":0}
+user_atc_warmup_data @offdefaults .paths null
+user_atc_warmup_data @offdefaults .placement {"x":300,"y":200}
+user_atc_warmup_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_bore_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_bore_data @defaults .handles <2 entries>
+user_bore_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_bore_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":6,"y":0}
+user_bore_data @defaults .items <0 entries>
+user_bore_data @defaults .onDrag "<fn/2>"
+user_bore_data @defaults .onEdit "<fn/2>"
+user_bore_data @defaults .origin {"x":0,"y":0}
+user_bore_data @defaults .paths <1 entries>
+user_bore_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":6,"y":0},{"x":5.1962,"y":3},{"x":3,"y":5.1962},{"x":0,"y":6},{"x":-3,"y":5.1962},{"x":-5.1962,"y":3},{"x":-6,"y":0},{"x":-5.1962,"y":-3},{"x":-3,"y":-5.1962},{"x":0,"y":-6},{"x":3,"y":-5.1962},{"x":5.1962,"y":-3},{"x":6,"y":0}]}
+user_bore_data @defaults .placement {"x":300,"y":200}
+user_bore_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_bore_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_bore_data @offdefaults .handles <3 entries>
+user_bore_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3.5,"y":7}
+user_bore_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
+user_bore_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"dr_dia","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":13,"y":7}
+user_bore_data @offdefaults .items <0 entries>
+user_bore_data @offdefaults .onDrag "<fn/2>"
+user_bore_data @offdefaults .onEdit "<fn/2>"
+user_bore_data @offdefaults .origin {"x":0,"y":0}
+user_bore_data @offdefaults .paths <90 entries>
+user_bore_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":13,"y":7},{"x":11.7272,"y":11.75},{"x":8.25,"y":15.2272},{"x":3.5,"y":16.5},{"x":-1.25,"y":15.2272},{"x":-4.7272,"y":11.75},{"x":-6,"y":7},{"x":-4.7272,"y":2.25},{"x":-1.25,"y":-1.2272},{"x":3.5,"y":-2.5},{"x":8.25,"y":-1.2272},{"x":11.7272,"y":2.25},{"x":13,"y":7}]}
+user_bore_data @offdefaults .paths[1] {"cls":"fc-guide","pts":[{"x":40,"y":7},{"x":38.7272,"y":11.75},{"x":35.25,"y":15.2272},{"x":30.5,"y":16.5},{"x":25.75,"y":15.2272},{"x":22.2728,"y":11.75},{"x":21,"y":7},{"x":22.2728,"y":2.25},{"x":25.75,"y":-1.2272},{"x":30.5,"y":-2.5},{"x":35.25,"y":-1.2272},{"x":38.7272,"y":2.25},{"x":40,"y":7}]}
+user_bore_data @offdefaults .paths[2] {"cls":"fc-guide","pts":[{"x":67,"y":7},{"x":65.7272,"y":11.75},{"x":62.25,"y":15.2272},{"x":57.5,"y":16.5},{"x":52.75,"y":15.2272},{"x":49.2728,"y":11.75},{"x":48,"y":7},{"x":49.2728,"y":2.25},{"x":52.75,"y":-1.2272},{"x":57.5,"y":-2.5},{"x":62.25,"y":-1.2272},{"x":65.7272,"y":2.25},{"x":67,"y":7}]}
+user_bore_data @offdefaults .paths[3] {"cls":"fc-guide","pts":[{"x":94,"y":7},{"x":92.7272,"y":11.75},{"x":89.25,"y":15.2272},{"x":84.5,"y":16.5},{"x":79.75,"y":15.2272},{"x":76.2728,"y":11.75},{"x":75,"y":7},{"x":76.2728,"y":2.25},{"x":79.75,"y":-1.2272},{"x":84.5,"y":-2.5},{"x":89.25,"y":-1.2272},{"x":92.7272,"y":2.25},{"x":94,"y":7}]}
+user_bore_data @offdefaults .paths[4] {"cls":"fc-guide","pts":[{"x":121,"y":7},{"x":119.7272,"y":11.75},{"x":116.25,"y":15.2272},{"x":111.5,"y":16.5},{"x":106.75,"y":15.2272},{"x":103.2728,"y":11.75},{"x":102,"y":7},{"x":103.2728,"y":2.25},{"x":106.75,"y":-1.2272},{"x":111.5,"y":-2.5},{"x":116.25,"y":-1.2272},{"x":119.7272,"y":2.25},{"x":121,"y":7}]}
+user_bore_data @offdefaults .paths[5] {"cls":"fc-guide","pts":[{"x":148,"y":7},{"x":146.7272,"y":11.75},{"x":143.25,"y":15.2272},{"x":138.5,"y":16.5},{"x":133.75,"y":15.2272},{"x":130.2728,"y":11.75},{"x":129,"y":7},{"x":130.2728,"y":2.25},{"x":133.75,"y":-1.2272},{"x":138.5,"y":-2.5},{"x":143.25,"y":-1.2272},{"x":146.7272,"y":2.25},{"x":148,"y":7}]}
+user_bore_data @offdefaults .paths[6] {"cls":"fc-guide","pts":[{"x":175,"y":7},{"x":173.7272,"y":11.75},{"x":170.25,"y":15.2272},{"x":165.5,"y":16.5},{"x":160.75,"y":15.2272},{"x":157.2728,"y":11.75},{"x":156,"y":7},{"x":157.2728,"y":2.25},{"x":160.75,"y":-1.2272},{"x":165.5,"y":-2.5},{"x":170.25,"y":-1.2272},{"x":173.7272,"y":2.25},{"x":175,"y":7}]}
+user_bore_data @offdefaults .paths[7] {"cls":"fc-guide","pts":[{"x":202,"y":7},{"x":200.7272,"y":11.75},{"x":197.25,"y":15.2272},{"x":192.5,"y":16.5},{"x":187.75,"y":15.2272},{"x":184.2728,"y":11.75},{"x":183,"y":7},{"x":184.2728,"y":2.25},{"x":187.75,"y":-1.2272},{"x":192.5,"y":-2.5},{"x":197.25,"y":-1.2272},{"x":200.7272,"y":2.25},{"x":202,"y":7}]}
+user_bore_data @offdefaults .paths[8] {"cls":"fc-guide","pts":[{"x":229,"y":7},{"x":227.7272,"y":11.75},{"x":224.25,"y":15.2272},{"x":219.5,"y":16.5},{"x":214.75,"y":15.2272},{"x":211.2728,"y":11.75},{"x":210,"y":7},{"x":211.2728,"y":2.25},{"x":214.75,"y":-1.2272},{"x":219.5,"y":-2.5},{"x":224.25,"y":-1.2272},{"x":227.7272,"y":2.25},{"x":229,"y":7}]}
+user_bore_data @offdefaults .paths[9] {"cls":"fc-guide","pts":[{"x":256,"y":7},{"x":254.7272,"y":11.75},{"x":251.25,"y":15.2272},{"x":246.5,"y":16.5},{"x":241.75,"y":15.2272},{"x":238.2728,"y":11.75},{"x":237,"y":7},{"x":238.2728,"y":2.25},{"x":241.75,"y":-1.2272},{"x":246.5,"y":-2.5},{"x":251.25,"y":-1.2272},{"x":254.7272,"y":2.25},{"x":256,"y":7}]}
+user_bore_data @offdefaults .paths[10] {"cls":"fc-guide","pts":[{"x":13,"y":34},{"x":11.7272,"y":38.75},{"x":8.25,"y":42.2272},{"x":3.5,"y":43.5},{"x":-1.25,"y":42.2272},{"x":-4.7272,"y":38.75},{"x":-6,"y":34},{"x":-4.7272,"y":29.25},{"x":-1.25,"y":25.7728},{"x":3.5,"y":24.5},{"x":8.25,"y":25.7728},{"x":11.7272,"y":29.25},{"x":13,"y":34}]}
+user_bore_data @offdefaults .paths[11] {"cls":"fc-guide","pts":[{"x":40,"y":34},{"x":38.7272,"y":38.75},{"x":35.25,"y":42.2272},{"x":30.5,"y":43.5},{"x":25.75,"y":42.2272},{"x":22.2728,"y":38.75},{"x":21,"y":34},{"x":22.2728,"y":29.25},{"x":25.75,"y":25.7728},{"x":30.5,"y":24.5},{"x":35.25,"y":25.7728},{"x":38.7272,"y":29.25},{"x":40,"y":34}]}
+user_bore_data @offdefaults .paths[12] {"cls":"fc-guide","pts":[{"x":67,"y":34},{"x":65.7272,"y":38.75},{"x":62.25,"y":42.2272},{"x":57.5,"y":43.5},{"x":52.75,"y":42.2272},{"x":49.2728,"y":38.75},{"x":48,"y":34},{"x":49.2728,"y":29.25},{"x":52.75,"y":25.7728},{"x":57.5,"y":24.5},{"x":62.25,"y":25.7728},{"x":65.7272,"y":29.25},{"x":67,"y":34}]}
+user_bore_data @offdefaults .paths[13] {"cls":"fc-guide","pts":[{"x":94,"y":34},{"x":92.7272,"y":38.75},{"x":89.25,"y":42.2272},{"x":84.5,"y":43.5},{"x":79.75,"y":42.2272},{"x":76.2728,"y":38.75},{"x":75,"y":34},{"x":76.2728,"y":29.25},{"x":79.75,"y":25.7728},{"x":84.5,"y":24.5},{"x":89.25,"y":25.7728},{"x":92.7272,"y":29.25},{"x":94,"y":34}]}
+user_bore_data @offdefaults .paths[14] {"cls":"fc-guide","pts":[{"x":121,"y":34},{"x":119.7272,"y":38.75},{"x":116.25,"y":42.2272},{"x":111.5,"y":43.5},{"x":106.75,"y":42.2272},{"x":103.2728,"y":38.75},{"x":102,"y":34},{"x":103.2728,"y":29.25},{"x":106.75,"y":25.7728},{"x":111.5,"y":24.5},{"x":116.25,"y":25.7728},{"x":119.7272,"y":29.25},{"x":121,"y":34}]}
+user_bore_data @offdefaults .paths[15] {"cls":"fc-guide","pts":[{"x":148,"y":34},{"x":146.7272,"y":38.75},{"x":143.25,"y":42.2272},{"x":138.5,"y":43.5},{"x":133.75,"y":42.2272},{"x":130.2728,"y":38.75},{"x":129,"y":34},{"x":130.2728,"y":29.25},{"x":133.75,"y":25.7728},{"x":138.5,"y":24.5},{"x":143.25,"y":25.7728},{"x":146.7272,"y":29.25},{"x":148,"y":34}]}
+user_bore_data @offdefaults .paths[16] {"cls":"fc-guide","pts":[{"x":175,"y":34},{"x":173.7272,"y":38.75},{"x":170.25,"y":42.2272},{"x":165.5,"y":43.5},{"x":160.75,"y":42.2272},{"x":157.2728,"y":38.75},{"x":156,"y":34},{"x":157.2728,"y":29.25},{"x":160.75,"y":25.7728},{"x":165.5,"y":24.5},{"x":170.25,"y":25.7728},{"x":173.7272,"y":29.25},{"x":175,"y":34}]}
+user_bore_data @offdefaults .paths[17] {"cls":"fc-guide","pts":[{"x":202,"y":34},{"x":200.7272,"y":38.75},{"x":197.25,"y":42.2272},{"x":192.5,"y":43.5},{"x":187.75,"y":42.2272},{"x":184.2728,"y":38.75},{"x":183,"y":34},{"x":184.2728,"y":29.25},{"x":187.75,"y":25.7728},{"x":192.5,"y":24.5},{"x":197.25,"y":25.7728},{"x":200.7272,"y":29.25},{"x":202,"y":34}]}
+user_bore_data @offdefaults .paths[18] {"cls":"fc-guide","pts":[{"x":229,"y":34},{"x":227.7272,"y":38.75},{"x":224.25,"y":42.2272},{"x":219.5,"y":43.5},{"x":214.75,"y":42.2272},{"x":211.2728,"y":38.75},{"x":210,"y":34},{"x":211.2728,"y":29.25},{"x":214.75,"y":25.7728},{"x":219.5,"y":24.5},{"x":224.25,"y":25.7728},{"x":227.7272,"y":29.25},{"x":229,"y":34}]}
+user_bore_data @offdefaults .paths[19] {"cls":"fc-guide","pts":[{"x":256,"y":34},{"x":254.7272,"y":38.75},{"x":251.25,"y":42.2272},{"x":246.5,"y":43.5},{"x":241.75,"y":42.2272},{"x":238.2728,"y":38.75},{"x":237,"y":34},{"x":238.2728,"y":29.25},{"x":241.75,"y":25.7728},{"x":246.5,"y":24.5},{"x":251.25,"y":25.7728},{"x":254.7272,"y":29.25},{"x":256,"y":34}]}
+user_bore_data @offdefaults .paths[20] {"cls":"fc-guide","pts":[{"x":13,"y":61},{"x":11.7272,"y":65.75},{"x":8.25,"y":69.2272},{"x":3.5,"y":70.5},{"x":-1.25,"y":69.2272},{"x":-4.7272,"y":65.75},{"x":-6,"y":61},{"x":-4.7272,"y":56.25},{"x":-1.25,"y":52.7728},{"x":3.5,"y":51.5},{"x":8.25,"y":52.7728},{"x":11.7272,"y":56.25},{"x":13,"y":61}]}
+user_bore_data @offdefaults .paths[21] {"cls":"fc-guide","pts":[{"x":40,"y":61},{"x":38.7272,"y":65.75},{"x":35.25,"y":69.2272},{"x":30.5,"y":70.5},{"x":25.75,"y":69.2272},{"x":22.2728,"y":65.75},{"x":21,"y":61},{"x":22.2728,"y":56.25},{"x":25.75,"y":52.7728},{"x":30.5,"y":51.5},{"x":35.25,"y":52.7728},{"x":38.7272,"y":56.25},{"x":40,"y":61}]}
+user_bore_data @offdefaults .paths[22] {"cls":"fc-guide","pts":[{"x":67,"y":61},{"x":65.7272,"y":65.75},{"x":62.25,"y":69.2272},{"x":57.5,"y":70.5},{"x":52.75,"y":69.2272},{"x":49.2728,"y":65.75},{"x":48,"y":61},{"x":49.2728,"y":56.25},{"x":52.75,"y":52.7728},{"x":57.5,"y":51.5},{"x":62.25,"y":52.7728},{"x":65.7272,"y":56.25},{"x":67,"y":61}]}
+user_bore_data @offdefaults .paths[23] {"cls":"fc-guide","pts":[{"x":94,"y":61},{"x":92.7272,"y":65.75},{"x":89.25,"y":69.2272},{"x":84.5,"y":70.5},{"x":79.75,"y":69.2272},{"x":76.2728,"y":65.75},{"x":75,"y":61},{"x":76.2728,"y":56.25},{"x":79.75,"y":52.7728},{"x":84.5,"y":51.5},{"x":89.25,"y":52.7728},{"x":92.7272,"y":56.25},{"x":94,"y":61}]}
+user_bore_data @offdefaults .paths[24] {"cls":"fc-guide","pts":[{"x":121,"y":61},{"x":119.7272,"y":65.75},{"x":116.25,"y":69.2272},{"x":111.5,"y":70.5},{"x":106.75,"y":69.2272},{"x":103.2728,"y":65.75},{"x":102,"y":61},{"x":103.2728,"y":56.25},{"x":106.75,"y":52.7728},{"x":111.5,"y":51.5},{"x":116.25,"y":52.7728},{"x":119.7272,"y":56.25},{"x":121,"y":61}]}
+user_bore_data @offdefaults .paths[25] {"cls":"fc-guide","pts":[{"x":148,"y":61},{"x":146.7272,"y":65.75},{"x":143.25,"y":69.2272},{"x":138.5,"y":70.5},{"x":133.75,"y":69.2272},{"x":130.2728,"y":65.75},{"x":129,"y":61},{"x":130.2728,"y":56.25},{"x":133.75,"y":52.7728},{"x":138.5,"y":51.5},{"x":143.25,"y":52.7728},{"x":146.7272,"y":56.25},{"x":148,"y":61}]}
+user_bore_data @offdefaults .paths[26] {"cls":"fc-guide","pts":[{"x":175,"y":61},{"x":173.7272,"y":65.75},{"x":170.25,"y":69.2272},{"x":165.5,"y":70.5},{"x":160.75,"y":69.2272},{"x":157.2728,"y":65.75},{"x":156,"y":61},{"x":157.2728,"y":56.25},{"x":160.75,"y":52.7728},{"x":165.5,"y":51.5},{"x":170.25,"y":52.7728},{"x":173.7272,"y":56.25},{"x":175,"y":61}]}
+user_bore_data @offdefaults .paths[27] {"cls":"fc-guide","pts":[{"x":202,"y":61},{"x":200.7272,"y":65.75},{"x":197.25,"y":69.2272},{"x":192.5,"y":70.5},{"x":187.75,"y":69.2272},{"x":184.2728,"y":65.75},{"x":183,"y":61},{"x":184.2728,"y":56.25},{"x":187.75,"y":52.7728},{"x":192.5,"y":51.5},{"x":197.25,"y":52.7728},{"x":200.7272,"y":56.25},{"x":202,"y":61}]}
+user_bore_data @offdefaults .paths[28] {"cls":"fc-guide","pts":[{"x":229,"y":61},{"x":227.7272,"y":65.75},{"x":224.25,"y":69.2272},{"x":219.5,"y":70.5},{"x":214.75,"y":69.2272},{"x":211.2728,"y":65.75},{"x":210,"y":61},{"x":211.2728,"y":56.25},{"x":214.75,"y":52.7728},{"x":219.5,"y":51.5},{"x":224.25,"y":52.7728},{"x":227.7272,"y":56.25},{"x":229,"y":61}]}
+user_bore_data @offdefaults .paths[29] {"cls":"fc-guide","pts":[{"x":256,"y":61},{"x":254.7272,"y":65.75},{"x":251.25,"y":69.2272},{"x":246.5,"y":70.5},{"x":241.75,"y":69.2272},{"x":238.2728,"y":65.75},{"x":237,"y":61},{"x":238.2728,"y":56.25},{"x":241.75,"y":52.7728},{"x":246.5,"y":51.5},{"x":251.25,"y":52.7728},{"x":254.7272,"y":56.25},{"x":256,"y":61}]}
+user_bore_data @offdefaults .paths[30] {"cls":"fc-guide","pts":[{"x":13,"y":88},{"x":11.7272,"y":92.75},{"x":8.25,"y":96.2272},{"x":3.5,"y":97.5},{"x":-1.25,"y":96.2272},{"x":-4.7272,"y":92.75},{"x":-6,"y":88},{"x":-4.7272,"y":83.25},{"x":-1.25,"y":79.7728},{"x":3.5,"y":78.5},{"x":8.25,"y":79.7728},{"x":11.7272,"y":83.25},{"x":13,"y":88}]}
+user_bore_data @offdefaults .paths[31] {"cls":"fc-guide","pts":[{"x":40,"y":88},{"x":38.7272,"y":92.75},{"x":35.25,"y":96.2272},{"x":30.5,"y":97.5},{"x":25.75,"y":96.2272},{"x":22.2728,"y":92.75},{"x":21,"y":88},{"x":22.2728,"y":83.25},{"x":25.75,"y":79.7728},{"x":30.5,"y":78.5},{"x":35.25,"y":79.7728},{"x":38.7272,"y":83.25},{"x":40,"y":88}]}
+user_bore_data @offdefaults .paths[32] {"cls":"fc-guide","pts":[{"x":67,"y":88},{"x":65.7272,"y":92.75},{"x":62.25,"y":96.2272},{"x":57.5,"y":97.5},{"x":52.75,"y":96.2272},{"x":49.2728,"y":92.75},{"x":48,"y":88},{"x":49.2728,"y":83.25},{"x":52.75,"y":79.7728},{"x":57.5,"y":78.5},{"x":62.25,"y":79.7728},{"x":65.7272,"y":83.25},{"x":67,"y":88}]}
+user_bore_data @offdefaults .paths[33] {"cls":"fc-guide","pts":[{"x":94,"y":88},{"x":92.7272,"y":92.75},{"x":89.25,"y":96.2272},{"x":84.5,"y":97.5},{"x":79.75,"y":96.2272},{"x":76.2728,"y":92.75},{"x":75,"y":88},{"x":76.2728,"y":83.25},{"x":79.75,"y":79.7728},{"x":84.5,"y":78.5},{"x":89.25,"y":79.7728},{"x":92.7272,"y":83.25},{"x":94,"y":88}]}
+user_bore_data @offdefaults .paths[34] {"cls":"fc-guide","pts":[{"x":121,"y":88},{"x":119.7272,"y":92.75},{"x":116.25,"y":96.2272},{"x":111.5,"y":97.5},{"x":106.75,"y":96.2272},{"x":103.2728,"y":92.75},{"x":102,"y":88},{"x":103.2728,"y":83.25},{"x":106.75,"y":79.7728},{"x":111.5,"y":78.5},{"x":116.25,"y":79.7728},{"x":119.7272,"y":83.25},{"x":121,"y":88}]}
+user_bore_data @offdefaults .paths[35] {"cls":"fc-guide","pts":[{"x":148,"y":88},{"x":146.7272,"y":92.75},{"x":143.25,"y":96.2272},{"x":138.5,"y":97.5},{"x":133.75,"y":96.2272},{"x":130.2728,"y":92.75},{"x":129,"y":88},{"x":130.2728,"y":83.25},{"x":133.75,"y":79.7728},{"x":138.5,"y":78.5},{"x":143.25,"y":79.7728},{"x":146.7272,"y":83.25},{"x":148,"y":88}]}
+user_bore_data @offdefaults .paths[36] {"cls":"fc-guide","pts":[{"x":175,"y":88},{"x":173.7272,"y":92.75},{"x":170.25,"y":96.2272},{"x":165.5,"y":97.5},{"x":160.75,"y":96.2272},{"x":157.2728,"y":92.75},{"x":156,"y":88},{"x":157.2728,"y":83.25},{"x":160.75,"y":79.7728},{"x":165.5,"y":78.5},{"x":170.25,"y":79.7728},{"x":173.7272,"y":83.25},{"x":175,"y":88}]}
+user_bore_data @offdefaults .paths[37] {"cls":"fc-guide","pts":[{"x":202,"y":88},{"x":200.7272,"y":92.75},{"x":197.25,"y":96.2272},{"x":192.5,"y":97.5},{"x":187.75,"y":96.2272},{"x":184.2728,"y":92.75},{"x":183,"y":88},{"x":184.2728,"y":83.25},{"x":187.75,"y":79.7728},{"x":192.5,"y":78.5},{"x":197.25,"y":79.7728},{"x":200.7272,"y":83.25},{"x":202,"y":88}]}
+user_bore_data @offdefaults .paths[38] {"cls":"fc-guide","pts":[{"x":229,"y":88},{"x":227.7272,"y":92.75},{"x":224.25,"y":96.2272},{"x":219.5,"y":97.5},{"x":214.75,"y":96.2272},{"x":211.2728,"y":92.75},{"x":210,"y":88},{"x":211.2728,"y":83.25},{"x":214.75,"y":79.7728},{"x":219.5,"y":78.5},{"x":224.25,"y":79.7728},{"x":227.7272,"y":83.25},{"x":229,"y":88}]}
+user_bore_data @offdefaults .paths[39] {"cls":"fc-guide","pts":[{"x":256,"y":88},{"x":254.7272,"y":92.75},{"x":251.25,"y":96.2272},{"x":246.5,"y":97.5},{"x":241.75,"y":96.2272},{"x":238.2728,"y":92.75},{"x":237,"y":88},{"x":238.2728,"y":83.25},{"x":241.75,"y":79.7728},{"x":246.5,"y":78.5},{"x":251.25,"y":79.7728},{"x":254.7272,"y":83.25},{"x":256,"y":88}]}
+user_bore_data @offdefaults .paths[40] {"cls":"fc-guide","pts":[{"x":13,"y":115},{"x":11.7272,"y":119.75},{"x":8.25,"y":123.2272},{"x":3.5,"y":124.5},{"x":-1.25,"y":123.2272},{"x":-4.7272,"y":119.75},{"x":-6,"y":115},{"x":-4.7272,"y":110.25},{"x":-1.25,"y":106.7728},{"x":3.5,"y":105.5},{"x":8.25,"y":106.7728},{"x":11.7272,"y":110.25},{"x":13,"y":115}]}
+user_bore_data @offdefaults .paths[41] {"cls":"fc-guide","pts":[{"x":40,"y":115},{"x":38.7272,"y":119.75},{"x":35.25,"y":123.2272},{"x":30.5,"y":124.5},{"x":25.75,"y":123.2272},{"x":22.2728,"y":119.75},{"x":21,"y":115},{"x":22.2728,"y":110.25},{"x":25.75,"y":106.7728},{"x":30.5,"y":105.5},{"x":35.25,"y":106.7728},{"x":38.7272,"y":110.25},{"x":40,"y":115}]}
+user_bore_data @offdefaults .paths[42] {"cls":"fc-guide","pts":[{"x":67,"y":115},{"x":65.7272,"y":119.75},{"x":62.25,"y":123.2272},{"x":57.5,"y":124.5},{"x":52.75,"y":123.2272},{"x":49.2728,"y":119.75},{"x":48,"y":115},{"x":49.2728,"y":110.25},{"x":52.75,"y":106.7728},{"x":57.5,"y":105.5},{"x":62.25,"y":106.7728},{"x":65.7272,"y":110.25},{"x":67,"y":115}]}
+user_bore_data @offdefaults .paths[43] {"cls":"fc-guide","pts":[{"x":94,"y":115},{"x":92.7272,"y":119.75},{"x":89.25,"y":123.2272},{"x":84.5,"y":124.5},{"x":79.75,"y":123.2272},{"x":76.2728,"y":119.75},{"x":75,"y":115},{"x":76.2728,"y":110.25},{"x":79.75,"y":106.7728},{"x":84.5,"y":105.5},{"x":89.25,"y":106.7728},{"x":92.7272,"y":110.25},{"x":94,"y":115}]}
+user_bore_data @offdefaults .paths[44] {"cls":"fc-guide","pts":[{"x":121,"y":115},{"x":119.7272,"y":119.75},{"x":116.25,"y":123.2272},{"x":111.5,"y":124.5},{"x":106.75,"y":123.2272},{"x":103.2728,"y":119.75},{"x":102,"y":115},{"x":103.2728,"y":110.25},{"x":106.75,"y":106.7728},{"x":111.5,"y":105.5},{"x":116.25,"y":106.7728},{"x":119.7272,"y":110.25},{"x":121,"y":115}]}
+user_bore_data @offdefaults .paths[45] {"cls":"fc-guide","pts":[{"x":148,"y":115},{"x":146.7272,"y":119.75},{"x":143.25,"y":123.2272},{"x":138.5,"y":124.5},{"x":133.75,"y":123.2272},{"x":130.2728,"y":119.75},{"x":129,"y":115},{"x":130.2728,"y":110.25},{"x":133.75,"y":106.7728},{"x":138.5,"y":105.5},{"x":143.25,"y":106.7728},{"x":146.7272,"y":110.25},{"x":148,"y":115}]}
+user_bore_data @offdefaults .paths[46] {"cls":"fc-guide","pts":[{"x":175,"y":115},{"x":173.7272,"y":119.75},{"x":170.25,"y":123.2272},{"x":165.5,"y":124.5},{"x":160.75,"y":123.2272},{"x":157.2728,"y":119.75},{"x":156,"y":115},{"x":157.2728,"y":110.25},{"x":160.75,"y":106.7728},{"x":165.5,"y":105.5},{"x":170.25,"y":106.7728},{"x":173.7272,"y":110.25},{"x":175,"y":115}]}
+user_bore_data @offdefaults .paths[47] {"cls":"fc-guide","pts":[{"x":202,"y":115},{"x":200.7272,"y":119.75},{"x":197.25,"y":123.2272},{"x":192.5,"y":124.5},{"x":187.75,"y":123.2272},{"x":184.2728,"y":119.75},{"x":183,"y":115},{"x":184.2728,"y":110.25},{"x":187.75,"y":106.7728},{"x":192.5,"y":105.5},{"x":197.25,"y":106.7728},{"x":200.7272,"y":110.25},{"x":202,"y":115}]}
+user_bore_data @offdefaults .paths[48] {"cls":"fc-guide","pts":[{"x":229,"y":115},{"x":227.7272,"y":119.75},{"x":224.25,"y":123.2272},{"x":219.5,"y":124.5},{"x":214.75,"y":123.2272},{"x":211.2728,"y":119.75},{"x":210,"y":115},{"x":211.2728,"y":110.25},{"x":214.75,"y":106.7728},{"x":219.5,"y":105.5},{"x":224.25,"y":106.7728},{"x":227.7272,"y":110.25},{"x":229,"y":115}]}
+user_bore_data @offdefaults .paths[49] {"cls":"fc-guide","pts":[{"x":256,"y":115},{"x":254.7272,"y":119.75},{"x":251.25,"y":123.2272},{"x":246.5,"y":124.5},{"x":241.75,"y":123.2272},{"x":238.2728,"y":119.75},{"x":237,"y":115},{"x":238.2728,"y":110.25},{"x":241.75,"y":106.7728},{"x":246.5,"y":105.5},{"x":251.25,"y":106.7728},{"x":254.7272,"y":110.25},{"x":256,"y":115}]}
+user_bore_data @offdefaults .paths[50] {"cls":"fc-guide","pts":[{"x":13,"y":142},{"x":11.7272,"y":146.75},{"x":8.25,"y":150.2272},{"x":3.5,"y":151.5},{"x":-1.25,"y":150.2272},{"x":-4.7272,"y":146.75},{"x":-6,"y":142},{"x":-4.7272,"y":137.25},{"x":-1.25,"y":133.7728},{"x":3.5,"y":132.5},{"x":8.25,"y":133.7728},{"x":11.7272,"y":137.25},{"x":13,"y":142}]}
+user_bore_data @offdefaults .paths[51] {"cls":"fc-guide","pts":[{"x":40,"y":142},{"x":38.7272,"y":146.75},{"x":35.25,"y":150.2272},{"x":30.5,"y":151.5},{"x":25.75,"y":150.2272},{"x":22.2728,"y":146.75},{"x":21,"y":142},{"x":22.2728,"y":137.25},{"x":25.75,"y":133.7728},{"x":30.5,"y":132.5},{"x":35.25,"y":133.7728},{"x":38.7272,"y":137.25},{"x":40,"y":142}]}
+user_bore_data @offdefaults .paths[52] {"cls":"fc-guide","pts":[{"x":67,"y":142},{"x":65.7272,"y":146.75},{"x":62.25,"y":150.2272},{"x":57.5,"y":151.5},{"x":52.75,"y":150.2272},{"x":49.2728,"y":146.75},{"x":48,"y":142},{"x":49.2728,"y":137.25},{"x":52.75,"y":133.7728},{"x":57.5,"y":132.5},{"x":62.25,"y":133.7728},{"x":65.7272,"y":137.25},{"x":67,"y":142}]}
+user_bore_data @offdefaults .paths[53] {"cls":"fc-guide","pts":[{"x":94,"y":142},{"x":92.7272,"y":146.75},{"x":89.25,"y":150.2272},{"x":84.5,"y":151.5},{"x":79.75,"y":150.2272},{"x":76.2728,"y":146.75},{"x":75,"y":142},{"x":76.2728,"y":137.25},{"x":79.75,"y":133.7728},{"x":84.5,"y":132.5},{"x":89.25,"y":133.7728},{"x":92.7272,"y":137.25},{"x":94,"y":142}]}
+user_bore_data @offdefaults .paths[54] {"cls":"fc-guide","pts":[{"x":121,"y":142},{"x":119.7272,"y":146.75},{"x":116.25,"y":150.2272},{"x":111.5,"y":151.5},{"x":106.75,"y":150.2272},{"x":103.2728,"y":146.75},{"x":102,"y":142},{"x":103.2728,"y":137.25},{"x":106.75,"y":133.7728},{"x":111.5,"y":132.5},{"x":116.25,"y":133.7728},{"x":119.7272,"y":137.25},{"x":121,"y":142}]}
+user_bore_data @offdefaults .paths[55] {"cls":"fc-guide","pts":[{"x":148,"y":142},{"x":146.7272,"y":146.75},{"x":143.25,"y":150.2272},{"x":138.5,"y":151.5},{"x":133.75,"y":150.2272},{"x":130.2728,"y":146.75},{"x":129,"y":142},{"x":130.2728,"y":137.25},{"x":133.75,"y":133.7728},{"x":138.5,"y":132.5},{"x":143.25,"y":133.7728},{"x":146.7272,"y":137.25},{"x":148,"y":142}]}
+user_bore_data @offdefaults .paths[56] {"cls":"fc-guide","pts":[{"x":175,"y":142},{"x":173.7272,"y":146.75},{"x":170.25,"y":150.2272},{"x":165.5,"y":151.5},{"x":160.75,"y":150.2272},{"x":157.2728,"y":146.75},{"x":156,"y":142},{"x":157.2728,"y":137.25},{"x":160.75,"y":133.7728},{"x":165.5,"y":132.5},{"x":170.25,"y":133.7728},{"x":173.7272,"y":137.25},{"x":175,"y":142}]}
+user_bore_data @offdefaults .paths[57] {"cls":"fc-guide","pts":[{"x":202,"y":142},{"x":200.7272,"y":146.75},{"x":197.25,"y":150.2272},{"x":192.5,"y":151.5},{"x":187.75,"y":150.2272},{"x":184.2728,"y":146.75},{"x":183,"y":142},{"x":184.2728,"y":137.25},{"x":187.75,"y":133.7728},{"x":192.5,"y":132.5},{"x":197.25,"y":133.7728},{"x":200.7272,"y":137.25},{"x":202,"y":142}]}
+user_bore_data @offdefaults .paths[58] {"cls":"fc-guide","pts":[{"x":229,"y":142},{"x":227.7272,"y":146.75},{"x":224.25,"y":150.2272},{"x":219.5,"y":151.5},{"x":214.75,"y":150.2272},{"x":211.2728,"y":146.75},{"x":210,"y":142},{"x":211.2728,"y":137.25},{"x":214.75,"y":133.7728},{"x":219.5,"y":132.5},{"x":224.25,"y":133.7728},{"x":227.7272,"y":137.25},{"x":229,"y":142}]}
+user_bore_data @offdefaults .paths[59] {"cls":"fc-guide","pts":[{"x":256,"y":142},{"x":254.7272,"y":146.75},{"x":251.25,"y":150.2272},{"x":246.5,"y":151.5},{"x":241.75,"y":150.2272},{"x":238.2728,"y":146.75},{"x":237,"y":142},{"x":238.2728,"y":137.25},{"x":241.75,"y":133.7728},{"x":246.5,"y":132.5},{"x":251.25,"y":133.7728},{"x":254.7272,"y":137.25},{"x":256,"y":142}]}
+user_bore_data @offdefaults .paths[60] {"cls":"fc-guide","pts":[{"x":13,"y":169},{"x":11.7272,"y":173.75},{"x":8.25,"y":177.2272},{"x":3.5,"y":178.5},{"x":-1.25,"y":177.2272},{"x":-4.7272,"y":173.75},{"x":-6,"y":169},{"x":-4.7272,"y":164.25},{"x":-1.25,"y":160.7728},{"x":3.5,"y":159.5},{"x":8.25,"y":160.7728},{"x":11.7272,"y":164.25},{"x":13,"y":169}]}
+user_bore_data @offdefaults .paths[61] {"cls":"fc-guide","pts":[{"x":40,"y":169},{"x":38.7272,"y":173.75},{"x":35.25,"y":177.2272},{"x":30.5,"y":178.5},{"x":25.75,"y":177.2272},{"x":22.2728,"y":173.75},{"x":21,"y":169},{"x":22.2728,"y":164.25},{"x":25.75,"y":160.7728},{"x":30.5,"y":159.5},{"x":35.25,"y":160.7728},{"x":38.7272,"y":164.25},{"x":40,"y":169}]}
+user_bore_data @offdefaults .paths[62] {"cls":"fc-guide","pts":[{"x":67,"y":169},{"x":65.7272,"y":173.75},{"x":62.25,"y":177.2272},{"x":57.5,"y":178.5},{"x":52.75,"y":177.2272},{"x":49.2728,"y":173.75},{"x":48,"y":169},{"x":49.2728,"y":164.25},{"x":52.75,"y":160.7728},{"x":57.5,"y":159.5},{"x":62.25,"y":160.7728},{"x":65.7272,"y":164.25},{"x":67,"y":169}]}
+user_bore_data @offdefaults .paths[63] {"cls":"fc-guide","pts":[{"x":94,"y":169},{"x":92.7272,"y":173.75},{"x":89.25,"y":177.2272},{"x":84.5,"y":178.5},{"x":79.75,"y":177.2272},{"x":76.2728,"y":173.75},{"x":75,"y":169},{"x":76.2728,"y":164.25},{"x":79.75,"y":160.7728},{"x":84.5,"y":159.5},{"x":89.25,"y":160.7728},{"x":92.7272,"y":164.25},{"x":94,"y":169}]}
+user_bore_data @offdefaults .paths[64] {"cls":"fc-guide","pts":[{"x":121,"y":169},{"x":119.7272,"y":173.75},{"x":116.25,"y":177.2272},{"x":111.5,"y":178.5},{"x":106.75,"y":177.2272},{"x":103.2728,"y":173.75},{"x":102,"y":169},{"x":103.2728,"y":164.25},{"x":106.75,"y":160.7728},{"x":111.5,"y":159.5},{"x":116.25,"y":160.7728},{"x":119.7272,"y":164.25},{"x":121,"y":169}]}
+user_bore_data @offdefaults .paths[65] {"cls":"fc-guide","pts":[{"x":148,"y":169},{"x":146.7272,"y":173.75},{"x":143.25,"y":177.2272},{"x":138.5,"y":178.5},{"x":133.75,"y":177.2272},{"x":130.2728,"y":173.75},{"x":129,"y":169},{"x":130.2728,"y":164.25},{"x":133.75,"y":160.7728},{"x":138.5,"y":159.5},{"x":143.25,"y":160.7728},{"x":146.7272,"y":164.25},{"x":148,"y":169}]}
+user_bore_data @offdefaults .paths[66] {"cls":"fc-guide","pts":[{"x":175,"y":169},{"x":173.7272,"y":173.75},{"x":170.25,"y":177.2272},{"x":165.5,"y":178.5},{"x":160.75,"y":177.2272},{"x":157.2728,"y":173.75},{"x":156,"y":169},{"x":157.2728,"y":164.25},{"x":160.75,"y":160.7728},{"x":165.5,"y":159.5},{"x":170.25,"y":160.7728},{"x":173.7272,"y":164.25},{"x":175,"y":169}]}
+user_bore_data @offdefaults .paths[67] {"cls":"fc-guide","pts":[{"x":202,"y":169},{"x":200.7272,"y":173.75},{"x":197.25,"y":177.2272},{"x":192.5,"y":178.5},{"x":187.75,"y":177.2272},{"x":184.2728,"y":173.75},{"x":183,"y":169},{"x":184.2728,"y":164.25},{"x":187.75,"y":160.7728},{"x":192.5,"y":159.5},{"x":197.25,"y":160.7728},{"x":200.7272,"y":164.25},{"x":202,"y":169}]}
+user_bore_data @offdefaults .paths[68] {"cls":"fc-guide","pts":[{"x":229,"y":169},{"x":227.7272,"y":173.75},{"x":224.25,"y":177.2272},{"x":219.5,"y":178.5},{"x":214.75,"y":177.2272},{"x":211.2728,"y":173.75},{"x":210,"y":169},{"x":211.2728,"y":164.25},{"x":214.75,"y":160.7728},{"x":219.5,"y":159.5},{"x":224.25,"y":160.7728},{"x":227.7272,"y":164.25},{"x":229,"y":169}]}
+user_bore_data @offdefaults .paths[69] {"cls":"fc-guide","pts":[{"x":256,"y":169},{"x":254.7272,"y":173.75},{"x":251.25,"y":177.2272},{"x":246.5,"y":178.5},{"x":241.75,"y":177.2272},{"x":238.2728,"y":173.75},{"x":237,"y":169},{"x":238.2728,"y":164.25},{"x":241.75,"y":160.7728},{"x":246.5,"y":159.5},{"x":251.25,"y":160.7728},{"x":254.7272,"y":164.25},{"x":256,"y":169}]}
+user_bore_data @offdefaults .paths[70] {"cls":"fc-guide","pts":[{"x":13,"y":196},{"x":11.7272,"y":200.75},{"x":8.25,"y":204.2272},{"x":3.5,"y":205.5},{"x":-1.25,"y":204.2272},{"x":-4.7272,"y":200.75},{"x":-6,"y":196},{"x":-4.7272,"y":191.25},{"x":-1.25,"y":187.7728},{"x":3.5,"y":186.5},{"x":8.25,"y":187.7728},{"x":11.7272,"y":191.25},{"x":13,"y":196}]}
+user_bore_data @offdefaults .paths[71] {"cls":"fc-guide","pts":[{"x":40,"y":196},{"x":38.7272,"y":200.75},{"x":35.25,"y":204.2272},{"x":30.5,"y":205.5},{"x":25.75,"y":204.2272},{"x":22.2728,"y":200.75},{"x":21,"y":196},{"x":22.2728,"y":191.25},{"x":25.75,"y":187.7728},{"x":30.5,"y":186.5},{"x":35.25,"y":187.7728},{"x":38.7272,"y":191.25},{"x":40,"y":196}]}
+user_bore_data @offdefaults .paths[72] {"cls":"fc-guide","pts":[{"x":67,"y":196},{"x":65.7272,"y":200.75},{"x":62.25,"y":204.2272},{"x":57.5,"y":205.5},{"x":52.75,"y":204.2272},{"x":49.2728,"y":200.75},{"x":48,"y":196},{"x":49.2728,"y":191.25},{"x":52.75,"y":187.7728},{"x":57.5,"y":186.5},{"x":62.25,"y":187.7728},{"x":65.7272,"y":191.25},{"x":67,"y":196}]}
+user_bore_data @offdefaults .paths[73] {"cls":"fc-guide","pts":[{"x":94,"y":196},{"x":92.7272,"y":200.75},{"x":89.25,"y":204.2272},{"x":84.5,"y":205.5},{"x":79.75,"y":204.2272},{"x":76.2728,"y":200.75},{"x":75,"y":196},{"x":76.2728,"y":191.25},{"x":79.75,"y":187.7728},{"x":84.5,"y":186.5},{"x":89.25,"y":187.7728},{"x":92.7272,"y":191.25},{"x":94,"y":196}]}
+user_bore_data @offdefaults .paths[74] {"cls":"fc-guide","pts":[{"x":121,"y":196},{"x":119.7272,"y":200.75},{"x":116.25,"y":204.2272},{"x":111.5,"y":205.5},{"x":106.75,"y":204.2272},{"x":103.2728,"y":200.75},{"x":102,"y":196},{"x":103.2728,"y":191.25},{"x":106.75,"y":187.7728},{"x":111.5,"y":186.5},{"x":116.25,"y":187.7728},{"x":119.7272,"y":191.25},{"x":121,"y":196}]}
+user_bore_data @offdefaults .paths[75] {"cls":"fc-guide","pts":[{"x":148,"y":196},{"x":146.7272,"y":200.75},{"x":143.25,"y":204.2272},{"x":138.5,"y":205.5},{"x":133.75,"y":204.2272},{"x":130.2728,"y":200.75},{"x":129,"y":196},{"x":130.2728,"y":191.25},{"x":133.75,"y":187.7728},{"x":138.5,"y":186.5},{"x":143.25,"y":187.7728},{"x":146.7272,"y":191.25},{"x":148,"y":196}]}
+user_bore_data @offdefaults .paths[76] {"cls":"fc-guide","pts":[{"x":175,"y":196},{"x":173.7272,"y":200.75},{"x":170.25,"y":204.2272},{"x":165.5,"y":205.5},{"x":160.75,"y":204.2272},{"x":157.2728,"y":200.75},{"x":156,"y":196},{"x":157.2728,"y":191.25},{"x":160.75,"y":187.7728},{"x":165.5,"y":186.5},{"x":170.25,"y":187.7728},{"x":173.7272,"y":191.25},{"x":175,"y":196}]}
+user_bore_data @offdefaults .paths[77] {"cls":"fc-guide","pts":[{"x":202,"y":196},{"x":200.7272,"y":200.75},{"x":197.25,"y":204.2272},{"x":192.5,"y":205.5},{"x":187.75,"y":204.2272},{"x":184.2728,"y":200.75},{"x":183,"y":196},{"x":184.2728,"y":191.25},{"x":187.75,"y":187.7728},{"x":192.5,"y":186.5},{"x":197.25,"y":187.7728},{"x":200.7272,"y":191.25},{"x":202,"y":196}]}
+user_bore_data @offdefaults .paths[78] {"cls":"fc-guide","pts":[{"x":229,"y":196},{"x":227.7272,"y":200.75},{"x":224.25,"y":204.2272},{"x":219.5,"y":205.5},{"x":214.75,"y":204.2272},{"x":211.2728,"y":200.75},{"x":210,"y":196},{"x":211.2728,"y":191.25},{"x":214.75,"y":187.7728},{"x":219.5,"y":186.5},{"x":224.25,"y":187.7728},{"x":227.7272,"y":191.25},{"x":229,"y":196}]}
+user_bore_data @offdefaults .paths[79] {"cls":"fc-guide","pts":[{"x":256,"y":196},{"x":254.7272,"y":200.75},{"x":251.25,"y":204.2272},{"x":246.5,"y":205.5},{"x":241.75,"y":204.2272},{"x":238.2728,"y":200.75},{"x":237,"y":196},{"x":238.2728,"y":191.25},{"x":241.75,"y":187.7728},{"x":246.5,"y":186.5},{"x":251.25,"y":187.7728},{"x":254.7272,"y":191.25},{"x":256,"y":196}]}
+user_bore_data @offdefaults .paths[80] {"cls":"fc-guide","pts":[{"x":13,"y":223},{"x":11.7272,"y":227.75},{"x":8.25,"y":231.2272},{"x":3.5,"y":232.5},{"x":-1.25,"y":231.2272},{"x":-4.7272,"y":227.75},{"x":-6,"y":223},{"x":-4.7272,"y":218.25},{"x":-1.25,"y":214.7728},{"x":3.5,"y":213.5},{"x":8.25,"y":214.7728},{"x":11.7272,"y":218.25},{"x":13,"y":223}]}
+user_bore_data @offdefaults .paths[81] {"cls":"fc-guide","pts":[{"x":40,"y":223},{"x":38.7272,"y":227.75},{"x":35.25,"y":231.2272},{"x":30.5,"y":232.5},{"x":25.75,"y":231.2272},{"x":22.2728,"y":227.75},{"x":21,"y":223},{"x":22.2728,"y":218.25},{"x":25.75,"y":214.7728},{"x":30.5,"y":213.5},{"x":35.25,"y":214.7728},{"x":38.7272,"y":218.25},{"x":40,"y":223}]}
+user_bore_data @offdefaults .paths[82] {"cls":"fc-guide","pts":[{"x":67,"y":223},{"x":65.7272,"y":227.75},{"x":62.25,"y":231.2272},{"x":57.5,"y":232.5},{"x":52.75,"y":231.2272},{"x":49.2728,"y":227.75},{"x":48,"y":223},{"x":49.2728,"y":218.25},{"x":52.75,"y":214.7728},{"x":57.5,"y":213.5},{"x":62.25,"y":214.7728},{"x":65.7272,"y":218.25},{"x":67,"y":223}]}
+user_bore_data @offdefaults .paths[83] {"cls":"fc-guide","pts":[{"x":94,"y":223},{"x":92.7272,"y":227.75},{"x":89.25,"y":231.2272},{"x":84.5,"y":232.5},{"x":79.75,"y":231.2272},{"x":76.2728,"y":227.75},{"x":75,"y":223},{"x":76.2728,"y":218.25},{"x":79.75,"y":214.7728},{"x":84.5,"y":213.5},{"x":89.25,"y":214.7728},{"x":92.7272,"y":218.25},{"x":94,"y":223}]}
+user_bore_data @offdefaults .paths[84] {"cls":"fc-guide","pts":[{"x":121,"y":223},{"x":119.7272,"y":227.75},{"x":116.25,"y":231.2272},{"x":111.5,"y":232.5},{"x":106.75,"y":231.2272},{"x":103.2728,"y":227.75},{"x":102,"y":223},{"x":103.2728,"y":218.25},{"x":106.75,"y":214.7728},{"x":111.5,"y":213.5},{"x":116.25,"y":214.7728},{"x":119.7272,"y":218.25},{"x":121,"y":223}]}
+user_bore_data @offdefaults .paths[85] {"cls":"fc-guide","pts":[{"x":148,"y":223},{"x":146.7272,"y":227.75},{"x":143.25,"y":231.2272},{"x":138.5,"y":232.5},{"x":133.75,"y":231.2272},{"x":130.2728,"y":227.75},{"x":129,"y":223},{"x":130.2728,"y":218.25},{"x":133.75,"y":214.7728},{"x":138.5,"y":213.5},{"x":143.25,"y":214.7728},{"x":146.7272,"y":218.25},{"x":148,"y":223}]}
+user_bore_data @offdefaults .paths[86] {"cls":"fc-guide","pts":[{"x":175,"y":223},{"x":173.7272,"y":227.75},{"x":170.25,"y":231.2272},{"x":165.5,"y":232.5},{"x":160.75,"y":231.2272},{"x":157.2728,"y":227.75},{"x":156,"y":223},{"x":157.2728,"y":218.25},{"x":160.75,"y":214.7728},{"x":165.5,"y":213.5},{"x":170.25,"y":214.7728},{"x":173.7272,"y":218.25},{"x":175,"y":223}]}
+user_bore_data @offdefaults .paths[87] {"cls":"fc-guide","pts":[{"x":202,"y":223},{"x":200.7272,"y":227.75},{"x":197.25,"y":231.2272},{"x":192.5,"y":232.5},{"x":187.75,"y":231.2272},{"x":184.2728,"y":227.75},{"x":183,"y":223},{"x":184.2728,"y":218.25},{"x":187.75,"y":214.7728},{"x":192.5,"y":213.5},{"x":197.25,"y":214.7728},{"x":200.7272,"y":218.25},{"x":202,"y":223}]}
+user_bore_data @offdefaults .paths[88] {"cls":"fc-guide","pts":[{"x":229,"y":223},{"x":227.7272,"y":227.75},{"x":224.25,"y":231.2272},{"x":219.5,"y":232.5},{"x":214.75,"y":231.2272},{"x":211.2728,"y":227.75},{"x":210,"y":223},{"x":211.2728,"y":218.25},{"x":214.75,"y":214.7728},{"x":219.5,"y":213.5},{"x":224.25,"y":214.7728},{"x":227.7272,"y":218.25},{"x":229,"y":223}]}
+user_bore_data @offdefaults .paths[89] {"cls":"fc-guide","pts":[{"x":256,"y":223},{"x":254.7272,"y":227.75},{"x":251.25,"y":231.2272},{"x":246.5,"y":232.5},{"x":241.75,"y":231.2272},{"x":238.2728,"y":227.75},{"x":237,"y":223},{"x":238.2728,"y":218.25},{"x":241.75,"y":214.7728},{"x":246.5,"y":213.5},{"x":251.25,"y":214.7728},{"x":254.7272,"y":218.25},{"x":256,"y":223}]}
+user_bore_data @offdefaults .placement {"x":300,"y":200}
+user_bore_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_comm_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"commscreen"}
+user_comm_data @defaults .handles <0 entries>
+user_comm_data @defaults .items <0 entries>
+user_comm_data @defaults .onDrag "<fn/2>"
+user_comm_data @defaults .onEdit "<fn/2>"
+user_comm_data @defaults .origin {"x":0,"y":0}
+user_comm_data @defaults .paths null
+user_comm_data @defaults .placement {"x":300,"y":200}
+user_comm_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_comm_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"commscreen"}
+user_comm_data @offdefaults .handles <0 entries>
+user_comm_data @offdefaults .items <0 entries>
+user_comm_data @offdefaults .onDrag "<fn/2>"
+user_comm_data @offdefaults .onEdit "<fn/2>"
+user_comm_data @offdefaults .origin {"x":0,"y":0}
+user_comm_data @offdefaults .paths null
+user_comm_data @offdefaults .placement {"x":300,"y":200}
+user_comm_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_contour_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_contour_data @defaults .handles <2 entries>
+user_contour_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3,"y":3}
+user_contour_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"ct_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":83,"y":63}
+user_contour_data @defaults .items <0 entries>
+user_contour_data @defaults .onDrag "<fn/2>"
+user_contour_data @defaults .onEdit "<fn/2>"
+user_contour_data @defaults .origin {"x":0,"y":0}
+user_contour_data @defaults .paths <2 entries>
+user_contour_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":3,"y":3},{"x":83,"y":3},{"x":83,"y":63},{"x":3,"y":63},{"x":3,"y":3}]}
+user_contour_data @defaults .paths[1] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":86,"y":0},{"x":86,"y":66},{"x":0,"y":66},{"x":0,"y":0}]}
+user_contour_data @defaults .placement {"x":300,"y":200}
+user_contour_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_contour_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_contour_data @offdefaults .handles <2 entries>
+user_contour_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"ct_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":25.5,"y":29}
+user_contour_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"ct_size","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":54,"y":29}
+user_contour_data @offdefaults .items <0 entries>
+user_contour_data @offdefaults .onDrag "<fn/2>"
+user_contour_data @offdefaults .onEdit "<fn/2>"
+user_contour_data @offdefaults .origin {"x":0,"y":0}
+user_contour_data @offdefaults .paths <2 entries>
+user_contour_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":54,"y":29},{"x":53.939,"y":30.864},{"x":53.7562,"y":32.72},{"x":53.4524,"y":34.5601},{"x":53.0289,"y":36.3763},{"x":52.4875,"y":38.161},{"x":51.8306,"y":39.9065},{"x":51.0609,"y":41.6052},{"x":50.1817,"y":43.25},{"x":49.1969,"y":44.8338},{"x":48.1106,"y":46.3497},{"x":46.9274,"y":47.7914},{"x":45.6525,"y":49.1525},{"x":44.2914,"y":50.4274},{"x":42.8497,"y":51.6106},{"x":41.3338,"y":52.6969},{"x":39.75,"y":53.6817},{"x":38.1052,"y":54.5609},{"x":36.4065,"y":55.3306},{"x":34.661,"y":55.9875},{"x":32.8763,"y":56.5289},{"x":31.0601,"y":56.9524},{"x":29.22,"y":57.2562},{"x":27.364,"y":57.439},{"x":25.5,"y":57.5},{"x":23.636,"y":57.439},{"x":21.78,"y":57.2562},{"x":19.9399,"y":56.9524},{"x":18.1237,"y":56.5289},{"x":16.339,"y":55.9875},{"x":14.5935,"y":55.3306},{"x":12.8948,"y":54.5609},{"x":11.25,"y":53.6817},{"x":9.6662,"y":52.6969},{"x":8.1503,"y":51.6106},{"x":6.7086,"y":50.4274},{"x":5.3475,"y":49.1525},{"x":4.0726,"y":47.7914},{"x":2.8894,"y":46.3497},{"x":1.8031,"y":44.8338},{"x":0.8183,"y":43.25},{"x":-0.0609,"y":41.6052},{"x":-0.8306,"y":39.9065},{"x":-1.4875,"y":38.161},{"x":-2.0289,"y":36.3763},{"x":-2.4524,"y":34.5601},{"x":-2.7562,"y":32.72},{"x":-2.939,"y":30.864},{"x":-3,"y":29},{"x":-2.939,"y":27.136},{"x":-2.7562,"y":25.28},{"x":-2.4524,"y":23.4399},{"x":-2.0289,"y":21.6237},{"x":-1.4875,"y":19.839},{"x":-0.8306,"y":18.0935},{"x":-0.0609,"y":16.3948},{"x":0.8183,"y":14.75},{"x":1.8031,"y":13.1662},{"x":2.8894,"y":11.6503},{"x":4.0726,"y":10.2086},{"x":5.3475,"y":8.8475},{"x":6.7086,"y":7.5726},{"x":8.1503,"y":6.3894},{"x":9.6662,"y":5.3031},{"x":11.25,"y":4.3183},{"x":12.8948,"y":3.4391},{"x":14.5935,"y":2.6694},{"x":16.339,"y":2.0125},{"x":18.1237,"y":1.4711},{"x":19.9399,"y":1.0476},{"x":21.78,"y":0.7438},{"x":23.636,"y":0.561},{"x":25.5,"y":0.5},{"x":27.364,"y":0.561},{"x":29.22,"y":0.7438},{"x":31.0601,"y":1.0476},{"x":32.8763,"y":1.4711},{"x":34.661,"y":2.0125},{"x":36.4065,"y":2.6694},{"x":38.1052,"y":3.4391},{"x":39.75,"y":4.3183},{"x":41.3338,"y":5.3031},{"x":42.8497,"y":6.3894},{"x":44.2914,"y":7.5726},{"x":45.6525,"y":8.8475},{"x":46.9274,"y":10.2086},{"x":48.1106,"y":11.6503},{"x":49.1969,"y":13.1662},{"x":50.1817,"y":14.75},{"x":51.0609,"y":16.3948},{"x":51.8306,"y":18.0935},{"x":52.4875,"y":19.839},{"x":53.0289,"y":21.6237},{"x":53.4524,"y":23.4399},{"x":53.7562,"y":25.28},{"x":53.939,"y":27.136},{"x":54,"y":29}]}
+user_contour_data @offdefaults .paths[1] {"cls":"fc-path","pts":[{"x":47.5,"y":29},{"x":47.4529,"y":30.4389},{"x":47.3118,"y":31.8716},{"x":47.0773,"y":33.292},{"x":46.7504,"y":34.694},{"x":46.3325,"y":36.0717},{"x":45.8253,"y":37.419},{"x":45.2312,"y":38.7304},{"x":44.5526,"y":40},{"x":43.7923,"y":41.2225},{"x":42.9538,"y":42.3928},{"x":42.0405,"y":43.5056},{"x":41.0563,"y":44.5563},{"x":40.0056,"y":45.5405},{"x":38.8928,"y":46.4538},{"x":37.7225,"y":47.2923},{"x":36.5,"y":48.0526},{"x":35.2304,"y":48.7312},{"x":33.919,"y":49.3253},{"x":32.5717,"y":49.8325},{"x":31.194,"y":50.2504},{"x":29.792,"y":50.5773},{"x":28.3716,"y":50.8118},{"x":26.9389,"y":50.9529},{"x":25.5,"y":51},{"x":24.0611,"y":50.9529},{"x":22.6284,"y":50.8118},{"x":21.208,"y":50.5773},{"x":19.806,"y":50.2504},{"x":18.4283,"y":49.8325},{"x":17.081,"y":49.3253},{"x":15.7696,"y":48.7312},{"x":14.5,"y":48.0526},{"x":13.2775,"y":47.2923},{"x":12.1072,"y":46.4538},{"x":10.9944,"y":45.5405},{"x":9.9437,"y":44.5563},{"x":8.9595,"y":43.5056},{"x":8.0462,"y":42.3928},{"x":7.2077,"y":41.2225},{"x":6.4474,"y":40},{"x":5.7688,"y":38.7304},{"x":5.1747,"y":37.419},{"x":4.6675,"y":36.0717},{"x":4.2496,"y":34.694},{"x":3.9227,"y":33.292},{"x":3.6882,"y":31.8716},{"x":3.5471,"y":30.4389},{"x":3.5,"y":29},{"x":3.5471,"y":27.5611},{"x":3.6882,"y":26.1284},{"x":3.9227,"y":24.708},{"x":4.2496,"y":23.306},{"x":4.6675,"y":21.9283},{"x":5.1747,"y":20.581},{"x":5.7688,"y":19.2696},{"x":6.4474,"y":18},{"x":7.2077,"y":16.7775},{"x":8.0462,"y":15.6072},{"x":8.9595,"y":14.4944},{"x":9.9437,"y":13.4437},{"x":10.9944,"y":12.4595},{"x":12.1072,"y":11.5462},{"x":13.2775,"y":10.7077},{"x":14.5,"y":9.9474},{"x":15.7696,"y":9.2688},{"x":17.081,"y":8.6747},{"x":18.4283,"y":8.1675},{"x":19.806,"y":7.7496},{"x":21.208,"y":7.4227},{"x":22.6284,"y":7.1882},{"x":24.0611,"y":7.0471},{"x":25.5,"y":7},{"x":26.9389,"y":7.0471},{"x":28.3716,"y":7.1882},{"x":29.792,"y":7.4227},{"x":31.194,"y":7.7496},{"x":32.5717,"y":8.1675},{"x":33.919,"y":8.6747},{"x":35.2304,"y":9.2688},{"x":36.5,"y":9.9474},{"x":37.7225,"y":10.7077},{"x":38.8928,"y":11.5462},{"x":40.0056,"y":12.4595},{"x":41.0563,"y":13.4437},{"x":42.0405,"y":14.4944},{"x":42.9538,"y":15.6072},{"x":43.7923,"y":16.7775},{"x":44.5526,"y":18},{"x":45.2312,"y":19.2696},{"x":45.8253,"y":20.581},{"x":46.3325,"y":21.9283},{"x":46.7504,"y":23.306},{"x":47.0773,"y":24.708},{"x":47.3118,"y":26.1284},{"x":47.4529,"y":27.5611},{"x":47.5,"y":29}]}
+user_contour_data @offdefaults .placement {"x":300,"y":200}
+user_contour_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_corner_data @defaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_corner_data @defaults .corner "FL"
+user_corner_data @defaults .handles <0 entries>
+user_corner_data @defaults .items <1 entries>
+user_corner_data @defaults .items[0] {"kind":"hole","r":2.4,"x":-36,"y":13.125}
+user_corner_data @defaults .onCornerPick "<fn/1>"
+user_corner_data @defaults .onDrag "<fn/2>"
+user_corner_data @defaults .onEdit "<fn/2>"
+user_corner_data @defaults .origin {"x":0,"y":0}
+user_corner_data @defaults .paths null
+user_corner_data @defaults .placement {"x":300,"y":200}
+user_corner_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_corner_data @offdefaults .panel {"keys":["corner","handles","items","onCornerPick","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_corner_data @offdefaults .corner "FR"
+user_corner_data @offdefaults .handles <0 entries>
+user_corner_data @offdefaults .items <2 entries>
+user_corner_data @offdefaults .items[0] {"kind":"hole","r":2.4,"x":136,"y":-43.875}
+user_corner_data @offdefaults .items[1] {"kind":"hole","r":2.4,"x":193,"y":13.125}
+user_corner_data @offdefaults .onCornerPick "<fn/1>"
+user_corner_data @offdefaults .onDrag "<fn/2>"
+user_corner_data @offdefaults .onEdit "<fn/2>"
+user_corner_data @offdefaults .origin {"x":0,"y":0}
+user_corner_data @offdefaults .paths null
+user_corner_data @offdefaults .placement {"x":300,"y":200}
+user_corner_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_drill_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_drill_data @defaults .handles <1 entries>
+user_drill_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_drill_data @defaults .items <0 entries>
+user_drill_data @defaults .onDrag "<fn/2>"
+user_drill_data @defaults .onEdit "<fn/2>"
+user_drill_data @defaults .origin {"x":0,"y":0}
+user_drill_data @defaults .paths <1 entries>
+user_drill_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":3,"y":0},{"x":2.5981,"y":1.5},{"x":1.5,"y":2.5981},{"x":0,"y":3},{"x":-1.5,"y":2.5981},{"x":-2.5981,"y":1.5},{"x":-3,"y":0},{"x":-2.5981,"y":-1.5},{"x":-1.5,"y":-2.5981},{"x":0,"y":-3},{"x":1.5,"y":-2.5981},{"x":2.5981,"y":-1.5},{"x":3,"y":0}]}
+user_drill_data @defaults .placement {"x":300,"y":200}
+user_drill_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_drill_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_drill_data @offdefaults .handles <2 entries>
+user_drill_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"dr_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3.5,"y":7}
+user_drill_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"dr_grid","kind":"size","label":"pitch","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":246.5,"y":223}
+user_drill_data @offdefaults .items <0 entries>
+user_drill_data @offdefaults .onDrag "<fn/2>"
+user_drill_data @offdefaults .onEdit "<fn/2>"
+user_drill_data @offdefaults .origin {"x":0,"y":0}
+user_drill_data @offdefaults .paths <90 entries>
+user_drill_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":6.5,"y":7},{"x":6.0981,"y":8.5},{"x":5,"y":9.5981},{"x":3.5,"y":10},{"x":2,"y":9.5981},{"x":0.9019,"y":8.5},{"x":0.5,"y":7},{"x":0.9019,"y":5.5},{"x":2,"y":4.4019},{"x":3.5,"y":4},{"x":5,"y":4.4019},{"x":6.0981,"y":5.5},{"x":6.5,"y":7}]}
+user_drill_data @offdefaults .paths[1] {"cls":"fc-guide","pts":[{"x":33.5,"y":7},{"x":33.0981,"y":8.5},{"x":32,"y":9.5981},{"x":30.5,"y":10},{"x":29,"y":9.5981},{"x":27.9019,"y":8.5},{"x":27.5,"y":7},{"x":27.9019,"y":5.5},{"x":29,"y":4.4019},{"x":30.5,"y":4},{"x":32,"y":4.4019},{"x":33.0981,"y":5.5},{"x":33.5,"y":7}]}
+user_drill_data @offdefaults .paths[2] {"cls":"fc-guide","pts":[{"x":60.5,"y":7},{"x":60.0981,"y":8.5},{"x":59,"y":9.5981},{"x":57.5,"y":10},{"x":56,"y":9.5981},{"x":54.9019,"y":8.5},{"x":54.5,"y":7},{"x":54.9019,"y":5.5},{"x":56,"y":4.4019},{"x":57.5,"y":4},{"x":59,"y":4.4019},{"x":60.0981,"y":5.5},{"x":60.5,"y":7}]}
+user_drill_data @offdefaults .paths[3] {"cls":"fc-guide","pts":[{"x":87.5,"y":7},{"x":87.0981,"y":8.5},{"x":86,"y":9.5981},{"x":84.5,"y":10},{"x":83,"y":9.5981},{"x":81.9019,"y":8.5},{"x":81.5,"y":7},{"x":81.9019,"y":5.5},{"x":83,"y":4.4019},{"x":84.5,"y":4},{"x":86,"y":4.4019},{"x":87.0981,"y":5.5},{"x":87.5,"y":7}]}
+user_drill_data @offdefaults .paths[4] {"cls":"fc-guide","pts":[{"x":114.5,"y":7},{"x":114.0981,"y":8.5},{"x":113,"y":9.5981},{"x":111.5,"y":10},{"x":110,"y":9.5981},{"x":108.9019,"y":8.5},{"x":108.5,"y":7},{"x":108.9019,"y":5.5},{"x":110,"y":4.4019},{"x":111.5,"y":4},{"x":113,"y":4.4019},{"x":114.0981,"y":5.5},{"x":114.5,"y":7}]}
+user_drill_data @offdefaults .paths[5] {"cls":"fc-guide","pts":[{"x":141.5,"y":7},{"x":141.0981,"y":8.5},{"x":140,"y":9.5981},{"x":138.5,"y":10},{"x":137,"y":9.5981},{"x":135.9019,"y":8.5},{"x":135.5,"y":7},{"x":135.9019,"y":5.5},{"x":137,"y":4.4019},{"x":138.5,"y":4},{"x":140,"y":4.4019},{"x":141.0981,"y":5.5},{"x":141.5,"y":7}]}
+user_drill_data @offdefaults .paths[6] {"cls":"fc-guide","pts":[{"x":168.5,"y":7},{"x":168.0981,"y":8.5},{"x":167,"y":9.5981},{"x":165.5,"y":10},{"x":164,"y":9.5981},{"x":162.9019,"y":8.5},{"x":162.5,"y":7},{"x":162.9019,"y":5.5},{"x":164,"y":4.4019},{"x":165.5,"y":4},{"x":167,"y":4.4019},{"x":168.0981,"y":5.5},{"x":168.5,"y":7}]}
+user_drill_data @offdefaults .paths[7] {"cls":"fc-guide","pts":[{"x":195.5,"y":7},{"x":195.0981,"y":8.5},{"x":194,"y":9.5981},{"x":192.5,"y":10},{"x":191,"y":9.5981},{"x":189.9019,"y":8.5},{"x":189.5,"y":7},{"x":189.9019,"y":5.5},{"x":191,"y":4.4019},{"x":192.5,"y":4},{"x":194,"y":4.4019},{"x":195.0981,"y":5.5},{"x":195.5,"y":7}]}
+user_drill_data @offdefaults .paths[8] {"cls":"fc-guide","pts":[{"x":222.5,"y":7},{"x":222.0981,"y":8.5},{"x":221,"y":9.5981},{"x":219.5,"y":10},{"x":218,"y":9.5981},{"x":216.9019,"y":8.5},{"x":216.5,"y":7},{"x":216.9019,"y":5.5},{"x":218,"y":4.4019},{"x":219.5,"y":4},{"x":221,"y":4.4019},{"x":222.0981,"y":5.5},{"x":222.5,"y":7}]}
+user_drill_data @offdefaults .paths[9] {"cls":"fc-guide","pts":[{"x":249.5,"y":7},{"x":249.0981,"y":8.5},{"x":248,"y":9.5981},{"x":246.5,"y":10},{"x":245,"y":9.5981},{"x":243.9019,"y":8.5},{"x":243.5,"y":7},{"x":243.9019,"y":5.5},{"x":245,"y":4.4019},{"x":246.5,"y":4},{"x":248,"y":4.4019},{"x":249.0981,"y":5.5},{"x":249.5,"y":7}]}
+user_drill_data @offdefaults .paths[10] {"cls":"fc-guide","pts":[{"x":6.5,"y":34},{"x":6.0981,"y":35.5},{"x":5,"y":36.5981},{"x":3.5,"y":37},{"x":2,"y":36.5981},{"x":0.9019,"y":35.5},{"x":0.5,"y":34},{"x":0.9019,"y":32.5},{"x":2,"y":31.4019},{"x":3.5,"y":31},{"x":5,"y":31.4019},{"x":6.0981,"y":32.5},{"x":6.5,"y":34}]}
+user_drill_data @offdefaults .paths[11] {"cls":"fc-guide","pts":[{"x":33.5,"y":34},{"x":33.0981,"y":35.5},{"x":32,"y":36.5981},{"x":30.5,"y":37},{"x":29,"y":36.5981},{"x":27.9019,"y":35.5},{"x":27.5,"y":34},{"x":27.9019,"y":32.5},{"x":29,"y":31.4019},{"x":30.5,"y":31},{"x":32,"y":31.4019},{"x":33.0981,"y":32.5},{"x":33.5,"y":34}]}
+user_drill_data @offdefaults .paths[12] {"cls":"fc-guide","pts":[{"x":60.5,"y":34},{"x":60.0981,"y":35.5},{"x":59,"y":36.5981},{"x":57.5,"y":37},{"x":56,"y":36.5981},{"x":54.9019,"y":35.5},{"x":54.5,"y":34},{"x":54.9019,"y":32.5},{"x":56,"y":31.4019},{"x":57.5,"y":31},{"x":59,"y":31.4019},{"x":60.0981,"y":32.5},{"x":60.5,"y":34}]}
+user_drill_data @offdefaults .paths[13] {"cls":"fc-guide","pts":[{"x":87.5,"y":34},{"x":87.0981,"y":35.5},{"x":86,"y":36.5981},{"x":84.5,"y":37},{"x":83,"y":36.5981},{"x":81.9019,"y":35.5},{"x":81.5,"y":34},{"x":81.9019,"y":32.5},{"x":83,"y":31.4019},{"x":84.5,"y":31},{"x":86,"y":31.4019},{"x":87.0981,"y":32.5},{"x":87.5,"y":34}]}
+user_drill_data @offdefaults .paths[14] {"cls":"fc-guide","pts":[{"x":114.5,"y":34},{"x":114.0981,"y":35.5},{"x":113,"y":36.5981},{"x":111.5,"y":37},{"x":110,"y":36.5981},{"x":108.9019,"y":35.5},{"x":108.5,"y":34},{"x":108.9019,"y":32.5},{"x":110,"y":31.4019},{"x":111.5,"y":31},{"x":113,"y":31.4019},{"x":114.0981,"y":32.5},{"x":114.5,"y":34}]}
+user_drill_data @offdefaults .paths[15] {"cls":"fc-guide","pts":[{"x":141.5,"y":34},{"x":141.0981,"y":35.5},{"x":140,"y":36.5981},{"x":138.5,"y":37},{"x":137,"y":36.5981},{"x":135.9019,"y":35.5},{"x":135.5,"y":34},{"x":135.9019,"y":32.5},{"x":137,"y":31.4019},{"x":138.5,"y":31},{"x":140,"y":31.4019},{"x":141.0981,"y":32.5},{"x":141.5,"y":34}]}
+user_drill_data @offdefaults .paths[16] {"cls":"fc-guide","pts":[{"x":168.5,"y":34},{"x":168.0981,"y":35.5},{"x":167,"y":36.5981},{"x":165.5,"y":37},{"x":164,"y":36.5981},{"x":162.9019,"y":35.5},{"x":162.5,"y":34},{"x":162.9019,"y":32.5},{"x":164,"y":31.4019},{"x":165.5,"y":31},{"x":167,"y":31.4019},{"x":168.0981,"y":32.5},{"x":168.5,"y":34}]}
+user_drill_data @offdefaults .paths[17] {"cls":"fc-guide","pts":[{"x":195.5,"y":34},{"x":195.0981,"y":35.5},{"x":194,"y":36.5981},{"x":192.5,"y":37},{"x":191,"y":36.5981},{"x":189.9019,"y":35.5},{"x":189.5,"y":34},{"x":189.9019,"y":32.5},{"x":191,"y":31.4019},{"x":192.5,"y":31},{"x":194,"y":31.4019},{"x":195.0981,"y":32.5},{"x":195.5,"y":34}]}
+user_drill_data @offdefaults .paths[18] {"cls":"fc-guide","pts":[{"x":222.5,"y":34},{"x":222.0981,"y":35.5},{"x":221,"y":36.5981},{"x":219.5,"y":37},{"x":218,"y":36.5981},{"x":216.9019,"y":35.5},{"x":216.5,"y":34},{"x":216.9019,"y":32.5},{"x":218,"y":31.4019},{"x":219.5,"y":31},{"x":221,"y":31.4019},{"x":222.0981,"y":32.5},{"x":222.5,"y":34}]}
+user_drill_data @offdefaults .paths[19] {"cls":"fc-guide","pts":[{"x":249.5,"y":34},{"x":249.0981,"y":35.5},{"x":248,"y":36.5981},{"x":246.5,"y":37},{"x":245,"y":36.5981},{"x":243.9019,"y":35.5},{"x":243.5,"y":34},{"x":243.9019,"y":32.5},{"x":245,"y":31.4019},{"x":246.5,"y":31},{"x":248,"y":31.4019},{"x":249.0981,"y":32.5},{"x":249.5,"y":34}]}
+user_drill_data @offdefaults .paths[20] {"cls":"fc-guide","pts":[{"x":6.5,"y":61},{"x":6.0981,"y":62.5},{"x":5,"y":63.5981},{"x":3.5,"y":64},{"x":2,"y":63.5981},{"x":0.9019,"y":62.5},{"x":0.5,"y":61},{"x":0.9019,"y":59.5},{"x":2,"y":58.4019},{"x":3.5,"y":58},{"x":5,"y":58.4019},{"x":6.0981,"y":59.5},{"x":6.5,"y":61}]}
+user_drill_data @offdefaults .paths[21] {"cls":"fc-guide","pts":[{"x":33.5,"y":61},{"x":33.0981,"y":62.5},{"x":32,"y":63.5981},{"x":30.5,"y":64},{"x":29,"y":63.5981},{"x":27.9019,"y":62.5},{"x":27.5,"y":61},{"x":27.9019,"y":59.5},{"x":29,"y":58.4019},{"x":30.5,"y":58},{"x":32,"y":58.4019},{"x":33.0981,"y":59.5},{"x":33.5,"y":61}]}
+user_drill_data @offdefaults .paths[22] {"cls":"fc-guide","pts":[{"x":60.5,"y":61},{"x":60.0981,"y":62.5},{"x":59,"y":63.5981},{"x":57.5,"y":64},{"x":56,"y":63.5981},{"x":54.9019,"y":62.5},{"x":54.5,"y":61},{"x":54.9019,"y":59.5},{"x":56,"y":58.4019},{"x":57.5,"y":58},{"x":59,"y":58.4019},{"x":60.0981,"y":59.5},{"x":60.5,"y":61}]}
+user_drill_data @offdefaults .paths[23] {"cls":"fc-guide","pts":[{"x":87.5,"y":61},{"x":87.0981,"y":62.5},{"x":86,"y":63.5981},{"x":84.5,"y":64},{"x":83,"y":63.5981},{"x":81.9019,"y":62.5},{"x":81.5,"y":61},{"x":81.9019,"y":59.5},{"x":83,"y":58.4019},{"x":84.5,"y":58},{"x":86,"y":58.4019},{"x":87.0981,"y":59.5},{"x":87.5,"y":61}]}
+user_drill_data @offdefaults .paths[24] {"cls":"fc-guide","pts":[{"x":114.5,"y":61},{"x":114.0981,"y":62.5},{"x":113,"y":63.5981},{"x":111.5,"y":64},{"x":110,"y":63.5981},{"x":108.9019,"y":62.5},{"x":108.5,"y":61},{"x":108.9019,"y":59.5},{"x":110,"y":58.4019},{"x":111.5,"y":58},{"x":113,"y":58.4019},{"x":114.0981,"y":59.5},{"x":114.5,"y":61}]}
+user_drill_data @offdefaults .paths[25] {"cls":"fc-guide","pts":[{"x":141.5,"y":61},{"x":141.0981,"y":62.5},{"x":140,"y":63.5981},{"x":138.5,"y":64},{"x":137,"y":63.5981},{"x":135.9019,"y":62.5},{"x":135.5,"y":61},{"x":135.9019,"y":59.5},{"x":137,"y":58.4019},{"x":138.5,"y":58},{"x":140,"y":58.4019},{"x":141.0981,"y":59.5},{"x":141.5,"y":61}]}
+user_drill_data @offdefaults .paths[26] {"cls":"fc-guide","pts":[{"x":168.5,"y":61},{"x":168.0981,"y":62.5},{"x":167,"y":63.5981},{"x":165.5,"y":64},{"x":164,"y":63.5981},{"x":162.9019,"y":62.5},{"x":162.5,"y":61},{"x":162.9019,"y":59.5},{"x":164,"y":58.4019},{"x":165.5,"y":58},{"x":167,"y":58.4019},{"x":168.0981,"y":59.5},{"x":168.5,"y":61}]}
+user_drill_data @offdefaults .paths[27] {"cls":"fc-guide","pts":[{"x":195.5,"y":61},{"x":195.0981,"y":62.5},{"x":194,"y":63.5981},{"x":192.5,"y":64},{"x":191,"y":63.5981},{"x":189.9019,"y":62.5},{"x":189.5,"y":61},{"x":189.9019,"y":59.5},{"x":191,"y":58.4019},{"x":192.5,"y":58},{"x":194,"y":58.4019},{"x":195.0981,"y":59.5},{"x":195.5,"y":61}]}
+user_drill_data @offdefaults .paths[28] {"cls":"fc-guide","pts":[{"x":222.5,"y":61},{"x":222.0981,"y":62.5},{"x":221,"y":63.5981},{"x":219.5,"y":64},{"x":218,"y":63.5981},{"x":216.9019,"y":62.5},{"x":216.5,"y":61},{"x":216.9019,"y":59.5},{"x":218,"y":58.4019},{"x":219.5,"y":58},{"x":221,"y":58.4019},{"x":222.0981,"y":59.5},{"x":222.5,"y":61}]}
+user_drill_data @offdefaults .paths[29] {"cls":"fc-guide","pts":[{"x":249.5,"y":61},{"x":249.0981,"y":62.5},{"x":248,"y":63.5981},{"x":246.5,"y":64},{"x":245,"y":63.5981},{"x":243.9019,"y":62.5},{"x":243.5,"y":61},{"x":243.9019,"y":59.5},{"x":245,"y":58.4019},{"x":246.5,"y":58},{"x":248,"y":58.4019},{"x":249.0981,"y":59.5},{"x":249.5,"y":61}]}
+user_drill_data @offdefaults .paths[30] {"cls":"fc-guide","pts":[{"x":6.5,"y":88},{"x":6.0981,"y":89.5},{"x":5,"y":90.5981},{"x":3.5,"y":91},{"x":2,"y":90.5981},{"x":0.9019,"y":89.5},{"x":0.5,"y":88},{"x":0.9019,"y":86.5},{"x":2,"y":85.4019},{"x":3.5,"y":85},{"x":5,"y":85.4019},{"x":6.0981,"y":86.5},{"x":6.5,"y":88}]}
+user_drill_data @offdefaults .paths[31] {"cls":"fc-guide","pts":[{"x":33.5,"y":88},{"x":33.0981,"y":89.5},{"x":32,"y":90.5981},{"x":30.5,"y":91},{"x":29,"y":90.5981},{"x":27.9019,"y":89.5},{"x":27.5,"y":88},{"x":27.9019,"y":86.5},{"x":29,"y":85.4019},{"x":30.5,"y":85},{"x":32,"y":85.4019},{"x":33.0981,"y":86.5},{"x":33.5,"y":88}]}
+user_drill_data @offdefaults .paths[32] {"cls":"fc-guide","pts":[{"x":60.5,"y":88},{"x":60.0981,"y":89.5},{"x":59,"y":90.5981},{"x":57.5,"y":91},{"x":56,"y":90.5981},{"x":54.9019,"y":89.5},{"x":54.5,"y":88},{"x":54.9019,"y":86.5},{"x":56,"y":85.4019},{"x":57.5,"y":85},{"x":59,"y":85.4019},{"x":60.0981,"y":86.5},{"x":60.5,"y":88}]}
+user_drill_data @offdefaults .paths[33] {"cls":"fc-guide","pts":[{"x":87.5,"y":88},{"x":87.0981,"y":89.5},{"x":86,"y":90.5981},{"x":84.5,"y":91},{"x":83,"y":90.5981},{"x":81.9019,"y":89.5},{"x":81.5,"y":88},{"x":81.9019,"y":86.5},{"x":83,"y":85.4019},{"x":84.5,"y":85},{"x":86,"y":85.4019},{"x":87.0981,"y":86.5},{"x":87.5,"y":88}]}
+user_drill_data @offdefaults .paths[34] {"cls":"fc-guide","pts":[{"x":114.5,"y":88},{"x":114.0981,"y":89.5},{"x":113,"y":90.5981},{"x":111.5,"y":91},{"x":110,"y":90.5981},{"x":108.9019,"y":89.5},{"x":108.5,"y":88},{"x":108.9019,"y":86.5},{"x":110,"y":85.4019},{"x":111.5,"y":85},{"x":113,"y":85.4019},{"x":114.0981,"y":86.5},{"x":114.5,"y":88}]}
+user_drill_data @offdefaults .paths[35] {"cls":"fc-guide","pts":[{"x":141.5,"y":88},{"x":141.0981,"y":89.5},{"x":140,"y":90.5981},{"x":138.5,"y":91},{"x":137,"y":90.5981},{"x":135.9019,"y":89.5},{"x":135.5,"y":88},{"x":135.9019,"y":86.5},{"x":137,"y":85.4019},{"x":138.5,"y":85},{"x":140,"y":85.4019},{"x":141.0981,"y":86.5},{"x":141.5,"y":88}]}
+user_drill_data @offdefaults .paths[36] {"cls":"fc-guide","pts":[{"x":168.5,"y":88},{"x":168.0981,"y":89.5},{"x":167,"y":90.5981},{"x":165.5,"y":91},{"x":164,"y":90.5981},{"x":162.9019,"y":89.5},{"x":162.5,"y":88},{"x":162.9019,"y":86.5},{"x":164,"y":85.4019},{"x":165.5,"y":85},{"x":167,"y":85.4019},{"x":168.0981,"y":86.5},{"x":168.5,"y":88}]}
+user_drill_data @offdefaults .paths[37] {"cls":"fc-guide","pts":[{"x":195.5,"y":88},{"x":195.0981,"y":89.5},{"x":194,"y":90.5981},{"x":192.5,"y":91},{"x":191,"y":90.5981},{"x":189.9019,"y":89.5},{"x":189.5,"y":88},{"x":189.9019,"y":86.5},{"x":191,"y":85.4019},{"x":192.5,"y":85},{"x":194,"y":85.4019},{"x":195.0981,"y":86.5},{"x":195.5,"y":88}]}
+user_drill_data @offdefaults .paths[38] {"cls":"fc-guide","pts":[{"x":222.5,"y":88},{"x":222.0981,"y":89.5},{"x":221,"y":90.5981},{"x":219.5,"y":91},{"x":218,"y":90.5981},{"x":216.9019,"y":89.5},{"x":216.5,"y":88},{"x":216.9019,"y":86.5},{"x":218,"y":85.4019},{"x":219.5,"y":85},{"x":221,"y":85.4019},{"x":222.0981,"y":86.5},{"x":222.5,"y":88}]}
+user_drill_data @offdefaults .paths[39] {"cls":"fc-guide","pts":[{"x":249.5,"y":88},{"x":249.0981,"y":89.5},{"x":248,"y":90.5981},{"x":246.5,"y":91},{"x":245,"y":90.5981},{"x":243.9019,"y":89.5},{"x":243.5,"y":88},{"x":243.9019,"y":86.5},{"x":245,"y":85.4019},{"x":246.5,"y":85},{"x":248,"y":85.4019},{"x":249.0981,"y":86.5},{"x":249.5,"y":88}]}
+user_drill_data @offdefaults .paths[40] {"cls":"fc-guide","pts":[{"x":6.5,"y":115},{"x":6.0981,"y":116.5},{"x":5,"y":117.5981},{"x":3.5,"y":118},{"x":2,"y":117.5981},{"x":0.9019,"y":116.5},{"x":0.5,"y":115},{"x":0.9019,"y":113.5},{"x":2,"y":112.4019},{"x":3.5,"y":112},{"x":5,"y":112.4019},{"x":6.0981,"y":113.5},{"x":6.5,"y":115}]}
+user_drill_data @offdefaults .paths[41] {"cls":"fc-guide","pts":[{"x":33.5,"y":115},{"x":33.0981,"y":116.5},{"x":32,"y":117.5981},{"x":30.5,"y":118},{"x":29,"y":117.5981},{"x":27.9019,"y":116.5},{"x":27.5,"y":115},{"x":27.9019,"y":113.5},{"x":29,"y":112.4019},{"x":30.5,"y":112},{"x":32,"y":112.4019},{"x":33.0981,"y":113.5},{"x":33.5,"y":115}]}
+user_drill_data @offdefaults .paths[42] {"cls":"fc-guide","pts":[{"x":60.5,"y":115},{"x":60.0981,"y":116.5},{"x":59,"y":117.5981},{"x":57.5,"y":118},{"x":56,"y":117.5981},{"x":54.9019,"y":116.5},{"x":54.5,"y":115},{"x":54.9019,"y":113.5},{"x":56,"y":112.4019},{"x":57.5,"y":112},{"x":59,"y":112.4019},{"x":60.0981,"y":113.5},{"x":60.5,"y":115}]}
+user_drill_data @offdefaults .paths[43] {"cls":"fc-guide","pts":[{"x":87.5,"y":115},{"x":87.0981,"y":116.5},{"x":86,"y":117.5981},{"x":84.5,"y":118},{"x":83,"y":117.5981},{"x":81.9019,"y":116.5},{"x":81.5,"y":115},{"x":81.9019,"y":113.5},{"x":83,"y":112.4019},{"x":84.5,"y":112},{"x":86,"y":112.4019},{"x":87.0981,"y":113.5},{"x":87.5,"y":115}]}
+user_drill_data @offdefaults .paths[44] {"cls":"fc-guide","pts":[{"x":114.5,"y":115},{"x":114.0981,"y":116.5},{"x":113,"y":117.5981},{"x":111.5,"y":118},{"x":110,"y":117.5981},{"x":108.9019,"y":116.5},{"x":108.5,"y":115},{"x":108.9019,"y":113.5},{"x":110,"y":112.4019},{"x":111.5,"y":112},{"x":113,"y":112.4019},{"x":114.0981,"y":113.5},{"x":114.5,"y":115}]}
+user_drill_data @offdefaults .paths[45] {"cls":"fc-guide","pts":[{"x":141.5,"y":115},{"x":141.0981,"y":116.5},{"x":140,"y":117.5981},{"x":138.5,"y":118},{"x":137,"y":117.5981},{"x":135.9019,"y":116.5},{"x":135.5,"y":115},{"x":135.9019,"y":113.5},{"x":137,"y":112.4019},{"x":138.5,"y":112},{"x":140,"y":112.4019},{"x":141.0981,"y":113.5},{"x":141.5,"y":115}]}
+user_drill_data @offdefaults .paths[46] {"cls":"fc-guide","pts":[{"x":168.5,"y":115},{"x":168.0981,"y":116.5},{"x":167,"y":117.5981},{"x":165.5,"y":118},{"x":164,"y":117.5981},{"x":162.9019,"y":116.5},{"x":162.5,"y":115},{"x":162.9019,"y":113.5},{"x":164,"y":112.4019},{"x":165.5,"y":112},{"x":167,"y":112.4019},{"x":168.0981,"y":113.5},{"x":168.5,"y":115}]}
+user_drill_data @offdefaults .paths[47] {"cls":"fc-guide","pts":[{"x":195.5,"y":115},{"x":195.0981,"y":116.5},{"x":194,"y":117.5981},{"x":192.5,"y":118},{"x":191,"y":117.5981},{"x":189.9019,"y":116.5},{"x":189.5,"y":115},{"x":189.9019,"y":113.5},{"x":191,"y":112.4019},{"x":192.5,"y":112},{"x":194,"y":112.4019},{"x":195.0981,"y":113.5},{"x":195.5,"y":115}]}
+user_drill_data @offdefaults .paths[48] {"cls":"fc-guide","pts":[{"x":222.5,"y":115},{"x":222.0981,"y":116.5},{"x":221,"y":117.5981},{"x":219.5,"y":118},{"x":218,"y":117.5981},{"x":216.9019,"y":116.5},{"x":216.5,"y":115},{"x":216.9019,"y":113.5},{"x":218,"y":112.4019},{"x":219.5,"y":112},{"x":221,"y":112.4019},{"x":222.0981,"y":113.5},{"x":222.5,"y":115}]}
+user_drill_data @offdefaults .paths[49] {"cls":"fc-guide","pts":[{"x":249.5,"y":115},{"x":249.0981,"y":116.5},{"x":248,"y":117.5981},{"x":246.5,"y":118},{"x":245,"y":117.5981},{"x":243.9019,"y":116.5},{"x":243.5,"y":115},{"x":243.9019,"y":113.5},{"x":245,"y":112.4019},{"x":246.5,"y":112},{"x":248,"y":112.4019},{"x":249.0981,"y":113.5},{"x":249.5,"y":115}]}
+user_drill_data @offdefaults .paths[50] {"cls":"fc-guide","pts":[{"x":6.5,"y":142},{"x":6.0981,"y":143.5},{"x":5,"y":144.5981},{"x":3.5,"y":145},{"x":2,"y":144.5981},{"x":0.9019,"y":143.5},{"x":0.5,"y":142},{"x":0.9019,"y":140.5},{"x":2,"y":139.4019},{"x":3.5,"y":139},{"x":5,"y":139.4019},{"x":6.0981,"y":140.5},{"x":6.5,"y":142}]}
+user_drill_data @offdefaults .paths[51] {"cls":"fc-guide","pts":[{"x":33.5,"y":142},{"x":33.0981,"y":143.5},{"x":32,"y":144.5981},{"x":30.5,"y":145},{"x":29,"y":144.5981},{"x":27.9019,"y":143.5},{"x":27.5,"y":142},{"x":27.9019,"y":140.5},{"x":29,"y":139.4019},{"x":30.5,"y":139},{"x":32,"y":139.4019},{"x":33.0981,"y":140.5},{"x":33.5,"y":142}]}
+user_drill_data @offdefaults .paths[52] {"cls":"fc-guide","pts":[{"x":60.5,"y":142},{"x":60.0981,"y":143.5},{"x":59,"y":144.5981},{"x":57.5,"y":145},{"x":56,"y":144.5981},{"x":54.9019,"y":143.5},{"x":54.5,"y":142},{"x":54.9019,"y":140.5},{"x":56,"y":139.4019},{"x":57.5,"y":139},{"x":59,"y":139.4019},{"x":60.0981,"y":140.5},{"x":60.5,"y":142}]}
+user_drill_data @offdefaults .paths[53] {"cls":"fc-guide","pts":[{"x":87.5,"y":142},{"x":87.0981,"y":143.5},{"x":86,"y":144.5981},{"x":84.5,"y":145},{"x":83,"y":144.5981},{"x":81.9019,"y":143.5},{"x":81.5,"y":142},{"x":81.9019,"y":140.5},{"x":83,"y":139.4019},{"x":84.5,"y":139},{"x":86,"y":139.4019},{"x":87.0981,"y":140.5},{"x":87.5,"y":142}]}
+user_drill_data @offdefaults .paths[54] {"cls":"fc-guide","pts":[{"x":114.5,"y":142},{"x":114.0981,"y":143.5},{"x":113,"y":144.5981},{"x":111.5,"y":145},{"x":110,"y":144.5981},{"x":108.9019,"y":143.5},{"x":108.5,"y":142},{"x":108.9019,"y":140.5},{"x":110,"y":139.4019},{"x":111.5,"y":139},{"x":113,"y":139.4019},{"x":114.0981,"y":140.5},{"x":114.5,"y":142}]}
+user_drill_data @offdefaults .paths[55] {"cls":"fc-guide","pts":[{"x":141.5,"y":142},{"x":141.0981,"y":143.5},{"x":140,"y":144.5981},{"x":138.5,"y":145},{"x":137,"y":144.5981},{"x":135.9019,"y":143.5},{"x":135.5,"y":142},{"x":135.9019,"y":140.5},{"x":137,"y":139.4019},{"x":138.5,"y":139},{"x":140,"y":139.4019},{"x":141.0981,"y":140.5},{"x":141.5,"y":142}]}
+user_drill_data @offdefaults .paths[56] {"cls":"fc-guide","pts":[{"x":168.5,"y":142},{"x":168.0981,"y":143.5},{"x":167,"y":144.5981},{"x":165.5,"y":145},{"x":164,"y":144.5981},{"x":162.9019,"y":143.5},{"x":162.5,"y":142},{"x":162.9019,"y":140.5},{"x":164,"y":139.4019},{"x":165.5,"y":139},{"x":167,"y":139.4019},{"x":168.0981,"y":140.5},{"x":168.5,"y":142}]}
+user_drill_data @offdefaults .paths[57] {"cls":"fc-guide","pts":[{"x":195.5,"y":142},{"x":195.0981,"y":143.5},{"x":194,"y":144.5981},{"x":192.5,"y":145},{"x":191,"y":144.5981},{"x":189.9019,"y":143.5},{"x":189.5,"y":142},{"x":189.9019,"y":140.5},{"x":191,"y":139.4019},{"x":192.5,"y":139},{"x":194,"y":139.4019},{"x":195.0981,"y":140.5},{"x":195.5,"y":142}]}
+user_drill_data @offdefaults .paths[58] {"cls":"fc-guide","pts":[{"x":222.5,"y":142},{"x":222.0981,"y":143.5},{"x":221,"y":144.5981},{"x":219.5,"y":145},{"x":218,"y":144.5981},{"x":216.9019,"y":143.5},{"x":216.5,"y":142},{"x":216.9019,"y":140.5},{"x":218,"y":139.4019},{"x":219.5,"y":139},{"x":221,"y":139.4019},{"x":222.0981,"y":140.5},{"x":222.5,"y":142}]}
+user_drill_data @offdefaults .paths[59] {"cls":"fc-guide","pts":[{"x":249.5,"y":142},{"x":249.0981,"y":143.5},{"x":248,"y":144.5981},{"x":246.5,"y":145},{"x":245,"y":144.5981},{"x":243.9019,"y":143.5},{"x":243.5,"y":142},{"x":243.9019,"y":140.5},{"x":245,"y":139.4019},{"x":246.5,"y":139},{"x":248,"y":139.4019},{"x":249.0981,"y":140.5},{"x":249.5,"y":142}]}
+user_drill_data @offdefaults .paths[60] {"cls":"fc-guide","pts":[{"x":6.5,"y":169},{"x":6.0981,"y":170.5},{"x":5,"y":171.5981},{"x":3.5,"y":172},{"x":2,"y":171.5981},{"x":0.9019,"y":170.5},{"x":0.5,"y":169},{"x":0.9019,"y":167.5},{"x":2,"y":166.4019},{"x":3.5,"y":166},{"x":5,"y":166.4019},{"x":6.0981,"y":167.5},{"x":6.5,"y":169}]}
+user_drill_data @offdefaults .paths[61] {"cls":"fc-guide","pts":[{"x":33.5,"y":169},{"x":33.0981,"y":170.5},{"x":32,"y":171.5981},{"x":30.5,"y":172},{"x":29,"y":171.5981},{"x":27.9019,"y":170.5},{"x":27.5,"y":169},{"x":27.9019,"y":167.5},{"x":29,"y":166.4019},{"x":30.5,"y":166},{"x":32,"y":166.4019},{"x":33.0981,"y":167.5},{"x":33.5,"y":169}]}
+user_drill_data @offdefaults .paths[62] {"cls":"fc-guide","pts":[{"x":60.5,"y":169},{"x":60.0981,"y":170.5},{"x":59,"y":171.5981},{"x":57.5,"y":172},{"x":56,"y":171.5981},{"x":54.9019,"y":170.5},{"x":54.5,"y":169},{"x":54.9019,"y":167.5},{"x":56,"y":166.4019},{"x":57.5,"y":166},{"x":59,"y":166.4019},{"x":60.0981,"y":167.5},{"x":60.5,"y":169}]}
+user_drill_data @offdefaults .paths[63] {"cls":"fc-guide","pts":[{"x":87.5,"y":169},{"x":87.0981,"y":170.5},{"x":86,"y":171.5981},{"x":84.5,"y":172},{"x":83,"y":171.5981},{"x":81.9019,"y":170.5},{"x":81.5,"y":169},{"x":81.9019,"y":167.5},{"x":83,"y":166.4019},{"x":84.5,"y":166},{"x":86,"y":166.4019},{"x":87.0981,"y":167.5},{"x":87.5,"y":169}]}
+user_drill_data @offdefaults .paths[64] {"cls":"fc-guide","pts":[{"x":114.5,"y":169},{"x":114.0981,"y":170.5},{"x":113,"y":171.5981},{"x":111.5,"y":172},{"x":110,"y":171.5981},{"x":108.9019,"y":170.5},{"x":108.5,"y":169},{"x":108.9019,"y":167.5},{"x":110,"y":166.4019},{"x":111.5,"y":166},{"x":113,"y":166.4019},{"x":114.0981,"y":167.5},{"x":114.5,"y":169}]}
+user_drill_data @offdefaults .paths[65] {"cls":"fc-guide","pts":[{"x":141.5,"y":169},{"x":141.0981,"y":170.5},{"x":140,"y":171.5981},{"x":138.5,"y":172},{"x":137,"y":171.5981},{"x":135.9019,"y":170.5},{"x":135.5,"y":169},{"x":135.9019,"y":167.5},{"x":137,"y":166.4019},{"x":138.5,"y":166},{"x":140,"y":166.4019},{"x":141.0981,"y":167.5},{"x":141.5,"y":169}]}
+user_drill_data @offdefaults .paths[66] {"cls":"fc-guide","pts":[{"x":168.5,"y":169},{"x":168.0981,"y":170.5},{"x":167,"y":171.5981},{"x":165.5,"y":172},{"x":164,"y":171.5981},{"x":162.9019,"y":170.5},{"x":162.5,"y":169},{"x":162.9019,"y":167.5},{"x":164,"y":166.4019},{"x":165.5,"y":166},{"x":167,"y":166.4019},{"x":168.0981,"y":167.5},{"x":168.5,"y":169}]}
+user_drill_data @offdefaults .paths[67] {"cls":"fc-guide","pts":[{"x":195.5,"y":169},{"x":195.0981,"y":170.5},{"x":194,"y":171.5981},{"x":192.5,"y":172},{"x":191,"y":171.5981},{"x":189.9019,"y":170.5},{"x":189.5,"y":169},{"x":189.9019,"y":167.5},{"x":191,"y":166.4019},{"x":192.5,"y":166},{"x":194,"y":166.4019},{"x":195.0981,"y":167.5},{"x":195.5,"y":169}]}
+user_drill_data @offdefaults .paths[68] {"cls":"fc-guide","pts":[{"x":222.5,"y":169},{"x":222.0981,"y":170.5},{"x":221,"y":171.5981},{"x":219.5,"y":172},{"x":218,"y":171.5981},{"x":216.9019,"y":170.5},{"x":216.5,"y":169},{"x":216.9019,"y":167.5},{"x":218,"y":166.4019},{"x":219.5,"y":166},{"x":221,"y":166.4019},{"x":222.0981,"y":167.5},{"x":222.5,"y":169}]}
+user_drill_data @offdefaults .paths[69] {"cls":"fc-guide","pts":[{"x":249.5,"y":169},{"x":249.0981,"y":170.5},{"x":248,"y":171.5981},{"x":246.5,"y":172},{"x":245,"y":171.5981},{"x":243.9019,"y":170.5},{"x":243.5,"y":169},{"x":243.9019,"y":167.5},{"x":245,"y":166.4019},{"x":246.5,"y":166},{"x":248,"y":166.4019},{"x":249.0981,"y":167.5},{"x":249.5,"y":169}]}
+user_drill_data @offdefaults .paths[70] {"cls":"fc-guide","pts":[{"x":6.5,"y":196},{"x":6.0981,"y":197.5},{"x":5,"y":198.5981},{"x":3.5,"y":199},{"x":2,"y":198.5981},{"x":0.9019,"y":197.5},{"x":0.5,"y":196},{"x":0.9019,"y":194.5},{"x":2,"y":193.4019},{"x":3.5,"y":193},{"x":5,"y":193.4019},{"x":6.0981,"y":194.5},{"x":6.5,"y":196}]}
+user_drill_data @offdefaults .paths[71] {"cls":"fc-guide","pts":[{"x":33.5,"y":196},{"x":33.0981,"y":197.5},{"x":32,"y":198.5981},{"x":30.5,"y":199},{"x":29,"y":198.5981},{"x":27.9019,"y":197.5},{"x":27.5,"y":196},{"x":27.9019,"y":194.5},{"x":29,"y":193.4019},{"x":30.5,"y":193},{"x":32,"y":193.4019},{"x":33.0981,"y":194.5},{"x":33.5,"y":196}]}
+user_drill_data @offdefaults .paths[72] {"cls":"fc-guide","pts":[{"x":60.5,"y":196},{"x":60.0981,"y":197.5},{"x":59,"y":198.5981},{"x":57.5,"y":199},{"x":56,"y":198.5981},{"x":54.9019,"y":197.5},{"x":54.5,"y":196},{"x":54.9019,"y":194.5},{"x":56,"y":193.4019},{"x":57.5,"y":193},{"x":59,"y":193.4019},{"x":60.0981,"y":194.5},{"x":60.5,"y":196}]}
+user_drill_data @offdefaults .paths[73] {"cls":"fc-guide","pts":[{"x":87.5,"y":196},{"x":87.0981,"y":197.5},{"x":86,"y":198.5981},{"x":84.5,"y":199},{"x":83,"y":198.5981},{"x":81.9019,"y":197.5},{"x":81.5,"y":196},{"x":81.9019,"y":194.5},{"x":83,"y":193.4019},{"x":84.5,"y":193},{"x":86,"y":193.4019},{"x":87.0981,"y":194.5},{"x":87.5,"y":196}]}
+user_drill_data @offdefaults .paths[74] {"cls":"fc-guide","pts":[{"x":114.5,"y":196},{"x":114.0981,"y":197.5},{"x":113,"y":198.5981},{"x":111.5,"y":199},{"x":110,"y":198.5981},{"x":108.9019,"y":197.5},{"x":108.5,"y":196},{"x":108.9019,"y":194.5},{"x":110,"y":193.4019},{"x":111.5,"y":193},{"x":113,"y":193.4019},{"x":114.0981,"y":194.5},{"x":114.5,"y":196}]}
+user_drill_data @offdefaults .paths[75] {"cls":"fc-guide","pts":[{"x":141.5,"y":196},{"x":141.0981,"y":197.5},{"x":140,"y":198.5981},{"x":138.5,"y":199},{"x":137,"y":198.5981},{"x":135.9019,"y":197.5},{"x":135.5,"y":196},{"x":135.9019,"y":194.5},{"x":137,"y":193.4019},{"x":138.5,"y":193},{"x":140,"y":193.4019},{"x":141.0981,"y":194.5},{"x":141.5,"y":196}]}
+user_drill_data @offdefaults .paths[76] {"cls":"fc-guide","pts":[{"x":168.5,"y":196},{"x":168.0981,"y":197.5},{"x":167,"y":198.5981},{"x":165.5,"y":199},{"x":164,"y":198.5981},{"x":162.9019,"y":197.5},{"x":162.5,"y":196},{"x":162.9019,"y":194.5},{"x":164,"y":193.4019},{"x":165.5,"y":193},{"x":167,"y":193.4019},{"x":168.0981,"y":194.5},{"x":168.5,"y":196}]}
+user_drill_data @offdefaults .paths[77] {"cls":"fc-guide","pts":[{"x":195.5,"y":196},{"x":195.0981,"y":197.5},{"x":194,"y":198.5981},{"x":192.5,"y":199},{"x":191,"y":198.5981},{"x":189.9019,"y":197.5},{"x":189.5,"y":196},{"x":189.9019,"y":194.5},{"x":191,"y":193.4019},{"x":192.5,"y":193},{"x":194,"y":193.4019},{"x":195.0981,"y":194.5},{"x":195.5,"y":196}]}
+user_drill_data @offdefaults .paths[78] {"cls":"fc-guide","pts":[{"x":222.5,"y":196},{"x":222.0981,"y":197.5},{"x":221,"y":198.5981},{"x":219.5,"y":199},{"x":218,"y":198.5981},{"x":216.9019,"y":197.5},{"x":216.5,"y":196},{"x":216.9019,"y":194.5},{"x":218,"y":193.4019},{"x":219.5,"y":193},{"x":221,"y":193.4019},{"x":222.0981,"y":194.5},{"x":222.5,"y":196}]}
+user_drill_data @offdefaults .paths[79] {"cls":"fc-guide","pts":[{"x":249.5,"y":196},{"x":249.0981,"y":197.5},{"x":248,"y":198.5981},{"x":246.5,"y":199},{"x":245,"y":198.5981},{"x":243.9019,"y":197.5},{"x":243.5,"y":196},{"x":243.9019,"y":194.5},{"x":245,"y":193.4019},{"x":246.5,"y":193},{"x":248,"y":193.4019},{"x":249.0981,"y":194.5},{"x":249.5,"y":196}]}
+user_drill_data @offdefaults .paths[80] {"cls":"fc-guide","pts":[{"x":6.5,"y":223},{"x":6.0981,"y":224.5},{"x":5,"y":225.5981},{"x":3.5,"y":226},{"x":2,"y":225.5981},{"x":0.9019,"y":224.5},{"x":0.5,"y":223},{"x":0.9019,"y":221.5},{"x":2,"y":220.4019},{"x":3.5,"y":220},{"x":5,"y":220.4019},{"x":6.0981,"y":221.5},{"x":6.5,"y":223}]}
+user_drill_data @offdefaults .paths[81] {"cls":"fc-guide","pts":[{"x":33.5,"y":223},{"x":33.0981,"y":224.5},{"x":32,"y":225.5981},{"x":30.5,"y":226},{"x":29,"y":225.5981},{"x":27.9019,"y":224.5},{"x":27.5,"y":223},{"x":27.9019,"y":221.5},{"x":29,"y":220.4019},{"x":30.5,"y":220},{"x":32,"y":220.4019},{"x":33.0981,"y":221.5},{"x":33.5,"y":223}]}
+user_drill_data @offdefaults .paths[82] {"cls":"fc-guide","pts":[{"x":60.5,"y":223},{"x":60.0981,"y":224.5},{"x":59,"y":225.5981},{"x":57.5,"y":226},{"x":56,"y":225.5981},{"x":54.9019,"y":224.5},{"x":54.5,"y":223},{"x":54.9019,"y":221.5},{"x":56,"y":220.4019},{"x":57.5,"y":220},{"x":59,"y":220.4019},{"x":60.0981,"y":221.5},{"x":60.5,"y":223}]}
+user_drill_data @offdefaults .paths[83] {"cls":"fc-guide","pts":[{"x":87.5,"y":223},{"x":87.0981,"y":224.5},{"x":86,"y":225.5981},{"x":84.5,"y":226},{"x":83,"y":225.5981},{"x":81.9019,"y":224.5},{"x":81.5,"y":223},{"x":81.9019,"y":221.5},{"x":83,"y":220.4019},{"x":84.5,"y":220},{"x":86,"y":220.4019},{"x":87.0981,"y":221.5},{"x":87.5,"y":223}]}
+user_drill_data @offdefaults .paths[84] {"cls":"fc-guide","pts":[{"x":114.5,"y":223},{"x":114.0981,"y":224.5},{"x":113,"y":225.5981},{"x":111.5,"y":226},{"x":110,"y":225.5981},{"x":108.9019,"y":224.5},{"x":108.5,"y":223},{"x":108.9019,"y":221.5},{"x":110,"y":220.4019},{"x":111.5,"y":220},{"x":113,"y":220.4019},{"x":114.0981,"y":221.5},{"x":114.5,"y":223}]}
+user_drill_data @offdefaults .paths[85] {"cls":"fc-guide","pts":[{"x":141.5,"y":223},{"x":141.0981,"y":224.5},{"x":140,"y":225.5981},{"x":138.5,"y":226},{"x":137,"y":225.5981},{"x":135.9019,"y":224.5},{"x":135.5,"y":223},{"x":135.9019,"y":221.5},{"x":137,"y":220.4019},{"x":138.5,"y":220},{"x":140,"y":220.4019},{"x":141.0981,"y":221.5},{"x":141.5,"y":223}]}
+user_drill_data @offdefaults .paths[86] {"cls":"fc-guide","pts":[{"x":168.5,"y":223},{"x":168.0981,"y":224.5},{"x":167,"y":225.5981},{"x":165.5,"y":226},{"x":164,"y":225.5981},{"x":162.9019,"y":224.5},{"x":162.5,"y":223},{"x":162.9019,"y":221.5},{"x":164,"y":220.4019},{"x":165.5,"y":220},{"x":167,"y":220.4019},{"x":168.0981,"y":221.5},{"x":168.5,"y":223}]}
+user_drill_data @offdefaults .paths[87] {"cls":"fc-guide","pts":[{"x":195.5,"y":223},{"x":195.0981,"y":224.5},{"x":194,"y":225.5981},{"x":192.5,"y":226},{"x":191,"y":225.5981},{"x":189.9019,"y":224.5},{"x":189.5,"y":223},{"x":189.9019,"y":221.5},{"x":191,"y":220.4019},{"x":192.5,"y":220},{"x":194,"y":220.4019},{"x":195.0981,"y":221.5},{"x":195.5,"y":223}]}
+user_drill_data @offdefaults .paths[88] {"cls":"fc-guide","pts":[{"x":222.5,"y":223},{"x":222.0981,"y":224.5},{"x":221,"y":225.5981},{"x":219.5,"y":226},{"x":218,"y":225.5981},{"x":216.9019,"y":224.5},{"x":216.5,"y":223},{"x":216.9019,"y":221.5},{"x":218,"y":220.4019},{"x":219.5,"y":220},{"x":221,"y":220.4019},{"x":222.0981,"y":221.5},{"x":222.5,"y":223}]}
+user_drill_data @offdefaults .paths[89] {"cls":"fc-guide","pts":[{"x":249.5,"y":223},{"x":249.0981,"y":224.5},{"x":248,"y":225.5981},{"x":246.5,"y":226},{"x":245,"y":225.5981},{"x":243.9019,"y":224.5},{"x":243.5,"y":223},{"x":243.9019,"y":221.5},{"x":245,"y":220.4019},{"x":246.5,"y":220},{"x":248,"y":220.4019},{"x":249.0981,"y":221.5},{"x":249.5,"y":223}]}
+user_drill_data @offdefaults .placement {"x":300,"y":200}
+user_drill_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_edge_data @defaults .panel {"keys":["edgeSel","handles","items","onDrag","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_edge_data @defaults .edgeSel {"axis":"X","dir":"pos"}
+user_edge_data @defaults .handles <0 entries>
+user_edge_data @defaults .items <1 entries>
+user_edge_data @defaults .items[0] {"cls":"fc-edge-wall","kind":"line","x1":0,"x2":0,"y1":0,"y2":150}
+user_edge_data @defaults .onDrag "<fn/2>"
+user_edge_data @defaults .onEdgePick "<fn/2>"
+user_edge_data @defaults .onEdit "<fn/2>"
+user_edge_data @defaults .origin {"x":0,"y":0}
+user_edge_data @defaults .paths null
+user_edge_data @defaults .placement {"x":300,"y":200}
+user_edge_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_edge_data @offdefaults .panel {"keys":["edgeSel","handles","items","onDrag","onEdgePick","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_edge_data @offdefaults .edgeSel {"axis":"Y","dir":"neg"}
+user_edge_data @offdefaults .handles <0 entries>
+user_edge_data @offdefaults .items <1 entries>
+user_edge_data @offdefaults .items[0] {"cls":"fc-edge-wall","kind":"line","x1":0,"x2":200,"y1":150,"y2":150}
+user_edge_data @offdefaults .onDrag "<fn/2>"
+user_edge_data @offdefaults .onEdgePick "<fn/2>"
+user_edge_data @offdefaults .onEdit "<fn/2>"
+user_edge_data @offdefaults .origin {"x":0,"y":0}
+user_edge_data @offdefaults .paths null
+user_edge_data @offdefaults .placement {"x":300,"y":200}
+user_edge_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_homing_data @defaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_homing_data @defaults .handles <0 entries>
+user_homing_data @defaults .items <0 entries>
+user_homing_data @defaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_homing_data @defaults .onDrag "<fn/2>"
+user_homing_data @defaults .onEdit "<fn/2>"
+user_homing_data @defaults .origin {"x":0,"y":0}
+user_homing_data @defaults .paths null
+user_homing_data @defaults .placement {"x":300,"y":200}
+user_homing_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_homing_data @offdefaults .panel {"keys":["handles","items","machine","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_homing_data @offdefaults .handles <0 entries>
+user_homing_data @offdefaults .items <0 entries>
+user_homing_data @offdefaults .machine {"homeX":0,"homeY":0,"x":800,"y":600,"z":-120}
+user_homing_data @offdefaults .onDrag "<fn/2>"
+user_homing_data @offdefaults .onEdit "<fn/2>"
+user_homing_data @offdefaults .origin {"x":0,"y":0}
+user_homing_data @offdefaults .paths null
+user_homing_data @offdefaults .placement {"x":300,"y":200}
+user_homing_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_io_step @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_io_step @defaults .handles <0 entries>
+user_io_step @defaults .items <0 entries>
+user_io_step @defaults .onDrag "<fn/2>"
+user_io_step @defaults .onEdit "<fn/2>"
+user_io_step @defaults .origin {"x":0,"y":0}
+user_io_step @defaults .paths null
+user_io_step @defaults .placement {"x":300,"y":200}
+user_io_step @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_io_step @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_io_step @offdefaults .handles <0 entries>
+user_io_step @offdefaults .items <0 entries>
+user_io_step @offdefaults .onDrag "<fn/2>"
+user_io_step @offdefaults .onEdit "<fn/2>"
+user_io_step @offdefaults .origin {"x":0,"y":0}
+user_io_step @offdefaults .paths null
+user_io_step @offdefaults .placement {"x":300,"y":200}
+user_io_step @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_lathe_centerdrill @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_centerdrill @defaults .handles <1 entries>
+user_lathe_centerdrill @defaults .handles[0] {"axis":"x","emits":true,"id":"drillDepth","kind":"size","label":"depth","value":15,"x":-15,"y":0}
+user_lathe_centerdrill @defaults .items <3 entries>
+user_lathe_centerdrill @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_centerdrill @defaults .items[1] {"cls":"fc-feature-pocket","h":0.6,"kind":"rect","w":15,"x":-15,"y":0}
+user_lathe_centerdrill @defaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_centerdrill @defaults .onDrag "<fn/2>"
+user_lathe_centerdrill @defaults .onEdit "<fn/2>"
+user_lathe_centerdrill @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_centerdrill @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_centerdrill @offdefaults .handles <1 entries>
+user_lathe_centerdrill @offdefaults .handles[0] {"axis":"x","emits":true,"id":"drillDepth","kind":"size","label":"depth","value":22,"x":-22,"y":0}
+user_lathe_centerdrill @offdefaults .items <3 entries>
+user_lathe_centerdrill @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_centerdrill @offdefaults .items[1] {"cls":"fc-feature-pocket","h":0.6,"kind":"rect","w":22,"x":-22,"y":0}
+user_lathe_centerdrill @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_centerdrill @offdefaults .onDrag "<fn/2>"
+user_lathe_centerdrill @offdefaults .onEdit "<fn/2>"
+user_lathe_centerdrill @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_faceprobe @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_faceprobe @defaults .handles <1 entries>
+user_lathe_faceprobe @defaults .handles[0] {"axis":"x","emits":true,"id":"probeFace","kind":"size","label":"touched face","value":0,"x":0,"y":10}
+user_lathe_faceprobe @defaults .items <4 entries>
+user_lathe_faceprobe @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_faceprobe @defaults .items[1] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_faceprobe @defaults .items[2] {"cls":"fc-probe-touch","cx":2,"cy":5.5,"kind":"circle","r":2}
+user_lathe_faceprobe @defaults .items[3] {"cls":"fc-probe-approach","kind":"line","x1":10,"x2":2,"y1":5.5,"y2":5.5}
+user_lathe_faceprobe @defaults .onDrag "<fn/2>"
+user_lathe_faceprobe @defaults .onEdit "<fn/2>"
+user_lathe_faceprobe @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_faceprobe @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_faceprobe @offdefaults .handles <1 entries>
+user_lathe_faceprobe @offdefaults .handles[0] {"axis":"x","emits":true,"id":"probeFace","kind":"size","label":"touched face","value":7,"x":7,"y":10}
+user_lathe_faceprobe @offdefaults .items <5 entries>
+user_lathe_faceprobe @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_faceprobe @offdefaults .items[1] {"cls":"fc-feature-pocket","h":10,"kind":"rect","w":7,"x":0,"y":0}
+user_lathe_faceprobe @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_faceprobe @offdefaults .items[3] {"cls":"fc-probe-touch","cx":16,"cy":5.5,"kind":"circle","r":9}
+user_lathe_faceprobe @offdefaults .items[4] {"cls":"fc-probe-approach","kind":"line","x1":52,"x2":16,"y1":5.5,"y2":5.5}
+user_lathe_faceprobe @offdefaults .onDrag "<fn/2>"
+user_lathe_faceprobe @offdefaults .onEdit "<fn/2>"
+user_lathe_faceprobe @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_facing @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_facing @defaults .handles <1 entries>
+user_lathe_facing @defaults .handles[0] {"axis":"x","emits":true,"id":"faceLine","kind":"size","label":"face","value":3,"x":3,"y":10}
+user_lathe_facing @defaults .items <3 entries>
+user_lathe_facing @defaults .items[0] {"kind":"line","x1":-60,"x2":3,"y1":0,"y2":0}
+user_lathe_facing @defaults .items[1] {"cls":"fc-feature-pocket","h":10,"kind":"rect","w":3,"x":0,"y":0}
+user_lathe_facing @defaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_facing @defaults .onDrag "<fn/2>"
+user_lathe_facing @defaults .onEdit "<fn/2>"
+user_lathe_facing @defaults .stock {"h":10,"ox":-60,"oy":0,"w":63}
+user_lathe_facing @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_facing @offdefaults .handles <1 entries>
+user_lathe_facing @offdefaults .handles[0] {"axis":"x","emits":true,"id":"faceLine","kind":"size","label":"face","value":10,"x":10,"y":10}
+user_lathe_facing @offdefaults .items <3 entries>
+user_lathe_facing @offdefaults .items[0] {"kind":"line","x1":-60,"x2":10,"y1":0,"y2":0}
+user_lathe_facing @offdefaults .items[1] {"cls":"fc-feature-pocket","h":10,"kind":"rect","w":10,"x":0,"y":0}
+user_lathe_facing @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_facing @offdefaults .onDrag "<fn/2>"
+user_lathe_facing @offdefaults .onEdit "<fn/2>"
+user_lathe_facing @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":70}
+user_lathe_odprobe @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_odprobe @defaults .handles <1 entries>
+user_lathe_odprobe @defaults .handles[0] {"axis":"y","emits":true,"id":"probeOD","kind":"size","label":"measured Ø","value":20,"x":-9.15,"y":10}
+user_lathe_odprobe @defaults .items <5 entries>
+user_lathe_odprobe @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_odprobe @defaults .items[1] {"kind":"line","x1":-60,"x2":1,"y1":10,"y2":10}
+user_lathe_odprobe @defaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_odprobe @defaults .items[3] {"cls":"fc-probe-touch","cx":-9.15,"cy":12,"kind":"circle","r":2}
+user_lathe_odprobe @defaults .items[4] {"cls":"fc-probe-approach","kind":"line","x1":-9.15,"x2":-9.15,"y1":20,"y2":12}
+user_lathe_odprobe @defaults .onDrag "<fn/2>"
+user_lathe_odprobe @defaults .onEdit "<fn/2>"
+user_lathe_odprobe @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_odprobe @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_odprobe @offdefaults .handles <1 entries>
+user_lathe_odprobe @offdefaults .handles[0] {"axis":"y","emits":true,"id":"probeOD","kind":"size","label":"measured Ø","value":27,"x":-9.15,"y":13.5}
+user_lathe_odprobe @offdefaults .items <5 entries>
+user_lathe_odprobe @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_odprobe @offdefaults .items[1] {"kind":"line","x1":-60,"x2":1,"y1":13.5,"y2":13.5}
+user_lathe_odprobe @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":13.5}
+user_lathe_odprobe @offdefaults .items[3] {"cls":"fc-probe-touch","cx":-9.15,"cy":22.5,"kind":"circle","r":9}
+user_lathe_odprobe @offdefaults .items[4] {"cls":"fc-probe-approach","kind":"line","x1":-9.15,"x2":-9.15,"y1":58.5,"y2":22.5}
+user_lathe_odprobe @offdefaults .onDrag "<fn/2>"
+user_lathe_odprobe @offdefaults .onEdit "<fn/2>"
+user_lathe_odprobe @offdefaults .stock {"h":13.5,"ox":-60,"oy":0,"w":61}
+user_lathe_odturn @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_odturn @defaults .handles <1 entries>
+user_lathe_odturn @defaults .handles[0] {"emits":true,"id":"shoulder","kind":"size","label":"shoulder","value":14,"x":-25,"y":7}
+user_lathe_odturn @defaults .items <5 entries>
+user_lathe_odturn @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_odturn @defaults .items[1] {"cls":"fc-feature-pocket","h":3,"kind":"rect","w":25,"x":-25,"y":7}
+user_lathe_odturn @defaults .items[2] {"kind":"line","x1":0,"x2":-25,"y1":7,"y2":7}
+user_lathe_odturn @defaults .items[3] {"kind":"line","x1":-25,"x2":-25,"y1":7,"y2":10}
+user_lathe_odturn @defaults .items[4] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_odturn @defaults .onDrag "<fn/2>"
+user_lathe_odturn @defaults .onEdit "<fn/2>"
+user_lathe_odturn @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_odturn @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_odturn @offdefaults .handles <2 entries>
+user_lathe_odturn @offdefaults .handles[0] {"emits":true,"id":"shoulder","kind":"size","label":"far end","value":"<NaN>","x":-32,"y":10.5}
+user_lathe_odturn @offdefaults .handles[1] {"axis":"y","emits":true,"id":"faceDia","kind":"size","label":"face Ø","value":21,"x":0,"y":10.5}
+user_lathe_odturn @offdefaults .items <5 entries>
+user_lathe_odturn @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_odturn @offdefaults .items[1] {"cls":"fc-feature-pocket","h":0,"kind":"rect","w":32,"x":-32,"y":10.5}
+user_lathe_odturn @offdefaults .items[2] {"kind":"line","x1":0,"x2":-32,"y1":10.5,"y2":10.5}
+user_lathe_odturn @offdefaults .items[3] {"kind":"line","x1":-32,"x2":-32,"y1":10.5,"y2":10}
+user_lathe_odturn @offdefaults .items[4] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_odturn @offdefaults .onDrag "<fn/2>"
+user_lathe_odturn @offdefaults .onEdit "<fn/2>"
+user_lathe_odturn @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_parting @defaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_parting @defaults .handles <3 entries>
+user_lathe_parting @defaults .handles[0] {"axis":"x","emits":true,"id":"partPos","kind":"size","label":"face","value":-10,"x":-10,"y":10}
+user_lathe_parting @defaults .handles[1] {"axis":"x","emits":true,"id":"partWidth","kind":"size","label":"blade","value":3,"x":-13,"y":10}
+user_lathe_parting @defaults .handles[2] {"axis":"y","emits":true,"id":"partFloor","kind":"size","label":"stop Ø","value":12,"x":-13,"y":6}
+user_lathe_parting @defaults .items <3 entries>
+user_lathe_parting @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_parting @defaults .items[1] {"cls":"fc-feature-pocket","h":4,"kind":"rect","w":3,"x":-13,"y":6}
+user_lathe_parting @defaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_parting @defaults .onDrag "<fn/2>"
+user_lathe_parting @defaults .onEdit "<fn/2>"
+user_lathe_parting @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_parting @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_parting @offdefaults .handles <2 entries>
+user_lathe_parting @offdefaults .handles[0] {"axis":"x","emits":true,"id":"partPos","kind":"size","label":"face","value":-3,"x":-3,"y":10}
+user_lathe_parting @offdefaults .handles[1] {"axis":"x","emits":true,"id":"partWidth","kind":"size","label":"blade","value":10,"x":-13,"y":10}
+user_lathe_parting @offdefaults .items <3 entries>
+user_lathe_parting @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_parting @offdefaults .items[1] {"cls":"fc-feature-pocket","h":10,"kind":"rect","w":10,"x":-13,"y":0}
+user_lathe_parting @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_parting @offdefaults .onDrag "<fn/2>"
+user_lathe_parting @offdefaults .onEdit "<fn/2>"
+user_lathe_parting @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_polygon @defaults .panel {"keys":["handles","items","onDrag","onEdit","paths","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_polygon @defaults .handles <2 entries>
+user_lathe_polygon @defaults .handles[0] {"axis":"x","emits":true,"id":"polyDepth","kind":"size","label":"extent","value":20,"x":-20,"y":8.5}
+user_lathe_polygon @defaults .handles[1] {"axis":"y","emits":true,"id":"polyFlats","kind":"size","label":"across flats","value":17,"x":17,"y":18.5}
+user_lathe_polygon @defaults .items <5 entries>
+user_lathe_polygon @defaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_polygon @defaults .items[1] {"cls":"fc-feature-pocket","h":1.5,"kind":"rect","w":20,"x":-20,"y":8.5}
+user_lathe_polygon @defaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_polygon @defaults .items[3] {"cx":17,"cy":10,"kind":"circle","r":10}
+user_lathe_polygon @defaults .items[4] {"cx":17,"cy":10,"kind":"circle","r":0.3}
+user_lathe_polygon @defaults .onDrag "<fn/2>"
+user_lathe_polygon @defaults .onEdit "<fn/2>"
+user_lathe_polygon @defaults .paths <1 entries>
+user_lathe_polygon @defaults .paths[0] {"cls":"fc-path","pts":[{"x":26.815,"y":10},{"x":26.3433,"y":10.8174},{"x":25.9086,"y":11.5708},{"x":25.5001,"y":12.2776},{"x":25.1105,"y":12.952},{"x":24.7326,"y":13.6058},{"x":24.3612,"y":14.25},{"x":23.989,"y":14.8938},{"x":23.6117,"y":15.5479},{"x":23.2225,"y":16.2225},{"x":22.8147,"y":16.9296},{"x":22.3796,"y":17.6828},{"x":21.9075,"y":18.5},{"x":20.9637,"y":18.5003},{"x":20.0939,"y":18.5005},{"x":19.2776,"y":18.5001},{"x":18.4988,"y":18.4999},{"x":17.7436,"y":18.4995},{"x":17,"y":18.5},{"x":16.2564,"y":18.4995},{"x":15.5012,"y":18.4999},{"x":14.7224,"y":18.5001},{"x":13.9061,"y":18.5005},{"x":13.0363,"y":18.5003},{"x":12.0925,"y":18.5},{"x":11.6204,"y":17.6828},{"x":11.1853,"y":16.9296},{"x":10.7775,"y":16.2225},{"x":10.3883,"y":15.5479},{"x":10.011,"y":14.8938},{"x":9.6388,"y":14.25},{"x":9.2674,"y":13.6058},{"x":8.8895,"y":12.952},{"x":8.4999,"y":12.2776},{"x":8.0914,"y":11.5708},{"x":7.6567,"y":10.8174},{"x":7.185,"y":10},{"x":7.6567,"y":9.1826},{"x":8.0914,"y":8.4292},{"x":8.4999,"y":7.7224},{"x":8.8895,"y":7.048},{"x":9.2674,"y":6.3942},{"x":9.6388,"y":5.75},{"x":10.011,"y":5.1062},{"x":10.3883,"y":4.4521},{"x":10.7775,"y":3.7775},{"x":11.1853,"y":3.0704},{"x":11.6204,"y":2.3172},{"x":12.0925,"y":1.5},{"x":13.0363,"y":1.4997},{"x":13.9061,"y":1.4995},{"x":14.7224,"y":1.4999},{"x":15.5012,"y":1.5001},{"x":16.2564,"y":1.5005},{"x":17,"y":1.5},{"x":17.7436,"y":1.5005},{"x":18.4988,"y":1.5001},{"x":19.2776,"y":1.4999},{"x":20.0939,"y":1.4995},{"x":20.9637,"y":1.4997},{"x":21.9075,"y":1.5},{"x":22.3796,"y":2.3172},{"x":22.8147,"y":3.0704},{"x":23.2225,"y":3.7775},{"x":23.6117,"y":4.4521},{"x":23.989,"y":5.1062},{"x":24.3612,"y":5.75},{"x":24.7326,"y":6.3942},{"x":25.1105,"y":7.048},{"x":25.5001,"y":7.7224},{"x":25.9086,"y":8.4292},{"x":26.3433,"y":9.1826},{"x":26.815,"y":10}]}
+user_lathe_polygon @defaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_lathe_polygon @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","paths","stock"],"layout":{"kind":"lathe_profile"},"panel":"form3d+2d"}
+user_lathe_polygon @offdefaults .handles <2 entries>
+user_lathe_polygon @offdefaults .handles[0] {"axis":"x","emits":true,"id":"polyDepth","kind":"size","label":"extent","value":27,"x":-27,"y":12}
+user_lathe_polygon @offdefaults .handles[1] {"axis":"y","emits":true,"id":"polyFlats","kind":"size","label":"across flats","value":24,"x":17,"y":22}
+user_lathe_polygon @offdefaults .items <5 entries>
+user_lathe_polygon @offdefaults .items[0] {"kind":"line","x1":-60,"x2":1,"y1":0,"y2":0}
+user_lathe_polygon @offdefaults .items[1] {"cls":"fc-feature-pocket","h":0,"kind":"rect","w":27,"x":-27,"y":12}
+user_lathe_polygon @offdefaults .items[2] {"kind":"line","x1":0,"x2":0,"y1":0,"y2":10}
+user_lathe_polygon @offdefaults .items[3] {"cx":17,"cy":10,"kind":"circle","r":10}
+user_lathe_polygon @offdefaults .items[4] {"cx":17,"cy":10,"kind":"circle","r":0.3}
+user_lathe_polygon @offdefaults .onDrag "<fn/2>"
+user_lathe_polygon @offdefaults .onEdit "<fn/2>"
+user_lathe_polygon @offdefaults .paths <1 entries>
+user_lathe_polygon @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":33.971,"y":10},{"x":32.7324,"y":11.2382},{"x":31.6504,"y":12.3204},{"x":30.6851,"y":13.2855},{"x":29.8088,"y":14.1618},{"x":29.0003,"y":14.9707},{"x":28.2427,"y":15.7285},{"x":27.5224,"y":16.4482},{"x":26.8296,"y":17.1416},{"x":26.153,"y":17.8174},{"x":25.4853,"y":18.4853},{"x":24.8174,"y":19.153},{"x":24.1416,"y":19.8296},{"x":23.4482,"y":20.5224},{"x":22.7285,"y":21.2427},{"x":21.9707,"y":22.0003},{"x":21.1618,"y":22.8088},{"x":20.2855,"y":23.6851},{"x":19.3204,"y":24.6504},{"x":18.2382,"y":25.7324},{"x":17,"y":26.971},{"x":15.7618,"y":25.7324},{"x":14.6796,"y":24.6504},{"x":13.7145,"y":23.6851},{"x":12.8382,"y":22.8088},{"x":12.0293,"y":22.0003},{"x":11.2715,"y":21.2427},{"x":10.5518,"y":20.5224},{"x":9.8584,"y":19.8296},{"x":9.1826,"y":19.153},{"x":8.5147,"y":18.4853},{"x":7.847,"y":17.8174},{"x":7.1704,"y":17.1416},{"x":6.4776,"y":16.4482},{"x":5.7573,"y":15.7285},{"x":4.9997,"y":14.9707},{"x":4.1912,"y":14.1618},{"x":3.3149,"y":13.2855},{"x":2.3496,"y":12.3204},{"x":1.2676,"y":11.2382},{"x":0.029,"y":10},{"x":1.2676,"y":8.7618},{"x":2.3496,"y":7.6796},{"x":3.3149,"y":6.7145},{"x":4.1912,"y":5.8382},{"x":4.9997,"y":5.0293},{"x":5.7573,"y":4.2715},{"x":6.4776,"y":3.5518},{"x":7.1704,"y":2.8584},{"x":7.847,"y":2.1826},{"x":8.5147,"y":1.5147},{"x":9.1826,"y":0.847},{"x":9.8584,"y":0.1704},{"x":10.5518,"y":-0.5224},{"x":11.2715,"y":-1.2427},{"x":12.0293,"y":-2.0003},{"x":12.8382,"y":-2.8088},{"x":13.7145,"y":-3.6851},{"x":14.6796,"y":-4.6504},{"x":15.7618,"y":-5.7324},{"x":17,"y":-6.971},{"x":18.2382,"y":-5.7324},{"x":19.3204,"y":-4.6504},{"x":20.2855,"y":-3.6851},{"x":21.1618,"y":-2.8088},{"x":21.9707,"y":-2.0003},{"x":22.7285,"y":-1.2427},{"x":23.4482,"y":-0.5224},{"x":24.1416,"y":0.1704},{"x":24.8174,"y":0.847},{"x":25.4853,"y":1.5147},{"x":26.153,"y":2.1826},{"x":26.8296,"y":2.8584},{"x":27.5224,"y":3.5518},{"x":28.2427,"y":4.2715},{"x":29.0003,"y":5.0293},{"x":29.8088,"y":5.8382},{"x":30.6851,"y":6.7145},{"x":31.6504,"y":7.6796},{"x":32.7324,"y":8.7618},{"x":33.971,"y":10}]}
+user_lathe_polygon @offdefaults .stock {"h":10,"ox":-60,"oy":0,"w":61}
+user_middle_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_middle_data @defaults .handles <0 entries>
+user_middle_data @defaults .items <0 entries>
+user_middle_data @defaults .onDrag "<fn/2>"
+user_middle_data @defaults .onEdit "<fn/2>"
+user_middle_data @defaults .origin {"x":0,"y":0}
+user_middle_data @defaults .paths null
+user_middle_data @defaults .placement {"x":300,"y":200}
+user_middle_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_middle_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_middle_data @offdefaults .handles <0 entries>
+user_middle_data @offdefaults .items <0 entries>
+user_middle_data @offdefaults .onDrag "<fn/2>"
+user_middle_data @offdefaults .onEdit "<fn/2>"
+user_middle_data @offdefaults .origin {"x":0,"y":0}
+user_middle_data @offdefaults .paths null
+user_middle_data @offdefaults .placement {"x":300,"y":200}
+user_middle_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_pause_confirm @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_pause_confirm @defaults .handles <0 entries>
+user_pause_confirm @defaults .items <0 entries>
+user_pause_confirm @defaults .onDrag "<fn/2>"
+user_pause_confirm @defaults .onEdit "<fn/2>"
+user_pause_confirm @defaults .origin {"x":0,"y":0}
+user_pause_confirm @defaults .paths null
+user_pause_confirm @defaults .placement {"x":300,"y":200}
+user_pause_confirm @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_pause_confirm @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_pause_confirm @offdefaults .handles <0 entries>
+user_pause_confirm @offdefaults .items <0 entries>
+user_pause_confirm @offdefaults .onDrag "<fn/2>"
+user_pause_confirm @offdefaults .onEdit "<fn/2>"
+user_pause_confirm @offdefaults .origin {"x":0,"y":0}
+user_pause_confirm @offdefaults .paths null
+user_pause_confirm @offdefaults .placement {"x":300,"y":200}
+user_pause_confirm @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_pocket_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_pocket_data @defaults .handles <2 entries>
+user_pocket_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_pocket_data @defaults .handles[1] {"color":"<undefined>","displayVals":[80,60],"emits":"<undefined>","id":"pk_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":80,"y":60}
+user_pocket_data @defaults .items <0 entries>
+user_pocket_data @defaults .onDrag "<fn/2>"
+user_pocket_data @defaults .onEdit "<fn/2>"
+user_pocket_data @defaults .origin {"x":0,"y":0}
+user_pocket_data @defaults .paths <13 entries>
+user_pocket_data @defaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":80,"y":0},{"x":80,"y":60},{"x":0,"y":60},{"x":0,"y":0}]}
+user_pocket_data @defaults .paths[1] {"cls":"fc-guide","pts":[{"x":3,"y":3},{"x":77,"y":3},{"x":77,"y":57},{"x":3,"y":57},{"x":3,"y":3}]}
+user_pocket_data @defaults .paths[2] {"cls":"fc-guide","pts":[{"x":5.4,"y":5.4},{"x":74.6,"y":5.4},{"x":74.6,"y":54.6},{"x":5.4,"y":54.6},{"x":5.4,"y":5.4}]}
+user_pocket_data @defaults .paths[3] {"cls":"fc-guide","pts":[{"x":7.8,"y":7.8},{"x":72.2,"y":7.8},{"x":72.2,"y":52.2},{"x":7.8,"y":52.2},{"x":7.8,"y":7.8}]}
+user_pocket_data @defaults .paths[4] {"cls":"fc-guide","pts":[{"x":10.2,"y":10.2},{"x":69.8,"y":10.2},{"x":69.8,"y":49.8},{"x":10.2,"y":49.8},{"x":10.2,"y":10.2}]}
+user_pocket_data @defaults .paths[5] {"cls":"fc-guide","pts":[{"x":12.6,"y":12.6},{"x":67.4,"y":12.6},{"x":67.4,"y":47.4},{"x":12.6,"y":47.4},{"x":12.6,"y":12.6}]}
+user_pocket_data @defaults .paths[6] {"cls":"fc-guide","pts":[{"x":15,"y":15},{"x":65,"y":15},{"x":65,"y":45},{"x":15,"y":45},{"x":15,"y":15}]}
+user_pocket_data @defaults .paths[7] {"cls":"fc-guide","pts":[{"x":17.4,"y":17.4},{"x":62.6,"y":17.4},{"x":62.6,"y":42.6},{"x":17.4,"y":42.6},{"x":17.4,"y":17.4}]}
+user_pocket_data @defaults .paths[8] {"cls":"fc-guide","pts":[{"x":19.8,"y":19.8},{"x":60.2,"y":19.8},{"x":60.2,"y":40.2},{"x":19.8,"y":40.2},{"x":19.8,"y":19.8}]}
+user_pocket_data @defaults .paths[9] {"cls":"fc-guide","pts":[{"x":22.2,"y":22.2},{"x":57.8,"y":22.2},{"x":57.8,"y":37.8},{"x":22.2,"y":37.8},{"x":22.2,"y":22.2}]}
+user_pocket_data @defaults .paths[10] {"cls":"fc-guide","pts":[{"x":24.6,"y":24.6},{"x":55.4,"y":24.6},{"x":55.4,"y":35.4},{"x":24.6,"y":35.4},{"x":24.6,"y":24.6}]}
+user_pocket_data @defaults .paths[11] {"cls":"fc-guide","pts":[{"x":27,"y":27},{"x":53,"y":27},{"x":53,"y":33},{"x":27,"y":33},{"x":27,"y":27}]}
+user_pocket_data @defaults .paths[12] {"cls":"fc-guide","pts":[{"x":29.4,"y":29.4},{"x":50.6,"y":29.4},{"x":50.6,"y":30.6},{"x":29.4,"y":30.6},{"x":29.4,"y":29.4}]}
+user_pocket_data @defaults .placement {"x":300,"y":200}
+user_pocket_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_pocket_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_pocket_data @offdefaults .handles <2 entries>
+user_pocket_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"pk_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":32,"y":35.5}
+user_pocket_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"pk_size","kind":"size","label":"Ø","noSnap":"<undefined>","value":"<undefined>","x":60.5,"y":35.5}
+user_pocket_data @offdefaults .items <0 entries>
+user_pocket_data @offdefaults .onDrag "<fn/2>"
+user_pocket_data @offdefaults .onEdit "<fn/2>"
+user_pocket_data @offdefaults .origin {"x":0,"y":0}
+user_pocket_data @offdefaults .paths <1 entries>
+user_pocket_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":60.5,"y":35.5},{"x":60.2562,"y":39.22},{"x":59.5289,"y":42.8763},{"x":58.3306,"y":46.4065},{"x":56.6817,"y":49.75},{"x":54.6106,"y":52.8497},{"x":52.1525,"y":55.6525},{"x":49.3497,"y":58.1106},{"x":46.25,"y":60.1817},{"x":42.9065,"y":61.8306},{"x":39.3763,"y":63.0289},{"x":35.72,"y":63.7562},{"x":32,"y":64},{"x":28.28,"y":63.7562},{"x":24.6237,"y":63.0289},{"x":21.0935,"y":61.8306},{"x":17.75,"y":60.1817},{"x":14.6503,"y":58.1106},{"x":11.8475,"y":55.6525},{"x":9.3894,"y":52.8497},{"x":7.3183,"y":49.75},{"x":5.6694,"y":46.4065},{"x":4.4711,"y":42.8763},{"x":3.7438,"y":39.22},{"x":3.5,"y":35.5},{"x":3.7438,"y":31.78},{"x":4.4711,"y":28.1237},{"x":5.6694,"y":24.5935},{"x":7.3183,"y":21.25},{"x":9.3894,"y":18.1503},{"x":11.8475,"y":15.3475},{"x":14.6503,"y":12.8894},{"x":17.75,"y":10.8183},{"x":21.0935,"y":9.1694},{"x":24.6237,"y":7.9711},{"x":28.28,"y":7.2438},{"x":32,"y":7},{"x":35.72,"y":7.2438},{"x":39.3763,"y":7.9711},{"x":42.9065,"y":9.1694},{"x":46.25,"y":10.8183},{"x":49.3497,"y":12.8894},{"x":52.1525,"y":15.3475},{"x":54.6106,"y":18.1503},{"x":56.6817,"y":21.25},{"x":58.3306,"y":24.5935},{"x":59.5289,"y":28.1237},{"x":60.2562,"y":31.78},{"x":60.5,"y":35.5}]}
+user_pocket_data @offdefaults .placement {"x":300,"y":200}
+user_pocket_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_rotary_center_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_center_data @defaults .handles <0 entries>
+user_rotary_center_data @defaults .items <2 entries>
+user_rotary_center_data @defaults .items[0] {"cls":"fc-rotary-axis","kind":"line","x1":0,"x2":200,"y1":75,"y2":75}
+user_rotary_center_data @defaults .items[1] {"cls":"fc-rotary-datum","cx":100,"cy":75,"kind":"circle","r":3}
+user_rotary_center_data @defaults .onDrag "<fn/2>"
+user_rotary_center_data @defaults .onEdit "<fn/2>"
+user_rotary_center_data @defaults .origin {"x":0,"y":0}
+user_rotary_center_data @defaults .paths null
+user_rotary_center_data @defaults .placement {"x":300,"y":200}
+user_rotary_center_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_rotary_center_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_center_data @offdefaults .handles <0 entries>
+user_rotary_center_data @offdefaults .items <2 entries>
+user_rotary_center_data @offdefaults .items[0] {"cls":"fc-rotary-axis","kind":"line","x1":0,"x2":200,"y1":75,"y2":75}
+user_rotary_center_data @offdefaults .items[1] {"cls":"fc-rotary-datum","cx":100,"cy":75,"kind":"circle","r":3}
+user_rotary_center_data @offdefaults .onDrag "<fn/2>"
+user_rotary_center_data @offdefaults .onEdit "<fn/2>"
+user_rotary_center_data @offdefaults .origin {"x":0,"y":0}
+user_rotary_center_data @offdefaults .paths null
+user_rotary_center_data @offdefaults .placement {"x":300,"y":200}
+user_rotary_center_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_rotary_clock_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_clock_data @defaults .handles <0 entries>
+user_rotary_clock_data @defaults .items <3 entries>
+user_rotary_clock_data @defaults .items[0] {"cls":"fc-rotary-span","kind":"line","x1":100,"x2":100,"y1":65,"y2":85}
+user_rotary_clock_data @defaults .items[1] {"cls":"fc-rotary-touch","cx":100,"cy":65,"kind":"circle","r":3}
+user_rotary_clock_data @defaults .items[2] {"cls":"fc-rotary-touch","cx":100,"cy":85,"kind":"circle","r":3}
+user_rotary_clock_data @defaults .onDrag "<fn/2>"
+user_rotary_clock_data @defaults .onEdit "<fn/2>"
+user_rotary_clock_data @defaults .origin {"x":0,"y":0}
+user_rotary_clock_data @defaults .paths null
+user_rotary_clock_data @defaults .placement {"x":300,"y":200}
+user_rotary_clock_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_rotary_clock_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_rotary_clock_data @offdefaults .handles <0 entries>
+user_rotary_clock_data @offdefaults .items <3 entries>
+user_rotary_clock_data @offdefaults .items[0] {"cls":"fc-rotary-span","kind":"line","x1":100,"x2":100,"y1":61.5,"y2":88.5}
+user_rotary_clock_data @offdefaults .items[1] {"cls":"fc-rotary-touch","cx":100,"cy":61.5,"kind":"circle","r":3}
+user_rotary_clock_data @offdefaults .items[2] {"cls":"fc-rotary-touch","cx":100,"cy":88.5,"kind":"circle","r":3}
+user_rotary_clock_data @offdefaults .onDrag "<fn/2>"
+user_rotary_clock_data @offdefaults .onEdit "<fn/2>"
+user_rotary_clock_data @offdefaults .origin {"x":0,"y":0}
+user_rotary_clock_data @offdefaults .paths null
+user_rotary_clock_data @offdefaults .placement {"x":300,"y":200}
+user_rotary_clock_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_slot_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_slot_data @defaults .handles <4 entries>
+user_slot_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","noSnap":"<undefined>","x":30,"y":0}
+user_slot_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","noSnap":"<undefined>","x":0,"y":0}
+user_slot_data @defaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","noSnap":"<undefined>","x":60,"y":0}
+user_slot_data @defaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","noSnap":"<undefined>","value":"<undefined>","x":30,"y":3}
+user_slot_data @defaults .items <0 entries>
+user_slot_data @defaults .onDrag "<fn/2>"
+user_slot_data @defaults .onEdit "<fn/2>"
+user_slot_data @defaults .origin {"x":0,"y":0}
+user_slot_data @defaults .paths <3 entries>
+user_slot_data @defaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":60,"y":0}]}
+user_slot_data @defaults .paths[1] {"cls":"fc-guide","pts":[{"x":0,"y":3},{"x":60,"y":3}]}
+user_slot_data @defaults .paths[2] {"cls":"fc-guide","pts":[{"x":0,"y":-3},{"x":60,"y":-3}]}
+user_slot_data @defaults .placement {"x":300,"y":200}
+user_slot_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_slot_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_slot_data @offdefaults .handles <4 entries>
+user_slot_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sl_anchor","kind":"move","label":"✛","noSnap":"<undefined>","x":33.5,"y":13.5}
+user_slot_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"sl_a","kind":"move","label":"A","labelDir":"<undefined>","noSnap":"<undefined>","x":3.5,"y":13.5}
+user_slot_data @offdefaults .handles[2] {"color":"<undefined>","emits":"<undefined>","id":"sl_b","kind":"move","label":"B","labelDir":"<undefined>","noSnap":"<undefined>","x":63.5,"y":13.5}
+user_slot_data @offdefaults .handles[3] {"color":"<undefined>","emits":"<undefined>","id":"sl_w","kind":"size","label":"width","noSnap":"<undefined>","value":"<undefined>","x":33.5,"y":20}
+user_slot_data @offdefaults .items <0 entries>
+user_slot_data @offdefaults .onDrag "<fn/2>"
+user_slot_data @offdefaults .onEdit "<fn/2>"
+user_slot_data @offdefaults .origin {"x":0,"y":0}
+user_slot_data @offdefaults .paths <3 entries>
+user_slot_data @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":3.5,"y":13.5},{"x":63.5,"y":13.5}]}
+user_slot_data @offdefaults .paths[1] {"cls":"fc-guide","pts":[{"x":3.5,"y":20},{"x":63.5,"y":20}]}
+user_slot_data @offdefaults .paths[2] {"cls":"fc-guide","pts":[{"x":3.5,"y":7},{"x":63.5,"y":7}]}
+user_slot_data @offdefaults .placement {"x":300,"y":200}
+user_slot_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_surfacing_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_surfacing_data @defaults .handles <2 entries>
+user_surfacing_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":false,"x":0,"y":0}
+user_surfacing_data @defaults .handles[1] {"color":"<undefined>","displayVals":[100,80],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":100,"y":80}
+user_surfacing_data @defaults .items <0 entries>
+user_surfacing_data @defaults .onDrag "<fn/2>"
+user_surfacing_data @defaults .onEdit "<fn/2>"
+user_surfacing_data @defaults .origin {"x":0,"y":0}
+user_surfacing_data @defaults .paths <1 entries>
+user_surfacing_data @defaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":100,"y":0},{"x":100,"y":80},{"x":0,"y":80},{"x":0,"y":0}]}
+user_surfacing_data @defaults .placement {"x":300,"y":200}
+user_surfacing_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_surfacing_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_surfacing_data @offdefaults .handles <2 entries>
+user_surfacing_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"sf_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":true,"x":0,"y":0}
+user_surfacing_data @offdefaults .handles[1] {"color":"<undefined>","displayVals":[107,87],"emits":"<undefined>","id":"sf_size","kind":"size","label":"W×H","labelDir":{"lx":1,"ly":-1},"noSnap":"<undefined>","value":"<undefined>","x":114,"y":94}
+user_surfacing_data @offdefaults .items <0 entries>
+user_surfacing_data @offdefaults .onDrag "<fn/2>"
+user_surfacing_data @offdefaults .onEdit "<fn/2>"
+user_surfacing_data @offdefaults .origin {"x":0,"y":0}
+user_surfacing_data @offdefaults .paths <1 entries>
+user_surfacing_data @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":0},{"x":107,"y":0},{"x":107,"y":87},{"x":0,"y":87},{"x":0,"y":0}]}
+user_surfacing_data @offdefaults .placement {"x":300,"y":200}
+user_surfacing_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_tap_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_tap_data @defaults .handles <1 entries>
+user_tap_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_tap_data @defaults .items <0 entries>
+user_tap_data @defaults .onDrag "<fn/2>"
+user_tap_data @defaults .onEdit "<fn/2>"
+user_tap_data @defaults .origin {"x":0,"y":0}
+user_tap_data @defaults .paths <1 entries>
+user_tap_data @defaults .paths[0] {"cls":"fc-guide","pts":[{"x":3,"y":0},{"x":2.7716,"y":1.1481},{"x":2.1213,"y":2.1213},{"x":1.1481,"y":2.7716},{"x":0,"y":3},{"x":-1.1481,"y":2.7716},{"x":-2.1213,"y":2.1213},{"x":-2.7716,"y":1.1481},{"x":-3,"y":0},{"x":-2.7716,"y":-1.1481},{"x":-2.1213,"y":-2.1213},{"x":-1.1481,"y":-2.7716},{"x":0,"y":-3},{"x":1.1481,"y":-2.7716},{"x":2.1213,"y":-2.1213},{"x":2.7716,"y":-1.1481},{"x":3,"y":0}]}
+user_tap_data @defaults .placement {"x":300,"y":200}
+user_tap_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_tap_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_tap_data @offdefaults .handles <1 entries>
+user_tap_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"tap_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":3.5,"y":7}
+user_tap_data @offdefaults .items <0 entries>
+user_tap_data @offdefaults .onDrag "<fn/2>"
+user_tap_data @offdefaults .onEdit "<fn/2>"
+user_tap_data @offdefaults .origin {"x":0,"y":0}
+user_tap_data @offdefaults .paths <1 entries>
+user_tap_data @offdefaults .paths[0] {"cls":"fc-guide","pts":[{"x":27.5,"y":7},{"x":25.6731,"y":16.1844},{"x":20.4706,"y":23.9706},{"x":12.6844,"y":29.1731},{"x":3.5,"y":31},{"x":-5.6844,"y":29.1731},{"x":-13.4706,"y":23.9706},{"x":-18.6731,"y":16.1844},{"x":-20.5,"y":7},{"x":-18.6731,"y":-2.1844},{"x":-13.4706,"y":-9.9706},{"x":-5.6844,"y":-15.1731},{"x":3.5,"y":-17},{"x":12.6844,"y":-15.1731},{"x":20.4706,"y":-9.9706},{"x":25.6731,"y":-2.1844},{"x":27.5,"y":7}]}
+user_tap_data @offdefaults .placement {"x":300,"y":200}
+user_tap_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_text_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_text_data @defaults .handles <2 entries>
+user_text_data @defaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":0,"y":0}
+user_text_data @defaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","noSnap":"<undefined>","value":"<undefined>","x":42.5143,"y":0}
+user_text_data @defaults .items <0 entries>
+user_text_data @defaults .onDrag "<fn/2>"
+user_text_data @defaults .onEdit "<fn/2>"
+user_text_data @defaults .origin {"x":0,"y":0}
+user_text_data @defaults .paths <8 entries>
+user_text_data @defaults .paths[0] {"cls":"fc-path","pts":[{"x":0,"y":12},{"x":8.9143,"y":12}]}
+user_text_data @defaults .paths[1] {"cls":"fc-path","pts":[{"x":4.4571,"y":12},{"x":4.4571,"y":0}]}
+user_text_data @defaults .paths[2] {"cls":"fc-path","pts":[{"x":19.3714,"y":12},{"x":10.8,"y":12},{"x":10.8,"y":0},{"x":19.3714,"y":0}]}
+user_text_data @defaults .paths[3] {"cls":"fc-path","pts":[{"x":10.8,"y":6},{"x":17.3143,"y":6}]}
+user_text_data @defaults .paths[4] {"cls":"fc-path","pts":[{"x":21.4286,"y":0},{"x":30,"y":12}]}
+user_text_data @defaults .paths[5] {"cls":"fc-path","pts":[{"x":21.4286,"y":12},{"x":30,"y":0}]}
+user_text_data @defaults .paths[6] {"cls":"fc-path","pts":[{"x":32.9143,"y":12},{"x":41.8286,"y":12}]}
+user_text_data @defaults .paths[7] {"cls":"fc-path","pts":[{"x":37.3714,"y":12},{"x":37.3714,"y":0}]}
+user_text_data @defaults .placement {"x":300,"y":200}
+user_text_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_text_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form3d+2d"}
+user_text_data @offdefaults .handles <2 entries>
+user_text_data @offdefaults .handles[0] {"color":"<undefined>","emits":"<undefined>","id":"txt_pos","kind":"move","label":"pos","labelDir":{"lx":-1,"ly":1},"noSnap":"<undefined>","x":1489.4621,"y":186.4224}
+user_text_data @offdefaults .handles[1] {"color":"<undefined>","emits":"<undefined>","id":"txt_rot","kind":"size","label":"↻","noSnap":"<undefined>","value":"<undefined>","x":4452.6094,"y":550.2511}
+user_text_data @offdefaults .items <0 entries>
+user_text_data @offdefaults .onDrag "<fn/2>"
+user_text_data @offdefaults .onEdit "<fn/2>"
+user_text_data @offdefaults .origin {"x":0,"y":0}
+user_text_data @offdefaults .paths <35 entries>
+user_text_data @offdefaults .paths[0] {"cls":"fc-path","pts":[{"x":7.8884,"y":23.6507},{"x":119.9611,"y":37.4115}]}
+user_text_data @offdefaults .paths[1] {"cls":"fc-path","pts":[{"x":63.9247,"y":30.5311},{"x":63.9247,"y":11.3884}]}
+user_text_data @offdefaults .paths[2] {"cls":"fc-path","pts":[{"x":244.4831,"y":52.7009},{"x":136.7209,"y":39.4694},{"x":136.7209,"y":20.3267},{"x":244.4831,"y":33.5582}]}
+user_text_data @offdefaults .paths[3] {"cls":"fc-path","pts":[{"x":136.7209,"y":29.898},{"x":218.6202,"y":39.954}]}
+user_text_data @offdefaults .paths[4] {"cls":"fc-path","pts":[{"x":263.3982,"y":35.8807},{"x":371.1603,"y":68.2549}]}
+user_text_data @offdefaults .paths[5] {"cls":"fc-path","pts":[{"x":263.3982,"y":55.0234},{"x":371.1603,"y":49.1122}]}
+user_text_data @offdefaults .paths[6] {"cls":"fc-path","pts":[{"x":400.8516,"y":71.9005},{"x":512.9243,"y":85.6613}]}
+user_text_data @offdefaults .paths[7] {"cls":"fc-path","pts":[{"x":456.8879,"y":78.7809},{"x":456.8879,"y":59.6382}]}
+user_text_data @offdefaults .paths[8] {"cls":"fc-path","pts":[{"x":718.3813,"y":110.8883},{"x":830.454,"y":124.6491}]}
+user_text_data @offdefaults .paths[9] {"cls":"fc-path","pts":[{"x":774.4176,"y":117.7687},{"x":774.4176,"y":98.626}]}
+user_text_data @offdefaults .paths[10] {"cls":"fc-path","pts":[{"x":864.4558,"y":124.4485},{"x":898.9396,"y":133.0581},{"x":898.9396,"y":113.9154}]}
+user_text_data @offdefaults .paths[11] {"cls":"fc-path","pts":[{"x":860.1453,"y":109.152},{"x":937.734,"y":118.6787}]}
+user_text_data @offdefaults .paths[12] {"cls":"fc-path","pts":[{"x":1047.1693,"y":148.5237},{"x":1016.9959,"y":147.5535},{"x":982.512,"y":141.6787},{"x":958.8044,"y":133.2984},{"x":952.3386,"y":126.7617},{"x":969.5806,"y":124.2298},{"x":1004.0645,"y":126.8231},{"x":1034.2379,"y":132.1687},{"x":1049.3246,"y":137.8497},{"x":1034.2379,"y":139.8258},{"x":1001.9092,"y":137.2237},{"x":969.5806,"y":131.6134},{"x":956.6491,"y":127.2909}]}
+user_text_data @offdefaults .paths[13] {"cls":"fc-path","pts":[{"x":1141.5179,"y":162.8429},{"x":1169.5361,"y":164.9158},{"x":1176.0018,"y":162.4281},{"x":1141.5179,"y":154.6389},{"x":1107.034,"y":153.9599},{"x":1113.4998,"y":158.0354},{"x":1141.5179,"y":162.8429}]}
+user_text_data @offdefaults .paths[14] {"cls":"fc-path","pts":[{"x":1141.5179,"y":154.6389},{"x":1178.1571,"y":156.6764},{"x":1186.778,"y":153.3595},{"x":1141.5179,"y":143.7002},{"x":1096.2578,"y":142.245},{"x":1104.8788,"y":147.679},{"x":1141.5179,"y":154.6389}]}
+user_text_data @offdefaults .paths[15] {"cls":"fc-path","pts":[{"x":1278.9714,"y":179.7201},{"x":1306.9895,"y":181.7929},{"x":1313.4553,"y":179.3052},{"x":1278.9714,"y":171.5161},{"x":1244.4875,"y":170.8371},{"x":1250.9532,"y":174.9126},{"x":1278.9714,"y":179.7201}]}
+user_text_data @offdefaults .paths[16] {"cls":"fc-path","pts":[{"x":1278.9714,"y":171.5161},{"x":1315.6105,"y":173.5536},{"x":1324.2315,"y":170.2366},{"x":1278.9714,"y":160.5774},{"x":1233.7113,"y":159.1222},{"x":1242.3323,"y":164.5562},{"x":1278.9714,"y":171.5161}]}
+user_text_data @offdefaults .paths[17] {"cls":"fc-path","pts":[{"x":1515.0839,"y":208.7111},{"x":1549.5678,"y":211.0309},{"x":1571.1203,"y":209.0282},{"x":1571.1203,"y":203.012},{"x":1549.5678,"y":195.7167},{"x":1515.0839,"y":189.5684},{"x":1480.6001,"y":187.2486},{"x":1459.0476,"y":189.2512},{"x":1459.0476,"y":195.2675},{"x":1480.6001,"y":202.5627},{"x":1515.0839,"y":208.7111}]}
+user_text_data @offdefaults .paths[18] {"cls":"fc-path","pts":[{"x":1605.1221,"y":200.6237},{"x":1605.1221,"y":219.7664},{"x":1712.8842,"y":232.9979}]}
+user_text_data @offdefaults .paths[19] {"cls":"fc-path","pts":[{"x":1605.1221,"y":210.4685},{"x":1687.0213,"y":220.5244}]}
+user_text_data @offdefaults .paths[20] {"cls":"fc-path","pts":[{"x":1731.7993,"y":216.1777},{"x":1731.7993,"y":235.3204},{"x":1839.5615,"y":248.5519}]}
+user_text_data @offdefaults .paths[21] {"cls":"fc-path","pts":[{"x":1731.7993,"y":226.0225},{"x":1813.6985,"y":236.0784}]}
+user_text_data @offdefaults .paths[22] {"cls":"fc-path","pts":[{"x":1875.7185,"y":243.4201},{"x":1948.9968,"y":252.4175}]}
+user_text_data @offdefaults .paths[23] {"cls":"fc-path","pts":[{"x":1974.3776,"y":245.9625},{"x":1974.3776,"y":265.1052}]}
+user_text_data @offdefaults .paths[24] {"cls":"fc-path","pts":[{"x":1974.3776,"y":265.1052},{"x":2039.0349,"y":273.0441},{"x":2082.1397,"y":272.8674},{"x":2082.1397,"y":264.6634},{"x":2039.0349,"y":253.9015},{"x":1974.3776,"y":245.9625}]}
+user_text_data @offdefaults .paths[25] {"cls":"fc-path","pts":[{"x":2219.5932,"y":295.2139},{"x":2111.831,"y":281.9824},{"x":2111.831,"y":262.8397},{"x":2219.5932,"y":276.0712}]}
+user_text_data @offdefaults .paths[26] {"cls":"fc-path","pts":[{"x":2111.831,"y":272.411},{"x":2193.7303,"y":282.467}]}
+user_text_data @offdefaults .paths[27] {"cls":"fc-path","pts":[{"x":2238.5083,"y":278.3937},{"x":2238.5083,"y":297.5364},{"x":2346.2704,"y":310.7679}]}
+user_text_data @offdefaults .paths[28] {"cls":"fc-path","pts":[{"x":2238.5083,"y":288.2385},{"x":2320.4075,"y":298.2945}]}
+user_text_data @offdefaults .paths[29] {"cls":"fc-path","pts":[{"x":2365.1855,"y":293.9477},{"x":2419.0666,"y":319.7062},{"x":2472.9477,"y":307.1793}]}
+user_text_data @offdefaults .paths[30] {"cls":"fc-path","pts":[{"x":2386.738,"y":304.2511},{"x":2451.3953,"y":312.19}]}
+user_text_data @offdefaults .paths[31] {"cls":"fc-path","pts":[{"x":2502.639,"y":329.9676},{"x":2502.639,"y":316.2942},{"x":2537.1229,"y":315.059},{"x":2575.9173,"y":319.8223},{"x":2610.4012,"y":329.5258},{"x":2610.4012,"y":343.1991}]}
+user_text_data @offdefaults .paths[32] {"cls":"fc-path","pts":[{"x":2640.0925,"y":346.8447},{"x":2640.0925,"y":327.7021},{"x":2739.2336,"y":339.8751}]}
+user_text_data @offdefaults .paths[33] {"cls":"fc-path","pts":[{"x":2755.9935,"y":361.0756},{"x":2868.0661,"y":374.8364}]}
+user_text_data @offdefaults .paths[34] {"cls":"fc-path","pts":[{"x":2812.0298,"y":367.956},{"x":2812.0298,"y":348.8133}]}
+user_text_data @offdefaults .placement {"x":300,"y":200}
+user_text_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_wcs_data @defaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_wcs_data @defaults .handles <0 entries>
+user_wcs_data @defaults .items <0 entries>
+user_wcs_data @defaults .onDrag "<fn/2>"
+user_wcs_data @defaults .onEdit "<fn/2>"
+user_wcs_data @defaults .origin {"x":0,"y":0}
+user_wcs_data @defaults .paths null
+user_wcs_data @defaults .placement {"x":300,"y":200}
+user_wcs_data @defaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+user_wcs_data @offdefaults .panel {"keys":["handles","items","onDrag","onEdit","origin","paths","placement","stock"],"layout":null,"panel":"form"}
+user_wcs_data @offdefaults .handles <0 entries>
+user_wcs_data @offdefaults .items <0 entries>
+user_wcs_data @offdefaults .onDrag "<fn/2>"
+user_wcs_data @offdefaults .onEdit "<fn/2>"
+user_wcs_data @offdefaults .origin {"x":0,"y":0}
+user_wcs_data @offdefaults .paths null
+user_wcs_data @offdefaults .placement {"x":300,"y":200}
+user_wcs_data @offdefaults .stock {"h":150,"ox":300,"oy":200,"w":200}
+gesture crossAim {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":19,"x":37,"y":20}
+gesture diagAim {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","noSnap":true,"x":17,"y":31}
+gesture length {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":12,"y":2}
+gesture point {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","labelDir":"<undefined>","noSnap":true,"x":4,"y":7}
+gesture probeVector {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":14,"x":18,"y":6}
+gesture projLength {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":17,"y":6}
+gesture radial {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":14.531,"y":11.7531}
+gesture rect {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","labelDir":"<undefined>","noSnap":true,"value":11,"x":8,"y":10}
+gesture scaleX {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":9,"y":2}
+gesture shear {"color":"#abcdef","emits":false,"id":"probe","kind":"size","label":"L","noSnap":true,"value":11,"x":2.9438,"y":12}
+gesture translate {"color":"#abcdef","emits":false,"id":"probe","kind":"move","label":"L","noSnap":true,"x":4,"y":6}
