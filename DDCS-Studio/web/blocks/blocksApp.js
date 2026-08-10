@@ -12,6 +12,7 @@ import { PALETTE, BLOCKS } from '../wizards/ops/index.js';   // for the palette 
 import { newBlock } from './blockEmitter.js';
 import { suggestNext, recordProgram } from './suggest.js';   // next-block suggestions
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
+import { installTokenGuard } from './blockly/tokenGuard.js';   // t1712 (cycle ACT 5) — REFUSE an ineligible live-value connection on the canvas
 import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
@@ -189,6 +190,7 @@ async function buildWorkspace() {
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });
+  installTokenGuard(ws);   // t1712 (cycle ACT 5) — REFUSE an ineligible token connection, the third authoring surface
 
   // GUARANTEE the popup singletons' DOM exists, so Blockly's global window-resize handler can never crash in
   // DropDownDiv.hide() (it blind-touches a `div` that createDom sets ONLY when no .blocklyDropDownDiv exists).

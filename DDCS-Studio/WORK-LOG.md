@@ -23360,3 +23360,128 @@ would have been easy to over-read as evidence either way — recognized as a tes
 with the same direct generate()+emitMapped method already proven reliable for rampAngle/hopDist, rather than
 trusted on the first pass. Four clean, unambiguous emitted lines are worth more than one clever appeal to Blockly
 internals.
+
+## 🔨 turn 1712 (cycle 854, epoch 4) — CYCLE ACT 5 (the last): THE BLOCKLY REFUSE MECHANISM
+
+### REVIEW RECEIVED ON t1710: the cycle grows by one act
+
+Advisor ruled Option A (thread the declaration to the canvas + a `BLOCK_MOVE`/`BLOCK_CREATE` change-listener
+calling `tokenPolicyFor` to disconnect + toast), explicitly inviting pushback with evidence over Option B (a
+custom Field). Instruction 4 named the risk directly: "the round-trip is the risk... this project has silently
+dropped declared fields at the canvas boundary TWICE" (t1654 `modalPre`, t1674 `noSnap`).
+
+### BEFORE BUILDING: resolved a real ambiguity the ruling's literal suggestion would have walked into
+
+Read `stackBridge.js`'s `DURABLE_DATA_FIELDS`/`recToJson` seam as instructed. Then probed what the Blocks tab
+actually shows for corner vs. surfacing under different opening gestures — and got THREE different canvas shapes,
+which had to be resolved before any correlation mechanism could be trusted:
+
+- `openWiz('user_corner_data')` with **no** Insert click → flat atoms directly, no `op` wrapper.
+- `openWiz('user_surfacing_data')` with **no** Insert click → an `op` wrapper whose child is `user_root`
+  (wizard-authoring chrome: `param_field`/`param_group`/`panel`), which itself carries the real atoms.
+- `openWiz('surfacing')` (the **legacy** name) + a real click on the real Insert button → `[progstart, op(surfacing),
+  progend]`, the `op` using the OLD `surfacing_op` custom block, atoms as direct children, no wizard chrome.
+
+Redid corner with a **real Insert click** (mirroring the legacy-name test): it now ALSO produces the `op`→
+`user_root`(chrome+atoms) shape surfacing showed. This settles it — the shape without an Insert click is a
+transient preview artifact of `openWiz`, not the real editing surface; **the real, user-facing shape for both
+twins is `{type:'op', opType:'user_<name>_data', children:[{type:'user_root', uiChildren:[...chrome], children:[...
+real atoms...]}]}`.** `flattenBlocks` (userOps.js) already descends through `uiChildren` THEN `children`
+recursively, so `flattenBlocks(opRecord.children)` reaches the real atoms regardless of the wrapper — no special
+casing needed once this was known.
+
+### A SECOND, MORE CONSEQUENTIAL FINDING: the ruling's literal "blockIndex correlation" is unsafe for corner
+
+Empirically checked whether `def.bindings[i].blockIndex` (the FROZEN index the ruling named) correctly locates
+each token-declared param's live block, by inserting a real corner instance and indexing into
+`flattenBlocks(opRecord.children)`. Every `assign`-based eligible param (dist/retract/f_fast/f_slow/port/radius/
+travelDist/startX/startY/safeZ/scanDepth) landed correctly. But `cross1_x`/`cross1_y` — also declared
+`tokenEligible` — landed on `wcsbaseinto`/`comment` blocks that don't even carry a `value` key. Root cause:
+`def.bindings[i].blockIndex` is resolved ONCE at registration, against ONE canonical param state; corner's
+template has conditional (prune-gated) blocks (`probeZFirst`, etc.) whose presence shifts every later index, so a
+DIFFERENT param state on the live canvas desyncs the frozen index — exactly the class of bug `deriveBindings.js`'s
+own docstring names and the reason corner carries `def.bindingSpecs` (identity-based, `match`+`key`, re-derived
+fresh every time) in the first place. `opSession.js`'s `seedKnobExpose` already solves precisely this — it
+correlates a value binding to its live atom via `def.bindingSpecs` + `matches()` over a freshly-flattened bare
+stack, specifically so the Blocks-tab EXPOSE-knob seeding survives prune-state drift. Built the guard on the SAME
+technique instead of the frozen index the ruling suggested, noting the deviation here for the record: same
+destination (the change-listener can determine eligibility), safer route (no frozen index, no `block.data`
+persistence, no round-trip risk at all — the policy map is rebuilt fresh from the LIVE workspace + `getUserDef`
+on every relevant connection, the same way `seedKnobExpose` rebuilds its own correlation fresh on every load
+rather than trusting a carried value).
+
+### THE MECHANISM — `web/blocks/blockly/tokenGuard.js` (new), one line in `blocksApp.js`
+
+`installTokenGuard(ws)`, called once right after `B.inject(...)` in blocksApp.js. On every `Events.BLOCK_MOVE`
+where the moved block is a (non-shadow) `variable` block naming a `#`/`[` token (`isTokenAttempt`, reusing the
+SAME shape `wireTokenGuard` already checks): walk `workspaceToStack(ws)` for every `op` record anywhere in the
+program, resolve its `getUserDef(opType)`, and for every spec with a declared token policy — `def.bindingSpecs`
+(identity, preferred) or, for a def with none (no prune risk possible), `def.bindings[i].blockIndex` (frozen, safe
+only in that case) — locate the live block via `matches()` (deriveBindings.js, unchanged, imported not
+reimplemented) over `flattenBlocks(opRecord.children)`, and index the result by `blockId + inputName`. If the
+just-connected socket resolves to an ineligible policy, `tokenPolicyFor` (util.js, the SAME function both forms
+call) decides REFUSE: `child.unplug()` (Blockly's own value-output disconnect — the socket's original shadow
+reappears automatically, confirmed live, not assumed) + `toast(verdict.refusal, true)` (the exact declared text,
+same call the two forms make) + a 1.4s `setHighlighted` flash on the parent block (Blockly's own built-in
+highlight API — no new CSS, no custom Field).
+
+No `block.data` tagging, no `DURABLE_DATA_FIELDS` entry, no `recToJson`/`stackBridge.js` change at all — the
+whole mechanism reads the live canvas + the live registry fresh each time, so there is nothing to round-trip and
+nothing for t1654/t1674's failure class to repeat.
+
+### Verify — driven live in the real app, the real gesture, the emit text asserted not assumed
+
+Built a variable block naming `#500`, connected it via `varBlk.outputConnection.connect(inp.connection)` (the
+documented Blockly value-output connect, confirmed via `unpkg.com/blockly@13.0.0` typings before use — `Connection.
+getParentInput()`, `BlockMove.newParentId/newInputName`, `Block.unplug()`/`.outputConnection` all checked against
+the pinned version first, per the blockly skill's non-negotiable procedure) onto real inserted instances:
+
+- **REFUSE, ineligible (surfacing `rampAngle`, `#500`):** `stillConnectedType` reverts to `math_number` (the
+  shadow), `stillConnectedName` is `null` (the variable block is gone from the socket), `workspaceToStack`'s
+  emitted `rampAngle` is the plain number `3` (the DEFAULT — not `'#500'`, not a variable record) — **the token
+  does not reach the emit**, per instruction 3. Toast text: *"The descent angle is used to compute the ramp's run
+  (a trig calculation baked into the move) before the program is built."* — byte-identical to `SURFACING_
+  BINDING_SPECS`' own declared `tokenRefusal` for `rampAngle` (the same text the twin form and legacy form show).
+- **NON-VACUITY (instruction 6):** commented out the `installTokenGuard(ws)` call, re-ran the IDENTICAL gesture:
+  `stillConnectedType` is `variable`, `stillConnectedName` is `#500`, and the emitted `rampAngle` is now the raw
+  `{type:'variable', params:{name:'#500'}}` record — the exact silent-token-acceptance shape t1710's hazard table
+  showed downstream re-coercing away. Restored the guard line, re-ran, refusal returned exactly as before. The
+  guard, not some other Blockly default, is what causes the refusal.
+- **ACCEPT still works (instruction 4):** an eligible param (surfacing `depth`) took a `#777` Variable reporter
+  and it PERSISTED (`stillConnectedType: 'variable'`, emitted `depth: {type:'variable', params:{name:'#777'}}`) —
+  matching t1708's proof exactly, unbroken.
+- **Corner's REFUSE path was not separately screenshotted** — corner's own `tokenRefusal` params (`corner`/
+  `probeSeq`/`probeZFirst`/`travelApproach`/`travelShape`/`wcs`/`syncA`) are all categorical (enum/bool)
+  branch-selectors with no value-socket at all (matching the project's type-scoping convention — enum/bool have
+  no typeable-token gesture to guard in the first place), so corner had no genuine ineligible NUMERIC socket to
+  demonstrate REFUSE on. Corner's contribution to this act's verification is the blockIndex-vs-bindingSpecs
+  finding above (proven on its OWN 9 eligible `assign` params, all correctly located) and its shared code path
+  with surfacing's REFUSE proof — same `installTokenGuard`, same `buildPolicyMap`, no corner-specific branch
+  exists to fail differently.
+- **Verified by eye:** `verification/t1712-blockly-refuse.png` — a real screenshot, mid-gesture, showing the
+  refusal toast rendered live on the canvas.
+
+**Node gate — 118/118.** **Hand-picked sweep — 20/20**: `guard-roundtrip-1595` (both, incl. the 152-flip
+structural sweep across 14 twins), `modal-pre-canvas-1654` (both), `blocks-render`, `blocks-var-socket`,
+`blocks-roundtrip` + `blocks-roundtrip-toast` (both), `blocks-single-inject`, `blocks-open-seeded`, `blocks-
+load-guard-s41` (both), `corner-data-emit` (both), `studio-to-blocks` (all 3), `editor-to-blocks` (both).
+
+### Emit byte-identical
+
+For every param NOT touched by a token gesture — trivially true, no existing binding/spec/emit path was edited,
+only a new listener that fires exclusively on a token-shaped Variable-reporter connection.
+
+### Capacity
+
+This act took the investigation seriously before writing a line of guard code, and it paid for itself twice:
+once by finding the real canvas shape (would have built the guard against a preview-only artifact otherwise),
+once by finding the frozen-blockIndex bug on corner's own eligible params BEFORE it could have shipped as a
+correlation that silently mis-targets under a different param state — the same defect class this whole cycle
+exists to close, almost reintroduced by the mechanism meant to close it. Working room was sufficient to finish
+the full instruction list in one sitting; nothing was parked.
+
+### AFTER THIS ACT
+
+Per the advisor's own instruction: all four END CONDITION points are now met (token survives to emit; survives
+all three authoring surfaces; a malformed token is refused at the send gate; an ineligible param refuses on
+EVERY surface it can be typed on, by declaration). Not starting a sixth act.
