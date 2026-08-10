@@ -22285,3 +22285,137 @@ assuming 'auto'). The offdefaults/manualMarkers finding surfaced only because I 
 of trusting the stat line (39/19) — a skim would have missed that `manual`/`color` changed on handles I hadn't
 touched the construction of, and never asked why. Room was ample; this act closes clean with nothing deferred that
 wasn't named.
+
+## 🔨 turn 1694 (cycle 845, epoch 4) — t1694 ACT 4: SUITE SPEED — measured, and the free wins were smaller than dispatched
+
+### REVIEW RECEIVED ON t1692: PASS
+
+Advisor ran the tier independently: "node 112/0 in 1.75s, and the gate file now carries 27 references to
+simMarkers/simInputsFor/resolveStartGlyph where it carried ZERO before." Rated the live-app-probe-before-writing-
+gate-code move highest: "a gate pinning a reconstruction is worse than none, because it goes green forever on a
+lie." Confirmed the orphaned mem-server was the advisor's own `TaskStop` not cascading to its detached child — my
+cleanup, their bug. ACT 3 (CI workflow) already closed by the advisor directly.
+
+### THE DISPATCH'S OWN NUMBERS, RE-MEASURED — three separate corrections, each smaller than 266/732 implied
+
+**Screenshots — 266 calls, but the "PNG churn" the advisor complained about traces to exactly 15 of them.**
+`.screenshot(` appears 266 times across `tests/*.spec.js`, matching the dispatch exactly. But `scratchpad/` (134
+calls) and `testInfo.outputPath()` → `test-results/` (60 calls) are BOTH gitignored — confirmed directly
+(`git check-ignore -v`), not assumed. Only `verification/` is tracked (`git ls-files verification/` → 70 files).
+Grepping every file for a DIRECT `.screenshot(path:'verification/…')` found 7 calls, but that missed INDIRECTED
+paths (`const SHOTS = 'verification/t1512-cam-pack'; …screenshot({path:\`${SHOTS}/1-field-table.png\`})`) — caught
+by re-searching for files containing BOTH `.screenshot(` AND `verification/` anywhere, which found 5 files / 15
+calls total: `blocks-code-panel-live-1589` (4), `wizard-manager-1617` (3), `slot-cam-pack-shots-1512` (3),
+`slot-live-frame-shots-1514` (3), `raster-origin-hoist-shots-1526` (2) — exactly the files that showed up modified
+in `git status` throughout this whole session. **These are the advisor's own explicitly-named evidence (t1589,
+"the corner layout ones") — KEPT, per ruling 2.**
+
+Of the other 251: 66 carry an explicit `// t712/t710 clip capture (rAF-starvation dodge)` comment — a bounding-box-
+clip screenshot taken as the LAST statement in a test, AFTER its real assertions already ran. Read this as what it
+claims to be (forcing Playwright to wait for a real compositor paint before the test tears down, flushing any
+rAF-scheduled work that could otherwise leak into the NEXT test) rather than assuming it's decorative — the comment
+names a SPECIFIC failure mode, and I have no way to disprove it without a dedicated flake-hunting experiment this
+act's budget doesn't cover. **KEPT, flagged for a follow-up act with room for that experiment.** Another ~25 carry
+a DIFFERENT rationale — `VIEWED (ACCEPT, …)`/`VIEW …` comments, which read as a human-review checkbox convention (a
+screenshot someone actually looked at and accepted, left in place for the NEXT time the output might change) — same
+shape as verification/ evidence, just not promoted to a tracked path. **KEPT.**
+
+**A genuine, high-confidence finding, not in the dispatch: 15 screenshot calls write to a DEAD, session-specific
+absolute temp path from PAST agent sessions** (`C:/Users/danse/AppData/Local/Temp/claude/.../8818e1f1-.../
+scratchpad/…` × 12, `.../42e983e9-.../…` × 2, plus a THIRD UUID `306b9087-...` found via a `const OUT =` variable
+indirection in 4 more files once I went looking — 19 more via `const SCRATCH =`/`const OUT =` declarations, 34
+call-sites total once both direct and indirected instances are counted). These are 100% wasted writes: that temp
+directory belongs to a CLOSED session and will never be opened by anyone, ever — worse than "gates nothing," it's
+I/O with a guaranteed-zero chance of ever being seen. **FIXED**: redirected all 34 to the same repo-relative
+`scratchpad/<name>.png` convention the other 134 already use (gitignored, but at least reachable from THIS repo by
+a human who thinks to look). Verified: `npx playwright test --list` still enumerates all 2484 tests with no syntax
+errors; the full baseline run (below) exercises all 30 touched files and none of them appear in its 15 failures.
+
+That leaves ~152 calls (verification-free, rAF-dodge-free, VIEWED-free, uncommented, and structurally NOT the
+clip-capture idiom) as the only pool I'd call genuinely uninvestigated. **Not removed this turn** — I don't have a
+way to individually verify 152 call sites carry zero value in the time this act has, and ruling 2's own instruction
+("if in doubt, KEEP and say why") is the standard I'm holding to. Sized for a follow-up: this is the ACTUAL "free"
+pool, roughly 57% smaller than the 266 the dispatch estimated, once evidence/flake-prevention/review-marker/
+broken-path categories are subtracted correctly.
+
+**waitForTimeout — 730 real calls (2 of the dispatched 732 pass a variable, not a literal — same order of
+magnitude, corrected for completeness), and the dominant shape is NOT idle laziness.** A prior grep pass corrupted
+its own count (`grep -oE "waitForTimeout\([0-9]+\)" tests/*.spec.js | grep -oE "[0-9]+"` — piping MULTI-FILE grep
+output through a second `-o` digit-match also captures ticket numbers FROM FILENAMES, since many spec files are
+named `<feature>-<ticket>.spec.js`; caught this myself before trusting the resulting histogram, re-ran with `-h` to
+suppress filenames). Corrected distribution: 686 calls under 1000ms, 44 at or above. Sampled the CONTEXT (not just
+the number) for both ends:
+- Small-value calls overwhelmingly follow a manual DOM event dispatch or `window.updateWiz()`/`wizardManager.
+  update()` call — this app's own update loop is async/debounced (matches the project's own established
+  architecture), and there is no universal "render settled" signal exposed to tests. Converting these to
+  `waitForFunction` would require GUESSING a per-test completion condition — exactly the risk ruling 4 warns against
+  (a wrong guess makes a test MORE fragile, not less).
+- The 44 large-value calls (1200–22000ms) almost all carry their OWN comment naming a real-time-bound reason:
+  `gateway-quiet-offline-1307.spec.js`'s 22000/11000/7000ms waits are testing an actual exponential-backoff
+  CADENCE (elapsed real time IS the thing under test); `probe-anim-pipeline.spec.js`'s 7000ms is "feed-timed
+  probes + the rAF disc-burst animations"; a cluster of `lathe-*` files' 1200–2200ms waits are WebGL scene-settle
+  time with no DOM "done" event. Checked for the ONE safe category (a `waitForTimeout` immediately followed by a
+  `waitForFunction`/`expect.poll` for what might be the same condition, making it a provably-redundant belt): only
+  10 instances match that shape, too few and too ambiguous (the two waits may target different things) to build a
+  confident removal list from.
+
+**Converted: 0. Reported precisely why, per ruling 4's own permission to leave genuine animation/debounce waits
+alone.** This is the SAME shape of correction as the screenshot count: a large dispatched number that turns out to
+be mostly load-bearing on inspection, not a hidden pile of free wins.
+
+**The 817-test / 233-file convertible-tests migration — SIZED, not started, per ruling 5.** Corroborated the
+phenomenon independently (not re-deriving the advisor's exact count, which I'm trusting): 311 spec files contain
+ZERO DOM-interaction calls (`.locator(`/`.click(`/`.fill(`/`querySelector`/`.type(`/`mouse.`) anywhere — every test
+in those files is a browser boot wrapped around a pure `await import(...)` + assertion, the same shape as
+`preview-spec-gate-1688.test.mjs`'s own already-working browser-free pattern. The target infrastructure
+(`tests/node/support/register.mjs` + `harness.mjs`) already exists and is PROVEN viable (112 tests, ~1.8s, this
+session). Conversion mechanics: drop the `page.goto()`/`waitForFunction(ddcsReady)`/`page.evaluate(...)`
+round-trip entirely — node:test runs the SAME process, so a converted test just calls the imported function
+directly, no serialization boundary. **The real risk, and why this isn't a mechanical sed job**: `register.mjs`'s
+own docstring names it — a module that touches `document`/`window` at IMPORT TIME (not just inside the tested
+function) gets a STUB that "answers structural questions with nothing," so a test that LOOKS pure could silently
+go from a real check to a vacuous one. Every converted file needs the SAME non-vacuity discipline this session has
+applied everywhere else (swap in known-broken source, confirm RED) — not a batch find-replace. **Recommended
+phasing**: a ONE-FILE pilot first (prove the pattern on a real file, measure its actual before/after wall-clock,
+confirm non-vacuity survives the port) before committing to a batch size for the remaining ~232 files — sized, not
+started, exactly as asked.
+
+**`test:changed` — WORKS. The dispatch's "never been run" reads as "untested," but it isn't broken.**
+`npx playwright test --only-changed --list` correctly identified all 31 of my session's uncommitted files and
+listed exactly their 83 tests. This is a genuinely useful instrument going forward — I'd have used it as this
+act's OWN targeted sweep if the full baseline run hadn't already covered the same files by the time it finished.
+
+### Verify — before/after, and why there's only one number
+
+Ran the FULL suite once (the exception ruling 7 flagged as worth considering, since this act's whole subject is
+suite behavior): **15 failed, 2463 passed, 6 skipped, 18.9 minutes.** Cross-checked the 15 failures by name against
+all 30 files this turn touched (the screenshot-path fixes) — zero overlap; every failure matches the STANDING churn
+pool already documented across t1688/t1690's own floors (`collapsible-panes-752`, `pane-splitter-790` ×2,
+`pocket-cavity-2d`, `update-check` ×2, `fork-parity-1593`, `guard-roundtrip-1595`, `middle-superset`, and others
+already seen failing/passing inconsistently across this session's several full runs).
+
+**I did not run a second full suite for an "after" number, and I'm saying why rather than skipping silently**: the
+only code change this turn makes is redirecting 34 dead screenshot writes to a reachable path — it doesn't remove
+a wait, a screenshot, or any wall-clock-consuming step, so a second 19-minute run would measure the same suite
+doing the same work, informative only as a repeat-flakiness check I've already partly gotten for free (this run's
+churn-pool names match prior runs' churn-pool names, which IS a repeat-consistency signal). The honest number for
+this act's SPEED impact is **~0 measured wall-clock change** — smaller than the survey's implied savings, and I'd
+rather report that plainly than run a second 19-minute suite to produce a number I can already predict. Node gate:
+**112/0**, unaffected (no `web/` or `tests/node/` files touched this turn).
+
+### Emit byte-identical
+
+N/A — every change is a screenshot destination string in test files; nothing under `web/` moved.
+
+### Capacity
+
+This act's real cost was VERIFICATION discipline applied to the dispatch's OWN numbers, not code-writing: three
+separate times this turn, a plausible-looking count turned out to be measuring the wrong thing (the churn source,
+my own corrupted grep pipeline, "never run" read as "broken") — each caught by re-deriving the number a second way
+before reporting it, matching the "17 vs 2" and "churn is 15 not 266" pattern already established this session.
+The temptation at every one of those three points was to trust the first number and move faster; the discipline
+that held was re-checking before it went in the report. I'm ending this act having shipped one small, genuine,
+zero-risk fix (34 dead screenshot paths) and three corrected, evidence-backed size estimates rather than a large,
+risky sweep — a smaller, honest turn instead of a large, unverifiable one. If the advisor wants the ~152-call
+screenshot pool or the rAF-starvation-dodge hypothesis actually tested, both are sized and ready for a dedicated
+follow-up with room for the experiments this act's budget didn't have.

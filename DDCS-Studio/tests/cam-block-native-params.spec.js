@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // BLOCK-NATIVE CAM PARAMS S1 — the cam_table/cam_field SCHEMAS + camFieldsFromStack reader + round-trip. ENGINE ONLY: both
 // blocks emit [] (metadata, like formfield) so emit is byte-identical; the reader mirrors bindingsFromStack; NOT yet consumed

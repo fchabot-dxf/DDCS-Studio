@@ -59,5 +59,5 @@ test('comped probe discs nudge onto the wall (corner X/Y) by ±the tip radius; e
   // every disc nudged ~a stylus radius (2) off its raw contact onto the wall — NOT 0 (left raw) and NOT a frame-wrong jump
   expect(r.minOff, 'discs moved off the raw contact (not left at the tool centre)').toBeGreaterThan(1.5);
   expect(r.maxOff, 'discs moved ~the tip radius, not a frame-mismatched jump').toBeLessThan(3.5);
-  await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/42e983e9-e380-4cb5-920a-df74f358dd7a/scratchpad/_disc-on-surface.png' });
+  await page.screenshot({ path: 'scratchpad/_disc-on-surface.png' });
 });

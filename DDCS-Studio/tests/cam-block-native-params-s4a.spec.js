@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // BLOCK-NATIVE CAM PARAMS S4a — the MODAL becomes a VIEW of the cam_field blocks, ADDITIVE-BY-FALLBACK. When the op's def
 // carries a cam_table, renderCbmTable READS the expose/bake/value from the cam_field block records and cbmToggle / the value

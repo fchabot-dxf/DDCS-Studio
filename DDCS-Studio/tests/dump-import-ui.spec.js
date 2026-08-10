@@ -79,5 +79,5 @@ test('drop a DM500 dump → honest "named from the eng, values N/A" (its setting
     // there is no travel candidate to apply (values N/A) → no envelope written
     const noTravel = await page.evaluate(() => !/travel \+|travel \d/i.test(document.getElementById('import-body').textContent));
     expect(noTravel, 'no derived travel value is offered for the DM500 (honest)').toBe(true);
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/dump-import-dm500.png' });
+    await page.screenshot({ path: 'scratchpad/dump-import-dm500.png' });
 });

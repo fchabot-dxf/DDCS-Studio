@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // t1077 S5 — the CORRECTNESS punch-list.
 // (2) DUPLICATE PARAM KEYS across parts: a sub-stack composes several parts, and two parts can legitimately carry the

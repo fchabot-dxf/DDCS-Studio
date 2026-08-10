@@ -56,7 +56,7 @@ test('S5b: New slot mounts the INLINE editor STACKED above the table (t1175 auto
   await page.click('#cbm_iconedit [data-add="rect"]');
   const after = await page.evaluate(() => document.querySelectorAll('#cbm_iconedit .ie-lyr').length);
   expect(after, 'adding a shape updates the layer list — interactions work in the inline box').toBeGreaterThan(before);
-  await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/cam-s5b-inline-icon.png' });
+  await page.screenshot({ path: 'scratchpad/cam-s5b-inline-icon.png' });
   // Build → the slot carries the rasterized BMP + the editable layers (360×180)
   await page.click('[data-act="cbm-build"]');
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'), null, { timeout: 8000 });

@@ -38,7 +38,7 @@ test('the wizard gear opens Settings OVER the wizard at Machine → Homing, edit
     expect(over.rows, 'the per-axis homing rows render in the Machine tab').toBeGreaterThan(0);
     expect(over.insideSettings, 'Settings renders OVER the wizard (hit-test)').toBe(true);
     expect(over.wizStillMounted, 'the wizard is still mounted behind').toBe(true);
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-settings-over-wizard.png' });
+    await page.screenshot({ path: 'scratchpad/homing-settings-over-wizard.png' });
 
     // edit the Z seek feed in the Homing section → commitHoming → settings.homing.axes.z.seekFeed
     await page.evaluate(() => {
@@ -95,5 +95,5 @@ test('the Macros → sysstart panel is a STORED, editable boot-macro editor (t65
     // the dropped section: the homing summary + the Settings link + the old Generate are GONE
     expect(info.droppedSection, 'the homing-summary section + link + old Generate are removed').toBe(true);
     expect(info.noAxesEditor, 'the editable per-axis GUI never lived in Macros (one-source)').toBe(true);
-    await page.locator('#macros_panel_sysstart').screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-macros-summary.png' });
+    await page.locator('#macros_panel_sysstart').screenshot({ path: 'scratchpad/homing-macros-summary.png' });
 });

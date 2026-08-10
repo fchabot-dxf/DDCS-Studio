@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // t1073 S4-Part2 — the CUSTOMIZE AFFORDANCE: fork a recognized CAM-generator twin (surfacing/pocket/corner/edge/slot/drill/
 // bore/middle) into editable blocks (editWizardDef wraps a recognized-at-default op in an opunit sub-stack boundary) from

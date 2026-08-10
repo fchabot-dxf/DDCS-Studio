@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // BLOCK-NATIVE CAM PARAMS S4b — the materialize HOOK at editWizardDef. maybeMaterializeCamTable(def) gains a cam_table for a
 // PILL-BASED UNIVERSAL op (opt-in: when the user opens it to customize in Blocks), and SKIPS a generator twin (its cam_table

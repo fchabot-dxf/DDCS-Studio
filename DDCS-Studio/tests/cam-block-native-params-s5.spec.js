@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // BLOCK-NATIVE CAM PARAMS S5.1 — the FORM half, mirroring the pendant S1+S3. A DEDICATED param_field block (Fork B: formfield's
 // var-identity match cannot address a (blockIndex,key) value socket), paramFieldsFromStack reader, paramGroupFromBindings

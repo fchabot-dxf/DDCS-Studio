@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // Sub-stack S3 — the FORK PATH declares opunit. At fork/LOAD time (editWizardDef), a RECOGNIZED generator twin (surfacing/
 // corner/…) opened to customize has its exec atoms WRAPPED in an opunit(opType, defV) so subStackToSlot keeps the standard

@@ -153,7 +153,7 @@ test('flicker + screenshot: the LAYOUT wall holds through the whole Start drag (
   await page.mouse.up();
   await page.waitForTimeout(400);
   console.log('FLICKER Layout-wall max-deviation-during-drag = ' + Math.round(maxDev) + 'px (0 = no on-Layout flicker)');
-  const OUT = 'C:\\Users\\danse\\AppData\\Local\\Temp\\claude\\c--Users-danse-APPS-ddcs-studio-project\\306b9087-a4e7-4ecb-a877-d4ad4867bab7\\scratchpad\\';
+  const OUT = 'scratchpad/';
   const lay = await page.$('#userVizContainer'); if (lay) await lay.screenshot({ path: OUT + 'startdrag-layout.png' });
   const wiz = await page.$('#wizard'); if (wiz) await wiz.screenshot({ path: OUT + 'startdrag-wizard.png' });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));

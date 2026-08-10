@@ -65,5 +65,5 @@ test('editor Simulate lands the probe disc on the TRUE surface via the program-m
   expect(r.nDiscs, 'the editor sim dropped probe discs').toBeGreaterThan(0);
   // the disc nudged ~a stylus radius onto the wall (the program-model comp) — was left at the tool centre (≈0) before this
   expect(r.maxOff, 'a disc landed on the TRUE surface, ~a stylus radius off its raw tool-centre contact').toBeGreaterThan(1.5);
-  await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/42e983e9-e380-4cb5-920a-df74f358dd7a/scratchpad/_editor-disc.png' });
+  await page.screenshot({ path: 'scratchpad/_editor-disc.png' });
 });

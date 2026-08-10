@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-const OUT = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const OUT = 'scratchpad/';
 
 async function openCornerTwin(page) {
     await page.goto('http://localhost:3211');

@@ -110,7 +110,7 @@ test('t656 amend1/2: the SELECTED controller drives the body — the chip shows 
     const switched = await page.evaluate(() => ({ chip: (document.getElementById('macros_ctrl_name') || {}).textContent, note: (document.getElementById('sysstart_editnote') || {}).textContent }));
     expect(switched.chip, 'the chip updated to V4.1 on switch').toMatch(/V4\.1/);
     expect(switched.note, 'the stale Expert body is flagged (generated for X — Regenerate for selected)').toMatch(/Generated for.*expert/i);
-    await page.locator('#macros-app').screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/macros-ctrl-chip-mismatch.png' });
+    await page.locator('#macros-app').screenshot({ path: 'scratchpad/macros-ctrl-chip-mismatch.png' });
 
     // Regenerate under V4.1 → the body is V4.1 (the honest refusal, NO Expert-only registers), recorded for V4.1, note clears
     await autoAppDialog(page, { accept: true });

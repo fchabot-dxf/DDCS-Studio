@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // t1075 Part C — the placed-op → SAVE fork route must produce the SAME opunit sub-stack the Customize (editWizardDef)
 // route does, so fork behaviour is ONE-SOURCE regardless of route. Gated on ALL of: recognized + not-already-opunit +

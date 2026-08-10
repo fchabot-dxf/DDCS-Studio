@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // Sub-stack S4 — the MODAL wires a forked op that CONTAINS an opunit through subStackToSlot. Today the modal routes any
 // forked op WHOLE-OP universal (geometry baked). S4 detects an opunit-containing op and shows the PARTS grouped: the standard

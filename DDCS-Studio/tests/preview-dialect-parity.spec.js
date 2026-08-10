@@ -70,7 +70,7 @@ test('REAL-SYMPTOM: the edge wizard preview panel shows the V4.1 emit (no #1925)
     await page.waitForFunction(() => (document.getElementById('wiz_edge_code')?.textContent || '').length > 20, null, { timeout: 8000 });
     const v41Panel = await page.evaluate(() => document.getElementById('wiz_edge_code').textContent || '');
     expect(v41Panel, 'the V4.1 edge preview panel has NO Expert #1925 register').not.toContain('#1925');
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/preview-v41.png' });
+    await page.screenshot({ path: 'scratchpad/preview-v41.png' });
 
     // switch to Expert → the panel re-renders with the Expert emit (#1925 back)
     await page.evaluate(async () => { const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js'); setActiveProfile('ddcs-expert-m350'); });
@@ -79,5 +79,5 @@ test('REAL-SYMPTOM: the edge wizard preview panel shows the V4.1 emit (no #1925)
     const expertPanel = await page.evaluate(() => document.getElementById('wiz_edge_code').textContent || '');
     expect(expertPanel, 'the Expert edge preview panel uses #1925').toContain('#1925');
     expect(expertPanel, 'the panel actually changed between posts').not.toBe(v41Panel);
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/preview-expert.png' });
+    await page.screenshot({ path: 'scratchpad/preview-expert.png' });
 });

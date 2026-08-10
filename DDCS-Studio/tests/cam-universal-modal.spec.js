@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 // Universal CAM U3 (the VISIBLE milestone): a forked/custom op (user_* with no generator) opens the REAL CAM authoring modal
 // via the op-card "Build CAM slot" door. The expose/bake table renders with value params (feed/coord/Z) EXPOSABLE and
 // geometry params (num()-consumed drill) Expose-DISABLED / bake-forced, and Build produces a slot with the exposed #vars.
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 test('U3 modal: a forked custom op → op-card Build CAM slot → value params exposable, geometry greyed bake-only → Build', async ({ page }) => {
     await page.goto('http://localhost:3211');

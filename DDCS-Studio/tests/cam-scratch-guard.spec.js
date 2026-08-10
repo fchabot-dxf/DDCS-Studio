@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // t1081 slice A declared the generator scratch bands and made the build REFUSE a slot whose form values its own
 // generator would clobber. t1083 slice B then made that collision IMPOSSIBLE by minting local vars around the band.

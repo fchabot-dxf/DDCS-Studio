@@ -81,7 +81,7 @@ test('the Homing section shows the derived home-end (no dir/method dropdowns), t
     // the derived home-end shows MAX, from the declared switch (z_max Home is on)
     expect(before.zEnd, 'the Z home-end is derived from the declared switch').toMatch(/home:\s*MAX/);
     expect(before.zEnd, 'attributed to the declared switch (not the old "Auto envelope" lie)').toMatch(/declared switch/);
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-derived-max.png' });
+    await page.screenshot({ path: 'scratchpad/homing-derived-max.png' });
 
     // the emit seeks Z toward MAX (+520) with the configured 600 feed
     const emitMax = await homingEmit(page);
@@ -130,7 +130,7 @@ test('the Homing section shows the derived home-end (no dir/method dropdowns), t
         return (zRow.querySelector('.hm-home-end') || {}).textContent || '';
     });
     expect(after, 'the Z home-end display followed the switch flip → min').toMatch(/home:\s*min/);
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-derived-min.png' });
+    await page.screenshot({ path: 'scratchpad/homing-derived-min.png' });
 
     // the emit follows the SAME source — Z now seeks toward MIN (-520). Display + emit are one source, no drift.
     const emitMin = await homingEmit(page);

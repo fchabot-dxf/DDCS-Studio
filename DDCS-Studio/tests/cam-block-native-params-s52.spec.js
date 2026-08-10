@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // BLOCK-NATIVE CAM PARAMS S5.2 — the wizard FORM renderer CONSUMES paramFieldsFromStack (the FORM analog of S2+S4a).
 // formBindings(def): when the def carries a param_group, its param_field ROWS drive the form (order = row order;

@@ -63,7 +63,7 @@ test('the tree renders the ACTIVE controller declaration: Expert wraps panels, V
     expect(dmfile.sendLabel, 'DM500 file → USB Export (no LAN)').toContain('Export');
     expect(dmfile.globalPush, 'DM500 (no LAN) hides the global deploy button').toBeFalsy();
 
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/macros-dm500-tree.png' });
+    await page.screenshot({ path: 'scratchpad/macros-dm500-tree.png' });
 });
 
 // t1217 — the second half of this test ("switching profiles SWAPS the workspace") is RETIRED with the profile library

@@ -6,7 +6,7 @@ import { autoAppDialog } from './_appDialog.js';
 // opensAs data-twin — leaving every other wizard and every custom op untouched. Shown ONLY when that built-in is actually
 // customized (a layout override OR a diverged twin). Distinct from the blanket ↺ Reset to factory (whole bar).
 test.use({ viewport: { width: 1400, height: 1000 } });
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 const render = (page) => page.evaluate(async () => {
     const { renderWizardLibrary } = await import('/ui/wizardManagerPanel.js');

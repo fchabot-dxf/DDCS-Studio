@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * trips this even if the Layout is perfect), each HELD, and #23/#24 recompute = wall − Start. Real rendered positions.
  */
 test.use({ viewport: { width: 1500, height: 1000 } });
-const OUT = 'C:\\Users\\danse\\AppData\\Local\\Temp\\claude\\c--Users-danse-APPS-ddcs-studio-project\\306b9087-a4e7-4ecb-a877-d4ad4867bab7\\scratchpad\\';
+const OUT = 'scratchpad/';
 
 async function openCorner(page) {
   await page.goto('http://localhost:3211');

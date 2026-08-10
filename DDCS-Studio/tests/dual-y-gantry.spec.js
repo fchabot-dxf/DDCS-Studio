@@ -96,5 +96,5 @@ test('REAL-SYMPTOM: a pulled dual-gantry dump seeds A=Gantry slave of Y; the ver
     expect(ui.homingSlaveDerived, 'the homing card shows the DERIVED slave read-only (from Axes)').toMatch(/syncs slave\s*A.*from Axes/i);
     await page.evaluate(() => document.querySelector('#set_axes_list').scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(150);
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/dual-y-axes.png' });
+    await page.screenshot({ path: 'scratchpad/dual-y-axes.png' });
 });

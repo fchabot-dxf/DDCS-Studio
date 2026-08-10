@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
+const SCRATCH = 'scratchpad';
 
 // t1089 — a SINGLE hole is a degenerate pattern (count 1 at the anchor), so drill/bore pattern 'single' now routes to the
 // GENERATOR instead of the universal unroll. This matters because 'single' is the DEFAULT drill pattern, and the universal

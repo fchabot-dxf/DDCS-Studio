@@ -76,7 +76,7 @@ test('homing feeds + WCS detail rows show raw → value; the Z sentinel note sho
     expect(zNote, 'Z sentinel note names the raw ±9999 reply').toMatch(/9999/);
     expect(zNote).toMatch(/sentinel|undeclared/);
     // screenshot the expanded review for the human
-    await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/pull-detail-expanded.png' });
+    await page.screenshot({ path: 'scratchpad/pull-detail-expanded.png' });
 });
 
 test('no gateway → the review still shows the visible error (detail feature does not break the error path)', async ({ page }) => {

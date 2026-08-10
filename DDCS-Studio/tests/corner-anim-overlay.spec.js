@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * INC-2 clicking Run animates the red head on the overlay; INC-3 the handles still drag (the overlay is pointer-events:none).
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
-const OUT = 'C:\\Users\\danse\\AppData\\Local\\Temp\\claude\\c--Users-danse-APPS-ddcs-studio-project\\306b9087-a4e7-4ecb-a877-d4ad4867bab7\\scratchpad\\';
+const OUT = 'scratchpad/';
 
 // `beforeOpen` (optional) runs AFTER navigation but BEFORE the wizard opens — settings must be set here, not
 // before calling openCorner: ddcsGetSettings() returns a plain in-memory object (there is no ddcsSetSettings;
