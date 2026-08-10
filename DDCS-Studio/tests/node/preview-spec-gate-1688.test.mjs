@@ -286,8 +286,13 @@ test('preview gate P1: every twin\'s declared 2D spec matches the checked-in sna
     }
     must(`missing snapshot fixture ${path.relative(ROOT, SNAP)} — create it with UPDATE_PREVIEW_SNAPSHOT=1 npm run test:node`,
         () => expect(fs.existsSync(SNAP)).toBe(true));
+    // LINE ENDINGS: this repo runs core.autocrlf=true, so the checked-out fixture is CRLF on Windows and LF on a
+    // Linux CI runner while the freshly-rendered OUT is always LF. Splitting on /\r?\n/ makes the comparison a
+    // comparison of CONTENT — otherwise the gate would go red on every fresh clone, which is the flicker a gate
+    // exists to not have.
+    const lineSplit = (s) => s.split(/\r?\n/);
     must('the declared preview spec CHANGED. Read the diff line by line: a KEY that disappeared is a declaration a renderer stopped receiving (t1674 noSnap / t1680 onEdit / t1684 emits); a NUMBER that moved is geometry. If the change is intended, regenerate with UPDATE_PREVIEW_SNAPSHOT=1 and review the fixture diff.',
-        () => expect(OUT.split('\n')).toEqual(fs.readFileSync(SNAP, 'utf8').split('\n')));
+        () => expect(lineSplit(OUT)).toEqual(lineSplit(fs.readFileSync(SNAP, 'utf8'))));
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
