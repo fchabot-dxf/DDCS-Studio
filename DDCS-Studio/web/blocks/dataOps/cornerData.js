@@ -227,8 +227,25 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
 
     // PRESENTATION mouth — FORM (input) + one peer per VIEW of the program (t119). All emit ∅. The per-pass sim-start
     // markers are the SHARED anchor source (fed to BOTH the 2D + 3D views by cornerSimStartsProvider — ONE source, never
-    // re-declared per view; the one-source guard); they ride 3D-SIM. LAYOUT-2D + PROJECTED-GCODE are LABELED PLACEHOLDERS
-    // this pass — their views are driven by the ONE trace + the form3d+2d panel; per-view rig blocks are a later follow-up.
+    // re-declared per view; the one-source guard); they ride 3D-SIM.
+    //
+    // t1724 — LAYOUT-2D + PROJECTED-GCODE stay EMPTY, TRACED, not "a later follow-up" (that framing is retired — this
+    // is the trace, cycle 856 ACT 3's amendment). Corner's own preview content was checked live against the two
+    // primitive vocabularies this follow-up meant to use:
+    //   - `shape_rect/circle/line/marker` (vizBlocks.js) HAS a real, working consumer (panelTypes.js:293, flattens
+    //     def.template and draws every shape it finds) — but corner has NOTHING to feed it. Its whole 2D vocabulary is
+    //     either INTERACTIVE (the per-pass sim-start markers above, and the corner-pick handle — panelTypes.js's
+    //     name-sniffed `cornerBind`) or TRACE-DERIVED (the toolpath overlay, correctly staying trace-only per this
+    //     cycle's Fork-2 ruling: geometry with G-code behind it must never gain a second, declared copy). Shape
+    //     primitives are deliberately non-interactive static drawing (vizBlocks.js's own doc: "no transform blocks");
+    //     corner draws no static shape at all, so there is nothing to port, not an unfinished port.
+    //   - `layout_2d_canvas`/`sim_3d_box`/`code_preview_panel` (the CONTAINER blocks this follow-up would have used)
+    //     are THEMSELVES unfinished, independent of corner: grep confirms zero readers anywhere in the app — their
+    //     `minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields are inert, `kind:'uibox'` only wires the
+    //     Blockly round-trip, never the real rendered panel. Placing one here would misrepresent inert machinery as
+    //     functional — exactly the declared-but-unread shape this project already named four times (`emits`/
+    //     `modalPre`/`noSnap`/`mouth`) and the fifth this act's trace found.
+    // Reported, not invented: no new block, no placeholder block. See WORK-LOG t1724.
     const uiChildren = [
         sec('FORM', '#d946ef', [panel, paramGroup]),           // form input — magenta
         sec('LAYOUT-2D', '#3b82f6', []),                       // view family — blue

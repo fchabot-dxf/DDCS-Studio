@@ -137,7 +137,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP1 Corner view import gone', file: 'web/wizards/views/index.js', line: 20, find: /retired 2026-07-02/ },
     { id: 'TRAP1 Corner opensAs the twin', file: 'web/blocks/wizardLibrary.js', line: 56, find: /opensAs:\s*'user_corner_data'/ },
     { id: 'TRAP1 cornerWizard.js import (cornerData.js:44)', file: 'web/blocks/dataOps/cornerData.js', line: 44, find: /cornerWizard\.js'/ },
-    { id: 'TRAP1 cornerStack() usage (cornerData.js:244)', file: 'web/blocks/dataOps/cornerData.js', line: 244, find: /cornerStack\(/ },
+    { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', line: 261, find: /cornerStack\(/ },
     { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
     { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', line: 173, find: /latheLayoutSpec/ },
     { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 250, find: /_writable/ },

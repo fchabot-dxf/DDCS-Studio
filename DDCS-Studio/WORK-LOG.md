@@ -24072,3 +24072,88 @@ N/A — this act touches test infrastructure only (config, a gate script, test a
 Running the full suite twice (40 minutes total) was the right call given the advisor's own explicit
 authorization and the fact that Run 1 surfaced a real, own-caused regression — a single run would have either
 missed it (if I'd trusted the misleading exit-code-0) or left it unconfirmed-fixed. Full working room used.
+
+## 🔨 turn 1724 continued (mid-task amendment) — CORNER PREVIEW AS DECLARED BLOCKS: the gap, traced and reported
+
+### AMENDMENT RECEIVED MID-TASK
+
+While finalizing ACT 3's verification, an amendment landed: park ACT 3 (already complete by then — committed
+as-is, no further full-suite runs), pivot immediately to the newly-dispatched, twice-rescoped act — finish
+CORNER's deferred 2D-preview declaration. `cornerData.js:223` declares `panel:'form3d+2d'` (the frame is
+already data); `:231`'s own comment named the CONTENTS as "a later follow-up." That follow-up is this act.
+Constraints, explicit: express corner's preview with the EXISTING primitives (`shape_rect/circle/line/marker`,
+`layout_2d_canvas`, `sim_3d_box`) where they suffice; where a primitive genuinely cannot say the thing, STOP
+and report the gap rather than inventing a block; whatever feeds a block must provably reuse the emit's own
+function; verify against the real picture (corner is user-verified on 5 symptoms — a regression here is
+immediately visible); node tier + hand-picked corner sweep only.
+
+### THE TRACE
+
+**Looked at corner's actual, current 2D Layout pane live** (`verification/t1724-corner-layout2d.png`) before
+touching anything: the stock rectangle, two corner-pick rings (one filled/selected), a cyan sim-start marker
+"①", and a dashed amber/cyan toolpath-overlay trace down to the machine Start. Cross-referenced against
+`layoutSpecFromOp`'s own returned spec (`items: ["hole"]`, `handles: ["reposition_pos"]`, `paths: 0`) — the
+"hole" item is the generic workpiece-cavity backdrop every op gets, not corner-specific content.
+
+**Traced each visible element back to its source**, one by one:
+- Corner-pick rings → `panelTypes.js`'s `cornerBind`, a NAME-SNIFF (any binding literally called `corner`) —
+  a generic, interactive HANDLE mechanism shared by every op with a `corner`-typed param, not corner-owned
+  content, and not expressible as a `shape_*` block anyway (those are declared as deliberately non-interactive
+  static drawing — `vizBlocks.js`'s own doc: "no transform blocks").
+- The sim-start marker → `def.simStartsProvider = cornerSimStartsProvider`, ALREADY a real, working, declared
+  mechanism — also interactive (draggable), also outside the shape-block vocabulary by the same design choice.
+- The dashed trace → the toolpath-overlay raster, parsed live from the EMITTED G-code. Correctly stays
+  trace-derived under this cycle's own Fork-2 ruling (declaring emit-backed geometry into a second channel
+  reintroduces the exact two-sources risk this whole cycle exists to close) — not something to port, by rule.
+
+**Result: corner draws NOTHING that fits the `shape_rect/circle/line/marker` vocabulary.** Every pixel on its
+2D pane is either a generic interactive handle (outside the primitives' scope by design) or a trace of the
+actual emit (outside the primitives' scope by this cycle's own ruling). There is no hand-rolled, corner-owned
+STATIC shape anywhere to port — corner's legacy view was ALSO already fully deleted (no bespoke drawing code
+ever existed to compare against either).
+
+**Second, independent finding, checking the OTHER half of the primitive set**: `shape_rect/circle/line/marker`
+DO have a real, working consumer (`panelTypes.js:293`, confirmed reading `def.template` — flattened, walking
+both `uiChildren` and `children` — and drawing every shape found; this is why nothing new was needed to wire a
+shape block IF corner had one to declare). But the THREE CONTAINER blocks the amendment also named
+(`layout_2d_canvas`, `sim_3d_box`, `code_preview_panel`) have **zero readers anywhere in the app** — grepped
+for all three type-strings and for the generic `kind:'uibox'` outside `vizBlocks.js` itself: nothing. Their
+declared fields (`minHeight`/`showControls`/`showRuler`/`maxHeight`/`title`) are completely inert; `kind:'uibox'`
+only wires the Blockly round-trip mouth machinery, never a real rendered panel. **A fifth instance of this
+project's own named "declared but unread" defect class** (`emits`/`modalPre`/`noSnap`/`mouth` are the first
+four) — found by tracing a real port attempt, the same way the first four were each found by accident while
+chasing something else, not by a dedicated sweep.
+
+### THE ACT: reported, not invented — per the amendment's own instruction
+
+No new block. No placeholder block (populating an inert container just for Blocks-tab cosmetics would
+misrepresent unread machinery as functional — worse than the empty section it would replace, since an empty
+section at least reads honestly as "nothing here yet"). Updated `cornerData.js:228-231`'s stale "later
+follow-up" comment to state the traced finding directly, in full, with the reasoning any future reader would
+need to NOT redo this exact investigation. Updated `ARCHITECTURE.md`'s Q3 renderer inventory with a new
+subsection naming the shape-block/container-block split, and corrected its "six legacy renderers" note to
+reflect that 2 of the 6 behavioral divergences it documented are now FIXED (t1722) rather than leaving a
+stale "confirmed... today" claim standing.
+
+### Verify
+
+**Node gate — caught and fixed 1 more self-caused architecture-map citation drift** (my comment insertion into
+`cornerData.js` shifted `cornerStack(`'s call site from line 244 to 261 — TRAP1's citation, fixed in the test
+file). **118/118** after. **Hand-picked corner sweep — 16/16**: `corner-data-emit`, `corner-marker-parity`
+("ANTI-GREEN: the wall marker is COINCIDENT in both panels"), `corner-marker-truth` (all 16 corner×order×Z
+configs, plus its OWN non-vacuity check — "the assert FAILS when the expected offset is deliberately mutated"),
+`corner-marker-independence` (all 5), `corner-layout-coherence`, `corner-selector`, `corner-source-declared`,
+`corner-atrest-parity` (all 16 configs + a settling-flash stress case). Exactly the "5 symptoms" class of
+regression the amendment warned would be immediately visible — none moved, as expected for a comment-only change.
+
+### Emit byte-identical
+
+Trivially true — zero functional code touched, only comments (`cornerData.js`) and documentation
+(`ARCHITECTURE.md`, a test citation).
+
+### Capacity
+
+The investigation cost more than the deliverable — tracing every visible pixel back to its source, then
+separately verifying the CONSUMER side of both the shape and container block sets, took the bulk of the turn;
+writing down the finding took little. That asymmetry is the right shape for a "STOP and report the gap" act:
+the value is in having actually checked, not in the length of the resulting diff. Full working room used.

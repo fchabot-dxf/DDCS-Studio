@@ -312,12 +312,26 @@ registers a SEVENTH, older renderer per op for 6 of the 8 probe/utility twins** 
 wizard views, unreachable from today's menu but reached the instant an op carries its RAW built-in type (an old
 save file, a Blocks-authored raw block) instead of its twin's `user_*_data` type. Only `corner`'s legacy view was
 actually deleted (`git log` shows a full-remove commit `cbe08b03`) — `wcs`'s legacy view (`wcsView.js`) also
-survives but draws nothing on either path, so it carries no divergence risk. Two of the six are **confirmed
-behaviorally different from their twin today**, not just duplicated: `middleView.js`'s `syncStockShape` mutates
-the global stock shape for a round preview the twin's `middle_data` has no equivalent for (a live regression);
-`rotaryCenterView.js`'s `activateCylinderStock()` silently persists a global `settings.stock` mutation the twin's
-`def.simStock` explicitly avoids. Full per-op detail, citations, and the complete duplicate-intent list:
-`PREVIEW-AS-DATA.md` (cycle 857 ACT 1 survey).
+survives but draws nothing on either path, so it carries no divergence risk. Two of the six **were** confirmed
+behaviorally different from their twin (this map caught it, cycle 857 ACT 1) and are **FIXED as of cycle 857 ACT 2
+(t1722)**: `middle_data` now declares `def.simStock` (mirrors rotaryCenterData.js's own pattern, non-mutating);
+`rotaryCenterView.js`'s `activateCylinderStock()` no longer touches global `settings.stock` at all. Full per-op
+detail, citations, and the complete duplicate-intent list: `PREVIEW-AS-DATA.md` (cycle 857 ACT 1 survey).
+
+### The wizard-shape-block vocabulary: one working consumer, three declared-but-unread containers
+
+`wizards/ops/vizBlocks.js` (t1627) declares SIX preview-authoring block types for the Blocks-tab wizard-maker:
+`shape_rect`/`shape_circle`/`shape_line`/`shape_marker` (`SHAPE_2D_TYPES`) and three CONTAINER blocks —
+`layout_2d_canvas` (`kind:'uibox'`), `sim_3d_box`, `code_preview_panel`. Traced live (cycle 856 ACT 3, t1724,
+attempting to finish corner's deferred "per-view rig blocks"): the four SHAPE primitives have a real, working
+consumer — `panelTypes.js:293` flattens `def.template` (walking BOTH `uiChildren` and `children` — mouth-
+agnostic) and draws every `shape_*` block it finds as a Layout-pane item, already wired, zero extra code needed
+by a twin that has content to declare. The THREE CONTAINER blocks do not: `rg -n "layout_2d_canvas|sim_3d_box|
+code_preview_panel" web --include='*.js'` outside `vizBlocks.js` itself returns nothing — their
+`minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields are inert, and `kind:'uibox'` only wires the
+generic Blockly round-trip (bridge/stackBridge's mouth machinery), never a real rendered panel. A FIFTH instance
+of this project's own "declared but unread" defect class (`emits`/`modalPre`/`noSnap`/`mouth` are the first
+four) — found by tracing a real port attempt, not by a dedicated sweep.
 
 ### The one-sources every renderer already shares — do not re-derive these
 
