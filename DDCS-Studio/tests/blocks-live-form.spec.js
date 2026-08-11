@@ -6,10 +6,9 @@ import { test, expect } from '@playwright/test';
  * form, so you "see the form change." (Built-ins are unaffected — they generate, not view.) Writeback is step 2.
  */
 
-// t1718 (gate repair) — DECLARED LOAD-SENSITIVITY, not a defect: deterministically green run alone or in a small
-// hand-picked group, intermittently red only under the full suite's worker=6 contention. A retry lets a genuine
-// one-off contention stall self-heal without masking a real regression — a defect fails EVERY retry too.
-test.describe.configure({ retries: 2 });
+// t1718 named this spec's load-sensitivity; t1724 retired the PER-SPEC retries declared here in favor of a
+// config-level policy (playwright.config.js's `retries`) — a fixed list goes stale every run as the starved
+// population shifts (measured at t1719: this turn's own survivors weren't the previous run's).
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 

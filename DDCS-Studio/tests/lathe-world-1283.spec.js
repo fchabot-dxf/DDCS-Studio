@@ -205,7 +205,10 @@ test('LATHE: the turning tool is there AND the mill spindle is NOT', async ({ pa
 
 test('LATHE: the centre drill declares its OWN tool — a bit on centre, not an insert', async ({ page }) => {
     const s = await sceneOf(page, 'lathe', 'user_lathe_centerdrill');
-    expect(s.toolType, 'the op declares what it puts against the work').toBe('centerdrill');
+    // t1722 — 'centredrill' (British), matching LATHE_TOOL_KINDS' declared id (data/latheTools.js): unified a
+    // real spelling split across 6 tool-KIND sites (this op's OWN opType, 'user_lathe_centerdrill', is a
+    // separate, correctly-American-spelled identity, untouched).
+    expect(s.toolType, 'the op declares what it puts against the work').toBe('centredrill');
     expect(s.note, 'and the header says so').toMatch(/centre drill/);
     expect(s.note, 'never a turning insert, which this op does not use').not.toMatch(/insert/);
     expect(s.hasChuck, 'the bar is still held').toBe(true);

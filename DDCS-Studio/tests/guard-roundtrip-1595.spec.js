@@ -24,11 +24,9 @@ import { test, expect } from '@playwright/test';
 // ~5.1s to settle, alone. Under the suite's six workers those numbers stretch, and the config's 5s actionTimeout is
 // the default for an un-optioned wait. This spec opens the two largest wizards in the registry, fourteen times.
 
-// t1718 (gate repair) — the comment above already NAMED this spec's load-sensitivity; this is that fact made
-// GATE-READABLE (a comment is not a declaration — the runner must read it). Confirmed green alone/in a small
-// hand-picked group, intermittently red only under the full suite's worker=6 contention. A retry lets a genuine
-// one-off contention stall self-heal without masking a real regression — a defect fails EVERY retry too.
-test.describe.configure({ retries: 2 });
+// t1718 made the comment above's load-sensitivity gate-readable via a per-spec retry; t1724 retired that in
+// favor of a config-level policy (playwright.config.js's `retries`) — a fixed list of "these specs get
+// retries" goes stale every run as the starved population shifts (measured at t1719).
 
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });

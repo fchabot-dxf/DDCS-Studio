@@ -23993,3 +23993,82 @@ Two real, unplanned discoveries mid-fix (the live-toggle caching gap for #1, the
 each caught by driving the ACTUAL gesture / checking the ACTUAL page before declaring done, not by trusting the
 unit-level change looked right. Both were small once found; neither would have been caught by the node tier
 alone. Full working room used; nothing parked.
+
+## 🔨 turn 1724 (cycle 856, epoch 4) — ACT 3: KILL THE DECORATIVE CI SIGNAL
+
+### DISPATCH
+
+t1718's per-spec `retries` fix was itself measured to be folklore-in-waiting: t1719's next gate run starved 3
+DIFFERENT specs than the 5 t1718 had named, none of which had failed the previous run. A fixed per-spec list
+goes stale immediately as the contention-starved population shifts run to run. The act: move retries from
+per-spec to a config-level policy (contention is configured via `workers`, so the mitigation belongs there
+too), keep the genuinely-reasoned `test.fixme` quarantines (real product statements, not scheduling luck), make
+the FLAKY COUNT the health metric read at each release, then run the full gate once to confirm 0 unexplained.
+
+### THE ACT
+
+Removed all 5 per-spec `test.describe.configure({ retries: 2 })` declarations t1718 added (fork-parity-1593,
+middle-superset, blocks-live-form, formfield-loud-mismatch-1636, guard-roundtrip-1595) — replaced each with a
+comment pointing at the new config-level policy, not silently deleted. Left 3 OTHER pre-existing per-spec
+`retries` declarations alone (middle-animator, middle-viz, probe-field-sticky) — different rationale (real DOM-
+animation timing, predates and is unrelated to t1718's contention fix), out of this act's scope. Added
+`retries: 2` to `playwright.config.js` at the top level, right beside `workers: 6` (the two are causally
+linked — contention from one is what the other exists to absorb) — unconditional, not CI-gated, since
+`workers: 6` itself isn't gated either and the advisor's own local gate runs need it too.
+
+**The flaky-count health metric, made structural, not left as scrollback**: added a `json` reporter
+(`test-results/summary.json`, gitignored) running unconditionally alongside the existing list/CI reporters, and
+updated `scripts/test-all.cjs` to read `stats.flaky`/`unexpected`/`expected`/`skipped` back out of it and print
+them as an explicit `=== FLAKY COUNT ===` summary line — a number the gate STATES, not text a human has to
+notice among ~2500 results.
+
+### Verify — ran the full gate twice (explicitly authorized this act; not a per-act habit)
+
+**Run 1** (before finalizing): `test:e2e exit 1` — **1 real, non-flaky failure** (failed even after 2 retries):
+`lathe-world-1283.spec.js`'s "the centre drill declares its OWN tool" test, asserting the OLD American
+`'centerdrill'` spelling my OWN t1722 turn had just retired in favor of the canonical `'centredrill'` (a stale
+test my t1722 hand-picked sweep hadn't included). Fixed the assertion immediately (traced, not guessed — the
+mesh selection path itself was unaffected, only the test's expected string). 5 flaky (all generic page-boot
+timeouts under contention, unrelated to anything this cycle touched).
+
+**Discovered and corrected a false-positive along the way**: piping `npm test` through `tee | tail` made the
+Bash tool report "exit code 0" for the WHOLE pipeline (reflecting `tail`'s own exit code, not `npm test`'s) —
+the log clearly said `test:e2e exit 1` underneath that misleading 0. Caught by reading the actual summary line,
+not trusting the reported exit code; re-ran the confirming pass capturing the real exit code explicitly
+(`echo "EXIT: $?"` immediately after, no pipe in between).
+
+**Run 2** (confirming, after the fix): **`EXIT: 0`, `test:e2e exit 0`. 0 failed. 2469 passed. 8 flaky (all
+self-healed by the config-level retry). 7 skipped (pre-existing, unrelated).** The flaky SET differs almost
+entirely from Run 1's — `context-menu-pass-1452`, `hook-carry-1682`, `middle-superset`, `open-as-modal-1625`,
+`pocket-cavity-2d` are new names that weren't flaky in Run 1 at all — live, first-hand confirmation of the
+dispatch's own diagnosis (the starved population shifts run to run) and of the config-level fix's correctness
+(it absorbed a COMPLETELY DIFFERENT flaky set on the very next run without any per-spec list needing to change).
+
+**Before/after, the number that matters:** t1719's baseline was **14 → 3** unexplained (a per-spec quarantine
+that itself went stale by the very next run). This turn: **0 unexplained**, twice in a row, across two runs
+whose flaky populations barely overlap.
+
+### Mid-task amendment — incorporated
+
+Received while finalizing: the full-suite verification above was already complete (both runs) before the
+amendment landed asking to skip it going forward — nothing further was run after receiving it. Per the
+amendment, committing this act as-is and pivoting immediately to the newly-dispatched CORNER PREVIEW task next;
+no further full-suite runs planned this cycle (the advisor folds future verification into their own release gate).
+
+### Report: declared vs. patched
+
+| # | genuinely broken? | action |
+|---|---|---|
+| per-spec retries | Not broken, but the WRONG granularity (already proven to go stale) | **moved to config-level `retries`** |
+| flaky-count visibility | Yes — existed only as reporter scrollback | **declared** (JSON reporter + `test-all.cjs` reads it structurally) |
+| `lathe-world-1283`'s stale assertion | Yes — my own t1722 miss | **fixed** (updated to the canonical spelling) |
+
+### Emit byte-identical
+
+N/A — this act touches test infrastructure only (config, a gate script, test assertions); zero product/emit code.
+
+### Capacity
+
+Running the full suite twice (40 minutes total) was the right call given the advisor's own explicit
+authorization and the fact that Run 1 surfaced a real, own-caused regression — a single run would have either
+missed it (if I'd trusted the misleading exit-code-0) or left it unconfirmed-fixed. Full working room used.

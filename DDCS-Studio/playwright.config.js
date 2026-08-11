@@ -13,13 +13,26 @@ export default defineConfig({
   testIgnore: ['node/**'],
   // t1607 — CI needs an HTML report to upload as a diagnosable artifact on a red run; local runs keep the
   // terse 'list' output unchanged (this only takes effect under GitHub Actions' own CI=true).
-  reporter: process.env.CI ? [['dot'], ['html', { open: 'never' }]] : 'list',
+  // t1724 — the JSON reporter runs UNCONDITIONALLY (local + CI alike): scripts/test-all.cjs reads its
+  // `stats.flaky`/`stats.unexpected` back out and prints them as the gate's own named health metric, so
+  // "how many flaked this run" is a number the gate states, not text a human has to notice in scrollback.
+  reporter: [...(process.env.CI ? [['dot'], ['html', { open: 'never' }]] : [['list']]), ['json', { outputFile: 'test-results/summary.json' }]],
   workers: 6,  // t1593 (2026-08-06) — re-measured on the i7-13700F (16c/24t/32GB): w4=1158s/73fail, w6=975s/73fail (same set, ±2 within
                // the existing flake class), w8=897s/82fail (+10 NEW beyond baseline, only 1 healed — a real contention ceiling; backed
                // off per the "new failures → back off one step" rule, so w12 was not run). The t836 baseline this replaces was itself
                // contaminated by the (now-fixed) formBindings bug's deterministic failures being misread as load sensitivity.
                // NOTE: the 73-count baseline itself is NOT zero — it's a separate, pre-existing mouse/hover-event class (drag/canvas
                // tests) confirmed present on main HEAD too (0 flaky across retries); unrelated to worker count, not investigated here.
+  // t1724 — retries live HERE, not on individual specs. t1718 declared `test.describe.configure({retries:2})` on
+  // 5 specs measured flaky under this SAME worker=6 contention; t1719's next gate run showed 3 DIFFERENT specs
+  // starved instead (names that hadn't failed the run before) — the contention-starved population shifts run to
+  // run, so a fixed per-spec list goes stale immediately and becomes exactly the "14 failed, all churn" folklore
+  // this whole arc exists to kill. Contention is a property of the CONFIG (`workers` above), not of any one
+  // spec, so the mitigation is declared at the same level: every test gets up to 2 retries, healing a genuine
+  // one-off contention stall without masking a real regression (a deterministic defect fails every retry too,
+  // and still fails the gate). The health metric this act asks for — the FLAKY COUNT, read at every release
+  // instead of a per-spec name list — is surfaced by the JSON reporter below + scripts/test-all.cjs.
+  retries: 2,
   timeout: 60_000,   // t1197 — per-test cap; lenient (a slow load-flake gets more time, never turns a passing test red)
   expect: { toHaveTimeout: 5000 },
   use: {
