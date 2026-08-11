@@ -1149,3 +1149,17 @@ NOTHING. It does not reach for something to display.
 generic form from the op's params · retaining the last wizard that was loaded · any "close enough" face.
 Each of those is the app inventing a wizard that is not there, which is precisely the lie 8b exists to
 prevent. **Empty is the true answer and it is the required one.**
+
+### 1b. UPDATE (user, 2026-08-11): the empty save NO LONGER REPRODUCES — *"that was before, now it works, in surfacing at least"*
+**Do NOT record this as fixed — nothing was fixed.** It was seen, then it was not. That makes it
+INTERMITTENT/state-dependent, not resolved, and the trigger is unknown to both the user and the advisor.
+**Stop asking the user which button** — the question is retired; they cannot answer it for a symptom that
+stopped appearing.
+
+**The code hole is real regardless and does not depend on the repro:** `ui/headerPost.js:51` guards with
+`window.ddcsSaveAsWizard ? … : notice(...)` — i.e. whether the FUNCTION EXISTS, not whether anything is
+LOADED. devMode defines that function on init, so an empty workspace saves an EMPTY wizard silently and the
+notice never fires. `ui/libraryModal.js:170` shares the call.
+**The act: make the save REFUSE when there is nothing to save** (and say so). Small, permanent, and it
+closes the hole without needing to reproduce the original symptom. Better still, if cheap: saving from a
+wizard context loads THAT wizard's stack first, so the gesture simply works.
