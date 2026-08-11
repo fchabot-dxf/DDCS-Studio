@@ -47,21 +47,25 @@ test('E3 unit: def.simStock derives a round bar from #57 (cylinder, Ø, along th
     expect(r.emitSame, 'emit BYTE-IDENTICAL (the round-bar read is sim-only)').toBe(true);
 });
 
-test('E3: restoreBoxStock (the defensive edge/middle/clock revert) still works after the twin path', async ({ page }) => {
+// t1722 (gate repair, cycle 857 ACT 2) — REWRITTEN: this test's OWN title named the built-in shim's mutation as
+// "deferred dead-code cleanup" — that cleanup is this act. activateCylinderStock() is retired (no export
+// survives), so there is nothing left for restoreBoxStock to defend against; it stays exported for
+// edge/middle/rotary-clock views' existing onOpen calls, now as a documented, harmless no-op.
+test('E3: activateCylinderStock is retired; restoreBoxStock is a harmless no-op (the deferred cleanup, done)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
     const r = await page.evaluate(async () => {
-        const { activateCylinderStock, restoreBoxStock } = await import('/wizards/views/rotaryCenterView.js');
+        const rcv = await import('/wizards/views/rotaryCenterView.js');
         const SP = await import('/ui/settingsPanel.js');
         SP.applySettings({ stock: { x: 200, y: 100, z: 80, shape: 'box', show: true } });
-        activateCylinderStock();   // the BUILT-IN shim still mutates (deferred dead-code cleanup)
-        const cyl = window.ddcsGetSettings().stock.shape;
-        restoreBoxStock();         // the defensive revert (edge/middle/clock views call this on open)
-        const back = window.ddcsGetSettings().stock.shape;
-        return { cyl, back };
+        const before = window.ddcsGetSettings().stock.shape;
+        rcv.restoreBoxStock();   // the defensive revert (edge/middle/clock views call this on open) — now a no-op
+        const after = window.ddcsGetSettings().stock.shape;
+        return { hasActivate: typeof rcv.activateCylinderStock === 'function', before, after };
     });
-    expect(r.cyl, 'the built-in shim activateCylinderStock still forces a cylinder (unchanged)').toBe('cylinder');
-    expect(r.back, 'restoreBoxStock reverts to a box (the defensive edge/middle/clock revert still works)').toBe('box');
+    expect(r.hasActivate, 'activateCylinderStock is retired, not deferred any longer').toBe(false);
+    expect(r.before).toBe('box');
+    expect(r.after, 'restoreBoxStock changes nothing — there is no mutation left to undo').toBe('box');
 });
 
 test.use({ viewport: { width: 1400, height: 1000 } });

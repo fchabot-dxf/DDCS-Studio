@@ -96,7 +96,7 @@ export function latheSimStock(params, current, fallback) {
  * THE TOOL IS DECLARED HERE TOO (t1285), beside the bar, because it is the same kind of fact: what this op puts
  * against the work. Most turning ops are an insert on a holder; a centre drill really is a bit in the tailstock, on
  * the centreline. Declared per op rather than inferred from the program, so nothing has to read a toolpath and guess.
- * @param {'turning'|'centerdrill'} tool
+ * @param {'turning'|'centredrill'} tool  — t1722: matches LATHE_TOOL_KINDS' declared id (data/latheTools.js), not a second, American-spelled identity
  */
 export function withLatheScene(def, fallback, tool = 'turning', probeAxis = null) {
     def.simStock = (params, stock) => latheSimStock(params, stock, fallback);

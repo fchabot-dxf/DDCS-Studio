@@ -185,5 +185,17 @@ export function middleDataDef() {
     // absent key would prune every arm away.
     def.deriveGuards = (p) => { const a = middleAxes(p || {}); return { axisOrder: a.order, dir1: a.dir1, dir2: a.dir2 }; };
     def.simStartsProvider = middleSimStartsProvider;   // E2 — the per-pass preview markers, byte-faithful to BUILT_IN.middle (sim-only)
+    // t1722 (gate repair, cycle 857 ACT 2) — THE STOCK-SHAPE PREVIEW, DECLARED NON-MUTATINGLY. The legacy built-in view's
+    // syncStockShape (middleView.js) mutated + PERSISTED the global settings.stock.shape so the 3D preview matched
+    // Feature/Circular — a preview writing user state is a defect on its own terms, and it left the twin with no
+    // equivalent at all (Feature=Boss+Circular showed whatever the global stock happened to be, not a round bar/boss).
+    // Mirrors rotaryCenterData.js's def.simStock exactly (registered the same way, read the same way by userOpView.js →
+    // mgr.preview3D): DERIVE the shape from the op's OWN declared params, return a NEW object, touch nothing global.
+    // Sim-only → emit byte-identical.
+    def.simStock = (params, stock) => {
+        const p = params || {};
+        const want = p.circular ? 'cylinder' : ((p.featureType || MIDDLE_DEFAULTS.featureType) === 'boss' ? 'boss' : 'pocket');
+        return { ...(stock || {}), shape: want };
+    };
     return def;
 }

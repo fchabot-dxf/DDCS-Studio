@@ -75,7 +75,7 @@ export function centerDrillDataDef() {
     const def = withLatheScene(userOpFromStack(
         'lathe_centerdrill', 'Centre Drill (lathe)', cdrillDataStack(CDRILL_DEFAULTS),
         [...CDRILL_BINDINGS, ...CDRILL_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
-    ), CDRILL_DEFAULTS, 'centerdrill');   // …a bit on the centreline, not an insert on a holder
+    ), CDRILL_DEFAULTS, 'centredrill');   // …a bit on the centreline, not an insert on a holder — t1722: matches LATHE_TOOL_KINDS.centredrill's declared id (data/latheTools.js), not a second, American-spelled identity
     def.postInstantiate = (stack, resolved) => applyStraightPeck(stack, resolved);
     return def;
 }

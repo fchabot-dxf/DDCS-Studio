@@ -362,7 +362,13 @@ export const userOpView = {
         const _tbl = (params.toolNum !== '' && params.toolNum != null) ? getTool(params.toolNum) : null;
         const _tdia = _tbl ? Number(_tbl.dia) : NaN;
         const _dia = (_tdia > 0) ? _tdia : ((_opToolDia > 0) ? _opToolDia : NaN);
-        if (_tbl && Number.isFinite(_dia)) _opTool = { type: _tbl.type || 'endmill', dia: _dia, name: _tbl.name, angle: Number(_tbl.angle) || undefined };   // t875 — the vee angle → the carve cone + sim tool
+        // t1722 (gate repair, cycle 857 ACT 2) — a lathe-authored table row declares its identity via `kind` (the
+        // LATHE_TOOL_KINDS id: turning/parting/centredrill/drill — data/latheTools.js), never `type` (the MILL
+        // field — settingsPanel.js's two row templates write one or the other, never both). Reading `_tbl.type`
+        // alone left every picked lathe tool falling to the 'endmill' default below, rendering as a flat mill
+        // cutter under a mill spindle assembly regardless of which lathe tool was actually chosen. `kind` first
+        // (wins when present — a lathe row), `type` as the unchanged mill fallback.
+        if (_tbl && Number.isFinite(_dia)) _opTool = { type: _tbl.kind || _tbl.type || 'endmill', dia: _dia, name: _tbl.name, angle: Number(_tbl.angle) || undefined };   // t875 — the vee angle → the carve cone + sim tool
         else if (_opToolDia > 0) _opTool = { type: 'endmill', dia: _opToolDia, _opValue: true };
         // t1285 — A LATHE OP'S OWN DECLARED TOOL. `getTool` is the FIRST thing the preview's tool-identity owner
         // honours, so declaring it here settles the question for the mesh AND the header at once — no flag set

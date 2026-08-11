@@ -552,7 +552,7 @@ export class GcodeViz3D {
         // t1285 — THE TOOL'S OWN TYPE decides its shape. Earlier attempts keyed this on the stock, then on the
         // workspace kind, and both lost races against whatever rebuilt the tool next; the tool identity has ONE owner
         // (the preview's simTool), so reading the type it hands over is the answer that cannot be overwritten.
-        if (tool.type === 'turning' || tool.type === 'centerdrill') { this._buildLatheTool(tool); return; }
+        if (tool.type === 'turning' || tool.type === 'centredrill') { this._buildLatheTool(tool); return; }   // t1722 — 'centredrill' matches LATHE_TOOL_KINDS' declared id (data/latheTools.js), one spelling not two
         // t1301 — A LATHE PROBE IS NOT A MILL PROBE ON A SPINDLE. The mill assembly hangs a Ø80 × 200 spindle body and
         // its collet above the tool; a lathe has no such thing over the work, and against a Ø20 bar that body WAS the
         // picture. A declared lathe probe renders as what it is: a ball, a stylus, and a small body, standing off along
@@ -726,7 +726,7 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         const grp = new THREE.Group();
         const part = (geo, color, op) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op }));
-        if (tool.type === 'centerdrill') {
+        if (tool.type === 'centredrill') {   // t1722 — matches LATHE_TOOL_KINDS' declared id, one spelling not two
             // ON CENTRE, pointing −Z into the work: the tip at the origin, body behind it
             const d = Math.max(1, Number(tool.dia) || 6), r = d / 2;
             const tip = new THREE.ConeGeometry(r, d, 20); tip.rotateX(Math.PI / 2); tip.translate(0, 0, d / 2);

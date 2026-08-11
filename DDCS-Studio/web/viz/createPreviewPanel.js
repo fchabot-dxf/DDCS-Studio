@@ -31,7 +31,7 @@ import { toggleStockEditor } from '../ui/stockEditor.js';
 import { droAxisLabel, droValue, droWorkShift } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
 import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
-import { magazinePockets } from '../wizards/views/atcViews.js';   // shared ATC magazine layout (handles the disk RING + a rotation) — reused for the pick-place occupancy swap
+import { magazinePockets, magazineOccupiedPockets } from '../wizards/views/atcViews.js';   // shared ATC magazine layout (handles the disk RING + a rotation) — reused for the pick-place occupancy swap; magazineOccupiedPockets (t1722) is the ONE function both this whole-program host and the single-op wizard preview call for the static "which pockets have tools" fact
 
 // DISC-ON-SURFACE (inc2): read the DECLARED radiuscomp atoms of the ops being previewed → { resultVar → { axis, sign } } for
 // ENABLED comps ONLY. The flat <name>Stack carries the probeSurfaceStack atoms; a radiuscomp's `raw` (trigger #1925/6/7) gives
@@ -284,7 +284,7 @@ export function createPreviewPanel(container, opts = {}) {
     // seen is the starting tool, NOT a swap). Isolated firmware op (no tool change) → #1300 never flips → no swap.
     let atcChoreo = null, atcStation = null, lastTool = null, deviceIoListener = null;
     let limitEdges = null, limitIoListener = null;   // H4 (t487) — the home/limit switch devices + their io_change trip listener
-    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
+    let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false, lastPreviewStockSig = '';
     let toolPosSubs = [];   // t309 — live-tool-position subscribers (the Layout animation overlay). Fed the SAME engine head as the 3D/2D, in ANY view mode; cb(pos, segIndex) each tick, cb(null,0) on stop.
     let touchSubs = [];      // t319/INC-6 — on-touch (G31 contact) subscribers (the Layout overlay's pulse). cb({pos, axis, feed, slow, pass, speed}).
     let lastPass = 0;        // the live tool's current pass index (from onPositionChange) — the pulse rides the SAME per-pass anchored frame as the head
@@ -755,9 +755,9 @@ export function createPreviewPanel(container, opts = {}) {
         // is why keying the tool on the stock, or on a flag set beside this, kept losing — the answer has to be HERE.
         // Kind in, correct tool out, whoever re-renders and whenever.
         if (isLatheWorkspace()) {
-            const drill = /centerdrill/.test(String(opts.opType || ''));
+            const drill = /centerdrill/.test(String(opts.opType || ''));   // the OPTYPE (lathe_centerdrill) — a separate, American-spelled identity, untouched
             return drill
-                ? { type: 'centerdrill', dia: 6, _default: true }   // the tailstock really does hold a bit on centre
+                ? { type: 'centredrill', dia: 6, _default: true }   // t1722 — the TOOL kind, matches LATHE_TOOL_KINDS' declared id; the tailstock really does hold a bit on centre
                 : { type: 'turning', dia: 6, _default: true };      // everything else is an insert on a holder
         }
         return { type: 'endmill', dia: 6, _default: true };   // no host tool / no T# / not a probe → the honest 6mm default (E); flagged so the carve note can own up to the assumption
@@ -958,10 +958,19 @@ export function createPreviewPanel(container, opts = {}) {
                 // ONE flag drives the whole frame: an incremental / operator-relative op (a probe) is LOCAL —
                 // stock top-at-0 AND no machine envelope; an absolute / WCS op (mill, WCS setup) shows the MACHINE
                 // frame — datum-aware stock + the envelope. The op's coordinate nature decides it, not the host.
-                if (anchor !== lastAnchor) {
-                    v.setStock(previewStock());
+                // t1722 (gate repair) — the anchor-only gate missed a REAL case: a per-op DERIVED preview stock
+                // (getStock/previewStock — the rotary round bar, now also middle_data's boss/pocket/cylinder shape)
+                // can change on a LIVE param edit (e.g. ticking "Circular") WITHOUT the anchor changing at all, and
+                // setStock() was then never called again — the panel kept showing the stock shape from whenever the
+                // anchor last flipped. Track the derived stock's OWN signature (shape is what a shape-preview bug
+                // actually needs — dims already reflow through the existing global-stock path) alongside the anchor.
+                const _ps = previewStock();
+                const stockSig = _ps ? String(_ps.shape) : '';
+                if (anchor !== lastAnchor || stockSig !== lastPreviewStockSig) {
+                    v.setStock(_ps);
                     v.setMachine(machineForViz());     // t738 — ENVELOPE EVERYWHERE: draw the declared box regardless of the anchor (the box + the G53 start-anchor are SEPARABLE — the start-anchor stock frame above stays as-is); the modal's `envelope` element gates it inside setMachine
                     lastAnchor = anchor;                               // (the 2D's anchor/machine are set above, for both views)
+                    lastPreviewStockSig = stockSig;
                 }
                 // Place EVERY pass's start marker before setSegments so each anchored (probe) pass offsets to its own
                 // start. A multi-point probe (rotary 3-point fit, alignment A/B) repositions between touches → one pass
@@ -998,7 +1007,7 @@ export function createPreviewPanel(container, opts = {}) {
                         // …and the HEADER names what the scene shows. A lathe op calling its insert a flat endmill is
                         // the same lie as drawing one: same source, same answer.
                         const tipName = tp === 'turning' ? 'turning tool (insert)'
-                            : tp === 'centerdrill' ? 'centre drill'
+                            : tp === 'centredrill' ? 'centre drill'   // t1722 — matches LATHE_TOOL_KINDS' declared id, one spelling not two
                             : (_carveTip === 'ball' ? 'ball-nose' : (_carveTip === 'vee' ? tp + ' (v-carve)' : 'flat endmill'));
                         // t722 P2a (2)+(4) — HONEST wording (no cognition verbs) + the op's TYPED Ø: an unset tool states the
                         // default fact; an op-value tool discloses only the tip-shape unknown (the Ø is the typed op value).
@@ -1471,7 +1480,12 @@ export function createPreviewPanel(container, opts = {}) {
      */
     function setShowMagazine(on) {
         if (!viz || !viz.setMagazine) return;
-        viz.setMagazine(on ? magPocketList(new Set(magToolNums()), 0) : null);
+        // t1722 — the SAME shared function atcViews.js's single-op wizard preview calls (magazineOccupiedPockets),
+        // not the locally-parameterized magPocketList above (which exists for renderPickPlaceMag's DIFFERENT need —
+        // excluding the specific tool currently on the spindle during a tool-change animation, not "all occupied").
+        // The two hosts showing the SAME static "which pockets have tools" fact for the SAME declared showMagazine
+        // intent now call one function and cannot disagree by construction.
+        viz.setMagazine(on ? magazineOccupiedPockets(atcCfg(), 0) : null);
     }
 
     function doToolSwap(oldN, newN) {

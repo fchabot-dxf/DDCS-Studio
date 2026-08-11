@@ -23875,3 +23875,121 @@ rather than competing with 32 twins' worth of file-reading for the same turn's b
 every sub-survey's claims against ARCHITECTURE.md's existing ground truth before writing them into the document,
 rather than transcribing verbatim. Full working room used across the whole turn; the four background surveys ran
 concurrently so wall-clock cost was one deep-dive's worth, not four.
+
+## 🔨 turn 1722 (cycle 857, epoch 4) — ACT 2: fix the four Tier-0 divergences (live on screen today)
+
+### DISPATCH
+
+Fix the four survey findings that are wrong TODAY, not future risk: middle_data's wrong stock shape, rotary_
+center_data's legacy view mutating persisted settings.stock, the lathe tool-identity field bug (advisor-verified
+independently), the ATC magazine pocket-list disagreement. Each fix must be a DECLARATION or a shared function —
+never a second hand-rolled copy that happens to agree today. Verify the real symptom, not just a green test.
+
+### 1 — `middle_data`'s wrong stock shape: DECLARED (`def.simStock`, follows rotaryCenterData.js's pattern)
+
+Added `def.simStock = (params, stock) => ({...stock, shape: want})` to `middleData.js`, deriving `want` from
+`featureType`/`circular` exactly like `middleView.js`'s legacy `syncStockShape` did — but returning a NEW
+object, touching nothing global. Registered automatically via the EXISTING generic wiring
+(`userOps.js:967`'s `setUserSimStock` + `userOpView.js:374`'s `getUserSimStock` read) — zero new machinery.
+
+**Found and fixed a second, deeper bug while verifying this live**: a LIVE toggle (open the wizard, then tick
+Circular) never updated the rendered stock at all — `createPreviewPanel.js`'s `v.setStock(previewStock())` call
+was gated behind `anchor !== lastAnchor`, an UNRELATED concept (G90/G91 route framing), so a per-op derived-
+stock change with no anchor change was silently dropped. This is a pre-existing gap (`lastStockKey`, a similarly-
+named but unrelated tracker for the Stock-modal path, was already declared and unused at that call site — a
+"declared but unread" shape this project has hit before). Added a parallel `lastPreviewStockSig` check (the
+derived stock's own `shape`) so a live param edit now re-applies the stock regardless of anchor. Without this,
+my own `def.simStock` fix would have been correct in data but invisible on screen for the most common real
+gesture (open, then change the feature) — caught only by driving the actual toggle, not by unit-testing
+`def.simStock` in isolation.
+
+### 2 — `rotary_center_data`'s legacy view mutating settings.stock: DECLARED (mirrors the twin, no global write)
+
+Replaced `activateCylinderStock()`'s `applySettings({stock:{...}})` with a pure `deriveCylinderStock()` — same
+cross-square math, returns a NEW object. Threaded the result through `ctx.preview3D(...)`'s existing `simStock`
+5th argument (confirmed live: `wizardManager.js:535` already accepts it; `userOpView.js` already uses it for
+every twin) instead of relying on the global mutation to reach the renderer. The "known diameter, from stock"
+convenience (auto-pull Ø when the REAL stock happens to already be a cylinder) now reads honestly — it no
+longer force-converts the stock to manufacture that match, matching the twin's own `def.simStock` comment
+("the USER's clean control, don't declare away user responsibility"). `restoreBoxStock()` (called by
+edge/middle/rotary-clock views on open) is kept exported as a now-harmless no-op rather than touching those 3
+call sites — a bigger footprint than this repair needs. **Broke the app boot on first pass** (deleted
+`activateCylinderStock`'s whole export without checking for other importers) — 3 other legacy views still
+imported `restoreBoxStock` from this file; caught immediately by a page-boot error check before any further work,
+fixed by keeping the no-op export.
+
+### 3 — the lathe tool-identity bug: DECLARED (one spelling, the read fixed at the source)
+
+`userOpView.js:365` read `_tbl.type` — the MILL field — off a picked tool; a lathe-authored row only ever writes
+`kind` (confirmed: `settingsPanel.js`'s two row templates write one field or the other, never both, verified by
+grep). Changed to `_tbl.kind || _tbl.type || 'endmill'` — `kind` wins when present (a lathe row), unchanged mill
+fallback otherwise. Then found the ALSO-flagged spelling split was real and load-bearing: `LATHE_TOOL_KINDS`
+(`data/latheTools.js`) declares the canonical id as British `centredrill`; six other sites independently spelled
+it American `centerdrill` as the TOOL-kind value (not the separate, correctly-American-spelled OPTYPE
+`lathe_centerdrill`, left untouched). Unified all six tool-KIND sites to `centredrill` — `centerDrillData.js`
+(the `withLatheScene` tool arg), `gcodeViz3d.js` ×2 (the mesh-branch checks), `createPreviewPanel.js` ×2 (the
+fallback-tool constructor + the header label), `latheScene.js`'s JSDoc. Left the 5 OPTYPE-string sites
+(`lathe_centerdrill`) alone — a genuinely separate identity, confirmed by checking `settingsPanel.js`'s row
+templates never write a `type` field for a lathe row and vice versa for mill, so `kind || type` cannot cross-
+contaminate the two vocabularies.
+
+### 4 — the ATC magazine pocket-list disagreement: DECLARED (one shared function, both hosts call it)
+
+Traced both computations first: `createPreviewPanel.js`'s `magPocketList` already called the SAME base
+`magazinePockets()` `atcViews.js` uses — the two were never independent re-derivations of the geometry, only of
+the OCCUPANCY FILTER (single-op host: none; whole-program host: tool-assigned only). Added
+`magazineOccupiedPockets(a, theta)` to `atcViews.js` (filters `magazinePockets()`'s own `.empty` field — no new
+computation) and pointed BOTH the single-op host (`atcViews.js`'s `applyPreviewIntent`) and the whole-program
+host's static case (`createPreviewPanel.js`'s `setShowMagazine`) at it. Left `magPocketList`'s OTHER caller
+(`renderPickPlaceMag`, the tool-change ANIMATION) untouched — it filters by an arbitrary passed-in tool-number
+set (excluding the just-picked spindle tool), a genuinely different, correct-as-is computation the advisor's
+finding never named.
+
+### Verify
+
+**Node gate — caught 2 architecture-map citation drifts my own edits caused** (line-shift in `userOpView.js` and
+`createPreviewPanel.js` moved 3 TRAP citations ARCHITECTURE.md/the map-checker test both cite by exact line —
+fixed both files' citations to the new lines, confirmed against the actual current content before updating,
+not guessed). **118/118** after.
+
+**Live, real-symptom verification, all 4** (not just green tests): (1) middle_data — ticked Circular on an
+already-open wizard, confirmed the 3D stock shape flips `boss`→`cylinder` (proves BOTH the declaration and the
+caching fix). (2) rotary_center — compared `settings.stock` before/after opening the legacy view: byte-identical
+JSON, while the preview itself still renders `cylinder`. (3) lathe — seeded a real `kind:'centredrill'` tool row,
+picked it by number, confirmed `host.__opTool.type === 'centredrill'` (not the buggy `'endmill'` default).
+(4) ATC — seeded one occupied + one empty pocket, confirmed `magazineOccupiedPockets` returns `[1]` (not `[1,2]`)
+for BOTH call sites, and separately confirmed the OLD unfiltered `magazinePockets()` would have returned `[1,2]`
+— non-vacuity, not assumed.
+
+**Hand-picked sweep found 2 pre-existing regression tests that directly tested the REMOVED mutation mechanism**
+(`rotary-stock-revert.spec.js`, `rotary-center-roundbar.spec.js`'s E3 restore test) — both failed with
+`activateCylinderStock is not a function`. Read them before touching anything: `rotary-center-roundbar.spec.js`'s
+OWN comment already named this "deferred dead-code cleanup" (from the original E3 port, t417) — this act IS that
+deferred cleanup, not a surprise regression. Rewrote both to assert the completed state (no mutation occurs;
+`restoreBoxStock` is a documented no-op; `activateCylinderStock` no longer exists as an export) rather than
+deleting or skipping them. **Full hand-picked sweep (19 files, 64 tests) — 63 passed, 1 pre-existing skip
+(unrelated), 0 failed.**
+
+### Report: declared vs. patched, and why (per item)
+
+| # | genuinely broken? | action | mechanism |
+|---|---|---|---|
+| 1 middle_data stock | Yes — no declaration existed | **Declared** | `def.simStock`, follows rotaryCenterData.js exactly |
+| 1b (found) live-toggle caching | Yes — pre-existing gap | **Fixed at the source** | anchor-only gate → also checks the derived stock's own signature |
+| 2 rotary_center mutation | Yes — the twin's own comment named the correct intent | **Declared** | local `deriveCylinderStock()`, threaded via the existing `simStock` preview3D arg |
+| 3 lathe tool field | Yes — wrong field read | **Fixed at the read** | `_tbl.kind \|\| _tbl.type` |
+| 3b spelling split | Yes — two declarations of one identity | **Unified to one** | 6 sites → `centredrill` (the canonical `LATHE_TOOL_KINDS` id) |
+| 4 ATC magazine | Yes — one intent, two computations | **Unified to one function** | `magazineOccupiedPockets`, both hosts call it |
+
+### Emit byte-identical
+
+All 4 fixes are preview-only (stock-shape rendering, tool-mesh selection, magazine display) — none touch a
+value binding, an emit path, or a G-code generator. `middle-data-emit.spec.js` and `rotary-center-data-emit.spec.js`
+(byte-identity sweeps, both in the hand-picked sweep) confirm this directly rather than by argument.
+
+### Capacity
+
+Two real, unplanned discoveries mid-fix (the live-toggle caching gap for #1, the app-boot break for #2) were
+each caught by driving the ACTUAL gesture / checking the ACTUAL page before declaring done, not by trusting the
+unit-level change looked right. Both were small once found; neither would have been caught by the node tier
+alone. Full working room used; nothing parked.

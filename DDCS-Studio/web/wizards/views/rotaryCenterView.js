@@ -2,40 +2,34 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { RotaryCenterWizard } from '../rotaryCenterWizard.js';
 import { cylinderOf, rotaryAxisOf } from '../../engine/probeGeometry.js';
-import { applySettings } from '../../ui/settingsPanel.js';
 import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (rig + envelope), single-sourced with the twin
 
 const wizard = new RotaryCenterWizard();
 
-let _savedBoxStock = null;   // the rectangular stock in effect before a rotary op forced the round bar (for revert)
-
-/** Rotary probing is for a round bar — make the stock a cylinder so the preview, the probe collision and the
- *  Ø-pull all match. Keeps the axial LENGTH but squares up the two cross dimensions to a single diameter, so a
- *  block (mismatched cross dims) doesn't become a thin rod lost in its bounding box. Skips if already a cylinder. */
-export function activateCylinderStock() {
+/** t1722 (gate repair, cycle 857 ACT 2) — Rotary probing is for a round bar, so the preview/collision/Ø-pull all
+ *  need to see one. THIS is the SAME cross-square math the OLD activateCylinderStock() used, kept as a pure
+ *  derivation: given the current stock, return a NEW round-stock object, touching nothing global. It no longer
+ *  mutates + persists window.ddcsGetSettings().stock — a preview writing user state was a defect on its own terms
+ *  (survey finding, PREVIEW-AS-DATA.md), and it's the exact shape rotaryCenterData.js's OWN def.simStock already
+ *  uses for the twin (that comment: "Mirrors activateCylinderStock's cross-square, but the Ø comes from #57" —
+ *  the twin was already built to retire this; the legacy view just never followed). */
+function deriveCylinderStock() {
     const get = window.ddcsGetSettings ? window.ddcsGetSettings() : {};
     const cur = get.stock || {};
-    if (cur.shape === 'cylinder' && cur.show) return;
-    _savedBoxStock = { ...cur };   // remember the rectangular stock so non-round ops can switch back to it
+    if (cur.shape === 'cylinder' && cur.show) return { ...cur };
     const axis = rotaryAxisOf(get.motors);
     const cross = axis === 'x' ? ['y', 'z'] : axis === 'y' ? ['x', 'z'] : ['x', 'y'];
     const dims = { x: cur.x || 150, y: cur.y || 76.2, z: cur.z || 76.2 };
     const D = Math.max(dims[cross[0]], dims[cross[1]]) || 76.2;   // diameter = the larger cross dim (fills the stock)
     dims[cross[0]] = D; dims[cross[1]] = D;
-    applySettings({ stock: { datum: 'nnp', pin: 'origin', ...cur, ...dims, shape: 'cylinder', show: true } });
+    return { datum: 'nnp', pin: 'origin', ...cur, ...dims, shape: 'cylinder', show: true };
 }
 
-/** Inverse of activateCylinderStock: revert to RECTANGULAR stock. Non-round ops (rotary clock, which clocks a
- *  flat; middle/corner/edge) call this so they don't inherit the round bar a prior rotary-centre op forced. Restores
- *  the remembered box dims if we have them, else just flips the shape back to a box. No-op if already rectangular. */
-export function restoreBoxStock() {
-    const get = window.ddcsGetSettings ? window.ddcsGetSettings() : {};
-    const cur = get.stock || {};
-    if (cur.shape !== 'cylinder') return;   // already rectangular — leave the operator's stock alone
-    const box = _savedBoxStock || { ...cur };
-    applySettings({ stock: { ...cur, ...box, shape: 'box' } });
-    _savedBoxStock = null;
-}
+/** t1722 — NOW A NO-OP, kept exported: `activateCylinderStock` no longer mutates the global stock (above), so
+ *  there is nothing left to restore. `edgeView.js`/`middleView.js`/`rotaryClockView.js` still call this on open
+ *  (their own "not a rotary op, revert a forced cylinder" gesture) — kept as a safe no-op rather than touching
+ *  those 3 call sites, which is a bigger footprint than this repair needs. */
+export function restoreBoxStock() { /* nothing to restore — the mutation this undid no longer happens */ }
 
 export const rotaryCenterView = {
     type: 'rotary_center',
@@ -51,7 +45,6 @@ export const rotaryCenterView = {
     probeSrcFields: { rc_feed_fast: 'fastFeed', rc_retract: 'retract' },
 
     onOpen(ctx) {
-        activateCylinderStock();           // rotary probing → round-bar stock (preview + collision + Ø-pull all match)
         setTimeout(() => { ctx.update(); }, 50);
     },
 
@@ -59,8 +52,11 @@ export const rotaryCenterView = {
         const settings = window.ddcsGetSettings ? window.ddcsGetSettings() : { probes: {}, stock: {} };
         const method = el('rc_method')?.value || 'known';
 
-        // Known diameter: if the stock IS a cylinder, pull Ø straight from it (the bar being probed) so the macro's
-        // R and the sim's collision radius can't disagree. Otherwise the operator types it.
+        // Known diameter: if the REAL stock is ALREADY a cylinder (the operator configured it that way in
+        // Settings → Stock), pull Ø straight from it — an honest read, not a forced one. t1722: this no longer
+        // FORCES the stock into a cylinder on open to manufacture that match (see deriveCylinderStock above);
+        // the preview below always shows round regardless (matching rotaryCenterData.js's own def.simStock,
+        // unconditional), independent of what this diameter-pull reads.
         const stock = settings.stock || {};
         const fromStock = stock.shape === 'cylinder' && stock.x > 0 && stock.y > 0 && stock.z > 0;
         const diaEl = el('rc_diameter');
@@ -107,9 +103,13 @@ export const rotaryCenterView = {
 
         const gcode = wizard.generate(params);
         el('wiz_rotary_center_code').innerHTML = UIUtils.formatGCode(gcode);
+        // t1722 — the round-bar preview stock, derived fresh each render (never mutating settings.stock — see
+        // deriveCylinderStock above). Fed to BOTH the start-position math and preview3D's simStock override, the
+        // SAME dual use rotaryCenterData.js's def.simStock gets via userOpView.js (stkNow → opSimStarts + preview3D).
+        const simStock = deriveCylinderStock();
         // Per-pass start hints: the FIT method repositions twice → 3 starts (top + ±Y flanks) so the 3 probes hit
         // DISTINCT points and the circle solves; the KNOWN method is a single pass (one start).
-        ctx.preview3D(gcode, 'rotaryCenterVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
+        ctx.preview3D(gcode, 'rotaryCenterVizContainer', wizard.inferStart(params, simStock), wizard.inferStarts(params, simStock), simStock);
         applyPreviewIntent(ctx, 'rotaryCenterVizContainer', 'rotary_center');   // t714 — rig + envelope, single-sourced with the twin
 
         const status = el('rotaryCenterVizStatus');

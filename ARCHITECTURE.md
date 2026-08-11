@@ -522,7 +522,7 @@ rg -n "setup_datawiz" DDCS-Studio/web
 while the click opens `'user_pocket_data'`. For `io_step` / `pause_confirm` / `tap` the stamped value is a type no
 builder registry knows.
 
-### 8 · The z-index comment in `createPreviewPanel.js:1103-1104` describes code that no longer runs.
+### 8 · The z-index comment in `createPreviewPanel.js:1112-1113` describes code that no longer runs.
 It says the 3D canvas is z-index 2 above the 2D canvas. The only code that sets that is `gcodeViz3d.js:2779`
 `attach()`, whose sole caller is the retired `wizards/_svgPreview.bak.js:94`. In the live path the WebGL canvas is
 appended **in flow** (`gcodeViz3d.js:68`) and the toggle works because `setMode` sets `display:'none'`.
@@ -533,7 +533,7 @@ rg -n "\.attach\(" DDCS-Studio/web --glob '*.js'
 ### 9 · `renderDeclaredLayout` is an exported function with ZERO callers — and it is the shape that would break the overlay.
 `_layout` is a module-level singleton (`panelTypes.js:639`) and `FeatureCanvas._mount` wipes `container.innerHTML`
 when the container changes (`featureCanvas.js:92-95`). Both live call sites pass `el('userVizContainer')`
-(`userOpView.js:587,602`), so it never fires. If a second container is ever rendered, the wipe destroys
+(`userOpView.js:593,608`), so it never fires. If a second container is ever rendered, the wipe destroys
 `.fc-anim-overlay` while `container.__animOverlay` still holds the detached canvas (`userOpView.js:86`) — the
 overlay would silently never come back.
 ```bash

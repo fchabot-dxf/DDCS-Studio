@@ -87,6 +87,19 @@ export function magazinePockets(a, theta) {
     return mag.map((p, i) => ({ x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p), empty: (p.tool === '' || p.tool == null) }));
 }
 
+/** t1722 (gate repair, cycle 857 ACT 2) — the SAME pocket list, filtered to tool-assigned pockets only (empty
+ *  pockets omitted). Survey finding: the single-op wizard preview showed EVERY configured pocket while the
+ *  whole-program preview (createPreviewPanel.js's setShowMagazine) independently filtered to occupied-only —
+ *  same declared showMagazine intent, two computations, visibly different magazines for the same op. This is
+ *  the ONE function both hosts now call, so they cannot disagree by construction (the survey's own Good/Bad
+ *  dividing line: does a preview call the shared function, or re-derive the fact next to it). */
+export function magazineOccupiedPockets(a, theta) {
+    const all = magazinePockets(a, theta);
+    const list = all.filter((p) => !p.empty);
+    list.disk = all.disk;   // t885 — keep the carousel-plate metadata through the occupancy filter
+    return list;
+}
+
 /**
  * t714 (R-A/R-B) — apply an op's DECLARED opSimContext(opType) preview intent to a container, via the manager's preview*
  * methods. THE ONE apply that BOTH the built-in views AND the twin (userOpView) call, so the built-in and the twin get the
@@ -105,7 +118,7 @@ export function applyPreviewIntent(mgr, containerId, opType) {
         if (mgr.previewProbesForWcs) mgr.previewProbesForWcs(containerId, !!ctx.probesForWcs);   // t1203 — a probe op never renders through the declared WCS table
         if (ctx.showMagazine && mgr.previewMagazine) {
             const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
-            mgr.previewMagazine(containerId, magazinePockets(s.atc || {}));
+            mgr.previewMagazine(containerId, magazineOccupiedPockets(s.atc || {}));   // t1722 — the SAME occupancy-filtered list the whole-program preview shows
         }
     } catch (_) { /* op declares no rig/machine/seat/magazine intent → harmless no-ops */ }
 }

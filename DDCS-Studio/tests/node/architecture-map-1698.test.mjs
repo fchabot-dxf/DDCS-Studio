@@ -152,12 +152,12 @@ const TRAP_CLAIMS = [
     { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 167, find: /setup_datawiz/ },
     { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', line: 28, lineEnd: 41, find: /_datawiz/ },
     { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 103, find: /opensAs/ },
-    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1103, lineEnd: 1104, find: /z-index/ },
+    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1112, lineEnd: 1113, find: /z-index/ },
     { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2779, find: /attach/ },
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
     { id: 'TRAP9 _layout is a module-level singleton', file: 'web/wizards/ops/panelTypes.js', line: 639, find: /_layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
-    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:587)', file: 'web/wizards/views/userOpView.js', line: 587, find: /renderLayout2D|el\('userVizContainer'\)/ },
+    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:593)', file: 'web/wizards/views/userOpView.js', line: 593, find: /renderLayout2D|el\('userVizContainer'\)/ },
 ];
 
 test('architecture map ASSERTED: every TRAP citation still holds', () => {

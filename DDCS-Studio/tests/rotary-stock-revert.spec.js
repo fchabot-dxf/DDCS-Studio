@@ -1,27 +1,31 @@
 import { test, expect } from '@playwright/test';
 
-// A rotary-centre op forces the stock to a round CYLINDER (so the preview / probe collision / Ø-pull all match).
-// When the operator then opens a NON-rotary probe op (middle / corner / edge), the stock must revert to the
-// remembered BOX — restoreBoxStock() does that, and those views call it from onOpen. This verifies the round-trip.
+// t1722 (gate repair, cycle 857 ACT 2) — REWRITTEN to match the completed cleanup this file's OWN sibling
+// (rotary-center-roundbar.spec.js) already named as deferred: "the BUILT-IN shim still mutates (deferred
+// dead-code cleanup)". rotaryCenterView.js's activateCylinderStock() no longer mutates + persists
+// window.ddcsGetSettings().stock at all (a preview writing user state was a defect on its own terms —
+// PREVIEW-AS-DATA.md survey finding) — it derives a round bar LOCALLY, same shape as rotaryCenterData.js's own
+// def.simStock. restoreBoxStock() is kept exported (edge/middle/rotary-clock views still call it on open) but
+// is now a documented no-op: there is nothing left to restore.
 test.use({ viewport: { width: 1000, height: 800 } });
 
-test('cylinder stock reverts to the box when a non-rotary view restores it', async ({ page }) => {
+test('opening the rotary-centre legacy view does NOT mutate the global stock; restoreBoxStock is a safe no-op', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => !!window.ddcsGetSettings && !!window.ddcsApplySettings);
   const r = await page.evaluate(async () => {
-    const { activateCylinderStock, restoreBoxStock } = await import('/wizards/views/rotaryCenterView.js');
+    const rcv = await import('/wizards/views/rotaryCenterView.js');
     // Start from a known rectangular stock.
     window.ddcsApplySettings({ stock: { x: 120, y: 80, z: 25, shape: 'box', show: true } });
     const before = { ...window.ddcsGetSettings().stock };
-    activateCylinderStock();                 // rotary op → forced cylinder
-    const asCyl = { ...window.ddcsGetSettings().stock };
-    restoreBoxStock();                       // a non-rotary view (middle/corner/edge) calls this from onOpen
-    const reverted = { ...window.ddcsGetSettings().stock };
-    return { before, asCyl, reverted };
+    window.openWiz('rotary_center');   // the real gesture a rotary op's preview runs through
+    await new Promise((r) => setTimeout(r, 200));   // onOpen's own update() runs on a 50ms setTimeout — outlast it
+    const afterOpen = { ...window.ddcsGetSettings().stock };
+    rcv.restoreBoxStock();                   // a non-rotary view (middle/corner/edge) still calls this on open — must stay harmless
+    const afterRestore = { ...window.ddcsGetSettings().stock };
+    return { before, afterOpen, afterRestore, hasActivate: typeof rcv.activateCylinderStock === 'function' };
   });
-  expect(r.before.shape).toBe('box');
-  expect(r.asCyl.shape, 'rotary op forced a cylinder').toBe('cylinder');
-  expect(r.reverted.shape, 'non-rotary view reverted to the box').toBe('box');
-  expect(r.reverted.x, 'original box dims restored').toBe(120);
-  expect(r.reverted.y).toBe(80);
+  expect(r.hasActivate, 'activateCylinderStock is retired, not just renamed — no export survives to mutate settings').toBe(false);
+  expect(r.afterOpen.shape, 'opening the rotary-centre view never touches the global stock shape').toBe('box');
+  expect(r.afterOpen.x, 'nor its dims').toBe(120);
+  expect(r.afterRestore, 'restoreBoxStock is a safe no-op now — nothing changed because nothing needed reverting').toEqual(r.afterOpen);
 });
