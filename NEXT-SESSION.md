@@ -1071,3 +1071,24 @@ t1726. Delete the two, keep the one.
 
 ## 7. AWAITING THE USER AT THE MACHINE
 Bench probes S6h + Expert V13c/a/b.
+
+## 8. THE BLOCKS TAB SHOWS THE WIZARD VIEW, AND ONLY THE WIZARD VIEW (user, 2026-08-11)
+**User's instruction:** *"wizard view is the wizard modal view in the blocks tab. now we still have the 3d
+preview and projected gcode, in this new system we remove both of these and only use the wizard view."*
+
+**Current shape (measured, `blocks/blocksApp.js:396-404,524-528`):** the right column wears ONE of two
+faces from a single predicate (`setRightFace(!!show)`):
+- **"Wizard View"** — the Generator Modal — when there IS a wizard;
+- **"Preview" + "Projected G-code"** — when there is not.
+**The act: delete the second face. The column is always the Wizard View.**
+
+**Why it fits rather than fights the architecture:** the wizard view already carries its own 3D (corner
+declares `panel:'form3d+2d'`), so the separate 3D-preview pane is a SECOND rendering of the same picture —
+the duplication this whole leg is removing. It also explains item 6: `sim_3d_box` and `code_preview_panel`
+are exactly these two panes as blocks, and were never wired because the direction was already heading here.
+Deleting them and deleting this face are ONE change, not two.
+
+⚠ **CHECK BEFORE CUTTING (advisor, flagged not argued):** Projected G-code is currently how the emitted
+code is seen FROM THAT COLUMN. Confirm where G-code viewing survives in the Blocks tab afterwards — do not
+delete it and discover the loss later. If nothing else shows it, say so and let the user rule; do not
+silently keep the pane to be safe.
