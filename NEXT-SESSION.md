@@ -1129,3 +1129,13 @@ Projected G-code is in neither tab; it is gone.
 presentation choice — do not build machinery around it or treat it as settled architecture. What is NOT
 provisional, and does not get undone: the deletion of the projected-G-code pane, the deletion of the
 four-term wizard-face predicate, and the rule that a Wizard View is never shown without a wizard.
+
+### 8d. CORRECTION (user, 2026-08-11): **the Wizard tab is ALWAYS THERE**
+Supersedes 8c's "the Wizard View tab exists only when there is a wizard." **Both tabs are present
+unconditionally.** Only the CONTENT varies: the wizard when one is loaded, EMPTY when not.
+
+**This is simpler AND still honest** — an empty Wizard tab is not a lie; it is a tab with nothing in it,
+which is exactly true. The dishonest thing 8b forbids is a wizard face SHOWING a wizard that is not there.
+It also removes the last conditional in the column: a tab that appears and disappears is still a decision
+the app has to make, and every such decision in this area has been patched for guessing wrong. Always-there
+means nothing to decide.
