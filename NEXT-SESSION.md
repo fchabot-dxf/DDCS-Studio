@@ -844,3 +844,31 @@ the user rules the four granularity forks, and none of the fixes commits us to a
 copy that happens to agree today.** That is the exact disease this survey mapped; do not add to it.
 Verify each with the real symptom (the picture is right), not only a passing test. Node tier +
 hand-picked sweep. Report each as declared-vs-patched and why.
+
+## ✅ USER RULING (2026-08-11) — PREVIEW GRANULARITY: point at the emit's own function
+**Fork 1 is ruled: OPTION 1 — a preview declares WHICH function it reuses (`previewSources`), so reuse is
+provable by reference identity, not by a snapshot that a currently-agreeing copy also passes.**
+
+Advisor rulings on the other three forks, applied from the user's STANDING rulings (surfaced, not asked —
+override any of them by saying so):
+- **Fork 2 — 3D stays trace-only** for geometry that has G-code behind it. That property (the 3D toolpath
+  CANNOT disagree with the emit, by construction) is free and load-bearing; declaring geometry into 3D
+  would re-introduce the two-sources risk this design avoids. Preview-only visuals (Skim marker, probe
+  stylus, ATC magazine) keep their explicit channel — that split gets NAMED so a future author cannot
+  "improve" the 3D pane by accident.
+- **Fork 3 — per-family idioms, formally named.** A universal `def.preview.*` would force lathe/ATC/probe
+  into mill's `paths/handles/bbox` shape and manufacture dead fields — this project's own named defect
+  class, four instances already (`emits`/`modalPre`/`noSnap`/`mouth`).
+- **Fork 4 — RETIRE the 6 legacy views.** Applies [[nothing-is-precious-delete-freely]] +
+  [[no-legacy-burden]]: no install base, old files regenerate, and `corner`'s legacy view is already
+  deleted with no ill effect. ⚠ EXTRACT FIRST — classify what survivors run THROUGH before cutting.
+
+### The rollout order (advisor's, revisable)
+1. **Declare the sources for the ops that ALREADY reuse correctly** (drill/bore `patternPoints`,
+   pocket's spiral, `lathe_polygon`'s `polygonPath`, surfacing's Skim table). These are free: the reuse is
+   already true, the declaration just records it. It also proves the shape against real cases before any
+   consumer exists.
+2. **Then the Tier-1 triplicates** (pocket/contour shape-dispatch ×3, `edge_data`'s near-face rule ×4,
+   `lathe_parting`'s kerf ×3) — each becomes ONE function the preview points at.
+3. **Only then** build the checker, once enough ops declare to make it worth the machinery.
+   (Rule of three: do not build the reader for two consumers.)
