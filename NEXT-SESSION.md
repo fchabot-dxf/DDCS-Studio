@@ -980,3 +980,29 @@ that, it grows the OP's own declaration; it does not introduce a vocabulary to c
 **"collapse duplicates"** — the 24 surveyed findings, each one fact currently written 2-4 times, each
 resolved by making everything call the ONE real function. No new concepts, no new blocks, nothing new for
 an author to learn.
+
+## ✏️ REFINEMENT (user, 2026-08-11) — the constraint above splits into TWO LAYERS, and only one is closed
+The advisor's "you cannot change a built-in's picture" was OVERSTATED. The user's counter-example decides
+it: *"changing the picture is not always a problem for built in, maybe i add a slider for a param we didnt
+have."* Correct — a picture only LIES when it CONTRADICTS the program. Adding something the program never
+spoke to contradicts nothing.
+
+**① DERIVED layer — has G-code behind it** (cut boundary, toolpath, hole positions).
+NOT authorable. Editing it would make the picture disagree with the program on purpose — the exact drift
+this leg exists to remove. To change it, change the STACK; the picture follows (principle 1). A user who
+adds a param that DRIVES GEOMETRY gets the updated picture for FREE — no preview authoring at all.
+
+**② ADDITIVE layer — no G-code behind it** (a reference marker, a datum dot, an annotation, a stylus).
+AUTHORABLE, OPTIONAL, ADDITIVE. It cannot contradict the program because the program never said anything
+about it. This is where a user extending a built-in — or authoring a custom op — legitimately needs to
+say "put a marker here," and where the useful half of the family idea survives.
+
+**THE CONSTRAINT SURVIVES, sharpened:** an author is NEVER REQUIRED to pick, name or configure a preview.
+Building a wizard = assembling a stack; the picture follows. The additive layer is an OPTIONAL EXTRA on
+top, never a step in the path. **The test becomes: can an author build a complete, correct wizard without
+ever touching a preview thing? If no, the act is wrong.** (Previously: "does an author ever pick a preview
+thing" — too strict; it forbade the additive case the user wants.)
+
+⚠ **Still unsized and NOT yet planned:** whether the additive layer is blocks, and what the minimum shape
+is. The user's own method applies — answer it against a REAL op they would actually build, not in the
+abstract. Do not design it from imagination; that error has been made twice today already.
