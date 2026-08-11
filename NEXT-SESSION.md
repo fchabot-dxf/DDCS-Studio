@@ -1177,3 +1177,17 @@ not pretend otherwise.**
 
 **Status: the empty save stays OPEN and UNEXPLAINED.** No fix until there is a cause. The
 `headerPost.js:51` guard is a noted oddity, NOT a diagnosis.
+
+### 1d. CLOSED — NOT A DEFECT (user, 2026-08-11)
+The user's objection to Phase 0 was not "you are fixing a guessed cause" (the advisor's assumption, itself
+then dressed up — see 1c). It was simpler and better: **why prevent a no-wizard save at all?**
+
+**Because saving a stack that has no wizard around it is the NORMAL WAY TO MAKE ONE.** Assemble atoms,
+save, and now it is a wizard. A guard that refuses "nothing to save" would refuse the very act of creating
+a wizard from a bare stack. `devMode.js:277` already says it plainly: *"with no exposures it saves a
+parameterless wizard."* That is not a failure mode — a wizard with no parameters is a button that runs a
+fixed operation, which is a legitimate thing to want.
+
+**So the empty save is CLOSED as not-a-defect.** A stack with no exposed params saves as a wizard with an
+empty form; that is the correct outcome of what was saved. No fix, no guard, no further investigation.
+Items 1, 1b and 1c are superseded by this. Do not resurrect them.
