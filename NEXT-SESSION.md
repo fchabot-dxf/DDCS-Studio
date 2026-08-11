@@ -747,3 +747,19 @@ a log is not a declaration; the gate must read it. Report which you fixed vs dec
 ## VERIFICATION TIER (unchanged, and it is a rule)
 Per act: `npm run test:node` + a hand-picked sweep of what you touched. **The full suite is the
 ADVISOR's release gate — never a per-act gate.**
+
+## ⛔ ACT 1 WITHDRAWN (t1717) — the premise was STALE, and the advisor shipped it unverified
+The worker GATED rather than built, correctly. It drove both surfaces live (real SVG click on the wizard,
+dropdown on the twin), shrank the area and cycled `stockAttach` + `pathDatum`: **both axes move, and the
+two surfaces are byte-identical.** The only zero-movement case is the default full-stock area, which is
+`placement-anchor-1642.spec.js`'s own already-closed no-op (3/3), with `surfacing-pos-dim-handles-1646`
+(3/3) covering the twin.
+
+Cause of the false dispatch: the trace this plan quoted dates from **t1633 and predates t1359's
+`absorbsPlacement` fallback** — `placeShiftFromParams` reads a `bminX/bmaxX` snapshot that `makePlace`
+wires from live w/h, so it never depended on `liveExtent` the way the old note claimed.
+
+**The lesson is the ADVISOR's:** a defect sitting in a plan file is a CLAIM WITH A TIMESTAMP, not a fact.
+Re-confirm it reproduces on TODAY's tip before spending an act on it — the same reconcile-against-ground-
+truth rule already applied to the worker's reports, applied to my own backlog. A stale defect costs a
+whole act, and worse, it invites forcing a "fix" onto code that is tested and working.
