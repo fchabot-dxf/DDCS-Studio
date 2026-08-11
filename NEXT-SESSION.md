@@ -670,7 +670,7 @@ widening · Corner-wall · S6h + Expert V13c/a/b probes.
 
 ---
 
-# ⛔ RELEASE-BLOCKING REPAIR (t1713) — the cycle's gate is RED and cannot ship
+# ✅ DONE (t1714) — RELEASE-BLOCKING REPAIR: selector repaired, tokenGuard made text, V2026.08.10.4 SHIPPED
 
 The cycle's five acts are DONE and the end condition is met, but the release gate came back
 **25 failed** (last release: 12, all churn). Advisor triage, already done — do NOT re-derive it:
@@ -706,3 +706,44 @@ Every field with a declaration becomes a text box — **including fields declare
 reason to convert is so the refusal can be shown. Rolled to the other 28 ops that converts most numeric
 fields in the app, costing the spinner arrows and the browser's numeric validation everywhere.
 Do NOT roll the declarations further until that ruling lands.
+
+---
+
+# 🔁 CYCLE 856 — "A CONTROL THAT DOES NOTHING, AND A GATE THAT CRIES WOLF"
+
+A FINITE cycle: two acts, an end condition, then the advisor runs `handoff.py done` rather than
+inventing a third. Both acts are UNBLOCKED by the open text-vs-number ruling — do not touch the
+28-op roll-out until the user rules.
+
+## ACT 1 — the stock-anchor picker that silently moves nothing
+The defect is already scoped above (see the placement/anchor section): the anchor picker changes the
+emit for some wizards and moves NOTHING for surfacing, because the shift derives from a live extent
+that reports empty. Same disease this project just spent a week killing — **a control that accepts a
+gesture and silently does nothing**. Follow the five steps written there, unchanged:
+confirm in the REAL app first · trace to the zero and NAME the empty link · fix at ONE source ·
+the TWIN gains it too · verify both faces + byte-identical default.
+
+## ACT 2 — make the release gate's red count HONEST (zero expected failures)
+Today's gate cost the advisor ~30 minutes of manual isolation because "14 failed, all churn" is
+FOLKLORE, not a declaration: nothing in the repo says which failures are expected, so every red must be
+re-isolated by hand, every release, forever. Measured this turn against `origin/main` — these fail on
+the RELEASED commit too, so they are pre-existing, not ours:
+  `collapsible-panes-752` (mobile collapse) · `pane-splitter-790` (desktop inert + mobile touch-drag) ·
+  `update-check` (banner + download button)
+Also load-sensitive (green alone, red under full-suite contention — do NOT "fix" these, they are real
+tests being starved): `fork-parity-1593` · `middle-superset` · `blocks-live-form` ·
+`formfield-loud-mismatch-1636` · `guard-roundtrip-1595`.
+**The act:** fix what is genuinely broken; for anything that is environmental, DECLARE it — a named,
+reasoned quarantine the gate reads, so the expected-red count is **0** and any red is real. A comment in
+a log is not a declaration; the gate must read it. Report which you fixed vs declared, and why for each.
+
+## END CONDITION (all three, or the cycle does not close)
+1. Setting the stock anchor to each corner moves the emitted program by the declared amount, in BOTH
+   faces, in the real app — and the untouched default is byte-identical.
+2. The twin carries it too (wizards-as-data compliance, user-ruled).
+3. A full release gate reports **0 unexplained failures** — every remaining red is a declared,
+   reasoned quarantine the gate itself knows about.
+
+## VERIFICATION TIER (unchanged, and it is a rule)
+Per act: `npm run test:node` + a hand-picked sweep of what you touched. **The full suite is the
+ADVISOR's release gate — never a per-act gate.**
