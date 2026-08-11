@@ -897,3 +897,25 @@ shared primitives (`shape_rect/circle/line/marker` + `layout2dCanvas`/`sim3dBox`
 guessed. Do NOT add blocks, do NOT port a wizard, do NOT commit a shape. A survey act again.
 ⚠ Watch palette growth: a family shares ONE colour, and a new block earns its place only where a
 primitive genuinely cannot say the thing.
+
+## ⚠ RESCOPED (t1723, user-caught AGAIN — same turn) — the 4-family ceiling probe is OVER-SCOPED. Do CORNER.
+The user invoked their own standing rule: **corner is the GATED PILOT — each mechanism is proven ONCE on
+corner and the rest inherit.** A survey that expresses one preview per family (mill/probe/lathe/ATC) asks
+"what would all 32 need?" before a single wizard has actually done it — designing for wizards we have not
+touched, which is the speculative-machinery trap this project's principles forbid. **The 4-family ceiling
+probe is WITHDRAWN.**
+
+**The act is: finish CORNER's preview as declared blocks.** Corner's own source already names it —
+`cornerData.js:223` declares `panel: 'form3d+2d'` (the FRAME) and `:231` says *"per-view rig blocks are a
+later follow-up."* That follow-up IS the act.
+- Express corner's preview CONTENTS with the existing primitives (`shape_rect/circle/line/marker`,
+  `layout2dCanvas`, `sim3dBox`). Where they suffice, use them unchanged.
+- Where a primitive genuinely cannot say the thing (a probe approach path? per-pass start markers?),
+  **STOP and report the gap** — do not invent a block mid-act. The gap is the finding; the user rules
+  whether it becomes the first probe-family block.
+- The user's principle still binds: whatever feeds those blocks must provably reuse the emit's own
+  function, not a copy that agrees today.
+- Corner is the pilot and it is ALREADY user-verified on 5 symptoms — a regression here is visible to the
+  user immediately, so verify against the real picture, not only a passing test.
+
+**Families are DISCOVERED as each family's first wizard ports, not surveyed upfront.**
