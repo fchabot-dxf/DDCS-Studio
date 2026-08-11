@@ -7,15 +7,12 @@
  * G0/G1 engraving — dialect-agnostic, so it emits identically on every post; the Step Down / framing route
  * through the active dialect like every other cutting wizard.
  */
-import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makePlace } from '../blocks/programFraming.js';
 import { layoutText, textContours } from './textGeometry.js';
 
 export { layoutText, textContours };   // back-compat for views/textView.js + the 2D schematic
-
-function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
 
 /** The laid-out text's bounding box — used by PlaceOnStock (when you attach a label to a stock corner) + the view. */
 export function textBBox(params = {}) {
@@ -23,47 +20,11 @@ export function textBBox(params = {}) {
     return { minX: b.x0, maxX: b.x1, minY: b.y0, maxY: b.y1 };
 }
 
-/** Text params → its engraving block stack (the one source of truth for both displays). */
-export function textStack(params = {}) {
-    const depth = num(params.depth, 0.4);
-    const stepdown = num(params.stepdown, depth) || depth;   // engraving is usually one pass
-    const tool = Math.max(0.1, num(params.toolDia, 1.5));
-    const clr = num(params.clearance, 4);
-
-    const S = [];
-    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
-
-    // STATIC comment text (no param interpolation): the text/tool/stroke/depth all live in the executable Fill Text /
-    // Step Down atoms (the single source of truth), so a forked/data-def label can't drift → byte-identical, dumb data-def.
-    C('Text engraving - DDCS Studio');
-    C('engrave fill');
-
-    const ps = newBlock('progstart');
-    ps.params = { ...ps.params, rpm: num(params.rpm, ps.params.rpm), dir: params.dir || ps.params.dir, clearance: clr };
-    S.push(ps);
-
-    const ft = newBlock('filltext');
-    ft.params = {
-        ...ft.params,
-        text: params.text == null ? 'TEXT' : String(params.text), font: params.font || 'single-stroke',
-        height: num(params.height, 12), width: num(params.width, 1), slant: num(params.slant, 0), rotation: num(params.rotation, 0),
-        spacing: num(params.spacing, 1.2), lineSpacing: num(params.lineSpacing, 1.6), align: params.align || 'left',
-        x: num(params.x, 0), y: num(params.y, 0), strokeWidth: num(params.strokeWidth, 2.5),
-        toolDia: tool, stepoverPct: num(params.stepoverPct, 50),
-        z: 'z', feed: num(params.feed, 400), plunge: num(params.plunge, 120), clearance: clr,
-        // t764 — {SN} dynamic-serial fields: inert unless the text carries the token, but must reach the filltext leaf
-        // (the emit source) so the wizard's serial #var / digits / increment route through the real path.
-        snSlot: num(params.snSlot, 490), snWidth: num(params.snWidth, 6), snIncrement: num(params.snIncrement, 1),
-        dateStamp: params.dateStamp || '',
-    };
-    const sd = newBlock('stepdown');
-    sd.params = { ...sd.params, to: depth, by: stepdown };
-    sd.children = [ft];
-    S.push(makePlace(params, textBBox(params), sd));   // opt-in placement: stays at x/y unless you attach to a corner
-
-    S.push(newBlock('progend'));
-    return S;
-}
+// t1728 (gameplan step 1) — textStack MOVED to stacks/textWizard.js (the twin's own builder dependency, kept
+// importable+re-exported here unchanged for every other existing caller — pure move). textStack calls textBBox
+// (staying here, SCREEN-ONLY per views/textView.js), so the new file imports it back from this one.
+import { textStack } from './stacks/textWizard.js';
+export { textStack };
 
 export class TextWizard {
     generate(params) {

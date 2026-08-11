@@ -16,7 +16,7 @@
  * NOT registered/opened in-place yet (E2). The per-axis config (feeds/backoff/slave) lives in settings.homing.axes (Homing
  * Setup), read at emit — the op stores only the axis SELECTION + order (`axes`) + the soft-limit re-enable flag.
  */
-import { homingStack, homingUnsetAxes } from '../../wizards/homingWizard.js';
+import { homingStack, homingUnsetAxes } from '../../wizards/stacks/homingWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 
 const ALL_AXES = ['x', 'y', 'z', 'a', 'b'];

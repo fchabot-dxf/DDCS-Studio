@@ -7,7 +7,7 @@
  * atcToolCheckHeaderComments; the #5/#6 source-chips re-applied via srcVal/srcNote on Expert). `level` baked. Static shape →
  * no superset; no sim-starts. (Only difference vs Tool Length: +tolerance #20 + a SINGLE interpolated header line.)
  */
-import { atcToolCheckStack, atcToolCheckHeaderComments } from '../../wizards/atcToolCheckWizard.js';
+import { atcToolCheckStack, atcToolCheckHeaderComments } from '../../wizards/stacks/atcToolCheckWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';

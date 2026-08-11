@@ -14,7 +14,7 @@
  * (block 4) — a binding is 1 param → 1 socket, so it stays at its default. Everything else binds. Proven byte-identical to
  * contourStack across side × the 4 shapes × a scalar/placement/wcs sweep (tests/contour-data-emit.spec.js).
  */
-import { contourStack } from '../../wizards/contourWizard.js';
+import { contourStack } from '../../wizards/stacks/contourWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point

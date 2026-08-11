@@ -17,7 +17,7 @@
  *
  * NOT registered/opened in-place yet (E2). Byte-identical to atcChangeStack across the method × callMacro × config sweep.
  */
-import { atcChangeStack, atcChangeEffectiveArm } from '../../wizards/atcChangeWizard.js';
+import { atcChangeStack, atcChangeEffectiveArm } from '../../wizards/stacks/atcChangeWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { atcCombo } from '../../wizards/atcModel.js';
 import { motionToSimGcode, interpCtxFromAtc } from '../../wizards/atcInterpreter.js';

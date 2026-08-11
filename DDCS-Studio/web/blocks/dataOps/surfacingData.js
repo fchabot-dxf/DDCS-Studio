@@ -25,7 +25,7 @@
  * valid-by-construction stack); the hand-authored BINDINGS map is the INDEPENDENT artifact, proven two ways by the spec
  * (emit-equivalence sweep + structural binding-wiring). Stage 6 authors the template independently (self-host); not this one.
  */
-import { surfacingStack } from '../../wizards/surfacingWizard.js';
+import { surfacingStack } from '../../wizards/stacks/surfacingWizard.js';
 import { stepoverPctOf } from '../../wizards/ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover
 import { num } from '../../wizards/ops/util.js';
 import { userOpFromStack } from '../userOps.js';

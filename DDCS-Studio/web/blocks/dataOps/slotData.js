@@ -39,7 +39,7 @@
  * sets opt-in); the BINDINGS map is the independent artifact, proven byte-identical across BOTH arms and both sides of
  * every gate by tests/slot-as-data.spec.js + tests/slot-twin-repoint-1500.spec.js.
  */
-import { slotStack, slotStackRidesRaster, slotStackArmGap, slotLeafParams } from '../../wizards/slotWizard.js';
+import { slotStack, slotStackRidesRaster, slotStackArmGap, slotLeafParams } from '../../wizards/stacks/slotWizard.js';
 import { slotRasterParams } from '../../wizards/ops/slot.js';   // t1500 — the atom's slot-side params are ALL derived; postInstantiate writes them from this one source
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD

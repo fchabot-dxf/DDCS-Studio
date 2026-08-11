@@ -23,7 +23,7 @@
  * The template is SEEDED from atcWarmupStack(ATC_WARMUP_DEFAULTS) (== the canonical valid-by-construction default
  * stack); the hand-authored BINDINGS map is the independent artifact, proven by the structural binding-wiring check.
  */
-import { atcWarmupStack } from '../../wizards/atcWarmupWizard.js';
+import { atcWarmupStack } from '../../wizards/stacks/atcWarmupWizard.js';
 import { userOpFromStack } from '../userOps.js';
 
 /** Author defaults — match atcWarmupStack's own num() fallbacks so the seeded template == the true default stack. */

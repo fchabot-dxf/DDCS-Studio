@@ -20,7 +20,7 @@
  * (kept by prune, untouched by the value bindings which only match `assign` #vars), so they pass through BYTE-IDENTICAL — the
  * A-datum value-swaps (refTerm/wcs) are the only A-axis text the recompose touches. NOT seeded / opensAs yet (E4).
  */
-import { rotaryClockStack, rotaryClockHeaderComments } from '../../wizards/rotaryClockWizard.js';
+import { rotaryClockStack, rotaryClockHeaderComments } from '../../wizards/stacks/rotaryClockWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';

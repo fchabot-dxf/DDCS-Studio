@@ -12,7 +12,7 @@
  * It rides a SENTINEL: the superset bakes SENTINEL_MSG (etc.); the recompose global-replaces the sentinel with the resolved,
  * dialect-formatted text — so a single swap covers all ~6 embeddings, and the twin is byte-identical to the concrete bake.
  */
-import { commStack } from '../../wizards/communicationWizard.js';
+import { commStack } from '../../wizards/stacks/communicationWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 // t632 — the twin no longer reads the active post (the _hmi guard is gone; the atoms fold per-post at emit time = the un-freeze).

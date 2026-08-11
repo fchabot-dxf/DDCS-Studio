@@ -11,7 +11,7 @@
  * Emit BYTE-IDENTICAL to ioStepStackResolved (the quick-insert path) across the mode × declared/raw sweep.
  */
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
-import { ioStepStack, resolveIoParams, IO_SENT } from '../../wizards/ioStepWizard.js';
+import { ioStepStack, resolveIoParams, IO_SENT } from '../../wizards/stacks/ioStepWizard.js';
 
 const num = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
 

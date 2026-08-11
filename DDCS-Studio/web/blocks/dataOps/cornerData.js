@@ -41,7 +41,7 @@
  * Template SEEDED from cornerStack(CORNER_DEFAULTS); the BINDINGS are derived + proven byte-identical by
  * tests/corner-data-emit.spec.js. SCOPE (inc B1) = EMIT only — no view/panel (B3), no sim-starts/inferStarts (B2).
  */
-import { cornerStack, cornerReposOffsets, dirsOf, cornerHeaderComments } from '../../wizards/cornerWizard.js';
+import { cornerStack, cornerReposOffsets, dirsOf, cornerHeaderComments } from '../../wizards/stacks/cornerWizard.js';
 import { userOpFromStack, simStartsToBlocks, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards, whenOk } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)

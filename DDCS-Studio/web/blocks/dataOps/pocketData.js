@@ -19,7 +19,7 @@
  * state (each block type appears at most once). Proven byte-identical to pocketStack across strategy × tooSmall (BOTH states)
  * × the 4 shapes × a scalar sweep + cross-dialect (tests/pocket-data-emit.spec.js).
  */
-import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster, pocketRasterGap, pocketToolRefuses, pocketToolRefusal } from '../../wizards/pocketWizard.js';   // t1444 — the strictly-smaller refusal: its guard + its operator sentence
+import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster, pocketRasterGap, pocketToolRefuses, pocketToolRefusal } from '../../wizards/stacks/pocketWizard.js';   // t1444 — the strictly-smaller refusal: its guard + its operator sentence
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';

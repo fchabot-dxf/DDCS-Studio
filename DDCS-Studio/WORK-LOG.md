@@ -24226,3 +24226,153 @@ guarded command surface.
 Full working room used — most of it on the now-discarded build + its verification (16-config sweep, node tier,
 before/after screenshots, non-vacuity toggle), a smaller remainder on the container-block audit that survives
 the discard, and the rest on a careful, confirmed-clean revert. Nothing committed this turn except this note.
+
+---
+
+## Turn 1728 (worker) — Cycle GAMEPLAN STEP 1: EXTRACT THE STACK BUILDERS
+
+Dispatch: classify every export of the 24 web/wizards/*Wizard.js files as builder / screen / legacy renderer /
+shared helper, report the table, then move the builders (and only the builders) into a home of their own -- a
+pure relocation with no behavior change, so a later act can safely delete the dead screens/legacy renderers that
+currently share the same files without risking the builders a live twin still depends on.
+
+### The mechanism
+
+New home: web/wizards/stacks/BASENAME.js, one file per wizard, same basename as the source file (no renames --
+only the directory changes). Old file keeps: its screen class (XWizard, calling the builder via a real LOCAL
+import, not just a bare re-export -- import + a SEPARATE export statement, never a combined re-export-from,
+because a bare re-export creates no local binding and several classes call their builder internally), plus any
+export nothing needs moved (dead-external helpers, screen-only helpers, and pass-through re-exports of things
+defined in a THIRD file). Every dataOps twin's own import line was repointed to the new stacks/ path -- that
+repoint is the actual point of the act, since it's what lets step 2 delete an old wizard file without checking
+whether the live twin still needs it. Every other existing consumer (opBuilders.js, CAM code, viz code, other
+wizard files, ui code, and all ~196 test files that dynamically import a wizard by its old path for equivalence
+comparisons) keeps working unchanged, because the old path still resolves the same names -- nothing but the
+dataOps twins' import lines needed to change.
+
+### Classification table (24 files)
+
+Legend: B = builder, moved | S = screen-only, left in place | D = dead (zero importers, internal or external),
+left in place, not tidied away | P = pass-through re-export of a name defined in a THIRD file (neither builder
+nor screen -- left exactly where it was) | shared = genuinely used by both a builder-context and a screen/CAM
+context; moved (the twin needs it) with a shim serving the other side.
+
+- alignmentWizard: moved alignmentHeaderComments, alignmentStack. Left AlignmentWizard(S).
+- atcChangeWizard: moved atcChangeEffectiveArm, atcChangeStack (+ private helpers getDialect/H/manualStack/
+  m6Stack/firmwareStack/macroCallStack/inlineTncStack/ARM_BUILDERS). Left firmwareStationSeed(S),
+  resolveMethod+atcChoreography(P -- defined in atcModel.js), AtcChangeWizard(S).
+- atcLengthWizard: moved atcLengthHeaderComments, atcLengthStack. Left AtcLengthWizard(S).
+- atcTableWizard: moved atcTableGuardKeys, atcTableStack. Left AtcTableWizard(S).
+- atcTestWizard: moved atcTestStack, atcTestEffectiveMode. Left AtcTestWizard(S).
+- atcToolCheckWizard: moved atcToolCheckHeaderComments, atcToolCheckStack. Left AtcToolCheckWizard(S).
+- atcWarmupWizard: moved atcWarmupStack. Left AtcWarmupWizard(S).
+- circularWizard: moved NOTHING. Left circularStack(D -- only opBuilders.js's legacy map, no twin, no BUILTINS
+  entry, unreachable from any UI), CircularWizard(D -- zero importers anywhere). No twin exists for circular at
+  all -- the whole file is dead weight already; nothing to extract, nothing extracted. Flag for step 2: likely a
+  full-file delete candidate, not just a screen-trim. Its own internal import of middleStack/MiddleWizard from
+  middleWizard.js keeps resolving via middleWizard's shim, untouched.
+- communicationWizard: moved commStack. Left CommunicationWizard -- NOT simply S: its generateScreenPreview() is
+  the LIVE renderer userOpView.js uses for the twin's own 'commscreen' panel, not legacy-only; left in place
+  either way since only commStack was a builder. Flagged, not resolved -- worth the advisor's attention before
+  step 2 touches this file.
+- contourWizard: moved contourStack (+ private contourFlatParams). Left contourBBox(shared -- dataOps AND
+  contourView.js; contourStack calls it directly, so the new stacks file imports it BACK from the old file -- a
+  deliberate, verified-safe circular import between the two: both are hoisted function declarations, resolved
+  before either is called), ContourWizard(S). A dead pre-existing contourFillBlock import in the old file,
+  unrelated to this move, was left untouched.
+- cornerWizard: moved dirsOf, cornerReposOffsets, cornerHeaderComments, cornerStack (+ private axesOf, AX). Left
+  CornerWizard(D -- zero importers anywhere, confirmed again this act). The gated pilot; handled personally,
+  verified with its own dedicated spec run + the full 111-file corner-*.spec.js directory.
+- drillWizard: moved cycleForMethod, drillStack. Left patternPoints(P -- defined in ops/index.js),
+  methodRampForCycle(no dataOps consumer -- only opSession.js's Blocks-tab reconcile -- stays), DrillWizard(S).
+- edgeWizard: moved edgeStack. Left EdgeWizard(S).
+- homingWizard: moved homeAxisBlocks (builder-internal, zero external importers), homingStack,
+  homingUnsetAxes(shared -- dataOps AND homingView.js). Left homingRunParams(no dataOps consumer -- homingView.js
+  + macrosApp.js's sysstart generator only -- stays; macrosApp.js also imports homingStack from the OLD path
+  unchanged, via the shim), HomingWizard(S).
+- ioStepWizard: moved IO_SENT, resolveOutput, resolveInput, resolveIoParams, ioStepStack. Left
+  ioStepStackResolved(no dataOps consumer, test-only -- stays, calls the shimmed-in local names),
+  ioInputSupported/ioEdgeOptions(formWidgets.js only -- stays). No screen ever existed for this wizard -- no
+  class, no view file; the file is builder + generic-form-support only.
+- middleWizard: moved middleAxes(shared, widest fan-out -- dataOps, viz/middleVizUtils.js, viz/opSimStarts.js,
+  wizards/ops/panelTypes.js, circularWizard.js, middleView.js), middleStack(also imported directly by
+  circularWizard.js). Left MiddleWizard(S). Caught and fixed a self-inflicted mid-edit error (a stray
+  renamed-not-deleted duplicate function body) before it reached verification.
+- pocketWizard: moved pocketBBox(shared -- dataOps AND pocketView.js), pocketTooSmall, pocketMaxToolDia,
+  pocketToolRefuses+pocketToolRefusal(shared -- dataOps AND opCamMap.js/CAM), pocketDrillCentre,
+  pocketRasterStrategy, pocketRasterGap, pocketRidesRaster, pocketStack. Left regionParamsFromDesc(D -- zero
+  importers anywhere, not even internally), PocketWizard(S). Almost the entire file moved.
+- rotaryCenterWizard: moved rotaryCenterHeaderComments, rotaryCenterStack. Left RotaryCenterWizard(S).
+- rotaryClockWizard: moved rotaryClockHeaderComments, rotaryClockStack. Left RotaryClockWizard(S).
+- slotWizard: moved slotBBox(D-internal-only), slotPatterned+slotPatternPoints(shared -- CAM AND slotView.js),
+  slotArrayBBox(screen-only external consumer but a hard internal dependency of slotStack -- moved regardless),
+  SLOT_PATTERN_GAP(D), slotLeafParams, slotStackArmGap, slotStackRidesRaster, slotStack. Left SlotWizard(S).
+  Almost the entire file moved, same shape as pocket.
+- surfacingWizard: moved surfacingStack (+ its private stepoverPctOf usage stays internal). Left
+  surfacingBBox(S), surfacingLiteralStack(D-by-app-code -- kept ONLY for equivalence-test comparison in 4+ test
+  files; independent implementation, verified to never call/be-called-by surfacingStack), SurfacingWizard(S).
+- tapWizard: moved tapStack. Left TapWizard(D -- zero importers anywhere; no tapView.js ever existed). The
+  proof-of-concept file.
+- textWizard: moved textStack (+ private num, moved since it was textStack's own private helper). Left
+  layoutText/textContours re-export(P -- defined in textGeometry.js; the textContours re-export here is itself
+  vestigial -- zero consumers use it via this path, fillText.js imports it directly from textGeometry.js instead
+  -- left alone, not tidied), textBBox(shared-by-call -- textStack calls it directly even though its only
+  external consumer is textView.js's screen; same deliberate-circular-import resolution as contourBBox, verified
+  end-to-end), TextWizard(S).
+- wcsWizard: moved wcsStack. Left WCSWizard(S -- its own generate() also calls resolveActivePost/
+  getActiveProfile directly, kept).
+
+23 of 24 files had a builder to extract; circularWizard did not (no twin exists for it at all).
+
+### Execution
+
+Proved the mechanism by hand on 3 files first (tap/alignment/atcLength -- verified with node --check + a real
+e2e spec run each), then split the remaining 20: 3 parallel background agents handled 11 straightforward
+single-builder files (the ATC family, contour, wcs, the two rotary wizards, surfacing, text) from a fully
+pre-derived classification (they were told which names move and which stay, not asked to re-derive it), while I
+handled personally the 9 files with real cross-cutting complexity -- corner (the pilot, extra care), middle+
+circular (the widest fan-out + the no-twin special case), communication (the screen/twin dual-use class), drill,
+homing, pocket, slot (each with a genuine builder+screen or builder+CAM shared export), and ioStep (the only
+file with no screen at all). One agent-reported wrinkle (contour's contourStack to contourBBox back-reference)
+and one I hit myself (text's textStack to textBBox, same shape) were resolved the same way: a deliberate
+circular import between the old file and its new stacks file, safe because both sides are hoisted function
+declarations never called at module-load time -- verified live, not just syntax-checked.
+
+### Verify
+
+node --check on every touched/created file (23 new stacks/ files, 23 modified old wizard files, 24 modified
+dataOps files) -- clean. Node tier 118/118 -- zero architecture-map citation drift (nothing this act touched is
+cited by file:line in ARCHITECTURE.md/architecture-map-1698.test.mjs). fork-parity-1593 -- the act's primary
+gate -- 2/2, all shipped twins fork byte-identical (form AND emit), unmoved. Since fork-parity compares a twin
+against ITS OWN FORK rather than against the legacy builder, separately ran the per-wizard twin-vs-legacy-builder
+emit-equivalence spec for every one of the 24 families (tap/alignment/atcLength/edge/corner/middle/comm/bore+
+drill/homing/pocket/slot/ioStep by hand; atcChange/atcTable/atcTest/atcToolCheck/atcWarmup/contour/wcs/
+rotaryCenter/rotaryClock/text/surfacing in a batch) -- all green, confirming the move touched zero emit bytes
+anywhere, not just on the pilot. Corner additionally got the full corner-*.spec.js directory (111/111) plus its
+own dedicated emit/marker-parity spec, given its pilot status.
+
+### Flagged, not resolved this act (for the advisor / step 2)
+
+1. circularWizard.js has no twin at all -- circularStack is only reachable through opBuilders.js's legacy
+   registry, which nothing in the live UI ever calls (circular has no BUILTINS/opensAs entry). Likely a
+   full-file delete candidate for step 2, not merely a screen-trim.
+2. communicationWizard.js's CommunicationWizard class is not simply a legacy screen -- its
+   generateScreenPreview() is the live renderer the twin's own 'commscreen' panel uses (userOpView.js). Deleting
+   it in step 2 the way a "dead screen" would be deleted would break the twin's own rendering.
+3. Several pass-through re-exports (drillWizard's patternPoints, atcChangeWizard's resolveMethod/
+   atcChoreography, textWizard's layoutText/textContours) point at a THIRD file, not the wizard file they sit
+   in -- untouched, but worth remembering when step 2 decides what "deleting this file" actually removes.
+4. textWizard's re-exported textContours has zero consumers via that path (dead re-export) -- noted, not tidied
+   (not this act's job).
+
+### Capacity
+
+A large, careful act -- the classification alone required tracing every export's real consumer set across the
+whole app (not just wizards/views/dataOps but viz/, ops/, ui/, and other wizard files), and several files
+resisted the "clean builder+screen split" premise the dispatch's own framing assumed (circular has no twin at
+all; communication's class is genuinely dual-use; several exports are pass-throughs of a third file). Delegating
+the 11 unambiguous files to 3 parallel background agents -- after proving the mechanism myself on 3 files and
+handing them fully pre-derived classifications, not asking them to re-derive judgment calls -- kept the personal
+attention on the 9 genuinely tricky files and the pilot. Full working room used across the whole act; the
+verification (fork-parity + 24 individual equivalence specs + the full corner directory) is what makes "nothing
+user-visible changed" a checked claim rather than an assumed one.

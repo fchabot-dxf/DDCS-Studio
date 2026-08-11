@@ -9,18 +9,15 @@
  * rs274/grbl: G10 L20; v41/dm500: G90 G92. This replaced the old build-time getDialect + M350-hardcoded #880 assigns that
  * leaked M350 registers onto every controller. The auto|fixed × axes × sync forks are COMPUTED inside the atom.
  */
-import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
-
-/** WCS params → [ wcszero ]. The one source of truth for both displays. */
-export function wcsStack(params = {}) {
-    const b = newBlock('wcszero');
-    b.params = { sys: params.sys || '0', axisX: !!params.axisX, axisY: !!params.axisY, axisZ: !!params.axisZ, sync: !!params.sync, slave: params.slave || '3' };
-    return [b];
-}
+// t1728 (gameplan step 1) — wcsStack MOVED to stacks/wcsWizard.js (the twin's own builder dependency, kept
+// importable+re-exported here unchanged for every other existing caller — pure move).
+import { wcsStack } from './stacks/wcsWizard.js';
+export { wcsStack };
 
 export class WCSWizard {
     constructor() {

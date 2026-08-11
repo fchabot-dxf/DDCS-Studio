@@ -7,7 +7,7 @@
  * tap leaf) so it is held at its default (the drill frontier-#3 pattern). The tap inherits the shared tool picker
  * (toolBindingsFor) — pick a tap tool + the tool-change tie-in for free — and the entry marker.
  */
-import { tapStack } from '../../wizards/tapWizard.js';
+import { tapStack } from '../../wizards/stacks/tapWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';

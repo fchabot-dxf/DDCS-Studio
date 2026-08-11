@@ -14,7 +14,7 @@
  * guard-handled (the surviving arm is already correct), so only the axis/dir-INDEPENDENT scalar line needs recompose. Plus
  * the #2/#3/#5 source-chips (Expert registers). NO wcs (a measurement — no work-offset write). NOT seeded / opensAs yet (E3).
  */
-import { alignmentStack, alignmentHeaderComments } from '../../wizards/alignmentWizard.js';
+import { alignmentStack, alignmentHeaderComments } from '../../wizards/stacks/alignmentWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';

@@ -18,7 +18,7 @@
  * built-in on ALL scalars, ALL 112 structural combos, and BOTH profiles — with E0 (the banked superset) UNCHANGED. FIT
  * ADVANCED banner stays (Studio-original, machine-unvalidated). NOT seeded / opensAs yet (E2/E4).
  */
-import { rotaryCenterStack, rotaryCenterHeaderComments } from '../../wizards/rotaryCenterWizard.js';
+import { rotaryCenterStack, rotaryCenterHeaderComments } from '../../wizards/stacks/rotaryCenterWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';

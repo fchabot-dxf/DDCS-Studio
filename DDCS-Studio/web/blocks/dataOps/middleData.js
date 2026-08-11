@@ -23,7 +23,7 @@
  * built-in emits the literal). Whether the built-in middle SHOULD source #5/#3/#2 like corner (a probe-param harmonisation)
  * is a SEPARATE question deferred to the human — if yes, add it to BOTH the built-in + the twin together (keeping byte-identical).
  */
-import { middleStack, middleAxes } from '../../wizards/middleWizard.js';   // t1211 — middleAxes: the ONE declared axis-order resolver
+import { middleStack, middleAxes } from '../../wizards/stacks/middleWizard.js';   // t1211 — middleAxes: the ONE declared axis-order resolver
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive MIDDLE_BINDINGS over a CANONICAL-pruned stack (the boss/twoAxis sockets are prune-gated in the superset)

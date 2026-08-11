@@ -15,7 +15,7 @@
  * built-in edge (across axis/dir/wcs + a scalar sweep) by tests/edge-data-emit.spec.js. SCOPE (E1) = EMIT only — no view/
  * panel (E3), no sim-starts (E2), no in-place swap (E4).
  */
-import { edgeStack } from '../../wizards/edgeWizard.js';
+import { edgeStack } from '../../wizards/stacks/edgeWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive EDGE_BINDINGS over a CANONICAL-pruned stack (the superset guards duplicate nothing bound — #1..#6 are outside the guards — but keep the corner-identical shape)

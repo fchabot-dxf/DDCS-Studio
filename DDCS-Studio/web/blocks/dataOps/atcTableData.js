@@ -16,7 +16,7 @@
  * NO second table editor — the edit UI STAYS Settings → Tool table (one source): the in-place form = the two toggles + the
  * 'Edit table…' button (an action widget) + the emit preview. NOT registered/in-place yet (E2 — done alongside).
  */
-import { atcTableStack, atcTableGuardKeys } from '../../wizards/atcTableWizard.js';
+import { atcTableStack, atcTableGuardKeys } from '../../wizards/stacks/atcTableWizard.js';
 import { userOpFromStack } from '../userOps.js';
 
 export const ATC_TABLE_DATA_OPTYPE = 'user_atc_table_data';

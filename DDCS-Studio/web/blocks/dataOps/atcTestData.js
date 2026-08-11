@@ -19,7 +19,7 @@
  * NOT registered/opened in-place yet (E2). The magazine (pocket XYZ + tool#) + the drawbar/sensor M-codes live in settings
  * (Tool table + ATC I/O), read at emit — the op stores only the FORM (mode + cycles/dwell + first/count/zClear/descend).
  */
-import { atcTestStack, atcTestEffectiveMode } from '../../wizards/atcTestWizard.js';
+import { atcTestStack, atcTestEffectiveMode } from '../../wizards/stacks/atcTestWizard.js';
 import { userOpFromStack } from '../userOps.js';
 
 export const ATC_TEST_DATA_OPTYPE = 'user_atc_test_data';

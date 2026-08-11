@@ -11,7 +11,7 @@
  * the built-in uses. `level` stays baked (a machine constant — the corner/edge/middle convention). Static shape → no
  * bindingSpecs superset (the template IS atcLengthStack(defaults)); no sim-starts (milling/ATC sim renders from the EMIT).
  */
-import { atcLengthStack, atcLengthHeaderComments } from '../../wizards/atcLengthWizard.js';
+import { atcLengthStack, atcLengthHeaderComments } from '../../wizards/stacks/atcLengthWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';   // the SAME source functions the built-in uses (controller register over the literal on Expert)
 import { deriveBindingsFor } from './deriveBindings.js';

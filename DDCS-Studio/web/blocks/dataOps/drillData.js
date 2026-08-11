@@ -37,7 +37,8 @@
  *     sweep (it also covers the unbound method/clearance sockets staying put).
  * Stage 6 authors the template independently too (then the builder can be deleted); that's the self-host step, not this one.
  */
-import { drillStack, patternPoints } from '../../wizards/drillWizard.js';
+import { drillStack } from '../../wizards/stacks/drillWizard.js';
+import { patternPoints } from '../../wizards/drillWizard.js';   // patternPoints itself is a pass-through re-export (defined in ops/index.js), not a moved builder — stays at the old path
 import { pointsBBox } from '../../wizards/ops/placement.js';   // t718 — the hole-CENTRES bbox for the placement-parity shift
 import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD

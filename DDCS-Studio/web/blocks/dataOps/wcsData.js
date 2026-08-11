@@ -7,7 +7,7 @@
  * DIALECT-AWARE at emit (the atom resolves the active post), so the twin == the built-in wcsStack byte-identical on every
  * dialect — M350 register writes / rs274·grbl G10 L20 / v41 #1506 / dm500 #804 (proven in wcs-in-place.spec).
  */
-import { wcsStack } from '../../wizards/wcsWizard.js';
+import { wcsStack } from '../../wizards/stacks/wcsWizard.js';
 import { userOpFromStack } from '../userOps.js';
 
 export const WCS_DEFAULTS = { sys: '0', axisX: true, axisY: true, axisZ: false, sync: false, slave: '3' };

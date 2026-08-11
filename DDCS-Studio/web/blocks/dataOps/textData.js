@@ -19,7 +19,7 @@
  * (progstart spindle params, supplied by settings — frozen at the template default; the sweep must not vary them).
  * NOTE: text has NO wcs block (engraving is dialect-agnostic) — so, unlike drill/surfacing/slot, there is no wcs binding.
  */
-import { textStack } from '../../wizards/textWizard.js';
+import { textStack } from '../../wizards/stacks/textWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker

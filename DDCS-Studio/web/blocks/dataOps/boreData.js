@@ -14,7 +14,7 @@
  * tests/bore-as-data.spec.js. `method` is BAKED helical (not bound — Bore is always helical, like drillData bakes peck);
  * `clearance` FANS OUT to progstart + the bore leaf → held at its default (frontier #3, same as drill).
  */
-import { drillStack, cycleForMethod } from '../../wizards/drillWizard.js';   // t1385 — the switch: one holecycle block; cycleForMethod translates the form's ramp vocabulary to the socket's
+import { drillStack, cycleForMethod } from '../../wizards/stacks/drillWizard.js';   // t1385 — the switch: one holecycle block; cycleForMethod translates the form's ramp vocabulary to the socket's
 import { userOpFromStack, flattenBlocks } from '../userOps.js';   // t1385 — flattenBlocks: postInstantiate normalises the merged block's cycle
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
