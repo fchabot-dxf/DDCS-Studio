@@ -1139,3 +1139,13 @@ which is exactly true. The dishonest thing 8b forbids is a wizard face SHOWING a
 It also removes the last conditional in the column: a tab that appears and disappears is still a decision
 the app has to make, and every such decision in this area has been patched for guessing wrong. Always-there
 means nothing to decide.
+
+### 8e. AND IT IS EMPTY ON OPS (user, 2026-08-11): *"but empty on ops"*
+The Wizard tab is empty **whenever the selected thing is not a wizard — INCLUDING when a plain op is
+selected.** A raw atom stack, a hand-built block, an inserted op that is not a wizard: the tab shows
+NOTHING. It does not reach for something to display.
+
+⚠ **The tempting wrong moves, all forbidden:** showing the op's parent/nearest wizard · synthesising a
+generic form from the op's params · retaining the last wizard that was loaded · any "close enough" face.
+Each of those is the app inventing a wizard that is not there, which is precisely the lie 8b exists to
+prevent. **Empty is the true answer and it is the required one.**
