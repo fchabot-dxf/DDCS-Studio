@@ -23768,3 +23768,110 @@ narrow, safely-fixable bugs (one product, one measurement-vs-intent test drift �
 OUT of this act's safe scope (named, not hidden), and five are genuinely environmental. Declaring 8/8 blind would
 have been faster but would have buried two real, one-line-fixable defects under "known flaky" forever. Full
 working room used; nothing parked that could be safely finished this turn.
+
+## 🔨 turn 1720 (cycle 857, epoch 4) — ACT 1: PREPARE PREVIEW-AS-DATA (survey only, read-only)
+
+### DISPATCH
+
+New cycle. EMIT is 32/32 declared, FORM is 32/32 declared, PREVIEW is 0/32 — every symptom the user reported on
+2026-08-10 (path drawn outside the stock, 3D/2D disagreeing, a marker solid in one pane and hollow in another)
+was one missing declaration, hand-rolled by renderers with no shared source of truth. ACT 1: survey every
+shipped twin — who draws it, what each renderer reads, where the same intent is expressed twice — propose a
+candidate DATA shape with 3 worked examples, name granularity forks without picking one, log broken previews
+without fixing them. Explicit constraints: read-only, no source changes, no engine built, **no Playwright** (the
+advisor's release gate was running concurrently), node tier only if needed.
+
+### METHOD
+
+Read `ARCHITECTURE.md`'s existing Q3 section first (`WHO DRAWS WHAT, AND IN WHICH FRAME`) — it already documents
+the GENERAL renderer machinery in real depth (the frame algebra, the three-shifts table, the renderer inventory,
+12 invariants, several traps) and confirms the 32-twin count (`SEED_BUILDERS`, `app.js:105-112`) independently
+of the dispatch. Did not re-derive any of that; this survey's value-add is the PER-OP layer ARCHITECTURE.md
+doesn't cover.
+
+Enumerated all 32 twins by grepping every `userOpFromStack(` call site in `blocks/dataOps/*.js`, grouped into 4
+families by character (probe/utility ×8, mill cutting ×8, ATC/utility ×9, lathe ×7 — 32 total, matching the
+registry). Dispatched 4 parallel read-only Explore agents, one per family, each given: the exact opType→file
+list, the 2 already-confirmed declared hooks (`previewGeometry`/`simStartsProvider`) as a starting point, the
+specific renderer files to trace (`createPreviewPanel.js`, `featureCanvas.js`, `gcodeViz3d.js`, family-specific
+files like `latheScene.js`/`atcSetupCanvas.js`), and the exact 4-part evidentiary ask (who draws it · what it
+reads · where expressed twice · anything broken, logged not fixed). None ran Playwright (all pure grep/read).
+Synthesized their results myself — the duplicate-intent ranking, the candidate declaration shape, and the
+granularity forks were NOT delegated (judgment work, not research).
+
+### FINDINGS (full detail + every citation in `PREVIEW-AS-DATA.md`)
+
+**The renderer *wiring* is mostly clean; the duplication lives one layer down.** All 4 families reach their
+renderers through genuinely declared hooks with essentially zero per-opType-name branches in the shared
+renderer files themselves (`gcodeViz3d.js`/`featureCanvas.js` — confirmed by grep, zero opType literals for 3 of
+4 families). The real risk is inside the *hook implementations*: some call the emit's own kernel function
+directly (drill/bore's `patternPoints`, polygon's `polygonPath`, surfacing's marker table — cited by the
+sub-surveys as the model to follow) and can never drift; others independently re-derive the same fact by hand
+next to a hook that could have called the real one (pocket/contour's shape-dispatch tables, hand-typed 2-3 times
+each; edge's "pos ⇒ near face" rule, 4 times; parting's kerf offset, 3 times).
+
+**Four findings are not future risk — they're live now:** `middle_data` shows the WRONG stock shape in preview
+for Feature=Boss+Circular (a confirmed regression vs. its own legacy view). `rotary_center_data`'s legacy view
+silently mutates persisted `settings.stock`; its twin correctly doesn't. Picking a real centre-drill/drill tool
+from the lathe tool library silently renders the 3D preview as a flat mill endmill — a field-name mismatch
+(`_tbl.type` vs `_tbl.kind`) reading the wrong property off the picked tool row; the single most consequential
+bug the whole survey found. The ATC magazine's pocket list disagrees between a single-op wizard preview (shows
+every pocket) and a whole-program preview (filters to tool-assigned only) for the same declared intent.
+
+**A structural fact ARCHITECTURE.md didn't cover**: 6 of the 8 probe/utility twins have a full SECOND renderer
+still live — the pre-port built-in wizard view, unreachable from today's menu but reached instantly by an op
+carrying its raw built-in type (an old save file, a Blocks-authored raw block). Only `corner`'s legacy view was
+actually deleted. Two of the six are behaviorally different from their twin right now (the two regressions
+above), not just duplicated code.
+
+**Candidate declaration shape**: not a new engine — a declared POINTER from a preview hook to the emit kernel
+function it must reuse (`def.previewSources = { region: regionDesc, ... }`), so "does this hook actually call the
+shared function, or silently reimplement it" becomes checkable by reference identity instead of by snapshot
+(which can't tell a coincidentally-agreeing duplicate from a real single source). This is ARCHITECTURE.md's own
+Invariant #7 ("one function, not two copies of a value that currently agree"), made checkable specifically for
+preview code. Worked for 3 ops of different character: `corner_data` (probe — closes the `cornerDatumXY`/`dirsOf`
+duplicate, names an orphaned dead 3rd copy in `cornerWizard.js`), `pocket_data` (mill — closes the 3-way
+region-params triplication), `lathe_parting` (lathe — the hardest case, since lathe's cut geometry has NO
+declared hook at all today, only the blank).
+
+**4 named granularity forks, not decided** (per instruction, per the project's own standing "ask, don't pick"
+ruling on this exact question class): per-op vs per-atom vs per-fact declaration; whether 3D should read
+declared geometry at all (a real cost either way — trace-only is a FEATURE for cut geometry, a GAP for
+preview-only facts like a Skim marker); one universal `def.preview.*` namespace vs per-family idioms (risk:
+manufacturing dead fields, the project's own already-named 4-time defect class); retiring the 6 legacy views vs
+declaring their divergence explicitly.
+
+**24 broken/missing previews logged, zero fixed** — full list in the doc, consolidated punch list matches the
+findings above plus: drill/bore's `skip` param never reaching the preview; tap/text missing `def.zRuler` despite
+their siblings' identical param shape; slot's missing `bbox` (the only mill op unverified against the
+placement-parity contract); a dead `setLatheTool` API with zero call sites; the 2D pane never drawing the ATC
+magazine at all.
+
+**ARCHITECTURE.md updated** (2 targeted edits, not a rewrite): resolved its own "UNSURE whether
+middleVizManager/etc still animate anything visible" — yes, they're the still-live legacy views' own animation
+machinery. Partially resolved its own "lathe family's divergences... not traced beyond panelTypes.js:173-174" —
+now traced fully, citing the tool-identity bug as the headline finding. Added a new subsection to the Q3
+renderer inventory naming the 6-still-live-legacy-renderer fact, which the existing inventory didn't cover at all.
+
+### Verify
+
+**Node gate — 118/118, unmoved** (zero source files touched — this act is a survey, not code; the only files
+this turn touched are `ARCHITECTURE.md` and the new `PREVIEW-AS-DATA.md`). **Did not run Playwright at all**, per
+the dispatch's explicit constraint (the advisor's release gate was running concurrently). Confirmed via
+`git status`: several `verification/*.png` files show as modified in the working tree — NOT from anything this
+turn did (zero browser/Playwright processes launched) — almost certainly the advisor's own concurrent gate run
+touching them as a side effect. Left them completely untouched (did not restore, did not stage) rather than
+interfere with a process that isn't mine this turn.
+
+### Emit byte-identical
+
+N/A — no emit-path code was touched; this act produced two documents.
+
+### Capacity
+
+Delegated the mechanical, parallelizable evidence-gathering (4 read-only Explore agents, ~230K tokens and ~55
+tool calls each) so the synthesis work — the ranking, the candidate shape, the forks — could get full attention
+rather than competing with 32 twins' worth of file-reading for the same turn's budget. Reviewed and cross-checked
+every sub-survey's claims against ARCHITECTURE.md's existing ground truth before writing them into the document,
+rather than transcribing verbatim. Full working room used across the whole turn; the four background surveys ran
+concurrently so wall-clock cost was one deep-dive's worth, not four.

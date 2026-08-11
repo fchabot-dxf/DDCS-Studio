@@ -304,6 +304,21 @@ double-shifts by the pin.
 - `wizards/ops/panelTypes.js` — the twin's **spec compiler**. `layoutSpecFromOp` (`:168`) turns def + live params
   into a FeatureCanvas spec. Everything the Layout pane shows for a twin originates here.
 
+### Six legacy renderers are still live, not five renderers and a composer
+
+The inventory above is what a twin reaches from the menu. **`wizards/views/index.js`'s `WIZARD_VIEWS` still
+registers a SEVENTH, older renderer per op for 6 of the 8 probe/utility twins** — `middleView.js` / `edgeView.js`
+/ `alignmentView.js` / `rotaryCenterView.js` / `rotaryClockView.js` / `homingView.js` — the pre-port built-in
+wizard views, unreachable from today's menu but reached the instant an op carries its RAW built-in type (an old
+save file, a Blocks-authored raw block) instead of its twin's `user_*_data` type. Only `corner`'s legacy view was
+actually deleted (`git log` shows a full-remove commit `cbe08b03`) — `wcs`'s legacy view (`wcsView.js`) also
+survives but draws nothing on either path, so it carries no divergence risk. Two of the six are **confirmed
+behaviorally different from their twin today**, not just duplicated: `middleView.js`'s `syncStockShape` mutates
+the global stock shape for a round preview the twin's `middle_data` has no equivalent for (a live regression);
+`rotaryCenterView.js`'s `activateCylinderStock()` silently persists a global `settings.stock` mutation the twin's
+`def.simStock` explicitly avoids. Full per-op detail, citations, and the complete duplicate-intent list:
+`PREVIEW-AS-DATA.md` (cycle 857 ACT 1 survey).
+
 ### The one-sources every renderer already shares — do not re-derive these
 
 `viz/sceneFrame.js` (frames) · `viz/markerWorld.js:12` `markerWorldOf` (marker world) · `viz/startGlyph.js`
@@ -577,10 +592,20 @@ WORK-LOG- and test-header-reported; not re-measured.)*
   position against its SVG on screen.
 - **`middleVizManager.js` / `middleVizAnimator.js` / `edgeVizAnimator.js` / `alignVizAnimator.js`** are imported at
   `web/app.js` and animate the legacy inline SVGs in containers `preview3D` sets to `display:none` on first use
-  (`wizardManager.js:564`). **UNSURE whether any of these still animate anything visible.**
+  (`wizardManager.js:564`). **RESOLVED (cycle 857 ACT 1, PREVIEW-AS-DATA.md):** yes — these ARE the still-registered
+  legacy built-in views' (`middleView.js`/`edgeView.js`/`alignmentView.js`) own animation machinery, reachable
+  whenever an op carries its raw built-in type instead of its twin's `user_*_data` type (an old save file, a
+  Blocks-authored raw block). See "Six legacy renderers are still live" below.
 - **Rule 13's partition claim** (three fork-inheritance cases cover the registry with no overlap, `userOps.js:1055-1058`)
   was read, not re-derived.
 - **Rule 14 (`postInstantiate`)** is verified as a *mechanism* at `userOps.js:946`; no violation of it was found in
   this week's work-log. It is listed because the project memory names it, not because this week caught it.
 - The **lathe family's** divergences from the mill spine were not traced beyond `panelTypes.js:173-174` and the
   missing `placement` key. Two of the three files dirty at verification time are lathe viz files.
+  **PARTIALLY RESOLVED (cycle 857 ACT 1, PREVIEW-AS-DATA.md):** traced fully — `withLatheScene` declares only the
+  blank/stock shape (`def.simStock`); CUT geometry has no declared hook at all (2D dispatched by a 6-armed regex
+  on `opType`, `latheProfileCanvas.js:128-161`; 3D tool mesh by a 2-armed switch on a plain string). The single
+  most consequential bug in the whole 32-twin preview survey lives here: picking a real centre-drill/drill tool
+  from the library silently renders as a flat mill endmill in 3D, because `userOpView.js:361-366` reads the wrong
+  field (`_tbl.type`, always `''` on a lathe row) off the picked tool. Full detail, citations, and 3 more
+  cross-cutting findings in `PREVIEW-AS-DATA.md`'s lathe section.
