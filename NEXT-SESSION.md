@@ -1301,3 +1301,18 @@ builder already moved in step 1; the class itself is untouched by this act.
 - Node tier 118/118.
 - A real old-format file/op of at least 2 of the 6 Tier-B types, opened live, showing the graceful message.
 - ARCHITECTURE.md / architecture-map-1698.test.mjs — this act WILL touch cited files; expect and fix drift.
+
+## ⚠ SIMPLIFIED (user, 2026-08-11) — Tier B's raw-type verification is DROPPED
+The advisor's step-2 dispatch gated Tier B (the 6 legacy renderer views) on verifying graceful degradation
+for an old-format op first. **User pushback: "so youre just telling me youll build a alarm for outdated
+wiz" — and separately, "no save file exist on my end."** Correct on both counts:
+- There is no old-save audience to protect (none exist), so the check was solving for a case that is not
+  real — the same over-caution pattern flagged repeatedly today (an invented hold on a decision already
+  made).
+- What actually needed protecting — "did the deletion break something still wired to these files" — is
+  already covered by fork-parity (byte-identical, all 33) + the node tier + the app booting normally. A
+  broken import surfaces as a hard error, not a silent gap needing a dedicated test.
+
+**DROPPED. Tier A and Tier B delete on the same gate: fork-parity + node tier + a normal app boot. No new
+UI, no new fallback message, no dedicated legacy-path test.** If deletion later surfaces a REAL crash on a
+path that matters, that is a normal bug to fix then — not a reason to have pre-built ceremony now.
