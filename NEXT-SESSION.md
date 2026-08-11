@@ -1093,3 +1093,28 @@ was hedging, not diligence — the user gave a clear instruction and the advisor
 qualifying it. Measured after the user pushed back: the projected-G-code pane IS the code panel
 (`blocksApp.js:350`), so nothing else in that column shows the emit — and the user knows that; it is what
 they are removing. **Delete both faces' content, the column is the Wizard View. No hold, no condition.**
+
+### 8b. THE SHAPE, AS THE USER STATED IT (2026-08-11) — honest and minimal
+*"i want wizard view to apear all the time, and 3d prev and proj gcode to be remove all the time"* … and,
+on what the column shows with no wizard: *"i want this honest and minimal, so its either nothing or a
+different panel with only the 3d preview."*
+
+**A wizard is loaded → the Wizard View. Always. No predicate, no mode, no fallback-to-something-else.**
+**No wizard → NOTHING, or a plain 3D-preview panel. NEVER the Wizard View wearing an empty face.**
+**Projected G-code → removed in both cases.**
+
+**What this deletes:** the four-term guess at `blocksApp.js:523` (`authoredHere ‖ customizing ‖ hasTree ‖
+def.bindings.length`) and the `setRightFace` switching with it. That predicate is a proxy for "is a wizard
+being authored" and its own comment records it being patched twice for guessing wrong (surfacing showed
+Preview with the Define-Custom-Wizard block sitting on the canvas — a user-reported gap). Removing the
+question removes the wrong answers.
+
+**The honesty property, which is the POINT and must not be traded away for convenience:** the face always
+means what it says. A Wizard View shown with no wizard behind it would be exactly the class of lie this
+project keeps fixing. Empty is honest; a fake wizard face is not.
+
+**Minimal means minimal:** the no-wizard fallback is AT MOST a bare 3D preview — not the old
+preview-plus-code arrangement rebuilt under a new name.
+
+⚠ The block→line link disappears with the code panel. The user has accepted that; do NOT preserve the pane
+"just in case", and do NOT invent a replacement. If it is ever wanted back it is a separate, later thing.
