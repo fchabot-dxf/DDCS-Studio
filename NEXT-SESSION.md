@@ -1118,3 +1118,14 @@ preview-plus-code arrangement rebuilt under a new name.
 
 ⚠ The block→line link disappears with the code panel. The user has accepted that; do NOT preserve the pane
 "just in case", and do NOT invent a replacement. If it is ever wanted back it is a separate, later thing.
+
+### 8c. THE LAYOUT, CURRENT INTENT (user, 2026-08-11): *"so a tab with wizard view and 3d view i guess for now"*
+Two TABS in the right column: **Wizard View** and **3D**. The 3D tab is always meaningful (it shows the
+program); the Wizard View tab exists only when there is a wizard behind it. So the no-wizard case needs no
+special mode and no empty face — 8b's honesty property is satisfied by the tab simply not being there.
+Projected G-code is in neither tab; it is gone.
+
+⚠ **"for now" is the user's own word and it is the right weight.** The TAB LAYOUT is a cheap, revisable
+presentation choice — do not build machinery around it or treat it as settled architecture. What is NOT
+provisional, and does not get undone: the deletion of the projected-G-code pane, the deletion of the
+four-term wizard-face predicate, and the rule that a Wizard View is never shown without a wizard.
