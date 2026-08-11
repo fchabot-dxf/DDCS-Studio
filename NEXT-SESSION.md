@@ -1006,3 +1006,68 @@ thing" — too strict; it forbade the additive case the user wants.)
 ⚠ **Still unsized and NOT yet planned:** whether the additive layer is blocks, and what the minimum shape
 is. The user's own method applies — answer it against a REAL op they would actually build, not in the
 abstract. Do not design it from imagination; that error has been made twice today already.
+
+---
+
+# 📌 OPEN TASKS — carried forward from the 2026-08-11 planning session (do NOT lose these)
+No cycle is running. These are the agreed live items, in the order they were established. Each carries
+its evidence so a fresh session does not re-derive it.
+
+## 1. THE EMPTY SAVE — a live user-reported bug on the flagship path
+**User, 2026-08-11:** *"if i save a built in as custom its empty."* They separately CONFIRMED that
+surfacing forks and works — so forking is NOT broken; the fault is ROUTE-SPECIFIC.
+Three routes reach "save as custom", and only one loads the stack first:
+- ① op card → 🧩 Customize as blocks → 💾 Save wizard… — calls `ddcsEditWizardDef(opType)` FIRST.
+  This is the route `fork-parity-1593.spec.js` drives, and it passes on all 33 twins.
+- ② header menu → save as wizard (`ui/headerPost.js:51`) — saves WHATEVER is in the Blocks workspace.
+  **Its guard checks `window.ddcsSaveAsWizard ? … : notice(...)` — i.e. whether the FUNCTION EXISTS, not
+  whether anything is LOADED.** devMode defines that function on init, so with an empty workspace the
+  notice never fires and an EMPTY wizard saves silently.
+- ③ library modal (`ui/libraryModal.js:170`) — same underlying call as ②.
+**Advisor's hypothesis (UNCONFIRMED — reproduction attempt failed to open the Blocks tab, proved nothing):**
+② or ③. **Ask the user which button they used before building anything.** Fix direction: the save REFUSES
+when there is nothing loaded, and better — saving from a wizard context loads THAT wizard's stack first.
+⚠ If it turns out to be route ①, that is far more serious: a test claiming to fork all 33 is lying.
+
+## 2. THE MISSING PROOF — the fork test never checks the PICTURE
+`fork-parity-1593.spec.js` asserts form + emit BYTE-IDENTICAL for every twin. It never compares the
+preview. **So a fork can come back with a different picture and every test still passes** — exactly the
+blind spot that let this week's four wrong pictures live (lathe tool as endmill, middle stock shape,
+rotary mutating saved settings, ATC magazine). Extend the fork comparison to the picture. Small, no design
+decisions, and it would have caught all four before the user did.
+
+## 3. RETIRE THE OLD SCREENS AND RENDERERS — turns "portable" into "as data"
+User has ruled they go ([[nothing-is-precious-delete-freely]], [[no-legacy-burden]]). ~20 dead built-in
+screens + **6 legacy renderer views still LIVE and reachable** (an op carrying its raw built-in type
+instead of `user_*_data` gets the OLD renderer; **2 of the 6 already behave differently from their twin**).
+Only corner's was actually deleted. ⚠ EXTRACT FIRST: 24 of 38 twins import from `wizards/*Wizard.js` —
+those imports are STACK BUILDERS (legitimate per principle 2, `BUILDERS(params)==children`), NOT leftovers.
+Cut the screens/renderers, keep the builders.
+**Why this is the highest-value item:** it serves BOTH ideas at once — the app's cleanliness (one source)
+AND the user's ownership (a fork can no longer silently get old behaviour). It is also the step that makes
+"wizards as data" TRUE rather than just "portable".
+
+## 4. THE 24 DUPLICATED FACTS (`PREVIEW-AS-DATA.md`, tiered)
+Tier 1 (3-4 copies of one fact): pocket shape table ×3 · contour ×3 · edge near-face rule ×4 ·
+parting kerf ×3 · comm message format ×3 · ATC sim declared twice with one copy permanently stale.
+Tier 2: 9 two-copy items. Tier 3: 5 capability gaps.
+**Each is the same move — find the one real function, make everything call it, delete the copies.**
+NO new blocks, NO vocabulary, nothing new for an author to learn (see the HARD CONSTRAINT above).
+⚠ **Still unanswered by the user:** WHICH of these wizards they actually run on real parts. "Most copies"
+is not "most likely to burn you" — ask before ordering the work.
+
+## 5. THE A/B RULING (blocks the machine-variable roll-out to the other 28 ops)
+Fields that accept a machine variable had to stop being strict number boxes (a number box discards the `#`
+before anything can react, so refusal would be silent). **A** = every field with a rule becomes a text box,
+so blocked fields flash red and explain — cost: no spinner arrows / native numeric validation, app-wide.
+**B** = only fields that ACCEPT variables convert; blocked ones keep the arrows but ignore `#` silently.
+Shipped as **A** in 4 pilot ops (corner + 3) so the user can feel it before ruling. **Do not roll further.**
+
+## 6. THE TWO DEAD CONTAINER BLOCKS
+`sim_3d_box` + `code_preview_panel` — zero readers, but present in the palette, so a user can place one and
+nothing happens (this project's own named disease). ⚠ **`layout_2d_canvas` is ALIVE and wired** — the shape
+vocabulary round-trips through it. The advisor twice reported all three as dead; corrected by the worker at
+t1726. Delete the two, keep the one.
+
+## 7. AWAITING THE USER AT THE MACHINE
+Bench probes S6h + Expert V13c/a/b.
