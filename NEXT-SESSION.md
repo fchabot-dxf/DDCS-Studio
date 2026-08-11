@@ -820,3 +820,27 @@ individual specs), and make the **flaky count** the health metric that gets read
 the genuinely-reasoned quarantines (the `test.fixme` with a traced root cause) — those are real
 statements about the product; the per-spec retry lists are not. Re-run the full gate to confirm the
 unexplained count is **0**.
+
+## CYCLE 857 ACT 2 — fix the FOUR Tier-0 divergences (they are wrong on screen TODAY)
+The survey's Tier 0 is not risk, it is four live defects. Fix them now: they are wrong regardless of how
+the user rules the four granularity forks, and none of the fixes commits us to a fork.
+1. **`middle_data` shows the wrong stock shape** — the legacy view syncs the 3D stock to round for
+   Feature=Boss+Circular; the twin declares no equivalent. `rotaryCenterData.js` already does this
+   correctly and non-destructively — follow ITS pattern (`def.simStock`), do not copy the legacy mutation.
+2. **`rotary_center_data`'s legacy view mutates persisted `settings.stock`** — a preview writing user
+   state is a defect on its own terms. The twin's own comment already states the correct intent.
+3. **The lathe tool-identity bug (advisor-verified independently, t1721):** `userOpView.js:365` reads
+   `_tbl.type || 'endmill'`, but a lathe-authored tool row only ever writes `kind` (`settingsPanel.js`
+   writes num/name/kind/feed/rpm/unit — `type` appears once in the whole file and not for lathe). So
+   `_tbl.type` is undefined and EVERY picked lathe tool renders as a flat mill endmill. Fix at the read.
+   ⚠ Check whether `kind`'s vocabulary matches what the mesh switch expects — the survey also found
+   `'centerdrill'` (code) vs `'centredrill'` (table) — an American/British spelling split. If two spellings
+   of one identity exist, that is a SECOND declaration, not a typo: make it one, don't patch both readers.
+4. **The ATC magazine pocket list disagrees between hosts** — single-op preview shows every configured
+   pocket, whole-program filters to tool-assigned ones. One declared `showMagazine` intent, two
+   computations. Make it ONE function both hosts call (the survey's own Good/Bad dividing line).
+
+**Each fix must be a DECLARATION or a single shared function where one fits — not a second hand-rolled
+copy that happens to agree today.** That is the exact disease this survey mapped; do not add to it.
+Verify each with the real symptom (the picture is right), not only a passing test. Node tier +
+hand-picked sweep. Report each as declared-vs-patched and why.
