@@ -1191,3 +1191,22 @@ fixed operation, which is a legitimate thing to want.
 **So the empty save is CLOSED as not-a-defect.** A stack with no exposed params saves as a wizard with an
 empty form; that is the correct outcome of what was saved. No fix, no guard, no further investigation.
 Items 1, 1b and 1c are superseded by this. Do not resurrect them.
+
+### 1e. THE ACTUAL SYMPTOM, IN THE USER'S WORDS (2026-08-11) — the advisor had been recording a mangled version
+*"i had a built in open and saved as custom and reopening shows no param, but that was before now it works."*
+
+**That is NOT "saving an empty workspace."** It is: a BUILT-IN was open → saved as custom → the resulting
+custom wizard REOPENED WITH NO PARAMETERS. A built-in has a form, so a fork of one showing no params is
+wrong on its face. The advisor drifted this into "an empty Blocks workspace was saved", then closed it as
+not-a-defect on the (true but IRRELEVANT) grounds that a parameterless wizard is a legitimate thing to
+save. **1d's closure reasoning does not apply to the symptom the user actually reported.**
+
+**Why it matters even though it no longer reproduces:** `fork-parity-1593.spec.js` forks EVERY twin and
+asserts the FORM comes back BYTE-IDENTICAL. The user's symptom is that assertion failing in the real app.
+So either (a) a real intermittent fault exists on that path, or (b) the test's route differs from the
+user's gesture — and (b) would mean the test does not cover what a user actually does.
+
+**Status: OPEN, unexplained, NOT reproducible today. No fix — there is no cause.** If it recurs, capture
+the FORKED wizard's stored definition (does it have bindings/params?) — that separates "the fork lost the
+form" from "the form is there but not rendering". Do not add a guard. Do not close this again as
+not-a-defect.
