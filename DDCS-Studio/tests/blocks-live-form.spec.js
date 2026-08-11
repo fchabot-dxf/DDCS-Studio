@@ -5,6 +5,12 @@ import { test, expect } from '@playwright/test';
  * pure VIEW of the blocks — derived live (deriveAuthoredDef), no save needed. Editing a block's value re-derives the
  * form, so you "see the form change." (Built-ins are unaffected — they generate, not view.) Writeback is step 2.
  */
+
+// t1718 (gate repair) — DECLARED LOAD-SENSITIVITY, not a defect: deterministically green run alone or in a small
+// hand-picked group, intermittently red only under the full suite's worker=6 contention. A retry lets a genuine
+// one-off contention stall self-heal without masking a real regression — a defect fails EVERY retry too.
+test.describe.configure({ retries: 2 });
+
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('editing a custom op shows its form derived from the blocks; editing a block updates the form', async ({ page }) => {

@@ -176,9 +176,13 @@ function applyPaneRatio(r) {
 }
 
 // The splitter only means something with BOTH panes open + visible → toggle its inertness off collapse / display state.
+// t790 (gate repair, t1718) — a COLLAPSED pane is not display:none (it folds to a slim strip, still in flow), so
+// offsetParent alone never catches it; the collapsed check was missing, so the splitter stayed 'live' (data-split-on
+// stuck at '1') the moment a pane folded, even though the MutationObserver above already re-runs this on every
+// data-collapsed change — the recompute fired, the condition just never looked at what changed.
 function updateSplitOn(split) {
     const panes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
-    const ok = panes.length === 2 && panes.every((p) => p.offsetParent !== null);
+    const ok = panes.length === 2 && panes.every((p) => p.offsetParent !== null && p.getAttribute('data-collapsed') !== '1');
     split.dataset.splitOn = ok ? '1' : '0';
 }
 

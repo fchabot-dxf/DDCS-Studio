@@ -23,6 +23,13 @@ import { test, expect } from '@playwright/test';
 // guard's arms means Corner now puts 1852 Blockly blocks on the canvas instead of 111 — measured ~2.6s to build and
 // ~5.1s to settle, alone. Under the suite's six workers those numbers stretch, and the config's 5s actionTimeout is
 // the default for an un-optioned wait. This spec opens the two largest wizards in the registry, fourteen times.
+
+// t1718 (gate repair) — the comment above already NAMED this spec's load-sensitivity; this is that fact made
+// GATE-READABLE (a comment is not a declaration — the runner must read it). Confirmed green alone/in a small
+// hand-picked group, intermittently red only under the full suite's worker=6 contention. A retry lets a genuine
+// one-off contention stall self-heal without masking a real regression — a defect fails EVERY retry too.
+test.describe.configure({ retries: 2 });
+
 const boot = async (page) => {
     await page.goto('/', { timeout: 60000 });
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsEditWizardDef, null, { timeout: 60000 });

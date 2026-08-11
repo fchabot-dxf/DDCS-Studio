@@ -39,12 +39,18 @@ test('update banner: silent on web, version compare correct, shows in (simulated
   await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
   await page.waitForSelector('.ddcs-update-bar');
 
+  // t1185's fix (see the OTHER test below) replaced the anchor+href Download control with a <button class="upd-dl">
+  // whose click listener calls window.open(dl, ...) directly — there is no href attribute to read anymore, so this
+  // asserts the SAME way test 2 does: mock window.open, click, check the URL it opened.
   const bar = await page.evaluate(() => {
+    const opens = [];
+    window.open = (...a) => { opens.push(a); return { focus() {} }; };
+    document.querySelector('.ddcs-update-bar .upd-dl').click();
     const b = document.querySelector('.ddcs-update-bar');
-    return { text: b.textContent, href: b.querySelector('a.upd-btn').getAttribute('href') };
+    return { text: b.textContent, openedUrl: opens[0] && opens[0][0] };
   });
   expect(bar.text).toContain('v9999.0');
-  expect(bar.href).toBe('https://example/DDCS-Studio.exe');
+  expect(bar.openedUrl).toBe('https://example/DDCS-Studio.exe');
 
   await page.click('.ddcs-update-bar .upd-what');
   const notes = await page.textContent('.ddcs-update-bar .upd-notes');
@@ -74,13 +80,13 @@ test('Download button triggers exactly ONE download: window.open once + anchor d
     };
   });
   await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
-  await page.waitForSelector('.ddcs-update-bar a.upd-btn');
+  await page.waitForSelector('.ddcs-update-bar .upd-dl');
 
   const r = await page.evaluate(() => {
     const opens = [];
     window.open = (...a) => { opens.push(a); return { focus() {} }; };   // truthy → the location.href fallback stays untaken
     const before = location.href;
-    const a = document.querySelector('.ddcs-update-bar a.upd-btn');
+    const a = document.querySelector('.ddcs-update-bar .upd-dl');
     const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
     a.dispatchEvent(ev);
     return { opens, defaultPrevented: ev.defaultPrevented, navigated: location.href !== before };

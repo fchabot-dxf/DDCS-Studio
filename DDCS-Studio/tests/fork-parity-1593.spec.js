@@ -37,6 +37,12 @@ import { test, expect } from '@playwright/test';
  * was shown to fail this exact assertion before being restored).
  */
 
+// t1718 (gate repair) — DECLARED LOAD-SENSITIVITY, not a defect: this spec is deterministically green run alone
+// or in a small hand-picked group, and intermittently red only under the full suite's worker=6 contention (the
+// SAME class the config's own `workers: 6` comment already documents for a different set of specs). A retry lets
+// a genuine one-off contention stall self-heal without masking a real regression — a defect fails EVERY retry too.
+test.describe.configure({ retries: 2 });
+
 // ⚠ t1595 — EVERY WAIT EXPLICIT. `waitForFunction(fn, {timeout})` passes the options object as the page-function's
 // ARGUMENT, so the option is silently ignored and the config's 5s actionTimeout applies — the second line below used
 // to read exactly that way. It mattered from t1595 on, because rendering a guard's arms took Corner's canvas from

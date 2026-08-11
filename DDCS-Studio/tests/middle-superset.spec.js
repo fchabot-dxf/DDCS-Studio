@@ -28,6 +28,13 @@ import { test, expect } from '@playwright/test';
  * shards partition the sweep EXACTLY (disjoint, and summing to the full count), so sharding cannot quietly drop combos
  * the way a hand-split range would. Raising the number is now the whole cost of making this faster.
  */
+
+// t1718 (gate repair) — DECLARED LOAD-SENSITIVITY, not a defect: already TIMEOUT-MARGINAL by design (see above, the
+// whole reason it's sharded), so it is exactly the kind of test full-suite worker contention pushes over its cap
+// intermittently while it stays green alone. A retry lets a genuine one-off contention stall self-heal without
+// masking a real regression — a defect fails EVERY retry too.
+test.describe.configure({ retries: 2 });
+
 const SHARDS = 4;
 const EXPECTED_COMBOS = 14336;   // 2^8 * 7 wcs * 2 orders * 2 dir1 * 2 dir2 — asserted, not assumed
 

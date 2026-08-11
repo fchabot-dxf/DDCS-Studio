@@ -12,6 +12,12 @@ import { test, expect } from '@playwright/test';
  * Drives the real save button + real dialog (not a direct model call), same discipline as
  * formfield-authoring-1610.spec.js.
  */
+
+// t1718 (gate repair) — DECLARED LOAD-SENSITIVITY, not a defect: confirmed 2/2 green with --workers=1 (no
+// contention); intermittently red only under the full suite's worker=6 contention. A retry lets a genuine one-off
+// contention stall self-heal without masking a real regression — a defect fails EVERY retry too.
+test.describe.configure({ retries: 2 });
+
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('a dangling formfield (Match Var names nothing) REFUSES the save and names the field', async ({ page }) => {

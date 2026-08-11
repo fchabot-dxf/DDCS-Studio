@@ -4,8 +4,17 @@ import { test, expect } from '@playwright/test';
  * t752 — COLLAPSIBLE WIZARD PANES + per-theme motion tokens + the header undo/redo yield rider.
  * t784 — SPLIT the atomic .wiz-visual collapse into INDIVIDUAL panes: the 2D layout and the 3D verify fold
  *   independently, each via a slim SIDE-CHEVRON strip (≥44px touch, both platforms; the t752 top title bars retire).
- *   PLATFORM-SPLIT reflow: desktop the surviving pane FILLS the freed space; mobile the surviving pane KEEPS its size
- *   and the freed space goes to the FORM below. State is app-wide per pane KIND (panePrefs, localStorage ddcs_panes).
+ *   PLATFORM-SPLIT reflow (ORIGINAL t784 intent, SUPERSEDED on mobile by t1468 below): desktop the surviving pane
+ *   FILLS the freed space; mobile the surviving pane KEEPS its size and the freed space goes to the FORM below.
+ * t1468 (user defect, gate repair t1718 — test updated to match, product untouched) — mobile's "fixed 400px total"
+ *   was a CONSTANT nothing downstream consumed: dragging the bottom sizer resized `.wiz-visual` but the pane bodies
+ *   stayed pinned at their old heights, so a down-drag opened bare grey panel below the previews and an up-drag
+ *   swallowed the drag handle under the pane. The fix makes the stacked total a MEASURED variable (`--viz-stack-h`)
+ *   and — as part of the same fix — a collapsed pane's sibling now takes the FULL stacked height instead of staying
+ *   fixed, mirroring desktop's fill behavior. Net: on mobile, collapsing a pane no longer frees height to the form
+ *   below at all (the visual's own total height is unchanged) — it reallocates entirely to the surviving pane,
+ *   measured live below (200→400 on a 492px visual, both before and after). State is app-wide per pane KIND
+ *   (panePrefs, localStorage ddcs_panes).
  *  - The motion is DECLARED per theme (--drawer-* tokens); ONE engine reads them; reduced-motion ⇒ instant; ≤350ms cap.
  *  - RIDER: the header undo/redo stay REACHABLE at 360px (the hy-controls yield step).
  *  - View-only: emit is byte-identical whether a pane is collapsed or not.
@@ -32,10 +41,10 @@ const bodyH = (page, type, kind) => page.evaluate(([t, k]) => {
 }, [type, kind]);
 const visualH = (page, type) => page.evaluate((t) => Math.round(document.querySelector(`#wiz_${t} .wiz-visual`).getBoundingClientRect().height), type);
 
-test.describe('collapse gives the form the space (mobile) — the surviving pane keeps its size', () => {
+test.describe('collapse reallocates to the surviving pane (mobile, t1468)', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('collapsing the 3D shrinks ITS pane to the strip; the 2D keeps its size + the form gains the space', async ({ page }) => {
+  test('collapsing the 3D shrinks ITS pane to the strip; the 2D GROWS to fill the freed height (visual total unchanged)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
@@ -78,10 +87,11 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
     expect(h3Collapsed, `collapsed the 3D pane folds to a SLIM bar (just the chevron, ≤~28px) — settled at ${h3Collapsed}`).toBeLessThanOrEqual(28);
     expect(h3Expanded - h3Collapsed, 'collapsing frees the 3D height').toBeGreaterThan(100);
 
-    // the OTHER pane keeps its size (mobile: fixed height, not grown), and the visual total shrinks → form gains
+    // t1468 — the OTHER pane GROWS to take the full stacked height (mirrors desktop's fill behavior), and the
+    // visual's OWN total height is unchanged: the freed space goes to the surviving canvas, not to the form below.
     const twoDafter = await bodyH(page, 'contour', 'layout2d');
-    expect(Math.abs(twoDafter - twoDbefore), 'the 2D pane KEEPS its size (does not grow)').toBeLessThan(8);
-    expect(await visualH(page, 'contour'), 'the visual shrinks so the form below reclaims the space').toBeLessThan(visBefore - 100);
+    expect(twoDafter - twoDbefore, 'the 2D pane GROWS to fill the freed height').toBeGreaterThan(100);
+    expect(Math.abs((await visualH(page, 'contour')) - visBefore), 'the visual\'s total height is unchanged — t1468 reallocates to the surviving pane, not the form').toBeLessThan(8);
 
     // the strip toggles it back (wait for the expand animation to actually restore the height)
     await strip(page, 'contour', 'preview3d').click();
