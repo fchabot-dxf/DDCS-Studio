@@ -872,3 +872,28 @@ override any of them by saying so):
    `lathe_parting`'s kerf ×3) — each becomes ONE function the preview points at.
 3. **Only then** build the checker, once enough ops declare to make it worth the machinery.
    (Rule of three: do not build the reader for two consumers.)
+
+## ⚠ CORRECTION (t1723, user-caught) — the preview blocks are the UNFINISHED HALF, not a parallel channel
+The survey dismissed `shape_rect/circle/line/marker` + `layout2dCanvas`/`sim3dBox` in ONE line ("a third,
+parallel 2D-declaration channel — unused by any of these ops today") and the advisor relayed it. **The user
+caught it: declaring the preview as data IS the goal of wizards-as-data, so "no twin uses it" is the GAP,
+not a justification for adding a fourth mechanism beside it.**
+
+**Measured across all 38 twin files (t1723):** panel (the FRAME) declared in 38 · layout 13 ·
+`previewGeometry` 8 · `simStartsProvider` 7 · `simStock` 4 · **shape blocks 0 · layout2d 0 · sim3d 0.**
+And `cornerData.js:223,231` says it in its own words: it declares `panel: 'form3d+2d'` — the frame — with
+the comment *"per-view rig blocks are a later follow-up."* **The frame is data; the CONTENTS are still
+code, deliberately deferred and never scheduled.**
+
+**So `previewSources` as proposed is WITHDRAWN as the vehicle.** The user's ruling stands as a PRINCIPLE
+(a preview must provably reuse the emit's own function, not a copy that agrees today) but it rides on the
+blocks that already exist — finishing the deferred half — rather than a new `def.*` field beside them.
+This is [[restructure-source-not-abstraction]] and "replace, don't parallel" applied to my own proposal.
+
+### NEXT ACT (dispatch when the worker frees) — FIND THE CEILING, don't commit the architecture
+Take ONE preview from each family (mill · probe · lathe · ATC) and express it using ONLY the existing
+shared primitives (`shape_rect/circle/line/marker` + `layout2dCanvas`/`sim3dBox`). Report, per family,
+**exactly where it breaks** — the breakages ARE the proposed family vocabulary, measured rather than
+guessed. Do NOT add blocks, do NOT port a wizard, do NOT commit a shape. A survey act again.
+⚠ Watch palette growth: a family shares ONE colour, and a new block earns its place only where a
+primitive genuinely cannot say the thing.
