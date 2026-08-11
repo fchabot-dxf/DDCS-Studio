@@ -919,3 +919,37 @@ later follow-up."* That follow-up IS the act.
   user immediately, so verify against the real picture, not only a passing test.
 
 **Families are DISCOVERED as each family's first wizard ports, not surveyed upfront.**
+
+---
+
+# 🔨 CYCLE 858 ACT 1 — GIVE CORNER THE WORDS ITS PREVIEW ACTUALLY NEEDS (a BUILD, not a survey)
+t1724 measured the ceiling honestly: corner's 2D pane is `items:['hole']`, `handles:['reposition_pos']`,
+`paths:0` — an interactive handle, a generic item, and a TRACE-derived path. The existing
+`shape_rect/circle/line/marker` vocabulary is deliberately non-interactive and static, so **it cannot say
+any of it.** That is why the follow-up was never finished: not neglect, a vocabulary that stops short.
+The three container blocks (`layout_2d_canvas`/`sim_3d_box`/`code_preview_panel`) have ZERO readers —
+a 5th declared-but-unread instance, and they are DRAGGABLE IN THE PALETTE today, so a user can place one
+and nothing happens (this project's own named disease: a control that accepts a gesture and does nothing).
+
+## THE ACT
+Design, from CORNER'S REAL NEEDS ONLY, the minimum vocabulary that lets corner declare its preview
+CONTENTS, and wire it end-to-end so the pane renders FROM the declaration.
+- **Derive the word list from what corner actually draws** — not from what 32 wizards might want. If
+  corner needs three words, add three. A word earns its place only where an existing primitive genuinely
+  cannot say the thing (t1724 already proved that for the interactive + trace cases).
+- **The containers: USE them or REPLACE them — never a third parallel path.** If `layout_2d_canvas`'s
+  shape fits, wire it and it stops being dead. If it does not fit, delete it (and its two siblings) in the
+  same act rather than leaving inert palette entries beside a new mechanism. Say which and why.
+- **Fork 2 still binds:** the toolpath TRACE stays trace-derived (it cannot drift from the emit, for
+  free). Declare only what has no G-code behind it — the markers, the handle, the item.
+- **The user's principle still binds:** whatever feeds a declared block must provably reuse the emit's own
+  function, never a copy that agrees today.
+- ⚠ **Palette hygiene** (user rule): the family shares ONE coherent colour, legible, category-consistent.
+- ⚠ **Handles are independent** (user rule): dragging one handle must never move another.
+
+## VERIFICATION — corner is USER-VERIFIED on 5 symptoms; a regression here is visible immediately
+1. The 16-config corner sweep (exact 3D/Layout coincidence + marker-truth) must be **unmoved**.
+2. The picture must be **unchanged to the eye** — screenshot before/after, same params.
+3. Emit **byte-identical** (this is preview-only).
+4. Prove the wiring to the VISIBLE PIXEL: show the pane rendering from the DECLARATION, not from the old
+   code path — a test that passes while the old path is still doing the drawing proves nothing.
