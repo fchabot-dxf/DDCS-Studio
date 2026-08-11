@@ -1239,3 +1239,19 @@ files into a home of their own. Leave the screens and the legacy views behind, u
 2. Node tier 118/118, plus a hand-picked sweep of whatever the moved builders touch.
 3. **Emit byte-identical everywhere** — if any G-code moves, the move was not pure.
 4. Report the classification table (builder/screen/renderer/helper per file) — step 2 depends on it.
+
+### Step 2 exclusion, ADVISOR-VERIFIED (t1729): communicationWizard.js is NOT a legacy screen
+Independently confirmed (not taken on the worker's word): `userOpView.js:618` —
+`host.innerHTML = _commWizard.generateScreenPreview(params)` — is the comm TWIN's own preview panel
+calling `CommunicationWizard.generateScreenPreview()` directly, live, every time a comm op is opened. It
+draws a mock of the DDCS controller's screen (title/message/Enter-Esc buttons) for the popup/status/input
+op being authored. **This is not dead code wearing an old filename — it is the one place that drawing
+logic lives, called by the CURRENT wizard, not a fallback.**
+
+**Consequence: `communicationWizard.js`'s `CommunicationWizard` class is EXCLUDED from step 2's deletion
+pass, full stop.** Its builder (`commStack`) already moved out in step 1; the class stays where it is.
+A future relocate/rename is fine; a delete is not.
+
+**Noted for later, not now:** `generateScreenPreview()` draws something with NO G-code behind it — exactly
+the "additive layer" named in item 8b/8e's preview discussion. A real candidate for becoming a declared
+preview-only visual eventually, but that is design work, not part of the gameplan's deletion step.
