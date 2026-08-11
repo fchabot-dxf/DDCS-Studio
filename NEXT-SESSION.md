@@ -1088,7 +1088,8 @@ the duplication this whole leg is removing. It also explains item 6: `sim_3d_box
 are exactly these two panes as blocks, and were never wired because the direction was already heading here.
 Deleting them and deleting this face are ONE change, not two.
 
-⚠ **CHECK BEFORE CUTTING (advisor, flagged not argued):** Projected G-code is currently how the emitted
-code is seen FROM THAT COLUMN. Confirm where G-code viewing survives in the Blocks tab afterwards — do not
-delete it and discover the loss later. If nothing else shows it, say so and let the user rule; do not
-silently keep the pane to be safe.
+✅ **NO CAVEAT.** The advisor first wrote a "check where G-code viewing survives" hold on this item. That
+was hedging, not diligence — the user gave a clear instruction and the advisor had not looked before
+qualifying it. Measured after the user pushed back: the projected-G-code pane IS the code panel
+(`blocksApp.js:350`), so nothing else in that column shows the emit — and the user knows that; it is what
+they are removing. **Delete both faces' content, the column is the Wizard View. No hold, no condition.**
