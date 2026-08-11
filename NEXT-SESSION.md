@@ -667,3 +667,42 @@ the fastest discriminator).
 Corner simstart placeholders · derived rows on the tree face · shape-field lint hook · drawer 2D pane ·
 Escape pair · flattenBlocks side-effect · the defects queue. User rulings still open: bevel · label
 widening · Corner-wall · S6h + Expert V13c/a/b probes.
+
+---
+
+# ⛔ RELEASE-BLOCKING REPAIR (t1713) — the cycle's gate is RED and cannot ship
+
+The cycle's five acts are DONE and the end condition is met, but the release gate came back
+**25 failed** (last release: 12, all churn). Advisor triage, already done — do NOT re-derive it:
+
+**Cause, measured.** ACT 3 changed `numberWidget` (`web/ui/formWidgets.js`): a binding carrying a
+declared token policy now renders `input type="text"` instead of `type="number"` (deliberate and
+well-argued — a native number input silently swallows a `#500` keystroke, so there is no gesture left
+to refuse). **12 specs use `#wiz_user_form input[type="number"]` as their FORM-IS-READY selector.**
+Corner's fields are now `text`, so the only `number` input left is a hidden `planeZ` — the wait times
+out and the test dies before reaching a single assertion.
+
+**The product is NOT broken — advisor verified in the real app (t1713):** corner opens with 10 visible
+inputs, all `type=text`, all carrying correct values (travelDist=50, safeZ=10, scanDepth=5, hopDist=15,
+dist=500, retract=5, f_fast=200, f_slow=50). So this is a stale test PROXY, not a regression. Repair
+the proxy — do not revert the widget change.
+
+## THE ACT
+1. **Repair the readiness selector in all 12 specs** so it is type-agnostic (the form is ready when its
+   fields are visible, whatever element type a declaration gives them). One shared helper if the specs
+   already share one; do not hand-roll 12 variants of the same wait.
+2. **Re-run those 12 specs** and report the remaining reds by NAME. 7 are reproduced and attributable
+   (5 x corner-marker-independence, 2 x corner-data-sim-marker-emits). `guard-roundtrip-1595` FAILED in
+   the full run but PASSES in isolation — full-suite noise, leave it.
+3. ⚠ **`web/blocks/blockly/tokenGuard.js` is BINARY to git** (`Bin 0 -> 6443 bytes` in the diff) because
+   it uses NUL bytes as Map key separators. It is therefore INVISIBLE to every future review, including
+   mine of ACT 5. Replace the separator with an ordinary character so the file is text; verify with
+   `git diff --stat` showing line counts, not `Bin`.
+4. **Verify**: the node tier + the 12 repaired specs. Do NOT run the full suite — that is the advisor's
+   release gate.
+
+## ⚠ A DESIGN FORK THE USER MUST RULE BEFORE THE 28-OP ROLL-OUT (advisor is asking them now)
+Every field with a declaration becomes a text box — **including fields declared INELIGIBLE**, whose only
+reason to convert is so the refusal can be shown. Rolled to the other 28 ops that converts most numeric
+fields in the app, costing the spinner arrows and the browser's numeric validation everywhere.
+Do NOT roll the declarations further until that ruling lands.
