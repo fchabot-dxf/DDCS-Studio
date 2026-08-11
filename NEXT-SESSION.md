@@ -763,3 +763,42 @@ wires from live w/h, so it never depended on `liveExtent` the way the old note c
 Re-confirm it reproduces on TODAY's tip before spending an act on it — the same reconcile-against-ground-
 truth rule already applied to the worker's reports, applied to my own backlog. A stale defect costs a
 whole act, and worse, it invites forcing a "fix" onto code that is tested and working.
+
+---
+
+# 🔁 CYCLE 857 — PREPARE THE LAST LEG: **PREVIEW AS DATA**
+
+EMIT is 32/32 declared. FORM is 32/32 declared. **PREVIEW is 0/32** — and every symptom the user
+reported on 2026-08-10 lived in that column (path drawn outside the stock · 3D and 2D disagreeing ·
+spindle offset from its own path · a marker solid in one pane and hollow in another). Those were not
+five bugs. They were ONE missing declaration, hand-rolled by renderers with no shared source of truth.
+
+## ACT 1 — SURVEY ONLY. Read-only. No source changes, no engine, no "while I'm in there".
+⚠ **Do NOT run Playwright while this act runs — the advisor's release gate is running and two concurrent
+suites manufacture false reds.** The node tier is fine.
+
+For **every shipped twin**, answer with EVIDENCE (`file:line`, not recollection):
+1. **Who draws it** — which renderers touch this op's preview (3D scene · 2D feature canvas · layout
+   pane · anything else), and which of them the op reaches by NAME (a per-op branch) vs generically.
+2. **What each renderer READS to decide** — op params? a shared spec? a hand-rolled table keyed on the
+   op name? Name the input.
+3. **Where the same intent is expressed TWICE** — the drift surface. This is the column that matters:
+   every duplicate is a future "the two panes disagree" report.
+
+Then produce a **CANDIDATE DECLARATION SHAPE** — data, not machinery — that could carry what all the
+previews need, with a worked example for 3 ops of DIFFERENT character (a probe, a milling op, a lathe
+op), so the shape is tested against variety rather than against the easy case.
+
+## ⚠ WHAT THIS ACT MUST NOT DO
+- **Do not pick the granularity.** Where reasonable people would slice differently (one block per
+  visual element? per pass? per op?), NAME the fork, show what each choice costs, and STOP. Granularity
+  is a standing USER ruling on this project — surfacing the fork IS the deliverable, not choosing.
+- **Do not build the reader.** A declaration nothing reads yet is cheap and correct at this stage; an
+  engine built before the shape is ruled is the expensive mistake.
+- **Do not "fix" a preview you find broken.** Log it. This act buys a map, not repairs.
+
+## DELIVERABLE
+A design doc (`PREVIEW-AS-DATA.md`) carrying: the per-op table, the duplicate-intent list ranked by
+how likely each is to drift, the candidate shape with its 3 worked examples, and the granularity forks
+stated as questions with costs. Update `ARCHITECTURE.md` where this survey contradicts it — that map
+already caught 8 drifted citations on day one; this act is exactly the kind that would drift it again.
