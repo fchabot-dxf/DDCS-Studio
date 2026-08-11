@@ -802,3 +802,21 @@ A design doc (`PREVIEW-AS-DATA.md`) carrying: the per-op table, the duplicate-in
 how likely each is to drift, the candidate shape with its 3 worked examples, and the granularity forks
 stated as questions with costs. Update `ARCHITECTURE.md` where this survey contradicts it — that map
 already caught 8 drifted citations on day one; this act is exactly the kind that would drift it again.
+
+## 📌 CYCLE 856 ACT 3 (queued — dispatch when the survey passes back)
+**Measured at t1719:** the honest-baseline act took the gate from **14 → 3** failures (2472 passed, 2
+flaky self-healed, 21.1 min). But the 3 survivors — `shared-labels-1611`, `subscriber-error-surface-1656`,
+`toolpath2d-anim` — are **names that did NOT fail in the previous run**, and all 7 tests in those files
+pass in **8.2 seconds** in isolation.
+
+**So the starved population SHIFTS run to run.** That falsifies the per-spec approach: naming five specs
+for retries treats a scheduling lottery as if it had a fixed set of winners. Whichever tests happen to
+lose the lottery next run will be a different list, and the "declared quarantine" will keep going stale —
+folklore again, just written down.
+
+**The act:** replace the per-spec `retries` with a POLICY at the config level (the population is
+whatever contention starves, so the declaration belongs where contention is configured, not on
+individual specs), and make the **flaky count** the health metric that gets read at each release. Keep
+the genuinely-reasoned quarantines (the `test.fixme` with a traced root cause) — those are real
+statements about the product; the per-spec retry lists are not. Re-run the full gate to confirm the
+unexplained count is **0**.
