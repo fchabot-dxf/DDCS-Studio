@@ -1210,3 +1210,32 @@ user's gesture — and (b) would mean the test does not cover what a user actual
 the FORKED wizard's stored definition (does it have bindings/params?) — that separates "the fork lost the
 form" from "the form is there but not rendering". Do not add a guard. Do not close this again as
 not-a-defect.
+
+---
+
+# 🔨 GAMEPLAN STEP 1 — EXTRACT THE STACK BUILDERS (user: "go", 2026-08-11)
+**Nothing user-visible changes in this act.** Its whole purpose is to make the deletions in step 2 safe.
+
+**The situation, measured (t1725):** 24 of 38 twin files import from `web/wizards/*Wizard.js`, e.g.
+`cornerData.js:44` imports `cornerStack, cornerReposOffsets, dirsOf, cornerHeaderComments`. Those imports
+are **STACK BUILDERS and they are legitimate** — principle 2 is `BUILDERS(op.params) == op.children`, so a
+builder being code is the architecture working, not a half-finished port. But they currently live in the
+SAME FILES as the ~20 dead screens and the 6 live legacy renderers that step 2 deletes. Until the builders
+are out, every deletion risks taking something load-bearing with it.
+
+## THE ACT
+Move the stack builders (and only the builders, plus whatever they genuinely need) out of the old wizard
+files into a home of their own. Leave the screens and the legacy views behind, untouched, for step 2.
+- **Classify before moving.** For each old wizard file, say what each export IS: builder · screen ·
+  legacy renderer · shared helper. Report the classification — it is also step 2's delete-list.
+- **Pure move.** No renaming, no "while I'm in here" tidying, no signature changes, no reformatting.
+  A diff that shows behaviour changes has failed this act.
+- **If an export resists classification, STOP and report it.** Do not guess. A helper used by BOTH a
+  builder and a screen is the interesting case and the user should hear about it, not have it decided
+  silently.
+
+## VERIFICATION — this act's whole value is that it changed nothing
+1. **`fork-parity-1593` byte-identical, all 33** — form AND emit. This is the act's primary gate.
+2. Node tier 118/118, plus a hand-picked sweep of whatever the moved builders touch.
+3. **Emit byte-identical everywhere** — if any G-code moves, the move was not pure.
+4. Report the classification table (builder/screen/renderer/helper per file) — step 2 depends on it.
