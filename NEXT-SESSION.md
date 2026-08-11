@@ -953,3 +953,30 @@ CONTENTS, and wire it end-to-end so the pane renders FROM the declaration.
 3. Emit **byte-identical** (this is preview-only).
 4. Prove the wiring to the VISIBLE PIXEL: show the pane rendering from the DECLARATION, not from the old
    code path — a test that passes while the old path is still doing the drawing proves nothing.
+
+---
+
+# 🛑 HARD CONSTRAINT (user, 2026-08-11) — AUTHORING A WIZARD NEVER INVOLVES CHOOSING A PREVIEW
+**The preview-family/preview-vocabulary idea is DEAD and may not return through any door.** It was killed
+by the project's own north star, not by preference:
+- **Principle 1 (one stack, many expressions):** the form, the G-code and the blocks are three RENDERINGS
+  of one stack. A preview vocabulary is a FOURTH thing declared BESIDE the stack — not a rendering of it.
+- **Sieve gate G3 (one-source):** it keeps a driftable duplicate. The gate fires; no judgement call.
+- **The author's seat (the user's own objection, and the decisive one):** *"if I make a wizard I don't want
+  to have to choose a family preview block."* Correct. Authoring = assembling a STACK. The picture follows
+  from it, exactly as the G-code does. Anything that makes the author describe the picture a second time
+  has re-created the duplication this whole leg exists to remove.
+
+**THE TEST any future preview act must pass:** *does an author ever pick, name, or configure a preview
+thing?* If yes, the act is wrong — no matter how clean the mechanism looks. Send it back.
+
+**The ONE honest residual, which already exists and is NOT an exception to the above:** visuals with no
+G-code behind them (a start marker, a probe stylus, the ATC magazine) cannot be derived from a program
+that does not contain them. Those stay declared ON THE OP, once (`def.sim`/`simStartsProvider`/`simStock`
+as today) — a property of the op, never a palette choice, never a family. If a future act needs to grow
+that, it grows the OP's own declaration; it does not introduce a vocabulary to choose from.
+
+**Consequence for the plan:** the remaining preview work is NOT "add declarations." It is
+**"collapse duplicates"** — the 24 surveyed findings, each one fact currently written 2-4 times, each
+resolved by making everything call the ONE real function. No new concepts, no new blocks, nothing new for
+an author to learn.
