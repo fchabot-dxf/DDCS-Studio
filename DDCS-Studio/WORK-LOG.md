@@ -23584,3 +23584,90 @@ declared field to `type="text"` isn't scoped to token-eligible fields — an INE
 its refusal has somewhere to land. Rolling the declaration to the other 28 ops converts most numeric fields
 app-wide, costing the browser's native spinner/validation everywhere. The advisor is asking the human; not
 re-litigated here.
+
+## 🔨 turn 1716 (cycle 856, epoch 4) — ACT 1 dispatched: PREMISE DOES NOT HOLD, gate not pushed past
+
+### DISPATCH
+
+Cycle 856 ACT 1: "the stock-anchor picker that silently moves nothing (surfacing)" — the anchor changes the
+emit for some wizards, moves NOTHING for surfacing, hypothesized cause a `liveExtent` that reports empty for
+`surfaceraster`, causing `placeShiftFromParams`'s `!s.x && !s.y && !s.z` early return. Instructed: confirm in
+the REAL app first, trace to the zero and name the empty link, fix at ONE source, the twin gains it too,
+verify both faces + byte-identical default.
+
+### STEP 1 — confirmed in the real app first, per instruction. It does not reproduce.
+
+Drove the actual gesture, not a proxy, on both authoring surfaces:
+
+- **Legacy wizard form (`surfacing`)**: shrank the faced area to 40×30 against a 100×80 stock (default stock
+  from `ddcsGetSettings()`), then clicked the REAL SVG anchor-picker cells (`pathAnchorField.js`'s
+  `buildPicker` — a genuine `page.mouse.click()` on the rendered `<rect data-code="pp">`, not a field write).
+  `nn`→`pp` moved X (`G0 X0`→`G0 X60`) AND the Y-carrying register's baked constant (`#47=[0+...]`→
+  `#47=[50+...]`) — both axes, matching `stockW-w=60` and `stockH-h=50` exactly.
+- **The twin (`user_surfacing_data`)**: same shrink, same corner cycle, driven through the twin form's
+  `stockAttach` `<select>` (a plain dropdown here, not the SVG picker — a real, if lesser, surface). Identical
+  diff, byte-for-byte the same lines as the wizard.
+- **`pathDatum`** (the OTHER anchor — which corner of the toolpath attaches, as opposed to which stock corner)
+  cycled independently with `stockAttach` held fixed: also moves the emit correctly (`X0`→`X-40`,
+  `#47=[0+...]`→`#47=[-30+...]`).
+- **The ONE case that genuinely produces zero movement**: cycling `stockAttach` on the wizard's DEFAULT-OPEN
+  state, BEFORE any manual shrink (the auto-fill-to-full-stock `onOpen` behavior) — `nn === pp`, byte-identical.
+  This is not a new finding: it is `placement-anchor-1642.spec.js`'s own title, "the default-on-open area
+  (== full stock) makes the anchor a MATHEMATICAL no-op — not a bug," and t1642's algebra (already in
+  NEXT-SESSION.md, already CLOSED) proves `FRAC[sa]` cancels exactly when the faced area equals the full
+  stock, for any corner. NEXT-SESSION.md's own standing ruling on this line is "do NOT touch it."
+
+**Ran the existing regression suite that already covers this exact ground**: `placement-anchor-1642.spec.js` —
+3/3 pass, including "the TWIN (user_surfacing_data): stockAttach + pathDatum both move the emit, same as the
+wizard." `surfacing-pos-dim-handles-1646.spec.js` — 3/3 pass, including the same full-stock-vs-shrunk-area
+distinction on the POS handle. **Six tests, already in the repo, already green, independently proving what my
+own live driving just found.**
+
+### WHY — the trace hypothesis is stale, not wrong-then, wrong-now
+
+`blockEmitter.js:363`'s `place` fold calls `placeShiftFromParams(p, liveExtent(block.children, scope))` exactly
+as the dispatch's t1633-era trace describes. But `placeShiftFromParams` (`placement.js:133`) was NOT read
+that far in the original trace — it has its OWN fallback: `liveBbox || {minX:numv(p.bminX), maxX:numv(p.bmaxX),
+...}`, reading a bbox SNAPSHOT baked onto the `placeonstock` block's own params. `makePlace`
+(`programFraming.js:29`) writes that snapshot from the bbox its CALLER passes — and `surfacingWizard.js:73`
+already passes `{minX:0, maxX:w, minY:0, maxY:h}`, the wizard's own current w/h, at every build. So even in a
+world where `liveExtent` returns null for every call, the shift still computes correctly for surfacing, because
+the snapshot fallback is independently wired to the same live w/h. This double-fallback (declared, not
+accidental — `liveExtent`'s own docstring names the snapshot as the deliberate un-migrated-op fallback) is
+almost certainly the product of `t1359`'s `absorbsPlacement` work (visible throughout `blockEmitter.js`'s
+comments, dated well after t1633) — meaning the trace this dispatch quotes predates a fix that already landed,
+and the "already scoped above" section of NEXT-SESSION.md is the OLD half of the story; t1642 and the
+"AFTER THE ACT" pos/dim work further down the same file are the closed, current half.
+
+### Per the worker skill's own gate rule: STOP, don't push past a premise that doesn't hold
+
+Confirming a premise before treating it as a regression is a standing discipline here, not a one-off judgment
+call: forcing a "fix" onto a mechanism that is already correct and already has a passing regression suite would
+either be a no-op dressed up as work, or — worse — risk breaking the double-fallback by "simplifying" it toward
+whatever the stale trace expected. Logging the objection here and passing back rather than inventing scope,
+per "if the plan looks wrong, log the objection in WORK-LOG, pass --to advisor, and STOP." Not touching ACT 2
+this wake — the dispatch named ACT 1 specifically, and one act per wake.
+
+**The one adjacent, already-known, already-reported gap** (not this act's target, flagged for completeness):
+`surfacing-pos-dim-handles-1646.spec.js`'s own test 6 title says it outright — the twin's `originX` write
+reaches its own emit (data parity holds) but the twin has NO draggable 2D canvas the way the wizard does. That
+is a UX/authoring-surface gap (no visual drag), not a "silently does nothing" defect — the twin's plain
+`<select>`/text inputs already move the emit correctly, as shown above.
+
+### Verify
+
+**Node gate — 118/118**, unmoved — zero source files touched this turn (confirmed via `git status`: nothing
+staged, nothing modified). **`placement-anchor-1642.spec.js` — 3/3.** **`surfacing-pos-dim-handles-1646.spec.js`
+— 3/3.**
+
+### Emit byte-identical
+
+Trivially true — no code was changed.
+
+### Capacity
+
+Full working room used on a careful, multi-angle reproduction attempt (both surfaces, both anchor fields, the
+default-vs-shrunk distinction, plus locating and running the pre-existing tests that already answer the
+question) rather than a quick single check — the cost of declaring "doesn't reproduce" wrongly is high (either
+a real defect ships unfixed, or a correct mechanism gets "fixed" into breaking), so the confirmation step earned
+the full turn.
