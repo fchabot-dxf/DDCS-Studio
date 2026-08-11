@@ -1255,3 +1255,49 @@ A future relocate/rename is fine; a delete is not.
 **Noted for later, not now:** `generateScreenPreview()` draws something with NO G-code behind it — exactly
 the "additive layer" named in item 8b/8e's preview discussion. A real candidate for becoming a declared
 preview-only visual eventually, but that is design work, not part of the gameplan's deletion step.
+
+---
+
+# 🔨 GAMEPLAN STEP 2 — DELETE THE OLD SCREENS AND LEGACY RENDERERS (user: "ok go", 2026-08-11)
+
+**Advisor pre-check before dispatch (t1729):** there are TWO separate risk tiers here, not one, and they
+must not be collapsed into a single blanket delete.
+
+**TIER A — genuinely unreachable dead code.** Confirmed by t1728's classification + advisor spot-check:
+`circularWizard.js` (whole file — no twin, no BUILTINS/opensAs entry, `CircularWizard` zero importers
+anywhere) and every `D`-marked class in the classification table (`CornerWizard` already zero importers,
+confirmed twice now). **Delete outright. No user-visible path can reach these today.**
+
+**TIER B — reachable via `opBuilders.js`'s `BUILDERS` map or the 6 `wizards/views/*View.js` legacy
+renderers** (`middleView.js`/`edgeView.js`/`alignmentView.js`/`rotaryCenterView.js`/`rotaryClockView.js`/
+`homingView.js`) — the path an OP CARRYING ITS RAW BUILT-IN TYPE takes (an old `.ddcs` save, or a
+Blocks-authored raw block, instead of the twin's `user_*_data` type). `opBuilders.js`'s `BUILDERS` map is
+imported by live, reachable machinery (`userOpView.js`, `panelTypes.js`, `editorManager.js`, `opSession.js`
+and others) — so this is NOT dead code the way Tier A is. It is exactly the old-format-compatibility path.
+
+**Per [[nothing-is-precious-delete-freely]] the user has already ruled programs are remakeable, so removing
+this path is consistent with policy — but ONLY IF removal fails GRACEFULLY.** A user who opens an old save
+carrying a raw built-in type must get a clear "unsupported, re-author from the wizard" message, never a
+crash or a silent blank pane. **Verify the failure mode BEFORE deleting Tier B, with a real old-format
+file/op, not by inspection.** If it does not already fail gracefully, that is a small prerequisite fix, not
+grounds to keep the dead renderer.
+
+⚠ **EXCLUDED, both tiers:** `communicationWizard.js`'s `CommunicationWizard` class — advisor-verified
+(t1729) as the comm twin's own LIVE preview renderer (`userOpView.js:618`), not a legacy screen. Its
+builder already moved in step 1; the class itself is untouched by this act.
+
+## THE ACT
+1. Delete Tier A outright (circularWizard.js + every zero-importer `D`-class from the classification).
+2. For Tier B: verify the graceful-degradation path FIRST (construct/open an old-format op of each of the
+   6 renderer types, confirm the fallback message, not a crash). Fix the fallback if it is not already
+   clean. THEN delete the 6 `*View.js` files and their dispatch wiring, and the corresponding dead
+   `opBuilders.js` entries IF nothing else needs them (check — `BUILDERS` also feeds live twin creation
+   for op types that still have no twin at all; do not remove an entry a live wizard still needs).
+3. Report, per file: which tier, what was deleted, and (Tier B only) what the user now sees when an old
+   raw-type file is opened.
+
+## VERIFICATION
+- fork-parity-1593 byte-identical, all 33 (primary gate, as step 1).
+- Node tier 118/118.
+- A real old-format file/op of at least 2 of the 6 Tier-B types, opened live, showing the graceful message.
+- ARCHITECTURE.md / architecture-map-1698.test.mjs — this act WILL touch cited files; expect and fix drift.
