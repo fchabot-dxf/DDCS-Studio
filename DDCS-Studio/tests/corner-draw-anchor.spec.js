@@ -144,7 +144,11 @@ test('(2) fallback: no anchorsAtPrev → self; a non-corner multi-pass op has NO
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async ({ stock }) => {
     const { drawAnchorFor } = await import('/engine/passAnchor.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const { traceToolpath } = await import('/engine/trace.js');
     // unit: no flag → self (===); pass 0 → self; absent pass → undefined (caller's own || fallback covers it)
     const plain = [{ x: 10, y: 20, z: 0 }, { x: 50, y: -30, z: 0 }];
@@ -155,10 +159,9 @@ test('(2) fallback: no anchorsAtPrev → self; a non-corner multi-pass op has NO
       flagged: (() => { const a = [{ x: 1, y: 1 }, { x: 2, y: 2, anchorsAtPrev: true }]; return drawAnchorFor(a, 1) === a[0]; })(),
     };
     // integration: a real non-corner multi-pass op (middle boss, 2-axis) — anchorsAtPrev is never set → every segment finite
-    const w = new MiddleWizard();
     const mstock = { x: 100, y: 80, z: 20, shape: 'boss', show: true };
-    const gcode = w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20 });
-    const starts = (typeof w.inferStarts === 'function') ? w.inferStarts({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg' }, { stock: mstock }) : [{ x: 0, y: 0, z: 0 }];
+    const gcode = emitMapped(middleStack({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20 })).text;
+    const starts = opSimStarts('middle', { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg' }, mstock) || [{ x: 0, y: 0, z: 0 }];
     const parsed = traceToolpath(gcode, { stock: mstock, start: starts[0], passStarts: starts });
     let anyNaN = false;
     for (const s of (parsed.segments || [])) { const o = drawAnchorFor(starts, s.pass) || { x: 0, y: 0 }; if (!Number.isFinite(s.x1 + o.x) || !Number.isFinite(s.y1 + o.y)) anyNaN = true; }

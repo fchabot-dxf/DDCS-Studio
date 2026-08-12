@@ -62,10 +62,10 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   const middleItem = probe.items.find((i) => /Middle/.test(i.text));
   expect(middleItem, 'Middle is IN its Probe slot (in-place)').toBeTruthy();
   expect(middleItem.onclick, 'Middle opens the data-op twin in-place').toBe("openWiz && openWiz('user_middle_data')");
-  expect(probe.items.some((i) => /openMiddleWiz/.test(i.onclick || '')), 'no openMiddleWiz opener in the menu (retired; the fn survives as the legacy shim)').toBe(false);
+  expect(probe.items.some((i) => /openMiddleWiz/.test(i.onclick || '')), 'no openMiddleWiz opener in the menu (retired; t1730 — the fn itself is gone too now, not just un-menu-routed)').toBe(false);
   const alignItem = probe.items.find((i) => /Align/.test(i.text));
   expect(alignItem.onclick, 'Align opens the data-op twin in-place (opensAs, t437 — the last probe port)').toBe("openWiz && openWiz('user_alignment_data')");
-  expect(probe.items.some((i) => /openAlignmentWiz/.test(i.onclick || '')), 'no openAlignmentWiz opener in the menu (retired; the fn survives as the legacy shim + is unrelated to the ⟳ Align rotate button)').toBe(false);
+  expect(probe.items.some((i) => /openAlignmentWiz/.test(i.onclick || '')), 'no openAlignmentWiz opener in the menu (retired; t1730 — the fn itself is gone too now, unrelated to the ⟳ Align rotate button)').toBe(false);
   expect(probe.dividers).toEqual(['Rotary']);
 
   // ATC: EVERY wizard now opens its data-op twin IN-PLACE (opensAs) — the port campaign is complete (t409/t411/t566/t568/t560)

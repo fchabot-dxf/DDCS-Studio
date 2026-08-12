@@ -14,15 +14,18 @@ test('circular bore middle: finds the centre AND a sensible diameter in the sim'
 
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
-    const w = new MiddleWizard();
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const stock = { x: 100, y: 80, z: 20, shape: 'pocket', show: true };
     const p = { featureType: 'pocket', circular: true, approach: 'auto', axis: 'X', dir1: 'pos', findBoth: true, dist: 40, retract: 2, safeZ: 10 };
-    const start = w.inferStart(p, stock);
+    const start = opSimStarts('middle', p, stock)[0];
     // wcsOffset = the machine coord of part-zero (= where the stock origin sits) so the macro's machine-frame
     // re-centre (G53 X#53, #53 being a machine-coord centre) maps back into the part frame the probes use.
     const e = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: start, wcsOffset: start });
-    const t = e.trace(w.generate(p));
+    const t = e.trace(emitMapped(middleStack(p)).text);
     return {
       capped: t.stats.capped,
       cx: e.vars.get(53), cy: e.vars.get(56),

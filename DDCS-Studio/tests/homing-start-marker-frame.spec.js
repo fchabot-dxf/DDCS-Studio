@@ -21,8 +21,9 @@ async function openHoming(page) {
         s.stock = { show: false };
         s.preview = s.preview || {}; s.preview.autoLoop = false;
     });
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(300);
@@ -42,7 +43,7 @@ test('the 3D start marker renders at its MACHINE coordinate (no WCS double-shift
     expect(r.worldY, `3D marker world Y (${r.worldY}) == the machine-coord Start Y (${r.startY}) — no WCS double-shift`).toBeCloseTo(r.startY, 1);
     // and it stays INSIDE the envelope [machine.y, 0] = [-776, 0]
     expect(r.worldY <= 0 && r.worldY >= r.machY, `marker world Y (${r.worldY}) inside the envelope [${r.machY}, 0]`).toBe(true);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing-start-marker.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing-start-marker.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('2D machine-frame op: the Start marker sits INSIDE the drawn envelope; a work-shifted envelope would exclude it', async ({ page }) => {

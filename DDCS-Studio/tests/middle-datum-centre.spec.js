@@ -10,10 +10,12 @@ test.use({ viewport: { width: 1300, height: 950 } });
 async function runDatum(page, p, stock) {
   return page.evaluate(async (a) => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');
-    const w = new MiddleWizard();
-    const code = w.generate(a.p);
+    const code = emitMapped(middleStack(a.p)).text;
     const starts = opSimStarts('middle', a.p, a.stock);
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
     viz._anchorToStart = true;
@@ -24,7 +26,7 @@ async function runDatum(page, p, stock) {
     const probeAxis = (raw) => { const m = /G31\s+([XYZ])/i.exec(raw || ''); return m ? m[1].toLowerCase() : null; };
     let pending = null;
     const e = new GcodeExecutionEngine({
-      autoAnswer: true, simSpeed: 1, stock: a.stock, stockOffset: w.inferStart(a.p, a.stock),
+      autoAnswer: true, simSpeed: 1, stock: a.stock, stockOffset: starts[0],
       onLineChange: ({ raw }) => {
         if (pending && viz.probeAxisTouched) viz.probeAxisTouched(pending, e.feedVal);
         pending = null;

@@ -9,18 +9,20 @@ test.use({ viewport: { width: 1280, height: 900 } });
 test('engine._passStarts stays coherent with the trace on a live STOCK edit while playing (same macro, new hints)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
-  await page.waitForSelector('#wiz_middle', { state: 'visible' });
+  // t1730 — 'middle' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_middle_data'));
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine !== undefined; });
 
   const r = await page.evaluate(() => {
-    // boss probe-both AUTO → 2 per-pass starts ①②
-    const set = (id, v, ev = 'change') => { const e = document.getElementById(id); if (!e) return; if (e.type === 'checkbox') e.checked = !!v; else e.value = v; e.dispatchEvent(new Event(ev, { bubbles: true })); };
-    set('m_type', 'boss'); set('m_both', true);
-    if (document.getElementById('m_inaxis')) set('m_inaxis', 'auto');
-    if (document.getElementById('m_transaxis')) set('m_transaxis', 'auto');
-    if (document.getElementById('m_dir')) set('m_dir', 'pos');
-    if (document.getElementById('m_dir2')) set('m_dir2', 'neg');
+    // boss probe-both AUTO → 2 per-pass starts ①②. t1730 — old m_* ids retired; the twin's generic form renders
+    // every declared param as [data-param="<name>"].
+    const set = (param, v, ev = 'change') => { const e = document.querySelector(`[data-param="${param}"]`); if (!e) return; if (e.type === 'checkbox') e.checked = !!v; else e.value = v; e.dispatchEvent(new Event(ev, { bubbles: true })); };
+    set('featureType', 'boss'); set('twoAxis', true);
+    if (document.querySelector('[data-param="inAxis"]')) set('inAxis', 'auto');
+    if (document.querySelector('[data-param="transAxis"]')) set('transAxis', 'auto');
+    if (document.querySelector('[data-param="dir1"]')) set('dir1', 'pos');
+    if (document.querySelector('[data-param="dir2"]')) set('dir2', 'neg');
     const stk = window.ddcsGetSettings().stock; stk.x = 100; stk.y = 80; stk.z = 20; stk.shape = 'boss'; stk.show = true;
     window.ddcsStudio.wizardManager.update();
 

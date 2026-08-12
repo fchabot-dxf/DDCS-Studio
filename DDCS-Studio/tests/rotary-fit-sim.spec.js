@@ -9,15 +9,17 @@ test('rotary 3-point fit sim solves the TRUE OD (swapped fit-start sides + real 
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { RotaryCenterWizard } = await import('/wizards/rotaryCenterWizard.js');
+    // t1730 — RotaryCenterWizard (the legacy screen class) was deleted alongside its view; rotaryCenterStack is
+    // the surviving builder — emit its block stack through the SAME mapper the app uses (emitMapped) for text.
+    const { rotaryCenterStack } = await import('/wizards/rotaryCenterWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');
     const stock = { x: 150, y: 76.2, z: 76.2, shape: 'cylinder', show: true };   // Ø76.2 bar → true OD radius 38.1
-    const w = new RotaryCenterWizard();
     const p = { method: 'fit', dist: 30, safeZ: 15, datum: 'center' };
     const starts = opSimStarts('rotary_center', p, stock);
     const e = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: starts[0] });
     e._passStarts = starts;                       // the real-preview wiring; the DRO is now populated (default store)
-    e.trace(w.generate(p));
+    e.trace(emitMapped(rotaryCenterStack(p)).text);
     return { nStarts: starts.length, p2y: +starts[1].y.toFixed(1), p3y: +starts[2].y.toFixed(1), flankZ: +starts[1].z.toFixed(1), R: +e.vars.get(55).toFixed(2), Yc: +e.vars.get(54).toFixed(2), Zc: +e.vars.get(56).toFixed(2) };
   });
   // 3 passes; the sides match the macro's probe dirs: P2 (probes +Y) on the -Y side, P3 (probes -Y) on the +Y side

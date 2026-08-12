@@ -18,8 +18,9 @@ test('the switch glyph reads the DECLARED render field: mechanical→plunger, pr
         s.homing = { axes: { x: { method: 'native' }, y: { method: 'native' }, z: { method: 'native' } } };
         s.limits = { xMinPin: 5, xMinSwitchType: 'mechanical' };
     });
-    await page.evaluate(() => window.ddcsStudio.wizardManager.open('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.ddcsStudio.wizardManager.update());
     await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz && p.viz.setLimitSwitchDevices; }, null, { timeout: 8000 });
@@ -50,5 +51,5 @@ test('the switch glyph reads the DECLARED render field: mechanical→plunger, pr
         expect(d.kind, `${name}: kind is the type (never 'mechanical' → never plunges)`).toBe(name);
         expect(d.hasPlunger, `${name}: NO plunger — the non-contact sensor-face glyph`).toBe(false);
     }
-    await page.locator('#wiz_homing .wiz-viz3d').first().screenshot({ path: 'scratchpad/switch_glyphs_4types.png' });
+    await page.locator('#wiz_user .wiz-viz3d').first().screenshot({ path: 'scratchpad/switch_glyphs_4types.png' });
 });

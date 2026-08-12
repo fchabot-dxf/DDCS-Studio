@@ -100,16 +100,20 @@ test('ROTARY — known value-identical + OD-top FIX; fit comp ON verified by dec
   await boot(page);
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { RotaryCenterWizard } = await import('/wizards/rotaryCenterWizard.js');
+    // t1730 — RotaryCenterWizard (the legacy screen class) was deleted alongside its view; rotaryCenterStack/
+    // opSimStarts are the surviving builder + start-inference registry.
+    const { rotaryCenterStack } = await import('/wizards/rotaryCenterWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const { builderOf } = await import('/blocks/opBuilders.js');
     const stock = { x: 150, y: 76.2, z: 76.2, shape: 'cylinder', show: true };
-    const w = new RotaryCenterWizard();
-    const run = (p) => { const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: w.inferStart(p, stock) }); eng.trace(w.generate(p)); return { yc: eng.vars.get(54), zc: eng.vars.get(56), R: eng.vars.get(55), top: eng.vars.get(50) }; };
+    const gen = (p) => emitMapped(rotaryCenterStack(p)).text;
+    const run = (p) => { const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: opSimStarts('rotary_center', p, stock)[0] }); eng.trace(gen(p)); return { yc: eng.vars.get(54), zc: eng.vars.get(56), R: eng.vars.get(55), top: eng.vars.get(50) }; };
     const known = run({ method: 'known', diameter: 76.2, dist: 30, safeZ: 15, approach: 'auto', datum: 'top' });
 
     // FIT — comp ON, verified WITHOUT the degenerate operator-jog sim:
     const fitParams = { method: 'fit', dist: 30, safeZ: 15, datum: 'center' };
-    const fitText = w.generate(fitParams);
+    const fitText = gen(fitParams);
     // (1) the 3 fit touches EMIT the comp (the declared surface): top −#6, +Y flank +#6, −Y flank −#6
     const fitEmit = { top: fitText.includes('#51=[#1927-#6]'), flankPlus: fitText.includes('#53=[#1926+#6]'), flankMinus: fitText.includes('#55=[#1926-#6]') };
     // (2) readEnabledComps(fit) now includes the 3 result vars → the disc-on-surface nudges the fit's discs (RELATIVE ±r)

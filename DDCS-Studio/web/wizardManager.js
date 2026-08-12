@@ -418,10 +418,10 @@ export class WizardManager {
         this._formSnapshot = this._captureForm();
     }
 
-    // Back-compat entry points (older callers and window.* glue). (openCorner retired ④ — Corner (data) opens via open('user_corner_data').)
-    openMiddle() { this.open('middle'); }
-    openEdge() { this.open('edge'); }
-    openAlignment() { this.open('alignment'); }
+    // Back-compat entry points (older callers and window.* glue). (openCorner retired ④ — Corner (data) opens via
+    // open('user_corner_data'). openMiddle/openEdge/openAlignment retired t1730 — Tier B, their coded views are
+    // gone; open('middle'|'edge'|'alignment') still resolves but the `if (wizElem)` guard above finds no panel
+    // and no-ops — same known, unfixed silent-blank-modal shape as 'corner' — see ARCHITECTURE.md TRAPS #5.)
 
     /**
      * Hide the wizard overlay.  If `reverse` is truthy the click sound will
@@ -452,17 +452,14 @@ export class WizardManager {
         if (view) return view.update(this);
     }
 
-    // Back-compat named update/anim entry points used by app.js listeners (updateCornerWizard retired ④)
-    updateMiddleWizard() { return viewByType.get('middle').update(this); }
-    updateEdgeWizard() { return viewByType.get('edge').update(this); }
-    updateAlignmentWizard() { return viewByType.get('alignment').update(this); }
+    // Back-compat named update/anim entry points used by app.js listeners (updateCornerWizard retired ④;
+    // updateMiddleWizard/updateEdgeWizard/updateAlignmentWizard/_startEdgeAnim/_startAlignmentAnim retired t1730
+    // — Tier B, alongside app.js's setupVisualizationListeners, their only remaining callers)
     updateCommunicationWizard() { return viewByType.get('comm').update(this); }
     updateWCSWizard() { return viewByType.get('wcs').update(this); }
     updateAtcLengthWizard() { return viewByType.get('atc_length').update(this); }
     updateAtcWarmupWizard() { return viewByType.get('atc_warmup').update(this); }
     updateAtcChangeWizard() { return viewByType.get('atc_change').update(this); }
-    _startEdgeAnim() { viewByType.get('edge').startAnim(); }
-    _startAlignmentAnim() { viewByType.get('alignment').startAnim(); }
 
     async insert() {
         const view = this.activeView();

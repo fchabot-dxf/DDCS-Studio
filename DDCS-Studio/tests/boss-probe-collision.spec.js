@@ -11,9 +11,12 @@ test('each REPOSITION pass probes from ITS start ② → collides (was: fired fr
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const { traceToolpath } = await import('/engine/trace.js');
-    const w = new MiddleWizard();
     const stock = { x: 100, y: 80, z: 20, shape: 'boss' };
     const base = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20, dist: 130, retract: 2 };
     // the FAST probe of each pass = the first probe seg of that pass; clamped (<dist) = collided, full (=dist) = missed.
@@ -25,7 +28,7 @@ test('each REPOSITION pass probes from ITS start ② → collides (was: fired fr
     };
     const out = {};
     for (const [name, p] of [['auto', { ...base, inAxis: 'auto', transAxis: 'auto' }], ['manual', { ...base, inAxis: 'manual', transAxis: 'manual' }]]) {
-      const code = w.generate(p), starts = w.inferStarts(p, stock);
+      const code = emitMapped(middleStack(p)).text, starts = opSimStarts('middle', p, stock);
       out[name] = { nStarts: starts.length, without: fastByPass(code, { start: starts[0] }), with: fastByPass(code, { start: starts[0], passStarts: starts }) };
     }
     return out;

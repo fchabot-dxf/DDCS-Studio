@@ -15,8 +15,11 @@ test('ANCHORED (incremental corner probe): path origin + live head coincide with
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async ({ START, STOCK }) => {
-    const { CornerWizard } = await import('/wizards/cornerWizard.js');
-    const code = new CornerWizard().generate({ corner: 'fl', stockX: 100, stockY: 80, stockZ: 20, probeZ: true });
+    // t1730 — CornerWizard (the legacy screen class) was deleted alongside its view; cornerStack is the surviving
+    // builder — emit its block stack through the SAME mapper the app uses (emitMapped) for G-code text.
+    const { cornerStack } = await import('/wizards/cornerWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const code = emitMapped(cornerStack({ corner: 'fl', stockX: 100, stockY: 80, stockZ: 20, probeZ: true })).text;
     const { traceToolpath } = await import('/engine/trace.js');
     const parsed = traceToolpath(code, { stock: STOCK, start: START });
     const segs = parsed.segments || [];

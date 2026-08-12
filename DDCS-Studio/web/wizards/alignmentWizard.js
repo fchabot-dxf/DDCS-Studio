@@ -14,28 +14,10 @@
  *
  * DDCS M350: status #1920/#1921 (2=SUCCESS), trigger pos #1925/#1926, DRO #880/#881 (check-axis machine coord).
  */
-import { emitMapped } from '../blocks/blockEmitter.js';
-import { activeDialectOpts } from './previewEmit.js';
-import { recordOp } from '../blocks/opRecord.js';
-import { opSimStarts } from '../viz/opSimStarts.js';
 // t1728 (gameplan step 1) — alignmentHeaderComments/alignmentStack MOVED to stacks/alignmentWizard.js (the twin's own
 // builder dependency, kept importable+re-exported here unchanged for every other existing caller — pure move).
+// t1730 (gameplan step 2, Tier B) — AlignmentWizard (the legacy screen class) DELETED alongside its sole
+// consumer, views/alignmentView.js (retired — see WORK-LOG t1730). Only the builder this file re-exports is
+// still live.
 import { alignmentHeaderComments, alignmentStack } from './stacks/alignmentWizard.js';
 export { alignmentHeaderComments, alignmentStack };
-
-export class AlignmentWizard {
-    constructor() {}
-
-    generate(params) {
-        recordOp('alignment', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(alignmentStack(params), activeDialectOpts()).text;
-    }
-
-    /** Preview start (first probe, point A). */
-    inferStart(params, stock) {
-        return this.inferStarts(params, stock)[0];
-    }
-
-    // Per-pass preview starts → the shared sim-start registry (viz/opSimStarts.js, BUILT_IN.alignment). Moved verbatim.
-    inferStarts(params, stock) { return opSimStarts('alignment', params, stock); }
-}

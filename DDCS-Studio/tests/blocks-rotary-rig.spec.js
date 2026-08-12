@@ -16,8 +16,9 @@ test('Blocks preview shows the 4th-axis rig for a rotary op, hides it for a mill
   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
 
   // Author a rotary op, then view it in the Blocks tab → the generic preview must frame the rotary rig.
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('rotary_clock'));
-  await page.waitForSelector('#wiz_rotary_clock', { state: 'visible' });
+  // t1730 — 'rotary_clock' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_rotary_clock_data'));
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);

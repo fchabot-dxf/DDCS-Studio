@@ -12,6 +12,9 @@ import { test, expect } from '@playwright/test';
  *   - alignmentView applies previewSeatAtStart (the built-in view now carries the same seat the twin declares);
  *   - setSeatAtStart re-seeds the RUNNING play; the trace `off` consumes the seat (_seatAtStart) even under stats.absolute.
  * VERIFIED across BOTH view-timing flows: 3D-initial open, AND default-view open → setView('3d') (the advisor's repro).
+ * t1730 — alignmentView (the built-in coded view) is RETIRED; openWiz('alignment') now degrades to a "no longer
+ * editable" toast with no panel. Only the data twin (user_alignment_data) has a live panel to seat any more, so the
+ * loop below covers it alone (the old dual-flow comparison is moot once the built-in view no longer exists).
  */
 test.use({ viewport: { width: 1300, height: 950 } });
 
@@ -50,7 +53,7 @@ async function assertSeated(page, label) {
     return r;
 }
 
-for (const op of ['alignment', 'user_alignment_data']) {
+for (const op of ['user_alignment_data']) {
     test(`${op}: 3D-INITIAL open seats the trace + sim at A (fresh, zero interaction)`, async ({ page }) => {
         await page.goto('http://localhost:3211');
         await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
@@ -75,7 +78,7 @@ for (const op of ['alignment', 'user_alignment_data']) {
         await page.evaluate(() => { const s = window.ddcsGetSettings(); s.preview = s.preview || {}; s.preview.default3D = false; });   // force a NON-3D initial view
         await setStock(page, true);
         await page.evaluate((o) => window.openWiz(o), op);
-        await page.waitForSelector('.wiz-body, #wiz_user_form, #wiz_alignment', { timeout: 8000 }).catch(() => {});
+        await page.waitForSelector('.wiz-body, #wiz_user_form', { timeout: 8000 }).catch(() => {});
         await page.waitForTimeout(400);
         await to3D(page);   // switch to 3D AFTER open — the trace must (re-)anchor to A here
         await assertSeated(page, `${op} open→setView(3d)`);

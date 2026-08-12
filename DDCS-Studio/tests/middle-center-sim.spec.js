@@ -10,12 +10,16 @@ test.use({ viewport: { width: 1000, height: 800 } });
 async function runMiddle(page, featureType, approach, stock, dist) {
   return page.evaluate(async (a) => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
-    const w = new MiddleWizard();
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const p = { featureType: a.featureType, approach: a.approach, axis: 'X', dir1: 'pos', dist: a.dist, retract: 2 };
-    const e = new GcodeExecutionEngine({ autoAnswer: true, stock: a.stock, stockOffset: w.inferStart(p, a.stock) });
-    const t = e.trace(w.generate(p));
-    return { capped: t.stats.capped, center: e.vars.get(53), gcode: w.generate(p) };
+    const gcode = emitMapped(middleStack(p)).text;
+    const e = new GcodeExecutionEngine({ autoAnswer: true, stock: a.stock, stockOffset: opSimStarts('middle', p, a.stock)[0] });
+    const t = e.trace(gcode);
+    return { capped: t.stats.capped, center: e.vars.get(53), gcode };
   }, { featureType, approach, stock, dist });
 }
 

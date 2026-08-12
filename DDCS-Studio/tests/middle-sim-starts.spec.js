@@ -77,15 +77,15 @@ test('E2: middle twin sim-starts == BUILT_IN.middle positions+count; pass count 
 test('E2 screenshot: the middle preview renders the per-pass markers', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
-  await page.waitForSelector('#wiz_middle', { state: 'visible', timeout: 5000 });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_middle_data'));
+  await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 5000 });
   await page.evaluate(() => {
-    const set = (id, v) => { const e = document.getElementById(id); if (e) { e.value = v; } };
-    const check = (id) => { const e = document.getElementById(id); if (e) { e.checked = true; } };
-    set('m_type', 'boss'); check('m_both'); set('m_inaxis', 'manual'); set('m_transaxis', 'manual');
+    const set = (sel, v) => { const e = document.querySelector(sel); if (e) { e.value = v; } };
+    const check = (sel) => { const e = document.querySelector(sel); if (e) { e.checked = true; } };
+    set('[data-param="featureType"]', 'boss'); check('[data-param="twoAxis"]'); set('[data-param="inAxis"]', 'manual'); set('[data-param="transAxis"]', 'manual');
     window.ddcsStudio.wizardManager.update();
   });
   await page.waitForTimeout(600);   // let the 3D preview rebuild + the markers place
-  { const _b = await page.locator('#wiz_middle').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/middle_e2_preview.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
-  await expect(page.locator('#wiz_middle'), 'the middle wizard preview is visible').toBeVisible();
+  { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/middle_e2_preview.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
+  await expect(page.locator('#wiz_user'), 'the middle wizard preview is visible').toBeVisible();
 });

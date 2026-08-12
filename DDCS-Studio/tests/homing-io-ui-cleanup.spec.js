@@ -6,7 +6,11 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1300, height: 950 } });
 
-test('(1) homing run-row chips show switch-seek / set-zero — NO stale "native", even with a saved method:native', async ({ page }) => {
+// t1730 — the homing coded view (homingView.js) that rendered `.homing-run-ax` checkboxes with a derived
+// method-label <span> (switch-seek/set-zero/native) is DELETED. The twin's run-form (homingData.js
+// HOMING_STRUCT_BINDINGS) is plain boolean ticks (run_z/run_x/run_y/run_a/run_b) with STATIC labels ("Home Z")
+// — there is no per-axis derived-method chip to assert against in the twin. No clean equivalent; not guessing.
+test.fixme('(1) homing run-row chips show switch-seek / set-zero — NO stale "native", even with a saved method:native', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate(() => {
@@ -69,8 +73,9 @@ test('(amendment 1) the homing preview draws NO switch-device meshes', async ({ 
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate(() => { const s = window.ddcsGetSettings(); s.machine = { x: 600, y: 600, z: 500, show: true }; s.limits = { zMaxHome: true, xMinHome: true, yMinHome: true }; });
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.waitForTimeout(500);
     const dev = await page.evaluate(() => {
@@ -78,7 +83,7 @@ test('(amendment 1) the homing preview draws NO switch-device meshes', async ({ 
         if (!viz) return null;
         return { hasLimitGroup: !!viz._limitGroup, nDevices: viz._limitDevices ? Object.keys(viz._limitDevices).length : 0, getLimitSwitchIsFn: typeof viz.getLimitSwitch === 'function' };
     });
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_no_device_meshes.png', clip: _b }); }   // t710 clip capture
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_no_device_meshes.png', clip: _b }); }   // t710 clip capture
     console.log('DEVICE MESHES: ' + JSON.stringify(dev));
     expect(dev && dev.hasLimitGroup, 'NO switch-device mesh group in the homing preview').toBe(false);
     expect(dev && dev.nDevices, 'NO switch device meshes').toBe(0);

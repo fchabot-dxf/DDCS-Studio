@@ -7,8 +7,9 @@ test.use({ viewport: { width: 1280, height: 900 } });
 test('executed trail is coloured per move-type (probe segment is blue, not amber)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('edge'));   // a pure probe op
-  await page.waitForSelector('#wiz_edge', { state: 'visible' });
+  // t1730 — 'edge' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_edge_data'));   // a pure probe op
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.waitForFunction(() => {
     const p = window.ddcsStudio.wizardManager._activePanel;

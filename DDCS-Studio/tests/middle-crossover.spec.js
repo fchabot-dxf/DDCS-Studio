@@ -8,14 +8,17 @@ test('boss probe-both cross-over is per-axis #19/#20, a clean declared 80 (decou
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
-    const w = new MiddleWizard();
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack is the surviving
+    // builder — emit its block stack through the SAME mapper the app uses (emitMapped) for G-code text.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const gen = (p) => emitMapped(middleStack(p)).text;
     const base = { featureType: 'boss', approach: 'auto', findBoth: true, axis: 'X', dir1: 'pos', dir2: 'neg' };
     return {
-      def: w.generate(base),                                  // default cross-over
-      over: w.generate({ ...base, crossX: '130', crossY: '70' }),   // explicit raw distances
-      manual: w.generate({ ...base, approach: 'manual' }),    // manual boss = reposition, no traverseOver
-      pocket: w.generate({ featureType: 'pocket', approach: 'auto', findBoth: true, axis: 'X', dir1: 'pos' }),
+      def: gen(base),                                  // default cross-over
+      over: gen({ ...base, crossX: '130', crossY: '70' }),   // explicit raw distances
+      manual: gen({ ...base, approach: 'manual' }),    // manual boss = reposition, no traverseOver
+      pocket: gen({ featureType: 'pocket', approach: 'auto', findBoth: true, axis: 'X', dir1: 'pos' }),
     };
   });
 
@@ -70,13 +73,16 @@ test('a boss wider than MAX PROBE is centre-found via the explicit cross-over di
   await page.waitForFunction(() => !!window.ddcsGetSettings);
   const run = async (a) => page.evaluate(async (a) => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
-    const w = new MiddleWizard();
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const stock = { x: 120, y: 60, z: 40, shape: 'boss', show: true };   // 120-wide boss → X centre = 60
     const p = { featureType: 'boss', approach: 'auto', axis: 'X', dir1: 'pos',
                 dist: 40, retract: 2, safeZ: 10, clearOver: 50, ...a };   // MAX PROBE 40 << the 120-wide feature
-    const e = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: w.inferStart(p, stock) });
-    const t = e.trace(w.generate(p));
+    const e = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: opSimStarts('middle', p, stock)[0] });
+    const t = e.trace(emitMapped(middleStack(p)).text);
     return { capped: t.stats.capped, cx: e.vars.get(53), v19: e.vars.get(19) };
   }, a);
 

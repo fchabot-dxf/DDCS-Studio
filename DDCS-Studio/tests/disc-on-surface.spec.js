@@ -16,17 +16,23 @@ test('comped probe discs nudge onto the wall (corner X/Y) by ±the tip radius; e
 
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { CornerWizard } = await import('/wizards/cornerWizard.js');
+    // t1730 — CornerWizard (the legacy screen class) was deleted alongside its view; cornerDataDef's own
+    // def.simStartsProvider is corner's declared start-inference (used elsewhere in this same repo, e.g.
+    // lift-drop-pairing-897.spec.js's traceCorner helper) — the singular-start equivalent of the old
+    // w.inferStart(p, stock) is simply its first entry.
+    const { cornerDataDef } = await import('/blocks/dataOps/cornerData.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { builderOf } = await import('/blocks/opBuilders.js');
-    const w = new CornerWizard();
+    const def = cornerDataDef();
     const p = { corner: 'FL', probeZ: false, probeSeq: 'XY', wcs: 'active', dist: 80, radius: 2 };
     const stock = { x: 100, y: 80, z: 20, shape: 'boss', show: true };
-    const code = w.generate(p);
+    const atoms = builderOf('corner')(p);
+    const code = emitMapped(atoms).text;
 
     // readEnabledComps: the DECLARED radiuscomp atoms → { resultVar → { axis, sign } } for enabled comps
     const TRIG = { '#1925': 'x', '#1926': 'y', '#1927': 'z' };
     const compMap = {};
-    for (const a of builderOf('corner')(p)) if (a && a.type === 'radiuscomp' && a.params && a.params.enable !== false) compMap[String(a.params.result)] = { axis: TRIG[a.params.raw], sign: a.params.dir === '-' ? -1 : 1 };
+    for (const a of atoms) if (a && a.type === 'radiuscomp' && a.params && a.params.enable !== false) compMap[String(a.params.result)] = { axis: TRIG[a.params.raw], sign: a.params.dir === '-' ? -1 : 1 };
 
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
     viz._anchorToStart = true; viz.resetProbe && viz.resetProbe();
@@ -37,7 +43,7 @@ test('comped probe discs nudge onto the wall (corner X/Y) by ±the tip radius; e
     // hover-above safeZ that a plunge used to reach) — so the horizontal wall probe crosses the wall with NO test-side z
     // override. If inferStart regressed to z=safeZ (above the top), the probe would fire over the stock and miss → discs stay raw.
     const e = new GcodeExecutionEngine({
-      autoAnswer: true, stock, stockOffset: w.inferStart(p, stock),
+      autoAnswer: true, stock, stockOffset: def.simStartsProvider(p, stock)[0],
       onLineChange: ({ raw }) => {
         if (pendingProbe && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe, e.feedVal); pendingProbe = null;
         if (raw) { const pa = probeAxis(raw); if (pa) pendingProbe = pa; }

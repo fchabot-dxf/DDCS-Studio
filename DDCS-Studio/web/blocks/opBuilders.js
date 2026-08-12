@@ -5,7 +5,7 @@
  * the builder for an op type; makeOp wraps the result in a { type:'op', … } container so a loaded program keeps
  * the op RECORD and emit can gate it per post (capable → children; incapable → marker; blocks/blockEmitter.js).
  *
- * This is the LEAF of the op modules: it imports the 21 wizards; opSession / opGlow / programModel import FROM
+ * This is the LEAF of the op modules: it imports the 20 wizards; opSession / opGlow / programModel import FROM
  * it (BUILDERS, makeOp, _framed, _builderAtoms) — nothing imports back, so there's no cycle.
  */
 import { surfacingStack } from '../wizards/surfacingWizard.js';
@@ -25,7 +25,6 @@ import { atcWarmupStack } from '../wizards/atcWarmupWizard.js';
 import { atcChangeStack } from '../wizards/atcChangeWizard.js';
 import { atcTestStack } from '../wizards/atcTestWizard.js';
 import { atcTableStack } from '../wizards/atcTableWizard.js';
-import { circularStack } from '../wizards/circularWizard.js';
 import { rotaryClockStack } from '../wizards/rotaryClockWizard.js';
 import { rotaryCenterStack } from '../wizards/rotaryCenterWizard.js';
 import { textStack } from '../wizards/textWizard.js';
@@ -35,7 +34,7 @@ export const BUILDERS = {
     surfacing: surfacingStack, pocket: pocketStack, contour: contourStack, slot: slotStack, drill: drillStack,
     wcs: wcsStack, edge: edgeStack, comm: commStack, middle: middleStack, corner: cornerStack, alignment: alignmentStack,
     atc_length: atcLengthStack, atc_check: atcToolCheckStack, atc_warmup: atcWarmupStack, atc_change: atcChangeStack, atc_test: atcTestStack, atc_table: atcTableStack,
-    circular: circularStack, rotary_clock: rotaryClockStack, rotary_center: rotaryCenterStack, text: textStack,
+    rotary_clock: rotaryClockStack, rotary_center: rotaryCenterStack, text: textStack,
     homing: homingStack,
 };
 // (No bare flag — framing is now Program Start/End BLOCKS in the stack; a snippet just omits them.)
@@ -68,7 +67,7 @@ export function unregisterUserBuilder(opType) { delete USER_BUILDERS[opType]; }
 const OP_LABELS = {
     surfacing: 'Surfacing', pocket: 'Pocket', contour: 'Contour', slot: 'Slot', drill: 'Drill', text: 'Text',
     wcs: 'WCS', edge: 'Edge Probe', middle: 'Middle Probe', corner: 'Corner Probe', alignment: 'Alignment',
-    circular: 'Circular Probe', rotary_clock: 'Rotary Clock', rotary_center: 'Rotary Centre', comm: 'Communication',
+    rotary_clock: 'Rotary Clock', rotary_center: 'Rotary Centre', comm: 'Communication',
     atc_length: 'Tool Length', atc_check: 'Tool Check', atc_warmup: 'Spindle Warmup', atc_change: 'Tool Change', atc_test: 'ATC Test',
     homing: 'Homing',
 };

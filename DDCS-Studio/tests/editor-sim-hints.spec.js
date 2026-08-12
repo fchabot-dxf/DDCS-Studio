@@ -11,12 +11,14 @@ test('editor sims an inserted boss-both with the registry hints (①② match th
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.setGcodeView);
   const r = await page.evaluate(async () => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack is the surviving
+    // builder — emit its block stack through the SAME mapper the app uses (emitMapped) for G-code text.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { markerLine } = await import('/blocks/opSchema.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');
-    const w = new MiddleWizard();
     const params = { featureType: 'boss', twoAxis: true, findBoth: true, axis: 'X', dir1: 'pos', dir2: 'neg', dist: 100, inAxis: 'auto', transAxis: 'auto' };
-    const macro = w.generate(params);
+    const macro = emitMapped(middleStack(params)).text;
     const editor = document.getElementById('editor');
 
     // 1) INSERTED OP — the program carries the @DDCS marker (op type + params)

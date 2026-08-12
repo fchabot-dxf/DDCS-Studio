@@ -50,15 +50,11 @@ import { commDataDef } from './blocks/dataOps/commData.js';   // t518 1b-ii — 
 import { ioStepDataDef } from './blocks/dataOps/ioStepData.js';   // t522 E2 — the grouped "I/O Step" twin (output/input/dwell): opened IN-PLACE from the built-in I/O Step setup slot (opensAs); declared-I/O by name + raw-pin fallback
 import { pauseConfirmDataDef } from './blocks/dataOps/pauseConfirmData.js';   // t1031 — the standalone Pause/Confirm twin (operator message + M0), opened in-place from the built-in setup slot (opensAs)
 import { homingDataDef } from './blocks/dataOps/homingData.js';   // t546-t552 homing port — the "Homing (data)" twin: opened IN-PLACE from the built-in Homing slot (opensAs); per-axis guarded arms + settings recompose (unroll) + the machine-frame preview (forced envelope + draggable Start)
-// Edge viz animator (registers `window.EdgeVizAnimator`)
-import './viz/edgeVizAnimator.js';
-// Alignment viz animator (registers `window.AlignVizAnimator`)
-import './viz/alignVizAnimator.js';
-
-// MiddleViz helpers (animation, id mapping, visibility controller)
-import './viz/middleVizUtils.js';
-import './viz/middleVizAnimator.js';
-import './viz/middleVizManager.js';
+// t1730 — edgeVizAnimator.js/alignVizAnimator.js/middleVizUtils.js/middleVizAnimator.js/middleVizManager.js
+// (window.EdgeVizAnimator/AlignVizAnimator/etc, the legacy SVG-schematic animators) DELETED: their sole consumer,
+// setupVisualizationListeners() (formerly here — see the retirement comment near line 215), is gone (its
+// coded-view targets — middleView.js/edgeView.js/alignmentView.js — were retired the same act). Zero other
+// callers of these globals anywhere in web/ (checked).
 
 // EDITOR / 3D toolpath preview tab (self-registers window.setGcodeView on DOM ready)
 import './ui/gcodePreviewTab.js';
@@ -217,7 +213,9 @@ class DDCSStudio {
             _checkKeyboard();
         }
 
-        this.setupVisualizationListeners();
+        // t1730 (gameplan step 2, Tier B) — setupVisualizationListeners() call retired: its whole body wired
+        // change-listeners to form ids that lived only inside the middle/edge/alignment coded-view panels, all
+        // now deleted (see WORK-LOG t1730). The method itself is removed below too, not left as a dead no-op.
 
         // Log layout snapshot for debugging: sizes and visibility
         this.logLayoutSnapshot();
@@ -294,75 +292,11 @@ class DDCSStudio {
         setupNumericInputGuardsImpl();
     }
 
-    setupVisualizationListeners() {
-        // (Corner wizard viz listeners retired ④ — the built-in Corner is replaced by the "Corner (data)" twin.)
-
-        // Middle wizard visualization listeners
-        ['m_type', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_probe_z_first'].forEach(id => {
-            const elem = el(id);
-            if (elem) {
-                elem.addEventListener('change', () => {
-                    if (el('wiz_middle').style.display !== 'none') {
-                        // Call the full update which triggers both viz and animation
-                        if (this.wizardManager && this.wizardManager.updateMiddleWizard) {
-                            this.wizardManager.updateMiddleWizard();
-                        } else if (window.drawMiddleViz) {
-                            window.drawMiddleViz();
-                        }
-                    }
-                });
-            }
-        });
-
-        // Edge/probe visualization listeners — wire to actual control IDs
-        ['p_axis', 'p_dir'].forEach(id => {
-            const elem = el(id);
-            if (elem) {
-                elem.addEventListener('change', () => {
-                    // Only update when the Edge wizard panel is visible
-                    if (el('wiz_edge') && el('wiz_edge').style.display !== 'none') {
-                        if (window.drawEdgeViz) window.drawEdgeViz();
-                        else if (window.drawProbeViz) window.drawProbeViz();
-
-                        // Ensure wizard manager refreshes its state and (re)starts animator
-                        if (this.wizardManager && this.wizardManager.updateEdgeWizard) this.wizardManager.updateEdgeWizard();
-                        if (this.wizardManager && this.wizardManager._startEdgeAnim) this.wizardManager._startEdgeAnim();
-                    }
-                });
-            }
-        });
-
-        // Alignment visualization listeners
-        ['al_check_axis', 'al_probe_dir'].forEach(id => {
-            const elem = el(id);
-            if (elem) {
-                elem.addEventListener('change', () => {
-                    if (el('wiz_alignment') && el('wiz_alignment').style.display !== 'none') {
-                        if (window.drawAlignmentViz) window.drawAlignmentViz();
-                        if (this.wizardManager && this.wizardManager.updateAlignmentWizard) this.wizardManager.updateAlignmentWizard();
-                    }
-                });
-            }
-        });
-    }
-
     // openCorner() retired ④ — the built-in Corner is replaced by the "Corner (data)" twin (user_corner_data).
-
-    openMiddle() {
-        this.open('middle');
-        setTimeout(() => {
-            if (window.drawMiddleViz) window.drawMiddleViz();
-            this.updateMiddleWizard();
-        }, 10);
-    }
-
-    openEdge() {
-        this.open('edge');
-        setTimeout(() => {
-            if (window.drawProbeViz) window.drawProbeViz();
-            this.updateEdgeWizard();
-        }, 10);
-    }
+    // setupVisualizationListeners()/openMiddle()/openEdge() retired t1730 (gameplan step 2, Tier B) — the
+    // middle/edge/alignment coded-view panels these wired are gone (see WORK-LOG t1730); openMiddle()/openEdge()
+    // had zero callers already (globalFunctions.js's window.openMiddleWiz/openEdgeWiz call
+    // wizardManager.openMiddle()/openEdge() — a DIFFERENT class's methods — not these).
 
     saveDefaults() {
         // All wizard input IDs to snapshot

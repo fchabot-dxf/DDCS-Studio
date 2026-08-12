@@ -54,11 +54,12 @@ test('REAL APP: a saved-native config code preview shows the SHORT G31 block per
     });
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(500);
-    const code = await page.evaluate(() => document.getElementById('wiz_homing_code').textContent || '');
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_simple_g31.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    const code = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_simple_g31.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
     console.log('CODE PREVIEW:\n' + code);
     expect(code, 'the code preview shows G31 (the saved native is ignored — no toggle)').toContain('G31');
     expect(code, 'NOT M98 P501 in the preview').not.toContain('M98P501');

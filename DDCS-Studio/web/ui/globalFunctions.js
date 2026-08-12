@@ -27,9 +27,10 @@ export function setupGlobalFunctions(app) {
         // Wizard functions
         window.openWiz = (type, variant, bypassPrereq) => { window.ddcsTrack?.('feature', 'wizard:' + type); return app.wizardManager.open(type, variant, bypassPrereq); };
         // openCornerWiz retired (④) — the built-in Corner is replaced by the "Corner (data)" twin (opens via openWiz('user_corner_data')).
-        window.openMiddleWiz = () => { window.ddcsTrack?.('feature', 'wizard:middle'); return app.wizardManager.openMiddle(); };
-        window.openEdgeWiz = () => { window.ddcsTrack?.('feature', 'wizard:edge'); return app.wizardManager.openEdge(); };
-        window.openAlignmentWiz = () => { window.ddcsTrack?.('feature', 'wizard:alignment'); return app.wizardManager.openAlignment(); };
+        // openMiddleWiz/openEdgeWiz/openAlignmentWiz retired t1730 (gameplan step 2, Tier B) — already unrouted
+        // from any live menu/onclick (WIZ_SPECIAL_OPENER has been {} since the opensAs port); their target
+        // wizardManager methods are gone too (their coded views are deleted — see WORK-LOG t1730). Opens via
+        // openWiz('user_middle_data'|'user_edge_data'|'user_alignment_data').
         window.closeWiz = () => app.wizardManager.close();
         window.openHomingSetup = () => { window.ddcsTrack?.('feature', 'homing:setup'); return openHomingSetup(); };
         window.ddcsOpenStock = (opts) => openStockEditor(undefined, opts);   // the rich Stock modal (centred, no anchor needed) — used by the Setup checklist; opts.returnTo='checklist' makes the ✕ go back

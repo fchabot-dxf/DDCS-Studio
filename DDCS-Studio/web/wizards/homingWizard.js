@@ -28,15 +28,14 @@
  * Posts: Expert emits the M98 + param writes. V4.1 / V3-DM500 sub/param maps are UNVERIFIED, so those posts get
  * a clear "unverified on <model>" note and emit NOTHING executable for homing (no guessed sequence).
  */
-import { emitMapped } from '../blocks/blockEmitter.js';
-import { activeDialectOpts } from './previewEmit.js';
-import { recordOp } from '../blocks/opRecord.js';
 import { slaveAxes } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing derives the slave sync from it
 // t1728 (gameplan step 1) — homeAxisBlocks/homingStack/homingUnsetAxes MOVED to stacks/homingWizard.js (the twin's
 // own builder dependency, kept importable+re-exported here unchanged for every other existing caller — pure
-// move, no signature change). homingRunParams stays HERE, unmoved — dataOps/homingData.js never imports it
-// (only views/homingView.js and ui/macrosApp.js's sysstart generator do), so severing the twin's dependency
-// doesn't need it to move.
+// move, no signature change). homingRunParams stays HERE, unmoved — dataOps/homingData.js never imports it.
+// t1730 (gameplan step 2, Tier B) — HomingWizard (the legacy screen class) DELETED alongside its sole consumer,
+// views/homingView.js (retired — see WORK-LOG t1730). homingRunParams STAYS: it's still live, imported directly
+// by ui/macrosApp.js's sysstart/advstart regenerator (Settings → Macros → "Regenerate from homing profile") —
+// a real, unrelated consumer that has nothing to do with the deleted view.
 import { homeAxisBlocks, homingStack, homingUnsetAxes } from './stacks/homingWizard.js';
 export { homeAxisBlocks, homingStack, homingUnsetAxes };
 
@@ -66,16 +65,4 @@ export function homingRunParams(settings = {}, opts = {}) {
         for (const { idx, follows } of slaves) config[follows] = { ...(cfg[follows] || {}), slaveFollows: String(idx) };
     }
     return { axes, config, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {}, limits: settings.limits || {} };
-}
-
-// t542 — homingSimProxy (a hand-made G53 motion model) is DELETED. It existed only because the pre-b0a9791 M98 emit
-// wasn't engine-runnable; the wizard is G31-only now and the emit plays to M30 (t540). The 3D preview plays the REAL
-// emitted G-code (homingView → HomingWizard.generate), the SAME execution the editor does — one simulator, one truth.
-
-export class HomingWizard {
-    generate(params) {
-        recordOp('homing', params);
-        return emitMapped(homingStack(params), activeDialectOpts()).text;
-    }
-    // t542 — the 3D preview plays generate()'s REAL emitted code (not a proxy), so simProxy()/inferStart() are gone.
 }

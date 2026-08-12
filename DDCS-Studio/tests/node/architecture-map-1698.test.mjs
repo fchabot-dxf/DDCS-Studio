@@ -114,11 +114,12 @@ test('architecture map GENERATED: Q1/registries — every stated count still mat
     must(`the two independent twin-count derivations disagree — SEED_BUILDERS says ${seedCount}, the _OPTYPE grep says ${optypeCount}. ARCHITECTURE.md cites both as agreeing at 32.`,
         () => expect(optypeCount).toBe(seedCount));
 
-    // WIZARD_VIEWS: 20 entries (wizards/views/index.js:36-57), the map's own regex given verbatim
+    // WIZARD_VIEWS: 14 entries (wizards/views/index.js:35-48, t1730 — middle/rotary_center/rotary_clock/edge/
+    // alignment/homing retired, 20→14), the map's own regex given verbatim
     const viewsIndex = linesOf(path.join(WEB, 'wizards/views/index.js'));
-    const viewsBlock = viewsIndex.slice(35, 57);   // lines 36-57
+    const viewsBlock = viewsIndex.slice(34, 48);   // lines 35-48
     const viewCount = viewsBlock.filter((l) => /^\s{4}\w+View,$/.test(l)).length;
-    must(`WIZARD_VIEWS entry count drifted from 20 (ARCHITECTURE.md Q1 + REGISTRIES) — got ${viewCount}`, () => expect(viewCount).toBe(20));
+    must(`WIZARD_VIEWS entry count drifted from 14 (ARCHITECTURE.md Q1 + REGISTRIES) — got ${viewCount}`, () => expect(viewCount).toBe(14));
 
     // the two deletions Q1/TRAP1 claims are load-bearing negatives
     const indexHtml = fs.readFileSync(path.join(WEB, 'index.html'), 'utf8');

@@ -52,9 +52,12 @@ time. Test pass/fail states are **not** re-measured — they are WORK-LOG-report
                                                                 entries + Restore-to-factory
  edit a SAVED op  (✎)         ui/globalFunctions.js:37          ⚠ open(op.opType) — the RAW
                               → wizardManager.js:401            opType, DELIBERATELY NOT via
-                                openForEdit → :404 this.open()   opensAs. This is the ONLY
-                                                                door left to the 20 coded
-                                                                built-in views.
+                                openForEdit → :406 this.open()   opensAs. This is the ONLY
+                                                                door left to the 14 coded
+                                                                built-in views — and, if the
+                                                                type has NO view/twin at all,
+                                                                a silent blank modal (known,
+                                                                unfixed — see TRAPS #5).
  Blocks tab palette           blocks/opToolbox.js               a BLOCK STACK, not a wizard
  prereq "Open anyway"         ui/wizardPrereq.js:107            re-enters openWiz(type,…)
 ```
@@ -62,21 +65,36 @@ time. Test pass/fail states are **not** re-measured — they are WORK-LOG-report
 **`openWiz` has exactly five call sites in app code** — `commandDeck.js:85,90,93,94` and `wizardPrereq.js:107`.
 `index.html` contains **zero** `openWiz(` onclicks (`grep -c "openWiz(" DDCS-Studio/web/index.html` → 0).
 
-**Three dead back-compat globals** survive with no caller: `window.openMiddleWiz / openEdgeWiz / openAlignmentWiz`
-(`ui/globalFunctions.js:30-32` → `wizardManager.js:422-424`). `openCornerWiz` was deleted; only the tombstone
-comment survives at `ui/globalFunctions.js:29`.
+**All legacy back-compat wizard-opener globals are now GONE — deleted, not merely dead.** `window.openCornerWiz`
+retired 2026-07-02 (tombstone comment only, `ui/globalFunctions.js:29`). `window.openMiddleWiz / openEdgeWiz /
+openAlignmentWiz` retired t1730 alongside their coded views — the globals themselves are deleted (tombstone
+comment `ui/globalFunctions.js:30-33`), and so are their wizardManager.js targets (`openMiddle`/`openEdge`/
+`openAlignment`, tombstone comment `wizardManager.js:421-423`); `updateMiddleWizard`/`updateEdgeWizard`/
+`updateAlignmentWizard`/`_startEdgeAnim`/`_startAlignmentAnim` (the `update()` back-compat entries app.js's now-
+also-deleted `setupVisualizationListeners` used to call) are gone too.
 
-**Two wizards are fully RETIRED — their entry points are deleted, not hidden.**
-- **CORNER** (retired 2026-07-02, `wizards/views/index.js:20`). No view import, no `#wiz_corner` panel
-  (`grep -c 'id="wiz_corner"' DDCS-Studio/web/index.html` → **0**), no opener. Its `BUILTINS` slot survives and
-  `opensAs: 'user_corner_data'` (`wizardLibrary.js:56`). `wizards/cornerWizard.js` still exists as the legacy
-  **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,244`).
-- **CIRCULAR** (retired 2026-06-23, superseded by Middle — `wizards/views/index.js:22`). Gone further: it has
-  **no `BUILTINS` entry at all**, so it is not even a bar slot.
+**EIGHT wizards are fully RETIRED — their entry points are deleted, not hidden.** Two before this turn, six more
+at t1730 (same shape each time: no view import, no `#wiz_<type>` panel, `BUILTINS` slot survives with
+`opensAs:'user_<type>_data'`, the legacy stack builder survives as the twin's own template source):
+- **CORNER** (retired 2026-07-02, `wizards/views/index.js` retirement comment). No `#wiz_corner` panel
+  (`grep -c 'id="wiz_corner"' DDCS-Studio/web/index.html` → **0**). `wizards/cornerWizard.js` still exists as the
+  legacy **stack builder** the twin's own template is built from (`blocks/dataOps/cornerData.js:44,244`).
+- **CIRCULAR** (retired 2026-06-23, superseded by Middle). Gone further: it has **no `BUILTINS` entry at all**
+  (deleted t1730 alongside its whole file, `wizards/circularWizard.js` — it had zero reachable UI path, twin or
+  otherwise), so it was never even a bar slot.
+- **MIDDLE / EDGE / ALIGNMENT / ROTARY_CENTER / ROTARY_CLOCK / HOMING** (all retired t1730, gameplan step 2 Tier
+  B — see WORK-LOG t1730). Each `opensAs` its twin and had for a while already (the wizard bar has routed every
+  one of these through `opensAs` since their own earlier in-place ports — `wizard-bar.spec.js` names the t-marks);
+  the coded view was already UNREACHABLE from any live menu/button, reached only by an old saved op / Blocks-
+  authored raw block carrying the RAW built-in type through `openForEdit`. Deleted together (not incrementally)
+  because `rotaryCenterView.js`'s `restoreBoxStock()` is consumed by `middleView.js`/`edgeView.js`/
+  `rotaryClockView.js` — a dangling-import intermediate state was avoided by removing all 6 in one act. `homing`
+  kept one live export, `homingRunParams` (`wizards/homingWizard.js`) — unrelated to the deleted view, still used
+  directly by `ui/macrosApp.js` for "Regenerate from homing profile".
 
-**The 20 coded built-in views still exist and still render real two-pane forms** — `WIZARD_VIEWS`
-(`wizards/views/index.js:36-57`, 20 entries), each with a live `#wiz_<type>` panel (21 unique `#wiz_*` panel ids
-in `index.html`, the 21st being `#wiz_user`). **No bar entry reaches any of them.** The only live door is
+**14 coded built-in views still exist and still render real two-pane forms** — `WIZARD_VIEWS`
+(`wizards/views/index.js:35-48`, 14 entries), each with a live `#wiz_<type>` panel (15 unique `#wiz_*` panel ids
+in `index.html`, the 15th being `#wiz_user`). **No bar entry reaches any of them.** The only live door is
 `openForEdit` (`wizardManager.js:401`), reached from the editor hover ✎ / op context menu.
 
 ### The greps that regenerate this — use these, not a copied list
@@ -194,7 +212,7 @@ slot body). **Correction to an earlier survey:** that is not the complete set �
 ### There are TWO preview boxes in a twin's wizard, and the Layout box holds TWO STACKED RENDERERS
 
 ```
-WIZARD BODY (twin, panel = form3d+2d)      index.html:837-843
+WIZARD BODY (twin, panel = form3d+2d)      index.html:353-355
 │
 ├─ #userViz3dBox / #userViz3dContainer ── the 3D box ─────────────────────────
 │   └─ .wiz-viz3d           wizardManager.js:539-543  (position:relative)
@@ -304,19 +322,25 @@ double-shifts by the pin.
 - `wizards/ops/panelTypes.js` — the twin's **spec compiler**. `layoutSpecFromOp` (`:168`) turns def + live params
   into a FeatureCanvas spec. Everything the Layout pane shows for a twin originates here.
 
-### Six legacy renderers are still live, not five renderers and a composer
+### Six legacy renderers were live, not five renderers and a composer — DELETED at t1730
 
-The inventory above is what a twin reaches from the menu. **`wizards/views/index.js`'s `WIZARD_VIEWS` still
-registers a SEVENTH, older renderer per op for 6 of the 8 probe/utility twins** — `middleView.js` / `edgeView.js`
-/ `alignmentView.js` / `rotaryCenterView.js` / `rotaryClockView.js` / `homingView.js` — the pre-port built-in
-wizard views, unreachable from today's menu but reached the instant an op carries its RAW built-in type (an old
-save file, a Blocks-authored raw block) instead of its twin's `user_*_data` type. Only `corner`'s legacy view was
-actually deleted (`git log` shows a full-remove commit `cbe08b03`) — `wcs`'s legacy view (`wcsView.js`) also
-survives but draws nothing on either path, so it carries no divergence risk. Two of the six **were** confirmed
-behaviorally different from their twin (this map caught it, cycle 857 ACT 1) and are **FIXED as of cycle 857 ACT 2
-(t1722)**: `middle_data` now declares `def.simStock` (mirrors rotaryCenterData.js's own pattern, non-mutating);
-`rotaryCenterView.js`'s `activateCylinderStock()` no longer touches global `settings.stock` at all. Full per-op
-detail, citations, and the complete duplicate-intent list: `PREVIEW-AS-DATA.md` (cycle 857 ACT 1 survey).
+Until t1730 this section named a real divergence risk: `wizards/views/index.js`'s `WIZARD_VIEWS` registered a
+SEVENTH, older renderer per op for 6 of the 8 probe/utility twins — `middleView.js` / `edgeView.js` /
+`alignmentView.js` / `rotaryCenterView.js` / `rotaryClockView.js` / `homingView.js` — the pre-port built-in
+wizard views, unreachable from any live menu/button but reachable the instant an op carried its RAW built-in type
+(an old save file, a Blocks-authored raw block) instead of its twin's `user_*_data` type. Two of the six **were**
+confirmed behaviorally different from their twin (this map caught it, cycle 857 ACT 1) and were fixed as of cycle
+857 ACT 2 (t1722): `middle_data` declared `def.simStock`; `rotaryCenterView.js`'s `activateCylinderStock()` no
+longer touched global `settings.stock`. Full per-op detail, citations, and the complete duplicate-intent list:
+`PREVIEW-AS-DATA.md` (cycle 857 ACT 1 survey, historical — the code it describes is gone).
+
+**All 6 are now DELETED (gameplan step 2 Tier B, t1730, WORK-LOG t1730)** — the divergence risk is fully closed,
+not just fixed-while-present: there is no second renderer left to diverge from. The RAW-built-in-type path (an
+old save / a Blocks-authored raw block) now finds no panel and silently no-ops instead of opening the deleted
+view — the SAME known, unfixed blank-modal shape `corner` already had — see TRAPS #5 (a graceful version was
+built and then explicitly ruled out the same turn: no old-save audience exists for this app). `wcs`'s legacy view
+(`wcsView.js`) is unrelated and still survives (one of the 14 that remain) — it draws nothing on either path, so
+it never carried divergence risk and was out of scope for this deletion.
 
 ### The wizard-shape-block vocabulary: one working consumer, three declared-but-unread containers
 
@@ -346,8 +370,8 @@ four) — found by tracing a real port attempt, not by a dedicated sweep.
 | fact | the declaration of record | regenerate with |
 |---|---|---|
 | what the bar shows and what it opens | `BUILTINS` + `opensAs`, `blocks/wizardLibrary.js:42-81` (**25** entries, **25** with `opensAs`) | `rg -n "opensAs" DDCS-Studio/web/blocks/wizardLibrary.js` |
-| the data twins | `SEED_BUILDERS`, `web/app.js:105-112` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:103-104`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
-| the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:36-57` (**20**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
+| the data twins | `SEED_BUILDERS`, `web/app.js:101-108` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:99-100`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
+| the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:35-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
 | which block kinds hold children | **`def.mouth`** on each def; the reader is one line — `blocks/blockly/bridge.js:78` | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
 | which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:23`) + `KNOWN_LEAF_RECORD_FIELDS` (`:35`) | — |
 | what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:874-876`; exported as `hookKeysOf` `:881` | — |
@@ -490,7 +514,7 @@ The declared half (`_declaredParams`/`_unwritable`) is still built from `MULTI_W
 the **same registry** `renderOpForm`'s `renderUnit` reads. The DOM half (`_field`, `panelTypes.js:75`) is skipped
 when no real form host exists at all (`_formHostExists`, `panelTypes.js:249`) — the node-tier gate's `document` is
 an inert stub whose `querySelector` always returns null, so AND-ing `_field` in unconditionally would zero out
-every twin's handles there again. A real page's `#wiz_user_form` (`index.html:849`) exists from load, so there the
+every twin's handles there again. A real page's `#wiz_user_form` (`index.html:365`) exists from load, so there the
 DOM half is live and a handle only appears once its own field has actually rendered.
 ```bash
 rg -n "_writable|_formHostExists" DDCS-Studio/web/wizards/ops/panelTypes.js
@@ -512,15 +536,25 @@ rg -n "indentStyle" DDCS-Studio/web --glob '!data/indentStyle.js'
 ```
 Only `ui/settingsPanel.js` (writes) and `wizards/previewEmit.js` (reads) appear. **I did not run this.**
 
-### 5 · A legacy `corner` (or `circular`) op has a live ✎ Edit that opens an EMPTY modal. **UNVERIFIED at runtime.**
+### 5 · A legacy `corner` op has a live ✎ Edit that opens onto nothing — CONFIRMED live at runtime, deliberately NOT fixed.
 `canEdit('corner')` (`wizardManager.js:318`) returns true because `paramFields('corner')` is non-empty —
 `FIELD_BIND.corner` (`blocks/opSchema.js:158`) is folded onto `SCHEMA.corner` at `:177-180`. But those 15 field
 ids point at DOM deleted with the panel:
 ```bash
 grep -c 'id="c_corner"' DDCS-Studio/web/index.html        # → 0
 ```
-`open('corner')` then shows the overlay, hides every panel, and finds no `#wiz_corner` to fill. Same shape for
-`circular` (`opSchema.js` ids `circ_*`).
+Confirmed live (not just by inspection), t1730, with a synthetic op carrying `opType:'corner'` driven through the
+real `openForEdit`/`open()` gesture: `wizardManager.js`'s `open()` finds no `#wiz_corner`, and — since `wizElem`
+is falsy — the whole `if (wizElem) {...}` body (`:277-309`) is simply skipped: the overlay stays open, every
+panel stays hidden, nothing fills in. A silent blank modal, no error, no message. Same shape for `middle` /
+`edge` / `alignment` / `rotary_center` / `rotary_clock` / `homing` (their coded views retired at t1730 too — Q1's
+"EIGHT wizards are fully RETIRED" above) and would be for any future retirement that leaves `canEdit` true. A fix
+(close the overlay + toast why) was built and proven at t1730, then explicitly RULED OUT the same turn: an
+amendment established there is no old-save audience for this app (no legacy `.ddcs` files exist to carry a raw
+built-in type back in), so the scenario the fix protected against doesn't occur in practice — "no new UI, no new
+verification step, nothing built for a legacy audience" (WORK-LOG t1730). The gap is real and reproducible
+exactly as described above; it stays a known, accepted rough edge rather than a fixed one. If it's ever worth
+closing, the mechanism to reuse is exactly this: `wizardManager.js`'s `open()`, right after the `wizElem` lookup.
 
 ### 6 · `setup_datawiz` is an undeclared group. **Read from source.**
 `blocks/dataOps/commData.js:154` and `blocks/dataOps/homingData.js:167` pass `'setup_datawiz'`, but `GROUPS`
@@ -580,7 +614,7 @@ rg -n "renderDeclaredLayout" DDCS-Studio/web        # → one hit: the definitio
 | layer | gated? | by |
 |---|---|---|
 | EMIT | **yes, 32/32** | `tests/fork-parity-1593.spec.js` byte-identity; `blocks/dataOps/equivalence.js:30` twin-vs-builtin sweep with a pinned dialect |
-| FORM | **yes, 32/32** | registry sweep over `SEED_BUILDERS` (`web/app.js:103-104` states why it is exported) |
+| FORM | **yes, 32/32** | registry sweep over `SEED_BUILDERS` (`web/app.js:99-100` states why it is exported) |
 | PREVIEW | **since 2026-08-10 only** | `tests/node/preview-spec-gate-1688.test.mjs` — spec snapshot per twin × 2 param sets; `spec.placement === partZeroShift`; the `_disp` / `getTransform` / `_pinFromTf` pixel identity at 1e-6 px with a non-vacuity guard; gesture forwarding; the glyph truth table |
 | `opensAs` resolvability | **NO** | 17 per-wizard in-place specs exist, but **no sweep asserts every `opensAs` target is a registered def**. A typo'd target opens an empty `#wiz_user`. The registry-parity pattern already exists next door (the preview gate's Part 0 discovers twins from `blocks/dataOps/*Data.js` and cross-checks `SEED_BUILDERS` — `preview-spec-gate-1688.test.mjs:273-277`); it just does not cover `opensAs`. |
 | the Q3 §"four semantics of `spec.placement`" and the overlay's not-told set | **NO** | nothing gates these |
@@ -604,12 +638,13 @@ WORK-LOG- and test-header-reported; not re-measured.)*
   and `envelopeRect()` branch the "wrong" way. Harmless today *only* because overlay mode never draws the envelope
   or start handles and `anchorToStart` dominates `passOff`. I did not verify a machine-frame twin's overlay
   position against its SVG on screen.
-- **`middleVizManager.js` / `middleVizAnimator.js` / `edgeVizAnimator.js` / `alignVizAnimator.js`** are imported at
-  `web/app.js` and animate the legacy inline SVGs in containers `preview3D` sets to `display:none` on first use
-  (`wizardManager.js:564`). **RESOLVED (cycle 857 ACT 1, PREVIEW-AS-DATA.md):** yes — these ARE the still-registered
-  legacy built-in views' (`middleView.js`/`edgeView.js`/`alignmentView.js`) own animation machinery, reachable
-  whenever an op carries its raw built-in type instead of its twin's `user_*_data` type (an old save file, a
-  Blocks-authored raw block). See "Six legacy renderers are still live" below.
+- **`middleVizUtils.js` / `middleVizManager.js` / `middleVizAnimator.js` / `edgeVizAnimator.js` /
+  `alignVizAnimator.js`** — was: imported at `web/app.js`, animating the legacy inline SVGs in containers
+  `preview3D` sets to `display:none` on first use. **DELETED (t1730):** their sole consumer, app.js's
+  `setupVisualizationListeners()`, was deleted the same act (its coded-view targets — middleView.js/edgeView.js/
+  alignmentView.js — were retired then too); confirmed zero other callers of their globals
+  (`window.EdgeVizAnimator`/`AlignVizAnimator`/etc.) anywhere in `web/` before deleting the 5 files. See "Six
+  legacy renderers were live... DELETED at t1730" above.
 - **Rule 13's partition claim** (three fork-inheritance cases cover the registry with no overlap, `userOps.js:1055-1058`)
   was read, not re-derived.
 - **Rule 14 (`postInstantiate`)** is verified as a *mechanism* at `userOps.js:946`; no violation of it was found in

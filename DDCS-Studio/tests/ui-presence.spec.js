@@ -10,8 +10,11 @@ test('UI basics: header, generators, chips and import control are present', asyn
 
   // Generator wizard sections exist in the DOM
   await expect(page.locator('#wiz_corner'), 'built-in Corner panel RETIRED ④ — replaced by the "Corner (data)" twin').toHaveCount(0);
-  await expect(page.locator('#wiz_middle')).toHaveCount(1);
-  await expect(page.locator('#wiz_edge')).toHaveCount(1);
+  // t1730 — middle/edge (+ alignment/rotary_center/rotary_clock/homing) coded views RETIRED, same shape as corner —
+  // replaced by their twins (#wiz_user, the shared generic panel), no per-wizard panel left.
+  await expect(page.locator('#wiz_middle'), 'built-in Middle panel RETIRED t1730 — replaced by the "user_middle_data" twin').toHaveCount(0);
+  await expect(page.locator('#wiz_edge'), 'built-in Edge panel RETIRED t1730 — replaced by the "user_edge_data" twin').toHaveCount(0);
+  await expect(page.locator('#wiz_user'), 'the shared generic twin panel is present').toHaveCount(1);
 
   // Variable chips render in the command deck's VARIABLES tab (replaced #varList)
   await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks   // dock listeners attach on app init

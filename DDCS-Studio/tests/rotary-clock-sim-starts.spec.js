@@ -16,11 +16,10 @@ test('E2: the twin single sim-start POSITION + COUNT == the built-in inferStart 
         const { registerUserOp } = await import('/blocks/userOps.js');
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
-        const { rotaryClockStack, RotaryClockWizard } = await import('/wizards/rotaryClockWizard.js');
+        const { rotaryClockStack } = await import('/wizards/rotaryClockWizard.js');
         const { opSimStarts } = await import('/viz/opSimStarts.js');
         registerUserOp(rotaryClockDataDef());
         const D = ROTARY_CLOCK_DEFAULTS;
-        const wiz = new RotaryClockWizard();
         const r3 = (v) => Math.round(v * 1000) / 1000;
         // the INDEPENDENT-TRUTH formula: POINT A = the stock CENTRE (span-INDEPENDENT — the jog-to start), B = A + span in +Y
         const expected = (c, s) => ({ x: (s ? s.x : 150) / 2, y: (s ? s.y : 76) / 2, z: Math.min(5, (s ? s.z : 76) * 0.5) });
@@ -40,8 +39,11 @@ test('E2: the twin single sim-start POSITION + COUNT == the built-in inferStart 
             const eB = { x: eA.x, y: eA.y + span, z: eA.z }, gotB = starts[1];   // B = A + span in +Y
             if (r3(gotA.x) !== r3(eA.x) || r3(gotA.y) !== r3(eA.y) || r3(gotA.z) !== r3(eA.z)
                 || r3(gotB.x) !== r3(eB.x) || r3(gotB.y) !== r3(eB.y) || r3(gotB.z) !== r3(eB.z)) { posFails++; if (!firstFail) firstFail = { c, reason: 'pos', gotA, eA, gotB, eB }; }
-            const bi = wiz.inferStart(c, s);   // inferStart returns [0] = A (single) → parity with starts[0], one registry source
-            if (r3(bi.x) !== r3(gotA.x) || r3(bi.y) !== r3(gotA.y) || r3(bi.z) !== r3(gotA.z)) { builtinFails++; if (!firstFail) firstFail = { c, reason: 'builtin', bi, gotA }; }
+            // t1730 — RotaryClockWizard (the legacy screen class) was deleted alongside its view; opSimStarts.js's
+            // BUILT_IN.rotary_clock (moved verbatim from the class's own inferStart, a SEPARATE registry entry
+            // from the twin's USER_STARTS provider above) is still a genuine second independent path.
+            const bi = (opSimStarts('rotary_clock', c, s) || [])[0];   // [0] = A (single) → parity with starts[0], one registry source
+            if (!bi || r3(bi.x) !== r3(gotA.x) || r3(bi.y) !== r3(gotA.y) || r3(bi.z) !== r3(gotA.z)) { builtinFails++; if (!firstFail) firstFail = { c, reason: 'builtin', bi, gotA }; }
         }
         // emit BYTE-IDENTICAL — the provider is sim-only, the builder untouched
         const emitSame = emitMapped(builderOf('user_rotary_clock_data')({ ...D })).text === emitMapped(rotaryClockStack({ ...D })).text

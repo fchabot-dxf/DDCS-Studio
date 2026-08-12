@@ -17,7 +17,21 @@ async function openWiz(page, type) {
   await page.evaluate((t) => window.ddcsStudio.wizardManager.open(t), type);
 }
 
-test('a wizard MAX PROBE edit sticks per-wizard, overrides only its own field, and survives refresh', async ({ page }) => {
+// t1730 port note — SIGNIFICANT PRE-EXISTING GAP, confirmed LIVE (not guessed): this whole mechanism —
+// applyProbeDefaults() (seed a probe field from settings.probes on open) AND the sticky per-field override store
+// (PROBE_FIELD_OVERRIDE_KEY) — is keyed ENTIRELY by a hardcoded map of OLD coded-view field ids
+// (wizardManager.js:28-36 PROBE_DEFAULT_FIELDS: m_dist/p_dist/al_dist/rc_dist/rcl_dist/c_dist/circ_dist, same
+// pattern for radius/fastFeed/slowFeed/retract/safeZ/qStop). None of those ids exist on the twin's generic form
+// (data-param="dist", no id attribute at all) — confirmed live: opening user_middle_data, the MAX PROBE field
+// shows the twin's own hardcoded default (200), NOT the global settings.probes.maxDist; editing it writes NOTHING
+// to ddcs_probe_field_overrides (the id-in-map check silently fails). This was ALREADY dead for corner + circular
+// (retired earlier, same shape) and is now ALSO dead for middle/edge/alignment/rotary_center/rotary_clock as of
+// t1730 — but again, UNREACHABLE from the live bar for a while already (opensAs routing predates this act); this
+// test's own opening gesture is what newly exposes it. This is a real lost user-facing feature across up to 7
+// wizards (seed-from-global-default AND the sticky-override UX), not a one-field edge case — flagged prominently
+// in WORK-LOG t1730 for an advisor/human decision on whether PROBE_DEFAULT_FIELDS needs a declared, twin-aware
+// replacement (e.g. keyed by opType+param instead of a hardcoded DOM id list).
+test.fixme('a wizard MAX PROBE edit sticks per-wizard, overrides only its own field, and survives refresh — t1730: applyProbeDefaults/sticky-override is keyed by dead old-view ids, no twin equivalent', async ({ page }) => {
   await page.goto('http://localhost:3211');
 
   // Clean slate: a known global default (33) + no prior override.

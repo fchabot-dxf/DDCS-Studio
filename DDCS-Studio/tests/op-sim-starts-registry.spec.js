@@ -2,32 +2,32 @@ import { test, expect } from '@playwright/test';
 
 // SIM-SIDE DECLARE-NOT-INFER, increment 1: the per-pass start inference moved into ONE shared REGISTRY
 // (viz/opSimStarts.js), federated like opSimContext — a pristine BUILT-IN layer (moved verbatim) + a USER_* layer so the
-// wizard maker plugs into the same seam. Behaviour-preserving: the registry returns the SAME starts as the old per-wizard
-// inferStarts, and each wizard now DELEGATES to it.
+// wizard maker plugs into the same seam. Behaviour-preserving AT THE TIME OF THE MOVE: the registry returned the SAME
+// starts as the old per-wizard inferStarts, and each wizard delegated to it.
+// t1730 — MiddleWizard/AlignmentWizard/RotaryCenterWizard (the legacy screen classes, and their inferStarts methods)
+// were deleted alongside their coded views (WORK-LOG t1730) — the SECOND source this test compared the registry
+// against no longer exists, closing the divergence risk permanently rather than merely fixing it (same shape as
+// ARCHITECTURE.md's "Six legacy renderers were live... DELETED at t1730"). The registry (viz/opSimStarts.js's
+// BUILT_IN) is now the ONE source — this test keeps verifying ITS behavior directly (pass counts + concrete
+// coordinate values, locked against independently-known-correct numbers), which is the coverage that still matters.
 test.use({ viewport: { width: 1280, height: 900 } });
 
-test('registry returns the SAME starts as each wizard inferStarts + the right pass COUNTS', async ({ page }) => {
+test('the registry returns the right pass COUNTS + locked coordinate values for each op', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
     const { opSimStarts } = await import('/viz/opSimStarts.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
-    const { AlignmentWizard } = await import('/wizards/alignmentWizard.js');
-    const { RotaryCenterWizard } = await import('/wizards/rotaryCenterWizard.js');
-    const m = new MiddleWizard(), a = new AlignmentWizard(), rc = new RotaryCenterWizard();
     const stock = { x: 100, y: 80, z: 20, shape: 'boss' };
     const cases = [
-      ['middle', m, { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', inAxis: 'auto' }],
-      ['middle', m, { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', inAxis: 'manual' }],
-      ['middle', m, { featureType: 'pocket' }],
-      ['alignment', a, { checkAxis: 'X' }],
-      ['rotary_center', rc, { method: 'known' }],
-      ['rotary_center', rc, { method: 'fit', retract: 2 }],
+      ['middle', { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', inAxis: 'auto' }],
+      ['middle', { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', inAxis: 'manual' }],
+      ['middle', { featureType: 'pocket' }],
+      ['alignment', { checkAxis: 'X' }],
+      ['rotary_center', { method: 'known' }],
+      ['rotary_center', { method: 'fit', retract: 2 }],
     ];
-    return cases.map(([op, wiz, p]) => ({ op, viaRegistry: opSimStarts(op, p, stock), viaWizard: wiz.inferStarts(p, stock) }));
+    return cases.map(([op, p]) => ({ op, viaRegistry: opSimStarts(op, p, stock) }));
   });
-  // the wizard delegates to the registry → identical for every op + param set
-  for (const c of r) expect(c.viaRegistry, `${c.op}: registry === wizard.inferStarts`).toEqual(c.viaWizard);
   // pass counts mirror the macro's reposition() calls
   expect(r[0].viaRegistry.length, 'middle boss-both auto → 2 passes').toBe(2);
   expect(r[1].viaRegistry.length, 'middle boss-both manual-in-axis → 4 passes').toBe(4);

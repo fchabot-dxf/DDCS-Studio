@@ -9,8 +9,9 @@ test('rotary op shows A± jog and rotating it spins the part; non-rotary hides i
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
 
   // --- rotary centre: the A row shows, and A+ rotates the part group ---
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('rotary_center'));
-  await page.waitForSelector('#wiz_rotary_center', { state: 'visible' });
+  // t1730 — 'rotary_center' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_rotary_center_data'));
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz && p.viz.jogPendant; });
 
   const rotary = await page.evaluate(() => {

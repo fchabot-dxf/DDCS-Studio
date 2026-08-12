@@ -9,15 +9,18 @@ test('trace tags each pass source from its REPOSITION (auto-traverse vs operator
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack is the surviving
+    // builder — emit its block stack through the SAME mapper the app uses (emitMapped) for G-code text.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { traceToolpath } = await import('/engine/trace.js');
-    const w = new MiddleWizard();
+    const gen = (p) => emitMapped(middleStack(p)).text;
     const base = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20 };
     const st = { stock: { x: 100, y: 80, z: 20, shape: 'boss' } };
     return {
-      auto: traceToolpath(w.generate({ ...base, inAxis: 'auto', transAxis: 'auto' }), st).stats.passSources,
-      manual: traceToolpath(w.generate({ ...base, inAxis: 'manual', transAxis: 'manual' }), st).stats.passSources,
-      mixed: traceToolpath(w.generate({ ...base, inAxis: 'auto', transAxis: 'manual' }), st).stats.passSources,
+      auto: traceToolpath(gen({ ...base, inAxis: 'auto', transAxis: 'auto' }), st).stats.passSources,
+      manual: traceToolpath(gen({ ...base, inAxis: 'manual', transAxis: 'manual' }), st).stats.passSources,
+      mixed: traceToolpath(gen({ ...base, inAxis: 'auto', transAxis: 'manual' }), st).stats.passSources,
     };
   });
   expect(r.auto, 'auto-both: pass0 + the auto trans-traverse').toEqual(['auto', 'auto']);

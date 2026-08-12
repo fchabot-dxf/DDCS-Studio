@@ -19,8 +19,9 @@ async function openHoming(page, z) {
         s.stock = { show: true, x: 100, y: 100, z: 25, datum: 'nnp' };
         s.preview = s.preview || {}; s.preview.autoLoop = false;
     }, z);
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(300);
@@ -41,14 +42,14 @@ test('(a) the Start marker seeds MID-ENVELOPE (machine center)', async ({ page }
     expect(Math.round(p.start.x), 'Start X = envelope mid (600/2)').toBe(300);
     expect(Math.round(p.start.y), 'Start Y = envelope mid (400/2)').toBe(200);
     expect(Math.round(p.start.z), 'Start Z = envelope mid (500/2)').toBe(250);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_start_midenvelope.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_start_midenvelope.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('(b) the played tool STARTS at the Start and homes UP to the top switch', async ({ page }) => {
     await openHoming(page, 500);
     // capture the engine's INITIAL pos the instant the run begins (seeded from the Start), then let it settle
     const r = await page.evaluate(async () => {
-        const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d');
+        const host = document.querySelector('.wiz-viz3d');
         const run = host.querySelector('.pp-run'); if (run) run.click();
         const p = window.ddcsStudio.wizardManager._activePanel;
         const startZ = p.engine ? +p.engine.pos.z.toFixed(1) : null;   // seeded initial pos = the Start (mid)
@@ -62,7 +63,7 @@ test('(b) the played tool STARTS at the Start and homes UP to the top switch', a
     expect(r.startZ, 'the run STARTS at the mid-envelope Start (Z≈250), not the top (500)').toBeLessThan(300);
     expect(end, 'the tool HOMES to the top switch (~495), backed off from 500').toBeGreaterThan(480);
     expect(end, 'the tool ends at the top, not overshooting').toBeLessThanOrEqual(505);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_start_homed.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_start_homed.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('(c) dragging the Start makes the NEXT run travel from the NEW Start', async ({ page }) => {
@@ -74,7 +75,7 @@ test('(c) dragging the Start makes the NEXT run travel from the NEW Start', asyn
     });
     const after = await page.evaluate(() => {
         const p = window.ddcsStudio.wizardManager._activePanel;
-        const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d');
+        const host = document.querySelector('.wiz-viz3d');
         host.querySelector('.pp-run').click();
         return { dragStart: p.getStartPos(), startZ: +p.engine.pos.z.toFixed(1) };
     });
@@ -85,7 +86,7 @@ test('(c) dragging the Start makes the NEXT run travel from the NEW Start', asyn
 
 test('(d) the emitted homing G-code NEVER contains the sim-only Start', async ({ page }) => {
     await openHoming(page, 500);
-    const code = await page.evaluate(() => document.getElementById('wiz_homing_code').textContent || '');
+    const code = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
     // the Start (mid = 300/200/250) must not leak into the macro — it is sim-only
     expect(code).not.toContain('X300');
     expect(code).not.toContain('Y200');

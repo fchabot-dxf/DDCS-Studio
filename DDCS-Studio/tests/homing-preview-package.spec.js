@@ -18,8 +18,9 @@ async function openHoming(page, mutate) {
         (new Function('s', src))(s);
         s.preview = s.preview || {}; s.preview.autoLoop = false;
     }, `(${mutate.toString()})(s)`);
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(300);
@@ -39,7 +40,7 @@ test('(2) the envelope BOX draws in the homing pin even with settings.machine.sh
     expect(r.show, 'settings.machine.show is OFF (the box is NOT drawn for ordinary part-frame views)').toBe(false);
     expect(r.forced, 'the homing pin FORCED the machine box').toBe(true);
     expect(r.machineBox, 'the envelope box IS drawn despite show OFF (homing is machine-frame)').toBe(true);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_box_forced_showoff.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_box_forced_showoff.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('(3) an UNSET axis travel surfaces a visible hint + the sim SKIPS that axis (no fictional span)', async ({ page }) => {
@@ -50,19 +51,18 @@ test('(3) an UNSET axis travel surfaces a visible hint + the sim SKIPS that axis
         s.stock = { show: false };
     });
     const r = await page.evaluate(async () => {
-        const status = document.getElementById('homing_status');
-        const vizStatus = document.getElementById('homingVizStatus');
-        const code = document.getElementById('wiz_homing_code').textContent || '';
-        return { status: status ? status.textContent : '', vizStatus: vizStatus ? vizStatus.textContent : '', code };
+        // t1730 — the twin has ONE shared status element (userVizStatus), not the old view's two (homing_status/homingVizStatus).
+        const vizStatus = document.getElementById('userVizStatus');
+        const code = document.getElementById('wiz_user_code').textContent || '';
+        return { vizStatus: vizStatus ? vizStatus.textContent : '', code };
     });
     // the visible hint names Z + says 'set … travel'
-    expect(r.status.toLowerCase(), 'the run status shows the unset-travel hint for Z').toContain('set z');
-    expect(r.status.toLowerCase()).toContain('travel');
-    expect(r.vizStatus.toLowerCase(), 'the viz status shows the hint too').toContain('set z');
+    expect(r.vizStatus.toLowerCase(), 'the viz status shows the unset-travel hint for Z').toContain('set z');
+    expect(r.vizStatus.toLowerCase()).toContain('travel');
     // t542 — the preview PLAYS the emit (no proxy). The emit SKIPS Z (a visible SET-TRAVEL comment, no fabricated seek)
     // but still homes X + Y — so nothing fictional is simulated for the unset axis.
     expect(r.code, 'Z homing is skipped in the emit (unset envelope), with a visible SET-TRAVEL comment').toMatch(/SET Z TRAVEL/i);
     expect(r.code, 'no fabricated Z seek move for the unset axis').not.toMatch(/G31 Z/);
     expect(r.code, 'X still homes (configured envelope)').toMatch(/G31 X/);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_unset_travel_hint.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_unset_travel_hint.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });

@@ -6,31 +6,41 @@ import { test, expect } from '@playwright/test';
  * INSERT already folds per post (programModel/dialectOpts). t634 threads activeDialectOpts() into every wizard generate() +
  * the data-op preview, so preview text == insert text per post. The sim engine is dialect-agnostic (it plays G31/DM500
  * move-until-input + populates all DRO bases) so the non-Expert forms trace to a drawable route.
+ *
+ * t1730 — CornerWizard/EdgeWizard (the legacy screen classes this originally drove as "the preview path") were deleted
+ * alongside their views; corner/edge's LIVE preview path is now exclusively the twin (user_corner_data/user_edge_data,
+ * rendered by userOpView.js), which threads dialect through the SAME emitMapped(builder(params), {dialect}) call the
+ * insert path uses. Below, `builderOf('user_corner_data')`/`builderOf('user_edge_data')` (the twin's own builder,
+ * proven byte-identical to cornerStack/edgeStack by fork-parity-1593) replace the deleted classes' generate() as "the
+ * preview path" — this still verifies the real thing users see (the twin IS the preview now), it just no longer
+ * exercises a separate class-based implementation (there isn't one to exercise anymore).
  */
 test.use({ viewport: { width: 1300, height: 950 } });
 
 const POSTS = ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500'];
 
-test('generate() folds per ACTIVE post (== the insert-path emit); v41 shows #1500 not #1925; Expert unchanged; sim plays each', async ({ page }) => {
+test('the twin builder folds per ACTIVE post (== the insert-path emit); v41 shows #1500 not #1925; Expert unchanged; sim plays each', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async (POSTS) => {
-        const { CornerWizard, cornerStack } = await import('/wizards/cornerWizard.js');
-        const { EdgeWizard, edgeStack } = await import('/wizards/edgeWizard.js');
+        const { cornerStack } = await import('/wizards/cornerWizard.js');
+        const { edgeStack } = await import('/wizards/edgeWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { getDialect } = await import('/wizards/dialects/index.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         const { GcodeExecutionEngine } = await import('/engine/index.js');
         const cornerP = { corner: 'FL', probeDia: 6, safeZ: 5, overtravel: 3, feed: 100 };
         const edgeP = { edge: 'left', probeDia: 6, safeZ: 5, overtravel: 3, feed: 100 };
-        const cw = new CornerWizard(), ew = new EdgeWizard();
+        const cornerBuild = builderOf('user_corner_data'), edgeBuild = builderOf('user_edge_data');
         const out = {};
         for (const id of POSTS) {
             setActiveProfile(id);
-            const genCorner = cw.generate(cornerP);           // the PREVIEW path (now threads activeDialectOpts)
-            const genEdge = ew.generate(edgeP);
-            const insCorner = emitMapped(cornerStack(cornerP), { dialect: getDialect(id) }).text;   // the INSERT path (programModel/dialectOpts)
-            const insEdge = emitMapped(edgeStack(edgeP), { dialect: getDialect(id) }).text;
+            const dialect = getDialect(id);
+            const genCorner = emitMapped(cornerBuild(cornerP), { dialect }).text;   // the PREVIEW path (the twin, threads activeDialectOpts)
+            const genEdge = emitMapped(edgeBuild(edgeP), { dialect }).text;
+            const insCorner = emitMapped(cornerStack(cornerP), { dialect }).text;   // the INSERT path (programModel/dialectOpts)
+            const insEdge = emitMapped(edgeStack(edgeP), { dialect }).text;
             let trace = null;
             try { const e = new GcodeExecutionEngine({ stock: { x: 100, y: 80, z: 20 }, autoAnswer: true }); trace = e.trace(genEdge).stats; } catch (err) { trace = { err: String(err) }; }
             out[id] = { genCorner, genEdge, cornerMatchesInsert: genCorner === insCorner, edgeMatchesInsert: genEdge === insEdge, trace };
@@ -63,20 +73,21 @@ test('REAL-SYMPTOM: the edge wizard preview panel shows the V4.1 emit (no #1925)
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram && window.openWiz);
 
-    // V4.1 active → open the edge wizard → the preview code panel shows the V4.1 emit
+    // V4.1 active → open the edge wizard → the preview code panel shows the V4.1 emit. t1730 — 'edge' opens the twin
+    // now (its coded view is retired); '#wiz_user'/'#wiz_user_code' are the shared twin panel/code element.
     await page.evaluate(async () => { const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js'); setActiveProfile('ddcs-v41'); });
-    await page.evaluate(() => window.openWiz('edge'));
-    await page.waitForSelector('#wiz_edge_code', { timeout: 8000 });
-    await page.waitForFunction(() => (document.getElementById('wiz_edge_code')?.textContent || '').length > 20, null, { timeout: 8000 });
-    const v41Panel = await page.evaluate(() => document.getElementById('wiz_edge_code').textContent || '');
+    await page.evaluate(() => window.openWiz('user_edge_data'));
+    await page.waitForSelector('#wiz_user_code', { timeout: 8000 });
+    await page.waitForFunction(() => (document.getElementById('wiz_user_code')?.textContent || '').length > 20, null, { timeout: 8000 });
+    const v41Panel = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
     expect(v41Panel, 'the V4.1 edge preview panel has NO Expert #1925 register').not.toContain('#1925');
     await page.screenshot({ path: 'scratchpad/preview-v41.png' });
 
     // switch to Expert → the panel re-renders with the Expert emit (#1925 back)
     await page.evaluate(async () => { const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js'); setActiveProfile('ddcs-expert-m350'); });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
-    await page.waitForFunction(() => (document.getElementById('wiz_edge_code')?.textContent || '').includes('#1925'), null, { timeout: 8000 });
-    const expertPanel = await page.evaluate(() => document.getElementById('wiz_edge_code').textContent || '');
+    await page.waitForFunction(() => (document.getElementById('wiz_user_code')?.textContent || '').includes('#1925'), null, { timeout: 8000 });
+    const expertPanel = await page.evaluate(() => document.getElementById('wiz_user_code').textContent || '');
     expect(expertPanel, 'the Expert edge preview panel uses #1925').toContain('#1925');
     expect(expertPanel, 'the panel actually changed between posts').not.toBe(v41Panel);
     await page.screenshot({ path: 'scratchpad/preview-expert.png' });

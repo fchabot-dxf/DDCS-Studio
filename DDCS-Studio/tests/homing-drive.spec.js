@@ -10,8 +10,9 @@ test('the homing sim drives every axis to the machine-0 home end (NOT the far/si
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetSettings);
     await page.evaluate(() => { const m = window.ddcsGetSettings().machine || (window.ddcsGetSettings().machine = {}); m.x = 300; m.y = 200; m.z = -120; });
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);
 
     // The human's LIVE symptom (t481 amend): the axes PLUNGE DOWN + LEFT — to the FAR (signed-travel) end, not home.
@@ -27,7 +28,7 @@ test('the homing sim drives every axis to the machine-0 home end (NOT the far/si
         const oldFar = { x: M.x, y: M.y, z: M.z };   // x -300 (left) · z -120 (down) — the plunge
         return { xSeek: seek('x'), ySeek: seek('y'), zSeek: seek('z'), oldFar, zHomeSide: axisSpan(M.z).homeSide, xHomeSide: axisSpan(M.x).homeSide };
     }, machine);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_at_home.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_at_home.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
     console.log('HOMING: symptom(old far end)=' + JSON.stringify(r.oldFar) + ' → fix(seek)= X:' + r.xSeek + ' Y:' + r.ySeek + ' Z:' + r.zSeek);
 
     // SYMPTOM (before): the OLD signed-travel home end drove DOWN (z -120) + LEFT (x -300) — the far end, away from home.

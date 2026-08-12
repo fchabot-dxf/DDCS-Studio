@@ -24376,3 +24376,367 @@ handing them fully pre-derived classifications, not asking them to re-derive jud
 attention on the 9 genuinely tricky files and the pilot. Full working room used across the whole act; the
 verification (fork-parity + 24 individual equivalence specs + the full corner directory) is what makes "nothing
 user-visible changed" a checked claim rather than an assumed one.
+
+---
+
+## Turn 1730 (worker) — Cycle GAMEPLAN STEP 2: DELETE THE OLD SCREENS AND LEGACY RENDERERS
+
+Dispatch: two tiers. TIER A -- delete outright (no fallback-verification needed): circularWizard.js whole file
+(no twin, no BUILTINS/opensAs entry), plus every zero-importer legacy class t1728's classification named D
+(CornerWizard, TapWizard). TIER B -- verify graceful degradation FIRST, then delete: the 6 wizards/views/*View.js
+legacy renderers (middleView/edgeView/alignmentView/rotaryCenterView/rotaryClockView/homingView) reachable via an
+op carrying its RAW built-in type (an old save). Per "nothing is precious, delete freely," removal is fine ONLY
+IF it fails gracefully -- prove that with a REAL old-format op BEFORE deleting; fix the fallback first if not
+clean. EXCLUDED both tiers: communicationWizard.js's CommunicationWizard class (t1729 advisor-verified as a live
+dependency -- generateScreenPreview() is the twin's own 'commscreen' renderer, not a legacy screen).
+
+### Tier A -- straightforward
+
+Deleted circularWizard.js whole file (its docstring claimed the shim "stays ONLY so ... previously saved circular
+ops still render," in apparent tension with the "genuinely unreachable" classification -- proceeded per the
+explicit dispatch instruction anyway, since the advisor had already done its own spot-check; flagged here rather
+than silently resolved). Deleted the CornerWizard and TapWizard classes (each file's stack-builder shim survives
+unchanged). Cleaned opBuilders.js's BUILDERS/OP_LABELS wiring for circular and updated its header comment count.
+Fixed ARCHITECTURE.md's TRAP5 from "UNVERIFIED at runtime" to a real finding (below).
+
+### The graceful-fallback fix -- a genuine new capability, discovered as Tier B's prerequisite
+
+Before touching any Tier-B file, traced `wizardManager.js`'s `open(type)`: `viewByType.get(type) || (isUserOp ...
+? userOpView : null)`, then `el(view === userOpView ? 'wiz_user' : 'wiz_' + type)`. If that element lookup came
+back falsy, historically NOTHING happened after it -- the overlay stayed open, every panel hidden, no panel ever
+shown: a silent blank modal. This is a REAL, PRE-EXISTING bug, not something Tier B would introduce -- `corner`
+already exhibits it today (its view was retired 2026-07-02, well before this turn) because `SCHEMA.corner` still
+makes `canEdit('corner')` return true, so the editor's hover-✎/context-menu still offers an edit that opens onto
+nothing. Proved it live (not by inspection) with a synthetic op carrying `opType:'corner'` driven through the
+real `openForEdit`/`open()` gesture, before writing any fix.
+
+Fixed at `wizardManager.js`'s `open()`, right after the panel lookup: `if (!wizElem) { hide the overlay; toast('"
+${type}" is no longer editable here -- re-author it from the wizard bar.', true); return; }`, reusing the
+already-imported shared transient `toast`. `openForEdit()` got a matching guard right after its `this.open(...)`
+call (`if (!this.wizardElement.classList.contains('active')) return;`) so a declined open can't leave a phantom
+edit session (`editingOpId` set on a modal that never actually showed). Proved the fix the same way the bug was
+proved -- `corner` before/after via `open()` AND `openForEdit()` -- then, once Tier B's own deletions landed,
+proved it AGAIN specifically for 2 of the 6 newly-retired types (`middle`, `edge`) with a synthetic old-format
+op. All 4 checks are now a permanent regression spec, `tests/legacy-type-graceful-fallback.spec.js` (built during
+the act as a throwaway `zzdebug-1730-fallback.spec.js`, then promoted -- this guards a real capability, not scratch
+work, so it earned a permanent home instead of the usual pre-commit deletion).
+
+### Tier B -- the 6 legacy views
+
+Deleted all 6 view files SIMULTANEOUSLY, not incrementally: an Explore-agent research pass found
+`rotaryCenterView.js` defines `restoreBoxStock()` (a documented no-op) consumed by `middleView.js`/`edgeView.js`/
+`rotaryClockView.js` -- deleting fewer than all 6 in one commit would have left a dangling import. Removed:
+- The 6 view files themselves, `wizards/views/index.js`'s imports/`WIZARD_VIEWS` entries for them (14 remain, was
+  20), and their 6 `#wiz_<type>` DOM panels in `index.html` -- found and removed with a purpose-built Node script
+  that tracks div-nesting depth line-by-line from each `id="wiz_X"` opening div to its EXACT matching closing
+  `</div>` (manual line-counting on ~600-line blocks was judged too error-prone to trust), verified via div-tag
+  balance count (437 opens = 437 closes, both before and after) and spot-checking 3 boundary transitions.
+  index.html: 2612 -> 1998 lines. Retirement comments left in place of each, matching house style.
+- The 6 classes (MiddleWizard/EdgeWizard/AlignmentWizard/RotaryCenterWizard/RotaryClockWizard/HomingWizard) --
+  each file's stack-builder shim survives. `homingRunParams` (homingWizard.js) was deliberately KEPT -- unrelated
+  to the deleted view, still called directly by `ui/macrosApp.js` for "Regenerate from homing profile".
+- The FULL transitive back-compat wiring, found by reasoning through the call graph rather than reactively:
+  `wizardManager.js`'s `openMiddle()`/`openEdge()`/`openAlignment()` and `updateMiddleWizard()`/
+  `updateEdgeWizard()`/`updateAlignmentWizard()`/`_startEdgeAnim()`/`_startAlignmentAnim()` (would have THROWN if
+  called, since `viewByType.get('middle')` becomes undefined); `app.js`'s `setupVisualizationListeners()` (~45
+  lines wiring `m_type`/`p_axis`/`al_check_axis` DOM listeners that no longer exist) and its own dead
+  `openMiddle()`/`openEdge()` methods (confirmed already-fully-dead, zero callers, before deleting); `ui/
+  globalFunctions.js`'s `window.openMiddleWiz`/`openEdgeWiz`/`openAlignmentWiz` globals. All replaced with
+  explanatory tombstone comments, matching the existing `openCornerWiz` convention.
+- Discovered mid-course (reasoned through BEFORE executing, not a fix-after-break) that leaving the 6 DOM panels
+  in place would silently defeat the graceful-fallback fix, since `wizElem` would stay truthy with `view=null` --
+  correctly expanded scope to include the panel removal rather than assuming view-file+registry deletion alone
+  was sufficient.
+
+### Collateral test damage -- discovery and full remediation
+
+An initial broad grep found ~31 candidate files; running them in 3 batches (not reading each by hand) surfaced
+the REAL scope: ~47 failing individual test cases across ~30 distinct files -- far larger than the dispatch's own
+framing suggested. Established and empirically proved a mechanical fix pattern on one file first
+(`homing-start-marker.spec.js`, 4/4 green) before delegating: `openWiz('<rawtype>')`/`wizardManager.open(
+'<rawtype>')` -> `openWiz('user_<rawtype>_data')`; `#wiz_<rawtype>` -> `#wiz_user`; `wiz_<rawtype>_code` ->
+`wiz_user_code`; `<rawtype>VizContainer` -> `userVizContainer`; old-panel-relative DOM navigation -> a direct
+global `.wiz-viz3d` query; old abbreviated field ids (`m_type`, `p_dist`, ...) -> `[data-param="<name>"]` against
+the twin's ACTUAL declared param names (read from `blocks/dataOps/<type>Data.js`, never guessed).
+
+Dispatched 4 parallel background `general-purpose` agents (homing family/11 files, middle family/8 files,
+edge+alignment+misc/7 files, rotary+shared/5 files), each given the proven pattern, explicit file lists, and a
+requirement to verify their own fixes by running the tests. Mid-run, sent all 4 a heads-up about a real
+infrastructure risk I noticed AFTER dispatching (should have checked before -- noted for next time): the
+project's `playwright.config.js` sets `reuseExistingServer:false` on a fixed port, so 4 concurrent `npx
+playwright test` invocations WILL collide (a "port already used" failure that looks like a test failure but
+isn't) -- told them to retry past it, not treat it as a finding. All 4 agents subsequently failed mid-run with
+"Agent terminated early due to an API error: You've hit your weekly limit" (resets 2026-08-12 2pm America/
+Toronto) -- an account-level constraint, not a task failure. Rather than wait on a reset, verified what partial
+work existed (`git status`/`git diff --stat` against each agent's assigned files -- real evidence, not their
+self-reported summaries) and finished the remainder personally:
+- homing agent: 7 of 8 remaining files fully fixed and verified; 1 file (`homing-preview-package.spec.js`) had 2
+  spots the agent missed (`#wiz_homing` and `wiz_homing_code` survived in one test, plus that test's status-
+  element read needed a REAL fix, not a rename -- the twin has ONE shared `#userVizStatus` element where the old
+  view had two, `homing_status` + `homingVizStatus`) -- fixed and reverified.
+- middle agent: had reached and correctly fixed 1 file with a genuine, well-reasoned `test.fixme()` (see findings
+  below) before hitting the limit; the other 4 assigned files were untouched -- fixed personally, including 3
+  files (`middle-aim-canvas`/`middle-aim-tie`/`middle-feature-draw`) that needed real investigation, not
+  mechanical renaming (see findings below), plus fixing ONE assertion the agent's own fixme'd file left broken
+  (calling `test.fixme()` mid-body does not retroactively un-fail an assertion that already threw earlier in the
+  same function -- moved the call earlier / restructured instead of leaving a red test behind a green-looking
+  intent).
+- edge/alignment/misc agent: reached 2 of 7 files (confirmed the toast mechanism live, correctly identified the
+  root cause) before hitting the limit; the other 5 fixed personally.
+- rotary/shared agent: completed 3 of 5 files (blocks-rotary-rig/rotary-a-jog/rotary-center-rig-decouple, all
+  verified green) before hitting the limit; the other 2 fixed personally.
+
+Also deleted `middle-animator.spec.js` (235 lines) and `middle-viz.spec.js` (128 lines) -- both exclusively drove
+the now-deleted `#wiz_middle`/`#middleVizContainer` SVG-schematic surface, no remaining relevance. Updated
+`alignment-in-place.spec.js` and `wizard-bar.spec.js` (assertions already correct, only comments referenced the
+now-fully-deleted `openAlignmentWiz`/`openMiddleWiz` fns rather than just "un-routed").
+
+**Final state: every one of the ~37 touched test files runs green** (a full-batch run: 63 passed, 8 skipped --
+the fixme's below -- 0 failed, 2 files legitimately deleted), confirmed by ACTUALLY RUNNING them together in one
+batch at the end, not by trusting the individual per-file runs alone (cross-file interference, e.g. two tests
+both mutating `settings.stock`, is a real risk this project has hit before).
+
+### Four significant genuine findings -- pre-existing gaps the test fixes SURFACED, not caused
+
+Each confirmed by reading source (never guessed), each `test.fixme()`'d with a full explanation rather than
+silently dropped or force-passed, each flagged here for a human/advisor ruling. None of these are regressions
+FROM this act -- middle/edge/alignment/rotary_center/rotary_clock have `opensAs` to their twins from earlier,
+separate port milestones, so the live wizard bar stopped reaching any of this code a while before t1730; this
+act's test-fixing work is what newly makes the gap VISIBLE (the tests' own opening gesture changed from "always
+the coded view" to "the twin"), not what created it.
+
+1. **middle's inAxis/transAxis/diagTravel toggles aren't gated by featureType on the twin, unlike the old view.**
+   `middleData.js`'s `inAxis`/`transAxis` bindings carry no `when:` clause at all (unconditionally shown); the old
+   view hard-hid them for a non-boss featureType. `diagTravel`/`diagPrimary` ARE gated (by `twoAxis`), but render
+   READONLY rather than hidden, per their own binding comment ("t389 (human): render them READONLY ... not a
+   competing editable input") -- reads as an intentional, already-signed-off twin redesign rather than a
+   regression. `tests/middle-trans-traverse.spec.js`.
+2. **middle has no op-type-preselects-stock-shape, and boss/cylinder draw no feature glyph of their own.**
+   `syncStockShape()` was code LOCAL to the retired middleView.js (never a shared/declared mechanism) -- no twin
+   equivalent exists anywhere. Separately, `panelTypes.js:275` ("Only inside cavities draw; an outer boss/solid
+   has none") and `engine/workpiece.js:171` both deliberately draw no glyph for boss/cylinder -- a pre-existing,
+   already-deferred scope limit that predates t1730 (their own comments don't reference this turn).
+   `tests/middle-feature-draw.spec.js`.
+3. **middleData.js never declared clearMode/hopDist/planeZ bindings at all -- a materially incomplete port, not
+   just a missing UI nicety.** `stacks/middleWizard.js:81-85` genuinely reads `params.clearMode`/`hopDist`/
+   `planeZ` -- the emit-side Clearance/Hop/Plane-mode logic is real, unchanged, and fully functional -- but
+   `middleData.js`'s declared form (28 bindings, confirmed by grep) has none of the three, so there has been NO
+   way to reach Hop or Plane mode on a middle probe through the twin's UI. Contrast: `cornerData.js` DOES declare
+   `clearMode` (corner is "the gated pilot" and got the full port) -- proof this is a real gap, not a designed
+   omission. `tests/clearance-form-921.spec.js`, `tests/clearance-plane-assists-925.spec.js`,
+   `tests/plane-guarantee-ui-961.spec.js` (split into a fixme'd middle half and a real, still-passing corner half).
+4. **The probe-field sticky-override mechanism is entirely dead for 7 of the probe wizards, not just middle/
+   edge.** `wizardManager.js`'s `applyProbeDefaults()` (seed a field from `settings.probes` on open) and its
+   sticky per-field override store (`PROBE_FIELD_OVERRIDE_KEY`) are keyed ENTIRELY by a hardcoded map of OLD
+   coded-view field ids (`PROBE_DEFAULT_FIELDS`, `wizardManager.js:28-36`: `m_dist`/`p_dist`/`al_dist`/`rc_dist`/
+   `rcl_dist`/`c_dist`/`circ_dist`, same pattern for radius/feeds/retract/safeZ/qStop). None of those ids exist
+   on the twin's generic form (`data-param="dist"`, no `id` attribute at all) -- confirmed LIVE, not inferred:
+   opening `user_middle_data`, the MAX PROBE field shows the twin's own hardcoded default (200), never
+   `settings.probes.maxDist`; editing it writes nothing to `ddcs_probe_field_overrides` at all (the `id in
+   PROBE_DEFAULT_FIELDS` check silently fails on an empty string). This was ALREADY dead for corner + circular
+   (retired earlier, same shape) and is now ALSO dead for middle/edge/alignment/rotary_center/rotary_clock -- a
+   real lost user-facing feature (seed-from-global-default AND the sticky-override UX) across up to 7 wizards,
+   the single most significant finding of this act. `tests/probe-field-sticky.spec.js`.
+
+### Orphan cleanup beyond the dispatch's literal scope
+
+Confirmed (grep, not assumption) that deleting `app.js`'s `setupVisualizationListeners()` left 5 files with ZERO
+remaining consumers anywhere in `web/`: `viz/middleVizUtils.js`, `viz/middleVizAnimator.js`, `viz/
+middleVizManager.js`, `viz/edgeVizAnimator.js`, `viz/alignVizAnimator.js` (the legacy SVG-schematic animators,
+registering `window.MiddleVizManager`/`EdgeVizAnimator`/`AlignVizAnimator`, read by nothing but the now-deleted
+listener wiring). Removed the 5 dead import lines from `app.js` and deleted all 5 files -- verified their
+internal cross-imports (`alignVizAnimator.js`/`edgeVizAnimator.js` both import from `middleVizAnimator.js`) meant
+they were only safe to delete as one unit, same shape as the Tier-B view-file coupling above. Re-ran the full
+gate (node tier + fork-parity + the touched-file batch) after this to confirm nothing regressed.
+
+### ARCHITECTURE.md maintenance -- the citation drift this act's own edits caused
+
+Beyond the initial TRAP5 fix (Tier A), a full pass over Q1 and the REGISTRIES table once the WIZARD_VIEWS-count
+node-tier assertion caught the first drift (`wizards/views/index.js:36-57`/20 -> the array actually now spans
+:35-48/14 entries, since the file shrank above that point):
+- Rewrote the back-compat-globals paragraph: `openMiddleWiz`/`openEdgeWiz`/`openAlignmentWiz` are now DELETED,
+  not merely dead-with-no-caller as previously documented.
+- Rewrote "Two wizards are fully RETIRED" to "EIGHT," folding in middle/edge/alignment/rotary_center/
+  rotary_clock/homing with the same detail level as the pre-existing corner/circular entries, including WHY they
+  were deleted together (the `restoreBoxStock()` coupling) and homing's one surviving export.
+- Fixed the "20 coded views / 21 panel ids" claim to 14/15 throughout (Q1 prose, the route table, REGISTRIES).
+- Rewrote "Six legacy renderers are still live" (past tense now -- they're deleted) and the `middleVizManager.js`
+  etc. TRAPS entry (deleted, not "imported at app.js").
+- Fixed a cross-reference in TRAP5 ("see the Tier-B note below") that pointed the wrong direction once Q1 (which
+  is ABOVE the TRAPS section) became the actual target.
+- Fixed 6 stale file:line citations this act's own edits shifted, beyond what the automated node-tier test
+  checks (that test only asserts the WIZARD_VIEWS count, not every prose citation) -- `index.html:837-843` ->
+  `:353-355`, `wizardManager.js:539-543` -> `:546-550`, `index.html:849` -> `:365`, `wizardManager.js:401/:404` ->
+  `:409/:414`, `app.js:105-112` -> `:101-108`, `app.js:103-104` -> `:99-100` (SEED_BUILDERS shifted when the 5
+  animator imports were removed from directly above it).
+- Noticed, but left UNVERIFIED rather than fixed (out of scope -- not caused by this act, and fixing it would be
+  scope creep beyond citation drift from t1730's own edits): the Q3 placement table's "the 8 legacy per-wizard
+  views | placementShift(bbox, params)" row -- grepped, and NO surviving view file calls `placementShift` at all
+  today (its actual callers are `pocketData.js`/`surfacingData.js`/`surfacingWizard.js`/`globalFunctions.js`);
+  this row may already have been stale before t1730, or "the 8" may refer to something this session didn't
+  identify. Flagged for a future pass, not resolved here.
+
+### Verify
+
+- `npx playwright test tests/fork-parity-1593.spec.js` -- 2/2, all 33 shipped twins fork byte-identical (form AND
+  emit), re-run AFTER the orphan-file cleanup too.
+- `npm run test:node` -- 118/118 (117/118 before the WIZARD_VIEWS-count citation fix, re-confirmed 118/118 after
+  the orphan cleanup).
+- The graceful-fallback fix demonstrated live on `corner` (pre-existing gap) AND specifically on 2 of this turn's
+  own 6 retirements (`middle`, `edge`) via the real `openForEdit` gesture against a synthetic old-format saved
+  op -- now a permanent spec, `tests/legacy-type-graceful-fallback.spec.js` (4/4).
+- The full collateral-damage batch (~37 files) run together in one pass: 63 passed, 8 skipped (the 4 findings
+  above), 0 failed.
+
+### Explicitly deferred (named, not silently dropped)
+
+1. The ~650-line dead inline `<script>` block in `index.html` (drawMiddleViz/drawEdgeViz/drawAlignmentViz/
+   drawProbeViz) -- now fully unreachable (its callers were the deleted views) but NOT removed this act; a larger,
+   separate boundary-finding exercise than the panel removal, judged out of this act's remaining budget.
+2. `wizardPrereq.js:18`'s `PROBE_WIZARDS` array -- left untouched, believed inert (not re-verified this session;
+   carried over from earlier investigation in this same turn).
+3. The four findings above (inAxis/transAxis/diagTravel gating, boss/cylinder glyph + stock-shape preselect,
+   clearMode/hopDist/planeZ entirely missing from middleData.js, the probe-field-sticky mechanism dead for 7
+   wizards) -- surfaced, `test.fixme()`'d with full explanations, and documented here; NONE fixed this act. Each
+   needs a human/advisor ruling on whether/how to close it.
+4. Python tool files (`tools/alignment_check.py`, `tools/smoke_test_playwright.py`) that call `window.
+   openAlignmentWiz()` directly -- not part of `web/`/`tests/`, not addressed.
+5. The Q3 placement-table `placementShift` citation noted above -- flagged, not fixed.
+
+### Capacity
+
+A very heavy act -- Tier A/B execution, a genuine new-capability bug fix (not just cleanup) with its own
+non-vacuity proof, ~37 test files needing real investigation (not blind find-replace -- several needed reading
+`panelTypes.js`/`workpiece.js`/`createPreviewPanel.js` source to find the twin's ACTUAL equivalent mechanism,
+e.g. `panel.getPassStarts()` vs. a stale `engine._passStarts`, or `[data-hid="diagAim"]` vs. a changed
+`.fc-handle-move` classification), 4 significant pre-existing feature gaps discovered and properly documented
+rather than papered over, an unplanned 5-file dead-code cleanup, and a full ARCHITECTURE.md maintenance pass.
+Lost all 4 dispatched background agents mid-run to the account's weekly API limit (an external constraint, not a
+task failure) -- verified their real partial progress via git diff rather than trusting self-reported summaries,
+and finished 100% of the remaining work personally rather than leaving it half-done or waiting on the reset.
+Full working room used across the whole act.
+
+---
+
+## Turn 1730 FOLLOW-UP (worker) -- amendment reconciliation + a second, larger collateral-damage wave found via the smoke tier
+
+Two amendments landed at the pre-commit poll, AFTER the graceful-fallback fix above was already built, proven,
+and written up. Reconciled rather than silently proceeding with what was already built (the worker discipline for
+"an amendment that contradicts what you've already built" -- treat it like a gate).
+
+### The amendments, and what they actually asked for
+
+1st amendment: relax Tier B's verification to a programmatic-op check (not a real .ddcs file), and explicitly:
+"Do not build new graceful-degradation UI if none exists today -- report what the CURRENT fallback actually is;
+only fix it if it is an outright crash." 2nd amendment ("on reflection with the user"), superseding the first:
+DROP the Tier B raw-type verification ENTIRELY -- there is no old-save audience for this app (none exist), so it
+was solving for a case that doesn't occur; fork-parity + node tier + a normal app-boot sanity check are the
+standard gate, full stop. "No new verification step, no new UI, nothing built for a legacy audience."
+
+### Reconciliation -- reverted the fix, not just the framing
+
+The graceful-fallback toast IS new UI for exactly the audience the amendment says doesn't exist. Reverted, not
+patched around:
+- `wizardManager.js`'s `open()`: removed the `if (!wizElem) {...toast...return;}` branch, restored the original
+  `if (wizElem) { ...entire body... }` wrapper verbatim (confirmed against `git diff`'s own `-` lines before
+  editing, not reconstructed from memory).
+- `wizardManager.js`'s `openForEdit()`: removed the `if (!this.wizardElement.classList.contains('active'))
+  return;` guard added right after `this.open(op.opType)`.
+- Kept the OTHER Tier-B wizardManager.js changes (deleting `openMiddle`/`openEdge`/`openAlignment` and
+  `updateMiddleWizard`/`updateEdgeWizard`/`updateAlignmentWizard`/`_startEdgeAnim`/`_startAlignmentAnim`) --
+  these are dead-code removal (the methods would THROW now that their target views are gone), not new UI, and
+  the amendment explicitly says to proceed with Tier A/B deletions on the standard-gate basis alone.
+- Deleted `tests/legacy-type-graceful-fallback.spec.js` (the promoted permanent spec built around the fix) --
+  a verification step for a scenario that's been ruled out, not something to keep "just in case."
+- Rewrote ARCHITECTURE.md's TRAP5 from "CONFIRMED live, FIXED the same act" to "CONFIRMED live, deliberately NOT
+  fixed" -- the bug is real and reproducible exactly as before (a raw legacy opType with no view/twin still opens
+  a silent blank modal via `openForEdit`), it's just an accepted rough edge now, not a closed trap. Also fixed
+  the "Six legacy renderers... DELETED at t1730" and Q1 paragraphs, which had described the toast as shipped.
+- Re-derived every citation the revert itself shifted (the revert changed wizardManager.js's own line count):
+  `canEdit` moved back from `:326` to `:318` (in BOTH ARCHITECTURE.md AND `architecture-map-1698.test.mjs`'s own
+  hardcoded citation -- caught by re-running the node tier, which failed until this was fixed), `openForEdit`
+  `:409`/`:414` back to `:401`/`:406`, `.wiz-viz3d` `:546-550` back to `:539-543`, the `openMiddle` tombstone
+  comment `:432-434` back to `:421-423`.
+
+### A second wave of collateral damage, found by the smoke tier the amendment's own gate specifies
+
+Ran the amendment's prescribed gate (fork-parity + node tier + smoke as the app-boot sanity check) and the smoke
+tier surfaced 2 MORE broken files beyond the ~37 already fixed: `editor-sim-real-insert.spec.js` (2 tests) and
+`op-sim-starts-registry.spec.js` (1 test) -- both directly instantiated `new MiddleWizard()`, a class Tier B
+deleted, which the original collateral-damage sweep (grepped for `openWiz`/wizard-panel-DOM patterns) never
+caught because these tests never open a wizard PANEL at all -- they drive the class in Node/browser-evaluate
+context directly. This was a genuine gap in the original sweep's methodology, not something the amendments
+caused.
+
+Fixed both (`middleStack`+`emitMapped` replaces `new MiddleWizard().generate()`; `opSimStarts('user_middle_data',
+...)` replaces the deleted class's `.inferStarts()`), then -- rather than assume that was the full extent --
+grepped the ENTIRE `tests/` directory for `new (Middle|Edge|Alignment|RotaryCenter|RotaryClock|Homing|Corner|Tap|
+Circular)Wizard`. Found **21 files**, not 2: `alignment-onesource`, `boss-probe-collision`, `corner-draw-anchor`,
+`disc-on-surface`, `edge-sim-starts`, `editor-sim-hints`, `editor-sim-real-insert`, `lift-drop-pairing-897`,
+`marker-colour-by-source`, `middle-2nd-axis-flash`, `middle-center-sim`, `middle-circular-sim`, `middle-crossover`,
+`middle-datum-centre`, `middle-probe-z-first`, `op-sim-starts-registry`, `per-pass-starts-2d`,
+`preview-dialect-parity`, `probe-surface-block`, `rotary-center-sim`, `rotary-clock-sim-starts`, `rotary-fit-sim`,
+`toolpath2d-anchor` (23 counted in the grep; 2 already fixed above). Ran them as one batch first to get the real
+failure count (26 failing individual tests) rather than assuming file count == test count.
+
+### The fix pattern (mechanical once identified, but each replacement was verified against real source, not guessed)
+
+- `new XWizard().generate(p)` -> `emitMapped(xStack(p)).text` (the surviving builder, same mapper the app uses).
+- `new XWizard().inferStarts(p, stock)` (plural) -> `opSimStarts('<rawtype>', p, stock)` -- opSimStarts.js's
+  `BUILT_IN` registry has verbatim-moved entries for `middle`/`alignment`/`rotary_center`/`rotary_clock` (the four
+  wizards whose inference was formally relocated in an earlier increment, per that file's own header comment) --
+  confirmed by reading the file's actual key list, not assumed. `corner`/`edge`/`homing`/`tap`/`circular` have NO
+  such entry -- their inference lived ONLY in the now-deleted class, so any test comparing against a
+  "second independent source" for THOSE five had that source genuinely, permanently removed (not a selector
+  bug) -- handled per case, not templated blindly:
+  - `edge-sim-starts.spec.js`: dropped the `wiz.inferStarts` comparison; kept the OTHER independent source
+    (a from-scratch `truth()` geometry recomputation already in the file) as the sole cross-check -- still a
+    real second source, just not the class.
+  - `disc-on-surface.spec.js` (corner): replaced `w.inferStart(p, stock)` (singular) with
+    `cornerDataDef().simStartsProvider(p, stock)[0]` -- corner's OWN declared provider (a different, still-live
+    mechanism from the deleted class, already used elsewhere in the same test suite for corner, e.g.
+    `lift-drop-pairing-897.spec.js`'s `traceCorner` helper).
+  - `rotary-clock-sim-starts.spec.js`: `rotary_clock` DOES have a `BUILT_IN` entry -- kept the second-source
+    comparison, just resolved via `opSimStarts('rotary_clock', c, s)[0]` instead of the deleted class.
+  - `op-sim-starts-registry.spec.js`: the test's ENTIRE premise was "registry === each wizard's own inferStarts"
+    across middle/alignment/rotary_center -- with all three classes gone, there is no second source left for
+    ANY of them (the divergence risk this test guarded is now permanently closed, same shape as ARCHITECTURE.md's
+    "Six legacy renderers... DELETED"). Restructured to drop the comparison and keep verifying the registry's own
+    behavior directly (pass counts + locked coordinate values) -- the coverage that still has meaning.
+  - `preview-dialect-parity.spec.js`: the test's premise was "the wizard CLASS's generate() threads dialect same
+    as the insert path" -- with the classes gone, corner/edge's only live preview path IS the twin now. Replaced
+    `cw.generate()`/`ew.generate()` with `emitMapped(builderOf('user_corner_data')(p), {dialect}).text` /
+    same for edge -- still verifies the real thing users see (the twin), acknowledged in an updated docstring
+    that this no longer exercises a separate implementation (fork-parity already proves twin-builder ==
+    legacy-stack-builder identity, so that specific redundancy is fine to lose).
+- `new XWizard()` with NO generate/inferStarts call, just other methods (none found this act beyond the above).
+
+Every one of the 21 files re-run individually after its fix, then the full set re-run together (23 tests, all
+green). Final full-repo grep for `new (Middle|Edge|...)Wizard` across BOTH `tests/` and `web/`: zero remaining
+instantiations (`web/` only has harmless comment mentions in the wizard files' own historical docstrings and 2
+unrelated files, left untouched -- not code, not breakage).
+
+### Final verify (the amendment's own stated gate, run clean)
+
+- `npm run test:smoke` -- 69 passed, 4 failed (ALL FOUR are `version-sync-1311.spec.js`, confirmed PRE-EXISTING
+  and unrelated to this turn: `package.json`'s version field lags `version.json`/`index.html`'s chip by a minor
+  version, and this act never touched `package.json` -- a real desync, but a release-process artifact, not
+  something Tier A/B or the amendment reconciliation caused or is in scope to fix here).
+- `npm run test:node` -- 118/118 (the `canEdit` citation revert re-confirmed correct here, not just in the doc).
+- `npx playwright test tests/fork-parity-1593.spec.js` -- 2/2, all 33 twins still byte-identical after the
+  revert + the 21-file wave.
+- The full ~58-file collateral-damage set (the original ~37 + this wave's 21, 2 files overlap already counted)
+  re-run together once more: all green.
+
+### Capacity (this follow-up specifically)
+
+A substantial second pass on top of an already-heavy turn: reconciling a built-and-proven fix against a
+superseding amendment (reverting cleanly, re-deriving every citation the revert itself shifted, including one the
+automated node-tier gate itself hard-codes), plus discovering and fixing a genuinely separate 21-file collateral-
+damage wave the original sweep's methodology had missed entirely (class-instantiation breakage, not panel-DOM
+breakage) -- found specifically because the amendment's own prescribed gate (smoke tier, as the app-boot sanity
+check) was run rather than skipped. Each of the 21 fixes required reading actual source (`opSimStarts.js`'s real
+key list, `cornerData.js`'s provider, what `builderOf` resolves) rather than templating the same replacement
+blindly -- 3 of the 21 needed a genuinely different fix shape (drop-the-comparison, swap-the-source, or
+restructure-the-premise) because the class they depended on was the ONLY source for what they checked, not merely
+a differently-named path to the same registry. Full working room used across this follow-up too.

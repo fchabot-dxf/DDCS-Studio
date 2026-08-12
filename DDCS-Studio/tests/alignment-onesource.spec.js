@@ -12,12 +12,13 @@ test('opSimStarts.alignment = A (the anchor fraction) + B (A + the declared span
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
         const { alignMarkersXY, alignSpan } = await import('/wizards/ops/alignPoints.js');
-        const { AlignmentWizard } = await import('/wizards/alignmentWizard.js');
-        const w = new AlignmentWizard();
+        // t1730 — AlignmentWizard (the legacy screen class) was deleted alongside its view; opSimStarts.js's
+        // BUILT_IN.alignment (moved verbatim from the class's own inferStarts) is the surviving start-inference.
+        const { opSimStarts } = await import('/viz/opSimStarts.js');
         const stock = { x: 150, y: 100, z: 25 };
-        const def = w.inferStarts({ checkAxis: 'X', span: 50 }, stock);                 // default: A OUTSIDE the probed fence + span 50
-        const draggedA = w.inferStarts({ checkAxis: 'X', ax: 0.5, ay: 0.5, span: 50 }, stock);  // A anchor DRAGGED (fractions)
-        const biggerSpan = w.inferStarts({ checkAxis: 'X', span: 80 }, stock);          // span 80 → B moves
+        const def = opSimStarts('alignment', { checkAxis: 'X', span: 50 }, stock);                 // default: A OUTSIDE the probed fence + span 50
+        const draggedA = opSimStarts('alignment', { checkAxis: 'X', ax: 0.5, ay: 0.5, span: 50 }, stock);  // A anchor DRAGGED (fractions)
+        const biggerSpan = opSimStarts('alignment', { checkAxis: 'X', span: 80 }, stock);          // span 80 → B moves
         return {
             defA: { x: def[0].x, y: def[0].y }, defB: { x: def[1].x, y: def[1].y },
             dragA: { x: draggedA[0].x, y: draggedA[0].y }, dragAB: { x: draggedA[1].x, y: draggedA[1].y },

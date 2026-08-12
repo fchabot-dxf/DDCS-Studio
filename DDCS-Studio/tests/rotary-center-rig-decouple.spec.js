@@ -22,8 +22,9 @@ test('E4: the rotary rig is a decoupled sim-device — child of _partGroup, spin
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
 
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('rotary_center'));
-  await page.waitForSelector('#wiz_rotary_center', { state: 'visible' });
+  // t1730 — 'rotary_center' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_rotary_center_data'));
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz && p.viz._partGroup; });
   await page.waitForTimeout(400);   // let the first preview render + apply the rotary-fixture hint
 

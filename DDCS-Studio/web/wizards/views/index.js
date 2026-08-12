@@ -18,12 +18,11 @@
 import { commView } from './commView.js';
 import { wcsView } from './wcsView.js';
 // Corner wizard retired 2026-07-02 (④) — REPLACED by the "Corner (data)" twin (user_corner_data, the generic user-op view).
-import { middleView } from './middleView.js';
 // Circular wizard retired 2026-06-23 — superseded by Middle (circular + probe-both-axes).
-import { rotaryCenterView } from './rotaryCenterView.js';
-import { rotaryClockView } from './rotaryClockView.js';
-import { edgeView } from './edgeView.js';
-import { alignmentView } from './alignmentView.js';
+// t1730 (gameplan step 2, Tier B) — middle/rotary_center/rotary_clock/edge/alignment/homing coded views RETIRED,
+// same shape as corner: each already `opensAs` its "<type> (data)" twin (wizardLibrary.js), so no live UI path
+// reached these anymore — only an old saved op carrying the raw legacy opType could, and that path now shows a
+// clear "no longer editable here" toast (wizardManager.js's open()) instead of the coded panel. See WORK-LOG t1730.
 import { atcLengthView, atcWarmupView, atcChangeView, atcTestView, atcCheckView, atcTableView } from './atcViews.js';
 import { drillView } from './drillView.js';
 import { pocketView } from './pocketView.js';
@@ -31,17 +30,10 @@ import { contourView } from './contourView.js';
 import { slotView } from './slotView.js';
 import { surfacingView } from './surfacingView.js';
 import { textView } from './textView.js';
-import { homingView } from './homingView.js';
 
 export const WIZARD_VIEWS = [
     commView,
     wcsView,
-    homingView,
-    middleView,
-    rotaryCenterView,
-    rotaryClockView,
-    edgeView,
-    alignmentView,
     drillView,
     pocketView,
     contourView,

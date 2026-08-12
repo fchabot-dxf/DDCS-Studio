@@ -35,9 +35,12 @@ test('a real boss probe-both macro has >1 pass (so the panel feeds both markers)
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack is the surviving
+    // builder — emit its block stack through the SAME mapper the app uses (emitMapped) for G-code text.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { traceToolpath } = await import('/engine/trace.js');
-    const code = new MiddleWizard().generate({ featureType: 'boss', twoAxis: true, approach: 'manual', stockX: 100, stockY: 80, stockZ: 20 });
+    const code = emitMapped(middleStack({ featureType: 'boss', twoAxis: true, approach: 'manual', stockX: 100, stockY: 80, stockZ: 20 })).text;
     const parsed = traceToolpath(code, { stock: { x: 100, y: 80, z: 20, shape: 'boss' } });
     return { passes: (parsed.stats && parsed.stats.passes) || 1 };
   });

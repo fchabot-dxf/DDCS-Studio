@@ -73,10 +73,11 @@ test('REAL APP (the human config): an existing config reloads → z_max Home bac
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetSettings && window.openWiz);
     const loaded = await page.evaluate(() => { const s = window.ddcsGetSettings(); return { zMaxHome: !!s.limits.zMaxHome, flag: s._ioHomeBackfill, hasZMaxRow: (s.inputs || []).some((r) => r.type === 'limit' && r.axis === 'z_max' && r.home) }; });
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);
-    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_backfill_top.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_backfill_top.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
     console.log('LOADED (existing config): ' + JSON.stringify(loaded));
     expect(loaded.zMaxHome, 'on load the existing config got its z_max home backfilled (declared)').toBe(true);
     expect(loaded.flag, 'the one-time backfill flag persisted').toBeTruthy();

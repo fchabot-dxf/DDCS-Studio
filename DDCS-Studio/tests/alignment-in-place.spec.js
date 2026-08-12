@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test';
  * box + 2 fence starts (no rig); (4) the 2D is coherent; (5) emit BYTE-IDENTICAL; (7) the G68 ⟳ Align rotate flow is unaffected.
  */
 
-test('E3 opensAs wiring: Align opens user_alignment_data IN-PLACE, plain title, twin retired, openAlignmentWiz un-routed', async ({ page }) => {
+test('E3 opensAs wiring: Align opens user_alignment_data IN-PLACE, plain title, twin retired, openAlignmentWiz retired', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
@@ -21,13 +21,18 @@ test('E3 opensAs wiring: Align opens user_alignment_data IN-PLACE, plain title, 
             opensAs: align && align.opensAs,
             title: WL.builtinLabelForTwin('user_alignment_data'),
             twinRetired: !twinEntry,
-            alignFnStillDefined: typeof window.openAlignmentWiz === 'function',   // (7) the legacy shim survives (unrelated to the rotate button)
+            // t1730 (gameplan step 2, Tier B) — openAlignmentWiz was the legacy shim to the coded AlignmentWizard
+            // view; both the shim and its target view are now DELETED (not just un-routed), alongside every
+            // other legacy caller (wizardManager.openAlignment/updateAlignmentWizard/_startAlignmentAnim,
+            // app.js's setupVisualizationListeners). A raw opType:'alignment' op now degrades via the
+            // "no longer editable here" toast instead — see WORK-LOG t1730.
+            alignFnGone: typeof window.openAlignmentWiz === 'undefined',
         };
     });
     expect(r.opensAs, 'the built-in Align entry opensAs the twin (the click re-points in-place)').toBe('user_alignment_data');
     expect(r.title, 'the seamless in-place title is the built-in plain label "Align"').toBe('Align');
     expect(r.twinRetired, 'the twin no longer surfaces its OWN data-wiz entry (one-source hide)').toBe(true);
-    expect(r.alignFnStillDefined, 'openAlignmentWiz survives as the legacy shim (just no longer menu-routed)').toBe(true);
+    expect(r.alignFnGone, 'openAlignmentWiz is retired, not just un-routed').toBe(true);
 });
 
 test('E3 emit BYTE-IDENTICAL: user_alignment_data == alignmentStack across the checkAxis/probeDir/frame sweep (the seed/menu wire never touches the stack)', async ({ page }) => {

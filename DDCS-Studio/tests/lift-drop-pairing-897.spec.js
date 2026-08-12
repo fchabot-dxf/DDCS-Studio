@@ -126,16 +126,20 @@ test('(4) middle boss (manual in-axis): every wall probes from ONE Z (the reposi
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async ({ stock }) => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry (opSimStarts.js's BUILT_IN.middle, moved verbatim from the
+    // class's own inferStarts, unaffected by the class's deletion).
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts } = await import('/viz/opSimStarts.js');
     const { traceToolpath } = await import('/engine/trace.js');
     const { passAnchorFor } = await import('/engine/passAnchor.js');   // t1203 — world-stitch (see the header note)
-    const w = new MiddleWizard();
     const mstock = { x: 100, y: 80, z: 20, shape: 'boss', show: true };
     // inAxis 'manual' → the wall1->wall2 within-axis reposition is the MANUAL jog (repositionR — the fixed machine-lift path);
     // auto in-axis uses the relative-symmetric traverseOverR, which the fix (correctly) leaves untouched.
     const cfg = { featureType: 'boss', twoAxis: true, inAxis: 'manual', axis: 'X', dir1: 'pos', dir2: 'neg', stockX: 100, stockY: 80, stockZ: 20 };
-    const gcode = w.generate(cfg);
-    const starts = (typeof w.inferStarts === 'function') ? w.inferStarts(cfg, { stock: mstock }) : [{ x: 0, y: 0, z: 0 }];
+    const gcode = emitMapped(middleStack(cfg)).text;
+    const starts = opSimStarts('middle', cfg, mstock) || [{ x: 0, y: 0, z: 0 }];
     const g53ApproxZ = Math.abs(Number((window.ddcsGetSettings().machine || {}).safeZMargin)) || 5;
     const parsed = traceToolpath(gcode, { stock: mstock, start: starts[0], passStarts: starts, g53ApproxZ });
     const segs = parsed.segments || [], pes = parsed.passEnds || [];

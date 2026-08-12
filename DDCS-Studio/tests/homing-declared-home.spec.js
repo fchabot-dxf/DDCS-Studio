@@ -55,13 +55,14 @@ async function homeSettle(page, z, shot) {
         s.stock = { show: true, x: 100, y: 100, z: 25, datum: 'nnp' };
         s.preview = s.preview || {}; s.preview.autoLoop = false;
     }, z);
-    await page.evaluate(() => window.openWiz('homing'));
-    await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
+    // t1730 — 'homing' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(300);
     await page.evaluate(() => {
-        const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d');
+        const host = document.querySelector('.wiz-viz3d');
         const run = host.querySelector('.pp-run'); if (run) run.click();
         const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60;   // speed the long +500 rapid so it settles fast
     });
@@ -72,7 +73,7 @@ async function homeSettle(page, z, shot) {
         return { engineZ: +p.engine.pos.z.toFixed(1), worldZ: w };
     });
     // t710 — clip capture (page.screenshot forces a composite) dodges locator.screenshot's rAF-starved "wait for stable" on the idle 3D viz
-    if (shot) { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: shot, clip: _b }); }
+    if (shot) { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: shot, clip: _b }); }
     return r;
 }
 

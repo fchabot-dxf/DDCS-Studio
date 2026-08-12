@@ -13,11 +13,14 @@ test('macro: OFF byte-identical; ON probes Z first + writes Z0 + reposition befo
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => !!window.ddcsGetSettings);
   const r = await page.evaluate(async (base) => {
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
-    const w = new MiddleWizard();
-    const off = w.generate({ ...base });
-    const offFalse = w.generate({ ...base, probeZ: false });
-    const on = w.generate({ ...base, probeZ: true });
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack is the surviving
+    // builder — emit its block stack through the SAME mapper the app uses (emitMapped) for G-code text.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const gen = (p) => emitMapped(middleStack(p)).text;
+    const off = gen({ ...base });
+    const offFalse = gen({ ...base, probeZ: false });
+    const on = gen({ ...base, probeZ: true });
     const lines = on.split('\n');
     return {
       off, offFalse, on,

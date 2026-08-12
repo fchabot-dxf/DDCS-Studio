@@ -17,36 +17,12 @@
  *
  * DDCS M350: status #1920/#1921 (2=SUCCESS), trigger pos #1925/#1926, stop #1905/#1906, limit #1915/#1916.
  */
-import { emitMapped } from '../blocks/blockEmitter.js';
-import { activeDialectOpts } from './previewEmit.js';
-import { recordOp } from '../blocks/opRecord.js';
-import { opSimStarts } from '../viz/opSimStarts.js';
 // t1728 (gameplan step 1) — middleAxes/middleStack MOVED to stacks/middleWizard.js (the twin's own builder
 // dependency, kept importable+re-exported here unchanged for every other existing caller — pure move, no
-// signature change). middleAxes has the widest fan-out in the registry (viz/*, ops/panelTypes.js,
-// circularWizard.js, views/middleView.js all read it through THIS path); none of them need to change.
+// signature change). middleAxes fans out to viz/middleVizUtils.js, viz/opSimStarts.js, wizards/ops/panelTypes.js.
+// t1730 (gameplan step 2, Tier B) — MiddleWizard (the legacy screen class) DELETED alongside its sole
+// consumer, views/middleView.js (retired — see WORK-LOG t1730); circularWizard.js (a second class-level
+// consumer) was ALSO deleted in the same act (Tier A — no twin, no reachable UI path). Only the builders this
+// file re-exports are still live.
 import { middleAxes, middleStack } from './stacks/middleWizard.js';
 export { middleAxes, middleStack };
-
-export class MiddleWizard {
-    generate(params) {
-        recordOp('middle', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(middleStack(params), activeDialectOpts()).text;
-    }
-
-    /**
-     * Per-pass preview starts — ONE per parser pass (each REPOSITION: in the macro starts a new pass, so the
-     * counts here MUST mirror the reposition() calls in middleStack, else extra markers fall back to the origin).
-     *   pocket            → 1 pass: probe both walls from the centre (no reposition).
-     *   boss single-axis  → manual: 2 (wall1, wall2); auto: 1 (traverses over hands-free).
-     *   boss two-axis     → manual: 4 (X w1/w2, Y w1/w2); auto: 2 (one per axis, with the between-axes reposition).
-     */
-    // Per-pass preview starts → the shared sim-start registry (viz/opSimStarts.js, BUILT_IN.middle). Moved verbatim; one
-    // home for the per-pass inference + the wizard-maker seam (declare, never infer).
-    inferStarts(params, stock) { return opSimStarts('middle', params, stock); }
-
-    /** Preview/sim start hint = the first pass's start. */
-    inferStart(params, stock) {
-        return this.inferStarts(params, stock)[0];
-    }
-}

@@ -11,12 +11,14 @@ test.use({ viewport: { width: 1280, height: 900 } });
 test('REAL pendant gesture: select ② → jog moves it on screen + it STICKS (beats the wizard hint)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
-  await page.waitForSelector('#wiz_middle', { state: 'visible' });
-  // a BOSS probe-both → multi-pass + inferStarts hints (the condition the first test missed)
+  // t1730 — 'middle' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_middle_data'));
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
+  // a BOSS probe-both → multi-pass + inferStarts hints (the condition the first test missed). t1730 — old m_* ids
+  // retired; the twin's generic form renders every declared param as [data-param="<name>"].
   await page.evaluate(() => {
-    const t = document.getElementById('m_type'); if (t) t.value = 'boss';
-    const b = document.getElementById('m_both'); if (b) b.checked = true;
+    const t = document.querySelector('[data-param="featureType"]'); if (t) { t.value = 'boss'; t.dispatchEvent(new Event('change', { bubbles: true })); }
+    const b = document.querySelector('[data-param="twoAxis"]'); if (b) { b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); }
   });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz && p.viz.starts && p.viz.starts.length >= 2; });

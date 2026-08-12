@@ -20,14 +20,16 @@ test('the RENDERED tool stays on ② through the 2nd-axis probe — no flash to 
 
   const r = await page.evaluate(async () => {
     const { GcodeExecutionEngine } = await import('/engine/index.js');
-    const { MiddleWizard } = await import('/wizards/middleWizard.js');
+    // t1730 — MiddleWizard (the legacy screen class) was deleted alongside its view; middleStack/opSimStarts are
+    // the surviving builder + start-inference registry.
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { opSimStarts } = await import('/viz/opSimStarts.js');
 
-    const w = new MiddleWizard();
     const stock = { x: 60, y: 60, z: 60, shape: 'boss', show: true };
     const p = { featureType: 'boss', approach: 'auto', inAxis: 'auto', transAxis: 'auto', twoAxis: true, findBoth: true,
                 axis: 'X', dir1: 'pos', dir2: 'neg', dist: 80, retract: 2, safeZ: 10, clearOver: 40 };
-    const code = w.generate(p);
+    const code = emitMapped(middleStack(p)).text;
     const starts = opSimStarts('middle', p, stock);   // [① X-wall, ② Y-wall]
 
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
@@ -39,7 +41,7 @@ test('the RENDERED tool stays on ② through the 2nd-axis probe — no flash to 
     const frames = [];
     const e = new GcodeExecutionEngine({
       autoAnswer: true, simSpeed: 1, stock,
-      stockOffset: w.inferStart(p, stock),
+      stockOffset: starts[0],
       onLineChange: ({ raw }) => { if (raw && /reposition:/i.test(raw)) { afterReposition = true; repoFrame = frames.length; } },
       onPositionChange: (pos) => {
         viz.setToolPosition(pos);   // REAL render anchoring — read the actual rendered tool
