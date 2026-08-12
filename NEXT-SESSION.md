@@ -1374,3 +1374,24 @@ the wizard modal view in the blocks tab."* It removes a step rather than adding 
 
 **The honesty rule is unchanged and still binds** (8b/8e): EMPTY when no wizard is open at all, EMPTY when
 a plain op is selected. It simply triggers less often. All deletions are identical under either reading.
+
+### 3c. USER RULING (2026-08-11) — the mirrored Wizard View must show the REAL values, not defaults
+Worker shipped step 3 with the Wizard View mirroring WHICH wizard is open but rendering the def's declared
+DEFAULTS, not the values live-typed into the open modal (value parity attempted, then scoped out — see
+WORK-LOG t1734 AMENDMENT). Flagged for a ruling. **User ruled: real values.**
+*"Well really it's about honesty so it better if it's the real values."*
+
+**Why it is the same rule, not a preference:** a field reading `dist=500` while the user has `777` typed
+in the other view is not a placeholder — it is a WRONG VALUE PRESENTED AS A REAL ONE, with nothing on
+screen saying "these are defaults". Same class as a picture that disagrees with the program, a control
+that accepts a gesture and does nothing, and a Wizard View pretending to hold a wizard it does not.
+**It is strictly worse than the EMPTY case 8b deliberately allows: empty claims nothing; a stale number
+claims something false.**
+
+**What is already established (do not re-derive):** `getLastOp()` genuinely carries live values (verified
+live at t1734: `dist: 500` → `777` after `fill()` + `wizardManager.update()`). The blocker is that a
+`hasTree` twin renders through `formBindings({...def, template:[userRoot]})`, which re-derives each
+field's value from `userRoot`'s OWN template tree (each `param_field`'s embedded `dflt`) and never from
+`def.bindings` — so the t1734 overlay silently no-oped for exactly Corner's shape while working for
+flat-bindings twins. **Inconsistent-across-shapes was correctly rejected; the fix is to make the template
+path read the live values too.**
