@@ -25073,3 +25073,56 @@ Two things worth being explicit about, both traced live rather than assumed:
   9 skipped (unchanged), 0 failed — the existing honesty guarantees ((b)/(c) from the main verification) still hold.
 - Re-ran `fork-parity-1593.spec.js`: 2/2 passed — this is a form-derivation change, not an emit change, and the
   gate confirms it.
+
+
+## Turn 1736 (worker) — STEP 3 FOLLOW-UP: the bar-opened Wizard View mirror shows REAL live values
+
+Dispatch (user-ruled, via advisor): the t1734 amendment's mirror must show LIVE values, not the def's bare
+defaults — a field showing `dist=500` while the user has `777` typed in the other view is a WRONG value presented
+as a real one, worse than the empty case (empty claims nothing; a stale number claims something false). The
+turn-1734 scoping-out was the right call at the time (inconsistent-across-shapes is worse than none); this turn
+does the real thing.
+
+### What shipped
+
+`web/blocks/blocksApp.js`'s `deriveLiveWizard()` — the t1734 amendment-B fallback now DEEP-CLONES the registered
+def's `template` (`JSON.parse(JSON.stringify(...))` — this codebase's established idiom for exactly this, per
+`openLiveAsModal`'s own precedent, and confirmed live this turn that the registry is genuinely untouched: reopening
+the SAME wizard type after mirroring a `999` still reads `500` off both the template's `param_field.params.dflt`
+and the binding's own `.default`), walks the clone's `uiChildren` (`flattenBlocks`, already imported) and patches
+each `param_field` whose `param` matches a key in `getLastOp().params` to carry that LIVE value as its `dflt`. The
+`def.bindings[].default` overlay from t1734 is kept alongside it — both are needed, each covering a different half
+of `formBindings()`'s own resolution order (`userOps.js:434`'s finite-number guard on `paramFieldsFromStack`'s row
+default means a NUMERIC field's value comes from the template row when patched, but a non-numeric field — string/
+enum/bool — never gets a row default at all and always falls through to the binding's own default; a twin with no
+`param_group` skips the row mechanism entirely and uses `def.bindings` unchanged). Patching only one of the two
+would have left exactly the "inconsistent across field types" gap the same "worse than none" reasoning warns about
+one level down — so both stayed, not just the one the first example (Corner, all-but-one-numeric) would have
+needed.
+
+### Verify
+
+- **Real gesture + screenshot, Corner** (numeric/template-tree path): open Corner from the bar, type `777` into
+  Max Probe Dist, switch to Blocks WITHOUT closing — Wizard View shows `777`, not `500`. Screenshot confirms
+  visually. Then closed the wizard for real and confirmed the mirror still goes fully empty (the honesty rule
+  from t1734 amendment B, re-checked, still holds).
+- **Real gesture + screenshot, WCS** (`user_wcs_data`, the second shape asked for): every one of its 6 bindings is
+  `enum`/`bool` — none are numeric, so this exercises the `def.bindings[].default` overlay in complete isolation
+  from the template-tree patch (the finite-number guard means WCS's fields NEVER get a template row default
+  regardless). Opened from the bar, switched `WCS System` to `G56` (default is `Active WCS (Auto)`/`'0'`), switched
+  to Blocks without closing — Wizard View shows `G56`. Screenshot confirms. Both shapes agree, as asked.
+- **Registry isolation, checked directly** (not assumed): after mirroring `999` for Corner's `dist`, re-read
+  `getUserDef('user_corner_data')` fresh from the registry — its template's `param_field.dflt` and its
+  `bindings[].default` both still read the ORIGINAL `500`, confirming the deep clone genuinely isolated the patch
+  and the shared def every other consumer (Customize route, future opens, other tabs) reads was never touched.
+- Full fast tier re-run (`blocks-*.spec.js` + `wizard-face-1599`/`palette-by-role-1623`/`ui-tree-unwired-1561`/
+  `context-menu-blocks-1454`/`wizard-shapes-1627`/`fork-parity-1593`, 70 tests): 61 passed, 9 skipped (unchanged —
+  the t1734 fixme's), 0 failed.
+- `npm run test:node`: 118/118, 0 failed.
+- fork-parity: 2/2 passed — this act touches form-derivation for a tab that isn't on the canvas at all; emit is
+  provably unaffected and the gate confirms it directly.
+
+No STOP-and-report needed — the "materially riskier than it looks" escape hatch in the dispatch wasn't triggered:
+the deep-clone-and-patch was mechanical once the two resolution paths were correctly identified (both already
+named in the t1734 WORK-LOG entry that flagged this for a ruling), and verifying registry isolation was a direct,
+cheap check rather than a leap of faith.
