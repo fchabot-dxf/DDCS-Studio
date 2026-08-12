@@ -1360,3 +1360,17 @@ loaded · any "close enough" face.
 - ⚠ Expect collateral: `wizard-face-1599.spec.js` exists specifically to test the predicate being deleted.
   Tests asserting the OLD two-face behaviour are stale BY DESIGN of this act — repoint or retire them with
   a stated reason, never weaken an assertion to make it pass.
+
+### 3b. USER RULING (2026-08-11) — the Wizard View mirrors the OPEN WIZARD, not the workspace
+Advisor's step-3 spec said "the wizard when one is LOADED", and `deriveLiveWizard()` derives from the
+Blockly WORKSPACE — so opening a built-in from the bar and switching to Blocks would have shown EMPTY.
+**The user asked the exact question that exposed it** (*"so now if i simply open a built in and open blocks
+it should show a wizard view?"*) and ruled **B**:
+
+**The Wizard View tab mirrors the CURRENTLY OPEN WIZARD.** Open Corner from the bar → switch to Blocks →
+the Wizard View shows Corner. **No "Customize as blocks" step is required first** — that step stops being
+a prerequisite for merely SEEING the wizard. This matches the user's original framing: *"wizard view is
+the wizard modal view in the blocks tab."* It removes a step rather than adding one.
+
+**The honesty rule is unchanged and still binds** (8b/8e): EMPTY when no wizard is open at all, EMPTY when
+a plain op is selected. It simply triggers less often. All deletions are identical under either reading.
