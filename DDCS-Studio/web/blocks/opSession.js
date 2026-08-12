@@ -429,12 +429,6 @@ export function hasActiveOpStack() {
  * stack builder yet (probe family still in progress), or the same op already loaded (so re-opening the
  * Blocks tab doesn't clobber block-side edits). Loading a changed op refreshes the view.
  */
-/** The active op's type if it has NO block builder yet (so the UI can say why it isn't shown), else null. */
-export function unportedActiveOp() {
-    const op = getLastOp();
-    return (op && !builderOf(op.type)) ? op.type : null;
-}
-
 export function buildActiveOpStack() {
     const op = getLastOp(), s = sig(op);
     if (!op || !builderOf(op.type)) { shownOp = null; return null; }

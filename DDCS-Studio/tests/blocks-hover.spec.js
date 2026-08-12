@@ -6,6 +6,13 @@ import { test, expect } from '@playwright/test';
  *   - VALUE hover  → the exact emitted token of the value under the cursor is boxed (.thot).
  *   - SELECT leaf  → all of a leaf atom's value tokens are boxed (.thot); selecting a container does not (leaf-scoped).
  * Block→block resolution rides Blockly's data-id on each SVG root; value/token spans come from opGlow (perturb+diff).
+ *
+ * t1734 — RETIRED, not repointed: GAMEPLAN STEP 3 deleted the Projected G-code pane (#blk-gcode) and every surface
+ * these three tests exercise — the `.gl`/`.warm`/`.thot` code-panel overlays, and the host mouseover/mouseleave
+ * listeners that drove them (resolveHoverTarget survives in blocksApp.js, but only to feed recordBlockEdit; its
+ * code-panel-hover caller is gone). The block-to-line link is an explicitly accepted loss (see the dispatch), and
+ * there is no successor surface on the new Wizard View / 3D tabs to point a "hover warms code lines" test at.
+ * Bodies kept verbatim, unexecuted, as the historical record. See ARCHITECTURE.md and WORK-LOG t1734.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -51,7 +58,7 @@ async function seedAndOpen(page, wiz = 'surfacing') {
  * loses its nesting, so a test whose premise IS nesting has to be re-homed each time — and it fails LOUDLY when the
  * premise goes (the `hasLeaf` assertion), which is the only reason this has not silently become a no-op twice over.
  */
-test('block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit', async ({ page }) => {
+test.fixme('block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit — t1734: #blk-gcode deleted', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e)));
   await seedAndOpen(page, 'contour');
@@ -96,7 +103,7 @@ test('block hover warms its lines (lighter, no scroll), resolves the INNERMOST b
   expect(errs).toEqual([]);
 });
 
-test('hovering a value field boxes exactly that value’s emitted token (.thot) and warms its block', async ({ page }) => {
+test.fixme('hovering a value field boxes exactly that value’s emitted token (.thot) and warms its block — t1734: #blk-gcode deleted', async ({ page }) => {
   await seedAndOpen(page);
   const r = await page.evaluate(() => {
     const ws = window.__blkws;
@@ -117,7 +124,7 @@ test('hovering a value field boxes exactly that value’s emitted token (.thot) 
   expect(r.thotAfter, 'moving off the value clears the token box').toBe(0);
 });
 
-test('selecting a leaf atom boxes its value tokens; selecting a container does not (leaf-scoped)', async ({ page }) => {
+test.fixme('selecting a leaf atom boxes its value tokens; selecting a container does not (leaf-scoped) — t1734: #blk-gcode deleted', async ({ page }) => {
   await seedAndOpen(page);
   const ids = await page.evaluate(() => {
     const ws = window.__blkws;

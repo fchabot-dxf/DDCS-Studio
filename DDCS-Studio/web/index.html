@@ -1185,39 +1185,36 @@
             <div class="blk-col-resize" aria-hidden="true" title="Drag to resize the preview"></div>
             <!-- Mobile-only: drag the top edge to resize the preview drawer -->
             <div class="blk-drawer-resize" aria-hidden="true"></div>
-            <!-- Mobile-only drawer header: grip + the current FACE's title + close. The title text is written by
-                 blocksApp's renderLiveForm from the same `show` predicate that picks the face (see below). -->
+            <!-- Mobile-only drawer header: grip + close. Which tab is showing is named by .blk-tabs below, not here. -->
             <div class="blk-drawer-head">
                 <span class="blk-grip" aria-hidden="true"></span>
-                <span class="blk-drawer-title" style="font-weight: 700; font-size: 14px; color: var(--fg); font-family: var(--font);">Wizard View</span>
                 <button id="blkDrawerClose" class="blk-drawer-x" type="button" aria-label="Close preview">✕</button>
             </div>
-            <!-- t1589 — this column has TWO FACES, never both, switched by ONE class (`.right.wizard-view`) written
-                 from the one `show` predicate in renderLiveForm. There is deliberately NO user-facing toggle: 0bd8b38c
-                 rejected a top-level G-code toggle COMPETING with the Wizard View, and that ruling stands. The Wizard
-                 View wins whenever there IS one; the panes below fill the column only when there is not (which is the
-                 ordinary block-stacking path, where 0bd8b38c had left a placeholder and orphaned four capabilities). -->
-            <!-- FACE 1 — Live Generator Modal View: 1:1 pixel-perfect wizard form preview -->
+            <!-- t1734 — TWO TABS, always present, never a guessed face: Wizard View shows the wizard when one is
+                 loaded and is EMPTY otherwise (never a synthesized substitute — see renderLiveForm's `show`); 3D is
+                 always meaningful. blocksApp's setActiveTab wires the click; CSS shows/hides by the `.tab-3d` class.
+                 Replaces the old single-class `.wizard-view` auto-switch, which PICKED a face for the user from a
+                 predicate that was patched twice for guessing wrong (see the retired wizard-face-1599 spec) — an
+                 always-present tab asks no question, so there is no wrong answer. Projected G-code (and the
+                 block↔line link it drove) is deleted, not hidden: the user accepted that loss explicitly. -->
+            <div class="blk-tabs" role="tablist">
+                <button type="button" class="blk-tab" data-tab="wizard" role="tab" aria-selected="true">Wizard View</button>
+                <button type="button" class="blk-tab" data-tab="3d" role="tab" aria-selected="false">3D</button>
+            </div>
+            <!-- Wizard View tab: the wizard's live form when one is loaded; truly empty otherwise (including a plain,
+                 non-wizard op selected) — never the nearest/parent wizard, a synthesized form, or the last wizard seen. -->
             <div class="blk-formpane" id="blk-formpane">
                 <h3 class="pane-h">Generator Modal <span class="blk-form-live" title="The form is a live view of the blocks — no save needed">live</span>
                     <button type="button" id="blkOpenModal" class="blk-openmodal" hidden title="See this wizard at full size — the real modal, rendered live from the current blocks; close it and nothing is saved">⧉ Open as modal</button></h3>
                 <div id="blk-form" class="blk-form-body"></div>
             </div>
-            <!-- FACE 2 — the ordinary path: toolpath preview over the projected G-code. These hosts must EXIST for
-                 blocksApp to bind its machinery to them at build time (exec line, hover warming, value-token boxing,
-                 selection); the face switch is CSS, not presence. -->
+            <!-- 3D tab: the program's toolpath simulation — always meaningful, independent of the Wizard View tab. -->
             <div class="pv">
-                <h3 class="pane-h">Preview</h3>
+                <h3 class="pane-h">3D</h3>
                 <div class="pv-body"><div id="blk-preview-panel"></div></div>   <!-- the shared createPreviewPanel mounts here -->
             </div>
-            <!-- Desktop: drag to resize the Preview pane vs the Projected G-code pane below it -->
-            <div class="blk-row-resize" aria-hidden="true" title="Drag to resize Preview vs G-code"></div>
-            <div class="gcode">
-                <h3 class="pane-h">Projected G-code</h3>
-                <pre id="blk-gcode"></pre>
-            </div>
         </div>
-        <!-- Mobile-only: bottom-centre pull-tab opens the drawer (label tracks the face, same source as the title) -->
+        <!-- Mobile-only: bottom-centre pull-tab opens the drawer (label tracks the active tab) -->
         <button id="blkDrawerHandle" class="blk-drawer-handle" type="button" aria-expanded="false">▲ Wizard View</button>
     </div>
 

@@ -13,7 +13,14 @@ import { test, expect } from '@playwright/test';
  * panel. A detached panel (or a `display:none` face, which is the same bug one layer up) makes every one of these
  * comparisons collapse to equality — which is exactly the failure mode that shipped.
  *
- * Pair this with the capability specs, never instead of them: they prove it is RIGHT, this proves it RUNS.
+ * t1734 — RETIRED, not repointed: GAMEPLAN STEP 3 deleted `#blk-gcode` (the Projected G-code pane) outright, along
+ * with every capability this file exists to paint-check (exec-line glow, hover-warm, selection dim, value-token
+ * boxing) — all of it was `#blk-gcode`-only machinery in blocksApp.js, removed in the same act. The user explicitly
+ * accepted the loss of the block-to-line link; "do NOT invent a replacement" is in the dispatch verbatim. There is
+ * no successor surface to point this file's paint-proof technique at (the Wizard View / 3D tabs are plain
+ * visibility toggles with no comparable per-line highlight state), so every test below is fixme'd rather than
+ * repointed. All five bodies are kept verbatim, unexecuted, as the historical record of what "does it run" meant
+ * for a pane that no longer exists. See ARCHITECTURE.md and WORK-LOG t1734.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -62,7 +69,7 @@ async function seedAndOpen(page, wiz) {
   }, { timeout: 10000 });
 }
 
-test('the code panel is ATTACHED and VISIBLE on the ordinary path (no wizard tree)', async ({ page }) => {
+test.fixme('the code panel is ATTACHED and VISIBLE on the ordinary path (no wizard tree) — t1734: #blk-gcode deleted', async ({ page }) => {
   await seedAndOpen(page, 'surfacing');
   const r = await page.evaluate(PAINT);
   expect(r.fatal, 'the panel is in the document').toBeUndefined();
@@ -79,7 +86,7 @@ test('the code panel is ATTACHED and VISIBLE on the ordinary path (no wizard tre
   expect(face.form, 'and the Generator Modal pane is the one standing down').toBe(false);
 });
 
-test('CAPABILITY 1/4 — the sim execution line is PAINTED, and the comet-tail behind it', async ({ page }) => {
+test.fixme('CAPABILITY 1/4 — the sim execution line is PAINTED, and the comet-tail behind it — t1734: #blk-gcode deleted', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
@@ -103,7 +110,7 @@ test('CAPABILITY 1/4 — the sim execution line is PAINTED, and the comet-tail b
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
-test('CAPABILITY 2/4 — hovering a block PAINTS its emitted lines warm', async ({ page }) => {
+test.fixme('CAPABILITY 2/4 — hovering a block PAINTS its emitted lines warm — t1734: #blk-gcode deleted', async ({ page }) => {
   await seedAndOpen(page, 'contour');
   await page.evaluate(() => {
     const ws = window.__blkws, out = document.getElementById('blk-gcode');
@@ -119,7 +126,7 @@ test('CAPABILITY 2/4 — hovering a block PAINTS its emitted lines warm', async 
   await page.screenshot({ path: 'verification/t1589-3-hover-warm.png' });
 });
 
-test('CAPABILITY 3/4 — selecting a block DIMS the rest and keeps its own lines lit (has-sel)', async ({ page }) => {
+test.fixme('CAPABILITY 3/4 — selecting a block DIMS the rest and keeps its own lines lit (has-sel) — t1734: #blk-gcode deleted', async ({ page }) => {
   await seedAndOpen(page, 'surfacing');
   await page.evaluate(() => {
     const ws = window.__blkws, out = document.getElementById('blk-gcode');
@@ -143,7 +150,7 @@ test('CAPABILITY 3/4 — selecting a block DIMS the rest and keeps its own lines
   await page.screenshot({ path: 'verification/t1589-4-selection.png' });
 });
 
-test('CAPABILITY 4/4 — hovering a value BOXES its emitted token (.thot) with real width', async ({ page }) => {
+test.fixme('CAPABILITY 4/4 — hovering a value BOXES its emitted token (.thot) with real width — t1734: #blk-gcode deleted', async ({ page }) => {
   await seedAndOpen(page, 'surfacing');
   await page.evaluate(async () => {
     const ws = window.__blkws;

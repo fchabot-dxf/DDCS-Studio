@@ -39,19 +39,23 @@ test.describe('STEP 1 (t1561) — unknown types get a visible placeholder, never
         expect(r.text, 'the placeholder uses the project\'s own "not wired yet" phrasing').toContain('not wired yet');
     });
 
-    test('a picker and a viz box (still unwired at t1561) also placeholder, not flatten', async ({ page }) => {
+    test('two unwired types together both placeholder, not just the first found', async ({ page }) => {
         await boot(page);
         const r = await page.evaluate(async () => {
             const m = await import('/ui/formWidgets.js');
             const host = document.createElement('div');
             const tree = [
+                // t1734 — the second entry was 'code_preview_panel' (a real, still-unwired viz box at t1561); that
+                // block is now deleted outright (GAMEPLAN STEP 3), so a synthetic stand-in replaces it here, same
+                // as the mouth-agnostic-fallback test below already does — this mechanism doesn't need a real block,
+                // only a type renderUiTree's switch doesn't recognise, and a synthetic one can't go stale under it.
                 { type: 'slider_field', params: { param: 'x' } },
-                { type: 'code_preview_panel', params: { title: 'Code' } },
+                { type: 'future_viz_box_type', params: { title: 'Code' } },
             ];
             m.renderUiTree(host, tree, [], {});
             return [...host.querySelectorAll('.unwired-block')].map((el) => el.dataset.blockType);
         });
-        expect(r.sort()).toEqual(['code_preview_panel', 'slider_field']);
+        expect(r.sort()).toEqual(['future_viz_box_type', 'slider_field']);
     });
 
     test('a NESTED unwired type under a NON-"DO" mouth name still loses nothing — the mouth-name-agnostic '

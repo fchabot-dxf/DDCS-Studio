@@ -56,7 +56,9 @@ test('FOUR role groups on the category axis — three populated (membership from
     expect(r.inputs).toEqual(expect.arrayContaining(['formfield', 'param', 'form_dropdown', 'coordlist', 'slider_field', 'param_field', 'param_group']));
     // (opunit also declares Wizard Layout but is palette-hidden by design — created programmatically at fork/load-wrap)
     expect(r.layout).toEqual(expect.arrayContaining(['user_root', 'section', 'group_box', 'split_horizontal', 'layoutwidget', 'layout_2d_canvas']));
-    expect(r.previews).toEqual(expect.arrayContaining(['sim', 'sim_3d_box', 'simstart', 'panel', 'code_preview_panel', 'form_diagram']));
+    // t1734 — sim_3d_box / code_preview_panel deleted (dead containers, zero readers); previews' anchor set shrinks
+    // with them, same membership-from-the-registry check either way.
+    expect(r.previews).toEqual(expect.arrayContaining(['sim', 'simstart', 'panel', 'form_diagram']));
     // t1627 — Wizard Shapes has its CONTENTS now (the four primitives): the group renders, membership from the registry
     expect(r.byCat.shapes, 'the four shape primitives declare the group').toEqual(['shape_circle', 'shape_line', 'shape_marker', 'shape_rect']);
     expect(r.groups, 'the once-empty group now renders — the auto-appear this spec was holding the door for').toContain('Wizard Shapes');

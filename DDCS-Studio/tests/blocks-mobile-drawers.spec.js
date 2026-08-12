@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-// Mobile Blocks tab (≤860px): canvas fills the tab; the right column is a bottom drawer (Preview STACKED over the
-// projected G-code since t1589 — no toggle) and the Blockly palette is a left drawer collapsed via the toolbox's
+// Mobile Blocks tab (≤860px): canvas fills the tab; the right column is a bottom drawer holding the SAME Wizard
+// View / 3D tabs as desktop (t1734), and the Blockly palette is a left drawer collapsed via the toolbox's
 // setVisible() so the canvas reclaims the width. Guards the responsive UX added for phone editing.
 test.use({ viewport: { width: 390, height: 800 } });
 
@@ -41,19 +41,29 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   await page.waitForFunction(() => document.querySelector('#blocks-app .right').classList.contains('open'), null, { timeout: 5000 });
   expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('open'))).toBeTruthy();
 
-  // t1589 — the `Preview | G-code` segmented toggle is RETIRED, by ruling, not by accident: 0bd8b38c deleted the
-  // buttons, and the act that brought the two panes back was told explicitly not to reintroduce a toggle competing
-  // with the Wizard View. So this is the one assertion here that could NOT be made green by fixing the app — the
-  // control it drove is gone on purpose. What replaced it is strictly more capability, and that is what is asserted
-  // now: on a phone BOTH panes are in the drawer at once, so neither is behind anything.
-  const panes = await page.evaluate(() => {
-    const seen = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect();
-      return { h: Math.round(r.height), shown: getComputedStyle(el).display !== 'none' && r.height > 20 }; };
-    return { pv: seen('#blocks-app .pv'), gcode: seen('#blocks-app .gcode'), seg: !!document.getElementById('blkSegCode') };
+  // t1589 — the `Preview | G-code` segmented toggle (blkSegPv/blkSegCode) is RETIRED, by ruling, not by accident:
+  // 0bd8b38c deleted the buttons and they never came back.
+  // t1734 — GAMEPLAN STEP 3 replaced the auto-picked face (and the Projected G-code pane it competed with) with a
+  // REAL user-facing toggle: the `.blk-tabs` bar, present in the drawer exactly as on desktop. Both tabs are always
+  // there; clicking one shows its pane and hides the other — asserted here the same way desktop is.
+  const panesShown = () => page.evaluate(() => {
+    const shown = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect();
+      return getComputedStyle(el).display !== 'none' && r.height > 20; };
+    return { pv: shown('#blocks-app .pv'), form: shown('#blk-formpane') };
   });
-  expect(panes.seg, 'no segmented Preview|G-code toggle — retired by ruling, not hidden').toBe(false);
-  expect(panes.pv && panes.pv.shown, 'the Preview pane is open in the drawer').toBe(true);
-  expect(panes.gcode && panes.gcode.shown, 'and the Projected G-code is too — no toggle, nothing behind anything').toBe(true);
+  const tabsInDrawer = await page.evaluate(() => [...document.querySelectorAll('.blk-tab')].map((b) => b.textContent.trim()));
+  expect(tabsInDrawer, 'both tabs are in the drawer, same as desktop').toEqual(['Wizard View', '3D']);
+  expect(!!(await page.$('#blkSegCode')), 'no segmented Preview|G-code toggle — retired by ruling, not hidden').toBe(false);
+
+  let panes = await panesShown();
+  expect(panes.form, 'Wizard View tab is active by default (static default, no wizard loaded here so it renders empty)').toBe(true);
+  expect(panes.pv, 'and the 3D pane is hidden until its tab is clicked').toBe(false);
+
+  await page.click('.blk-tab[data-tab="3d"]');
+  await page.waitForTimeout(300);
+  panes = await panesShown();
+  expect(panes.pv, 'clicking 3D shows the Preview pane').toBe(true);
+  expect(panes.form, 'and hides the Wizard View pane — one at a time, same as desktop').toBe(false);
 
   // close preview drawer
   await page.click('#blkDrawerClose');

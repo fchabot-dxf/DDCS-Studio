@@ -342,20 +342,27 @@ built and then explicitly ruled out the same turn: no old-save audience exists f
 (`wcsView.js`) is unrelated and still survives (one of the 14 that remain) — it draws nothing on either path, so
 it never carried divergence risk and was out of scope for this deletion.
 
-### The wizard-shape-block vocabulary: one working consumer, three declared-but-unread containers
+### The wizard-shape-block vocabulary: one working consumer, one structural container, two deleted (t1734)
 
-`wizards/ops/vizBlocks.js` (t1627) declares SIX preview-authoring block types for the Blocks-tab wizard-maker:
-`shape_rect`/`shape_circle`/`shape_line`/`shape_marker` (`SHAPE_2D_TYPES`) and three CONTAINER blocks —
-`layout_2d_canvas` (`kind:'uibox'`), `sim_3d_box`, `code_preview_panel`. Traced live (cycle 856 ACT 3, t1724,
-attempting to finish corner's deferred "per-view rig blocks"): the four SHAPE primitives have a real, working
-consumer — `panelTypes.js:293` flattens `def.template` (walking BOTH `uiChildren` and `children` — mouth-
-agnostic) and draws every `shape_*` block it finds as a Layout-pane item, already wired, zero extra code needed
-by a twin that has content to declare. The THREE CONTAINER blocks do not: `rg -n "layout_2d_canvas|sim_3d_box|
-code_preview_panel" web --include='*.js'` outside `vizBlocks.js` itself returns nothing — their
-`minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields are inert, and `kind:'uibox'` only wires the
-generic Blockly round-trip (bridge/stackBridge's mouth machinery), never a real rendered panel. A FIFTH instance
-of this project's own "declared but unread" defect class (`emits`/`modalPre`/`noSnap`/`mouth` are the first
-four) — found by tracing a real port attempt, not by a dedicated sweep.
+`wizards/ops/vizBlocks.js` (t1627) declares the four SHAPE primitives — `shape_rect`/`shape_circle`/`shape_line`/
+`shape_marker` (`SHAPE_2D_TYPES`) — plus ONE container, `layout_2d_canvas` (`kind:'uibox'`, `mouth:'DO'`). The four
+shapes have a real, working consumer: `panelTypes.js:293` flattens `def.template` (walking BOTH `uiChildren` and
+`children` — mouth-agnostic) and draws every `shape_*` block it finds as a Layout-pane item, already wired, zero
+extra code needed by a twin that has content to declare. `layout_2d_canvas` is wired too, but GENERICALLY — bridge.js
+(`else if (mouthOf(def)) addMouth(mouthOf(def))`) gives any def carrying a `.mouth` a Blockly mouth regardless of
+type, so grepping the literal string `layout_2d_canvas` outside its own declaration finds nothing even though the
+round-trip is live: the shape vocabulary nests inside it via that generic mechanism. (The advisor twice reported all
+three ORIGINAL container blocks dead by that grep; corrected by the worker at t1726 for this one.)
+
+Two more container blocks were declared alongside it — `sim_3d_box` and `code_preview_panel` — and neither carried a
+`.mouth` (so the generic mechanism above never applied to them) nor any other consumer. Traced live (cycle 856 ACT
+3, t1724, attempting to finish corner's deferred "per-view rig blocks"): `rg -n "layout_2d_canvas|sim_3d_box|
+code_preview_panel" web --include='*.js'` outside `vizBlocks.js` itself returned nothing for any of the three at the
+time — only `layout_2d_canvas` turned out to have the generic-mouth exception once traced further. The other two's
+`minHeight`/`showControls`/`showRuler`/`maxHeight`/`title` fields were genuinely inert — a FIFTH instance of this
+project's own "declared but unread" defect class (`emits`/`modalPre`/`noSnap`/`mouth` are the first four). **Deleted
+at t1734** (GAMEPLAN STEP 3, alongside the Blocks-tab right column's face-switch predicate and the Projected G-code
+pane they would have backed) — see WORK-LOG t1734.
 
 ### The one-sources every renderer already shares — do not re-derive these
 

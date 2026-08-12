@@ -5,10 +5,17 @@ import { test, expect } from '@playwright/test';
  * PROJECTED G-code panel (#blk-gcode) lights the currently-EXECUTING line (`.gl.active-line`) plus a fading comet-tail
  * (`[data-exec-age]` 1..5) — driven by the shared preview panel's onLine(lineIndex) → setExecLine, mapping the sim's
  * current line index to the matching `.gl` span. Display-only: it emits nothing (the .nc is unaffected).
+ *
+ * t1734 — RETIRED: GAMEPLAN STEP 3 deleted the Projected G-code pane (#blk-gcode) and every line this test reads
+ * (`.gl`, `.active-line`, `[data-exec-age]`) along with it — blocksApp's setExecLine/clearExec/execTrail and the
+ * onLine callback that drove them are gone too (createPreviewPanel's `onLine` option is simply no longer passed).
+ * The block-to-line link this glow served is an explicitly accepted loss (see the dispatch), not replaced by
+ * anything on the new Wizard View / 3D tabs — there is no successor surface to repoint this at. Body kept verbatim,
+ * unexecuted, as the historical record. See ARCHITECTURE.md and WORK-LOG t1734.
  */
 test.use({ viewport: { width: 1400, height: 950 } });
 
-test('the projected G-code lights the sim execution line + a fading comet-tail (index-mapped)', async ({ page }) => {
+test.fixme('the projected G-code lights the sim execution line + a fading comet-tail (index-mapped) — t1734: #blk-gcode deleted', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });

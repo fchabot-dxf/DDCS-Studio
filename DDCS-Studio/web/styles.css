@@ -5331,58 +5331,35 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .add-menu .add-child { margin:0; }
 #blocks-app .blk.selected { outline:2px solid var(--accent); outline-offset:1px; }
 #blocks-app .blk-head[data-sel] { cursor:pointer; }
-/* right column (preview + G-code) — black "screen", mirrors the app editor */
+/* right column (Wizard View / 3D tabs) — black "screen", mirrors the app editor */
 #blocks-app .right { position:relative; display:flex; flex-direction:column; border-left:1px solid var(--line); min-width:0; background:var(--screen); }
 #blocks-app .pane-h { margin:0; padding:6px 10px; font-size:11px; letter-spacing:.08em; color:var(--screen-dim);
                       text-transform:uppercase; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
-#blocks-app .pv { height:var(--blk-pv-split, 320px); flex:0 0 auto; display:flex; flex-direction:column; background:var(--screen); }
+#blocks-app .pv { flex:1; height:100%; max-height:100%; display:flex; flex-direction:column; background:var(--screen); }
 #blocks-app .pv-body { flex:1; position:relative; }
 #blocks-app .pv-body > canvas, #blocks-app .pv-body > div { position:absolute; inset:0; width:100%; height:100%; }
 #blocks-app .seg { margin-left:auto; display:flex; gap:4px; }   /* 2D/3D + Play reuse .op-btn (.primary = active) */
 #blocks-app .leg { display:flex; gap:9px; font-size:10px; text-transform:none; letter-spacing:0; }
 #blocks-app .leg i { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:3px; }
-#blocks-app .gcode { flex:1; overflow:auto; background:var(--screen); }
-#blocks-app .gcode pre { margin:0; padding:10px; font:12px/1.45 ui-monospace,Consolas,monospace; color:var(--screen-ink); white-space:pre; }
 /* Live Generator Modal View pane — takes full 100% height of right pane in Blocks tab. */
 #blocks-app .blk-formpane { flex:1; height:100%; max-height:100%; overflow:auto; background:var(--screen); }
 #blocks-app .blk-formpane[hidden] { display:none; }
-/* t1589 — THE FACE SWITCH. One class on .right, written by blocksApp's setRightFace from the same `show` predicate
-   that decides whether a Wizard View exists. Exactly one face is displayed; there is no user-facing toggle between
-   them (0bd8b38c rejected a G-code toggle competing with the Wizard View, and that ruling stands). Both faces stay
-   in the DOM either way, because blocksApp binds its code-panel machinery to #blk-gcode / #blk-preview-panel at
-   build time — a face that vanished from the DOM would put us straight back to writing into a detached node. */
-#blocks-app .right:not(.wizard-view) .blk-formpane { display:none; }
-#blocks-app .right.wizard-view .pv,
-#blocks-app .right.wizard-view .gcode,
-#blocks-app .right.wizard-view .blk-row-resize { display:none; }
+/* t1734 — THE TAB BAR. Two tabs, ALWAYS present (Wizard View / 3D) — clicked, not guessed. Replaces the old
+   single-class `.wizard-view` auto-switch (blocksApp's setRightFace, driven by renderLiveForm's `show` predicate),
+   which picked a face FOR the user and — per its own removed comment — had been patched twice for guessing wrong.
+   An always-present tab asks no question, so there is no wrong answer; `show` still decides the Wizard View tab's
+   CONTENT (the form, or empty), just never whether the tab itself exists. Default tab (no `.tab-3d` on `.right`) is
+   Wizard View — a static choice, never recomputed. Projected G-code had no tab of its own and is deleted outright. */
+#blocks-app .blk-tabs { display:flex; gap:4px; padding:8px 8px 0; background:var(--screen); border-bottom:1px solid var(--line); }
+#blocks-app .blk-tab { font:700 11px/1 inherit; letter-spacing:.04em; padding:7px 14px; border:1px solid var(--line); border-bottom:none;
+                       border-radius:7px 7px 0 0; background:transparent; color:var(--screen-dim); cursor:pointer; }
+#blocks-app .blk-tab:hover { color:var(--screen-ink); }
+#blocks-app .blk-tab[aria-selected="true"] { color:var(--screen-ink); background:var(--panel2,var(--panel,#161d28)); }
+#blocks-app .right:not(.tab-3d) .pv { display:none; }
+#blocks-app .right.tab-3d .blk-formpane { display:none; }
 #blocks-app .blk-form-body { padding:8px 12px 12px; color:var(--screen-ink); }
 #blocks-app .blk-form-live { margin-left:6px; padding:1px 6px; border-radius:8px; font:700 9px/1.6 inherit; letter-spacing:.04em; color:#fff; background:var(--accent,#3b82f6); }
 #blocks-app .blk-form-empty { font-size:11px; color:var(--screen-dim); padding:6px 2px; }
-/* code view: one span per line, carrying its owning-block ancestry → linked selection */
-#blocks-app .gl { display:block; border-radius:3px; }
-#blocks-app .gl:empty::after { content:'\200B'; }                 /* keep blank separator lines tall */
-#blocks-app .gl[data-owner] { cursor:pointer; }
-#blocks-app #blk-gcode.has-sel .gl { opacity:.3; }
-#blocks-app #blk-gcode.has-sel .gl.hot { opacity:1; background:color-mix(in srgb, var(--accent) 26%, #000); box-shadow:inset 2px 0 var(--accent); }
-/* HOVER preview (block→code learner highlight): lighter than selection, NO scroll/dim. Self-sufficient — shows on
-   its own (no .has-sel needed); under an active selection a hovered line lifts out of the .3 dim. :not(.hot) so
-   hovering the SELECTED block never downgrades its .hot treatment. */
-#blocks-app .gl.warm:not(.hot) { background:color-mix(in srgb, var(--accent) 13%, #000); box-shadow:inset 2px 0 color-mix(in srgb, var(--accent) 55%, #000); }
-#blocks-app #blk-gcode.has-sel .gl.warm:not(.hot) { opacity:.7; }
-/* WORD-LEVEL value token (hover a value field / select a leaf → box its exact emitted token). Background + 1px inset
-   outline only (no padding) so wrapping a substring never reflows the line. Slightly stronger than the line glows. */
-#blocks-app .gl .thot { border-radius:2px; background:color-mix(in srgb, var(--accent) 34%, #000); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, #000); }
-/* EXEC-LINE glow (Blocks tab): the projected G-code lights the sim's ACTIVE line + a fading comet-tail — the SAME
-   read-out as the read-only editor panel (driven by blocksApp.setExecLine via the shared panel's onLine). The exec
-   blue is distinct from the --accent selection/hover glows above, so "executing" never reads as "selected". */
-#blocks-app #blk-gcode .gl { transition: background-color 0.4s ease; }
-#blocks-app #blk-gcode .gl.active-line { background: rgba(64, 130, 220, 0.42); box-shadow: inset 3px 0 rgba(96, 165, 250, 0.9); }
-#blocks-app #blk-gcode .gl[data-exec-age="1"] { background: rgba(64, 110, 171, 0.28); }
-#blocks-app #blk-gcode .gl[data-exec-age="2"] { background: rgba(64, 110, 171, 0.20); }
-#blocks-app #blk-gcode .gl[data-exec-age="3"] { background: rgba(64, 110, 171, 0.14); }
-#blocks-app #blk-gcode .gl[data-exec-age="4"] { background: rgba(64, 110, 171, 0.09); }
-#blocks-app #blk-gcode .gl[data-exec-age="5"] { background: rgba(64, 110, 171, 0.05); }
-#blocks-app #blk-gcode.has-sel .gl.active-line { opacity: 1; }   /* exec line stays lit even while a block is selected */
 /* Reporter pills (value blocks) inside value sockets — rounded, category-coloured, recursive (Math) */
 #blocks-app .rep { display:inline-flex; align-items:center; gap:3px; padding:1px 3px 1px 6px; border-radius:11px;
                    color:#fff; font-size:11px; vertical-align:middle; max-width:100%; }
@@ -5459,17 +5436,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* Desktop: drag the left edge of the preview column to resize it (width = --blk-pv-w on #blocks-app). */
 #blocks-app .blk-col-resize { position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:6; }
 #blocks-app .blk-col-resize:hover { background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:.6; }
-/* Horizontal divider between the Preview pane and the Projected G-code pane (desktop) — drag to resize. */
-#blocks-app .blk-row-resize { flex:0 0 auto; height:7px; cursor:ns-resize; position:relative; z-index:6; border-top:1px solid var(--line); }
-#blocks-app .blk-row-resize:hover { background:linear-gradient(180deg, transparent, var(--accent), transparent); opacity:.7; }
 
 /* ============================================================================
-   BLOCKS TAB — MOBILE (≤860px): Blockly canvas gets the whole tab; the Preview
-   becomes a BOTTOM drawer (G-code tucked behind its toggle) and the Blockly
-   palette/toolbox becomes a LEFT drawer over the canvas — each with a handle.
-   This mirrors the MakeCode/Scratch pattern (overlay flyout + collapsible
-   category column). All rules are media-gated so desktop is untouched even with
-   the .open/.show-code/.tools-open classes present.
+   BLOCKS TAB — MOBILE (≤860px): Blockly canvas gets the whole tab; the right
+   column becomes a BOTTOM drawer (Wizard View / 3D tabs inside it, same as
+   desktop) and the Blockly palette/toolbox becomes a LEFT drawer over the
+   canvas — each with a handle. This mirrors the MakeCode/Scratch pattern
+   (overlay flyout + collapsible category column). All rules are media-gated so
+   desktop is untouched even with the .open/.tools-open classes present.
    ============================================================================ */
 @media (max-width: 860px) {
     #blocks-app { grid-template-columns:1fr; }                 /* canvas spans the tab; drawers overlay it */
@@ -5490,10 +5464,6 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         cursor:ns-resize; touch-action:none; z-index:3;
     }
     #blocks-app .blk-col-resize { display:none; }   /* desktop-only column resize off in the mobile drawer layout */
-    /* t1589 — the drawer STACKS Preview over G-code and scrolls; it does not split, and (since the segmented
-       Preview|G-code toggle is not coming back) it no longer hides one behind the other either. */
-    #blocks-app .right:not(.wizard-view) .blk-row-resize { display:none; }
-    #blocks-app .right .pv { height:auto; }         /* drawer layout controls the preview height itself */
 
     #blocks-app .blk-drawer-head {
         display:flex; align-items:center; gap:8px; position:relative;
@@ -5508,14 +5478,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
         border:1px solid var(--line); background:transparent; color:var(--screen-dim);
     }
 
-    /* t1589 — BOTH panes live in the drawer now, Preview over G-code, each taking half and scrolling its own
-       overflow. This replaces the one-at-a-time `.show-code` split: that arrangement only existed to serve the
-       segmented toggle, and the toggle is not returning, so hiding `.gcode` by default would simply make the
-       projected G-code unreachable on a phone. `.pane-h` comes BACK on mobile — with two panes stacked and no
-       toggle naming them, the headings are the only thing saying which is which. */
-    #blocks-app .right .pv { height:auto; flex:1 1 50%; min-height:0; }
-    #blocks-app .right .gcode { flex:1 1 50%; min-height:0; overflow:auto; border-top:1px solid var(--line); }
-    #blocks-app .right.wizard-view .pane-h { display:none; }   /* the Wizard View is one pane — its heading is noise */
+    /* t1734 — the tab bar (base rules, not mobile-gated) already makes Wizard View / 3D mutually exclusive here,
+       same as desktop — no mobile-specific stacking override needed now that there's a real tab to click. */
 
     /* bottom-centre pull-tab opens the preview drawer (hidden once open) */
     #blocks-app .blk-drawer-handle {

@@ -220,11 +220,12 @@ test('non-destructive save: "Update" overwrites the re-authored wizard in place 
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
-// t1587/t1589 — the pane no longer hides ITSELF; the column decides which of its two faces to wear. With no wizard
-// tree there is no Generator Modal to show, so the column gives the space to Preview + Projected G-code and the form
-// pane stands down. The GUARANTEE this test was written for is untouched and is what it still asserts: just building
-// a program must not conjure a wizard form — NO param controls appear. It now also pins where the space went, since
-// "the form is absent" was true of the placeholder era too, and that era was the bug.
+// t1587/t1589/t1734 — the column no longer has faces to wear; Wizard View and 3D are ALWAYS-PRESENT tabs (GAMEPLAN
+// STEP 3), and `show` now decides only the Wizard View tab's CONTENT. The GUARANTEE this test was written for is
+// untouched and is what it still asserts: just building a program must not conjure a wizard form — NO param
+// controls appear, and the tab is truly EMPTY (no leftover placeholder message either — the t1734 honesty property:
+// a plain op gets nothing, never a synthesized substitute). It now also pins that both tabs stay present regardless,
+// and that the 3D tab is unaffected by the Wizard View tab having nothing to show.
 test('no wizard form is conjured when NOT editing a custom op (normal Blocks use)', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack);
@@ -233,18 +234,24 @@ test('no wizard form is conjured when NOT editing a custom op (normal Blocks use
   await page.evaluate(() => window.ddcsLoadBlockStack([{ type: 'move', params: { x: 0, y: 0, z: -5, mode: 'feed' } }]));
   await page.waitForTimeout(500);
   const r = await page.evaluate(() => {
-    const shown = (s) => { const el = document.querySelector(s); return !!el && getComputedStyle(el).display !== 'none'; };
+    const host = document.getElementById('blk-form');
     return {
-      controls: document.querySelectorAll('#blk-form [data-param]').length,
-      wizardView: document.querySelector('#blocks-app .right').classList.contains('wizard-view'),
-      formShown: shown('#blk-formpane'),
-      gcodeShown: shown('#blocks-app .gcode'),
-      gcodeLines: document.querySelectorAll('#blk-gcode .gl').length,
+      controls: host.querySelectorAll('[data-param]').length,
+      formText: host.textContent.trim(),
+      tabs: [...document.querySelectorAll('.blk-tab')].map((b) => b.textContent.trim()),
     };
   });
   expect(r.controls, 'no param controls when just building a program (not editing a wizard)').toBe(0);
-  expect(r.wizardView, 'no wizard tree → the column is not wearing the Wizard View face').toBe(false);
-  expect(r.formShown, 'so the form pane stands down entirely — not an empty pane holding the column').toBe(false);
-  expect(r.gcodeShown, 'and the projected G-code has the space instead').toBe(true);
-  expect(r.gcodeLines, 'with the program actually in it').toBeGreaterThan(0);
+  expect(r.formText, 'the Wizard View tab is truly empty — no leftover placeholder message either').toBe('');
+  expect(r.tabs, 'both tabs stay present regardless (never hidden/removed for lack of a wizard)').toEqual(['Wizard View', '3D']);
+
+  // the 3D tab is unaffected by the Wizard View tab having nothing to show
+  await page.click('.blk-tab[data-tab="3d"]');
+  await page.waitForTimeout(300);
+  const pv = await page.evaluate(() => ({
+    pvVisible: getComputedStyle(document.querySelector('.pv')).display !== 'none',
+    panelMounted: !!document.getElementById('blk-preview-panel').__panel,
+  }));
+  expect(pv.pvVisible, '3D tab shows its pane').toBe(true);
+  expect(pv.panelMounted, 'and the shared preview panel is mounted there').toBe(true);
 });

@@ -21,7 +21,8 @@ import { renderOpForm, formBindings, renderUiTree } from '../ui/formWidgets.js';
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
-import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
+import { getLastOp } from './opRecord.js';   // t1734 amendment — the wizard currently OPEN in the modal (kept live by every wizard's own recordOp on generate/update)
+import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { applyProgramIntent } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview
@@ -127,8 +128,6 @@ export async function showBlocks() {
     } else {
       // The model is empty (fresh tab click), seed it with whatever active op the UI is focused on.
       ops.previewActiveOp();
-      const un = ops.unportedActiveOp(), g = document.getElementById('blk-gcode');
-      if (un && g) g.textContent = `( "${un}" isn't available as blocks yet — port in progress )`;
     }
   } catch (err) { console.error('show blocks failed', err); }
 }
@@ -153,7 +152,6 @@ async function buildWorkspace() {
   const topbar = document.createElement('div'); topbar.className = 'blk-topbar';
   const host = document.createElement('div'); host.className = 'blk-bk-host';
   wsHost.append(topbar, host);
-  const out = document.getElementById('blk-gcode') || document.createElement('div');
   // t756 (R-C) — per-pass sim-start HINTS from the DECLARED source (opSimStarts), read off the whole block program —
   // the SAME registry the editor + wizard previews use, so the Blocks preview seats each pass identically. Retires the
   // legacy WIZARDS[type].inferStart start-source (the imperative per-wizard guess).
@@ -174,9 +172,6 @@ async function buildWorkspace() {
     // The DECLARED start source (opSimStarts) — pass 0 begins at the inferred start, matching the editor + wizard.
     getStart: () => (blkStartHints() || [])[0] || null,
     getStartHints: blkStartHints,
-    // Route the sim's EXECUTING line to the projected G-code view: glow the emitting line (+ a fading comet-tail),
-    // mirroring the read-only editor panel — so watching a run in the Blocks tab lights the very code the blocks emit.
-    onLine: (i) => setExecLine(i),
   }) : { setGcode: () => {}, setActive: () => {}, refresh: () => {}, setHighlights: () => {}, draw: () => {} };
   if (blkPanelHost) blkPanelHost.__panel = panel;   // expose for inspection/tests (mirrors wizardManager's host.__panel)
 
@@ -347,15 +342,14 @@ async function buildWorkspace() {
     try { ws.scroll(30, 30); } catch (_) { /* pre-render */ }
   };
 
-  // Render the right pane (code panel + preview + selection) from a projection { text, lines, map }.
-  // t788 — split into the PROMPT half (code panel · selection · overlays · live form — cheap/moderate, and read
-  // synchronously by glow / the form writeback) and the HEAVY half (the 2D/3D preview: toolpath re-trace + 3D route
-  // rebuild + stock carve). On a block edit the prompt half runs inline (the edit reflects at once) and the heavy half
-  // DEFERS to quiescence (see reproject). A full render (load / resize) runs both, in the original order.
+  // Render the right pane (3D preview + live form) from a projection { text, lines, map }.
+  // t788 — split into the PROMPT half (live form — cheap, and read synchronously by the form writeback) and the
+  // HEAVY half (the 2D/3D preview: toolpath re-trace + 3D route rebuild + stock carve). On a block edit the prompt
+  // half runs inline (the edit reflects at once) and the heavy half DEFERS to quiescence (see reproject). A full
+  // render (load / resize) runs both, in the original order.
+  // t1734 — the code panel (renderCode/applySelection/repaintOverlays, all `#blk-gcode`-only) is gone with the
+  // Projected G-code pane; `p.lines`/`p.map` are unused here now (still read by the model/editor projection elsewhere).
   function renderViewsPrompt(p) {
-    renderCode(p.lines, p.map);
-    applySelection();
-    repaintOverlays();   // re-apply transient hover (.warm) + value-token (.thot) overlays onto the rebuilt spans
     renderLiveForm();    // the wizard's form as a LIVE view of the blocks (only while editing a custom op)
   }
   function renderViewsPreview(p) {
@@ -365,7 +359,7 @@ async function buildWorkspace() {
     // construction (both call applyProgramIntent with their program's op types; the wizard derives the same per op).
     applyProgramIntent(panel, getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
   }
-  function renderViews(p) { renderCode(p.lines, p.map); renderViewsPreview(p); applySelection(); repaintOverlays(); renderLiveForm(); }
+  function renderViews(p) { renderViewsPreview(p); renderLiveForm(); }
 
   // Live FORM view — the wizard's form as a TWO-WAY view of the blocks (only while editing a custom op).
   //  · block→form: derive the bindings (deriveAuthoredDef) on every render. Same structure → sync values into the
@@ -389,19 +383,22 @@ async function buildWorkspace() {
       }
     }
   }
-  // t1589 — the column's face, written from ONE predicate. `.wizard-view` = the Generator Modal; no class = Preview
-  // over Projected G-code. Both mobile labels are derived here rather than hard-coded, so they cannot name a face
-  // the column is not wearing. Re-fit the preview when it becomes visible (a canvas sized while display:none is 0×0).
-  let rightFace = null;
-  function setRightFace(wizard) {
+  // t1734 — THE TAB BAR. Two tabs, ALWAYS present (Wizard View / 3D) — user-clicked, never auto-picked. Replaces
+  // the old ONE-predicate face switch (setRightFace, driven by renderLiveForm's `show`): that predicate decided
+  // whether the Wizard View existed AT ALL, and its own history is two rounds of guessing wrong (see the retired
+  // wizard-face-1599 spec). An always-present tab asks no question, so switching it can never be "wrong" — `show`
+  // still decides the Wizard View tab's CONTENT (the form, or empty), just never whether the tab itself is there.
+  let activeTab = 'wizard';   // static default — never recomputed from wizard-authoring state
+  function setActiveTab(tab) {
+    if (tab !== 'wizard' && tab !== '3d') return;
+    activeTab = tab;
     const right = root.querySelector('.right');
-    if (!right || rightFace === wizard) return;
-    rightFace = wizard;
-    right.classList.toggle('wizard-view', wizard);
-    const name = wizard ? 'Wizard View' : 'Preview';
-    const title = right.querySelector('.blk-drawer-title'); if (title) title.textContent = name;
-    const handle = document.getElementById('blkDrawerHandle'); if (handle) handle.textContent = `▲ ${name}`;
-    if (!wizard) setTimeout(() => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } }, 60);
+    if (right) right.classList.toggle('tab-3d', tab === '3d');
+    root.querySelectorAll('.blk-tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    const handle = document.getElementById('blkDrawerHandle');
+    if (handle) handle.textContent = `▲ ${tab === 'wizard' ? 'Wizard View' : '3D'}`;
+    // Re-fit the preview when its tab becomes visible (a canvas sized while display:none is 0×0).
+    if (tab === '3d') setTimeout(() => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } }, 60);
   }
   /**
    * t1625 — ONE derivation of "the wizard this canvas is showing": the drawer's live form AND "Open as modal"
@@ -437,6 +434,29 @@ async function buildWorkspace() {
     // Preview — the exact trap the wizard-face spec pins.
     if (customizing && (!def || !def.bindings || !def.bindings.length)) {
       const regDef = getUserDef(authoringWizardType());
+      if (regDef) def = regDef;
+    }
+    // t1734 amendment (user-ruled B) — the Wizard View tab mirrors the CURRENTLY OPEN WIZARD too, not only canvas
+    // authoring: open Corner from the bar and switch to Blocks WITHOUT any Customize step, and this tab still shows
+    // Corner. `wizardManager.wizardElement` carries the overlay's own `.active` class, cleared ONLY by close()
+    // (Cancel/Insert) — unlike `_activeType`/getLastOp(), which never reset, so THAT'S the "is it still open right
+    // now" fact, not "was one open at some point" (the same staleness trap `customizing` already guards against,
+    // one layer up). showApp('blocks') hides #studio-app (and the wizard overlay nested inside it) via CSS without
+    // ever calling close() — the modal stays genuinely open, just visually behind the tab. Only a FALLBACK — canvas
+    // authoring above still wins whenever it already produced bindings.
+    // ⚠ STRUCTURE/IDENTITY only, not live VALUES: this shows the def's own declared defaults, not what's currently
+    // typed into the open modal's fields. Tried overlaying getLastOp().params onto def.bindings[].default first —
+    // works for a flat-bindings twin, but a `hasTree` twin (Corner included) renders via formBindings(liveDef) off
+    // userRoot's OWN template tree (each param_field's own embedded dflt), never reading def.bindings for values —
+    // so the overlay silently no-oped for exactly the case the amendment's own example uses. Reaching real value
+    // parity means deep-walking and rewriting that template tree per field, a materially bigger and riskier change
+    // than "mirror which wizard is open" — flagged here rather than shipped half-working (inconsistent per twin
+    // shape is worse than consistently defaults-only). Left for a ruling if live values are actually wanted.
+    if (!def || !def.bindings || !def.bindings.length) {
+      const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
+      const modalOpen = !!(wm && wm.wizardElement && wm.wizardElement.classList.contains('active'));
+      const lastOp = modalOpen ? getLastOp() : null;
+      const regDef = lastOp && getUserDef(lastOp.type);
       if (regDef) def = regDef;
     }
     const userRoot = authoredHere
@@ -522,10 +542,8 @@ async function buildWorkspace() {
     // tests said so within the minute.
     const show = !!authoredHere || customizing || hasTree || (def && (editingWizardType() || (def.bindings && def.bindings.length)));
     pane.hidden = false;
-    // t1589 — `show` is the ONE source for which face this column wears; write it once, let CSS and both mobile
-    // labels read it. Wizard View when there IS one (0bd8b38c's intention, intact); Preview + Projected G-code when
-    // there is not, instead of the placeholder that used to sit in 27% of the tab doing nothing.
-    setRightFace(!!show);
+    // t1734 — `show` now decides ONLY this tab's CONTENT (the form below, or empty): the Wizard View tab itself is
+    // always present regardless (see setActiveTab). No more face to write to CSS.
     // t1625 — the "Open as modal" door follows the wizard face: no wizard on the canvas, no door. Wired here
     // (renderLiveForm runs on every render) so the button needs no separate init path.
     {
@@ -661,105 +679,10 @@ async function buildWorkspace() {
   }
   onChange(({ proj, origin }) => { if (origin !== 'blockly' && origin !== 'reproject') renderFromModel(proj); });   // 'reproject' = our own post-render echo (t1161) — already rendered; do NOT re-render (would loop)
 
-  // ---- code view + linked selection (click a code line ⇄ its Blockly block) ----
-  // EXECUTION GLOW: the sim's active line lights on the projected G-code with a fading comet-tail — the SAME read-out
-  // as the read-only editor panel (`#blk-gcode .gl.active-line` + `[data-exec-age]` in styles.css). `onLine(i)` from the
-  // shared preview panel drives setExecLine; i indexes getProjection().text lines == the `.gl` spans (one per line).
-  let execTrail = [];   // recent .gl elements, newest first (index 0 = the current line)
-  function clearExec() { execTrail.forEach((sp) => { sp.classList.remove('active-line'); sp.removeAttribute('data-exec-age'); }); execTrail = []; }
-  function setExecLine(i) {
-    const el = (i >= 0 && i < out.children.length) ? out.children[i] : null;
-    if (!el || execTrail[0] === el) return;
-    execTrail.unshift(el);
-    execTrail.splice(6).forEach((sp) => { sp.classList.remove('active-line'); sp.removeAttribute('data-exec-age'); });   // age off the tail
-    execTrail.forEach((sp, age) => { sp.classList.toggle('active-line', age === 0); if (age === 0) sp.removeAttribute('data-exec-age'); else sp.dataset.execAge = String(Math.min(age, 5)); });
-    el.scrollIntoView({ block: 'nearest' });
-  }
-  function renderCode(lines, map) {
-    clearExec();   // the .gl spans are about to be replaced — drop the stale exec trail so it can't point at dead nodes
-    const frag = document.createDocumentFragment();
-    lines.forEach((ln, i) => {
-      const span = document.createElement('span');
-      span.className = 'gl'; span.textContent = ln;
-      const src = map[i];                                  // null = program-owned; else ancestry [outer…inner] of Blockly block ids
-      if (src && src.length) { span.dataset.src = src.join(','); span.dataset.owner = src[src.length - 1]; }
-      frag.appendChild(span);
-    });
-    out.replaceChildren(frag);
-  }
-  let selectedId = null;
-  function applySelection(opts = {}) {
-    let firstHot = null, hot = 0;
-    out.querySelectorAll('.gl').forEach((sp) => {
-      const src = sp.dataset.src ? sp.dataset.src.split(',') : null;
-      const on = !!(selectedId && src && src.includes(selectedId));
-      sp.classList.toggle('hot', on);
-      if (on) { hot++; if (!firstHot) firstHot = sp; }
-    });
-    out.classList.toggle('has-sel', !!selectedId);
-    if (selectedId && firstHot && opts.scrollCode) firstHot.scrollIntoView({ block: 'nearest' });
-  }
-  // HOVER (learner aid): mouse over a block → light its emitted lines in the code panel — a LIGHTER glow than
-  // selection, and NO scroll. Reuses the SAME per-line block ancestry (dataset.src) as applySelection, so block→code
-  // mapping comes from the one emit map, not a second one. Independent class (.warm) so it composes with selection.
-  let hoveredId = null;
-  function applyHover(id) {
-    if (id === hoveredId) return;
-    hoveredId = id;
-    out.querySelectorAll('.gl').forEach((sp) => {
-      const src = sp.dataset.src ? sp.dataset.src.split(',') : null;
-      sp.classList.toggle('warm', !!(id && src && src.includes(id)));
-    });
-  }
-
-  // WORD-LEVEL value highlight (.thot): box the exact emitted token(s) a value occupies — driven by hovering a value
-  // field (the precise value under the cursor) OR selecting a leaf atom (all its values). Spans come from the emit via
-  // opGlow.valueTokenRanges / valueRangesForSubtree (perturb+diff provenance, no regex). Wrapping replaces a line
-  // span's text with [text][<span.thot>token</span>][text]; clearing resets textContent (collapses the wraps).
-  let valueHover = null;          // { ownerId, paramKey } of the value under the cursor, or null
-  let selTokens = [];             // cached value-token spans for the current LEAF selection (recomputed on change)
-  const tokenLines = new Set();   // line indices currently carrying .thot wraps (for cleanup)
-  function wrapLine(sp, ranges) {
-    const text = sp.textContent;
-    ranges.sort((a, b) => a[0] - b[0]);
-    const frag = document.createDocumentFragment();
-    let pos = 0;
-    for (const [s, e] of ranges) {
-      if (s < pos || s >= e || e > text.length) continue;        // skip overlaps / out-of-bounds
-      if (s > pos) frag.appendChild(document.createTextNode(text.slice(pos, s)));
-      const tok = document.createElement('span'); tok.className = 'thot'; tok.textContent = text.slice(s, e);
-      frag.appendChild(tok); pos = e;
-    }
-    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
-    sp.replaceChildren(frag);
-  }
-  function paintTokens(ranges) {
-    const gls = out.querySelectorAll('.gl');
-    tokenLines.forEach((i) => { const sp = gls[i]; if (sp) sp.textContent = sp.textContent; });   // restore plain text
-    tokenLines.clear();
-    const byLine = new Map();
-    for (const { line, range } of ranges) { if (!byLine.has(line)) byLine.set(line, []); byLine.get(line).push(range); }
-    byLine.forEach((rs, line) => { const sp = gls[line]; if (sp) { wrapLine(sp, rs); tokenLines.add(line); } });
-  }
-  // hovered value wins (the precise token under the cursor); else the selected leaf's tokens; else nothing.
-  function refreshTokens() { paintTokens(valueHover ? valueTokenRanges(valueHover.ownerId, valueHover.paramKey) : selTokens); }
-  function recomputeSelTokens() {
-    const rec = selectedId ? findModelById(getStack(), selectedId) : null;
-    selTokens = (rec && (!rec.children || !rec.children.length)) ? valueRangesForSubtree(selectedId) : [];   // leaf only (cheap + uncluttered)
-  }
-  function setSelected(id, opts) { selectedId = id; recomputeSelTokens(); applySelection(opts); refreshTokens(); }
-  // re-apply the transient hover + value-token overlays onto the freshly-rebuilt .gl spans (renderCode replaces them
-  // on every projection render, dropping .warm/.thot; the reset-then-apply defeats applyHover's same-id early-return).
-  function repaintOverlays() { const h = hoveredId; hoveredId = null; applyHover(h); recomputeSelTokens(); refreshTokens(); }
-
-  out.addEventListener('click', (e) => {
-    const sp = e.target.closest('.gl');
-    if (sp && sp.dataset.owner) { try { ws.getBlockById(sp.dataset.owner)?.select(); } catch (_) { /* gone */ } setSelected(sp.dataset.owner, { scrollCode: false }); }
-    else setSelected(null);
-  });
-  // Resolve the innermost hovered block to (a) the statement/leaf whose LINES to warm, and (b) the value socket under
-  // the cursor (if any) whose TOKEN to box. A value/reporter block has an outputConnection; walk up past it to the
-  // owning leaf, then map the socket input → the model param key (FN = uppercase, so match case-insensitively).
+  // Resolve the innermost edited block to (a) the statement/leaf whose model atom owns it, and (b) the value socket
+  // under it (if any) → the model param key (FN = uppercase, so match case-insensitively). Feeds recordBlockEdit
+  // below. t1734 — no longer also feeds a code-panel hover highlight; that surface (and the Projected G-code pane
+  // it lit) is deleted, not replaced.
   function resolveHoverTarget(blk) {
     let v = blk, top = null;
     while (v && v.outputConnection) { top = v; v = v.getParent(); }
@@ -772,20 +695,6 @@ async function buildWorkspace() {
     const paramKey = (inputName && rec && rec.params) ? Object.keys(rec.params).find((k) => k.toUpperCase() === inputName) : null;
     return { warmId: leaf.id, value: paramKey ? { ownerId: leaf.id, paramKey } : null };
   }
-  function setHover(warmId, value) {
-    const changed = JSON.stringify(value || null) !== JSON.stringify(valueHover);
-    applyHover(warmId);                                          // early-returns if the warmed block is unchanged
-    if (changed) { valueHover = value; refreshTokens(); }
-  }
-  // Block→code hover: Blockly tags every block's SVG root with data-id, so closest('[data-id]') from the event target
-  // is the innermost hovered block; the grid/empty canvas has none → clear. mouseleave clears on exit.
-  host.addEventListener('mouseover', (e) => {
-    const g = e.target && e.target.closest && e.target.closest('[data-id]');
-    const blk = g && ws.getBlockById(g.getAttribute('data-id'));
-    if (blk) { const t = resolveHoverTarget(blk); setHover(t.warmId, t.value); }
-    else setHover(null, null);
-  });
-  host.addEventListener('mouseleave', () => setHover(null, null));
 
   /**
    * ── t1454 — THE CANVAS'S CONTEXT MENU: our entries JOIN Blockly's, they do not replace it ────────────────────────
@@ -794,16 +703,16 @@ async function buildWorkspace() {
    * oversight. The Blocks canvas ALREADY HAS a right-click menu — Blockly's own, deliberately left alive (the
    * middle-pan guard above says so in as many words: *"RMB (button 2 = context menu) are untouched"*) — and its
    * registry already ships **Duplicate, Delete, Comment, Collapse/Expand and Inline**. Opening our menu on
-   * `contextmenu` would have suppressed all five. Two of them are literally the entries this pass was asked to add,
-   * so "reuse the one mechanism" would have DELETED the very actions it was meant to provide.
+   * `contextmenu` would have suppressed all five. One of them is literally the entry this pass was asked to add,
+   * so "reuse the one mechanism" would have DELETED the very action it was meant to provide.
    *
    * So the canvas keeps ONE menu — the rule's real intent — and we register into it. Duplicate and Delete are
    * therefore already satisfied here and are NOT re-added: a second Delete beside Blockly's would be two entries that
    * must agree forever, which is the same defect as two menus one level down.
    *
-   * RULE 1 holds for both entries: ✎ Edit is the hover chip's action, visible in the editor and in the op menu; and
-   * ▤ Show G-code is what a plain CLICK on a block already does (it selects the op and scrolls the code panel to it) —
-   * the entry names a behaviour the surface has, for a user who has not discovered that clicking does it.
+   * RULE 1 holds: ✎ Edit is the hover chip's action, visible in the editor and in the op menu. t1734 — ▤ Show G-code
+   * (what a plain click on a block already did — select the op and scroll the code panel to it) is deleted along
+   * with the Projected G-code pane it targeted; not replaced.
    */
   (function registerCanvasMenu() {
     const CMR = B.ContextMenuRegistry;
@@ -821,7 +730,6 @@ async function buildWorkspace() {
       });
     };
     reg('ddcsEditOp', (o) => `✎ Edit ${labelOf(o)}`, (o) => { if (window.ddcsEditOp) window.ddcsEditOp(o.id); }, 0.5);
-    reg('ddcsShowGcode', () => '▤ Show G-code', (o) => { try { o.select(); } catch (_) { /* */ } setSelected(o.id, { scrollCode: true }); }, 0.6);
   })();
 
   // DECLARE the edit, don't infer it: when a REAL user change fires (not a UI event, not our own muted model→workspace
@@ -848,11 +756,10 @@ async function buildWorkspace() {
     recordEdit(opBlk.id, t.warmId, detail);
   }
 
-  // ---- workspace events: structural change → re-emit; selection → highlight code ----
+  // ---- workspace events: structural change → re-emit + record edits ----
   ws.addChangeListener((e) => {
-    if (!e.isUiEvent && !muteChanges) { try { recordBlockEdit(e); } catch (_) { /* a recording miss must never break reproject/selection */ } }
-    if (e.type === B.Events.SELECTED) { setSelected(e.newElementId || null, { scrollCode: true }); }
-    else if (e.element === 'field' && _ops) {
+    if (!e.isUiEvent && !muteChanges) { try { recordBlockEdit(e); } catch (_) { /* a recording miss must never break reproject */ } }
+    if (e.element === 'field' && _ops) {
       try {
         const blk = ws.getBlockById(e.blockId);
         // t154 — a STRUCTURAL-CONTROL edit drives the guards: find the enclosing user op, gather ALL its sc_* values into
@@ -930,11 +837,11 @@ async function buildWorkspace() {
   // Canvas fills the tab; the right column = bottom drawer, palette = left drawer over canvas. The drawer translates
   // (keeps its size off-screen) → re-render on open. Palette uses the toolbox's own setVisible() so the canvas
   // actually reclaims the width when collapsed.
-  // t1589 — the `blkSegPv` / `blkSegCode` segmented toggle and its `showPane` wiring are GONE, not merely unbound.
-  // 0bd8b38c deleted the buttons and this code has been calling `document.getElementById` on nothing ever since;
-  // the ruling that brought the panes back explicitly does not bring the toggle back, so the drawer stacks both
-  // panes instead of hiding one behind a control. Which FACE the column wears is setRightFace's business, and it
-  // reads the same `show` predicate as the form — it is not a thing the user toggles.
+  // t1734 — the `blkSegPv` / `blkSegCode` segmented toggle and its `showPane` wiring are GONE, not merely unbound
+  // (0bd8b38c deleted the buttons; this code called `document.getElementById` on nothing ever since). What replaced
+  // it, later the same arc, is the `.blk-tabs` bar wired just below: a REAL user-facing toggle between Wizard View
+  // and 3D — the thing that comment used to say was deliberately absent. setRightFace/`show` no longer pick the
+  // face; `show` only decides the Wizard View tab's content now (see renderLiveForm).
   (function wireDrawers() {
     const right = root.querySelector('.right');
     const handle = document.getElementById('blkDrawerHandle');
@@ -946,6 +853,11 @@ async function buildWorkspace() {
     const openPv = (on) => { right.classList.toggle('open', on); if (handle) handle.setAttribute('aria-expanded', String(on)); if (on) setTimeout(refit, 260); };
     handle && handle.addEventListener('click', () => openPv(true));
     closeBtn && closeBtn.addEventListener('click', () => openPv(false));
+
+    // The Wizard View / 3D tab bar — static default (Wizard View) set once at build; every further change is a
+    // direct user click, never recomputed from wizard-authoring state.
+    root.querySelectorAll('.blk-tab').forEach((b) => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
+    setActiveTab('wizard');
 
     // Drag the top edge to resize the preview drawer. Height lives in --blk-pv-h (only the mobile rule reads it,
     // so desktop is untouched) and persists across sessions.
@@ -994,35 +906,6 @@ async function buildWorkspace() {
         refit();   // re-fit the preview to the new column width
       };
       colResize.addEventListener('pointerdown', (e) => {
-        dragging = true; e.preventDefault();
-        window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
-      });
-    }
-
-    // Desktop: drag the horizontal divider to resize the Preview pane vs the Projected G-code pane below it.
-    // Split height lives in --blk-pv-split on .right and persists across sessions.
-    const rowResize = right.querySelector('.blk-row-resize');
-    const pvPane = right.querySelector('.pv');
-    if (rowResize && pvPane) {
-      try { const h = parseInt(localStorage.getItem('ddcs_blk_pv_split'), 10); if (h > 0) right.style.setProperty('--blk-pv-split', h + 'px'); } catch (_) { /* */ }
-      let dragging = false;
-      const onMove = (e) => {
-        if (!dragging) return;
-        const y = e.touches ? e.touches[0].clientY : e.clientY;
-        const pvTop = pvPane.getBoundingClientRect().top;
-        const rr = right.getBoundingClientRect();
-        const h = Math.max(120, Math.min(Math.round(rr.bottom - pvTop - 90), Math.round(y - pvTop)));
-        right.style.setProperty('--blk-pv-split', h + 'px');
-        try { panel.refresh(); } catch (_) { /* re-fit the 3D preview to the new height */ }
-      };
-      const onUp = () => {
-        if (!dragging) return;
-        dragging = false;
-        window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
-        try { localStorage.setItem('ddcs_blk_pv_split', parseInt(right.style.getPropertyValue('--blk-pv-split'), 10) || ''); } catch (_) { /* */ }
-        try { panel.refresh(); } catch (_) { /* */ }
-      };
-      rowResize.addEventListener('pointerdown', (e) => {
         dragging = true; e.preventDefault();
         window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
       });

@@ -24837,3 +24837,239 @@ investigation (reading `blocksApp.js`'s change-listener gate logic, `opToolbox.j
 than pattern-matching the previous turn's fixes onto files that turned out to need a materially different
 diagnosis. One citation fix in production data (`trigEvidence.js`) rather than the test, per instruction. Full
 personal run of the 2474-test suite (not delegated, not sampled) as the explicit gate. Full working room used.
+
+
+## Turn 1734 (worker) — Cycle GAMEPLAN STEP 3: THE BLOCKS TAB IS THE WIZARD VIEW
+
+### Task
+
+Dispatch: the Blocks-tab right column becomes TWO TABS, both ALWAYS PRESENT unconditionally — "Wizard View" (the
+wizard's live form when one is loaded, truly EMPTY otherwise — including a plain, non-wizard op selected — never a
+synthesized substitute) and "3D" (the program's toolpath preview, always meaningful). Projected G-code is DELETED,
+not hidden — the block-to-line link it drove is an explicitly accepted loss. This deletes the four-term wizard-face
+predicate at the old `blocksApp.js:523` (`authoredHere || customizing || hasTree || def.bindings.length`) plus
+`setRightFace` and its `.wizard-view` class toggling, and the two dead container blocks `sim_3d_box` /
+`code_preview_panel` — `layout_2d_canvas` stays (the shape vocabulary round-trips through it).
+
+### What shipped
+
+**`web/wizards/ops/vizBlocks.js` + `web/wizards/ops/index.js`** — deleted `sim3dBoxBlock`/`codePreviewPanelBlock`
+(both zero-reader containers per t1724's trace, confirmed again live: neither carries a `.mouth`, so even the
+generic Blockly round-trip mechanism `layout_2d_canvas` rides never touches them). Kept `layout_2d_canvas` and the
+four shape primitives untouched. Trimmed the import + PALETTE array in `index.js` to match.
+
+**`web/index.html`** — the `.right` column's three panes (`.blk-formpane` / `.pv` / `.gcode`) become two: a new
+`.blk-tabs` bar (two `<button role="tab">`, "Wizard View" / "3D") sits above `.blk-formpane` and `.pv`; `.gcode`
+(`#blk-gcode`) is deleted outright. Dropped the mobile drawer header's dynamic `.blk-drawer-title` span (the tab
+bar names the content now, so the separate title text was redundant with — and only ever mirrored — what
+`setRightFace` used to write there).
+
+**`web/styles.css`** — replaced the `.wizard-view` class-based single-face switch with `.blk-tabs`/`.blk-tab`
+styling and a `.tab-3d` class-based switch (same polarity pattern: default/no-class = Wizard View, `.tab-3d` =
+opt-in 3D). `.pv` changed from a fixed/resizable split height (`var(--blk-pv-split, 320px)`) to `flex:1;
+height:100%; max-height:100%` — same sizing contract as `.blk-formpane`, since it's now the SOLE content of its
+tab rather than sharing the column with `.gcode` below it. Deleted the entire code-view CSS block (`.gl`, `.thot`,
+exec-line glow `.active-line`/`[data-exec-age]`, `.has-sel`/`.warm`/`.hot`) — all `#blk-gcode`-only. Deleted
+`.blk-row-resize` styling (nothing left to split). Simplified the mobile media query: the old "both panes stack,
+50/50, no toggle" block is gone — the tab bar's base rules (not mobile-gated) already make Wizard View / 3D
+mutually exclusive in the drawer too, for free.
+
+**`web/blocks/blocksApp.js`** (the bulk of the change):
+- `setRightFace`/`rightFace` deleted; replaced with `setActiveTab(tab)` — a **static default** ('wizard' on every
+  build, never recomputed from wizard-authoring state) that only changes on an explicit tab click. This is the
+  literal fix for what the dispatch's "patched twice for guessing wrong" comment was about: the old system
+  RECOMPUTED which face to show on every render; the new one asks once, then only a user click ever changes it.
+  Re-fits the 3D preview (`panel.setActive(true); panel.refresh()`) when the 3D tab becomes visible — same
+  0×0-while-hidden fix `setRightFace` used to do, now triggered by the click handler instead.
+- `renderLiveForm`'s `show` predicate (the `deriveLiveWizard` facts: `authoredHere`/`customizing`/`hasTree`/`def`)
+  is **completely unchanged** — it still decides only whether `#blk-form` gets the wizard's form or is left
+  truly empty (`formHost.innerHTML = ''`). The ONLY edit here is deleting the `setRightFace(!!show)` call and its
+  comment: `show` no longer also picks which pane is visible, only what the (always-visible-when-its-tab-is-active)
+  Wizard View pane contains.
+- Deleted the entire `#blk-gcode`-rendering machinery: `out`, `renderCode`, `execTrail`/`clearExec`/`setExecLine`
+  (exec-line glow), `selectedId`/`applySelection`/`setSelected` (the code-panel selection state — the Blockly
+  `SELECTED` event no longer drives anything here), `hoveredId`/`applyHover`, `valueHover`/`selTokens`/`tokenLines`/
+  `wrapLine`/`paintTokens`/`refreshTokens`/`recomputeSelTokens`/`repaintOverlays` (word-level value-token boxing),
+  and the `host` mouseover/mouseleave listeners that drove hover-warming. `resolveHoverTarget` **survives** — it's
+  also used by `recordBlockEdit` to resolve which model atom a field edit belongs to, independent of the code
+  panel — confirmed by checking both call sites before deleting anything.
+  `createPreviewPanel(...)`'s `onLine` option is simply no longer passed (it was always optional there — no change
+  needed in `createPreviewPanel.js` itself).
+- `renderViewsPrompt`/`renderViewsPreview`/`renderViews` trimmed to drop the code-panel calls; `renderLiveForm()`
+  and `panel.setGcode(p.text)` (which feeds the 3D SIM, unrelated to the visible G-code pane) both survive intact.
+- The canvas context menu's `▤ Show G-code` entry deleted (it and a plain click did the same thing — select the op
+  and scroll the code panel to it — and the pane is gone); `✎ Edit` is untouched.
+- `wireDrawers()`: deleted the `.blk-row-resize` drag block (Preview-vs-G-code split, nothing to split now); added
+  the tab-click wiring (`root.querySelectorAll('.blk-tab').forEach(...)`) + the one-time `setActiveTab('wizard')`
+  seed. Updated its own stale comment (used to say "not a thing the user toggles" about the exact mechanism this
+  turn made a real toggle).
+- `showBlocks()`: the "unported op" status message (`"${un}" isn't available as blocks yet — port in progress`)
+  wrote into `#blk-gcode`, now deleted — no new home invented for it (same "don't invent a replacement" principle
+  the dispatch states for the pane itself; an unported-op empty canvas now just shows the same honest emptiness as
+  any other no-wizard state). `unportedActiveOp()` (`web/blocks/opSession.js`) became fully unused as a result and
+  was deleted too (checked: its only two references were its own definition and this one call site).
+- Cleaned up now-dead imports: `valueTokenRanges`/`valueRangesForSubtree` (from `opGlow.js`) were only ever called
+  by the deleted `refreshTokens`/`recomputeSelTokens` — trimmed from the import. Verified they're NOT orphaned in
+  `opGlow.js` itself (still exported, still independently tested by `value-token-ranges.spec.js` /
+  `text-glow-cap.spec.js`) — only blocksApp.js's local usage is gone, so the functions themselves were left alone.
+
+**`ARCHITECTURE.md`** — rewrote the "wizard-shape-block vocabulary" section: was "SIX types, one working consumer,
+three declared-but-unread containers"; now explains `layout_2d_canvas` is wired GENERICALLY (bridge.js's
+`mouthOf(def)` branch gives any def with a `.mouth` a Blockly mouth regardless of type — which is why grepping the
+literal string finds nothing even though it's live), while `sim_3d_box`/`code_preview_panel` carried neither a
+`.mouth` nor any other consumer and are now deleted.
+
+### Design decisions made (not fully dictated by the dispatch, made explicit here for the advisor to confirm/amend)
+
+- **Default active tab = "Wizard View", static, never recomputed.** The dispatch says both tabs are always present
+  but doesn't specify which is active on a fresh Blocks-tab open. Chose Wizard View because it matches the page's
+  own pre-JS default markup (the drawer title/handle already defaulted to that text before any JS ran) and because
+  re-deriving "which tab should be active" from wizard-authoring state would have reintroduced exactly the kind of
+  guessing-logic the dispatch is retiring. A user click is the only thing that ever changes it thereafter.
+- **The tab bar is now visible on DESKTOP too**, not just mobile. Previously desktop had NO visible switch
+  mechanism at all (the face was entirely auto-picked); the mobile drawer's `.blk-drawer-head` title was the only
+  place a "which face" signal showed, and only on phones. The new `.blk-tabs` bar is a single, unconditional
+  element used at both breakpoints — this also let the mobile media query SHRINK (the old "stack both panes,
+  50/50, no toggle" workaround is gone; the tab bar's base rules already give mobile the same one-at-a-time
+  behavior as desktop, for free).
+- **The "unported op" status message has no new home.** Applied the dispatch's own "do not invent a replacement"
+  principle to a second, smaller case it didn't explicitly name.
+
+### Collateral test handling
+
+**Retired (fixme), no successor surface exists — 3 files, 9 tests**, each with a per-test reason citation:
+- `blocks-code-panel-live-1589.spec.js` (5 tests) — the file's whole purpose was proving `#blk-gcode`'s highlight
+  classes are actually PAINTED (attached + visible), not just set on a detached node. The pane, every class it
+  checks, and blocksApp's machinery that set them are all deleted together.
+- `blocks-exec-glow.spec.js` (1 test) — the sim execution-line glow on the projected G-code; `setExecLine`/
+  `clearExec`/`execTrail` deleted.
+- `blocks-hover.spec.js` (3 tests) — block-hover code-line warming + value-hover/leaf-select token-boxing, all
+  `#blk-gcode`-only (confirmed `resolveHoverTarget`'s OTHER caller, `recordBlockEdit`, is untouched and unrelated).
+
+**Repointed — file/test survives, assertions retargeted at what's actually unchanged:**
+- `blocks-live-form.spec.js` — last test's `wizardView`/`gcodeShown`/`gcodeLines` DOM checks (class + deleted pane)
+  replaced with `#blk-form` content emptiness + "both tabs present" + "3D tab still shows the mounted preview
+  panel" — same underlying claim ("no wizard form conjured for a plain op"), now also covering dispatch
+  verification (b) as an automated regression.
+- `blocks-mobile-drawers.spec.js` — the "segmented toggle retired, panes stack 50/50" section rewritten to drive
+  the real tab clicks in the drawer and assert one-at-a-time visibility, same as desktop.
+- `context-menu-blocks-1454.spec.js` — 3 spots: dropped the "Show G-code" assertion from the "keeps one menu"
+  test; dropped the "Show G-code" half of "the entries act" (renamed, Edit half kept verbatim); swapped the
+  "hidden off an op" precondition test from `/Show G-code/i` to `/Edit/i` (the entry that still exists and is
+  still conditionally hidden the same way).
+- `wizard-face-1599.spec.js` — full repoint (this file WAS the four-term predicate's own regression-guard spec,
+  named directly in the dispatch). `face()` now reads `#blk-form`'s content only (`formText`/`fields`), never the
+  deleted `.wizard-view` class or `.blk-drawer-title` text. Every assertion keeps its original CLAIM (customizing
+  a fork-only twin renders real fields; a plain program / a placed twin renders nothing; mid-edit says what's
+  missing) — only the DOM surface it reads from changed. Kept the full historical trace comment (the
+  Customize-route nesting bug, the fork-only `editingWizardType()` gap, the placed-twin trap) since
+  `deriveLiveWizard`'s logic — and the reasons it looks the way it does — is completely unchanged by this turn.
+  — **Found and fixed a pre-existing, unrelated harness bug while verifying this repoint**: `boot()` never opened
+  the Blocks tab, so `window.__blkws` was undefined for 3 of the file's 4 tests (only the 4th, which calls
+  `ddcsEditWizardDef`, happened to open Blocks as a side effect of that function). Confirmed via
+  `editWizardDef`'s source (`devMode.js:579`, `window.showApp('blocks')`) vs `ddcsLoadBlockStack`
+  (`programModel.js:252`, pure model update, no navigation) that this was a structural gap in the ORIGINAL file,
+  not something this turn's app changes caused — reproduced deterministically in isolation (`--workers=1`) before
+  touching it. Fixed by having `boot()` also call `showApp('blocks')` and wait for `window.__blkws`.
+- `palette-by-role-1623.spec.js` — dropped `sim_3d_box`/`code_preview_panel` from the `previews` category's
+  anchor-membership spot-check (line 59); the file's OWN stronger self-consistency assertion (`r.previews` must
+  equal `r.byCat.previews`, derived live from the registry) was already correct and untouched.
+- `ui-tree-unwired-1561.spec.js` — swapped `code_preview_panel` (used only as an example "not yet wired" type,
+  unrelated to the block's registration status) for a synthetic `future_viz_box_type`, matching the file's own
+  established pattern one test down (`future_container_type`/`future_item_type`) — keeps the test meaningful and
+  immune to any future block's lifecycle, rather than quietly citing a now-deleted block as if it still existed.
+
+**No action needed (checked directly, confirmed unaffected)**: `blocks-rotary-rig.spec.js` (unrelated
+`#blk-preview-panel` usage), `corner-structctl.spec.js` / `op-declared-edits.spec.js` / `studio-to-blocks.spec.js`
+/ `whole-program-intent-756.spec.js` (comment-only historical `#blk-gcode` references, already reading from the
+model per an earlier t1587 migration), `enum-options-codec-1607.spec.js` / `param-group-rows-1605.spec.js`
+("wizard-view face" used only as descriptive English for `#blk-form`'s content, never the CSS class),
+`blocks-edit-fail-loud-1518.spec.js` (mentions `renderLiveForm` only in an explanatory comment about an unrelated,
+not-reproduced bug hypothesis).
+
+### Verify
+
+- **Real gestures, screenshots** (dispatch's explicit ask), driven via a scratch spec
+  (`tests/zzdebug-1734-manual-verify.spec.js`, left untracked, not committed — project convention per
+  `zzdebug-1730-fallback.spec.js`): (a) Customize → corner: Wizard View tab shows 23 real fields, switching to 3D
+  hides the form and shows the mounted preview panel with a live sim readout, switching back still shows the form;
+  (b) a plain 3-block program: Wizard View tab is byte-empty (0 fields, `textContent === ''`), 3D tab still works;
+  (c) empty workspace: both tabs present with correct labels, Wizard View tab empty; (d) mobile drawer (390×800):
+  tab bar renders inside the bottom drawer, 3D tab click correctly swaps visibility there too. Screenshots
+  reviewed directly (not just asserted) — confirmed visually correct in all four scenarios.
+- **fork-parity-1593.spec.js** — 2/2 passed (registry partition + the real per-twin fork gesture: form + emit
+  BYTE FOR BYTE across all shipped twins). This act never touches emit; expected and confirmed.
+- **Node tier** (`npm run test:node`) — 118/118 passed, 0 failed.
+- **Fast tier**: all 23 `blocks-*.spec.js` files + `wizard-face-1599`/`palette-by-role-1623`/
+  `ui-tree-unwired-1561`/`context-menu-blocks-1454`/`wizard-shapes-1627` together — 59 passed, 9 skipped
+  (the fixme's, exact expected count), 0 failed. Two unrelated tests (`blocks-mmb-pan`'s empty-canvas pan,
+  `blocks-rotary-rig`) flaked once on a 6-worker parallel run (`ddcsStudio`/`showApp` boot timeout — cold-start
+  contention, not this turn's surface) and passed clean on the immediate re-run.
+
+### Capacity
+
+A large, single-surface UI restructure (one column, one JS file doing most of the work) but with wide collateral —
+14 test files needed inspection, 9 needed edits ranging from a one-line array trim to a full-file repoint, plus one
+unrelated pre-existing bug found and fixed along the way. Investigated before writing any code (vizBlocks.js's
+exact declarations, every CSS rule governing the column, every JS function touching `#blk-gcode`/`#blk-preview-
+panel`, all 14 candidate test files read individually rather than pattern-guessed from grep hits alone — one
+initial mis-attribution while eyeballing a large parallel grep batch was caught and corrected by re-checking
+directly rather than trusted). Verified with a real browser pass (screenshots, not just green assertions) before
+touching the test suite, which caught nothing wrong in the implementation but caught two setup bugs in my OWN
+scratch script (wrong "load a wizard" gesture, wrong default viewport) — worth naming since the same category of
+mistake was hiding in the pre-existing `wizard-face-1599.spec.js` too. Full working room used; suite is clean.
+
+
+## Turn 1734 AMENDMENT (worker) — the Wizard View tab also mirrors a wizard opened from the BAR
+
+An amendment landed after the main turn's verification pass but before commit (polled per protocol, incorporated
+before passing): the Wizard View tab must mirror the CURRENTLY OPEN WIZARD, not only canvas/Customize-route state.
+Today's `deriveLiveWizard()` reads the Blockly workspace exclusively — opening a built-in from the bar (no
+Customize step) and switching to Blocks showed EMPTY, which the ruling calls wrong. Correct: open Corner from the
+bar, switch to Blocks, the Wizard View tab shows Corner. No Customize-as-blocks step required first — that step is
+unchanged for what it already does (editing the raw stack). Honesty rule unchanged: EMPTY when no wizard is open at
+all, EMPTY on a plain op; it just triggers less often now. The deletions from the main dispatch are untouched by
+this — identical either way.
+
+### What shipped
+
+`web/blocks/blocksApp.js`'s `deriveLiveWizard()` gained one more FALLBACK (after the existing canvas-authoring
+checks, only consulted when none of them already produced usable bindings): if `wizardManager.wizardElement`
+carries its own `.active` class (the overlay's genuine open/closed state, cleared ONLY by `close()` — Cancel or
+Insert — never by a tab switch) AND `opRecord.js`'s `getLastOp()` names a type with a registered def, that def
+becomes the Wizard View tab's content.
+
+Two things worth being explicit about, both traced live rather than assumed:
+- **`showApp('blocks')` does not close the wizard.** It only toggles `.hidden` on `#studio-app` (checked in
+  `gatewayStatus.js`); the wizard overlay is born INSIDE `#studio-app` by default (per the pre-existing
+  `openLiveAsModal` comment) and rides that CSS hide — it stays genuinely `.active` in the JS model, just visually
+  behind the Blocks tab. This is WHY `wizardElement.active` (not `_activeType`, which never resets on close — same
+  staleness shape `customizing` already guards against one layer up) is the correct "is it still open right now"
+  signal, confirmed by checking every `this.close(` call site in `wizardManager.js` (backdrop click, Escape,
+  Cancel, and both branches of Insert all reach it).
+- **Value parity was attempted, then deliberately scoped back out.** First cut overlaid `getLastOp().params` onto
+  `def.bindings[].default`, matching what's live-typed into the open modal. Verified via a diagnostic that
+  `getLastOp()` genuinely does carry live values (`dist: 500` → `777` after a `fill()` + `wizardManager.update()`).
+  But the override never reached the screen for Corner: a `hasTree` twin renders through
+  `formBindings({...def, template:[userRoot]})`, which re-derives field values from `userRoot`'s OWN template tree
+  (each `param_field`'s embedded `dflt`), never from `def.bindings` — so the overlay silently no-oped for exactly
+  the shape the amendment's own example uses, while it WOULD have worked for a flat-bindings twin. Inconsistent
+  behaviour across twin shapes is worse than none, and reaching real parity means deep-walking and rewriting that
+  template tree per field — a materially bigger, riskier change than "mirror which wizard is open." Shipped the
+  safe version (shows the def's own declared defaults, not the other modal's current keystrokes) and left the
+  comment naming the fork explicitly. **Flagging for a ruling**: is default-values-only sufficient, or is live
+  value parity actually wanted enough to justify the template-tree rewrite?
+
+### Verify
+
+- Scratch spec (`tests/zzdebug-1734-manual-verify.spec.js`, untracked): open Corner from the bar (no Customize),
+  set a distinctive value, switch to Blocks WITHOUT closing the wizard — Wizard View tab shows Corner's 23 fields
+  (screenshot confirmed: the Blocks CANVAS is genuinely empty, nothing placed, yet the tab shows the form) with the
+  def's declared default (500, not the typed 777 — the scoped-back limitation, asserted explicitly so it fails
+  loud if that changes silently). Then closed the wizard for real (`wizardManager.close()`, simulating Cancel) and
+  confirmed the mirror goes away — 0 fields, empty text — the honesty rule still binds.
+- Re-ran the full fast tier (all `blocks-*.spec.js` + `wizard-face-1599`/`palette-by-role-1623`/
+  `ui-tree-unwired-1561`/`context-menu-blocks-1454`/`wizard-shapes-1627`, 68 tests) after this change: 59 passed,
+  9 skipped (unchanged), 0 failed — the existing honesty guarantees ((b)/(c) from the main verification) still hold.
+- Re-ran `fork-parity-1593.spec.js`: 2/2 passed — this is a form-derivation change, not an emit change, and the
+  gate confirms it.

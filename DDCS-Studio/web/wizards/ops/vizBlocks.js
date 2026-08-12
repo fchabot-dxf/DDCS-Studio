@@ -1,14 +1,11 @@
 /**
  * wizards/ops/vizBlocks.js — Standalone preview & visualizer declaration UI blocks.
- * Declares 3D toolpath simulation, 2D interactive feature canvas, and G-code output boxes.
+ * Declares the 2D interactive feature canvas + its shape vocabulary.
+ * t1734 — sim3dBoxBlock ('sim_3d_box') and codePreviewPanelBlock ('code_preview_panel') were deleted here: zero
+ * readers anywhere in the app (confirmed at t1724, acted on at t1734), and the Blocks-tab right column no longer
+ * has a placeholder-container concept for either — 3D preview and G-code are handled by the tab machinery itself
+ * (blocksApp.js), not by a droppable block. See ARCHITECTURE.md and WORK-LOG t1734.
  */
-export const sim3dBoxBlock = {
-    type: 'sim_3d_box', label: '3D toolpath box', category: 'Wizard Previews',
-    defaults: { minHeight: '300px', showControls: true },
-    fields: ['minHeight', 'showControls'],
-    emit: () => [],
-};
-
 export const layout2dCanvasBlock = {
     // t1627 — `kind: 'uibox'`: a UI container that HOLDS declarations (the shape primitives nest in its DO mouth)
     // and never emits its children. A NEW declared kind on the existing mouth axis — the t1595 guard precedent:
@@ -68,10 +65,3 @@ export const shapeMarkerBlock = {
 /** ONE source for "is this a 2D shape declaration" — the spec builder draws them, the ui-tree walker skips them
  *  (their rendering IS the canvas), and a future lint names them. A fifth primitive is a row here. */
 export const SHAPE_2D_TYPES = new Set(['shape_rect', 'shape_circle', 'shape_line', 'shape_marker']);
-
-export const codePreviewPanelBlock = {
-    type: 'code_preview_panel', label: 'G-code preview', category: 'Wizard Previews',
-    defaults: { title: 'Code Preview', maxHeight: '150px' },
-    fields: ['title', 'maxHeight'],
-    emit: () => [],
-};

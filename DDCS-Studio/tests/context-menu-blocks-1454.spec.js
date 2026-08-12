@@ -7,11 +7,14 @@ import { test, expect } from '@playwright/test';
  * This canvas ALREADY HAS a right-click menu — Blockly's own, deliberately left alive (blocksApp's middle-pan guard
  * states it: *"RMB (button 2 = context menu) are untouched"*) — and its registry already ships **Duplicate, Delete,
  * Comment, Collapse/Expand and Inline**. Opening the app's `openMenu` on `contextmenu` would have suppressed all
- * five, and TWO OF THEM are the entries this pass was asked to add. So "reuse the one mechanism" is honoured as its
- * real intent — the surface keeps ONE menu — by REGISTERING into Blockly's rather than covering it.
+ * five, and ONE OF THEM was among the entries this pass was asked to add. So "reuse the one mechanism" is honoured
+ * as its real intent — the surface keeps ONE menu — by REGISTERING into Blockly's rather than covering it.
  *
- * The test therefore asserts BOTH halves, because either alone would be misleading: our entries appear, AND
+ * The test therefore asserts BOTH halves, because either alone would be misleading: our entry appears, AND
  * Blockly's survive. A test that only checked ours would pass on the version that deleted Duplicate and Delete.
+ *
+ * t1734 — ▤ Show G-code (this pass's OTHER entry) is deleted along with the Projected G-code pane it targeted;
+ * see the trimmed assertions below and blocks-code-panel-live-1589.spec.js for the fuller retirement note.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -74,35 +77,24 @@ test('THE CANVAS KEEPS ONE MENU — ours joins Blockly\'s, and Blockly\'s SURVIV
     expect(r.err, 'the canvas really has an op block').toBeUndefined();
     expect(r.opened, 'right-clicking an op block opens a context menu').toBe(true);
     const all = r.items.join(' | ');
-    // OURS — the two the pass adds
+    // OURS — t1734: Show G-code deleted along with the Projected G-code pane it targeted; Edit survives
     expect(all, 'our Edit entry, naming the op').toMatch(/Edit/);
-    expect(all, 'and Show G-code').toMatch(/Show G-code/i);
     // ⚠ BLOCKLY'S — the half a "replace the menu" implementation would have silently deleted. These are the reason
     // Duplicate and Delete are NOT re-added by us: they already exist here, and two of each would have to agree forever.
     expect(all, 'Blockly\'s Duplicate survives — it is already this surface\'s Duplicate').toMatch(/Duplicate/i);
     expect(all, 'and Blockly\'s Delete').toMatch(/Delete/i);
 });
 
-test('THE ENTRIES ACT — Edit opens the op\'s wizard, Show G-code selects it in the code panel', async ({ page }, testInfo) => {
+test('THE ENTRY ACTS — Edit opens the op\'s wizard', async ({ page }, testInfo) => {
     await seedAndOpen(page);
     await page.evaluate(() => { window.__ddcsEditCalls = []; const real = window.ddcsEditOp; window.ddcsEditOp = (id) => { window.__ddcsEditCalls.push(id); return real && real(id); }; });
     const r = await menuOnOp(page);
     await page.screenshot({ path: 'test-results/t1454-shots/blocks-canvas-menu.png' });
     await testInfo.attach('t1454-blocks-canvas-menu', { path: 'test-results/t1454-shots/blocks-canvas-menu.png', contentType: 'image/png' });
 
-    // SHOW G-CODE — pick the entry with the REAL mouse (a Blockly menu item answers pointer events, not `.click()`;
-    // measured the same way the menu itself was), then assert the code panel really selected THIS op — the `.has-sel`
-    // contract the panel already uses for a plain click. The entry only names a behaviour the surface had but never
-    // advertised, so asserting the panel's own state is asserting that the shortcut and the click agree.
-    await pickMenuItem(page, /Show G-code/i);
-    const shown = await page.evaluate(() => {
-        const out = document.getElementById('blk-gcode');
-        return { hasSel: !!out && out.classList.contains('has-sel'), selLines: out ? out.querySelectorAll('.gl.sel, .gl.on').length : 0 };
-    });
-    expect(shown.hasSel, 'the code panel is now in its selected state for that op').toBe(true);
-
-    // EDIT — reopen the menu and pick Edit; assert it routed to the app's ONE edit hook with THIS op's id.
-    await menuOnOp(page);
+    // t1734 — this test used to also pick "Show G-code" and assert the code panel selected the op; that entry and
+    // the pane it targeted are both deleted (see the file header). EDIT — pick it; assert it routed to the app's
+    // ONE edit hook with THIS op's id.
     await pickMenuItem(page, /Edit/);
     const calls = await page.evaluate(() => window.__ddcsEditCalls || []);
     expect(calls.length, 'Edit called the app\'s one edit hook').toBeGreaterThan(0);
@@ -126,5 +118,6 @@ test('THE ENTRIES ARE HIDDEN OFF AN OP — never a dead row', async ({ page }) =
         return { type: loose.type, items };
     });
     if (r.skipped) { test.info().annotations.push({ type: 'note', description: r.skipped }); return; }
-    expect(r.items.join(' | '), `off an op (${r.type}), Show G-code must not appear`).not.toMatch(/Show G-code/i);
+    // t1734 — was Show G-code (deleted with the Projected G-code pane); Edit is now the entry this precondition guards.
+    expect(r.items.join(' | '), `off an op (${r.type}), Edit must not appear`).not.toMatch(/Edit/);
 });
