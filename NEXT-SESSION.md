@@ -1316,3 +1316,47 @@ wiz" — and separately, "no save file exist on my end."** Correct on both count
 **DROPPED. Tier A and Tier B delete on the same gate: fork-parity + node tier + a normal app boot. No new
 UI, no new fallback message, no dedicated legacy-path test.** If deletion later surfaces a REAL crash on a
 path that matters, that is a normal bug to fix then — not a reason to have pre-built ceremony now.
+
+---
+
+# 🔨 GAMEPLAN STEP 3 — THE BLOCKS TAB IS THE WIZARD VIEW (user: "yes", 2026-08-11)
+The user's spec, gathered across items 8/8b/8c/8d/8e — read those for the reasoning; this is the act.
+
+## THE SHAPE
+Right column = **TWO TABS, both ALWAYS PRESENT, unconditionally: "Wizard View" and "3D".**
+- **Wizard View tab content:** the wizard when one is loaded. **EMPTY otherwise — including when a plain
+  op is selected.** It never reaches for something to show.
+- **3D tab:** the program's 3D preview. Always meaningful.
+- **Projected G-code: DELETED.** Both faces. The block→line link goes with it — the user has explicitly
+  accepted that; do NOT preserve the pane "just in case" and do NOT invent a replacement.
+
+## WHAT THIS DELETES (the point of the act — it removes more than it adds)
+1. **The four-term wizard-face predicate** (`blocksApp.js:523`):
+   `show = authoredHere || customizing || hasTree || (def && (editingWizardType() || def.bindings.length))`
+   — plus `setRightFace()` and the `.wizard-view` class-toggling that reads it. That predicate is a PROXY
+   for "is a wizard being authored" and its OWN comment records it being patched twice for guessing wrong
+   (surfacing showed the Preview face with the Define-Custom-Wizard block sitting on the canvas — a
+   user-reported gap). **Two always-present tabs ask no question, so there are no wrong answers.**
+2. **The projected-G-code pane** and its code-panel rendering in that column.
+3. **The two dead container blocks** — `sim_3d_box`, `code_preview_panel` (zero readers, but DRAGGABLE in
+   the palette today, so a user can place one and nothing happens). They ARE these two panes as blocks;
+   deleting the face and deleting them is ONE change.
+   ⚠ **`layout_2d_canvas` is ALIVE — the shape vocabulary round-ABOUTS through it. KEEP IT.** The advisor
+   twice mis-reported all three as dead; corrected at t1726.
+
+## THE HONESTY PROPERTY — the point, not a nice-to-have
+**A Wizard View shown with no wizard behind it would be a lie about what the user is looking at** — the
+same class of fault as a control that does nothing or a picture that disagrees with the program. An EMPTY
+tab is honest; a tab that always shows *something* is not. **Forbidden substitutes:** the op's
+parent/nearest wizard · a synthesised generic form from the op's params · retaining the last wizard
+loaded · any "close enough" face.
+
+## VERIFICATION
+- fork-parity-1593 byte-identical, all 33 (unchanged primary gate).
+- Node tier 118/118.
+- **Drive the REAL gestures and show them:** (a) a wizard loaded → Wizard View has the wizard; (b) a plain
+  op selected → Wizard View is EMPTY, 3D still works; (c) empty workspace → both tabs present, wizard tab
+  empty. Screenshots, not assertions alone.
+- ⚠ Expect collateral: `wizard-face-1599.spec.js` exists specifically to test the predicate being deleted.
+  Tests asserting the OLD two-face behaviour are stale BY DESIGN of this act — repoint or retire them with
+  a stated reason, never weaken an assertion to make it pass.
