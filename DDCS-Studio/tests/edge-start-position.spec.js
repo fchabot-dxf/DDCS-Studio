@@ -8,7 +8,8 @@ test.use({ viewport: { width: 1280, height: 900 } });
 test('edge wizard preview start is parked clear of the wall, not at the origin', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
-  await page.evaluate(() => window.ddcsStudio.wizardManager.open('edge'));
+  // t1730 — 'edge' opens the twin now (its coded view is retired).
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_edge_data'));
   await page.waitForTimeout(200);
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.waitForFunction(() => {

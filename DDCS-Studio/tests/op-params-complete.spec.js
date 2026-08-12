@@ -16,7 +16,12 @@ import { test, expect } from '@playwright/test';
  * awaits insertWiz per op; the glow read is synchronous). Fix = DECOMPOSE into a fast cores guard + 4 shards, so
  * no single test runs long enough to time out under contention (deterministic sizing, no added waits/retries).
  */
-const CORES = ['surfacing', 'pocket', 'contour', 'slot', 'edge'];   // the region-bearing ops the nested-id bug bit + a clean control
+// t1732 — 'edge' repointed to its twin 'user_edge_data': edge's coded view is retired (t1730), so a real user
+// today only ever reaches it through the twin — confirmed live (openWiz('user_edge_data') gives 9 visible fields
+// and inserts correctly; commandDeck's WIZ_SPECIAL_OPENER is empty and every probe entry routes via opensAs to
+// its twin, so no user-clickable path still uses the raw type). Still serves the same "clean control" role
+// (contrasted against surfacing/pocket/contour/slot's nested-region bug) via the door users actually use.
+const CORES = ['surfacing', 'pocket', 'contour', 'slot', 'user_edge_data'];   // the region-bearing ops the nested-id bug bit + a clean control
 const SHARDS = 4;
 
 /** Insert every BUILDERS type matching `sel` and report which committed + which false-glowed. `sel` is either
@@ -29,8 +34,13 @@ async function runSlice(page, sel) {
     const ops = await import('/blocks/opBuilders.js');
     const glowMod = await import('/blocks/opGlow.js');
     const committed = [], dirty = [];
-    const keys = Object.keys(ops.BUILDERS);
-    const want = (type, i) => sel.list ? sel.list.includes(type) : (i % sel.n === sel.s);
+    // t1732 — an explicit `sel.list` is iterated DIRECTLY (not intersected against ops.BUILDERS' keys): a twin
+    // type like 'user_edge_data' is a real, live, openable/insertable op, but BUILDERS only holds the pristine
+    // built-in (raw-type) layer — USER_BUILDERS (the twin layer) is a separate object, so a twin type would never
+    // appear in Object.keys(ops.BUILDERS) at all and would be silently skipped forever under the old intersection.
+    // The sharded sweep (no sel.list) is UNCHANGED — it still exhaustively walks the built-in layer only.
+    const keys = sel.list ? sel.list : Object.keys(ops.BUILDERS);
+    const want = (type, i) => sel.list ? true : (i % sel.n === sel.s);
     for (let i = 0; i < keys.length; i++) {
       const type = keys[i];
       if (!want(type, i)) continue;

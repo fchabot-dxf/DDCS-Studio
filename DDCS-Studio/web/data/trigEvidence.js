@@ -193,7 +193,10 @@ export const TRIG_LIFT_PLAN = [
     },
     {
         id: 'rotary-fit-sqrt', kind: 'shipped-unconfirmed', needs: 'SQRT', lifts: false,
-        site: 'wizards/rotaryCenterWizard.js', decl: 'the 3-point circle fit R solver', anchor: 'SQRT[[[#52-#54]', keys: [],
+        // t1732 — site updated: the stack-builder body (incl. this SQRT expression) moved to stacks/rotaryCenterWizard.js
+        // at t1728 (gameplan step 1, pure relocation, no behavior change); the old wizards/rotaryCenterWizard.js now
+        // only re-exports it. The declaration follows the code, not the shim.
+        site: 'wizards/stacks/rotaryCenterWizard.js', decl: 'the 3-point circle fit R solver', anchor: 'SQRT[[[#52-#54]', keys: [],
         what: 'the FIT arm solves the true OD radius with SQRT of the squared deltas. It is Studio-original and '
             + 'machine-UNVALIDATED, and it says so on the operator\'s screen — the ADVANCED / verify-on-machine '
             + 'banner is the reason this ships at all where the ramp may not',

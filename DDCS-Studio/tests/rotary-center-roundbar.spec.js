@@ -47,25 +47,29 @@ test('E3 unit: def.simStock derives a round bar from #57 (cylinder, Ø, along th
     expect(r.emitSame, 'emit BYTE-IDENTICAL (the round-bar read is sim-only)').toBe(true);
 });
 
-// t1722 (gate repair, cycle 857 ACT 2) — REWRITTEN: this test's OWN title named the built-in shim's mutation as
-// "deferred dead-code cleanup" — that cleanup is this act. activateCylinderStock() is retired (no export
-// survives), so there is nothing left for restoreBoxStock to defend against; it stays exported for
-// edge/middle/rotary-clock views' existing onOpen calls, now as a documented, harmless no-op.
-test('E3: activateCylinderStock is retired; restoreBoxStock is a harmless no-op (the deferred cleanup, done)', async ({ page }) => {
+// t1722 (gate repair, cycle 857 ACT 2) — this test's OWN title named the built-in shim's mutation as "deferred
+// dead-code cleanup" — that cleanup landed at t1722 (activateCylinderStock retired, no export survived).
+// t1732 port note — REPOINTED, not merely no-longer-passing: t1730 went further and deleted the WHOLE
+// rotaryCenterView.js file (its sole remaining reason to exist — restoreBoxStock as a defensive no-op called by
+// edge/middle/rotary-clock views' onOpen — vanished the same act those 3 views were deleted too, WORK-LOG t1730).
+// So `import('/wizards/views/rotaryCenterView.js')` now throws (404) rather than returning a no-op export — a
+// STRONGER, more definitive form of the exact same claim this test always made ("the mutating hack is gone"):
+// there is no longer any CODE left that could mutate the global stock, not merely a function that declines to.
+test('E3: rotaryCenterView.js (activateCylinderStock + restoreBoxStock) is fully retired — t1730 deleted the whole file, not merely the mutation', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
     const r = await page.evaluate(async () => {
-        const rcv = await import('/wizards/views/rotaryCenterView.js');
         const SP = await import('/ui/settingsPanel.js');
         SP.applySettings({ stock: { x: 200, y: 100, z: 80, shape: 'box', show: true } });
         const before = window.ddcsGetSettings().stock.shape;
-        rcv.restoreBoxStock();   // the defensive revert (edge/middle/clock views call this on open) — now a no-op
+        let importThrew = false;
+        try { await import('/wizards/views/rotaryCenterView.js'); } catch (_) { importThrew = true; }
         const after = window.ddcsGetSettings().stock.shape;
-        return { hasActivate: typeof rcv.activateCylinderStock === 'function', before, after };
+        return { importThrew, before, after };
     });
-    expect(r.hasActivate, 'activateCylinderStock is retired, not deferred any longer').toBe(false);
+    expect(r.importThrew, 'the whole file is gone (t1730), not just activateCylinderStock retired within it').toBe(true);
     expect(r.before).toBe('box');
-    expect(r.after, 'restoreBoxStock changes nothing — there is no mutation left to undo').toBe('box');
+    expect(r.after, 'nothing mutated the global stock — there is no code left that could').toBe('box');
 });
 
 test.use({ viewport: { width: 1400, height: 1000 } });

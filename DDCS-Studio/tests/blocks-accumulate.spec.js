@@ -5,9 +5,10 @@ import { test, expect } from '@playwright/test';
 // the renumber-labels + single-terminator normalisation in opSession.appendIntoProgram.
 test.use({ viewport: { width: 1400, height: 1000 } });
 
+// t1730 — 'middle' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
 async function insertOp(page, name) {
   await page.evaluate((n) => window.ddcsStudio.wizardManager.open(n), name);
-  await page.waitForSelector(`#wiz_${name}`, { state: 'visible' });
+  await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.evaluate(() => window.ddcsStudio.wizardManager.insert());
   await page.waitForTimeout(150);
@@ -17,8 +18,8 @@ test('two probe ops accumulate with ONE M30 and unique labels', async ({ page })
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsGetBlockGcode);
 
-  await insertOp(page, 'middle');
-  await insertOp(page, 'middle');
+  await insertOp(page, 'user_middle_data');
+  await insertOp(page, 'user_middle_data');
 
   const gcode = await page.evaluate(() => window.ddcsGetBlockGcode() || '');
   const lines = gcode.split('\n');

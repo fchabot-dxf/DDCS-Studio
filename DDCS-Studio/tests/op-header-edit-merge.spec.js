@@ -23,7 +23,28 @@ const openBlocks = async (page) => {
   await page.waitForTimeout(150);   // let the change listener settle after the model→workspace rebuild
 };
 
-test('Blocks-tab header-dropdown edit on a hand-edited typed op MERGES (preserves the body), never clobbers', async ({ page }) => {
+// t1732 port note — NO TWIN EQUIVALENT, confirmed by reading source (not guessed) — per instruction, STOPPING and
+// reporting rather than inventing a workaround. This test drives `edge_op`, a Blockly block type HARDCODED in
+// `blocks/blockly/bridge.js` (`makeOpDef('edge_op', ...)`) specifically for the 4 legacy typed ops (corner_op/
+// edge_op/middle_op/circular_op) — a header row of individual typed dropdown/checkbox FIELDS wrapping ONE DO body.
+// The merge-vs-replace guard this test protects lives in `blocksApp.js`'s workspace change-listener, gated
+// EXPLICITLY on `blk.type === 'op' || blk.type.endsWith('_op')`, with a HARDCODED per-type field-extraction table
+// (`if (blk.type === 'edge_op') { params.axis = blk.getFieldValue('AXIS')... }` etc, only for those same 4 types)
+// — there is no branch for a twin's block shape at all.
+// A twin's Blockly representation is STRUCTURALLY DIFFERENT, confirmed live: `builderOf('user_edge_data')(params)`
+// returns `[{type:'user_root', children/uiChildren:[...]}]` — ONE wrapper with exactly TWO mouths (Presentation,
+// Execution; `bridge.js`'s `def.kind === 'user_root'` branch), no top-level typed dropdown FIELDS of its own at
+// all (every param lives as a SEPARATE nested `param_field` block inside the Presentation mouth, e.g. `middle`'s
+// flattened stack samples as `user_root > section > panel > param_group > param_field × N`). There is no single
+// top-level "AXIS dropdown" to flip on a twin op, and even if a nested param_field's value changed, blocksApp.js's
+// merge-vs-replace branch would never fire for it (the gate is on the OP block's own type, never matched).
+// Neither insertion path reaches `edge_op` anymore either: the wizard (dead, view retired) and the Blocks-tab
+// palette (`opToolbox.js` — builds its flyout EXCLUSIVELY from `listUserOps()`, the twin/USER_BUILDERS layer,
+// never the raw BUILDERS map `edge_op` etc. are keyed to) both produce twin-shaped ops now. This suggests
+// `corner_op`/`edge_op`/`middle_op`/`circular_op` (their block defs in bridge.js AND their dedicated branches in
+// blocksApp.js) may be fully dead code today — a candidate for a future cleanup, NOT decided here (out of this
+// turn's "repoint tests" scope; flagging for the advisor/human, not deleting production code unprompted).
+test.fixme('Blocks-tab header-dropdown edit on a hand-edited typed op MERGES (preserves the body), never clobbers — t1732: no live path reaches edge_op (or any of the 4 legacy typed blocks) anymore; needs a human/advisor ruling, possibly a dead-code cleanup, not a repoint', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.insertWiz && window.closeWiz
     && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack && window.showApp);

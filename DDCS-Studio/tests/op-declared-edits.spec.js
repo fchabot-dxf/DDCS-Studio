@@ -37,10 +37,11 @@ async function seedAndOpen(page, wiz) {
 }
 
 test('a NO-EDIT blocks round-trip leaves a middle op un-edited (no false glow from socket-default drift)', async ({ page }) => {
-  await seedAndOpen(page, 'middle');
+  // t1732 — 'middle' opens the twin now (its coded view is retired); a real insert stores 'user_middle_data'.
+  await seedAndOpen(page, 'user_middle_data');
   const r = await page.evaluate(async () => {
     const glow = await import('/blocks/opGlow.js');
-    const op = (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op' && b.opType === 'middle');
+    const op = (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op' && b.opType === 'user_middle_data');
     return { found: !!op, edited: op ? glow.isOpBlockEdited(op.id) : null, ranges: op ? glow.editedRangesForOp(op.id).length : null };
   });
   expect(r.found, 'seeded a middle op').toBe(true);

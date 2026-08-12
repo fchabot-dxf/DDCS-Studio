@@ -6,8 +6,26 @@ import { test, expect } from '@playwright/test';
  *   - a value-edited LEAF atom → range = [start,end) covering just the changed token (glow the word, not the line),
  *   - an INJECTED atom (a wholly new line) → range = null (whole-line glow).
  * This is the "glow the exact edit" ask (NEXT-TASKS) — the precise half that line lists can't do.
+ *
+ * t1732 port note — NO TWIN EQUIVALENT for this test's SPECIFIC TECHNIQUE, confirmed by direct inspection (not
+ * guessed) — per instruction, STOPPING and reporting rather than inventing a workaround. Both tests below manually
+ * mutate a leaf atom found by walking the PLAIN op.children tree (`ddcsGetBlockProgram()`'s serialized form),
+ * then call `recordEdit(op.id, asn.id, {...})` to declare the edit — mirroring what a LIVE Blockly field edit
+ * would do. For the old raw 'edge' type this worked because its stored atoms carried a `.id`. For the twin
+ * ('user_edge_data'), it does not: dumping the found 'assign' leaf live gives
+ * `{"type":"assign","params":{"var":"#1","value":"...", "note":"..."},"_group":null}` — THREE keys, no `id` at
+ * all. `recordEdit(opId, atomId, detail)` is `if (opId && atomId) _bag(opId).set(atomId, detail)` — a falsy
+ * `atomId` (`asn.id === undefined`) makes it a silent no-op, confirmed live (`opEditMap(op.id)` reads back `null`
+ * immediately after the call, before any async/timing could be a factor). This isn't a selector or timing issue;
+ * it's that a twin's EXECUTION-mouth atoms (the plain atoms a stack-builder like edgeStack(params) returns) have
+ * no individual identity in their SERIALIZED form — only the live Blockly WORKSPACE block Blockly creates for
+ * them gets an id (Blockly assigns it), which is exactly the path `op-declared-edits.spec.js`'s passing test
+ * uses instead (`ws.getBlockById(...).getDescendants(false).find(...)`, then a REAL `setFieldValue` — never a
+ * manual plain-object mutation + recordEdit call). That test already proves the underlying glow MECHANISM works
+ * correctly for twins; what has no equivalent here is specifically "synthesize an edit by id-addressing a plain
+ * execution atom directly," which requires an id that twin atoms don't carry in this representation.
  */
-test('editedRangesForOp: word-level range for a value edit, whole-line for an injection', async ({ page }) => {
+test.fixme('editedRangesForOp: word-level range for a value edit, whole-line for an injection — t1732: twin execution atoms carry no .id in their plain (non-Blockly) form, so recordEdit(op.id, atom.id, ...) silently no-ops; needs a human/advisor ruling', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack && window.ddcsGetProjection);
 
@@ -23,13 +41,14 @@ test('editedRangesForOp: word-level range for a value edit, whole-line for an in
       return null;
     };
 
+    // t1732 — 'edge' opens the twin now (its coded view is retired); a real insert stores 'user_edge_data'.
     window.ddcsLoadBlockStack([]);
-    window.openWiz('edge', undefined, true);
+    window.openWiz('user_edge_data', undefined, true);
     window.updateWiz();
     await window.insertWiz();
     window.closeWiz && window.closeWiz();
     const prog = window.ddcsGetBlockProgram() || [];
-    const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'edge');
+    const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'user_edge_data');
     if (!op) return { error: 'no edge op' };
 
     const oe = await import('/blocks/opEdits.js');
@@ -72,7 +91,8 @@ test('editedRangesForOp: word-level range for a value edit, whole-line for an in
 });
 
 // The RENDERER actually wraps the changed token in a .word-edited span in the editor overlay (the real symptom).
-test('editorOpHover wraps the changed token in a .word-edited span', async ({ page }) => {
+// t1732 — same root cause as the test above (twin execution atoms carry no .id in their plain form); see its note.
+test.fixme('editorOpHover wraps the changed token in a .word-edited span — t1732: same no-.id root cause as the sibling test above', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack && window.ddcsRefreshBlockGlow);
 
@@ -86,13 +106,14 @@ test('editorOpHover wraps the changed token in a .word-edited span', async ({ pa
       }
       return null;
     };
+    // t1732 — 'edge' opens the twin now (its coded view is retired); a real insert stores 'user_edge_data'.
     window.ddcsLoadBlockStack([]);
-    window.openWiz('edge', undefined, true);
+    window.openWiz('user_edge_data', undefined, true);
     window.updateWiz();
     await window.insertWiz();
     window.closeWiz && window.closeWiz();
     const prog = window.ddcsGetBlockProgram() || [];
-    const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'edge');
+    const op = [...prog].reverse().find((b) => b && b.type === 'op' && b.opType === 'user_edge_data');
     const ov = clone(op.children);
     const asn = findLeaf(ov, (b) => b.type === 'assign' && b.params && /^-?\d+(\.\d+)?$/.test(String(b.params.value)));
     const fromVal = asn.params.value;

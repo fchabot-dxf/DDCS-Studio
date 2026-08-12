@@ -24740,3 +24740,100 @@ key list, `cornerData.js`'s provider, what `builderOf` resolves) rather than tem
 blindly -- 3 of the 21 needed a genuinely different fix shape (drop-the-comparison, swap-the-source, or
 restructure-the-premise) because the class they depended on was the ONLY source for what they checked, not merely
 a differently-named path to the same registry. Full working room used across this follow-up too.
+
+---
+
+## Turn 1732 (worker) -- STEP 2 FOLLOW-UP: repoint the advisor's full-gate stragglers, run the full suite myself
+
+Dispatch: the advisor's OWN full-suite run (not the smoke subset t1730 checked) found 15 reds beyond the 4
+version-sync ones. 11 reproduce in isolation (real, not contention): blocks-accumulate, edge-start-position,
+editor-sim-disc, op-declared-edits, op-header-edit-merge, op-params-complete, rotary-center-roundbar,
+rotary-stock-revert, trig-lift-plan-1466, word-glow (×2 tests). Advisor's own triage on op-params-complete (given
+verbatim, not re-derived): `openWiz('edge')` calls the RAW retired-view door; the TWIN door
+(`openWiz('user_edge_data')`) is confirmed live (9 visible fields, inserts correctly) and is what commandDeck
+actually routes every probe entry through today (WIZ_SPECIAL_OPENER empty, all `opensAs`). THE ACT: repoint each
+of the 11 at the live twin path, never weakening/deleting an assertion; STOP and report (not invent) anywhere a
+twin has no equivalent; fix trig-lift-plan-1466's stale `web/data/trigEvidence.js` declaration, not its assert;
+gate on the FULL suite this time, run personally, unexplained reds = 0 excluding the 4 version-sync.
+
+### The 11, reported repointed-vs-other (as asked)
+
+**REPOINTED (7)** -- mechanical or near-mechanical, the twin door produces the exact same observable behavior:
+- `blocks-accumulate.spec.js` -- `insertOp(page, 'middle')`×2 -> `insertOp(page, 'user_middle_data')`×2; the
+  helper's `#wiz_${name}` selector generalized to the shared `#wiz_user` (every twin shares one panel, so the
+  old per-type-selector pattern was already wrong for a twin regardless of which type).
+- `edge-start-position.spec.js` -- `open('edge')` -> `open('user_edge_data')`; no DOM selector depended on the
+  raw type, so this was the whole fix.
+- `op-declared-edits.spec.js` -- `seedAndOpen(page, 'middle')` -> `seedAndOpen(page, 'user_middle_data')`, and the
+  `opType === 'middle'` read-back check to match; `'surfacing'` (untouched view) needed nothing.
+- `op-params-complete.spec.js` -- CORES' `'edge'` -> `'user_edge_data'` (the advisor's exact triage). Required
+  ONE structural fix beyond the string swap: `runSlice`'s `sel.list` mode was iterating
+  `Object.keys(ops.BUILDERS)` (the raw built-in layer only) and checking list-membership -- a twin type would
+  NEVER appear there (twins live in the separate `USER_BUILDERS` object), so it would have silently never been
+  tested at all. Changed `sel.list` mode to iterate the list directly; the sharded exhaustive-sweep mode (no
+  `sel.list`) is untouched, still walks only the built-in layer as designed.
+- `rotary-center-roundbar.spec.js` (2nd of 3 tests) -- REWRITTEN, not merely repointed: the test imported
+  `wizards/views/rotaryCenterView.js` directly to check its exports; t1730 deleted the WHOLE FILE (not just the
+  mutation it used to check), so the import 404s. Rewrote to assert the import THROWS -- a stronger, more
+  definitive form of the exact same original claim ("the mutating hack is gone": now there's no code left that
+  could mutate anything, not merely a function that declines to).
+- `rotary-stock-revert.spec.js` -- same file-deletion shape as above, PLUS `openWiz('rotary_center')` was already
+  a dead door (rotary_center's `opensAs` has pointed at its twin for a while, unrelated to t1730). Repointed the
+  open to `user_rotary_center_data` and the file-check to assert-throws, same as its sibling.
+- `trig-lift-plan-1466.spec.js` -- NOT a test change. `web/data/trigEvidence.js`'s `rotary-fit-sqrt` row's `site`
+  pointed at `wizards/rotaryCenterWizard.js`; the actual `SQRT[[[#52-#54]` expression it anchors on moved to
+  `wizards/stacks/rotaryCenterWizard.js` back at t1728 (gameplan step 1, pure relocation) and this citation was
+  never updated then. Fixed the `site` field, left the assert exactly as it was (per instruction) -- the lock did
+  its job, catching a real citation drift from two turns ago that had gone unnoticed until the full suite ran.
+
+**OTHER -- test.fixme'd with a full explanation, per "stop and report, don't invent" (4, across 3 files)**, each
+confirmed by direct inspection/instrumentation, not guessed:
+- `op-header-edit-merge.spec.js` -- the merge-vs-replace guard this test protects
+  (`blocksApp.js`'s workspace change-listener) is gated EXPLICITLY on `blk.type === 'op' || blk.type.endsWith(
+  '_op')`, with a hardcoded per-type field table for exactly 4 legacy typed blocks (`corner_op`/`edge_op`/
+  `middle_op`/`circular_op`, defined in `blocks/blockly/bridge.js`). Confirmed live that a twin's Blockly shape is
+  structurally different: `builderOf('user_edge_data')(params)` returns ONE `user_root`-wrapped block with two
+  MOUTHS (Presentation/Execution), no top-level typed dropdown fields of its own -- every param is a separate
+  nested `param_field` block instead. Confirmed neither live insertion path (the dead wizard, or the Blocks-tab
+  palette -- `opToolbox.js` builds its flyout EXCLUSIVELY from `listUserOps()`, the twin layer) can produce
+  `edge_op` anymore. This suggests the 4 typed-block defs and their blocksApp.js branches may be fully dead code
+  today -- flagged, not deleted (out of this turn's repoint scope).
+- `editor-sim-disc.spec.js` -- kept 2 of 4 assertions (op type, disc count -- the sim itself runs fine), fixme'd
+  the 2 that hit a confirmed REAL PRODUCTION BUG: `createPreviewPanel.js`'s `readEnabledComps()` shallow-loops
+  `for (const a of stack)` over `builderOf(op.type)(op.params)` with no flatten. For a twin, `stack` is
+  `[{type:'user_root', ...}]` -- ONE wrapper, so the loop never finds nested `radiuscomp` atoms. Confirmed live on
+  BOTH middle (`stack.map(a=>a.type)` = exactly `['user_root']`) and corner (`cornerData.js`'s builder ALSO
+  returns `[user_root]`) -- so the disc-on-surface nudge (a probe-touch disc landing on the comped wall instead of
+  the raw tool-centre) has been non-functional in the editor's Simulate for every twin-routed probe, not a
+  middle-specific or t1730-caused regression. NOT fixed here (production code, out of "repoint tests" scope) --
+  flagged for a ruling.
+- `word-glow.spec.js` (both tests) -- confirmed live, by dumping the actual atom object, that a twin's
+  EXECUTION-mouth atoms carry NO `.id` field at all in their plain (`ddcsGetBlockProgram()`-serialized) form:
+  `{"type":"assign","params":{...},"_group":null}` -- three keys, no id. `recordEdit(opId, atomId, detail)` is
+  `if (opId && atomId) ...` -- a falsy atomId silently no-ops, confirmed immediately (before any timing could be a
+  factor: `opEditMap(op.id)` reads back `null` right after the call). This is NOT a regression in the underlying
+  glow mechanism -- `op-declared-edits.spec.js`'s passing test proves the mechanism works for twins, but only via
+  a REAL Blockly field edit (`ws.getBlockById(...).setFieldValue(...)`, where Blockly itself assigns every block
+  an id) -- never via this test's technique of manually id-addressing a plain execution atom. That specific
+  technique has no equivalent for a twin's plain-serialized atoms.
+
+### Verify
+
+- The 10 files individually, then together: 23 tests, 19 passed + 4 skipped (the fixme's) as expected, 0 failed.
+- **The FULL suite, run personally** (not the smoke subset): `npx playwright test`, 2474 tests, ~19.4 minutes.
+  4 failed (exactly `version-sync-1311.spec.js`, all four, matching the advisor's own exclusion -- confirmed
+  unrelated: `package.json`'s version trails `version.json`/the chip by a minor version, untouched by this or the
+  prior turn, a release-process artifact). 7 flaky (passed on retry; none in any file touched by t1730 or t1732 --
+  `blocks-load-guard-s41`/`formfield-loud-mismatch-1636`/`glyph-colors`/`guard-roundtrip-1595`/
+  `import-safety-1219`/`param-group-rows-1605`/`pocket-cavity-2d`, pre-existing timing-sensitive tests under
+  2474-test parallel load, not this turn's concern). 17 skipped (the fixme's: 7 from t1730 + 4 new this turn +
+  ~6 pre-existing, unrelated ones already in the suite). 2446 passed. **Zero unexplained reds.**
+
+### Capacity
+
+A focused, evidence-heavy turn: 7 mechanical-or-near-mechanical repoints, and 4 fixme's each requiring genuine
+investigation (reading `blocksApp.js`'s change-listener gate logic, `opToolbox.js`'s palette-build source,
+`createPreviewPanel.js`'s comp-reading loop, and live-instrumenting a test to dump an atom's actual keys) rather
+than pattern-matching the previous turn's fixes onto files that turned out to need a materially different
+diagnosis. One citation fix in production data (`trigEvidence.js`) rather than the test, per instruction. Full
+personal run of the 2474-test suite (not delegated, not sampled) as the explicit gate. Full working room used.
