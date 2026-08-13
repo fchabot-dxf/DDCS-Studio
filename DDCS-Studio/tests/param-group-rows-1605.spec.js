@@ -63,8 +63,17 @@ test('Customize Surfacing — the param_group renders as its rows, not a placeho
     // The canvas param_group carries the twin's materialized declaration rows; the form face must show them.
     expect(r.fields.length, 'the parameter rows render where the placeholder sat').toBeGreaterThanOrEqual(20);
     expect(r.fields, 'the rows are the DECLARED ones (spot-checked)').toEqual(expect.arrayContaining(['depth', 'stepdown', 'toolDia', 'feed']));
-    // Row ORDER is the canvas's declared mouth order — toolNum leads the surfacing group.
-    expect(r.fields.indexOf('toolNum'), 'declared first row renders first').toBe(0);
+    // t1754 — ROOT-CAUSED against the pane's own contract (saving this exact stack as a custom wizard, then
+    // comparing the saved def's bindings against these rendered fields): membership matches EXACTLY (30/30,
+    // including zMode and passes — both ARE in the saved bindings, so the pane is right to show them), and once
+    // entryX/entryY are set aside, the REST of the order matches the save byte-for-byte too. Only entryX/entryY's
+    // position differs — and that is `renderOpForm`'s DECLARED SECTION_RANK (t1239, formWidgets.js: `['IDENTITY',
+    // 'GEOMETRY', 'TOOL & CUT']`, "op-defining-fields-at-top") legitimately promoting them: they are the surfacing
+    // twin's only GEOMETRY-sectioned fields, so they rank ahead of every unranked (COORDINATES/no-section) field —
+    // toolNum included. This assertion was stale (written as if canvas/declared-bindings order were render order,
+    // which SECTION_RANK deliberately overrides); toolNum leads the UNRANKED group, not the whole form.
+    expect(r.fields.slice(0, 2), 'GEOMETRY-sectioned fields (entryX/entryY) rank first (t1239 SECTION_RANK)').toEqual(['entryX', 'entryY']);
+    expect(r.fields.indexOf('toolNum'), 'toolNum leads the unranked group, right after the ranked GEOMETRY fields').toBe(2);
 });
 
 test('Customize Corner — the full row set renders too (post-guard-render)', async ({ page }) => {

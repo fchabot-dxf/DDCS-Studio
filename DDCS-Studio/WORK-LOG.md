@@ -26256,3 +26256,93 @@ remaining 2 are Surfacing-specific and real — not a repointing miss, a discrep
 (the retired path) and `formBindings`+`renderOpForm` (the current one) order and select rows for at least this
 one twin. Whether this is worth root-causing now, or is a known-acceptable cost of the switch pending its own
 act, is a call worth making with the full trace above rather than guessed at here.
+
+## t1754 — ACT 1b-vi: ROOT-CAUSE THE LAST 2 REDS (answered from the SAVE, not from taste)
+
+The advisor's own reproduction found MORE than t1752's trace: not just `zMode` but ALSO `passes` has no canvas
+`param_field` block, plus the order mismatch — but flagged that "not on the canvas" isn't automatically wrong
+(`passes` is a DERIVED binding, per `passes-field-1613`, not a block), and demanded the discriminating test be
+answered empirically: **save the Customize-Surfacing stack as a custom wizard and compare the SAVED def against
+the pane, per field** — the pane's own contract (3e) is that it shows what you are about to save.
+
+### The empirical answer
+
+Drove the real gesture: Customize Surfacing → `window.ddcsSaveAsWizard()` → filled + submitted the real save
+dialog (`.blk-dev-savedlg`) → read the resulting def back via `userOps.js`'s `listUserOps()`. (First attempt's
+diagnostic script had its own ordering bug — it waited on `window.ddcsSaveAsWizard` BEFORE `showApp('blocks')`,
+but that global is registered by `mountDevMode` only once the Blocks tab mounts, per `devMode.js:270-300` — fixed
+by moving the wait to after `showApp('blocks')`/`window.__blkws`, then it worked first try.)
+
+**Membership: MATCHES EXACTLY.** The saved def's 30 bindings and the pane's 30 rendered fields are the identical
+set — `zMode` AND `passes` are BOTH genuinely in the saved bindings. The pane is correct to show both; there is
+no phantom field for either.
+
+**Order: differs by exactly one thing, and it's explained, not a bug.** Set `entryX`/`entryY` aside and the rest
+of the pane's order matches the saved order byte-for-byte. Traced why those two are the one exception: `getUserDef
+('user_surfacing_data').bindings` — the SAME array the save mechanism reads — declares `entryX`/`entryY` (via
+`entryBindingsFor`) LAST, after `toolNum` (via `toolBindingsFor`) FIRST; confirmed this via the registered def,
+the live canvas's own `param_field` blocks (`getAllBlocks()`), AND the live reconstructed `userRoot` (`getStack()`)
+— all four independent sources agree: `toolNum` first, `entryX`/`entryY` last, matching the save. So the DATA
+is consistent everywhere. The pane's rendered order alone differs, and `renderOpForm` (`formWidgets.js:1227`)
+explains exactly why: a DECLARED `SECTION_RANK = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT']` (t1239, user-ruled
+"op-defining-fields-at-top") sorts a form's sections so identity/geometry-defining fields lead, ahead of any
+unranked section. `entryX`/`entryY` are Surfacing's ONLY `GEOMETRY`-sectioned fields (`entryBindingsFor`'s own
+`section: 'GEOMETRY'`); `toolNum` and `wcs`/`zMode` (section `COORDINATES`, not in the rank list) are unranked —
+`Array#sort` is stable, so they keep their original relative order, just pushed after the ranked GEOMETRY pair.
+This is a DELIBERATE, documented reordering the pane applies at render time for readability — it would apply
+identically if the saved wizard were reopened, so the raw saved-array order was never meant to BE the render
+order. **`param-group-rows-1605.spec.js`'s expectation (`toolNum` at index 0) was the stale one** — written as
+if declared/canvas order were render order, without accounting for SECTION_RANK. Fixed the test to assert the
+real contract: `entryX`/`entryY` lead (GEOMETRY-ranked), `toolNum` leads the unranked group right after them
+(index 2) — same underlying data, same section declarations, now asserting what SECTION_RANK actually produces.
+
+### A REAL, second bug found in the process — not the one being chased, but load-bearing
+
+While root-causing order, found why "values are LIVE both ways" was ACTUALLY timing out (not an order issue —
+a genuine write failure): `document.getElementById('blk_wiz_user_form').inert` was `true` during a live
+Customize-Surfacing session. Traced to `deriveLiveWizard()`'s `placedOpFallback` guard (t1752's own fix) firing
+for the Customize route too: Customize loads a twin as `{type:'op', opType, children}` — the EXACT SAME shape a
+genuinely PLACED op has — and `deriveAuthoredDef(ws)` legitimately returns empty bindings for it too (no exposed
+knobs on a Customize session either), so the `opBlock` fallback branch fired and marked the pane read-only,
+exactly as it should for a placed op — but Customize is the ONE route that must never be read-only; it IS the
+editor. t1752 built `placedOpFallback` to distinguish a placed op from a hand-built stack with exposed knobs, but
+never tested it against Customize, which turns out to hit the identical shape. Fixed in `blocksApp.js`'s
+`deriveLiveWizard()`: hoisted the `customizing` computation above the `opBlock` fallback (it only needs `stack`
++ `authoringWizardType()`, both already available there) and added `!customizing` to the fallback's guard, so
+Customize is excluded from `placedOpFallback` the same way it already gets its own dedicated def-resolution
+branch further down. Verified before/after with a live diagnostic: `host.inert` was `true` pre-fix, `false`
+post-fix, during the identical Customize-Surfacing session — this is what actually made "values are LIVE both
+ways" pass, independent of the order fix.
+
+### Per-field summary (as the dispatch asked — no single blanket story)
+
+- `zMode`: membership — pane correct (in save). Order — n/a to this field specifically (unranked, keeps its
+  original relative position pre- and post-sort).
+- `passes`: membership — pane correct (in save; legitimately DERIVED per `passes-field-1613`, never a canvas
+  block, exactly as the advisor's caveat anticipated). Order — unranked, same as zMode.
+- `entryX`/`entryY`: membership — pane correct (in save). Order — DIFFERS from raw saved-array order, but for a
+  documented, deliberate reason (SECTION_RANK), not a defect — the STALE PARTY was the test's assumption, fixed.
+- Read-only (`values are LIVE both ways`): a genuine, separate regression (Customize wrongly inert) — FIXED at
+  the source (`deriveLiveWizard`), not worked around in the test.
+
+### Verify
+
+- `param-group-rows-1605.spec.js`: 3/3 green (Surfacing order+membership, Corner, live-both-ways writeback).
+  Re-ran ×3 (`--repeat-each=3`, 9 executions) to check for a real regression under the flaky-Corner report from
+  the full run below — 1 flaky-then-passed occurrence, timing out on `window.__blkws` appearing (pure cold-boot,
+  not touching anything this act changed) — not a regression.
+- `npm run test:node`: 118/118.
+- `fork-parity-1593.spec.js`: both tests green (1 flaky-then-passed on the same `window.__blkws` cold-boot class,
+  retry clean).
+- **Full suite**: 2435 passed, **0 failed**, 13 flaky-then-passed (environmental cold-boot/timing, a different
+  specific set than last run, none touching this act's files), 26 skipped. Both previously-red tests now pass
+  for the traced reason, not forced.
+
+### For the advisor
+
+Both reds are closed, one as "test was stale, pane was already right" (order) and one as "pane had a real bug"
+(read-only) — per field, as asked, not one blanket story. The `placedOpFallback` fix is the one worth double-
+checking hardest: it changes read-only behavior on the `deriveLiveWizard` hot path every render of every op
+touches, so a mis-scope there would be wide-blast-radius; re-verified it does NOT reopen the `hand-built-form.
+spec.js`/`t1752` case it was built for (that case has `customizing=false` unconditionally — a bare stack has no
+`authoringWizardType()` match — so the new `!customizing` guard term is always true there and changes nothing).

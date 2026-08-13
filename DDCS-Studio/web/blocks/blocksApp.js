@@ -424,14 +424,24 @@ async function buildWorkspace() {
     // canvas top=1, pane=0 fields. Added getUserDef(b.opType) alongside the pre-existing checks (kept, in case
     // some other shape genuinely nests it) rather than replacing them.
     const opBlock = stack.find((b) => b && (getUserDef(b.type) || getUserDef(b.opType) || (b.params && getUserDef(b.params.opType))));
+    // t1599 — hoisted above the opBlock-fallback below (was computed later, alongside authoredHere/userRoot): the
+    // fallback needs this fact to exclude the Customize route (t1754 fix, see placedOpFallback comment).
+    const customizing = !!(authoringWizardType() && stack.some((b) => b && b.type === 'op' && b.opType === authoringWizardType()));
     // t1752 — set ONLY inside this fallback, which is the ONE case that is genuinely "a placed op's own registry
     // def, not something authored here": a hand-built/bare stack with EXPOSED KNOBS (hand-built-form.spec.js's own
     // case) ALSO has authoredHere=false and customizing=false — it is NOT "placed," `def` there comes straight
     // from `deriveAuthoredDef`, this branch never runs for it (the `!def.bindings.length` guard is false). Read
     // by renderLiveForm() below to decide read-only (t1750) — `!authoredHere && !customizing` alone is NOT enough,
     // it can't tell a placed op from a hand-built one with knobs; this flag can.
+    // t1754 — ALSO excluded: the Customize route itself. Opening a twin to customize loads it as the exact same
+    // {type:'op', opType, children} shape a genuinely placed op has, and deriveAuthoredDef legitimately returns
+    // no bindings for it either (no exposed knobs) — so `opBlock` matches and the OLD guard fired here too,
+    // marking the live Customize pane read-only (found chasing param-group-rows-1605's "values are LIVE both
+    // ways" timeout: the field's write never reached the canvas because `host.inert` was true). Customize is the
+    // one route that must NEVER be read-only — it IS the editor — so it is excluded by the same `customizing`
+    // fact the branch below already uses to decide the def itself.
     let placedOpFallback = false;
-    if ((!def || !def.bindings || !def.bindings.length) && opBlock) {
+    if (!customizing && (!def || !def.bindings || !def.bindings.length) && opBlock) {
       const regDef = getUserDef(opBlock.type) || getUserDef(opBlock.opType) || (opBlock.params && getUserDef(opBlock.params.opType));
       if (regDef) {
         placedOpFallback = true;
@@ -466,7 +476,7 @@ async function buildWorkspace() {
     // PLACED data-op twin's body carries a user_root too, so merely inserting Corner into a program turned the whole
     // right pane into the wizard face and took the sim's Preview + G-code away from it.
     const authoredHere = stack.find((b) => b && b.type === 'user_root');
-    const customizing = !!(authoringWizardType() && stack.some((b) => b && b.type === 'op' && b.opType === authoringWizardType()));
+    // (customizing is computed above, before the opBlock fallback, which needs it too)
     // t1605 — the Customize route renders from the REGISTERED def: a twin's bindings live in the registry, not on
     // its canvas (no knobs, no pills), so the derived def is binding-less and the wizard view got an EMPTY byParam —
     // a param_group placeholder and zero rows where Surfacing's fields belong. Gated on the DECLARED authoring fact
