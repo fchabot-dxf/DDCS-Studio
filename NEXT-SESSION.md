@@ -1451,3 +1451,31 @@ canvas (Parameter Group, ~14 form-field blocks) with the pane BLANK. That is the
 work and that the advisor reproduced working. Asked the user to hard-reload first (ES-module cache is a
 known trap here — [[verify-release-needs-hard-reload]]); if it persists it is a real defect in the
 canvas→form path and must be chased there, NOT in the deleted mirror.
+
+### 3f. USER (2026-08-11): *"can the preview look more like the modal?"* → it must BE the modal's renderer
+**First: the blank pane was STALE CACHED CODE.** After a hard reload it renders. Not a defect —
+[[verify-release-needs-hard-reload]] again.
+
+**The real finding, from the user's two screenshots side by side:** the pane and the modal render the SAME
+wizard through TWO DIFFERENT PATHS, and they visibly disagree.
+- pane: `renderOpForm(formHost, formBindings(def))` (`blocksApp.js:634`) — a simplified form renderer.
+- modal: `openLiveAsModal()` (`blocksApp.js:496`) → the REAL wizard overlay via wizardManager/userOpView.
+
+Measured differences: raw `FORM`/`LAYOUT-2D`/`3D-SIM` headings vs the modal's `IDENTITY`/`GEOMETRY`
+grouping · identity fields (Corner, Probe Order) MISSING from the pane · stray unlabelled inputs (`5`,
+`200`, `3`, `10`) in the pane with no labels · FEATURE CANVAS empty black in the pane, the real 92-line
+probe path in the modal · VISUALIZATION empty black in the pane, the live 3D in the modal.
+
+**This is the project's own named defect — two renderers for one thing — inside the very pane whose job is
+to show what you will get.** A preview that approximates the result defeats its own purpose: the user
+would be checking a lookalike before saving.
+
+**THE ACT: the Wizard View renders through the SAME path the modal uses, hosted in the pane.** Not styled
+to match — the same renderer. `openLiveAsModal` already proves the modal can be driven from the canvas's
+own derived def, so the mechanism exists; the pane should use it rather than `renderOpForm` directly.
+**Do NOT "fix" the pane by adding grouping/canvas code to the simplified renderer** — that builds the
+second copy deliberately, which is the thing being removed.
+
+⚠ Honesty rule and everything else from step 3 unchanged. If the modal's renderer genuinely cannot be
+hosted in a narrow pane without a rewrite, STOP and report the constraint rather than shipping a
+half-match.
