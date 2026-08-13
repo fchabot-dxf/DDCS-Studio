@@ -2052,3 +2052,21 @@ disappears into it**; that erases the very distinction the user asked to keep.
 ⚠ Also fix the small mess visible in the screenshot: the `✕` floats alone on black, and the tabs are
 clipped by the surface edge. Whatever is chosen, those three elements should read as ONE deliberate bar.
 **Scope: presentation only.** No behaviour change — Insert/Cancel rulings (3j/3k) untouched.
+
+### …and the header's black is `--screen`, DELIBERATELY (traced t1765) — the identity is what is stale
+User: *"make the panel use the theme too."* **It already does — but as the WRONG THING.** Traced:
+`#blocks-app .right { background: var(--screen) }` (`styles.css:5378`, and the mobile drawer head at
+`:5516` likewise), and **`--screen` is `#000` in EVERY theme ON PURPOSE** — `styles.css:5182`:
+*"fixed: the screen is black in every theme"*. It is the READOUT/EDITOR black (code panel, DRO).
+
+**So the column is themed as A SCREEN.** That was correct when it held Projected G-code + a preview. It is
+wrong now: the column holds a **WIZARD**, and wizards live on the PANEL surface (`.wiz-box`'s themed
+ground, which t1764 just gave the pane). **The chrome kept the old identity after the content changed.**
+
+**The fix is therefore NOT "add theme support"** — it is to re-point the column's chrome at the PANEL
+family of tokens rather than `--screen`, so the header and the surface belong to the same object.
+⚠ Do NOT redefine `--screen` — it is correct for the editor/DRO and other things read it.
+⚠ Check what else uses `#blocks-app .right`'s background before changing it — the 3D tab lives in that
+same column, and a 3D viewport arguably DOES want the screen black. If so, the token change belongs on the
+header/Wizard-View side only, and say so.
+⚠ The 3f/3k distinction still holds: this must not make the pane indistinguishable from the real wizard.
