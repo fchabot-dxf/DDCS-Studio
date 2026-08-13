@@ -27188,3 +27188,136 @@ act rather than a same-turn amendment fix. The test-level fix (bounded wait + di
 robust to BOTH races regardless — a good backstop either way, but worth knowing the underlying plumbing isn't
 100% proven closed. If this exact shape (a spec doing rapid `ddcsLoadBlockStack`+`ddcsEditWizardDef` cycles)
 resurfaces flaky elsewhere, this is where I'd look first.
+
+## 🔨 turn 1768 (epoch 4) — THE PANE HEADER: minimal, no LIVE badge (four items, one strip)
+
+Presentation-only dispatch, four related items bundled because they are literally one strip: (1) a minimal
+header — the wizard's own name where "Generator Modal" was, Open-as-modal reduced to an icon, the LIVE badge
+gone; (2) the Wizard View/3D tab row collapses into a single view toggle, persisted; (3) the header chrome was
+themed as `--screen` (the readout black, correct for the editor/DRO — wrong for a column that now holds a
+wizard) — re-point it to the panel family; (4) the DRO/legend overlay collides with the viz toolbar in a short
+box — fix by reading the actual box size, not a third width breakpoint. Full detail read from NEXT-SESSION.md's
+t1765-tagged sections per the dispatch's own instruction, before touching anything.
+
+### Items 1+2 — ONE unified header bar (index.html + styles.css + blocksApp.js)
+
+Merged the old 3-row stack (`.blk-drawer-head` grip+close / `.blk-tabs` 2-tab row / `.pane-h` "Generator Modal +
+LIVE badge + Open as modal") into one `.blk-pane-head` flex row: grip (mobile-only, absolutely positioned) →
+title (`#blkPaneTitle`, set every render in `renderLiveForm` to `def.label` when `show`, else "Wizard View" —
+clears immediately when nothing's loaded, no stale name left over) → a `.blk-view-toggle` (two `.blk-view-btn`s,
+`data-view="wizard"/"3d"`) → the `⧉` open-as-modal icon (was a text button) → close (mobile-only). Removed:
+`.blk-drawer-head`, `.blk-tabs`/`.blk-tab`, both `<h3 class="pane-h">` elements, `.blk-form-live` — all now dead,
+deleted along with their CSS (no orphaned rules left behind).
+
+**The toggle's two required decisions, stated per the dispatch's own demand not to leave them implied:**
+- **Shows the CURRENT view** (`aria-pressed` = active), not the one you'd switch to — reusing the SAME reading
+  the app's own existing `.seg`/`.op-btn` "2D/3D + Play" pattern already uses elsewhere in this same right
+  column (`.primary` = active) — a native idiom, not an invented one.
+- **Persists** — `localStorage.ddcs_blk_view` (same naming convention as the existing `ddcs_blk_pv_h` drawer-
+  height key), restored once at build, updated on every click; never recomputed from wizard-authoring state.
+  Did NOT implement the rejected auto-switch (3D while a sim runs, form otherwise) — that's the four-term face
+  predicate returning under a friendlier name, exactly what the dispatch named and forbade.
+- **The honesty property held**: with no wizard loaded, the Wizard View side renders genuinely empty (unchanged
+  `show` logic) — the toggle never silently defaults to 3D to paper over that.
+
+### Item 3 — the header chrome re-pointed to the panel family, scoped narrowly
+
+Traced first, per the dispatch's own caution: `#blocks-app .right`/`.pv`/`.blk-formpane` all share `background:
+var(--screen)` — `--screen` is `#000` in every theme, deliberately (the readout/editor black). Checked what else
+depends on it before touching anything: the 3D content (`.pv-body`) and the wizard's own empty/mid-edit state
+(`.blk-formpane`, when `#blk_wiz_user` isn't shown) both legitimately want that black — so ONLY the new
+`.blk-pane-head` re-points to `var(--panel2, var(--panel, #161d28))`. `.right`, `.pv`, `.blk-formpane` are all
+UNCHANGED. Also added a deliberately HEAVIER seam (`border-bottom: 2px solid var(--line)`, not the app's usual
+1px hairline) between the header and the panel-textured body below — per the user's own standing constraint
+(3f/3k, restated in this dispatch): with the LIVE badge gone, THIS bar's own boundary is now the thing that
+still says "this is a live view of something uncommitted," so it must not be allowed to visually dissolve into
+the surface below it.
+
+### Item 4 — DRO/legend overlap, fixed by reading the real box height (createPreviewPanel.js + styles.css)
+
+Traced the actual overlay elements first (the dispatch's own NEXT-SESSION.md citation of two fighting width
+breakpoints didn't fully match what's in the code — `.pp-dro`/`.viz3d-legend`, absolute-positioned from the TOP,
+vs `.viz3d-controls`, absolute-positioned from the BOTTOM; in a short enough box they converge). Extended the
+EXISTING `ResizeObserver` in `createPreviewPanel.js` (already observing `container` for a different reason — 2D
+canvas redraw-on-resize) to also toggle a `.viz3d-compact` class when `container.clientHeight < 200` — a rule
+reading the ACTUAL measured box size, per the dispatch's own explicit preference, not a third width breakpoint
+stacked on the two that already govern `.wiz-viz3d`'s own height. Compact mode hides the legend (least
+essential — the DRO/status chip already carry the numbers) and moves the DRO up to where the legend used to
+start, freeing the bottom for the toolbar.
+
+**Verified the mechanism directly, but could not reproduce the reported overlap in the pane's CURRENT state** —
+tried the default drawer, a forced-short inline height, and a shrunk `--blk-pv-h`; the pane's own
+`.wiz-viz3d` consistently floors at 200px (a `min-height` elsewhere in the split-pane calc), and at exactly
+200px the geometry already clears (DRO's own bottom edge sits ~22px above the toolbar's own top edge — checked
+the actual pixel math, not assumed). Confirmed the compact-mode CLASS/CSS mechanism itself DOES engage and hide
+the legend correctly when a box genuinely drops under 200px (verified against a different `.wiz-viz3d` instance
+in the DOM). Plausible explanation, not proven: t1764/1766's own fixes (letting `#blk_wiz_user` grow to its
+natural height, painting its real surface) may have already resolved whatever pre-existing state let the box
+shrink further than 200px when the advisor's report was taken. Shipping the fix regardless — it's correct,
+low-risk, and a reasonable defensive floor either way — but flagging the "couldn't reproduce the original bug"
+finding honestly rather than claiming a clean confirmed fix.
+
+### Fixed 2 real regressions the restructuring caused — found by running the actual test suite, not assumed clean
+
+`blocks-live-form.spec.js` and `blocks-mobile-drawers.spec.js` both asserted directly on the retired `.blk-tab`/
+`data-tab`/text-content selectors. Updated both to the new `.blk-view-btn`/`data-view` shape (mirroring the same
+CURRENT-state reading the toggle itself uses). 3 OTHER failures in the same batch run (`transform-modal.spec.js`,
+`alignment-correction-840.spec.js`, `open-as-modal-1625.spec.js`, plus a `blocks-live-form.spec.js` "Save as new"
+case) all passed clean on isolated re-run (3-6× each) — confirmed load-induced flakes from this session's own
+sustained heavy concurrent test usage, not real regressions; one (`open-as-modal-1625`'s "Save as new" sibling)
+traced to a genuinely pre-existing test gap (missing `window.showApp` in its own boot-wait condition) unrelated
+to this turn's edit, noted but not fixed (out of this act's scope).
+
+### The architecture map — two more citation drifts, traced and fixed, not guessed
+
+`createPreviewPanel.js`'s new `ResizeObserver` callback body shifted every line after it by +7. Found via a red
+`npm run test:node`, not assumed: TRAP8 (the stale z-index comment, `:1112-1113`→`:1119-1120`) in both
+`architecture-map-1698.test.mjs` (mechanically checked) and `ARCHITECTURE.md` (prose, cosmetic). Separately
+noticed two OTHER prose citations in `ARCHITECTURE.md` (lines 221/223, `createPreviewPanel.js:1106`/`:1102`)
+that don't match their described content even after applying the same +7 shift — flagged as pre-existing drift
+from unrelated earlier work (not mechanically checked, so nothing catches it), NOT silently "corrected" with a
+guessed number I couldn't verify.
+
+### A git-tooling note carried forward from t1766's own mishap, applied correctly this time
+
+Same non-vacuity revert-proof shape as every other turn this session — `git checkout HEAD -- <paths>` (HEAD, not
+an older commit) then restore from a scratch `cp` backup. Checked `git diff --cached` immediately after
+restoring (t1766's own lesson: verify the restore, don't assume it landed) — clean, no stale index this time.
+
+### New permanent test — non-vacuous (including catching my OWN vacuous first draft)
+
+`tests/pane-header-1768.spec.js`: title = wizard's own name + no LIVE badge/no "Generator Modal" text anywhere;
+header bar is panel-themed (not `rgb(0,0,0)`) AND the element genuinely exists (the FIRST draft of this
+assertion passed against the pre-fix code too, vacuously — `.blk-pane-head` didn't exist yet, so `bgColor` was
+`null`, and `null !== 'rgb(0,0,0)'` trivially held; caught by re-checking non-vacuity, fixed by asserting
+existence first); the toggle choice survives a full page reload. `git checkout HEAD --` (pre-t1768) + restore
+from `cp`, re-ran: title test failed (element didn't exist), reload test failed (button didn't exist), AND —
+after the fix — the panel-themed test correctly failed too (existence assertion now catches the vacuous case).
+Restored, re-ran — 3/3 pass.
+
+### Verify
+
+- `npm run test:node`: 118/118.
+- `tests/node/architecture-map-1698.test.mjs`: 5/5 (2 citation drifts fixed, both traced not guessed).
+- New `pane-header-1768.spec.js`: 3/3, proven non-vacuous (including a caught-and-fixed vacuous first draft).
+- `fork-parity-1593.spec.js`: 2/2 — `createPreviewPanel.js` is shared app-wide (every wizard's 3D preview, not
+  just the Blocks pane), so run deliberately, not skipped.
+- Broad sweep (fork-parity + every blocks/pane spec from this whole session, 11 files): 29/29 across 2 runs (a
+  few flaky-then-passed under this session's own heavy concurrent load, all individually re-confirmed clean
+  3-6× in isolation — see the regressions section above for which and why).
+- Real gesture, screenshotted: mobile 393px (drawer open, both Form and 3D toggle states) and desktop 1400px —
+  title, toggle, seam, and panel-theming all match the modal's own look; item 4 verified via the
+  compact-mode mechanism directly (a different `.wiz-viz3d` instance), not reproduced organically on the pane.
+- All `tests/zzdebug-1768-*.spec.js` scratch diagnostics deleted, none committed.
+
+### For the advisor
+
+Items 1-3 are solid and directly verified against the user's own screenshot symptoms (title, toggle, seam, panel
+theming). Item 4 is the one honest gap: I could not reproduce the actual reported DRO/toolbar overlap on the
+pane in its CURRENT state — every technique I tried (default, forced-short, shrunk drawer) floors at 200px where
+the geometry already clears. The compact-mode fix is real, verified-functional (on a different `.wiz-viz3d`
+instance), and a reasonable defensive floor, but I can't confirm it was NEEDED for the specific symptom reported
+— plausibly t1764/1766's own earlier fixes this session already resolved whatever let the box shrink further
+than 200px when the report was taken. Worth a real screenshot from the user's own device if the overlap is still
+visible on the deployed build, since I couldn't force the box short enough through any legitimate app-level
+state to see it happen myself.

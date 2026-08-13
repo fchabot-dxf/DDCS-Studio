@@ -243,15 +243,17 @@ test('no wizard form is conjured when NOT editing a custom op (normal Blocks use
     return {
       controls: host.querySelectorAll('[data-param]').length,
       formText: host.textContent.trim(),
-      tabs: [...document.querySelectorAll('.blk-tab')].map((b) => b.textContent.trim()),
+      views: [...document.querySelectorAll('.blk-view-btn')].map((b) => b.dataset.view),
     };
   });
   expect(r.controls, 'no param controls when just building a program (not editing a wizard)').toBe(0);
   expect(r.formText, 'the Wizard View tab is truly empty — no leftover placeholder message either').toBe('');
-  expect(r.tabs, 'both tabs stay present regardless (never hidden/removed for lack of a wizard)').toEqual(['Wizard View', '3D']);
+  // t1768 — the tab row became a header toggle (blk-tab/data-tab → blk-view-btn/data-view); both views stay
+  // present regardless (never hidden/removed for lack of a wizard) — same property, new selector.
+  expect(r.views, 'both views stay present regardless (never hidden/removed for lack of a wizard)').toEqual(['wizard', '3d']);
 
-  // the 3D tab is unaffected by the Wizard View tab having nothing to show
-  await page.click('.blk-tab[data-tab="3d"]');
+  // the 3D view is unaffected by the Wizard View side having nothing to show
+  await page.click('.blk-view-btn[data-view="3d"]');
   await page.waitForTimeout(300);
   const pv = await page.evaluate(() => ({
     pvVisible: getComputedStyle(document.querySelector('.pv')).display !== 'none',

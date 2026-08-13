@@ -413,7 +413,14 @@ export function createPreviewPanel(container, opts = {}) {
     // The 2D canvas only repaints when told to; without this it goes blank if first drawn at a transient/zero
     // size (drawer slide-in) or after the panel is resized. Re-fit the 2D route whenever the container resizes.
     if (typeof ResizeObserver !== 'undefined') {
-        new ResizeObserver(() => { if (mode === '2d') t2.redraw(); }).observe(container);
+        new ResizeObserver(() => {
+            if (mode === '2d') t2.redraw();
+            // t1768 — the legend/DRO overlay from the TOP, the toolbar from the BOTTOM; in a short box (the
+            // Blocks pane's mobile drawer) they can collide. Read the ACTUAL box height rather than add a THIRD
+            // width breakpoint on top of the two that already govern .wiz-viz3d's own height — a container this
+            // narrow isn't necessarily this short (desktop two-pane vs. the mobile stack collapse differently).
+            container.classList.toggle('viz3d-compact', container.clientHeight < 200);
+        }).observe(container);
     }
 
     // t867 rider — the status chip shows the RAW EXECUTING LINE (one source with the editor highlight): "N · <verbatim

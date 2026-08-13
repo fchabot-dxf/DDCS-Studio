@@ -44,22 +44,23 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   // t1589 — the `Preview | G-code` segmented toggle (blkSegPv/blkSegCode) is RETIRED, by ruling, not by accident:
   // 0bd8b38c deleted the buttons and they never came back.
   // t1734 — GAMEPLAN STEP 3 replaced the auto-picked face (and the Projected G-code pane it competed with) with a
-  // REAL user-facing toggle: the `.blk-tabs` bar, present in the drawer exactly as on desktop. Both tabs are always
-  // there; clicking one shows its pane and hides the other — asserted here the same way desktop is.
+  // REAL user-facing toggle, present in the drawer exactly as on desktop; t1768 folded the tab row into the
+  // header's own `.blk-view-toggle`. Both views are always there; clicking one shows its pane and hides the
+  // other — asserted here the same way desktop is.
   const panesShown = () => page.evaluate(() => {
     const shown = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect();
       return getComputedStyle(el).display !== 'none' && r.height > 20; };
     return { pv: shown('#blocks-app .pv'), form: shown('#blk-formpane') };
   });
-  const tabsInDrawer = await page.evaluate(() => [...document.querySelectorAll('.blk-tab')].map((b) => b.textContent.trim()));
-  expect(tabsInDrawer, 'both tabs are in the drawer, same as desktop').toEqual(['Wizard View', '3D']);
+  const viewsInDrawer = await page.evaluate(() => [...document.querySelectorAll('.blk-view-btn')].map((b) => b.dataset.view));
+  expect(viewsInDrawer, 'both views are in the drawer, same as desktop').toEqual(['wizard', '3d']);
   expect(!!(await page.$('#blkSegCode')), 'no segmented Preview|G-code toggle — retired by ruling, not hidden').toBe(false);
 
   let panes = await panesShown();
-  expect(panes.form, 'Wizard View tab is active by default (static default, no wizard loaded here so it renders empty)').toBe(true);
-  expect(panes.pv, 'and the 3D pane is hidden until its tab is clicked').toBe(false);
+  expect(panes.form, 'Wizard View is active by default (static default, no wizard loaded here so it renders empty)').toBe(true);
+  expect(panes.pv, 'and the 3D pane is hidden until its view is clicked').toBe(false);
 
-  await page.click('.blk-tab[data-tab="3d"]');
+  await page.click('.blk-view-btn[data-view="3d"]');
   await page.waitForTimeout(300);
   panes = await panesShown();
   expect(panes.pv, 'clicking 3D shows the Preview pane').toBe(true);

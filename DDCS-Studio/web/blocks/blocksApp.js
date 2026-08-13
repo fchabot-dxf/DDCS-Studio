@@ -376,7 +376,11 @@ async function buildWorkspace() {
   // whether the Wizard View existed AT ALL, and its own history is two rounds of guessing wrong (see the retired
   // wizard-face-1599 spec). An always-present tab asks no question, so switching it can never be "wrong" — `show`
   // still decides the Wizard View tab's CONTENT (the form, or empty), just never whether the tab itself is there.
-  let activeTab = 'wizard';   // static default — never recomputed from wizard-authoring state
+  // t1768 — PERSISTS (localStorage, same convention as ddcs_blk_pv_h below): the user rarely switches, so the
+  // choice should stay where they left it rather than resetting to Wizard View every open. Still never
+  // recomputed from wizard-authoring state — only a direct click (or this one-time restore) ever changes it.
+  let activeTab = 'wizard';
+  try { const saved = localStorage.getItem('ddcs_blk_view'); if (saved === 'wizard' || saved === '3d') activeTab = saved; } catch (_) { /* */ }
   // t1744 ACT 1b-ii — THE SWITCH: the pane's OWN namespaced instance of the SAME renderer the modal uses
   // (openLiveAsModal's default ns=null instance). One instance, created once, reused across every render —
   // its closure-scoped state (_def/_seed/_layoutSpots/…) persists across renders the way a live pane needs.
@@ -431,9 +435,12 @@ async function buildWorkspace() {
   function setActiveTab(tab) {
     if (tab !== 'wizard' && tab !== '3d') return;
     activeTab = tab;
+    try { localStorage.setItem('ddcs_blk_view', tab); } catch (_) { /* */ }
     const right = root.querySelector('.right');
     if (right) right.classList.toggle('tab-3d', tab === '3d');
-    root.querySelectorAll('.blk-tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    // t1768 — the toggle shows the CURRENT view (aria-pressed = active), same reading as the app's own existing
+    // .seg/.op-btn "2D/3D + Play" pattern (.primary = active) elsewhere in this same right column.
+    root.querySelectorAll('.blk-view-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === tab)));
     const handle = document.getElementById('blkDrawerHandle');
     if (handle) handle.textContent = `▲ ${tab === 'wizard' ? 'Wizard View' : '3D'}`;
     // Re-fit the preview when its tab becomes visible (a canvas sized while display:none is 0×0).
@@ -633,6 +640,13 @@ async function buildWorkspace() {
     // tests said so within the minute.
     const show = !!authoredHere || customizing || hasTree || (def && (editingWizardType() || (def.bindings && def.bindings.length)));
     pane.hidden = false;
+    // t1768 — the header's title is the WIZARD'S OWN NAME (was the internal "Generator Modal" label): every
+    // render, not just the hasTree/flat branches below, so it clears back to a neutral label the instant `show`
+    // goes false (no stale name left over from whatever was last loaded).
+    {
+      const titleEl = document.getElementById('blkPaneTitle');
+      if (titleEl) titleEl.textContent = (show && def && def.label) ? def.label : 'Wizard View';
+    }
     // t1734 — `show` now decides ONLY this tab's CONTENT (the form below, or empty): the Wizard View tab itself is
     // always present regardless (see setActiveTab). No more face to write to CSS.
     // t1625 — the "Open as modal" door follows the wizard face: no wizard on the canvas, no door. Wired here
@@ -964,9 +978,9 @@ async function buildWorkspace() {
   // actually reclaims the width when collapsed.
   // t1734 — the `blkSegPv` / `blkSegCode` segmented toggle and its `showPane` wiring are GONE, not merely unbound
   // (0bd8b38c deleted the buttons; this code called `document.getElementById` on nothing ever since). What replaced
-  // it, later the same arc, is the `.blk-tabs` bar wired just below: a REAL user-facing toggle between Wizard View
-  // and 3D — the thing that comment used to say was deliberately absent. setRightFace/`show` no longer pick the
-  // face; `show` only decides the Wizard View tab's content now (see renderLiveForm).
+  // it, later the same arc, is the `.blk-view-toggle` (t1768; was a `.blk-tabs` tab row) wired just below: a REAL
+  // user-facing toggle between Wizard View and 3D — the thing that comment used to say was deliberately absent.
+  // setRightFace/`show` no longer pick the face; `show` only decides the Wizard View content now (see renderLiveForm).
   (function wireDrawers() {
     const right = root.querySelector('.right');
     const handle = document.getElementById('blkDrawerHandle');
@@ -979,10 +993,10 @@ async function buildWorkspace() {
     handle && handle.addEventListener('click', () => openPv(true));
     closeBtn && closeBtn.addEventListener('click', () => openPv(false));
 
-    // The Wizard View / 3D tab bar — static default (Wizard View) set once at build; every further change is a
-    // direct user click, never recomputed from wizard-authoring state.
-    root.querySelectorAll('.blk-tab').forEach((b) => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
-    setActiveTab('wizard');
+    // The Wizard View / 3D toggle — restored from localStorage (or the Wizard View default) once at build; every
+    // further change is a direct user click, never recomputed from wizard-authoring state.
+    root.querySelectorAll('.blk-view-btn').forEach((b) => b.addEventListener('click', () => setActiveTab(b.dataset.view)));
+    setActiveTab(activeTab);
 
     // Drag the top edge to resize the preview drawer. Height lives in --blk-pv-h (only the mobile rule reads it,
     // so desktop is untouched) and persists across sessions.

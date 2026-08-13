@@ -153,7 +153,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 167, find: /setup_datawiz/ },
     { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', line: 28, lineEnd: 41, find: /_datawiz/ },
     { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 103, find: /opensAs/ },
-    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1112, lineEnd: 1113, find: /z-index/ },
+    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1119, lineEnd: 1120, find: /z-index/ },
     { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2779, find: /attach/ },
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
     { id: 'TRAP9 _layout is a module-level singleton', file: 'web/wizards/ops/panelTypes.js', line: 639, find: /_layout/ },
