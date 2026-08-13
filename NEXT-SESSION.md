@@ -1395,3 +1395,29 @@ field's value from `userRoot`'s OWN template tree (each `param_field`'s embedded
 `def.bindings` — so the t1734 overlay silently no-oped for exactly Corner's shape while working for
 flat-bindings twins. **Inconsistent-across-shapes was correctly rejected; the fix is to make the template
 path read the live values too.**
+
+### 3d. ⛔ AMENDMENT B WAS UNREACHABLE — user ruled: ONLY the closed-wizard case (2026-08-11)
+**Measured at t1737, in the real app:** with a wizard open, `document.elementFromPoint()` at the BLOCKS
+tab's own centre returns `DIV.wiz-box.large` — **the modal covers the tab bar. A human CANNOT switch to
+Blocks while a wizard is open.** So the t1736 mirror, which keys on `wizardElement.classList.active`
+(cleared by Cancel/Insert), fires ONLY for a script. By the time the user can reach the Blocks tab the
+flag is already cleared → the pane is empty, every time. That is exactly the screenshot they sent.
+
+⚠ **Advisor's own failure, and it is the project's named one:** I "verified" amendment B by calling
+`openWiz()` + `showApp()` from code, which bypasses the modal entirely. The test passed, the feature
+looked shipped, and it was never reachable by a user. **Prove the wiring to the VISIBLE PIXEL** — I
+enforce that on the worker and broke it myself in the same session.
+
+**User's ruling, verbatim:** *"i dont want 1-2 i only want 3"* — i.e. the ONLY case that matters is:
+**close the wizard (Cancel/Insert) → switch to Blocks → the Wizard View shows that wizard.**
+
+**So the `.active`-keyed mirror is DELETED, not repaired.** The pane must be driven by what is ON THE
+CANVAS in that tab — the state that survives closing the modal, which is precisely when the user is
+looking at it. Canvas-authoring derivation already does this and already works (advisor-verified t1737:
+`ddcsEditWizardDef('user_corner_data')` renders 23 fields). The act is to make the CLOSE→BLOCKS path land
+in that same state, and to remove the unreachable modal-mirror + its live-value patching that exists only
+to serve it.
+
+⚠ Everything else from step 3 STANDS: two always-present tabs, the four-term predicate deleted, projected
+G-code deleted, `sim_3d_box`/`code_preview_panel` deleted, `layout_2d_canvas` kept, and the honesty rule
+(EMPTY on a plain op, EMPTY when there is genuinely no wizard).
