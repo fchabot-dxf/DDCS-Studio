@@ -26873,3 +26873,96 @@ ES module on that run rather than a real divergence; I could not reproduce it 4/
 server. Flagging rather than asserting, since I can't inspect your environment directly — if it recurs, the
 `/api/descriptor` 404 both routes throw (pre-existing, unrelated — no `/api/*` route on the static mem-server)
 is the only console noise either gesture produces, so a genuine re-failure would show something new beyond that.
+
+## 🔨 turn 1764 (epoch 4) — THE PANE HAS NO SURFACE: `.wiz-box`'s paint never had a `#blk_wiz_user` branch
+
+Advisor's next dispatch, off the user's own screenshot at 393px on the deployed build: the 2D canvas draws
+correctly (t1762's fix confirmed good) but the FORM below it is raw browser controls on straight black — no
+panel background, illegible labels. Traced by the advisor first, confirmed here: `.wiz-body` (styles.css:3571,
+pre-turn) is layout-only — padding/gap/flex/overflow, no colour. The MODAL gets its surface from its `.wiz-box`
+ancestor; `#blk_wiz_user` (the pane) has NO `.wiz-box` ancestor — it IS the `.wiz-body`, embedded directly in the
+pane's own chrome, not wrapped in a floating dialog. The scaffold (t1742) copied the STRUCTURE, never the SURFACE.
+
+### Reproduced first, then found the SPECIFIC missing layer (not just "add a background")
+
+`getComputedStyle('#blk_wiz_user').backgroundColor` → `rgba(0,0,0,0)`, confirmed transparent, `studio` theme
+active. Screenshotted the real gesture (`openWiz`→`insertWiz`→`showApp('blocks')`, drawer opened, forced tall to
+see past the visualization) — a large black void below the visualization, "IDENTITY" and "Corner" rendered in
+near-invisible dark-grey text (`--text-dim:#4b4843`, tuned for the studio theme's light silver panel, illegible
+on raw black), while the "Front-Left" `<select>` still showed SOME native grey styling. Traced why the select
+looked partially fine while labels didn't: individual form controls (`formWidgets.js`'s `CTRL_CSS`, used by
+EVERY widget kind — inputs, selects, buttons) set their own colours via an INLINE style keyed on `var(--bg)`/
+`var(--border)`, which are theme tokens defined globally on `body[data-theme]` and therefore resolve identically
+regardless of `.wiz-box` ancestry — so individual controls were never really broken, just visually orphaned
+without the surrounding panel their designed contrast assumes. The actual missing piece is narrower and more
+specific than "style every control": it's `.wiz-box`'s own background/border/border-radius/box-shadow, declared
+once in a BASE rule (styles.css:2147, pre-turn) plus FIVE per-theme overrides (`normal`/`studio`/`steampunk`/
+`futuristic`/`organic`), all keyed on `.wiz-box` alone.
+
+### Fixed by extending the SELECTOR, not duplicating the DECLARATION — per the dispatch's own steer
+
+Split the base `.wiz-box` rule: sizing (width/max-height/padding/display/flex-direction — pane-irrelevant, the
+pane's own container already sizes it) stays `.wiz-box`-only; the surface-painting properties (background/
+border/border-radius/box-shadow) moved to a rule keyed on `.wiz-box, #blk_wiz_user` together. Same pattern for
+all five per-theme overrides — each `[data-theme="X"] .wiz-box { ... }` became `[data-theme="X"] .wiz-box,
+[data-theme="X"] #blk_wiz_user { ... }` (studio's gradient-border trick, steampunk/futuristic's glow shadows,
+organic's asymmetric biomorph radius — all now apply to the pane identically, no declaration copied into a
+second block). This is the shape the dispatch explicitly asked for over a duplicated block: "if that means the
+styles key on something both hosts carry rather than on `.wiz-box`, say so and do that" — `#blk_wiz_user` is a
+stable, existing ID both routes already produce, so no new class or HTML change was needed, just a broadened
+selector at each of the 6 rule sites (styles.css: base ~2147, `normal` ~2946, `studio` ~3183, `steampunk` ~3296,
+`futuristic` ~3401, `organic` ~3497 and ~3539 for its separate radius override).
+
+### Verified across ALL FIVE themes, not just the one screenshotted — and both viewports
+
+`getComputedStyle('#blk_wiz_user')` for each of `normal`/`studio`/`steampunk`/`futuristic`/`organic`: every theme
+now reports a real, theme-correct `background-image` (gradient themes) or `background-color` (flat-colour
+themes) — `normal` `rgb(240,240,240)`, `studio` a silver gradient, `steampunk` `rgb(61,40,23)`, `futuristic`
+`rgb(14,22,38)`, `organic` `rgb(36,28,21)` with its asymmetric `30px 12px` radius — none transparent, none the
+raw page black. Screenshotted the real gesture at 393px (drawer open, forced-taller to see the whole form) and
+desktop 1400px: labels and section headers ("IDENTITY", "GEOMETRY") are now legible dark-on-silver, segmented
+buttons ("Manual/Auto", "Dogleg/Diagonal") show their proper active-state blue highlight, number/dropdown fields
+sit in their intended sunken-well styling — the pane now genuinely looks like the same app as the modal, not an
+unstyled shell floating on the page background.
+
+### Regression risk assessed, not assumed — this touches shared CSS reaching every wizard's `.wiz-box`
+
+Per the amended tiering's own exception ("if you touch the shared render path again, say so and run wider") and
+the dispatch's own note ("this touches shared CSS so say if you run wider") — this genuinely is that case: every
+themed `.wiz-box` selector across all 5 themes was edited. Reasoned through the actual risk before running wide:
+every edit ADDS a selector branch (`, #blk_wiz_user`) to an EXISTING rule — no declaration's VALUE changed, no
+rule was removed — so `.wiz-box` alone computes byte-identical properties to before; the only behavioural change
+is that `#blk_wiz_user` now ALSO receives them, which it never did. Grepped the test suite for any assertion
+depending on `#blk_wiz_user` staying transparent — none found. Ran wide anyway rather than trust the reasoning
+alone: `fork-parity-1593.spec.js` (forks EVERY shipped twin's form+emit byte-for-byte through the SAME renderer
+this CSS reaches) — 2/2, clean. `blocks-theme.spec.js` (the existing Blockly-chrome theme-follow test) — 1/1.
+`collapsible-panes-752.spec.js` + `pane-splitter-790.spec.js` (structurally adjacent to `.wiz-box`/`.wiz-2pane`)
+— 11/12 (1 pre-existing unrelated skip).
+
+### New permanent test — non-vacuous, reverted `styles.css` and watched all 5 themes fail
+
+`tests/pane-surface-1764.spec.js`: for each of the 5 themes, sets `body[data-theme]`, runs the real placed-op
+gesture, and asserts `#blk_wiz_user`'s own computed `background-image`/`background-color` is non-default (not
+`none`/transparent/black). `git checkout HEAD -- styles.css` (pre-t1764, i.e. HEAD at the time = t1760's
+commit — t1762 touched no CSS), re-ran: all 5 FAILED for the predicted reason (transparent/none), restored from
+a scratch backup, re-ran — 5/5 pass.
+
+### Verify
+
+- `npm run test:node`: 118/118.
+- New `pane-surface-1764.spec.js`: 5/5 (all themes), proven non-vacuous.
+- `fork-parity-1593.spec.js`: 2/2 — run deliberately, this act's own stated shared-CSS exception.
+- `blocks-theme.spec.js`: 1/1.
+- `collapsible-panes-752.spec.js` + `pane-splitter-790.spec.js`: 11/12 (1 pre-existing skip, unrelated).
+- Real gesture, screenshotted: 393px (drawer open, forced-tall to see the whole form) and desktop 1400px, both
+  showing the pane's form with a real painted surface matching the modal's own look.
+- All `tests/zzdebug-1764-*.spec.js` scratch diagnostics deleted, none committed.
+
+### For the advisor
+
+Your trace was exactly right (`.wiz-body` is layout-only, `.wiz-box` is where the paint lives, the pane has no
+`.wiz-box` ancestor) — the one thing I'd add is that individual form CONTROLS were never actually broken
+(`formWidgets.js`'s `CTRL_CSS` is inline-styled off theme vars that resolve globally, ancestor-independent), only
+the PANEL/LABEL surface around them was missing, which is why the "Front-Left" dropdown had some native styling
+while its own label text was nearly invisible — worth knowing if a similar "unstyled" report comes in elsewhere,
+since the fix and the actual gap are narrower than "the pane has no CSS at all."

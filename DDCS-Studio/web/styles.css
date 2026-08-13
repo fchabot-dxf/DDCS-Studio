@@ -2152,12 +2152,22 @@ button.primary:hover {
     max-height: 95vh;           /* fallback for older browsers */
     max-height: 95dvh;          /* dynamic viewport-aware height */
     margin-bottom: env(safe-area-inset-bottom);
-    
+
     padding: 0 !important;      /* CRITICAL: No padding so header touches edges */
-    
+
     display: flex;
     flex-direction: column;
-    
+}
+
+/* t1764 — THE SURFACE, shared with the Blocks tab's Wizard View pane (#blk_wiz_user): that pane renders through
+   the SAME userOpView renderer as the modal but has no .wiz-box ancestor of its own (it IS the .wiz-body, embedded
+   directly in the pane's own chrome, not wrapped in a floating dialog) — so it never painted a ground and every
+   theme's dark-on-light label/header colours (tuned for THIS background) landed on the raw page black instead.
+   Keyed on BOTH hosts here (and at every themed .wiz-box override below) rather than duplicated into a second
+   block, so the two renderers can never visually drift apart the way t1740/t1744/t1748/t1760 already found the
+   RENDER path could. Sizing/position (width/max-height/padding/display above) stays .wiz-box-only — the pane has
+   its own container that already sizes it. */
+.wiz-box, #blk_wiz_user {
     /* Theme Defaults */
     background: var(--panel);
     border: 2px solid var(--accent);
@@ -2933,7 +2943,7 @@ Middle (handle) {
     color: #fff;
 }
 
-[data-theme="normal"] .wiz-box {
+[data-theme="normal"] .wiz-box, [data-theme="normal"] #blk_wiz_user {
     border: 2px solid var(--accent);
 }
 
@@ -3170,7 +3180,7 @@ Middle (handle) {
 
 /* --- Wizard / modal → silver dialog --- */
 /* silver key-tray, same recipe as the toolbar dropdown */
-[data-theme="studio"] .wiz-box {
+[data-theme="studio"] .wiz-box, [data-theme="studio"] #blk_wiz_user {
     border: 3px solid transparent; border-radius: 10px;
     background:
         linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
@@ -3283,7 +3293,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     background: rgba(40, 20, 0, 0.85);
 }
 
-[data-theme="steampunk"] .wiz-box {
+[data-theme="steampunk"] .wiz-box, [data-theme="steampunk"] #blk_wiz_user {
     border: 2px solid #8b6914;
     box-shadow: 0 0 20px rgba(139, 105, 20, 0.5);
 }
@@ -3388,7 +3398,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     background: rgba(10, 14, 26, 0.9);
 }
 
-[data-theme="futuristic"] .wiz-box {
+[data-theme="futuristic"] .wiz-box, [data-theme="futuristic"] #blk_wiz_user {
     border: 2px solid #00ffff;
     box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
 }
@@ -3484,7 +3494,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 }
 
 [data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
-[data-theme="organic"] .wiz-box { border: 1px solid #6e5840; box-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20); }
+[data-theme="organic"] .wiz-box, [data-theme="organic"] #blk_wiz_user { border: 1px solid #6e5840; box-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20); }
 
 /* Bone keycaps / buttons: ivory cap, sinew rim, soft organic shadow, big curvature */
 [data-theme="organic"] .toolbar-btn,
@@ -3526,7 +3536,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 /* Biomorph SHAPES — organic & asymmetric (not boxy): blob panels + pebble keys with varied radii,
    so the deck reads like a grown exoskeleton rather than a grid of rectangles. */
 [data-theme="organic"] .dock-body .deck-tab-panel { border-radius: 0 30px 36px 32px; }
-[data-theme="organic"] .wiz-box { border-radius: 30px 12px 30px 12px; }
+[data-theme="organic"] .wiz-box, [data-theme="organic"] #blk_wiz_user { border-radius: 30px 12px 30px 12px; }
 [data-theme="organic"] #controller-dock .dock-body .toolbar-btn { border-radius: 18px 26px 16px 22px; }
 [data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(2n) { border-radius: 26px 16px 22px 18px; }
 [data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(3n) { border-radius: 16px 22px 28px 14px; }
