@@ -22,6 +22,16 @@ let stack = [];
 let proj = { text: '', lines: [], map: [] };   // cached emitMapped of the stack
 let applying = false;                           // true while WE programmatically setValue the editor
 const subs = new Set();
+// t1766 — bumped on every setStack call. blocksApp's renderFromModel queues a microtask that reads the
+// workspace BACK into the model (to sync ids after a rebuild) — under rapid back-to-back setStack calls
+// (e.g. a scripted `ddcsLoadBlockStack([])` immediately followed by `ddcsEditWizardDef(...)`, which itself
+// calls `ddcsLoadBlockStack([opC])`), a queued echo from an EARLIER call can still be pending when a LATER
+// call has already moved the model on — the echo then overwrites the newer stack with stale workspace data,
+// and nothing ever corrects it (found via wizard-face-1599.spec.js hanging on the 3rd customize in a row: the
+// program never became empty, so a stale confirmDestructiveLoad dialog appeared and nothing dismissed it).
+// The queuer captures this generation at queue time and no-ops if it's stale by the time the microtask runs.
+let gen = 0;
+export const getGen = () => gen;
 
 function dialectOpts() { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } }
 function editor() { const s = window.ddcsStudio; return s && s.editorManager; }
@@ -211,6 +221,7 @@ export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
 
 /** Replace the program. `origin` lets a view skip its own echo ('blockly' = from the workspace, 'editor', …). */
 export function setStack(next, origin = 'api') {
+    gen++;   // t1766 — every real replacement supersedes any reproject echo still queued from a prior call
     stack = Array.isArray(next) ? next : [];
     proj = emitMapped(stack, dialectOpts());
     projectToEditor();

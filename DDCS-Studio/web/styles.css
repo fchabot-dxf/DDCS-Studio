@@ -2292,6 +2292,18 @@ button.primary:hover {
    but had nowhere to draw. Scoped to `#blk_wiz_user` specifically (never the modal's own `#wiz_user`, which DOES
    have the wide context the desktop rule assumes) — mirrors the ≤860px block's own rules verbatim, unconditionally,
    since the pane's available width never crosses the threshold that layout needs. */
+/* t1766 — THE SURFACE RAN OUT PARTWAY DOWN: t1764 painted #blk_wiz_user's own background, but `.wiz-body`'s base
+   rule (below) ALSO sets `max-height: calc(95vh - 120px)` + `overflow-y: auto` on any `.wiz-body` — meant for the
+   MODAL, where `.wiz-box` is a fixed-height floating dialog and `.wiz-body` must scroll WITHIN it. #blk_wiz_user
+   inherits that unconditionally too, capping its own painted box to ~640px while its real content (visualization
+   + form stacked) measures ~1400px — background paints across the padding box, which past that cap is smaller
+   than the scrollable content, so everything scrolled beyond ~640px sits on the raw page black no matter how
+   correct the paint declaration is. #blk-formpane (the pane's OUTER sidebar column, below) already has its own
+   `overflow:auto` — a SECOND, redundant scroll container was nested inside it. Let #blk_wiz_user grow to its
+   natural content height instead (matching `.wiz-2pane`'s own `height:auto` already set here) so the OUTER
+   #blk-formpane becomes the one and only scroll container, and #blk_wiz_user's background then covers everything
+   that scrolls, by construction — not a new selector, a removed conflicting cap. */
+#blk_wiz_user { max-height: none; overflow-y: visible; }
 #blk_wiz_user .wiz-2pane { flex-direction: column; height: auto; }
 #blk_wiz_user .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
 #blk_wiz_user .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }

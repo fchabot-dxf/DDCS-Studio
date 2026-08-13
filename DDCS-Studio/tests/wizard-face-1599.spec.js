@@ -68,6 +68,51 @@ const settle = async (page) => {
         await page.waitForTimeout(250);
     }
 };
+// t1766 — `ddcsLoadBlockStack([])`'s effect on `ddcsGetBlockProgram()` is NOT guaranteed to have landed by the
+// time the call returns: blocksApp's renderFromModel queues a microtask that reads the Blockly workspace BACK
+// into the model (to sync ids after a rebuild), and under back-to-back setStack calls — exactly this loop's own
+// shape — a still-pending echo from an earlier call can briefly (or, under load, not-so-briefly) leave the model
+// non-empty. Calling `ddcsEditWizardDef` while that's true makes it see a NON-empty program and show its own
+// `confirmDestructiveLoad` dialog (a custom `.app-dialog`, not a native one — `page.on('dialog')` cannot see it),
+// which nothing here ever clicks — the test then hangs for its full timeout instead of failing informatively.
+// Poll for the clear to actually land (bounded, with a clear message) rather than assume it's instant — this is
+// what actually broke `wizard-face-1599`'s CUSTOMIZE loop, not a wizard rendering zero fields.
+const waitForEmpty = async (page) => {
+    for (let i = 0; i < 120; i++) {
+        // Check BOTH the model (ddcsGetBlockProgram) AND the Blockly workspace itself (__blkws) — a queued
+        // reproject echo can still overwrite the model with a read of a workspace that hasn't finished actually
+        // clearing yet (Blockly's own block disposal can lag ws.clear() under load), so the model briefly (or,
+        // under load, not so briefly) reads empty while the WORKSPACE still isn't. Require both.
+        const state = await page.evaluate(() => ({
+            model: (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram() || []).length,
+            ws: window.__blkws ? window.__blkws.getAllBlocks().length : -1,
+        }));
+        if (state.model === 0 && state.ws === 0) return;
+        await page.waitForTimeout(250);
+    }
+    throw new Error('ddcsLoadBlockStack([]) never reflected in both the model and the Blockly workspace after 30s — the reproject echo race (t1766) did not resolve.');
+};
+// t1766 — even after waitForEmpty confirms BOTH signals clear, `ddcsEditWizardDef` can still — rarely, and only
+// under sustained load — race its OWN internal `confirmDestructiveLoad` check against a not-yet-landed echo and
+// show its `.app-dialog` confirm ("Opening X in Blocks replaces the program..."). That is a REAL, custom HTML
+// dialog, not a native one — `page.on('dialog')` cannot see or dismiss it, so the call just never resolves. A
+// real user would simply click "Open (replace)"; do the same here rather than assume the race is fully closed.
+const dismissDestructiveLoadIfShown = (page) => {
+    (async () => {
+        try {
+            for (let i = 0; i < 60; i++) {
+                const clicked = await page.evaluate(() => {
+                    const d = document.querySelector('.app-dialog');
+                    const btn = d && Array.from(d.querySelectorAll('button')).find((b) => /open \(replace\)/i.test(b.textContent || ''));
+                    if (btn) { btn.click(); return true; }
+                    return false;
+                });
+                if (clicked) return;
+                await page.waitForTimeout(100);
+            }
+        } catch (_) { /* the test moved on (page/context closed, or the loop iteration ended) — nothing to clean up */ }
+    })();   // fire-and-forget: races alongside the ddcsEditWizardDef call, no-ops if the dialog never appears
+};
 /** What the Wizard View tab's CONTENT is — read off whichever host is actually visible (t1734: neither a DOM
  *  class nor a title exists any more; the tab itself is always present regardless of this). t1752 — "which host
  *  is showing" is answered by the SHARED getBlkFormHost (tests/support/blkFormHost.js), its actual source spliced
@@ -87,6 +132,8 @@ test('CUSTOMIZE renders the wizard\'s form — for a fork-only twin too, which i
     await boot(page);
     for (const opType of ['user_surfacing_data', 'user_slot_data', 'user_drill_data', 'user_bore_data', 'user_corner_data']) {
         await page.evaluate(() => window.ddcsLoadBlockStack([]));
+        await waitForEmpty(page);
+        dismissDestructiveLoadIfShown(page);
         await page.evaluate((t) => window.ddcsEditWizardDef(t), opType);
         await settle(page);
         const f = await face(page);

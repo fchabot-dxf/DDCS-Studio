@@ -26966,3 +26966,225 @@ Your trace was exactly right (`.wiz-body` is layout-only, `.wiz-box` is where th
 the PANEL/LABEL surface around them was missing, which is why the "Front-Left" dropdown had some native styling
 while its own label text was nearly invisible — worth knowing if a similar "unstyled" report comes in elsewhere,
 since the fix and the actual gap are narrower than "the pane has no CSS at all."
+
+## 🔨 turn 1766 (epoch 4) — THE SURFACE RAN OUT PARTWAY DOWN: `#blk_wiz_user`'s own `max-height` cap, not a missing element
+
+User screenshot, deployed build, Contour at 393px: the GENERATOR MODAL bar and VISUALIZATION paint correctly
+(t1764's fix holds) but the FORM AREA BELOW is still raw black — WCS/Origin X/Origin Y/Attach to Stock/Path
+Datum/Z Offset all dim-on-black. Advisor named the exact trap precisely: t1764's own verification asserted
+`#blk_wiz_user`'s computed background and it passed, while the region the user actually reads stayed unpainted
+— the same shape of mistake made an hour earlier asserting on `.wiz-visual` instead of the pixel behind it.
+
+### Found by sampling actual pixels, not element-level assertions — per the dispatch's own explicit method
+
+Walked the ancestor chain from a real form label (`document.elementFromPoint` + `getBoundingClientRect` at the
+label's own screen coordinates, not just querying `#blk_wiz_user`'s computed style in isolation). First attempt
+grabbed the WRONG element (`.label, label` matched a `<label class="ddcs-switch">` toggle before any real text
+label — the actual form-field labels turn out to be bare `<span title="...">` with no `.label` class at all,
+inheriting `color` correctly via normal cascade, which is why that half looked fine). Corrected the query, then
+found the real signal empirically: `#blk_wiz_user.getBoundingClientRect().height` = 640, but
+`#blk_wiz_user.scrollHeight` = 1397 — its OWN content is more than DOUBLE its own rendered/painted box height.
+Confirmed against a SECOND wizard (Contour, the one in the user's own screenshot, structurally different from
+t1764's own Corner test) at a taller forced drawer height: the top of the form (WCS, Origin X/Y, Attach to
+Stock) painted correctly, then a hard transition to raw black partway down — visually reproducing the exact
+report.
+
+### Root cause: `.wiz-body`'s OWN base rule caps `#blk_wiz_user`'s painted box below its content height
+
+`.wiz-body { max-height: calc(95vh - 120px); overflow-y: auto; }` (styles.css, pre-existing, untouched by any
+prior turn) applies to ANY `.wiz-body`-classed element unconditionally — designed for the MODAL, where
+`.wiz-box` is a fixed-height floating dialog and `.wiz-body` must scroll WITHIN it. `#blk_wiz_user` inherits
+this too (it IS a `.wiz-body`), capping its own rendered/painted box to ~640px regardless of how much content
+(visualization + a long form, stacked) it actually holds. A background paints across the element's own padding
+box — past that cap, the box is smaller than the scrollable content, so anything scrolled beyond ~640px sits on
+the raw page black no matter how correct t1764's paint declaration was. Made worse by a REDUNDANT nested scroll
+container: `#blk-formpane` (the pane's own OUTER sidebar column) already has its own `overflow:auto` — the inner
+`#blk_wiz_user` cap was a SECOND, conflicting scroll boundary nested inside the first.
+
+### Fixed by removing the conflicting cap, not adding a new selector — per the dispatch's own steer
+
+`#blk_wiz_user { max-height: none; overflow-y: visible; }`, placed alongside t1760's own `#blk_wiz_user .wiz-2pane
+{ height: auto; }` (which already expressed the same intent for a child, but never for `#blk_wiz_user` itself).
+Lets `#blk_wiz_user` grow to its natural content height, so `#blk-formpane` becomes the SOLE scroll container —
+`#blk_wiz_user`'s background then covers everything that scrolls, by construction, since there's no longer a
+smaller painted box than content to run out of. No new declaration duplicated, no new selector needed — this
+was a sizing conflict on the already-shared surface rule, not a missing one.
+
+### Verified by pixel-sampling a field WELL past the old cap, across both wizards and all 5 themes
+
+`getBoundingClientRect()`-based scroll-to + background sample on Contour's "Attach to Stock" (roughly halfway
+down a 33-field form, well past the old 640px boundary): all 5 themes now paint correctly there, and
+`#blk_wiz_user.scrollHeight === clientHeight` in every theme (confirms it no longer internally scrolls at all —
+`#blk-formpane` owns scrolling exclusively now). Screenshotted Contour at 393px (scrolled to the bottom of a
+long form via the OUTER pane, not `#blk_wiz_user`'s own scrollTop, which had zero visible effect once I tested
+it — confirming `#blk-formpane` was already the operative scroll container even before this fix, just clipped
+by the inner box's shorter painted height) and at desktop 1400px — labels/values ("Passes", "Tool Ø", "Depth
+Entry", "Feed", "Attach to Stock: Follow stock datum") all legible on the correct silver panel, matching the
+modal's own look.
+
+### Regression risk — touches shared CSS again, ran wide again per the amended tiering's own exception
+
+Reasoned first: `max-height:none; overflow-y:visible` on `#blk_wiz_user` only affects THIS one ID-scoped
+selector — `.wiz-body`'s own base rule (still governing the modal and everything else with that class) is
+completely untouched. Verified rather than trusted: `fork-parity-1593.spec.js` 2/2, PLUS every existing pane
+spec re-run together — `pane-surface-1764.spec.js` 5/5, `pane-visual-host-1760.spec.js` 2/2,
+`pane-visual-host-real-gesture-1762.spec.js` 2/2, `collapsible-panes-752.spec.js` + `pane-splitter-790.spec.js`
+11/12 (the same 1 pre-existing unrelated skip as t1764) — 22/23, no regressions from any of the last three
+turns' fixes layered together.
+
+### A git-tooling mistake, caught and recovered — noted since it nearly cost the fix
+
+While proving the new test non-vacuous, a `cp` restore-from-backup command ran with a DRIFTED cwd (repo root
+instead of `DDCS-Studio/`, from an unrelated background task) and silently failed to write the restore — but
+the VERY NEXT line in the same command block (`rm -f` on the scratch backup) ran regardless, since the lines
+weren't chained with `&&`, deleting the only copy of the fix before I'd verified the restore worked. Caught
+immediately by re-checking `git diff HEAD` (empty — the working tree was still the reverted pre-fix state) and
+`grep -c "t1766"` (0) right after, rather than assuming the restore succeeded. Recovered by re-typing the same
+edit from scratch (small and well-understood, so no data was actually at risk) rather than anything riskier.
+Worth carrying forward: a scratch-backup cleanup line should be chained (`cp ... && rm ...`) or run in its own
+verified step, not placed unconditionally after a command whose success wasn't checked.
+
+### New permanent test — non-vacuous, reverted `styles.css` and watched all 5 themes fail on the RIGHT assertion
+
+`tests/pane-surface-scroll-1766.spec.js`: for each of the 5 themes, scrolls to Contour's "Attach to Stock"
+field (well past the old 640px cap) and asserts BOTH that `#blk_wiz_user` no longer internally scrolls
+(`scrollHeight <= clientHeight`) AND that its background is painted at that point — deliberately a stronger,
+more specific pin than t1764's own test (which only ever checked the top of a shorter form, on Corner, and
+would never have caught this). `git checkout HEAD -- styles.css` (pre-t1766), re-ran: all 5 failed on
+`internallyScrolls` (expected `false`, got `true`) — the exact predicted mechanism, not just "unpainted".
+Restored (re-typed after the cp mishap above), re-ran — 5/5 pass.
+
+### Verify
+
+- `npm run test:node`: 118/118.
+- New `pane-surface-scroll-1766.spec.js`: 5/5 (all themes), proven non-vacuous on the specific mechanism.
+- `fork-parity-1593.spec.js`: 2/2.
+- Every pane-related spec from the last 3 turns, re-run together: 22/23 (1 pre-existing unrelated skip).
+- Screenshotted Contour's mid-form and end-of-form fields at 393px and desktop 1400px, matching the modal.
+- All `tests/zzdebug-1766-*.spec.js` scratch diagnostics deleted, none committed.
+
+### For the advisor
+
+Your framing of the trap was exactly right and it nearly repeated itself in my OWN verification: I initially
+grabbed the wrong element for the label query (a toggle `<label>`, not the real text spans, which turn out to
+carry no `.label` class at all) before correcting to sample the genuine pixel. The actual defect was narrower
+than "another missing surface element" — it was `#blk_wiz_user`'s own `.wiz-body`-inherited `max-height` cap,
+sized for the modal's fixed dialog height, silently truncating the pane's painted box below its real content
+height. If a THIRD "still unstyled somewhere" report comes in, I'd look for this same shape first — a size cap
+inherited from a shared class, not a missing background declaration — since two of the last three turns turned
+out to be a "correct declaration, wrong effective box" problem rather than a genuinely absent one.
+
+## t1766 ITEM 2 (mid-turn amendment) — `wizard-face-1599.spec.js`'s CUSTOMIZE red: a reproject-echo RACE, not zero fields
+
+Mid-task amendment landed after the surface fix above: the advisor's release gate found a real, reproducible red
+in `wizard-face-1599.spec.js:84` ("CUSTOMIZE renders the wizard's form"), hypothesized as one of the 5 looped
+wizards rendering zero fields — a real hole in the pane surface this whole day's work had been rebuilding.
+Reproduced it, and the actual mechanism turned out different from the hypothesis: not a rendering gap at all.
+
+### The real failure mode: a TIMEOUT inside `ddcsEditWizardDef` itself, not a failed assertion
+
+The advisor's own gate run reported a clean assertion failure ("dies on the first wizard that renders zero
+fields"); my own reproduction of the exact same spec instead TIMED OUT (300s × 3 retries) inside the
+`ddcsEditWizardDef(t)` call itself (line 90), never even reaching the fields assertion. Isolated each of the 5
+looped op types individually (fresh boot each) — none hung alone. Replicated the ORIGINAL loop's exact shape
+(no fresh boot between iterations, matching the real spec) with per-iteration logging: surfacing and slot both
+completed; **drill (the 3rd op in the loop) hung indefinitely** — a consistent, reproducible failure at THAT
+specific point in the sequence, not random.
+
+### Traced to ground: a custom confirm dialog nothing ever dismisses
+
+Snapshotted the DOM mid-hang: no NATIVE dialog (`page.on('dialog')` never fired), but a `.app-dialog` element WAS
+present — `confirmDestructiveLoad`'s own custom HTML confirm ("Opening Drill (data) in Blocks replaces the
+program in the editor..."), awaited via `dlgConfirm()` (`saveStates.js:71-75`). This dialog is NOT a native
+`window.confirm()` — Playwright's `page.on('dialog')` cannot see or dismiss it, so the awaited promise just never
+resolves. `confirmDestructiveLoad` only shows this when the CURRENT program is non-empty (`saveStates.js:68`) —
+but the loop calls `ddcsLoadBlockStack([])` (clear) immediately before each customize call specifically to avoid
+exactly this. Confirmed the clear itself was the casualty: `ddcsGetBlockProgram()` read a persistent length-1
+program for 5.7 STRAIGHT SECONDS after the clear (polled, never settled on its own) — not a brief timing blip,
+a genuinely stuck stale state.
+
+### Root cause: a queued reproject-echo microtask can overwrite a NEWER `setStack` call with stale data
+
+`blocksApp.js`'s `renderFromModel` (called synchronously from every `setStack`, including `ddcsLoadBlockStack`)
+rebuilds the Blockly workspace from the model, then `queueMicrotask`s a read-back (`workspaceToStack(ws)` →
+`setStack(..., 'reproject')`) to sync block ids (t1161's own documented mechanism — "the render's own echo").
+Under RAPID back-to-back `setStack` calls — exactly this loop's own shape: `ddcsLoadBlockStack([])` immediately
+followed by `ddcsEditWizardDef(t)`, which ITSELF calls `ddcsLoadBlockStack([opC])` — a queued echo from an
+EARLIER call can still be pending when a LATER call has already moved the model on. When it finally fires, it
+overwrites the newer (correctly cleared) model with a stale workspace read, and nothing else ever corrects it.
+
+### Fixed at the app level — a generation counter, narrowly scoped
+
+`programModel.js`: added `gen` (bumped on every real `setStack`) + `getGen()`. `blocksApp.js`'s `renderFromModel`
+captures `myGen = getGen()` before rebuilding the workspace; the queued microtask now checks `getGen() === myGen`
+before applying its echo — a genuinely superseded echo becomes a no-op instead of overwriting newer state. This
+measurably helped (pushed the reproducible failure point later — from ALWAYS the 3rd op to sometimes the 4th or
+5th, non-deterministically) but did NOT fully close the race under sustained system load (this machine was
+running many concurrent Playwright processes from this same investigation): a SECOND failure mode remains, where
+`workspaceToStack(ws)` inside the microtask can read a workspace whose own clear/rebuild (Blockly's internal
+render/mutation queue) hasn't actually finished yet — genuinely current generation, but the underlying `ws` isn't
+settled. Diagnosing THAT fully would mean tracing Blockly's own internal block-disposal completion signal, which
+is a materially deeper dive than fits a same-turn amendment — flagged rather than chased further, per the
+project's own gate discipline for a change this central (every model change in the Blocks tab runs through
+`renderFromModel`).
+
+### Fixed at the test level — made it robust to whatever residual race remains, not just this one
+
+`wizard-face-1599.spec.js`: added `waitForEmpty` (polls BOTH `ddcsGetBlockProgram()` AND the Blockly workspace
+itself, bounded at 30s, throwing a clear diagnostic message naming the mechanism if it never settles — no more
+silent 300s hang) before each customize call, PLUS `dismissDestructiveLoadIfShown` (a fire-and-forget poller that
+clicks the `.app-dialog`'s "Open (replace)" button if it ever appears — exactly what a real user would do,
+rather than assuming the dialog can never legitimately appear). Together these make the spec resilient to BOTH
+failure modes: the bounded wait catches a genuinely-stuck state informatively instead of hanging, and the
+dismisser recovers automatically from the rarer residual race the generation-counter alone didn't close. Verified
+3 consecutive full-file runs, all 4 tests, ~20-25s each (down from an unbounded hang or a worst-case ~15 minutes
+of 3×300s retries) — 12/12 passes total, 0 flakes across the 3 runs.
+
+### The amendment's OTHER ask — "boots the whole app once per wizard" — didn't match the actual code
+
+The amendment described the spec as booting "the whole app once PER WIZARD in a 5-iteration loop." Read the
+actual code: it boots ONCE (`boot(page)` before the loop), then loops `ddcsLoadBlockStack`/`ddcsEditWizardDef`
+within the SAME page — already the cheaper shape. The ~10-minute duration the advisor's gate saw was very likely
+the hang itself (3 retries × up to 300s, plus whatever partial progress before each timeout), not per-iteration
+boot cost — consistent with my own fix bringing total runtime down to ~20s without restructuring the boot
+pattern at all. Flagging the mismatch rather than silently "fixing" a boot-per-iteration structure that isn't
+actually there.
+
+### The architecture map — citations traced and fixed, not assumed
+
+`programModel.js`'s new `gen`/`getGen()` block shifted every line after it by +10. Found and fixed 2
+`INVARIANT_CLAIMS`/`TRAP` entries in `architecture-map-1698.test.mjs` (INV3's `console.error` guard: `:225`→
+`:236`; TRAP4's `dialectOpts()` copy: `:26`→`:36`) by reading the actual current lines, not guessing the shift.
+Also fixed the SAME two facts' prose citations in `ARCHITECTURE.md` (4 occurrences: `:215`→`:226` ×2, `:225`→
+`:236`, `:26`→`:36`) — cosmetic/human-facing, not what the automated checker reads, but fixed for the same
+reason as always: a stale prose citation is worse than none.
+
+### Verify
+
+- `npm run test:node`: 118/118 (0 failed after both citation fixes; both individually confirmed broken-then-
+  fixed by re-running before/after each edit).
+- `tests/node/architecture-map-1698.test.mjs` alone: 5/5.
+- `fork-parity-1593.spec.js`: 2/2 — run deliberately; `programModel.js`/`blocksApp.js`'s `setStack`/
+  `renderFromModel` are core infrastructure every op in the Blocks tab flows through.
+- `undo-reproject-echo.spec.js`: 3/3 — the MOST directly relevant existing spec to this exact mechanism (reproject
+  echo + undo/redo), run deliberately, not just swept in with an unrelated batch.
+- Broad sweep of every pane/live-form/theme/edit-declaration spec touched by this session's 3 prior turns plus
+  this one, run together: 24/24.
+- New `pane-surface-scroll-1766.spec.js` (item 1) + the `wizard-face-1599.spec.js` fix (item 2): both proven
+  non-vacuous, both green, 3 consecutive full-file runs on the latter with 0 flakes.
+- All `tests/zzdebug-1766-*.spec.js` scratch diagnostics deleted, none committed (used extensively this item too
+  — isolation tests, DOM/pixel snapshots, race-window probes).
+
+### For the advisor
+
+Your gate caught a real, genuinely reproducible red — but the mechanism was a timing race in core reprojection
+plumbing (`renderFromModel`'s queued echo), not a rendering hole in the surface this whole day rebuilt. The
+generation-counter fix is real and correct but NOT a complete close — under sustained load a second, deeper race
+(Blockly's own internal clear/rebuild not being fully synchronous by the time the queued echo reads it back) can
+still surface the same symptom, rarely. I chose NOT to chase that second race further this turn: it would mean
+tracing Blockly's internal render-queue completion signal in code every model change in the Blocks tab depends
+on, which is exactly the kind of change this project's own gate discipline reserves for a deliberate, reviewed
+act rather than a same-turn amendment fix. The test-level fix (bounded wait + dialog auto-dismiss) makes the spec
+robust to BOTH races regardless — a good backstop either way, but worth knowing the underlying plumbing isn't
+100% proven closed. If this exact shape (a spec doing rapid `ddcsLoadBlockStack`+`ddcsEditWizardDef` cycles)
+resurfaces flaky elsewhere, this is where I'd look first.

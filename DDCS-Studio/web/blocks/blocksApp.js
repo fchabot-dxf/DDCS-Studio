@@ -14,7 +14,7 @@ import { suggestNext, recordProgram } from './suggest.js';   // next-block sugge
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { installTokenGuard } from './blockly/tokenGuard.js';   // t1712 (cycle ACT 5) — REFUSE an ineligible live-value connection on the canvas
 import { ddcsTheme } from './blockly/theme.js';
-import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
+import { setStack, getStack, getProjection, onChange, getGen } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
@@ -791,8 +791,13 @@ async function buildWorkspace() {
     // onChange re-render guard skips it → no loop). Deferred to a microtask so it runs AFTER this onChange settles (no
     // re-entrant setStack). A REAL user edit fires later (events enabled) → reproject() with 'blockly' → it still snapshots.
     B.Events.disable();
+    const myGen = getGen();   // t1766 — captured BEFORE the rebuild so a setStack fired mid-rebuild is also seen as newer
     try { stackToWorkspace(getStack(), ws); applyOpGating(ws); } finally { B.Events.enable(); muteChanges = false; }   // gate gated ops
-    queueMicrotask(() => { try { setStack(workspaceToStack(ws), 'reproject'); } catch (_) { /* ws torn down */ } });   // sync ids, no Undo state, no re-render
+    // t1766 — a rapid second setStack (e.g. a scripted clear immediately followed by another load) can land
+    // before this microtask runs; re-reading the NOW-STALE `ws` at that point would overwrite the newer model
+    // with old data. Bail if the generation has moved on — the newer call's own renderFromModel already queued
+    // (or will queue) its own correct echo.
+    queueMicrotask(() => { try { if (getGen() === myGen) setStack(workspaceToStack(ws), 'reproject'); } catch (_) { /* ws torn down */ } });   // sync ids, no Undo state, no re-render
     if (_dev) _dev.onModelRender();   // re-grow the always-on "expose as knob" affordances after a clean rebuild
     requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
     renderViews(p);
