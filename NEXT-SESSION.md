@@ -1733,3 +1733,20 @@ One extra click; one editing path.
 **If that ever chafes, the fix is NOT a commit button on a preview** — the pane's own fields already write
 through to the blocks (`onFieldWrite`, t1740). That is the editing mechanism if one is wanted, and it
 needs no second modal.
+
+### 3k. USER RULING (2026-08-13) — in the pane: CANCEL reverts, INSERT stays inert
+*"cancel can actually cancel"* + *"other is just inert"*. The two controls are NOT symmetric, and the
+asymmetry is principled:
+- **INSERT — inert (3j, unchanged).** The pane is not building a program, so committing means nothing.
+- **CANCEL — a REAL action.** The pane's fields WRITE THROUGH to the blocks (`onFieldWrite`, wired in
+  1b-ii), so the user genuinely can change things there — which makes "put back what I typed" meaningful.
+
+**Scope note (advisor asked, user confirmed "other is just inert"): REVERT, not QUIT.** In an
+always-present tab there is nothing to close, so "quit" has no meaning here; Cancel restores values.
+
+⚠ **OPEN DESIGN DETAIL, do not guess:** *when* is the snapshot taken that Cancel restores to? On entering
+the tab? On each render? On the first edit after a clean state? Whichever is chosen must be stated in the
+act, not implied — a revert that silently restores the wrong baseline is worse than no revert.
+
+**SEQUENCING: this comes AFTER the keystroke-loss fix.** Reverting edits is meaningless while typing into
+the pane does not land at all (see the 1b-ii red below).
