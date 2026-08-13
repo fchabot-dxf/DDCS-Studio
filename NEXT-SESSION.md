@@ -1750,3 +1750,19 @@ act, not implied — a revert that silently restores the wrong baseline is worse
 
 **SEQUENCING: this comes AFTER the keystroke-loss fix.** Reverting edits is meaningless while typing into
 the pane does not land at all (see the 1b-ii red below).
+
+### 3k-CORRECTED (user, 2026-08-13): *"sorry in modal its revert"* — 3k had the surfaces BACKWARDS
+| surface | Insert | Cancel |
+|---|---|---|
+| **PANE** (Wizard View tab) | inert | **inert** |
+| **MODAL** (⧉ Open as modal) | inert (3j) | **REVERTS** |
+
+**Why this is the right way round** (3k had it reversed — advisor's error, user corrected):
+- The **MODAL is a SESSION** — opened, edited, closed. Cancel = put the values back and close, which is
+  the modal's own standing promise (*"close it and nothing is saved"*) actually being kept.
+- The **PANE is not a session** — it is always present, never opened, never closed. There is no "before"
+  moment to revert to and nothing to close, so a Cancel there would be **a control that does nothing** —
+  exactly the pattern this whole gameplan has been deleting.
+
+**So the pane carries NEITHER control as a live action.** The snapshot-timing question raised in 3k
+belongs to the MODAL, where it has an obvious answer: the state at open.
