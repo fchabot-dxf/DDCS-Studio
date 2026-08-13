@@ -2093,3 +2093,23 @@ icon. No tab row, no `GENERATOR MODAL`, no `LIVE` badge.
   must not quietly hide that by defaulting to 3D.
 **REJECTED, and record it so nobody re-proposes it:** an auto-switch that infers intent (3D while a sim
 runs, form otherwise). That is exactly the four-term predicate returning under a friendlier name.
+
+## ⚠ OPEN — the reproject-echo race in programModel is NARROWED, not CLOSED (t1766)
+Found while chasing `wizard-face-1599`'s red (which was a HANG, not the zero-fields assertion the name
+suggested): **a queued reproject-echo microtask (`blocksApp.js` renderFromModel) can overwrite a NEWER
+`setStack` with STALE workspace data** under rapid back-to-back calls. In the test it left the program
+stuck non-empty → `confirmDestructiveLoad` raised a custom `.app-dialog` Playwright's `page.on('dialog')`
+cannot see → unbounded hang. **In the app the same race means an edit can silently revert.**
+
+**Fixed:** a generation counter in `programModel.js` (`gen++` on every real replacement; a superseded echo
+no-ops). Small and right.
+**NOT FIXED, and the worker said so rather than claiming a close:** a second, deeper Blockly-internals race
+can still rarely surface it. They stopped instead of chasing further into core plumbing — correct for a
+side-finding, but it leaves a known hole.
+
+**Why this deserves its own act:** `programModel` is the path EVERY change to the user's program runs
+through. "Rarely loses an edit" there is a data-integrity bug, not a UI nit, and it will be near-impossible
+to attribute when it bites (the user will report "it undid my change", months from now, unreproducibly).
+⚠ Do NOT bundle it with presentation work. It wants: a deliberate stress reproduction (rapid
+clear-then-load, undo storms), the Blockly-side race named precisely, and a fix that makes a stale echo
+STRUCTURALLY unable to land rather than losing a race less often.
