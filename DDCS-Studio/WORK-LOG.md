@@ -26662,3 +26662,126 @@ kernel rather than pattern-matching the param name against surfacing). Also fixe
 (`TOOL_BINDING_SPECS`, `entryBindingsFor` in `deriveBindings.js`) that had carried NO token policy at all since
 t1704 — every consumer, mill and probe family alike, now inherits the same correct verdict from the one place
 each is declared. Remaining families (ATC/control/lathe-turning) are a separate act per the dispatch.
+
+## 🔨 turn 1760 (epoch 4) — THE PANE HAS NO VISUAL HOST: four root causes, all in `blocksApp.js` + `styles.css`
+
+Amendment from mid-t1758, now formally dispatched: the Blocks tab's "Wizard View" pane (`createUserOpView('blk',
+...)`, distinct from the "Open as modal" overlay — both instances of the SAME `userOpView.js` renderer) shows the
+VISUALIZATION heading above empty content — 393px, drawer open, fields=23, `.wiz-visual`=NONE, canvases=[].
+Reproduced first, then traced to FOUR independent root causes stacked on top of each other, each real, each
+verified separately before moving to the next.
+
+### Root cause 1 — the pane's `mgr` was an inert stub
+
+`renderLiveForm()` passed `{ update() {} }` to `onShow`/`refresh` everywhere — a stand-in with no
+`preview3D`/`previewVarSeed`, so even code that TRIED to build a picture had nothing to call. Fixed with a real
+`blkMgr()` (`blocksApp.js:410-416`) that forwards both methods to `window.ddcsStudio.wizardManager` — the SAME
+singleton instance `wizardManager.preview3D` (`wizardManager.js:542-579`) already uses for the modal, since that
+method stores all render state ON THE HOST DOM ELEMENT (`host.__gcode`/`__panel`/etc.), not on the manager
+instance — safe to share because pane and modal are never interacted with simultaneously.
+
+### Root cause 2 — `onShow`/`refresh` never call `update()` at all
+
+Misread the code once before catching this: `userOpView.js`'s `render()` (303-379) builds ONLY the form
+(`formBindings`/`renderOpForm`/`renderUiTree`); the 3D/2D visualization is a SEPARATE function, `update(mgr)`
+(408+), which computes G-code from the current field values and calls `mgr.preview3D(...)`/`previewVarSeed(...)`
+(557/673/565). `onShow(mgr)`/`refresh(mgr)` call `render()` internally but never `update()`. The modal's own
+`open()` (`wizardManager.js:280-313`) calls BOTH — `onShow` (292) then, separately, `update()` (309) — the pane
+only ever called the first half. Fixed by adding an explicit `blkView.view.update(blkMgr());` right after every
+onShow/refresh call, both branches (`blocksApp.js:687`, `:736`).
+
+Confirmed root causes 1+2 together were enough to make SOMETHING draw (canvas count > 0, hooked
+`wm.preview3D` and watched it fire) but not enough to make it usable — the visual host was drawing at
+effectively-zero size.
+
+### Root cause 3 — the CSS assumes the wide modal, not the pane's own 379px-wide column
+
+`.wiz-2pane > .wiz-controls { flex: 0 0 360px }` / `.wiz-2pane > .wiz-visual { flex: 1 1 0 }` (the shared
+`styles.css` rule both the modal and the pane sit under) is sized for the modal's own wide overlay. Measured the
+Blocks pane's own right-column sidebar directly (`getBoundingClientRect()`) at **379px total width even at a
+1400px browser window** — the fixed 360px control column alone eats nearly all of it, squeezing `.wiz-visual` to
+`width:0`. The project already solves an analogous problem for true mobile viewports (`@media (max-width: 860px)`
+stacks `.wiz-controls`/`.wiz-visual` vertically) — mirrored those exact rules into a NEW block scoped to
+`#blk_wiz_user` only (never the modal's `#wiz_user`), applied UNCONDITIONALLY since the pane's own available
+width is narrow regardless of the overall window (`styles.css:2285-2296`).
+
+### Root cause 4 — `makePanesCollapsible()` never ran for the pane, so `--viz-stack-h` was never written
+
+Even after root cause 3's CSS fix, `.wiz-visual` stayed stuck at ~122px (the bare height of its own
+control-bar content) and did not respond to a simulated taller drawer or a tab-switch re-fit gesture. Traced to
+`web/ui/paneAccordion.js`: `makePanesCollapsible(root)` (496-526) is what dynamically wraps each
+`[data-viz-pane]`'s content in a `.wiz-pane-body` div (`paneAccordion.js:150` — this class does not exist in
+static HTML at all) and internally calls `applyVisualHeight()` (508), which is the ONLY thing that writes the
+`--viz-stack-h` CSS custom property root cause 3's height rules read (`var(--viz-stack-h, 400px)`). The modal's
+own `open()` calls it (`wizardManager.js:287`); the pane's `renderLiveForm()` never did. Fixed by calling
+`makePanesCollapsible(blkHost)` right after each new `update()` call, both branches (`blocksApp.js:692`, `:738`)
+— idempotent, safe to call on every render the same way the mobile drawer's own `refit()` already reuses it.
+
+Also wired the pane into the SAME re-fit-on-visible pattern the old standalone "3D" tab already uses (per the
+dispatch's own explicit instruction not to invent a new one) — `refitBlkWizardVisual()` (`blocksApp.js:424-430`)
+calls `host.__panel.setActive(true); host.__panel.refresh();` on the pane's own `.wiz-viz3d` host, wired to
+`setActiveTab('wizard')` (442) and folded into the existing drawer-open/resize `refit()` closure alongside the
+3D tab's own panel.
+
+### Verified empirically, not just by the CSS reading — real screenshots, both root-cause states
+
+Took screenshots at each stage rather than trusting the diagnostic numbers alone. Before root cause 3's fix:
+0-width `.wiz-visual`. After 3 alone: non-zero width, ~122px height (a thin strip). After all 4: **mobile 393px,
+drawer default-height — `.wiz-visual` renders a full 3D scene (WCS/machine/tool, "4 probes · 9 rapids") AND the
+2D layout canvas below it (Corner (data) · 92 lines, the actual 4-point probe path with a start marker) —
+both visibly correct, not placeholder chrome. Forced a taller drawer (`--blk-pv-h: 600px`) — `.wiz-visual` grew
+to `369×495`, confirming the re-fit path responds to a real size change, not just a fixed initial CSS number.
+Desktop 1400px — same content, full-height stacked column, the actual form (IDENTITY/GEOMETRY sections) visible
+below the visualization, nothing squeezed.** A `#blk_userViz3dContainer` diagnostic briefly read `children: 0`
+mid-investigation and looked like a 5th bug — resolved as a false alarm: `wizardManager.preview3D` inserts the
+`.wiz-viz3d` host as a SIBLING of the container (inside the container's PARENT, `insertBefore`), never as the
+container's own child; the diagnostic was checking the wrong DOM relationship.
+
+### New permanent test — non-vacuous, reverted `blocksApp.js`+`styles.css` and watched it fail for the predicted reason
+
+`tests/pane-visual-host-1760.spec.js`: loads a corner op into the Blocks pane's Wizard View at both 393px
+(drawer open) and 1400px, asserts `.wiz-visual`'s own `getBoundingClientRect()` is non-trivial (not the
+pre-fix ~0×122), and asserts a real `<canvas>` with non-trivial size exists inside the `.wiz-viz3d` host plus a
+real 2D canvas/svg inside `#blk_userVizContainer`. First pass at the 3D assertion picked the WRONG canvas — the
+host holds two (a 0×0 label/minimap layer plus the real render canvas) and a bare `querySelector('canvas')`
+grabs the first, which happened to be the empty one; fixed to check whichever canvas has the largest actual
+rect. `git checkout HEAD --` both `blocksApp.js` and `styles.css` to their pre-turn content, re-ran: failed on
+BOTH tests for the predicted reason (`.wiz-visual` rect width 0 — the pane never opens the
+`mgr`/`update()`/`makePanesCollapsible` path, nor gets the stacked-layout CSS, pre-fix), restored the real
+files, re-ran — 2/2 pass.
+
+### Verify — per the mid-turn amendment (turn 1760 is the visual-host act it names directly)
+
+Mid-task amendment landed: "STOP RUNNING THE FULL SUITE PER ACT" — the advisor's own standing instruction from
+t1751 ("run the full suite yourself") was meant for that specific shared-host regression, not a permanent rule;
+this act's own blast radius is one pane's DOM, and 20 minutes of full suite is a poor instrument for "does the
+3D scene draw at 393px." New gate (per the amendment): node tier + the specs this change actually touches + the
+real gesture with a screenshot — the advisor runs the full suite itself once before anything ships. A full-suite
+run was already in flight when the amendment landed; per its own instruction ("let it finish rather than killing
+it mid-run") it was left alone until the human operator asked to kill it for taking too long, at which point it
+was stopped (`TaskStop` + cleaning up the two leftover child processes it left holding port 3211) — no full-suite
+numbers exist for this turn, by design under the amended gate, not by omission.
+
+- `npm run test:node`: 118/118.
+- `tests/node/architecture-map-1698.test.mjs`: 5/5 (no citation drift — every edit stayed inside
+  `web/blocks/blocksApp.js`/`web/styles.css`, neither cited by the map).
+- `fork-parity-1593.spec.js`: 2/2, clean — the ONE exception the amendment itself names ("a change touching a
+  shared host/renderer/registry that many specs reach through... say so and run wider deliberately"): this act's
+  `update()`/`blkMgr()` changes sit on `renderLiveForm()`, the same render path every twin in the Blocks pane
+  goes through, so this was run deliberately rather than skipped.
+- New `pane-visual-host-1760.spec.js`: 2/2, proven non-vacuous against the pre-turn `blocksApp.js`+`styles.css`.
+- The real gesture, screenshotted: mobile 393px (default drawer height AND a forced-taller drawer), desktop
+  1400px — all three show the actual 3D scene (WCS/machine/tool) and the actual 2D corner probe path drawing,
+  not placeholder chrome (see the "verified empirically" section above).
+- All `tests/zzdebug-1760-*.spec.js` scratch diagnostics deleted, none committed.
+
+### For the advisor
+
+Not a wiring detail that "genuinely can't live in the pane" — all four causes were fixable without the renderer
+growing any new capability; the pane now uses the exact SAME `preview3D`/`previewVarSeed`/`makePanesCollapsible`
+machinery the modal already had, just never called. The one new thing added is `refitBlkWizardVisual()`, which
+mirrors (does not reinvent) the existing 3D-tab `refit()` pattern per the dispatch's own instruction. The
+"declare vs hand-roll" question didn't really arise here — this was pure wiring, no new data shape. Separately:
+absorbed the "stop full-suite-per-act" amendment starting with THIS turn's own Verify section — flagging that
+explicitly since this is a real change in what "done" looks like in the WORK-LOG going forward, not something to
+infer silently from an entry that just looks different.

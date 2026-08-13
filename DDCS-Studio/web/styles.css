@@ -2274,6 +2274,27 @@ button.primary:hover {
     }
 }
 
+/* t1760 — THE BLOCKS PANE'S OWN COLUMN IS ALWAYS NARROW, REGARDLESS OF THE WINDOW: the ≤860px block above stacks
+   `.wiz-2pane` because the desktop side-by-side layout needs `.wiz-controls`'s fixed 360px PLUS real room for
+   `.wiz-visual` (flex:1 1 0) — but `#blk-formpane` (the Wizard View pane's own sidebar column) measures ~380px
+   even at a wide browser window (it shares the window with the Blockly canvas + palette), so the desktop rule
+   squeezed `.wiz-visual` to ~0 width: canvases mounted (confirmed via wizardManager.preview3D, t1760's own fix)
+   but had nowhere to draw. Scoped to `#blk_wiz_user` specifically (never the modal's own `#wiz_user`, which DOES
+   have the wide context the desktop rule assumes) — mirrors the ≤860px block's own rules verbatim, unconditionally,
+   since the pane's available width never crosses the threshold that layout needs. */
+#blk_wiz_user .wiz-2pane { flex-direction: column; height: auto; }
+#blk_wiz_user .wiz-2pane > .wiz-controls { order: 2 !important; flex: 0 0 auto; overflow: visible; width: 100%; padding: 0; }
+#blk_wiz_user .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }
+#blk_wiz_user .wiz-2pane > .wiz-splitter { display: none; }
+#blk_wiz_user .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
+#blk_wiz_user .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
+#blk_wiz_user .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 0 0 auto; min-height: 0; }
+#blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) / 2); }
+#blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5)); }
+#blk_wiz_user .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
+#blk_wiz_user .wiz-2pane .wiz-visual .viz-split.has-collapsed-pane > [data-viz-pane]:not([data-collapsed="1"]) > .wiz-pane-body { height: var(--viz-stack-h, 400px) !important; }
+#blk_wiz_user .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
+
 /* ============================================================================================================
    t752 · t784 — COLLAPSIBLE WIZARD PANES (paneAccordion engine). Each DECLARED viz pane (data-viz-pane: the 2D
    layout · the 3D verify) and the code preview folds INDEPENDENTLY via a slim SIDE-CHEVRON strip (a vertical bar on

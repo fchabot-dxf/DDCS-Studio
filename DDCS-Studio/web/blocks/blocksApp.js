@@ -24,6 +24,7 @@ import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 AC
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
+import { makePanesCollapsible } from '../ui/paneAccordion.js';   // t1760 — the Wizard View pane's own visual host needs the SAME accordion setup (wraps each viz pane's content in .wiz-pane-body + writes --viz-stack-h) the modal's own open() already gets; without it the pane's #blk_wiz_user visual content-sizes to its bare control-bar height instead of a real preview height
 import { applyProgramIntent } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview
 import { opSimStarts } from '../viz/opSimStarts.js';                  // t756 — the DECLARED per-op start source (retires the legacy inferStart)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
@@ -395,6 +396,38 @@ async function buildWorkspace() {
   // this render's OWN writeback echo) and route to onShow vs the lighter refresh() accordingly. null whenever
   // blkView isn't the active host, so returning to it always counts as fresh.
   let blkLastOpType = null;
+  // t1760 — THE PANE'S VISUAL HOST NEVER DREW: `onShow`/`refresh` passed `{ update() {} }` at every call site below —
+  // a stub with NO `preview3D`/`previewVarSeed`. userOpView.render()'s form3d+2d branch calls `mgr.preview3D(...)`
+  // UNCONDITIONALLY (userOpView.js:557,673) — on the stub this throws mid-render, so everything after the form
+  // (the 3D/2D mount) never ran. The DOM scaffold (t1742) was never the gap; the capability was. `preview3D`/
+  // `previewVarSeed` are pure functions of (gcode, containerId, …) — createPreviewPanel's own host state lives on
+  // the target DOM element (wizardManager.js:542-579), not on the manager instance, so borrowing the SAME
+  // singleton `openLiveAsModal` already reuses (this file, `window.ddcsStudio.wizardManager`) is safe: it never
+  // renders into the pane's `blk_`-prefixed containers and the modal's un-prefixed ones at once (one gesture at a
+  // time). `update` stays a no-op — blocksApp already re-renders the pane reactively on canvas change; routing it
+  // through the real manager's own `update()` would re-render whichever wizard THAT considers active, which is a
+  // different (and, for the pane, wrong) concept.
+  function blkMgr() {
+    const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
+    return {
+      update() {},
+      preview3D: (...a) => { if (wm) wm.preview3D(...a); },
+      previewVarSeed: (...a) => { if (wm) wm.previewVarSeed(...a); },
+    };
+  }
+  // t1760 — THE KNOWN TRAP, applied here: a canvas sized while its container is display:none (or, per the CSS fix
+  // above, content-sized to ~0 before its stack height is known) comes out 0×0 or wrong-sized and never re-fits on
+  // its own. The standalone "3D" tab's own panel already has a re-fit-on-visible/resize pattern (`refit`, `panel.
+  // setActive(true); panel.refresh()`, wired to the drawer-open/resize/tab-switch events below) — this reuses the
+  // SAME mechanism for the Wizard View pane's own `.wiz-viz3d` panel (a DIFFERENT panel instance, created lazily
+  // inside `#blk_userViz3dBox` the first time `mgr.preview3D` runs — so this is a no-op, not an error, before that).
+  function refitBlkWizardVisual() {
+    try {
+      const c = document.getElementById('blk_userViz3dContainer');
+      const host = c && c.parentElement && c.parentElement.querySelector('.wiz-viz3d');
+      if (host && host.__panel) { host.__panel.setActive(true); host.__panel.refresh(); }
+    } catch (_) { /* no panel mounted yet — nothing to refit */ }
+  }
   function setActiveTab(tab) {
     if (tab !== 'wizard' && tab !== '3d') return;
     activeTab = tab;
@@ -405,6 +438,8 @@ async function buildWorkspace() {
     if (handle) handle.textContent = `▲ ${tab === 'wizard' ? 'Wizard View' : '3D'}`;
     // Re-fit the preview when its tab becomes visible (a canvas sized while display:none is 0×0).
     if (tab === '3d') setTimeout(() => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } }, 60);
+    // t1760 — the Wizard View tab's own visual host needs the SAME re-fit-on-visible the 3D tab already gets.
+    if (tab === 'wizard') setTimeout(refitBlkWizardVisual, 60);
   }
   /**
    * t1625 — ONE derivation of "the wizard this canvas is showing": the drawer's live form AND "Open as modal"
@@ -640,11 +675,21 @@ async function buildWorkspace() {
         blkHost.style.display = '';
         blkView.setUserOpDef(liveDef);
         if (blkLastOpType === def.opType) {
-          blkView.view.refresh({ update() {} });
+          blkView.view.refresh(blkMgr());
         } else {
           blkLastOpType = def.opType;
-          blkView.view.onShow({ update() {} });
+          blkView.view.onShow(blkMgr());
         }
+        // t1760 — onShow/refresh only build the FORM (userOpView.js's render()); the 3D/2D VISUALIZATION lives
+        // in view.update() (computes gcode from the current field values, then calls mgr.preview3D/previewVarSeed)
+        // — the modal's own open() calls it right after onShow (wizardManager.js:292,309) and this pane never did,
+        // which is why the visual host's containers existed but stayed empty. Same call, every render.
+        blkView.view.update(blkMgr());
+        // t1760 — the modal's open() also calls makePanesCollapsible(wizElem) (wizardManager.js:287) right after
+        // onShow: it wraps each [data-viz-pane]'s content in a fresh .wiz-pane-body and calls applyVisualHeight(),
+        // which is what actually WRITES --viz-stack-h — without it the pane's viz panes never get a real height,
+        // content-sizing to their bare control-bar instead. Idempotent (mirrors the mobile drawer's own reuse).
+        makePanesCollapsible(blkHost);
         applyBlkReadOnly(placedOpFallback);   // t1752 — a hand-built/bare stack with exposed knobs is NOT placed either, so authoredHere/customizing alone can't tell; placedOpFallback is the fact that actually distinguishes it
       } else {
         formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
@@ -681,11 +726,16 @@ async function buildWorkspace() {
       // refresh() instead: it does not reset host.__sig, so render()'s sync-in-place check can actually fire and
       // a field the user is mid-keystroke in gets synced, not destructively rebuilt out from under them.
       if (blkLastOpType === def.opType) {
-        blkView.view.refresh({ update() {} });
+        blkView.view.refresh(blkMgr());
       } else {
         blkLastOpType = def.opType;
-        blkView.view.onShow({ update() {} });
+        blkView.view.onShow(blkMgr());
       }
+      // t1760 — see the hasTree branch's own note: onShow/refresh only build the form, view.update() builds the
+      // 3D/2D visualization (mgr.preview3D/previewVarSeed) — the modal's open() always calls both, this pane didn't.
+      blkView.view.update(blkMgr());
+      // t1760 — same makePanesCollapsible fix as the hasTree branch above (see that note for why).
+      makePanesCollapsible(blkHost);
       applyBlkReadOnly(placedOpFallback);   // t1752 — a hand-built/bare stack with exposed knobs is NOT placed either, so authoredHere/customizing alone can't tell; placedOpFallback is the fact that actually distinguishes it
     } else {
       formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
@@ -919,7 +969,7 @@ async function buildWorkspace() {
     const toolsHandle = document.getElementById('blkToolsHandle');
     if (!right) return;
 
-    const refit = () => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } };
+    const refit = () => { try { panel.setActive(true); panel.refresh(); } catch (_) { /* */ } refitBlkWizardVisual(); };   // t1760 — the drawer-open/resize handles below also own the Wizard View pane's own visual now
     const openPv = (on) => { right.classList.toggle('open', on); if (handle) handle.setAttribute('aria-expanded', String(on)); if (on) setTimeout(refit, 260); };
     handle && handle.addEventListener('click', () => openPv(true));
     closeBtn && closeBtn.addEventListener('click', () => openPv(false));
