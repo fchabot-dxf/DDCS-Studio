@@ -2031,3 +2031,24 @@ or move the DRO out of the canvas into the panel chrome where it has its own spa
 reads the ACTUAL box size over another max-width breakpoint** — two breakpoints already fight here, and a
 third is how this got confusing.
 ⚠ Check the MODAL is unaffected: it has the room today and must keep the current layout.
+
+## 🎨 THE PANE HEADER — minimal, no LIVE badge (user, 2026-08-13)
+*"we could still make this part more elegant, while still differentiate it from the actual wizard"* →
+*"minimal without the live flag at all."*
+
+**Today** the strip above the surface carries three things badly, on bare black, outside the panel:
+a floating `✕`, the two tabs (half-cut by the surface edge below), then a row of
+`GENERATOR MODAL` + a `LIVE` badge + `⧉ Open as modal`.
+
+**Wanted:** the wizard's OWN NAME where the internal label is, `Open as modal` reduced to an icon, and the
+**LIVE badge REMOVED**. The tab is already called Wizard View and it is always live — a badge announcing
+that is the app explaining itself to itself. `GENERATOR MODAL` is internal vocabulary in a title's place.
+
+⚠ **THE CONSTRAINT THAT REMAINS (user, same breath): it must still read as NOT the real wizard.** It is a
+live view of something uncommitted, and that distinction is worth seeing. With the badge gone, the signal
+has to come from the FRAME — the header bar's own treatment, the seam where it meets the surface, the
+tabs reading as tabs — not from a word. **Do not simply extend the panel surface upward until the header
+disappears into it**; that erases the very distinction the user asked to keep.
+⚠ Also fix the small mess visible in the screenshot: the `✕` floats alone on black, and the tabs are
+clipped by the surface edge. Whatever is chosen, those three elements should read as ONE deliberate bar.
+**Scope: presentation only.** No behaviour change — Insert/Cancel rulings (3j/3k) untouched.
