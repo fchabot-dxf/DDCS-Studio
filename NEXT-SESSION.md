@@ -1910,3 +1910,27 @@ on the same line is the same shape. **This is a sweep, not a single edit.**
 
 **And a standing rule going forward:** the user's own machine config, WCS table, tool table and shop
 topology are NOT project facts. They belong in their workspace file / memory, never in shipped defaults.
+
+### …AND THE REASON THAT SHARPENS THE SWEEP (user, 2026-08-13)
+*"the idea is that if we did we might get confused and restrict unnecessarily other user."* — this is the
+real cost, and it is bigger than a wrong number:
+
+**A personal value hardcoded as a default eventually becomes a RULE.** Once `-120` sits in the engine, the
+next person reasoning about Z assumes machines are ~120 deep. A guard gets written against it; a clamp; a
+validation that refuses something legitimate because it does not match a shape that was only ever ONE
+user's. **And it looks principled from the inside** — nobody can tell the constant was a measurement of
+somebody's garage machine rather than a considered default.
+
+```
+  a personal VALUE           → one wrong number, findable
+  a personal value as a RULE → restrictions nobody knows are personal
+                               (a clamp, a warning threshold, a refusal, a test baseline)
+```
+
+⚠ **Already happening:** agent test specs boot a DEFAULT machine at Z −120 ([[agent-tests-use-default-
+config-not-users]]), so a whole class of verification runs against one envelope as if it were neutral.
+
+**So the sweep is not just "stop hardcoding -120."** It is: **find where a personal number has already
+become a CONSTRAINT** — a clamp, a threshold, a validation, a refusal, a test baseline treating one
+envelope as normal. Those are the ones that would restrict another user with nobody intending it, and they
+will not look like personal data; they will look like engineering.
