@@ -1795,3 +1795,51 @@ because it looks like it worked.
 the reason available is the fix. Do NOT merely drop the listener and leave the fields looking live.
 **Scope: a PLACED op only.** The authoring cases (hand-built wizard, Customize) keep their live editing —
 that is the pane's other job (3i) and it works today.
+
+---
+
+# 📡 QUEUED — the M350 Modbus register map, from the M3X bridge source (2026-08-13)
+Source: `foinnc/M3X-M350-IoT-Bridge` (MIT), `Firmware/01_Web_Touch_Console/main.ino`. **The RELEASES are
+irrelevant to us** — V2.0 is WiFi TX power / modem-sleep / AP channel, V1.0 is the web UI; neither release
+note mentions the protocol. **The value is in the source**, and it has been there since V1.0.
+
+⚠ **STATUS: EVIDENCE, NOT ATTESTATION.** These are read off another project's working implementation, not
+bench-verified against the user's own controller. Anything built on them stays provisional until a real
+read succeeds on their machine. Do NOT promote to attested corpus without that.
+
+## The transport
+Modbus RTU, **slave id `0x01`**, **115200** on the DB9. Requires M350 firmware **≥ 2025-12-11-00**.
+Controller params: **P279 = Slave**, **P267 = 115200**, P296/P297 default.
+
+## READ — function 0x03 (read holding registers)
+| register | qty | meaning |
+|---|---|---|
+| `7080` | 10 | WORK coords X,Y,Z,A,B — 5 × 32-bit floats |
+| `7260` | 10 | MACHINE coords X,Y,Z,A,B — 5 × 32-bit floats |
+| `10002` | 2 | system state (IDLE / BUSY / RESET) — 32-bit int |
+Each axis spans two consecutive registers, reassembled as `((uint32_t)r2 << 16) | r1` then cast to float.
+The bridge polls every 100 ms (`readInterval`).
+
+## WRITE — function 0x10 (write multiple registers)
+| register | qty | meaning |
+|---|---|---|
+| `6908` | 2 | KEYPRESS — `keyCode` in the low 16 bits, `actionState` in the high 16 |
+
+**Key codes:** X± `0x015e`/`0x015f` · Y± `0x0160`/`0x0161` · Z± `0x0162`/`0x0163` · A± `0x0164`/`0x0165` ·
+B± `0x0109`/`0x0166` · START `0x0148` · PAUSE `0x0149` · RESET `0x0147` · HF/LF `0x0184` ·
+F1–F6 `0x0600`–`0x0605`.
+
+## What is genuinely NEW
+[[m350-v1-v2-and-modbus-slave]] already recorded that fw ≥2025-12-11 unlocks P279 Slave, and that the M3X
+does live DRO + keypresses over the existing cable. **What was missing were the NUMBERS.** This turns
+"known possible" into "implementable".
+
+## Queued item A — LIVE DRO IN THE GATEWAY (read-only)
+Three register reads gives a live 5-axis DRO plus machine state. **Read-only FIRST, and that is a rule not
+a phase** — [[live-cnc-readonly-when-away]]: only read-only ops on a powered controller when the user is
+not at the machine. Scope it as: connect, poll `7080`/`7260`/`10002`, show the DRO. Nothing that moves.
+
+## Queued item B — KEYPRESSES (START/PAUSE/RESET/jog) — a SEPARATE, LATER decision
+One write to `6908` can start, pause, reset, or jog a real machine. **Do not fold this into item A.** It
+needs its own ruling from the user about when Studio may command a powered controller at all, and it is
+exactly the class of thing [[live-cnc-readonly-when-away]] exists to gate.
