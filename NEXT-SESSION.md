@@ -1570,3 +1570,22 @@ instead" already partly IS the behaviour, and the real question was never asked 
 BLOCKS canvas is a normal user workflow. The user says they do not even know how they would do that. **Do
 not build on that assumption.** Re-establish what the user actually does in each surface before drawing
 any more conclusions about canvas behaviour.
+
+### 3h. USER (2026-08-11) — the Wizard View pane must NOT have working Insert / Cancel
+*"one thing i do not want for the wizard view, is the insert cancel button to work."*
+
+**Why it matters now:** 3f makes the pane render through the MODAL's own renderer, so INSERT and CANCEL
+come along with it. In that pane they would be actively wrong — the Blocks tab does not run or build a
+program (user: *"we cant run wizard in blocks"*); it BUILDS a wizard and EDITS an op. An Insert there
+would silently commit an op into the user's program from a surface that is not for that.
+
+**Requirement: they must be INERT, not merely hidden.** Hiding the buttons while the commit path stays
+live is the failure shape this project keeps hitting — some other route (Enter key, a shortcut, a
+programmatic caller) reaches the same commit and it fires anyway. **Verify the ACTION cannot happen, not
+just that the button is not visible.**
+
+⚠ **Advisor note — do NOT over-build this.** The obvious wrong fix is a new "preview mode" flag threaded
+through the renderer. Prefer the smallest honest thing: the pane's host simply does not carry those
+controls / their handlers. If the modal's renderer cannot omit them without a mode flag, say so and report
+the constraint rather than inventing one. **The full-size modal (⧉ Open as modal) KEEPS its Insert/Cancel —
+that IS the wizard, and it is unaffected by this.**
