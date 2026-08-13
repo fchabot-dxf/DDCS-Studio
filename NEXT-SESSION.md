@@ -1589,3 +1589,22 @@ through the renderer. Prefer the smallest honest thing: the pane's host simply d
 controls / their handlers. If the modal's renderer cannot omit them without a mode flag, say so and report
 the constraint rather than inventing one. **The full-size modal (⧉ Open as modal) KEEPS its Insert/Cancel —
 that IS the wizard, and it is unaffected by this.**
+
+### 3i. WHY THE USER CARES ABOUT THE BUILT-IN CASE (2026-08-11) — it is the PROOF of wizards-as-data
+*"so im asking about built in, in wizard view because to me it would make concrete the idea that they are
+each merely a view of the data."*
+
+**The pane is not a convenience — it is the DEMONSTRATION.** If Corner is genuinely just data, then one
+source renders three ways: the modal's form, the blocks on the canvas, and the Wizard View's form. Insert
+a built-in, open Blocks, and you should SEE that. **An empty pane does not merely look broken — it says
+the built-in is not really data yet**, that something about it works only through its own front door.
+
+**So the acceptance test is by EYE, not by argument, and it applies to EVERY wizard:**
+insert any wizard (built-in or user-authored) → open Blocks → its form is there, the same way.
+If built-ins render and custom ones do not (or the reverse), that is the two-classes-of-citizen problem
+made visible — and this pane is where it shows.
+
+⚠ This raises the bar on the current act: "make the pane populate for corner" is NOT sufficient. The
+worker should sample ACROSS the twin families (a probe, a mill op, a lathe op, an ATC op) and report any
+that do NOT render identically — a wizard that renders differently here is a real wizards-as-data gap,
+not a pane bug, and the user wants to know about it either way.
