@@ -1421,3 +1421,33 @@ to serve it.
 ⚠ Everything else from step 3 STANDS: two always-present tabs, the four-term predicate deleted, projected
 G-code deleted, `sim_3d_box`/`code_preview_panel` deleted, `layout_2d_canvas` kept, and the honesty rule
 (EMPTY on a plain op, EMPTY when there is genuinely no wizard).
+
+### 3e. ✅ THE WIZARD VIEW, SETTLED (user, 2026-08-11) — a live preview of what you are about to SAVE
+Three advisor guesses were all wrong and are all withdrawn: the last-opened wizard (`getLastOp`), the
+still-open modal (`wizardElement.active`), and the whole-program-as-forms reading. **The user's own
+statement decides it:** *"the goal of the wizard view is to see what im about to save as a custom
+wizard"*, and on multiple ops: *"all of them"*.
+
+**THE REQUIREMENT:** the Wizard View renders **the ENTIRE stack currently on the Blocks canvas, as the
+FORM it will become when saved as a custom wizard** — every op in it, every exposed param, in stack
+order. Not one wizard, not the last one, not a session detail. It is a live preview of the save.
+
+**This is what the pane already claims to be** — `index.html:1207`: *"Generator Modal · live — the form is
+a live view of the blocks, no save needed"* — and the canvas-authoring derivation ALREADY does it for the
+single-wizard case (advisor-verified t1737: `ddcsEditWizardDef('user_corner_data')` → 23 fields rendered).
+So this is mostly "make the existing thing cover the whole stack", not a new mechanism.
+
+**Why the side-channels were wrong, in the user's words:** *"doesnt the stack carry the wizard anyways…
+my stack wizard is data."* Correct — measured at t1737, the inserted op already carries
+`{opType, params:{dist:777}, children}`. Any tracked "last op" or "modal open" flag is a SECOND COPY of a
+fact the stack already holds. **One source: the canvas stack.**
+
+**Honesty rule needs no special cases under this reading:** nothing on the canvas → EMPTY; nothing on it
+exposes a form → EMPTY (or the existing "no fields yet" hint). Nothing can go stale because nothing is
+tracked separately.
+
+⚠ **OPEN BUG, separate from the requirement:** the user photographed a full Define Custom Wizard on the
+canvas (Parameter Group, ~14 form-field blocks) with the pane BLANK. That is the case that is supposed to
+work and that the advisor reproduced working. Asked the user to hard-reload first (ES-module cache is a
+known trap here — [[verify-release-needs-hard-reload]]); if it persists it is a real defect in the
+canvas→form path and must be chased there, NOT in the deleted mirror.
