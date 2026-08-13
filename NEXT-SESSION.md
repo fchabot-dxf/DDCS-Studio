@@ -1766,3 +1766,32 @@ the pane does not land at all (see the 1b-ii red below).
 
 **So the pane carries NEITHER control as a live action.** The snapshot-timing question raised in 3k
 belongs to the MODAL, where it has an obvious answer: the state at open.
+
+### 3l. USER RULING (2026-08-13) — the pane's fields are READ-ONLY for a placed op (option 3)
+t1748 found: the pane now renders every built-in correctly, typing keeps focus and lands characters, **but
+the writeback never reaches the canvas for a normally-placed op** — `writeAuthoredValue` handles two
+AUTHORING shapes (an authored atom tree; Customize's `param_field` blocks) and neither covers a placed
+op's `{type:'op', params}`, so it **silently no-ops**. Fields that look editable and change nothing is
+the same silent-wrong-thing family this whole gameplan exists to remove — and worse than the empty pane,
+because it looks like it worked.
+
+**Three options were put to the user. RULED: option 3 — make the fields visibly read-only.**
+
+**The mechanical reason, not just the ruling:**
+- **Option 1 (extend `writeAuthoredValue`)** — rejected. Its two existing shapes are AUTHORING shapes; a
+  placed op is a program INSTANCE. Teaching an authoring function about instances gives it a second job
+  and leaves its dispatch with no common principle for the next shape.
+- **Option 2 (route through `replaceOp`/`openForEdit`)** — the RIGHT way IF editing is ever wanted: it is
+  the proven, already-tested "edit a placed op" path STUDIO's insert uses, so one implementation not two.
+- **Option 3 — chosen, and not as the timid choice: IT DELETES A FAILURE MODE.** The pane renders FROM the
+  canvas; any edit path writes BACK to the canvas, which re-renders the pane. **That loop is the source of
+  today's only real bug** (keystrokes eaten), fixed only by carefully distinguishing "the echo of my own
+  edit" from "a genuine upstream change" — a distinction that gets HARDER with more writers. Read-only
+  makes the pane strictly one-directional: canvas → pane. No echo, no race.
+- **Cost is near zero:** the user already has two better places to change values — the wizard in STUDIO,
+  and the blocks themselves on the same canvas.
+
+**⚠ VISIBLY read-only.** A field that silently ignores you is the defect being fixed; disabled/greyed with
+the reason available is the fix. Do NOT merely drop the listener and leave the fields looking live.
+**Scope: a PLACED op only.** The authoring cases (hand-built wizard, Customize) keep their live editing —
+that is the pane's other job (3i) and it works today.
