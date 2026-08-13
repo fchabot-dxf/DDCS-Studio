@@ -2070,3 +2070,26 @@ family of tokens rather than `--screen`, so the header and the surface belong to
 same column, and a 3D viewport arguably DOES want the screen black. If so, the token change belongs on the
 header/Wizard-View side only, and say so.
 ⚠ The 3f/3k distinction still holds: this must not make the pane indistinguishable from the real wizard.
+
+### …and the TABS become a SINGLE TOGGLE (user, 2026-08-13)
+*"maybe we also remove the wizard view vs 3d tabs and use a different mechanism to switch"* → **single
+toggle.** Folds into the minimal-header act above; do them together.
+
+**Why the tabs existed, and why that reason does not require tabs:** t1734 replaced a four-term predicate
+that GUESSED which face to show (patched twice for guessing wrong). Two always-present tabs removed the
+guess — but "no guessing" never implied "a tab row"; that was the advisor picking the first shape with no
+predicate in it. A single explicit toggle is equally guess-free and costs one row less, which matters most
+in the phone drawer where the pane is already short.
+
+**Target:** the header is ONE line — the wizard's own name, a small view toggle, and `Open as modal` as an
+icon. No tab row, no `GENERATOR MODAL`, no `LIVE` badge.
+
+⚠ **Decide and STATE these, do not leave them implied:**
+- **What the toggle shows** — the CURRENT view or the one you would switch TO. Either is defensible; being
+  vague about it is the classic way to make a toggle confusing. Label/tooltip must match the choice.
+- **Does the choice PERSIST** across tab switches / sessions? "You rarely switch" implies yes — it should
+  stay where the user left it rather than resetting to Wizard View each time.
+- ⚠ The honesty rule (8b/8e) still binds: with a wizard absent, the Wizard View side is EMPTY — the toggle
+  must not quietly hide that by defaulting to 3D.
+**REJECTED, and record it so nobody re-proposes it:** an auto-switch that infers intent (3D while a sim
+runs, form otherwise). That is exactly the four-term predicate returning under a friendlier name.
