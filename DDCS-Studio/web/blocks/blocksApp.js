@@ -526,6 +526,20 @@ async function buildWorkspace() {
     if (t) t.textContent = `${modalDef.label || 'Custom wizard'} — PREVIEW (live from the blocks · nothing is saved)`;
   }
 
+  // t1750 ACT 1b-iv — a PLACED op's pane fields render VISIBLY read-only, not silently ignoring input (t1748's
+  // own finding: writeAuthoredValue has no case for a placed op's {type:'op',params} shape, so an edit there was
+  // already a no-op — the bug was that nothing SHOWED that). `inert` blocks every widget kind uniformly (input,
+  // select, segmented, xy-pad, …) without enumerating each one; the class carries the visual + cursor; the title
+  // carries WHY. Called after every onShow/refresh in both branches below, not just once, since a render can flip
+  // placed↔authoring (switching which op the canvas holds) without a full page reload in between.
+  const BLK_READONLY_REASON = 'Read-only here — a placed op edits through its wizard (STUDIO tab) or its blocks on this canvas, not this pane.';
+  function applyBlkReadOnly(readOnly) {
+    const host = document.getElementById('blk_wiz_user_form');
+    if (!host) return;
+    host.classList.toggle('blk-form-readonly', !!readOnly);
+    host.inert = !!readOnly;
+    if (readOnly) host.title = BLK_READONLY_REASON; else host.removeAttribute('title');
+  }
   function renderLiveForm() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
@@ -613,6 +627,7 @@ async function buildWorkspace() {
           blkLastOpType = def.opType;
           blkView.view.onShow({ update() {} });
         }
+        applyBlkReadOnly(!authoredHere && !customizing);   // t1750 — a sectioned/panel twin reached via a placed op (not authoring) is read-only
       } else {
         formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
       }
@@ -653,6 +668,7 @@ async function buildWorkspace() {
         blkLastOpType = def.opType;
         blkView.view.onShow({ update() {} });
       }
+      applyBlkReadOnly(!authoredHere && !customizing);   // t1750 — a flat-bindings twin reached via a placed op (not authoring) is read-only
     } else {
       formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
     }

@@ -26106,3 +26106,64 @@ The writeback gap is the one open question: extend `writeAuthoredValue` with a t
 route a placed op's pane edits through the EXISTING `replaceOp`/`openForEdit` mechanism instead of
 `writeAuthoredValue` at all (arguably the more honest fix — an edit to a placed op's field is exactly what that
 mechanism already exists for). Not guessed at here. Cancel remains untouched, still queued behind this.
+
+
+## Turn 1750 (worker) — ACT 1b-iv: a PLACED op's pane fields render visibly read-only (the user's ruled option 3)
+
+### The ruling and the mechanical reason behind it
+
+Option 1 (extend `writeAuthoredValue`) and option 2 (wire `replaceOp`) both declined for now — the ruling: make
+the fields read-only instead. The reason given, worth recording because it's the actual design principle for
+whatever comes next: the pane renders FROM the canvas, and if an edit writes BACK to it, the render re-fires —
+that loop is the source of the ONE real bug this whole arc actually had (t1746's eaten keystrokes), survivable
+only by carefully distinguishing the pane's own echo from a genuine upstream change, which only gets harder as
+more writers are added. Read-only keeps a placed op's pane strictly one-directional; no new writer, no new loop
+to reason about.
+
+### THE ACT
+
+A placed op (`!authoredHere && !customizing` — the same two facts the whole file already computes) gets its pane
+fields made read-only after every `onShow`/`refresh` call, in BOTH the flat and hasTree branches (one small
+helper, `applyBlkReadOnly`, called from both — not two copies of the logic). Three things happen together, not
+just one:
+- `.blk-form-readonly` (CSS: `opacity:.6; filter:grayscale(.35); cursor:not-allowed; pointer-events:none` — the
+  same visual language `.toolbar-btn:disabled` already uses elsewhere in this app) — VISIBLY dimmed, not
+  identical to a live form.
+- `host.inert = true` (already an established pattern in this codebase — `wizardManager.js` uses it for the
+  fronting/backing wizard panels) — blocks EVERY widget kind uniformly (plain inputs, dropdowns, segmented
+  buttons, xy-pads, coord-lists, …) at the browser level, not by enumerating 18 different widget implementations
+  one at a time. `pointer-events:none` in the CSS is belt-and-suspenders for the cursor; `inert` is what actually
+  does the blocking, including keyboard/tab access CSS alone can't reach.
+- `title` — the discoverable reason ("edit this op in its wizard (STUDIO tab) or its blocks on this canvas"),
+  matching the dispatch's own suggested form.
+
+**Explicitly NOT done**: no new guard was added to the write path itself (`onFieldWrite`/`writeAuthoredValue`) —
+t1748 already proved it silently no-ops for this shape, so there was nothing further to defend there. This act is
+purely about the pane genuinely refusing interaction and SHOWING that it does, not about the write mechanism.
+
+### Verified — the real gesture, both directions
+
+- **Placed op** (bar → Corner → Insert → BLOCKS): `#blk_wiz_user_form` carries `.blk-form-readonly`, `.inert ===
+  true`, a non-empty `title`, computed `opacity < 1`. A REAL Playwright `.click()` + `.pressSequentially()`
+  attempt on the field THREW (Playwright's own actionability check refuses an inert element — not a mocked
+  assertion, the same refusal a real mouse/keyboard user would hit) — and the program's own `params.dist` never
+  changed. Screenshot (`t1750-readonly-pane.png`) shows the visibly dimmed pane.
+- **Authoring, hand-built** (a fresh `userOpFromStack` wizard, re-authored via `ddcsEditWizardDef`): NOT
+  read-only, NOT inert — a field edit (`depth: -5 → -777`) reaches the projected G-code, proving the existing
+  live-editing path is completely unaffected.
+- **Authoring, Customize-as-blocks** (`ddcsEditWizardDef('user_corner_data')`): also NOT read-only, NOT inert —
+  the SAME twin that is read-only when reached via a placed op stays fully live when reached via Customize,
+  confirming the distinction is keyed on the RIGHT fact (`authoredHere`/`customizing`), not on the twin's own type.
+
+### Verify
+
+- `npm run test:node`: 118/118.
+- `fork-parity-1593.spec.js`, `open-as-modal-1625.spec.js`, `wizard-face-1599.spec.js`, full `blocks-*` family:
+  ONE clean run this time — 67 passed, 0 failed, 0 flaky, 9 skipped. No repointing needed (this act didn't move
+  any render host, only added a read-only overlay on top of the existing one).
+- Modal: unaffected — the read-only logic lives entirely in `blocksApp.js`'s pane-rendering code, never touches
+  `createUserOpView(null)`'s own path.
+
+### Still open
+
+Cancel — untouched again this act, still queued behind whatever comes next for the pane.

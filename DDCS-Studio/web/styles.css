@@ -5360,6 +5360,11 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .blk-form-body { padding:8px 12px 12px; color:var(--screen-ink); }
 #blocks-app .blk-form-live { margin-left:6px; padding:1px 6px; border-radius:8px; font:700 9px/1.6 inherit; letter-spacing:.04em; color:#fff; background:var(--accent,#3b82f6); }
 #blocks-app .blk-form-empty { font-size:11px; color:var(--screen-dim); padding:6px 2px; }
+/* t1750 ACT 1b-iv — a PLACED op's pane fields: visibly non-editable (not silently ignoring input), same visual
+   language as .toolbar-btn:disabled. `inert` (set in JS alongside this class) is what actually blocks interaction
+   uniformly across every widget kind (input/select/segmented/xy-pad/…) — pointer-events here is belt-and-suspenders
+   for the hover cursor; the title attribute (also set in JS) carries WHY, discoverable on hover. */
+#blocks-app .blk-form-readonly { opacity:.6; filter:grayscale(.35); cursor:not-allowed; pointer-events:none; }
 /* Reporter pills (value blocks) inside value sockets — rounded, category-coloured, recursive (Math) */
 #blocks-app .rep { display:inline-flex; align-items:center; gap:3px; padding:1px 3px 1px 6px; border-radius:11px;
                    color:#fff; font-size:11px; vertical-align:middle; max-width:100%; }
