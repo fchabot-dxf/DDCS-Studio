@@ -1608,3 +1608,37 @@ made visible — and this pane is where it shows.
 worker should sample ACROSS the twin families (a probe, a mill op, a lathe op, an ATC op) and report any
 that do NOT render identically — a wizard that renders differently here is a real wizards-as-data gap,
 not a pane bug, and the user wants to know about it either way.
+
+---
+
+# 🔁 TODAY'S LOOP (user: "sure", 2026-08-11) — three acts, sequential, same tree
+Sequential NOT parallel: ② and ③ touch files ① is rewriting, and two writers in one tree is the trap.
+
+## ① FINISH THE ONE RENDERER (in flight, turn 1740)
+**The acceptance test, and it is the user's own:** *does the pane RENDER BY CALLING the modal's render
+path, or does it still have its own?* Advisor checked the in-flight tree at t1739 and the pane still calls
+`renderOpForm(formHost, formBindings(def))` directly (`blocksApp.js:619`) while the modal renders through
+`userOpView`. What HAS landed is shared HELPERS (`formSig`/`syncFormValues` moved into `formWidgets.js`) —
+real de-duplication, but that is two renderers sharing utilities, not one renderer.
+**Matching OUTPUT is the state we already had. If the pane still owns a render path, the act is not done —
+however similar the result looks.** (User: *"it sortof still look like a second renderer still."*)
+Already fixed inside this act and guarded: the empty-pane bug —
+`wizard-face-1599.spec.js:110 "a PLACED data-op twin in a program renders its LIVE form"` now passes.
+
+## ② MIDDLE GAINS THE CLEARANCE MODE
+Corner offers Hop / Plane clearance; **Middle does not — `middleData.js`'s MIDDLE_BINDING_SPECS never
+declared `clearMode`/`hopDist`/`planeZ`** (28 bindings, none of those three). The EMIT side genuinely
+supports it: `stacks/middleWizard.js:81-85` reads `params.clearMode/hopDist/planeZ` already. So this is a
+missing DECLARATION, not new machinery — follow `cornerData.js`'s own declaration of the same trio.
+Found at t1730 when the deleted legacy view stopped absorbing the test.
+⚠ Middle's form GROWS by three fields — a visible change to a wizard the user uses. Expected, not a defect.
+Un-fixme `clearance-form-921.spec.js` when it lands (it was parked naming exactly this).
+
+## ③ THE SIMULATED PROBE DISC RESPECTS TIP-RADIUS COMPENSATION
+`readEnabledComps()` (`viz/createPreviewPanel.js:43`) loops `for (const a of (stack || []))` — **TOP LEVEL
+ONLY**. A twin's builder returns a `user_root`-wrapped stack, so nested `radiuscomp` atoms are never seen
+and the comp map comes back empty. **Broken for EVERY twin probe** (confirmed on middle and corner).
+**SIM-ONLY — advisor verified the emit is unaffected:** `readEnabledComps` is read exclusively by the
+preview panel (`:717`, `:1146`); the `radiuscomp` atom still emits normally. So the machine is fine and the
+PICTURE is wrong — the disc lands on the raw surface instead of the compensated one.
+Un-fixme `editor-sim-disc.spec.js` when it lands.
