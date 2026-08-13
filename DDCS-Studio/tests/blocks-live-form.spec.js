@@ -28,12 +28,15 @@ test('editing a custom op shows its form derived from the blocks; editing a bloc
   });
 
   // re-author it → Blocks tab; the live form pane appears with a control for the knob (no save)
+  // t1744 ACT 1b-ii — a hand-built, non-sectioned custom op has no user_root layout tree, so it renders through
+  // the FLAT branch, which now goes through createUserOpView('blk') — its host is #blk_wiz_user_form, not the
+  // OLD #blk-form (kept for the hasTree/mid-edit/empty faces, which this case never reaches).
   await page.evaluate(() => window.ddcsEditWizardDef('user_liveform'));
-  await page.waitForSelector('#blk-formpane:not([hidden]) #blk-form [data-param="depth"]', { timeout: 8000 });
+  await page.waitForSelector('#blk-formpane:not([hidden]) #blk_wiz_user_form [data-param="depth"]', { timeout: 8000 });
 
   const before = await page.evaluate(() => {
-    const f = document.querySelector('#blk-form [data-param="depth"]');
-    return { val: f && Number(f.value), hasLabel: /depth/i.test(document.getElementById('blk-form').textContent) };
+    const f = document.querySelector('#blk_wiz_user_form [data-param="depth"]');
+    return { val: f && Number(f.value), hasLabel: /depth/i.test(document.getElementById('blk_wiz_user_form').textContent) };
   });
   expect(before.hasLabel, 'the form shows the exposed knob label').toBe(true);
   expect(before.val, 'the form reflects the block value, derived without saving').toBe(-5);
@@ -47,7 +50,7 @@ test('editing a custom op shows its form derived from the blocks; editing a bloc
     tgt.setFieldValue('-8', 'NUM');
   });
   await expect.poll(async () => page.evaluate(() => {
-    const f = document.querySelector('#blk-form [data-param="depth"]');
+    const f = document.querySelector('#blk_wiz_user_form [data-param="depth"]');
     return f ? Number(f.value) : null;
   })).toBe(-8);
 
@@ -68,7 +71,9 @@ test('form→block writeback: editing the live form writes the value back to the
     window.ddcsRefreshWizardBar();
   });
   await page.evaluate(() => window.ddcsEditWizardDef('user_wbtest'));
-  await page.waitForSelector('#blk-formpane:not([hidden]) #blk-form [data-param="depth"]', { timeout: 8000 });
+  // t1744 ACT 1b-ii — this hand-built op's flat, non-sectioned template routes through createUserOpView('blk')
+  // now; its host is #blk_wiz_user_form (see the previous test's own note).
+  await page.waitForSelector('#blk-formpane:not([hidden]) #blk_wiz_user_form [data-param="depth"]', { timeout: 8000 });
 
   // sanity: the projected G-code starts at Z-5
   // t1587 — read the projection from the MODEL: 0bd8b38c deleted the `#blk-gcode` pane from the Blocks shell.
@@ -76,11 +81,11 @@ test('form→block writeback: editing the live form writes the value back to the
   await expect.poll(() => page.evaluate(() => window.ddcsGetBlockGcode())).toContain('Z-5');
 
   // EDIT THE FORM: depth -5 → -8 → it writes back to the block, so the projected G-code reflects Z-8
-  await page.locator('#blk-form [data-param="depth"]').fill('-8');
+  await page.locator('#blk_wiz_user_form [data-param="depth"]').fill('-8');
   await expect.poll(() => page.evaluate(() => window.ddcsGetBlockGcode())).toContain('Z-8');
 
   // the form field still shows -8 (the smart sync didn't clobber the field that was edited)
-  expect(await page.locator('#blk-form [data-param="depth"]').inputValue()).toBe('-8');
+  expect(await page.locator('#blk_wiz_user_form [data-param="depth"]').inputValue()).toBe('-8');
 
   // the bound param pill in the model carries -8
   const pillVal = await page.evaluate(() => {

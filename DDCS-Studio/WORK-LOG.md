@@ -25846,3 +25846,112 @@ Given this act's own scope explicitly excludes Insert/Cancel in the pane (now mo
 — it stays inert everywhere, no separate pane-specific decision needed) — Cancel is the one requirement genuinely
 still open: the pane, once wired, must not expose a working Cancel either (no commit path in either button, matching
 the ruling's own "one door" reasoning), sized but not built this act.
+
+
+## Turn 1744 (worker) — ACT 1b-ii, THE SWITCH: done for the case it reaches; a real gap and a real STOP found doing it
+
+### THE MECHANICAL SWAP — done, gate passes
+
+`renderLiveForm()`'s flat-bindings branch (`blocksApp.js`, was: its own `formSig`/`syncFormValues` check +
+`renderOpForm(formHost, formBindings(def))`) now hides `#blk-form`, shows the ACT-1b-i scaffold (`#blk_wiz_user`),
+and calls the pane's own `createUserOpView('blk')` instance (`setUserOpDef(def)` then `view.onShow({update(){}})`)
+— the SAME renderer `openLiveAsModal()` uses, via a SEPARATE namespaced instance, not a lookalike. The other three
+branches (`!show`, `hasTree`, mid-edit) are untouched, still target `#blk-form`, and default it visible / the new
+scaffold hidden at the top of every render so switching between a flat and a tree/empty case toggles correctly.
+`grep -n "renderOpForm(formHost" web/blocks/blocksApp.js` → no matches (the gate).
+
+### FINDING 1 — the stated verification gesture does not reach the code this act changed, for ANY built-in twin
+
+Traced rather than assumed, because the dispatch's own stated verification ("open a built-in from the bar…") is
+the thing to check FIRST, not last. `deriveLiveWizard()`'s `userRoot` (which decides `hasTree`) now also resolves
+from `def.template` (t1740's own empty-pane fix, landed in the SAME earlier turn) — and EVERY sampled built-in
+twin's registered template carries a `user_root` whose `uiChildren` include `section` and/or `panel`/`param_group`
+wrapper nodes, which `checkLayoutNodes` recognizes as `hasTree = true`:
+
+| twin | `uiChildren` types | `hasTree` |
+|---|---|---|
+| `user_corner_data` | `section, section, section, section` | true |
+| `user_surfacing_data` | (sectioned) | true |
+| `user_edge_data` | (sectioned) | true |
+| `user_atc_length_data` | `panel, param_group` | true |
+| `user_comm_data` | (sectioned) | true |
+| `user_wcs_data` | `panel, sim, param_group` | true |
+
+**Every one of them takes the `hasTree` branch — completely untouched by this act — not the flat branch this act
+rewired.** This is NOT new in this turn; Corner (and presumably every built-in) has ALWAYS rendered its Wizard
+View content through the tree branch's OWN mechanism (`renderOpForm(tempHost, binds)` seeding a `byParam` map,
+then `renderUiTree(formHost, …)` placing rows into the declared layout) — via Customize, and now via the t1740
+empty-pane fix's placed-op route too. So "open a built-in from the bar, INSERT, click BLOCKS tab, screenshot the
+pane showing that value" — run for real, screenshot saved (`t1744-switch-pane.png`, Corner, before this finding
+was traced) — shows the SAME rendering it always has: correct field count, correct live value (both proven working
+independently by t1740), but via the OLD `renderOpForm`/`renderUiTree` combination, not `createUserOpView('blk')`.
+The literal grep gate passes; the SPIRIT of the act — the pane renders a built-in through the SAME renderer the
+modal uses — does not hold for the gesture named to prove it.
+
+**What DOES reach the flat branch, verified directly:** a hand-built custom op with NO layout tree at all — a bare
+`{type:'move', params:{z:{type:'param', ...}}}` template, no `panel`/`param_group`/`section` wrapper — the exact
+shape `blocks-live-form.spec.js`'s own fixtures already use. Confirmed with a fresh instance of that shape: renders
+through `#blk_wiz_user_form`, `#blk-form` stays empty, the block's value reaches the pane. Real, verified, just not
+what "open a built-in from the bar" describes.
+
+**Not fixed this act** — extending `hasTree`'s branch (or `userOpView`'s own tree handling) to route through
+`createUserOpView('blk')` too is a materially bigger change than "delete one render call, nothing else": it means
+touching the tree branch's OWN `renderOpForm(tempHost,…)`/`renderUiTree(…)` combination, which `userOpView.render()`
+has a DIFFERENT (not identical) tree-handling path for. Flagged rather than guessed at.
+
+### FINDING 2 (proven necessary, not assumed) — the write-back hook, wired
+
+Running the full `blocks-*` family with the switch landed and `onFieldWrite` still unset broke three REAL, existing
+tests: `blocks-live-form.spec.js`'s "form→block writeback" (its own title: "no echo clobber") and its sibling
+"editing a custom op shows its form…", plus `blocks-edit-fail-loud-1518.spec.js`'s PROOF 3 — all three exercise the
+flat-branch case (a hand-built, non-sectioned op) and check either the writeback claim directly or the bound field's
+presence at the render host. Wired `onFieldWrite` on the `'blk'` instance to `writeAuthoredValue(ws, param, n)` —
+byte-identical logic to the OLD `#blk-form` listener it replaces (same `Number.isFinite` guard), a few lines, not a
+redesign — and repointed these three tests' selectors from `#blk-form` to `#blk_wiz_user_form` (the render host
+genuinely, intentionally moved for this case; nothing about their CLAIMS changed). All three green again.
+
+### FINDING 3 — STOP: the destructive-rebuild-vs-focus conflict bites, root cause isolated precisely
+
+Per the dispatch's own instruction ("if it bites, STOP and report rather than papering over it"): typing directly
+into the pane's OWN rendered field (a real, sustained `pressSequentially` gesture, not a single `.fill()`) loses
+every keystroke — the field ends up empty, not holding what was typed. Diagnosed to source, not just observed:
+
+`renderLiveForm()` calls `blkView.view.onShow({update(){}})` on EVERY render (there being no lighter "just
+re-render" entry point on the view). `onShow` — by design, for the MODAL's "fresh open" case — unconditionally
+resets `host.__sig = null` before calling `render()` (t1740's own line, added so a FRESH op never syncs-in-place
+against a DIFFERENT op's stale structure). `render()`'s own sync-in-place check (`if (host.__sig === sig …)`) —
+the mechanism BUILT specifically to prevent this class of bug — can therefore never fire when reached via `onShow`,
+because `__sig` was just forced to `null` immediately before the check runs. So even with `onFieldWrite` wired
+(FINDING 2), the write-back's own echo (field edit → `writeAuthoredValue` → canvas reprojects → `renderLiveForm()`
+→ `onShow` → `__sig=null` → `render()`'s check always misses → destructive `host.innerHTML=''` rebuild) wipes the
+field on every keystroke that reaches a valid number. This is caused by THIS ACT's OWN choice to call the
+full-reset `onShow` on every render, not by any flaw in the sync-in-place mechanism itself — `onShow`'s reset is
+correct for what it was built for (a genuinely fresh wizard open), just not for a continuously-live pane re-render.
+
+Not fixed here, per the explicit instruction: the fix is understood (the pane needs a render trigger that does NOT
+reset `__sig`/`_layoutSpots`/`_simStartFracs` on every call — only on a genuine op-type change — which is a real,
+if small, design decision about what "the pane is now showing a different op" means operationally, not a
+mechanical patch) but implementing it wasn't asked for in an act scoped to "nothing else."
+
+### Verify
+
+- Gate: `grep -n "renderOpForm(formHost" web/blocks/blocksApp.js` → no matches.
+- `THE SWITCH` (a non-sectioned custom op, the real case this act rewired): new host renders, old host empty,
+  value correct — green.
+- Three previously-red `blocks-*` tests (writeback, live-form-derivation, PROOF 3): green after the `onFieldWrite`
+  wire + selector repoint.
+- Typing-into-the-pane focus test: RED, as documented in FINDING 3 — left red and reported, not silenced.
+- `npm run test:node`: 118/118.
+- `fork-parity-1593.spec.js`, `open-as-modal-1625.spec.js`, `wizard-face-1599.spec.js`, full `blocks-*` family:
+  67 passed, 0 failed, 9 skipped (a clean re-run after an initial 2 flaky-then-passed on the usual
+  `window.__blkws` cold-boot pattern, unrelated).
+- Modal: unaffected (default `createUserOpView(null)` instance, untouched code path).
+
+### For the advisor — findings, not guesses
+
+1. **Built-ins never reach the code this act changed** (Finding 1) — the tree branch is where "the same renderer"
+   question actually needs answering for anything a user opens from the bar. Extending it is real, separate scope.
+2. **The render-trigger design question** (Finding 3) is now precisely understood, not vague: the pane needs an
+   entry point distinct from "fresh open" (`onShow`) for its OWN continuous re-render cadence. A candidate shape
+   (not implemented): a second, lighter method on the view — call it once per genuine op-type change via `onShow`,
+   and via something that skips the `_layoutSpots`/`_simStartFracs`/`__sig` resets for every other render.

@@ -133,7 +133,9 @@ test('PROOF 3 — a normal re-author still works, and its four signals settle to
     const r = await page.evaluate(async () => {
         const snap = () => {
             const app = document.getElementById('blocks-app'), chip = document.querySelector('.blk-edit-chip');
-            const pane = document.getElementById('blk-formpane'), host = document.getElementById('blk-form');
+            // t1744 ACT 1b-ii — 'happy' is a hand-built, non-sectioned op (seedOp's own template): the flat
+            // branch, which now renders through createUserOpView('blk') into #blk_wiz_user_form, not #blk-form.
+            const pane = document.getElementById('blk-formpane'), host = document.getElementById('blk_wiz_user_form');
             return `${+!!(app && app.classList.contains('editing-wizard'))}${+!!(chip && !chip.hidden && /Op happy/.test(chip.textContent || ''))}`
                  + `${+!!(pane && !pane.hidden)}${+!!(host && host.querySelector('[data-param="depth"]'))}`;
         };

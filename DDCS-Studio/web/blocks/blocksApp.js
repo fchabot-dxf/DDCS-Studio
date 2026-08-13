@@ -21,6 +21,7 @@ import { renderOpForm, formBindings, renderUiTree, formSig, syncFormValues } fro
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
+import { createUserOpView } from '../wizards/views/userOpView.js';   // t1744 ACT 1b-ii — the pane's OWN namespaced instance (ns='blk'), the SAME renderer the modal uses via openLiveAsModal's default (ns=null) instance
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -375,6 +376,20 @@ async function buildWorkspace() {
   // wizard-face-1599 spec). An always-present tab asks no question, so switching it can never be "wrong" — `show`
   // still decides the Wizard View tab's CONTENT (the form, or empty), just never whether the tab itself is there.
   let activeTab = 'wizard';   // static default — never recomputed from wizard-authoring state
+  // t1744 ACT 1b-ii — THE SWITCH: the pane's OWN namespaced instance of the SAME renderer the modal uses
+  // (openLiveAsModal's default ns=null instance). One instance, created once, reused across every render —
+  // its closure-scoped state (_def/_seed/_layoutSpots/…) persists across renders the way a live pane needs.
+  // onFieldWrite: PROVEN necessary, not assumed — blocks-live-form.spec.js's own "form→block writeback" test
+  // (editing the live form must reach the block + G-code) failed without this wired, and blocks-edit-fail-
+  // loud-1518.spec.js's PROOF 3 needs the SAME host's bound field. Mirrors the OLD #blk-form listener exactly
+  // (same Number.isFinite guard, same writeAuthoredValue call) — the mechanism doesn't change, only which
+  // renderer's delegated listener calls it.
+  const blkView = createUserOpView('blk', {
+    onFieldWrite(param, rawValue) {
+      const n = Number(rawValue);
+      if (Number.isFinite(n)) { try { writeAuthoredValue(ws, param, n); } catch (_) { /* transient mid-edit miss is fine */ } }
+    },
+  });
   function setActiveTab(tab) {
     if (tab !== 'wizard' && tab !== '3d') return;
     activeTab = tab;
@@ -509,6 +524,12 @@ async function buildWorkspace() {
   function renderLiveForm() {
     const pane = document.getElementById('blk-formpane'), formHost = document.getElementById('blk-form');
     if (!pane || !formHost) return;
+    const blkHost = document.getElementById('blk_wiz_user');
+    // t1744 ACT 1b-ii — default every render to the OLD host visible / the new scaffold hidden; only the flat-
+    // bindings branch at the bottom (the ONE case createUserOpView('blk') now owns) flips this before it returns.
+    // Every other branch below (empty / hasTree / mid-edit) is untouched and still targets `formHost`.
+    if (blkHost) blkHost.style.display = 'none';
+    formHost.style.display = '';
     const { def, stack, authoredHere, customizing, userRoot } = deriveLiveWizard();
 
     function checkLayoutNodes(nodes) {
@@ -602,15 +623,19 @@ async function buildWorkspace() {
       return;
     }
 
-    const sig = formSig(def.bindings);
-    if (formHost.__sig === sig && formHost.querySelector('[data-param]')) {        // structure unchanged → value-sync only
-      syncFormValues(formHost, def.bindings);
-      return;
+    // t1744 ACT 1b-ii — THE SWITCH: this flat-bindings case (a `hasTree` layout tree is a SEPARATE face above,
+    // untouched) now renders through the SAME renderer the "Open as modal" overlay uses, not a lookalike. `render()`
+    // has no `onFieldWrite` wired here (unneeded for this act — nothing writes the pane's fields back to the
+    // canvas yet, so there is no echo for it to guard against; ACT 1b-ii-b's own scope if that changes), so every
+    // call rebuilds fresh — acceptable for now since nothing currently re-triggers this from typing IN the pane.
+    if (blkHost) {
+      formHost.style.display = 'none';
+      blkHost.style.display = '';
+      blkView.setUserOpDef(def);
+      blkView.view.onShow({ update() {} });
+    } else {
+      formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
     }
-    formHost.__sig = sig;                                                          // structure changed → rebuild
-    formHost.innerHTML = '';
-    if (def.bindings && def.bindings.length) renderOpForm(formHost, formBindings(def));   // S5.2 — consume param_field rows when present; else byte-identical
-    else formHost.innerHTML = '<div class="blk-form-empty">No knobs yet — tick a value’s “knob” on the blocks to expose one.</div>';
   }
   // form→block writeback (wired once): an edited form field writes its value back to the bound block, surgically.
   (() => {
