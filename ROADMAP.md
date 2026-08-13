@@ -350,6 +350,40 @@ Full text: [`docs/archive/CRAZY-IDEAS.md`](docs/archive/CRAZY-IDEAS.md).
 
 ---
 
+## TEST TO RUN — two PCs on one shop network (2026-08-13)
+
+**The setup:** PC #1 is wired to the CNC (it would run the **gateway**); PC #2 is on the same network with
+no machine connection (it would run the **console**). This is the *Local-network / Direct* mode already
+described in `bridge/bridge-app/CONFIGS.md`.
+
+**Why it is a TEST and not a feature request — nobody has tried it.** The pieces look present:
+- `web/ui/gateway/views/admin.js` has a free-text **address box**, so a custom base URL *can* be entered.
+- In the **native app** the browser mixed-content rule does not apply (no HTTPS page), so an
+  `http://<LAN-IP>:<port>` base is not blocked the way it is in a hosted browser tab.
+
+**What is NOT in place, and is why it probably fails today:**
+1. **Discovery is loopback-only** — `service.js`'s `DEFAULT_LOCAL_BASE` is `http://127.0.0.1:<port>` and
+   the scan walks `127.0.0.1` on the registered ports. From PC #2 it finds nothing on PC #1 and says
+   nothing, because it never looks off-box.
+2. **The UI never offers the LAN case** — the address placeholder reads
+   *"https://your-service.example/ (Cloudflare / self-host)"* and the hint says *"Same PC: point at
+   http://127.0.0.1:&lt;port&gt;"*. Cloud or same-PC; the shop's actual topology is unmentioned.
+3. **⚠ THE DECIDING UNKNOWN — what does the gateway BIND to?** If it listens on `127.0.0.1` it will
+   refuse PC #2 no matter what address is typed; it must bind `0.0.0.0` to answer another host. CORS is
+   written for `localhost` and would likely need the LAN origin too. **Check this first — it decides
+   whether the rest is a one-line change or already works.**
+
+**THE TEST:** on PC #2's native app, enter `http://<PC-1 IP>:<port>` in the Gateway → Admin address box
+and attempt a status read. Record: does the gateway answer at all (bind), is it refused by CORS, or does
+it work? ⚠ **Read-only first** ([[live-cnc-readonly-when-away]]) — a status/DRO read, never a send, until
+this path is understood.
+
+**Constraint on any fix:** the user is **not a network admin**. Any answer requiring port forwarding,
+certificates, static IPs or firewall surgery is the wrong answer — it should be "type the other PC's
+address" or better, "the console finds it."
+
+---
+
 ## Archived (under `docs/archive/`)
 Collapsed here on 2026-06-25 to end the planning-doc sprawl: `NEXT-TASKS.md`, `WIZARD-PLATFORM-VISION.md`,
 `CRAZY-IDEAS.md`, `FUSION-INTEGRATION.md`, `SESSION-2026-06-10.md`, and the `docs/` planning/research notes
