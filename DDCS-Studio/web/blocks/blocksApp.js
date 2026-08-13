@@ -17,7 +17,6 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
-import { renderOpForm, formBindings, renderUiTree, formSig, syncFormValues } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present; renderUiTree for block layouts; formSig/syncFormValues: t1740 — moved here so userOpView.js's render() shares the SAME structure-unchanged check, not a duplicate
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
@@ -368,8 +367,9 @@ async function buildWorkspace() {
   //  · form→block: a delegated input listener (wired below) writes a field's value back to its bound block
   //    (writeAuthoredValue), surgically — which reprojects, updating the G-code + preview too. The smart sync here
   //    absorbs that echo (the edited field is focused, so it's skipped), so there's no loop and no focus loss.
-  // formSig/syncFormValues: t1740 — moved to ui/formWidgets.js (imported above) so userOpView.js's render() can
-  // share the SAME structure-unchanged check rather than a second copy that could quietly diverge.
+  // formSig/syncFormValues: t1740 — moved to ui/formWidgets.js so userOpView.js's render() can share the SAME
+  // structure-unchanged check rather than a second copy that could quietly diverge (t1748 — this file no longer
+  // imports either itself; both branches that used to render into #blk-form now route through createUserOpView).
   // t1734 — THE TAB BAR. Two tabs, ALWAYS present (Wizard View / 3D) — user-clicked, never auto-picked. Replaces
   // the old ONE-predicate face switch (setRightFace, driven by renderLiveForm's `show`): that predicate decided
   // whether the Wizard View existed AT ALL, and its own history is two rounds of guessing wrong (see the retired
@@ -589,28 +589,33 @@ async function buildWorkspace() {
       // canvas — a canvas dflt edit reaches the form, and the form face shows what the author is building, not
       // the registry's stored snapshot. When userRoot already came from def.template this is the same object.
       const liveDef = def ? { ...def, template: [userRoot] } : {};
-      const binds = formBindings(liveDef);
-      // t1605 — the tree face gets the SAME structure-unchanged value sync the flat face below has. Without it,
-      // every canvas echo (including the one a form edit itself triggers) rebuilt the whole pane and the field
-      // being typed in lost focus per keystroke. The sig covers the binds shape PLUS the layout tree minus block
-      // ids and dflt values — so a value edit syncs in place and a structure/presentation edit rebuilds.
-      const treeSig = formSig(binds) + '||' + JSON.stringify(userRoot.uiChildren, (k, v) => ((k === 'id' || k === 'dflt') ? undefined : v));
-      blkLastOpType = null;   // t1746 — a later return to the flat branch counts as fresh, not a same-op re-render
-      if (formHost.__sig === treeSig && formHost.querySelector('[data-param]')) {
-        syncFormValues(formHost, binds);
-        return;
+      // t1748 ACT 1b-iii — THE hasTree BRANCH renders through the SAME createUserOpView('blk') instance the flat
+      // branch already uses (t1744), not a second renderer — this is the branch EVERY sampled built-in twin
+      // actually takes (t1744's own Finding 1: every one carries a sectioned/panel-based template). Same shape as
+      // the flat branch: onShow on a genuine fresh op, refresh on a same-op re-render, ONE shared tracker
+      // (blkLastOpType) — reset alongside it in the other branches' own returns, never a second one here.
+      //
+      // Checked before wiring, not assumed: userOpView.render() has its OWN tree/flat split internally
+      // (hasTreeLayout — narrower than this file's checkLayoutNodes: only split_horizontal/split_vertical count,
+      // not section/panel/tab_group/param_group/sim), so a sectioned twin like Corner takes ITS OWN flat path
+      // internally, not renderUiTree. Verified empirically that this is NOT a missing capability: formBindings()
+      // + renderOpForm()'s own section-grouping (`.form-sec`, grouped off each binding's `.section`) already
+      // produces the complete, correctly field for every sampled twin — Corner 23/23 fields (3 named sections),
+      // WCS 6/6, ATC Length 7/7, Surfacing 30/30, zero exceptions. A different internal branch inside the SAME
+      // renderer, not a gap — so this act does not need to touch userOpView.js at all.
+      if (blkHost) {
+        formHost.style.display = 'none';
+        blkHost.style.display = '';
+        blkView.setUserOpDef(liveDef);
+        if (blkLastOpType === def.opType) {
+          blkView.view.refresh({ update() {} });
+        } else {
+          blkLastOpType = def.opType;
+          blkView.view.onShow({ update() {} });
+        }
+      } else {
+        formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
       }
-      formHost.__sig = treeSig;
-      formHost.innerHTML = '';
-      const byParam = {};
-      const tempHost = document.createElement('div');
-      const readers = renderOpForm(tempHost, binds) || [];
-      tempHost.querySelectorAll('[data-param]').forEach((inp, idx) => {
-        if (!inp || !inp.dataset || !inp.dataset.param) return;
-        const row = inp.closest('.form-row') || inp.closest('.grid-2') || inp.parentElement;
-        byParam[inp.dataset.param] = { row, read: readers[idx] || (() => ({ [inp.dataset.param]: inp.value })) };
-      });
-      renderUiTree(formHost, userRoot.uiChildren, (def && def.bindings) || [], byParam);
       return;
     }
 
@@ -652,18 +657,11 @@ async function buildWorkspace() {
       formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
     }
   }
-  // form→block writeback (wired once): an edited form field writes its value back to the bound block, surgically.
-  (() => {
-    const formHost = document.getElementById('blk-form');
-    if (!formHost || formHost.dataset.wbWired) return;
-    formHost.dataset.wbWired = '1';
-    formHost.addEventListener('input', (e) => {
-      const f = e.target && e.target.closest && e.target.closest('[data-param]');
-      if (!f) return;
-      const n = Number(f.value);
-      if (Number.isFinite(n)) { try { writeAuthoredValue(ws, f.dataset.param, n); } catch (_) { /* transient mid-edit miss is fine */ } }
-    });
-  })();
+  // t1748 — the OLD #blk-form writeback listener that used to live here is gone: since t1744 (flat branch) and
+  // this act (hasTree branch), nothing renders a `[data-param]` field into #blk-form anymore — both cases route
+  // through createUserOpView('blk')'s own delegated listener (its onFieldWrite hook, wired in this file, calls
+  // the SAME writeAuthoredValue). #blk-form now only ever holds the empty/mid-edit/no-scaffold messages, none of
+  // which carry a data-param field, so the old listener was dead code, not a second copy of live behavior.
 
   // User edited the WORKSPACE → push to the shared model (which re-projects the editor) → refresh the pane.
   // t788 — the RULED TRIGGER SPLIT (pipeline-level; every heavy op, not a pocket special-case). One field edit used to

@@ -67,10 +67,17 @@ const settle = async (page) => {
         await page.waitForTimeout(250);
     }
 };
-/** What the Wizard View tab's CONTENT is — read off #blk-form, not off a DOM class/title (t1734: neither exists
- *  any more; the tab itself is always present regardless of this). */
+/** What the Wizard View tab's CONTENT is — read off whichever host is actually visible (t1734: neither a DOM
+ *  class nor a title exists any more; the tab itself is always present regardless of this). t1748 ACT 1b-iii —
+ *  a hasTree case (every built-in twin; a hand-built wizard with a real Presentation layout) now renders through
+ *  createUserOpView('blk')'s own #blk_wiz_user_form, not #blk-form — #blk-form stays the host only for the
+ *  no-wizard / mid-edit-without-layout faces. Pick whichever is genuinely showing, same as the product itself
+ *  does (blocksApp.js toggles #blk_wiz_user's display), rather than assuming which face any given test reaches. */
 const face = async (page) => page.evaluate(() => {
-    const host = document.getElementById('blk-form');
+    const newWrap = document.getElementById('blk_wiz_user');
+    const newHost = document.getElementById('blk_wiz_user_form');
+    const newVisible = !!(newWrap && newHost && getComputedStyle(newWrap).display !== 'none');
+    const host = newVisible ? newHost : document.getElementById('blk-form');
     return {
         formText: (host && host.textContent || '').trim(),
         fields: host ? host.querySelectorAll('[data-param]').length : -1,
@@ -134,8 +141,9 @@ test('a PLACED data-op twin in a program renders its LIVE form — t1740 FOLLOW-
     expect(placed.opType, 'the program really does hold a placed data-op twin').toBe('user_corner_data');
     const f = await face(page);
     expect(f.fields, 'a PLACED twin IS the wizard\'s data — the pane must show it, not stay empty').toBeGreaterThan(0);
+    // t1748 — Corner is sectioned (hasTree), so it renders through createUserOpView('blk') now, not #blk-form.
     const distField = await page.evaluate(() => {
-        const inp = document.querySelector('#blk-form [data-param="dist"]');
+        const inp = document.querySelector('#blk_wiz_user_form [data-param="dist"]');
         return inp && inp.value;
     });
     expect(Number(distField), 'the LIVE value (912), not the registry default (500)').toBe(912);

@@ -26018,3 +26018,91 @@ would be a control doing nothing. In the MODAL ("Open as modal"), Insert stays i
 modal IS a session (opened, edited, closed), so Cancel there means restore the values at open and close, keeping
 the modal's own "close it and nothing is saved" promise. Queued behind this fix landing first (reverting is
 meaningless while typing didn't reliably land); left exactly as it is — no code touched toward it this act.
+
+
+## Turn 1748 (worker) — ACT 1b-iii: THE hasTree BRANCH — the one every built-in twin actually takes, now switched
+
+### Checked before touching code: is this a missing capability, or a different internal branch?
+
+`userOpView.render()` has its OWN tree/flat split (`hasTreeLayout`), narrower than `renderLiveForm()`'s own
+`checkLayoutNodes`: only `split_horizontal`/`split_vertical` count as "tree" for it — `section`, `panel`,
+`tab_group`, `param_group`, `sim` do not. Every sampled built-in twin's `uiChildren` is exactly THAT kind of
+node (`section×4` for Corner, `panel+sim+param_group` for WCS, `panel+param_group` for ATC Length), meaning
+`userOpView.render()` would take its OWN internal FLAT path for all of them, not `renderUiTree`. Rather than
+assume that's a gap, built a scratch instance against each of Corner/WCS/ATC-Length/Surfacing directly (`createUserOpView`
++ a scaffold, no wiring): zero exceptions, field counts matched `regDef.bindings.length` EXACTLY for all four
+(23/23, 6/6, 7/7, 30/30). `formBindings()` + `renderOpForm()`'s own section-grouping (`.form-sec`, keyed off each
+binding's `.section`) already produces the complete, grouped field set — a different internal branch inside the
+SAME renderer, not a missing capability. This meant `userOpView.js` itself needed NO changes for this act.
+
+### THE ACT
+
+`renderLiveForm()`'s `hasTree` branch now builds the SAME `liveDef` it always has (`{ ...def, template:
+[userRoot] }` — the canvas's own live user_root, not a frozen registry snapshot) and passes it to
+`blkView.setUserOpDef(liveDef)`, then the SAME onShow-vs-refresh split t1746 built for the flat branch — reusing
+`blkLastOpType`, not a second tracker (the other branches already reset it at their own returns; unchanged). The
+old `renderOpForm(tempHost, binds)` / `renderUiTree(formHost, …)` pair, and the `treeSig`/`formHost.__sig`
+signature check that guarded it, are gone — `userOpView.render()`'s own signature check (t1740, now reachable via
+`refresh`) does that job now.
+
+**Cleaned up as a direct, mechanical consequence** (both branches routing through `blkView` means nothing renders
+a `[data-param]` field into `#blk-form` any more): the now-dead `#blk-form` form→block writeback listener (its
+job is `blkView`'s own `onFieldWrite`, wired since t1744) and the now-fully-unused `renderOpForm`/`formBindings`/
+`renderUiTree`/`formSig`/`syncFormValues` import in `blocksApp.js` (still exported from `ui/formWidgets.js` for
+`userOpView.js`'s own use — only this FILE's now-redundant copy of the import is gone).
+
+### Verified — the gesture, not a string, across 3 families
+
+Real bar-click gestures (Probe▼→Corner, Mill▼→Surfacing, ATC▼→ATC Length), a distinctive value typed before
+Insert for the two that have an obvious numeric field, then BLOCKS tab: for all three, `#blk_wiz_user_form` is
+the visible host with the correct field count and live value, `#blk-form` stays empty and hidden, and
+`window.ddcsGetBlockProgram()` confirms the real op is actually in the program (not a proxy check). Screenshot
+(`t1748-hastree-corner.png`) shows Corner's pane with its 3 named sections (IDENTITY / GEOMETRY / TOOL & CUT) and
+the typed value (555) live in "Max Probe Dist" — a clean, complete, correctly-grouped render, not a half-match.
+
+### A real, precisely-diagnosed finding — the writeback gap this act's own check named
+
+"Type into a pane field: every character lands, focus holds, the writeback reaches the canvas — the same red you
+just closed must not reopen." Two of three held: sustained typing into a hasTree-branch field keeps focus and
+every keystroke lands (t1746's fix generalizes correctly — no new focus-loss). **The writeback does NOT reach the
+canvas.** Traced to source, not left as "it doesn't work": `writeAuthoredValue` (`devMode.js:243`) has exactly
+TWO mechanisms — (1) `deriveAuthoredDef(ws)`'s own atom-tree walk, for a HAND-BUILT/authored stack where each
+exposed param is a socket-bound `math_number`/`param` sub-block; (2) a `param_field`-BLOCK lookup on the canvas,
+for the CUSTOMIZE route (a twin's bindings live in the registry there, so the canvas's OWN `param_field`
+declaration block is the writable thing). **Neither covers a NORMALLY-PLACED op** (`openWiz→insertWiz`, this
+act's own primary gesture): its canvas representation is ONE `{type:'op', opType, params}` block with the values
+living DIRECTLY on `.params` — no atom-tree of individually-exposed param blocks, no `param_field` declarations.
+`writeAuthoredValue` silently returns `false` for this shape (caught by `onFieldWrite`'s own `try/catch`, so no
+crash — the value just never reaches the block), which is why typing showed `888` in the field but the program's
+own `params.dist` stayed `500`.
+
+This is not a wiring mistake in this act — `onFieldWrite` fires correctly, `writeAuthoredValue` is called
+correctly, it just has no case for the data shape a normally-placed op actually has. Not attempted here: a
+normally-placed op's params are ALREADY editable in place today, through a completely different, existing
+mechanism (`wizardManager.openForEdit`/`ops.replaceOp`, keyed by the op's `id`) — extending `writeAuthoredValue`
+to ALSO cover this shape would either duplicate that path or need to delegate to it, and doing either without
+guessing at which is a real design question, not a few-line fix. Per this act's own instruction, reported rather
+than pushed through.
+
+### Verify
+
+- Real-gesture family sweep (Corner/Surfacing/ATC Length): all green, screenshot saved.
+- Typing-survives check: focus/value assertions green; writeback assertion red (the finding above), left red and
+  reported, not silenced.
+- `wizard-face-1599.spec.js`: its shared `face()` helper always read `#blk-form` — now reads whichever host is
+  actually visible (matching what the product itself toggles), since every one of its scenarios that reaches
+  `hasTree` (CUSTOMIZE for 5 twins, a placed Corner, a hand-built wizard WITH a real layout) now renders through
+  the new host. One hardcoded `#blk-form [data-param="dist"]` selector in the t1740-FOLLOW-UP test repointed the
+  same way. All 4 tests green after the fix.
+- `npm run test:node`: 118/118 (no citation drift this time — no line-shifting edits to userOpView.js this act).
+- `fork-parity-1593.spec.js`, `open-as-modal-1625.spec.js`, `wizard-face-1599.spec.js`, full `blocks-*` family:
+  two clean runs, 0 failed both times (65 / 64 passed, 2–3 flaky-then-passed each run, a different specific test
+  every time — the same `window.__blkws`/timing-under-load pattern logged all session, not chased).
+- Modal: unaffected — `createUserOpView(null)`'s code paths are untouched by this act.
+
+### For the advisor
+
+The writeback gap is the one open question: extend `writeAuthoredValue` with a third, placed-op-shaped case, or
+route a placed op's pane edits through the EXISTING `replaceOp`/`openForEdit` mechanism instead of
+`writeAuthoredValue` at all (arguably the more honest fix — an edit to a placed op's field is exactly what that
+mechanism already exists for). Not guessed at here. Cancel remains untouched, still queued behind this.
