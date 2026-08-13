@@ -1886,3 +1886,27 @@ saying so.* Every future declaration added to a binding will hit it again, in wh
 **Worth a dedicated act (not yet scoped):** find every place a binding/param object is rebuilt field-by-
 field, and make the unknown-field case either CARRY THROUGH or REFUSE LOUDLY — never silently drop.
 A grep for the known two is not enough; the point is to find the ones nobody has tripped yet.
+
+---
+
+## ⚠ PERSONAL MACHINE VALUES HARDCODED AS UNIVERSAL DEFAULTS (2026-08-13)
+**User:** *"my machine config and layout of my setup is not meant to be hardcoded in the repo."* Correct,
+and it is a CORRECTNESS point before it is a privacy one: one machine's numbers baked in as a default are
+WRONG for every other owner, silently.
+
+**Found (shipped code, not tests, not comments):**
+1. `web/engine/GcodeExecutionEngine.js:1041` — `num(machine.z, -120)`. **A runtime FALLBACK: a machine
+   config with no Z travel is silently treated as 120 deep.** Same disease as everything else this week —
+   a silent assumption standing in for a missing fact. A user whose machine is not 120 deep gets a
+   confidently wrong simulation with nothing saying so.
+2. `web/blocks/dataOps/homingData.js:30` — `TEMPLATE_MACHINE = { x: 300, y: 300, z: -120 }`.
+*(`web/data/workspaceMachine.js:139-149` mentions -120 only in illustrative doc comments — fine, leave.)*
+
+**THE ACT (queued, not urgent):** a missing axis travel must not silently become a number. Either the
+value is DECLARED once as a named, obviously-generic default, or the sim REFUSES/says so rather than
+assuming. Prefer refuse-or-say: an invented envelope is exactly what makes a wrong picture look right.
+⚠ Check for siblings — grep every `num(machine.<axis>, …)` and any other per-axis fallback; `300` for X/Y
+on the same line is the same shape. **This is a sweep, not a single edit.**
+
+**And a standing rule going forward:** the user's own machine config, WCS table, tool table and shop
+topology are NOT project facts. They belong in their workspace file / memory, never in shipped defaults.
