@@ -21,7 +21,6 @@ import { renderOpForm, formBindings, renderUiTree } from '../ui/formWidgets.js';
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
-import { getLastOp } from './opRecord.js';   // t1734 amendment — the wizard currently OPEN in the modal (kept live by every wizard's own recordOp on generate/update)
 import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the merge-vs-replace decision on a re-instantiate)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -436,46 +435,12 @@ async function buildWorkspace() {
       const regDef = getUserDef(authoringWizardType());
       if (regDef) def = regDef;
     }
-    // t1734 amendment B — the Wizard View tab mirrors the CURRENTLY OPEN WIZARD too, not only canvas authoring:
-    // open Corner from the bar and switch to Blocks WITHOUT any Customize step, and this tab still shows Corner.
-    // `wizardManager.wizardElement` carries the overlay's own `.active` class, cleared ONLY by close() (Cancel/
-    // Insert) — unlike `_activeType`/getLastOp(), which never reset, so THAT'S the "is it still open right now"
-    // fact, not "was one open at some point" (the same staleness trap `customizing` already guards against, one
-    // layer up). showApp('blocks') hides #studio-app (and the wizard overlay nested inside it) via CSS without
-    // ever calling close() — the modal stays genuinely open, just visually behind the tab. Only a FALLBACK —
-    // canvas authoring above still wins whenever it already produced bindings.
-    // t1736 (user-ruled follow-up) — LIVE VALUES too, not just structure: a field showing the def's bare default
-    // while the open modal holds a different, real value is a WRONG number presented as a real one — worse than
-    // the empty case (empty claims nothing; a stale number claims something false). getLastOp().params is kept
-    // live by every wizard's own recordOp on each generate/update. Two overlay paths, because formBindings() reads
-    // a field's value from TWO different places depending on the twin's shape:
-    //   (1) a `hasTree` twin (Corner included) renders through formBindings({...def, template:[userRoot]}), whose
-    //       paramFieldsFromStack() reads each param_field block's OWN embedded `dflt` — but ONLY when it parses as
-    //       a finite number (userOps.js:434); that row's `.default` then WINS over the binding's own default. So a
-    //       NUMERIC field needs its value patched INTO the template tree, on a DEEP CLONE (mutating the registered
-    //       def's template in place would corrupt every other consumer of this same twin — openLiveAsModal hit the
-    //       identical trap; JSON.parse(JSON.stringify(...)) is this codebase's established idiom for it).
-    //   (2) a non-numeric field (string/enum/bool) never gets a template-row default (the finite-number guard
-    //       above excludes it) — formBindings() falls back to the BINDING's own `.default`, and a flat-bindings
-    //       twin with no param_group at all skips paramFieldsFromStack entirely (empty rows → `def.bindings`
-    //       returned unchanged) — so `def.bindings[].default` is patched too, covering both cases.
-    if (!def || !def.bindings || !def.bindings.length) {
-      const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
-      const modalOpen = !!(wm && wm.wizardElement && wm.wizardElement.classList.contains('active'));
-      const lastOp = modalOpen ? getLastOp() : null;
-      const regDef = lastOp && getUserDef(lastOp.type);
-      if (regDef) {
-        const params = lastOp.params || {};
-        const template = JSON.parse(JSON.stringify(regDef.template || []));   // deep clone — never patch the shared registry def
-        const root = template.find((b) => b && b.type === 'user_root');
-        if (root) {
-          for (const b of flattenBlocks(root.uiChildren || [])) {
-            if (b && b.type === 'param_field' && b.params && b.params.param in params) b.params.dflt = params[b.params.param];
-          }
-        }
-        def = { ...regDef, template, bindings: (regDef.bindings || []).map((b) => (b && b.param in params) ? { ...b, default: params[b.param] } : b) };
-      }
-    }
+    // t1738 — the t1734/t1736 side-channel mirror (first `.active`-keyed, then `getLastOp()`-keyed) is DELETED
+    // outright, not patched further. User ruling: the STACK IS THE WIZARD — any tracked side-channel (a DOM flag,
+    // a recorded-op snapshot) is a second copy of a fact the canvas already carries, which is exactly the
+    // duplication this gameplan exists to remove. The Wizard View's content question is settled differently now
+    // (render the whole stack as the form it becomes when saved, through the SAME renderer openLiveAsModal uses —
+    // see below); nothing here reaches for a wizard that isn't genuinely represented on the canvas.
     const userRoot = authoredHere
       || (customizing ? flattenBlocks(stack).find((b) => b && b.type === 'user_root') : null)
       || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);

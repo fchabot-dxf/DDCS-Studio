@@ -25126,3 +25126,208 @@ No STOP-and-report needed — the "materially riskier than it looks" escape hatc
 the deep-clone-and-patch was mechanical once the two resolution paths were correctly identified (both already
 named in the t1734 WORK-LOG entry that flagged this for a ruling), and verifying registry isolation was a direct,
 cheap check rather than a leap of faith.
+
+
+## Turn 1738 (worker) — STEP 3 CORRECTION: the Wizard View mirror rebuilt on a REACHABLE gesture
+
+Dispatch (advisor, citing their own measurement + a verbatim user ruling "i dont want 1-2 i only want 3"): the
+t1734/t1736 `.active`-keyed mirror was UNREACHABLE. Measured in the real app: the wizard modal is `position:fixed`
+covering the full viewport, so `elementFromPoint` at the Blocks tab button's screen position resolves to the
+wizard's own `.wiz-box` while it's open — a human cannot click Blocks while a wizard is open. Both my t1734
+verification and the advisor's own re-verification of it had called `showApp('blocks')` programmatically, bypassing
+the modal — exactly the shortcut "prove it to the visible pixel" exists to catch. The advisor took ownership of
+that miss ("MY FAILURE not yours") but the instruction was unambiguous: delete the unreachable mechanism, rebuild
+on the one reachable gesture (close — Cancel or Insert — then switch to Blocks), prefer routing into the EXISTING
+canvas-authoring derivation over inventing a second mechanism, and verify with real clicks only.
+
+### Investigation before writing anything
+
+Given this is the THIRD round on this exact feature, spent real effort establishing facts empirically rather than
+guessing a third time:
+- Found the real DOM gestures (the wizard bar is behind a category dropdown — `button:has-text("Probe")` then
+  `[data-optype="corner"]`; Insert is `.wiz-box .wiz-foot .primary`; Cancel is the sibling non-primary button; the
+  tab is the real `<button>BLOCKS</button>`), after an initial wrong guess (`[data-wiz="..."]`, which doesn't exist)
+  wasted a couple of diagnostic rounds — worth naming since it's the same class of mistake as the modal-bypass one.
+- Confirmed live: a REAL Insert lands `{type:'op', opType:'user_corner_data', children:[{type:'user_root',…}]}` on
+  `programModel.js`'s stack — the exact shape `customizing`'s own existing check already looks for
+  (`stack.some(b => b.type==='op' && b.opType===authoringWizardType())`), just needing the type sourced from
+  somewhere other than the Customize-only `authoringWizardType()` flag.
+- Traced WHY a normally-placed twin never triggered `deriveLiveWizard`'s OWN top-of-function `opBlock` scan
+  (`stack.find(b => b.type===... || (b.params && getUserDef(b.params.opType)))`): that check reads
+  `b.params.opType`, but a real placed op's type is a TOP-LEVEL `b.opType` field, not nested under `params` —
+  confirmed live (`opBlockFound: false` on a genuinely placed twin). Not a bug I was asked to fix; noted here so
+  the next person tracing this same confusion doesn't have to re-derive it.
+- Initially concluded Cancel was structurally uncoverable (a direct stack-length check via
+  `window.ddcsGetBlockProgram()` showed 0 before and after a real Cancel click) and was about to flag it as an
+  open question rather than guess a third mechanism. Caught my own error before reporting it: that check only
+  proves Cancel commits nothing to the REAL program — it says nothing about what happens once you actually open
+  Blocks. `opSession.js`'s `previewActiveOp()` (pre-existing, predates this whole feature) already seeds an EMPTY
+  canvas from `getLastOp()` as a preview whenever `showBlocks()` runs — and Cancel doesn't clear `getLastOp()`
+  either. So Cancel's session, once you switch to Blocks with nothing else on the canvas, lands in the exact same
+  shape a real Insert does, and the SAME new check picks it up — verified live, no new code needed for Cancel
+  specifically.
+
+### What shipped
+
+`web/blocks/blocksApp.js`'s `deriveLiveWizard()`:
+- **Deleted** the t1734/t1736 `.active`/`wizardElement`-keyed fallback in full, including the live-value
+  template/bindings patching that existed only to serve it.
+- **Replaced** with a `recentlyUsed` check: `getLastOp()` (kept live by every wizard's own `recordOp` on
+  generate/update) matched against the current stack the SAME way `customizing` matches
+  `authoringWizardType()` — `stack.some(b => b.type==='op' && b.opType===lastOp.type)`. This is a fallback,
+  checked after the existing canvas-authoring terms, exactly parallel in shape and precedence to how `customizing`
+  already works. It inherits the SAME anti-staleness property for free: valid only while a matching op is still on
+  the stack, and it stops matching the instant the user removes or replaces it — no new flag, no new listener, no
+  cross-module wiring, no first-use-this-session timing gap (unlike an event-listener design I considered and
+  rejected: `devMode.js`/`blocksApp.js` only load once Blocks is first opened, so a listener registered there would
+  miss a bar-insert that happened before the very first Blocks-tab visit — `getLastOp()` read fresh on every
+  render has no such gap).
+- Re-applied the SAME two-path live-value overlay from t1736 (template-tree patch for numeric `param_field` rows;
+  `def.bindings[].default` for everything else), now gated on `recentlyUsed` instead of the deleted `.active`
+  check — the honesty ruling ("a stale number is worse than empty") applies identically here: `lastOp.params` are
+  the exact values just used, and showing the registry's bare defaults instead would repeat the same mistake in a
+  new spot.
+
+### Verify — real gestures only, as instructed (no `page.evaluate(() => window.showApp(...))` substitutes)
+
+- **Insert**: real click through Probe ▼ → Corner → fill `dist=777` → real click Insert → real click the BLOCKS
+  tab. Wizard View shows Corner, 23 fields, `dist` reads `777` (the live value, not the `500` default). Screenshot
+  taken. Works unconditionally — the op lands on the stack regardless of what else was already there.
+- **Cancel**: same open + fill `dist=888`, real click Cancel this time → real click BLOCKS. Confirmed FIRST (before
+  ever touching the Blocks tab) that the real program stack is genuinely empty (`programModel.getStack().length
+  === 0`) — Cancel truly commits nothing. Then, after the real tab click, Wizard View shows Corner, 23 fields,
+  `dist` reads `888`. Screenshot taken.
+- **Cancel's actual scope, checked directly rather than assumed**: this coverage is CONDITIONAL on the Blocks
+  canvas being empty at the moment of switching (since `previewActiveOp()`'s seed only fires then). Verified: with
+  an unrelated plain program already on the Blocks canvas, cancelling Corner and switching to Blocks leaves the
+  Wizard View empty (no mirror) AND leaves the existing unrelated program fully intact (never clobbered — checked
+  the `move` block survived). Insert has no such condition; it always lands regardless of prior canvas state. Both
+  behaviours are honest (never stale, never destructive) — reporting the asymmetry rather than glossing over it,
+  since the dispatch's own gesture (open a wizard, immediately act, immediately check Blocks) is the common case
+  this covers, not a claim of universal coverage.
+- Full fast tier (`blocks-*.spec.js` ×23 + `wizard-face-1599`/`palette-by-role-1623`/`ui-tree-unwired-1561`/
+  `context-menu-blocks-1454`/`wizard-shapes-1627`/`fork-parity-1593`, 70 tests): 60 passed + 1 flaky-then-passed
+  (an unrelated `ddcsEditWizardDef` boot-timing test, same class of cold-start flake seen earlier this session in
+  files t1734 never touched), 9 skipped (unchanged), 0 failed.
+- `npm run test:node`: 118/118, 0 failed.
+- fork-parity: unaffected by a form-derivation change for a tab that isn't the canvas; not re-run redundantly
+  beyond the fast-tier batch above (fork-parity-1593 is included in it).
+
+No STOP-and-report was needed in the end — the investigation that looked headed toward "Cancel is structurally
+unfixable, flag it" turned up a pre-existing mechanism that already closes the gap once combined with the new
+check, so the honest report is a full implementation plus one accurately-scoped caveat, not an open question.
+
+
+## Turn 1738 FOLLOW-UP (worker) — 5-amendment cascade landed mid-fix; reverted the rejected mechanism, STOP-and-report on the settled one
+
+While verifying the t1738 fix above (real-gesture screenshots for Insert and Cancel, both passing), a rapid cascade
+of 5 amendments landed and were polled together. Each explicitly supersedes the previous on the Wizard View's
+content question; only the LAST is binding. In order:
+
+1. "SIMPLER THAN MY DISPATCH SAID" — drive the pane from canvas-authoring where it applies, else `getLastOp()`.
+   (What t1738 above had just implemented and verified.)
+2. "SUPERSEDES BOTH PREVIOUS" — use NEITHER `.active` NOR `getLastOp()`. User: "the STACK IS THE WIZARD" — any
+   tracked side-channel is a second copy of a fact the canvas already carries.
+3. "HOLD ON THE WIZARD-VIEW CONTENT" — the user expects a view of the WHOLE STACK (every op, as it would become
+   when saved), not one wizard. Told to stop at the content question rather than guess between one-wizard and
+   whole-stack, keep everything else settled (tabs, deletions).
+4. "THE WIZARD VIEW IS SETTLED" — verbatim user requirement: "the goal of the wizard view is to see what im about
+   to save as a custom wizard" (on multiple ops: "all of them"). Renders the ENTIRE canvas stack as the form it
+   becomes when saved, every op, every exposed param, in stack order — not the last-opened wizard, not a still-open
+   modal, not per-op separate forms. Prefer EXTENDING the canvas derivation (proven working for one wizard via
+   `ddcsEditWizardDef`) over building anything new. Also carried a user bug report (blank pane on a full stack).
+5. ADDS TO #4 (doesn't replace it) — (a) the blank-pane report was stale cached JS, not a real defect, dropped.
+   (b) NEW, measured by the user comparing the pane and the modal side by side for the SAME wizard: they render
+   through TWO DIFFERENT paths and visibly disagree (pane = `renderOpForm(formHost, formBindings(def))` at
+   blocksApp.js:634, a simplified renderer; modal = `openLiveAsModal()` at blocksApp.js:496 → the real
+   `wizardManager`/`userOpView` overlay). Named differences: different section grouping/headings, missing identity
+   fields, unlabelled stray inputs, empty FEATURE CANVAS / VISUALIZATION panels vs the modal's real 92-line path +
+   live 3D. THE ACT: make the pane use the SAME renderer as the modal (not a re-implementation, not added
+   grouping/canvas code bolted onto the simplified one — that IS the duplication being removed). Explicit escape
+   hatch: "If the modal's renderer genuinely cannot be hosted in a narrow pane without a rewrite, STOP and report
+   the constraint rather than shipping a half-match."
+
+### Reverted immediately (unambiguous across every amendment in the cascade)
+
+`web/blocks/blocksApp.js`'s `deriveLiveWizard()` — deleted the ENTIRE `.active`/`getLastOp()` fallback block (both
+the t1734 amendment-B mechanism and the t1738 `recentlyUsed` replacement), including the live-value template/
+bindings patching that existed only to serve it, and the now-dead `getLastOp` import. `deriveLiveWizard()` is back
+to exactly its canvas-authoring-only shape (`authoredHere`/`customizing`/the `opBlock` scan) — the SAME shape it
+had before t1734 amendment B was ever written. Confirmed clean: full fast tier (`blocks-*` ×23 +
+`wizard-face-1599`/`palette-by-role-1623`/`ui-tree-unwired-1561`/`context-menu-blocks-1454`/`wizard-shapes-1627`,
+68 tests) 59 passed / 9 skipped / 0 failed; node tier 118/118. The deleted `tests/zzdebug-1734-manual-verify.spec.js`
+t1738 (a)/(b) scratch tests (untracked, never part of the suite) verified this revert by failing exactly as
+expected against the rejected mechanism, then were removed as obsolete rather than left red.
+
+### Investigated before implementing amendment 5 — found a genuine, evidenced blocker
+
+Two findings, each checked directly rather than assumed, that together make "render the whole stack through the
+modal's own renderer, hosted in the pane" a materially bigger change than the dispatch's own framing suggested:
+
+**1. The canvas-authoring derivation does not naturally cover "every op … all of them" today.** `devMode.js`'s
+`authoringBody(ws)` (line 65) — the function `collectAuthoring`/`saveAsCustomOp` and (transitively)
+`openLiveAsModal` all derive from — does `const opRec = stack.find(b => b.type === 'op')`: `.find()`, the FIRST
+`{type:'op'}` block only. Its else-branch (no `op`-wrapper present) DOES combine every bare atom into one
+`children` array, but that's a different shape (a hand-built Define-Custom-Wizard chain, not multiple placed ops).
+A canvas holding two placed ops (e.g. Corner then WCS) has its SECOND op silently ignored by the exact mechanism
+amendment 4 says to extend. Getting "every op, in stack order" genuinely requires changing what this function
+returns, not just how it's rendered.
+
+**2. `userOpView.js` (the modal's actual renderer, 656 lines) is deeply coupled to one singleton DOM location, not
+parameterized to a host.** Counted 18 distinct hardcoded references to the modal's own ids/classes across the
+file — `el('wiz_user_form')` ×3, `document.querySelector('#wiz_user .wiz-visual')`, `host.closest('.wiz-2pane')`,
+`el('wiz_user_usage')`, the `panelId:'wiz_user'`/`codeElId:'wiz_user_code'` config pair, `el('wiz_user_code')`, and
+`.wiz-viz3d` container resolution logic spread across `update()` and multiple standalone helper functions
+(`renderZRulerBeside` and others). The file's own comments show this is not idle coupling: line 447 explicitly
+notes `#wiz_user` "is shared across ops so a stale pane can linger from a prior op's panel" — i.e. even TODAY's
+single-consumer (modal-only, one-open-at-a-time) design has already needed care around this singleton. Hosting the
+SAME renderer in the Blocks-tab pane means a SECOND, ALWAYS-VISIBLE consumer wanting the same DOM subtree the
+on-demand modal also wants — a new class of the exact problem that comment is already guarding against, not an
+absent one.
+
+Two ways to actually satisfy "same renderer, not a second copy" given this, neither of which is "call the existing
+function from a new place":
+- **(A) Generalize `userOpView.js` to accept a host container** — parameterize the ~18 hardcoded lookups so the
+  same module renders into either `#wiz_user_form` (the modal) or `#blk-form` (the pane). A real, scoped refactor
+  of a file currently used by every custom-op wizard open in the app (`wizardManager._userView`/`open()` routes
+  every `user_*` type here) — correctness-critical, not a small edit.
+- **(B) Relocate the singleton `#wiz_user` panel between the pane's slot and the modal's slot** depending on which
+  is currently showing it — the same DOM-relocation idea `openLiveAsModal()` already uses once for the whole
+  wizard overlay (`document.body.appendChild(overlay)`), extended to a resource TWO consumers now want
+  concurrently instead of one consumer at different times. Avoids touching `userOpView.js`'s internals, but needs
+  a new handoff protocol between an always-mounted pane and an on-demand modal that doesn't exist today (what
+  happens if "Open as modal" is clicked while the pane is actively showing something — does the panel visibly jump?).
+
+Given the file's own documented fragility around this singleton, and that (1) means the derivation feeding either
+option ALSO needs extending — I judge this to cross the dispatch's own stated line ("if the modal's renderer
+genuinely cannot be hosted in a narrow pane without a rewrite, STOP and report"). Did not attempt A or B, and did
+NOT patch the simplified `renderOpForm` path to look more like the modal — amendment 5 explicitly forbids exactly
+that ("DO NOT fix this by adding grouping/canvas code to the simplified renderer").
+
+### Where this leaves the shipped state
+
+Everything settled and unaffected by this cascade remains exactly as before: two always-present tabs, the
+four-term predicate deleted, `setRightFace` deleted, the Projected G-code pane and its `#blk-gcode` machinery
+deleted, `sim_3d_box`/`code_preview_panel` deleted, `layout_2d_canvas` kept. The Wizard View tab's CONTENT is, for
+now, back to exactly its pre-t1734 behaviour: populated only during canvas-authoring (`authoredHere`/`customizing`
+via the Customize route or a hand-built Define Custom Wizard block), empty otherwise — honest, never stale, not
+yet upgraded to amendment 4/5's fuller "whole stack, modal-fidelity" vision. No half-match shipped.
+
+### For the advisor's call — not guessed a further time
+
+1. Which of (A) generalize `userOpView.js` to a host parameter, or (B) relocate the singleton panel between pane
+   and modal — or a third approach not considered here — should the "same renderer" requirement use, given both
+   carry real scope beyond a wiring change?
+2. Is "every op … all of them" (amendment 4's literal words) meant literally for a MULTI-op stack right now, which
+   would also require extending `authoringBody`'s single-op `.find()` — or is getting ONE op's pane rendering to
+   correctly match the modal (amendment 5's own concrete, measured, single-wizard bug report) the right scope to
+   land first, with multi-op explicitly deferred?
+
+### Verify (this turn's actual change: the revert)
+
+- Full fast tier (68 tests across `blocks-*`/`wizard-face-1599`/`palette-by-role-1623`/`ui-tree-unwired-1561`/
+  `context-menu-blocks-1454`/`wizard-shapes-1627`): 59 passed, 9 skipped (unchanged), 0 failed.
+- `npm run test:node`: 118/118.
+- No screenshots taken this pass — nothing user-visible changed from the LAST fully-shipped, verified state
+  (turn 1734's original two-tab ship); this pass only removed code added and already screenshotted in the
+  turns being superseded.
