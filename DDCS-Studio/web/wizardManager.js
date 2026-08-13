@@ -228,6 +228,10 @@ export class WizardManager {
         this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
         // t1625 — a real open always clears the preview chrome: the class AND the banner title (nothing else ever
         // writes #wizTitle, so the preview's banner would otherwise outlive the preview).
+        // t1740 — `this._previewing` is the JS-level companion to the `.previewing` CSS class, read by insert()
+        // so a preview's Insert is genuinely INERT (no commit reachable via Enter/programmatic call), not merely
+        // CSS-hidden — the CSS class alone only ever hid the button, it never stopped insert() itself from running.
+        this._previewing = false;
         {
             const b = document.querySelector('.wiz-box');
             if (b) { b.classList.remove('editing'); b.classList.remove('previewing'); }
@@ -462,6 +466,12 @@ export class WizardManager {
     updateAtcChangeWizard() { return viewByType.get('atc_change').update(this); }
 
     async insert() {
+        // t1740 — a preview (openLiveAsModal's "Open as modal") shows the REAL chrome including Insert, CSS-hidden
+        // only (.previewing .wiz-foot .primary{display:none}) — hiding the button never stopped a stray Enter-key
+        // submit or a programmatic wm.insert() call from reaching this method and committing a duplicate op into
+        // the program. "Do NOT make it add a new op" (t1740 dispatch) must hold regardless of HOW insert() is
+        // reached, not only via the one hidden button — so the guard lives here, not in the click wiring.
+        if (this._previewing) return;
         const view = this.activeView();
         const code = view ? el(view.codeElId)?.textContent : '';
 

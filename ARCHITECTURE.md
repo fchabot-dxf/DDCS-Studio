@@ -544,7 +544,7 @@ rg -n "indentStyle" DDCS-Studio/web --glob '!data/indentStyle.js'
 Only `ui/settingsPanel.js` (writes) and `wizards/previewEmit.js` (reads) appear. **I did not run this.**
 
 ### 5 · A legacy `corner` op has a live ✎ Edit that opens onto nothing — CONFIRMED live at runtime, deliberately NOT fixed.
-`canEdit('corner')` (`wizardManager.js:318`) returns true because `paramFields('corner')` is non-empty —
+`canEdit('corner')` (`wizardManager.js:322`) returns true because `paramFields('corner')` is non-empty —
 `FIELD_BIND.corner` (`blocks/opSchema.js:158`) is folded onto `SCHEMA.corner` at `:177-180`. But those 15 field
 ids point at DOM deleted with the panel:
 ```bash
@@ -587,8 +587,9 @@ rg -n "\.attach\(" DDCS-Studio/web --glob '*.js'
 
 ### 9 · `renderDeclaredLayout` is an exported function with ZERO callers — and it is the shape that would break the overlay.
 `_layout` is a module-level singleton (`panelTypes.js:639`) and `FeatureCanvas._mount` wipes `container.innerHTML`
-when the container changes (`featureCanvas.js:92-95`). Both live call sites pass `el('userVizContainer')`
-(`userOpView.js:593,608`), so it never fires. If a second container is ever rendered, the wipe destroys
+when the container changes (`featureCanvas.js:92-95`). Both live call sites pass the same `'userVizContainer'`
+container (`userOpView.js:651,666` — namespaced to `elNS('userVizContainer')` since t1740's host-parameterization
+refactor, same id for the default modal instance), so it never fires. If a second container is ever rendered, the wipe destroys
 `.fc-anim-overlay` while `container.__animOverlay` still holds the detached canvas (`userOpView.js:86`) — the
 overlay would silently never come back.
 ```bash

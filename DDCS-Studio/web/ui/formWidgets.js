@@ -1061,6 +1061,28 @@ export function formBindings(def) {
     return out;
 }
 
+// t1740 — SHARED with userOpView.js's render(): a live-editing form (the Blocks pane's flat/tree faces; soon
+// userOpView too) re-renders on every upstream change, INCLUDING the echo its own field edits trigger — wiping
+// and rebuilding the DOM on every such call loses focus/cursor position mid-keystroke. `formSig` hashes STRUCTURE
+// only (param/widget/group/role — never `.default`), so a caller can skip the destructive rebuild and just
+// `syncFormValues` when only VALUES moved. Moved here (was blocksApp.js-local) so a second consumer reads the
+// SAME function rather than a duplicate that could quietly diverge on what "structure changed" means.
+export const formSig = (bs) => (bs || []).map((b) => `${b.param}:${b.widget || b.type || 'number'}:${b.group || ''}:${b.role || ''}`).join('|');
+/** Structure unchanged → push the bindings' current defaults into the NON-focused fields (the focused one is the
+ *  user's own echo — clobbering it is how a live form eats your typing). A null default is skipped rather than
+ *  written as the string 'undefined'. */
+export function syncFormValues(formHost, binds) {
+    for (const b of (binds || [])) {
+        if (!b || b.default == null) continue;
+        const f = formHost.querySelector(`[data-param="${window.CSS ? CSS.escape(b.param) : b.param}"]`);
+        if (f && f !== document.activeElement && String(f.value) !== String(b.default)) {
+            f.value = b.default;
+            const echo = f.type === 'range' && f.parentElement && f.parentElement.querySelector('span');   // keep a slider's readout in step
+            if (echo) echo.textContent = f.value;
+        }
+    }
+}
+
 /**
  * t1613 — the DERIVED/WRITES engine, ONE implementation for both faces (renderOpForm wires it for the flat
  * form; renderUiTree wires it after tree placement, since rows MOVE out of the flat pass's scratch host and

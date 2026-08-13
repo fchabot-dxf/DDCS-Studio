@@ -26,15 +26,26 @@ import { test, expect } from '@playwright/test';
  *   hand-built + panel + param_group   true      null      wizard     form
  *   bare Define Custom Wizard          false     null      PREVIEW    form     ← mid-edit
  *   plain program, no wizard block     false     null      Preview    empty    ← the reverse must hold
- *   PLACED data-op twin in a program   false     null      Preview    empty    ← the trap; see that test
+ *   PLACED data-op twin in a program   false     null      Preview    form     ← t1740 FOLLOW-UP, was empty
  *
- * ⚠ THE OBVIOUS FIX IS WRONG, AND THE LAST ROW IS WHY. "A Define Custom Wizard block anywhere in the stack means
- * content" is what the ruling sounds like, and I wrote exactly that first — but every data-op twin's INSTANTIATED
- * body is `[user_root{…}]`, so inserting Corner into an ordinary program would have conjured a form for it. A placed
- * op is a program, not an authoring session. So the content asks a DECLARED fact instead of guessing at a shape:
- * devMode.authoringWizardType(), set by every Customize including the fork-only ones, and checked against the stack
- * still holding that op so a stale session cannot claim a program it no longer describes. The old proxies survive
- * as additional SUFFICIENT conditions — a plain saved op with a param pill has no user_root at all.
+ * ⚠ THE OBVIOUS FIX WAS WRONG FOR THE REASON BELOW — BUT "empty" TURNED OUT TO BE THE WRONG CALL TOO (t1740
+ * FOLLOW-UP). "A Define Custom Wizard block anywhere in the stack means content" is what the original ruling
+ * sounded like, and it was rejected first: every data-op twin's INSTANTIATED body is `[user_root{…}]`, so a naive
+ * "user_root anywhere" predicate would have conjured a form for ANY placed twin, stealing the sim tab's relevance
+ * from an ordinary program. The fix that shipped instead asked a DECLARED fact (devMode.authoringWizardType()) and,
+ * for anything NOT reached by that fact, showed nothing — which is where this row's "empty" came from. That part
+ * was too strong: the user's own report (t1740, verbatim: "i use the built in, press insert, then press blocks
+ * tab") showed a placed Corner op — genuinely in the program, genuinely on the canvas — rendering ZERO fields, and
+ * named why it matters: "im asking about built in... because to me it would make concrete the idea that they are
+ * each merely a view of the data" — an empty pane for a built-in doesn't just look broken, it contradicts wizards-
+ * as-data for that op. The actual bug was narrower than "no declared fact covers this": `deriveLiveWizard`'s
+ * `opBlock` scan (blocksApp.js) checked `b.params.opType` for a placed op's type — but a REAL placed op carries its
+ * type on the TOP-LEVEL `b.opType` field (opBuilders.js's own shape), never nested under `params` (params holds
+ * VALUE fields). The check never matched anything; fixed to also check `b.opType`, plus a live-value overlay
+ * (opBlock.params, read straight off the stack itself — no side-channel) so the form shows what THIS op actually
+ * holds, not the registry's bare defaults. `authoringWizardType()`/Customize is UNCHANGED and still the route for
+ * "is a wizard being AUTHORED" — this is a separate, additional fact: "is a wizard's DATA sitting on the canvas,
+ * placed or authored," which is what the Wizard View tab was always meant to answer.
  */
 
 const boot = async (page) => {
@@ -96,20 +107,23 @@ test('a plain program leaves the Wizard View tab empty — the reverse still hol
     expect(f.formText, 'the form host is truly empty, not carrying stale advice').toBe('');
 });
 
-test('a PLACED data-op twin in a program leaves the Wizard View tab empty — the trap in the obvious fix', async ({ page }) => {
+test('a PLACED data-op twin in a program renders its LIVE form — t1740 FOLLOW-UP, was the empty-pane bug', async ({ page }) => {
     test.setTimeout(180_000);
     page.on('dialog', (d) => d.accept());
     await boot(page);
-    // ⚠ THE OBVIOUS FIX IS WRONG AND THIS IS WHY. "A Define Custom Wizard block anywhere in the stack means
-    // content" reads well and I wrote it — but EVERY data-op twin's instantiated body is `[user_root{…}]`, so
-    // merely INSERTING Corner into an ordinary program would have conjured a form for it and taken the sim's 3D
-    // tab's relevance away. A placed op is a program, not an authoring session; the content asks a DECLARED fact
-    // (devMode.authoringWizardType) instead of guessing from the stack's shape.
+    // t1740 FOLLOW-UP — see the file header for the full history. This used to assert the OPPOSITE (empty), on
+    // the reasoning "a placed op is a program, not an authoring session." The user's own report overturned that:
+    // opening a built-in and inserting it is the ORDINARY way most people put an op on the canvas, and they
+    // expect the Wizard View tab to show THAT op — proving wizards-as-data ("they are each merely a view of the
+    // data"), not just serving the Customize/authoring routes. A non-default dist (912, not the registry's own
+    // default of 500) is baked into the placed op's OWN params here specifically so a stale-default render would
+    // be VISIBLY wrong, not accidentally right — the empty-pane bug's actual fix is a live-value overlay, not
+    // just "stop being empty."
     await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         const OB = await import('/blocks/opBuilders.js');
         const def = U.getUserDef('user_corner_data');
-        const params = U.defaultParams(def);
+        const params = { ...U.defaultParams(def), dist: 912 };
         window.ddcsLoadBlockStack([OB.makeOp('user_corner_data', params, U.instantiate(def, params))]);
     });
     await settle(page);
@@ -119,8 +133,12 @@ test('a PLACED data-op twin in a program leaves the Wizard View tab empty — th
     });
     expect(placed.opType, 'the program really does hold a placed data-op twin').toBe('user_corner_data');
     const f = await face(page);
-    expect(f.fields, 'a PLACED twin is a program, not an authoring session → no fields conjured').toBe(0);
-    expect(f.formText, 'and no stale/mismatched message either — truly empty').toBe('');
+    expect(f.fields, 'a PLACED twin IS the wizard\'s data — the pane must show it, not stay empty').toBeGreaterThan(0);
+    const distField = await page.evaluate(() => {
+        const inp = document.querySelector('#blk-form [data-param="dist"]');
+        return inp && inp.value;
+    });
+    expect(Number(distField), 'the LIVE value (912), not the registry default (500)').toBe(912);
 });
 
 test('MID-EDIT — a half-built wizard\'s tab SAYS WHAT IS MISSING, never a blank form', async ({ page }) => {

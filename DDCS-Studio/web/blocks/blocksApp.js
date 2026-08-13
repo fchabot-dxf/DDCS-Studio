@@ -17,7 +17,7 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
-import { renderOpForm, formBindings, renderUiTree } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present; renderUiTree for block layouts
+import { renderOpForm, formBindings, renderUiTree, formSig, syncFormValues } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present; renderUiTree for block layouts; formSig/syncFormValues: t1740 — moved here so userOpView.js's render() shares the SAME structure-unchanged check, not a duplicate
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { getUserDef, flattenBlocks } from './userOps.js';
@@ -367,21 +367,8 @@ async function buildWorkspace() {
   //  · form→block: a delegated input listener (wired below) writes a field's value back to its bound block
   //    (writeAuthoredValue), surgically — which reprojects, updating the G-code + preview too. The smart sync here
   //    absorbs that echo (the edited field is focused, so it's skipped), so there's no loop and no focus loss.
-  const formSig = (bs) => (bs || []).map((b) => `${b.param}:${b.widget || b.type || 'number'}:${b.group || ''}:${b.role || ''}`).join('|');
-  // Structure unchanged → push the bindings' current defaults into the NON-focused fields (the focused one is the
-  // user's own echo — clobbering it is how a live form eats your typing). t1605 — extracted so the tree face shares
-  // the flat face's sync instead of copying it; a null default is skipped rather than written as the string 'undefined'.
-  function syncFormValues(formHost, binds) {
-    for (const b of (binds || [])) {
-      if (!b || b.default == null) continue;
-      const f = formHost.querySelector(`[data-param="${window.CSS ? CSS.escape(b.param) : b.param}"]`);
-      if (f && f !== document.activeElement && String(f.value) !== String(b.default)) {
-        f.value = b.default;
-        const echo = f.type === 'range' && f.parentElement && f.parentElement.querySelector('span');   // keep a slider's readout in step
-        if (echo) echo.textContent = f.value;
-      }
-    }
-  }
+  // formSig/syncFormValues: t1740 — moved to ui/formWidgets.js (imported above) so userOpView.js's render() can
+  // share the SAME structure-unchanged check rather than a second copy that could quietly diverge.
   // t1734 — THE TAB BAR. Two tabs, ALWAYS present (Wizard View / 3D) — user-clicked, never auto-picked. Replaces
   // the old ONE-predicate face switch (setRightFace, driven by renderLiveForm's `show`): that predicate decided
   // whether the Wizard View existed AT ALL, and its own history is two rounds of guessing wrong (see the retired
@@ -409,10 +396,38 @@ async function buildWorkspace() {
     try { def = deriveAuthoredDef(ws); } catch (_) { /* a mid-edit derive can throw; keep the last good form */ }
 
     const stack = getStack() || [];
-    const opBlock = stack.find((b) => b && (getUserDef(b.type) || (b.params && getUserDef(b.params.opType))));
+    // t1740 FOLLOW-UP — a NORMALLY PLACED op (bar → Insert → Blocks tab, not authoring/Customize) carries its type
+    // on the TOP-LEVEL `opType` field (opBuilders.js's own shape: {id,type:'op',opType,label,params,children}) —
+    // NOT nested under `params.opType` (params holds the op's VALUE fields, e.g. depth/feed; it has no opType key).
+    // The params-nested check below predates this and never matched a real placed op — reported by the user
+    // ("i use the built in, press insert, then press blocks tab") as an empty pane; reproduced: program=[op],
+    // canvas top=1, pane=0 fields. Added getUserDef(b.opType) alongside the pre-existing checks (kept, in case
+    // some other shape genuinely nests it) rather than replacing them.
+    const opBlock = stack.find((b) => b && (getUserDef(b.type) || getUserDef(b.opType) || (b.params && getUserDef(b.params.opType))));
     if ((!def || !def.bindings || !def.bindings.length) && opBlock) {
-      const regDef = getUserDef(opBlock.type) || (opBlock.params && getUserDef(opBlock.params.opType));
-      if (regDef) def = regDef;
+      const regDef = getUserDef(opBlock.type) || getUserDef(opBlock.opType) || (opBlock.params && getUserDef(opBlock.params.opType));
+      if (regDef) {
+        // t1740 FOLLOW-UP — the registry def carries only DECLARED DEFAULTS; opBlock.params is the placed op's OWN
+        // current values, read straight off `stack` — no side-channel, no snapshot, the same object the canvas
+        // itself holds (the t1738 ruling: "the stack IS the wizard"). Same two-part overlay t1736 proved (then
+        // reverted only because ITS SOURCE — getLastOp()/.active — was a rejected side-channel; the PATCHING SHAPE
+        // was never the problem): formBindings() resolves a numeric field's value from the TEMPLATE ROW's own
+        // embedded `dflt` when one exists (userOps.js's paramFieldsFromStack; that row wins over the binding's own
+        // default — formWidgets.js's `default: (row.default != null) ? row.default : b.default`), so a `hasTree`-
+        // shaped twin like Corner needs the template patched too, not just bindings — a binding-only overlay is
+        // silently discarded for exactly this twin shape. Both patches run on a DEEP CLONE (JSON.parse(JSON.
+        // stringify(...)) — this codebase's established idiom, also used by openLiveAsModal) so the shared registry
+        // def already in USER_DEFS is never mutated (the t1736 rule).
+        const params = opBlock.params || {};
+        const template = JSON.parse(JSON.stringify(regDef.template || []));
+        const root = template.find((b) => b && b.type === 'user_root');
+        if (root) {
+          for (const b of flattenBlocks(root.uiChildren || [])) {
+            if (b && b.type === 'param_field' && b.params && b.params.param in params) b.params.dflt = params[b.params.param];
+          }
+        }
+        def = { ...regDef, template, bindings: (regDef.bindings || []).map((b) => (b && b.param != null && b.param in params) ? { ...b, default: params[b.param] } : b) };
+      }
     }
 
     // ── t1599 — IS A WIZARD BEING AUTHORED HERE? Two ways, and both are facts, not shape-guesses ─────────────────
@@ -484,6 +499,7 @@ async function buildWorkspace() {
     const { setUserOpDef } = await import('../wizards/views/userOpView.js');
     setUserOpDef(modalDef);
     wm.open('group');
+    wm._previewing = true;   // t1740 — open() above just reset this to false; set it AFTER, same ordering reason as the CSS class below
     const box = document.querySelector('.wiz-box');
     if (box) box.classList.add('previewing');
     const t = document.getElementById('wizTitle');

@@ -25331,3 +25331,444 @@ yet upgraded to amendment 4/5's fuller "whole stack, modal-fidelity" vision. No 
 - No screenshots taken this pass — nothing user-visible changed from the LAST fully-shipped, verified state
   (turn 1734's original two-tab ship); this pass only removed code added and already screenshotted in the
   turns being superseded.
+
+
+## Turn 1740 (worker) — Option A executed for the RENDERER; STOP on wiring it to the pane (two new, concrete findings)
+
+Dispatch: both stop-questions from t1738 answered. Q2 (multi-op): NO, correction not deferral — `authoringBody()`
+truly is single-op, and the pane previews THE SAVE, which is one op; do not extend it. Q1: TAKE OPTION A
+(parameterize `userOpView.js` to a host), B rejected (depends on incidental "the modal covers the tab bar" layout
+fact, the exact class of mistake this whole arc has been removing). Characterized as "18+ mechanical substitutions,
+no logic change" with an explicit watch-for: stop again if real logic (not DOM lookups) turns out welded to the
+singleton.
+
+### What shipped: Option A's core, done and verified safe
+
+`web/wizards/views/userOpView.js` refactored from a module-level singleton into `createUserOpView(ns)`: every
+DOM id is now built via `id(base) = ns ? \`${ns}_${base}\` : base` (an `elNS(base) = el(id(base))` helper covers
+the ~10 `el('wiz_user_…')`-style lookups; the 2 class-selector lookups — `#wiz_user .wiz-visual` and
+`host.closest('.wiz-2pane')` — needed the SAME treatment only for the outer id, since `.closest()` is already
+relative and works unmodified once the pane's own scaffold repeats the same class names). All per-session state
+(`_def`/`_seed`/`_readers`/`_mgr`/`_layoutSpots`/`_simStartFracs`/the throttle timer) moved inside the factory's
+closure — no longer module-level, so two instances (modal, pane) can exist without sharing mutable state.
+`ns=null` (the exported default `userOpView`/`setUserOpDef`) produces byte-identical ids and behavior to before —
+every existing caller (`wizardManager.js`'s `_userView`/`open()`, `blocksApp.js`'s `openLiveAsModal()`) is
+unchanged, importing the same names. This is real, reusable progress independent of how the remaining question
+resolves — a genuinely mechanical (per-reference) but wide (18+ touch points across a 656-line file used by every
+custom-op wizard in the app) refactor, exactly the shape the dispatch described.
+
+Verified: a 198-file sweep (every test referencing `wiz_user`/`ddcsEditWizardDef`/`userOpView` — essentially every
+custom-op wizard test in the suite, since this file serves ALL of them, across corner/alignment/homing/ATC/rotary/
+group/CAM/save-dialog/form-widget families) — 550 passed, 0 failed, 10 skipped (pre-existing), 9 flaky-then-passed
+(all `waitForFunction` timeouts on app-boot state under 198-file parallel load — the same cold-start pattern seen
+repeatedly elsewhere this session in files this turn never touched; none reproduce in isolation). No `X failed`
+line in the summary. `fork-parity-1593.spec.js`: 2/2 passed. High confidence this refactor is byte-behavior-identical
+for the modal.
+
+### Map repair: the refactor moved code, and `ARCHITECTURE.md`'s own TRAP9 citation went stale — fixed in the same act
+
+`npm run test:node` caught it immediately: `tests/node/architecture-map-1698.test.mjs` failed with `TRAP9
+renderDeclaredLayout has zero live callers (userOpView.js:593) — …userOpView.js:593 no longer contains
+/renderLayout2D|el\('userVizContainer'\)/`. TRAP9's actual claim (`ARCHITECTURE.md`, "9 · renderDeclaredLayout is
+an exported function with ZERO callers"): `_layout` is a module-level singleton (`panelTypes.js:639`),
+`FeatureCanvas._mount` wipes `container.innerHTML` on container CHANGE (`featureCanvas.js:92-95`), and BOTH of
+`userOpView.js`'s live 2D-layout call sites pass the SAME container (so the wipe-on-change branch never fires,
+keeping a latent overlay-loss bug dormant) — cited at the two lines where that container is threaded into
+`renderLayout2D`. Reordering the file (helpers hoisted above the factory, `render()`/`update()` reshuffled) moved
+those two call sites from old `593,608` to new `621,636` — confirmed by diffing `git show HEAD:…userOpView.js`
+against the working tree at both old lines: old 593 was the `3d2d`-branch call (`const fc = renderLayout2D(c, …)`,
+now line 621), old 608 was the `2d`-branch call (`const c = el('userVizContainer'); … renderLayout2D(c, …)`, now
+line 636, `el` renamed to `elNS`). The semantic claim is untouched — both sites still pass the identical
+`'userVizContainer'` id — only the citation's line numbers and (for the map's prose) the `el`→`elNS` spelling
+were stale. Fixed both: `tests/node/architecture-map-1698.test.mjs`'s TRAP9 entry now cites line 621 (its `find`
+regex needed no change — `renderLayout2D` already matches literally on the new line); `ARCHITECTURE.md`'s own
+prose updated to `userOpView.js:621,636` with a note on the `elNS` rename. Re-ran `npm run test:node`: 118/118,
+0 failed.
+
+### STOP — wiring `renderLiveForm()` to call it surfaced two concrete, test-backed architectural mismatches
+
+Did NOT touch `blocksApp.js`'s `renderLiveForm()` — the pane still renders through the pre-existing
+`renderOpForm(formHost, formBindings(def))` path, unchanged since the t1738 revert. Before wiring in the new
+renderer, traced what "just call it" would actually do, and found two things that are LOGIC, not DOM plumbing:
+
+**1. The pane has a TESTED two-way writeback `userOpView` has no equivalent for.**
+`blocks-live-form.spec.js`'s "form→block writeback" test (still passing, unchanged) edits
+`#blk-form [data-param="depth"]` and asserts BOTH the projected G-code AND the bound Blockly block's own param
+pill update (`window.ddcsGetBlockProgram()`'s `op.children.find(c=>c.type==='move').params.z.params.value`) —
+i.e. editing the pane's form writes back into the SPECIFIC canvas block, via `writeAuthoredValue(ws, param, n)`
+(blocksApp.js's own delegated listener on `#blk-form`, line ~599). `userOpView`'s entire model has no concept of
+this: its own delegated listener (wired inside `render()`) reads the CURRENT field values and recomputes a G-code
+PREVIEW + calls `recordOp()` — it has zero awareness of a Blockly workspace, because it was built for the STUDIO
+wizard MODAL, which has no Blockly workspace to write back into. Swapping the pane's renderer for `userOpView`'s
+would silently drop this — an existing, tested capability — not a DOM-id issue.
+
+**2. `userOpView.render()` always destructively rebuilds; the Blocks-tab's own re-render cycle depends on NOT doing that.**
+`renderLiveForm()` fires on every canvas change — including the re-projection an edit inside the pane's own form
+would trigger via `writeAuthoredValue` (block edit → `ws`'s change listener → `reproject()` → `renderFromModel()` →
+`renderViews()` → `renderLiveForm()` again). The EXISTING flat/tree branches guard against this with `formSig`-based
+caching (`if (formHost.__sig === sig …) { syncFormValues(...); return; }` — sync values in place, only rebuild the
+DOM when the STRUCTURE changes) specifically so a field being typed into doesn't lose focus on its own echo — the
+writeback test's own title says so: "(no echo clobber)". `userOpView.render()` has no such distinction; every call
+does `host.innerHTML = ''` and rebuilds from scratch. Wiring it directly into a re-render loop that includes the
+renderer's own edits as a trigger reintroduces the exact, named bug class a prior turn fixed and tests for.
+
+Both are real behavioral gaps between "how the MODAL is used" (open once, `render()`; every subsequent field edit
+goes through `update()`, never `render()` again, because nothing else is re-triggering a fresh open) and "how the
+PANE is used" (continuously live, re-rendered by the SAME canvas-change signal its own editable fields would fire).
+Neither is fixable by continuing to namespace more ids.
+
+### Options, not a guess
+
+1. **The pane becomes read-only**, matching "Open as modal"'s own contract ("close persists nothing by
+   construction") — accept the writeback loss as the cost of full modal-fidelity rendering; real editing stays on
+   the canvas blocks directly or via "Open as modal". Smallest change from here, but a real, user-facing capability
+   loss versus today.
+2. **Teach `userOpView` an opt-in "host-owns-writeback + sync-in-place" mode** — new, actual logic (a structure-hash
+   check before `render()` wipes the DOM, plus a way for the pane's writeback listener to coexist) added to the
+   shared module, carefully gated so the modal's own behavior (open once, no re-entrant render loop) is provably
+   unaffected. Keeps both capabilities; is the "real logic" work the dispatch's watch-for was naming.
+3. Something else not considered here.
+
+### Where this leaves the shipped state
+
+`blocksApp.js` is untouched this turn — the pane's rendering, its edit-and-writeback behavior, and every existing
+test covering it are exactly as they were after t1738's revert. `userOpView.js` is refactored (factory + namespaced
+ids) but the ONLY live instance is still the `ns=null` default the modal already used — nothing new is reachable
+from the UI yet, so there is nothing new to regress. `createUserOpView` is exported and ready to use once the
+writeback question is settled. `ARCHITECTURE.md` and its own node-level checker agree again (TRAP9 above).
+
+### Verify
+
+- 198-file regression sweep (every test touching `userOpView`/`wiz_user`/`ddcsEditWizardDef`): 550 passed, 0 failed,
+  10 skipped, 9 flaky-then-passed (environmental, unrelated — see above).
+- `fork-parity-1593.spec.js`: 2/2 passed.
+- `npm run test:node`: 118/118, 0 failed (first run caught the TRAP9 staleness this turn's own refactor caused;
+  fixed per the map-repair section above; second run clean).
+- No screenshots this pass — nothing new is reachable from the UI (see "Where this leaves the shipped state"), so
+  there is nothing new to screenshot; the pane's real-gesture behavior is provably unchanged (same code path as
+  t1738's revert, covered by the regression sweep above).
+
+
+## Turn 1740 FOLLOW-UP (worker) — the empty-pane bug (user-reported), an inert-Insert fix, and a STOP on write-back-in-place
+
+### First — the bar the advisor set mid-turn, and where this leaves it
+
+Mid-turn, the human told the advisor "it sortof still look like a second renderer still," and the advisor's reply
+(relayed here) named the exact test that matters: **not "does the pane look like the modal" but "is it the same
+code path" — does the pane call the SAME function the modal calls, or a lookalike that happens to agree today and
+can silently diverge later.** Stated plainly against that bar: **everything in this FOLLOW-UP still renders through
+the OLD simplified path, `renderOpForm(formHost, formBindings(def))` — NOT `userOpView`'s renderer.** The pane and
+the modal remain two separate code paths. Nothing below changes that. What this FOLLOW-UP does is fix a real,
+user-reported bug (the pane rendering NOTHING for the common case) and close an unsafe gap (a preview's Insert
+being reachable at all) — both genuine, both verified — but neither is the "one renderer" unification Option A's
+remaining, still-STOPPED step would deliver. That STOP (below, "Amendment 2's write-back-in-place — STOP") is
+still open and is where the same-code-path question actually gets settled, not here.
+
+### The empty-pane bug — user-reported, reproduced by the advisor, root-caused and fixed
+
+The advisor reproduced the user's own gesture ("i use the built in, press insert, then press blocks tab":
+`openWiz(user_corner_data) → insertWiz() → showApp('blocks')`) and found the pane renders **zero fields** even
+though the op is genuinely in the program and on the canvas — a DIFFERENT bug from anything this turn's Option A
+work was about. The advisor's own earlier repros had all gone through `ddcsEditWizardDef()` (Customize), which
+works — masking this entirely. A further correction narrowed scope further: "Customize as blocks" is gated to 8
+CAM-generator twin types (`opContextMenu.js:145`'s `isCamGeneratorTwin` check, `opCamMap.js:441`) — most op
+families never show that menu entry at all, so Customize is not the path to verify against. **The primary path is
+the bar → Insert → Blocks tab**, and the reason it matters is bigger than one bug: "im asking about built in...
+because to me it would make concrete the idea that they are each merely a view of the data" — an empty pane for a
+built-in contradicts wizards-as-data for that op, not just looks broken.
+
+**Root cause, traced (not guessed):** `deriveLiveWizard()`'s `opBlock` scan (`blocksApp.js`) checked
+`getUserDef(b.type) || (b.params && getUserDef(b.params.opType))` — but a REAL placed op carries its type on the
+TOP-LEVEL `opType` field (`opBuilders.js:97`: `{id, type:'op', opType, label, params, children}`), never nested
+under `params` (`params` holds the op's VALUE fields — depth, feed, etc. — it has no `opType` key at all). Confirmed
+by constructing a real op via `makeOp()` and inspecting it directly: the check could never have matched a real
+placed op. Fixed by adding `getUserDef(b.opType)` alongside the existing checks (kept, not replaced, in case some
+other shape genuinely nests it).
+
+**That alone was not the whole fix — found by testing, not assumed.** Verifying with a NON-default value (`page.fill`
+a field, then Insert) showed the pane rendering 23 fields but with the REGISTRY'S bare defaults, not what was typed
+— a stale value shown as real, which the project's own honesty rule (t1736) rejects outright. Traced with an inline
+`console.log` inside `deriveLiveWizard()` (temporary, removed once diagnosed): the derivation's OWN `def.bindings`
+correctly carried the live value at every step — the loss was further downstream, in `formWidgets.js`'s
+`formBindings()`: `default: (row.default != null) ? row.default : b.default` — when the twin's registered template
+has `param_field` rows (Corner does), the ROW's own baked default WINS over the binding's overlaid default,
+silently discarding it. This is the EXACT mechanism t1736 already discovered and patched (then reverted in t1738's
+cascade — but ONLY because its SOURCE, `getLastOp()`/`.active`, was a rejected side-channel; the two-part PATCHING
+SHAPE itself was never the problem). Reused it verbatim, re-sourced from `opBlock.params` — read straight off
+`stack` itself, no side-channel, no snapshot, satisfying "the stack IS the wizard": both `def.bindings[].default`
+AND the deep-cloned `def.template`'s `param_field` rows' own `dflt` are now patched from the placed op's live
+params (clone via `JSON.parse(JSON.stringify(...))` — this codebase's established idiom, also used by
+`openLiveAsModal`; the shared registry def in `USER_DEFS` is never mutated).
+
+**Verified, real gestures, not shortcuts:**
+- `zzdebug-1734-manual-verify.spec.js`'s "REAL GESTURE" test: real click chain (Probe▼ dropdown → Corner entry →
+  fill a field to a non-default value → real click on `.wiz-box .wiz-foot .primary` → real click on
+  `button[data-app="blocks"]`) → pane shows 23 fields, the typed value survives byte-exact. Screenshot saved to
+  scratchpad (`t1740-real-gesture-corner-pane.png`).
+- Family sample (same real-click chain, one representative per family, per the advisor's explicit "report any that
+  do NOT render, or render differently" — a genuine gap is the finding, not a test failure to hide):
+
+  | Family | optype | Result |
+  |---|---|---|
+  | Probe | `edge` | opened, 9 fields |
+  | Mill | `surfacing` | opened, 30 fields |
+  | Lathe | `user_lathe_facing` | **GATED** — hardware-gated (`axisGating.js`, `aria-disabled`) in this default test config, not a bug; not reachable to test further without a lathe-mode machine |
+  | ATC | `atc_length` | opened, 7 fields |
+  | Setup | `comm` | opened, 14 fields |
+
+  No family rendered empty or differently-shaped. A separate cross-check confirmed the LIVE-VALUE overlay (not
+  just field count) also generalizes: Surfacing's `entryX` field, filled to a non-default value before Insert,
+  showed that exact value in the pane, not the registry default.
+- `wizard-face-1599.spec.js`'s `"a PLACED data-op twin in a program leaves the Wizard View tab empty"` test
+  asserted the OLD, now-superseded behavior as correct — its own header comment explained the (real, still-valid)
+  reasoning for why "content whenever `user_root` appears anywhere" was rejected, but the "so show nothing for a
+  placed twin" conclusion it settled on turned out too strong, per this bug report. Rewrote the test (title, body,
+  and the file's header table/commentary) to assert the NEW behavior — non-empty, live-valued — while keeping the
+  ORIGINAL reasoning in place as history (why the naive "user_root anywhere" fix was rejected is still true and
+  still why the code is shaped the way it is; only the "therefore empty" tail changed). Added a non-default `dist`
+  value to the test's own constructed op so a stale-default regression would fail loudly, not pass by accident.
+
+**Scope check — did NOT touch `authoringWizardType()`/Customize.** That fact still means exactly what it meant
+before ("is a wizard being AUTHORED"); the fix adds an independent, additional fact this pane always meant to
+answer too — "is a wizard's DATA sitting on the canvas, placed or authored" — which is what a placed op actually
+is. No wiring or predicate governing Customize itself changed.
+
+### Amendment: Insert during a preview made genuinely inert, not merely CSS-hidden
+
+Separately dispatched, and independently actionable regardless of the STOP below: "one thing i do not want for the
+wizard view, is the insert cancel button to work" (for the still-unbuilt pane) plus, for the EXISTING full-size
+"Open as modal" preview, an explicit requirement that Insert must not add a new op "in either case," and that
+hiding a control while its commit path stays reachable is a known failure shape ("some other route — Enter key,
+shortcut, programmatic caller — reaches the same commit anyway. Verify THE ACTION CANNOT HAPPEN, not just that the
+button is invisible").
+
+Checked: `openLiveAsModal()`'s preview ALREADY hides Insert, but ONLY via CSS (`styles.css:5422`:
+`.wiz-box.previewing .wiz-foot .primary { display:none; }`) — `wizardManager.insert()` itself had no awareness of
+the preview state at all; a stray call would run to completion and commit. Confirmed this is not theoretical: a
+forced `await wm.insert()` from the console during an active preview committed nothing to VISIBLY change the DOM
+(button hidden) but WOULD have appended into the program had the guard not existed.
+
+Fixed with the smallest change that makes the property actually true rather than merely likely: a JS-level
+`this._previewing` flag on `WizardManager`, set `false` at the exact point `open()` already clears the `.previewing`
+CSS class (`wizardManager.js` — same call site, same "cleared by every real open()" guarantee the CSS class already
+had), set `true` by `openLiveAsModal()` right after `wm.open('group')` returns (setting it before would have it
+immediately reset — `open()` unconditionally clears it). `insert()` now returns immediately, before any commit
+logic runs, whenever `this._previewing` is true — this makes it not matter HOW `insert()` is reached (click,
+Enter-key submit, a stray programmatic call): none of them can commit during a preview, because the method itself
+refuses, not just the one button that calls it.
+
+**Verified, both directions:**
+- During a preview: a forced `await wizardManager.insert()` call leaves `ddcsGetBlockProgram()` byte-identical
+  before/after (confirmed via JSON-string comparison) — the action genuinely cannot happen, not just isn't visible.
+- After closing the preview and opening a REAL wizard: Insert is visible again and a real insert still commits
+  normally (program length > 0 after) — the guard does not leak into ordinary use.
+- Full existing `open-as-modal-1625.spec.js` suite (which already covered the CSS-hidden behavior) still passes
+  unchanged — this is a strictly additive safety net under the same observable behavior, not a replacement of it.
+
+### Amendment 2's write-back-in-place — STOP, with the structural reason traced to source
+
+The remaining half of the same dispatch: "open as modal can be like you say if it uses the insert in place not as
+new" — Open-as-modal's Insert should write back INTO the existing op when the canvas came from one, and stay inert
+only when authoring something genuinely new, with an explicit escape hatch ("if the editing identity is not
+available at openLiveAsModal... STOP and report — that is a real structural gap"). Investigated rather than
+attempted a guess:
+
+**Confirmed the mechanics (measured directly, matching the dispatch's own citations):** `wizardManager.js:228`
+(`open()`) unconditionally clears `this.editingOpId = null` on every open; it is set only by `openForEdit()`
+(`:415`) and `_openGroupForEdit()` (`:396`) — the two "editing an existing placed op" entry points. `insert()`
+branches on it (`:475`): set → surgical writeback (`replaceOp`/`applyGroupEdits`); unset → `commitActiveOp()`,
+which always appends a NEW op. `openLiveAsModal()` calls `wm.open('group')` — which ALWAYS clears `editingOpId` —
+and never sets it itself. So today, unconditionally, an Open-as-modal Insert adds a new op. Confirmed.
+
+**Traced WHY no op-instance identity is available to set it, rather than assuming there's simply a missing wire:**
+`openLiveAsModal()` is reachable only when `deriveLiveWizard()`'s `show` is true, which (unchanged by anything
+above) happens only via `authoredHere` (a hand-built "Define Custom Wizard" block — authored from scratch, no
+instance at all) or `customizing` (`authoringWizardType()` set + a matching stack op). The `customizing` route is
+"Customize as blocks," and it is TYPE-keyed by construction, not instance-keyed: `devMode.js:571`'s
+`editWizardDef(opType)` takes only a type string; it calls `reconstructUserOpBlock(opType)` (`:507`, also
+type-only) which REBUILDS a block from the REGISTRY, not from any specific placed op. The context-menu entry that
+triggers it (`opContextMenu.js:145`) DOES have the specific clicked instance in scope (`full`, re-hydrated by
+`op.id` at `:130`) but deliberately discards the id and passes only `full.opType` — and the surrounding comment
+(`:140-143`) names this as intentional: "Customize as blocks: **fork** a CAM-generator twin... the standard
+sub-unit stays LIVE." Customize-as-blocks is a fork by design, not an in-place editor — the SEPARATE, already-
+existing "Update" mechanism (`devMode.js`'s `_editingWizard`/`forkOnly` gate) is what governs re-saving a wizard's
+STORED DEFINITION in place, and that is not the same object as a placed program instance either.
+
+**Conclusion: there is no case, reachable today, where `openLiveAsModal()` runs against a genuine placed-op
+identity.** Both routes into it are about authoring/forking a wizard's TYPE, never about a specific instance in the
+program. Making "write back in place" real would mean one of: (a) reversing Customize-as-blocks' documented fork
+semantics (a design decision, not a wiring fix), or (b) building an entirely new "edit this exact placed instance
+as blocks" entry point that does not exist today and was not asked for. Per the dispatch's own instruction, this is
+reported rather than guessed at. Given this, "Insert must not add a new op in either case" (both amendments agree
+on this much) is satisfied for every case reachable today by the inert-Insert fix above — the "write back in place"
+branch has nothing to attach to yet.
+
+### Amendment 1 (pane Insert/Cancel inert) — folded into the still-open Option-A STOP, not yet actionable
+
+"One thing i do not want for the wizard view, is the insert cancel button to work" — once the pane is wired to
+render through `userOpView` (the still-unresolved half of Option A, STOP'd above this FOLLOW-UP for the writeback-
+gap and destructive-rebuild reasons), the modal's Insert/Cancel controls come along with that renderer and would be
+actively wrong in the pane (the Blocks tab builds a wizard and edits an op; it does not run a program — "we cant
+run wizard in blocks"). Requirement carried forward for whichever option is chosen: genuinely inert (verified,
+per the pattern just proven above for the modal), not merely absent from the pane's layout — "hiding the buttons
+while the commit path stays live is the failure shape this project keeps hitting." Not implemented this pass:
+there is no pane-hosted Insert/Cancel to make inert yet, since the pane does not render through that path (see the
+opening section). Recorded here as the third requirement for that still-open decision, alongside the original two
+(writeback gap; destructive-rebuild-vs-focus-preservation).
+
+### Where this leaves the shipped state
+
+Shipped and verified this pass: the empty-pane bug (real, user-reported, root-caused, fixed, verified across
+families) and the inert-preview-Insert safety fix (real gap, closed, verified both directions). Both are
+independent of, and do not resolve, Option A's still-open wiring question — restated per the advisor's own bar
+above: **the pane still renders through `renderOpForm(formHost, formBindings(def))`, a lookalike of, not the same
+code path as, `userOpView`'s renderer.** `openLiveAsModal()` still cannot write back in place, for the structural
+reason traced above, not a missing wire. Three requirements now stand for whenever the wiring question is settled:
+the writeback gap, the destructive-rebuild-vs-focus-preservation conflict, and inert-not-hidden Insert/Cancel in
+the pane.
+
+### Verify (this FOLLOW-UP's changes only)
+
+- `zzdebug-1734-manual-verify.spec.js` (scratch, untracked): DIAGNOSTIC + REAL GESTURE + SAMPLE tests, all passing
+  (detailed above).
+- `wizard-face-1599.spec.js`: 4/4 passing (one rewritten to match the new, correct behavior).
+- `open-as-modal-1625.spec.js`: 3/3 passing (unchanged behavior, now with an additional non-observable safety net
+  underneath it).
+- Fast tier re-run (`blocks-*`, `wizard-face-1599`, `palette-by-role-1623`, `ui-tree-unwired-1561`,
+  `context-menu-blocks-1454`, `wizard-shapes-1627`, `open-as-modal-1625`, `gui-blocks-reauthor`,
+  `save-dialog-declared-1615`, `passes-field-1613`): 83 passed initially with 1 real failure (the since-rewritten
+  `wizard-face-1599` test — expected, it asserted the old behavior) and 4 flaky-then-passed
+  (`blocks-roundtrip-toast`, `open-as-modal-1625`'s first test, `palette-by-role-1623`, `passes-field-1613` —
+  re-ran each in isolation: all pass cleanly except `palette-by-role-1623`, which flaked AGAIN on a
+  `window.__blkws` cold-boot timeout unrelated to anything this pass touched — the same environmental pattern
+  logged repeatedly elsewhere this session, not chased further).
+- `npm run test:node`: pending final re-run before commit (below).
+
+
+## Turn 1740 SECOND FOLLOW-UP (worker) — Option 2's shared capabilities, built (not yet wired to the pane)
+
+The human, live: "it sortof still look like a second renderer still" — correct, and the advisor's own reply (relayed
+here) named the exact test that matters, which this note leads with because it governs how everything below must
+be read: **not "does the pane look like the modal" but "is it the same code path" — does the pane call the SAME
+function the modal calls, or a lookalike that agrees today and can silently diverge later.** Restated once more
+because it bears repeating: **the pane still does not call `userOpView`'s renderer.** Nothing in this section wires
+it in. What follows, per the human's direct follow-up ("why wouldnt you unify it" / "its wasted effort" / "can you
+do the first few steps before turning back to advisor"), is the two capabilities the earlier STOP named as missing
+— built, additive, and proven not to change the modal's existing behavior — so unification is one wiring step away
+instead of blocked on unbuilt logic.
+
+### 1 — `formSig`/`syncFormValues` moved to a shared home, not duplicated
+
+Both were `blocksApp.js`-local (its own flat/tree structure-unchanged check, guarding against a field losing focus
+to its own echo). `userOpView.js` needs the IDENTICAL check for the identical reason once it lives in a
+continuously-re-rendering host. Duplicating the logic would be exactly the "second copy of a fact" shape this
+session keeps removing — moved both to `ui/formWidgets.js` (already the shared home `formBindings`/`renderOpForm`
+live in, already imported by both files) and re-exported; `blocksApp.js` now imports them instead of defining them.
+Pure mechanical relocation — the function bodies are untouched, byte-for-byte.
+
+### 2 — `userOpView.js`: two new OPT-IN capabilities, gated behind one new parameter
+
+`createUserOpView(ns, opts)` — `opts.onFieldWrite` is the single opt-in switch (was `createUserOpView(ns)`; every
+existing call site, `createUserOpView(null)` for the modal, passes no second argument, so `onFieldWrite` is `null`
+for all of them — unchanged):
+
+- **Write-back hook**: the existing delegated `input`/`change` listener now also calls
+  `onFieldWrite(param, rawValue)` when set, resolving the target field exactly the way `blocksApp.js`'s own
+  `#blk-form` listener already does (`e.target.closest('[data-param]')`, `.dataset.param`, `.value`) — so a future
+  pane instance can wire this straight to `writeAuthoredValue`, and this shared file never needs to know a Blockly
+  workspace exists.
+- **Sync-in-place**: `render()` now computes a structure signature (`formSig` on the flat bindings; `formSig` +
+  the tree's `uiChildren` minus `id`/`dflt` for a `hasTree` def — the SAME two-shape split `blocksApp.js`'s own
+  flat/tree branches already use) and, when `onFieldWrite` is set AND the signature matches the host's last
+  render, calls `syncFormValues` and returns instead of the unconditional `host.innerHTML = ''` rebuild. The
+  signature resets to `null` on every `onShow` (a fresh open must never sync-in-place against a stale signature
+  left over from a DIFFERENT op shown earlier in the same pane instance).
+
+**Why gating both behind one flag, not two independent ones:** both exist for the identical reason — a host that
+re-renders continuously, including on the echo its own edits cause — so they're one opt-in describing "I am a
+live-editing host," not two orthogonal features.
+
+**Why this is provably inert for the modal today, not just "should be":** the modal is `createUserOpView(null)`
+with no second argument — `onFieldWrite` is `null` there by construction, so both `if (onFieldWrite)` guards are
+unreachable for it. It also only ever calls `render()` ONCE per open (every field edit after that goes through
+`update()`, never `render()` again — traced and stated in the original STOP), so even the signature-reset-on-
+`onShow` line is a no-op for a code path that never gets a second `render()` call to compare against. No existing
+caller's behavior changes.
+
+### Two more architecture-map citations moved, fixed in the same act (same class as the FIRST FOLLOW-UP's TRAP9 fix)
+
+`npm run test:node` caught both immediately on re-run:
+- `TRAP5 canEdit reads paramFields` (`wizardManager.js:318` → `:322`, a +4 shift from the `_previewing` flag +
+  its comments added earlier this turn, before `canEdit` in the file).
+- `TRAP9 renderDeclaredLayout has zero live callers` (`userOpView.js:621` → `:651`, and its OTHER call site
+  `:636` → `:666` — a +30 shift from this section's own additions). Same semantic claim as before (both live
+  `renderLayout2D` call sites still pass the identical `'userVizContainer'` id) — only the line numbers moved.
+Both citations (`architecture-map-1698.test.mjs`) and `ARCHITECTURE.md`'s own prose updated together.
+
+### Still NOT done — the actual wiring, and why it's still a separate, deliberate step
+
+`blocksApp.js`'s `renderLiveForm()` is untouched. The pane still renders through `renderOpForm(formHost,
+formBindings(def))` — same as every prior turn since the t1738 revert. Wiring it to call `createUserOpView('blk',
+{onFieldWrite: (param, raw) => { const n = Number(raw); if (Number.isFinite(n)) writeAuthoredValue(ws, param, n); }
+}).view`'s `render()`/`update()` instead — which is what would actually make "is it the same code path" true — has
+NOT been attempted this pass. Two reasons, stated plainly rather than assumed away:
+
+1. **A namespaced DOM scaffold for the pane doesn't exist yet.** `userOpView`'s `elNS`/`id` helpers resolve to
+   `blk_wiz_user_form`, `blk_wiz_user_usage`, `blk_userVizContainer`, etc. under an `ns='blk'` instance — none of
+   those elements are in `index.html` today; the pane's current markup is just `#blk-formpane`/`#blk-form`, a much
+   thinner scaffold than the modal's two-pane `.wiz-2pane`/`.wiz-visual`/`.wiz-controls` structure `userOpView`
+   expects to find via `.closest()`. Building that scaffold (with the code-preview block omitted, per the earlier-
+   settled "Projected G-code deleted" design) is itself a real, visible change to `index.html` — worth its own
+   verification pass, not a rider on this one.
+2. **The three-way interaction with `renderLiveForm()`'s OWN `show`/`hasTree` branching (the flat/tree split,
+   the mid-edit message, the "no wizard" empty state) needs to be worked out deliberately**, not improvised —
+   `userOpView`'s `render()` has its own, slightly different tree/flat split and doesn't know about `renderLiveForm`'s
+   mid-edit or empty-pane messaging at all. Wiring the two together means deciding which function owns which
+   decision, not just swapping a render call.
+
+Given the user's own explicit steer earlier this turn ("i do not want... the insert cancel button to work" for the
+pane) is ALSO unimplemented until the wiring exists to make inert — landing the wiring and the inert-controls
+requirement together, verified with real gestures and a screenshot showing the pane genuinely matching the modal's
+layout (per [[review-eyeballs-whole-wizard]]), is the next act. Flagging this now rather than rushing a partial
+wire-up under time pressure this same turn — the two capabilities above are the part that was safe to build ahead
+of a ruling; the wiring itself touches enough (`index.html`, `renderLiveForm`, Insert/Cancel inertness in a new
+surface) that it deserves its own dedicated, fully-verified pass.
+
+### Verify
+
+- Fast tier re-run after these changes (`blocks-*`, `wizard-face-1599`, `open-as-modal-1625`, `gui-blocks-reauthor`,
+  `save-dialog-declared-1615`, `passes-field-1613`, `blocks-live-form`): 84 passed, 1 flaky-then-passed
+  (`blocks-rotary-rig` — a `window.ddcsStudio` cold-boot timeout, the same environmental pattern, unrelated).
+- Broad regression sweep (207 files referencing `wiz_user`/`ddcsEditWizardDef`/`userOpView`/`formWidgets` — wider
+  than the FIRST FOLLOW-UP's 198, since this pass also touched the shared `formWidgets.js`): 598 passed, 0 failed,
+  7 flaky-then-passed, 10 skipped. No `X failed` line anywhere in the output. All 7 flaky items are the same
+  `window.__blkws`/cold-boot/port-contention pattern under heavy parallel load logged repeatedly this session —
+  `corner-start-datum-drag.spec.js`'s 16-config sweep among them, double-checked in isolation on a second port
+  (own dev-server race against the concurrently-running 207-file sweep, since the spec hardcodes
+  `localhost:3211` rather than reading `baseURL` — an unrelated, pre-existing test-infra quirk, not something this
+  turn touched): failed once on the shared port, passed cleanly once isolated from that specific collision.
+- A self-review of the full diff (`git diff`) BEFORE this final sweep caught a genuinely duplicated 7-line comment
+  block in `blocksApp.js` (the SAME `t1740 FOLLOW-UP` explanation pasted back-to-back — an artifact of an earlier
+  edit sequence, not two intentional changes) — removed; this shifted TRAP5/TRAP9's citation lines AGAIN, both
+  re-verified below.
+- `npm run test:node`: 118/118, re-confirmed a THIRD time after the duplicate-comment removal (which shifted line
+  numbers once more — `TRAP5`/`TRAP9` re-checked against the CURRENT file, both still correct).
+
+### A mid-turn scope amendment, then its own reversal — both incorporated, net change: none
+
+After the sweep above went clean, an amendment landed asking this whole SECOND FOLLOW-UP be split out of the act
+("STOP AT THE PARAMETERISATION... Do NOT in this act:... make Insert/Cancel inert, change Open-as-modal writeback")
+— began reverting the inert-Insert fix and the `onFieldWrite`/sync-in-place additions to comply. Mid-revert, a
+follow-up amendment reversed course: the split was meant for FUTURE acts only, not retroactive, and asked
+everything already built and verified be RESTORED rather than left half-backed-out. Restored every reverted piece
+verbatim (`wizardManager.js`'s `_previewing` flag + `insert()` guard, `blocksApp.js`'s companion line,
+`userOpView.js`'s `opts`/`onFieldWrite`/sync-in-place/`onShow` reset) — confirmed byte-identical to the pre-revert
+state by re-running `npm run test:node` (118/118, no citation drift — the restored text landed at the exact same
+line numbers, since nothing else changed in between). Net effect on the shipped code: none: this section exists so
+the sequence is on record, not because the outcome differs from the SECOND FOLLOW-UP section above.
+
+Re-verified per the amendment's own list: `node --check` clean on all four touched files; `fork-parity-1593.spec.js`
+both tests green (the twin-registry partition check + "fork EVERY shipped twin: form + emit BYTE FOR BYTE," which
+internally sweeps `twins.length >= 32` — the full registered set); `open-as-modal-1625.spec.js` and
+`wizard-face-1599.spec.js` full green; `npm run test:node` 118/118; the scratch inert-Insert test (recreated after
+being deleted mid-revert) green (1 flaky-then-passed retry, load-related).
