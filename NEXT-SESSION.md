@@ -1642,3 +1642,29 @@ and the comp map comes back empty. **Broken for EVERY twin probe** (confirmed on
 preview panel (`:717`, `:1146`); the `radiuscomp` atom still emits normally. So the machine is fine and the
 PICTURE is wrong — the disc lands on the raw surface instead of the compensated one.
 Un-fixme `editor-sim-disc.spec.js` when it lands.
+
+## ⚙️ ACT SIZING — the advisor was dispatching acts far too large (user, 2026-08-11)
+*"can you actually break down the workers load more"* — correct, and it is an ADVISOR failure. Turn 1740
+accumulated SIX amendments and 1166 changed lines in one file. **An act that large cannot be reviewed
+meaningfully, which removes the second-observer value the loop exists for**, and a mid-act correction then
+lands on top of work already built on the older reading.
+
+**RULE: one act = one verifiable change, with its own gate.** If a dispatch needs more than ~2 amendments,
+it was mis-sized — split it and re-dispatch rather than amending further. Prefer passing back sooner: a
+short act reviewed is worth more than a long act trusted.
+
+### ① BROKEN DOWN — the one-renderer work, four acts instead of one
+- **1a — PARAMETERISE (in flight, narrowed t1739).** `userOpView`'s render takes a HOST container; the
+  mechanical `getElementById` → `host.querySelector` substitutions. The MODAL passes its own host, so its
+  behaviour is byte-identical. *Gate: modal unchanged — fork-parity 33/33, node 118/118, open-as-modal +
+  wizard-face specs green.* **Nothing else in this act.**
+- **1b — THE PANE CALLS IT.** Point the pane at the parameterised render with the pane's host, and DELETE
+  the pane's own `renderOpForm(formHost, formBindings(def))` path (`blocksApp.js:619`). *Gate — the user's
+  own test: the pane RENDERS BY CALLING the modal's path, not a lookalike. Matching output is the state we
+  already have.* Drive the real gesture: built-in → INSERT → BLOCKS.
+- **1c — INERT INSERT/CANCEL + WRITEBACK.** Insert/Cancel inert in the pane (the ACTION cannot happen, not
+  merely hidden); Open-as-modal writes back IN PLACE when editing an existing op, inert when authoring a
+  new wizard, never "add a copy". *Gate: prove the action cannot fire, including by keyboard.*
+- **1d — SAMPLE ACROSS FAMILIES.** A probe, a mill op, a lathe op, an ATC op, each via the user's gesture.
+  Report a per-family table; any that render differently is a wizards-as-data GAP to surface, not smooth
+  over (3i).
