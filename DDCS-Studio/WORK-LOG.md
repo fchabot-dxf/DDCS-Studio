@@ -26785,3 +26785,91 @@ mirrors (does not reinvent) the existing 3D-tab `refit()` pattern per the dispat
 absorbed the "stop full-suite-per-act" amendment starting with THIS turn's own Verify section — flagging that
 explicitly since this is a real change in what "done" looks like in the WORK-LOG going forward, not something to
 infer silently from an entry that just looks different.
+
+## 🔨 turn 1762 (epoch 4) — RE-VERIFY t1760 AGAINST THE REAL PLACED-OP GESTURE: passes; the gap was the TEST, not the fix
+
+Advisor re-ran t1760's own fix against the user's exact route — `openWiz('user_corner_data') → insertWiz() →
+showApp('blocks')` — at 393px, and reported it identical to before the fix: fields=23, `.wiz-visual`=NONE,
+canvases=[]. Named a real, specific hypothesis: t1760's own `pane-visual-host-1760.spec.js` proved the fix via
+`ddcsLoadBlockStack([{type:'op',opType,params:{}}])`, a SYNTHETIC stack write — never the real gesture — and the
+placed-op route runs through a DIFFERENT branch of `deriveLiveWizard()` (the `opBlock`/`placedOpFallback` overlay)
+than the authoring/Customize route does, per t1740/t1748's own history of exactly this split biting twice already.
+The dispatch: make the visual host present on the placed-op route, prove it with THAT gesture, screenshot, then
+repeat for the authoring route too.
+
+### Reproduced the EXACT gesture first — it works, on the current committed code, every time (4/4)
+
+Wrote the identical 3-call sequence (`openWiz`/`insertWiz`/`showApp`) against d7e10a17 (the committed t1760 fix,
+untouched since) at 393px: `.wiz-visual` present, 369×495; a real 3D canvas 334×200; the 2D layout canvas present.
+Ran it 4 times (no flake). This directly contradicts the advisor's report — same code, same gesture, opposite
+result. Rather than trust either result blind, traced WHY, and found something more interesting than a cache
+mismatch:
+
+### The real finding: `insertWiz()` does NOT place the shape either of us assumed
+
+Screenshotted the canvas mid-gesture and caught the actual mechanism: `insertWiz()`'s `commitActiveOp()`
+(`wizardManager.js:512`) does not commit a plain `{type:'op', opType, params}` leaf block — it EXPANDS the op into
+a full "Define Custom Wizard" block tree on the canvas (a round-trip toast confirms it: *"This op is now an
+editable block stack — open the Blocks tab to edit or extend it."*). That means the placed op carries a `user_root`
+block AT THE TOP LEVEL of the stack — which makes `deriveLiveWizard()`'s `authoredHere = stack.find(b => b.type
+=== 'user_root')` (`blocksApp.js:513`) TRUE for it. So the REAL placed-op-via-Insert route does not take the
+`opBlock`/`placedOpFallback` registry-overlay branch either of us assumed (`blocksApp.js:478-504`) — it takes the
+SAME `authoredHere`-driven branch the Customize route takes, both converging on the identical `hasTree` rendering
+code (`blocksApp.js:653-697`) that t1760 already fixed. t1760's own synthetic test (a bare `{type:'op'}` with no
+`user_root`) exercised the OTHER branch — the one genuinely-untested one — and that branch turns out to converge
+on the same fixed code path anyway, which is WHY the real gesture already works with no further source change.
+(The `placedOpFallback` branch is real and still exists — for a hand-built/bare stack with exposed knobs,
+`hand-built-form.spec.js`'s own case — just not what `insertWiz()` itself produces for a registered twin.)
+
+### Repeated for the authoring/Customize route too, per the dispatch's own second ask
+
+`ddcsEditWizardDef('user_corner_data')` → `showApp('blocks')`, 393px, drawer opened: `.wiz-visual` 369×495, 3D
+canvas 334×200, 2D canvas present — same numbers as the placed-op route (expected — both converge on the same
+branch). Screenshots of both routes show the genuine 3D scene (WCS/machine/tool, "4 probes · 9 rapids") and the
+2D corner probe path drawing, not placeholder chrome.
+
+### No source change was needed — the gap was in the PROOF, not the product
+
+Zero edits to `blocksApp.js`/`styles.css` this turn. What t1760 was missing was a test using the REAL gesture
+rather than a synthetic stack write. New `tests/pane-visual-host-real-gesture-1762.spec.js`: both routes
+(placed-op via `openWiz`/`insertWiz`, authoring via `ddcsEditWizardDef`), asserting `.wiz-visual`'s own rect,
+a real 3D canvas at non-trivial size, and a real 2D canvas/svg — all via `page.evaluate` DOM reads, not just a
+screenshot. Non-vacuous: saved a scratch `cp` of the working files (both were already committed and clean, so
+this step was belt-and-suspenders), then `git checkout d7e10a17~1 -- blocksApp.js styles.css` (the commit
+immediately before t1760's fix) to revert, re-ran — both FAILED for the predicted reason (height stuck at
+67-122px, the exact pre-fix symptom), restored via the scratch `cp`, re-ran — 2/2 pass. **One git trap hit and
+fixed while reverting**: `git checkout <ref> -- <path>` both updates the working tree AND STAGES the reverted
+content — restoring the working-tree files with `cp` afterward left the INDEX still holding the OLD pre-fix
+content, showing as `MM` (staged-modified relative to HEAD, but working-tree-clean relative to the index) in
+`git status`. Caught via `git diff --cached` showing a real diff after `git diff HEAD` showed none; fixed with
+`git reset HEAD -- <path>` (the working tree already matched HEAD, only the index needed unwinding) — nothing
+was ever actually committed wrong, but flagging the trap since `git checkout <ref> -- <path>` for a revert-proof
+is now an established idiom in this project and it silently poisons the index every time unless followed by an
+explicit unstage.
+
+### Verify — per the amended tiering (node + touched specs + real gesture; fork-parity only if the shared render path is touched again)
+
+- No source file changed — `blocksApp.js`/`styles.css` are byte-identical to the already-verified d7e10a17.
+- `npm run test:node`: 118/118 (re-run for completeness though nothing in its scope changed).
+- New `pane-visual-host-real-gesture-1762.spec.js`: 2/2, proven non-vacuous against the pre-t1760 commit.
+- `pane-visual-host-1760.spec.js` (t1760's own synthetic-gesture test): still 2/2, run alongside the new one —
+  both test shapes coexist, covering the `placedOpFallback` branch (t1760's) and the `authoredHere` branch
+  (t1762's) separately, since real placed-ops turn out to take the latter.
+- fork-parity NOT re-run — no source touched, the amendment's own exception ("if you touch the shared render path
+  again") doesn't apply.
+- Real gesture, screenshotted: both the placed-op route and the authoring route at 393px with the drawer opened,
+  both showing the actual 3D scene and 2D corner probe path drawing.
+- All `tests/zzdebug-1762-*.spec.js` scratch diagnostics deleted, none committed.
+
+### For the advisor
+
+Your hypothesis named the right SHAPE of bug (a route split t1740/t1748 already burned us on twice) even though
+the specific branch turned out different from what either of us assumed — the placed-op route converges on
+`authoredHere`, not `placedOpFallback`, because `insertWiz()` expands to a full editable block tree rather than
+placing an opaque op leaf. Given the same fix already covers both, I can't fully explain your original
+`.wiz-visual`=NONE reading against the same commit — the most likely candidate, per this project's own standing
+trap (`playwright-stale-cache-testuse-error`/"verify a release with a hard reload"), is a stale server or cached
+ES module on that run rather than a real divergence; I could not reproduce it 4/4 tries with a guaranteed-fresh
+server. Flagging rather than asserting, since I can't inspect your environment directly — if it recurs, the
+`/api/descriptor` 404 both routes throw (pre-existing, unrelated — no `/api/*` route on the static mem-server)
+is the only console noise either gesture produces, so a genuine re-failure would show something new beyond that.
