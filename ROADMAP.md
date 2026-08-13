@@ -378,6 +378,17 @@ and attempt a status read. Record: does the gateway answer at all (bind), is it 
 it work? ⚠ **Read-only first** ([[live-cnc-readonly-when-away]]) — a status/DRO read, never a send, until
 this path is understood.
 
+**⚠ CONSTRAINT — LAN IS AN OPTION, NEVER THE PATH (user, 2026-08-13):** *"this is an example of an option
+to give user and not to make it the only path."* The shop's network is the USER'S circumstance, not ours to
+prescribe. Same-PC · LAN · cloud · USB stick are all situations people already have; Studio works in
+whichever one they are standing in. **Whatever gets built here must not become the blessed route** — the
+one-PC owner with the machine sitting right there must never face an address box to reach it, and the
+same-PC path must stay the zero-configuration default it is today.
+This is the [[hardcoded personal values]] failure one level up: a personal *value* restricts what MACHINE
+you can have; a single connection path restricts what SHOP you can have. It is the LIKELIER mistake here
+precisely because the LAN case is the user's own — build it, watch it work, and it quietly becomes the
+path everyone is assumed to be on.
+
 **Constraint on any fix:** the user is **not a network admin**. Any answer requiring port forwarding,
 certificates, static IPs or firewall surgery is the wrong answer — it should be "type the other PC's
 address" or better, "the console finds it."
