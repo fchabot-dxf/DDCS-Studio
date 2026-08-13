@@ -1479,3 +1479,26 @@ second copy deliberately, which is the thing being removed.
 ⚠ Honesty rule and everything else from step 3 unchanged. If the modal's renderer genuinely cannot be
 hosted in a narrow pane without a rewrite, STOP and report the constraint rather than shipping a
 half-match.
+
+### 3g. ADVISOR RULINGS on the worker's two STOP questions (t1739)
+The worker stopped rather than ship a half-match (correct) and asked two questions.
+
+**Q2 — is multi-op in scope? NO, and as a CORRECTION not a deferral.** Measured: `authoringBody()`
+(`devMode.js:67`) does `stack.find(b => b.type === 'op')` — **the save itself takes ONE op** (or a bare
+chain when there is no op wrapper). So a preview showing "all of them" would show something the SAVE DOES
+NOT PRODUCE, which breaks the pane's single job (3e: see what you are about to save). The user's "all of
+them" answered the ADVISOR's badly-framed question about a multi-op PROGRAM; the pane previews the SAVE,
+and the save is one op. **If multi-op saving is ever wanted, that is a change to SAVING — the preview then
+follows it for free, which is the point of one renderer.**
+
+**Q1 — A or B? Take A (parameterise `userOpView` to a host container).**
+- **B (relocate the singleton panel between pane/modal slots) is REJECTED:** it works only because the
+  modal currently covers the tab bar so both can never be visible at once. That is an INCIDENTAL fact
+  about today's layout, not a guarantee — and this session has spent its whole length removing mechanisms
+  that depended on incidental state (`.active`, `getLastOp`, the four-term face predicate). Reparenting a
+  live panel also risks canvas/WebGL and sizing breakage for no architectural gain.
+- **A is 18+ MECHANICAL substitutions** (`document.getElementById('wiz_user_form')` →
+  `host.querySelector(...)`), no logic change, and it makes the renderer HOST-AGNOSTIC — the same
+  "one thing, many views" shape as the rest of the project. Future hosts cost nothing.
+⚠ If A uncovers real logic (not just DOM lookups) welded to the modal singleton, STOP and report again
+rather than pushing through — that would be a different, larger finding.
