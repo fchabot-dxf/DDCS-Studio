@@ -1502,3 +1502,30 @@ follows it for free, which is the point of one renderer.**
   "one thing, many views" shape as the rest of the project. Future hosts cost nothing.
 ⚠ If A uncovers real logic (not just DOM lookups) welded to the modal singleton, STOP and report again
 rather than pushing through — that would be a different, larger finding.
+
+---
+
+## 📌 SMALL, REAL — the multi-op save silently drops work (found by the user, t1739)
+`authoringBody()` (`devMode.js:67`) does `stack.find(b => b.type === 'op')` — **the FIRST op only.** With
+several ops on the canvas, Save wizard… keeps one and DISCARDS THE REST WITH NO WARNING. Grepped: no
+multi-op guard anywhere in the save path. Same family as the semicolon eating a G-code line — the app
+accepts a gesture and quietly does something other than what it implies, and here the loss is invisible
+exactly when the user would trust it (the saved wizard works; it just is not what they built).
+
+**Fix: REFUSE, and say why** — e.g. "This canvas has 3 ops; a wizard saves one. Remove the others, or open
+just the one you want." (Advisor's call over "save the first + warn": a selector or a warning makes
+picking-one look like the intended workflow, when the real answer is that a wizard IS one op.)
+
+### Ruled out, and why — do NOT resurrect these
+- **Compound / multi-op wizards: NOT NEEDED.** A wizard is ONE op whose stack can already contain as many
+  STEPS as you like (atoms in sequence). "Several ops on the canvas saved together" would invent merging
+  rules (duplicate feed rates, field order, what reopening shows) for something already achievable.
+  **User: *"i think im against multiop at all in the canvas… users should be able to add ops directly in a
+  wizard"* — and they can, at atom level, today.**
+- **A save-time op SELECTOR: rejected.** Same reason — it normalises a workflow that should not exist.
+- ⚠ **Precision, since the advisor was loose about it:** a wizard's GCODE mouth holds ATOMS, not other `op`
+  blocks. `opunit` is a TRANSPARENT grouping of atoms (`userRoot.js:56`, emits byte-identically to the
+  atoms loose, `hidden: true` — created programmatically at fork, never dragged).
+- **Draggable `opunit` + "add a Surfacing step" authoring gesture: NOTED, NOT NOW.** User: *"lets not go
+  there right now, we can simply add steps."* The transparent-boundary mechanism already exists and is
+  proven; only the authoring gesture is missing. Revisit against a REAL wizard the user wants to build.
