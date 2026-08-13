@@ -2013,3 +2013,21 @@ provable in ONE place. It also gives this work a concrete finish line: not "make
 say so and the rule inverts: the pane's own specs must drive the real gesture, and the shortcut is banned
 THERE specifically. Either outcome is fine — what is not fine is 95 specs quietly asserting about a state
 that does not occur.
+
+## 📌 SMALL — the 3D DRO/legend overlay collides with the toolbar in the narrow pane (2026-08-13)
+**User's screenshot (393px, pane, after the surface fix landed and looked right):** the Work/Mach DRO block
+(`X 17.500 / Y −39.680 / Z −5.000`) and the path legend print ON TOP of the viz toolbar (`3D`, `1×`, play).
+Values are correct and the scene is right — it is a LAYOUT collision, not a wrong reading. But it makes the
+readout unusable at phone width, which is exactly where the user reads it.
+
+**Traced:** the overlay is drawn INSIDE the 3D box and assumes the modal's taller canvas; nothing about it
+is size-aware. At 393px BOTH rules apply and the second wins:
+`@media (max-width:520px) .wiz-viz3d { height: 220px; }` then
+`@media (max-width:860px) .wiz-2pane .wiz-visual .wiz-viz3d { flex:1 1 auto; height:auto !important; }`
+→ the box becomes whatever flex gives it, while the overlay still expects room.
+
+**Fix direction (not prescribed):** make the overlay yield when the box is short — collapse the legend,
+or move the DRO out of the canvas into the panel chrome where it has its own space. **Prefer a rule that
+reads the ACTUAL box size over another max-width breakpoint** — two breakpoints already fight here, and a
+third is how this got confusing.
+⚠ Check the MODAL is unaffected: it has the room today and must keep the current layout.
