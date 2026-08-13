@@ -88,11 +88,20 @@ const placeEnumPair = (param, key, extra) => [
 ];
 
 // ── VALUE bindingSpecs (identity-by-type over the pruned superset) ──────────────────────────────────────────────
+// t1758 — MACHINE VARIABLES ROLL OUT, mill family. Pocket is the census's own "shape/dia/sides/w/h pick between
+// FOUR structurally different stacks via pocketToolRefuses/pocketRasterGap" worked example (t1704) — traced FRESH
+// against the current pocketWizard.js, not copied from that summary, since several params (toolDia/entry/direction)
+// turn out to have a STRONGER structural role here than the SAME param name carries on surfacing (see per-param
+// notes below — "same name, different wiring", t1704's own warning). wcs binds the SAME `wcs` atom surfacing does
+// → eligible, matching surfacing's own wcs classification exactly.
 const POCKET_BINDING_SPECS = [
-    { param: 'wcs', type: 'enum', key: 'wcs', match: { type: 'wcs' }, default: POCKET_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, label: 'WCS', section: G },
+    { param: 'wcs', tokenEligible: true, type: 'enum', key: 'wcs', match: { type: 'wcs' }, default: POCKET_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, label: 'WCS', section: G },
     // placement (placeonstock, always present) — origin ALSO rides the leaves (pocket geometry carries its origin)
-    ...placePair('originX', 'offX', { default: POCKET_DEFAULTS.originX, label: 'Origin X', section: G }),
-    ...placePair('originY', 'offY', { default: POCKET_DEFAULTS.originY, label: 'Origin Y', section: G }),
+    // t1758 — NOT eligible: placeonstock/makePlace bakes originX/Y/offZ into a TEXT-LEVEL coordinate shift computed
+    // before the program exists (the exact surfacing originX/offZ shape, t1704) — deferrable, since it's a plain
+    // magnitude re-resolved downstream, not a categorical branch.
+    ...placePair('originX', 'offX', { tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, default: POCKET_DEFAULTS.originX, label: 'Origin X', section: G }),
+    ...placePair('originY', 'offY', { tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, default: POCKET_DEFAULTS.originY, label: 'Origin Y', section: G }),
     { param: 'originX', type: 'number', key: 'originX', match: { type: 'pocketfill' }, optional: true },
     { param: 'originX', type: 'number', key: 'originX', match: { type: 'pocketwall' }, optional: true },
     { param: 'originY', type: 'number', key: 'originY', match: { type: 'pocketfill' }, optional: true },
@@ -100,47 +109,92 @@ const POCKET_BINDING_SPECS = [
     // t1406 — the re-pointed arm's atom carries the pocket's own outline as its frame (x/y/w/h) + a separate `inset`.
     { param: 'originX', type: 'number', key: 'x', match: { type: 'surfaceraster' }, optional: true },
     { param: 'originY', type: 'number', key: 'y', match: { type: 'surfaceraster' }, optional: true },
-    ...placeEnumPair('stockAttach', 'stockAttach', { default: POCKET_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Attach to Stock', section: G }),
-    ...placeEnumPair('pathDatum', 'pathDatum', { default: POCKET_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Path Datum', section: G }),
-    ...placeEnumPair('stockDatum', 'stockDatum', { formHidden: true, default: POCKET_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, label: 'Stock Datum', section: G }),
-    ...placePair('stockW', 'stockW', { formHidden: true, default: POCKET_DEFAULTS.stockW, label: 'Stock W', section: G }),
-    ...placePair('stockH', 'stockH', { formHidden: true, default: POCKET_DEFAULTS.stockH, label: 'Stock H', section: G }),
-    ...placePair('stockZ', 'stockZ', { formHidden: true, default: POCKET_DEFAULTS.stockZ, label: 'Stock Z', section: G }),
-    ...placePair('offZ', 'offZ', { default: POCKET_DEFAULTS.offZ, label: 'Z Offset', section: G }),
+    // t1758 — placeonstock-bound datum enums, SAME atom + shape as surfacing's own stockAttach/pathDatum/stockDatum
+    // (t1704: eligible — the datum CODE string reaches the atom directly, no text-shift math on the code itself).
+    ...placeEnumPair('stockAttach', 'stockAttach', { tokenEligible: true, default: POCKET_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Attach to Stock', section: G }),
+    ...placeEnumPair('pathDatum', 'pathDatum', { tokenEligible: true, default: POCKET_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Path Datum', section: G }),
+    ...placeEnumPair('stockDatum', 'stockDatum', { tokenEligible: true, formHidden: true, default: POCKET_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, label: 'Stock Datum', section: G }),
+    // t1758 — the stock SIZE feeds the same baked text-shift as position (surfacing's own stockW/H/Z shape, t1704).
+    ...placePair('stockW', 'stockW', { tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, default: POCKET_DEFAULTS.stockW, label: 'Stock W', section: G }),
+    ...placePair('stockH', 'stockH', { tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, default: POCKET_DEFAULTS.stockH, label: 'Stock H', section: G }),
+    ...placePair('stockZ', 'stockZ', { tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, default: POCKET_DEFAULTS.stockZ, label: 'Stock Z', section: G }),
+    ...placePair('offZ', 'offZ', { tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, default: POCKET_DEFAULTS.offZ, label: 'Z Offset', section: G }),
     // geometry (fan-out to both leaves)
-    { param: 'shape', type: 'enum', key: 'shape', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: G },
+    // t1758 — shape/dia/sides/w/h: t1704's own worked example — these pick between structurally different region
+    // walks (rect analytic / circle-polygon-ellipse JS contour) AND feed pocketTooSmall/pocketMaxToolDia, deciding
+    // whether the pocket refuses everywhere or degenerates to a single plunge. Never deferrable — a categorical
+    // shape/count decision, not a magnitude a downstream atom merely re-resolves.
+    { param: 'shape', tokenRefusal: 'Picks the region-walk shape (an analytic rectangle vs a JS contour walk for circle/polygon/ellipse) and feeds the too-small/refusal check — a categorical decision about which program gets built, not a value inside one.', type: 'enum', key: 'shape', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: G },
     { param: 'shape', type: 'enum', key: 'shape', match: { type: 'pocketwall' }, optional: true },
-    ...leafPair('w', 'w', 'number', { default: POCKET_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: G }),   // t722 P2a — per-shape visibility
-    ...leafPair('h', 'h', 'number', { default: POCKET_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: G }),
-    ...leafPair('dia', 'dia', 'number', { default: POCKET_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: G }),
-    ...leafPair('sides', 'sides', 'number', { default: POCKET_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: G }),
+    ...leafPair('w', 'w', 'number', { tokenRefusal: 'Sets the pocket size, which decides whether the tool fits at all (too-small refuses everywhere) and the placed footprint\'s bounding box — the program\'s shape depends on this number before it can be built.', default: POCKET_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: G }),   // t722 P2a — per-shape visibility
+    ...leafPair('h', 'h', 'number', { tokenRefusal: 'Sets the pocket size, which decides whether the tool fits at all (too-small refuses everywhere) and the placed footprint\'s bounding box — the program\'s shape depends on this number before it can be built.', default: POCKET_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: G }),
+    ...leafPair('dia', 'dia', 'number', { tokenRefusal: 'Sets the pocket size, which decides whether the tool fits at all (too-small refuses everywhere) and the placed footprint\'s bounding box — the program\'s shape depends on this number before it can be built.', default: POCKET_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: G }),
+    ...leafPair('sides', 'sides', 'number', { tokenRefusal: 'Picks the polygon\'s vertex count — a different JS contour walk, not a value inside one.', default: POCKET_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: G }),
     // t800 P6 — the CLEARING cluster (strategy → direction → stepover) lands together right after shape/size (strategy, the
     // structural driver, is spliced in ahead of these in pocketDataDef). direction gates to raster — the only path the kernel scans.
-    { param: 'direction', type: 'enum', key: 'direction', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.direction, widget: 'dropdown', widgetConfig: { options: DIRECTION_OPTIONS }, label: 'Direction', section: T, group: 'clearing', when: { param: 'strategy', is: 'raster' }, help: 'Raster scan pattern: Zig-zag links passes back-and-forth (fastest); One-way lifts and rapids back before each pass for a consistent climb (or conventional) cut. Applies to the raster passes — concentric rings keep their fixed direction.' },
-    { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.stepoverPct, section: T, group: 'clearing' },   // t1662 — label from SHARED_LABELS
+    // t1758 — direction picks which WALK PATTERN gets written (zig-zag / one-way climb / one-way conventional) — a
+    // different text sequence, the same "content-shape" class as corner's travelShape (Dogleg vs Diagonal).
+    { param: 'direction', tokenRefusal: 'Picks the raster walk pattern (zig-zag, one-way climb, one-way conventional) — a different sequence of moves gets written, not a value inside one.', type: 'enum', key: 'direction', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.direction, widget: 'dropdown', widgetConfig: { options: DIRECTION_OPTIONS }, label: 'Direction', section: T, group: 'clearing', when: { param: 'strategy', is: 'raster' }, help: 'Raster scan pattern: Zig-zag links passes back-and-forth (fastest); One-way lifts and rapids back before each pass for a consistent climb (or conventional) cut. Applies to the raster passes — concentric rings keep their fixed direction.' },
+    // t1758 — stepoverPct: a clamp-and-derive magnitude (feeds the ring spacing, mirrors surfacing's own stepoverPct
+    // exactly) — it does NOT feed pocketTooSmall/pocketRasterGap, so it's deferrable, not categorical.
+    { param: 'stepoverPct', tokenRefusal: 'Combined with the tool diameter to resolve the ring spacing before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', key: 'stepoverPct', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.stepoverPct, section: T, group: 'clearing' },   // t1662 — label from SHARED_LABELS
     // t804 — DEPTH ENTRY (in the clearing cluster): the per-level descent + its per-mode fields (when-gated).
-    { param: 'entry', type: 'enum', key: 'entry', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', section: T, group: 'clearing', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle (degrades to plunge, with the reason, on a pocket too small for it). Helix = a descending helix at the helix Ø, pitch mm per rev.' },
-    { param: 'rampAngle', type: 'number', key: 'rampAngle', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.rampAngle, label: 'Ramp Angle', section: T, group: 'clearing', when: { param: 'entry', is: 'ramp' }, units: '°', help: 'Max descent angle of the ramp (degrees from horizontal). Shallower = gentler on the tool; too shallow needs a longer run than a small pocket has (then it degrades to a straight plunge).' },
-    { param: 'helixDia', type: 'number', key: 'helixDia', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.helixDia, label: 'Helix Ø', section: T, group: 'clearing', when: { param: 'entry', is: 'helix' }, units: 'mm', help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the pocket.' },
-    { param: 'helixPitch', type: 'number', key: 'helixPitch', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.helixPitch, label: 'Helix Pitch', section: T, group: 'clearing', when: { param: 'entry', is: 'helix' }, units: 'mm/rev', help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler entry, more revolutions.' },
-    ...leafPair('toolDia', 'toolDia', 'number', { default: POCKET_DEFAULTS.toolDia, section: T }),   // t1662 — label from SHARED_LABELS
-    ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
-    ...leafPair('feed', 'feed', 'number', { default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),
+    // t1758 — entry is STRUCTURAL here (unlike surfacing's own entry, which is eligible): pocketRasterGap's own
+    // envelope check reads it to decide whether the pocket rides the parametric `surfaceraster` atom at all or
+    // falls back to the literal arm — a stronger, arm-selecting role surfacing's entry does not have. Same param
+    // name, different wiring (t1704's own warning) — traced from pocketWizard.js:145-159, not assumed from surfacing.
+    { param: 'entry', tokenRefusal: 'Decides which of the two program arms gets built (the parametric raster atom or the literal fallback) — a categorical choice, not a value inside one.', type: 'enum', key: 'entry', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', section: T, group: 'clearing', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle (degrades to plunge, with the reason, on a pocket too small for it). Helix = a descending helix at the helix Ø, pitch mm per rev.' },
+    // t1758 — rampAngle/helixDia: clamp-and-derive magnitudes (surfaceraster.js:1420 `Math.min(45, Math.max(0.5,
+    // rampAngle))`, :1528 `helixDia > 0 ? helixDia/2 : ...` — a fallback pick, not an arm/count decision) — matches
+    // surfacing's own rampAngle/helixDia exactly, deferrable. helixPitch is DIFFERENT: it directly sets the winding
+    // COUNT (surfaceraster.js:1530 `Math.max(0.1, helixPitch)` feeds how many turns the helix makes) — matches
+    // surfacing's own helixPitch, which t1704 marked refused-NOT-deferrable for the identical reason.
+    { param: 'rampAngle', tokenRefusal: 'The descent angle is used to compute the ramp\'s run (a trig calculation baked into the move) before the program is built.', tokenDeferrable: true, type: 'number', key: 'rampAngle', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.rampAngle, label: 'Ramp Angle', section: T, group: 'clearing', when: { param: 'entry', is: 'ramp' }, units: '°', help: 'Max descent angle of the ramp (degrees from horizontal). Shallower = gentler on the tool; too shallow needs a longer run than a small pocket has (then it degrades to a straight plunge).' },
+    { param: 'helixDia', tokenRefusal: 'The helix diameter is baked into the radius of every winding move — computed before the program is built.', tokenDeferrable: true, type: 'number', key: 'helixDia', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.helixDia, label: 'Helix Ø', section: T, group: 'clearing', when: { param: 'entry', is: 'helix' }, units: 'mm', help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the pocket.' },
+    { param: 'helixPitch', tokenRefusal: 'Directly decides how many windings the descending helix contains — the program\'s SHAPE depends on this number before it can be built.', type: 'number', key: 'helixPitch', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.helixPitch, label: 'Helix Pitch', section: T, group: 'clearing', when: { param: 'entry', is: 'helix' }, units: 'mm/rev', help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler entry, more revolutions.' },
+    // t1758 — toolDia: a STRONGER role than surfacing's own toolDia (clamp-and-derive-stepover only) — pocket's
+    // toolDia ALSO feeds pocketMaxToolDia -> pocketToolRefuses (whether the pocket cuts ANYTHING at all) and
+    // pocketTooSmall (plunge-fallback vs stepover). A categorical arm/refusal decision, not a coercion casualty —
+    // same param name as surfacing's, different wiring (pocketWizard.js:65-99), so NOT deferrable here.
+    ...leafPair('toolDia', 'toolDia', 'number', { tokenRefusal: 'The tool diameter decides whether this pocket can be cut at all (too large refuses everywhere) and whether it degenerates to a single plunge — a categorical decision, not a value inside one.', default: POCKET_DEFAULTS.toolDia, section: T }),   // t1662 — label from SHARED_LABELS
+    // t1758 — wallOffset: the SAME pocketTooSmall/pocketMaxToolDia math toolDia feeds (pocketWizard.js:66-67,83-90)
+    // — a categorical too-small/refusal input, not a coercion casualty.
+    ...leafPair('wallOffset', 'wallOffset', 'number', { tokenRefusal: 'Combines with the tool diameter to decide whether this pocket can be cut at all, or degenerates to a single plunge — a categorical decision, not a value inside one.', default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
+    // t1758 CORRECTION — like plunge/clearance above, pocketfill.js's own kernel reads feed via hard `num()`, not
+    // surfaceraster.js's val() pass-through — a magnitude re-resolved downstream, deferrable not eligible.
+    ...leafPair('feed', 'feed', 'number', { tokenRefusal: 'This value is re-resolved by the pocket-fill atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),
     // depth pass (stepdown, clearing arm) + the TOO-SMALL arm carry the SAME params at different keys.
     // t1391 — the too-small arm's leaf is `holecycle` now, not the literal `drill`: pocket's fallback re-points through the
     // parametric family so that atom can retire. Every key carries straight over (depth/peck/feed/clearance all exist on
     // holecycle), which is why this is a target change and not a re-spec.
-    { param: 'depth', type: 'number', units: 'mm', key: 'to', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.depth, label: 'Depth', section: T },
+    // t1758 CORRECTION — depth/stepdown bind to the `stepdown` atom (kind:'depth'), NOT `surfaceraster`: I first
+    // wrote these eligible by wrongly borrowing surfacing's verdict, which applies ONLY to surfacing's OWN
+    // surfaceraster-bound depth/stepdown (that atom runs its Z-loop as a controller-side runtime IF/GOTO). Pocket's
+    // literal `stepdown` block is different: blockEmitter.js:305-318 (`kind==='depth'`) computes `depthLevels(to,
+    // by)` in JS and JS-UNROLLS one body copy per array element (`levels.forEach`) — the emitted line COUNT depends
+    // on the resolved value. It also runs `unresolvableBounds` first and REFUSES LOUDLY in the G-code comment if to
+    // /by don't resolve — the exact "decide program shape" class, not a coercion casualty. NOT deferrable.
+    { param: 'depth', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', type: 'number', units: 'mm', key: 'to', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.depth, label: 'Depth', section: T },
     { param: 'depth', type: 'number', units: 'mm', key: 'depth', match: { type: 'holecycle' }, optional: true },
-    { param: 'stepdown', type: 'number', units: 'mm', key: 'by', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.stepdown, label: 'Step Down', section: T },
+    { param: 'stepdown', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', type: 'number', units: 'mm', key: 'by', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.stepdown, label: 'Step Down', section: T },
     { param: 'stepdown', type: 'number', units: 'mm', key: 'peck', match: { type: 'holecycle' }, optional: true },
-    { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'stepdown' }, optional: true, default: 0, label: 'Confirm every N passes', section: T, help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    // t1758 — confirmEvery decides whether the confirm-and-pause step EXISTS at all (0 = off) — matches surfacing's
+    // own confirmEvery exactly (t1704: "decides whether the confirm-and-pause step exists at all"); ALSO caught by
+    // the SAME unresolvableBounds refuse-loudly check as depth/stepdown above (blockEmitter.js:308).
+    { param: 'confirmEvery', tokenRefusal: 'Decides whether the confirm-and-pause step exists at all — a threshold check made before the program is built, not a value read from one field.', type: 'number', key: 'confirmEvery', match: { type: 'stepdown' }, optional: true, default: 0, label: 'Confirm every N passes', section: T, help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    // t1758 CORRECTION — plunge/feed/clearance bind to `pocketfill`/`pocketwall`/`progstart`/`holecycle`, whose OWN
+    // kernels (pocketfill.js:134, programFraming.js's makeStart) read them via a hard `num(p.x, default)` with NO
+    // val()-pass-through the way surfaceraster.js's identical fields do — a magnitude embedded straight into a move
+    // line, no branch on the value. Deferrable (a coercion casualty, not a shape decision), like corner's hopDist.
     // plunge → both leaves + the HOLE's feed (the fallback plunges at the plunge feed); clearance → progstart + both leaves + the hole
-    { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.plunge, label: 'Plunge', section: T },
+    { param: 'plunge', tokenRefusal: 'This value is re-resolved by the pocket-fill atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.plunge, label: 'Plunge', section: T },
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketwall' }, optional: true },
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'feed', match: { type: 'holecycle' }, optional: true },
-    { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'progstart' }, default: POCKET_DEFAULTS.clearance, label: 'Clearance', section: T },
-    { param: 'rpm', type: 'number', key: 'rpm', match: { type: 'progstart' }, label: 'Spindle RPM', section: T, help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart (no default → socket-held: blank keeps the Head)
+    { param: 'clearance', tokenRefusal: 'This value is re-resolved by the framing atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, type: 'number', units: 'mm', key: 'clearance', match: { type: 'progstart' }, default: POCKET_DEFAULTS.clearance, label: 'Clearance', section: T },
+    // t1758 — rpm: socket-held (no default → the blank keeps the machine Head), matching surfacing's own rpm
+    // exactly ("falls back to the tool library's RPM when left blank — that fallback decision runs before the
+    // program is built").
+    { param: 'rpm', tokenRefusal: 'Falls back to the tool library\'s RPM when left blank — that fallback decision runs before the program is built.', tokenDeferrable: true, type: 'number', key: 'rpm', match: { type: 'progstart' }, label: 'Spindle RPM', section: T, help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart (no default → socket-held: blank keeps the Head)
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'pocketfill' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'pocketwall' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'holecycle' }, optional: true },
@@ -211,8 +265,13 @@ const POCKET_BINDING_SPECS = [
     { param: 'plunge', type: 'number', key: 'plunge', match: { type: 'wallfinish' }, optional: true },
     { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'wallfinish' }, optional: true },
     { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'wallfinish' }, optional: true },
-    { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
-    { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
+    // t1758 CORRECTION — the entry-waypoint's own emit (blockEmitter.js:555, applyEntryWaypoint) reads it via
+    // `num(e.params.entryX, NaN)`, then ε-compares against the program's own derived cut entry (firstRapidXY) to
+    // decide whether to SPLICE AN EXTRA G0 LINE into the emitted text (blockEmitter.js:567-570) — presence/absence
+    // of an entire line, the same class as confirmEvery ("decides whether the step exists at all"), not a magnitude
+    // merely re-resolved downstream. NOT deferrable (corrected from my own first pass, which under-weighted this).
+    { param: 'entryX', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
+    { param: 'entryY', tokenRefusal: 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
     // t768 P1a — the tool-selection declaration. IN the bindingSpecs (re-derived over the pruned stack each instantiate).
     ...TOOL_BINDING_SPECS,
 ];
@@ -223,14 +282,21 @@ const POCKET_BINDING_SPECS = [
 // r2 ≥ r1 case is caught at emit (restValid false → byte-identical) + the restGreyReason (declared why); the shape gate is
 // what whenOk can express declaratively (no param-to-param compare / OR).
 const SMOOTH_GATE = { param: 'shape', in: ['circle', 'ellipse'], tip: 'Smooth walls (circle / ellipse) leave no corner material — there is no rest to clear.' };
+// t1758 — strategy: the guard-fork driver itself (raster adds the wallfinish pass + a different clearing atom
+// shape; spiral does not) — categorical, not deferrable, the same class as corner's own structural toggles.
+// restDia: gates the ENTIRE rest pass's existence via restValid -> the geometry-derived `_rest` guard — categorical,
+// not deferrable (deciding whether an atom exists, not re-resolving a magnitude). restStepover: only clamps the
+// rest ring spacing (restmachining.js's restStepMm, `Math.max(0.15, ...)`) — a coercion casualty, deferrable, the
+// same shape as the main stepoverPct. restTool: has NO socket of its own (bindingless, per the comment below) — it
+// only auto-fills restDia's UI field; a token here would never reach the emit at all.
 const POCKET_STRUCT_BINDINGS = [
-    { param: 'strategy', help: "Clearing pattern: Spiral = concentric offset rings inward (no wall pass); Raster = parallel zig-zag passes then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T, group: 'clearing' },   // t800 P6 — group:'clearing' + spliced ahead of direction/stepover so it LEADS the cluster
+    { param: 'strategy', tokenRefusal: 'Raster adds a wall-finish pass and a different clearing atom shape than Spiral — a categorical choice of which program gets built, not a value inside one.', help: "Clearing pattern: Spiral = concentric offset rings inward (no wall pass); Raster = parallel zig-zag passes then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T, group: 'clearing' },   // t800 P6 — group:'clearing' + spliced ahead of direction/stepover so it LEADS the cluster
     // t871 — REST MACHINING: a smaller 2nd tool clears the corner material this tool leaves. restTool picks the tool (fills
     // restDia); restDia > 0 on a cornered shape (rect/polygon) appends the rest pass. Bindingless (structural drivers of the
     // geometry-derived _rest guard) so they always render + drive prune; the value sockets bind on the pocketrest leaf.
-    { param: 'restTool', type: 'number', default: POCKET_DEFAULTS.restTool, widget: 'toolpick', widgetConfig: { fill: { dia: 'restDia' } }, label: 'Rest tool', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'REST MACHINING: pick a SMALLER second tool to clear the corner material this tool leaves (rect + polygon only — smooth walls have no corners). Its Ø fills Rest tool Ø below.' },
-    { param: 'restDia', type: 'number', default: POCKET_DEFAULTS.restDia, label: 'Rest tool Ø', units: 'mm', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'Diameter of the rest tool (mm) — must be SMALLER than the main tool Ø. 0 = no rest pass (byte-identical). Filled by the Rest tool picker, or type it.' },
-    { param: 'restStepover', type: 'number', default: POCKET_DEFAULTS.restStepover, label: 'Rest stepover %', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'Stepover of the rest tool as a % of its Ø (like the main stepover). Only used when a rest tool is set.' },
+    { param: 'restTool', tokenRefusal: 'This field only auto-fills Rest tool Ø below (its own picker fills restDia) — it has no socket of its own and never reaches the emit.', type: 'number', default: POCKET_DEFAULTS.restTool, widget: 'toolpick', widgetConfig: { fill: { dia: 'restDia' } }, label: 'Rest tool', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'REST MACHINING: pick a SMALLER second tool to clear the corner material this tool leaves (rect + polygon only — smooth walls have no corners). Its Ø fills Rest tool Ø below.' },
+    { param: 'restDia', tokenRefusal: 'Turns the whole rest pass on or off (zero = none) — changes how many atoms the program contains, not a value inside one.', type: 'number', default: POCKET_DEFAULTS.restDia, label: 'Rest tool Ø', units: 'mm', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'Diameter of the rest tool (mm) — must be SMALLER than the main tool Ø. 0 = no rest pass (byte-identical). Filled by the Rest tool picker, or type it.' },
+    { param: 'restStepover', tokenRefusal: 'Combined with the rest tool diameter to resolve the rest ring spacing before the program is built — it can\'t be read from the controller at that point.', tokenDeferrable: true, type: 'number', default: POCKET_DEFAULTS.restStepover, label: 'Rest stepover %', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'Stepover of the rest tool as a % of its Ø (like the main stepover). Only used when a rest tool is set.' },
 ];
 
 // t867 — FEEDS & SPEEDS: the material picker + the advisory "Suggest feed" button (the feedsuggest composite widget).

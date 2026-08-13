@@ -26533,3 +26533,132 @@ per the dispatch. Also: the FULL suite (not just the fast tier) is what caught a
 picked verification would have surfaced — this act's own declaration work was the first thing to ever feed that
 round-trip a spec carrying `tokenEligible`. Worth noting since the standing rule is per-act verification stays at
 the fast tier; this dispatch's own "run the full suite yourself" instruction is what caught it.
+
+## 🔨 turn 1758 (epoch 4) — MACHINE VARIABLES, FAMILY 2 (MILL)
+
+Family 1 (probes) was accepted — the advisor reviewed the REASONS, not the count, naming the bar precisely: a
+refusal must state the MACHINE reason (why a variable can carry a NUMBER but not decide WHICH program gets
+built), not a generic "not supported." This act: the mill family — surfacing was t1704's own pilot; declared the
+other 7 (pocket, contour, slot, drill, bore, tap, text). 205 params, same rigor: traced each from its OWN
+stack-builder AND the atom kernel it hands values to, per the dispatch's own warning that a parametric-vs-literal
+op split (surfacing/drill/pocket parametric end-to-end; slot/contour/text literal-transcript/instrumented) means
+the SAME param name can carry opposite verdicts on different ops.
+
+### Research at scale — 5 parallel Explore agents, one per file, self-verified against 2 already-shipped precedents
+
+Given the volume and the parametric/literal warning, dispatched parallel `Explore` agents for contour/slot/drill/
+bore/tap+text (pocket I traced myself first, since it needed the deepest, most novel tracing — see below), each
+given the calibrated rule + BOTH worked examples (corner's `hopDist`, pocket's `shape`/`dia`/`sides`/`w`/`h`) and
+told to cite `file:line` for every verdict. **Did not apply their findings blind** — cross-checked every one
+against the actual current code before writing a single declaration, exactly as the dispatch demanded ("trace
+each from its OWN builder... rather than assuming the probe pattern transfers"). Two real corrections came out
+of that cross-check:
+
+1. **A genuine 3-way agent disagreement, resolved by the already-shipped precedent.** The bore and drill agents
+   independently classified `stockAttach`/`pathDatum`/`stockDatum` as REFUSED (categorical corner-formula
+   selector), citing the SAME probe-family "which corner... not a magnitude" language t1704 used for corner's OWN
+   `corner` field. That citation is a category error: corner's `corner` field decides WHICH WALLS get physically
+   touched (reorders the whole probe sequence — a genuine structural fork); `stockAttach`/`pathDatum` merely pick
+   which of 3 fixed-corner FORMULAS computes ONE numeric placement shift, the SAME atom running regardless —
+   already shipped as `tokenEligible: true` on `surfacingData.js:87-89` (t1704, reviewed) and independently
+   confirmed by the contour and slot agents tracing the identical `placementShift` code. Went with the
+   already-accepted, cross-confirmed reading — eligible — across all 7 files, not the 2 agents' outlier.
+2. **My own first-pass pocket classification was wrong**, caught only by cross-referencing the slot agent's
+   independent finding on the shared `stepdown`/`depth`-kind atom. I initially marked pocket's `depth`/`stepdown`/
+   `feed`/`plunge`/`clearance` ELIGIBLE by pattern-matching surfacing's own eligible verdict for those NAMES —
+   but surfacing's eligibility there is specific to `surfaceraster`'s own atom (a controller-side runtime IF/GOTO
+   loop, `val()`-pass-through). Pocket's LITERAL arm (what the canonical/form-rendered view actually binds to)
+   uses the generic `stepdown` block instead, which `blockEmitter.js`'s `kind==='depth'` fold JS-UNROLLS in a real
+   loop (`depthLevels(to,by)`, one G-code block per array element) and hard-`num()`-discards feed/plunge/clearance
+   in `pocketfill.js`'s own kernel — the opposite verdict, not the surfacing one. Caught by reading `pocketfill.js:
+   134`/`blockEmitter.js:305-334` directly (not trusting the name-match), corrected before writing the file.
+
+### THE RULE, applied per-op not per-name (same param, opposite verdict, same op-shape lesson t1704 already named)
+
+- **surfacing/drill/bore**: genuinely parametric atoms (`surfaceraster`, `holecycle`) with a declared LIVE-TOKEN
+  seam — `val()`/`liveWord()` pass a `#`/`[` string through verbatim to a controller-side register the RUNTIME
+  loop reads. `depth`/`peck`/`feed`/`pitch` are eligible here specifically because this seam exists — not "no
+  branch found," a real declared mechanism (`holecycle.js`'s `liveWord()`, t1389).
+- **pocket/contour/slot/text**: literal-transcript ops whose depth/geometry loops are JS-UNROLLED at build time
+  (`blockEmitter.js`'s `kind==='depth'` fold, `scanlineFill`, `depthLevels`) — the identically-named `depth`/
+  `stepdown`/`feed`/`plunge` are REFUSED here (categorical loop-count or refused+deferrable coercion, depending on
+  whether the VALUE itself sets a count or just gets embedded as a magnitude).
+- **placement** (`originX`/`originY`/`offZ`/`stockW`/`H`/`Z`): the SAME `placementShift` text-level coordinate
+  bake across every mill op — refused+deferrable everywhere, matching surfacing's own shipped verdict exactly.
+- **the entry-waypoint marker** (`entryX`/`entryY`, shared via `deriveBindings.js`'s `entryBindingsFor` — fixed
+  ONCE there for every consumer, plus pocket/slot's own inline duplicates fixed to match): `blockEmitter.js`'s
+  `applyEntryWaypoint` ε-compares the resolved value against the program's own derived cut entry to decide
+  whether to SPLICE AN EXTRA LINE — presence/absence of a whole move, the confirmEvery class, not deferrable.
+- **the shared tool marker** (`toolNum`, `deriveBindings.js`'s `TOOL_BINDING_SPECS`, fixed once): `tn>0` decides
+  whether a `@TOOL` marker emits at all, which `applyToolChanges` reads to decide whether a REAL tool-change
+  routine gets built — structural, not deferrable. (Also not eligible in the probe family's own t1756 declarations
+  — this shared spec had NO token policy at all until this turn; now every consumer, mill and probe alike,
+  inherits the same correct verdict from the one place it's declared.)
+
+### Totals: 205 params, 36 eligible / 94 refused+deferrable / 75 refused-categorical
+
+| op | eligible | refused+deferrable | refused-categorical | total |
+|---|---|---|---|---|
+| pocket | 4 (wcs, stockAttach, pathDatum, stockDatum) | 14 | 18 | 36 |
+| contour | 6 (+feed, plunge) | 10 | 9 | 25 |
+| slot | 4 | 12 | 13 | 29 |
+| drill | 7 (+depth, peck, feed) | 15 | 9 | 31 |
+| bore | 7 (+depth, pitch, feed) | 15 | 12 | 34 |
+| tap | 4 | 12 | 1 (`rigid`) | 17 |
+| text | 4 (+align) | 16 | 10 | 30 |
+| shared (`toolNum`, `entryX`/`entryY`) | 0 | 0 | 3 | 3 |
+| **total** | **36** | **94** | **75** | **205** |
+
+Full per-param reasoning lives inline as each binding's own `tokenRefusal` string (the operator-facing text IS
+the record — reviewable directly in the diff, not restated here). Representative categorical reasons, one per
+newly-seen shape this act found: pocket's `toolDia`/`wallOffset` (feeds `pocketToolRefuses`/`pocketTooSmall` —
+whether the pocket cuts ANYTHING, a stronger role than surfacing's own clamp-only `toolDia`); text's `strokeWidth`/
+`toolDia` (feeds a real too-small refusal AND the fill's JS-unrolled scanline row count, unlike surfacing's
+controller-deferred stepover); bore's `holeDia`/`toolDia` (the too-small refusal swaps the WHOLE emitted body);
+tap's `rigid` (picks between a 7-line G84 canned cycle and a 9-line floating-holder sequence, hardware-gated).
+
+### Non-vacuous, the strong way — reverted a file mid-correction and watched the new test go red
+
+New spec `tests/mill-family-token-policy-1758.spec.js`, mirroring the probe-family one: renders each op's form
+directly off its own `def`, drives the real keystroke gesture where a typing surface exists, falls back to
+asserting the DECLARATION directly where it doesn't (several mill ops ended up with only ENUM fields eligible —
+`pocket`/`slot`/`tap` have zero numeric eligible params; `text` has only `align` — enums have no typing surface
+to drive live, the same established scope note corner's own enum toggles carry). All 7 pass. Reverted
+`drillData.js` to its pre-declaration HEAD content, re-ran the drill case alone — failed 3/3 for the predicted
+reason (`depth is declared tokenEligible: Expected true, Received false`), restored, re-ran — passed again.
+
+### Emit byte-identical — confirmed, not assumed
+
+Every field added is additive-only data on an existing binding-spec object; nothing in the emit path reads the
+new fields. Ran each touched twin's own dedicated emit/round-trip suite: `pocket-data-emit`, `contour-data-emit`,
+`slot-as-data` + `slot-twin-repoint-1500` (the full 20-test re-point domain, both arms), `drill-as-data` +
+`drill-bindings-identity-1385`, `bore-as-data`, `tap-twin-778`, `text-as-data` — 29/29 green, byte-identical.
+
+### The allow-list-drop the advisor asked me to watch for — checked, none found
+
+t1756's fix closed one instance of the round-trip-drops-new-fields class (`bindingsToBlocks`/`bindingsFromStack`);
+this act doesn't touch any binding-spec round-trip mechanism beyond the same `tokenEligible`/`tokenRefusal`/
+`tokenDeferrable` fields already carried through by that fix and `deriveBindings.js`'s own carry-through (t1704).
+No third instance found — the full suite (below) is the actual check, and it came back clean.
+
+### Verify
+
+- `npm run test:node`: 118/118.
+- `tests/node/architecture-map-1698.test.mjs`: 5/5 (no `userOps.js` line-shift this turn — every edit stayed
+  inside `web/blocks/dataOps/*.js` + `deriveBindings.js`, neither cited by the map).
+- `fork-parity-1593.spec.js`: 2/2, clean (no retry needed).
+- Hand-picked emit sweep (7 touched twins, their own dedicated suites): 29/29.
+- New `mill-family-token-policy-1758.spec.js`: 7/7, proven non-vacuous against a reverted file.
+- **Full suite: 0 failed**, 2450 passed, 12 flaky-then-passed (environmental cold-boot/timing, none touching this
+  act's files — the one overlap-checked name, `context-menu-pass-1452`, is unrelated to any file this act
+  touched), 26 skipped.
+
+### For the advisor
+
+205 params across 7 files, cross-checked (not blindly applied) against 5 parallel research agents — caught one
+3-way agent disagreement (resolved by the already-shipped surfacing precedent, not a majority vote) and one of my
+OWN mistakes (pocket's depth/stepdown/feed/plunge, corrected before writing the file by reading the actual atom
+kernel rather than pattern-matching the param name against surfacing). Also fixed 2 shared specs
+(`TOOL_BINDING_SPECS`, `entryBindingsFor` in `deriveBindings.js`) that had carried NO token policy at all since
+t1704 — every consumer, mill and probe family alike, now inherits the same correct verdict from the one place
+each is declared. Remaining families (ATC/control/lathe-turning) are a separate act per the dispatch.

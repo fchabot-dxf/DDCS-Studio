@@ -119,10 +119,15 @@ export function deriveBindingsFor(stack, specs) {
 /** t726 P2b — the entryX/entryY bindings for a mill twin, derived BY IDENTITY (match the appended `entry` marker) so its
  *  flat index is found by type — no fixed offset, works whether the twin has 5 or 6 body blocks. These go into def.bindings
  *  (NOT the exported EXEC bindings the as-data goldens iterate), so the wiring goldens stay untouched. */
+// t1758 — MACHINE VARIABLES ROLL OUT, mill family. Not eligible: the entry-waypoint's own emit
+// (blockEmitter.js:555, applyEntryWaypoint) ε-compares the resolved value against the program's own derived cut
+// entry (firstRapidXY) to decide whether to SPLICE AN EXTRA G0 LINE into the emitted text — presence/absence of an
+// entire line, not a magnitude merely re-resolved downstream, so NOT deferrable either (same class as confirmEvery).
+const ENTRY_REFUSAL = 'Decides whether an extra lead-in rapid gets inserted before the cut (an ε-comparison against the program\'s own derived entry point) — not a value inside an existing move.';
 export function entryBindingsFor(stack) {
     return deriveBindingsFor(stack, [
-        { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
-        { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+        { param: 'entryX', tokenRefusal: ENTRY_REFUSAL, type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+        { param: 'entryY', tokenRefusal: ENTRY_REFUSAL, type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
     ]);
 }
 
@@ -130,9 +135,13 @@ export function entryBindingsFor(stack) {
  *  marker). ONE shared spec so every mill twin (+ any composed wizard carrying the marker) inherits the same tool picker,
  *  sim cutter, and (Phase 2) change emit — the corner-pilot "prove once, inherit" rule. The tool's diameter + tip SHAPE
  *  derive from the library at sim/carve (one source, no COPY on the op); a free-typed toolDia is the no-table fallback. */
+// t1758 — NOT eligible: blockEmitter.js:417-420 reads it via `num(p.toolNum,0)`, and `tn>0` decides whether a
+// `@TOOL` marker emits at all, which `applyToolChanges` downstream reads to decide whether a REAL tool-change
+// routine (ATC arm / manual prompt / none) gets built into the program — a structural decision, not a magnitude
+// merely re-resolved downstream, so NOT deferrable either.
 export const TOOL_BINDING_SPECS = [
     {
-        param: 'toolNum', type: 'number', key: 'toolNum', match: { type: 'toolsel' }, default: '',
+        param: 'toolNum', tokenRefusal: 'Decides whether a tool-change routine gets built into the program at all — a structural decision, not a value inside one.', type: 'number', key: 'toolNum', match: { type: 'toolsel' }, default: '',
         widget: 'toolpick', label: 'Tool',
         help: 'Pick a tool from the library (Settings -> Tool table). Its diameter + tip shape drive the sim and carve; the typed cutter Ø is the fallback when no tool is picked.',
     },

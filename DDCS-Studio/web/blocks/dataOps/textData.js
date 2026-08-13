@@ -49,59 +49,71 @@ const FONT_OPTIONS = [
 
 // Pre-order flatten of textStack's [comment, comment, progstart, placeonstock{ stepdown{ filltext } }, progend]:
 //   0 comment · 1 comment · 2 progstart · 3 placeonstock · 4 stepdown · 5 filltext · 6 progend
+// t1758 — MACHINE VARIABLES ROLL OUT, mill family. Text's `filltext`/`stepdown` kernels are fully JS-unrolled at
+// emit time (fillText.js / textGeometry.js / clearing.js's scanlineFill) with NO controller-deferred loop the way
+// surfaceraster.js has — so several params sharing a NAME with surfacing carry the OPPOSITE verdict here (depth/
+// stepdown/feed/plunge/toolDia/stepoverPct): traced fresh against text's own kernels, not copied from surfacing.
 const TEXT_EXEC_BINDINGS = [
     // placement scalars (block 3, placeonstock) — opt-in: originX/originY are the raw offset; stock-attach uses live extent
-    { param: 'originX', blockIndex: 3, key: 'offX', type: 'number', default: TEXT_DEFAULTS.originX },
-    { param: 'originY', blockIndex: 3, key: 'offY', type: 'number', default: TEXT_DEFAULTS.originY },
-    { param: 'offZ', blockIndex: 3, key: 'offZ', type: 'number', default: TEXT_DEFAULTS.offZ },
+    { param: 'originX', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 3, key: 'offX', type: 'number', default: TEXT_DEFAULTS.originX },
+    { param: 'originY', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 3, key: 'offY', type: 'number', default: TEXT_DEFAULTS.originY },
+    { param: 'offZ', tokenRefusal: 'This position is baked into every coordinate in the program by a text-level shift, computed before the program exists — it can\'t be read from the controller at that point.', tokenDeferrable: true, blockIndex: 3, key: 'offZ', type: 'number', default: TEXT_DEFAULTS.offZ },
     {
-        param: 'stockAttach', blockIndex: 3, key: 'stockAttach', type: 'enum', default: TEXT_DEFAULTS.stockAttach,
+        param: 'stockAttach', tokenEligible: true, blockIndex: 3, key: 'stockAttach', type: 'enum', default: TEXT_DEFAULTS.stockAttach,
         widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
     },
     {
-        param: 'pathDatum', blockIndex: 3, key: 'pathDatum', type: 'enum', default: TEXT_DEFAULTS.pathDatum,
+        param: 'pathDatum', tokenEligible: true, blockIndex: 3, key: 'pathDatum', type: 'enum', default: TEXT_DEFAULTS.pathDatum,
         widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
     },
     {
-        param: 'stockDatum', formHidden: true, blockIndex: 3, key: 'stockDatum', type: 'enum', default: TEXT_DEFAULTS.stockDatum,
+        param: 'stockDatum', tokenEligible: true, formHidden: true, blockIndex: 3, key: 'stockDatum', type: 'enum', default: TEXT_DEFAULTS.stockDatum,
         widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS },
     },
-    { param: 'stockW', formHidden: true, blockIndex: 3, key: 'stockW', type: 'number', default: TEXT_DEFAULTS.stockW },
-    { param: 'stockH', formHidden: true, blockIndex: 3, key: 'stockH', type: 'number', default: TEXT_DEFAULTS.stockH },
-    { param: 'stockZ', formHidden: true, blockIndex: 3, key: 'stockZ', type: 'number', default: TEXT_DEFAULTS.stockZ },
-    // depth pass (block 4, stepdown)
-    { param: 'depth', blockIndex: 4, key: 'to', type: 'number', default: TEXT_DEFAULTS.depth },
-    { param: 'stepdown', blockIndex: 4, key: 'by', type: 'number', default: TEXT_DEFAULTS.stepdown },
+    { param: 'stockW', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 3, key: 'stockW', type: 'number', default: TEXT_DEFAULTS.stockW },
+    { param: 'stockH', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 3, key: 'stockH', type: 'number', default: TEXT_DEFAULTS.stockH },
+    { param: 'stockZ', tokenRefusal: 'The stock size feeds the same baked coordinate shift as position — it can\'t be read from the controller before the program is built.', tokenDeferrable: true, formHidden: true, blockIndex: 3, key: 'stockZ', type: 'number', default: TEXT_DEFAULTS.stockZ },
+    // depth pass (block 4, stepdown) — the generic stepdown atom JS-unrolls the Z-level loop (blockEmitter.js
+    // kind==='depth'); text has no controller-deferred descent the way surfaceraster does, so unlike surfacing's
+    // depth/stepdown this is a genuine line-count decision. NOT deferrable.
+    { param: 'depth', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', blockIndex: 4, key: 'to', type: 'number', default: TEXT_DEFAULTS.depth },
+    { param: 'stepdown', tokenRefusal: 'Sets how many Z-descent levels get built into the program (JS-unrolled at build time) — the program\'s SHAPE depends on this number, not a value inside one.', blockIndex: 4, key: 'by', type: 'number', default: TEXT_DEFAULTS.stepdown },
     // glyph geometry + cut (block 5, the filltext leaf)
-    { param: 'text', blockIndex: 5, key: 'text', type: 'string', default: TEXT_DEFAULTS.text, label: 'Text', help: 'The engraved text. Two tokens: {SN} = a running serial number that increments on the controller each run (persistent #var — set the digits/increment below); {DATE} = the date you insert it, stamped statically (no controller has a live clock). Type any prefix/suffix around them, e.g. PART-{SN}.' },
+    { param: 'text', tokenRefusal: 'The string content directly sets how many glyph-stroke moves get built into the program — the program\'s SHAPE depends on this, not a value inside one.', blockIndex: 5, key: 'text', type: 'string', default: TEXT_DEFAULTS.text, label: 'Text', help: 'The engraved text. Two tokens: {SN} = a running serial number that increments on the controller each run (persistent #var — set the digits/increment below); {DATE} = the date you insert it, stamped statically (no controller has a live clock). Type any prefix/suffix around them, e.g. PART-{SN}.' },
     {
-        param: 'font', help: "Letter font — single-stroke engraving fill; more fonts drop in when registered.", blockIndex: 5, key: 'font', type: 'enum', default: TEXT_DEFAULTS.font,
+        param: 'font', tokenRefusal: 'Selects an entirely different glyph registry (a different point-generation source per letter) — a categorical choice, not a value inside one.', help: "Letter font — single-stroke engraving fill; more fonts drop in when registered.", blockIndex: 5, key: 'font', type: 'enum', default: TEXT_DEFAULTS.font,
         widget: 'dropdown', widgetConfig: { options: FONT_OPTIONS },
     },
-    { param: 'height', help: "Cap height (mm).", blockIndex: 5, key: 'height', type: 'number', default: TEXT_DEFAULTS.height },
-    { param: 'width', help: "Horizontal scale: 1 = normal, <1 condensed, >1 extended.", blockIndex: 5, key: 'width', type: 'number', default: TEXT_DEFAULTS.width },
-    { param: 'slant', help: "Oblique / italic skew in degrees (0 = upright; positive leans right).", blockIndex: 5, key: 'slant', type: 'number', default: TEXT_DEFAULTS.slant },
-    { param: 'rotation', help: "Label rotation in degrees about its anchor (0 = level).", blockIndex: 5, key: 'rotation', type: 'number', default: TEXT_DEFAULTS.rotation },   // t708 — the label angle (deg, about the anchor); the ↻ preview handle writes it
-    { param: 'spacing', help: "Extra gap between letters (mm).", blockIndex: 5, key: 'spacing', type: 'number', default: TEXT_DEFAULTS.spacing },
-    { param: 'lineSpacing', help: "Line pitch for multi-line text = cap height × this.", blockIndex: 5, key: 'lineSpacing', type: 'number', default: TEXT_DEFAULTS.lineSpacing },   // t708 — multi-line pitch = height × this
+    { param: 'height', tokenRefusal: 'Sets the glyph outline\'s extent, which feeds the fill\'s row-count loop before the program is built — the program\'s shape depends on this number, not a value inside one.', help: "Cap height (mm).", blockIndex: 5, key: 'height', type: 'number', default: TEXT_DEFAULTS.height },
+    { param: 'width', tokenRefusal: 'Sets the glyph outline\'s extent, which feeds the fill\'s row-count loop before the program is built — the program\'s shape depends on this number, not a value inside one.', help: "Horizontal scale: 1 = normal, <1 condensed, >1 extended.", blockIndex: 5, key: 'width', type: 'number', default: TEXT_DEFAULTS.width },
+    // slant/rotation: pure per-point coordinate transforms (a skew/rotate applied to already-shaped glyph outlines)
+    // — no stroke/row count changes, the same magnitude-re-resolved-downstream shape as corner's hopDist.
+    { param: 'slant', tokenRefusal: 'This value is re-resolved by the text-layout atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, help: "Oblique / italic skew in degrees (0 = upright; positive leans right).", blockIndex: 5, key: 'slant', type: 'number', default: TEXT_DEFAULTS.slant },
+    { param: 'rotation', tokenRefusal: 'This value is re-resolved by the text-layout atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, help: "Label rotation in degrees about its anchor (0 = level).", blockIndex: 5, key: 'rotation', type: 'number', default: TEXT_DEFAULTS.rotation },   // t708 — the label angle (deg, about the anchor); the ↻ preview handle writes it
+    { param: 'spacing', tokenRefusal: 'This gap is re-resolved by the text-layout atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, help: "Extra gap between letters (mm).", blockIndex: 5, key: 'spacing', type: 'number', default: TEXT_DEFAULTS.spacing },
+    { param: 'lineSpacing', tokenRefusal: 'This pitch is re-resolved by the text-layout atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, help: "Line pitch for multi-line text = cap height × this.", blockIndex: 5, key: 'lineSpacing', type: 'number', default: TEXT_DEFAULTS.lineSpacing },   // t708 — multi-line pitch = height × this
     {
-        param: 'align', blockIndex: 5, key: 'align', type: 'enum', default: TEXT_DEFAULTS.align,
+        param: 'align', tokenEligible: true, blockIndex: 5, key: 'align', type: 'enum', default: TEXT_DEFAULTS.align,
         widget: 'dropdown', widgetConfig: { options: ALIGN_OPTIONS },
     },
-    { param: 'x', blockIndex: 5, key: 'x', type: 'number', default: TEXT_DEFAULTS.x },
-    { param: 'y', blockIndex: 5, key: 'y', type: 'number', default: TEXT_DEFAULTS.y },
-    { param: 'strokeWidth', help: "Letter boldness (mm). Use ≥ the tool Ø so the fill is clean.", blockIndex: 5, key: 'strokeWidth', type: 'number', default: TEXT_DEFAULTS.strokeWidth },
-    { param: 'toolDia', blockIndex: 5, key: 'toolDia', type: 'number', default: TEXT_DEFAULTS.toolDia },
-    { param: 'stepoverPct', blockIndex: 5, key: 'stepoverPct', type: 'number', default: TEXT_DEFAULTS.stepoverPct },
-    { param: 'feed', blockIndex: 5, key: 'feed', type: 'number', default: TEXT_DEFAULTS.feed },
-    { param: 'plunge', blockIndex: 5, key: 'plunge', type: 'number', default: TEXT_DEFAULTS.plunge },
+    { param: 'x', tokenRefusal: 'This position is re-resolved by the text-layout atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 5, key: 'x', type: 'number', default: TEXT_DEFAULTS.x },
+    { param: 'y', tokenRefusal: 'This position is re-resolved by the text-layout atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 5, key: 'y', type: 'number', default: TEXT_DEFAULTS.y },
+    // strokeWidth/toolDia: together decide the too-small tool-fit refusal (no toolpath at all if it fails) AND the
+    // stepover that sets the fill's scanline row count — a genuine existence + count decision, unlike surfacing's
+    // toolDia (never feeds a too-large refusal, its stepover is controller-deferred).
+    { param: 'strokeWidth', tokenRefusal: 'Combined with the tool diameter, this decides whether the engraving can be cut at all (refuses everywhere if the tool doesn\'t fit) — a categorical decision, not a value inside one.', help: "Letter boldness (mm). Use ≥ the tool Ø so the fill is clean.", blockIndex: 5, key: 'strokeWidth', type: 'number', default: TEXT_DEFAULTS.strokeWidth },
+    { param: 'toolDia', tokenRefusal: 'Combined with the stroke width, this decides whether the engraving can be cut at all, and sets the fill\'s scanline row count — a categorical decision, not a value inside one.', blockIndex: 5, key: 'toolDia', type: 'number', default: TEXT_DEFAULTS.toolDia },
+    { param: 'stepoverPct', tokenRefusal: 'Directly sets the fill\'s scanline row count (JS-unrolled at build time, no controller-deferred loop) — the program\'s shape depends on this number, not a value inside one.', blockIndex: 5, key: 'stepoverPct', type: 'number', default: TEXT_DEFAULTS.stepoverPct },
+    { param: 'feed', tokenRefusal: 'This value is re-resolved by the fill atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 5, key: 'feed', type: 'number', default: TEXT_DEFAULTS.feed },
+    { param: 'plunge', tokenRefusal: 'This value is re-resolved by the fill atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 5, key: 'plunge', type: 'number', default: TEXT_DEFAULTS.plunge },
     // t764 — DYNAMIC SERIAL {SN} fields (a text carrying the {SN} token engraves a persistent, per-run-bumping serial on
     // the controller). Inert unless the text uses {SN}. The START value is NOT a field — it drives an "Initialize counter"
     // action (never emitted, else it'd reset every run). Prefix/suffix = just type static text around {SN}. {DATE} = the
     // insert-time stamp (no controller has a macro-readable clock).
-    { param: 'snSlot', blockIndex: 5, key: 'snSlot', type: 'number', default: TEXT_DEFAULTS.snSlot, label: 'Serial #var', help: 'The controller uservar holding the running serial — it persists across runs. 100-549. Avoid slots your own macros use: the park macros use #470-471, tool-change #472-473.' },
-    { param: 'snWidth', blockIndex: 5, key: 'snWidth', type: 'number', default: TEXT_DEFAULTS.snWidth, label: 'Serial digits', help: 'Digit count, zero-padded — e.g. 6 → 000042.' },
-    { param: 'snIncrement', blockIndex: 5, key: 'snIncrement', type: 'number', default: TEXT_DEFAULTS.snIncrement, label: 'Serial increment', help: 'How much the serial advances each run (usually 1).' },
+    { param: 'snSlot', tokenRefusal: 'This register number is embedded literally into the serial-engrave macro before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 5, key: 'snSlot', type: 'number', default: TEXT_DEFAULTS.snSlot, label: 'Serial #var', help: 'The controller uservar holding the running serial — it persists across runs. 100-549. Avoid slots your own macros use: the park macros use #470-471, tool-change #472-473.' },
+    // snWidth: directly sets a JS-unrolled per-digit extraction loop (one macro block per digit) — a real count decision.
+    { param: 'snWidth', tokenRefusal: 'Sets how many per-digit extraction blocks get built into the serial macro (JS-unrolled at build time) — the program\'s shape depends on this number, not a value inside one.', blockIndex: 5, key: 'snWidth', type: 'number', default: TEXT_DEFAULTS.snWidth, label: 'Serial digits', help: 'Digit count, zero-padded — e.g. 6 → 000042.' },
+    { param: 'snIncrement', tokenRefusal: 'This value is re-resolved by the serial-engrave atom itself before the program is built — it can\'t carry a live value yet.', tokenDeferrable: true, blockIndex: 5, key: 'snIncrement', type: 'number', default: TEXT_DEFAULTS.snIncrement, label: 'Serial increment', help: 'How much the serial advances each run (usually 1).' },
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).
