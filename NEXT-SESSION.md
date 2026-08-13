@@ -1872,3 +1872,17 @@ declared. **This is declaration work, not machinery** — do not grow the mechan
 ⚠ **393 params were measured at t1704** — most are ineligible and need a REFUSAL REASON written by someone
 who knows why. A generic "not supported here" is the dead-field pattern; the reason should say what the
 field is and why a variable cannot drive it.
+
+## ⚠ RECURRING STRUCTURAL PATTERN (2nd occurrence, t1756) — the ALLOW-LIST DROP
+Declaring the probe family's token policy broke the formfield-block round-trip: `bindingsToBlocks` /
+`bindingsFromStack` carry a HARDCODED list of known binding fields and **silently discard anything not on
+it** — so the new `tokenEligible`/`tokenRefusal`/`tokenDeferrable` vanished through the round-trip. Caught
+by the worker's own full-suite run, fixed by carrying them through.
+
+**This is the SAME class already fixed once, in a sibling function** (`deriveBindings.js`, t1704). Two
+occurrences of one shape: *a function that enumerates the fields it knows and drops the rest, without
+saying so.* Every future declaration added to a binding will hit it again, in whichever copy was missed.
+
+**Worth a dedicated act (not yet scoped):** find every place a binding/param object is rebuilt field-by-
+field, and make the unknown-field case either CARRY THROUGH or REFUSE LOUDLY — never silently drop.
+A grep for the known two is not enough; the point is to find the ones nobody has tripped yet.
