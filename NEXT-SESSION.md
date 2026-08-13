@@ -1529,3 +1529,28 @@ picking-one look like the intended workflow, when the real answer is that a wiza
 - **Draggable `opunit` + "add a Surfacing step" authoring gesture: NOTED, NOT NOW.** User: *"lets not go
   there right now, we can simply add steps."* The transparent-boundary mechanism already exists and is
   proven; only the authoring gesture is missing. Revisit against a REAL wizard the user wants to build.
+
+## 📌 THE BLOCKS CANVAS AUTHORS ONE WIZARD — insert REPLACES, with a notice (user, 2026-08-11)
+**Supersedes the "refuse at save" fix above** — this removes the silent-drop hole BY CONSTRUCTION instead
+of guarding it: there is never a second op to lose.
+
+**The rule:** in the BLOCKS tab, inserting a wizard REPLACES the canvas contents rather than appending.
+That canvas is for authoring ONE wizard — which is what a wizard is (one op, whose stack holds as many
+STEPS as you like). Users author extra steps INTO the wizard; they do not stack ops beside it.
+User: *"id rather let users learn to author them in."*
+
+**⚠ A NOTICE IS REQUIRED before clearing** (user: *"obvi there should be a notice about the ops gonna be
+cleared"*). Replacing DISCARDS whatever was on the canvas, so the gesture must say so before it happens —
+silently wiping authored work is the same disease as silently dropping ops at save, just faster. Name what
+is being cleared, not a generic "are you sure".
+
+**Advisor's scoping questions, NOT yet ruled by the user — do not assume:**
+- **Scope: BLOCKS only.** STUDIO's insert builds the user's PROGRAM and must keep APPENDING — that is what
+  a program is. (Advisor's read, stated for the user to correct.)
+- **When to warn:** only when there is something to lose (canvas edited and unsaved). A fresh/untouched
+  canvas replaces silently — nothing to protect, and a prompt on every insert becomes noise the user
+  learns to click through, which defeats the point.
+
+**Tension to keep in view:** the user earlier valued stacking two ops and editing them SEPARATELY. That
+still holds — in the PROGRAM (STUDIO), which is where a multi-op program belongs. The Blocks canvas is an
+authoring surface, not a program.
