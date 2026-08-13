@@ -158,7 +158,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
     { id: 'TRAP9 _layout is a module-level singleton', file: 'web/wizards/ops/panelTypes.js', line: 639, find: /_layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
-    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:651)', file: 'web/wizards/views/userOpView.js', line: 651, find: /renderLayout2D|el\('userVizContainer'\)/ },
+    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 661, find: /renderLayout2D|el\('userVizContainer'\)/ },
 ];
 
 test('architecture map ASSERTED: every TRAP citation still holds', () => {

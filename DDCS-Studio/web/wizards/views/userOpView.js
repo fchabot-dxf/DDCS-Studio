@@ -393,6 +393,16 @@ export function createUserOpView(ns, opts) {
         applyVariant(variant) { if (variant != null && variant !== '' && _def && (_def.bindings || []).some((b) => b.param === 'mode')) _seed = { ...(_seed || {}), mode: variant }; },
 
         onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; clearPreviewOnlyParams(); _clearThrottle(); applyPanel(); const h = elNS('wiz_user_form'); if (h) h.__sig = null; render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too; t1648 clear the preview-only side-store too; t808 drop any pending throttled update; t1740 — reset the sync-in-place signature too, so a fresh op never syncs-in-place against a DIFFERENT op's stale structure
+        // t1746 ACT 1b-ii-FIX — the LIGHTER entry point a continuously-live host (the Blocks pane) needs for a
+        // same-op re-render: everything onShow resets above is correctly scoped to "a genuinely fresh wizard
+        // open" (a different op, or the same op reopened from scratch) — NOT to "this op's own re-render cycle,"
+        // which fires on every upstream canvas change including the echo this view's own onFieldWrite causes.
+        // Calling onShow there unconditionally forced host.__sig back to null before every render() call, so
+        // render()'s own sync-in-place check (built in t1740 for exactly this) could never fire — the form
+        // rebuilt from scratch on every keystroke that reached a valid value, wiping the field under the user's
+        // cursor. refresh() only updates `_mgr` and calls render() — __sig, _layoutSpots, _simStartFracs, and the
+        // throttle are left exactly as they are, so a structure-unchanged re-render takes the sync-in-place path.
+        refresh(mgr) { _mgr = mgr; render(); },
         onHide() { _clearThrottle(); },   // t810 — clear the throttle on CLOSE too, so a trailing update can't ghost-fire ~200ms after the modal closes
 
         update(mgr) {

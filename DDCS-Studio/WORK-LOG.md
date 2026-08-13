@@ -25955,3 +25955,66 @@ mechanical patch) but implementing it wasn't asked for in an act scoped to "noth
    entry point distinct from "fresh open" (`onShow`) for its OWN continuous re-render cadence. A candidate shape
    (not implemented): a second, lighter method on the view — call it once per genuine op-type change via `onShow`,
    and via something that skips the `_layoutSpots`/`_simStartFracs`/`__sig` resets for every other render.
+
+
+## Turn 1746 (worker) — ACT 1b-ii-FIX: close the keystroke-loss red, exactly the candidate shape sized last turn
+
+### THE FIX
+
+`userOpView.js`'s `view` gained `refresh(mgr)` — the lighter entry point t1744's own report sized: `_mgr = mgr;
+render();`, nothing else. Unlike `onShow`, it does NOT reset `_layoutSpots`/`_simStartFracs`/`clearPreviewOnlyParams`/
+the throttle/`host.__sig` — so `render()`'s own sync-in-place check (built in t1740, gated on `onFieldWrite`, which
+t1744 wired) can actually compare against the LAST render's signature instead of always finding it forced to `null`.
+
+`blocksApp.js`'s flat branch now distinguishes the two cases with one new tracked variable, `blkLastOpType`
+(module-scoped, alongside `blkView`): a genuine fresh open (arriving from a different branch, or a different op)
+calls `onShow` and records the opType; a same-op re-render (this render's OWN writeback echo, or an unrelated
+canvas change while this op is already the one showing) calls `refresh` instead. `blkLastOpType` resets to `null`
+in each of the OTHER three branches' own return points (`!show`, both `hasTree` returns, mid-edit) — so returning
+to the flat branch after a detour through any of them always counts as fresh, matching what `onShow`'s resets are
+actually for.
+
+### A bug in my own first attempt, found before shipping it
+
+The first version reset `blkLastOpType = null` ONCE, unconditionally, at the very TOP of `renderLiveForm()` —
+reasoning it as "default to not-showing-blkView, only the flat branch undoes this." That reset ran on EVERY call,
+INCLUDING calls that were about to re-enter the flat branch for the SAME op — wiping the tracking variable
+immediately before the flat branch's own comparison could ever see a match, so `onShow` (with its reset) fired
+every single time regardless, and the keystroke-loss red did not move. Caught by re-running the exact failing
+check (not trusting the code review) and reading a temporary diagnostic log placed right at the comparison:
+`{"blkLastOpType":null, ...}` on a render that should NOT have been the first. Traced it to the single reset line,
+moved the reset into each of the three OTHER branches' own returns instead (where "we are NOT the flat branch this
+time" is actually known, rather than assumed at the top before any branch has run), removed the diagnostic, re-ran.
+
+### CHECK — the real gesture, not a unit
+
+- `pressSequentially('-999', {delay: 90})` into a live pane field: every character landed (`value: "-999"`, not a
+  partial or empty string), focus never left the field (`document.activeElement` stayed the same `[data-param]`
+  element throughout).
+- "THE SWITCH" (t1744's own check, re-run): still green — new host renders, old host empty, live value correct.
+- The writeback t1744 wired: still working (`blocks-live-form.spec.js`'s writeback test, part of the full sweep
+  below, passing — the fix didn't touch `onFieldWrite` itself, only when `render()`'s signature check can fire).
+
+### Verify
+
+- `npm run test:node`: 118/118 — first run caught a THIRD `TRAP9` citation drift (`userOpView.js:651→661`, the
+  `refresh()` addition's own +10 lines; the OTHER call site `:666→:676`), fixed in the test + `ARCHITECTURE.md`
+  together, second run clean.
+- `fork-parity-1593.spec.js`, `open-as-modal-1625.spec.js`, `wizard-face-1599.spec.js`, full `blocks-*` family:
+  two clean runs, 65 passed / 0 failed / 9 skipped each (2 flaky-then-passed per run, a DIFFERENT specific test
+  each time — `blocks-mobile-drawers`/`blocks-rotary-rig` this pass — the same `window.__blkws`/CSS-transition-
+  under-load environmental pattern logged repeatedly this session, not chased).
+- Modal: unaffected — `createUserOpView(null)`'s `onShow` is unchanged, and nothing calls the new `refresh` for it.
+
+### Not in this act (per the dispatch, explicitly deferred, not forgotten)
+
+(a) The `hasTree` branch — every built-in twin still renders through the old `renderOpForm(tempHost,…)`/
+`renderUiTree(…)` path (t1744's Finding 1); the advisor's own note: their 1b-ii gate tested a grep instead of
+which path the real gesture takes, and the next act will gate on the gesture itself.
+(b) Cancel — a mid-turn amendment corrected the surface this ruling applies to (does not change this act's own
+code, incorporated for the record only): in the PANE, both Insert AND Cancel stay INERT — the pane is always
+present, never opened/closed, so there is no before-state to revert to and no session to close; a pane Cancel
+would be a control doing nothing. In the MODAL ("Open as modal"), Insert stays inert but Cancel REVERTS — the
+modal IS a session (opened, edited, closed), so Cancel there means restore the values at open and close, keeping
+the modal's own "close it and nothing is saved" promise. Queued behind this fix landing first (reverting is
+meaningless while typing didn't reliably land); left exactly as it is — no code touched toward it this act.

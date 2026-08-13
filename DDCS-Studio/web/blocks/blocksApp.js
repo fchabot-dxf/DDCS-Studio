@@ -390,6 +390,11 @@ async function buildWorkspace() {
       if (Number.isFinite(n)) { try { writeAuthoredValue(ws, param, n); } catch (_) { /* transient mid-edit miss is fine */ } }
     },
   });
+  // t1746 ACT 1b-ii-FIX — which op blkView last showed, so renderLiveForm can tell a genuine fresh open (a
+  // different op, or arriving from a different branch) from a same-op re-render (an unrelated canvas change, or
+  // this render's OWN writeback echo) and route to onShow vs the lighter refresh() accordingly. null whenever
+  // blkView isn't the active host, so returning to it always counts as fresh.
+  let blkLastOpType = null;
   function setActiveTab(tab) {
     if (tab !== 'wizard' && tab !== '3d') return;
     activeTab = tab;
@@ -574,6 +579,7 @@ async function buildWorkspace() {
       // reader to add a block while the other face was already showing them the program. Nothing to say.
       formHost.innerHTML = '';
       formHost.__sig = null;
+      blkLastOpType = null;   // t1746 — a later return to the flat branch counts as fresh, not a same-op re-render
       return;
     }
 
@@ -589,6 +595,7 @@ async function buildWorkspace() {
       // being typed in lost focus per keystroke. The sig covers the binds shape PLUS the layout tree minus block
       // ids and dflt values — so a value edit syncs in place and a structure/presentation edit rebuilds.
       const treeSig = formSig(binds) + '||' + JSON.stringify(userRoot.uiChildren, (k, v) => ((k === 'id' || k === 'dflt') ? undefined : v));
+      blkLastOpType = null;   // t1746 — a later return to the flat branch counts as fresh, not a same-op re-render
       if (formHost.__sig === treeSig && formHost.querySelector('[data-param]')) {
         syncFormValues(formHost, binds);
         return;
@@ -617,6 +624,7 @@ async function buildWorkspace() {
       const root = userRoot || {};
       const hasPresentation = Array.isArray(root.uiChildren) && root.uiChildren.length > 0;
       formHost.__sig = null;
+      blkLastOpType = null;   // t1746 — a later return to the flat branch counts as fresh, not a same-op re-render
       formHost.innerHTML = hasPresentation
         ? '<div class="blk-form-empty">This wizard has no fields yet — add a <b>Form field</b> block, or a <b>Parameter Group</b>, to the Presentation mouth.</div>'
         : '<div class="blk-form-empty">This wizard is empty — drop a <b>Panel</b> and a <b>Form field</b> block into its <b>Presentation (UI &amp; Sim)</b> mouth to give it a form.</div>';
@@ -624,15 +632,22 @@ async function buildWorkspace() {
     }
 
     // t1744 ACT 1b-ii — THE SWITCH: this flat-bindings case (a `hasTree` layout tree is a SEPARATE face above,
-    // untouched) now renders through the SAME renderer the "Open as modal" overlay uses, not a lookalike. `render()`
-    // has no `onFieldWrite` wired here (unneeded for this act — nothing writes the pane's fields back to the
-    // canvas yet, so there is no echo for it to guard against; ACT 1b-ii-b's own scope if that changes), so every
-    // call rebuilds fresh — acceptable for now since nothing currently re-triggers this from typing IN the pane.
+    // untouched) now renders through the SAME renderer the "Open as modal" overlay uses, not a lookalike.
     if (blkHost) {
       formHost.style.display = 'none';
       blkHost.style.display = '';
       blkView.setUserOpDef(def);
-      blkView.view.onShow({ update() {} });
+      // t1746 ACT 1b-ii-FIX — onShow ONLY on a genuine fresh open (blkLastOpType reset to null above whenever
+      // some OTHER branch just ran, or this is the first time). A same-op re-render — this render's OWN
+      // writeback echo, or an unrelated canvas change while this op is already showing — uses the lighter
+      // refresh() instead: it does not reset host.__sig, so render()'s sync-in-place check can actually fire and
+      // a field the user is mid-keystroke in gets synced, not destructively rebuilt out from under them.
+      if (blkLastOpType === def.opType) {
+        blkView.view.refresh({ update() {} });
+      } else {
+        blkLastOpType = def.opType;
+        blkView.view.onShow({ update() {} });
+      }
     } else {
       formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
     }

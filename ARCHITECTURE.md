@@ -588,7 +588,7 @@ rg -n "\.attach\(" DDCS-Studio/web --glob '*.js'
 ### 9 · `renderDeclaredLayout` is an exported function with ZERO callers — and it is the shape that would break the overlay.
 `_layout` is a module-level singleton (`panelTypes.js:639`) and `FeatureCanvas._mount` wipes `container.innerHTML`
 when the container changes (`featureCanvas.js:92-95`). Both live call sites pass the same `'userVizContainer'`
-container (`userOpView.js:651,666` — namespaced to `elNS('userVizContainer')` since t1740's host-parameterization
+container (`userOpView.js:661,676` — namespaced to `elNS('userVizContainer')` since t1740's host-parameterization
 refactor, same id for the default modal instance), so it never fires. If a second container is ever rendered, the wipe destroys
 `.fc-anim-overlay` while `container.__animOverlay` still holds the detached canvas (`userOpView.js:86`) — the
 overlay would silently never come back.
