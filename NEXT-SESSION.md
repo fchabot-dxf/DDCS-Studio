@@ -1554,3 +1554,19 @@ is being cleared, not a generic "are you sure".
 **Tension to keep in view:** the user earlier valued stacking two ops and editing them SEPARATELY. That
 still holds — in the PROGRAM (STUDIO), which is where a multi-op program belongs. The Blocks canvas is an
 authoring surface, not a program.
+
+### ⛔ WITHDRAWN (t1739) — the "insert replaces on the Blocks canvas" entry above is on the WRONG SURFACE
+The user was talking about **STUDIO**, not the Blocks canvas. The advisor mapped the question onto Blocks
+and wrote a whole rule (replace + notice + scoping assumptions) about a surface the user was not asking
+about. **User: *"nope … i was talking about studio, i dont even understand how to add wiz gcode through
+blocks."*** Withdraw that entry entirely — do not implement it.
+
+**And the premise was wrong too.** STUDIO's insert is NOT append-only: `wizardManager.insert()` (:464)
+branches on `this.editingOpId` — open an op that is already in the program and Insert does a SURGICAL
+WRITEBACK to that op (replace-in-place); it only ADDS when nothing is being edited. So "can insert replace
+instead" already partly IS the behaviour, and the real question was never asked properly.
+
+⚠ **The advisor's larger error, worth naming:** several recent conclusions assumed adding ops on the
+BLOCKS canvas is a normal user workflow. The user says they do not even know how they would do that. **Do
+not build on that assumption.** Re-establish what the user actually does in each surface before drawing
+any more conclusions about canvas behaviour.
