@@ -1952,3 +1952,41 @@ Same rule as everywhere else this week: the value can be a guess, it just cannot
 personal number already become a RULE (clamp/threshold/refusal/test baseline)" is still worth doing. A
 good default becoming an invisible constraint is exactly the failure mode, and a good default is MORE
 likely to spread than a bad one.
+
+---
+
+# 🔬 THE DOORS DIVERGE — the finding under five separate bugs (user, 2026-08-13)
+**The user's question, and it is the right one:** *"in a wizard as data world why are these even different"*
+
+In a wizards-as-data world there is ONE def (template + bindings) and every door should reach the SAME
+rendered wizard. If Customize renders zero fields for a wizard the bar renders fine, **the doors are not
+equivalent** — something on one path does work the other does not, and the def is not the single source it
+claims to be.
+
+## THE THREE DOORS, and what each actually does differently
+| door | what it does | evidence |
+|---|---|---|
+| **bar → Insert** (the user's daily path) | `commitActiveOp()` **EXPANDS** into a full `Define Custom Wizard` tree → `deriveLiveWizard` takes the **authoredHere** branch | traced t1762 |
+| **Customize as blocks** | `editWizardDef(opType)` → `reconstructUserOpBlock(opType)` → `makeOp(opType, defaultParams(def), forkTpl)` — **REBUILDS from the registry at DEFAULTS**, TYPE-keyed, a FORK by design (`opContextMenu.js:140-143`), and gated to 8 CAM-generator twins | traced t1754, t1739 |
+| **`ddcsLoadBlockStack`** (tests) | injects a stack **directly**, no expansion, no rebuild | `wizard-face-1599` uses this for every case |
+
+## WHY THIS IS THE REAL FINDING, not a failing test
+**Every pane bug this session was the same wizard behaving differently depending on how you arrived:**
+- the EMPTY PANE (t1740) — the scan checked `b.type`/`params.opType`, never the placed op's own `opType`
+- the `hasTree` BRANCH (t1748) — 1b-ii switched the flat branch; every built-in takes the other one
+- the VISUAL HOST (t1760/62) — built against one route, verified against the other
+- the READ-ONLY RULE (t1752/54) — a proxy for "is this a placed op" caught a hand-built stack AND Customize
+- `wizard-face-1599:84` — Customize renders 0 fields for at least one twin
+
+**Five bugs, one shape.** Fixing them one at a time is treating symptoms.
+
+## THE ACT (after the surface fix)
+**Map what each door does that the others do not, and ask how much of it is NECESSARY.** Deliverable is a
+table: per door, the transformation applied to the def before rendering, and whether it is essential
+(Customize's fork semantics ARE deliberate — see t1754) or incidental. **Then collapse the incidental
+ones**, so the divergences stop being POSSIBLE rather than being fixed one by one.
+⚠ Do not "fix" `wizard-face-1599` by making its assertion pass — first establish whether the Customize
+route is genuinely broken or the spec is asserting through a door that no longer means what it did.
+⚠ Related and probably the same root: the specs guarding the PANE are synthetic (`ddcsLoadBlockStack`)
+while 29 specs elsewhere DO drive the real `insertWiz` gesture — the pane's own coverage was the gap, which
+is why the user found the empty pane and the tests did not.
