@@ -1207,6 +1207,34 @@
                 <h3 class="pane-h">Generator Modal <span class="blk-form-live" title="The form is a live view of the blocks — no save needed">live</span>
                     <button type="button" id="blkOpenModal" class="blk-openmodal" hidden title="See this wizard at full size — the real modal, rendered live from the current blocks; close it and nothing is saved">⧉ Open as modal</button></h3>
                 <div id="blk-form" class="blk-form-body"></div>
+                <!-- t1742 ACT 1b-i — the SCAFFOLD a createUserOpView('blk') instance expects (elNS('wiz_user_form')
+                     → #blk_wiz_user_form, .closest('.wiz-2pane')/.wiz-controls, applyPanel's #blk_wiz_user
+                     .wiz-visual). HIDDEN and UNUSED this act — #blk-form above (renderOpForm) is still what
+                     actually renders; this exists only so the renderer can be constructed and exercised against
+                     real DOM without throwing, staged ahead of the ACT 1b-ii wiring decision. Mirrors the modal's
+                     own #wiz_user block (this file, the wiz_user id) with blk_-prefixed ids; the code-preview
+                     block is intentionally OMITTED (t1734 deleted Projected G-code, not hidden it). -->
+                <div id="blk_wiz_user" class="wiz-body" style="display:none">
+                    <div class="wiz-2pane">
+                        <div class="wiz-visual">
+                            <span class="section-label">VISUALIZATION</span>
+                            <div class="viz-split">
+                                <div class="viz-container" id="blk_userViz3dBox" data-viz-pane="preview3d" style="display:none">
+                                    <div id="blk_userViz3dStatus" class="viz-status"></div>
+                                    <div id="blk_userViz3dContainer" class="viz-canvas"></div>
+                                </div>
+                                <div class="viz-container" data-viz-pane="layout2d">
+                                    <div id="blk_userVizStatus" class="viz-status"></div>
+                                    <div id="blk_userVizContainer" class="viz-canvas"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="wiz-controls">
+                            <div class="wiz-usage" id="blk_wiz_user_usage">Custom op.</div>
+                            <div id="blk_wiz_user_form"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <!-- 3D tab: the program's toolpath simulation — always meaningful, independent of the Wizard View tab. -->
             <div class="pv">

@@ -25772,3 +25772,77 @@ both tests green (the twin-registry partition check + "fork EVERY shipped twin: 
 internally sweeps `twins.length >= 32` — the full registered set); `open-as-modal-1625.spec.js` and
 `wizard-face-1599.spec.js` full green; `npm run test:node` 118/118; the scratch inert-Insert test (recreated after
 being deleted mid-revert) green (1 flaky-then-passed retry, load-related).
+
+
+## Turn 1742 (worker) — ACT 1b-i: the pane's namespaced DOM scaffold, unwired, plus a correction and a ruling
+
+### The correction, taken plainly
+
+The advisor's dispatch measured something my own t1740 STOP got wrong: I concluded "no reachable case exists where
+`openLiveAsModal()` runs against a genuine placed-op identity," having traced `authoredHere` and `customizing` —
+the two routes that existed BEFORE this turn. The empty-pane fix, landed LATER in the SAME turn, added a THIRD
+route (the `opBlock` scan recognizing a normally-placed op) — and never re-checked the STOP's own conclusion
+against the route I had just built. The advisor measured it directly: `openWiz → insertWiz → showApp('blocks')`
+leaves the program holding `{opType:'user_corner_data', id:'op1', params}` — a REAL id — with the pane rendering
+23 fields AND `#blkOpenModal` visible. So a genuine placed-op identity IS reachable through `openLiveAsModal()`
+today, via the very fix that was supposed to be a separate, unrelated bug. Noted as a pattern (my own trace was
+good at the time it was written; it went stale the moment a later edit in the same turn changed what it was
+tracing over) rather than argued with.
+
+### The ruling, despite the correction
+
+Even with a real identity reachable, the RULING (the user, via the advisor) is: Blocks-modal Insert stays INERT
+for EVERY route, full stop. Reasoning given: the button's own copy already promises "close it and nothing is
+saved"; Studio already has a working in-place edit for a placed op (`editingOpId`/`openForEdit`); a SECOND door to
+the same edit, reached from a different surface, is exactly the duplication-that-drifts shape this whole gameplan
+exists to remove. Write-back-in-place for Open-as-modal (the "1c-ii" question from the STOP) is WITHDRAWN, not
+deferred — the inert-Insert guard already shipped (t1740's `_previewing` flag) is confirmed as the correct,
+FINAL answer, not a stopgap. Nothing to change in code for this — the guard already covers every route
+unconditionally (`if (this._previewing) return;`, no route-specific carve-out to remove).
+
+### THE ACT — the pane's scaffold, built and exercised, still unwired
+
+Added the DOM structure a `createUserOpView('blk')` instance needs (`index.html`, inside `#blk-formpane`, hidden,
+after the existing `#blk-form`): `#blk_wiz_user` (`.wiz-2pane` > `.wiz-visual` + `.wiz-controls`), the 2D/3D
+`viz-container`s (`#blk_userViz3dBox`/`#blk_userVizContainer`/their status divs), `#blk_wiz_user_usage`,
+`#blk_wiz_user_form` — mirroring the modal's own `#wiz_user` block verbatim with `blk_`-prefixed ids, minus the
+code-preview block (Projected G-code stays deleted, not reintroduced here). `#blk-form`/`renderOpForm` — the
+pane's ACTUAL rendering — is completely untouched; the new scaffold starts `display:none` and nothing writes into
+it yet.
+
+**Exercised, not just inspected — a scratch diagnostic constructed a real `createUserOpView('blk')` instance,
+called `setUserOpDef(getUserDef('user_corner_data'))`, then `view.onShow({update(){}})` (a minimal mgr stub, since
+`update()` itself is never invoked by `render()`) against the new scaffold: no exception, `#blk_wiz_user_form`
+populated with 23 fields, `#blk_wiz_user_usage` correctly read "Corner."** This is real evidence the scaffold is
+structurally complete for the renderer, not just plausible-looking markup.
+
+### Verify
+
+- Insert-to-Blocks gesture (`openWiz → insertWiz → showApp('blocks')`): pane still 23 fields via the OLD path,
+  new scaffold exists/hidden/empty — nothing visibly changed.
+- `createUserOpView('blk')` construct-and-render diagnostic: no throw, 23 fields, usage text correct (above).
+- Modal (`openWiz('user_corner_data')` directly): still 23 fields, unaffected.
+- `npm run test:node`: 118/118.
+- `fork-parity-1593.spec.js`, `open-as-modal-1625.spec.js`, `wizard-face-1599.spec.js`, and the full `blocks-*`
+  family: 66 passed, 1 flaky-then-passed (`window.__blkws`/`ddcsStudio` cold-boot under load, a different specific
+  test each of two runs — the same established environmental pattern, not chased), 9 skipped, 0 failed both runs.
+
+### Constraints for ACT 1b-ii (sized, NOT solved this act, per the dispatch)
+
+Both from the original t1740 STOP, unchanged by anything this act touched — restated here as the two things
+whoever designs the actual wiring will need to resolve, not reopened:
+
+1. **The writeback gap.** The pane's CURRENT path (`renderOpForm`/`writeAuthoredValue`) lets an edited field write
+   back into the specific Blockly block on the canvas. `userOpView`'s renderer has an opt-in hook for this now
+   (`onFieldWrite`, t1740) but nothing has wired it to `writeAuthoredValue` yet — that wiring, plus deciding what
+   happens to the field ↔ block coupling once `userOpView` owns rendering, is 1b-ii's work, not this act's.
+2. **Destructive-rebuild vs. focus.** `userOpView.render()` now HAS a sync-in-place path (t1740, gated on
+   `onFieldWrite`) mirroring the pane's own existing `formSig`/`syncFormValues` check — built, verified inert for
+   the modal, but never exercised against the PANE's actual re-render cadence (triggered by every canvas change,
+   including the echo a wired writeback would itself cause). Whether it behaves correctly under that real load is
+   untested until 1b-ii actually wires it in.
+
+Given this act's own scope explicitly excludes Insert/Cancel in the pane (now moot for Insert per the ruling above
+— it stays inert everywhere, no separate pane-specific decision needed) — Cancel is the one requirement genuinely
+still open: the pane, once wired, must not expose a working Cancel either (no commit path in either button, matching
+the ruling's own "one door" reasoning), sized but not built this act.
