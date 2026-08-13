@@ -1709,3 +1709,27 @@ than 2 amendments; a third means it was mis-sized — pass back, re-slice, re-di
   *Check: the comp map is non-empty for a twin probe op.*
 - **3b — PROVE THE PICTURE.** Un-fixme `editor-sim-disc.spec.js`; the disc lands on the COMPENSATED surface.
   *Check: that spec green + a screenshot. **Emit must stay byte-identical — this is sim-only.***
+
+### 3j. RULING (advisor, user delegated — "ok i trust you", 2026-08-11): the Blocks modal's Insert stays INERT
+**First, a correction the user caught:** t1740's WORK-LOG concluded "there is no reachable case where
+`openLiveAsModal()` runs against a genuine placed-op identity." **That is FALSE for the insert→Blocks
+route** — and it was falsified by that same turn's OWN empty-pane fix, which added the placed-op scan as a
+third way the pane finds a wizard. Advisor measured it (t1741): after `openWiz → insertWiz → showApp
+('blocks')` the program holds `{opType:'user_corner_data', id:'op1', params:{…}}`, the pane renders 23
+fields, and **`#blkOpenModal` is VISIBLE**. So there IS something to write back to. The trace was correct
+for the two routes that existed when it was written and was not re-checked against the route just created.
+
+**RULING: Insert is INERT in the Blocks modal for ALL routes** (hand-built · Customize-as-blocks · a
+placed op). Reasons:
+1. **The button already promises it** — its own title: *"…close it and nothing is saved."* A committing
+   Insert would break a promise the UI currently keeps.
+2. **STUDIO already edits a placed op IN PLACE** (`wizardManager.insert()`'s `editingOpId` surgical
+   writeback — proven, tested). A second door to the same edit is the duplication this whole gameplan
+   removes, and two doors drift.
+3. **The pane's job is SEEING, not changing.** Values get changed where they were entered.
+
+**Cost, stated honestly:** to tweak a value while looking at an op in Blocks, the user returns to STUDIO.
+One extra click; one editing path.
+**If that ever chafes, the fix is NOT a commit button on a preview** — the pane's own fields already write
+through to the blocks (`onFieldWrite`, t1740). That is the editing mechanism if one is wanted, and it
+needs no second modal.
