@@ -26167,3 +26167,92 @@ purely about the pane genuinely refusing interaction and SHOWING that it does, n
 ### Still open
 
 Cancel — untouched again this act, still queued behind whatever comes next for the pane.
+
+
+## Turn 1752 (worker) — ACT 1b-v: repoint the host-blind tests — 10 of 12 clean, 2 are a real new finding
+
+### The gate's own premise, checked first (per the advisor's own instruction)
+
+The advisor's FULL gate (not the `blocks-*` family subset t1744–t1750 ran per-turn) found 12 red the family run
+never covers: 7 tracked tests all querying the now-empty `#blk-form`, plus 5 of my own untracked `zzdebug-*`
+scratch specs. Verified the product itself first, as instructed, before touching any test: Customize→Corner
+renders 23 fields in `#blk_wiz_user_form`, `dist=500`, `inert=false`, no readonly class — the pane is correct;
+the tests were checking the wrong place.
+
+### A REAL bug found while repointing, not a mechanical string swap
+
+`hand-built-form.spec.js`'s own case — a BARE stack (no op wrapper, no Define Custom Wizard block) with one
+EXPOSED KNOB — is genuinely "authored," but has `authoredHere=false` AND `customizing=false`, EXACTLY the same
+as a placed built-in op. **t1750's `isPlacedOp = !authoredHere && !customizing` cannot tell them apart** — it
+would have marked this hand-built case read-only too, which is wrong and would have broken this test's own
+writeback claim even after a correct host repoint. Fixed at the source: `deriveLiveWizard()` now returns
+`placedOpFallback`, set ONLY inside the `opBlock`-registry-fallback branch (the ONE case that is genuinely "a
+placed op's own registry def, not something authored here" — a hand-built stack's `def` comes straight from
+`deriveAuthoredDef` and never reaches that branch). Both `applyBlkReadOnly` call sites now key on
+`placedOpFallback`, not the broader `!authoredHere && !customizing`. Caught by reading the test's OWN claim
+carefully (per the dispatch's explicit warning) rather than trusting a host-id-only fix to be sufficient.
+
+### Shared helper, not N copies of the id
+
+`tests/support/blkFormHost.js` exports `getBlkFormHost()` — the SAME "which host is genuinely visible" logic
+`wizard-face-1599.spec.js`'s own `face()` already had (t1748), now the ONE place that answers it. Used via
+Playwright's own idiom for reusing a browser-side helper (splicing `fn.toString()` into an evaluated string,
+since `page.evaluate`'s `arg` can't carry a function reference) in `wizard-face-1599.spec.js` (repointed to
+import it instead of its own copy), `hand-built-form.spec.js`, and `param-group-rows-1605.spec.js`'s `rows()`.
+Where a test's scenario is DETERMINISTIC (Customize always reaches `createUserOpView('blk')` — every sampled
+twin is sectioned, t1748's own finding) a plain Playwright `page.locator('#blk_wiz_user_form …')` stays a direct
+id, since a locator can't ask a dynamic JS question the way `evaluate` can — noted inline at each such site.
+
+### Tests strengthened, not just repointed, where the dispatch's own warning applied
+
+`hand-built-form.spec.js`'s test now ALSO asserts `host.classList.contains('blk-form-readonly') === false` and
+`host.inert === false` directly — proving this case is NOT the read-only one, not just that a field exists at
+the new selector (a presence-only check would have passed all through this week's read-only rollout too, the
+exact vacuous shape the dispatch named). `param-group-rows-1605.spec.js`'s writeback test and `passes-field-
+1613.spec.js`'s stepper test already asserted real behavior (a value reaching the canvas param_field's `dflt`)
+— those only needed their selector corrected, the claim itself was already the right one.
+
+### 5 untracked failures — deleted, not repointed
+
+All five `zzdebug-*` scratch specs (1734, 1742, 1744, 1748, 1750) had already served their diagnostic purpose —
+their findings are recorded in the WORK-LOG entries for those turns. Per the project's own convention (never
+committed, throwaway), deleted rather than kept green artificially.
+
+### 2 of 12 remain red — a genuine, newly-discovered finding, not silenced
+
+Both in `param-group-rows-1605.spec.js`, both Surfacing-specific (Corner, in the SAME file, SAME mechanism,
+passes clean): "Customize Surfacing — the param_group renders as its rows" (fails on row ORDER: `toolNum`
+expected at index 0, lands at index 2) and "values are LIVE both ways" (the form→block writeback never reaches
+the canvas — a 10s timeout, not a wrong value). Traced with a scratch diagnostic (not guessed): Surfacing's
+RENDERED field order (`entryX, entryY, toolNum, zMode, wcs, originX, …`) does NOT match its CANVAS `param_field`
+block order (`toolNum, wcs, originX, …, entryX, entryY` — `entryX`/`entryY` LAST, matching what the test, and
+presumably the OLD `renderUiTree`, expected). Worse: the rendered fields include `zMode`, which has **no
+corresponding `param_field` block on the canvas at all** — it exists only in the registry's OWN `def.bindings`,
+which `formBindings()`+`renderOpForm()`'s section-grouping evidently surfaces regardless of whether the canvas
+declares a row for it, where `renderUiTree`'s tree-walk apparently did not. Corner (the OTHER twin this whole
+arc has used as the running example) does not exhibit this, so the discrepancy is Surfacing-shaped, not general
+— but the ROOT CAUSE (why `formBindings`+`renderOpForm`'s grouping order/membership differs from
+`paramFieldsFromStack`'s canvas-tree walk for THIS twin specifically) was not traced to source before time ran
+out on this act, and STOPPING here rather than guessing a fix matches this whole arc's own established pattern
+(t1748's writeback gap, t1750's ruling) — this is exactly a case of "the renderer needs something it doesn't
+have," not a wiring detail, and forcing it green without understanding why would be exactly what the dispatch's
+own warning was written to prevent.
+
+### Verify
+
+- `npm run test:node`: 118/118.
+- `fork-parity-1593.spec.js`: 2/2 (unaffected — emit reads params by key, not by the pane's DOM order).
+- **The FULL suite, run twice** (the first run was CONTAMINATED — I was still editing the exact files it was
+  about to reach while it ran, a timing mistake caught by re-reading its own output rather than trusting the
+  green count; re-ran clean with no concurrent edits): 2437 passed, 2 failed (the finding above), 9 flaky-then-
+  passed (the same environmental cold-boot/timing pattern logged all session — different specific tests each
+  run, none touching this act's own changes), 26 skipped.
+- Modal, authoring (hand-built + Customize-Corner): unaffected, confirmed passing.
+
+### For the advisor
+
+10 of the 12 named failures are genuinely fixed (verified twice, once contaminated-then-caught, once clean). The
+remaining 2 are Surfacing-specific and real — not a repointing miss, a discrepancy between how `renderUiTree`
+(the retired path) and `formBindings`+`renderOpForm` (the current one) order and select rows for at least this
+one twin. Whether this is worth root-causing now, or is a known-acceptable cost of the switch pending its own
+act, is a call worth making with the full trace above rather than guessed at here.

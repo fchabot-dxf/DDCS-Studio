@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { getBlkFormHost } from './support/blkFormHost.js';
 
 /**
  * t1605 — renderUiTree renders a `param_group`'s rows.
@@ -40,14 +41,17 @@ const customize = async (page, opType) => {
     await page.evaluate((t) => window.ddcsEditWizardDef(t), opType);
     await settle(page);
 };
-/** The wizard-view form pane's row state, read off the live DOM. */
-const rows = async (page) => page.evaluate(() => {
-    const host = document.getElementById('blk-form');
+/** The wizard-view form pane's row state, read off the live DOM. t1752 — "which host" via the SHARED
+ *  getBlkFormHost (tests/support/blkFormHost.js): Customize always reaches createUserOpView('blk')'s
+ *  #blk_wiz_user_form now (every twin sampled so far is sectioned/panel-shaped — t1748), but this helper
+ *  doesn't assume that, it asks. */
+const rows = async (page) => page.evaluate(`(() => {
+    const host = (${getBlkFormHost.toString()})();
     return {
         fields: host ? [...host.querySelectorAll('[data-param]')].map((f) => f.dataset.param) : [],
         unwired: host ? [...host.querySelectorAll('.unwired-block')].map((e) => e.dataset.blockType) : [],
     };
-});
+})()`);
 
 test('Customize Surfacing — the param_group renders as its rows, not a placeholder', async ({ page }) => {
     test.setTimeout(180_000);
@@ -81,7 +85,10 @@ test('values are LIVE both ways on the wizard-view face', async ({ page }) => {
 
     // form → block: editing a row writes the canvas declaration (the param_field's dflt) — the two-way pair of
     // the face READING row dflts. Drive the real gesture: fill + input event on the rendered field.
-    const depth = page.locator('#blk-form [data-param="depth"]');
+    // t1752 — Surfacing via Customize is deterministically the createUserOpView('blk') host (sectioned template,
+    // customizing=true so never the placed-op read-only case) — a plain Playwright locator can't ask
+    // getBlkFormHost's "which host" question dynamically, so this is the one place a direct id is still correct.
+    const depth = page.locator('#blk_wiz_user_form [data-param="depth"]');
     await expect(depth, 'the depth row rendered').toHaveCount(1);
     await depth.fill('2.5');
     await depth.dispatchEvent('input');
@@ -97,7 +104,7 @@ test('values are LIVE both ways on the wizard-view face', async ({ page }) => {
         const blk = window.__blkws.getAllBlocks().find((b) => b.type === 'param_field' && b.getFieldValue('PARAM') === 'stepdown');
         blk.setFieldValue('0.75', 'DFLT');
     });
-    await expect(page.locator('#blk-form [data-param="stepdown"]'), 'the canvas dflt edit lands in the form row').toHaveValue('0.75', { timeout: 10_000 });
+    await expect(page.locator('#blk_wiz_user_form [data-param="stepdown"]'), 'the canvas dflt edit lands in the form row').toHaveValue('0.75', { timeout: 10_000 });
     // …and the depth edit above survived (the sync did not clobber the earlier write with a stale rebuild).
     await expect(depth).toHaveValue('2.5');
 });

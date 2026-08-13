@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { getBlkFormHost } from './support/blkFormHost.js';
 
 /**
  * t1599 — A DEFINE CUSTOM WIZARD BLOCK ON THE CANVAS MEANS THE WIZARD VIEW TAB HAS CONTENT.
@@ -68,21 +69,17 @@ const settle = async (page) => {
     }
 };
 /** What the Wizard View tab's CONTENT is — read off whichever host is actually visible (t1734: neither a DOM
- *  class nor a title exists any more; the tab itself is always present regardless of this). t1748 ACT 1b-iii —
- *  a hasTree case (every built-in twin; a hand-built wizard with a real Presentation layout) now renders through
- *  createUserOpView('blk')'s own #blk_wiz_user_form, not #blk-form — #blk-form stays the host only for the
- *  no-wizard / mid-edit-without-layout faces. Pick whichever is genuinely showing, same as the product itself
- *  does (blocksApp.js toggles #blk_wiz_user's display), rather than assuming which face any given test reaches. */
-const face = async (page) => page.evaluate(() => {
-    const newWrap = document.getElementById('blk_wiz_user');
-    const newHost = document.getElementById('blk_wiz_user_form');
-    const newVisible = !!(newWrap && newHost && getComputedStyle(newWrap).display !== 'none');
-    const host = newVisible ? newHost : document.getElementById('blk-form');
+ *  class nor a title exists any more; the tab itself is always present regardless of this). t1752 — "which host
+ *  is showing" is answered by the SHARED getBlkFormHost (tests/support/blkFormHost.js), its actual source spliced
+ *  into the evaluated string (Playwright's own idiom for reusing a browser-side helper) rather than a second
+ *  hand-copy of the same visibility check — the next host move is one edit there, not N here. */
+const face = async (page) => page.evaluate(`(() => {
+    const host = (${getBlkFormHost.toString()})();
     return {
         formText: (host && host.textContent || '').trim(),
         fields: host ? host.querySelectorAll('[data-param]').length : -1,
     };
-});
+})()`);
 
 test('CUSTOMIZE renders the wizard\'s form — for a fork-only twin too, which is the one that was broken', async ({ page }) => {
     test.setTimeout(300_000);

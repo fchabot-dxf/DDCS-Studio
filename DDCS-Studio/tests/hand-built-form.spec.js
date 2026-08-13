@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { getBlkFormHost } from './support/blkFormHost.js';
 
 /**
  * #12 — a hand-built block stack is FORM-EDITABLE too ("one stack, many views"). The FORM [LIVE] pane was gated to
@@ -28,31 +29,41 @@ test('a hand-built bare stack with an exposed knob → FORM [LIVE] shows + write
     { type: 'move', params: { x: 50, y: 60, z: -2, mode: 'feed', f: 800 } },
   ]);
 
-  const shown = await page.evaluate(async () => {
+  // t1752 — this is a BARE hand-built stack (no Define Custom Wizard block, no Customize route): neither
+  // authoredHere nor customizing is true, so it is NOT the "placed op" case t1750 made read-only (that
+  // distinction is `placedOpFallback`, not authoredHere/customizing alone — see blocksApp.js's own comment).
+  // Asserted directly below (not read-only), because THIS is exactly the behavior a host-id-only repoint would
+  // have missed proving: a field existing at the new selector is not the same claim as it being genuinely live.
+  const shown = await page.evaluate(`(async () => {
     const dm = await import('/blocks/devMode.js');
     const def = dm.deriveAuthoredDef(window.__blkws);
     const pane = document.getElementById('blk-formpane');
-    const field = document.querySelector('#blk-form [data-param="px"]');
+    const host = (${getBlkFormHost.toString()})();
+    const field = host && host.querySelector('[data-param="px"]');
     return {
       editingType: dm.editingWizardType(),                 // null — NOT editing a saved wizard
       defNull: def === null,
       bindings: def ? def.bindings.map((b) => b.param) : [],
       paneHidden: pane ? pane.hidden : 'no-pane',
       fieldValue: field ? field.value : 'no-field',
+      hostReadonly: host ? host.classList.contains('blk-form-readonly') : 'no-host',
+      hostInert: host ? host.inert : 'no-host',
     };
-  });
+  })()`);
   expect(shown.editingType, 'not editing a saved wizard — the form shows purely from the hand-built stack').toBeNull();
   expect(shown.defNull, 'a bare hand-built stack now DERIVES a def (authoringBody handles no op wrapper)').toBe(false);
   expect(shown.bindings, 'the exposed knob becomes a binding').toContain('px');
   expect(shown.paneHidden, 'FORM [LIVE] is visible for a hand-built stack with a knob').toBe(false);
   expect(Number(shown.fieldValue), 'the form renders the knob at its current value').toBe(30);
+  expect(shown.hostReadonly, 'a hand-built stack with a knob is NOT the placed-op read-only case (t1750/t1752)').toBe(false);
+  expect(shown.hostInert, 'and is genuinely interactive, not merely visible').toBe(false);
 
   // form → block: edit the field → writeAuthoredValue writes the bound block → reproject updates the program.
-  await page.evaluate(() => {
-    const f = document.querySelector('#blk-form [data-param="px"]');
+  await page.evaluate(`(() => {
+    const f = (${getBlkFormHost.toString()})().querySelector('[data-param="px"]');
     f.value = '99';
     f.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  })()`);
   await page.waitForTimeout(400);
   const wrote = await page.evaluate(() => {
     const prog = window.ddcsGetBlockProgram() || [];
@@ -77,16 +88,17 @@ test('a hand-built stack with NO exposed knobs → FORM [LIVE] renders no contro
     { type: 'spindle', params: { rpm: 12000, on: true } },
   ]);
 
-  const r = await page.evaluate(async () => {
+  const r = await page.evaluate(`(async () => {
     const dm = await import('/blocks/devMode.js');
     const def = dm.deriveAuthoredDef(window.__blkws);
     const pane = document.getElementById('blk-formpane');
+    const host = (${getBlkFormHost.toString()})();
     return {
       bindings: def ? def.bindings.length : 'null',
       hasPane: !!pane,
-      controls: document.querySelectorAll('#blk-form [data-param]').length,
+      controls: host ? host.querySelectorAll('[data-param]').length : 0,
     };
-  });
+  })()`);
   expect(r.bindings, 'no knobs exposed on the bare stack').toBe(0);
   expect(r.hasPane, 'the pane stays mounted (blocksApp binds to it at build time)').toBe(true);
   expect(r.controls, 'no knobs + not editing → no param controls are rendered').toBe(0);

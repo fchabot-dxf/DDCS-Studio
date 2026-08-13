@@ -424,9 +424,17 @@ async function buildWorkspace() {
     // canvas top=1, pane=0 fields. Added getUserDef(b.opType) alongside the pre-existing checks (kept, in case
     // some other shape genuinely nests it) rather than replacing them.
     const opBlock = stack.find((b) => b && (getUserDef(b.type) || getUserDef(b.opType) || (b.params && getUserDef(b.params.opType))));
+    // t1752 — set ONLY inside this fallback, which is the ONE case that is genuinely "a placed op's own registry
+    // def, not something authored here": a hand-built/bare stack with EXPOSED KNOBS (hand-built-form.spec.js's own
+    // case) ALSO has authoredHere=false and customizing=false — it is NOT "placed," `def` there comes straight
+    // from `deriveAuthoredDef`, this branch never runs for it (the `!def.bindings.length` guard is false). Read
+    // by renderLiveForm() below to decide read-only (t1750) — `!authoredHere && !customizing` alone is NOT enough,
+    // it can't tell a placed op from a hand-built one with knobs; this flag can.
+    let placedOpFallback = false;
     if ((!def || !def.bindings || !def.bindings.length) && opBlock) {
       const regDef = getUserDef(opBlock.type) || getUserDef(opBlock.opType) || (opBlock.params && getUserDef(opBlock.params.opType));
       if (regDef) {
+        placedOpFallback = true;
         // t1740 FOLLOW-UP — the registry def carries only DECLARED DEFAULTS; opBlock.params is the placed op's OWN
         // current values, read straight off `stack` — no side-channel, no snapshot, the same object the canvas
         // itself holds (the t1738 ruling: "the stack IS the wizard"). Same two-part overlay t1736 proved (then
@@ -479,7 +487,7 @@ async function buildWorkspace() {
     const userRoot = authoredHere
       || (customizing ? flattenBlocks(stack).find((b) => b && b.type === 'user_root') : null)
       || (def && def.template && Array.isArray(def.template) ? def.template.find((b) => b && b.type === 'user_root') : null);
-    return { def, stack, authoredHere, customizing, userRoot };
+    return { def, stack, authoredHere, customizing, userRoot, placedOpFallback };
   }
 
   /**
@@ -549,7 +557,7 @@ async function buildWorkspace() {
     // Every other branch below (empty / hasTree / mid-edit) is untouched and still targets `formHost`.
     if (blkHost) blkHost.style.display = 'none';
     formHost.style.display = '';
-    const { def, stack, authoredHere, customizing, userRoot } = deriveLiveWizard();
+    const { def, stack, authoredHere, customizing, userRoot, placedOpFallback } = deriveLiveWizard();
 
     function checkLayoutNodes(nodes) {
       if (!nodes) return false;
@@ -627,7 +635,7 @@ async function buildWorkspace() {
           blkLastOpType = def.opType;
           blkView.view.onShow({ update() {} });
         }
-        applyBlkReadOnly(!authoredHere && !customizing);   // t1750 — a sectioned/panel twin reached via a placed op (not authoring) is read-only
+        applyBlkReadOnly(placedOpFallback);   // t1752 — a hand-built/bare stack with exposed knobs is NOT placed either, so authoredHere/customizing alone can't tell; placedOpFallback is the fact that actually distinguishes it
       } else {
         formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
       }
@@ -668,7 +676,7 @@ async function buildWorkspace() {
         blkLastOpType = def.opType;
         blkView.view.onShow({ update() {} });
       }
-      applyBlkReadOnly(!authoredHere && !customizing);   // t1750 — a flat-bindings twin reached via a placed op (not authoring) is read-only
+      applyBlkReadOnly(placedOpFallback);   // t1752 — a hand-built/bare stack with exposed knobs is NOT placed either, so authoredHere/customizing alone can't tell; placedOpFallback is the fact that actually distinguishes it
     } else {
       formHost.innerHTML = '<div class="blk-form-empty">Wizard View scaffold missing.</div>';
     }

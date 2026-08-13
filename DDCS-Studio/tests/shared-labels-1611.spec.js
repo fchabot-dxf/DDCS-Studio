@@ -84,6 +84,8 @@ test('the Blocks Wizard View face resolves through the SAME chain', async ({ pag
         await page.waitForTimeout(250);
     }
     const d = await declared(page);
-    const got = await labelsIn(page, '#blk-form');
+    // t1752 — Surfacing via Customize is deterministically the createUserOpView('blk') host now (sectioned
+    // template, customizing=true — never the placed-op read-only case), not the old #blk-form.
+    const got = await labelsIn(page, '#blk_wiz_user_form');
     for (const p of PARAMS) expect(got[p], `${p} renders its SHARED label on the blocks face too`).toBe(d.map[p]);
 });

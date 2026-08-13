@@ -62,9 +62,11 @@ test('the BLOCKS wizard-view face renders a matched stockAttach/pathDatum select
         last = n;
         await page.waitForTimeout(250);
     }
+    // t1752 — Surfacing via Customize is deterministically the createUserOpView('blk') host now (sectioned
+    // template, customizing=true — never the placed-op read-only case), not the old #blk-form.
     for (const param of ['stockAttach', 'pathDatum']) {
         const s = await page.evaluate((p) => {
-            const el = document.querySelector(`#blk-form [data-param="${p}"]`);
+            const el = document.querySelector(`#blk_wiz_user_form [data-param="${p}"]`);
             return el && el.tagName === 'SELECT' ? { n: el.options.length, value: el.value, selLabel: el.selectedOptions[0] && el.selectedOptions[0].textContent } : null;
         }, param);
         expect(s, `${param} is a select`).not.toBeNull();

@@ -135,12 +135,14 @@ test('the BLOCKS Wizard View face: the stepper works there too, and the write re
         last = n;
         await page.waitForTimeout(250);
     }
-    await expect(page.locator('#blk-form [data-param="passes"]'), 'the stepper renders on the blocks face').toHaveCount(1);
+    // t1752 — Surfacing via Customize is deterministically the createUserOpView('blk') host now (sectioned
+    // template, customizing=true — never the placed-op read-only case), not the old #blk-form.
+    await expect(page.locator('#blk_wiz_user_form [data-param="passes"]'), 'the stepper renders on the blocks face').toHaveCount(1);
     // Defaults 0.5 @ 0.5 → 1 pass. Step ▲ → depth 1.0 (one more whole bite), and the write rides the t1605
     // writeback into the CANVAS param_field declaration — the two-way chain end to end.
-    await expect(page.locator('#blk-form [data-param="passes"]')).toHaveValue('1');
-    await page.evaluate(() => document.querySelector('#blk-form [data-param="passes"]').nextElementSibling.click());
-    await expect(page.locator('#blk-form [data-param="depth"]'), 'the write lands in the depth field').toHaveValue('1');
+    await expect(page.locator('#blk_wiz_user_form [data-param="passes"]')).toHaveValue('1');
+    await page.evaluate(() => document.querySelector('#blk_wiz_user_form [data-param="passes"]').nextElementSibling.click());
+    await expect(page.locator('#blk_wiz_user_form [data-param="depth"]'), 'the write lands in the depth field').toHaveValue('1');
     await page.waitForFunction(() => {
         const walk = (bs, out = []) => { for (const b of bs || []) { if (!b) continue; out.push(b); walk(Array.isArray(b.children) ? b.children : Object.values(b.children || {}).flat(), out); walk(Array.isArray(b.uiChildren) ? b.uiChildren : Object.values(b.uiChildren || {}).flat(), out); } return out; };
         const pf = walk(window.ddcsGetBlockProgram() || []).find((b) => b.type === 'param_field' && b.params && b.params.param === 'depth');
