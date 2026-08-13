@@ -1668,3 +1668,44 @@ short act reviewed is worth more than a long act trusted.
 - **1d — SAMPLE ACROSS FAMILIES.** A probe, a mill op, a lathe op, an ATC op, each via the user's gesture.
   Report a per-family table; any that render differently is a wizards-as-data GAP to surface, not smooth
   over (3i).
+
+## 🔪 FINER SPLIT (user: "split more", 2026-08-11) — supersedes the 1a-1d list
+**One act = one change + one check the advisor can verify in a single command.** No act should need more
+than 2 amendments; a third means it was mis-sized — pass back, re-slice, re-dispatch.
+
+### The one-renderer work
+- **1a ✅ LANDED** — `createUserOpView(ns)` factory; modal uses `createUserOpView(null)`.
+  *Check: `grep createUserOpView userOpView.js` + modal byte-identical.*
+- **1b-i — PANE SCAFFOLD ONLY.** Give the pane host the namespaced ids/structure a `createUserOpView('blk')`
+  instance expects. **Render nothing through it yet; the pane still uses its current path.**
+  *Check: the instance can be constructed against the pane host without throwing; nothing visibly changes.*
+- **1b-ii — THE SWITCH.** The pane renders through its instance, and the `renderOpForm(formHost,
+  formBindings(def))` call at `blocksApp.js:612` is DELETED.
+  *Check, and it is the user's own: `grep -n "renderOpForm(formHost" blocksApp.js` returns NOTHING.*
+  *Plus the real gesture: built-in → INSERT → BLOCKS → the form is there.*
+- **1b-iii — SWEEP THE ORPHANS.** Remove imports/helpers that 1b-ii made dead. Nothing else.
+  *Check: node tier green, no unused-import left behind.*
+- **1c-i — PROVE THE INERT INSERT.** The `_previewing` guard already landed in `wizardManager.insert()`.
+  This act only PROVES it: a test that reaches insert() by keyboard AND programmatically while previewing,
+  and asserts no op is committed. *Check: that test exists and fails if the guard is removed.*
+- **1c-ii — OPEN-AS-MODAL WRITEBACK.** Editing an existing op → writes back IN PLACE; authoring a new
+  wizard → inert. Never "add a copy". *Check: insert from the preview modal on a placed op leaves the
+  program length UNCHANGED and the op's params updated.*
+- **1d — THE FAMILY SAMPLE (read-only).** A probe, a mill op, a lathe op, an ATC op, each via the user's
+  gesture. *Check: a per-family table; any that render differently is reported as a wizards-as-data gap
+  (3i), not fixed in this act.*
+
+### ② Middle's clearance mode
+- **2a — DECLARE.** Add `clearMode`/`hopDist`/`planeZ` to `middleData.js`'s MIDDLE_BINDING_SPECS, following
+  `cornerData.js`'s own declaration of the same trio. Nothing else.
+  *Check: the three bindings exist; Middle's form shows Clearance + Hop/Plane.*
+- **2b — PROVE IT DRIVES THE EMIT.** Un-fixme `clearance-form-921.spec.js`; show the emit CHANGES with the
+  mode (the stack builder already reads these — `stacks/middleWizard.js:81-85`).
+  *Check: that spec green, and Hop vs Plane produce different G-code.*
+
+### ③ The simulated probe disc
+- **3a — WALK NESTED ATOMS.** `readEnabledComps()` (`viz/createPreviewPanel.js:43`) currently loops top
+  level only; a twin wraps its atoms in `user_root`. Make it descend. Nothing else.
+  *Check: the comp map is non-empty for a twin probe op.*
+- **3b — PROVE THE PICTURE.** Un-fixme `editor-sim-disc.spec.js`; the disc lands on the COMPENSATED surface.
+  *Check: that spec green + a screenshot. **Emit must stay byte-identical — this is sim-only.***
