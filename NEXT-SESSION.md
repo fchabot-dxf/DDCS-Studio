@@ -1990,3 +1990,26 @@ route is genuinely broken or the spec is asserting through a door that no longer
 ⚠ Related and probably the same root: the specs guarding the PANE are synthetic (`ddcsLoadBlockStack`)
 while 29 specs elsewhere DO drive the real `insertWiz` gesture — the pane's own coverage was the gap, which
 is why the user found the empty pane and the tests did not.
+
+### 🎯 THE FINISH LINE for the diverging-doors work (user, 2026-08-13)
+*"so im ok with doing programatically but we need to make sure they run the same thing, right?"* — yes, and
+this is a better rule than "always drive the real gesture."
+
+**The problem was never that tests are programmatic. It is that the SHORTCUT PRODUCES A DIFFERENT STATE.**
+`ddcsLoadBlockStack([op])` injects the op as-is; `bar → Insert` EXPANDS it into a full `Define Custom
+Wizard` tree, which renders through a different branch. So today the fast path tests a state no user can
+reach.
+
+**THE ACT'S ACCEPTANCE TEST — one spec earns the shortcut for all the others:**
+drive the REAL gesture (openWiz → fill → insertWiz), drive the PROGRAMMATIC setup, and **assert the
+resulting program + canvas are the SAME** (deep-equal the stack modulo ids). If that holds, the ~95 specs
+using `ddcsLoadBlockStack` are testing what the user actually does. If it ever stops holding, THAT test
+fails — instead of the divergence hiding until the user photographs it.
+
+**Same move as everything else this week:** do not repeat the check in 95 places — make the EQUIVALENCE
+provable in ONE place. It also gives this work a concrete finish line: not "make the doors similar" but
+**"this equivalence test passes."**
+⚠ If the two genuinely CANNOT be made equivalent (e.g. the expansion is load-bearing for authoring), then
+say so and the rule inverts: the pane's own specs must drive the real gesture, and the shortcut is banned
+THERE specifically. Either outcome is fine — what is not fine is 95 specs quietly asserting about a state
+that does not occur.
