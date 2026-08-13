@@ -387,6 +387,14 @@ export function bindingsFromStack(children) {
         if (p.optional === true || p.optional === 'true' || p.optional === 'TRUE') spec.optional = true;
         if (p.readonly === true || p.readonly === 'true' || p.readonly === 'TRUE') { spec.readonly = true; if (p.readonlyhint) spec.readonlyHint = String(p.readonlyhint); }
         if (p.whenparam) spec.when = { param: String(p.whenparam), is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : String(p.whenis) };
+        // t1756 — CARRY THE TOKEN-POLICY DECLARATION (tokenEligible/tokenRefusal/tokenDeferrable, t1704) through the
+        // round-trip — the same allow-list-drop class as widgetConfig/gate/derived above (deriveBindings.js hit this
+        // exact bug for its own derivation and was fixed at t1704; this is the SAME fix for the formfield-block
+        // authoring round-trip, caught by formfield-block.spec.js's own lossless-round-trip test going red the
+        // moment a real fixture — MIDDLE_BINDING_SPECS — carried the new fields).
+        if (p.tokenEligible === true || p.tokenEligible === 'true' || p.tokenEligible === 'TRUE') spec.tokenEligible = true;
+        if (p.tokenRefusal) spec.tokenRefusal = String(p.tokenRefusal);
+        if (p.tokenDeferrable === true || p.tokenDeferrable === 'true' || p.tokenDeferrable === 'TRUE') spec.tokenDeferrable = true;
         return spec;
     });
 }
@@ -564,6 +572,8 @@ export function bindingsToBlocks(specs) {
             options: wcStr(wc),
             nmin: wc.min != null ? String(wc.min) : '', nmax: wc.max != null ? String(wc.max) : '',
             nstep: wc.step != null ? String(wc.step) : '', units: wc.units || '',
+            // t1756 — the reverse half of the token-policy carry-through (see bindingsFromStack's own t1756 note).
+            tokenEligible: !!s.tokenEligible, tokenRefusal: s.tokenRefusal || '', tokenDeferrable: !!s.tokenDeferrable,
         } };
     });
 }

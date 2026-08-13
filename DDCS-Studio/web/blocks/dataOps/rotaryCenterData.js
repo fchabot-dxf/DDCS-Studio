@@ -35,27 +35,38 @@ export const ROTARY_CENTER_DEFAULTS = {
 
 /** The bindable scalars → the `assign` macro var each writes (by identity). #2/#3/#5 are ALSO source-chip vars. #57
  *  (diameter) is OPTIONAL — present only in the KNOWN arm (deriveBindings optional-skips it when fit is pruned). */
+// t1756 — MACHINE VARIABLES ROLL OUT, probe family. dist/retract/f_fast/f_slow/port/radius/safeZ/diameter are all
+// eligible — rotaryCenterWizard.js:114 writes diameter straight into #57 as a plain magnitude (`mkA('#57',
+// diameter, ...)`); the R=diameter/2 math is a CONTROLLER-SIDE macro expression (`#55=[#57/2]`, line 115), never
+// JS — same "magnitude embedded, math deferred to the controller" shape corner's own scalars already proved.
 export const ROTARY_CENTER_BINDING_SPECS = [
-    { param: 'dist',     type: 'number', default: ROTARY_CENTER_DEFAULTS.dist,     label: 'Max Probe Dist', help: 'How far the stylus travels toward each surface before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
-    { param: 'retract',  type: 'number', default: ROTARY_CENTER_DEFAULTS.retract,  label: 'Retract',        help: 'How far the probe backs off after the first touch, before the slow re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
-    { param: 'f_fast',   type: 'number', default: ROTARY_CENTER_DEFAULTS.f_fast,   label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
-    { param: 'f_slow',   type: 'number', default: ROTARY_CENTER_DEFAULTS.f_slow,   label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
-    { param: 'port',     type: 'number', default: ROTARY_CENTER_DEFAULTS.port,     label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
-    { param: 'radius',   type: 'number', default: ROTARY_CENTER_DEFAULTS.radius,   label: 'Stylus Radius',  help: 'The probe stylus tip radius (mm) — the OD comp for both methods.', section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
-    { param: 'safeZ',    type: 'number', default: ROTARY_CENTER_DEFAULTS.safeZ,    label: 'Safe Z',         help: 'The clearance height the probe lifts to between flanks / for the final park.', section: 'GEOMETRY', match: { type: 'assign', var: '#17' }, key: 'value' },
-    { param: 'diameter', type: 'number', default: ROTARY_CENTER_DEFAULTS.diameter, optional: true, when: { param: 'method', is: 'known' }, label: 'Known Diameter', help: 'The known bar diameter (mm). R = diameter/2; the centreline Z = top − R. Known method only.', section: 'GEOMETRY', match: { type: 'assign', var: '#57' }, key: 'value' },
+    { param: 'dist',     type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.dist,     label: 'Max Probe Dist', help: 'How far the stylus travels toward each surface before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
+    { param: 'retract',  type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.retract,  label: 'Retract',        help: 'How far the probe backs off after the first touch, before the slow re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
+    { param: 'f_fast',   type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.f_fast,   label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
+    { param: 'f_slow',   type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.f_slow,   label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
+    { param: 'port',     type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.port,     label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
+    { param: 'radius',   type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.radius,   label: 'Stylus Radius',  help: 'The probe stylus tip radius (mm) — the OD comp for both methods.', section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
+    { param: 'safeZ',    type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.safeZ,    label: 'Safe Z',         help: 'The clearance height the probe lifts to between flanks / for the final park.', section: 'GEOMETRY', match: { type: 'assign', var: '#17' }, key: 'value' },
+    { param: 'diameter', type: 'number', tokenEligible: true, default: ROTARY_CENTER_DEFAULTS.diameter, optional: true, when: { param: 'method', is: 'known' }, label: 'Known Diameter', help: 'The known bar diameter (mm). R = diameter/2; the centreline Z = top − R. Known method only.', section: 'GEOMETRY', match: { type: 'assign', var: '#57' }, key: 'value' },
 ];
 
+// t1756 — neither is eligible: both are CATEGORICAL branch-selectors guarding which arm of rotaryCenterStack's
+// superset survives prune (known vs 3-point-fit builds a genuinely different probe sequence; auto vs guided is
+// hands-free vs a jog-and-verify pause per flank) — the identical shape corner's own axis/order analogues are.
 /** STRUCTURAL toggles — drive the guard prune (NO value socket). method(known|fit) + approach(auto|guided). */
 export const ROTARY_CENTER_STRUCT_BINDINGS = [
-    { param: 'method',   type: 'enum', default: ROTARY_CENTER_DEFAULTS.method,   label: 'Method',         help: 'Known diameter (probe the top + two flanks) or 3-point Fit (probe 3 points, solve the circle — ADVANCED, verify on machine).', section: 'GEOMETRY', widgetConfig: { options: [['Known diameter', 'known'], ['3-point fit (advanced)', 'fit']] } },
-    { param: 'approach', type: 'enum', widget: 'segmented', default: ROTARY_CENTER_DEFAULTS.approach, label: 'Flank Approach', help: 'Known method: Auto runs the flank cycle hands-free; Guided pauses at each flank for you to verify / fine-jog.', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Guided', 'guided']] } },
+    { param: 'method',   type: 'enum', tokenRefusal: 'Known diameter vs 3-point Fit are two different probe sequences (a different number and shape of touches) — not a value inside one; it can\'t be resolved until the program is already built.', default: ROTARY_CENTER_DEFAULTS.method,   label: 'Method',         help: 'Known diameter (probe the top + two flanks) or 3-point Fit (probe 3 points, solve the circle — ADVANCED, verify on machine).', section: 'GEOMETRY', widgetConfig: { options: [['Known diameter', 'known'], ['3-point fit (advanced)', 'fit']] } },
+    { param: 'approach', type: 'enum', tokenRefusal: 'Picks between an automatic flank cycle and a manual jog-and-verify pause at each flank — two different program shapes, not two values of one move.', widget: 'segmented', default: ROTARY_CENTER_DEFAULTS.approach, label: 'Flank Approach', help: 'Known method: Auto runs the flank cycle hands-free; Guided pauses at each flank for you to verify / fine-jog.', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Guided', 'guided']] } },
 ];
 
+// t1756 — neither is eligible despite carrying no guard: applyDatumWcs (postInstantiate, below) COMPARES each value
+// in JS to pick which literal gets written into the setworkoffset block (datum picks #50 vs #56; wcs picks '#578'
+// vs a computed Gnn slot number) — a categorical branch-selector over WHICH content lands in an already-fixed atom,
+// the identical shape corner's own `clearMode` was found to be (t1704).
 /** VALUE-SWAP form controls — NOT structural (no guard, no #var socket): they drive the postInstantiate RECOMPOSE. */
 export const ROTARY_CENTER_VALUESWAP_BINDINGS = [
-    { param: 'datum',      type: 'enum', default: ROTARY_CENTER_DEFAULTS.datum,      label: 'Z0 Datum',     help: 'Set Z0 at the centreline (the bar axis) or the OD top.', section: 'GEOMETRY', widgetConfig: { options: [['Centreline', 'center'], ['OD top', 'top']] } },
-    { param: 'wcs',        type: 'enum', default: ROTARY_CENTER_DEFAULTS.wcs,        label: 'WCS',          help: 'Which work-coordinate register to store the found centre into.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
+    { param: 'datum',      type: 'enum', tokenRefusal: 'Picks which Z value gets written into the work-offset (the OD-top register or the centreline register) — a categorical choice of WHICH content lands in the program, not a number inside it; it can\'t be resolved until the program is already built.', default: ROTARY_CENTER_DEFAULTS.datum,      label: 'Z0 Datum',     help: 'Set Z0 at the centreline (the bar axis) or the OD top.', section: 'GEOMETRY', widgetConfig: { options: [['Centreline', 'center'], ['OD top', 'top']] } },
+    { param: 'wcs',        type: 'enum', tokenRefusal: 'Selects which work-coordinate register the found centre is written to — this changes which G-code gets built, not a number inside it.', default: ROTARY_CENTER_DEFAULTS.wcs,        label: 'WCS',          help: 'Which work-coordinate register to store the found centre into.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
 ];
 
 export const ROTARY_CENTER_DATA_OPTYPE = 'user_rotary_center_data';

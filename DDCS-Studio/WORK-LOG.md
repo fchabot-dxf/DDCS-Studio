@@ -26346,3 +26346,190 @@ checking hardest: it changes read-only behavior on the `deriveLiveWizard` hot pa
 touches, so a mis-scope there would be wide-blast-radius; re-verified it does NOT reopen the `hand-built-form.
 spec.js`/`t1752` case it was built for (that case has `customizing=false` unconditionally — a bare stack has no
 `authoringWizardType()` match — so the new `!customizing` guard term is always true there and changes nothing).
+
+## 🔨 turn 1756 (epoch 4) — MACHINE VARIABLES ROLL OUT, FAMILY 1 (PROBES)
+
+The user ruled A on the text-vs-number fork (t1714): a field that can hold a machine variable renders as text so
+the app can ACCEPT one and REFUSE VISIBLY where it cannot — "its just that we add variable to field," and the
+only real question was whether an ineligible field TELLS the user or silently prevents them; the answer is TELL.
+t1704 measured 393 params across 32 ops into 3 batches (mill-geometry 11, probe family 10, ATC/control/lathe 11)
+and piloted the mechanism on 4 ops (corner/wcs/homing/surfacing). This act: DECLARE the same `tokenEligible`/
+`tokenRefusal`/`tokenDeferrable` fields on the REMAINING 7 probe-family ops — the mechanism is proven, this is
+declaration work, not engine work.
+
+### Which 10 ops are "the probe family" — traced, not assumed
+
+WORK-LOG never lists the 10 op files by name (only the aggregate table). Dispatched an Explore agent to trace it
+from the code rather than guess: `wizardLibrary.js`'s palette tags 8 ops `group: 'probe'` (wcs, homing, corner,
+middle, edge, alignment, rotary_center, rotary_clock); the other 2 are the lathe probes (`odProbeData.js`,
+`faceProbeData.js` — genuine `PROBE_VARS`-shaped ops that write a measured value into a WCS register, unlike
+`centerDrillData.js` [an ordinary lathe drilling op] or `pauseConfirmData.js` [pure control/HMI], which the agent
+confirmed are NOT probes despite superficially plausible names). Of the 10, corner/wcs/homing were already done
+in t1704's pilot (surfacing is mill-geometry, not this family) — leaving 7: **edge, middle, alignment,
+rotary_center, rotary_clock, od probe, face probe**.
+
+### THE RULE (unchanged from t1704, applied fresh per file — not copy-pasted from corner)
+
+Eligible only if the wizard's own stack-builder never needs a resolved NUMBER for the param before the program is
+built (no JS arithmetic/branch/count decision riding on it). For each of the 7 files, traced the ACTUAL consuming
+stack-builder (`edgeWizard.js`, `middleWizard.js`, `alignmentWizard.js`, `rotaryCenterWizard.js`,
+`rotaryClockWizard.js`, `odProbe.js`, `faceProbe.js`) — not inferred from the param name or corner's precedent
+alone.
+
+**Two NEW shapes found that corner's own 4-op pilot never hit:**
+
+1. **A magnitude routed through `String()`, never `num()`/`Number()`, at the JS layer** — middle's `crossX`/
+   `crossY`/`diagTravel`/`diagPrimary` (`middleWizard.js:94-105`). Cleaner than corner's own scalars (which DO run
+   through `num()` before embedding, harmlessly) — still eligible either way, since what matters is whether the
+   RESULT feeds a branch, not whether `num()` touched it en route to a plain socket-write.
+2. **A whole-stack REBUILD keyed on `Number.isFinite(Number(p[k]))` with a silent default fallback** —
+   `odProbeData.js`/`faceProbeData.js`'s `postInstantiate` (`rebuildOdProbe`/`rebuildFaceProbe`) regenerates the
+   entire macro from resolved params on every edit, coercing EVERY scalar through `Number()` first. A token typed
+   into any of these 7 fields TODAY silently reverts to the default — exactly the class this whole cycle exists to
+   stop. None are branch-selectors (each is a plain magnitude with no count/shape decision on it — `odProbe.js`/
+   `faceProbe.js` just plug the resolved number into a probe atom's socket or a controller-side expression, e.g.
+   `ahead` → `[surface-ahead]` computed AT the controller). This is precisely corner's own `hopDist`/`planeZ`
+   shape ("re-resolved by the atom itself... can't carry a live value yet") — so all 14 (7×2 ops) are
+   `tokenRefusal` + `tokenDeferrable: true`, not a flat refusal: eligible IF/WHEN the rebuild is replaced with a
+   direct #var-identity bind like corner's, which this act does not attempt (out of scope — declaration only).
+
+**A third recurring shape, seen on corner's `clearMode` but reappearing three more times here:** a param with NO
+guard/prune fork at all, but whose VALUE gets JS-COMPARED in `postInstantiate` to pick which literal/expression
+lands in an already-fixed atom — rotary_center's `datum`/`wcs` (`applyDatumWcs`) and rotary_clock's `reference`/
+`wcs` (`applyReferenceWcs`) each do exactly this (`p.datum === 'top' ? '#50' : '#56'`, `wcs === 'active' ? '#578'
+: <computed Gnn index>`). Categorical branch-selector, same as a guard fork, just implemented as a JS ternary
+instead of a stack-prune — declared `tokenRefusal`, not deferrable (it's a genuine selection, not a coercion
+casualty).
+
+**One value-only-in-name field with no runtime read at all:** alignment's `tolerance` is DISPLAY-ONLY — it never
+reaches a `#var`, only a header COMMENT string (`alignmentHeaderComments`, baked once at build time). `num()`
+would silently coerce a typed token to `0` in the comment text, so it's `tokenRefusal` too, phrased for what it
+actually is (a build-time-only decoration, not a runtime value the controller could ever supply).
+
+### THE 80 DECLARATIONS — per file, per param, membership + reason (as asked, not a blanket story)
+
+**edge (9)** — eligible: `dist retract f_fast f_slow port radius` (6, same #1-#6 shape as corner). refused:
+`axis` (picks a guarded fork — confirm+probe region), `dir` (picks a guarded fork — probe vars/sign), `wcs`
+(picks which register gets written).
+
+**middle (22)** — eligible: `dist retract f_fast f_slow port radius` (6) + `crossX crossY diagTravel diagPrimary`
+(4, `String()`-only, incl. 2 that are `readonly`/drag-driven — corner's own `cross1_x` etc. establish that
+readonly/hidden doesn't disqualify eligibility, only today's widget affordance). refused (12, all categorical
+guard-fork selectors): `axisOrder dir1 dir2 featureType inAxis transAxis travelShape twoAxis circular probeZ wcs
+syncA`.
+
+**alignment (11)** — eligible: `dist retract f_fast f_slow port safeZ span` (7). refused: `travel checkAxis
+probeDir` (3, guard-fork selectors) + `tolerance` (1, display-only comment, no runtime read).
+
+**rotary_center (12)** — eligible: `dist retract f_fast f_slow port radius safeZ diameter` (8 — `diameter`'s
+`R=diameter/2` math is a CONTROLLER-side macro expression, `#55=[#57/2]`, never JS, so the magnitude itself is
+clean). refused: `method approach` (2, guard-fork selectors) + `datum wcs` (2, JS-compared value-swaps, corner's
+`clearMode` shape).
+
+**rotary_clock (10)** — eligible: `dist retract f_fast f_slow port span safeZ` (7). refused: `action` (1,
+guard-fork selector — Rotate genuinely SPINS THE PART, a different atom sequence) + `reference wcs` (2, JS-compared
+value-swaps).
+
+**od probe / face probe (8 each, 16 total)** — refused+deferrable: `tipRadius/ahead maxDist retract feedFast
+feedSlow port` + the op's own identity scalar (`caliperDiameter` / `ahead`) — 7 each, 14 total, the whole-stack-
+rebuild-discard shape above. refused, not deferrable: `wcs` (1 each, 2 total — reaches BOTH the base compute and
+the write address per the file's own doc comment, a genuine selector).
+
+**Totals: 38 eligible, 28 refused-categorical, 14 refused-deferrable = 80 params declared, 0 skipped.**
+
+### `homingData.js` — checked, not touched
+
+Flagged by the research agent as using `tokenRefusal` exclusively (no `tokenEligible` entries anywhere in the
+file) — confirmed this is CORRECT and already complete from t1704's own pilot: homing is "the trivial OPPOSITE
+case... no NUMBER a token could replace exists on this op's params at all" (the real seek feeds/back-off/declared
+-home-switch live in global `settings.homing`, read live at emit, never bound to the op). Nothing to add.
+
+### The mechanism generalizes with ZERO new wiring — verified, not assumed
+
+`wireTokenGuard`/`numberWidget` (`formWidgets.js:54-221`) read `tokenEligible`/`tokenRefusal` GENERICALLY off
+ANY binding — `type = tokenDeclared ? 'text' : 'number'`, a `#`/`[` keystroke checked against `tokenPolicyFor`
+(refuse → `preventDefault` + a toast naming the declared reason + a flash; eligible → passes through as a plain
+keystroke). No per-op registration exists to update — confirmed by grepping every file this act touched for any
+reference to the mechanism itself: none, by design (the whole point of t1706's "ONE mechanism, driven ENTIRELY by
+the binding's declaration").
+
+### Non-vacuous, the strong way — reverted a file and watched the new test go red
+
+New spec `tests/probe-family-token-policy-1756.spec.js`: for each of the 7 files, renders the form directly off
+the op's own `def` (`formBindings`+`renderOpForm`, no app-navigation gesture needed per op), types `#500` into
+one ELIGIBLE field and asserts it survives verbatim, and either types `#` into one INELIGIBLE numeric field and
+asserts the keystroke never lands (value unchanged) + a toast names the reason, or — for an ineligible ENUM field
+(no typing surface exists at all, corner's own established scope note) — asserts the binding itself carries a
+real, non-generic `tokenRefusal` string. All 7 pass. Then, to PROVE this against the pre-change code rather than
+assume it: reverted `edgeData.js` to its HEAD (pre-declaration) content, re-ran the edge case alone — failed 3/3
+attempts with exactly the predicted symptom (`Expected: "text", Received: "number"`), restored the real file,
+re-ran — passed again. The test can fail, and fails for the right reason.
+
+### Emit byte-identical — confirmed, not assumed
+
+Every field added is additive-only data on an existing binding-spec object; nothing in the emit path reads
+`tokenEligible`/`tokenRefusal`/`tokenDeferrable`. Ran each touched twin's own emit/round-trip spec (`edge-data-
+emit`, `middle-data-emit` ×2, `alignment-data-emit` ×3, `rotary-center-data-emit`, `rotary-clock-data-emit`,
+`lathe-probe-1299` ×12, `corner-data-emit` ×2 as a control) — 20/20 green, byte-identical.
+
+### A REAL regression, found by the full suite, not chased away as noise
+
+First full-suite run: 1 hard failure (plus 12 flaky-then-passed, environmental). `formfield-block.spec.js`'s
+"LOSSLESS round-trip" test uses `MIDDLE_BINDING_SPECS` as a REAL fixture — `bindingsFromStack(bindingsToBlocks
+(MIDDLE_BINDING_SPECS))` must deep-equal the original — and the round-trip silently DROPPED every `tokenEligible`
+field the moment a real spec array carried one. `bindingsToBlocks`/`bindingsFromStack` (`userOps.js`) are BOTH
+explicit ALLOW-LISTS (spec → formfield block params → spec back), the exact "declared but unread" defect class
+this project has hit five times before (t1638/1654/1670/1674/1684) and the exact same class `deriveBindings.js`'s
+own carry-through was fixed for at t1704 — this is the SAME bug, in the OTHER round-trip function nobody had
+fed a token-policy-bearing fixture through yet. Fixed by carrying `tokenEligible`/`tokenRefusal`/`tokenDeferrable`
+through both directions (mirroring the existing `optional`/`readonly` boolean-or-string-encoded pattern already
+there for the same reason). Verified: `formfield-block.spec.js` 4/4 green after the fix (was 1 failed / 3 passed
+before); the failure itself — the actual full-suite diff — IS the before/after proof, no separate revert needed.
+
+### The architecture map's own citations — traced, not assumed, and one finding beyond my own edit
+
+The `userOps.js` fix above shifted every line number after it by +10, which broke `tests/node/architecture-map-
+1698.test.mjs`'s own `INVARIANT_CLAIMS` array (INV6/INV13/INV14 — hookKeysOf, the FAIL-CLOSED `return null`, and
+the `postInstantiate` ordering guard). **Checked first, not assumed**: read the actual current line numbers for
+`_BASE_DEF_SHAPE`/`hookKeysOf` (884/891), the real `return null; // FAIL CLOSED` line (1136), and
+`materializeParamGroup`/`validateUserOp`'s call sites inside `registerUserOp` (945/947) directly off the file,
+confirming they land exactly `+10` from the old citations — a real, traced shift, not a guessed one. Fixed the
+3 INVARIANT_CLAIMS entries in the TEST FILE itself (the actual source the checker reads — ARCHITECTURE.md's own
+prose citations at the SAME 3 spots are cosmetic/human-facing only and were fixed too, for the same reason, but
+fixing only those would NOT have turned the test green; `INVARIANT_CLAIMS` is a hardcoded array in the .mjs file,
+not parsed from the doc). **One separate finding surfaced while re-reading that section**: two ADJACENT prose
+citations (`userOps.js:935`/`:902` for `materializeParamGroup`/`validateUserOp`'s call sites, and `:1055-1058`
+for "Rule 13's partition claim") were ALREADY stale by ~45-50 lines — NOT caused by this turn's edit (the drift
+is far larger than the +10 my change produced) and NOT covered by the automated INVARIANT_CLAIMS check at all
+(prose outside that array silently rots and nobody catches it). Corrected them too while directly in that
+paragraph (945/947/1112-1114 respectively, verified against the real file) since the cost was one line each and
+I was already reading the exact functions — but flagging plainly that this was PRE-EXISTING drift from other work,
+not something my act introduced, so it doesn't get folded into the "caused by me" story above.
+
+### Verify
+
+- `npm run test:node`: 118/118 (both before AND after the userOps.js fix — re-confirmed clean).
+- `tests/node/architecture-map-1698.test.mjs` alone: 5/5 (was 4/5 — the one INVARIANT check — before the citation
+  fix).
+- `fork-parity-1593.spec.js`: 2/2, clean (no retry needed).
+- Hand-picked emit sweep (7 touched twins + corner control): 20/20.
+- `formfield-block.spec.js`: 4/4 (was 1 failed / 3 passed before the round-trip carry-through fix).
+- New `probe-family-token-policy-1756.spec.js`: 7/7, proven non-vacuous against a reverted file.
+- **Full suite, run TWICE** (the first run is what FOUND the `formfield-block` regression — 1 failed, 12
+  flaky-then-passed, 26 skipped, 2442 passed; re-ran clean after fixing it + the architecture-map citations —
+  **0 failed**, 12 flaky-then-passed [environmental, a different specific set — re-ran the one overlapping name,
+  `formfield-loud-mismatch-1636`, ×3 in isolation: 3/3 pass, a pure `window.ddcsStudio` cold-boot timeout,
+  nothing this act touches], 26 skipped, 2443 passed).
+
+### For the advisor
+
+7 files, 80 params classified from their OWN stack-builders (not copied from corner's shapes without checking) —
+found 2 genuinely new eligibility SHAPES beyond corner's pilot (a `String()`-only magnitude; a whole-stack
+Number()-rebuild that silently discards a token today, `tokenDeferrable` like corner's `hopDist`) plus 2 more
+instances of a shape corner only showed once (`clearMode`'s JS-compared value-swap, now also on rotary_center's
+`datum`/`wcs` and rotary_clock's `reference`/`wcs`). Remaining families (mill, lathe/ATC, setup) are separate acts
+per the dispatch. Also: the FULL suite (not just the fast tier) is what caught a real, pre-existing-shaped bug
+(`bindingsToBlocks`/`bindingsFromStack` dropping the new fields) that no amount of node-tier/emit-sweep/hand-
+picked verification would have surfaced — this act's own declaration work was the first thing to ever feed that
+round-trip a spec carrying `tokenEligible`. Worth noting since the standing rule is per-act verification stays at
+the fast tier; this dispatch's own "run the full suite yourself" instruction is what caught it.

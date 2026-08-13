@@ -31,32 +31,41 @@ export const ALIGNMENT_DEFAULTS = {
 
 /** The bindable scalars → the `assign` macro var each writes (by identity). #2/#3/#5 are ALSO source-chip vars. safeZ→#19
  *  is bindable via the E0 F2 restructure (#20=[0-#19] references it, so the ±safeZ pair tracks one source). */
+// t1756 — MACHINE VARIABLES ROLL OUT, probe family. dist/retract/f_fast/f_slow/port/safeZ/span are the same
+// #1-#5/#19/#73 shape corner already proved eligible (alignmentWizard.js:65's `A()` writes String(val) straight
+// into the assign — no JS branching/count decision on any of them).
 export const ALIGNMENT_BINDING_SPECS = [
-    { param: 'dist',    type: 'number', default: ALIGNMENT_DEFAULTS.dist,    label: 'Max Probe Dist', help: 'How far the stylus travels toward the fence before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
-    { param: 'retract', type: 'number', default: ALIGNMENT_DEFAULTS.retract, label: 'Retract',        help: 'How far the probe backs off after the first touch, before the slow re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
-    { param: 'f_fast',  type: 'number', default: ALIGNMENT_DEFAULTS.f_fast,  label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
-    { param: 'f_slow',  type: 'number', default: ALIGNMENT_DEFAULTS.f_slow,  label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
-    { param: 'port',    type: 'number', default: ALIGNMENT_DEFAULTS.port,    label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
-    { param: 'safeZ',   type: 'number', default: ALIGNMENT_DEFAULTS.safeZ,   label: 'Safe Z',         help: 'The clearance height the probe lifts to between the two fence touches / for the final park.', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value' },
+    { param: 'dist',    type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.dist,    label: 'Max Probe Dist', help: 'How far the stylus travels toward the fence before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
+    { param: 'retract', type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.retract, label: 'Retract',        help: 'How far the probe backs off after the first touch, before the slow re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
+    { param: 'f_fast',  type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.f_fast,  label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
+    { param: 'f_slow',  type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.f_slow,  label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
+    { param: 'port',    type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.port,    label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
+    { param: 'safeZ',   type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.safeZ,   label: 'Safe Z',         help: 'The clearance height the probe lifts to between the two fence touches / for the final park.', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value' },
     // t544 — the A→B SPAN (mm along checkAxis) = AUTO's relative jog (#73, present only in the AUTO arm; a MANUAL build has
     // no #73 so this socket is a no-op there → MANUAL byte-identical). Handle B's drag writes this field; typing it moves B.
-    { param: 'span',    type: 'number', default: ALIGNMENT_DEFAULTS.span,    label: 'A→B Span',       help: 'Distance from point A to point B along the fence (checkAxis), in mm. AUTO steps exactly this (signed — B may be either side of A). Drag handle B or type it — one source.', section: 'GEOMETRY', match: { type: 'assign', var: '#73' }, key: 'value', optional: true },
+    { param: 'span',    type: 'number', tokenEligible: true, default: ALIGNMENT_DEFAULTS.span,    label: 'A→B Span',       help: 'Distance from point A to point B along the fence (checkAxis), in mm. AUTO steps exactly this (signed — B may be either side of A). Drag handle B or type it — one source.', section: 'GEOMETRY', match: { type: 'assign', var: '#73' }, key: 'value', optional: true },
 ];
 
 /** STRUCTURAL toggles — drive the 4-arm guards (NO value socket). checkAxis(X|Y fence) + probeDir(pos|neg). */
+// t1756 — none of the 3 are token-eligible: each is a CATEGORICAL branch-selector guarding one of the 4 arms
+// alignmentStack's superset carries (the axis-letter + probe-var thread through ~16 atoms per the doc above —
+// "too pervasive to recompose, E0 GUARDS both"), the identical shape corner's own axis/order/wcs analogues are.
 export const ALIGNMENT_STRUCT_BINDINGS = [
     // t544 — the TRAVEL mode (guards the auto/manual arms). AUTO: probe A WHERE THE MACHINE IS (no travel, no Confirm), then
     // the ONLY auto-jog — step the declared SPAN along the fence (relative) + probe B. MANUAL = jog to each + Confirm. AUTO no
     // longer needs a stock (the span is plain mm) → no gateAuto greying.
-    { param: 'travel',    type: 'enum', widget: 'segmented', default: ALIGNMENT_DEFAULTS.travel,    label: 'Travel',     help: 'AUTO: probe point A where the machine is (position it first, no Confirm), then step the A→B span along the fence and probe B. MANUAL: you jog to each point + Confirm (handle A is a preview start anchor).', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
-    { param: 'checkAxis', type: 'enum', widget: 'segmented', default: ALIGNMENT_DEFAULTS.checkAxis, label: 'Fence Axis', help: 'The machine axis the fence runs ALONG (the probe moves in the perpendicular axis).', section: 'GEOMETRY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
-    { param: 'probeDir',  type: 'enum', widget: 'segmented', default: ALIGNMENT_DEFAULTS.probeDir,  label: 'Probe Dir',  help: 'Which way the probe approaches the fence: positive (+) or negative (−) along the perpendicular axis.', section: 'GEOMETRY', widgetConfig: { options: [['+', 'pos'], ['−', 'neg']] } },
+    { param: 'travel',    type: 'enum', tokenRefusal: 'Picks between an automatic jog and a manual jog-and-confirm prompt — two different program shapes, not two values of one move.', widget: 'segmented', default: ALIGNMENT_DEFAULTS.travel,    label: 'Travel',     help: 'AUTO: probe point A where the machine is (position it first, no Confirm), then step the A→B span along the fence and probe B. MANUAL: you jog to each point + Confirm (handle A is a preview start anchor).', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
+    { param: 'checkAxis', type: 'enum', tokenRefusal: 'Which axis the fence runs along picks a different guarded fork (the axis letter + probe vars thread through the whole probe body) — not a value inside one; it can\'t be resolved until the program is already built.', widget: 'segmented', default: ALIGNMENT_DEFAULTS.checkAxis, label: 'Fence Axis', help: 'The machine axis the fence runs ALONG (the probe moves in the perpendicular axis).', section: 'GEOMETRY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
+    { param: 'probeDir',  type: 'enum', tokenRefusal: 'Which way the probe approaches the fence picks a different guarded fork (opposite probe vars/sign) — not a value inside one; it can\'t be resolved until the program is already built.', widget: 'segmented', default: ALIGNMENT_DEFAULTS.probeDir,  label: 'Probe Dir',  help: 'Which way the probe approaches the fence: positive (+) or negative (−) along the perpendicular axis.', section: 'GEOMETRY', widgetConfig: { options: [['+', 'pos'], ['−', 'neg']] } },
 ];
 
 /** VALUE-SWAP form controls — NOT structural (no guard, no #var socket): they drive the postInstantiate RECOMPOSE.
  *  tolerance is F3 DISPLAY-ONLY — a number field that recomposes ONLY the header comment (the macro never enforces it). */
 export const ALIGNMENT_VALUESWAP_BINDINGS = [
-    { param: 'tolerance',  type: 'number', default: ALIGNMENT_DEFAULTS.tolerance, label: 'Tolerance', help: 'Informational only: the acceptable misalignment (mm), shown in the header comment. The macro measures the angle; it does not enforce a tolerance.', section: 'GEOMETRY' },
+    // t1756 — NOT eligible: tolerance has no #var socket at all — alignmentHeaderComments() calls num() on it and bakes the
+    // RESULT into a comment string at build time (alignmentWizard.js:30-32). A comment prints once, when the program is
+    // generated; there is no run-time controller read left for a token to drive, and num() would silently coerce a token to 0.
+    { param: 'tolerance',  type: 'number', tokenRefusal: 'This is informational only, baked into the header comment when the program is built — a comment prints once, at build time, so there\'s no run-time controller read left for a value typed here to drive.', default: ALIGNMENT_DEFAULTS.tolerance, label: 'Tolerance', help: 'Informational only: the acceptable misalignment (mm), shown in the header comment. The macro measures the angle; it does not enforce a tolerance.', section: 'GEOMETRY' },
 ];
 
 export const ALIGNMENT_DATA_OPTYPE = 'user_alignment_data';

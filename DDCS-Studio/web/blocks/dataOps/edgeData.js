@@ -31,21 +31,27 @@ export const EDGE_DEFAULTS = {
 
 /** The 6 bindable scalars → the `assign` macro var each writes. DECLARED by identity (var), NOT position — deriveBindings
  *  re-finds the flat index, so a template edit can never desync them. (level is BAKED — no live socket, like corner.) */
+// t1756 — MACHINE VARIABLES ROLL OUT, probe family. Edge's 6 scalars are the SAME shape as corner's own #1-#6
+// (a plain magnitude read into a G31 probe atom's value socket, no JS arithmetic/branch/count) — corner already
+// proved this shape eligible, so the same 6 params get the same declaration here, not re-litigated.
 export const EDGE_BINDING_SPECS = [
-    { param: 'dist',    type: 'number', default: EDGE_DEFAULTS.dist,    label: 'Max Probe Dist', help: 'How far the stylus travels toward the wall before it gives up — larger than the gap to the wall, smaller than the next obstacle.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' }, key: 'value' },
-    { param: 'retract', type: 'number', default: EDGE_DEFAULTS.retract, label: 'Retract',        help: 'How far the probe backs off the wall after the first touch, before the slow, accurate re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' }, key: 'value' },
-    { param: 'f_fast',  type: 'number', default: EDGE_DEFAULTS.f_fast,  label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach to the wall, before the touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' }, key: 'value' },
-    { param: 'f_slow',  type: 'number', default: EDGE_DEFAULTS.f_slow,  label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch — slower gives a more accurate trigger point.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' }, key: 'value' },
-    { param: 'port',    type: 'number', default: EDGE_DEFAULTS.port,    label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' }, key: 'value' },
-    { param: 'radius',  type: 'number', default: EDGE_DEFAULTS.radius,  label: 'Stylus Radius',  help: 'The probe stylus tip radius (mm) — applied to the wall touch to give the true wall coordinate.', section: 'TOOL & CUT', match: { type: 'assign', var: '#6' }, key: 'value' },
+    { param: 'dist',    type: 'number', tokenEligible: true, default: EDGE_DEFAULTS.dist,    label: 'Max Probe Dist', help: 'How far the stylus travels toward the wall before it gives up — larger than the gap to the wall, smaller than the next obstacle.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' }, key: 'value' },
+    { param: 'retract', type: 'number', tokenEligible: true, default: EDGE_DEFAULTS.retract, label: 'Retract',        help: 'How far the probe backs off the wall after the first touch, before the slow, accurate re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' }, key: 'value' },
+    { param: 'f_fast',  type: 'number', tokenEligible: true, default: EDGE_DEFAULTS.f_fast,  label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach to the wall, before the touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' }, key: 'value' },
+    { param: 'f_slow',  type: 'number', tokenEligible: true, default: EDGE_DEFAULTS.f_slow,  label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch — slower gives a more accurate trigger point.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' }, key: 'value' },
+    { param: 'port',    type: 'number', tokenEligible: true, default: EDGE_DEFAULTS.port,    label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' }, key: 'value' },
+    { param: 'radius',  type: 'number', tokenEligible: true, default: EDGE_DEFAULTS.radius,  label: 'Stylus Radius',  help: 'The probe stylus tip radius (mm) — applied to the wall touch to give the true wall coordinate.', section: 'TOOL & CUT', match: { type: 'assign', var: '#6' }, key: 'value' },
 ];
 
 /** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). axis×dir
- *  reshapes the confirm+probe region (per-combo vars/sign); axis×wcs the WCS write; wcs the base address. */
+ *  reshapes the confirm+probe region (per-combo vars/sign); axis×wcs the WCS write; wcs the base address.
+ *  t1756 — none of the three are token-eligible or deferrable: each is a CATEGORICAL branch-selector (picks which
+ *  guarded arm of edgeStack's superset survives prune, or which G-code the base-address block resolves to), the
+ *  identical shape corner's own axis/dir/wcs analogues (`corner`/`probeSeq`/`wcs`) were already found to be. */
 export const EDGE_STRUCT_BINDINGS = [
-    { param: 'axis', type: 'enum', default: EDGE_DEFAULTS.axis, label: 'Axis', help: 'Which axis the wall faces — X (a wall you approach along X) or Y.', section: 'IDENTITY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
-    { param: 'dir', type: 'enum', default: EDGE_DEFAULTS.dir, label: 'Direction', help: 'Which way the stylus travels to reach the wall — Positive (toward +axis) or Negative.', section: 'IDENTITY', widgetConfig: { options: [['Positive', 'pos'], ['Negative', 'neg']] } },
-    { param: 'wcs', type: 'enum', default: EDGE_DEFAULTS.wcs, label: 'WCS', help: 'Which work-coordinate register to store the found edge into — Active uses the currently-selected WCS; G54..G59 write that specific register.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
+    { param: 'axis', type: 'enum', tokenRefusal: 'Which axis the wall faces picks a different guarded fork of the program (its own confirm+probe region, per-combo sign) — not a value inside one; it can\'t be resolved until the program is already built.', default: EDGE_DEFAULTS.axis, label: 'Axis', help: 'Which axis the wall faces — X (a wall you approach along X) or Y.', section: 'IDENTITY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
+    { param: 'dir', type: 'enum', tokenRefusal: 'Which way the stylus travels to reach the wall picks a different guarded fork (per-combo vars/sign) — not a value inside one; it can\'t be resolved until the program is already built.', default: EDGE_DEFAULTS.dir, label: 'Direction', help: 'Which way the stylus travels to reach the wall — Positive (toward +axis) or Negative.', section: 'IDENTITY', widgetConfig: { options: [['Positive', 'pos'], ['Negative', 'neg']] } },
+    { param: 'wcs', type: 'enum', tokenRefusal: 'Selects which work-coordinate register the found edge is written to — this changes which G-code gets built, not a number inside it.', default: EDGE_DEFAULTS.wcs, label: 'WCS', help: 'Which work-coordinate register to store the found edge into — Active uses the currently-selected WCS; G54..G59 write that specific register.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
 ];
 
 export const EDGE_DATA_OPTYPE = 'user_edge_data';

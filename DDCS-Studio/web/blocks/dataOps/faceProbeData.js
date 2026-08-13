@@ -24,33 +24,42 @@ const V = PROBE_VARS;
 /** WCS choices — the same seven the mill probes offer, because a datum is a datum. */
 const WCS_OPTIONS = [['Active WCS', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']];
 
+// t1756 — MACHINE VARIABLES ROLL OUT, probe family. Same shape as odProbeData (its lathe-probe sibling, same
+// rebuild mechanism): postInstantiate (rebuildFaceProbe, below) regenerates the whole stack via `n(k)` —
+// `Number.isFinite(Number(p[k])) ? Number(p[k]) : DEFAULT` — so a token in any of these 7 fields is silently
+// swallowed back to the default today. None decide program SHAPE (faceProbe.js just plugs each resolved number
+// into a probe atom's socket or a controller-side expression, e.g. `ahead` → `[surface-ahead]` computed AT the
+// controller, never branched on in JS) — the corner `hopDist`/`planeZ` shape, so all 7 are DEFERRABLE-CANDIDATES.
+const REBUILD_REFUSAL = 'This value is re-resolved by the op\'s own rebuild before the program is built — it can\'t carry a live value yet.';
 export const FACE_PROBE_BINDING_SPECS = [
-    { param: 'ahead', match: { type: 'assign', var: V.ahead }, key: 'value', type: 'number',
+    { param: 'ahead', match: { type: 'assign', var: V.ahead }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Touched face is ahead of Z0 by', section: 'IDENTITY', default: FACE_PROBE_DEFAULTS.ahead,
       help: 'Zero means the face you touch IS Z0 — the ordinary touch-off. Type the facing allowance instead and the datum lands on the FINISHED face, so Z0 is still Z0 after facing.' },
-    { param: 'tipRadius', match: { type: 'assign', var: V.tip }, key: 'value', type: 'number',
+    { param: 'tipRadius', match: { type: 'assign', var: V.tip }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Stylus radius', section: 'PROBE', default: FACE_PROBE_DEFAULTS.tipRadius,
       help: 'The one number between the trigger position and the surface. Wrong here = every Z wrong by the difference.' },
-    { param: 'maxDist', match: { type: 'assign', var: V.maxDist }, key: 'value', type: 'number',
+    { param: 'maxDist', match: { type: 'assign', var: V.maxDist }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Max seek', section: 'PROBE', default: FACE_PROBE_DEFAULTS.maxDist,
       help: 'How far to travel before calling it a miss. Jog close first; this is a safety limit, not an approach.' },
-    { param: 'retract', match: { type: 'assign', var: V.retract }, key: 'value', type: 'number',
+    { param: 'retract', match: { type: 'assign', var: V.retract }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Retract between touches', section: 'PROBE', default: FACE_PROBE_DEFAULTS.retract,
       help: 'How far the probe backs off (mm) after the fast find, before creeping in again at the slow feed. Big enough to clear the surface, small enough that the slow touch is short.' },
-    { param: 'feedFast', match: { type: 'assign', var: V.feedFast }, key: 'value', type: 'number',
+    { param: 'feedFast', match: { type: 'assign', var: V.feedFast }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Fast find feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedFast,
       help: 'Feed for the FIRST approach (mm/min) — it only has to find the surface roughly, so it can be quick. The measurement comes from the slow touch, not this one.' },
-    { param: 'feedSlow', match: { type: 'assign', var: V.feedSlow }, key: 'value', type: 'number',
+    { param: 'feedSlow', match: { type: 'assign', var: V.feedSlow }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Slow touch feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedSlow,
       help: 'Feed for the SECOND, measuring touch (mm/min). This is the number that decides accuracy — slower gives a more repeatable trigger point.' },
-    { param: 'port', match: { type: 'assign', var: V.port }, key: 'value', type: 'number',
+    { param: 'port', match: { type: 'assign', var: V.port }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Probe port', section: 'PROBE', default: FACE_PROBE_DEFAULTS.port,
       help: 'Which controller input the probe is wired to. Must match the physical port, or the touch is never seen and the tool keeps driving.' },
 ];
 
+// t1756 — NOT eligible, and not deferrable: the WCS choice reaches BOTH the base compute and the write address
+// (per this file's own doc comment) — a categorical branch-selector (which register), not a coercion casualty.
 /** WHERE THE ANSWER GOES — no socket of its own: it reaches the base compute AND the write address. */
 export const FACE_PROBE_STRUCT_BINDINGS = [
-    { param: 'wcs', type: 'enum', widget: 'select', default: FACE_PROBE_DEFAULTS.wcs, label: 'Write to', section: 'IDENTITY',
+    { param: 'wcs', type: 'enum', widget: 'select', tokenRefusal: 'Selects which work-coordinate register the measured datum is written to — this changes which G-code gets built, not a number inside it.', default: FACE_PROBE_DEFAULTS.wcs, label: 'Write to', section: 'IDENTITY',
       help: 'Which work coordinate system this datum lands in. The probe never READS it — it is the output.',
       widgetConfig: { options: WCS_OPTIONS } },
 ];

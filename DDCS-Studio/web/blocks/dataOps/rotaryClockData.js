@@ -36,25 +36,34 @@ export const ROTARY_CLOCK_DEFAULTS = {
 
 /** The bindable scalars → the `assign` macro var each writes (by identity). #2/#3/#5 are ALSO source-chip vars. #6 is the
  *  Y SPAN between the two flat touches (the Clock's #6 is a span, NOT a radius — a flat cancels any comp). */
+// t1756 — MACHINE VARIABLES ROLL OUT, probe family. All 7 are the same magnitude-into-assign shape corner already
+// proved eligible.
 export const ROTARY_CLOCK_BINDING_SPECS = [
-    { param: 'dist',    type: 'number', default: ROTARY_CLOCK_DEFAULTS.dist,    label: 'Max Probe Dist', help: 'How far the stylus travels toward the flat before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
-    { param: 'retract', type: 'number', default: ROTARY_CLOCK_DEFAULTS.retract, label: 'Retract',        help: 'How far the probe backs off after the first touch, before the slow re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
-    { param: 'f_fast',  type: 'number', default: ROTARY_CLOCK_DEFAULTS.f_fast,  label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
-    { param: 'f_slow',  type: 'number', default: ROTARY_CLOCK_DEFAULTS.f_slow,  label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
-    { param: 'port',    type: 'number', default: ROTARY_CLOCK_DEFAULTS.port,    label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
-    { param: 'span',    type: 'number', default: ROTARY_CLOCK_DEFAULTS.span,    label: 'Y Span',         help: 'The Y distance between the two Z-down touches across the flat — the tilt is atan(dZ / span).', section: 'GEOMETRY', match: { type: 'assign', var: '#6' },  key: 'value' },
-    { param: 'safeZ',   type: 'number', default: ROTARY_CLOCK_DEFAULTS.safeZ,   label: 'Safe Z',         help: 'The clearance height the probe lifts to between touches / for the final park.', section: 'GEOMETRY', match: { type: 'assign', var: '#17' }, key: 'value' },
+    { param: 'dist',    type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.dist,    label: 'Max Probe Dist', help: 'How far the stylus travels toward the flat before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
+    { param: 'retract', type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.retract, label: 'Retract',        help: 'How far the probe backs off after the first touch, before the slow re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
+    { param: 'f_fast',  type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.f_fast,  label: 'Fast Feed',      help: 'Feed rate (mm/min) for the initial fast approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
+    { param: 'f_slow',  type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.f_slow,  label: 'Slow Feed',      help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
+    { param: 'port',    type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.port,    label: 'Port',           help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
+    { param: 'span',    type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.span,    label: 'Y Span',         help: 'The Y distance between the two Z-down touches across the flat — the tilt is atan(dZ / span).', section: 'GEOMETRY', match: { type: 'assign', var: '#6' },  key: 'value' },
+    { param: 'safeZ',   type: 'number', tokenEligible: true, default: ROTARY_CLOCK_DEFAULTS.safeZ,   label: 'Safe Z',         help: 'The clearance height the probe lifts to between touches / for the final park.', section: 'GEOMETRY', match: { type: 'assign', var: '#17' }, key: 'value' },
 ];
 
+// t1756 — NOT eligible: a 3-way categorical branch-selector guarding which arm of rotaryClockStack's superset
+// survives prune (Set vs Report vs Rotate build genuinely different atom sequences — Rotate SPINS THE PART) —
+// the identical shape corner's own axis/order analogues are.
 /** STRUCTURAL toggle — drives the guard prune (NO value socket). action(set|report|rotate). */
 export const ROTARY_CLOCK_STRUCT_BINDINGS = [
-    { param: 'action', type: 'enum', default: ROTARY_CLOCK_DEFAULTS.action, label: 'Action', help: 'Set A0 (datum without moving the part), Report (measure the tilt only, leave A unchanged), or Rotate (spin the flat to the reference, then zero A there — SPINS THE PART).', section: 'GEOMETRY', widgetConfig: { options: [['Set A0', 'set'], ['Report only', 'report'], ['Rotate to 0', 'rotate']] } },
+    { param: 'action', type: 'enum', tokenRefusal: 'Set A0 / Report / Rotate build genuinely different atom sequences (Rotate spins the part; Report leaves A untouched) — not a value inside one; it can\'t be resolved until the program is already built.', default: ROTARY_CLOCK_DEFAULTS.action, label: 'Action', help: 'Set A0 (datum without moving the part), Report (measure the tilt only, leave A unchanged), or Rotate (spin the flat to the reference, then zero A there — SPINS THE PART).', section: 'GEOMETRY', widgetConfig: { options: [['Set A0', 'set'], ['Report only', 'report'], ['Rotate to 0', 'rotate']] } },
 ];
 
+// t1756 — neither is eligible despite carrying no guard: applyReferenceWcs (postInstantiate, below) COMPARES each
+// value in JS to pick which literal (refTerm '-90' vs '', wcsArg) gets written into the A work-offset/rotation —
+// the identical "categorical choice of WHICH content lands, not a number inside it" shape rotaryCenterData's own
+// datum/wcs (and corner's clearMode, t1704) already carry this same reasoning for.
 /** VALUE-SWAP form controls — NOT structural (no guard, no #var socket): they drive the postInstantiate RECOMPOSE. */
 export const ROTARY_CLOCK_VALUESWAP_BINDINGS = [
-    { param: 'reference',  type: 'enum', default: ROTARY_CLOCK_DEFAULTS.reference,  label: 'Reference',    help: 'Which orientation reads A0: the flat facing top (+Z) or the +Y side (3 o clock).', section: 'GEOMETRY', widgetConfig: { options: [['Top (+Z)', 'top'], ['+Y side', 'side']] } },
-    { param: 'wcs',        type: 'enum', default: ROTARY_CLOCK_DEFAULTS.wcs,        label: 'WCS',          help: 'Which work-coordinate register to store the A datum into.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
+    { param: 'reference',  type: 'enum', tokenRefusal: 'Picks which reference-angle term gets folded into the A-datum formula (a different embedded expression, not a number inside one) — it can\'t be resolved until the program is already built.', default: ROTARY_CLOCK_DEFAULTS.reference,  label: 'Reference',    help: 'Which orientation reads A0: the flat facing top (+Z) or the +Y side (3 o clock).', section: 'GEOMETRY', widgetConfig: { options: [['Top (+Z)', 'top'], ['+Y side', 'side']] } },
+    { param: 'wcs',        type: 'enum', tokenRefusal: 'Selects which work-coordinate register the A datum is written to — this changes which G-code gets built, not a number inside it.', default: ROTARY_CLOCK_DEFAULTS.wcs,        label: 'WCS',          help: 'Which work-coordinate register to store the A datum into.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
 ];
 
 export const ROTARY_CLOCK_DATA_OPTYPE = 'user_rotary_clock_data';

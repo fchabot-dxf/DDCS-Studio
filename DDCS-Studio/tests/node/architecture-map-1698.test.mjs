@@ -187,7 +187,7 @@ const INVARIANT_CLAIMS = [
     { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 225, find: /console\.error/ },
     { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
     { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
-    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 874, lineEnd: 881, find: /_BASE_DEF_SHAPE|hookKeysOf/ },
+    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 884, lineEnd: 891, find: /_BASE_DEF_SHAPE|hookKeysOf/ },
     { id: 'INV7 getTransform folds placement', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
     { id: 'INV7 onTransform relays the same composed value', file: 'web/viz/featureCanvas.js', line: 383, find: /getTransform|onTransform/ },
     { id: 'INV8 fork-parity byte-identity gate exists', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', line: 1, find: /./ },
@@ -196,8 +196,8 @@ const INVARIANT_CLAIMS = [
     { id: 'INV11 UPDATE_PREVIEW_SNAPSHOT rewrites and throws', file: 'DDCS-Studio/tests/node/preview-spec-gate-1688.test.mjs', line: 324, find: /UPDATE_PREVIEW_SNAPSHOT/ },
     { id: 'INV12 tri-state fill: emits !== false', file: 'web/viz/startGlyph.js', line: 20, lineEnd: 24, find: /emits\s*!==\s*false/ },
     { id: 'INV12 pass 0 is manual regardless of source', file: 'web/viz/startGlyph.js', line: 13, find: /pass 0|manual/i },
-    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1126, find: /return null/ },
-    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 946, find: /postInstantiate/ },
+    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1136, find: /return null/ },
+    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 956, find: /postInstantiate/ },
     // no `line`: NEXT-SESSION.md is rewritten wholesale each cycle (advisor-owned, uncommitted mid-edit as this
     // very claim was first checked — a live case, not a hypothetical) — anchored by content, not a position.
     { id: 'INV15 corner is the gated pilot, standing ruling', file: 'NEXT-SESSION.md', find: /Corner is the gated pilot/i },
