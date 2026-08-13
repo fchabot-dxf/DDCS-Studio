@@ -1843,3 +1843,32 @@ not at the machine. Scope it as: connect, poll `7080`/`7260`/`10002`, show the D
 One write to `6908` can start, pause, reset, or jog a real machine. **Do not fold this into item A.** It
 needs its own ruling from the user about when Studio may command a powered controller at all, and it is
 exactly the class of thing [[live-cnc-readonly-when-away]] exists to gate.
+
+---
+
+# ✅ USER RULING (2026-08-13) — **A**: machine variables roll to all 32 wizards
+*"ok its just that we add variable to field"* … *"yes A"*. This UNBLOCKS the roll-out that has been held
+since the 4-op pilot shipped in V2026.08.10.4.
+
+**Why A is nearly forced, in the user's own framing:** a field that can hold a VARIABLE cannot be a strict
+number box — the browser refuses a `#` at the keyboard before any code sees it. That is browser behaviour,
+not a design choice. So the real question was only ever: **for fields where a variable makes no sense, is
+the user TOLD or quietly prevented?** A = told. Consistent with every ruling this week (the semicolon
+eating a G-code line · the picture disagreeing with the program · the field that silently ignores typing).
+
+**Cost, accepted:** declared fields lose the ▲▼ spinner and native numeric validation. Mobile keeps a
+numeric keypad via `inputMode="decimal"` (already in the pilot).
+
+## THE ACT(S) — roll the token declarations to the remaining 28 ops
+Mechanism is PROVEN on 4 (corner + 3): `tokenEligible`/`tokenRefusal`/`tokenDeferrable` declared per
+binding (`userOps.js`), fail-closed, `tokenRefusal` REQUIRED when ineligible; `wireTokenGuard`
+(`ui/formWidgets.js`) reads the declaration; `numberWidget` renders `type=text` only where a policy is
+declared. **This is declaration work, not machinery** — do not grow the mechanism.
+
+⚠ **SPLIT IT.** 28 ops is not one act (the sizing rule, t1739). Suggested slices, each with its own gate:
+- by FAMILY — probes · mill · lathe · ATC · setup/utility — so a family's refusals can be reviewed together
+- each act: declare, then PROVE on that family (a token survives to the emit on an eligible field; an
+  ineligible field refuses VISIBLY with its declared text), plus fork-parity byte-identical + node tier.
+⚠ **393 params were measured at t1704** — most are ineligible and need a REFUSAL REASON written by someone
+who knows why. A generic "not supported here" is the dead-field pattern; the reason should say what the
+field is and why a variable cannot drive it.
