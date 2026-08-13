@@ -1934,3 +1934,21 @@ config-not-users]]), so a whole class of verification runs against one envelope 
 become a CONSTRAINT** — a clamp, a threshold, a validation, a refusal, a test baseline treating one
 envelope as normal. Those are the ones that would restrict another user with nobody intending it, and they
 will not look like personal data; they will look like engineering.
+
+### ✏️ CORRECTION (user, 2026-08-13): *"the -120 default is a good general starting point"*
+The advisor over-flagged. **A DEFAULT is fine; a SILENT FALLBACK is not.** −120 is a reasonable starting
+Z for a hobby-class mill, and a sensible starting value beats an empty field.
+
+| | verdict |
+|---|---|
+| `homingData.js:30` `TEMPLATE_MACHINE = {x:300,y:300,z:-120}` | **KEEP** — a visible starting template the user can see and change |
+| `GcodeExecutionEngine.js:1041` `num(machine.z, -120)` | **the actual issue** — fires at emit/sim time for a config that never stated its Z travel; the user never picked −120, they just never said, and the engine decided silently |
+
+**So the act shrinks:** do NOT delete the default. Make the ASSUMPTION VISIBLE — if a config has no Z
+travel, the sim should say it is using a fallback rather than presenting an invented envelope as known.
+Same rule as everywhere else this week: the value can be a guess, it just cannot be a SILENT guess.
+
+⚠ The [[…constraint-creep…]] point above still stands and is unchanged — the sweep for "where has a
+personal number already become a RULE (clamp/threshold/refusal/test baseline)" is still worth doing. A
+good default becoming an invisible constraint is exactly the failure mode, and a good default is MORE
+likely to spread than a bad one.
