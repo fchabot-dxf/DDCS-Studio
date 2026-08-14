@@ -27906,3 +27906,78 @@ still cites the OLD filename twice (I can't touch that file); (2) worth deciding
 renderer branches from the same real gesture), whether it should EXTEND this spec (same click chain, assert
 both branches converge) or stay a separate file — I didn't pre-judge that here since the dispatch scoped this
 act to Addition 1 only.
+
+## 🔨 turn 1778 (epoch 4) — ADDITION 2: GESTURE == PROGRAMMATIC EQUIVALENCE — verified equivalent, one exception, licenses the shortcut
+
+### Dispatch
+
+Addition 1 accepted (verified by the advisor via grep for any function-call fallback — none found). This is
+Addition 2, the user's own question: "if it call[s] programatically it needs to be the same path as the UI, is
+that verifiable?" One spec: drive the real gesture chain (Addition 1's chain) AND the programmatic equivalent
+(`openWiz → fill → insertWiz`), deep-equal the resulting program + canvas state with ids/timestamps stripped.
+Match → licenses the ~95 specs using the shortcut. Diverge → report exactly where, and that divergence is
+itself the finding. State what gets normalised and why; a normaliser that grows to make the two match proves
+nothing — a third exception means STOP and report, not keep excusing. Scope note required in the spec's own
+docblock: this proves entry paths converge, not that rendering is correct. Gate: node tier + this spec +
+non-vacuity; no full suite.
+
+### Result: they converge, with exactly ONE normalisation exception
+
+`tests/gesture-programmatic-equivalence-1778.spec.js` — two fresh browser contexts (no shared state), same
+corner op, same distinctive value (`dist=777`, non-default):
+- **PATH A (real)**: click `.wizard-btn` "Probe" (opens the click-to-toggle dropdown from t1776's own finding)
+  → click `button[data-optype="corner"]` → `.fill()` the real `#wiz_user_form [data-param="dist"]` field →
+  click the real `.wiz-foot button.primary` INSERT.
+- **PATH B (shortcut)**: `window.openWiz('user_corner_data')` → the SAME `.fill()` on the SAME field selector
+  (the field-fill itself isn't the shortcut under test — SKIPPING THE BAR NAVIGATION is) → `window.insertWiz()`.
+
+Captured `window.ddcsGetBlockProgram()` from both, ran through ONE declared normaliser (`stripIds` — strips
+`id` recursively, nothing else), and deep-equalled. **They matched on the first attempt** — no second or third
+exception was ever needed (no `timestamps` field turned up on this object either, so the dispatch's "ids/
+timestamps" pairing was cautionary, not descriptive of what's actually there). This is a real, positive result:
+the bar-click chain and the `openWiz`/`insertWiz` shortcut produce byte-identical programs (modulo Blockly's own
+per-block random id), so the ~95 specs using that shortcut are asserting about a state a real user's clicks
+genuinely reach.
+
+### The canvas half — a narrower check, on purpose, to avoid inventing a second exception
+
+"Program + canvas state" — the program half is `ddcsGetBlockProgram()` above; for the canvas, switched BOTH
+paths to the real Blocks tab (`[data-app="blocks"]`.click()) and read `window.__blkWs.getAllBlocks(false)`.
+Did NOT extend the id-stripped deep-equal to Blockly's own serialization: a block's canvas position (x/y) is
+real, expected, per-run auto-layout variance that has nothing to do with "the program" — folding it into the
+SAME comparison would have forced a SECOND normalisation exception (position) on top of `id`, which the
+dispatch explicitly warned against manufacturing just to make two things match. Instead: a narrower, honest
+check — same block-type set on both canvases, same block count, and the planted `777` value genuinely visible
+in the rendered code preview on BOTH canvases. This proves the canvas is a faithful function of the (already
+proven identical) program without inventing a comparison shape just to reach "equal."
+
+### Non-vacuity — both halves, proven by disabling the real chain, not the test
+
+Two separate temporary probes, each run 3/3 and reverted:
+1. Filled Path B's field with `888` instead of `777` (a genuine divergence between the two entry paths) —
+   the program-level `toEqual` failed with an exact, readable diff (three sites: the header comment text, the
+   `#1` assign value, and the op's own `params.dist`, `888` vs `777`) — proving the comparison is real
+   structural equality, not an accidental always-pass.
+2. Inverted `canvasA.hasDistinctiveValue` to assert `false` (should be `true`) — failed cleanly — proving the
+   canvas-side assertion actually reads the rendered DOM, not a stubbed/hardcoded value.
+
+### Verify
+
+- `tests/gesture-programmatic-equivalence-1778.spec.js` — 1/1 green (program deep-equal + 4 canvas assertions).
+- Both non-vacuity probes: 3/3 fail while active, 1/1 green after revert.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source file touched this act (test-only) — gate matched the dispatch (node tier + this spec + non-vacuity,
+  no full suite).
+- Hit the stale-transform-cache `test.use()` collection error once more mid-act after an intervening `cd
+  <repo-root>`-anchored command (same Cause #1 as t1776, not a new class) — re-anchored `cd .../DDCS-Studio` in
+  the same command as the next `npx playwright` call and it cleared immediately.
+
+### For the advisor
+
+Clean positive result — no divergence found, no rule inversion needed, the shortcut stays licensed on this
+surface. The one thing worth a decision before Addition 3 or 4 reuses this pattern: I treated "program" and
+"canvas" as two DIFFERENT-STRENGTH checks (full deep-equal for the program, a narrower type/count/value check
+for the canvas) rather than deep-equalling both the same way, specifically to avoid manufacturing a position
+normalisation exception. If a later addition needs a STRICTER canvas comparison (e.g. actual block nesting/
+connections, not just the type set), that's a legitimate escalation, but I didn't pre-build it speculatively
+here — flagging the asymmetry so it's a visible decision, not a quietly-inherited pattern.
