@@ -30806,3 +30806,123 @@ standing anti-concurrency rule, and every flaky result chased down to a clean is
 accepted on a retry — 1071/1071 real passes, nothing left unresolved.
 
 🔨 turn 1830
+
+## Turn 1832 — Bug 2 diagnosed: a deliberate union-of-intent design, not a leak; STOP AND REPORT, no source change
+
+### Dispatch
+
+Bug 2 (Homing poisons `forceMachine` panel-wide), OBSERVED in t1786, re-confirmed by gesture in t1826
+(`getSimConfig().stock === null`). STEP 1: test first, asserting the OUTCOME (the stock is actually there),
+fail on today's code, say so. STEP 2: diagnose, minding "PANEL-WIDE" — check whether this is one more instance
+of the census's own cross-surface-singleton pattern or a second population, and name it before fixing. Also
+asked whether it has any flavour of bug 1's own "name mismatch." Hard constraint, verbatim: "Homing is a
+MACHINE-FRAME op and this project treats machine-frame vs WCS as a real distinction, not a display toggle. Do
+not make the stock reappear by weakening the frame handling — if the honest fix touches how the machine frame
+is applied, STOP AND REPORT rather than choosing. That is a domain call, not a rendering one." After fixing (or
+not), re-check bug 3's numbers against t1826's own. Gate: node tier + the new test + every spec touching the
+homing/forceMachine path.
+
+### STEP 1 — the failing test, proven non-vacuous
+
+`tests/homing-stock-poisons-1832.spec.js`: real bar gesture (Homing → Insert → Corner → Insert → Blocks tab),
+reads `document.getElementById('blk-preview-panel').__panel.getSimConfig().stock`. Asserts `not.toBeNull()` —
+the OUTCOME a user sees (the workpiece is actually drawn), not an internal flag's value. Ran against today's
+code before adding any tracking: fails 3/3, `stock: null` — exact match to t1786's and t1826's own
+measurements. Added `test.fail(true, ...)` (the t1796/t1814/t1816 convention) with an inline comment citing
+the mechanism and this turn, so the suite reports it as a tracked pass rather than a hard red or a silent
+omission.
+
+### STEP 2 — diagnosis
+
+Traced the whole chain:
+
+- `web/viz/opSimContext.js`: `MACHINE_FRAME_TOOL = new Set(['homing', 'atc_change', 'atc_test', 'atc_table'])`.
+  `opSimContext(opType)` derives per-op-type intent, `toolMachineFrame` implying `forceMachine`.
+  `programSimContext(opTypes)` (line 91-103) computes the UNION across a WHOLE PROGRAM's op types — its own
+  comment states the design in plain language: "force the envelope if ANY op needs it." `applyProgramIntent`
+  (line 113-124) applies this union ONCE, via `panel.setForceMachine`/`panel.setToolMachineFrame`, to the
+  preview panel.
+- `web/viz/createPreviewPanel.js`: `forceMachine`/`machineFrameTool` (lines 272/274) are variables CLOSED OVER
+  by `createPreviewPanel`'s own factory function — genuinely per-PANEL-INSTANCE state, not a bare module-level
+  singleton. `simStock()` (line 802): `machineFrameTool ? null : previewStock()`, with its own comment: "a
+  homing SWITCH-SEEK ignores the workpiece for COLLISION (rendered separately)" — explicitly a
+  collision-relevant decision, not cosmetic.
+- The one PERSISTENT `blk-preview-panel` instance (created once in `blocksApp.js`, the whole-program preview)
+  is where this bites: `applyProgramIntent` sets its `machineFrameTool` from the UNION of every op type in the
+  program. Homing's own true wins the OR across the whole program, so `simStock()` returns null for the
+  ENTIRE trace — including Corner's own segment, which genuinely interacts with the stock (it probes the
+  stock's own corner).
+
+**Is this "one more instance" of today's cross-surface-singleton pattern, or a second population? — a second
+population, named explicitly.** The census's four earlier findings (`_formHost`, `_layout`,
+`previewOnlyParams`/`_onPreviewOnlyWrite`, the reproject-echo race) all share ONE shape: state that is shared
+ACROSS MULTIPLE COEXISTING UI SURFACES that should not see each other's writes — a module-level or
+cross-instance singleton. Bug 2 does not have that shape. `machineFrameTool` is correctly scoped to its ONE
+panel instance; nothing else reads or writes it. Its defect is different: it is ONE FLAG summarizing the UNION
+of MULTIPLE OPS' declared intent, correctly applied to ONE panel — but that one panel's trace is a SINGLE
+CONTINUOUS pass spanning those multiple ops, and the flag carries no memory of WHICH op a given point in the
+trace belongs to. The bug is temporal/positional (per-segment), not spatial (cross-surface). Same family of
+lesson — "state reaches further than the thing that set it" — but a genuinely different mechanism, so this is
+a second population, not a fifth instance of the first.
+
+**Does it have any flavour of bug 1's own name mismatch?** No. Bug 1's defect lived IN a naming gap —
+`'op'`/`'user_root'`/`'endprogram'` were three names a single unwrap check failed to reconcile, and fixing the
+gap (recognizing `'user_root'` too) closed the bug with no design change. Here, `forceMachine` /
+`machineFrameTool` / `toolMachineFrame` are not competing names for one concept — they are three intentionally
+LAYERED concepts (`toolMachineFrame`: this op's tool position uses machine coords; implies `forceMachine`: also
+force the whole envelope display; both distinct from `seatAtStart`, a third declared flag in the same
+registry). `opSimContext.js` documents the implication explicitly (`sim-intent-fold.spec.js` even pins it:
+"toolMachineFrame IMPLIES forceMachine + seatAtStart — one intent, not three flags"). Reconciling names would
+not touch this bug at all; the union-across-ops design is the actual cause, and it's deliberate, not an
+oversight.
+
+### STOP AND REPORT
+
+Per the dispatch's own explicit constraint, not attempting a fix. The honest fix is NOT "stop forcing the
+machine frame when Homing is present" (that would be exactly the "weakening the frame handling" the dispatch
+warned against — Homing's own segment genuinely needs `machineFrameTool` true, for a real collision-relevant
+reason its own comment states). The honest fix would need the trace/stock-render/collision machinery to know,
+PER SEGMENT, which op a given point in the whole-program trace belongs to, and gate `simStock()`'s null-out
+(and any real collision check riding on it) to only that op's own span — rather than one flag summarizing an
+OR across the whole program applied uniformly to the whole trace. That is a change to how the machine frame is
+APPLIED across a multi-op trace, exactly the class of change the dispatch reserved for the advisor. Reporting
+rather than choosing.
+
+### Bug 3 re-check
+
+No source file was changed this turn (only the new test file), so bug 3 could not have moved — but re-ran
+t1826's own exact measurement (a throwaway diagnostic spec, `zzdiag-bug3-recheck-1832.spec.js`, deleted after
+use) rather than asserting that from inference alone: same Homing+Corner gesture, `panel.viz.spindleMarkers
+.length`. Result: `markerCount: 1` — an exact match to t1826's own number. Confirmed unmoved, by
+measurement, not just by absence of a diff.
+
+### Gate
+
+- `npm run test:node`: 118/118 pass (run earlier this turn, before the diagnosis work; no source file changed
+  since, so unaffected).
+- Every spec touching the homing/forceMachine path: built the file list by grepping the actual SYMBOLS
+  (`forceMachine|machineFrameTool|setToolMachineFrame|opSimContext|programSimContext|applyProgramIntent`), not
+  filenames — the exact mistake that produced t1830's own scoping gap. This caught 27 files, wider than a
+  filename-based `homing|forcemachine|machineframe` grep's own 25 (missed `op-sim-context.spec.js`,
+  `sim-intent-fold.spec.js`, `whole-program-intent-756.spec.js`, `preview-intent-single-source-714.spec.js`,
+  among others). Ran all 27 together (72 tests, single invocation, no batching needed): 72/72 passed, 0
+  flaky, one run (includes `homing-stock-poisons-1832.spec.js` itself, showing as a tracked pass via
+  `test.fail()`).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1832` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+STEP 1 done and proven non-vacuous: the new test fails 3/3 on today's code (`stock: null`), now `test.fail()`
+tracked. STEP 2: this is a SECOND POPULATION, not a fifth instance of today's cross-surface-singleton family —
+`machineFrameTool` is correctly scoped to its one panel instance; the defect is a deliberate union-of-ops
+design (`programSimContext`'s own documented "force it if ANY op needs it") colliding with a single continuous
+trace that spans ops with genuinely different per-segment needs. No name-mismatch flavor — `forceMachine`/
+`machineFrameTool`/`toolMachineFrame` are intentionally layered, not accidentally colliding, names. STOPPING
+rather than fixing, per the dispatch's own explicit constraint: the honest fix needs per-segment frame
+awareness in the trace/stock/collision machinery, a change to how machine-frame is applied across a multi-op
+trace — a domain call, not a rendering one. Bug 3 re-measured (not just assumed unmoved): `markerCount: 1`,
+exact match to t1826. No source code changed this turn — only the new guard test (`test.fail()`-tracked) and
+this log. Gate: node 118/118, the 27-file symbol-grepped homing/forceMachine gate 72/72, both clean single runs.
+
+🔨 turn 1832
