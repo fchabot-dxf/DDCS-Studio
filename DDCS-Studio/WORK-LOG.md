@@ -27321,3 +27321,152 @@ instance), and a reasonable defensive floor, but I can't confirm it was NEEDED f
 than 200px when the report was taken. Worth a real screenshot from the user's own device if the overlap is still
 visible on the deployed build, since I couldn't force the box short enough through any legitimate app-level
 state to see it happen myself.
+
+## 🔬 turn 1770 (epoch 4) — THE DOORS DIVERGE: investigation only, no source changes
+
+Read-only act per the dispatch: map what each of the three doors (bar→Insert, Customize, `ddcsLoadBlockStack`)
+does to a wizard's def before `deriveLiveWizard()` renders it, whether each transformation is essential or
+incidental, and whether ONE equivalence test (real gesture vs. programmatic setup, deep-equal modulo ids) can
+hold. Traced every claim against the actual current code — the advisor's own dispatch table (which cites "traced
+t1762" for one row) turned out to be based on a real mistake in MY OWN earlier work-log entry, caught and
+corrected here.
+
+### Correction, found first: the bar→Insert door does NOT take the `authoredHere` branch
+
+t1762's own work-log entry (and the advisor's dispatch table, inheriting it) states bar→Insert "converges on
+`authoredHere`." Traced fresh, with a live diagnostic that hooked `ddcsLoadBlockStack` and logged the exact
+stack shape immediately after `insertWiz()` AND after a full render+reproject settle: both read
+`[{type:'op', opType:'user_corner_data', children:['user_root']}]` — a SINGLE `type:'op'` wrapper, `user_root`
+NESTED one level inside `children`, never promoted to the top of `stack`. `deriveLiveWizard`'s own
+`authoredHere` check (`blocksApp.js:520`, `stack.find(b => b.type === 'user_root')`) only looks at the TOP
+LEVEL — and its own comment right above (`:517-519`) says exactly why, in the file's own words: *"NOT 'a
+user_root anywhere in the flattened stack' — I wrote that first and it was worse than the bug: a PLACED data-op
+twin's body carries a user_root too."* For this exact stack shape, `authoredHere` is FALSE by design.
+What actually fires is `placedOpFallback` (`:485-511`) — `opBlock` matches on `opType` (line 468), `customizing`
+is false (nothing set `authoringWizardType()`), so the fallback branch runs, and it's THAT branch's own
+`def = {...regDef, template: <patched clone>}` (line 509) that supplies the `user_root`-bearing template —
+`userRoot` then resolves via the THIRD term of the fallback chain at `:541` (`def.template.find(user_root)`),
+never via `authoredHere` at all. Confirmed empirically (see the diagnostic above), not just re-derived from
+static reading — the trace matched the code exactly. Correcting this now since the dispatch table (and any
+future turn reading it) would otherwise keep repeating the same wrong branch name.
+
+### THE THREE DOORS, traced precisely (citations, not the shorthand from NEXT-SESSION.md)
+
+| door | entry point → stack shape produced | `authoringWizardType()`? | `deriveLiveWizard` branch | `def` source | field values shown | read-only? |
+|---|---|---|---|---|---|---|
+| **bar → Insert** | `wizardManager.js:insert()` → `opSession.js:554 commitActiveOp()` → `makeOp(opType, op.params, builderOf(opType)(op.params))` (`opBuilders.js:95,561`) → `{type:'op', opType, params:<REAL current values>, children: builder output}`; for a data-op twin the builder is `instantiate(def, params)` (`userOps.js:953`), so `children` = `[user_root…]` | NO | `placedOpFallback` (`blocksApp.js:485-511`) — **not `authoredHere`, correcting t1762/the dispatch table** | `{...regDef, template: <deep clone, param_field dflt overlaid from opBlock.params>, bindings: <.default overlaid>}` | the REAL placed op's own current values (t1740's live-overlay fix) | YES (`applyBlkReadOnly(placedOpFallback)`, t1752 — deliberate) |
+| **Customize** (`editWizardDef`) | `devMode.js:507 reconstructUserOpBlock(opType)` → `makeOp(opType, defaultParams(def), forkTpl)` where `forkTpl` = `wrapRecognizedForFork(def).template` (`devMode.js:381-392`) → `{type:'op', opType, params:<REGISTRY DEFAULTS>, children: forkTpl}`; `forkTpl` STILL rooted at `user_root` for every twin, fork-only or not — the fork-wrap only touches `root.children` (the SIM/exec mouth), never `root.uiChildren` (the Presentation mouth `hasTree`/`checkLayoutNodes` actually reads) | YES (`devMode.js:588 _authoringWizard = opType`) | `customizing` (`blocksApp.js:529-532`) | `def = regDef` DIRECTLY — unpatched, no params overlay at all (start-fresh-from-defaults is the deliberate semantic) | registry's own declared defaults — never a stale placed op's values (t1754's own deliberate fork) | NO — editable (this pane IS the editor) |
+| **`ddcsLoadBlockStack` direct** (test shortcut) | whatever the caller constructs; NEVER sets `authoringWizardType()` on its own | NO (unless the caller separately fakes it) | `placedOpFallback` — **same branch as bar→Insert**, IF a top-level `{type:'op', opType:<registered>}` exists, REGARDLESS of what `children`/`params` the caller supplied | same as bar→Insert's branch — but the params-overlay is a no-op if the caller passed `params:{}` | registry defaults IF `params:{}` (a fully-synthetic fixture); the REAL live values IF the caller constructed `params`/`children` via `makeOp`+`instantiate` the same way `commitActiveOp` does | YES (same branch as bar→Insert) |
+
+### The load-bearing finding: `hasTree`/`userRoot` do NOT depend on the STACK's own `children` at all
+
+For the `placedOpFallback` branch (bar→Insert AND any `ddcsLoadBlockStack` call matching a registered `opType`),
+`userRoot` is resolved from `def.template` — which is a CLONE of `regDef.template`, read from the REGISTRY
+(`getUserDef`), never from `opBlock.children`. This means a fully-synthetic test fixture
+(`{type:'op', opType, params:{}, children:[]}` — EMPTY children, no `user_root` anywhere in the stack at all)
+STILL renders through the identical `hasTree` branch as a real placed op, because the registry alone supplies
+the template regardless of what's physically on the canvas. The doors do NOT diverge on FORM STRUCTURE (field
+count, section layout, hasTree-vs-flat) — they diverge ONLY on (a) which values populate the fields (registry
+defaults vs. live overlay) and (b) editable-vs-read-only, both of which are governed by the SAME two orthogonal
+facts (`authoringWizardType()` state + whether `opBlock.params` has anything to overlay), not by three
+genuinely different rendering paths.
+
+### `wizard-face-1599`'s "Customize renders 0 fields" red — re-investigated, NOT the doors diverging
+
+Tested each of the 5 looped ops (`surfacing`/`slot`/`drill`/`bore`/`corner`) via `ddcsEditWizardDef` in TRUE
+isolation — fresh `page.goto` per op, no prior iterations, no shared page state — exactly the condition that
+would isolate a genuine "Customize is structurally broken for fork-only twins" defect from t1766's own
+already-diagnosed reproject-echo race (which specifically needs BACK-TO-BACK calls on the same page to
+manifest). Result: **all 5 rendered correctly** — surfacing 30 fields, slot 31, drill 35, bore 37, corner 23 —
+every fork-only twin included, none zero. A couple of individual runs hit an unrelated boot-timeout under this
+session's own sustained heavy load (my own diagnostic's 5s wait was too tight, not a real hang) — re-ran
+individually, clean every time. Traced `wrapRecognizedForFork` precisely (the ONE mechanism specific to the
+fork-only/"recognized" twins wizard-face-1599 targets) to confirm it wraps `root.children` (the SIM/exec mouth)
+only, never `root.uiChildren` (the Presentation mouth the FORM actually reads) — structurally incapable of
+producing zero fields on its own. **Conclusion: the "0 fields" red the advisor's gate saw was the t1766
+reproject-echo race** (the SAME loop shape — `ddcsLoadBlockStack([])` immediately followed by
+`ddcsEditWizardDef`, repeated 5× on one page — is exactly the race's trigger condition), not a genuine
+architectural divergence between the doors. t1766's own fix (generation counter + the test's own bounded
+wait/dialog-dismiss) already resolves the OBSERVABLE symptom; no further "doors" fix is needed for this
+specific red.
+
+### Essential vs. incidental — the dispatch's own question, answered
+
+- **`authoringWizardType()` gating `customizing` vs `placedOpFallback`**: ESSENTIAL. This is the ONE fact that
+  correctly separates "start fresh from defaults, editable" (Customize) from "show what's actually placed,
+  read-only" (everything else) — t1754's own deliberate fork, restated and confirmed still true.
+- **`placedOpFallback`'s params-overlay onto the registry template**: ESSENTIAL — this is t1740's own live-value
+  fix (the empty-pane bug's actual cause), not incidental machinery.
+- **The FORM-STRUCTURE convergence (`hasTree`/`userRoot` sourced from the registry regardless of the stack's own
+  children)**: this is NOT a divergence to collapse — it's already ONE mechanism, already unified. There is no
+  incidental structural difference between the doors to remove.
+- **What genuinely IS incidental**: nothing found in `deriveLiveWizard()` itself. The actual incidental variance
+  lives entirely in TEST FIXTURES — some specs construct a fully-synthetic stack (`children:[]`, `params:{}`)
+  that happens to render the same FORM STRUCTURE as a real placed op (since structure comes from the registry)
+  but shows registry defaults instead of live values, which is fine for structure-only assertions and WRONG for
+  any test claiming to verify "the live view of this op's actual data" (the exact property t1740's own fix and
+  its regression test care about).
+
+### The finish line — can ONE equivalence test hold? Yes for bar→Insert; the question doesn't apply to Customize
+
+**Bar → Insert: YES, and `wizard-face-1599.spec.js`'s OWN existing "PLACED data-op twin" test (`:161-194`,
+untouched this turn) already demonstrates the pattern**: it builds
+`OB.makeOp('user_corner_data', params, U.instantiate(def, params))` — the EXACT SAME low-level construction
+`commitActiveOp()` performs internally (`opSession.js:561`, `userOps.js:953`) — not a naive/empty fixture. This
+is a "constructed-equivalent" (same primitives, skips the UI interaction), not a byte-for-byte replay of the
+modal gesture, but it is provably the same code path — `commitActiveOp` IS `makeOp(opType, params,
+builderOf(opType)(params))`, and for a data-op twin `builderOf(opType)(params)` IS `instantiate(def, params)`.
+A genuine "drive the real gesture AND the programmatic setup, deep-equal the two resulting stacks" test would
+very likely hold, given the shared primitives — but wasn't run this turn (read-only act; building and running it
+is surgery on a path every wizard flows through, which the dispatch explicitly asked to defer until after the
+map). RECOMMEND: promote this test's OWN construction (`makeOp`+`instantiate`, matching real params) as the
+SANCTIONED shortcut pattern for the ~95 specs, replacing the naive empty-children/empty-params shape wherever a
+spec's assertions actually depend on live field values (not needed for pure structure/field-count assertions,
+where the naive shape is provably equivalent too, per the finding above).
+
+**Customize: the question doesn't apply — `ddcsLoadBlockStack` structurally CANNOT reach the `customizing`
+branch alone**, because `authoringWizardType()` is separate devMode state only `editWizardDef`/`editWizardDefs`
+set (`devMode.js:588`). `wizard-face-1599.spec.js`'s own Customize test already correctly calls
+`ddcsEditWizardDef` directly (never `ddcsLoadBlockStack` for this purpose) — this door's own test coverage is
+already correct and needs no change. The dispatch's own fallback clause applies cleanly here: since the two
+CANNOT be made equivalent (the expansion/defaults-reset is load-bearing for Customize's whole semantic), the
+rule inverts as the dispatch itself anticipated — Customize's own specs must drive the real door
+(`ddcsEditWizardDef`), and they already do.
+
+### Recommendation — NOT implemented this turn (read-only act)
+
+1. No change needed inside `deriveLiveWizard()` itself — the branch logic is already correctly unified at the
+   FORM-STRUCTURE level; there is no incidental divergence there to collapse.
+2. Write ONE new equivalence test: drive `openWiz→fill→insertWiz` for a representative twin, capture the
+   resulting stack; separately construct `makeOp(opType, <same params>, instantiate(def, <same params>))` via
+   `ddcsLoadBlockStack`; deep-equal the two programs modulo ids. Expect it to hold, given the shared primitives
+   traced above — if it does, that's the license the ~95 specs need.
+3. Audit (not rewrite in one pass) the ~95 `ddcsLoadBlockStack`-based specs for which ones assert LIVE FIELD
+   VALUES against a fully-synthetic (`params:{}`) fixture — only those need upgrading to the `makeOp`+
+   `instantiate` pattern; specs asserting pure structure (field count, section presence, read-only-ness) are
+   already testing something real and don't need touching.
+4. `wizard-face-1599.spec.js` needs no further "doors" fix — its own construction is already correct on both
+   the Customize and PLACED-twin tests; t1766 already fixed the race that was producing its red.
+
+### Verify
+
+- Read-only act: `git status` confirms zero source files touched this turn (checked explicitly before writing
+  this entry).
+- All findings traced against the actual current code, several confirmed empirically via live diagnostics (the
+  stack-shape trace, the 5-twin isolated Customize re-test) rather than left as static-reading claims — one of
+  which caught and corrected a real mistake in my own t1762 entry.
+- All `tests/zzdebug-1770-*.spec.js` scratch diagnostics deleted, none committed.
+
+### For the advisor
+
+The headline finding: the doors do NOT actually diverge at the level your dispatch table described (my own
+earlier t1762 entry had the branch name wrong — bar→Insert takes `placedOpFallback`, not `authoredHere` — now
+corrected). `deriveLiveWizard` already unifies form-structure across all three doors via the registry; the real
+divergences (defaults-vs-live-values, editable-vs-read-only) are both deliberate and already correctly gated on
+one clean fact (`authoringWizardType()`). The `wizard-face-1599` "0 fields" red that motivated this whole
+investigation was fully explained by t1766's own race, re-confirmed here with a clean isolated re-test across
+all 5 looped ops. The genuine, actionable gap is narrower than "collapse the doors": some subset of the ~95
+`ddcsLoadBlockStack` specs use a fixture shape that's fine for structure but not for live-value claims — a test
+audit, not architectural surgery. Did not write or run the equivalence test itself (read-only act, and it
+touches the same shared path every wizard flows through) — recommending it as the next act if this diagnosis
+holds up to your own review.
