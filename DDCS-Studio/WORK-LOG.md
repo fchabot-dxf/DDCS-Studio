@@ -29369,3 +29369,159 @@ confirmed live this turn, not fixed (a harder, separate problem: making `_layout
 that's the next act.
 
 🔨 turn 1806
+
+## Turn 1808 — regression from my own fix, plus make the failure mode loud
+
+### Dispatch
+
+The advisor's FULL-SUITE release gate ran on the t1806 tip: 2483 passed, 3 failed. Two are a REAL REGRESSION
+from the injection work, isolate-confirmed 2/2: `custom-op-number-roles.spec.js:17` and `:83`. The third
+(`pane-surface-scroll-1766`, steampunk theme) is flaky, not broken (same file flaky for futuristic/organic in
+the same run) — leave it, note it, don't chase a fix unless a cheap deterministic one is obvious. Cause traced by
+the advisor: the custom-op AUTHOR SURFACE is a THIRD consumer of `layoutSpecFromOp` that was living off the old
+global `document.querySelector` and never got wired to `setFormHost`. STEP 1: enumerate EVERY consumer, not just
+the one that went red — list yes/no per site, including the already-fine ones. STEP 2: make a missing injection
+LOUD — separate (a) no document at all (node-tier, stay permissive), (b) a host injected but this param has no
+bound field (legitimate preview-only, stay silent), (c) a real browser render with NO host injected (a caller
+bug, must not be silent) — a console.error naming the op is the floor, or an established dev-assert convention
+if one exists. Don't throw without doing STEP 1 first. Extend `canvas-handle-writable-1804` so a no-host render
+is detectable in test. Gate: node tier + `custom-op-number-roles` + `custom-op-canvas-handles` +
+`canvas-handle-writable-1804` + `render-equivalence-1796` + the two baselines — not the full suite (the advisor
+runs that themselves).
+
+### STEP 1 — the full per-site enumeration
+
+Grepped every call to `layoutSpecFromOp(`/`renderLayout2D(`/`renderDeclaredLayout(` across `web/` and `tests/`.
+
+**Production (`web/`) — the only two REAL callers, both correct:**
+
+| Site | Injects? |
+|---|---|
+| `userOpView.js:665-666` (`renderLayoutWithSim`, `form3d+2d` panels) | **YES** — `setFormHost(() => elNS('wiz_user_form'))` immediately before |
+| `userOpView.js:682-683` (plain `2d` panels) | **YES** — same call, immediately before |
+| `renderDeclaredLayout` (wraps `renderLayout2D`) | **N/A — zero real callers**, confirmed by grep (matches ARCHITECTURE.md §9's own long-standing claim) |
+
+**Test files calling `layoutSpecFromOp` raw, building their OWN synthetic form — must self-inject:**
+
+| Site | Injects (before this turn)? | Now |
+|---|---|---|
+| `custom-op-canvas-handles.spec.js` (4 sites) | YES — fixed at t1804 | unchanged, still correct |
+| `canvas-handle-writable-1804.spec.js` (t1806's own deterministic test) | YES — written that way | unchanged |
+| `custom-op-number-roles.spec.js` (3 sites: :47, :107, :165) | **NO — THE REGRESSION** | **FIXED this turn** |
+
+**Test files calling `layoutSpecFromOp` raw AFTER a real `window.openWiz(...)` already rendered the modal —
+correct by inheriting the production path's own injection, no self-injection needed:**
+
+| Site | Real `openWiz` first? | Calls `.onDrag()` + checks a field? |
+|---|---|---|
+| `pointpick-block.spec.js:87` | YES (`:75`) | YES — passes (relies on the earlier real render's still-valid `_host`) |
+| `middle-diag-aim.spec.js:69,...` | YES (`:46`, `:103`) | NO (structure/position only) |
+| `layout-partzero-shift-1672.spec.js:178`'s drag test | YES (`window.openWiz('user_corner_data')`) | YES — passes |
+
+**Test files calling `layoutSpecFromOp` raw with NO host at all, NEVER call `.onDrag()` + check a field —
+unaffected regardless of injection (the "no host → permissive" fallback still builds the same handles):**
+
+`corner-data-repos-handle.spec.js` (3), `corner-data-start-live.spec.js` (1), `corner-layout-coherence.spec.js`
+(1), `corner-marker-labels.spec.js` (1), `corner-source-declared.spec.js` (1), `corner-viz-polish.spec.js` (1),
+`edge-view.spec.js` (2), `edge-wall-picker.spec.js` (2), `layout-overlay-frame-1686.spec.js` (1),
+`layout-partzero-shift-1672.spec.js`'s other 4 non-drag calls, `rotary-datum-glyph.spec.js` (3),
+`wizard-shapes-1627.spec.js` (3).
+
+**Node-tier — no `document` at all, permissive by design, unaffected:**
+
+`tests/node/preview-spec-gate-1688.test.mjs:227`.
+
+Verified the WHOLE non-regression list empirically, not just by reasoning: ran all 14 files above (35 tests) —
+35/35 pass, both before and after the STEP 2 loud-signal addition (below), confirming the reasoning matched
+reality rather than assuming it.
+
+### The fix
+
+`custom-op-number-roles.spec.js`'s three synthetic-form sites now: (1) use a UNIQUE host id instead of
+`'wiz_user_form'` (the real app already has one, empty, static in `index.html` — a duplicate id let a query
+silently resolve to the WRONG one, the exact same fragility `custom-op-canvas-handles.spec.js` had before its
+own t1804 fix), and (2) call `PT.setFormHost(() => document.getElementById(...))` before each `layoutSpecFromOp`
+call. All 4 tests in that file pass now (2 were the regression; 2 others use the same host-id pattern
+defensively even though they don't call `.onDrag()`, for consistency and to remove the collision risk outright).
+
+### STEP 2 — making a missing injection loud
+
+Checked the codebase for an established convention first, per the dispatch's own instruction, rather than
+inventing one: `formWidgets.js:250` already does exactly this shape — `if (typeof console !== 'undefined' &&
+console.error) console.error(...)` for "a dropdown with ZERO options... a DECLARATION BUG, NOT a valid empty
+state... a LOUD read-only fallback + a dev-mode console error — never a silent empty select." Reused that
+convention verbatim rather than inventing a new one.
+
+Added to `layoutSpecFromOp`, right after `_host` is captured (`panelTypes.js:184-186`):
+
+```js
+if (!_host && typeof document !== 'undefined' && typeof console !== 'undefined' && console.error) {
+    console.error(`panelTypes: layoutSpecFromOp("${(def && def.opType) || '?'}") rendered with NO form host
+    injected — call setFormHost(...) before this render ..., or every declared handle's drag/picker-click on
+    this op will silently no-op instead of writing its field.`);
+}
+```
+
+This fires ONCE per render call missing a host (not deferred to gesture time) — the next caller who forgets
+finds out on their FIRST render, not only if/when someone happens to drag something. Distinguishes the three
+cases cleanly: `typeof document === 'undefined'` (the node-tier gate) never reaches this line at all since the
+condition requires a real `document` — stays exactly as permissive as today, confirmed (node tier still
+118/118). A host injected but a SPECIFIC param has no field (`_field(name)` returns null further down, inside
+`_writeParam`) is a SEPARATE, later check — untouched, still silent, still legitimate (t1648's own preview-only
+store). Only "no `_host` at all, in a real browser" triggers this line.
+
+**Chose console.error, not a throw** — per the dispatch's own caution. STEP 1's enumeration is precisely what
+makes this decision informed rather than a guess: production has exactly two callers and both are correct;
+every test file either already injects, inherits a valid injection from an earlier real render, or never
+exercises the write path at all (so a throw there would be pure noise, not a caught bug, since those tests never
+call `.onDrag()`). Given that, a throw wouldn't currently break anything either — but chose the non-fatal
+`console.error` anyway, matching the codebase's own established convention for this exact shape of defect
+("declaration bug, not a valid state" — loud, not fatal) rather than introducing a new, stricter failure mode
+this act wasn't asked to decide.
+
+**Consequence, reported plainly**: every one of the ~20 test files in the "no host, never checks a write" table
+above will now print this console.error on each `layoutSpecFromOp` call, since none of them inject (by design —
+they only test declared-handle SHAPE). This is accurate noise, not a false positive: those calls genuinely run
+with no host. It doesn't fail any of them (confirmed, 35/35 still pass) but it does make local test output
+noisier. Did not change those files — they're deliberately exercising the permissive/no-host path, and touching
+20 files to silence an accurate signal felt like exactly the wrong instinct for an act about making failures
+visible.
+
+### Guarding it — canvas-handle-writable-1804.spec.js
+
+New test: a real-browser render with no injected host logs exactly one `console.error` naming the op, and the
+handle still renders (permissive fallback unchanged) — then, in the same test, a SECOND render WITH a host
+injected logs nothing more (no false positives on the legitimate path). Non-vacuity: temporarily disabled the
+new `if` block (`if (false && !_host && ...)`) — failed 3/3 (`Received: 0` where `1` was expected). Restored,
+re-ran 3× consecutive clean.
+
+### Verify
+
+- Full requested gate (node tier + `custom-op-number-roles` + `custom-op-canvas-handles` +
+  `canvas-handle-writable-1804` + `render-equivalence-1796` + the two screenshot baselines): 18 Playwright tests
+  + 118 node-tier tests, 3× consecutive clean.
+- The 35-test non-regression sweep (every other `layoutSpecFromOp` caller in `tests/`): 35/35 pass, confirming
+  STEP 1's enumeration empirically, not just by reading the code.
+- Non-vacuity on the new loud-signal test: 3/3 fail with the check disabled, clean after restoring.
+- Architecture-map citations repaired a third time (this change added ~19 lines near the top of
+  `layoutSpecFromOp`, shifting everything below again) — both the node-tier test's `line:`/`lineEnd:` fields and
+  the prose `ARCHITECTURE.md` citations, verified against the current file each time. §3's narrative extended
+  with the t1808 chapter (now "five fixes"), not just the line numbers patched.
+- `handoff.py amendments --role worker`: none pending.
+- Did NOT run the full suite myself, per the dispatch's explicit instruction — the advisor re-runs that.
+
+### For the advisor
+
+The regression was exactly what you traced: a sibling test file (`custom-op-number-roles.spec.js`) using the
+SAME synthetic-form-without-injection pattern `custom-op-canvas-handles.spec.js` had at t1804, just not yet
+touched. Fixed identically (unique host id + `setFormHost`). Full per-site enumeration is above — production is
+clean (only two callers, both correct since t1804/t1806); every test file is now accounted for by category, not
+just the two that broke. The loud signal reuses `formWidgets.js:250`'s own established convention rather than
+inventing one, fires at render time (not deferred to a drag), and is non-fatal — chose that over a throw because
+STEP 1 showed nothing today NEEDS to break, and a throw is a bigger, more disruptive call than this act's scope
+if a legitimate caller I haven't enumerated ever appears (e.g. a future real caller of `renderDeclaredLayout`,
+still hypothetical, zero callers today). One real, disclosed side effect: ~20 pre-existing test files that
+deliberately exercise the "no host" permissive path will now print accurate console noise on every run — didn't
+touch those files, since they're correctly using the documented fallback and 35/35 still pass.
+
+🔨 turn 1808

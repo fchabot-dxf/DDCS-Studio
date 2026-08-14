@@ -168,6 +168,22 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // stays loyal to the surface that was live WHEN THIS CALL RAN, even if another surface renders afterward and
     // re-points setFormHost before the gesture fires (see setFormHost's own comment for the live repro this closes).
     const _host = _formHostEl();
+    // t1808 — THREE DIFFERENT situations were collapsing into one silent "no host" branch, the exact conflation
+    // this whole chain started from. Separated explicitly: (a) no `document` at all (the node-tier gate) — stays
+    // silent/permissive, unchanged, on purpose (see `_writable` below). (b) a host WAS injected but a SPECIFIC
+    // param has no bound field yet (the legitimate t1648 preview-only side-store, or the very first paint before
+    // render() has built the form) — stays silent, also on purpose. (c) a REAL BROWSER RENDER reached here with
+    // NO host injected at all — that is a CALLER BUG (a consumer of layoutSpecFromOp/renderLayout2D that never
+    // called setFormHost first), and it must not be silent: it used to mean "every declared param renders a
+    // handle whose drag silently no-ops" — a dead affordance nobody would notice until a user actually dragged
+    // it. Not a throw (STEP 1 of t1808 enumerated every real caller — production is clean, two test files were
+    // the gap and are fixed — but a throw here would be a bigger, more disruptive call than this act's scope; a
+    // console.error is the SAME "declaration bug, not a valid state" convention formWidgets.js:250 already uses
+    // for a dropdown with no options — loud, not fatal, and it names the op so the NEXT missing injection is
+    // caught at the moment it's introduced, not discovered later as a silently dead handle).
+    if (!_host && typeof document !== 'undefined' && typeof console !== 'undefined' && console.error) {
+        console.error(`panelTypes: layoutSpecFromOp("${(def && def.opType) || '?'}") rendered with NO form host injected — call setFormHost(...) before this render (see userOpView.js's own call sites), or every declared handle's drag/picker-click on this op will silently no-op instead of writing its field.`);
+    }
     const _field = (name) => (_host ? _host.querySelector('[data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null);
     // t808 — LOOP-GUARD (stepper-runaway fix b): a handle write-back only dispatches when the value ACTUALLY changes. An
     // unchanged write (a jittery drag frame, or any render-time re-derive that lands the same number) must NOT fire a

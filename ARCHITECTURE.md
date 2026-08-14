@@ -270,7 +270,7 @@ WIZARD BODY (twin, panel = form3d+2d)      index.html:353-355
 
 **Not everything in the SVG is placed.** `_disp` is applied to paths (:446), items (:457,461,464), holes (:473),
 handles (:490), the origin crosshair (:436). Raw `_S` is used for the grid (:402), the **stock rect** (:417 — its
-shift is baked into `spec.stock.ox/oy` at `panelTypes.js:195` instead), the snap ring (:559), the machine frame
+shift is baked into `spec.stock.ox/oy` at `panelTypes.js:211` instead), the snap ring (:559), the machine frame
 (:574,578,588), the stock-attach markers (:610), the corner-pick rings (:642) and the edge-pick strips (:677).
 Drag input runs the exact inverse: `_hit` subtracts placement (:356), `onDrag` subtracts it (:157),
 `_followHandle`/`_handleInGutter` add it (:307,:323).
@@ -279,9 +279,9 @@ Drag input runs the exact inverse: `_hit` subtracts placement (:356), `onDrag` s
 
 | name | what it is | declared at | read by |
 |---|---|---|---|
-| `partZeroShift(machine, stock, floorZ)` | machine coords of part-zero (the WCS pin) | `viz/sceneFrame.js:43` | 3D `PartFrame`; twin Layout `spec.placement` (`panelTypes.js:214, 618, 653, 655`) |
+| `partZeroShift(machine, stock, floorZ)` | machine coords of part-zero (the WCS pin) | `viz/sceneFrame.js:43` | 3D `PartFrame`; twin Layout `spec.placement` (`panelTypes.js:230, 634, 669, 671`) |
 | `stockPinOffset(machine, stock)` | `pinRow − workOrigin`; `{0,0}` unless explicitly pinned — **a different number** | `viz/sceneFrame.js:88` | `toolpath2d.js:91` (both modes) |
-| `placeShiftFromParams` / `placeShiftOfStack` | the op's **PlaceOnStock** attach shift | `wizards/ops/placement.js:133` / `blockEmitter.js:152` | the place fold (`blockEmitter.js:358`); baked into twin preview geometry as `_pShift` (`panelTypes.js:283-289`) |
+| `placeShiftFromParams` / `placeShiftOfStack` | the op's **PlaceOnStock** attach shift | `wizards/ops/placement.js:133` / `blockEmitter.js:152` | the place fold (`blockEmitter.js:358`); baked into twin preview geometry as `_pShift` (`panelTypes.js:299-305`) |
 
 **Consequence, stated plainly:** for the same op, the Layout pane anchors on `partZeroShift` while the 3D box's
 own 2D canvas anchors on `stockPinOffset`. These are equal only when the stock is pinned *and* `workOrigin` is 0.
@@ -303,8 +303,8 @@ double-shifts by the pin.
 |---|---|
 | the 8 legacy per-wizard views | `placementShift(bbox, params)` — the **PlaceOnStock attach offset** (`wizards/ops/placement.js:34`) |
 | edge / middle views | hardcoded `{x:0,y:0}` |
-| **every mill twin** | `partZeroShift(...)` — the **WCS pin**, machine coords (`panelTypes.js:618,653,655`) |
-| the 7 lathe twins | **absent** — a lathe spec carries no `placement` key at all (`viz/latheProfileCanvas.js`, early-returned at `panelTypes.js:192-193`) |
+| **every mill twin** | `partZeroShift(...)` — the **WCS pin**, machine coords (`panelTypes.js:634,669,671`) |
+| the 7 lathe twins | **absent** — a lathe spec carries no `placement` key at all (`viz/latheProfileCanvas.js`, early-returned at `panelTypes.js:208-209`) |
 
 ### Renderer inventory (four renderers, one composer, one spec compiler)
 
@@ -346,7 +346,7 @@ it never carried divergence risk and was out of scope for this deletion.
 
 `wizards/ops/vizBlocks.js` (t1627) declares the four SHAPE primitives — `shape_rect`/`shape_circle`/`shape_line`/
 `shape_marker` (`SHAPE_2D_TYPES`) — plus ONE container, `layout_2d_canvas` (`kind:'uibox'`, `mouth:'DO'`). The four
-shapes have a real, working consumer: `panelTypes.js:313` flattens `def.template` (walking BOTH `uiChildren` and
+shapes have a real, working consumer: `panelTypes.js:329` flattens `def.template` (walking BOTH `uiChildren` and
 `children` — mouth-agnostic) and draws every `shape_*` block it finds as a Layout-pane item, already wired, zero
 extra code needed by a twin that has content to declare. `layout_2d_canvas` is wired too, but GENERICALLY — bridge.js
 (`else if (mouthOf(def)) addMouth(mouthOf(def))`) gives any def carrying a `.mouth` a Blockly mouth regardless of
@@ -384,7 +384,7 @@ pane they would have backed) — see WORK-LOG t1734.
 | what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:884-886`; exported as `hookKeysOf` `:891` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |
 | per-atom scratch vars | `def.scratch` on each atom; aggregated by `data/universalScratch.js` | — |
-| which widgets own several params | `MULTI_WIDGETS`, `ui/formWidgets.js` — read by BOTH `renderOpForm`'s `renderUnit` AND `panelTypes.js:251` | — |
+| which widgets own several params | `MULTI_WIDGETS`, `ui/formWidgets.js` — read by BOTH `renderOpForm`'s `renderUnit` AND `panelTypes.js:267` | — |
 | the posts | `wizards/dialects/index.js` registry (7 posts) + `DEFAULT_CAPS` | — |
 
 **32 twins vs 25 `opensAs` targets.** The 7-op remainder is the lathe family
@@ -506,8 +506,8 @@ Two elements in `#userVizContainer`: a `z-index:-1` canvas and a transparent SVG
 the Layout pane, **ask which of the two layers is wrong first.**
 
 ### 3 · A DOM query standing in for a declaration → "17 twins will gain handles", then a HARDCODED selector broke
-the Blocks pane, then the fix for THAT left a deferred-reader ordering hole. Four fixes, each closing the gap the
-previous one's design left open.
+the Blocks pane, then the fix for THAT left a deferred-reader ordering hole, then a caller with no host at all
+regressed silently. Five fixes, each closing the gap the previous one's design left open.
 A dispatch relayed 17. Reading the whole regenerated snapshot diff — 10 lines, 7 insertions, 3 deletions, not the
 ~50 a 17-twin gain implies — showed only `user_corner_data` and `user_middle_data` moved. Of the other 15,
 **13 declare zero role/group-tagged bindings anywhere** and have no spatial X/Y to drag at all; **2** were a
@@ -515,10 +515,10 @@ gate-harness gap, not a product gap. t1690 replaced the DOM query wholesale with
 put a handle over a param with NO rendered field yet (declared ≠ rendered; `tests/custom-op-canvas-handles.spec.js`
 caught it). t1700 restored the DOM check as a SECOND, conditional half, but hardcoded which form to query:
 ```js
-// wizards/ops/panelTypes.js:270
+// wizards/ops/panelTypes.js:286
 const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_host || !!_field(name));
 ```
-The declared half (`_declaredParams`/`_unwritable`) is still built from `MULTI_WIDGETS` (`panelTypes.js:25,251`) —
+The declared half (`_declaredParams`/`_unwritable`) is still built from `MULTI_WIDGETS` (`panelTypes.js:25,267`) —
 the **same registry** `renderOpForm`'s `renderUnit` reads. t1700's DOM half hardcoded `document.querySelector
 ('#wiz_user_form ...')` — fine while only the MODAL rendered this module, wrong once the Blocks pane got its own
 namespaced form (`#blk_wiz_user_form`, ns='blk'). On a page that opened the modal first (warm), a drag on the
@@ -541,6 +541,23 @@ instead — see WORK-LOG t1806.) Fixed by capturing the host ONCE into a local `
 the top of `layoutSpecFromOp`, with `_field`/`_writeParam` defined LOCALLY inside that call (no longer
 module-level functions) so every closure it builds — deferred or not — closes over that one captured value
 forever, never re-reading the singleton again.
+**t1808's full-suite release gate caught a REAL REGRESSION from the t1804/t1806 injection work itself**:
+`tests/custom-op-number-roles.spec.js`'s two authoring specs called `layoutSpecFromOp` directly, in a real
+browser, and had never called `setFormHost` — they were living off the OLD global `document.querySelector`
+default, same shape as the gap `custom-op-canvas-handles.spec.js` had already been fixed for at t1804, just a
+sibling test file nobody had touched yet. Enumerated EVERY consumer of `layoutSpecFromOp`/`renderLayout2D`
+(`web/` production code: exactly the two `userOpView.js` sites, both already correct; every `tests/` call site,
+categorized by whether it exercises `.onDrag()` against a real field or only inspects handle structure) before
+concluding these were the only two gaps — see WORK-LOG t1808 for the full per-site list. Fixed the test file the
+same way. Then closed the CLASS of this regression, not just the instance: `layoutSpecFromOp` now separates
+three previously-conflated situations explicitly — no `document` at all (the node-tier gate) stays silent and
+permissive; a host injected but THIS param has no bound field (the legitimate t1648 preview-only store, or the
+very first paint) stays silent; a REAL BROWSER RENDER WITH NO HOST INJECTED AT ALL is now a LOUD
+`console.error` naming the op (`panelTypes.js:184-186`, the same "declaration bug, not a valid state" convention
+`formWidgets.js:250` already uses for an enum with no options) — not a throw, since STEP 1's enumeration is what
+makes a throw provably safe to consider LATER, not something to reach for before that enumeration exists. The
+NEXT caller who forgets `setFormHost` now finds out at the moment they introduce the gap, not when a full-suite
+gate catches a silently-dead handle days later.
 ```bash
 rg -n "_writable|_host|setFormHost" DDCS-Studio/web/wizards/ops/panelTypes.js DDCS-Studio/web/wizards/views/userOpView.js
 ```
@@ -605,7 +622,7 @@ rg -n "\.attach\(" DDCS-Studio/web --glob '*.js'
 
 ### 9 · `renderDeclaredLayout` is an exported function with ZERO callers. Its SIBLING risk — the shared `_layout`
 singleton reparenting across the modal and the Blocks pane — is not hypothetical: t1806 hit it live.
-`_layout` is a module-level singleton (`panelTypes.js:659`) and `FeatureCanvas._mount` wipes `container.innerHTML`
+`_layout` is a module-level singleton (`panelTypes.js:675`) and `FeatureCanvas._mount` wipes `container.innerHTML`
 when the container changes (`featureCanvas.js:92-95`). `renderDeclaredLayout` itself genuinely has zero callers
 (`rg` below still returns one hit, the definition) — but it shares `_layout` with `renderLayout2D`, whose own TWO
 real call sites (`userOpView.js:665,682`) pass DIFFERENT containers depending on which instance is rendering: the
@@ -683,7 +700,7 @@ WORK-LOG- and test-header-reported; not re-measured.)*
   was read, not re-derived.
 - **Rule 14 (`postInstantiate`)** is verified as a *mechanism* at `userOps.js:956`; no violation of it was found in
   this week's work-log. It is listed because the project memory names it, not because this week caught it.
-- The **lathe family's** divergences from the mill spine were not traced beyond `panelTypes.js:192-193` and the
+- The **lathe family's** divergences from the mill spine were not traced beyond `panelTypes.js:208-209` and the
   missing `placement` key. Two of the three files dirty at verification time are lathe viz files.
   **PARTIALLY RESOLVED (cycle 857 ACT 1, PREVIEW-AS-DATA.md):** traced fully — `withLatheScene` declares only the
   blank/stock shape (`def.simStock`); CUT geometry has no declared hook at all (2D dispatched by a 6-armed regex

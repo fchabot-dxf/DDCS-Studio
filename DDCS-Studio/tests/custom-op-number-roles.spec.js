@@ -37,10 +37,14 @@ test('authored 2D-point op: number fields render data-param, preview handle drag
     const grouped = bindings.filter((b) => b.group);
     const byRole = {}; for (const b of grouped) byRole[b.role] = b;
 
-    // (2) RENDER the real form into the id layoutSpecFromOp queries
-    const host = document.createElement('div'); host.id = 'wiz_user_form'; document.body.appendChild(host);
+    // (2) RENDER the real form into a UNIQUE host (not 'wiz_user_form' — the real app already has one, empty,
+    // static in index.html; a duplicate id would let a query silently resolve to the WRONG one), injected via
+    // setFormHost (panelTypes.js's real dependency-injection contract, t1804/t1806 — layoutSpecFromOp no longer
+    // reads a hardcoded '#wiz_user_form' selector).
+    const host = document.createElement('div'); host.id = 'test_number_roles_point'; document.body.appendChild(host);
     const readers = FW.renderOpForm(host, bindings);
     const dataParams = [...host.querySelectorAll('[data-param]')].map((n) => n.dataset.param).sort();
+    PT.setFormHost(() => document.getElementById('test_number_roles_point'));
 
     // (3) CONSUMER: layoutSpecFromOp derives the draggable handle from the roles (writable now → a real handle)
     const def = { bindings };
@@ -99,9 +103,10 @@ test('authored 2D-rect (numbers): four data-param fields; preview size-handle wr
     }];
     const bindings = UO.extractParamBlocks(template, new Set(), true);
 
-    const host = document.createElement('div'); host.id = 'wiz_user_form'; document.body.appendChild(host);
+    const host = document.createElement('div'); host.id = 'test_number_roles_rect'; document.body.appendChild(host);   // t1808 — unique, not 'wiz_user_form' (see the point test's own comment)
     FW.renderOpForm(host, bindings);
     const dataParams = [...host.querySelectorAll('[data-param]')].map((n) => n.dataset.param).sort();
+    PT.setFormHost(() => document.getElementById('test_number_roles_rect'));
 
     const def = { bindings };
     const spec = PT.layoutSpecFromOp(def, { rx: 10, ry: 20, rw: 60, rh: 40 });
@@ -158,10 +163,11 @@ test('canvas xy-pad is unchanged: renders a mini-canvas (no data-param), no dead
       y: { type: 'param', params: { name: 'cy', value: 20, widget: 'xy-y' } },
     } }];
     const padBinds = UO.extractParamBlocks(tplPad, new Set(), true);
-    const host = document.createElement('div'); host.id = 'wiz_user_form'; document.body.appendChild(host);
+    const host = document.createElement('div'); host.id = 'test_number_roles_pad'; document.body.appendChild(host);   // t1808 — unique, not 'wiz_user_form' (see the point test's own comment)
     FW.renderOpForm(host, padBinds);
     await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));   // let the canvas draw
     const padDataParams = host.querySelectorAll('[data-param]').length;
+    PT.setFormHost(() => document.getElementById('test_number_roles_pad'));
     const padSpec = PT.layoutSpecFromOp({ bindings: padBinds }, { cx: 10, cy: 20 });
     host.remove();
 

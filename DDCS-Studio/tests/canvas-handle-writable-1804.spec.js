@@ -191,3 +191,40 @@ test('t1806: a spec built under host A keeps writing to host A after host B is i
     expect(Number(r.hostB_px), 'host B (injected AFTER the spec was built) must be untouched').toBe(50);
     expect(Number(r.hostB_py)).toBe(40);
 });
+
+test('t1808: a real-browser render with NO host injected is LOUD, not silent (a caller bug, not a valid state)', async ({ page }) => {
+    // Regression class this guards: custom-op-number-roles.spec.js's own two specs called layoutSpecFromOp
+    // directly, in a real browser, with no setFormHost call at all — the t1804/t1806 injection contract makes
+    // that a caller bug (every declared handle's drag silently no-ops), and it must be DETECTABLE, not merely
+    // "the drag quietly did nothing" (which is exactly how the regression shipped and stayed unnoticed in the
+    // first place). Distinguishes it from the two LEGITIMATE silent cases (a host injected but this param has no
+    // bound field yet; the node-tier gate, no document at all) — neither of those should ever log this.
+    const errors = [];
+    page.on('console', (m) => { if (m.type() === 'error' && m.text().includes('panelTypes: layoutSpecFromOp')) errors.push(m.text()); });
+    await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+
+    const r = await page.evaluate(async () => {
+        const PT = await import('/wizards/ops/panelTypes.js');
+        const def = { opType: 't1808_no_host_probe', bindings: [{ param: 'px', group: 'pt', role: 'x' }, { param: 'py', group: 'pt', role: 'y' }] };
+        // Deliberately NO setFormHost call — the exact shape the regression shipped as.
+        const spec = PT.layoutSpecFromOp(def, { px: 5, py: 6 });
+        return { handles: spec.handles.length };
+    });
+
+    expect(r.handles, 'the permissive fallback still renders the handle (unchanged, declared-only)').toBe(1);
+    expect(errors.length, 'exactly one loud console.error, naming the op, for the no-host render').toBe(1);
+    expect(errors[0]).toContain('t1808_no_host_probe');
+
+    // Non-vacuity: the SAME call, WITH a host injected, must NOT log anything.
+    const errorsBefore = errors.length;
+    await page.evaluate(async () => {
+        const PT = await import('/wizards/ops/panelTypes.js');
+        const host = document.createElement('div'); host.id = 'test_1808_quiet_host'; document.body.appendChild(host);
+        PT.setFormHost(() => document.getElementById('test_1808_quiet_host'));
+        PT.layoutSpecFromOp({ opType: 't1808_quiet_probe', bindings: [{ param: 'qx', group: 'q', role: 'x' }, { param: 'qy', group: 'q', role: 'y' }] }, { qx: 1, qy: 2 });
+        host.remove();
+    });
+    await page.waitForTimeout(100);
+    expect(errors.length, 'an injected host stays quiet — no false positives').toBe(errorsBefore);
+});
