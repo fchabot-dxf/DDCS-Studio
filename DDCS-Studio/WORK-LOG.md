@@ -29636,3 +29636,116 @@ this render call is about" the same way `_host` is now scoped — over patching 
 call, and whether `previewOnlyParams`/`_onPreviewOnlyWrite` belong in the same fix or a separate one, is yours.
 
 🔨 turn 1810
+
+## Turn 1812 — _activePanel: build the repro first — CONFIRMED the mechanism, KILLED the specific claim (no fix)
+
+### Dispatch
+
+`_activePanel` is a bigger find than `_layout` IF the claim holds: `_layout` is a picture bug, `_activePanel`
+was read from the census as able to "put a wrong number in the emitted program" — this project emits G-code
+that moves a real machine. But it is unproven; the census was read from code, not driven. STEP 1: drive the
+real gesture — get the pane and the modal both live (the `openLiveAsModal` path used for t1806), drag a start
+position on the pane, press the MODAL's real Insert, read the EMITTED PROGRAM. If the pane's dragged number
+appears in the modal's emit, confirmed and serious. If it does NOT reproduce, say so and STOP — don't fix an
+unproven finding, don't adjust the scenario until it fails. Also flagged as a pattern: `_onPreviewOnlyWrite`'s
+comment claiming both instances re-arm it every `onShow` (false — set once at construction) is the SECOND
+comment in this chain asserting a safety the code doesn't provide, after TRAP9 — note it as a pattern. STEP 2
+(only if confirmed): fix with the SAME capture-at-call-time discipline `_formHost` used — explicitly NOT a
+shared per-surface context object (the advisor's own structural call: a context is itself a re-pointable
+singleton, risks reintroducing the bug one level up). If the pattern genuinely doesn't fit, stop and say so
+rather than inventing something. Guard with a test asserting the EMITTED PROGRAM, not panel state. Report
+whether the same scenario also exercises `_layout`. Gate: node tier + new test + touched specs — not the full
+suite.
+
+### Building the repro — the modal genuinely blocks the pane, confirmed before assuming
+
+First checked, rather than assumed, how to get "both live" concretely: the real-bar-opened modal's `#wizard`
+overlay lives inside `#studio-app` (not adopted onto `document.body` — that adoption is specific to
+`openLiveAsModal`'s own code path, which pulls FROM the pane and therefore isn't the right tool for THIS
+sequence, since it needs the MODAL's own real, non-preview Insert). A REAL Playwright click on the Blocks tab
+while this modal is open **times out — genuinely blocked**, confirmed empirically (not assumed from the CSS).
+Since the thing under test is a JS-level singleton, not a rendering/CSS concern, drove the tab switch via
+`window.showApp('blocks')` — the EXACT function the tab button's own `onclick` calls — while keeping both
+start-position drags as real Playwright mouse gestures (the actual behaviour under test).
+
+### The repro, and the live evidence
+
+1. Real bar → open corner in the MODAL, fill `dist=741`. Do not insert.
+2. Real mouse drag on the MODAL's own Start marker → position A: `{x:30.92, y:-56.74, z:-5}` (read directly
+   from that panel's own `getStartPos()`).
+3. `window.showApp('blocks')` (the pane's real render trigger) → the pane picks up the modal's live op via
+   `previewActiveOp()` and renders its OWN, independent preview panel instance.
+4. Real mouse drag on the PANE's own Start marker → position B: `{x:-33.39, y:-15.23, z:-5}` — deliberately far
+   from A.
+5. Traced `wm._activePanel`'s identity right before Insert by comparing object references against both known
+   panels: **`PANE`** — confirmed, not inferred.
+6. Pressed the MODAL's real Insert (`window.ddcsStudio.wizardManager.insert()` — the exact call a click
+   dispatches to; the button itself was behind the now-active Blocks tab).
+7. Instrumented `window.ddcsSetSpindleStart` to capture its arguments: **called with `{x:-33.39, y:-15.23,
+   z:-5}`** — the PANE's dragged position B, not the MODAL's own A. **The `_activePanel` cross-contamination
+   mechanism is CONFIRMED LIVE, with hard evidence, exactly as the code read predicted.**
+
+### But the specific "wrong number in the EMITTED PROGRAM" claim does NOT hold — checked, not assumed
+
+Read the inserted corner op's own recorded `params` (`cross1_x:-73.918, cross1_y:50` — the WALL-2 REPOSITION
+values, #23/#24) and the FULL emitted G-code text (5517 chars). Neither contains position A's coordinates NOR
+position B's. Traced why this is architecturally guaranteed, not coincidental: `insert()`'s own code order
+commits/emits the op FIRST (lines ~476-516), and only AFTER that reads `_activePanel` for a SEPARATE, later
+side-effect (lines ~518-528) — the emit had already happened before the contaminated read occurs at all. And
+the "Start" marker (pass 0) itself is explicitly documented in `userOpView.js`'s own comment as sim-only: **"it
+moves the SIM, never the emit."** `ddcsSetSpindleStart`/`window.__pendingSpindleStart` feed ONLY
+`gcodePreviewTab.js`'s own MAIN STUDIO EDITOR preview panel — a transient, self-clearing (`= null` immediately
+after read) visualization seed for "where does the NEXT simulated trace start," never persisted, never written
+into any saved file or the inserted op's own params.
+
+**Verdict: the MECHANISM is real and confirmed; the SEVERITY claim that justified prioritizing it ahead of
+`_layout` is not.** This is a wrong-picture bug (the main editor's own gcode-preview panel would show a
+misleading "tool starts here" hint after an Insert, in this specific cross-surface sequence) — the SAME
+category and stakes as `_layout`, not a machine-safety-relevant G-code correctness bug. Per the dispatch's own
+explicit instruction — "if it does not reproduce, say so and stop; a non-reproduction here is a real result and
+it demotes `_activePanel` below `_layout`" — I am reporting this precisely and NOT proceeding to STEP 2. The
+specific claim under test did not reproduce; a different, real, lower-stakes claim did. Held the same line as
+t1788 rather than pushing through on a partial match.
+
+### Does the same harness also exercise `_layout`?
+
+**No — checked directly, not assumed.** The pane's own drag in this sequence worked CORRECTLY (a real,
+distinct position B was captured exactly as dragged) — meaning `_layout`'s reparenting symptom did NOT manifest
+here. The two bugs need DIFFERENT trigger shapes: `_layout`'s t1806 repro specifically required
+`openLiveAsModal()` ("Open as modal," which reuses the SAME shared `FeatureCanvas` singleton for the modal's own
+render while the pane's earlier render is still the last thing to have used it that way) — a mechanism this
+turn's harness never invoked, since getting the modal live here went through the real bar instead. One harness
+does not serve both; they would need separate repro scaffolding if both are dispatched together.
+
+### The `_onPreviewOnlyWrite` comment pattern — noted, not investigated further this turn
+
+Confirmed at t1810 and reiterated as directed: `userOpView.js`'s own comment claims "both instances already
+re-arm it every onShow" for `setPreviewOnlyWriteHandler` — traced again this turn to be sure, still only ONE
+call site (construction time), no re-arming found anywhere. This is the SECOND comment in this chain asserting
+a safety the code does not provide (after TRAP9's "so it never fires"). Recording the pattern explicitly, as
+asked: **a confident comment is worse than no comment, because it stops the next person looking** — two
+independent instances of this exact failure mode in one small corner of the codebase is itself worth treating
+as a signal, not a coincidence, the same way the dispatch treated `_formHost`+`_layout` as a signal rather than
+two unrelated bugs.
+
+### Verify
+
+- Node tier (`npm run test:node`): 118/118 pass — no source touched this turn (STEP 2 was not reached).
+- Throwaway diagnostic spec deleted after use, per this project's own convention.
+- `handoff.py amendments --role worker`: none pending.
+- No test added to the permanent suite — there is nothing confirmed-and-fixed to guard yet; guarding a
+  non-reproduced claim would itself be the wrong kind of artifact.
+
+### For the advisor
+
+Confirmed the mechanism live, with hard evidence at every step (object-identity trace, an instrumented
+`ddcsSetSpindleStart` capture, the full emitted text). But the specific claim that made this outrank `_layout`
+— "a wrong number in the emitted program" — does not hold: the emit already happened before the contaminated
+read occurs, and the dragged value only ever reaches a transient, self-clearing preview seed in the main
+editor's own gcode-preview tab, never the inserted op's own params or the saved program. That demotes
+`_activePanel` to `_layout`'s own tier, by your own stated rule, so I stopped rather than proceeding to STEP 2 —
+did not fix, did not design a fix. The one harness does not exercise both bugs; `_layout` still needs its own
+`openLiveAsModal`-shaped repro if it's next. Both `_activePanel` and `_layout` remain real, live-confirmed,
+same-severity-tier, unfixed. Your call on which (or whether a shared structural answer) comes next.
+
+🔨 turn 1812
