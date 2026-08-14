@@ -2094,25 +2094,46 @@ icon. No tab row, no `GENERATOR MODAL`, no `LIVE` badge.
 **REJECTED, and record it so nobody re-proposes it:** an auto-switch that infers intent (3D while a sim
 runs, form otherwise). That is exactly the four-term predicate returning under a friendlier name.
 
-## ⚠ OPEN — the reproject-echo race in programModel is NARROWED, not CLOSED (t1766)
-Found while chasing `wizard-face-1599`'s red (which was a HANG, not the zero-fields assertion the name
-suggested): **a queued reproject-echo microtask (`blocksApp.js` renderFromModel) can overwrite a NEWER
-`setStack` with STALE workspace data** under rapid back-to-back calls. In the test it left the program
-stuck non-empty → `confirmDestructiveLoad` raised a custom `.app-dialog` Playwright's `page.on('dialog')`
-cannot see → unbounded hang. **In the app the same race means an edit can silently revert.**
+## ✓ CLOSED (t1824) — the reproject-echo race is real in the code, unreachable by any real user gesture
+Originally logged here (t1767) as "NARROWED, not CLOSED," with "in the app the same race means an edit can
+silently revert" — that sentence was THIS PLAN's OWN INFERENCE from the mechanism, not something anyone
+observed happen to a real edit. t1766's own WORK-LOG entry (the source) never claims a user's edit was lost:
+the actual observed incident was `wizard-face-1599` HANGING on a custom `.app-dialog` Playwright's
+`page.on('dialog')` cannot see, caused by `ddcsGetBlockProgram()` staying stuck non-empty for 5.7 straight
+seconds — triggered by the TEST'S OWN scripted `ddcsLoadBlockStack([])` immediately followed by
+`ddcsEditWizardDef(t)`, with no yield to the event loop in between.
 
-**Fixed:** a generation counter in `programModel.js` (`gen++` on every real replacement; a superseded echo
-no-ops). Small and right.
-**NOT FIXED, and the worker said so rather than claiming a close:** a second, deeper Blockly-internals race
-can still rarely surface it. They stopped instead of chasing further into core plumbing — correct for a
-side-finding, but it leaves a known hole.
+**t1824 investigated whether a real user gesture can reproduce this, rather than assuming it from the code,
+and found it structurally cannot:**
+- `gen++` is the first line of `setStack` (`programModel.js:224`) and `stack` is mutated ONLY inside
+  `setStack` (grepped) — every program change, INCLUDING a real user's own direct Blockly edit
+  (`blocksApp.js:788`, `setStack(workspaceToStack(ws), 'blockly')`, synchronous), bumps `gen`. A queued
+  reproject echo checks `getGen() === myGen` before applying, so even in the theoretical case a real edit
+  DID land while an echo was pending, the edit's own `setStack` call would already have superseded it.
+- Grepped every real production call site of `ddcsLoadBlockStack`/`editWizardDef` (18 sites total): none
+  synchronously chains a SECOND `setStack`-touching call within the same handler with no yield. The one
+  production "Clear" call site (`editorManager.js:165`) does a single clear. The two production "Customize"
+  triggers (`opContextMenu.js`, `wizardManagerPanel.js`) both call `editWizardDef` (`devMode.js:571`), whose
+  own internal chain has REAL `await` points (`confirmDestructiveLoad`, `blocksAppReady`) before it ever
+  touches the model — unlike the test, which called the raw functions directly with no such gate.
+- The decisive reason, not just an absence of a found path: JS's own event loop drains ALL pending
+  microtasks before dispatching the NEXT macrotask, including the next real DOM input event — a
+  specification-level guarantee, not an implementation detail. Two SEPARATE real user actions (two clicks,
+  two keypresses, an "undo storm") can never interleave with a microtask queued during an EARLIER action's
+  handler; the queued reproject echo always resolves first, no matter how fast the user acts. The race is
+  reachable only by a single synchronous script issuing two `setStack` calls with no event-loop yield
+  in between — which is what the test itself did, not something any UI gesture can produce.
+- Tried to construct a real two-click reproduction anyway (Clear + an immediate Customize click) rather than
+  rest on the argument alone: the UI's own structure doesn't offer a tight adjacent pairing for this — Clear
+  removes the very op a context-menu Customize would target, and the Settings-panel Edit route needs its own
+  navigation first, adding real event-loop gaps that only reinforce the conclusion.
 
-**Why this deserves its own act:** `programModel` is the path EVERY change to the user's program runs
-through. "Rarely loses an edit" there is a data-integrity bug, not a UI nit, and it will be near-impossible
-to attribute when it bites (the user will report "it undid my change", months from now, unreproducibly).
-⚠ Do NOT bundle it with presentation work. It wants: a deliberate stress reproduction (rapid
-clear-then-load, undo storms), the Blockly-side race named precisely, and a fix that makes a stale echo
-STRUCTURALLY unable to land rather than losing a race less often.
+**The second, deeper "Blockly-internals" race t1766 flagged (a queued echo reading a workspace whose own
+clear/rebuild hasn't finished)** inherits the same conclusion: it only matters within the identical
+scripted-double-call shape, which no real gesture reaches either.
+
+**Did not widen the gen-guard speculatively** — nothing here needs a bigger fix; the guard already correctly
+protects every path a real user can reach. See WORK-LOG t1824 for the full trace.
 
 ---
 

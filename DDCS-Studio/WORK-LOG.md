@@ -30321,3 +30321,115 @@ fixed (t1806); these last two are real-but-currently-unreachable, and are docume
 patched to look resolved. Moving to the reproject-echo race next, as instructed — not started here.
 
 🔨 turn 1822
+
+## Turn 1824 — the reproject-echo race: OBSERVED or INFERRED? Traced to ground, then proved unreachable
+
+### Dispatch
+
+STEP 1, and do not skip to the fix: establish from the WORK-LOG and git history whether an actual edit loss
+was ever OBSERVED, or whether "narrowed, not closed" was an INFERENCE from reading the code — quote the
+original evidence. STEP 2: try to construct the loss, driven as a REAL user would, not a scripted
+double-setStack. Two specific sub-questions: is there a path that changes the workspace without bumping
+`gen`; and do the macrotask-scale timers in `renderFromModel` (`requestAnimationFrame`/`setTimeout(...,120)`/
+`setTimeout(...,400)`) reach across a gap a real edit could land inside. If constructible, fail-first-then-fix
+like t1816. If not, say so plainly, document what the gen guard covers, and STOP — do not widen it
+speculatively. Correct the plan text either way.
+
+### STEP 1 — OBSERVED or INFERRED? Quoted, not paraphrased
+
+Read t1766's own WORK-LOG entry (the origin) in full, then the git history. **The observed incident was a
+TEST HANG, not an edit loss.** t1766's own words: "the advisor's own gate run reported a clean assertion
+failure... my own reproduction... instead TIMED OUT... inside the `ddcsEditWizardDef(t)` call itself" and
+"`ddcsGetBlockProgram()` read a persistent length-1 program for 5.7 STRAIGHT SECONDS after the clear." The
+trigger was the TEST'S OWN scripted loop: `ddcsLoadBlockStack([])` immediately followed by
+`ddcsEditWizardDef(t)`, with no intervening wait — the test's own setup convenience, not a UI gesture. t1766's
+own "For the advisor" section describes the residual risk as "the same symptom, rarely" (the TEST's hang
+symptom) — it never once says an edit was lost.
+
+`git log` confirms the timeline precisely: `5b67f537` ("a reproject-echo race hung wizard-face-1599", t1766,
+the WORKER's fix commit) is immediately followed by `5cc9caf0` ("the reproject-echo race is narrowed not
+closed -- a stale echo can still overwrite newer program state", t1767) — a **docs-only** commit (20
+insertions, `NEXT-SESSION.md` only, co-authored by the advisor's own session) that FIRST wrote the sentence
+"In the app the same race means an edit can silently revert." That sentence does not appear anywhere in
+t1766's own WORK-LOG entry. **Answer: INFERRED — a forward-looking extrapolation written into the plan one
+commit after the fix, not an incident anyone observed or the user reported.**
+
+### STEP 2 — tried to construct it as a real user would, and traced why it cannot happen
+
+**`gen` bumps on every `setStack` call, no exceptions found.** `gen++` is the literal first line of `setStack`
+(`programModel.js:224`); grepped every mutation of the module-level `stack` variable — the ONLY one is inside
+`setStack` itself. Crucially, a REAL user's own direct Blockly edit ALSO calls `setStack(workspaceToStack(ws),
+'blockly')` synchronously the moment Blockly fires its change event (`blocksApp.js:788`) — so even in a
+scenario where a stale echo WERE still pending, the user's own edit would immediately supersede it via the
+same generation check. Answers the dispatch's first sub-question directly: no path changes the workspace
+without the model (and `gen`) following it.
+
+**No real UI path chains two `setStack`-touching calls without a yield.** Grepped every real production call
+site of `ddcsLoadBlockStack` (18 total, across `blocksApp.js`, `devMode.js`, `opSession.js`,
+`programFile.js`, `saveStates.js`, `commandDeck.js`, `editorManager.js`, `editorOpHover.js`,
+`globalFunctions.js`) and both real triggers of `editWizardDef` (`opContextMenu.js`'s "Customize as blocks",
+`wizardManagerPanel.js`'s "✎ Edit"). None fires a second model-touching call synchronously after the first.
+The ONE production "Clear" (`editorManager.js:165`) is a single call. `editWizardDef` itself
+(`devMode.js:571`) — the function whose OWN internal shape the test's scripted loop was approximating — never
+calls `ddcsLoadBlockStack([])` before its own load; it has REAL `await` points (`confirmDestructiveLoad`,
+`blocksAppReady`) between "user clicked Customize" and the actual model write, unlike the test's direct calls.
+`undo()`/`redo()` (`saveStates.js`) each make exactly one `apply()` call too — an "undo storm" is still N
+separate keypresses, not one call making two.
+
+**The decisive reason — not just an absence of a found path.** JS's event loop drains every pending microtask
+before dispatching the next macrotask, including the next real DOM input event — this is a
+specification-level guarantee (the HTML event loop spec's own job-queue-before-next-task rule), not
+browser-specific or timing-dependent. Two SEPARATE real user actions — two clicks, two keypresses, however
+fast — can never interleave with a microtask queued during an EARLIER action's own handler; that microtask
+(the reproject echo) always finishes first. The race is reachable only from a SINGLE synchronous execution
+issuing two `setStack` calls with no event-loop yield between them — exactly the test's own shape (calling the
+raw functions directly), not anything a UI gesture can produce. This also answers why the ORIGINAL
+reproduction needed Playwright's own `page.evaluate` calls rather than real clicks: it was exploiting the
+absence of that yield, which only a direct function call (script or test) can create.
+
+**Tried a real two-click reproduction anyway, rather than resting on the argument alone.** Built a throwaway
+diagnostic (deleted after use): insert a real op, register a second custom op, open the Settings/Wizard
+Manager panel, then attempt a real `#btn-clear` click immediately followed by a real click on that op's "✎
+Edit" row. Could not even get the two triggers simultaneously reachable in the tightest possible sequence —
+Clear removes the on-canvas op a context-menu Customize would need to target, and the Settings-panel Edit
+route requires its own navigation first, which only ADDS real event-loop gaps rather than closing them. This
+is corroborating evidence, not the primary argument (the primary argument is the event-loop guarantee above,
+which does not depend on this UI's particular shape) — but it's consistent with "unreachable," not
+contradicting it.
+
+**The second, deeper "Blockly-internals" race t1766 flagged** (a queued echo reading a workspace whose own
+clear/rebuild Blockly hasn't finished) lives inside the identical queued-microtask mechanism — it inherits the
+same conclusion for the same reason: it can only be reached by the same scripted-double-call shape, which no
+real gesture produces either.
+
+### Did not widen the gen-guard — nothing found that needs it
+
+Per the dispatch's own explicit instruction: an honest cannot-reproduce, backed by a structural reason rather
+than just a failed attempt, closes this the same way a fix would. Made no source changes. Corrected
+`NEXT-SESSION.md`'s own entry (explicitly authorized by this turn's dispatch — "correct the plan text... if it
+turns out closed or unreachable I want that written down") from "OPEN — NARROWED, not CLOSED" to "CLOSED —
+real in the code, unreachable by any real user gesture," with the same evidence trail as here, so the next
+session doesn't have to re-derive it or worry about it unattributed months from now.
+
+### Verify
+
+- No functional code change this turn — investigation + `WORK-LOG.md`/`NEXT-SESSION.md` only.
+- `npm run test:node`: 118/118 pass (confirms nothing else drifted; not expected to be affected).
+- `zzdiag-reproject-race-1824.spec.js` (the real-two-click attempt) deleted after use, per this project's
+  convention for throwaway diagnostics.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+
+### For the advisor
+
+STEP 1: INFERRED, not observed — quoted above. The "edit can silently revert" sentence was written into
+`NEXT-SESSION.md` one commit after the fix (`5cc9caf0`, docs-only), and doesn't appear in t1766's own
+WORK-LOG entry, which only ever describes a test hang and a stale read inside a scripted loop. STEP 2: traced
+why a real user cannot reproduce it — `gen` bumps on every `setStack` including a real Blockly edit itself, no
+real UI path chains two model-touching calls without a yield, and (the decisive point) JS's own event loop
+guarantees a queued microtask always drains before the next real user-input event, so two separate real
+actions can never race one. Tried a real two-click UI reproduction anyway; the UI's own structure doesn't even
+offer a tight-enough pairing to test it directly, which is corroborating, not the main argument. Did not widen
+the guard — nothing here needs it. Corrected the plan text to CLOSED with the trace attached, as asked.
+
+🔨 turn 1824
