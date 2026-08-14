@@ -2403,3 +2403,28 @@ hand. Follows the user's own declare-don't-derive ruling (t1836).
 `#var` into a numeric field and pressing Save.
 
 ⚠ NOT STARTED. Bugs first: the 36mm marker gap, then B slices 2-3.
+
+## PREVIEW CAMERA FIT — RULED: LEAVE IT [USER RULING 2026-08-14]
+
+**Ruled: fit everything (today's behaviour). No change.** Options offered were: cap a single op's
+contribution (the worker's lean, precedent = `fitAll()`'s existing Z-cap for a tall retract) · fit the
+toolpath only · leave it · add a control. **User chose LEAVE IT.**
+
+**What this closes:** the user's ORIGINAL report — *"the start is clamped to the 000 of the stock"* and
+*"markers and path aren't aligned"* — is **NOT a coordinate defect**. Measured (t1860): at a 3000mm envelope,
+Homing+Corner gives dataBounds {maxX:1500, maxY:1050}; the SAME scene with Homing removed collapses to
+corner's own {maxX:7, maxY:43} and reads perfectly. Homing's real motion (its switches genuinely ARE far away
+on a big machine) enters the same UNWEIGHTED union `fitAll()` fits to, with no per-op prioritisation. Correct
+geometry, compressed to a few pixels, reads as bunched-and-offset.
+
+⚠ `fitAll()`'s own `_fitWide` envelope-exclusion (t780) was CLEARED — it stayed false across all 5 runs. The
+camera does NOT default to the envelope box. The advisor's hypothesis named the wrong code; the effect was
+real, the cause was a different op's real motion.
+
+⚠ Reproduces under BOTH Expert and V4.1 — NOT profile-specific. Affects every large-machine user who homes
+before a small op. Left as-is BY DECISION, not by oversight. Revisit if the user changes their mind; the
+manual camera re-fit is the existing escape.
+
+⚠ The user's picture was verified against their real (V4.1) settings, but their exact session is
+unrecoverable — the backup's projects store is genuinely empty. Their file is personal: reproduction only,
+never a source of values.
