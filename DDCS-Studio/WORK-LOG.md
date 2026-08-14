@@ -28061,3 +28061,85 @@ distinguish "the branches converged because they're supposed to" from "the branc
 gesture never reaches the one case where they'd differ" (a live canvas edit mid-authoring). That narrower case
 is worth a name if a future addition wants it — I didn't invent a fixture for it here since the dispatch scoped
 this act to reachability + field-render-with-value, which both twins now have.
+
+## 🔨 turn 1782 (epoch 4) — ADDITION 4: A VISUAL HOST MUST CONTAIN A DRAWING, NOT A CANVAS
+
+### Dispatch
+
+Addition 3 accepted (finding the flat twins by predicate + not adding branch-naming instrumentation both
+called correct restraint). This act kills the false-green pattern: 83 specs reference a canvas, only 10 read
+pixels, and the `*-in-place` family (16 files) asserts `canvas ? 1 : 0` — proving an ELEMENT exists while the
+test name claims "the sim renders." Extend Addition 1's real chain so that, once on the Blocks tab, it asserts
+the 3D and 2D visual containers actually CONTAIN A DRAWING — `getImageData` over both, asserting non-uniform
+pixels. If WebGL readback taints/refuses, say so and assert the strongest available alternative (scene-graph
+geometry count, whatever the code already exposes) rather than dropping back to element-existence. Do NOT fix
+the 16 `*-in-place` specs this act — name them for a later slice. State in the docblock what "non-uniform"
+tolerates. Gate: node tier + this spec + non-vacuity (blank the canvas, watch it fail); no full suite.
+
+### Checked the WebGL readback live before assuming it would fail — it works
+
+`createPreviewPanel.js`'s own comment (line ~1517) already admits the gap: "the WebGL 3D clean-capture is a
+follow-on — no preserveDrawingBuffer." Confirmed via grep: `preserveDrawingBuffer` and `renderer.info` are
+never referenced anywhere in app code (only inside the vendored `three.min.js` itself). Rather than assume this
+means readback is impossible, built a throwaway probe against the live app: `drawImage(webglCanvas, 0, 0)` into
+a fresh 2D canvas, then `getImageData`, immediately after the corner wizard's 3D scene had settled. **It
+worked** — genuinely non-uniform pixels came back, no taint/security error, no permission prompt. The browser
+does not clear a WebGL drawing buffer until the NEXT actual render call, so a read shortly after the scene
+settles still sees the last-rendered frame even with `preserveDrawingBuffer` unset. No scene-graph fallback was
+needed — reported per the dispatch's own instruction to say so either way, not assumed.
+
+### A real timing property found along the way — and how the check handles it
+
+A first attempt (single-shot sample, ~600ms after reaching the Blocks tab) read the 3D canvas as UNIFORM
+(blank) — a genuine render-settle race, not a fluke (reproduced). The app's 3D render is event-driven (redrawn
+on `setGcode`/`update`, not a continuous animation loop), so a sample taken before that redraw fires sees an
+empty/just-cleared buffer. Fixed by polling `sampleCanvas` up to 5s instead of a fixed sleep-then-sample-once —
+a real timing property of the renderer, not a guessed wait padded out further. This also shaped the non-vacuity
+proof below.
+
+### The spec — extended `tests/primary-route-real-gesture-1776.spec.js` (Addition 1's own file)
+
+The dispatch said "extend the addition-1 real chain," so this act adds to that file rather than duplicating its
+boilerplate in a new one: after step 5 (Wizard View shows the typed value), a new step 6 samples
+`#blk_userViz3dContainer` and `#blk_userVizContainer` via `sampleCanvas` (drawImage into a throwaway 2D canvas +
+per-pixel comparison against the first pixel — works uniformly for a WebGL canvas or a plain 2D one). Picks the
+LARGEST canvas under each container by area, not the first DOM match — verified live that the 3D host also
+carries a second, legend/overlay canvas that stays 0×0 at sample time, which would have been a false "no
+drawing" read if picked naively.
+
+### Non-vacuity — "blank the canvas, watch it fail," adapted for the poll's own resilience
+
+A literal blank-then-poll probe self-healed (the app's event-driven redraw fired again inside the 5s poll
+window and the test passed anyway) — which is a correct, deliberate property of the poll, not a leak in the
+proof. So the fair version of "blank it, watch it fail" is a SINGLE-SHOT read at the instant of blanking,
+bypassing the poll: manually cleared the real WebGL canvas (`gl.clear`) and the real 2D canvas (`ctx.fillRect`)
+in place, then called `sampleCanvas` once, immediately — read `nonUniform:false`, confirming the detection logic
+genuinely reads a blank surface as blank. Removed the temporary probe code after confirming; the reasoning and
+result are recorded in the shipped file's own docblock so a future reader doesn't have to re-derive it.
+
+### The 16 `*-in-place` specs — named, not fixed, per the dispatch
+
+`alignment-in-place.spec.js`, `atc-change-in-place.spec.js`, `atc-check-in-place.spec.js`,
+`atc-length-in-place.spec.js`, `atc-table-in-place.spec.js`, `atc-test-in-place.spec.js`, `bore-in-place.spec.js`,
+`comm-in-place.spec.js`, `contour-in-place.spec.js`, `drill-in-place.spec.js`, `io-step-in-place.spec.js`,
+`mill-atc-in-place.spec.js`, `pocket-in-place.spec.js`, `rotary-center-in-place.spec.js`,
+`rotary-clock-in-place.spec.js`, `wcs-in-place.spec.js` — 16 files, matches the audit's count exactly. Confirmed
+by listing `tests/*-in-place*.spec.js`, not re-counted by hand.
+
+### Verify
+
+- `tests/primary-route-real-gesture-1776.spec.js` (extended) — 1/1 green, all 6 steps including the two new
+  drawing checks.
+- Non-vacuity: single-shot blank-probe read `false` as expected (3D canvas); the shipped polling check re-passed
+  within its own window afterward, confirming the self-heal is real render activity, not a stale/cached read.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source file touched this act (test-only) — gate matched the dispatch (node tier + this spec + non-vacuity,
+  no full suite).
+
+### For the advisor
+
+3D readback works — no scene-graph fallback needed, contrary to what the dispatch's own caveat anticipated
+might be necessary. One real, useful side-finding: the 3D render is event-driven, not continuously looping, so
+any FUTURE pixel-based check on this surface needs either a poll (as here) or an explicit trigger, never a bare
+fixed sleep — worth remembering when the 16 `*-in-place` specs actually get repointed. The 16 are named above,
+ready for whichever slice takes them next.
