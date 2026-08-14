@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openWizardViaBar, fillField } from './support/barGesture.js';
-import { stopLiveSim } from './support/simControls.js';
+import { stopLiveSim, dismissToasts } from './support/simControls.js';
 
 /**
  * t1792 — ADDITION 8: SCREENSHOT BASELINES for the modal and the pane.
@@ -32,6 +32,30 @@ import { stopLiveSim } from './support/simControls.js';
  * below.** Everything else — the form, its live-typed value, the modal/pane chrome, the bottom Layout-2D pane —
  * is compared for real, not masked.
  *
+ * ── t1794 — A SECOND TIMER FOUND BY REVIEWING THE BASELINE IMAGES, NOT THE 3-RUN GATE ────────────────────────────
+ * The pane baseline (only the pane test clicks INSERT) captured `showRoundTripToastOnce()`'s toast
+ * (wizardManager.js:72) — a 3.2s-lifetime `.toast` element (`ui/gateway/util.js:20-24`) that fires on every
+ * fresh test page because the one-time `ddcs_seen_blocks_roundtrip` localStorage flag is never set. Three
+ * consecutive runs in one window on one machine cannot expose a timer like this (it lands at the same offset
+ * into the SAME 3.2s window every time) — `dismissToasts` (`support/simControls.js`) now removes any `.toast`
+ * outright, right before each screenshot, so no toast can be in frame regardless of how long the preceding
+ * action took — never a wait past 3200ms, which would only trade a fast flake for a slower one.
+ *
+ * SWEPT for anything else timer/animation-driven inside either baselined region (not just the one that already
+ * bit us) — checked, not assumed, each with the evidence that cleared it:
+ *   - `formWidgets.js:67`'s `token-refused-flash` (1.4s) — only fires on a refused TOKEN drag-drop; this file
+ *     only ever calls `.fill()` on a plain numeric field, never attempts a token assignment.
+ *   - `ratePrompt.js`'s post-insert prompt (`ddcs:op-inserted`, fired by every real INSERT, exactly what the
+ *     pane test does) — its own declared gate, `RATE_TRIGGER = { minSessions: 2, minInserts: 5, ... }`
+ *     (`ui/ratePrompt.js:15`): this file does ONE insert in ONE fresh session, below both thresholds, so the
+ *     prompt structurally cannot fire here.
+ *   - `editorManager.js`'s flash effects (750ms) — scoped to the MAIN CODE EDITOR, not inside `.wiz-box` or
+ *     `#blk_wiz_user` at all; out of scope by DOM location, not by luck.
+ *   - `headerPost.js`'s "copied" flash (600ms) — only follows clicking the header's "copy program" button,
+ *     which this file never clicks.
+ *   - CSS `@keyframes`/`transition` animations — Playwright's own `toHaveScreenshot` already disables these by
+ *     default (confirmed in its own verbose log: "disabled all CSS animations"); not this file's concern.
+ *
  * ── TOLERANCE — justified, not the default ──────────────────────────────────────────────────────────────────────
  * `maxDiffPixelRatio: 0` — the unmasked region is PROVEN byte-stable (see above), so any non-zero pixel diff on
  * it is a real regression, not noise to tolerate. A looser default would have hidden exactly the kind of bug
@@ -57,6 +81,7 @@ test('baseline: the MODAL (corner, form3d+2d)', async ({ page }) => {
     await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '741' });
     await stopLiveSim(page, '#userViz3dBox');
     await page.waitForTimeout(600);
+    await dismissToasts(page);
 
     await expect(page.locator('.wiz-box')).toHaveScreenshot('modal-corner.png', {
         mask: [page.locator('#userViz3dBox')],
@@ -77,6 +102,7 @@ test('baseline: the BLOCKS WIZARD-VIEW PANE (corner, form3d+2d)', async ({ page 
     await page.waitForTimeout(1000);
     await stopLiveSim(page, '#blk_userViz3dBox');
     await page.waitForTimeout(600);
+    await dismissToasts(page);
 
     await expect(page.locator('#blk_wiz_user')).toHaveScreenshot('pane-corner.png', {
         mask: [page.locator('#blk_userViz3dBox')],

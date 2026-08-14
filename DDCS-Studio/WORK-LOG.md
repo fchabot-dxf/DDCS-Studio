@@ -28552,3 +28552,81 @@ region is ever wanted (would need to find whatever residual camera/render settle
 point even fully stopped), but not attempted here since the dispatch's own permission covered this outcome
 and forcing it further risked exactly the "raise the tolerance until it passes" trap the gate explicitly
 warned against.
+
+## 🔨 turn 1794 (epoch 4) — BASELINE HYGIENE + ONE OBSERVATION TO CONFIRM
+
+### Dispatch
+
+The t1792 baselines accepted in substance — narrow mask, justified tolerance, documented updating, and using
+the REAL t1764 regression for non-vacuity all called the right pattern to keep. Two things found by reviewing
+the baseline IMAGES, not the summary: (1) `pane-corner.png` captured the round-trip toast (wizardManager.js:72,
+a 3.2s-lifetime element) at ~1.6s into its life — a 3-consecutive-run gate on one machine cannot expose a timer
+like this, so fix it by removing the toast outright (not sleeping past 3200ms) and RE-RECORD both baselines,
+then re-run 3× clean; also sweep the same question for anything ELSE timer/animation-driven in either baselined
+region, and say what was checked including what was cleared. (2) CONFIRM ONLY, do not fix: the modal's 2D pane
+appears to draw the dashed traverse/probe path, the pane's 2D pane appears not to — same op, one renderer. It
+may be the ~3× downscale swallowing the dashes. Establish which, with evidence, one paragraph. Gate: node tier
++ this spec 3× clean; no full suite.
+
+### (1) The toast — root-caused, fixed by removal, re-recorded, re-swept
+
+Confirmed exactly as described: `showRoundTripToastOnce()` (`wizardManager.js:72`) fires the shared `toast()`
+(`ui/gateway/util.js:20-24` — `document.body.append(t); setTimeout(() => t.remove(), 3200)`) on every INSERT
+whose op is placed via `commitActiveOp`, gated by a ONE-TIME `ddcs_seen_blocks_roundtrip` localStorage flag —
+which a fresh Playwright test page never has set, so the toast fires on every single run of the pane test (the
+only one that clicks INSERT). Fixed by adding `dismissToasts` to `tests/support/simControls.js` — removes any
+`.toast` element outright, generic by class rather than scoped to the round-trip toast specifically, called
+right before each screenshot in both tests (defensive on the modal test too, even though it never triggered
+one). Re-recorded both baselines (`--update-snapshots`): `modal-corner.png` came back byte-identical to before
+(it was never affected — the modal test never clicks INSERT), `pane-corner.png` was flagged as genuinely
+re-generated (the toast pixels are gone).
+
+**Non-vacuity, done for real**: temporarily disabled the `dismissToasts` call on the pane test only, re-ran —
+failed with `1724 pixels (ratio 0.01)` different, exactly the toast's own footprint. Restored (fixed the
+resulting indentation glitch from the sed edit too), re-ran the full 3× consecutive gate clean.
+
+**The sweep**, each item checked with evidence, not assumed clear:
+- `formWidgets.js:67`'s `token-refused-flash` (1.4s) — only fires on a refused token drag-drop; this file only
+  calls `.fill()` on a plain numeric field.
+- `ratePrompt.js`'s post-insert prompt, gated on `RATE_TRIGGER = { minSessions: 2, minInserts: 5, ... }`
+  (`ui/ratePrompt.js:15`) — this file does ONE insert in ONE fresh session; structurally below both thresholds.
+- `editorManager.js`'s flash effects (750ms) — scoped to the main code editor, outside `.wiz-box`/`#blk_wiz_user`
+  entirely; out of scope by DOM location.
+- `headerPost.js`'s "copied" flash (600ms) — only follows clicking "copy program," never clicked here.
+- CSS `@keyframes`/`transition` — Playwright's own `toHaveScreenshot` disables these by default (its own verbose
+  log said so: "disabled all CSS animations"); not this file's concern.
+
+### (2) The 2D path-line question — CONFIRMED a downscale artefact, not a bug, with pixel evidence
+
+Compared the SVG `<line>` element counts first: modal 69, pane 23 — but breaking them down by class showed
+EVERY non-grid class (`fc-stock`, `fc-hole`, `fc-handle`, `fc-corner-pick`, …) at IDENTICAL counts in both;
+the entire 46-line gap was `fc-grid-minor`/`fc-grid-major` — grid lines, which scale with canvas width (modal's
+2D box is 981px wide, the pane's is 314px — the ~3.1× ratio matches the grid-line-count ratio almost exactly).
+Neither rendering has a separate SVG element for the dashed traverse/probe path at all — it's drawn on a
+DIFFERENT layer, `canvas.fc-anim-overlay`, which sits under the SVG. Read its actual pixels directly (a
+same-technique reuse of Addition 4's canvas-sampling approach): scanned both canvases for the two traverse-line
+colours visible in the modal screenshot (cyan `#22d3ee`, amber `#ffb300`, ±30 per channel). **Both canvases
+have the path drawn**: modal 240 cyan / 251 amber pixels; pane 160 cyan / 154 amber pixels — present in both,
+proportionally fewer in the pane's smaller canvas, consistent with the same path at a smaller physical size, not
+absent. **Conclusion: this is the downscale swallowing the dashes visually at screenshot/thumbnail scale, not a
+real rendering divergence between the two doors — it dies here, not added to the bug list.**
+
+### Verify
+
+- `tests/screenshot-baselines-1792.spec.js` — 2/2 green, 3 consecutive full runs after the toast fix, zero
+  diffs each time.
+- Non-vacuity (toast removal specifically): disabling `dismissToasts` on the pane test reproduced the exact
+  1724-pixel toast footprint as a failure; restored, re-verified 3× clean.
+- Node tier (`npm run test:node`): 118/118 pass.
+- `pane-corner-win32.png` re-recorded (contains the toast-free rendering); `modal-corner-win32.png` unchanged
+  (confirmed byte-identical, the modal path was never affected).
+- The 2D path-line investigation used only ad hoc diagnostic scripts (canvas pixel scans, SVG element counts),
+  all deleted after — no committed test asserts on it, since it's a confirmed non-bug per the dispatch's own
+  "if a downscale artefact, it dies there" instruction.
+
+### For the advisor
+
+Both findings landed exactly as your framing anticipated: the toast was a real gap in the 3-run gate (a timer
+gate can't see, not a diligence gap — noted and agreed), and the path-line question was the "may simply be the
+downscale" case, confirmed with real pixel evidence rather than presumed from the screenshots alone. Nothing new
+to add to the bug list from either half of this act.
