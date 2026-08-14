@@ -191,10 +191,18 @@ export function createUserOpView(ns, opts) {
     function _clearThrottle() { if (_uTimer) { clearTimeout(_uTimer); _uTimer = null; } _uPending = false; }
     // t1648 — a preview-only handle target (no bound field to dispatch 'input' on) re-renders INLINE, same as a real
     // field's synthetic (non-focused) canvas-drag write already does (t808: only a FOCUSED field's edit throttles).
-    // NOTE: setPreviewOnlyWriteHandler is a SHARED, module-level hook (panelTypes.js) — the LAST instance to call
-    // onShow "owns" it until the next onShow anywhere. Both instances already re-arm it every onShow, so whichever
-    // one is actively being interacted with owns it at that moment — same one-active-editor assumption the rest of
-    // this file already makes (see the class doc comment).
+    // t1822 — CORRECTING A FALSE CLAIM THIS COMMENT USED TO MAKE: setPreviewOnlyWriteHandler is a SHARED,
+    // module-level hook (panelTypes.js) set ONCE HERE, at construction — this call does NOT sit inside onShow, so
+    // it never re-arms. The comment previously claimed "both instances already re-arm it every onShow" as if that
+    // were implemented; traced and confirmed FALSE — whichever of the two `createUserOpView` instances constructs
+    // LAST (module load order) owns this callback forever, not "whichever is actively being interacted with."
+    // Left unfixed rather than patched to match the false claim: investigated whether the wrong-instance callback
+    // can actually fire today and found it cannot — panelTypes.js's own `_writeParam` only reaches this callback
+    // through a branch that requires a real, built handle whose param has NO bound form field, and every path that
+    // builds such a handle is gated by `_writable`, which (since t1804/t1806 always inject a host before
+    // rendering) requires that field to already exist. Confirmed empirically too: dragging every 2D-layout handle
+    // on a live corner wizard never touched panelTypes.js's `previewOnlyParams` store. See WORK-LOG t1822 for the
+    // full trace — this is a genuinely latent, currently-unreachable mechanism, not a fixed one.
     setPreviewOnlyWriteHandler(() => _inlineUpdate());
 
     /** Write a dragged sim-start marker's WORLD point into _simStartFracs, per the op's declared marker→param binding

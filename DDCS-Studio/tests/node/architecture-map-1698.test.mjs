@@ -140,8 +140,8 @@ const TRAP_CLAIMS = [
     { id: 'TRAP1 cornerWizard.js import (cornerData.js:44)', file: 'web/blocks/dataOps/cornerData.js', line: 44, find: /cornerWizard\.js'/ },
     { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', line: 261, find: /cornerStack\(/ },
     { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
-    { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', line: 208, find: /latheLayoutSpec/ },
-    { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 286, find: /_writable/ },
+    { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', line: 233, find: /latheLayoutSpec/ },
+    { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 311, find: /_writable/ },
     { id: 'TRAP4 activeDialectOpts declares {dialect, indentStyle}', file: 'web/wizards/previewEmit.js', line: 21, lineEnd: 24, find: /indentStyle/ },
     { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', line: 36, find: /dialect/ },
     { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', line: 18, find: /dialect/ },
@@ -156,9 +156,9 @@ const TRAP_CLAIMS = [
     { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1119, lineEnd: 1120, find: /z-index/ },
     { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2779, find: /attach/ },
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
-    { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 681, find: /container\.__layout/ },
+    { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 706, find: /container\.__layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
-    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 666, find: /renderLayout2D|el\('userVizContainer'\)/ },
+    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 674, find: /renderLayout2D|el\('userVizContainer'\)/ },
 ];
 
 test('architecture map ASSERTED: every TRAP citation still holds', () => {
@@ -237,7 +237,7 @@ const Q3_CLAIMS = [
     { id: 'Q3 partZeroShift is the ONE declared transform', file: 'web/viz/sceneFrame.js', line: 43, find: /partZeroShift/ },
     { id: 'Q3 stockPinOffset — a DIFFERENT number', file: 'web/viz/sceneFrame.js', line: 88, find: /stockPinOffset/ },
     { id: 'Q3 placeShiftFromParams / PlaceOnStock attach shift', file: 'web/wizards/ops/placement.js', line: 133, find: /placeShift/ },
-    { id: 'Q3 lathe spec carries no placement key (early-return)', file: 'web/wizards/ops/panelTypes.js', line: 208, lineEnd: 209, find: /latheLayoutSpec/ },
+    { id: 'Q3 lathe spec carries no placement key (early-return)', file: 'web/wizards/ops/panelTypes.js', line: 233, lineEnd: 234, find: /latheLayoutSpec/ },
 ];
 
 test('architecture map ASSERTED: Q3 frame-algebra citations still hold (the highest-cost defect class)', () => {

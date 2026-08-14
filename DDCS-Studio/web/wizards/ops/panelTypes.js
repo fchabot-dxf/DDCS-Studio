@@ -85,11 +85,29 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 let _formHost = null;
 export function setFormHost(hostOrGetter) { _formHost = hostOrGetter || null; }
 function _formHostEl() { return typeof _formHost === 'function' ? _formHost() : _formHost; }
-// t1648 — a PREVIEW-ONLY side-store for a declared handle target with NO bound form field (e.g. a Skim-mode jog
-// seed — deliberately never bound, so it never reaches the emit). Before this, `_writeParam` silently no-op'd on
-// such a name (strictly additive: nothing that has a real field is affected). Exported so the caller (userOpView's
-// update()) can merge it into `params` the same way `_simStartFracs` merges declared marker fractions — one
-// established convention, reused rather than restated. The caller clears it per fresh wizard OPEN.
+// t1648 — a PREVIEW-ONLY side-store for a declared handle target with NO bound form field. Before this,
+// `_writeParam` silently no-op'd on such a name (strictly additive: nothing that has a real field is affected).
+// Exported so the caller (userOpView's update()) can merge it into `params` the same way `_simStartFracs` merges
+// declared marker fractions — one established convention, reused rather than restated. The caller clears it per
+// fresh wizard OPEN.
+// t1822 — CENSUS (t1810) flagged this as a shared, module-level flat object: two coexisting surfaces writing a
+// param with the SAME NAME would contaminate each other, and any surface's onShow would wipe the OTHER surface's
+// in-progress entry too. Investigated whether that is reachable today, not assumed either way: `_writeParam` only
+// ever reaches THIS branch when `_field(name)` returns null, and `_field` is read here — but every write SITE
+// that can reach `_writeParam` at all (the byRole `pos()`/`wr()` gate at :357, the pinned-wall write-back at
+// :449-450, diagAim/crossAim at :470/:493/:503, `latheLayoutSpec`'s callback at :208) is ITSELF gated by
+// `_writable`, which requires `_field(name)` to already exist whenever a host is injected (`_writable`'s own
+// `(!_host || !!_field(name))` clause, t1690/t1700 — added specifically so an un-rendered param never gets a
+// "dead" handle). Since t1804/t1806 BOTH surfaces always inject a host before rendering, and `renderOpForm`
+// renders every declared binding as a real row by default (no "canvas-only, no form field" flag exists anywhere
+// in this codebase — checked, not assumed) — the precondition for a write to land here (a real, built handle
+// whose param has no field) does not currently occur via any real render. Confirmed empirically too: dragged
+// EVERY 2D-layout handle on a live corner wizard (both `reposition_pos` and `__simstart0`) and this store stayed
+// `{}` throughout. The comment's own original example — "a Skim-mode jog seed" — is ALSO stale: that scenario
+// shipped later through a DIFFERENT, newer mechanism (`previewVarSeed`/`host.__varSeed`, see
+// surfacing-start-position-1648.spec.js), not this store. Left AS-IS — not "fixed to look safe," genuinely
+// unreachable by the evidence above; see WORK-LOG t1822 for the full trace. If a future op's binding ever DOES
+// reach here with two coexisting surfaces live, this is exactly where to look first.
 export const previewOnlyParams = {};
 /** Clear every preview-only side-store entry (a fresh wizard OPEN = undragged = byte-identical — mirrors the
  *  _simStartFracs/_layoutSpots reset). A plain reassignment would break the exported binding other modules hold. */
@@ -97,6 +115,13 @@ export function clearPreviewOnlyParams() { for (const k in previewOnlyParams) de
 // A real form field's write dispatches 'input', which the host's OWN listener re-renders on. A preview-only target
 // has no field to dispatch on, so the caller (userOpView) registers its own (throttled) update trigger here —
 // dependency injection, not a new import cycle (panelTypes.js is a lower layer than userOpView.js).
+// t1822 — set ONCE, at `createUserOpView` CONSTRUCTION time (userOpView.js's own call site sits at the top level
+// of the factory body, not inside onShow) — never re-armed after that, so whichever instance constructs LAST
+// (module load order) owns this slot forever. A sibling comment in userOpView.js used to claim "both instances
+// already re-arm it every onShow" — traced and confirmed FALSE: that re-arming was never implemented, not a
+// behavior that regressed. Left unfixed for the same reason as `previewOnlyParams` just above: this callback only
+// ever fires from that same now-confirmed-unreachable branch of `_writeParam`, so there is no real scenario today
+// where the wrong instance's callback actually gets invoked. See WORK-LOG t1822.
 let _onPreviewOnlyWrite = null;
 export function setPreviewOnlyWriteHandler(fn) { _onPreviewOnlyWrite = typeof fn === 'function' ? fn : null; }
 

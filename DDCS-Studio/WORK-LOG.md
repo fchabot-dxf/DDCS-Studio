@@ -30230,3 +30230,94 @@ poll, not `stopLiveSim` — flagged, not fixed, since it's outside this act's me
 Gate: node tier (118/118) + isolation (9/9) + 3 load runs (2 before, 1 after, all clean either way).
 
 🔨 turn 1820
+
+## Turn 1822 — the last two census singletons: investigated exhaustively, found genuinely unreachable, left alone
+
+### Dispatch
+
+Close panelTypes.js's remaining two LATENT t1810-census entries so nothing sits half-finished. (1)
+`_onPreviewOnlyWrite`: a single-slot module-level callback whose comment claims "both instances re-arm it every
+onShow" while the code sets it once at construction — fix the code AND the comment together, or say the comment
+described intent never implemented. (2) `previewOnlyParams`: a shared flat object, unqualified merge-back, an
+over-eager clear — prefer the container-lifetime mechanism t1816 already established if it fits; stop and say why
+if it doesn't. Each needs its OWN guard, built to fail on today's code first — if a real failing case can't be
+built, say so and leave it alone rather than fixing a hypothetical. After this, the singleton class is closed and
+the reproject-echo race (an app bug, can lose a user's edit) is next — do not start it.
+
+### The false comment — confirmed, exactly as described
+
+`userOpView.js`'s `setPreviewOnlyWriteHandler(() => _inlineUpdate())` call sits at the TOP LEVEL of the
+`createUserOpView` factory body (not inside `onShow`), so it runs exactly ONCE, at construction — for BOTH the
+modal instance (module scope) and the pane instance (`blocksApp.js`). The comment beside it claimed "Both
+instances already re-arm it every onShow" — traced and confirmed false: no call site exists inside `onShow`
+anywhere in the file. Whichever instance constructs last (module load order) owns the shared slot forever. This
+is the SECOND confident-but-wrong safety comment this chain has found (after TRAP9's "so it never fires").
+
+### Trying to build the failing tests — and finding the activation precondition doesn't occur
+
+Both bugs live behind the SAME gate: `_writeParam`'s no-field branch (where `previewOnlyParams` gets written and
+`_onPreviewOnlyWrite` gets called) only runs when `_field(name)` returns null. Set out to build a t1806-style
+deterministic host-A/host-B test — construct two synthetic hosts with a declared `{group:'pt', role:'x'/'y'}`
+binding and NO matching `[data-param]` element, call `layoutSpecFromOp`, drag the resulting handle.
+
+**It never built a handle at all.** Traced why: `_writable` (`panelTypes.js`) is `_declaredParams.has(name) &&
+!_unwritable.has(name) && (!_host || !!_field(name))` — the `(!_host || !!_field(name))` clause (added at
+t1690/t1700 specifically to stop a param from getting a "dead" handle that writes nowhere) means: whenever a host
+IS injected, a param needs its OWN real `_field` to be writable AT ALL. And `pos()` — the ONE function that
+builds a point handle, reached from every call site I could find (`:357`'s own gate, the declared-`anchor`
+short-circuit at `:363`, the pinned-wall write-back at `:449-450`, `diagAim`/`crossAim` at `:470/:493/:503`,
+`latheLayoutSpec`'s callback at `:208`) — has this SAME `wr()`/`_writable` gate baked into its own body, so EVERY
+path that could build a preview-only handle refuses to build one at all once a host is present, unless the
+specific field genuinely exists. Checked whether any binding shape is declared "canvas-only, no form row" (which
+would let a handle exist without ever getting a field) — grepped `formWidgets.js` for any such flag: none exists.
+Every declared binding gets a real form row by default.
+
+Confirmed this isn't a fluke of my synthetic setup with a REAL op, not just code-reading: opened corner in a live
+browser, dragged EVERY handle the 2D layout canvas renders (`reposition_pos`, `__simstart0`), and sampled
+`panelTypes.previewOnlyParams` after each drag. **It stayed `{}` throughout — never wrote anything.** Since
+t1804/t1806 BOTH surfaces always inject a host before every render, and I could not find (by trace or by search)
+any op whose declared binding reaches `_writeParam`'s no-field branch with a host present, the precondition for
+EITHER bug to actually manifest — a real, built handle whose param has no bound field, while a host IS injected —
+does not currently occur. The comment's own original example, "a Skim-mode jog seed," is ALSO stale: that
+scenario shipped later through a DIFFERENT, newer mechanism (`previewVarSeed`/`host.__varSeed`,
+`surfacing-start-position-1648.spec.js`), not this store at all.
+
+**Could not build either failing test — said so rather than forcing one.** Per the dispatch's own explicit
+permission, left BOTH mechanisms as-is: no per-host redesign for `previewOnlyParams` (t1816's own
+container-lifetime pattern doesn't need applying to something that never actually gets written), no re-arming fix
+for `_onPreviewOnlyWrite`. Fixed only the demonstrably false comment — a genuine code/comment mismatch,
+independent of reachability — in BOTH `userOpView.js` (the source of the false claim) and `panelTypes.js` (added
+the full trace + the empirical corner-drag result as a comment, so the NEXT person who wonders whether this is
+still true doesn't have to re-derive the whole chain — and so that if a FUTURE op's binding ever does reach this
+branch with two coexisting surfaces live, the comment says exactly where to look first).
+
+### Verify
+
+- No functional/API change — comment-only edits in `panelTypes.js` and `userOpView.js`. Confirmed by inspection:
+  `setPreviewOnlyWriteHandler`/`previewOnlyParams`/`clearPreviewOnlyParams`'s signatures are untouched, so
+  `tests/node/preview-spec-gate-1688.test.mjs`'s own direct calls to them needed no changes either.
+  `zzdiag-previewonly-1822.spec.js` (the corner-drag empirical probe) deleted after use, per this project's
+  convention for throwaway diagnostics.
+- Node tier (`npm run test:node`): 118/118 pass, after fixing 5 architecture-map citations the comment additions
+  shifted (`panelTypes.js`'s TRAP2/TRAP3/TRAP9/Q3 entries + `userOpView.js`'s TRAP9 entry — re-verified via fresh
+  `grep`, not offset arithmetic).
+- Every spec touching `panelTypes.js`/`userOpView.js` (28 files, including this turn's own two edited files):
+  84 passed, 1 skipped, 1 flaky (`blocks-live-form.spec.js`'s "Save as new" test — resolved on retry, unrelated
+  to this turn's comment-only changes, a different test than the one t1820 touched in that same file).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+
+### For the advisor
+
+Both bugs are real as a matter of code correctness (the comment IS false; the sharing IS structurally there) but
+neither has a constructible failing case today: `_writable`'s own field-existence gate (t1690/t1700) makes every
+path that could build a preview-only handle refuse to build one at all once a host is injected, and no binding
+shape exists that skips form-row rendering to create the gap. Confirmed by trace AND by dragging every handle on
+a live corner wizard — the store never wrote anything. Fixed the false comment in both files (with the full
+trace left behind for whoever revisits this if a future op ever does reach the branch); left the mechanisms
+themselves unfixed rather than build machinery for a case I couldn't produce. The census's LATENT class is now
+fully accounted for: `_layout` was real and got fixed (t1816); `_formHost`'s deferred-reader gap was real and got
+fixed (t1806); these last two are real-but-currently-unreachable, and are documented as such rather than quietly
+patched to look resolved. Moving to the reproject-echo race next, as instructed — not started here.
+
+🔨 turn 1822
