@@ -18,15 +18,21 @@ test('a writable xy param group → a draggable point handle whose drag writes t
     const PT = await import('/wizards/ops/panelTypes.js');
     const def = { bindings: [{ param: 'px', group: 'pt', role: 'x' }, { param: 'py', group: 'pt', role: 'y' }] };
 
-    // (1) NOT writable yet (no rendered form) → still DRAWN, but NO handle (don't put a dead handle over it)
+    // t1804 — a UNIQUE host id (not 'wiz_user_form' — the real app already has one, empty, static in index.html;
+    // a duplicate id would let getElementById silently resolve to the WRONG one), injected via setFormHost.
+    const emptyHost = document.createElement('div'); emptyHost.id = 'test_wiz_user_form_1_empty'; document.body.appendChild(emptyHost);
+    PT.setFormHost(() => document.getElementById('test_wiz_user_form_1_empty'));
+    // (1) a host is injected (matches userOpView's very first paint, before render() has built the fields yet) but
+    // it's EMPTY — still DRAWN, but NO handle (don't put a dead handle over an as-yet-unrendered field).
     const readOnly = PT.layoutSpecFromOp(def, { px: 50, py: 40 });
 
-    // (2) render the form fields the way the number widget does (tagged data-param) → now writable
-    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    // (2) render the form fields the way the number widget does (tagged data-param) → now writable.
+    const form = document.createElement('div'); form.id = 'test_wiz_user_form_1';
     const ix = document.createElement('input'); ix.dataset.param = 'px'; ix.value = '50';
     const iy = document.createElement('input'); iy.dataset.param = 'py'; iy.value = '40';
     form.append(ix, iy); document.body.appendChild(form);
     let fired = 0; ix.addEventListener('input', () => { fired++; }); iy.addEventListener('input', () => { fired++; });
+    PT.setFormHost(() => document.getElementById('test_wiz_user_form_1'));   // t1804 — the form host is injected, no longer a hardcoded selector
 
     const spec = PT.layoutSpecFromOp(def, { px: 50, py: 40 });
     const h = (spec.handles || [])[0];
@@ -37,7 +43,7 @@ test('a writable xy param group → a draggable point handle whose drag writes t
       hKind: h && h.kind, hx: h && h.x, hy: h && h.y,
       newX: Number(ix.value), newY: Number(iy.value), fired,
     };
-    form.remove();
+    form.remove(); emptyHost.remove();
     return out;
   });
 
@@ -62,10 +68,11 @@ test('a writable xywh group → a position + a size handle; size drag writes w/h
   const r = await page.evaluate(async () => {
     const PT = await import('/wizards/ops/panelTypes.js');
     const def = { bindings: ['x', 'y', 'w', 'h'].map((role) => ({ param: 'r_' + role, group: 'rc', role })) };
-    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    const form = document.createElement('div'); form.id = 'test_wiz_user_form_2';   // t1804 — unique, not 'wiz_user_form' (see test 1's own comment)
     const fields = {};
     for (const role of ['x', 'y', 'w', 'h']) { const f = document.createElement('input'); f.dataset.param = 'r_' + role; f.value = ({ x: 10, y: 20, w: 60, h: 40 })[role]; form.append(f); fields[role] = f; }
     document.body.appendChild(form);
+    PT.setFormHost(() => document.getElementById('test_wiz_user_form_2'));
 
     const spec = PT.layoutSpecFromOp(def, { r_x: 10, r_y: 20, r_w: 60, r_h: 40 });
     const size = spec.handles.find((h) => /_size$/.test(h.id));
@@ -89,10 +96,11 @@ test('Stage 3: a writable xy+dia group → a position + a radius (radial) handle
   const r = await page.evaluate(async () => {
     const PT = await import('/wizards/ops/panelTypes.js');
     const def = { bindings: [{ param: 'qx', group: 'cg', role: 'x' }, { param: 'qy', group: 'cg', role: 'y' }, { param: 'qd', group: 'cg', role: 'dia' }] };
-    const form = document.createElement('div'); form.id = 'wiz_user_form';
+    const form = document.createElement('div'); form.id = 'test_wiz_user_form_3';   // t1804 — unique, not 'wiz_user_form' (see test 1's own comment)
     const fields = {};
     for (const [role, val] of [['x', 50], ['y', 40], ['dia', 30]]) { const f = document.createElement('input'); f.dataset.param = ({ x: 'qx', y: 'qy', dia: 'qd' })[role]; f.value = val; form.append(f); fields[role] = f; }
     document.body.appendChild(form);
+    PT.setFormHost(() => document.getElementById('test_wiz_user_form_3'));
 
     const spec = PT.layoutSpecFromOp(def, { qx: 50, qy: 40, qd: 30 });
     const size = spec.handles.find((h) => /_size$/.test(h.id));

@@ -69,10 +69,22 @@ export const layoutType = (id) => LAYOUT_TYPES[id] || LAYOUT_TYPES[DEFAULT_LAYOU
 const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
+// t1804 — THE FORM HOST is INJECTED, never hardcoded: this module renders for TWO independent, coexisting
+// wizard-form surfaces (the modal's #wiz_user_form and the Blocks pane's own namespaced form), and a fixed
+// '#wiz_user_form' selector can only ever be right for one of them. Dependency injection, not a new import
+// cycle (panelTypes.js is a lower layer than userOpView.js, which already holds its own namespaced host via
+// elNS('wiz_user_form') — mirrors setPreviewOnlyWriteHandler just below). The caller sets this SYNCHRONOUSLY,
+// immediately before each render that reaches this module (userOpView.js's renderLayout2D call sites), so two
+// coexisting instances can never race or go stale between renders — no "last one wins" singleton risk.
+// Unset (the node-tier gate, which never calls setFormHost at all) → null, same permissive fallback _writable
+// always had for "no live DOM at all" (see there).
+let _formHost = null;
+export function setFormHost(hostOrGetter) { _formHost = hostOrGetter || null; }
+function _formHostEl() { return typeof _formHost === 'function' ? _formHost() : _formHost; }
 // A live form field is still the ONE way to actually WRITE a value back (dispatching 'input' is what drives the
 // whole update() loop) — _field/_writeParam stay a real DOM query for that reason. _writable (is a param individually
 // settable AT ALL) is declared per-call inside layoutSpecFromOp instead — see there for why.
-const _field = (name) => (typeof document !== 'undefined') ? document.querySelector('#wiz_user_form [data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null;
+const _field = (name) => { const h = _formHostEl(); return h ? h.querySelector('[data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null; };
 // t1648 — a PREVIEW-ONLY side-store for a declared handle target with NO bound form field (e.g. a Skim-mode jog
 // seed — deliberately never bound, so it never reaches the emit). Before this, `_writeParam` silently no-op'd on
 // such a name (strictly additive: nothing that has a real field is affected). Exported so the caller (userOpView's
@@ -235,19 +247,20 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // t1700 — REGRESSION FOUND BY THE RELEASE GATE: t1690 dropped the RENDERED half by mistake. DECLARED is not the
     // same fact as RENDERED — a param can be individually addressable BY SHAPE and still have no live field yet (the
     // very first paint, before `render()` has run), and a handle over it writes nowhere: a dead affordance
-    // (`tests/custom-op-canvas-handles.spec.js`'s own case for this, unchanged since before t1690). `_field` (line
-    // ~75) already answers "does a field exist for this param RIGHT NOW" — restore it as the SECOND half, but ONLY
-    // once a real form host is actually present: the node-tier gate's `document` is an INERT STUB whose
-    // `querySelector` always returns null (register.mjs's own docstring: "a document that answers structural
-    // questions with nothing"), so AND-ing `_field` in unconditionally would zero out corner/middle's handles there
-    // again — the exact node-tier gap t1690 fixed. Gating on `#wiz_user_form`'s mere EXISTENCE (not the specific
-    // field) tells the two environments apart cleanly: the node-tier stub never has one (no host → declared-only
-    // stands, matching t1690's steady-state answer there); a real page always does (`index.html`'s static
-    // `<div id="wiz_user_form">`, present from load, before any wizard opens) — so once a form host exists, a
-    // handle is writable only once ITS OWN field has actually rendered into it, restoring the exact browser
-    // behaviour `_field` gave before t1690 (verified live then; unchanged now — see WORK-LOG t1690's own probe).
-    const _formHostExists = (typeof document !== 'undefined') && !!document.querySelector('#wiz_user_form');
-    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_formHostExists || !!_field(name));
+    // (`tests/custom-op-canvas-handles.spec.js`'s own case for this, unchanged since before t1690). `_field` already
+    // answers "does a field exist for this param RIGHT NOW" — restore it as the SECOND half, but ONLY once an
+    // injected form host is actually present: the node-tier gate never calls `setFormHost` at all (there is no DOM
+    // there to inject), so AND-ing `_field` in unconditionally would zero out corner/middle's handles there again —
+    // the exact node-tier gap t1690 fixed. Gating on "was a host INJECTED" (not a hardcoded selector's existence)
+    // tells the two environments apart cleanly: the node-tier gate never injects one (no host → declared-only
+    // stands, matching t1690's steady-state answer there); a real render always does (userOpView.js sets it
+    // synchronously immediately before every renderLayout2D call) — so once a form host is injected, a handle is
+    // writable only once ITS OWN field has actually rendered into it, restoring the exact browser behaviour
+    // `_field` gave before t1690 (verified live then; unchanged now — see WORK-LOG t1690's own probe).
+    // t1804 — was `_formHostExists = !!document.querySelector('#wiz_user_form')`, a selector that could only ever
+    // be right for ONE of the two coexisting form surfaces (the modal's); collapsed into "was a host injected at
+    // all" now that `_formHostEl()` answers that question per-surface (see its own comment above `_field`).
+    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_formHostEl() || !!_field(name));
     const items = [], decls = [];
     // t708 — DECLARED preview geometry (the general seam): an atom may declare real vector geometry + handles. Its handle
     // decls join `decls` (so they build through the SAME setFields writer round-trip below); its paths join a `paths` array
@@ -566,7 +579,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const edgePick = (edgeAxisBind && edgeDirBind) ? {
         edgeSel: { axis: params.axis === 'Y' ? 'Y' : 'X', dir: (params.dir || 'pos') !== 'neg' ? 'pos' : 'neg' },
         onEdgePick: (axis, dir) => {
-            const setParam = (param, val) => { const s = (typeof document !== 'undefined') && document.querySelector(`#wiz_user_form [data-param="${param}"]`); if (s && s.value !== val) { s.value = val; s.dispatchEvent(new Event('change', { bubbles: true })); } };
+            const setParam = (param, val) => { const s = _field(param); if (s && s.value !== val) { s.value = val; s.dispatchEvent(new Event('change', { bubbles: true })); } };
             setParam('axis', axis); setParam('dir', dir);
         },
     } : {};
@@ -574,7 +587,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const cornerPick = cornerBind ? {
         corner: params.corner,
         onCornerPick: (code) => {
-            const sel = (typeof document !== 'undefined') && document.querySelector('#wiz_user_form [data-param="corner"]');
+            const sel = _field('corner');
             if (sel && sel.value !== code) { sel.value = code; sel.dispatchEvent(new Event('change', { bubbles: true })); }
         },
     } : {};

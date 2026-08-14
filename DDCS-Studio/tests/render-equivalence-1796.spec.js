@@ -130,17 +130,14 @@ for (const op of OPS) {
 for (const op of OPS) {
     test(`RENDER EQUIVALENCE — ddcsLoadBlockStack vs the real bar+Insert chain, into the PANE (${op.optype})`, async ({ page, browser }, testInfo) => {
         test.setTimeout(60_000);
-        // t1796 — REAL, CONFIRMED FINDING for corner specifically (not fixed here, per the dispatch's own
-        // instruction: "STOP, do not fix it, report"). The wall1 marker renders as a solid filled cyan SQUARE
-        // with its "1" label via the real bar->Insert->Blocks chain, but as a small HOLLOW CIRCLE with no label
-        // when the identical captured program is fed through ddcsLoadBlockStack instead — a genuinely different
-        // glyph family (t1688's own shape convention: filled square = AUTO/emitting, a different glyph = a
-        // different emits/source classification), not a subtle pixel/AA difference. 104px diff, reproduced
-        // identically across 3 consecutive full runs (not flaky). `test.fail()` here keeps this a TRACKED,
-        // visible red rather than a silently-loosened pass — if this line ever starts failing (the test
-        // starts passing), that is itself the signal the underlying divergence was fixed and this line should
-        // be removed. pause_confirm (the flat twin, no visualization at all) is NOT affected — see its own run.
-        if (op.optype === 'corner') test.fail(true, 'ddcsLoadBlockStack renders wall1 marker as a different glyph family than the real Insert chain — see WORK-LOG t1796');
+        // t1796 found a REAL divergence here for corner specifically: the reposition handle rendered via
+        // ddcsLoadBlockStack disagreed with the real bar->Insert->Blocks chain. Traced across t1798/t1800/t1802 to
+        // panelTypes.js's `_field`/`_writable` hardcoding the MODAL's `#wiz_user_form` — wrong on the Blocks pane,
+        // which has its own namespaced form. Fixed at t1804 by dependency injection (`setFormHost`, called by
+        // userOpView.js with each instance's own namespaced host). This test now runs unguarded — a real,
+        // unmasked equivalence proof on its own terms, the same as the other 3 in this file. If it ever goes red
+        // again, that is a real regression in the fix, not a known/tracked finding — do not re-add test.fail()
+        // without re-diagnosing first.
 
         // Path A: the real bar gesture through to the Blocks pane. Capture BOTH its render and its resulting
         // program (the program is fed to path B verbatim — this test is about the RENDER step only, not

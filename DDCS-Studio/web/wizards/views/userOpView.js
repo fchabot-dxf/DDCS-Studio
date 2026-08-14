@@ -24,7 +24,7 @@ import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
 import { flattenBlocks, getUserStatusHint, getUserSimGcode, getUserPreviewVarSeed } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
-import { panelType, renderLayout2D, pinnedStartsFor, previewOnlyParams, clearPreviewOnlyParams, setPreviewOnlyWriteHandler } from '../ops/panelTypes.js';
+import { panelType, renderLayout2D, pinnedStartsFor, previewOnlyParams, clearPreviewOnlyParams, setPreviewOnlyWriteHandler, setFormHost } from '../ops/panelTypes.js';
 import { renderZRuler } from '../../viz/zRulerStrip.js';   // t1021 — the depth ruler docked down the LEFT of the 2D plan canvas
 import { depthLevels } from '../clearing.js';   // t1021 — the ONE slice source (== the emitter) for the ruler's pass ticks
 import { resolvePlacementStock } from '../ops/placement.js';   // t720 P1 (d) — fill a twin's UNSET stockW/H from the settings stock so cc-attach places on the real stock
@@ -658,6 +658,11 @@ export function createUserOpView(ns, opts) {
                         const simStart = (spb || epb || manualMarkers || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
                             ? ((pos0 && !spb && !epb && !manualMarkers) ? { pos: pos0, emits: pos0.emits } : null)
                             : { pos: pos0, emits: pos0.emits, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
+                        // t1804 — inject THIS instance's own namespaced form host (elNS, not a hardcoded '#wiz_user_form')
+                        // synchronously, immediately before the ONE render call that consumes it — panelTypes.js is a
+                        // lower layer and must not hardcode which of the (possibly several coexisting) wizard forms it
+                        // belongs to. See panelTypes.js's own comment above _field for why this is set per-call, not once.
+                        setFormHost(() => elNS('wiz_user_form'));
                         const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)
                         wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)
                         renderZRulerBeside(c, _def, params);   // t1021 — the declared depth ruler down the LEFT of the plan
@@ -673,7 +678,9 @@ export function createUserOpView(ns, opts) {
                 const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, id('userVizContainer'), (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool);
             } else if (pt.mode === '2d') {
                 if (viz3dBox) viz3dBox.style.display = 'none';
-                const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = elNS('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params); renderZRulerBeside(c, _def, params);
+                const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = elNS('userVizContainer'); if (c) c.style.display = '';
+                setFormHost(() => elNS('wiz_user_form'));   // t1804 — see the form3d+2d call site's own comment
+                renderLayout2D(c, _def, params); renderZRulerBeside(c, _def, params);
             } else if (pt.mode === 'commscreen') {
                 // t518 — Comm/MDI: a live mock of the DDCS controller screen (popup / status / input / beep) instead of a toolpath.
                 if (viz3dBox) viz3dBox.style.display = 'none';

@@ -29100,3 +29100,169 @@ the form lookup (option 1) — it's the one that fixes the class, not the instan
 parallel-derivation risk your own comment at panelTypes.js:390-391 already flags against widening the fallback.
 
 🔨 turn 1802
+
+## Turn 1804 — FIX IT: inject the form host, guard the class, prove the warm case first
+
+### Dispatch
+
+Ruling on shape: OPTION B, injection, not namespacing — `panelTypes.js` is a lower layer and must not learn a
+naming convention; reuse the ALREADY-ESTABLISHED `setPreviewOnlyWriteHandler` dependency-injection convention
+(userOpView.js already holds its own `elNS('wiz_user_form')`). Scope: fix ALL FIVE call sites as ONE defect
+(`panelTypes.js:75 _field`, `:249 _formHostExists`, `:569 setParam` in the edge picker, `:577` the corner read),
+check `formWidgets.js:791`'s own fallback rather than assuming it's fine. `_formHostExists` should DISAPPEAR, not
+be fixed — porting it across is the smell that the injection is incomplete. BEFORE fixing: prove with a real drag
+whether the WARM case was actually correct or a silent cross-surface write (may change the fix). Tests: guard the
+CLASS (a cold-page test that a declared handle exists+writable on the pane, plus one op that is not corner), and
+REMOVE t1796's `test.fail()` line so that test goes green on its own terms — if it doesn't, say so rather than
+re-adding the annotation. Gate: node tier + render-equivalence-1796 + the new tests + the two screenshot
+baselines (expect the pane baseline to change — re-record deliberately, confirm the diff shows the handle
+appearing).
+
+### Pre-fix: answered the warm question first, as instructed — it changed nothing about the SHAPE of the fix but
+### changed the URGENCY
+
+Built a throwaway diagnostic driving a REAL drag on the pane's `reposition_pos` handle on a WARM page (modal
+opened earlier via the real bar), reading both the modal's `#wiz_user_form [data-param="cross1_x"]` and the
+pane's own `#blk_wiz_user_form` field before/after:
+
+```
+BEFORE: modalField:"", paneField:"#16"
+AFTER:  modalField:"1081.768", paneField:"#16"   (UNCHANGED)
+```
+
+**Confirmed: the warm case was a silent cross-surface write, not merely "not wrong."** The drag visually appears
+to work (nothing errors, the marker likely still tracks the mouse), but the value lands in the closed MODAL's
+form (which nothing reads) while the PANE's own displayed value and the actual live program data are completely
+unaffected. This is worse than the cold failure — a user dragging the marker to set a value gets silent no-op
+data loss with no error, vs. cold's visibly-absent handle (at least honest about not working). This raised, not
+lowered, the priority of a proper fix — reported before writing any fix code, per the dispatch.
+
+### The fix — dependency injection, matching the established convention
+
+`panelTypes.js` (lines 72-87): a new module-level `_formHost`/`setFormHost(hostOrGetter)`/`_formHostEl()` trio,
+placed directly above `_field`, mirroring `setPreviewOnlyWriteHandler` just below it (same file, same pattern,
+now two of them). `_field` reads `_formHostEl()` instead of a hardcoded `document.querySelector('#wiz_user_form
+...')`. `_formHostExists` is GONE (not fixed, per the dispatch) — `_writable`'s condition collapsed from
+`!_formHostExists || !!_field(name)` to `!_formHostEl() || !!_field(name)`: "was a host injected at all" replaces
+"does this hardcoded selector happen to exist in the document," the exact same permissive fallback for the
+node-tier gate (which never calls `setFormHost`) that `_formHostExists` gave it before. The two picker
+write-backs (`onEdgePick`'s `setParam`, `onCornerPick`) now call `_field(param)` instead of their own separate
+raw `document.querySelector` — one fewer hand-rolled copy of the same query, not just a namespacing fix.
+
+`userOpView.js`: `setFormHost(() => elNS('wiz_user_form'))` called SYNCHRONOUSLY, immediately before each of the
+two `renderLayout2D` call sites (the `form3d+2d` branch's `renderLayoutWithSim`, and the plain `2d` branch) —
+deliberately NOT piggybacked on the existing `setPreviewOnlyWriteHandler`/`onShow` registration pattern, which on
+inspection turns out to register only ONCE per instance at construction (not actually re-armed per `onShow`
+despite its own comment's claim — a separate, pre-existing quirk I did not touch or need to touch, since
+`elNS('wiz_user_form')` is a pure, stable, per-instance-correct getter regardless of when it's called — no
+"last one wins" singleton risk the way `setPreviewOnlyWriteHandler`'s literal shared-callback value has).
+
+**`formWidgets.js:791`** — checked, not assumed: `host.closest('#wiz_user_form') || host.parentElement`. This
+is `.closest()` on a REAL, locally-owned DOM element (the widget's own container), not a fresh unscoped
+`document.querySelector` — it naturally resolves to whichever form ACTUALLY contains that widget (the modal's if
+`host` lives there, `null` → falls through to `host.parentElement` — still correctly scoped to the SAME
+subtree — if it lives in the pane instead, since the pane's form has a different id and `.closest` simply
+doesn't match). Confirmed correct by construction, not by luck: left untouched.
+
+### Verifying the fix — both symptoms closed
+
+Re-ran the exact warm cross-write drag repro: `AFTER: modalField:"" (unchanged), paneField:"-16.341" (changed)`
+— the write now lands in the pane's own form, the modal is untouched. Re-ran the cold repro (real file-Load,
+never opened a wizard first): the `reposition_pos` handle now renders (`toHaveCount(1)`), screenshot confirms
+the filled, labeled square, matching the warm/correct render exactly.
+
+### New permanent tests — the class, not corner
+
+`tests/canvas-handle-writable-1804.spec.js`, two tests:
+1. **Corner, cold, real Load**: the exact reproduction path from t1798/t1800/t1802 — the handle exists, and a
+   real drag writes into the pane's own form, never the modal's.
+2. **A genuinely non-corner op**: corner is the ONLY shipped built-in twin currently using the `group`+`role`
+   declared-canvas-handle binding pattern (checked — `grep "group:.*role:" web/blocks/dataOps/` matches only
+   `cornerData.js`), so a synthetic op is registered at runtime via `userOpFromStack` + `registerUserOp` — the
+   SAME real API `user-ops.spec.js`'s own foundation test uses, not a mock. Built via `makeOp`/`_builderAtoms`
+   (the same reconstruction path `programModel.js`'s `opFromMarker` uses on a real import, not a hand-typed
+   object missing the form's `uiChildren` tree). Loaded cold via `ddcsLoadBlockStack` (this op's pane has never
+   rendered before) — the handle exists and a real drag writes correctly into the pane's own field.
+   Two mistakes caught and fixed while building this: `userOpFromStack` PREFIXES the given opType
+   (`USER_OP_PREFIX`), so the actual registered type must be read back from `def.opType`, never assumed; and
+   `def.panel` must be the `PANEL_TYPES` id `'form2d'`, not the raw string `'2d'` — the latter silently falls
+   back to the default (`'form3d'`, mode `'3d'`) since it isn't a valid key, which is exactly the kind of silent
+   wrong-default this whole turn has been about.
+
+**Non-vacuity**: stashed both fixed files, re-ran this new spec — both tests failed 2/2 against the pre-fix code
+(exact same "handle count 0" / "cross-surface write" symptoms). Restored the stash, confirmed byte-identical to
+the fixed version (`git diff` clean after a line-ending-only false alarm from an intermediate temp-file compare,
+resolved by comparing with line endings stripped), re-ran the spec — green again.
+
+### t1796's `test.fail()` — removed, and the test goes green on its own terms
+
+Removed the `test.fail()` line and its explanatory comment from `render-equivalence-1796.spec.js`, replaced with
+a note pointing at this fix. Ran the full 4-test file 3× consecutively: **all 4 pass, including the previously-
+tracked corner/PANE case, with no annotation** — "4 passed" every run, the `x` marker gone. This confirms the
+fix genuinely closed the underlying divergence rather than narrowing it.
+
+### The screenshot baselines — did NOT change (a real, verified answer, not the guessed one)
+
+Ran `screenshot-baselines-1792.spec.js` (no `--update-snapshots`) expecting a diff per the dispatch's own
+prediction. **Both baselines pass unchanged, byte-for-byte** (`maxDiffPixelRatio: 0`, zero tolerance). Reasoned
+through why: this baseline's own gesture ALWAYS opens the wizard via the real bar (a warm scenario) before
+reaching the Blocks pane — it never exercised the cold path the missing-handle bug lived in, and the warm case's
+STATIC render was always visually correct (only a DRAG's write-back was silently wrong on warm, which a static
+screenshot with no gesture could never have caught). So there is genuinely nothing to re-record here — forcing
+an `--update-snapshots` run against an already byte-identical image would be a no-op, not "re-recording
+deliberately." Reporting this precisely rather than the dispatch's own prior guess: **this baseline never had
+coverage of either the cold-render bug or the warm-drag-write bug**, which is exactly why t1796/t1798/t1800's
+own specs (built specifically to exercise cold contexts and, in t1804, a real drag) were the ones that caught
+this at all.
+
+### Architecture-map upkeep — 9 stale citations, all corrected in place
+
+Adding ~12-16 lines near the top of `panelTypes.js` (the injection block + the `_writable`/comment rewrite) and
+~5 lines to `userOpView.js` (the two `setFormHost` call-site comments) shifted every line-anchored citation past
+those points. Found via the node-tier gate's own architecture-map self-check (`architecture-map-1698.test.mjs`),
+which is EXACTLY the mechanism it exists for — caught it, not silently drifted. Fixed BOTH layers, not just the
+test's own line numbers:
+- `tests/node/architecture-map-1698.test.mjs`: 5 citation line numbers corrected (173→185, 250→263, 639→652,
+  661→666, plus the 173-174→185-186 lineEnd pair) — verified against the actual current file, not computed by
+  offset arithmetic (grepped each symbol's real current line directly).
+- `ARCHITECTURE.md` itself: rewrote §3 (the `_writable`/`_formHostExists` history) to describe the CURRENT
+  injected design and the t1804 cross-surface-write finding, not just patch stale line numbers onto a
+  description of code that no longer exists — plus 6 more citation corrections elsewhere in the doc
+  (`partZeroShift`/`placement` call sites, the lathe early-return, the `_layout` singleton, the two
+  `renderLayout2D` call sites) that the node-tier gate doesn't directly check (prose, not `find:` patterns) but
+  would have gone stale identically if left alone.
+
+### Broader regression sweep (beyond the dispatch's own named gate)
+
+Since this touches a shared, low-level module every 2D-layout-bearing op renders through, additionally ran the
+existing specs most likely to exercise the exact changed code paths: `corner-data-repos-handle.spec.js`,
+`corner-layout-coherence.spec.js`, `corner-data-drag.spec.js`, `layout-partzero-shift-1672.spec.js`,
+`layout-overlay-frame-1686.spec.js`, `layout-placement-parity-718.spec.js` — 23/23 pass, no regressions.
+
+### Verify
+
+- Node tier (`npm run test:node`): 118/118 pass (was failing on 2 stale architecture-map checks mid-turn, now
+  clean after the citation fixes above).
+- `render-equivalence-1796.spec.js`: 4/4 pass, 3× consecutive, including the previously-tracked case now
+  unguarded.
+- `canvas-handle-writable-1804.spec.js` (new): 2/2 pass, 3× consecutive; non-vacuity proven 2/2 fail against the
+  pre-fix code, then restored and re-confirmed green.
+- `custom-op-canvas-handles.spec.js` (updated for the injection contract): 4/4 pass.
+- `screenshot-baselines-1792.spec.js`: 2/2 pass, UNCHANGED (see above — a verified negative, not an oversight).
+- Broader sweep: 23/23 pass across 6 other pre-existing corner/layout specs.
+- `handoff.py amendments --role worker`: none pending.
+
+### For the advisor
+
+Warm was a real silent cross-surface write, confirmed with a real drag before any fix code — worse than cold,
+reported as instructed. Fixed by injection exactly as ruled (Option B), all five call sites plus the two picker
+write-backs deduplicated onto the same `_field` rather than each carrying its own raw query;
+`formWidgets.js:791` confirmed fine by construction (`.closest()`, not a hardcoded selector) rather than assumed.
+`_formHostExists` is gone. Both new class-level tests pass with non-vacuity proven; t1796's `test.fail()` is
+removed and that test is green on its own terms, 3× consecutive. The one place your own prediction and my result
+differ: the screenshot baselines did NOT change — a real, reasoned answer (this baseline's own gesture never
+exercised either the cold-render bug or the warm-drag-write bug), not a shortcut past your instruction to
+re-record and confirm. Architecture-map upkeep done in both the test's citations and the prose doc, not just
+enough to make the gate pass. Broader sweep clean. Ready for review/merge from my side.
+
+🔨 turn 1804
