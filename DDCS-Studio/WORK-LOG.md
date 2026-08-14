@@ -28211,3 +28211,113 @@ The repoint still had value even with that outcome — it moved the PROOF from a
 covered entry paths" onto an actually-re-derived equivalence for the specific layer (rendering) these two specs
 care about, and the docblocks now say so explicitly so nobody collapses that reasoning later. No wrong-reason
 passing found either — the assertion logic never referenced the open route, so there was no room for one.
+
+## 🔨 turn 1786 (epoch 4) — ADDITION 6 (the last one): the ABSOLUTE branch, on a real concatenated program, plus three new confounds found and reported
+
+### Dispatch
+
+Addition 5 accepted. This is the last of the six queued acts: close the loop on the t1774 bug permanently.
+`toolpath2d-anchor.spec.js:14` tests `setAnchor(true)` and asserts path-origin == start-marker; `:55` tests
+`setAnchor(false)` and asserts only a cursor-snap coordinate, never the marker — the buggy branch was the
+uncovered one. Assert the invariant the user actually caught — drawn path position == marker == readout — on
+the ABSOLUTE/anchor-off branch, modeled on `corner-marker-parity.spec.js` (real drag + rendered-position reads).
+Critically: prove this fails if t1774's fix is reverted (revert locally, watch it go red, restore) — "a guard
+that would not have caught the bug it exists for is worse than none." Don't try to close the separate 36mm
+`markerWorldOf` gap here, but say so if this spec happens to catch it too. Make sure the spec reads what's
+DRAWN, not the `__t2starts` hook (already fixed at t1774 to report `markerWorld`, not the raw start).
+
+### Building "a real earlier op, then corner" surfaced THREE separate, new bugs — none of them t1774's
+
+This act's honest center: constructing a real, bar-built two-op program to exercise the ABSOLUTE branch turned
+into its own investigation, because every real op tried broke for a DIFFERENT reason:
+
+1. **Drill (a cutting op) never lets corner's own section execute at all.** The static preview trace advances
+   normally through Drill's own WHILE/peck loop (confirmed: 1 correct peck, matching depth=bite=5mm defaults)
+   but stops dead right after Drill's own `M5` (spindle off) — `traceToolpath`'s own `segments`/`stats` show
+   ONLY Drill's 6 segments, `probeCount:0`, and corner's own text (confirmed present in the concatenated
+   `getProjection().text` — this is not a projection-building bug) is simply never reached. Not root-caused
+   further (well outside this act's scope) — reported as a real, reproducible gap.
+
+2. **Homing (the machine-frame door) lets corner's section execute, but poisons `forceMachine` for the WHOLE
+   panel.** Confirmed corner's own probes DO fire (segCount jumped to 25+, `probeCount:10`) and `stats.absolute`
+   genuinely resolves to `false` by corner's own last real move (verified with a throwaway direct re-trace) —
+   but `blk-preview-panel`'s own `getSimConfig().stock` reads `null` (only true when `machineFrameTool` is on)
+   for corner+Homing, while the IDENTICAL panel reads the real stock for corner alone. Grepped `blocksApp.js`
+   for every call site that could set `setForceMachine`/`setToolMachineFrame` on this panel: **zero.** The exact
+   propagation mechanism was not pinned down — a real, separate, reportable gap — but the symptom is
+   reproducible and isolable (confirmed: calling the panel's own exposed `setForceMachine(false)` +
+   `setToolMachineFrame(false)` + `refresh()` flips `getAnchor()` from `false` to `true` immediately).
+
+3. **Downstream of (2): even after neutralizing forceMachine, the 3D marker array never rebuilds for corner.**
+   `panel.getPassStarts()` correctly lists all 3 passes (Homing's own start + corner's wall1 + wall2) after the
+   override, but `panel.viz.spindleMarkers` stays at length 1 (Homing's own marker only) — corner's own lead
+   marker never gets created, so reading "the rendered marker" or driving the jog-pendant readout for corner
+   specifically is unreliable through this door. A separate desync from (2), not investigated further.
+
+None of these three block the ANCHOR mechanism this act exists to guard — they're separate, real findings,
+named here for whoever picks them up next, not silently absorbed into a workaround that would hide them.
+
+### The construction that actually works — a real, shipped "Raw G-code" atom + corner via the real chain
+
+Given three real-op candidates each failed for reasons unrelated to t1774, used the `raw` atom
+(`wizards/ops/macro.js` — "Raw G-code," a genuine, shipped, palette-droppable block under Signals category,
+`emit: (p) => [p.text]`, no M-codes, no forceMachine declaration) as a minimal two-line absolute-move prefix
+(`G90\nG0 X0 Y0 Z-5`), placed via `ddcsLoadBlockStack` — **the one shortcut this act uses**, and only for this
+prefix. CORNER ITSELF — the op whose rendering is actually under test — is still placed via the full real bar
+→ entry → INSERT chain from Addition 1, unchanged. Verified this construction has none of the three confounds:
+`getSimConfig().stock` is populated (no forceMachine poisoning), `getProjection().text` genuinely includes
+corner's own emit (`hasCorner:true`, `gcodeLen:2403` vs a 2-line prefix), and corner's probes fire normally.
+
+### The assertion — two independent routes to the same fact
+
+`panel.getAnchor()` (the panel's own exposed flag — the ONE thing `passOff`/`_anchorToStart` actually read) AND
+an INDEPENDENT re-trace of the exact same real `window.ddcsGetProjection().text`, checked directly against
+`GcodeExecutionEngine`'s own `stats.absolute` — the precise value t1774 changed. Two different code paths
+measuring the same underlying fact: a bug that makes one read correctly by accident is unlikely to also fool
+the other. Given the marker/readout desync found in (3) above, this act does NOT assert the rendered 3D marker
+or jog-readout position directly — that would be red today for reason (3), which has nothing to do with t1774,
+and shipping that would be exactly the false-signal problem this whole audit exists to eliminate. Reported
+plainly (per the dispatch's own standing rule: a check that can't be made to test the right thing without
+inheriting an unrelated bug's noise is a finding, not an obstacle to paper over).
+
+### The revert-proof — the load-bearing part of this act, done for real
+
+Manually reverted the t1774 fix (`GcodeExecutionEngine.js`'s one line, back to the original one-way OR-latch) —
+the new spec failed 3/3, both assertions, with `anchor:false`/`statsAbsolute:true` exactly reproducing the
+user's own reported symptom on this synthetic-but-real construction. Restored the fix from the exact original
+edit (`git diff` confirmed byte-identical, zero diff) — re-ran, 1/1 green, `anchor:true`/`statsAbsolute:false`.
+This is the ONE property the dispatch called "the more important half" — confirmed, not assumed.
+
+### Relationship to the 36mm markerWorldOf gap (t1772) — not caught, as expected
+
+This spec does not touch corner's wall2 reconciliation math (`cornerSimStartsProvider`) at all — it only
+exercises `curAnchor`'s resolution for the lead pass. Confirms t1774's own earlier finding again: the two are
+genuinely separate defects, not two views of one bug.
+
+### Verify
+
+- `tests/anchor-contamination-1786.spec.js` — 1/1 green with the fix in place.
+- Revert-proof: 3/3 fail with the fix reverted (`anchor:false`, `statsAbsolute:true` both), 1/1 green restored,
+  `git diff` on the reverted-then-restored file confirmed byte-identical to HEAD.
+- Ran alongside `gcode-absolute-latch-1774.spec.js` + `toolpath2d-anchor.spec.js` (both unchanged) — 4/4 green,
+  no regression on the existing anchor coverage.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source file left modified — the revert-proof's edit was reverted back to HEAD's exact content before this
+  commit; only the new spec file is new.
+
+### Mid-turn amendment (not acted on this turn, per its own instruction)
+
+A widened version of the "corner lost its 2D preview" regression landed mid-act: the user now confirms NO
+wizard has the 2D pane in the modal, not just corner, and the advisor's own prior measurements are explicitly
+retracted ("ignore my measurements entirely," their selectors were likely wrong). Per the amendment's own
+instruction ("take it as the NEXT act after addition 6, do not switch mid-act"), not investigated this turn —
+noted here so it isn't lost, full context is in the amendment itself for next wake.
+
+### For the advisor
+
+The core guard is real and proven both ways. But this act surfaced more separate, real findings than any prior
+one in this series (three, all named above, none fixed): the M5-halt, the forceMachine stickiness, and the
+marker-array desync. All three live in the SAME general area (`createPreviewPanel.js`/`blk-preview-panel`'s own
+state management across a re-render) as the bug this act closes — worth considering whether they share a root
+with each other, even though none of them share a root with t1774's own latch. I did not chase that question
+this act; it's a real candidate for a future one. Six additions done — this was the last of the standing queue.
