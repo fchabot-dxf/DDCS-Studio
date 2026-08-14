@@ -2150,7 +2150,7 @@ first, then this.** Do not drop it — a symptom the user can see is worth more 
 about the app's behaviour while never driving it.
 
 **What exists after today:** `picture-parity-1772.spec.js` (declared markers vs traced path, red on corner)
-and `pane-visual-host-real-gesture-1762.spec.js` (drives the real bar→Insert→Blocks chain). **Two specs.**
+and `pane-visual-host-programmatic-1762.spec.js` (drives the real bar→Insert→Blocks chain). **Two specs.**
 
 **What does not:** ~95 specs build state with `ddcsLoadBlockStack` and assert against it. That is where
 every green-but-broken result this week came from — the empty pane, the wrong branch, the missing visual
@@ -2191,7 +2191,7 @@ user actually takes**. Today it does not, and the user has had to be the integra
 | `toHaveScreenshot`/`toMatchSnapshot` baselines | **0** |
 | specs reading canvas PIXELS (`getImageData`) | 10 (of 83 referencing a canvas) |
 
-⚠ **The file named `pane-visual-host-real-gesture-1762.spec.js` drives no real gesture** — `window.openWiz`
+⚠ **The file named `pane-visual-host-programmatic-1762.spec.js` drives no real gesture** — `window.openWiz`
 `:18`, `window.insertWiz` `:20`, `window.showApp` `:21`. The advisor cited it to the user as covering their
 route. It does not.
 ⚠ **The `*-in-place.spec.js` family (16 files) asserts `canvas ? 1 : 0`** — e.g. `pocket-in-place.spec.js:44,55`
@@ -2229,7 +2229,10 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
 
 **Track it here, and update this line every time one lands:**
 ```
-  1  primary route, 4 real clicks        [ ]
+  1  primary route, 4 real clicks        [x]  t1776 -- primary-route-real-gesture-1776.spec.js
+                                             clicks the Probe menu, the corner entry, fills dist=777,
+                                             clicks INSERT, clicks the Blocks tab; asserts #1=777.
+                                             ZERO function shortcuts (advisor-verified by grep).
   2  GESTURE==PROGRAMMATIC equivalence   [ ]   <- user, 2026-08-13
   3  both renderer branches              [ ]
   4  pixels not element-exists           [ ]
