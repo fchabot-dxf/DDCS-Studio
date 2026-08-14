@@ -2,29 +2,37 @@ import { test, expect } from '@playwright/test';
 import { openWizardViaBar, clickInsert } from './support/barGesture.js';
 
 /**
- * t1832/t1834 — BUG 2 of the three t1786 trace bugs, RE-RULED. Homing's own machine-frame intent unions across the
- * WHOLE `blk-preview-panel` program (`programSimContext`'s own documented "force it if ANY op needs it" design),
- * so `simStock()` withholds the workpiece for the entire trace, including a later op (Corner) that genuinely
- * probes it.
+ * t1832/t1834/t1836 — BUG 2 of the three t1786 trace bugs, RE-RULED TWICE. Homing's own machine-frame intent
+ * unions across the WHOLE `blk-preview-panel` program (`programSimContext`'s own documented "force it if ANY op
+ * needs it" design), so `simStock()` withholds the workpiece for the entire trace, including a later op (Corner)
+ * that genuinely probes it.
  *
- * t1832's ORIGINAL version of this test asserted the stock stays VISIBLE — that expectation was WRONG, and is
- * corrected here, not just patched. The advisor's t1834 ruling: THE HIDING IS CORRECT. A probe op PRODUCES the WCS
- * (this project's own standing rule, [[probes-never-read-wcs]]) — it never READS one. In a machine-frame view, the
- * stock's part-frame position is genuinely UNKNOWN until a probe runs, so drawing it beside those moves would
- * assert a spatial relationship nobody has measured yet — the false-picture failure this project treats as worst.
- * Hiding it is the honest answer; do NOT restore the old expectation thinking this is a regression.
+ * t1832's ORIGINAL version of this test asserted the stock stays VISIBLE — that expectation was WRONG, corrected
+ * at t1834: the advisor ruled THE HIDING IS CORRECT, and t1834 gave a reason for WHY. Do NOT restore the old
+ * "stock visible" expectation thinking either version of this test is a regression.
  *
- * THE ACTUAL DEFECT was that the hiding was SILENT — a user watching the workpiece vanish had no way to tell this
- * apart from something broken. t1834's fix (opSimContext.js's `machineFrameContributors` + createPreviewPanel.js's
- * `setFrameNote`) makes the panel SAY what is withheld and why, in the user's language, as an honest caption (the
- * same neutral, non-alarming treatment as the existing `.pp-carve-note`) — not an error, not a warning. This test
- * now asserts THAT outcome: the stock stays hidden, AND the panel explains why, naming Homing.
+ * t1834's OWN reason was ALSO WRONG, and t1836 corrects it here rather than papering over it: t1834 claimed the
+ * stock's position is "unknown until a probe runs," reasoning from [[probes-never-read-wcs]] — but that rule is
+ * about something else entirely (the SIM must not map a probe's OWN moves through the WCS table, because that op
+ * is producing the value, not consuming it). A WCS offset, once RECORDED, already exists — a probe REPLACES a
+ * stale one, it does not conjure a position from nothing. The genuinely honest, NARROWER reason: THIS WORKSPACE
+ * has no WCS offsets recorded (`machine.wcs.table` empty/unpulled) — there is nothing on file to place the
+ * workpiece against. When a WCS table IS populated, that reason no longer holds, and the note must not claim it —
+ * `createPreviewPanel.js`'s `setFrameNote` now SUPPRESSES the note in that case, reusing
+ * `engine/envelopeCheck.js`'s own `placementDeclared` predicate (the pre-flight safety check's existing "is a
+ * real WCS placement on file" gate) rather than inventing a second one. This project's DEFAULT test settings
+ * (`settingsPanel.js`) carry `machine.wcs.table: null` — unpulled — so `placementDeclared` is false and the note
+ * fires in the first test below; the second test proves the suppression really engages when a table IS populated.
+ *
+ * THE ACTUAL DEFECT (t1834, still the point of this fix) was that the hiding was SILENT — a user watching the
+ * workpiece vanish had no way to tell this apart from something broken. The fix makes the panel SAY what is
+ * withheld and why, in the user's language, as an honest caption (the same neutral, non-alarming treatment as the
+ * existing `.pp-carve-note`) — not an error, not a warning.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('after a Homing op hides the workpiece for the whole preview, the panel explains why', async ({ page }) => {
-    test.setTimeout(60_000);
+async function buildHomingThenCornerProgram(page) {
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 
@@ -41,8 +49,10 @@ test('after a Homing op hides the workpiece for the whole preview, the panel exp
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => window.__blkws, null, { timeout: 10000 });
     await page.waitForTimeout(1500);
+}
 
-    const r = await page.evaluate(() => {
+function readFrameNote(page) {
+    return page.evaluate(() => {
         const host = document.getElementById('blk-preview-panel');
         const panel = host && host.__panel;
         const simConfig = panel && panel.getSimConfig ? panel.getSimConfig() : null;
@@ -54,12 +64,53 @@ test('after a Homing op hides the workpiece for the whole preview, the panel exp
             noteVisible: noteEl ? noteEl.style.display !== 'none' : false,
         };
     });
+}
+
+test('no WCS on file: after a Homing op hides the workpiece, the panel explains why', async ({ page }) => {
+    test.setTimeout(60_000);
+    await buildHomingThenCornerProgram(page);
+    const r = await readFrameNote(page);
 
     expect(r.hasPanel, 'sanity: the whole-program preview panel exists').toBe(true);
-    // THE (now-confirmed-correct) HIDING: still null. A probe's part-frame position is genuinely unknown here.
-    expect(r.stock, 'the workpiece stays hidden — its part-frame position is unknown in a machine-frame view').toBeNull();
-    // THE FIX: the omission SPEAKS. Neutral caption, names the responsible op, explains the reason in plain words.
-    expect(r.noteVisible, 'the frame note is shown when the stock is withheld').toBe(true);
-    expect(r.noteText || '', 'the note names the reason (machine coordinates)').toMatch(/machine coordinates/i);
+    // THE (now-confirmed-correct) HIDING: still null. Nothing on file to place the workpiece against.
+    expect(r.stock, 'the workpiece stays hidden while no WCS is recorded').toBeNull();
+    // THE FIX: the omission SPEAKS. Neutral caption, names the responsible op, gives the CORRECTED reason.
+    expect(r.noteVisible, 'the frame note is shown when the stock is withheld and no WCS is on file').toBe(true);
+    expect(r.noteText || '', 'the note names the reason (no WCS offsets recorded)').toMatch(/no wcs offsets recorded/i);
+    expect(r.noteText || '', 'the note does NOT claim the position is "unknown until a probe runs" (t1834\'s wrong premise)').not.toMatch(/until a probe (runs|sets)/i);
     expect(r.noteText || '', 'the note names Homing as the responsible op').toMatch(/homing/i);
+});
+
+test('a WCS IS on file: the note is suppressed (the "nothing on file" reason no longer holds)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+    // A real, non-empty WCS table (envelopeCheck.js's own `placementDeclared` shape) — set BEFORE the first
+    // insert/reproject so the panel's first applyProgramIntent call already sees it populated.
+    await page.evaluate(() => {
+        const s = window.ddcsGetSettings();
+        s.machine = s.machine || {};
+        s.machine.wcs = { active: 1, table: [{ x: 10, y: 20, z: 0 }] };
+    });
+
+    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
+    await clickInsert(page);
+    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
+
+    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
+    await expect(page.locator('#wiz_user_form [data-param="dist"]')).toBeVisible({ timeout: 5000 });
+    await clickInsert(page);
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+
+    await page.locator('[data-app="blocks"]').click();
+    await page.waitForFunction(() => window.__blkws, null, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+
+    const r = await readFrameNote(page);
+    expect(r.hasPanel, 'sanity: the whole-program preview panel exists').toBe(true);
+    // The union-hiding itself is UNTOUCHED this turn (Option B, per-segment frames, is design-only) — stock still hidden.
+    expect(r.stock, 'the whole-program union hiding is unchanged this turn — stock still hidden').toBeNull();
+    // But the note must not claim "nothing on file" when something IS on file.
+    expect(r.noteVisible, 'the note is suppressed once a WCS table is populated — the note\'s own reason would be false otherwise').toBe(false);
+    expect(r.noteText || '', 'no stale text left behind').toBe('');
 });

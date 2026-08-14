@@ -31037,3 +31037,353 @@ docblock. Proved non-vacuous both directions. Bug 3 re-measured: unmoved (`marke
 173/173 real (2 pre-existing unrelated fixme), both screenshot baselines clean with zero diff.
 
 🔨 turn 1834
+
+## Turn 1836 — PART 1: the shipped note's own premise was wrong, fixed; PART 2: Option B designed, not built
+
+### Dispatch
+
+Two parts. PART 1: the t1834 note's wording ("its part-frame position isn't known until a probe sets the WCS")
+is FALSE — a WCS offset, once recorded, already exists; a probe REPLACES it, doesn't create it from nothing.
+[[probes-never-read-wcs]] is about a different thing (the SIM must not map a probe's OWN moves through the WCS
+table). Fix the note, its comment, the test's docblock, and the WORK-LOG reasoning that repeats it. If
+`machine.wcs.table` IS populated, even the corrected reason doesn't hold — reuse `envelopeCheck.js:51`'s own
+`placementDeclared` gate rather than adding a new condition; check whether it's populated in the failing scenario
+and say so. PART 2: design (not build) Option B — per-segment frames, gated at design because it reaches into the
+COLLISION machinery. Cover: how a segment's frame is declared (prefer the existing `opSimContext` source over a
+new one); how two segments in different frames share one 3D space; the empty-WCS-table fallback; and, the part
+the advisor cares most about, what `checkEnvelope` asserts per segment under B — stronger, weaker, or
+differently-scoped, SAID LOUDLY if weaker anywhere. Plus rough cost and a 3-slice landing plan.
+
+An amendment landed mid-turn (polled before committing, per protocol) sharpening B: the user's ruling is that
+visibility is **SEGMENT-SCOPED IN TIME** — during PLAYBACK, the workpiece is hidden while a machine-frame segment
+(Homing) is executing and shown while a part-frame segment (Corner) executes. Not a whole-program static choice.
+The appearing/disappearing is treated as a FEATURE (it tells the operator when the machine is in machine-frame vs
+part-frame motion; during homing the workpiece may not even be loaded) — do not design it away with a fade/ghost/
+dim unless that carries the SAME information. The static (never-played) picture, per the user's own reading, still
+shows the workpiece throughout (Corner uses it, the whole program is drawn at once) — only PLAYBACK hides it, and
+only while a machine-frame segment is the one currently running. Flag if the design finds that inconsistent rather
+than resolving it silently. Design must say whether "which segment is playing" is already derivable from the
+playback machinery or needs a new declaration — prefer deriving. Absorbed below; it reshapes sections 1+2 of the
+design but leaves the checkEnvelope question (section 4) and Part 1 unaffected, exactly as the amendment said.
+
+### PART 1 — the note's premise, corrected
+
+**The false claim, and why:** the shipped sentence read "...its part-frame position isn't known until a probe
+sets the WCS." A recorded WCS offset already exists once it's on file; a probe run REPLACES a value, it does not
+conjure the FIRST one. [[probes-never-read-wcs]] governs a different question entirely — the SIM must not map a
+probe op's OWN moves through the declared WCS table (that op is busy PRODUCING the value, not consuming one) — it
+never claimed a WCS value doesn't exist. Conflating "the sim shouldn't read the table for THIS specific op" with
+"nothing is on file" is what shipped as user-visible text asserting something false about how probing works.
+
+**The corrected, narrower reason:** THIS WORKSPACE has no WCS offsets recorded (`machine.wcs.table` is
+empty/never pulled) — there is nothing on file to place the workpiece against. **Checked, not assumed, whether
+this holds in the failing/test scenario:** `settingsPanel.js:119`'s DEFAULT settings carry
+`wcs: { active: 1, table: null }` — unpulled. `placementDeclared(machine)` (`envelopeCheck.js:50-52`,
+`!!(machine.wcs && Array.isArray(machine.wcs.table) && machine.wcs.table.length > 0)`) is `false` against that
+default — so the corrected reason genuinely holds in the test's own default-settings scenario, confirmed by
+running it (below), not inferred.
+
+**What happens when a WCS table IS populated:** the corrected reason ("nothing on file") is ALSO false then — so
+`createPreviewPanel.js`'s `setFrameNote` now SUPPRESSES the note entirely in that case, reusing
+`envelopeCheck.js`'s own `placementDeclared` (imported directly, `import { placementDeclared } from
+'../engine/envelopeCheck.js'`) rather than re-deriving the same predicate a second time. No circular import (
+checked `envelopeCheck.js`'s own import list and its dependencies' — none reach back into `viz/createPreviewPanel
+.js`). This is Option B's own promised fallback in miniature: this turn does NOT build per-segment awareness, so
+a program with a populated WCS table still gets the SAME blunt whole-program hiding as before — it just no longer
+gets a FALSE explanation for it. (A populated-but-not-yet-per-segment-aware program showing no note at all, while
+still hiding the stock, is an honest gap, not a lie — better than a confident wrong sentence.)
+
+**Fixed:** `createPreviewPanel.js`'s `setFrameNote` wording + its own comment (states the correction explicitly,
+citing this turn); the guard test's docblock (states plainly the t1834 reason was ALSO wrong, so nobody chases
+the wrong fix later); this WORK-LOG entry. **The t1834 entry itself was left untouched** (WORK-LOG is append-only
+per this project's own standing rule) — this section IS the correction, not an edit to the old one; flagging this
+choice explicitly in case an actual edit was intended.
+
+**Test, rebuilt (not just patched) into two cases, non-vacuous both directions:**
+1. No WCS on file (default settings): stock stays hidden, note shows, text matches `/no wcs offsets recorded/i`,
+   text does NOT match `/until a probe (runs|sets)/i` (guards against the wrong premise creeping back in).
+2. A WCS table IS populated: stock STILL hidden (the union-hiding itself is untouched this turn — Option B is
+   design-only), but the note is SUPPRESSED (`noteVisible: false`, `noteText: ''`).
+
+Reverted `createPreviewPanel.js` to its t1834-committed (pre-correction) state, ran both: **both fail** — test 1
+on the literal old wording (`"...isn't known until a probe sets the WCS."` printed verbatim in the failure), test
+2 on the missing suppression (`noteVisible: true` when it should be `false`). Restored from a scratch backup,
+diffed byte-identical, re-ran: **both pass.**
+
+### PART 2 — Option B, designed (not built)
+
+**Reframed by the mid-turn amendment.** My first pass (before the amendment landed) treated B as "each op's
+segments render in their OWN frame, statically, for the whole preview" — a per-op static choice. The amendment
+corrected this: visibility is **per-moment, tied to whichever segment is EXECUTING during playback**, not a
+static per-program or even per-op-for-the-whole-trace property. This splits B into two coupled but distinct
+sub-problems, both covered below:
+- **B1 — per-segment POSITIONING:** the drawn route + the live tool must place a machine-frame segment (Homing)
+  and a part-frame segment (Corner) correctly in ONE shared 3D scene, simultaneously, regardless of playback.
+- **B2 — per-moment STOCK VISIBILITY:** during active playback, the stock mesh itself must show/hide LIVE, in
+  sync with the playhead crossing a frame boundary — a genuinely NEW dynamic behavior, not a rendering of B1's
+  static geometry.
+
+#### 1 — how is a segment's frame DECLARED — does the existing source suffice?
+
+**Yes, for BOTH halves of B — no new declaration needed.** Two existing, independent pieces of machinery already
+carry everything required, verified by direct reading, not assumed:
+
+- **"What does this op WANT" already exists per-type:** `opSimContext(opType).toolMachineFrame`
+  (`viz/opSimContext.js:70-84`) — exactly the source `machineFrameContributors` (this turn's own t1834 addition)
+  already reads. No change needed here at all.
+- **"Which op does THIS line belong to" already exists per-line:** `programModel.js:22,44`'s own projection
+  cache — `proj.map[i]` = the block ANCESTRY for source line `i` (`map[i][0]` = the top-level block id,
+  confirmed by its own comment at line 44 and its two existing consumers at lines 57/75). Combined with
+  `getStack()` (op id → opType), this resolves "line N belongs to op type T" with NOTHING new — the mapping is
+  already built and already exported (`getBlocksForLine`-style helpers already read `proj.map` at lines 57-99).
+- **"Which line is CURRENTLY EXECUTING" (B2's own extra need) already exists too:** `createPreviewPanel.js`'s
+  own playback callback already receives the executing line index on every step — confirmed by its EXISTING
+  consumer, the "N · raw" status chip (`fmtExecLine(lineIndex + 1, raw)`, `createPreviewPanel.js:630`). B2 needs
+  nothing new here either — the SAME callback that already updates the status chip can ALSO resolve
+  `proj.map[lineIndex][0] → opType → opSimContext(opType).toolMachineFrame` and drive a live visibility toggle.
+- **Per-op PASS ownership (needed for B1's per-pass route builder, see §2) is ALSO free:** the whole-program
+  `starts` array is built by looping `getStack()`'s op blocks IN ORDER and concatenating each op's own
+  `opSimStarts(opType, ...)` result (`blocks/blocksApp.js:161-166`, `ui/gcodePreviewTab.js:35-48` — same shape,
+  two call sites). Pass index `p` in the final array is therefore ALREADY implicitly owned by a specific op, in
+  order — recording `opType` alongside each pushed start (one line added per call site) gives a `passOwners[p]`
+  array with no new declaration, just carrying data the loop already has in hand.
+
+**Conclusion: zero new declarations.** Every piece B needs — per-type intent, per-line ownership, per-pass
+ownership, and the live executing-line signal — already exists, in four different places, none built for this
+purpose. What's missing is WIRING them together, not declaring anything new.
+
+**A second mid-turn amendment landed here** (polled and absorbed before committing, same as the first): the
+advisor's own "prefer DERIVING the segment boundary from seekLine/the line walk" instruction was overruled by
+the user — reverse-engineering intent back out of the executed stream is exactly the inference this project's
+declare-or-handroll doctrine rejects, and the user pointed at a DECLARED source instead: `programModel.js:103-105`'s
+`( @DDCS:1 {…} )` self-describing marker, inserted before each op's first line, carrying the op record (which
+names the op type) — plus the per-type frame source above. Told to VERIFY both halves rather than take the
+claim on trust, especially whether the markers live in the SAME stream playback walks.
+
+**Checked, not assumed — and the answer matters, so stating it plainly as asked: the `@DDCS` markers are NOT in
+the stream this design's own §1 (and B) actually needs.** `programModel.js:103-105`'s own comment says so
+directly: "The live editor projection (`proj.text`) stays CLEAN — markers are a file-format concern, read back
+on import." `serializeWithMarkers()` (`programModel.js:106-121`) is a SEPARATE function, called only for
+export/persistence. Confirmed the playback/preview path never touches it: `blocksApp.js:356`'s
+`panel.setGcode(p.text)` and `gcodePreviewTab.js`'s equivalent both feed the CLEAN `proj.text`, and
+`createPreviewPanel.js:905/907`'s own `traceToolpath(code, ...)` runs on whatever `setGcode` was given — so the
+markers genuinely do not reach playback. Good news: this doesn't reopen the design — §1's own answer already
+named the RIGHT live-stream source without knowing to defend it: `proj.map[i]` (`programModel.js:22,226`,
+`proj = emitMapped(stack, dialectOpts())` — `.map` is built by the SAME call that builds `.text`, on every
+reproject, always in sync by construction, never separately maintained or capable of drifting stale). This is
+not "derived by walking output" in the sense the user is guarding against (reverse-engineering intent from
+parsed text) — it is the model's own maintained index of which block produced which line, built at projection
+time, already read by two existing consumers (`programModel.js:57,75`). The `@DDCS` marker and `proj.map` are
+two declared expressions of the SAME underlying fact (line→op ownership) for two different streams — the marker
+for the exported/persisted file, `proj.map` for the live one — and B's own machinery (§1 above) already named
+the correct one for the job.
+
+**The design question asked directly: should the FRAME be carried INSIDE the export marker record itself
+(self-describing), or read via op-type lookup at reimport time?** Arguing both, recommending one, per the ask:
+- **Self-describing (write `machineFrame: true/false`, or similar, into the marker JSON at export time)** — more
+  robust in exactly one real case: a hand-edited or FOREIGN file (authored by a different Studio config/plugin
+  set, or an OLDER version whose `opSimContext` table has since changed) where op-type lookup and the marker's
+  own recorded frame could diverge. `opSimContext`'s own doc is explicit that an unrecognized opType defaults to
+  ALL-FALSE — so a foreign/unknown op imported into this app would silently lose its machine-frame declaration
+  under op-type lookup, but would carry it correctly if self-described. This is the strongest case for B.
+- **Op-type lookup (status quo — the marker already carries `op.opType`, `programModel.js:113`; nothing new)** —
+  keeps the marker's shape unchanged (no `opSchema.js` sentinel bump, no old-file/new-file migration surface for
+  THIS property). More importantly: `toolMachineFrame` is one of SIX flags `opSimContext` declares per type
+  (`showRotaryRig`, `forceMachine`, `showMagazine`, `toolMachineFrame`, `seatAtStart`, `probesForWcs`) — self-
+  describing only the frame flag while leaving the other five to op-type lookup is inconsistent scoping that
+  doesn't actually solve the foreign/stale-file problem in general, just narrows it to one property. And this
+  project's own architecture-map convention already names the failure mode of the alternative: "name the
+  declaration or registry that HOLDS a fact rather than copying the fact — a copied list rots; a named source
+  cannot" — a frame flag snapshotted into every marker at export time is a COPY of `opSimContext`'s own output,
+  not the source itself, and copies rot exactly the way that convention warns about.
+
+**Recommendation: op-type lookup (status quo), not self-description — for THIS feature.** The foreign/stale-file
+robustness argument is real, but it is a property of the WHOLE declared-per-type-intent system, not something
+particular to frame-ness; solving it by special-casing one of six flags is a partial fix that leaves the other
+five exposed to the identical risk, and reintroduces a copy-that-can-rot into a marker format this project
+otherwise keeps minimal. If the foreign/stale-file case is a real enough concern to solve, it reads as its own,
+broader ruling (e.g., something in `opSchema.js`'s own defV/sentinel machinery, which already exists precisely
+to handle "this saved file's declared shape is stale relative to the current app") — not a one-off addition to
+the marker for this feature alone. Flagging the tradeoff for the ruling either way, per the ask, but this is my
+recommendation.
+
+#### 2 — how do two segments in different frames share ONE 3D space
+
+**Substantially already mechanically supported, at the WRONG granularity (whole-trace, not per-segment) — not
+absent.** Read `gcodeViz3d.js` directly rather than assuming:
+- The scene's master frame is the PART frame — `partFrame.shift` (`_partShift()` = `partZeroShift(machine, stock,
+  stockFloorZ)`, `gcodeViz3d.js:2150`) positions the stock/part group once.
+- The LIVE TOOL already converts a machine-frame point into that shared scene by SUBTRACTING the part shift:
+  `setToolPosition(pos)` computes `sh = this._toolMachineFrame ? this.partFrame.shift : {0,0,0}` and applies it
+  PER CALL (`gcodeViz3d.js:804,806`) — this is already a per-POINT transform, just fed by ONE whole-program
+  boolean today instead of a per-segment one.
+- The STATIC DRAWN ROUTE does the identical thing, ALREADY inside a PER-PASS loop (`gcodeViz3d.js:1103-1125`):
+  `const machTool = !!this._toolMachineFrame;` is read ONCE per loop today, but the loop itself is already
+  iterating pass-by-pass (`for (let p = 0; p < this._passCount; p++)`) — B1's core mechanical change here is
+  moving that ONE line INSIDE the loop, reading `passOwners[p]` (see §1) instead of the outer flag.
+- A THIRD surface carries the same flag: the 2D canvas mirror (`t2.setMachineFrame(on)`, referenced from
+  `setToolMachineFrame`, `createPreviewPanel.js` — not yet traced to its own per-segment readiness; FLAGGED,
+  not verified, as a third site needing the same per-pass treatment, easy to forget since it's a sibling
+  surface to the 3D one rather than inside the same function).
+
+**Conclusion:** the geometric "share one space" question is not an open design problem — it is an EXISTING,
+proven-working per-point transform (`raw − partFrame.shift` for machine-frame, `raw` for part-frame) that
+already runs inside a per-pass loop; B1 is re-scoping an existing loop variable from "once per whole trace" to
+"once per pass," in (at least) three sites: the live tool (`gcodeViz3d.js:804`), the static route
+(`gcodeViz3d.js:1117-1124`), and the 2D mirror (unverified, flagged above).
+
+#### Consistency check on the static (idle) picture — the advisor's own explicit ask
+
+**My read: consistent, not contradictory — provided "idle" and "playing" are genuinely two different render
+states, which they already structurally are.** The static/idle preview draws the WHOLE route + the stock as a
+one-shot overview (built once by `setGcode`/retrace, no live playhead). Playback is a SEPARATE mode (the live
+tool + progressive trail) that today shares the SAME `machineFrameTool` boolean for both — but nothing requires
+that sharing; B2's live-visibility toggle only needs to exist WHILE PLAYING, driven by the onLineChange callback
+that only fires during play. Idle stays exactly as it is today (stock shown, since `machineFrameTool` would no
+longer gate the STATIC stock mesh at all under B — only the PLAYING-state toggle would).
+
+**One genuine open question, surfaced rather than resolved:** what happens on STOP mid-machine-frame-segment (the
+user presses stop while the tool is inside Homing's own motion)? Two readings: (a) return to the idle rule (stock
+reappears immediately, since "nothing is executing" once stopped), or (b) stay hidden until the NEXT play (freeze
+the last playing-state). Reading (a) fits the user's own framing best (the visibility change is tied to EXECUTION,
+and stop ends execution) — that's my own inference, not decided here; flagging it as a real design detail rather
+than picking silently, per the advisor's own instruction on the idle-picture question.
+
+#### 3 — the empty-WCS-table case
+
+**Confirmed as the fallback, not a separate concern — this turn's own PART 1 fix already IS it.** B needs a real
+`wcsOffsetAt` mapping to correctly place a part-frame stock alongside machine-frame motion; when
+`placementDeclared(machine)` is false, there is genuinely no honest mapping to draw. In that state, B's own
+per-segment machinery has nothing to key off — the correct behavior is EXACTLY today's (post-t1836) fallback:
+hide the stock for the whole trace, show the honest "no WCS offsets recorded" note. B does not replace this
+fallback; it NARROWS the circumstances under which it fires (only when truly nothing is on file), which is
+precisely what t1834's own forward-compatibility claim promised structurally — that promise is validated here,
+not just asserted.
+
+#### 4 — checkEnvelope under B — the part the advisor cares most about
+
+**Checked directly, not assumed: `envelopeCheck.js` imports NOTHING from `opSimContext.js` today** (its own
+import list is `trace.js`, `limitSwitches.js`, `viz/sceneFrame.js`, `workpiece.js`, `probeGeometry.js`,
+`viz/opSimStarts.js` — confirmed by reading the file). **So B, scoped as designed above (viz/render-layer only,
+sections 1-3), does not touch checkEnvelope AT ALL — the safety check is UNCHANGED, neither stronger nor
+weaker, because it was never coupled to `opSimContext`'s render-intent union in the first place.**
+
+**⚠ A separate, PRE-EXISTING finding, unrelated to whether B is ever built — surfacing it because it directly
+informs "what checkEnvelope asserts" and the advisor asked to see the reasoning, not just the conclusion.**
+`checkEnvelope`'s own per-point test (`testPoint`, `envelopeCheck.js:110-122`) computes
+`mach = workPt[ax] + wo[ax]` — i.e., treats EVERY segment's raw coordinate as WORK-frame, needing the ONE
+program-wide WCS offset added to become machine coords. This per-point test only RUNS when `trace.stats.absolute`
+is true (`anchored`, line 108/135) — and this project's own memory ([[g53-move-breaks-preview-start-anchor]]) and
+`envelopeCheck.js`'s own docblock both confirm a machine-frame G53 excursion (Homing's own kind of move) CAN set
+`stats.absolute = true`. **Checked empirically, not just reasoned about:** built a throwaway diagnostic
+(`zzdiag-envelope-frame-1836.spec.js`, deleted after use) that ran `checkEnvelope` on the real Homing+Corner
+program from this turn's own test, with a populated WCS table. Result: `stats.absolute` was **false** for THIS
+specific program (an incremental/relative probe pairing), so `testPoint` never ran — only the frame-agnostic
+EXTENT check did (which cancels any constant offset by construction, per its own comment at line 124-127, so it
+carries no risk here). **This means I did NOT observe the double-offset risk actually firing** in the one real
+scenario tested — but I also did NOT rule it out for a DIFFERENT mixed program where a machine-frame op's own
+G53 excursion DOES leave `stats.absolute = true` (e.g., a machine-frame tool-setter op followed by an absolute
+mill op). In that branch, `testPoint`'s blanket `+wo` would apply to every segment uniformly, including ones a
+machine-frame op may have left in a coordinate space `+wo` isn't the right correction for. **This is a
+PRE-EXISTING question about the safety check's own current correctness, independent of Option B** — B (as
+scoped) doesn't touch checkEnvelope, so it cannot be blamed for this either way, but B's own future extension
+(see below) would inherit whatever the true answer is. Recommending this get its own targeted, empirical
+check — a program that DOES leave `stats.absolute = true` after a machine-frame excursion, run through
+`checkEnvelope`, inspecting actual violate/no-violate output against a hand-computed expectation — BEFORE any
+future act wires per-segment frame data into `envelopeCheck.js` itself, so that act isn't built on an unverified
+foundation. Not chased further this turn — it's a real but SEPARATE finding, flagged per this project's own
+"mention, don't fix, unrelated dead/uncertain code" convention, not folded into B's own scope or cost estimate.
+
+**If checkEnvelope IS later extended to consume B's per-segment data (a natural follow-on, NOT part of the 3
+slices below): it must only ever ADD precision — e.g., excluding a machine-frame op's own non-stock-relevant
+segments from a future through-stock check, using the SAME declared `opSimContext` source — and must NEVER use a
+per-segment frame guess to loosen the MACHINE-ENVELOPE (soft-limit) check, which is unconditional today and
+already returns amber-for-the-whole-program whenever `placementDeclared` is false (line 75-77) — that
+already-conservative behavior must not be relaxed by B or any of its follow-ons.** Stated loudly, as asked:
+**within the 3-slice scope below, checkEnvelope does not change at all — it is not weaker, not stronger, simply
+untouched.** The only way it becomes WEAKER is if a future act mishandles the extension warned about above; that
+extension is explicitly NOT part of what's being scoped/costed here.
+
+#### Rough cost + a 3-slice landing plan
+
+Not a full implementation audit — an estimate, flagged as such. Surfaces touched: `viz/opSimContext.js`
+(possibly nothing new — the existing per-type source suffices), a new small pure derivation module/function
+(segment/pass → owning opType), `blocks/blocksApp.js` + `ui/gcodePreviewTab.js` (extend the existing per-op
+starts-building loop, ~2 call sites), `viz/gcodeViz3d.js` (the per-pass route loop + the live-tool setter + the
+2D mirror — 3 sites, 1 unverified), `viz/createPreviewPanel.js` (wire the playback line-change callback to the
+new live-visibility toggle). Roughly **6-8 source files**, plus new/expanded tests per slice.
+
+1. **Slice 1 — the derivation, alone.** A small pure function: given the block stack + the projection's own
+   `proj.map`, resolve "which opType owns line N" / "which opType owns pass P." Zero behavior change (nothing
+   calls it yet) — reviewable and testable in complete isolation, useful as a foundation even if slices 2-3 slip.
+2. **Slice 2 — B1, positioning only.** Wire slice 1's per-pass ownership into the route builder + live tool
+   (§2) so Homing's own segments draw in the machine frame and Corner's own draw in the part frame, correctly,
+   SIMULTANEOUSLY, in the idle/static picture. Stock visibility stays exactly as it is today (shown when idle,
+   whole-program-hidden-or-not during play) — this slice is purely geometric correctness, no new visibility
+   behavior yet, and is independently reviewable/shippable.
+3. **Slice 3 — B2, the live visibility toggle.** Wire slice 1's per-line ownership into the playback callback to
+   toggle stock visibility live as the playhead crosses a frame boundary — the exact behavior the user ruled on.
+   Depends on slice 2 (toggling visibility of a stock that's positioned against a mis-placed machine-frame route
+   would be worse than today, not better) — lands last, and is the smallest, most user-visible slice.
+
+`checkEnvelope`'s own extension (if ever wanted) is explicitly a 4th, SEPARATE, not-yet-scoped step — outside
+this 3-slice plan, per the analysis in §4 above.
+
+### Bug 3 re-check
+
+Source changed twice more this turn (the PART 1 fix, then the architecture-map citation). Re-measured (not
+assumed) after each: `markerCount: 1` both times — exact match to t1826/t1832/t1834. Unmoved.
+
+### Architecture map
+
+`tests/node/architecture-map-1698.test.mjs`'s TRAP8 citation for `createPreviewPanel.js`'s "stale z-index
+comment" (lines 1119-1120) shifted to 1121-1122 by this turn's own additions above it — caught by the node gate
+itself failing, not missed. Fixed the citation; grepped for every OTHER architecture-map citation touching the
+two files this turn edited (`createPreviewPanel.js`, `opSimContext.js`) — only the one.
+
+### Gate
+
+- `npm run test:node`: 118/118 (after the architecture-map fix; failed once beforehand on the stale citation,
+  fixed, re-ran clean).
+- Full preview-panel + baseline gate (same 47-file set as t1834, now including the rebuilt 2-test guard file):
+  **174 tests, 172 passed, the SAME 2 pre-existing unrelated `test.fixme`** (`blocks-exec-glow.spec.js`/t1734,
+  `editor-sim-disc.spec.js`/t1732). **0 failures, 0 flakes.** Both screenshot baselines clean, zero diff (same
+  reasoning as t1834 — the note lives only on `blk-preview-panel`/`gpPanel`, never the baselined single-op
+  surfaces).
+- `handoff.py amendments --role worker`: 2 landed mid-turn (the segment-scoped-in-time sharpening; the
+  declare-not-derive correction + the marker-self-description question), both polled and absorbed above before
+  committing, at the pre-commit checkpoint each time. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1836` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+PART 1 shipped: the note's own premise corrected (recorded-WCS-exists vs never-recorded, not
+[[probes-never-read-wcs]]'s actual claim), gated on `placementDeclared` (reused, not reinvented) so a populated
+WCS table suppresses the note rather than showing a still-wrong reason. Confirmed the failing/test scenario has
+`table: null` by default, so the corrected reason genuinely applies there. Test rebuilt into 2 cases, both
+non-vacuous. PART 2: B reframed by the mid-turn amendment into two coupled sub-problems (B1 positioning, B2
+live visibility) — found that BOTH need zero new declarations (four existing sources, none built for this,
+already carry everything: `opSimContext`, `proj.map`, the per-op starts-loop, the playback line-change callback)
+and that the geometric "share one scene" mechanism ALREADY EXISTS at the wrong granularity (a per-pass loop
+reading one whole-trace flag instead of a per-pass one) rather than needing to be invented. A second amendment
+corrected my "prefer deriving" framing to declare-not-derive; verified, as asked, whether the `@DDCS` export
+marker lives in the playback stream — it does NOT (`proj.text` is deliberately kept clean; markers are an
+export-only concern, confirmed by tracing `setGcode`'s own input) — but the design's own §1 had already named
+the correct LIVE-stream declared source (`proj.map`, built by the same call that builds `.text`, never separately
+maintained), so nothing in the design itself needed to change, only the justification for it. Answered the
+marker-self-description question asked directly: recommending op-type lookup (status quo) over embedding the
+frame flag in the export marker, since the latter only fixes one of `opSimContext`'s six flags and reintroduces
+a copy of a fact this project's own architecture-map convention warns against copying — argued both ways, ruling
+left explicitly open. Answered the idle-picture consistency question (consistent, if idle/playing stay two
+states — which they already are) and surfaced one open sub-question (does STOP-mid-segment reset to idle or
+freeze?) rather than deciding it.
+checkEnvelope: UNCHANGED by B as scoped (verified, no import coupling) — neither stronger nor weaker; separately
+flagged a PRE-EXISTING, unverified concern about `testPoint`'s blanket WCS-offset application when
+`stats.absolute` is true for a machine-frame excursion, empirically checked (does not fire in the one scenario
+tested, `stats.absolute` was false there) but not ruled out for others — recommended as its own targeted check
+before any future act wires B into the safety check, not folded into B's cost. Proposed a 3-slice landing plan
+(derivation → positioning → live visibility), each independently reviewable. No implementation of B this turn.
+Bug 3 re-measured twice more, unmoved both times. Gate: node 118/118 (one architecture-map citation fixed along
+the way), 172/174 real (2 pre-existing unrelated), both baselines clean.
+
+🔨 turn 1836

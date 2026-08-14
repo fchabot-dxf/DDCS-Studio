@@ -27,6 +27,7 @@ import { wcsOffsetAt, declaredWcsOffset } from './sceneFrame.js';   // t588 — 
 import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — the preview-visibility modal (opens from the toolbar 👁)
 import { onDisplayChange } from './displayPrefs.js';   // t738 — re-apply the visibility registry to THIS panel on any modal change
 import { GcodeExecutionEngine } from '../engine/index.js';
+import { placementDeclared } from '../engine/envelopeCheck.js';   // t1836 — the ONE existing "is a WCS placement on file" gate (pre-flight's own predicate), reused by the frame note rather than re-derived
 import { toggleStockEditor } from '../ui/stockEditor.js';
 import { droAxisLabel, droValue, droWorkShift } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
@@ -1390,12 +1391,24 @@ export function createPreviewPanel(container, opts = {}) {
         retraceAndReseed();
     }
 
-    // t1834 — Host hint: WHICH op type(s) are forcing this whole-program preview into the machine frame (so the
-    // stock is withheld — see simStock()). An HONEST NOTE, not an error: nothing is broken, the stock's part-frame
-    // position is genuinely unknown here (a probe op PRODUCES the WCS, per [[probes-never-read-wcs]] — it never reads
-    // one, so a machine-frame op earlier in the program leaves no declared datum to place the stock against). Same
-    // pattern as the existing `.pp-carve-note` (an always-neutral caption, never styled as a warning/error) — reused
-    // rather than inventing a second notification style. Purely descriptive: does not touch forceMachine/
+    // t1834/t1836 — Host hint: WHICH op type(s) are forcing this whole-program preview into the machine frame (so
+    // the stock is withheld — see simStock()). An HONEST NOTE, not an error: nothing is broken.
+    //
+    // t1836 CORRECTION (user-caught): the t1834 wording claimed the stock's position is "unknown until a probe
+    // runs" — FALSE. A WCS offset, once recorded, ALREADY EXISTS; a probe REPLACES it, it does not create it from
+    // nothing. [[probes-never-read-wcs]] is about a DIFFERENT thing — the SIM must not map a probe's OWN moves
+    // through the WCS table (that op is busy producing the value, not consuming it) — it says nothing about
+    // whether a WCS value exists at all. The genuinely honest, NARROWER reason: THIS WORKSPACE has no WCS offsets
+    // recorded (`machine.wcs.table` empty/unpulled) — there is nothing on file to place the workpiece against. If
+    // a WCS table IS populated, that reason no longer holds (a real, if provisional, offset exists) — reusing
+    // engine/envelopeCheck.js's own `placementDeclared` predicate (the ONE existing "is a WCS placement on file"
+    // gate, already used by the pre-flight safety check) rather than inventing a second one: the note is
+    // SUPPRESSED whenever `placementDeclared` is true, since claiming "nothing to place it against" would then be
+    // false too, and this turn deliberately does NOT build the per-segment-frame machinery (Option B) that would
+    // let the note say something narrower-but-still-true in that case.
+    //
+    // Same pattern as the existing `.pp-carve-note` (an always-neutral caption, never styled as a warning/error) —
+    // reused rather than inventing a second notification style. Purely descriptive: does not touch forceMachine/
     // machineFrameTool or any render/collision decision. Forward-compatible by construction — this is driven by the
     // SAME opTypes list applyProgramIntent already computes the union from, so if per-segment frame-awareness ever
     // replaces that whole-program union, whoever changes applyProgramIntent's call to this function changes both at
@@ -1404,9 +1417,9 @@ export function createPreviewPanel(container, opts = {}) {
     function setFrameNote(opTypes) {
         if (!frameNoteEl) return;
         const list = Array.isArray(opTypes) ? opTypes.filter(Boolean) : [];
-        if (!list.length) { frameNoteEl.textContent = ''; frameNoteEl.style.display = 'none'; return; }
+        if (!list.length || placementDeclared(machineForViz())) { frameNoteEl.textContent = ''; frameNoteEl.style.display = 'none'; return; }
         const names = [...new Set(list.map((t) => opLabelOf(t)))].join(' + ');
-        frameNoteEl.textContent = `Workpiece hidden — ${names} runs in machine coordinates; its part-frame position isn't known until a probe sets the WCS.`;
+        frameNoteEl.textContent = `Workpiece hidden — ${names} runs in machine coordinates; this workspace has no WCS offsets recorded, so there's nothing on file to place it against.`;
         frameNoteEl.style.display = '';
     }
 
