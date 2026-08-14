@@ -29988,3 +29988,114 @@ Full requested gate green (node tier + the two 1814/1816 tests + 1804 + 1796 + b
 touching panelTypes.js). Did not run the full suite — that's still yours before release.
 
 🔨 turn 1816
+
+## Turn 1818 — pane-surface-scroll-1766's chronic flake: found the real cause, fixed it, proved it under load
+
+### Dispatch
+
+pane-surface-scroll-1766.spec.js unstable in THREE CONSECUTIVE full-suite runs (steampunk+futuristic flaky, then
+clean, then studio+steampunk+futuristic red) — passes 5/5 in isolation, so load-sensitivity, not breakage. FIND
+OUT WHY and FIX THE CAUSE — no bare timeout increases, no retry counts, no loosened pixel assertion. Likely
+candidates to CHECK: a scroll/paint awaited by a fixed timeout instead of a real condition, a theme switch not
+settled before the pixel read, a viewport/layout assumption that only holds when the machine isn't busy. PROVE
+THE FIX UNDER LOAD (not isolation), report before/after under the SAME load, or say plainly if it can't be
+reproduced. Note whether the OTHER 16 flaky entries in that gate run share the cause.
+
+### Reproducing it first
+
+Ran the spec alongside a ~200-file / 500-test batch of the suite's other heavy real-gesture specs (default 6
+workers, matching `playwright.config.js`'s own committed setting) — this is a representative LOAD composition,
+not the literal full suite (too long for one pass), but the same kind of concurrent-Chromium contention the
+advisor's own gate runs under. **Run 1 (unfixed): all 5 theme variants of pane-surface-scroll-1766 failed or
+flaked** — confirmed reproduction, not a guess.
+
+### The actual mechanism — read from the error, not assumed
+
+Every failure was the SAME signature:
+```
+TimeoutError: locator.scrollIntoViewIfNeeded: Timeout ...ms exceeded.
+  - waiting for element to be stable
+```
+Remaining budgets varied wildly (69ms, 1276ms, up to a clean run where the element resolved fine but
+`scrollIntoViewIfNeeded`'s OWN 5000ms default action timeout was fully exhausted on stability alone). That last
+one rules out "just ran out of overall test budget" as the sole story: `#blk_wiz_user_form`'s bounding box was
+genuinely still MOVING for the full 5 seconds under load, not merely slow to reach.
+
+Traced why: `createPreviewPanel.js`'s `autoStartOnOpen()` auto-plays a LOOPING sim (`pv.autoLoop !== false`,
+Settings→Preview default) the moment `panel.setActive(true)` fires — which happens synchronously inside
+`blocksApp.js`'s render pass, before `window.__blkws` is ever set. So by the time this test's own
+`waitForFunction(() => !!window.__blkws)` resolves, the 3D/2D preview is ALREADY playing, looping forever, for
+the rest of the test's life — this file never stops it. Every OTHER real-gesture spec that reads pane DOM state
+after opening Blocks (`canvas-handle-writable-1804`, `layout-singleton-reparent-1814`,
+`layout-ontransform-per-container-1816`, and others) calls `stopLiveSim(page, '#blk_userViz3dBox')` first,
+specifically for this reason — this file was the one that didn't. Under light/isolated load the sim evidently
+settles (or its frame-to-frame layout impact is too brief to register) before the fixed waits elapse; under
+6-worker contention the same animation runs at a fraction of its isolated frame rate, so it's still actively
+shifting layout well past those same fixed windows — genuine load-SENSITIVITY, not load-caused breakage, exactly
+matching the "passes 5/5 isolated, fails under load" symptom the advisor described.
+
+### The fix
+
+Added the import and one call, in the SAME position sibling specs use it (right after the initial settle wait,
+before touching anything the animation could move):
+```js
+import { stopLiveSim, dismissToasts } from './support/simControls.js';
+...
+await stopLiveSim(page, '#blk_userViz3dBox');
+await dismissToasts(page);
+```
+No existing `waitForTimeout` NUMBER was touched, no retry count added, no assertion loosened. This is a real
+settle condition (an explicit action with a determinate end state — the sim is confirmed stopped) reusing an
+ALREADY-ESTABLISHED, already-correct convention this exact test family uses everywhere else, not a longer guess
+at an indeterminate, load-speed-dependent animation's remaining runtime. Confirmed contour (this test's op)
+declares `panel: 'form3d+2d'` (`contourData.js:151`), so `#blk_userViz3dBox` and its `.pp-run` toggle exist for
+this test exactly as they do for the sibling specs that already call this helper against the same id.
+
+### Proved under load, not just in isolation
+
+- Isolation, post-fix: 5/5 pass (34.8s) — no regression to the baseline behaviour.
+- Same ~200-file/500-test load batch, post-fix, run 2: **0/5 failed or flaky for pane-surface-scroll-1766**
+  (clean pass in all 5 themes, no retries triggered).
+- Same batch, run 3 (a first attempt hit Playwright's own known stale-collection-cache artifact after editing a
+  spec file — "Playwright Test did not expect test.use() to be called here," a recognized benign quirk, not a
+  real result — immediately retried clean): **0/5 failed or flaky for pane-surface-scroll-1766** again.
+- Before/after, same load, same batch: **5/5 broken → 0/5 broken across two independent post-fix runs.**
+
+### Do the other flaky entries from that load batch share the cause? Evidence, not the advisor's own 16 — I only have my own runs
+
+Run 1's other flaky/failed entries: `layout-overlay-frame-1686` and `middle-superset` both failed with a raw
+`page.waitForFunction`/`page.evaluate` **timeout on page load or on a large CPU-bound computation** (a 14336-combo
+structural sweep) — generic "the machine is busy, this operation takes longer" contention, unrelated to any
+animation or DOM-stability mechanism. `wizard-face-1599` failed with `waitForEmpty` throwing an error that
+**names its own already-recognized race** in its own source comment — "the reproject echo race (t1766)" — a
+separate, already-characterized model/Blockly-sync race, not a missing-stopLiveSim symptom. None of these three
+share pane-surface-scroll-1766's specific "waiting for element to be stable" signature or its cause. I cannot
+speak to the advisor's own specific 16-entry list from their own gate run (different composition, not something I
+have direct access to) — only that nothing in MY reproduction runs pointed at the same mechanism.
+
+### Verify
+
+- pane-surface-scroll-1766.spec.js: isolation 5/5 pass; load (2 independent post-fix runs): 0/5 broken, versus
+  5/5 broken pre-fix under the identical batch.
+- Node tier (`npm run test:node`): 118/118 pass (no source file touched, only the one test file).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- cwd drifted to the repo root TWICE more this turn (once caught via a failed `npm run test:node` — "Missing
+  script" — immediately diagnosed via `pwd` and re-anchored; once mid-background-launch, harmless since the batch
+  file path was absolute). Re-anchored explicitly before this WORK-LOG write.
+
+### For the advisor
+
+Root cause: this file never calls `stopLiveSim`, unlike every sibling real-gesture spec touching the Blocks
+pane — the pane's 3D preview autoplays a looping sim on activation, and under load the animation runs slowly
+enough to still be shifting `#blk_wiz_user_form`'s layout well past the fixed settle windows, so
+`scrollIntoViewIfNeeded`'s own actionability check ("waiting for element to be stable") times out. Fixed by
+adding the same `stopLiveSim`/`dismissToasts` calls the sibling specs already use, in the same position — no
+timeout numbers changed, no retries added, no assertion loosened. Proved causally: reproduced 5/5 broken under a
+~200-file/500-test load batch pre-fix, then 0/5 broken across two independent post-fix runs under the identical
+batch. The other flaky entries in my own load runs (`layout-overlay-frame-1686`, `middle-superset`,
+`wizard-face-1599`) show distinct, unrelated mechanisms (raw CPU-contention timeouts, and an already-named
+separate race) — I don't have visibility into your own gate run's specific 16 entries to compare against those
+directly. Gate: this spec under load (2 clean post-fix runs) + isolation + node tier.
+
+🔨 turn 1818

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { stopLiveSim, dismissToasts } from './support/simControls.js';
 
 // t1766 — t1764 painted #blk_wiz_user's own background, but `.wiz-body`'s base rule (styles.css) ALSO sets
 // `max-height: calc(95vh - 120px)` + `overflow-y: auto` on any `.wiz-body` — meant for the modal, where
@@ -36,6 +37,18 @@ for (const theme of THEMES) {
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => !!window.__blkws);
     await page.waitForTimeout(500);
+    // t1818 — the pane's 3D preview autoplays a LOOPING sim on activation (createPreviewPanel.js's own
+    // autoStartOnOpen, `pv.autoLoop !== false` by default) the moment this render pass calls panel.setActive(true)
+    // — every sibling real-gesture spec that reads pane DOM state after opening Blocks (canvas-handle-writable-
+    // 1804, layout-singleton-reparent-1814, layout-ontransform-per-container-1816, ...) stops it first via this
+    // same helper; this file never did. A running loop is not merely a visual distraction — the load run that
+    // reproduced this file's chronic flake showed `scrollIntoViewIfNeeded` timing out on "waiting for element to
+    // be stable" (up to the full 5s default action timeout, not merely running out of overall test budget),
+    // i.e. `#blk_wiz_user_form`'s own layout was genuinely still shifting under load, not just slow to reach.
+    // Stopping the sim is a real settle condition (an explicit action with a determinate end state), not a
+    // longer guess at how long an indeterminate, load-speed-dependent animation might still be running.
+    await stopLiveSim(page, '#blk_userViz3dBox');
+    await dismissToasts(page);
 
     const target = page.locator('#blk_wiz_user_form span', { hasText: 'Attach to Stock' }).first();
     await target.scrollIntoViewIfNeeded();
