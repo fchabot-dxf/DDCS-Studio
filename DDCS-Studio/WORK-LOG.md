@@ -29525,3 +29525,114 @@ deliberately exercise the "no host" permissive path will now print accurate cons
 touch those files, since they're correctly using the documented fallback and 35/35 still pass.
 
 🔨 turn 1808
+
+## Turn 1810 — THE SHARED-SINGLETON CENSUS (read-only, no fixes)
+
+### Dispatch
+
+`_formHost` (t1804/t1806/t1808) and `_layout` (found live at t1806, still unfixed) are both module-level
+singletons broken by the SAME underlying cause: the userOpView factory split created a second coexisting
+surface out of what used to be per-document state. Twice is a consequence, not a coincidence. Census first,
+fixes after — enumerate every module-level mutable value in the wizard render path (`panelTypes.js`,
+`userOpView.js`, `featureCanvas.js`, `createPreviewPanel.js`, `toolpath2d.js`, `formWidgets.js`, and anything
+else both surfaces reach), classify each SAFE / BROKEN TODAY / LATENT (safe only by an unenforced call-ordering
+accident — the category that matters most, since `_formHost`'s safety was written in a comment as a guarantee
+before it bit). Include the SAFE entries with reasons, not just problems. For BROKEN/LATENT, a one-line severity
+read: silent (writes go nowhere) ranks above visible. No fixes, no fix design. Flag any ARCHITECTURE.md claim
+the census contradicts. Gate: node tier only — the list is the deliverable.
+
+### Method
+
+Grepped every file the dispatch named for module-level `let`/mutable `const` bindings (objects, Maps, class
+instances — not plain declared data tables), then traced each one's writers and readers across both surfaces.
+Followed `import` chains outward wherever a file "both surfaces reach" turned out to reach a THIRD shared file
+not on the original list (`wizardManager.js`, reached by both the modal directly and the pane's own
+`blkMgr()`/`openLiveAsModal()` in `blocksApp.js`) — the dispatch's own "and anything else" covers this, and it
+is where the second-largest finding turned up.
+
+### The list
+
+**`web/wizards/ops/panelTypes.js`**
+
+| Value | Class | Reason / severity |
+|---|---|---|
+| `_formHost` | **SAFE (fixed)** | Was the t1804/t1806 bug. Now captured once per `layoutSpecFromOp` call into a local `_host`; every closure that call builds closes over that value, never re-reads the singleton. Verified non-vacuous both times it was fixed. |
+| `_layout` (the shared `FeatureCanvas` instance in `renderLayout2D`) | **BROKEN TODAY** | Confirmed live at t1806: opening "Open as modal" from the Blocks pane re-mounts this ONE `FeatureCanvas` into the modal's container (`_mount`'s own `container.innerHTML=''` + fresh SVG/listeners), leaving the pane's own SVG's event listeners still attached but now firing into a `this.spec`/`this.active` that belongs to the MODAL. Traced the exact mechanism this turn: `_hit(x,y)` (the pointerdown handler) tests against `this.spec.handles` — now the wrong spec — finds no match at the pane's coordinates, and silently falls into the PAN branch instead of the drag branch, so `onDrag`/`_writeParam` never fires at all. **Severity: SILENT** (no error; the drag just does a tiny background pan instead of the intended write) — exactly the shape this whole chain has been chasing. Not fixed here, per the dispatch. |
+| `previewOnlyParams` (`export const previewOnlyParams = {}`, a shared flat object) | **LATENT** | Written by `_writeParam`'s no-field branch (`previewOnlyParams[name] = next`) from EITHER surface's deferred handlers; read back via an UNQUALIFIED `Object.assign(params, previewOnlyParams)` in `userOpView.js:416` — no filtering by which surface or op the entry came from. If the modal and the pane ever have a preview-only param with the SAME NAME open at once (plausible — common names like a jog seed aren't namespaced per op), one surface's drag value silently appears in the other's params on its next `update()`. Also cleared UNCONDITIONALLY by `clearPreviewOnlyParams()` on ANY instance's `onShow` — a fresh open on ONE surface can wipe the OTHER surface's uncommitted preview-only drag. **Severity: SILENT** (values appear/vanish with no error) — currently safe only because no shipped custom op happens to collide on a preview-only param name across two simultaneously-open surfaces, which nothing enforces. |
+| `_onPreviewOnlyWrite` (the redraw callback for a preview-only write) | **LATENT** | Set via `setPreviewOnlyWriteHandler(() => _inlineUpdate())` ONCE per `userOpView` instance, at CONSTRUCTION time (not re-armed per `onShow`/render, despite the file's own comment claiming "both instances already re-arm it every onShow" — traced this turn and found no second call site; the comment does not match the code). Whichever instance is constructed LAST — by import/lazy-init order, not session behaviour — owns this callback for the rest of the page's life. A preview-only drag on the OTHER (non-owning) instance would trigger the WRONG instance's `_inlineUpdate`/`mgr.update()`. **Severity: mixed** — most likely VISIBLE (the surface the user is actually dragging in fails to redraw inline until its next unrelated re-render) but could mask a SILENT stale-preview state in between. Did not build a live repro (out of scope, read-only), flagging on code evidence alone. |
+| `PANEL_TYPES`, `LAYOUT_TYPES`, `DEFAULT_PANEL`, `DEFAULT_LAYOUT` | **SAFE** | Declared, static lookup tables. Grepped for `.add`/`.delete`/reassignment on any of them — none found. Read-only data, not session state; the same category as importing a constant. |
+
+**`web/wizards/views/userOpView.js`**
+
+| Value | Class | Reason |
+|---|---|---|
+| `_commWizard = new CommunicationWizard()` (module-level, shared) | **SAFE** | Read the class: empty constructor, zero `this.x =` assignments anywhere in the file, `generateScreenPreview(params)` and its helpers are pure functions of their own argument. A genuinely stateless singleton — safe to share regardless of how many surfaces call it. |
+| `wireAnimOverlay(...)`'s overlay state | **SAFE** | The function is module-level (its own comment: "pure w.r.t. instance state... shared"), but the STATE it manages (`{ canvas, tp }`) is memoised on `container.__animOverlay` — the actual per-surface DOM node — not on any module variable. Two surfaces calling this function operate on two different `container`s and therefore two independent `__animOverlay` records. Correctly designed. |
+| `_pinFromTf`, `applyGroupParams`, `hasTreeLayout`, `machineReachXY` | **SAFE** | All module-level but pure functions of their arguments (the file explicitly comments three of these as "shared by every instance" / "pure... shared"). `machineReachXY` reads `window.ddcsGetSettings()` — deliberately global machine settings, not per-wizard state; there is exactly one machine. |
+| `_def`/`_seed`/`_readers`/`_mgr`/`_layoutSpots`/`_simStartFracs`/the throttle timer | **SAFE** | Confirmed genuinely closure-scoped per `createUserOpView(ns, opts)` call (the file's own t1740 factory-not-singleton docblock, and I traced the call sites: `_modalInstance = createUserOpView(null)` at module scope, `blkView = createUserOpView('blk', {...})` inside `blocksApp.js` — two separate closures, two separate copies of every one of these). This is the part of the factory split that WAS done correctly. |
+
+**`web/viz/featureCanvas.js`, `web/viz/createPreviewPanel.js`, `web/viz/toolpath2d.js`**
+
+| Value | Class | Reason |
+|---|---|---|
+| No module-level mutable state in any of the three files (grepped, none found) | **SAFE by construction** | All three are proper factories: `new FeatureCanvas()` / `createPreviewPanel(host, opts)` / `createToolpath2d(canvas, opts)` are called once per real caller with their own `host`/`canvas`, and each returns/builds independent per-instance state (confirmed by finding TWO separate call sites for `createToolpath2d` — once inside `createPreviewPanel.js` per-panel, once inside `userOpView.js`'s `wireAnimOverlay` per-container — and by finding `host.__panel = createPreviewPanel(host, {...})` called separately per surface's own container in `wizardManager.js:555`). The FeatureCanvas CLASS itself is well-designed for isolation; the bug is entirely that `panelTypes.js` shares ONE instance of it (`_layout`) across both callers instead of one per surface. |
+
+**`web/ui/formWidgets.js`**
+
+| Value | Class | Reason |
+|---|---|---|
+| `MULTI_WIDGETS = new Set([...])` | **SAFE** | Static declared registry, grepped for mutation — none. Same category as `PANEL_TYPES`. |
+| No other module-level mutable state found | **SAFE** | `renderOpForm`/`renderUiTree`/etc. build and return fresh DOM + reader closures per call; nothing cached at module scope. |
+
+**`web/wizardManager.js`** — not on the dispatch's original list, but reached by both surfaces: the modal directly (it IS the modal's own controller) and the pane via `blocksApp.js`'s `blkMgr()` wrapper (`preview3D`/`previewVarSeed` delegate straight through) and `openLiveAsModal()` (which literally reuses the SAME modal instance to preview pane content). This is the **second-largest finding** in this census.
+
+| Value | Class | Reason / severity |
+|---|---|---|
+| `this._activePanel` (set inside `preview3D`, read by `insert()` and the code-preview line-click listener) | **LATENT — the highest-severity item in this census** | `preview3D(gcode, containerId, ...)` stores everything surface-specific on `host` (the container-specific DOM node — `host.__panel`/`__gcode`/`__start`/etc., all correctly isolated), EXCEPT one line: `this._activePanel = host.__panel;` — a write onto the SHARED `wm` instance itself, regardless of which container/surface called it. Both the modal's own real render AND the pane's `blkMgr()` wrapper call this SAME method. `insert()` — the REAL modal Insert button's handler — later reads `this._activePanel.getStartPos()` to "carry the start position the user set in this wizard's 3D preview" into the emitted program. If the Blocks pane renders (or re-renders reactively — `blocksApp.js`'s own words, "re-renders the pane reactively on canvas change") AFTER the modal's own last render but BEFORE the user clicks the modal's Insert, `_activePanel` now points at the PANE's panel — and `insert()` would silently carry the PANE's dragged start position into the MODAL's emitted program instead of the modal's own. **Severity: SILENT** — no error, no visual sign; a wrong (or simply different) start coordinate is carried into `window.ddcsSetSpindleStart(...)` without comment. I did not build a live repro this turn (read-only dispatch) — flagging on direct code evidence: the write is unconditional and un-scoped, and the read has no surface-identity check at all. |
+| `this._previewing` (guards `insert()` into a full no-op while a preview is showing) | **LATENT, but currently well-handled** | Set `true` by `blocksApp.js`'s `openLiveAsModal()` immediately AFTER calling `wm.open('group')` (which itself resets `_previewing = false` as part of every real open) — the file's own comment names this exact ordering dependency: `"open() above just reset this to false; set it AFTER, same ordering reason as the CSS class below."` I traced every path that calls `wm.open(...)` and confirmed each one legitimately resets `_previewing` for a genuinely fresh session. Currently correct, but it is THE SAME STRUCTURAL SHAPE `_formHost` had before it broke — a guarantee that holds only because nobody has yet introduced a call to `preview3D`/`open` in an order the comment didn't anticipate. Not observed broken; flagged because the dispatch specifically asked for this category. **Severity if it ever breaks: likely VISIBLE** (a legitimate Insert becomes a silent no-op, which the user would notice immediately — "the button did nothing"). |
+| `#wizard` / `.wiz-box` (the ONE real modal DOM overlay) | **SAFE AS A DESIGN CHOICE, but the root reason the two fields above are shared at all** | There is genuinely only one modal in the whole app; `openLiveAsModal()` deliberately reuses it to preview pane content rather than building a second one. Not itself a bug — but it is why `wm` (and therefore `_activePanel`/`_previewing`) is reachable from both surfaces in the first place. Noting this as context for whoever designs the structural fix: retiring `_activePanel`'s hazard does not mean giving the pane its own modal — the ONE-modal design is fine; what's missing is scoping `_activePanel` to the render call the same way t1806 scoped `_host`. |
+
+### What's genuinely SAFE and why (the request to include these explicitly)
+
+Registries that are mutated only at OP-REGISTRATION time, not per-render or per-gesture, are excluded from the
+BROKEN/LATENT list above — they are the correctly-designed shared-state pattern, not a variant of the bug:
+`viz/opSimStarts.js`'s `USER_STARTS`/`USER_START_ROWS`/`USER_SIM_STOCK` Maps (written once per op TYPE by
+`registerUserOp`, read as pure lookups by both surfaces via `opSimStarts(opType, params, stock)`), and the
+broader `blocks/userOps.js` def registry (`USER_DEFS`) it sits alongside. These are deliberately GLOBAL because
+there is exactly one canonical definition per op type, shared by design, not per-surface state that leaked.
+`blocksApp.js`'s own module-level singletons (`api`, `_ops`, `initPromise`) are also excluded: `blocksApp.js`
+itself is inherently singular (there is only one Blocks tab), so "shared across both surfaces" does not apply
+to its own internals — it is one of the two surfaces, not a third shared layer.
+
+### ARCHITECTURE.md — one prior contradiction already fixed, one gap to flag, nothing else found
+
+TRAP9's "so it never fires" claim about the `_layout` singleton was already corrected in place at t1806 (with
+the live repro cited). Nothing else in `ARCHITECTURE.md` makes a claim this census contradicts — `_activePanel`/
+`_previewing`/`previewOnlyParams`/`_onPreviewOnlyWrite` are not mentioned anywhere in the document at all
+(grepped), so there is no false safety claim to correct for them, only an absence. Given the dispatch is
+read-only this turn, did not add new sections — flagging that `wizardManager.js`'s `_activePanel` in particular
+deserves a documented entry once its fix (or the structural answer) is decided, so it doesn't become the NEXT
+TRAP9-shaped gap.
+
+### Verify
+
+- Node tier (`npm run test:node`): 118/118 pass — no code was touched this turn, confirming the gate trivially
+  as instructed.
+- No fixes attempted, no fix designed, per the dispatch.
+
+### For the advisor
+
+Two BROKEN/LATENT findings beyond the already-known `_layout`: `previewOnlyParams` (a shared flat object with
+an unqualified merge-back, contamination gated on param-name collision) and, the one I'd weigh most heavily,
+`wizardManager.js`'s `_activePanel` — the SAME shape as `_formHost` before it bit (an unscoped write onto a
+shared instance, read later with no surface-identity check), but with a HIGHER-stakes read: it feeds the actual
+emitted program's start coordinates on a real Insert, not just a preview redraw. `_previewing` is the one
+"already fixed by discipline" example in this census — worth keeping as a reference for what "handled correctly
+today, but still latent-shaped" looks like, since the census asked for those too. My own read matches your
+suspicion stated in the dispatch: `_activePanel` and `_layout` are the same root cause in two different files
+(a factory made per-instance state out of what used to be per-document state, and the modal's own controller,
+`wm`, is a THIRD place that same pattern reaches), which argues for one structural answer — scoping "the panel
+this render call is about" the same way `_host` is now scoped — over patching each field independently. That
+call, and whether `previewOnlyParams`/`_onPreviewOnlyWrite` belong in the same fix or a separate one, is yours.
+
+🔨 turn 1810
