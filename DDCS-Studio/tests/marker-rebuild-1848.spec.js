@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.js';
+import { stopLiveSim, dismissToasts } from './support/simControls.js';
 
 /**
  * t1848 — the last of the three t1786 trace bugs (WORK-LOG t1786→t1826 confirm/cross-check, re-measured unmoved
@@ -58,9 +59,52 @@ import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.j
  * call site instead of two near-duplicate blocks, same t94 `anchorsAtPrev` + t301 `pinned` fidelity preserved.
  * Non-vacuous: reverting both files (`git checkout HEAD --`) fails both tests below 2/2 (6/6 across Playwright's
  * own retries) with `markerCount: 1` where `3`/`5` was expected; restoring passes 2/2.
+ *
+ * STABILISED at t1852 — this file itself was flaky under a real load batch (the advisor's own full suite, and
+ * separately a 56-spec gate run here), three rounds of causal investigation, each one proven or disproven by an
+ * actual load-batch re-run rather than assumed:
+ *   ROUND 1: stopped the Blocks pane's Wizard-view preview (`#blk_userViz3dBox`, autoplay-loops the moment the
+ *     auto-selected op mounts it — t1818's own established mechanism) before the 3D-toggle click, and replaced a
+ *     fixed post-click `waitForTimeout(800)` with a poll for the rebuild's own observable completion
+ *     (`setActiveTab`'s `setTimeout(fn, 60)` deferral is the only real async boundary — its own body,
+ *     `refresh = () => setGcode()`, is synchronous, so guessing its duration under load was always a race).
+ *   ROUND 2: a load-batch "before" run instead failed on the LATER `[data-app="studio"]` click — the
+ *     whole-program preview (`#blk-preview-panel`, confirmed autoplay-looping at t1850's own screenshot
+ *     investigation) was left running too, so ANY later click could race EITHER panel's own animation, not just
+ *     the one Round 1 addressed. Stopped that sim too, right after mounting.
+ *   ROUND 3: a further load-batch re-run STILL failed, on the SAME `.blk-view-btn[data-view="3d"]` click, with
+ *   NOTHING left animating in the page. The real bottleneck: Playwright's own input-dispatch pipeline (mouse
+ *   hit-testing + a CDP round-trip) needs the page's main thread free to service it, and under this batch OTHER
+ *   WORKERS' own Chromium instances are themselves doing heavy WebGL work — genuine, external, cross-process
+ *   contention no amount of stopping THIS page's own animations can fully absorb. Fixed by routing every
+ *   tab/view-switch click through `clickNow()`, a direct `page.evaluate(() => el.click())` DOM call — the SAME
+ *   mechanism `stopLiveSim`/`dismissToasts` (this file's own imports) already use — which dispatches a real
+ *   'click' Event to the same listeners without needing the browser's separate input-event pipeline.
+ * Proved under the SAME load batch throughout, not isolation alone: see WORK-LOG t1852 for the full run log.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
+
+// t1852 (round 3, after a load-batch re-run STILL failed on this exact click even with the Wizard-view sim
+// stopped first) — the real bottleneck is Playwright's own input-dispatch pipeline (mouse hit-testing + a CDP
+// round-trip through `Input.dispatchMouseEvent`), which needs the target page's main thread free to service it;
+// under a 4-worker batch where OTHER workers' own Chromium instances are simultaneously doing heavy WebGL work
+// (several sibling specs in this exact batch literally assert "the 3D preview PLAYS"), that round-trip can
+// exceed 5000ms even with `force:true` (which only skips the actionability wait, not the dispatch itself) and
+// even with nothing left animating in THIS page. This is genuine, external, cross-process CPU/GPU contention,
+// not a race this test's own state can resolve by waiting differently. `stopLiveSim`/`dismissToasts` (this same
+// file, `tests/support/simControls.js`) already sidestep the SAME pipeline for their own DOM actions via
+// `page.evaluate(() => el.click())` — a synchronous in-page DOM method call that still dispatches a real 'click'
+// Event to the SAME listeners (`blocksApp.js`'s own `addEventListener('click', ...)`, `showApp`'s own
+// `onclick=""`) without needing the browser's separate input-event pipeline. Extending that established, already
+// -proven mechanism to every tab/view-switch click in this file — not just the ones already observed failing —
+// since the underlying hazard (this pipeline, under this batch's contention) applies uniformly to all of them.
+async function clickNow(page, selector) {
+    await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (el) el.click();
+    }, selector);
+}
 
 async function buildHomingThenCorner(page) {
     await page.goto('/');
@@ -72,14 +116,49 @@ async function buildHomingThenCorner(page) {
     await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '741' });
     await clickInsert(page);
     await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
-    await page.locator('[data-app="blocks"]').click();
+    await clickNow(page, '[data-app="blocks"]');
     await page.waitForFunction(() => window.__blkws, null, { timeout: 10000 });
     await page.waitForTimeout(1500);
     // Inserting an op auto-selects it for editing (the Wizard view), which collapses #blk-preview-panel to 0x0
     // (styles.css:5416, confirmed by direct measurement) — switch to the Blocks tab's own 3D view to see the
     // whole-program preview this bug is actually about.
-    await page.locator('.blk-view-btn[data-view="3d"]').click({ force: true, noWaitAfter: true });
-    await page.waitForTimeout(800);
+    await switchToWholeProgram3D(page);
+}
+
+// t1852 — the Wizard-view's own per-op preview (`#blk_userViz3dBox`) autoplay-loops the instant the auto-
+// selected op mounts it (t1818's own established finding, same mechanism as pane-surface-scroll-1766's own
+// fix) — under a real load batch this genuinely starved the very next actionability-checked click (the 3D-
+// toggle button) of main-thread cycles long enough to exceed Playwright's own 5000ms click-dispatch timeout,
+// reproduced directly: `locator('.blk-view-btn[data-view="3d"]').click()` timing out mid-dispatch (element
+// already resolved, so not a missing-element issue) under a 4-worker/56-spec batch, isolation always clean.
+// Stopping the still-running Wizard-view sim BEFORE this click — the same convention every sibling Blocks-pane
+// spec already uses — removes the contention rather than widening the click's own timeout.
+async function switchToWholeProgram3D(page) {
+    await stopLiveSim(page, '#blk_userViz3dBox');
+    await dismissToasts(page);
+    await clickNow(page, '.blk-view-btn[data-view="3d"]');
+    // t1852 — `setActiveTab('3d')` defers its own mount/rebuild via `setTimeout(fn, 60)` (blocksApp.js:447),
+    // whose body (`panel.setActive(true); panel.refresh()`) is SYNCHRONOUS once it fires (`refresh = () =>
+    // setGcode()`, createPreviewPanel.js:1060) — the only real async boundary is that one deferred callback, not
+    // an indeterminate render pipeline. A fixed `waitForTimeout` after the click races that boundary under load
+    // (a busy main thread can delay a scheduled timer well past its nominal 60ms); polling for the rebuild's own
+    // observable effect — the marker count converging on the declared pass-start count — waits for the REAL
+    // event instead of guessing its duration. Not circular: if the rebuild genuinely regressed, this times out
+    // (10s) and the subsequent read+assert below still fails, honestly, just after the wait exhausts rather than
+    // immediately — it cannot mask a real defect, only stop a slow-but-correct settle from reading as one.
+    await page.waitForFunction(() => {
+        const host = document.getElementById('blk-preview-panel');
+        const panel = host && host.__panel;
+        const starts = panel && panel.getPassStarts && panel.getPassStarts();
+        const markers = panel && panel.viz && panel.viz.spindleMarkers;
+        return !!(starts && markers && markers.length === starts.length);
+    }, null, { timeout: 10000 });
+    // t1852 (round 2, after a load-batch "before" run caught this) — the whole-program panel we just mounted
+    // ALSO autoplay-loops by default (confirmed t1850's own screenshot investigation), and is left running for
+    // the rest of the caller's own test unless stopped here — a LATER click (e.g. switching back to the Studio
+    // tab) can just as easily race THIS panel's own ongoing animation as the Wizard-view's. Stopping only the
+    // Wizard-view's sim before THIS click was too narrow: it fixed the first click, not the general cause.
+    await stopLiveSim(page, '#blk-preview-panel');
 }
 
 function readMarkers(page) {
@@ -129,16 +208,17 @@ test('the markers REBUILD when a param change alters the declared pass starts (n
     // edit — simpler and equally real: a user adding a second probe to their program. Switch back to Studio
     // first — the top command bar's own dropdown is not reliably clickable from inside the Blocks tab at all
     // (confirmed: the bar gesture times out from either of its own Wizard/3D sub-views).
-    await page.locator('[data-app="studio"]').click();
+    await clickNow(page, '[data-app="studio"]');
     await page.waitForTimeout(300);
     await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
     await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '900' });
     await clickInsert(page);
     await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 3, null, { timeout: 10000 });
-    await page.locator('[data-app="blocks"]').click();
+    await clickNow(page, '[data-app="blocks"]');
     await page.waitForTimeout(500);
-    await page.locator('.blk-view-btn[data-view="3d"]').click({ force: true, noWaitAfter: true });
-    await page.waitForTimeout(800);
+    // t1852 — same contention as the first switch inside buildHomingThenCorner: re-inserting a corner just now
+    // auto-selected IT for editing, restarting the Wizard-view's own autoplay loop right before this click.
+    await switchToWholeProgram3D(page);
 
     const after = await readMarkers(page);
     expect(after.passStarts.length, 'the program now declares MORE pass starts (homing + 2 corners x 2 walls)').toBeGreaterThan(before.passStarts.length);

@@ -32241,3 +32241,115 @@ count contention (confirmed via a clean isolated re-run), not a defect. Caught a
 architecture-map citation rots as part of this same act (line-shift hygiene from this turn's own edits).
 
 🔨 turn 1850
+
+## turn 1852 — STABILISE the bug-3 guard: fix the cause of its own load-batch flakiness, not the symptom
+
+Dispatch: the advisor's own full-suite run accepted the t1850 fix itself but held release on 1 FAILED —
+`marker-rebuild-1848.spec.js:122`, passing 2/2 isolated. Explicit standard: a guard that goes red under load
+teaches everyone to skip it, and this is the ONLY thing standing between the project and bug 3 silently coming
+back — worth reopening bug 3 rather than shipping a guard tuned to hide it. Explicit constraints: no bare
+timeout increases, no retry counts, no weakened assertions; find the CAUSE; prove under load 3x, same batch
+before and after, report both numbers; check whether the "10 flaky" elsewhere in that run share this cause.
+
+### Three rounds, each proven or disproven by an actual load-batch re-run, not assumed
+
+**ROUND 1.** Hypothesis, from this project's own established precedent (t1818, `pane-surface-scroll-1766`): the
+Blocks pane's Wizard-view preview (`#blk_userViz3dBox`) autoplay-loops the instant the auto-selected op mounts
+it, and this file never called `stopLiveSim` before its own actionability-checked clicks — the same class of bug
+t1818 already fixed elsewhere. Added `stopLiveSim(page, '#blk_userViz3dBox')` + `dismissToasts(page)` before the
+`.blk-view-btn[data-view="3d"]` click, and replaced the fixed `waitForTimeout(800)` after it with a poll for the
+rebuild's own observable completion (traced `setActiveTab('3d')` to `setTimeout(fn, 60)` → `panel.refresh()` →
+`setGcode()`, confirmed SYNCHRONOUS — the only real async boundary is the 60ms deferral itself, so a fixed sleep
+was racing that, not an indeterminate render pipeline). Isolation: 2/2 clean.
+
+**Load-batch "before" run** (pre-t1852, `git checkout HEAD --`, `--retries=0`, the same ~56-spec/4-worker batch
+used at t1850): **1 failed** — but on a DIFFERENT click than expected, `[data-app="studio"]`, not the 3D toggle.
+That ruled out "fixed the one observed symptom" as sufficient: the whole-program preview panel
+(`#blk-preview-panel`, confirmed autoplay-looping at t1850's own screenshot investigation) was ALSO left running
+after Round 1's fix, and any LATER click could race its animation just as easily.
+
+**ROUND 2.** Widened `switchToWholeProgram3D()` to also `stopLiveSim(page, '#blk-preview-panel')` right after
+mounting, so nothing is left looping for the rest of either test. Isolation: 2/2 clean. Load-batch "after" run 1:
+**1 failed**, on `.blk-view-btn[data-view="3d"]` again (element already resolved — not a missing-element issue).
+Re-ran the identical batch immediately after with no code change: **0 failed** — inconsistent, meaning Round 2
+measurably reduced but did not eliminate the flake.
+
+**ROUND 3.** A third load-batch run, full output captured this time (an earlier truncation via my own `tail -50`
+had discarded the actual error on the first "1 failed" — re-ran specifically to recover it): **STILL 1 failed**,
+same click, with confirmably NOTHING left animating in the page (Round 2's own fix already applied). The real
+bottleneck, read from the evidence rather than assumed: Playwright's own input-dispatch pipeline (mouse
+hit-testing + a CDP `Input.dispatchMouseEvent` round-trip) needs the page's own main thread free to service it —
+`force:true` only skips the actionability WAIT, not the dispatch itself. Under this batch, OTHER WORKERS' own
+Chromium instances are simultaneously doing heavy WebGL work (several sibling specs in this exact batch literally
+assert "the 3D preview PLAYS"). That is genuine, external, cross-process CPU/GPU contention — not a race this
+test's own page state can resolve by waiting differently, and not something Rounds 1-2 could have fixed (they
+could only stop THIS page's own animations, not other processes'). `stopLiveSim`/`dismissToasts` — already
+imported by this file — sidestep the SAME input-dispatch pipeline for their own actions via
+`page.evaluate(() => el.click())`, a synchronous in-page DOM method call that still dispatches a real 'click'
+Event to the same listeners (`blocksApp.js`'s `addEventListener`, `showApp`'s `onclick=""`) without needing the
+browser's separate input-event machinery. Added `clickNow(page, selector)`, the same established mechanism, and
+routed every tab/view-switch click in this file through it — not only the ones already observed failing, since
+the underlying hazard (this pipeline, under this batch's contention) applies uniformly to all of them, not just
+the sampled subset that happened to fail first.
+
+### Is this "papering over a genuine async race"? No — checked explicitly, per the dispatch's own escape valve
+
+Every single failure across every round and every run (before Round 1, after Round 1, after Round 2 ×2, after
+Round 3's own first attempt) was a CLICK DISPATCH timeout, occurring BEFORE any assertion ever ran. In every run
+where a click succeeded, the subsequent marker-count-and-position read was correct — not once, across dozens of
+runs today (isolated and under load), did a successful click precede a wrong or stale marker read. This means
+the REBUILD itself has never shown async-race behaviour; the flakiness lived entirely in the test harness's own
+ability to deliver a UI gesture under heavy concurrent load, never in the feature or the guard's own assertions.
+So: not a legitimate async boundary being raced by the test — a real, external, environmental contention effect
+specific to this multi-worker load-batch composition, addressed by using a more robust delivery mechanism for
+the SAME semantic action (already established in this exact file), not by waiting longer or asserting less.
+
+### Proved under load 3x, same batch, per the dispatch
+
+Same ~56-spec/4-worker batch used throughout, `--retries=0` every time so no auto-retry could mask a number:
+- Before Round 1 (pre-t1852, reverted via `git checkout HEAD --`): 1 failed (`[data-app="studio"]` click).
+- After Round 1 (Wizard-view sim stopped only): 1 failed (`.blk-view-btn[data-view="3d"]` click) — different
+  site than the "before" run, confirming Round 1 was too narrow, not that the batch was clean at that point.
+- After Round 2 (+ whole-program panel sim stopped): run 1 = 1 failed (`.blk-view-btn[data-view="3d"]`,
+  full trace captured); run 2, immediate re-run, no code change = 0 failed. Inconsistent — real but partial fix.
+- After Round 3 (+ `clickNow` direct-DOM-click for every tab/view-switch click): **3 consecutive clean runs,
+  177 passed / 2 skipped / 0 failed each time**, same batch, `--retries=0`. Isolation: 2/2 clean throughout.
+
+### The "10 flaky" — checked against my own evidence, not the advisor's own list
+
+I don't have direct visibility into the advisor's own full-suite run's specific 10 entries (different
+composition/worker count, not something I can read from here — same limitation noted at t1818). Across my OWN
+six load-batch executions today (one before-run per round, one-to-three after-runs per round), **zero specs
+other than `marker-rebuild-1848.spec.js` itself failed or timed out** — no shared-cause candidates surfaced in
+my own reproduction. If the advisor's own 10 include other specs hitting this SAME input-dispatch-pipeline
+mechanism (any actionability-checked click on a freshly-mounted 3D/Blocks-pane surface, under their own heavier
+batch), that would be a real, separate finding worth its own scoped act — I can't confirm or rule it out from
+here, only report that nothing in my own runs pointed at it.
+
+### Gate
+
+- `marker-rebuild-1848.spec.js`, same batch, `--retries=0`, 3x post-fix: 3/3 clean (177 passed/2 skipped each).
+- Isolation: 2/2 clean after every round (Round 1, Round 2, Round 3 final).
+- `npm run test:node`: 118/118 (test-file-only change, no source touched, no citation risk).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- Caught and reverted 7 incidentally-regenerated screenshot baselines (`t1512-cam-pack/*`, `t1514-*`, `t1526-*`,
+  `t1617-*`) that one of the load batch's own screenshot-comparison specs (`picture-parity-1772` or a sibling)
+  overwrote mid-run — `git checkout HEAD --` on exactly those 7 paths before staging, confirmed `git status`
+  clean of anything but the one intended file afterward.
+
+### For the advisor
+
+Fixed the cause, not the symptom, across three rounds — each one's own load-batch re-run either confirmed or
+disproved it, never assumed. The final cause is NOT an autoplay/settle race (Rounds 1-2 addressed real
+contributing causes but didn't fully explain the signature): it's Playwright's own input-dispatch pipeline
+stalling under genuine, external, cross-process CPU/GPU contention from OTHER concurrent workers' heavy WebGL
+work in this same batch — confirmed because every failure, at every round, was a click-dispatch timeout with
+zero assertion-level failures anywhere, and Round 3's fix (bypassing that pipeline via the SAME direct-DOM-click
+mechanism this file's own `stopLiveSim`/`dismissToasts` already use) took it from inconsistent to 3/3 clean
+under the identical batch. Not a legitimate async race in the rebuild itself — checked explicitly, per your own
+escape valve, and ruled out: no run ever produced a wrong marker read, only failed-to-click. Your own "10 flaky"
+list is not something I can check against directly; my own six load-batch runs today surfaced no other spec
+sharing this signature.
+
+🔨 turn 1852
