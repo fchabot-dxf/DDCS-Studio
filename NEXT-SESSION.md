@@ -2218,3 +2218,23 @@ Wizard View pane would have caught bugs 3 and 4 with no assertion logic at all.
 
 **Repointing pool:** 200 files / 564 tests classed as user-visible or live-value with no Playwright
 gesture. Top 25 listed in the audit; 175 more exist. **Slice into reviewable acts — never one pass.**
+
+## 🛑 STANDING COMMITMENT (user, 2026-08-13): the five additions GET DONE
+*"sure, but lets make it a point to actually do it."* They have been queued twice today and slipped twice —
+once behind the header work, once behind the clamp fix. **Queuing is not doing.**
+
+**THE RULE, binding on the advisor:** after the start-clamp fix passes back, **the next FIVE acts are
+additions 1–5, in order, one per act.** No feature work, no presentation work, no defect from the queue
+jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
+
+**Track it here, and update this line every time one lands:**
+```
+  1  primary route, 4 real clicks        [ ]
+  2  both renderer branches              [ ]
+  3  pixels not element-exists           [ ]
+  4  surface via the real chain          [ ]
+  5  drawn position vs readout           [ ]
+```
+**If the advisor dispatches anything else while a box is unticked, that is the failure this note exists to
+prevent.** The reason is not tidiness: until #1 exists, a green suite says nothing about the route the user
+takes every day, and they have personally been the integration test for five bugs this week.
