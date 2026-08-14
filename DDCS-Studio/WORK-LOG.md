@@ -32910,3 +32910,150 @@ positions for free once Slice 2 lands, whenever that is. Stopped clean per both 
 no revert was needed. Not starting the reopened-report investigation; waiting for that dispatch.
 
 🔨 turn 1862
+
+## turn 1864 — the user's actual bug: confirmed reproducible, the G53 hypothesis KILLED, the real mechanism named
+
+Dispatch: confirm or kill the hypothesis that Expert and V4.1 put a different VALUE on the same G53 safe-Z
+retract (Expert's `#var` unresolvable → falls back to an honest approximation; V4.1's literal resolvable → draws
+raw machine coords). Evidence wanted: the emitted G53 line per profile, what the tracer resolved each to, two
+screenshots. Also: does `checkEnvelope` disagree between profiles. Also, per two amendments, a compact 3-row
+DDCS-family table (Expert/V4.1/V3-DM500) of what each dialect's machine-move/safe-retract actually emits. No
+fix. Reproduce with a single default built-in Corner, no Homing — the user's own exact, confirmed conditions.
+
+### The symptom reproduces exactly as reported — screenshots first
+
+Built ONE default `Corner` op, no Homing, under each profile (synthetic default machine, not the user's real
+file — no personal values needed for this reproduction at all). **Visually confirmed**: under Expert, the Start
+marker sits correctly at the workpiece's own corner. Under V4.1, the SAME gesture on the SAME default params
+draws the Start marker visibly displaced from the corner — the picture the user described, reproduced cleanly
+with the exact minimal conditions they gave (one op, built-in, default params, no Homing).
+
+### STEP 1 — an early own-test bug caught and fixed before trusting anything
+
+My first pass built the G-code for both profiles via a raw `emitMapped(stack, {})` call and got byte-IDENTICAL
+G53 lines for both — which was wrong, and I caught it before reporting it: `wizards/previewEmit.js`'s own header
+documents this EXACT class of bug already, already fixed for the real app: "`emitMapped(stack).text` with NO
+dialect → DEFAULT_DIALECT (Expert) on every post, so the preview LIED on V4.1/DM500" — the fix is
+`activeDialectOpts()`, which every real insert/preview path already uses. My own standalone diagnostic was the
+one caller not using it. Fixed, re-ran, verified `getDialect()`'s own resolved id matched the active profile
+before trusting anything downstream.
+
+### STEP 2 — the emitted G53 lines, verbatim, and what the tracer resolved
+
+**Expert**, corner's safe-Z retract/hop:
+```
+G53 Z#43
+G53 Z#95 ( @returnProbeZ )
+G53 Z#42
+G53 Z#42
+```
+**V4.1**, the same points:
+```
+G0 G53 Z#191
+G0 G53 Z#95 ( @returnProbeZ )
+G0 G53 Z#190
+G0 G53 Z#190
+```
+
+**The hypothesis, as stated, is KILLED by this evidence.** Both forms reference a VARIABLE in the G53 line
+itself (`#42`/`#43` for Expert, `#190`/`#191` for V4.1) — NOT a literal directly in the G53 line for either.
+V4.1's own margin IS baked as a literal, but one line EARLIER, into the scratch variable's own assignment
+(`#190=-5`), not into the G53 move itself — the G53 line's own shape (var-referenced) is the SAME class of
+expression for both dialects.
+
+**What the tracer resolved each retract to: IDENTICAL.** Traced both (with the correct per-profile dialect this
+time): the resolved Z at this retract is **-10 for BOTH profiles**, byte-equal. Confirmed directly against
+`GcodeExecutionEngine.js:1181`'s own logic: for a Z-axis G53 move, `_g53ApproxZ != null` (true for both — neither
+profile has a WCS table on a fresh boot) unconditionally substitutes the declared safe-Z-margin approximation
+for Z, **regardless of what the emitted value resolves to** — so even if one dialect's variable genuinely were
+unresolvable, this specific branch would never reach the raw `value` at all. The G53-retract mechanism cannot be
+what's producing the divergence, for either profile, in this scenario.
+
+### STEP 3 — what actually differs: the PROBE FORM, not the retract
+
+The measured, real divergence is in **Y**, not Z — and no G53 line in either dialect's own sequence touches Y at
+all (all four are Z-only moves). Comparing the full emitted programs line-by-line found the real difference,
+inside the Y-probe step itself, well before any G53 line:
+
+**Expert**'s own probe-success check is a STATUS-FLAG read: `IF #1921!=2 GOTO1` (a DDCS status variable, 2 =
+success). The touched position is saved by writing into a COMPUTED WCS-TABLE REGISTER ADDRESS:
+`#[#73]=#101` (`#73` = the active WCS row's own Y address).
+
+**V4.1** has no probe-status variable at all (confirmed at t1858: absent from its own `caps`) — its own form is
+structurally different: a **DRO-DISTANCE COMPARISON** to detect a miss (`IF #1501>=[#190+#8-0.05]GOTO1`,
+comparing the live machine-Y DRO against the full commanded travel), AND it writes the touched position with a
+**`G92` work-coordinate redefinition** — `G90 G92 Y[#1501-#101]` — which Expert never emits anywhere in this
+program.
+
+`GcodeExecutionEngine.js:1136-1143` DOES have explicit G92 handling, and by design it is a NO-MOVE operation
+(`this.pos` is deliberately left unchanged — the code's own comment: "G92 sets the WORK offset... it does NOT
+move... Without this, G92 fell into the move handler below and drew a spurious jump") — so G92 itself, as
+currently implemented, should NOT be what shifts the reposition traverse. That leaves the DRO-distance miss-check
+(`IF #1501>=...`) as the most likely remaining candidate: it depends on the tracer correctly modeling the LIVE
+machine-position DRO value DURING an in-flight probe move, a fundamentally different and more fragile mechanism
+than Expert's own plain status-flag read. **Not fully traced to the exact expression that produces the specific
+Y delta** — that is one layer past what "confirm or kill, do not fix" asks for; naming the real difference
+precisely (probe-form structure, not the G53 retract) is the deliverable, not the last-mile arithmetic.
+
+**Headline, stated as asked: this is NOT "V4.1 is broken."** Both dialects' own probe macros are attested,
+different, real forms — V4.1's is the one CONFIRMED live against actual hardware (per `ddcs-v41.js`'s own
+header). The divergence is that the TRACER's own simulation of the two structurally different probe forms
+produces different answers for one of them — a tracer-side gap in probe-form coverage, not a defect baked into
+either dialect's own G-code. Whether Expert's own picture is "right" here, or merely doesn't currently exercise
+whatever the tracer gets wrong, was not established either way this turn — no evidence either confirms Expert's
+own mechanism as correct-by-design versus correct-by-not-exercising-the-gap.
+
+### checkEnvelope — no disagreement, in this exact scenario
+
+Ran `checkEnvelope` on both profiles' own real emitted program, same settings: **identical verdict for both** —
+`{status:'amber', reason:'placement not declared...'}`. `placementDeclared` gates BEFORE anything trace-specific
+runs (line 75 of `envelopeCheck.js`), so with no WCS table on file (true for both, fresh boot), the pre-flight
+check never reaches the code path where the probe-form divergence could matter. **Stays preview-only for this
+exact scenario** — not confirmed either way for a scenario where placement IS declared (a real WCS table),
+which would exercise the trace-dependent path; not tested this turn, flagging as an open question rather than
+extrapolating past what was measured.
+
+### The 3-row DDCS-family table (per the amendment)
+
+| Dialect | machine-move / safe-retract emits | Tracer resolution | Drawn start |
+|---|---|---|---|
+| **ddcs-expert-m350** | `G53 Z#var` (bare, no G0) — var assigned from `#520`, a real machine register with a baked-literal fallback (`#42=#520; IF #42<0 GOTO…; #42=-5`) | `_g53ApproxZ` substitution applies unconditionally when placement undeclared (true here) — resolves to the honest margin approximation, same for both dialects | **CORRECT** (screenshot-confirmed) — but see below: not proven correct BY this mechanism, since the same Z-approximation applies to V4.1 too and V4.1 still draws wrong |
+| **ddcs-v41** | `G0 G53 Z#var` — var assigned a baked LITERAL directly (`#190=-5`), no register read at all | SAME Z-approximation substitution as Expert (measured identical, -10 both) — the retract is NOT where this dialect diverges | **WRONG** (screenshot-confirmed) — traced to the Y-probe step's own structurally different form (DRO-distance miss-check + G92), not the retract |
+| **ddcs-v3-dm500** | `safeRetract` **DEGRADES — no G53 at all**: `G0 Z${workClear}`, an ABSOLUTE WORK-FRAME move, with the dialect's own comment stating why: "machine G53 not grounded on DM500... absolute work-frame clearance." A THIRD state, as flagged: no machine-frame move for this path at all. | N/A for the retract (never a G53, so the g53Approx branch never applies) | Not measured this turn (out of the primary-evidence scope) — by construction a work-frame move needs no machine→part mapping, so it is architecturally immune to the SAME class of gap the retract-approximation code exists to paper over. Not proof of correctness for the REST of DM500's own probe form (its own miss-check/success-read mechanism was not read this turn). |
+
+Every row included, including the one (Expert) that comes out fine, with the reason — per the amendment's own
+explicit instruction not to map only the broken ones.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- `handoff.py amendments --role worker`: 2 landed and absorbed above (widen to all dialects, then narrowed to
+  DDCS-family only — the second superseding the first). Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: zero source changes — investigation only, per the dispatch.
+- Data hygiene: reproduced with a SYNTHETIC default machine, not the user's real file — no personal values
+  needed or used this turn. Screenshots written to `.repro/` anyway as a matter of discipline;
+  `git check-ignore -v` confirmed both excluded by `.repro/.gitignore`'s own `*` pattern; a dry-run
+  `git add -A` picked up nothing beyond the pre-existing `.gitignore`.
+
+### For the advisor
+
+The symptom reproduces exactly, cleanly, with the user's own minimal conditions — screenshots confirm the Start
+marker sits correctly at the corner under Expert and visibly displaced under V4.1, same op, same params, same
+gesture. The SPECIFIC G53-value-resolution hypothesis is KILLED by direct evidence: both dialects' own G53
+retract lines reference variables (not "Expert var, V4.1 literal" as proposed), and the tracer resolves BOTH to
+the identical Z value (-10), because `_g53ApproxZ`'s own substitution is unconditional whenever placement is
+undeclared — the emitted value is never even read in that branch, for either dialect. The measured divergence is
+in Y, which no G53 line touches at all. The real difference: V4.1's own probe-success check is a structurally
+different mechanism (a live DRO-distance comparison) from Expert's own status-flag read, plus a `G92`
+work-coordinate write Expert never emits — the tracer's own G92 handling is explicitly a no-move operation by
+design, so the DRO-comparison form is the more likely remaining candidate, though the exact expression producing
+the specific Y delta was not traced to its last mile (past "confirm or kill, do not fix"). `checkEnvelope` agrees
+across profiles in this exact scenario (gated to amber before reaching the divergent code path) — stays
+preview-only here, not proven either way for a declared-placement scenario. Three-row DDCS table delivered,
+including DM500's own genuinely different third state (no G53 at all for its safe-retract, by design). If
+several DDCS profiles' own probe forms turn out to diverge the same way once traced further, that would
+strengthen the case for a tracer-side fix (probe-form-aware simulation) over any one dialect's own G-code — your
+call, not mine, and not attempted here.
+
+🔨 turn 1864
