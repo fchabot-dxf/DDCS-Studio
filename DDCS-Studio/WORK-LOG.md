@@ -30433,3 +30433,139 @@ offer a tight-enough pairing to test it directly, which is corroborating, not th
 the guard — nothing here needs it. Corrected the plan text to CLOSED with the trace attached, as asked.
 
 🔨 turn 1824
+
+## Turn 1826 — the three trace bugs: confirmed by gesture, shared-root claim TESTED and REJECTED
+
+### Dispatch
+
+Confirm each of three named-but-unfixed bugs by real gesture before any diagnosis: (1) M5 halts the static
+trace; (2) Homing poisons forceMachine panel-wide; (3) the 3D marker array never rebuilds for corner. First
+check the "suspected shared root" claim's own provenance — evidence in a WORK-LOG, or another inference. For
+each bug: reproduce as a user would, screenshot, state OBSERVED or NOT REPRODUCIBLE. Only for the ones that
+reproduce, TEST the shared-root claim rather than assume it — evidence either way. If they share a root, stop
+before fixing (a structural call, reserved). If separate, say which is worst. Do not fix anything. Gate: node
+tier only.
+
+### Provenance — real evidence behind the three bugs themselves; the "shared root" phrase is the ORIGINAL discoverer's own flagged-as-untested hunch
+
+Traced through `NEXT-SESSION.md` to `WORK-LOG.md`'s turn 1786 ("ADDITION 6... plus three new confounds found
+and reported"). This is a PRIOR WORKER TURN, not an advisor inference: while building a real two-op program
+(an earlier op + corner) to test an unrelated anchor bug, three separate real ops (Drill, Homing, others) each
+broke the construction for a DIFFERENT reason, each with concrete measurements — `traceToolpath`'s own
+`segments`/`stats` showing only the first op's data; `getSimConfig().stock` reading `null` confirmed via a
+direct panel call; `panel.viz.spindleMarkers.length` staying at 1, confirmed by reading the live array. **All
+three are OBSERVED findings with real measurements, not inferences.** The "suspected shared root" phrase is
+that SAME original worker's own explicit, self-flagged hunch — their own "For the advisor" section says
+verbatim: "worth considering whether they share a root with each other... I did not chase that question this
+act; it's a real candidate for a future one." `NEXT-SESSION.md` preserved this wording faithfully rather than
+inventing it. So: the three bugs are evidenced; the shared-root claim is a named-as-open hypothesis from the
+person who found them, carried forward unchanged — worth testing, not worth trusting either way without a check.
+
+### STEP 1 — all three reproduce via a real bar gesture; screenshots saved
+
+**Bug 1 (M5 halts the static trace) — OBSERVED.** Real bar: insert Drill, then Corner, into one program.
+`traceToolpath(getProjection().text)`: `segCount: 6` (Drill's own segment count exactly), `probeCount: 0` —
+corner's own probe segments never appear, even though `getProjection().text` genuinely contains corner's text
+(`textLen: 3501`, confirmed present). Screenshot: `verification/t1826-bug1-setup.png` (the Studio tab showing
+the concatenated program's raw text — Drill's own G-code visible; corner's text is present further down,
+confirmed via the projection read, not by scrolling).
+
+**Bug 2 (Homing poisons forceMachine panel-wide) — OBSERVED.** Real bar: insert Homing, then Corner. Switched
+to Blocks tab, read `document.getElementById('blk-preview-panel').__panel.getSimConfig()`: `stock: null`
+(exact match to t1786's own finding). Screenshot: `verification/t1826-bug23-setup.png`.
+
+**Bug 3 (the 3D marker array never rebuilds for corner) — OBSERVED, and visually obvious in the screenshot.**
+Same Homing+Corner setup: `getPassStarts()` correctly lists 3 passes (Homing's own + corner's wall1 + wall2),
+but `panel.viz.spindleMarkers.length` stays at 1. The screenshot's own 3D preview shows exactly one orange
+"Start" marker at Homing's own position (150, 150, −60) — no second or third marker for corner's own passes,
+even though both "Homing (data)" and "Corner (data)" op blocks are genuinely present on the canvas in the same
+image.
+
+### STEP 2 — tested the shared-root claim with a cross-check, not assumed either way; it does NOT hold as stated
+
+Ran each scenario through the OTHER bug's own measurement lens — the check the original t1786 worker
+explicitly did not have time for:
+
+|                                    | Drill+Corner (bug 1's own case) | Homing+Corner (bugs 2/3's own case) |
+|---|---|---|
+| `traceToolpath` segCount           | 6 (halted)                      | 25 (NOT halted)                     |
+| G-code contains M5?                | yes                              | no                                   |
+| `getSimConfig().stock`             | populated (NOT null)            | `null`                              |
+| `panel.viz.spindleMarkers.length`  | **1**                            | **1**                               |
+
+**Bug 1 and Bug 2 are mutually exclusive, not shared.** Drill emits M5 and triggers the trace-halt (bug 1) but
+does NOT poison `forceMachine` (`stock` reads correctly populated through `blk-preview-panel`). Homing has no
+M5 anywhere in its own emitted G-code and does NOT halt `traceToolpath` (25 segments, all the way through
+corner) but DOES poison `forceMachine`. Each op triggers exactly one of the two — different causes, confirmed
+by testing both conditions in both scenarios rather than assuming the co-occurrence in t1786's own single
+combined construction meant anything.
+
+**Bug 3 is independent of both** — it happens in EITHER scenario, with or without M5, with or without the
+forceMachine poisoning. This points to its own, separate cause (something in `createPreviewPanel.js`'s own
+marker-instantiation path never re-running for a non-first op), not something downstream of bug 2 as t1786's
+own report speculated ("Downstream of (2)") — since it fires even where bug 2 provably does NOT (Drill+Corner
+has a correctly-populated `stock` yet still shows `markerCount: 1`).
+
+**Verdict: the "suspected shared root" hypothesis does not survive the cross-check.** These are (at least)
+THREE separate root causes, not one — despite `traceToolpath`/`GcodeExecutionEngine` genuinely being shared
+machinery between bug 1 and `createPreviewPanel.js`'s own `parsed = traceToolpath(code, ...)` call
+(`createPreviewPanel.js:903`), that shared MACHINERY is not a shared BUG — bug 1's specific trigger (M5 in an
+EARLIER op) simply doesn't occur in bug 2/3's own reproduction (Homing has no M5), and bug 2/3's own trigger
+(Homing's forceMachine declaration) doesn't occur in bug 1's own reproduction (Drill has none). Per the
+dispatch's own instruction, since they do NOT share a root, no stop-before-fixing is needed on that basis —
+instead, reporting which is worst, since each needs its own act.
+
+### Which is worst, and why — for the advisor's own slicing call
+
+- **Bug 1 (M5-halt) is the widest blast radius and hits the deepest layer.** The trigger (an M5-emitting
+  cutting op followed by ANY later op) is about as common as CNC programs get — M5 is emitted at the end of
+  nearly every milling/drilling operation — and the affected function (`traceToolpath`) is not a display-only
+  helper: `createPreviewPanel.js` itself calls it to build `parsed`, the LIVE SIM's own source of truth. A
+  truncated trace here means the simulation engine itself — not just a screenshot — has silently stopped
+  reasoning about everything after the first cutting op in a program. This is my own top pick.
+- **Bug 3 (marker array stuck at 1) has the widest CONFIRMED reach of the three** — it fired in both
+  cross-check scenarios, independent of M5 or forceMachine, suggesting it may reproduce for ANY second op
+  after a first, not just these two combinations (untested beyond these two ops, flagged rather than
+  overclaimed). t1786's own note that this also makes "driving the jog-pendant readout for corner... unreliable
+  through this door" suggests it may affect INTERACTIVITY, not just the visual marker count — worth checking
+  when this gets its own act.
+- **Bug 2 (forceMachine poisoning)** is narrower — specific to ops that declare a machine-frame/forceMachine
+  sim intent (Homing is the one confirmed trigger) — but Homing-first is an extremely common real workflow
+  (home the machine, then do work), and the user-visible consequence (the workpiece disappearing from the
+  live preview) is a plain, confusing wrongness a real user would notice immediately.
+
+Not ranking bug 3 above bug 1 outright — bug 1's failure mode (the sim engine silently stops reasoning) feels
+more consequential per-incident even if bug 3's trigger condition may be more common; both are real, evidenced
+candidates for "first," and the actual slicing call is explicitly the advisor's per this dispatch.
+
+### Verify
+
+- All three bugs OBSERVED via real bar-Insert-Insert-BlocksTab gestures, not `page.evaluate`-driven state
+  mutation — screenshots saved to `verification/` (`t1826-bug1-setup.png`, `t1826-bug23-setup.png`,
+  `t1826-crosscheck-drillcorner.png`), left uncommitted per this project's own established convention for
+  verification screenshots (every prior turn's own `verification/*.png` deliverable is untracked too).
+- Cross-check table above: 2 real scenarios × both measurement lenses, 4 numbers each, all read live from the
+  app, not asserted from memory.
+- No source or test file changed or left behind — three throwaway diagnostic specs built, run, and deleted
+  after use, per this project's own convention.
+- `npm run test:node`: 118/118 pass (unaffected, as expected for an investigation-only turn).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+
+### For the advisor
+
+Provenance: all three bugs are real, OBSERVED findings from t1786 (a prior worker turn, concrete measurements,
+not inference) — the "suspected shared root" phrase is that SAME worker's own explicit, self-flagged-as-untested
+hunch, faithfully carried into the plan, not invented along the way. All three reproduce cleanly via a real bar
+gesture, screenshotted. The shared-root claim does NOT survive a cross-check: bug 1 (M5-halt) and bug 2
+(forceMachine poisoning) are mutually exclusive — Drill triggers one, Homing triggers the other, neither
+triggers both. Bug 3 (marker array stuck at 1) is independent of both, firing in either scenario regardless of
+M5 or forceMachine — not "downstream of bug 2" as t1786 speculated, since it happens even where bug 2 provably
+doesn't. These are three separate causes sharing only the `traceToolpath`/`createPreviewPanel` machinery, not a
+common bug. My own read on severity: bug 1 for its depth (the live sim engine's own truncated source of
+truth) and breadth (any cutting-op-then-anything program); bug 3 for its confirmed reach (both cross-check
+scenarios) and possible interactivity impact (t1786's own jog-pendant note, unverified this turn). Bug 2 is
+narrower but still a common real workflow. Did not fix anything, as instructed — evidence and the provenance
+answer are the whole deliverable this turn.
+
+🔨 turn 1826
