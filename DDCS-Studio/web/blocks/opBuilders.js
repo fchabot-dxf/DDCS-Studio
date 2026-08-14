@@ -111,13 +111,19 @@ export function opLabelOf(opType) { return OP_LABELS[opType] || USER_LABELS[opTy
  *  label). Touches the USER layer only — a built-in label can never be dropped, even if called with a built-in opType. */
 export function removeOpLabel(opType) { if (opType) delete USER_LABELS[opType]; }
 
-// Build an op's stack, UNWRAPPING a builder that returns its OWN op container (only homing today) → the bare
-// blocks. Every consumer (wizard commit, marker import, glow/edit rebuild) must agree on the shape: without this,
-// makeOp would wrap homing's container AGAIN (op.children = [{op:homing}]) while the glow/edit checks rebuild the
-// unwrapped atoms — so a fresh homing op would false-glow + falsely read as block-edited.
+// Build an op's stack, UNWRAPPING a builder that returns its OWN self-wrapping container → the bare blocks.
+// Every consumer (wizard commit, marker import, glow/edit rebuild) must agree on the shape: without this, makeOp
+// would wrap the container AGAIN (op.children = [{wrapper}]) while the glow/edit checks rebuild the unwrapped
+// atoms — so a fresh op would false-glow + falsely read as block-edited.
+// t1828 — 'op' alone (homing's own self-wrapping shape) missed 'user_root', the wrapper EVERY `userOpFromStack`
+// twin uses (wizards/ops/userRoot.js — a transparent emit container, safe to unwrap the same way). Without this,
+// `commitActiveOp()`'s own `framed.find(b => b.type === 'progstart'/'progend')` silently found nothing for any
+// twin carrying its own program framing (any cutting op — drill, pocket, contour, …), leaving `progend` (which
+// emits its own M30) buried unstripped inside the op's own children: the M30-mid-program bug traced in WORK-LOG
+// t1828 (a cutting op followed by another op halted not just the static trace but the real exported file).
 export function _framed(opType, params) {
     let f = builderOf(opType)(params || {}) || [];
-    if (f.length === 1 && f[0] && f[0].type === 'op') f = f[0].children || [];
+    if (f.length === 1 && f[0] && (f[0].type === 'op' || f[0].type === 'user_root')) f = f[0].children || [];
     return f;
 }
 

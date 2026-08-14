@@ -30569,3 +30569,112 @@ narrower but still a common real workflow. Did not fix anything, as instructed �
 answer are the whole deliverable this turn.
 
 🔨 turn 1826
+
+## Turn 1828 — Bug 1 fixed: test first, the M5 hypothesis killed, and it's worse than "a wrong picture"
+
+### Dispatch
+
+Bug 1 (M5 halts the static trace) goes first — its own severity is "the live sim's own source of truth
+truncating," not a cosmetic defect. STEP 1: build the failing test first, asserting the OUTCOME (the whole
+program traces — segment count or final position — not a parser flag), confirm it fails on today's code. STEP
+2: confirm or kill "M5 is treated as a terminator" with the actual line; check who else reads the parse
+(stats, absolute/relative accounting, duration/line-count estimates) — a bigger finding than the trace itself
+if so; specifically say whether `JOB-PROGRESS-PLAN.md`'s planned time-remaining feature (which walks the whole
+program through this same machinery) would be affected. Do not touch bug 2 or bug 3 even if the fix looks like
+it would help them. Gate: node tier + the new test + every spec touching the tracer.
+
+### STEP 1 — the failing test, built and proven before touching source
+
+`multi-op-progend-1828.spec.js`: real bar-Insert Drill, then Corner, into one program. Asserts the OUTCOME —
+the real EXPORTED FILE (`ddcsSerializeWithMarkers()`, the same function Export/Download uses) carries exactly
+one `M30`, and the static trace's own `probe` count is nonzero (corner's own probes were reached) — not any
+internal parser flag. Ran against today's code: **fails 3/3**, `exportedM30Count: 2`. (Caught and fixed my own
+bug in the test along the way — I'd used a stats field name, `probeCount`, that doesn't exist; the real field
+is `probe`. Re-proved non-vacuity with the corrected assertion before trusting it: reverted the fix, confirmed
+the corrected test STILL fails 3/3 for the right reason, restored.)
+
+### STEP 2 — the M5 hypothesis is KILLED, with the actual line; the real cause is worse and wider
+
+**M5 is not a terminator anywhere in the engine — confirmed by grep, not inference.** `GcodeExecutionEngine.js`
+has exactly two `return true` exits from `_executeStep`'s own top level: the terminator match at line 899,
+`/^(M30|M02|M2|M99)\b/i.test(line)`, and nothing else that isn't itself gated behind `this._traceSink` (auto-
+satisfied during a trace, never reached). M5 is not in that pattern. A live step-trail (manually driving
+`_executeStep` line by line) proved it directly: M5 at program index 29 passes through cleanly (`done: false`),
+M9 at 30 the same — the halt is the LITERAL "M30" atom at index 33, drill's own.
+
+**The real cause: `user_drill_data`'s own builder embeds a real M30 mid-program, and nothing strips it, because
+the code that's supposed to only recognizes ONE of the two wrapper shapes twins actually use.**
+`opBuilders.js`'s `_framed(opType, params)` unwraps a builder that self-wraps its own output in `{type:'op',
+children:[...]}` — "only homing today," per its own comment — so `commitActiveOp()` (`opSession.js`) can find
+and strip the op's own `progstart`/`progend` before wrapping its bare content. But drill (and every OTHER
+`userOpFromStack` twin) self-wraps in `{type:'user_root', children:[...]}` instead — a DIFFERENT type name
+`_framed`'s condition never matched. So for drill, `framed.find(b => b.type === 'progstart'/'progend')` silently
+found nothing, `bare` stayed the whole unstripped `[user_root{...}]`, and `progend` — which emits `M30` itself
+(`wizards/ops/program.js`'s own `end: 'M30'` default) — stayed buried three levels deep inside the op's own
+children, invisible to both `appendIntoProgram`'s `endIdx = cur.findIndex(b => b.type === 'progend')` lookup and
+`normalizeEnds`'s own recursive cleanup (which only recognizes `'endprogram'`, a third, different type name
+used when DECODING a bare M30 from raw text — `gcodeToStack.js:166`). Confirmed the whole chain live: the block-
+program structure for a real Drill+Corner insert showed `progend` genuinely nested inside `user_drill_data`'s
+own children tree, and `builderOf('user_drill_data')(params)` returns `[user_root{progstart, wcs, placeonstock,
+progend, entry, toolsel}]` — exactly the unmatched shape.
+
+**Fixed at the root**: `_framed()`'s unwrap condition now also matches `'user_root'`
+(`f[0].type === 'op' || f[0].type === 'user_root'`) — `user_root`'s own `emit` function (`userRoot.js`) is
+already a transparent pass-through container, the same architectural shape `'op'` already gets unwrapped for,
+so this mirrors an existing, working case rather than inventing a new mechanism. One line.
+
+**Who else reads the parse — bigger than the dispatch anticipated.** Grepped every `traceToolpath` consumer:
+`createPreviewPanel.js` (the picture, as expected) — but also `engine/timeEstimate.js` AND
+`engine/envelopeCheck.js`. The second is a MACHINE-ENVELOPE/COLLISION SAFETY CHECK, not a picture or an
+estimate — it was silently reading a truncated trace for any multi-op program with an early cutting op, meaning
+it never saw ANY move from the second op at all. This bug has been shipping since before this session; it is
+now fixed for every consumer at once, not just the preview, because the fix is at the shared trace/parse layer
+both read.
+
+**`JOB-PROGRESS-PLAN.md` — yes, it would have been affected.** Its own text: "the sim already walks the whole
+thing" (line 23) as the stated foundation for the planned time-remaining prediction, and `timeEstimate.js`
+(the existing machinery that scoping note is built on) calls `traceToolpath` directly. The plan is explicitly
+"nothing built" yet, so nothing shipped on the broken foundation — but had it been built before this fix landed,
+any multi-op program with an early cutting op would have predicted a truncated, wrong duration. Fixed before
+that feature exists, not after.
+
+### Scope check — bug 2 and bug 3, explicitly NOT touched, confirmed unaffected
+
+Per the dispatch's own instruction, re-ran the exact Homing+Corner scenario from t1826 against the fixed code:
+`getSimConfig().stock` still reads `null` (bug 2) and `panel.viz.spindleMarkers.length` still reads `1` (bug 3)
+— both numbers byte-identical to t1826's own measurements. The fix stayed precisely scoped to bug 1; nothing
+about bug 2 or bug 3 moved, confirming they are genuinely independent, as the t1826 cross-check found.
+
+### Verify
+
+- `multi-op-progend-1828.spec.js`: fails 3/3 against unfixed code (twice — once before, once after correcting
+  my own test bug), passes 1/1 fixed.
+- Scope check: bug 2/bug 3 measurements unchanged after the fix (confirmed, not assumed).
+- Node tier (`npm run test:node`): 118/118 pass.
+- Gate: every spec referencing `traceToolpath`/`GcodeExecutionEngine`/`_framed`/`_builderAtoms`/
+  `commitActiveOp`/`progend` (137 files) + the new test: **715 passed, 4 flaky (all resolved on retry, none
+  novel — `wizard-face-1599`'s own flake names itself: "the reproject echo race (t1766)", the SAME already-
+  characterized, load-sensitive class this session traced and closed at t1824; `group-auto`/`group-gesture`/
+  `pane-visual-host-programmatic-1762` are unrelated to this change), 2 skipped, 0 real failures.**
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- All throwaway diagnostic specs (step-trail dump, block-structure dump, builderOf comparison, scope-check)
+  deleted after use, per this project's convention.
+
+### For the advisor
+
+M5 hypothesis killed with the actual line — it was never in any terminator list; the halt is a REAL M30, drill's
+own, buried where nothing strips it. Root cause: `_framed()`'s unwrap only recognized homing's `'op'`-wrapping
+shape, never `'user_root'`, the shape every OTHER twin (including every cutting op) actually uses — so
+`commitActiveOp()`'s own progstart/progend extraction silently found nothing for any of them. One-line fix,
+mirrors the existing homing case rather than inventing a new mechanism. Bigger than the trace: `envelopeCheck.js`
+(a collision/machine-envelope safety check, not a picture) reads the same `traceToolpath` output and was
+silently blind to every move after the first cutting op in a multi-op program — this has been shipping, now
+fixed at the shared layer both it and the preview read. `JOB-PROGRESS-PLAN.md`'s own stated foundation ("the sim
+already walks the whole thing") would have inherited this exact bug had it been built before now; it wasn't, so
+nothing shipped broken there. Bug 2 and bug 3 explicitly re-checked after the fix and found byte-identical to
+t1826's own numbers — confirmed independent, not touched. Gate green: node 118/118 + the new test (non-vacuous,
+reverted-and-restored twice) + 715/715 real passes across every tracer/framing-touching spec (4 pre-existing,
+unrelated flakes, all resolved on retry).
+
+🔨 turn 1828
