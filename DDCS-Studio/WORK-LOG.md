@@ -28476,3 +28476,79 @@ no second implementation to drift out of sync with the pane's own version. The f
 to draw" case is asserted explicitly rather than skipped, which is worth naming: a future twin with panel
 `form` that ACCIDENTALLY grows a 3D box (a copy-paste of a form3d+2d twin's def, say) would now be caught here
 too, not just the reverse.
+
+## 🔨 turn 1792 (epoch 4) — SUITE FIX 2 of 3: SCREENSHOT BASELINES for the modal and the pane
+
+### Dispatch
+
+Addition 7 accepted — refactoring Addition 1 onto the extracted helpers BEFORE building on top, and the flat
+twin asserting "no 3D box" rather than skipping it, both called exactly right. This act: the suite has ZERO
+`toHaveScreenshot`/`toMatchSnapshot` baselines (audit-measured). Two of this week's bugs (the empty visual host,
+the unstyled surface) would have been caught by a baseline with no assertion logic at all — a human glance at a
+diff image. Add baselines for the modal and the Blocks Wizard-View pane, reached through the real gesture
+(reuse `barGesture.js`). Mask/disable whatever legitimately varies (live DRO, animation, the 3D canvas if it
+won't render deterministically headless) and say what was masked and why; pick one viewport and pin it; set a
+justified tolerance, not the default; if 3D can't be stabilized, baseline form+surface only and say so. State
+how to update the baselines intentionally. Gate: run each baseline 3× consecutively, confirm ZERO diffs — if
+any run differs, report rather than raising the tolerance to force a pass.
+
+### Measured stability first — found real, live animation, not assumed noise
+
+Screenshotted a freshly-opened corner wizard 3× in a row before writing any assertion: never byte-identical
+(file sizes genuinely differed, not PNG-compression noise). Visual diff of the raw screenshots showed why: the
+DRO readout — echoed into BOTH the top visualization overlay AND the bottom Layout-2D pane's own "Mach X/Y/Z"
+line — visibly advanced between shots (Y −34.200 → −24.993 → …). Found the cause, not guessed: the panel's own
+`.pp-run.on` (Run/Stop toggle) and `.pp-loop.on` (loop-on-complete) are BOTH on by default — the preview
+auto-plays and loops the moment a wizard opens.
+
+### Stopping the sim stabilizes the bottom pane completely; the top visualization box does not
+
+`.pp-run`'s own title says "click to stop and reset to the start" — clicking it (added as `support/
+simControls.js`'s `stopLiveSim`) makes the BOTTOM Layout-2D pane (`#userVizContainer` / its Blocks-pane
+equivalent) perfectly byte-stable: 3 consecutive raw screenshots, identical byte length and content, confirmed
+in every attempt. The TOP visualization box (`#userViz3dBox` / `#blk_userViz3dBox`) stayed pixel-unstable even
+after stopping — its own status line and DRO still read slightly different coordinates run to run, most likely
+a camera/render-queue settle that doesn't reach a byte-fixed point in the time available to chase it further.
+Per the dispatch's own explicit permission for exactly this outcome, the top box is **masked**
+(`toHaveScreenshot`'s own `mask` option — a solid overlay drawn before comparison, not a crop) in both
+baselines; everything else — form, typed value, chrome, the bottom Layout-2D pane — is compared for real.
+
+### The two baselines — `tests/screenshot-baselines-1792.spec.js`
+
+Viewport pinned at 1500×950 (matches every other real-gesture spec in this series). Both open corner via
+`openWizardViaBar`/`fillField` (reused, not reimplemented), call `stopLiveSim`, wait to settle, then
+`toHaveScreenshot` with the top box masked and `maxDiffPixelRatio: 0` — justified, not the default: the
+unmasked region is PROVEN byte-stable, so any diff on it is real, not noise to tolerate. The docblock states
+explicitly how to update intentionally (`--update-snapshots`, only after looking at the new render yourself)
+and why 0 tolerance, so a future reader doesn't loosen it blind or delete the file as flaky.
+
+### Non-vacuity — reproduced the EXACT historical bug this baseline exists to catch
+
+Rather than an arbitrary probe, reverted the real regression class: temporarily removed `#blk_wiz_user` from
+`[data-theme="studio"] .wiz-box, [data-theme="studio"] #blk_wiz_user` in `styles.css` (the THEME-SPECIFIC rule
+actually in effect — `index.html`'s default is `data-theme="studio"`, not the base/no-theme rule; checked, not
+assumed, after a first attempt at the wrong rule passed for the wrong reason and was caught before it was
+trusted). Re-ran: the PANE baseline failed correctly (13149 pixels different, even the element's own height
+shifted 1404→1402px), 3/3 retries, while the MODAL baseline stayed green — exactly right, since the reverted
+rule only ever covered the pane. Restored (`git diff` confirmed byte-identical to HEAD), re-ran the full 3×
+consecutive gate clean.
+
+### Verify
+
+- `tests/screenshot-baselines-1792.spec.js` — 2/2 green, 3 consecutive full runs, zero diffs each time.
+- Non-vacuity: reproducing the t1764 regression class made the pane baseline fail 3/3 (wrong CSS rule first
+  self-corrected before trusting a false pass), modal baseline correctly unaffected; reverted, re-verified 3×
+  clean.
+- Node tier (`npm run test:node`): 118/118 pass.
+- New: `tests/support/simControls.js` (`stopLiveSim`) — a third small reusable piece alongside `barGesture.js`/
+  `drawingCheck.js`, kept in its own file since it's a genuinely different concern (screenshot stability, not
+  the gesture chain or pixel sampling).
+
+### For the advisor
+
+Both baselines are real and stable, at 0 tolerance, on the region that's provably stable. The masked top
+visualization box is a real, named limitation — worth a future look if `--update-snapshots` for that specific
+region is ever wanted (would need to find whatever residual camera/render settle keeps it from a byte-fixed
+point even fully stopped), but not attempted here since the dispatch's own permission covered this outcome
+and forcing it further risked exactly the "raise the tolerance until it passes" trap the gate explicitly
+warned against.
