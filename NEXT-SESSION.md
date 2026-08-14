@@ -2357,3 +2357,37 @@ looks identical to the mirror is worse than no scratch mode.
 mean, and how does the user know which state they are in). Worth designing together rather than twice.
 
 ⚠ NOT STARTED. Bugs first: the 36mm marker gap, then B slices 2-3.
+
+## CUSTOM WIZARDS — MAKE VARIABLE USE LEGAL  [USER RULING 2026-08-14]
+
+**The ask:** *"can we just make variable use legal then for cuatom wiz"*.
+**The scoping principle, their words:** *"most people use it for themself if they want to share it its other
+user responsability to verify"* — so DO NOT build elaborate validation for the sharing case. Consistent with
+their standing position that a restriction written for one person's certainty becomes everyone else's ceiling
+(see the machine-config-not-hardcoded ruling).
+
+**Today:** built-in twins declare `tokenEligible: true` PER BINDING (e.g. `alignmentData.js:38`), and
+`tokenGuard.js` is **fail-closed** — no declaration means refuse. Authored wizards DERIVE their bindings and
+those derived bindings never carry the flag, so every authored knob refuses a `#`. Nobody decided that; the
+declaration was simply never extended to the second population. Save-as-custom then rejects outright:
+*"a knob must be a plain number"* (`devMode.js:752`).
+
+```
+  knob -> EMIT only          #805 is fine, Studio never needs the number
+  knob -> PREVIEW GEOMETRY   Studio must DRAW with it; it cannot compute a shape from a reference
+```
+
+**RULED: allow it. Where the preview genuinely cannot draw, SAY SO — do not refuse the value.** Refusing
+protects Studio's picture at the cost of the user's intent. Same honest-omission pattern as t1834's frame
+note (the workpiece is withheld AND the panel explains why).
+
+**PROPOSED SHAPE, not yet ruled:** declare token-eligibility on the ATOM, not on each binding. An atom already
+knows whether a param is geometry or a pass-through value; declaring it once there lets BOTH the built-in
+bindings and the authored derivation inherit it, and eventually lets the built-in tables stop repeating it by
+hand. Follows the user's own declare-don't-derive ruling (t1836).
+
+⚠ Makes moot the possibly-dead `varErr` guard — `devMode.js:112`'s `EXPOSE_` checkbox no longer exists
+(t1610), so line 113 may be unreachable and `varErr` permanently null. UNVERIFIED; settle it by plugging a
+`#var` into a numeric field and pressing Save.
+
+⚠ NOT STARTED. Bugs first: the 36mm marker gap, then B slices 2-3.
