@@ -32688,3 +32688,129 @@ was made to for the earlier bug-3 marker-rebuild fix, or does it still default t
 frame whenever one is present.
 
 🔨 turn 1858
+
+## turn 1860 — the camera-fit hypothesis, tested: real, but not the code the hypothesis named
+
+Dispatch: reproduce the camera-fit hypothesis WITHOUT the user's file — a large SYNTHETIC envelope, an ordinary
+corner probe on a normal stock, screenshots at a few envelope sizes showing a progression. Name the exact code
+that decides whether the fit is whole-envelope or the drawn work. If it defaults to whole-envelope, say so
+plainly. Give the UX trade-off as options with a lean, not a decision. Record the homingWizard.js over-broad-
+proxy finding in WORK-LOG. No fix; gate is node tier only.
+
+### STEP 2 first — the code, read before testing anything
+
+`gcodeViz3d.js`'s `fitAll(wide=false)` (t779/t780, already a real prior fix): the default fit unions ONLY the
+drawn work (`_dataBounds`, i.e. traced toolpath) and the stock footprint — it explicitly EXCLUDES the machine
+envelope from driving the camera. The envelope only joins the fit (`wantWide`) when the caller passes `wide`
+(the existing double-click cycle) OR when there is genuinely nothing else to frame (`!b` — no data bounds AND no
+stock). Confirmed by direct inspection (`viz._fitWide`) across every scenario built this turn: **`_fitWide` was
+`false` in all five runs, including the largest synthetic envelope tested.** The literal code path the
+hypothesis named — "defaults to whole-envelope whenever an envelope exists" — does **not** trigger here. t780's
+own fix is doing exactly what its own comment says it does.
+
+### STEP 1 — reproduced anyway, and precisely isolated to a DIFFERENT cause
+
+Built the identical Homing→Corner sequence (real bar gesture, default params, default stock) under a SYNTHETIC
+machine envelope at three sizes (a small ~300mm-class machine, a mid ~1200mm-class, and a large ~3000mm-class —
+none of these are the user's real numbers), screenshotted each. **The progression is real and dramatic**: at the
+small size the picture is readable; by the large size the stock and the corner probe's own route/markers shrink
+to a barely-visible sliver inside a mostly-empty grid — visually indistinguishable from what a naive
+"fits-the-envelope" bug would produce, even though the code confirms that specific bug is not what's happening.
+
+**Isolated the real cause by removing one variable at a time.** `_dataBounds` at each envelope size (dumped
+directly, not inferred from the picture): Homing's own contribution to the data bounds GROWS with the declared
+envelope (maxX 950→950→1500 across 300/1200/3000) — because Homing, under a profile that actually emits motion
+(Expert), seeks toward the REAL home switches, and on a genuinely large declared machine those switches are
+genuinely far from the work. That is legitimate, real, drawn toolpath data — not the envelope box, not a
+computation error — and `fitAll()`'s own work-driven union has no way to tell "this op's motion is huge and
+dominates the frame" apart from "this op's motion is what the user actually wants to see right now."
+
+**Confirmed by removing Homing entirely, same 3000mm envelope, same corner op:** `_dataBounds` collapses to
+corner's own small declared range (`{minX:-43, maxX:7, minY:-43, maxY:43}` — exactly corner's own 3-pass
+extent, nothing more), and the screenshot is a clean, well-framed, fully readable picture — marker, workpiece,
+traverse, all clearly visible, at the SAME envelope size that dwarfed everything when Homing was present.
+
+**So: the hypothesis's PREDICTED EFFECT is real and cleanly reproduced — a small toolpath does get lost inside
+a large machine's own picture. The CODE it named is not the cause.** The actual mechanism: `fitAll()` unions
+ALL drawn ops' own real motion with no per-op weighting; Homing's own real, large, entirely legitimate
+excursion (present because the declared machine genuinely has that much travel) enters the SAME union as
+Corner's own small probe motion, and the union is dominated by whichever op moved further — which, right after
+a Homing op, is almost always Homing itself, on any machine with real travel. This reproduces UNDER BOTH
+PROFILES equally (confirmed: V4.1's own smaller, differently-positioned data bounds at the same 3000mm envelope
+still produced the same dwarfed picture) — **this is not V4.1-specific, and not this one user's problem. It is a
+real usability defect for every large-machine user who homes before doing a small op**, exactly as the dispatch
+warned it would be if confirmed. Saying so plainly, not softened: **on a large declared machine, inserting an
+ordinary Homing op before a small probe/mill op makes the small op's own picture unreadable by default**, and
+the existing "fit to work" design (t780's own fix) does not protect against this specific combination, because
+it was solving a different case (the envelope BOX dwarfing everything) than this one (one REAL op's own motion
+dwarfing another REAL op's own motion).
+
+### The options, and a lean — the user's call, not mine or the advisor's
+
+- **A — keep the current union-of-everything default.** Preserves "see the whole job's own actual path in
+  context" (a real, legitimate use — knowing where a small op sits relative to the machine's real travel matters
+  for crash-avoidance, exactly the trade-off the dispatch itself named). Cost: unchanged, this exact defect.
+- **B — fit to the LAST-inserted / currently-edited op's own data only**, ignoring earlier ops' motion for
+  framing purposes. Solves the immediate "I can't see what I'm working on" problem directly. Cost: loses the
+  "where does this sit in the whole job" context by default — a user who wants that view has to ask for it
+  (double-click already exists for envelope-wide; would need a second gesture, or the SAME one repurposed, for
+  "whole job" vs "just this op").
+- **C — union everything, but cap any single op's own contribution the way `fitAll()`'s existing Z-cap already
+  clamps a tall retract column** (`zCap`, already in this exact function, already precedent for "this real motion
+  is being deliberately weighted down for framing purposes"). Middle ground; needs a rule for "how much is too
+  much" that doesn't itself become a second bug (a subtler version of the very magnitude-heuristic problem the
+  Z-cap already exists to solve once).
+- **D — an explicit, discoverable "fit to this op" affordance**, separate from the existing wide-toggle, so the
+  user chooses rather than the app guessing. Most honest about the trade-off being real and user-specific; costs
+  a UI surface for something today's convention (dbl-click) handles silently.
+
+**My lean, offered as a lean:** C, extending the SAME precedent this function already sets (the Z-cap already
+demonstrates "clamp one axis of one kind of real-but-outlier motion for framing purposes, without discarding the
+data or the drawn line itself" is an accepted pattern in exactly this function) — feels the most consistent
+continuation of t780's own design language, over inventing a new mode (B) or a new UI surface (D) for a problem
+this function already has one working precedent for solving. Not a recommendation to build it — the trade-off
+(losing at-a-glance "where does this sit in the machine" context, which matters for probe crash-avoidance) is
+real and is the user's own call, exactly as the dispatch said.
+
+### homingWizard.js's own gate — recorded, not changed, per the explicit instruction
+
+`web/wizards/stacks/homingWizard.js:159,166-173` refuses to emit ANY homing sequence for every dialect except
+`ddcs-expert-m350`, reasoned from Expert's OWN subprogram numbers (`M98 P501/P503`, the `#[1045+]/#[607+]/#[880+]`
+param map) being unverified **elsewhere** (on other controllers) — not from any evidence about what V4.1 (or
+DM500) can or cannot actually do. This is an over-broad proxy for the real hazard (guessing a WRONG homing
+sequence on unfamiliar firmware) — the fourth instance of that shape today (t1846's `PROGRAM_FRAMING_TYPES`
+widening, t1844's own sharpened log, and the two earlier trace-bug root-causes all shared the same "the fix
+addressed the SYMPTOM's own layer, not the actual hazard" shape). Correctly NOT changed this turn — settling it
+needs real V4.1 hardware verification (matching this project's own S5 bench-kit discipline), not a guess from
+here.
+
+### Data hygiene
+
+None of this turn's screenshots used the user's real file — all synthetic envelope sizes, all default params.
+Written to `.repro/` anyway as a matter of discipline. `git check-ignore -v` confirmed all five screenshots
+excluded by `.repro/.gitignore`'s own `*` pattern; a dry-run `git add -A` picked up nothing beyond the
+pre-existing `.gitignore` itself. No value from the user's file appears anywhere in this entry.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: zero tracked files changed except this WORK-LOG entry — no app source changes, per the
+  dispatch.
+
+### For the advisor
+
+The hypothesis's PREDICTED EFFECT is confirmed, cleanly, as a real progression across three envelope sizes, and
+isolated precisely by removing Homing (the picture recovers instantly at the SAME envelope size). But the exact
+code you named — `fitAll()` defaulting to a whole-envelope fit — is NOT the mechanism: `_fitWide` stayed `false`
+in every single run, confirming t780's own envelope-exclusion fix is working exactly as designed. The real cause
+is one level more specific: Homing's own real, legitimate motion (large because a large declared machine's real
+switches ARE genuinely far away) enters the SAME unweighted union as everything else `fitAll()` fits to, and
+dominates a smaller op's own picture with no mechanism to prioritize "what the user is currently looking at."
+This reproduces identically under both profiles — it is a real usability defect for every large-machine user who
+homes before a small op, not specific to V4.1 or to this one user. Options and a lean given above, framed as the
+user's own trade-off to make. `homingWizard.js`'s V4.1 refusal recorded as the fourth over-broad-proxy instance
+today, unchanged, needing real hardware to settle.
+
+🔨 turn 1860
