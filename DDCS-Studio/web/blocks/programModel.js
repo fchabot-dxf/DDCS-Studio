@@ -47,7 +47,24 @@ export const getProjection = () => proj;
 function findOpInStack(blocks, anc) {
     for (const b of (blocks || [])) {
         if (!b) continue;
-        if (b.type === 'op' && anc.includes(b.id)) return b;
+        if (b.type === 'op') {
+            if (b.id == null) {
+                // t1842 — a type:'op' block with NO id is a builder defect (an internal wrapper that should have
+                // been stripped, or given a real id, before landing in a stored program's own tree — homing's own
+                // `homingDataStack` was doing exactly this until this same turn's fix). `anc.includes(b.id)` would
+                // otherwise match it BY ACCIDENT for any OTHER line whose own ancestry pads out with genuine
+                // `undefined` at this depth, silently resolving to the wrong op (confirmed reachable, WORK-LOG
+                // t1838/t1840: a real Homing+Corner program's hover chip + .nc export markers both misattributed
+                // EVERY line of the SECOND op to this fragment). Never match it — and never stay silent about it
+                // either (t1808's own established convention: a declaration bug gets a console.error naming it,
+                // not a silent wrong answer or a throw that could break an otherwise-working caller).
+                if (typeof console !== 'undefined' && console.error) {
+                    console.error(`programModel: findOpInStack found a type:'op' block with no id (opType "${b.opType || '?'}") — skipping it rather than matching it by accident. This indicates a builder left an internal wrapper unstripped.`);
+                }
+            } else if (anc.includes(b.id)) {
+                return b;
+            }
+        }
         if (b.children) { const f = findOpInStack(b.children, anc); if (f) return f; }
     }
     return null;

@@ -57,7 +57,24 @@ export const HOMING_STRUCT_BINDINGS = [
 /** The wrapped user_root template — the E0 superset (all axes guarded), machine-frame sim (homing is G53): FORCED envelope +
  *  the live tool in RAW machine coords (toolMachine, t497) so it homes at the top even with a stock shown. */
 export function homingDataStack(params = HOMING_DEFAULTS) {
-    const exec = homingStack(params, { superset: true });
+    let exec = homingStack(params, { superset: true });
+    // t1842 — homingStack's own top-level return self-wraps as ONE {type:'op', opType:'homing', children:[...]}
+    // element (wizards/stacks/homingWizard.js:200) meant for opBuilders.js's `_framed` to unwrap on the LEGACY
+    // built-in path (makeOp() re-wraps it with a real id there). This twin never goes through `_framed`, so the
+    // wrapper landed verbatim, nested inside every STORED homing instance's own tree — and `type:'op'` is exactly
+    // the tag programModel.js's own line→op resolution treats as a potential real, addressable op. Tried giving
+    // it an id instead of retyping it — doesn't work: `userOpFromStack`'s own `stripIds` unconditionally strips
+    // `id` from EVERY block in a def's template (any depth, by design — templates are id-free; each INSTANCE gets
+    // fresh ids only at actual insertion, and nested children are never independently addressable), so any id set
+    // here never survives to a real instance (confirmed empirically — reverted that attempt). The real defect is
+    // the TYPE, not the missing id: `type:'op'` is supposed to mean "independently addressable," and this node
+    // isn't one — it's an internal grouping, the exact role `type:'section'` already has, already established,
+    // and already used by sibling twins for their own equivalent internal content (e.g. cornerDataStack's own
+    // tree). Retype it to `'section'` here — keeps `opType:'homing'` as the SAME distinguishing marker
+    // `applyHomingRecompose` below already searches by, just matched via `type:'section'` instead of `type:'op'`
+    // now (its own search predicate updated to match, same file, below). This is a STRIPPED-DOWN transform, not a
+    // wholesale rebuild: only `type` changes; `applyHomingRecompose`'s own children-swap logic is untouched.
+    if (exec.length === 1 && exec[0] && exec[0].type === 'op') exec = [{ ...exec[0], type: 'section' }];
     return [{
         type: 'user_root', params: {},
         uiChildren: [
@@ -134,7 +151,10 @@ function blockRole(b) {
 function applyHomingRecompose(stack, resolved) {
     const st = currentSettings();
     const order = axesOf(resolved, st.config);
-    const opBlk = flattenBlocks(stack).find((b) => b && b.type === 'op' && b.opType === 'homing');
+    // t1842 — the STORED stack's own anchor is now `type:'section'` (homingDataStack's own fix, above) — `fresh`
+    // below is a RAW, untouched homingStack() call (never passes through homingDataStack), so it still self-wraps
+    // as `type:'op'` exactly as before; ONLY this lookup (against the stored stack) needed to change.
+    const opBlk = flattenBlocks(stack).find((b) => b && b.type === 'section' && b.opType === 'homing');
     if (!opBlk || !Array.isArray(opBlk.children)) return stack;
     // the FRESH emit (the ONE source) → its header + tail (rebuilt, machine-generated) + the per-axis arms for the swap
     const fresh = homingStack({ axes: order, config: st.config, machine: st.machine, limits: st.limits, softLimits: resolved.softLimits !== false }, {});

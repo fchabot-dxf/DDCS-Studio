@@ -31641,3 +31641,167 @@ picking one — the ruling on whether to fix one or both is explicitly not made 
 changed. Node 118/118.
 
 🔨 turn 1840
+
+## Turn 1842 — both layers fixed: the algorithm's own missing identity check, and homing's own out-of-step wrapper
+
+### Dispatch
+
+Ruling made: fix both layers. THE BUILDER is the immediate cause (unique to homing among its siblings — one op
+out of step, not a fact the rest of the system must accommodate). THE ALGORITHM is the class (any future builder
+mistake reproduces the same silent failure). Fix the algorithm FIRST, prove it converts silent-wrong into
+correct-or-loudly-wrong; THEN fix the builder, prove homing produces the same shape as its siblings — two
+separate proofs. The undefined-id case must not silently do nothing (check whether the t1808 loud-signal
+convention fits). BEFORE fixing: does the .ddcs workspace save share this path — check, don't assume, since the
+answer changes severity. atc_table still flagged UNVERIFIED at t1840 — check it too. Guard both layers with
+tests, and make the round-trip one assert the OUTCOME (export Homing+Corner, reimport, BOTH ops survive with
+their params) — not a marker count. Gate: node tier + new tests + every spec touching
+programModel.js/opSchema.js/homingData.js. No implementation of B this turn (unrelated — B is still design-only).
+
+### Answered BEFORE fixing, as instructed: does .ddcs save share this path?
+
+**No — checked by tracing the actual call chain, not assumed.** `ui/workspaceSave.js`'s Ctrl+S flow calls
+`buildBackup()` (`data/backup.js:123`), which reads each `BACKUP_STORES` entry's own declared `.read()`. The
+`projects` store's `.read()` is `exportAllEntries()` (`ui/projects/projectStore.js:95`, "never a second project
+serializer" — raw IDB entries, as-is). Each entry's own `.data` comes from `serializeProject(name)`
+(`blocks/programFile.js:17-31`): `const stack = window.ddcsGetBlockProgram()` — the RAW BLOCK STACK, real ids
+intact, saved DIRECTLY as JSON. **This never calls `opAtLine`, never needs line→op resolution at all** — the
+whole marker/line-mapping mechanism this bug lives in is structurally bypassed. Same for the "Save Program"
+(.mjson) flow — identical `serializeProject()` call. **The .ddcs/.mjson save/load round-trip is immune by
+construction, not by luck.**
+
+**What IS affected, precisely, so severity is calibrated on the real feature, not a guess:** `editorManager.js
+:220`'s "download .nc" flow — `if (window.ddcsSerializeWithMarkers && _proj && code === _proj.text) code =
+window.ddcsSerializeWithMarkers();` — this is the ORDINARY "export program as .nc" action, and it uses the
+marker path BY DEFAULT whenever the editor matches the model (the common case). The MACHINED text itself is
+unaffected (motion lines push unconditionally regardless of marker correctness) — a downloaded, corrupted-marker
+.nc file still cuts correctly. The defect bites on REOPENING that same file: `ui/commandDeck.js:137-140`'s file-
+open handler auto-detects `@DDCS` markers and decodes them via `importMarkedNc` — an entirely normal "open a .nc
+I made earlier to keep editing it as blocks" action. **Verdict: real, but narrower than "the user's own save
+file" — confined to the download-.nc-then-reopen-as-blocks round trip, not the primary persistence path.**
+
+### FIX 1 — the algorithm (`programModel.js`'s `findOpInStack`) — first, and proven alone
+
+Added an identity check: a `type:'op'` block with `id == null` can never match `anc.includes(b.id)` — and,
+per the t1808 loud-signal precedent (a declaration bug gets a `console.error` naming it, never a silent wrong
+answer, never a throw that could break an otherwise-working caller), logs exactly what it found and why it's
+being skipped, every time the search walks past one — not just when it would have matched, so the underlying
+data-shape defect surfaces even on a call whose OWN outcome happens to still resolve correctly.
+
+**Proven alone, builder still broken (temporarily left unfixed to test this in isolation):** the real Homing+
+Corner program, `window.ddcsOpAtLine` for one of Corner's own lines: **`{opId:'op2', opType:'user_corner_data'}`**
+— CORRECT, converted from the t1838/t1840 silent-wrong result. AND a `console.error` fired, naming the exact
+defect (`"found a type:'op' block with no id (opType \"homing\")"`). Both halves of "correct, not silent" proven
+together, before touching the builder at all.
+
+### FIX 2 — the builder (`homingData.js`'s `homingDataStack`) — second
+
+**First attempt (id, not retype) — tried, found it can't work, said so rather than forcing it.** Set an id on
+the wrapper directly. Verified empirically: had NO effect on the real, stored instance — `userOpFromStack`
+(`userOps.js:1163-1168`) calls `stripIds(stack)` (`userOps.js:673-681`) when building `def.template`, and
+`stripIds` unconditionally strips `id` from EVERY block in a def's template, at ANY depth, by design (templates
+are id-free; only a real INSTANCE gets a fresh id, assigned once at insertion, and nested children are never
+independently addressable in this system). Confirmed by tracing the exact call (`resolveArm`'s own `clone =
+JSON.parse(JSON.stringify(def.template))`, `userOps.js:760`) — the id was gone before it could ever reach a
+stored instance. Reverted this attempt rather than working around `stripIds`.
+
+**Second, real finding, not anticipated by the dispatch: the wrapper is NOT a stray artifact — it's load-
+bearing.** `applyHomingRecompose` (t550, the SAME file) actively searches the STORED stack for this exact
+`type:'op', opType:'homing'` node as its own anchor (`flattenBlocks(stack).find(b => b.type === 'op' &&
+b.opType === 'homing')`) to locate the per-axis arms for the settings-recompose logic. Simply STRIPPING the
+wrapper (making homing's shape LITERALLY identical to siblings — zero `type:'op'`/`type:'section'` markers at
+all) would have silently broken this feature: `opBlk` would resolve to `undefined`, the function's own early
+return (`if (!opBlk...) return stack;`) would silently no-op every future settings-driven recompose. Caught this
+BEFORE shipping it — not by running the gate and finding a regression, but by reading the file's OWN other
+function before assuming the wrapper was disposable.
+
+**The actual fix: retype, not strip or leave alone.** `type:'op'` → `type:'section'` (keeping `opType:'homing'`
+as the SAME distinguishing marker, `children` untouched) — `'section'` is not invented for this: it's the
+ALREADY-established, ALREADY-registered (`wizards/ops/userRoot.js:40-43`, `kind:'section', mouth:'DO'` — safe
+for `stackBridge.js`'s own rendering, no throw risk) transparent-grouping type
+(`blocks/blockEmitter.js:237`, "section is transparent — emit its children in order") that sibling twins (e.g.
+corner's own tree) already use for equivalent internal content. `applyHomingRecompose`'s own `opBlk` lookup
+updated to match (`type === 'section'`); its OWN sibling variable `freshOp` (built from a raw, untouched
+`homingStack()` call that never passes through `homingDataStack`) correctly left as `type === 'op'` — the two
+lookups now genuinely search two different sources with two different shapes, both correct for their own source.
+
+**Proven, both directions:** `tests/homing-data-emit.spec.js`'s own pre-existing E2 test (a Blocks edit inside
+the Z arm survives the settings recompose) — the closest thing to a direct regression check for
+`applyHomingRecompose` itself — broke on the FIRST attempt (line 110's own `type === 'op'` lookup, `Cannot read
+properties of undefined`), confirming the load-bearing finding wasn't theoretical. Updated that ONE line to
+match the new marker shape (a legitimate, expected consequence of the fix, not a new bug) — all 3 of that file's
+own tests pass after, including E1's byte-identical-emit checks (confirming the MACHINED output is untouched —
+this is purely an internal data-shape change). Homing's own tree, dumped after the fix: **zero `type:'op'` nodes
+anywhere** except the real top-level instance — matching siblings' own shape, as asked, just via `'section'`
+rather than deletion.
+
+**`atc_table` — the t1840 UNVERIFIED flag, resolved.** `atcTableStack()` (`wizards/stacks/atcTableWizard.js`)
+returns either a plain flat array or a `guard`-wrapped superset — no `type:'op'` self-wrap anywhere, confirmed
+by reading its own return statements directly. Clean, same as `atc_change`/`atc_test`. Homing remains the one
+and only affected op among the 4 `MACHINE_FRAME_TOOL` members.
+
+### Guard tests — three, matching the two-proof requirement + the outcome the advisor asked for
+
+`tests/opatline-identity-1842.spec.js`:
+1. **ALGORITHM** — a HAND-BUILT synthetic stack (fabricated `opType`s, an id-less `type:'op'` node nested inside
+   a real op, ahead of a second real op) — decoupled from homing's own current (now-fixed) shape on purpose, so
+   this test keeps guarding the general CLASS of defect even if some future, unrelated builder reintroduces it.
+   Asserts correct resolution AND the console.error firing, naming the phantom.
+2. **BUILDER** — `homingDataStack`'s own output tree carries zero `type:'op'` nodes; the retyped `'section'`
+   marker is still findable (not silently deleted) and still carries its real children.
+3. **OUTCOME**, exactly as asked — not a marker count: real Homing+Corner program (Corner's own `dist` param set
+   to a distinctive `741`), `ddcsSerializeWithMarkers()` → `importMarkedNc()`, asserting BOTH ops survive with
+   the SAME opTypes AND corner's own real param value survives — not an empty/default param set, the actual
+   failure mode this bug produced.
+
+**Non-vacuity, the full matrix, not just the endpoints:** reverted each file independently (scratch-backed,
+never `git stash`) and reran all three tests at each combination — algorithm reverted alone: test 1 fails (exact
+old symptom, `opId: undefined`), tests 2+3 pass (the algorithm fix alone is already sufficient for the OUTCOME,
+confirming builder fix and algorithm fix are independently valuable, not redundant); builder reverted alone:
+test 2 fails (`type:'op'` node reappears), tests 1 (synthetic, unaffected by which builder is broken) + 3
+(algorithm fix alone still resolves the real scenario correctly) pass; BOTH reverted: all 3 fail, test 3
+reproducing the EXACT original symptom byte-for-byte (`afterTypes[1]: "homing"` instead of `"user_corner_data"`).
+Restored both fixes, all 3 pass again. This is the "two separate proofs" the dispatch asked for, plus the third,
+outcome-level one, cross-checked against every combination rather than just before/after.
+
+### Architecture map
+
+Two citations shifted by this turn's own line insertions, caught by the node gate itself (not missed): TRAP6
+(`homingData.js`'s `setup_datawiz` line, 167→187) and INV3 (`programModel.js`'s subscriber-isolation
+`console.error`, 236→253 — note: NOT my new `console.error`, a pre-existing, unrelated one the new code simply
+pushed further down). Both fixed; grepped for any other citation touching either file — none.
+
+### Gate
+
+- `npm run test:node`: 118/118 (after the two architecture-map fixes; failed twice beforehand on stale
+  citations, fixed each, re-ran clean).
+- `homing-data-emit.spec.js` (the pre-existing, closest-to-direct regression check for `applyHomingRecompose`):
+  3/3, including the one line updated for the new marker shape.
+- Full gate, grepped for actual symbol/import usage (not filenames) across `programModel.js`/`opSchema.js`/
+  `homingData.js`: 40 files, 114 tests. **111 passed direct, 2 flaky** (`modal-pre-canvas-1654.spec.js`,
+  `subscriber-error-surface-1656.spec.js` — both a `window.__blkws` boot-timeout under the heavy batch, NOT a
+  logic failure) — re-ran BOTH files in isolation 3 consecutive times: **5/5 clean every run, zero retries**,
+  confirming batch contention, not a regression. **1 pre-existing, unrelated `test.fixme`**
+  (`homing-io-ui-cleanup.spec.js`, about run-row UI chips, nothing to do with this turn). **0 real failures.**
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1842` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+.ddcs/.mjson save is SAFE, confirmed by tracing the actual call chain (serializeProject → raw getStack(), never
+opAtLine) — the real, narrower affected feature is the ordinary "download .nc" (marker path by default) +
+"reopen that .nc later" round trip. Both layers fixed, in the requested order, each proven independently AND
+against the full revert matrix. The algorithm fix alone already resolves the real-world scenario correctly (not
+just loudly) — the builder fix's own value is closing the ROOT cause (so the algorithm's new guard clause
+becomes dead code for THIS defect, while still standing watch for the next one) and restoring homing's own
+shape to match its siblings. The builder fix took one real detour worth flagging: my first attempt (give the
+wrapper an id) is architecturally impossible in this system (`stripIds` always wins) — found and reverted before
+shipping it, not caught later. The SECOND, more important finding: the wrapper isn't disposable — `applyHoming
+Recompose` depends on it as its own anchor, confirmed by an existing test breaking on the first "just strip it"
+instinct. Final fix retypes rather than removes, reusing the SAME transparent-grouping type (`'section'`)
+siblings already use, verified safe for Blockly rendering (already registered, already declares a mouth) rather
+than assumed safe. atc_table confirmed clean (t1840's UNVERIFIED flag resolved) — homing is the only affected
+type. Three tests, non-vacuous across the full 2×2 revert matrix, not just endpoints. No work on Option B this
+turn (separate, still design-only). Gate: node 118/118 (2 stale architecture-map citations fixed), 111/114 direct
++ 2 confirmed-clean-on-isolation, 1 pre-existing unrelated skip, 0 real failures.
+
+🔨 turn 1842
