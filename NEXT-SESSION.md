@@ -2252,7 +2252,16 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
                                              byte-identical except a live-canvas-template override that
                                              only matters MID-AUTHORING -- a fresh insert cannot
                                              distinguish it, so that case stays uncovered.
-  4  pixels not element-exists           [ ]
+  4  pixels not element-exists           [x]  t1782 -- folded into primary-route-real-gesture-1776
+                                             samples #blk_userViz3dContainer + #blk_userVizContainer via
+                                             drawImage+getImageData, asserts NON-UNIFORM pixels. WebGL
+                                             readback WORKS with no preserveDrawingBuffer -- the advisor's
+                                             scene-graph fallback caveat was unnecessary. FOUND A REAL
+                                             RACE: the 3D renders EVENT-DRIVEN, not in a loop, so a
+                                             single-shot sample can catch it mid-blank -> bounded 5s poll.
+                                             Docblock records that the poll SELF-HEALS on a blanked canvas
+                                             (the app truly redraws), so the non-vacuity proof needed the
+                                             single-shot form. 16 *-in-place files named, NOT touched.
   5  surface via the real chain          [ ]
   6  drawn position vs readout           [ ]
 
