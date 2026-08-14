@@ -985,10 +985,13 @@ export function createPreviewPanel(container, opts = {}) {
                 // start. A multi-point probe (rotary 3-point fit, alignment A/B) repositions between touches → one pass
                 // each; the wizard supplies a per-pass hint array (getStartHints) so the passes land at DISTINCT points
                 // (else all passes default to the same start and the circle solve is degenerate). Pass 0 also honours a
-                // user drag (curStart, via st). setSegments has already grown viz.starts to passCount.
-                if (v.starts) {   // sync the 3D markers from the shared per-pass starts (computed above for both views)
-                    for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z, anchorsAtPrev: !!passStarts[p].anchorsAtPrev, pinned: !!passStarts[p].pinned };   // t94 draw-anchor flag + t301 `pinned` (a datum-held wall — _markerWorld skips the passEnds relocation)
-                }
+                // user drag (curStart, via st).
+                // t1850 — mirrors t2.setStarts(passStarts) above: the 3D view's own setStarts() replaces v.starts
+                // wholesale from the DECLARED per-pass array (same t94 anchorsAtPrev + t301 pinned fidelity the old
+                // per-index sync loop had), and rebuilds spindleMarkers to match its length — closing the gap where
+                // setSegments's own _passCount (trace-derived, WORK-LOG t1786→t1848) undercounted a program whose
+                // ops (e.g. Homing) emit no REPOSITION comment of their own.
+                if (v.setStarts) v.setStarts(passStarts);
                 if (v._syncJogPos) v._syncJogPos();   // t297 — BIDIRECTIONAL pendant: refresh the jog-pendant Pos fields from the freshly-mirrored viz.starts, so EVERY drag surface (2D-top handle, Layout ◇/#-handle, 3D gizmo) writes the pendant back — not only the 3D gizmo. Kills the pendant-overrides-handle asymmetric-refresh bug (setGcode runs after every drag). syncPos skips the focused field → live typing is safe.
                 if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
                 if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour. t1684 — the DECLARED tri-state, undisturbed (see the 2D call site's note)

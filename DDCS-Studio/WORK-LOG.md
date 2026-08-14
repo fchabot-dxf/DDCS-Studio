@@ -32129,3 +32129,115 @@ shape. The fix's own shape is now obvious but intentionally not built — that's
 new test 2/2 confirmed failing, non-flaky.
 
 🔨 turn 1848
+
+## turn 1850 — FIX bug 3 (the last of the three t1786 trace bugs): the 3D marker array now rebuilds
+
+Dispatch: fix bug 3, per t1848's own diagnosis (a NAME MISMATCH, bug 1's own family — "pass count" means two
+different things). Explicit warnings: enumerate every `_passCount` consumer before changing its source (the
+first `_framed()` fix went wrong by being right about the cause and too broad in the remedy); test the PICTURE
+(count AND position), not just the number; re-run both screenshot baselines and stop if either moves; if the
+fix makes `stats.passes` itself look wrong for its OWN consumers, name it and stop rather than fixing it here.
+
+### The consumer enumeration (done BEFORE touching source, per the dispatch)
+
+Three places in `gcodeViz3d.js` read `_passCount`:
+
+1. **`_ensureMarkers()`** — the marker-rebuild trigger + loop bound + `selectedStart` clamp. Wants the DECLARED
+   count (how many pass starts the program actually declares). **FIXED**: rebuilds to
+   `Math.max(this._passCount, this.starts.length)` — never smaller than either source, so it can't undercut a
+   caller that pre-populates `starts` beyond `_passCount` (the normal path, this fix) NOR one that sets
+   `_passCount` directly without touching `starts` (`marker-colour-by-source.spec.js`'s own first test, line
+   31-47 — manipulates `viz._passCount = 3` alone; `Math.max` keeps it working unchanged).
+2. **`setSegments()`'s own `this.starts` array sizing** — previously grew AND TRUNCATED to `_passCount`, which
+   silently discarded real, already-correct entries a caller had just set. **FIXED**: grow-only, truncation
+   line removed.
+3. **`_rebuild()`'s own per-pass route-drawing loop** (`byPass[p]`, grouping ACTUAL TRACED SEGMENTS by the
+   trace engine's own per-segment `.pass` index) and the SAME loop's `_dataBounds` (read by `fitAll()` for
+   camera framing) — **LEFT UNCHANGED, named per the dispatch's own escape valve.** This consumer genuinely
+   needs the TRACE-derived count: `byPass` is keyed by the trace engine's own pass index, which has no declared-
+   count equivalent without deeper trace-engine work (a segment doesn't know which DECLARED pass it belongs to,
+   only which REPOSITION boundary it followed). Widening this loop's bound without also fixing how segments get
+   their own `.pass` index would misalign markers against route geometry — a different, deeper fix, out of
+   scope here. Consequence, confirmed empirically: `fitAll()`'s camera-fit inherits the SAME undercounting
+   limitation as bug 3 itself, a separate, pre-existing interaction (see screenshot section below).
+
+**Answering the dispatch's own "if they need different numbers, they need different names" directly:** they do.
+`_passCount` (trace-derived, `parsed.stats.passes`) and "declared pass-start count" (`passStarts.length`,
+`getPassStarts()`) are genuinely different concepts already carrying different names in the codebase — the bug
+was never that one name meant two things structurally, it was that the 3D view's marker-rebuild path (consumer
+1) was wired to the wrong one of the two already-named things. No renaming needed; re-wiring was.
+
+### The fix
+
+`createPreviewPanel.js`'s own pre-existing per-index sync loop (lines 984-991, which already correctly grew
+`v.starts` to the declared length via direct array-index assignment, just without ever triggering a rebuild
+comparison against it) is replaced by one call, `v.setStarts(passStarts)` — a new method on `GcodeViz3D`
+mirroring `t2.setStarts(passStarts)` one line above it (the 2D view's identical, already-proven seam), full
+parity with the old loop's own `anchorsAtPrev` + `pinned` fields (`pinned` matters — read directly by
+`markerWorld.js:14`, confirmed by grep before assuming a plain map was safe). One call site instead of two near-
+duplicate blocks; `setStarts()` also fully replaces `v.starts` (matching the 2D view's own contract) rather than
+partially merging, which additionally fixes a latent, un-asked-for adjacent bug: the old per-index loop never
+truncated stale extra entries if a later program declared FEWER passes than a prior one — noted, not chased
+further, since it was never reachable as bug 3's own symptom.
+
+### Non-vacuity
+
+Scratch-backed both fixed files, reverted to HEAD via `git checkout HEAD --`, re-ran
+`marker-rebuild-1848.spec.js`: **fails 2/2 (6/6 across Playwright's own retries)**, both with the exact
+predicted `markerCount: 1` where 3 or 5 was expected. Restored from scratch, re-ran: **passes 2/2.**
+
+### The picture, not just the number
+
+`marker-rebuild-1848.spec.js` already asserts XY position (within 1mm of each declared pass start), not count
+alone — satisfies the dispatch's own requirement structurally. Additionally chased a VISUAL screenshot: a manual
+`viz.fit()` computed from the correct `viz.starts` (all 3 real positions, confirmed via direct JS inspection)
+still showed only the tight, Homing-only zoomed view — traced to the panel's own documented default
+autoplay/loop behavior overriding the one-time `fit()` call (`tests/support/simControls.js`'s own established
+`stopLiveSim()` convention exists for exactly this). Applying `stopLiveSim(page, '#blk-preview-panel')` before
+the manual fit produced a correctly wide view showing real traverse geometry spanning from Homing's own start
+out to Corner's own walls (screenshot taken, reviewed, then the throwaway diagnostic deleted per convention —
+the permanent numeric+position proof lives in the guard test, not a kept screenshot).
+
+### Screenshot baselines
+
+`screenshot-baselines-1792.spec.js` + `render-equivalence-1796.spec.js`: **6/6 pass, zero diff** (the 3D box is
+masked in both, as the dispatch expected). No stop-and-report triggered.
+
+### Unplanned: 2 architecture-map TRAP8 citations rotted, fixed in the same act
+
+`npm run test:node` first run: 117/118 — `architecture-map-1698.test.mjs` caught that this turn's own edits
+shifted two `file:line` citations out from under their claims (line-shift hygiene, same class as t1842's own two
+fixes). `createPreviewPanel.js`'s z-index comment moved 1121-1122 → 1124-1125; `gcodeViz3d.js`'s `attach()`
+moved 2779 → 2803. Verified each new location by grep before writing it down, updated both `ARCHITECTURE.md`
+§8 and the test's own `TRAP_CLAIMS` array to match. Re-ran: 118/118.
+
+### Gate
+
+- `npm run test:node`: 118/118 (after the citation fix above).
+- `marker-rebuild-1848.spec.js` (isolated): 2/2, non-vacuous per above.
+- `marker-colour-by-source.spec.js`: 6/6 unaffected (confirms the `Math.max` design choice held).
+- Both screenshot baselines: 6/6, zero diff.
+- Full 56-spec gate (every spec touching `createPreviewPanel.js` or `gcodeViz3d.js`, built via grep on actual
+  file mentions, not filenames alone): 175 passed, 2 skipped, 2 flaky — **both flaky results were
+  `marker-rebuild-1848.spec.js`'s own two tests**, a `.blk-view-btn[data-view="3d"]` click timing out at 5000ms
+  under the 4-worker parallel load (both retried and passed automatically). Re-ran in isolation, `--retries=0`,
+  once more specifically to rule out a real intermittent defect rather than accept the auto-retry: **2/2 clean**
+  — the 4th consecutive clean isolated run of this exact test this turn (post-fix, post-non-vacuity-restore, and
+  now this). Reported honestly as load contention (heavy concurrent CPU/render pressure from 56 specs racing 4
+  workers, several of them themselves 3D-panel-heavy), not glossed over.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+
+### For the advisor
+
+Fixed, non-vacuous, gated. The consumer enumeration found exactly one genuine "needs a different number"
+case — `_rebuild()`'s own route-drawing loop / `_dataBounds` / `fitAll()`'s camera-fit — named per your own
+escape valve, not touched. That means the whole-program 3D preview's camera-fit on a program like Homing+Corner
+will still, on its own default autoplay, initially frame tighter than the full route until the user manually
+orbits/zooms — a real, separate, pre-existing limitation, not reachable without deeper trace-engine changes to
+give segments their own declared-pass index. Flagging it as its own future item rather than folding it into
+this fix. The 56-spec gate's 2 flaky results were both this turn's own new/changed test, both traced to worker-
+count contention (confirmed via a clean isolated re-run), not a defect. Caught and fixed 2 incidental
+architecture-map citation rots as part of this same act (line-shift hygiene from this turn's own edits).
+
+🔨 turn 1850

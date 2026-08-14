@@ -353,18 +353,30 @@ export class GcodeViz3D {
     // JOG START pendant — implementation in viz/jogPendant.js
     _setupJogPendant() { setupJogPendant(this); }
 
-    // Recreate markers only when the pass count changes
+    // Recreate markers only when the pass count changes.
+    // t1850 — a marker per DECLARED pass start (`this.starts`, fed by `setStarts()`), not per `_passCount` alone.
+    // `_passCount` is the TRACE's own count of `REPOSITION:` comment boundaries crossed during execution
+    // (GcodeExecutionEngine.js's own `_maxPass + 1`) — a real but NARROWER concept than "how many passes this
+    // program declares": an op that contributes no REPOSITION comment of its own (Homing) is invisible to it, so
+    // a Homing+Corner program's `_passCount` reads 2 while it genuinely declares 3 pass starts (WORK-LOG
+    // t1786→t1848 own diagnosis). `_rebuild()`'s own per-pass route-drawing loop (below) still reads `_passCount`
+    // alone, unchanged — it groups TRACED SEGMENTS by their own trace-pass index, which is a real, different
+    // question ("how many distinct segment groups did the trace produce") this fix does not touch. Marker count
+    // uses `Math.max` so it can never undercut EITHER a caller that pre-populates `this.starts` beyond
+    // `_passCount` (this fix) or one that sets `_passCount` directly without touching `starts` (the existing
+    // `marker-colour-by-source.spec.js`'s own test, unchanged) — never smaller than either source.
     _ensureMarkers() {
-        if (this.spindleMarkers.length === this._passCount) return;
+        const n = Math.max(this._passCount, this.starts.length);
+        if (this.spindleMarkers.length === n) return;
         for (const m of this.spindleMarkers) this.partFrame.group.remove(m);
         this.spindleMarkers = [];
         this._hoverKey = undefined;
-        for (let p = 0; p < this._passCount; p++) {
+        for (let p = 0; p < n; p++) {
             const m = this._makeMarker(p);
             this.spindleMarkers.push(m);
             this.partFrame.add(m);   // start markers ride the part frame
         }
-        if (this.selectedStart >= this._passCount) this.selectedStart = 0;
+        if (this.selectedStart >= n) this.selectedStart = 0;
         if (this._renderJogStarts) this._renderJogStarts();   // refresh the jog pendant's start selector
     }
 
@@ -432,6 +444,14 @@ export class GcodeViz3D {
             const tex = this._startGlyphTex(g.shape, g.fill);
             if (glyph.material.map !== tex) { glyph.material.map = tex; glyph.material.needsUpdate = true; }
         }
+    }
+    // t1850 — the DECLARED per-pass operator starts (mirrors toolpath2d.js's own `setStarts`, the 2D view's
+    // identical seam) — the marker-rebuild's own correct source (WORK-LOG t1848/t1850), replacing `this.starts`
+    // wholesale on every call (no partial-merge with a prior drag: a drag writes back through `onStartChange`
+    // into the DECLARED model, so the next recompute already carries it — same contract the 2D view relies on).
+    setStarts(arr) {
+        this.starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, anchorsAtPrev: !!p.anchorsAtPrev, pinned: !!p.pinned })) : [{ x: 0, y: 0, z: 0 }];
+        this._ensureMarkers();
     }
     // Per-pass reposition sources (['auto'|'manual',…]) → start-marker colour. Re-applies via the highlight pass.
     setStartSources(sources) { this._startSources = Array.isArray(sources) ? sources : []; this._highlightSelectedStart(); this.render(); }
@@ -1048,9 +1068,13 @@ export class GcodeViz3D {
     setSegments(parsed, fit = true) {
         this._segs = (parsed && parsed.segments) || [];
         this._passCount = Math.max(1, (parsed && parsed.stats && parsed.stats.passes) || 1);
-        // one draggable start per pass (keep existing positions; new passes default to origin)
+        // one draggable start per pass (keep existing positions; new passes default to origin). t1850 — GROW to
+        // cover _passCount, but never SHRINK: `this.starts` may already hold MORE entries than `_passCount` when
+        // `setStarts()` was called with the DECLARED pass-start array first (the normal path, `createPreviewPanel
+        // .js`'s own `setGcode`) — `_passCount` (trace-derived) can genuinely undercount vs the declared array
+        // (WORK-LOG t1848/t1850). Truncating here used to silently discard the extra, already-correct entries
+        // `setStarts()` had just set, right back down to the trace's own narrower count.
         while (this.starts.length < this._passCount) this.starts.push({ x: 0, y: 0, z: 0 });
-        this.starts.length = this._passCount;
         this._ensureMarkers();
         this._rebuild();
         // fit re-frames the camera; skip it on live re-renders (e.g. wizard input changes) so the

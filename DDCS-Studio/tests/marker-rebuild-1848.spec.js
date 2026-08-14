@@ -30,7 +30,34 @@ import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.j
  * become 2 on the next `setSegments` call). `_ensureMarkers()`'s own rebuild-skip guard is not the root cause;
  * it is working exactly as designed against a `_passCount` fed from the wrong source in the first place — the
  * SAME shape as bug 1's own `_framed()` gap (a naming/routing mismatch one layer above the visible symptom, not
- * the layer where the symptom appears). Not fixed this turn — diagnosis only, per the dispatch.
+ * the layer where the symptom appears).
+ *
+ * FIXED at t1850, after enumerating every `_passCount` consumer in `gcodeViz3d.js` first (per the dispatch's own
+ * explicit warning: the first `_framed()` fix went wrong by being right about the cause and too broad in the
+ * remedy). Three consumers found:
+ *   (a) `_ensureMarkers()` — the marker-rebuild trigger. Wants the DECLARED count. FIXED: rebuilds to
+ *       `Math.max(this._passCount, this.starts.length)`, never smaller than either source (keeps
+ *       `marker-colour-by-source.spec.js`'s own direct `_passCount=3` manipulation working, since it never
+ *       touches `starts`).
+ *   (b) `setSegments()`'s own `this.starts` sizing — previously grew AND TRUNCATED to `_passCount`, silently
+ *       discarding real, already-correct entries `setStarts()` had just set. FIXED: grow-only, truncation
+ *       removed.
+ *   (c) `_rebuild()`'s own per-pass route-drawing loop (`byPass[p]`, grouping ACTUAL TRACED SEGMENTS by the
+ *       trace's own per-segment `.pass` index) and the SAME loop's `_dataBounds` (read by `fitAll()` for camera
+ *       framing) — LEFT UNCHANGED. This consumer genuinely needs the trace-derived count: `byPass` is keyed by
+ *       the trace engine's own pass index, which has no declared-count equivalent without deeper trace-engine
+ *       work. NAMED, not fixed, per the dispatch's own "if it makes stats.passes look wrong for its OWN
+ *       consumers, do not fix that here" instruction — `fitAll()`'s camera-fit inherits this same limitation
+ *       (confirmed: a manual `viz.fit()` computed from the correct `viz.starts` still requires `stopLiveSim()`
+ *       first, `tests/support/simControls.js`, to see past the panel's own default autoplay/loop — a separate,
+ *       pre-existing interaction, not this bug).
+ *
+ * `createPreviewPanel.js`'s own pre-existing per-index sync loop (which already, correctly, grew `v.starts` to
+ * the declared length via direct array-index assignment) is replaced by a new `v.setStarts(passStarts)` method
+ * on `GcodeViz3D`, mirroring `t2.setStarts(passStarts)` — the 2D view's identical, already-proven seam — one
+ * call site instead of two near-duplicate blocks, same t94 `anchorsAtPrev` + t301 `pinned` fidelity preserved.
+ * Non-vacuous: reverting both files (`git checkout HEAD --`) fails both tests below 2/2 (6/6 across Playwright's
+ * own retries) with `markerCount: 1` where `3`/`5` was expected; restoring passes 2/2.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
