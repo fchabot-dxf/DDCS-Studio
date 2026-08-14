@@ -32034,3 +32034,98 @@ honestly at 4/5 clean rather than smoothed over. Diff this turn: `programModel.j
 and the architecture-map citation shift it caused, plus the test file. Nothing else touched, as asked.
 
 🔨 turn 1846
+
+## Turn 1848 — Bug 3 diagnosed: a name mismatch, bug 1's own family, one layer above the symptom
+
+### Dispatch
+
+RELEASED V2026.08.14.5, full suite zero failed. The last of the three t1786 trace bugs: `panel.viz
+.spindleMarkers.length` stuck at 1, OBSERVED in t1786, re-confirmed at t1826, re-measured UNMOVED four separate
+times since across the whole bug1/bug2 fix chain — unusually well-established, meaning it's genuinely
+independent of everything touched so far. STEP 1: test first, asserting the OUTCOME — after Corner's own params
+change, the 3D markers REBUILD to the right COUNT and the right POSITIONS, not that some array got reassigned.
+State plainly what a person actually SEES wrong, screenshot it. If the count is stuck but the PICTURE is
+correct, the measurement was the wrong proxy — a third real-in-code-unreachable finding would be a fine answer.
+STEP 2: diagnose only, then stop — do not fix. Specifically check whether this is ANOTHER instance of the SAME
+two families hit today (a name meaning two things; state that outlives the thing that set it) before assuming
+it's new. If it's neither, say so. Gate: node tier + the new test. No fix this turn.
+
+### STEP 1 — the real symptom, screenshotted, then the outcome test built and proven non-vacuous
+
+**Screenshotted first, per the dispatch's own instruction to state what a person actually sees.** Built a real
+Homing+Corner program, switched to the Blocks tab's own 3D sub-view (`.blk-view-btn[data-view="3d"]` — inserting
+an op auto-selects it for editing, which collapses `#blk-preview-panel` to a genuine `0×0` rect, confirmed by
+direct measurement, matching t1838's own earlier finding for a sibling panel; had to switch views to see the
+whole-program preview at all). **The picture IS actually wrong, not just the count** — sent as a file alongside
+this turn: the 3D view shows exactly ONE position readout, near Homing's own start; nothing marks where Corner's
+own two walls will be probed. This rules out the "measurement was the wrong proxy" possibility the dispatch
+named as an acceptable answer — it is not that answer this time.
+
+**`marker-rebuild-1848.spec.js`, two tests, both asserting the OUTCOME:**
+1. The whole-program preview marks every declared pass start — right COUNT (`spindleMarkers.length` ===
+   `getPassStarts().length`) AND right POSITION (each marker's XY within 1mm of its own declared pass start).
+2. The markers REBUILD when a real "insert another pass" gesture (a second Corner probe) changes the declared
+   pass-start count — not frozen from the very first render.
+
+**Both fail on today's code, confirmed 3/3 with retries (not flaky — the SAME error every single time):** test 1
+— `markerCount:1` vs `passStarts.length:3`; test 2 — the program's own declared pass-start count genuinely grows
+(confirmed) but `markerCount` stays frozen at 1 regardless.
+
+### STEP 2 — diagnosed, not fixed: a NAME MISMATCH, bug 1's own family
+
+**Traced precisely, not guessed at.** `createPreviewPanel.js`'s own `setGcode` (:888) computes `passStarts` via
+`computePassStarts()` — the DECLARED, correct, per-op-concatenated count (confirmed: 3 for Homing+Corner,
+matching `getPassStarts()`) — and correctly feeds it to the 2D sibling view (`t2.setStarts(passStarts)`, :935).
+**But the 3D `viz`'s own rebuild trigger never receives it.** `v.setSegments(parsed, !fitted)`
+(`createPreviewPanel.js:996`, confirmed the ONLY call site) passes ONLY the trace result — `gcodeViz3d.js`'s own
+`setSegments(parsed, fit)` (:1048-1050) derives `_passCount` entirely from `parsed.stats.passes`
+(`GcodeExecutionEngine.js:300,464`) — a DIFFERENT, narrower concept: a count of `REPOSITION:` COMMENT boundaries
+crossed during trace EXECUTION, not of declared pass starts.
+
+**Why this specific combination (Homing then Corner) triggers it, measured not assumed:** Homing emits no
+`REPOSITION:` comment (it isn't a multi-pass op in that sense); Corner emits exactly one, between its own wall1
+and wall2. So the trace-execution counter never sees a boundary before Corner's own first wall — Homing +
+Corner's-wall1 read as ONE undivided pass to `parsed.stats.passes`, and only the wall1→wall2 crossing counts.
+Measured directly (a fresh `traceToolpath()` call on the live projection text): `stats.passes` computes to **2**
+for this program — not 3 (the correct answer) and not the OBSERVED 1 either. The live panel's own internal
+`viz._passCount`, checked directly, reads **1** — stale from Homing's own SOLO first render (before Corner
+existed, when `stats.passes` was legitimately 1) and never re-derived to 2 on the next `setSegments` call the
+way it should have been. `_ensureMarkers()`'s own rebuild-skip guard
+(`if (spindleMarkers.length === this._passCount) return`) is not itself the defect — it is working exactly as
+designed against a `_passCount` fed from the wrong source from the start.
+
+**Answering the dispatch's own explicit question: this IS one of today's two families — a NAME MISMATCH, bug
+1's own family, not "state that outlives its setter."** "Pass count" means two different things in this
+codebase: the DECLARED, per-op `opSimStarts`-based count (`passStarts.length`, correct, already computed and
+already fed to the 2D view) and a TRACE-TEXT-DERIVED count of manual-reposition boundaries
+(`parsed.stats.passes`, a real but narrower concept — it doesn't know an op like Homing constitutes its own pass
+unless that op happens to ALSO emit a REPOSITION comment). The 3D marker-rebuild path is wired to the wrong one.
+This is the SAME shape as bug 1's own `_framed()` gap (`'op'`/`'user_root'`/`'endprogram'` — three names one
+unwrap check failed to reconcile) — a naming/routing mismatch ONE LAYER ABOVE where the symptom appears (the
+symptom is "markers don't rebuild"; the cause is "the wrong count feeds the rebuild-trigger comparison"), not a
+defect in `_ensureMarkers()`'s own equality check, which is the layer the symptom is actually observed at.
+
+**Not fixed, per the dispatch's own explicit instruction.** The shape of a fix is now obvious (thread
+`passStarts.length` — or `passStarts` itself — into `v.setSegments()`, mirroring what `t2.setStarts(passStarts)`
+already does) but is left for its own act, not decided or built here.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched — a new test file only).
+- `marker-rebuild-1848.spec.js`: 2/2 tests, both confirmed FAILING on today's code, 3/3 consistently (not
+  flaky — the identical error every retry), exactly as STEP 1 requires.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1848` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+The picture is genuinely wrong (screenshot sent), not a stuck-count-only case — the "wrong proxy" answer does
+NOT apply here. Diagnosed to a precise root cause, not just a symptom: `createPreviewPanel.js`'s own `setGcode`
+already computes the DECLARED, correct pass-start count and already feeds it to the 2D view one line away from
+where the 3D view's own rebuild trigger is called — the 3D path alone was left wired to a narrower, trace-text-
+derived count that doesn't know a non-reposition-marked op (Homing) constitutes its own pass. Named explicitly,
+as asked: this is a NAME MISMATCH, bug 1's own family — not state outliving its setter, and not a new, third
+shape. The fix's own shape is now obvious but intentionally not built — that's its own act. Gate: node 118/118,
+new test 2/2 confirmed failing, non-flaky.
+
+🔨 turn 1848
