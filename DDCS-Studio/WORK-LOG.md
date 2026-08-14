@@ -28722,3 +28722,140 @@ just the narrower affected subset vs. leave `ddcsLoadBlockStack` as pane-only-sa
 for you.
 
 🔨 turn 1796
+
+## Turn 1798 — CONFIRM the t1796 finding via the real open path, then diagnose (no fix)
+
+### Dispatch
+
+t1796's pane test found corner's marker rendering as a hollow, unlabeled glyph via `ddcsLoadBlockStack(capturedProgram)`
+on a fresh page/context, vs. a filled, labeled glyph via the real bar->Insert->Blocks chain. The advisor traced the glyph
+resolver (`toolpath2d.js:224-243`) and found the divergence is not cosmetic: SHAPE encodes whether dragging the
+marker EDITS THE PROGRAM (filled = AUTO/emitting) or does nothing (hollow = sim-only) — the two renders make
+CONTRADICTORY PROMISES about the same marker. `ddcsLoadBlockStack` is reachable from real paths, not just tests
+(`commandDeck.js:137-142`'s file-open, `editorOpHover.js:67`, `globalFunctions.js:196`/`:387`). STEP 1: confirm
+the real user-facing symptom via the real "open a saved program" gesture (not `window.ddcsLoadBlockStack`
+directly) — build corner, export via markers, open that file back through the real UI, look at wall1. If it
+does not reproduce, say so and STOP. STEP 2 (gated on confirmation): diagnose the mechanism, no fix. Test the
+advisor's own hypothesis (`startEmits` sourced from the active wizard session, empty after a load) and whether
+this shares a root with the already-known "3D marker array never rebuilds for corner" finding. Gate: node tier
++ the touched spec; no full suite. Screenshots are the deliverable.
+
+### Step 1 — confirmed, but NARROWER than the original finding suggested
+
+Built a throwaway diagnostic (`tests/zzdebug-1798-real-open-path.spec.js`, deleted after use per this project's
+own scratch-spec convention) driving four variants, all on real UI gestures:
+
+- **A** — real bar->fill->Insert corner, click Blocks tab. Screenshot: correct (filled square, labeled).
+- **B** — from A, export via `window.ddcsSerializeWithMarkers()` (the SAME function `editorManager.js:220`'s
+  own Export/Download uses — confirmed by reading that call site, not assumed), write to a real temp `.nc`
+  file, then the REAL "open a saved program" gesture: switch to the STUDIO tab (`#editor-file-btn` lives in
+  the main editor toolbar, hidden while Blocks is active), open the file menu, click "Load...", and hand
+  Playwright's real file-chooser the temp file — genuinely driving `commandDeck.js`'s `window.loadGcodeFile()`
+  end to end (`importMarkedNc` -> `ddcsLoadBlockStack`), not a direct API call. Re-open Blocks. Screenshot:
+  **correct** (filled, labeled) — byte-plausible match to A; `ddcsGetBlockProgram()` before/after is
+  structurally identical (same params, same shape, only fresh block ids, as expected from a rebuild).
+- **C** — isolates the two variables t1796's ORIGINAL pane test changed at once (fresh browser context AND raw
+  `ddcsGetBlockProgram()`-capture vs. marker-reconstruction): feed the RAW captured program from A into
+  `window.ddcsLoadBlockStack` directly, but on the SAME already-warmed page (no fresh context). Screenshot:
+  **correct**. This rules out "raw capture vs. marker-rebuilt object shape" as the cause — identical either way
+  on a warm page.
+- **D** — the decisive variant: a **genuinely cold page that never opens any wizard first** (no bar click at
+  all), going straight to the real file-open gesture for the SAME saved corner program. This is a completely
+  ordinary real user flow (launch the app, first action is opening yesterday's file). Screenshot: **reproduces
+  the bug** — the marker renders as a small hollow circle, no number label, exactly the degraded glyph t1796
+  found. Confirmed NOT a transient race: waited 2.5s + dispatched a `resize` event + re-screenshotted (D2) —
+  still hollow, no self-correction.
+
+**So the finding survives, but narrower than t1796 implied**: it is NOT a synthetic-test-only artifact (the
+real Load gesture reproduces it), but it IS conditioned on the page never having opened a wizard first in the
+session — every one of the OTHER 3 real-reachable `ddcsLoadBlockStack` call sites the advisor named
+(`editorOpHover.js:67`, `globalFunctions.js:196`/`:387`) fire only from an already-interactive session (hovering
+an existing op in the editor, transforming an existing program) — i.e. an already-warm page. The one call site
+that plausibly runs cold — `commandDeck.js`'s file-Load, a user's very first action after launching the app —
+IS affected. The affected marker in this cold-load repro is **wall1** (labeled "1" in the earlier screenshots),
+confirmed the same one t1796 found — see the `__t2starts` dump below, which resolves index 1 (`emits:true`, the
+filled-square case) as the one that degrades.
+
+### Step 2 — the advisor's hypothesis is FALSIFIED with evidence; the actual mechanism is still open
+
+**Hypothesis tested**: "startEmits is populated from the active wizard session... after a load there is no
+active op, so the per-pass emits array is empty and the shape falls back to hollow — a one-source-of-truth
+violation, DERIVED FROM SESSION STATE."
+
+**Killed.** Traced every consumer: `opSimStarts(opType, params, stock)` (`viz/opSimStarts.js:295-300`) is a
+PURE function of its three arguments, reading only the `USER_STARTS`/`BUILT_IN` registries — populated once, at
+`registerUserOp()` time (`blocks/userOps.js:976`'s `setUserSimStarts(def.opType, provider, starts)`), not per
+render, not from any live wizard-session object. Both real call sites of this function for the pane view —
+`wizards/views/userOpView.js:541` (the per-op wizard-view pane, `getStartHints`) and
+`blocks/blocksApp.js:158-167`'s `blkStartHints` (the Blocks canvas's own always-on preview) — call it fresh with
+the op's own `params` read straight from the shared program model (`getStack()`), never from "the active
+session." Direct evidence: `toolpath2d.js:204`'s own debug hook, `canvas.__t2starts` — written in the SAME
+synchronous `paint()` call immediately after `drawStartHandles` runs (`toolpath2d.js:199` then `:204`), so it
+mirrors exactly the `source`/`emits` values that call used — was read from the live canvas in BOTH the warm (B)
+and cold (D) cases:
+
+```
+T2STARTS B (warm, real reload): [{"i":0,...,"source":"auto","emits":false},{"i":1,...,"source":"auto","emits":true}]
+T2STARTS D (cold, real load):   [{"i":0,...,"source":"auto","emits":false},{"i":1,...,"source":"auto","emits":true}]
+```
+
+**Byte-identical.** The declared per-pass data reaching the renderer is not empty, not different, not stale —
+it is exactly correct in both cases. Whatever breaks the cold render is NOT in `opSimStarts`, not in
+`computePassStarts` (`createPreviewPanel.js:776-795`), and not a session-state derivation at all.
+
+**What's actually happening is an open puzzle, reported honestly rather than forced to a conclusion**: since the
+declared data is identical but the drawn pixels persistently differ (not a momentary race — D2's wait+resize
+didn't fix it), and `__t2starts` is written in the same call as the paint it's describing, either (a) the
+`__t2starts` I read belongs to a DIFFERENT toolpath2d canvas instance than the one visibly wrong (this op's
+wizard-view pane instantiates the panel via TWO separate `preview3D` calls per `userOpView.js:669-673` — one
+for the 3D box, one for the always-2D "Layout" box that carries this glyph — my query took the first canvas
+matching `.__t2starts` under `#blk_wiz_user`, which is not provably the right one if more than one exists), or
+(b) `drawStartHandles` itself reads a stale closure over `startSources`/`startEmits` that disagrees with what
+`canvas.__t2starts` reports moments later, which would be a genuine same-function inconsistency worth its own
+instrumentation. I did not chase this further — it's real diagnostic work beyond "confirm + name the
+mechanism," and the dispatch was explicit: no fix this turn.
+
+**Shared-root question — inconclusive by architecture, not tested empirically.** The previously-reported "3D
+marker array never rebuilds for corner" finding lives in a DIFFERENT preview panel entirely — the Blocks tab's
+own always-on whole-program preview (`blocksApp.js:169-176`'s `blk-preview-panel`, fed by `blkStartHints`) — not
+the per-op wizard-view pane (`#blk_wiz_user`) this turn's repro used. Both are "corner-specific, marker-render,
+first-appearance" bugs by shape, and both ultimately trace back to the same `opSimStarts` family, but they run
+through separate call sites and separate panel instances. I did not reproduce the other finding fresh to
+compare directly — flagging this as a real open question rather than asserting either way.
+
+### Non-vacuity / evidence
+
+- Screenshots saved to `verification/`: `t1798-warm-correct-filled-square.png` (variant B),
+  `t1798-cold-bug-hollow-circle.png` (variant D) — the two decisive frames.
+- `__t2starts` dumps (above) captured live from the app, not asserted from memory.
+- The self-correction check (D2: +2.5s wait + forced `resize` event, re-screenshot) rules out a momentary paint
+  race as the full explanation.
+- `programBefore`/`programAfter` JSON dumps (both variants) confirmed structurally identical op records
+  (deep-equal params, differing only in freshly-generated block ids) — rules out a params/shape mismatch as
+  the cause.
+
+### Verify
+
+- Throwaway diagnostic spec run clean (both its tests green — it asserts only that markers export/import and
+  that the .nc carries `@DDCS:` markers; the glyph comparison itself was visual/screenshot, per the dispatch's
+  own "screenshots are the deliverable, not a green run"). Deleted after use.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source file touched this turn — confirm-and-diagnose only, per the dispatch's explicit "still no fix."
+- `handoff.py amendments --role worker`: none pending.
+
+### For the advisor
+
+Confirmed real, but narrower than it first looked: only a genuinely COLD page (no wizard opened yet this
+session) going through the real file-Load hits it — every other real `ddcsLoadBlockStack` call site you named
+runs on an already-warm page and is unaffected (tested C directly for the raw-capture path). The session-state
+hypothesis is dead — `opSimStarts` and its two real call sites are pure functions over the shared stack, and the
+live `__t2starts` debug values are byte-identical between the correct and broken renders. What's left standing
+is a genuine puzzle: correct declared data, wrong persistent pixels, no self-correction — pointing at either a
+wrong-canvas-instance read on my part or a real closure-staleness bug inside `drawStartHandles`/its two-preview-
+panel plumbing (`userOpView.js:669-673`), not yet isolated. Your call whether the next act chases that specific
+instrumentation, or treats "cold app + Load a saved corner program" as enough of a known-bad path to fix at a
+coarser grain (e.g. force one extra repaint after any `ddcsLoadBlockStack` import, matching this family's prior
+fix precedent noted at `toolpath2d.js:231-234`). The shared-root question with "3D marker never rebuilds" is
+open — different panel, same op, not empirically compared.
+
+🔨 turn 1798
