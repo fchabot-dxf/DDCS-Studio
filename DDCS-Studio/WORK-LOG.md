@@ -29266,3 +29266,106 @@ re-record and confirm. Architecture-map upkeep done in both the test's citations
 enough to make the gate pass. Broader sweep clean. Ready for review/merge from my side.
 
 🔨 turn 1804
+
+## Turn 1806 — CLOSE THE DEFERRED HALF: bind the host into the closure, not a singleton read at gesture time
+
+### Dispatch
+
+The t1804 fix closes `_writable` (evaluated synchronously during the render) but not three DEFERRED readers —
+`setFields`'s drag write-back, `onEdgePick`, `onCornerPick` — which call `_field` again at GESTURE time, long
+after the render that built them returned. `_formHost` is a module-level singleton; if a LATER render (a
+different surface) re-points it before the gesture fires, the hazard has moved, not closed. STEP 1: demonstrate
+whether the window is real — does closing a later-opened modal re-render the pane? If yes, it self-heals; if no,
+live bug. STEP 2: fix regardless (a load-bearing call-ordering assumption is the exact defect shape recent turns
+have been chasing) — capture the host ONCE at the top of `layoutSpecFromOp`, thread it through every closure
+built inside that call via closure capture, not a later re-read. Watch whether the form element is ever REPLACED
+(not just its children) — if so, capture a getter, not the element. Extend `canvas-handle-writable-1804` to
+guard the deferred path with non-vacuity. Gate: node tier + canvas-handle-writable-1804 + render-equivalence-1796
++ custom-op-canvas-handles + the two baselines.
+
+### Step 1 — the window is real, demonstrated with the REAL user-facing gesture, with an honest complication
+
+First attempt (tab-switch: pane renders → Studio tab → open modal → close → Blocks tab → drag) came back clean —
+the drag correctly wrote into the pane's own field. Traced why with a temporary `setFormHost` call-tracer: **the
+`[data-app="blocks"]` tab click itself re-renders the pane** (3 fresh `setFormHost` calls fire every time,
+confirmed by resolving each call's host id live) — so switching tabs self-heals, exactly as the dispatch's own
+"if closing always re-renders, the window closes on its own" branch predicted for THAT path.
+
+Found the REAL path that does NOT self-heal: `#blkOpenModal` ("Open as modal", `blocksApp.js`'s `openLiveAsModal`)
+opens the SAME op as a modal overlay WITHOUT ever leaving the Blocks tab — no tab switch, so no re-render trigger
+at all. Sequence: pane renders corner (cold) → click "Open as modal" (re-points `_formHost` to the modal,
+confirmed via the same call-tracer) → close the modal (confirmed: zero further `setFormHost` calls) → drag the
+pane's still-visible handle.
+
+**Complication, reported honestly rather than smoothed over**: the real drag in this exact scenario didn't reach
+`_writeParam` AT ALL (confirmed: added a trace inside `_writeParam` itself — zero calls during the drag,
+though the SVG element visibly existed at the exact drag coordinates, `elementFromPoint` confirmed a real `rect`
+there). This traces to a SEPARATE, unrelated hazard already named (but marked "so it never fires") in
+`ARCHITECTURE.md`'s own TRAP9 entry: `renderLayout2D`'s `_layout` FeatureCanvas is a SHARED MODULE-LEVEL
+SINGLETON across every surface. Opening the modal reparents it into the modal's container; closing the modal
+does not restore it to the pane's; the pane's own already-built SVG/listeners go stale relative to the
+singleton's current internal state. **This swallowed the pane's drag before it could reach the `_formHost`
+code at all in this specific real-gesture scenario** — a real, live, worse-than-hypothetical bug in its own
+right (corrected the TRAP9 entry's "so it never fires" claim in `ARCHITECTURE.md`, §9), but it means THIS
+particular real gesture cannot cleanly isolate the deferred-reader bug's own symptom (a stray write into the
+modal) — the two bugs are entangled in this one path.
+
+Given that, verified the deferred-reader bug on its own terms with a deterministic, gesture-free unit test
+instead (below) — clean, unconfounded, and it is what canvas-handle-writable-1804.spec.js now guards
+permanently.
+
+### The element-vs-getter question — checked, not guessed
+
+`index.html` has BOTH `#wiz_user_form` (:365) and `#blk_wiz_user_form` (:1238) as STATIC markup, present from
+page load — neither div is ever removed/recreated; only their `innerHTML` is wiped and rebuilt by `render()`.
+Confirmed by direct grep, not inference. So capturing the RESOLVED ELEMENT (not a getter) at the top of
+`layoutSpecFromOp` is safe: the div itself never goes stale, only its children change, and `host.querySelector`
+called later always searches the CURRENT children of the SAME still-attached node.
+
+### The fix
+
+`panelTypes.js`: `_field` and `_writeParam` are no longer module-level functions reading the module singleton —
+they are now LOCAL to `layoutSpecFromOp`, defined at its very top, closing over a `const _host = _formHostEl();`
+captured exactly once per call (`panelTypes.js:170-190`). `_writable` (already local) now reads `_host` directly
+instead of re-calling `_formHostEl()`. The module-level `_formHost`/`setFormHost`/`_formHostEl` trio remains —
+that IS the injection point, called by `userOpView.js` before each `renderLayout2D` call — but nothing inside
+`layoutSpecFromOp` reads it more than once. Every closure the call builds (the lathe write-back, `setFields`,
+`onEdgePick`, `onCornerPick`) is now correct BY CONSTRUCTION, with no ordering dependency — the "sets
+synchronously" reasoning in the old comment is gone, not defended, per the dispatch's own instruction ("if that
+paragraph is still needed after your change, the change is not finished").
+
+### Non-vacuity — deterministic, unconfounded proof
+
+Built `t1806: a spec built under host A keeps writing to host A after host B is injected later` (folded into
+`canvas-handle-writable-1804.spec.js`): build a spec while host A is injected, THEN inject host B (simulating a
+later render), THEN fire the FIRST spec's own deferred `onDrag` — assert host A changed, host B did not.
+Temporarily reverted `_field` to re-read `_formHostEl()` at call time (the pre-fix shape) — failed 3/3
+(`hostA_px` stayed 50 instead of 111, meaning the write landed in host B). Restored, re-ran 3× clean.
+
+### Verify
+
+- Full requested gate (node tier + `canvas-handle-writable-1804` + `render-equivalence-1796` +
+  `custom-op-canvas-handles` + the two screenshot baselines): 13/13 pass, 3× consecutive.
+- Node tier: 118/118 (after two rounds of architecture-map citation repair — adding the injection block and
+  later the local-closure block each shifted line numbers again; fixed both the test's `line:`/`lineEnd:` fields
+  and the prose `ARCHITECTURE.md` citations each time, verified against the actual current file each time, not
+  computed by offset arithmetic).
+- `custom-op-canvas-handles.spec.js` showed one transient app-boot timing flake (`waitForFunction` on
+  `window.ddcsStudio`) during a combined multi-file run — reran the file alone, 4/4 clean; not a regression
+  (unrelated to this turn's code, a resource-contention artifact of running many Playwright files together).
+- `handoff.py amendments --role worker`: none pending.
+
+### For the advisor
+
+The window was real — demonstrated with the actual "Open as modal" gesture, not a synthetic stand-in — and it
+does NOT self-heal (confirmed: zero re-render after modal-close). Fixed by capturing the host once into a local
+`_host`, closures now correct by construction. The real-gesture repro also surfaced a second, separate,
+previously-dormant hazard: the shared `_layout` FeatureCanvas singleton reparenting across the modal and the
+pane, which actually swallowed the pane's drag entirely in that one scenario (before it could even reach the
+`_formHost` code) and made that specific gesture unable to cleanly isolate the deferred-reader bug on its own —
+so the clean, non-vacuous proof is the deterministic unit test instead, not the live gesture. Corrected
+`ARCHITECTURE.md`'s TRAP9 entry, which previously asserted the shared-singleton risk "never fires" — it does,
+confirmed live this turn, not fixed (a harder, separate problem: making `_layout` per-surface). Your call whether
+that's the next act.
+
+🔨 turn 1806

@@ -69,22 +69,22 @@ export const layoutType = (id) => LAYOUT_TYPES[id] || LAYOUT_TYPES[DEFAULT_LAYOU
 const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
-// t1804 — THE FORM HOST is INJECTED, never hardcoded: this module renders for TWO independent, coexisting
+// t1804/t1806 — THE FORM HOST is INJECTED, never hardcoded: this module renders for TWO independent, coexisting
 // wizard-form surfaces (the modal's #wiz_user_form and the Blocks pane's own namespaced form), and a fixed
 // '#wiz_user_form' selector can only ever be right for one of them. Dependency injection, not a new import
 // cycle (panelTypes.js is a lower layer than userOpView.js, which already holds its own namespaced host via
-// elNS('wiz_user_form') — mirrors setPreviewOnlyWriteHandler just below). The caller sets this SYNCHRONOUSLY,
-// immediately before each render that reaches this module (userOpView.js's renderLayout2D call sites), so two
-// coexisting instances can never race or go stale between renders — no "last one wins" singleton risk.
-// Unset (the node-tier gate, which never calls setFormHost at all) → null, same permissive fallback _writable
-// always had for "no live DOM at all" (see there).
+// elNS('wiz_user_form') — mirrors setPreviewOnlyWriteHandler just below).
+// t1806 — this is ONLY the injection point now, read ONCE per layoutSpecFromOp call (see `_host` there) and
+// never again afterward. It is NOT read at gesture time: a drag or a picker click fires long after the render
+// that built it returned, and by then ANOTHER surface may have rendered and re-pointed this singleton — proven
+// live (WORK-LOG t1806: pane renders, "Open as modal" opens+closes the SAME op with no tab switch, a drag on
+// the still-visible PANE handle silently wrote into the closed MODAL's hidden field instead). Every closure
+// layoutSpecFromOp builds (setFields, onEdgePick, onCornerPick, the lathe write-back) closes over ITS OWN
+// captured `_host` local, so a later re-point of THIS module-level value can never leak into an earlier call's
+// deferred gesture handlers — correct by construction, not by call-ordering.
 let _formHost = null;
 export function setFormHost(hostOrGetter) { _formHost = hostOrGetter || null; }
 function _formHostEl() { return typeof _formHost === 'function' ? _formHost() : _formHost; }
-// A live form field is still the ONE way to actually WRITE a value back (dispatching 'input' is what drives the
-// whole update() loop) — _field/_writeParam stay a real DOM query for that reason. _writable (is a param individually
-// settable AT ALL) is declared per-call inside layoutSpecFromOp instead — see there for why.
-const _field = (name) => { const h = _formHostEl(); return h ? h.querySelector('[data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null; };
 // t1648 — a PREVIEW-ONLY side-store for a declared handle target with NO bound form field (e.g. a Skim-mode jog
 // seed — deliberately never bound, so it never reaches the emit). Before this, `_writeParam` silently no-op'd on
 // such a name (strictly additive: nothing that has a real field is affected). Exported so the caller (userOpView's
@@ -99,22 +99,6 @@ export function clearPreviewOnlyParams() { for (const k in previewOnlyParams) de
 // dependency injection, not a new import cycle (panelTypes.js is a lower layer than userOpView.js).
 let _onPreviewOnlyWrite = null;
 export function setPreviewOnlyWriteHandler(fn) { _onPreviewOnlyWrite = typeof fn === 'function' ? fn : null; }
-// t808 — LOOP-GUARD (stepper-runaway fix b): a handle write-back only dispatches when the value ACTUALLY changes. An
-// unchanged write (a jittery drag frame, or any render-time re-derive that lands the same number) must NOT fire a
-// synthetic 'input' — otherwise it re-triggers update() → re-render → write-back → … a self-sustaining round-trip that
-// walks/sticks the value. (Mirrors setParam's `s.value !== val` guard for the enum pickers.)
-function _writeParam(name, val) {
-    const next = r3(val);
-    const f = _field(name);
-    if (!f) {   // no bound field → the preview-only side-store, then ask the host to re-render (no 'input' to dispatch)
-        if (previewOnlyParams[name] === next) return;   // unchanged → no re-render (the same loop-guard real fields get)
-        previewOnlyParams[name] = next;
-        if (_onPreviewOnlyWrite) _onPreviewOnlyWrite();
-        return;
-    }
-    if (String(f.value) === String(next)) return;   // unchanged → no dispatch (breaks the write-back→recompute→write-back chain)
-    f.value = next; f.dispatchEvent(new Event('input', { bubbles: true }));
-}
 
 // Derive a 2D FeatureCanvas spec from the op's xy / rect / circle-bound params — a top-down summary that mirrors what
 // the canvas pickers set (xy group → a point; rect group → a rectangle; circle group → a disc), drawn on the configured
@@ -178,6 +162,29 @@ function _previewGeometryOf(def, params) {
 }
 
 export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
+    // t1806 — capture the injected form host ONCE, here, at the top of this call — never read the module-level
+    // singleton again below. `_field`/`_writeParam` are LOCAL to this call and close over `_host`, so every
+    // handler this call builds (including ones that fire long after this call returns — a drag, a picker click)
+    // stays loyal to the surface that was live WHEN THIS CALL RAN, even if another surface renders afterward and
+    // re-points setFormHost before the gesture fires (see setFormHost's own comment for the live repro this closes).
+    const _host = _formHostEl();
+    const _field = (name) => (_host ? _host.querySelector('[data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null);
+    // t808 — LOOP-GUARD (stepper-runaway fix b): a handle write-back only dispatches when the value ACTUALLY changes. An
+    // unchanged write (a jittery drag frame, or any render-time re-derive that lands the same number) must NOT fire a
+    // synthetic 'input' — otherwise it re-triggers update() → re-render → write-back → … a self-sustaining round-trip that
+    // walks/sticks the value. (Mirrors setParam's `s.value !== val` guard for the enum pickers.)
+    const _writeParam = (name, val) => {
+        const next = r3(val);
+        const f = _field(name);
+        if (!f) {   // no bound field → the preview-only side-store, then ask the host to re-render (no 'input' to dispatch)
+            if (previewOnlyParams[name] === next) return;   // unchanged → no re-render (the same loop-guard real fields get)
+            previewOnlyParams[name] = next;
+            if (_onPreviewOnlyWrite) _onPreviewOnlyWrite();
+            return;
+        }
+        if (String(f.value) === String(next)) return;   // unchanged → no dispatch (breaks the write-back→recompute→write-back chain)
+        f.value = next; f.dispatchEvent(new Event('input', { bubbles: true }));
+    };
     // t1273 — A LATHE OP DRAWS ITSELF. Everything below this line reasons about an XY stock rectangle: a datum corner,
     // a top-down footprint, corner picks. None of that means anything for a bar spinning on centres, so a lathe op
     // DECLARES its layout kind and gets its half-profile instead. Its handles route to the SAME _writeParam field
@@ -259,8 +266,8 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // `_field` gave before t1690 (verified live then; unchanged now — see WORK-LOG t1690's own probe).
     // t1804 — was `_formHostExists = !!document.querySelector('#wiz_user_form')`, a selector that could only ever
     // be right for ONE of the two coexisting form surfaces (the modal's); collapsed into "was a host injected at
-    // all" now that `_formHostEl()` answers that question per-surface (see its own comment above `_field`).
-    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_formHostEl() || !!_field(name));
+    // all" now that `_host` (captured once, at the top of this call — see there) answers that per-surface.
+    const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_host || !!_field(name));
     const items = [], decls = [];
     // t708 — DECLARED preview geometry (the general seam): an atom may declare real vector geometry + handles. Its handle
     // decls join `decls` (so they build through the SAME setFields writer round-trip below); its paths join a `paths` array

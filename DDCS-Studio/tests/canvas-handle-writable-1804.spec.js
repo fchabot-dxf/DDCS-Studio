@@ -18,12 +18,29 @@ import { stopLiveSim, dismissToasts } from './support/simControls.js';
  * MODAL's LEFTOVER field from that earlier session and a drag on the PANE silently wrote into the (closed, unread)
  * MODAL's form instead of the pane's own — a silent cross-surface write, confirmed live at t1804 with a real drag.
  *
- * Fixed by dependency injection (`panelTypes.js`'s `setFormHost`, called by `userOpView.js` synchronously,
- * immediately before every render that needs it, with each view instance's own namespaced `elNS('wiz_user_form')`
- * — never a hardcoded selector). This is a CLASS fix (every declared draggable handle, every op), not a corner-only
- * patch, so this file guards the class: corner (a real op, the real REPRODUCTION path) + a synthetic non-corner op
- * (registered at runtime via the same `registerUserOp` real API every custom op uses) sharing NOTHING with corner's
- * own dataOp module.
+ * Fixed by dependency injection (`panelTypes.js`'s `setFormHost`, called by `userOpView.js` before every render
+ * that needs it, with each view instance's own namespaced `elNS('wiz_user_form')` — never a hardcoded selector).
+ * This is a CLASS fix (every declared draggable handle, every op), not a corner-only patch, so this file guards
+ * the class: corner (a real op, the real REPRODUCTION path) + a synthetic non-corner op (registered at runtime
+ * via the same `registerUserOp` real API every custom op uses) sharing NOTHING with corner's own dataOp module.
+ *
+ * ── t1806 — THE DEFERRED-READER HALF ────────────────────────────────────────────────────────────────────────────
+ * The t1804 fix alone left `_formHost` a MODULE-LEVEL SINGLETON read AGAIN at gesture time by three DEFERRED
+ * readers (a drag's `setFields`, `onEdgePick`, `onCornerPick`) — correct for `_writable` (evaluated synchronously
+ * during the render that built it) but not for a handler that fires long after that render returned. Demonstrated
+ * LIVE via the real "Open as modal" button (`#blkOpenModal`, `blocksApp.js`'s `openLiveAsModal` — opens the SAME
+ * op as a modal overlay with NO tab switch away from the Blocks pane): closing that modal does NOT re-render the
+ * pane, so the pane's own already-built drag handlers were still reading the singleton, which by then pointed at
+ * the modal. That real-gesture repro also surfaced a SEPARATE, unrelated hazard (the `_layout` FeatureCanvas
+ * singleton, `panelTypes.js`'s own `renderLayout2D`, reparents across whichever container rendered last — the
+ * ARCHITECTURE.md TRAP9 entry already named this as dormant risk) that swallowed the pane's drag entirely once
+ * the modal had rendered, making the two bugs' symptoms impossible to cleanly separate through that one gesture.
+ * Reported, NOT fixed here — out of this act's scope. Fixed the confirmed one (the deferred-reader window) by
+ * capturing the host ONCE at the top of `layoutSpecFromOp` into a local `_host`, so every closure that call
+ * builds — deferred or not — closes over that value forever, never re-reading the module singleton. Guarded below
+ * with a deterministic, gesture-free proof (no dependence on the separate singleton hazard): build a spec under
+ * host A, inject host B (simulating a later render), fire the FIRST spec's own deferred `onDrag` — it must still
+ * land in host A.
  */
 
 test.use({ viewport: { width: 1500, height: 950 } });
@@ -128,4 +145,49 @@ test('COLD page: a declared draggable handle on a SYNTHETIC non-corner op is wri
     const paneField = await page.evaluate(() => { const f = document.querySelector('#blk_wiz_user_form [data-param="mx"]'); return f ? f.value : null; });
     expect(paneField, 'the drag wrote into the pane\'s own form field for the synthetic op too').not.toBeNull();
     expect(Number(paneField)).not.toBe(33);
+});
+
+test('t1806: a spec built under host A keeps writing to host A after host B is injected later (deferred readers)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+
+    const r = await page.evaluate(async () => {
+        const PT = await import('/wizards/ops/panelTypes.js');
+        const def = { bindings: [{ param: 'px', group: 'pt', role: 'x' }, { param: 'py', group: 'pt', role: 'y' }] };
+
+        const hostA = document.createElement('div'); hostA.id = 'test_1806_hostA';
+        const axA = document.createElement('input'); axA.dataset.param = 'px'; axA.value = '50';
+        const ayA = document.createElement('input'); ayA.dataset.param = 'py'; ayA.value = '40';
+        hostA.append(axA, ayA); document.body.appendChild(hostA);
+
+        const hostB = document.createElement('div'); hostB.id = 'test_1806_hostB';
+        const axB = document.createElement('input'); axB.dataset.param = 'px'; axB.value = '50';
+        const ayB = document.createElement('input'); ayB.dataset.param = 'py'; ayB.value = '40';
+        hostB.append(axB, ayB); document.body.appendChild(hostB);
+
+        try {
+            // Build the spec while host A is the injected host — its onDrag closure must capture host A.
+            PT.setFormHost(() => document.getElementById('test_1806_hostA'));
+            const specA = PT.layoutSpecFromOp(def, { px: 50, py: 40 });
+            const handleId = (specA.handles || [])[0] && specA.handles[0].id;
+
+            // A LATER render (a different surface, e.g. the modal opened via "Open as modal") re-points the
+            // singleton to host B — simulating exactly what userOpView.js's next renderLayout2D call does.
+            PT.setFormHost(() => document.getElementById('test_1806_hostB'));
+
+            // Fire specA's OWN deferred onDrag — built under host A, long before host B was ever injected. This
+            // is the drag/picker-click moment: it must stay loyal to host A, not read the CURRENT singleton.
+            specA.onDrag(handleId, { x: 111, y: 222 });
+
+            return { handleId, hostA_px: axA.value, hostA_py: ayA.value, hostB_px: axB.value, hostB_py: ayB.value };
+        } finally {
+            hostA.remove(); hostB.remove();
+        }
+    });
+
+    expect(r.handleId, 'a handle was built').toBeTruthy();
+    expect(Number(r.hostA_px), 'the deferred drag wrote into host A (captured at build time)').toBe(111);
+    expect(Number(r.hostA_py)).toBe(222);
+    expect(Number(r.hostB_px), 'host B (injected AFTER the spec was built) must be untouched').toBe(50);
+    expect(Number(r.hostB_py)).toBe(40);
 });
