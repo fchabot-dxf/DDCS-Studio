@@ -2332,3 +2332,28 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
 **If the advisor dispatches anything else while a box is unticked, that is the failure this note exists to
 prevent.** The reason is not tidiness: until #1 exists, a green suite says nothing about the route the user
 takes every day, and they have personally been the integration test for five bugs this week.
+
+## WIZARD VIEW — an EXPLORATORY (scratch) form state  [USER REQUEST 2026-08-14, not yet ruled]
+
+**Their words:** *"i dont need them to edit the actual stack, but id want to be able to interact with it to
+simulate behavior, it doesnt need to save to the staxk"* — and *"i might change my mind"*, so this is a
+direction, NOT a settled decision.
+
+```
+  READ-ONLY     today - inert, nothing touchable
+  WRITE-BACK    edits the real op          <- deliberately NOT this
+  EXPLORATORY   edits drive the PREVIEW live, discarded, never reach the stack   <- the ask
+```
+
+**Why it is wanted:** answer "what would this look like at 8mm?" without committing an edit to the program.
+
+⚠ **THE TENSION, which is the whole design problem:** the pane MIRRORS the op today. The instant a scratch
+edit lands, it shows numbers that are NOT in the program — a picture asserting something untrue, which is the
+exact silent-divergence family t1804/t1816/t1828/t1842/t1850 all belonged to. So the exploratory state must
+ANNOUNCE ITSELF the moment a field is touched (and offer a way back to the real values). A scratch mode that
+looks identical to the mirror is worse than no scratch mode.
+
+⚠ Related and already queued: *Cancel reverts in the modal* — same underlying question (what does "discard"
+mean, and how does the user know which state they are in). Worth designing together rather than twice.
+
+⚠ NOT STARTED. Bugs first: the 36mm marker gap, then B slices 2-3.
