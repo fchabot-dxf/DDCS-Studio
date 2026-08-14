@@ -121,9 +121,38 @@ export function removeOpLabel(opType) { if (opType) delete USER_LABELS[opType]; 
 // twin carrying its own program framing (any cutting op — drill, pocket, contour, …), leaving `progend` (which
 // emits its own M30) buried unstripped inside the op's own children: the M30-mid-program bug traced in WORK-LOG
 // t1828 (a cutting op followed by another op halted not just the static trace but the real exported file).
+// t1830 — REGRESSION, caught by the advisor's full-suite gate, on a first attempt that UNWRAPPED `user_root`
+// the same way `'op'` unwraps: `user_root` is not the same shape. `'op'` (homing) unwraps because it's a builder
+// returning its OWN `makeOp()`-shaped container — unwrapping it and re-wrapping via `makeOp()` avoids double-
+// wrapping (`op.children = [{op:homing}]`, which the glow/edit checks don't expect). `user_root` is a genuinely
+// DIFFERENT, LEGITIMATE structural block (`wizards/ops/userRoot.js`) meant to stay NESTED one level inside an
+// `op` container — `stackBridge.js:310`'s own render only splits `rec.uiChildren`/`rec.children` into the
+// PRESENTATION/EXECUTION mouths when `def.kind === 'user_root'` — i.e. the record BEING RENDERED must still
+// literally BE a `user_root` block. Unwrapping it away (or flattening its two mouths into one array, an
+// intermediate attempt this same turn) both broke that: the FORM/3D-SIM/LAYOUT-2D/PROJECTED-GCODE Presentation
+// sections either landed in the wrong mouth or rendered nowhere at all, and the Class-B render guards in
+// formfield-block.spec.js/pointpick-block.spec.js found ZERO blocks on the canvas.
+// The correct move: leave `user_root` WRAPPED (so it renders itself, recursively, exactly as before t1828) —
+// only reach INSIDE its own `.children` to find and lift out `progstart`/`progend` (the ONLY things that ever
+// needed finding at the top level, for the "does this op bring its own program frame" multi-op-assembly
+// question) onto a COPY of the user_root block with those two stripped from its `children`. `_framed()` still
+// returns one flat, searchable array — now `[progstart, user_root{…, children: without progstart/progend},
+// progend]` (either terminator omitted if this op declares none) — so every existing `.find`/`.filter` caller
+// keeps working unchanged, `bare` (the filtered non-progstart/progend elements) is `[user_root{…}]`, and that
+// ONE wrapped element is exactly what `makeOp()` should wrap as the op's own `children` — nothing new for the
+// four `opSession.js` callers to thread through separately.
 export function _framed(opType, params) {
     let f = builderOf(opType)(params || {}) || [];
-    if (f.length === 1 && f[0] && (f[0].type === 'op' || f[0].type === 'user_root')) f = f[0].children || [];
+    if (f.length === 1 && f[0] && f[0].type === 'op') { f = f[0].children || []; }
+    else if (f.length === 1 && f[0] && f[0].type === 'user_root') {
+        const kids = f[0].children || [];
+        const start = kids.find((b) => b && b.type === 'progstart');
+        const end = kids.find((b) => b && b.type === 'progend');
+        if (start || end) {
+            const stripped = { ...f[0], children: kids.filter((b) => !(b && (b.type === 'progstart' || b.type === 'progend'))) };
+            f = [start, stripped, end].filter(Boolean);
+        }
+    }
     return f;
 }
 
