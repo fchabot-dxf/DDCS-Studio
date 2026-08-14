@@ -2262,7 +2262,16 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
                                              Docblock records that the poll SELF-HEALS on a blanked canvas
                                              (the app truly redraws), so the non-vacuity proof needed the
                                              single-shot form. 16 *-in-place files named, NOT touched.
-  5  surface via the real chain          [ ]
+  5  surface via the real chain          [x]  t1784 -- pane-surface-1764 + pane-surface-scroll-1766
+                                             repointed onto the real chain, assertions UNCHANGED.
+                                             FINDING: NO styling divergence -- 10 tests (5 themes x 2
+                                             files) pass identically on both routes. Not a bug found; a
+                                             confirmation, now guarded by the route that would notice a
+                                             change. Checked for false-passing: none possible (both read
+                                             DOM/CSS facts independent of the open route). Both docblocks
+                                             record WHY they stay on the long route despite addition 2
+                                             (program-state equivalence != rendering/styling equivalence)
+                                             so nobody folds them back citing #2.
   6  drawn position vs readout           [ ]
 
   #2 is the user's own: "if it call programatically it needs to be the same path
