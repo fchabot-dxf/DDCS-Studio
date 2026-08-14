@@ -2279,7 +2279,16 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
                                              stats.absolute agree. REVERT-PROOF PROVEN: reverting t1774
                                              fails 3/3 reproducing the user's own symptom; restore
                                              confirmed byte-identical.
-  ==> ALL SIX ADDITIONS DONE (t1776-t1786).
+  7  guard the MODAL                    [x]  t1790 -- modal-real-gesture-1790.spec.js
+                                             corner (form3d+2d): form value + BOTH visual containers sized
+                                             AND drawn + .wiz-box painted. Pause/Confirm (flat): form value
+                                             + painted + EXPLICITLY asserts NO 3D box (asserted, not
+                                             skipped -- an omission and an assertion look identical in a
+                                             green run). Extracted tests/support/barGesture.js +
+                                             drawingCheck.js, refactored addition 1 onto them and
+                                             re-verified green BEFORE building on top. No duplicated
+                                             technique.
+  ==> ALL SEVEN ADDITIONS DONE (t1776-t1790).
 
   ⚠ THREE NEW BUGS found while building #6, named + NOT fixed, suspected shared root:
      (a) M5 halts the static trace before a later op's section ever runs
