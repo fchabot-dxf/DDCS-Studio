@@ -28406,3 +28406,73 @@ serves) — the app already built the exact diagnostic this situation calls for.
 still shows the bug, that would be the strongest possible signal this act's search missed something real, and
 I'd want their fresh screenshot + browser/viewport specifics before the next attempt, rather than re-guessing
 blind a second time.
+
+## 🔨 turn 1790 (epoch 4) — ADDITION 7: GUARD THE MODAL
+
+### Dispatch
+
+Mystery solved: the user was viewing the app in VS Code Live Preview, which serves a mix of stale and current
+ES modules — a browser hard-reload doesn't apply to it. A real browser showed the 2D pane immediately. t1788's
+non-reproduction was correct and useful — it eliminated the code as a suspect, which is what let the real
+variable surface. This act closes the gap that investigation exposed: all six prior additions guard the PANE
+(Blocks tab); nothing guards the MODAL, and the two now share a renderer AND (since t1764) share CSS selectors
+— the modal has been the second-order victim of a pane change twice today already. Point the same real-gesture
+assertions at the modal: open via the bar, assert the form shows the typed value, both visual containers exist/
+sized/contain a drawing (Addition 4's technique), and the panel surface is painted. Cover corner (hasTree) and
+one flat twin. Reuse Additions 1 and 4's helpers rather than a second copy — factor into a shared module if
+cleaner. State in the docblock that this guards a different surface, so it doesn't get trimmed as redundant.
+Gate: node tier + this spec + non-vacuity; no full suite.
+
+### Extracted the two reusable pieces, refactored Addition 1 onto them
+
+Created `tests/support/barGesture.js` (`openWizardViaBar`, `fillField`, `clickInsert`, `clickBlocksTab` — the
+click-to-toggle dropdown chain from t1776) and `tests/support/drawingCheck.js` (`sampleCanvas`,
+`assertContainerHasDrawing` — the pixel-sampling + event-driven-render poll from t1782, including its own
+documented non-vacuity reasoning carried over verbatim so a future reader doesn't lose it). Refactored
+`primary-route-real-gesture-1776.spec.js` to import both instead of carrying its own copies — re-ran it after
+the refactor (1/1 green, unchanged behavior) before building anything on top of it, so the new spec inherits a
+verified-working extraction, not an assumed one.
+
+### The modal spec — `tests/modal-real-gesture-1790.spec.js`
+
+Two tests, both importing the shared helpers:
+- **Corner (hasTree, panel `form3d+2d`)**: real bar open → fill `dist` → form shows the value (read directly,
+  no Insert yet — this act is about the modal's OWN rendering) → both `#userViz3dBox`/`#userVizContainer` exist
+  and are meaningfully sized (>50px each way — the exact "0×0 wrapper around a sized child" shape t1788's own
+  investigation had to rule out first) → both actually contain a drawing (`assertContainerHasDrawing`, reused)
+  → `.wiz-box` (the modal's own surface, NOT `#blk_wiz_user` — this is the surface t1764's CSS rule was
+  originally written FOR) is painted.
+- **Pause/Confirm (the flat twin, panel `form`)**: real bar open → fill `msg` → form shows the value → `.wiz-box`
+  painted → **and explicitly asserts NO 3D box is shown** (`display !== 'none'` must be false) — this twin
+  deliberately has no motion to preview, so asserting drawing containers against it would be the same
+  element-existence-shaped mistake this whole series exists to retire, just inverted (claiming absence is a bug
+  when it's the declared, correct shape). Named and asserted rather than silently skipped.
+
+### Non-vacuity — the three genuinely new assertions, each inverted and reverted
+
+1. Corner's form-value check: inverted to a wrong string — failed 3/3, reverted, green.
+2. The `.wiz-box` painted check (both tests share the same expression): inverted to `false` — failed 3/3 on the
+   corner test specifically, reverted, green. (The pixel-drawing checks themselves inherit Addition 4's own
+   already-documented non-vacuity proof — not re-proven here, would be pure duplication of that record.)
+3. Pause/Confirm's "correctly no 3D box" check: inverted to `true` — failed 3/3, reverted, green.
+
+All three reverts confirmed via a full re-run of both tests together afterward (2/2 green), not assumed from
+the individual failing runs.
+
+### Verify
+
+- `tests/modal-real-gesture-1790.spec.js` — 2/2 green.
+- `tests/primary-route-real-gesture-1776.spec.js` (refactored onto the shared helpers) — 1/1 green, unchanged
+  behavior confirmed before AND after building the new spec on top of the same extraction.
+- Three non-vacuity probes: 3/3 fail while inverted each, 2/2 green after full revert.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No app source file touched — test-only (two new support modules, one refactor, one new spec) — gate matched
+  the dispatch (node tier + this spec + non-vacuity, no full suite).
+
+### For the advisor
+
+The modal is now guarded on the same surfaces the pane already was, using the identical proven techniques —
+no second implementation to drift out of sync with the pane's own version. The flat twin's "correctly nothing
+to draw" case is asserted explicitly rather than skipped, which is worth naming: a future twin with panel
+`form` that ACCIDENTALLY grows a 3D box (a copy-paste of a form3d+2d twin's def, say) would now be caught here
+too, not just the reverse.
