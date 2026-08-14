@@ -33057,3 +33057,105 @@ strengthen the case for a tracer-side fix (probe-form-aware simulation) over any
 call, not mine, and not attempted here.
 
 🔨 turn 1864
+
+## turn 1866 — the last mile in Y: the exact line, the exact mechanism, a possible machine-safety escalation
+
+Dispatch: find the exact line where the drawn Y first diverges between Expert and V4.1, via a step-trail diff of
+both profiles through the same single Corner — not by testing the leading candidate (the DRO comparison) first.
+Report that line and what the tracer did with it. Check one other V4.1 probe op to see whether the symptom
+generalizes. No fix; the design call on where to fix it is reserved.
+
+### The step-trail — segment-by-segment, world Y, aligned by content since line numbers differ structurally
+
+Built both profiles' own real emit (via `activeDialectOpts()`, matching t1864's own correction), traced each,
+and read every pass-0 segment's own source line + world Y directly from `traced.segments` (each segment already
+carries its own source `line`) — no engine instrumentation needed, the trace already records this per-step.
+
+```
+EXPERT                                          V4.1
+line  raw                    worldY2            line  raw                    worldY2
+31    G31 Y#8 F#3...         -2.000             28    G31 Y#8 L#682...        -2.000   ✓ agrees
+33    G0 Y#9                 -7.000             30    G0 Y#9                  -7.000   ✓ agrees
+34    G31 Y#8 F#4...         -2.000             32    G31 Y#8 L#682...        -2.000   ✓ agrees
+39    G0 Y#9                 -7.000             36    G0 Y#9                 -48.000   ✗ DIVERGES HERE
+```
+
+**The exact line: V4.1's second `G0 Y#9` (the retract right after the slow re-touch) — line 36 in this build.**
+Everything before it agrees exactly, including the FIRST `G0 Y#9` retract (line 30), which is the SAME
+instruction and produces the SAME correct -7.000. The second one, immediately after V4.1's own
+`G90 G92 Y[#1501-#101]` line (line 35, one line earlier), jumps to -48.000 instead — a delta of -46mm where a
+-5mm retract was intended.
+
+### What the tracer did with it — read from the code, not inferred from the number
+
+`GcodeExecutionEngine.js:1121-1122`: `G90 → this.absolute = true`; `G91 → this.absolute = false` — a plain,
+PERSISTENT modal flag, exactly like every G-code dialect's own G90/G91 semantic. V4.1's own line 35 is
+`G90 G92 Y[#1501-#101]` — it carries a `G90` word ALONGSIDE the `G92`. The G90 sets `this.absolute = true`
+(confirmed the modal-code parse runs before the G92-specific dispatch, since `gcodes.includes(92)` is checked
+AFTER the general G-word loop). G92 itself is correctly a no-move operation (confirmed at t1864, re-confirmed
+here: `GcodeExecutionEngine.js:1136-1143`, explicit early return, `this.pos` untouched) — but the `G90` word
+riding on the SAME line is NOT reset by anything before the very next line. **Nothing in V4.1's own emitted
+sequence re-asserts `G91` between this G92 line and the next motion command.** So that next `G0 Y#9` — meant as
+a relative -5mm retract — executes through `setAxis`'s own absolute branch (`GcodeExecutionEngine.js:1182`,
+`this.absolute ? value * this.unitScale : ...`), landing at LOCAL Y = -5 instead of a relative move from -2 to
+-7. World Y = anchor(-43) + local(-5) = **-48**, exactly the observed number.
+
+Confirmed Expert has no equivalent: no G92 anywhere in its own probe form, so `this.absolute` is set to `false`
+once (the leading `G91` at program start) and never touched again through this whole span — nothing to leak.
+
+### Why this may not be tracer-only — a severity note, not softened
+
+G90/G91 are near-universally PERSISTENT modal codes on real CNC controllers, DDCS included (this project's own
+established handling elsewhere assumes exactly this persistence — see the existing `gcode-absolute-latch-1774`
+test family, built for precisely this class of "a mode leaks across lines it shouldn't" bug). That makes it
+LIKELY, not merely possible, that a REAL V4.1 controller would ALSO stay in absolute mode after this line and
+ALSO misinterpret the next `G0 Y#9` as an absolute move — which would mean this is not only a preview defect but
+a genuine gap in the EMITTED G-code itself (a missing `G91` before the reposition/retract that follows
+`setWorkOffset`), with real machine-motion consequences on actual hardware, not just a wrong picture. **I have
+not verified this against real V4.1 hardware or the corpus dumps** — stating it as the more likely reading of
+standard G-code semantics, not as a confirmed hardware fact. If true, the severity is materially higher than
+"the preview is misleading": an absolute jump substituting for an intended small retract, right after a probe
+touch, is exactly the shape of motion that could drive a tool into the part or a fixture.
+
+### Does it generalize? Checked ONE other V4.1 probe op, as asked — `edge`
+
+`ddcs-v41.js`'s own `setWorkOffset` (line 68: `(wcsExpr, axis, value) => [G90 G92 ${axis}[...]]`) is the ONE
+SHARED, dialect-level function every V4.1 probe op calls to record a touched position — not something corner's
+own wizard reimplements. Built `edge` (single-axis probe) under V4.1: it DOES emit the identical
+`G90 G92 X[...]` pattern (confirmed, same shared function). **But edge's own program ends right after** —
+nothing relative follows the G92 within that op's own remaining lines (the next thing is a redundant `G90`
+comment line, then the success path to `M30`) — so THIS specific op, in isolation, does not visibly manifest a
+wrong position, even though the same latent mode-leak is present in its own emit.
+
+**The mechanism generalizes structurally (one shared function, confirmed); the VISIBLE symptom depends on
+whether a relative move follows the G92 within the same op or program.** Corner's own shape (two walls, a
+reposition traverse BETWEEN the first G92 and the second probe) is exactly the shape that turns the latent gap
+into a wrong drawn position. Any V4.1 op sharing that same "record via G92, then move again" shape — multi-point
+ops the advisor named (middle, bore, alignment) — would very plausibly hit the identical mechanism; not directly
+verified for those three this turn (time-scoped to "check one," as asked), naming them as the natural next
+check rather than asserting they're confirmed affected.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: zero source changes — investigation only, per the dispatch.
+- Synthetic default machine only, no personal data touched this turn.
+
+### For the advisor
+
+The exact line: V4.1's second `G0 Y#9`, immediately after `G90 G92 Y[#1501-#101]`. The exact mechanism: the `G90`
+riding on the G92 line sets a standard, persistent modal flag that nothing resets before the next relative move,
+so that move executes absolute instead of relative — G92 ITSELF is correctly a no-op, exactly as I said last
+turn; the G90 it carries is what leaks. Not the DRO-comparison I favored — the diff, run first, pointed straight
+at this instead. Generalizes structurally: `setWorkOffset` is one shared V4.1-dialect function every probe op
+calls; checked `edge`, confirmed the identical emit pattern, but its own single-axis shape has nothing relative
+following the G92 so it doesn't visibly manifest there — the symptom needs a SUBSEQUENT relative move in the
+same span, which corner has and edge doesn't. Flagging, not softening: since G90/G91 are standard persistent
+modal codes on real hardware, this may be a genuine missing-`G91` gap in the EMITTED G-code itself, not only a
+tracer misunderstanding — which would carry real machine-motion risk on an actual V4.1 controller, not just a
+wrong preview. Not verified against real hardware or the corpus. The design call — teach the tracer, or add the
+missing `G91` to the emit, or both — is exactly as reserved as asked; not attempted here.
+
+🔨 turn 1866
