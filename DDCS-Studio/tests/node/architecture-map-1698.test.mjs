@@ -150,7 +150,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', line: 322, find: /canEdit/ },
     { id: 'TRAP5 FIELD_BIND.corner folded at opSchema.js', file: 'web/blocks/opSchema.js', line: 158, find: /corner/ },
     { id: 'TRAP6 commData.js passes setup_datawiz', file: 'web/blocks/dataOps/commData.js', line: 154, find: /setup_datawiz/ },
-    { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 187, find: /setup_datawiz/ },   // t1842 — shifted from 167 by homingDataStack's own new wrapper-retype fix above it
+    { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 167, find: /setup_datawiz/ },
     { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', line: 28, lineEnd: 41, find: /_datawiz/ },
     { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 103, find: /opensAs/ },
     { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1121, lineEnd: 1122, find: /z-index/ },   // t1836 — shifted from 1119-1120 by the new setFrameNote/machine-frame-note additions above it

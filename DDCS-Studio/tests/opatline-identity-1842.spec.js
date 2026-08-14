@@ -2,19 +2,33 @@ import { test, expect } from '@playwright/test';
 import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.js';
 
 /**
- * t1842 — BOTH LAYERS of the opAtLine bug (WORK-LOG t1838/t1840), guarded with two separate proofs, per the
- * advisor's own explicit order: the ALGORITHM layer (programModel.js's findOpInStack) must never accidentally
- * match an id-less `type:'op'` node, and must say so loudly when it encounters one; the BUILDER layer
- * (homingData.js's homingDataStack) must not produce such a node in the first place.
+ * t1842/t1844 — the opAtLine bug (WORK-LOG t1838/t1840/t1842/t1844), ALGORITHM layer only.
  *
- * These are independent tests on purpose — the algorithm test uses a HAND-BUILT synthetic stack, decoupled from
- * homing's own current (now-fixed) shape, so it keeps guarding the general CLASS of defect even if some future
- * builder (anywhere) reintroduces an id-less type:'op' node by a different route.
+ * t1842 shipped TWO fixes: the algorithm (programModel.js's findOpInStack, an identity check so an id-less
+ * type:'op' node can never match by accident) and the builder (homingData.js's homingDataStack, retyping its
+ * own internal arms-marker away from 'op'). t1844 REVERTED the builder fix — full-suite gate found it trips
+ * FIVE separate structural/parity/round-trip guards (fork-parity-1593, guard-roundtrip-1595 ×2,
+ * homing-stock-poisons-1832 ×2) that all notice a genuine RETYPE, a different claim from "byte-identical emit."
+ * The wrapper is load-bearing (`applyHomingRecompose`'s own anchor, found at t1842) and a structural retype that
+ * trips five guards is more risk than the benefit justifies — homing's own odd shape (a raw, id-less type:'op'
+ * fragment nested inside every stored homing instance) STAYS. Do not "fix" it again without re-reading t1842's
+ * own load-bearing finding and t1844's own guard-trip list.
+ *
+ * KEPT: the algorithm fix. Proven at t1842 (and re-confirmed here, "OUTCOME") to fully close the round trip on
+ * its own — the builder fix never closed the bug, it only silenced the new warning by removing its own trigger.
+ *
+ * t1844 also SHARPENED the algorithm's own logging. The first cut (t1842) logged on every ENCOUNTER of an
+ * id-less type:'op' node during a search — which, with the builder fix reverted, would fire on every single line
+ * of every homing op in the app, regardless of whether the search actually failed. An over-broad proxy for the
+ * real hazard (this project's own third instance of that shape this session). Sharpened to fire ONLY when BOTH
+ * (a) the search failed to resolve any op for the line, AND (b) that line's own ancestry carries the specific
+ * `undefined` (not `null`) padding that an id-less node could otherwise have matched by accident — the actual
+ * cost, not just the node's mere existence somewhere in the tree.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('ALGORITHM: findOpInStack never matches an id-less type:\'op\' node, and logs it loudly (synthetic, builder-independent)', async ({ page }) => {
+test('ALGORITHM: resolution that succeeds despite a nested id-less type:\'op\' node stays silent (no false alarm)', async ({ page }) => {
     test.setTimeout(30_000);
     await page.goto('/');
     await page.waitForFunction(() => window.ddcsLoadBlockStack && window.ddcsGetProjection, null, { timeout: 20000 });
@@ -22,8 +36,8 @@ test('ALGORITHM: findOpInStack never matches an id-less type:\'op\' node, and lo
     page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
 
     // A hand-built stack matching the STRUCTURAL SHAPE of the real defect (an id-less type:'op' node nested
-    // inside a REAL op, ahead of a second REAL op in program order) — but with fabricated types, so this test
-    // guards the algorithm itself, not any one builder's current behavior.
+    // inside a REAL op, ahead of a second REAL op in program order) — fabricated types, decoupled from homing's
+    // own current shape, so this guards the general CLASS, not any one builder's present behavior.
     const stack = [
         { id: 'A', type: 'op', opType: 'fakeA', children: [
             { type: 'op', opType: 'phantom_no_id', children: [{ type: 'raw', params: { text: 'G0 X1' } }] },
@@ -42,46 +56,44 @@ test('ALGORITHM: findOpInStack never matches an id-less type:\'op\' node, and lo
     }, stack);
 
     expect(r.bLine, 'sanity: op B genuinely owns a real line').toBeGreaterThanOrEqual(0);
-    expect(r.opId, 'op B resolves to ITSELF, not the id-less phantom nested inside A').toBe('B');
+    expect(r.opId, 'op B resolves to ITSELF, not the id-less phantom nested inside A — never matched by accident').toBe('B');
     expect(r.opType, 'op B\'s own opType, not the phantom\'s').toBe('fakeB');
     expect(
-        errors.some((e) => e.includes("findOpInStack found a type:'op' block with no id") && e.includes('phantom_no_id')),
-        'the id-less node is not silently skipped — it is named in a console.error'
+        errors.some((e) => e.includes('could not be resolved to an op')),
+        'the search SUCCEEDED (found B correctly) — nothing bad happened, so nothing is logged (sharpened t1844: encounter alone is not the hazard, an unresolved line is)'
+    ).toBe(false);
+});
+
+test('ALGORITHM: a line that genuinely cannot be resolved, in the accident-prone ancestry shape, IS logged loudly', async ({ page }) => {
+    test.setTimeout(30_000);
+    await page.goto('/');
+    await page.waitForFunction(() => window.ddcsLoadBlockStack && window.ddcsGetProjection, null, { timeout: 20000 });
+    const errors = [];
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+
+    // An id-less TOP-LEVEL op: makeOp() always assigns a real id to a real top-level op, so this shape is not
+    // reachable via any current real user gesture — it exists here to prove the sharpened condition is REAL
+    // code, not dead code (the advisor's own explicit worry), by constructing the exact failure it targets:
+    // a line whose own resolution genuinely fails, with the specific undefined-padded ancestry shape.
+    const stack = [{ type: 'op', opType: 'orphan_no_id', children: [{ type: 'raw', params: { text: 'G0 X9' } }] }];
+
+    const r = await page.evaluate(async (s) => {
+        window.ddcsLoadBlockStack(s);
+        await new Promise((res) => setTimeout(res, 100));
+        const proj = window.ddcsGetProjection();
+        const op = window.ddcsOpAtLine(0);
+        return { op, anc0HasUndefined: (proj.map[0] || []).some((v) => v === undefined) };
+    }, stack);
+
+    expect(r.op, 'the search genuinely fails to resolve this line — no real op to find').toBeNull();
+    expect(r.anc0HasUndefined, 'sanity: this line\'s own ancestry carries the accident-prone undefined padding').toBe(true);
+    expect(
+        errors.some((e) => e.includes('could not be resolved to an op') && e.includes('line 0')),
+        'an unresolved line in the accident-prone shape IS logged, naming the line — the condition is reachable, not dead code'
     ).toBe(true);
 });
 
-test('BUILDER: homingDataStack carries no bare type:\'op\' node anywhere in its own tree (matches its siblings)', async ({ page }) => {
-    test.setTimeout(30_000);
-    await page.goto('/');
-    await page.waitForFunction(() => window.ddcsGetSettings, null, { timeout: 20000 });
-
-    const r = await page.evaluate(async () => {
-        const { homingDataStack } = await import('/blocks/dataOps/homingData.js');
-        const tree = homingDataStack({ axes: ['x', 'y', 'z'], run_x: true, run_y: true, run_z: true });
-        const bareOpNodes = [];
-        (function walk(b, path) {
-            if (!b) return;
-            if (b.type === 'op') bareOpNodes.push({ path, opType: b.opType, id: b.id });
-            (b.children || []).forEach((c, i) => walk(c, path + '.c' + i));
-            (b.uiChildren || []).forEach((c, i) => walk(c, path + '.ui' + i));
-        })(tree[0], 'root');
-        // The internal arms marker should still be findable — just retyped, not removed (applyHomingRecompose's
-        // own anchor, WORK-LOG t1842) — confirms the fix is a RETYPE, not a silent deletion of real content.
-        const armsMarker = (function find(b) {
-            if (!b) return null;
-            if (b.type === 'section' && b.opType === 'homing') return b;
-            for (const c of (b.children || [])) { const f = find(c); if (f) return f; }
-            return null;
-        })(tree[0]);
-        return { bareOpNodes, armsMarkerFound: !!armsMarker, armsChildCount: armsMarker ? armsMarker.children.length : 0 };
-    });
-
-    expect(r.bareOpNodes, 'NO type:\'op\' node anywhere inside homingDataStack\'s own tree').toEqual([]);
-    expect(r.armsMarkerFound, 'the internal arms marker still exists, just retyped (not silently deleted)').toBe(true);
-    expect(r.armsChildCount, 'the retyped marker still carries its real content (the homing arms)').toBeGreaterThan(0);
-});
-
-test('OUTCOME: export a Homing+Corner program, reimport it — BOTH ops survive with their real params', async ({ page }) => {
+test('OUTCOME: export a Homing+Corner program, reimport it — BOTH ops survive with their real params (the algorithm fix alone closes this)', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
@@ -111,7 +123,8 @@ test('OUTCOME: export a Homing+Corner program, reimport it — BOTH ops survive 
     });
 
     expect(r.beforeCount, 'sanity: the real program has 2 ops before export').toBe(2);
-    // THE OUTCOME, not a marker count: BOTH ops survive the export+reimport round trip.
+    // THE OUTCOME, not a marker count: BOTH ops survive the export+reimport round trip — with ONLY the
+    // algorithm fix in place (homing's own raw self-wrap is back, unchanged, per t1844's own ruling).
     expect(r.afterCount, 'BOTH ops survive export+reimport — not one silently replaced by a garbage duplicate').toBe(2);
     expect(r.afterTypes[0], 'op 1 is still the homing twin').toBe(r.beforeTypes[0]);
     expect(r.afterTypes[1], 'op 2 is still the corner twin — NOT lost, NOT a garbage duplicate homing op').toBe(r.beforeTypes[1]);

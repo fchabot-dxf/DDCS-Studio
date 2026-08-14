@@ -47,24 +47,15 @@ export const getProjection = () => proj;
 function findOpInStack(blocks, anc) {
     for (const b of (blocks || [])) {
         if (!b) continue;
-        if (b.type === 'op') {
-            if (b.id == null) {
-                // t1842 — a type:'op' block with NO id is a builder defect (an internal wrapper that should have
-                // been stripped, or given a real id, before landing in a stored program's own tree — homing's own
-                // `homingDataStack` was doing exactly this until this same turn's fix). `anc.includes(b.id)` would
-                // otherwise match it BY ACCIDENT for any OTHER line whose own ancestry pads out with genuine
-                // `undefined` at this depth, silently resolving to the wrong op (confirmed reachable, WORK-LOG
-                // t1838/t1840: a real Homing+Corner program's hover chip + .nc export markers both misattributed
-                // EVERY line of the SECOND op to this fragment). Never match it — and never stay silent about it
-                // either (t1808's own established convention: a declaration bug gets a console.error naming it,
-                // not a silent wrong answer or a throw that could break an otherwise-working caller).
-                if (typeof console !== 'undefined' && console.error) {
-                    console.error(`programModel: findOpInStack found a type:'op' block with no id (opType "${b.opType || '?'}") — skipping it rather than matching it by accident. This indicates a builder left an internal wrapper unstripped.`);
-                }
-            } else if (anc.includes(b.id)) {
-                return b;
-            }
-        }
+        // t1842 — a type:'op' block with NO id is a builder defect (an internal wrapper that should have been
+        // stripped, or given a real id, before landing in a stored program's own tree — homing's own
+        // `homingDataStack` does exactly this, LOAD-BEARING and left alone, see its own comment). Never match
+        // it: `anc.includes(b.id)` would otherwise match it BY ACCIDENT for any OTHER line whose own ancestry
+        // pads out with genuine `undefined` at this depth, silently resolving to the wrong op (confirmed
+        // reachable, WORK-LOG t1838/t1840). `b.id != null` guards that; see `opAtLine` for the loud signal —
+        // logging HERE, on every encounter, was tried and reverted (t1844): it fired on every homing line
+        // whether or not the search actually failed, an over-broad proxy for the real hazard.
+        if (b.type === 'op' && b.id != null && anc.includes(b.id)) return b;
         if (b.children) { const f = findOpInStack(b.children, anc); if (f) return f; }
     }
     return null;
@@ -72,7 +63,20 @@ function findOpInStack(blocks, anc) {
 /** The op-container owning projected line `i` (or null) — only when the editor matches the live projection. */
 export function opAtLine(i) {
     const anc = proj.map && proj.map[i];
-    return (anc && anc.length) ? findOpInStack(stack, anc) : null;
+    if (!anc || !anc.length) return null;
+    const result = findOpInStack(stack, anc);
+    // t1844 — loud, but on the thing that actually costs something: the search FAILED for this line AND its own
+    // ancestry carries the specific shape (`undefined`, not `null`) that an id-less type:'op' block elsewhere in
+    // the stack could otherwise have matched by accident. A line that resolves correctly despite an id-less node
+    // existing SOMEWHERE in the tree is not a hazard — logging on every encounter (t1842's own first cut) fired
+    // on every homing line regardless of outcome, an over-broad proxy this project has hit before; this is the
+    // precise condition instead. Genuinely unowned lines (anc[0] === null, no undefined padding) never trigger
+    // this — only a line whose own resolution FAILED, in the exact shape that would have caused a wrong-but-
+    // silent answer before t1842's algorithm fix.
+    if (!result && anc.includes(undefined) && typeof console !== 'undefined' && console.error) {
+        console.error(`programModel: line ${i} could not be resolved to an op — its own ancestry carries an unset (undefined) slot, the shape an id-less type:'op' block elsewhere in the stack could otherwise match by accident. This indicates a builder left an internal wrapper unstripped.`);
+    }
+    return result;
 }
 /** All projected line indices that belong to op `opId` (its highlight range in the editor). */
 export function linesForOp(opId) {

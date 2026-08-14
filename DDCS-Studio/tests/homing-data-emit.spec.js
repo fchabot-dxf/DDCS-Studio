@@ -107,11 +107,7 @@ test('E2 ruling: a Blocks edit SURVIVES the settings recompose (in-place on the 
         const stack = build({ axes: ['z'], softLimits: true });
 
         // MUTATE a child atom (as a Blocks edit would) — inject a user comment INSIDE the Z arm
-        // t1842 — homingDataStack's own internal arms-marker is now type:'section' (opType:'homing' unchanged),
-        // not type:'op' (the id-less type:'op' wrapper this used to match was a real, confirmed defect — see
-        // WORK-LOG t1838/t1840/t1842 — fixed by retyping it, since a nested type:'op' block collides with
-        // programModel.js's own line→op resolution, which treats ANY type:'op' node as a potential real op).
-        const op = flattenBlocks(stack).find((b) => b.type === 'section' && b.opType === 'homing');
+        const op = flattenBlocks(stack).find((b) => b.type === 'op' && b.opType === 'homing');
         const zi = op.children.findIndex((b) => b.type === 'comment' && /^Home Z/.test((b.params && b.params.text) || ''));
         op.children.splice(zi + 1, 0, { type: 'comment', params: { text: 'USER BEEP - do not lose me' } });
         const emitBefore = emitMapped(stack).text;

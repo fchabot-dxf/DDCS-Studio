@@ -31805,3 +31805,150 @@ turn (separate, still design-only). Gate: node 118/118 (2 stale architecture-map
 + 2 confirmed-clean-on-isolation, 1 pre-existing unrelated skip, 0 real failures.
 
 🔨 turn 1842
+
+## Turn 1844 — revert the builder half, keep the algorithm half, sharpen the log — and a real finding on the sharpen itself
+
+### Dispatch
+
+Not released — the advisor's own full suite found 6 failures, 5 confirmed in isolation, all in files that check
+STRUCTURE/PARITY (`fork-parity-1593`, `guard-roundtrip-1595` ×2, `homing-stock-poisons-1832` ×2 — my own t1834/
+t1836 tests), a different claim from t1842's own "byte-identical emit" check. Ruling: (1) REVERT FIX2 (the
+builder retype) — the wrapper is load-bearing (t1842's own finding), and a retype that trips five guards is more
+risk than benefit; homing's odd shape stays. (2) KEEP FIX1 (the algorithm fix) — confirm it alone still fully
+closes the round trip; if not, say so immediately, the whole ruling rests on it. (3) SHARPEN the log — firing on
+every ENCOUNTER of an id-less node (t1842's own first cut) is an over-broad proxy (this project's third instance
+of that shape); fire only when the lookup CANNOT RESOLVE an op for a line. If that makes it unreachable, say so.
+Re-run the five isolated failures explicitly, by name, with counts. Record in WORK-LOG why homing's raw
+self-wrap stays. Gate: node tier + those 5 + the 3 (now rewritten) tests + every spec touching programModel.js/
+homingData.js.
+
+### (1) FIX2 reverted
+
+`homingData.js` reverted to its pre-t1842 state (`git checkout d9090970~1 -- web/blocks/dataOps/homingData.js`)
+— `homingDataStack` no longer retypes its own internal arms-marker; it stays `type:'op'`, id-less, exactly as
+it's always been. `applyHomingRecompose`'s own search predicate reverted to `type === 'op'` too (both halves,
+`opBlk` and `freshOp`). The one test line I'd updated at t1842 (`homing-data-emit.spec.js:114`) reverted back to
+`type === 'op'` — a legitimate consequence of the revert, not a new edit. Architecture-map TRAP6 citation
+reverted (167, not 187).
+
+**Why the wrapper stays, for whoever finds it next — this is the record the dispatch asked for:** homing's own
+builder (`wizards/stacks/homingWizard.js:200`) self-wraps its output as `{type:'op', opType:'homing',
+children:[...]}` with no `id` — the ONLY one of the 4 `MACHINE_FRAME_TOOL` members that does this (atc_change/
+atc_test/atc_table all verified clean, t1842). `homingData.js`'s own `homingDataStack` embeds this raw, unstripped,
+inside every stored homing instance's own tree. It looks like a stray artifact and reads like one — it is not:
+`applyHomingRecompose` (t550, same file) actively searches the STORED stack for this exact node as its own
+anchor for the settings-recompose logic. A t1842 attempt to retype it to `'section'` (matching every sibling
+twin's own shape) trips FIVE separate structural/parity/round-trip guards this turn's own dispatch named —
+`fork-parity-1593`, `guard-roundtrip-1595` (×2), `homing-stock-poisons-1832` (×2) — all genuinely, correctly
+noticing a real structural change, a different claim from "the emitted G-code is byte-identical" (which t1842's
+own E1 checks DID prove, and still do). Retyping it again without addressing why those five guards react is
+very likely to reproduce the same class of break. **FIX1 alone (below) makes this shape harmless** — the
+algorithm no longer trusts an id-less node regardless of what type it carries — so there is no known reason to
+touch the builder again.
+
+### (2) FIX1 confirmed sufficient, alone
+
+Re-ran the round-trip OUTCOME test with ONLY the algorithm fix in place (builder reverted): **passes** — a real
+Homing+Corner program (Corner's own `dist=741`), exported via `ddcsSerializeWithMarkers()`, reimported via
+`importMarkedNc()`: both ops survive, with Corner's own real param intact. **Confirmed: FIX1 alone fully closes
+the round trip. FIX2 never closed the bug — it only removed FIX1's own trigger condition** (with the builder
+clean, the algorithm's guard clause simply never had anything to catch). This is exactly the reading the dispatch
+asked to be confirmed before trusting the rest of the ruling.
+
+### (3) The log, sharpened — and a real finding while proving it isn't dead
+
+Moved the loud signal out of `findOpInStack` (which now just silently — but correctly — refuses to match an
+id-less node, no logging inside the recursion at all) and into `opAtLine`, gated on the PRECISE condition: the
+search returned `null` for this line AND the line's own ancestry (`proj.map[i]`) contains a genuine `undefined`
+(not `null`) — the specific padding shape an id-less node could otherwise have matched by accident. An encounter
+that still resolves correctly (the real Homing+Corner scenario, corner's own lines) logs nothing now — proven by
+the first rewritten test (`opatline-identity-1842.spec.js`, "resolution that succeeds... stays silent").
+
+**Proven NOT dead code, per the dispatch's own explicit ask — and then something more, found by actually
+checking rather than assuming.** Built a synthetic id-less TOP-LEVEL op (no nesting) — its own line genuinely
+fails to resolve, its ancestry is `[undefined, undefined]`, and the log fires, naming the line. This proves the
+sharpened condition is real, reachable code — but this specific construction (an id-less TOP-LEVEL op) is not
+reachable via any current real gesture (`makeOp()` always assigns a real id to a real top-level op).
+
+**So I checked the REAL Homing+Corner scenario directly, probing every one of its 123 lines — and the log DOES
+fire there too, which I did not expect.** Line 122 — the LAST line, `"M30"`, the whole-program end marker — logs
+`"line 122 could not be resolved to an op"`. Traced why: its own ancestry is `[undefined]` (a single-slot array)
+— program-level trailing content (the framing around `progend`, not owned by any op) apparently represents "no
+owner" with `undefined` in this one case, not the `null` a genuinely-unowned-but-different line would carry
+elsewhere. **This is not a false alarm about an unrelated case — checked, not assumed:** under the ORIGINAL,
+unfixed algorithm, this exact line's own `anc.includes(undefined)` would ALSO have matched the id-less phantom
+(true before AND after this turn's revert of FIX2) — meaning M30's own resolution was ALSO silently wrong before
+t1842's algorithm fix, on every homing-containing program, not just ones followed by another op. Nobody had
+specifically checked THIS line before. **But it also means the sharpened log will fire on the LAST line of
+essentially every homing program that has a trailing M30** — not rare, not occasional — every time, regardless
+of whether anything is actually wrong (M30 correctly resolving to `null` is itself fine; nothing downstream
+needs an owning op for a program-end marker). **Not resolved further this turn — surfaced for a ruling rather
+than guessed at,** per the dispatch's own explicit invitation ("if sharpening makes it unreachable, say so, and
+we'll decide whether it earns its keep"): this is the OPPOSITE finding (very reachable, on a benign, frequent,
+harmless case) and deserves the same kind of check-in. My own lean, stated as a recommendation, not a decision:
+keep it — it's a `console.error`, functionally inert, and every firing IS technically true (this line's own
+ancestry does carry the accident-prone shape, and it did misresolve before the algorithm fix) — but it is
+noisier than the dispatch's own "fire only on genuine problems" goal, and the advisor may want a narrower signal
+(e.g., tracking whether the search ACTUALLY walked past a real id-less `type:'op'` node during resolution,
+rather than inferring it from the ancestry shape alone — investigated this alternative too: it does NOT help,
+the exhaustive walk for the M30 line passes through homing's own id-less fragment regardless of relevance, so
+tracking "encountered during this search" would still fire for M30 exactly the same way).
+
+### Guard tests — rewritten to match the kept/reverted state
+
+`opatline-identity-1842.spec.js`, 3 tests (BUILDER test removed — it asserted the now-intentionally-reverted
+shape, so keeping it would either fail forever or need inverting into "asserts the defect exists," which isn't
+a useful guard; the WORK-LOG is the record instead, per the dispatch's own request):
+1. **Resolution that succeeds despite a nested id-less node stays silent** — no false alarm.
+2. **A line that genuinely cannot be resolved, in the accident-prone shape, IS logged** — the sharpened
+   condition is live code (synthetic id-less top-level op).
+3. **OUTCOME, unchanged in intent** — real Homing+Corner, export, reimport, both ops survive with real params —
+   now explicitly proving the ALGORITHM fix alone, since the builder is reverted.
+
+**Non-vacuity, full matrix again:** reverted `programModel.js` to pre-t1842 (both fixes gone) — all 3 fail, test
+3 reproducing the exact original symptom (`afterTypes[1]: "homing"`). Restored from scratch backup, diffed
+byte-identical, re-ran: all 3 pass.
+
+### The five originally-failing tests, re-run explicitly by name, with counts (not a summary)
+
+Ran `fork-parity-1593.spec.js`, `guard-roundtrip-1595.spec.js`, `homing-stock-poisons-1832.spec.js` together —
+**6/6 passed** (the extra one, `fork-parity-1593.spec.js:89`, is a sibling test in the same file, incidentally
+included by running the whole file rather than a single line):
+- `fork-parity-1593.spec.js:89` — "the registry PARTITIONS on guards, and the inheritance rule covers every
+  twin" — **pass**
+- `fork-parity-1593.spec.js:121` — "THE REAL GESTURE — fork EVERY shipped twin: form + emit BYTE FOR BYTE, and
+  nothing is refused" — **pass**
+- `guard-roundtrip-1595.spec.js:67` — "the canvas round-trips a guarded template LOSSLESSLY — every guard, every
+  arm, every predicate" — **pass**
+- `guard-roundtrip-1595.spec.js:120` — "THE SWEEP THAT CLOSES IT — flip every STRUCTURAL param on every guarded
+  twin; source and fork emit BYTE-IDENTICALLY" (152 structural flips swept across 14 twins) — **pass**
+- `homing-stock-poisons-1832.spec.js:69` — "no WCS on file: after a Homing op hides the workpiece, the panel
+  explains why" — **pass**
+- `homing-stock-poisons-1832.spec.js:84` — "a WCS IS on file: the note is suppressed..." — **pass**
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- Full gate, grepped for actual symbol/import usage across `programModel.js`/`homingData.js`: 21 files, 65 tests.
+  **64 passed, 1 pre-existing unrelated `test.fixme`** (`homing-io-ui-cleanup.spec.js`, the same one flagged at
+  t1842). **0 failures.**
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1844` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+Reverted FIX2 exactly as ruled; FIX1 alone confirmed (not assumed) to fully close the round trip — reported
+immediately since your whole ruling rested on it, and it holds. Sharpened the log to the precise condition (an
+unresolved line whose own ancestry carries the accident-prone shape) — proven live via a constructed scenario,
+then found, by actually checking the real program rather than assuming the check-in was unnecessary, that it
+ALSO fires on the M30 program-end line of every homing-containing program — a real, harmless-but-frequent case,
+not a false alarm (that line's own resolution genuinely was wrong before the algorithm fix too) but noisier than
+the "fire only on genuine problems" goal. Investigated a narrower alternative (track actual encounters instead
+of inferring from ancestry shape) and confirmed it doesn't help — M30 gets walked past regardless. Surfacing
+this for your own ruling rather than picking narrower on my own, per your own explicit invitation to say so
+rather than assume the sharpen is done. All 5 originally-failing tests re-run explicitly by name: 6/6 pass (one
+extra sibling test came along for free). WORK-LOG records why homing's own raw self-wrap stays and that FIX1
+alone makes it harmless, so a future reader doesn't repeat the retype. Gate: node 118/118, 64/65 direct (1
+pre-existing unrelated skip), 0 failures.
+
+🔨 turn 1844
