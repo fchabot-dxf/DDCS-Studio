@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { stopLiveSim } from './support/simControls.js';
 
 /**
  * Live block→form (custom-op round-trip, step 1). Editing a custom wizard in the Blocks tab renders its FORM as a
@@ -79,6 +80,14 @@ test('form→block writeback: editing the live form writes the value back to the
   // t1587 — read the projection from the MODEL: 0bd8b38c deleted the `#blk-gcode` pane from the Blocks shell.
   // The writeback claim (form edit → block → emit) is untouched; only the readout channel moved.
   await expect.poll(() => page.evaluate(() => window.ddcsGetBlockGcode())).toContain('Z-5');
+
+  // t1820 — #blk_wiz_user's preview panel autoplays a looping sim once this op's edit view is up (same
+  // mechanism as pane-surface-scroll-1766's own chronic flake, WORK-LOG t1818); under load the still-playing
+  // sim can keep the form's own layout unstable long enough for .fill()'s actionability check to time out.
+  // Scoped to the whole pane rather than the sibling convention's narrower '#blk_userViz3dBox', because this
+  // op declares no explicit `panel:` (defaults to plain form3d) and mounts its preview through the layout2d
+  // slot's own parent instead — see WORK-LOG.
+  await stopLiveSim(page, '#blk_wiz_user');
 
   // EDIT THE FORM: depth -5 → -8 → it writes back to the block, so the projected G-code reflects Z-8
   await page.locator('#blk_wiz_user_form [data-param="depth"]').fill('-8');

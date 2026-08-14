@@ -30099,3 +30099,134 @@ separate race) — I don't have visibility into your own gate run's specific 16 
 directly. Gate: this spec under load (2 clean post-fix runs) + isolation + node tier.
 
 🔨 turn 1818
+
+## Turn 1820 — is the autoplay flake a class? Measured precisely, fixed only what survived verification
+
+### Dispatch
+
+The advisor's own gate sweep found 20+ specs touching the layout/pane visuals that never call `stopLiveSim`,
+including a SECOND confirmed flaky instance (`census-finding2-emits-teal-1684`). Explicit warning against the
+over-broad proxy "never calls stopLiveSim": the real hazard is narrower — an actionability-checked Playwright
+gesture on an element INSIDE the animating region, with the sim never stopped first. STEP 1: measure and report
+three buckets (AT RISK / NOT AT RISK / MUST NOT STOP) with reasons for every file, including checking
+`gesture-programmatic-equivalence-1778` specifically. STEP 2: fix only AT RISK, same convention, prove under
+load — before/after, same batch, 3x — or stop and report if the bucket is large.
+
+### STEP 1 — measurement
+
+Regexed every spec touching the pane/preview surface without calling `stopLiveSim`: **99 candidate files** —
+much wider than the advisor's own "20+", confirming the regex alone is exactly the over-broad proxy warned
+against. Delegated the actual per-file read-and-classify work to 4 parallel research agents (a well-specified
+rubric: does it open an animating preview; does it perform a real actionability-checked gesture — click/fill/
+drag/scrollIntoView, NOT a `page.evaluate` read — inside the shifting region; does it already stop the sim; is
+the test's own SUBJECT the animation itself). Their combined first pass: 12 files AT RISK, dozens NOT AT RISK
+with reasons, several MUST-NOT-STOP files correctly identified (including flagging genuinely load-sensitive ones
+within that bucket with a suggested non-timeout settle condition, per the dispatch's own ask) — full per-file
+detail is in the four agents' own transcripts; not reproduced here at that length.
+
+**A real methodological error, caught before it reached a fix, not after:** two of the four agents disagreed on
+architecture — one argued the shifting-flex-column mechanism is universal to any wizard body, the other argued
+(correctly, on inspection of `styles.css`) that it's `#blk_wiz_user`-SPECIFIC: `#blk_wiz_user .wiz-2pane {
+flex-direction: column; ... }` (`styles.css:2306-2318`) applies UNCONDITIONALLY, with no media query — but the
+MODAL's own `.wiz-2pane` (`styles.css:2192`) has NO explicit `flex-direction` (default: row) and stays row at any
+desktop width; the column/order-swap for the modal only exists inside a mobile `@media (max-width: 860px)` block
+(`styles.css:2254-2280`). This was MY OWN mistake, not the agents' — the background brief I gave them described
+"the visual pane and form share a flex column" too generally, without stating it only applies to `#blk_wiz_user`
+or a narrow viewport, so several agents over-applied it to MODAL-targeting gestures at desktop viewports.
+
+Rather than trust either claim, built a throwaway diagnostic (`zzdiag-modal-reflow-1820.spec.js`, deleted after
+use per this project's convention): opened corner in the MODAL at 1400×1000 (matching several disputed files'
+own viewport), let the sim autoplay, and sampled the 2D handle's AND the form's own bounding boxes every 250ms
+for 3 seconds. **Both were byte-identical across all 12 samples — zero movement.** This empirically kills the
+"modal at desktop width reflows" premise and confirms 10 of the 12 originally-flagged files were false positives,
+caught by a background brief I wrote too loosely, not a defect in the agents' reasoning: `alignment-fresh-seat`,
+`alignment-in-place`, `corner-anim-overlay` (its INC-3 test only), `corner-layout-sim-drag`,
+`corner-marker-independence`, `corner-selector`, `gesture-programmatic-equivalence-1778` (the advisor's own named
+suspect — genuinely NOT at risk, confirmed directly, not assumed), `layout-partzero-shift-1672`,
+`middle-manual-markers`, `modal-real-gesture-1790` — all target `#userVizContainer`/`#wiz_user_form` (the bare,
+unprefixed MODAL ids) at desktop viewports (1300-1500px, confirmed via each file's own `test.use({viewport})`),
+none narrower than the mobile breakpoint.
+
+**Final AT-RISK bucket, after verification: 2 files**, both confirmed by direct reading (not agent report alone):
+- `blocks-live-form.spec.js` — the "form→block writeback" test's `.fill()` (line 84) targets
+  `#blk_wiz_user_form [data-param="depth"]`. This op declares no explicit `panel:` (defaults to plain `form3d`,
+  `userOps.js:1165`), which still mounts a live, looping preview via `mgr.preview3D(...)`
+  (`userOpView.js:678`) into `#blk_wiz_user`'s own unconditionally-stacked layout. Never calls `stopLiveSim`.
+- `param-group-rows-1605.spec.js` — the "values are LIVE both ways" test's `.fill()` (line 102) targets
+  `#blk_wiz_user_form [data-param="depth"]` via `customize(page, 'user_surfacing_data')`. Same host, same
+  mechanism, never stopped.
+
+Both genuinely target `#blk_wiz_user` (the Blocks pane), not the modal — the one host where the stacked layout
+is unconditional regardless of viewport, matching `pane-surface-scroll-1766`'s own confirmed mechanism exactly.
+
+**A separate finding, not fit into AT RISK — `census-finding2-emits-teal-1684.spec.js`, the advisor's own named
+second instance:** read all 4 of its tests directly. (A) and (B) build a detached `<div>` + a raw `new
+FeatureCanvas()`, entirely bypassing any wizard/pane/autoplay mechanism. (C) opens the MODAL (`openWiz`), and its
+one "click" is a raw DOM `.click()` inside `page.evaluate` (bypasses Playwright actionability entirely) followed
+by a `page.evaluate` READ (not gesture-checked). (D) is `page.evaluate`-only against the modal's drill preview.
+**None of the four tests perform an actionability-checked gesture on an animating region at all** — this file
+does not fit this class's mechanism. If it is genuinely flaky in the advisor's gate, the more likely cause is (C)'s
+own `page.waitForTimeout(300)` (line 85) before reading `#userVizContainer svg [data-hid$="_pos"]` — a plain
+render-timing race (the handle may not be drawn yet when the fixed wait elapses), unrelated to sim-autoplay
+layout instability. `stopLiveSim` would not fix that — the right tool would be a `waitForFunction` polling for
+the handle's presence, which is a different, narrower act than this one and not done here.
+
+### STEP 2 — fix (small bucket, proceeded rather than stopping)
+
+Two files, same convention as `pane-surface-scroll-1766`: import `stopLiveSim` from `./support/simControls.js`,
+call it before the risky `.fill()`. Scoped to `'#blk_wiz_user'` (the whole pane) rather than the sibling
+convention's narrower `'#blk_userViz3dBox'`, because both ops declare no explicit `panel:` and default to plain
+`form3d`, which mounts its preview through the layout2d slot's OWN parent (`userOpView.js:678`,
+`id('userVizContainer')`) rather than the `userViz3dBox` id form3d+2d ops use — the narrower scope would miss the
+`.pp-run` button for these two specifically. Noted this reasoning in both files' own comments.
+
+### Proof under load — honest result, weaker than t1818's
+
+Isolation: both files pass cleanly post-fix (9/9). Under the SAME ~200-file/500-test load batch used for
+`pane-surface-scroll-1766`: **ran the unfixed code under load twice (both valid, clean collection runs — two
+earlier attempts were invalidated by this session's own recurring cwd-drift trap, caught and discarded, not
+counted) and neither target test failed.** Restored the fix and ran once more under the identical batch — also
+clean. So: 0/2 broken before, 0/1 broken after — **I could not reproduce an actual failure for either of these
+two specific tests, unlike `pane-surface-scroll-1766`'s reliable 5/5 reproduction on the very first clean
+attempt.** Reporting this precisely rather than overclaiming: the architectural mechanism is real and confirmed
+(same host, same unstopped autoplay, same actionability-checked `.fill()` — not a guess), but I do not have an
+observed failure to point to for these two files specifically, only sound reasoning plus the established,
+zero-cost, assertion-preserving convention. Kept the fix — it is free (no downside, no weakened assertion, no
+timeout number changed) and closes a confirmed-real mechanism even though I could not trigger it myself. Did not
+manufacture a "before" failure by e.g. sizing the load differently until one turned up — that would be exactly
+the kind of confirmation-seeking this project's own discipline warns against.
+
+### Verify
+
+- `blocks-live-form.spec.js` + `param-group-rows-1605.spec.js`: isolation 9/9 pass; two valid before-fix load
+  runs (0/2 broken) and one after-fix load run (0/1 broken) under the identical ~200-file/500-test batch — no
+  reproduction either direction, reported honestly rather than inflated.
+- Node tier (`npm run test:node`): 118/118 pass.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- Threw away the `zzdiag-modal-reflow-1820.spec.js` diagnostic after it settled the row-vs-column dispute, per
+  this project's own convention for one-off diagnostics.
+- Process note: hit the cwd-drift trap repeatedly again this turn (at least 4 times — once corrupting an early
+  `npm run test:node` call, twice invalidating early "before" load-run attempts I initially MISDIAGNOSED as
+  Playwright's own stale-collection-cache artifact before realizing via a plain `pwd`/small isolated run that
+  cwd was actually wrong). Every git/npm/npx command in this WORK-LOG's own verify section was re-run only after
+  an explicit `pwd` check confirmed `DDCS-Studio/`.
+
+### For the advisor
+
+Measured before fixing: the true AT-RISK bucket is 2 files, not 12 and not your own swept 20+ — 10 of my own
+first-pass candidates were false positives from a background brief I wrote too loosely (over-generalizing the
+shifting-flex-column mechanism to the MODAL, which an empirical diagnostic then disproved for any desktop
+viewport). `gesture-programmatic-equivalence-1778` specifically is NOT at risk, confirmed directly rather than
+assumed. Fixed `blocks-live-form.spec.js` and `param-group-rows-1605.spec.js` with the same `stopLiveSim`
+convention, scoped to the whole pane rather than the narrower sibling id because both ops default to plain
+`form3d` and mount through a different slot. Could not reproduce an actual failure for either file across three
+valid load runs (2 before, 1 after) — said so plainly rather than overclaiming proof I don't have; kept the fix
+anyway since it's free and the underlying mechanism is confirmed real. `census-finding2-emits-teal-1684` — your
+own named second instance — does not fit this class at all on inspection: none of its 4 tests perform an
+actionability-checked gesture on an animating region. If it's genuinely flaky in your gate, the likely cause is
+a plain `waitForTimeout(300)`-before-read race in test (C), a different problem needing a `waitForFunction`
+poll, not `stopLiveSim` — flagged, not fixed, since it's outside this act's mechanism and deserves its own act.
+Gate: node tier (118/118) + isolation (9/9) + 3 load runs (2 before, 1 after, all clean either way).
+
+🔨 turn 1820

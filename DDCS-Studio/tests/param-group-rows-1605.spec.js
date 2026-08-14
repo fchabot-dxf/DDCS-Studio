@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { getBlkFormHost } from './support/blkFormHost.js';
+import { stopLiveSim } from './support/simControls.js';
 
 /**
  * t1605 — renderUiTree renders a `param_group`'s rows.
@@ -97,6 +98,12 @@ test('values are LIVE both ways on the wizard-view face', async ({ page }) => {
     // t1752 — Surfacing via Customize is deterministically the createUserOpView('blk') host (sectioned template,
     // customizing=true so never the placed-op read-only case) — a plain Playwright locator can't ask
     // getBlkFormHost's "which host" question dynamically, so this is the one place a direct id is still correct.
+    // t1820 — #blk_wiz_user's preview panel autoplays a looping sim on Customize (same mechanism as
+    // pane-surface-scroll-1766's own chronic flake, WORK-LOG t1818); under load the still-playing sim can keep
+    // the form's own layout unstable long enough for .fill()'s actionability check to time out. Scoped to the
+    // whole pane rather than the sibling convention's narrower '#blk_userViz3dBox', because a plain form3d op
+    // (no explicit `panel:`) mounts its preview through the layout2d slot's own parent instead — see WORK-LOG.
+    await stopLiveSim(page, '#blk_wiz_user');
     const depth = page.locator('#blk_wiz_user_form [data-param="depth"]');
     await expect(depth, 'the depth row rendered').toHaveCount(1);
     await depth.fill('2.5');
