@@ -32353,3 +32353,124 @@ list is not something I can check against directly; my own six load-batch runs t
 sharing this signature.
 
 🔨 turn 1852
+
+## turn 1854 — DIAGNOSIS ONLY: the 36mm marker gap, the user's own last open picture bug
+
+Dispatch: `picture-parity-1772` is still red — `user_corner_data pass 1 (anchorsAtPrev=true): declared (-43,7)
+vs rendered (-43,43), gap 36mm`. X matches exactly; only Y is wrong. STEP 1: find what 36 IS, in the user's own
+terms. STEP 2: establish which side is wrong — declared or rendered — proven against the emitted G-code as
+ground truth, not assumed. Check whether this is gated to `anchorsAtPrev`. Report and stop; no fix.
+
+### STEP 1 — what 36 is
+
+Not a form field, not a named parameter, not half of anything in the corner form. It is the NET Y-displacement
+between wall 1's declared/preview approach position and where wall 1's probe actually, physically lands once
+simulated against real stock — the gap between a pre-probe guess and the probe's own real result.
+
+Traced with real numbers (dumped live via `opSimStarts`/`traceToolpath`, corner FL/YX defaults, travelDist=50,
+retract=5, STOCK 100×80×20 — the exact scenario `picture-parity-1772` uses):
+- `declared[0]` (wall 1's approach/hover start, fed as the trace's own seed): `{x:7, y:-43}`.
+- `passEnds[0]` (wall 1's REAL runtime end, from the trace actually executing the emitted G-code — probe to
+  contact, then retract by the declared 5mm): `{x:7, y:-7}`.
+- Net Y-displacement: `-7 - (-43) = 36`. That IS the 36 — not a parameter, an emergent, per-job quantity: how
+  far the wall-1 probe actually had to travel (net of its own retract) to find material, for this stock. For a
+  real user's own stock it will be whatever THEIR wall's real distance is — never zero, never predictable in
+  advance, because that is the entire point of probing.
+
+X doesn't move here purely because wall 1 is a pure-Y probe (`( Step 1: Y Probe )`, `G31 Y#8`) — X is untouched
+by construction during wall 1's own sequence, so `passEnds[0].x` trivially equals `declared[0].x` (both 7). That
+is WHY X "matches exactly" — it's a property of this pass being single-axis motion, not evidence the whole frame
+is otherwise correct. It would NOT hold for a probe sequence where wall 1 moves in X.
+
+### STEP 2 — which side is wrong, proven against the emitted G-code, not assumed
+
+Did not take "declared must be right, rendered must be wrong" (or the reverse) on faith — read the ACTUAL
+emitted G-code's own reposition math and computed, independently, where it puts the tool.
+
+```
+( Step 2: REPOSITION: Traverse past corner and set up for X )
+G0 X#23      ( #23 = #16 = -travelDist = -50 )
+G0 Y#24      ( #24 = #15 = +travelDist = +50 )
+```
+These are `G91` INCREMENTAL moves, applied from wherever the tool physically is at that point in the program —
+which is `passEnds[0]` (post wall-1-probe, post-retract), `{x:7, y:-7}`, NOT from the declared row's own value.
+Applying the G-code's own numbers: `{x: 7 + (-50), y: -7 + 50} = {x:-43, y:43}`.
+
+That is EXACTLY the rendered/reconciled value (`markerWorldOf`'s output) — not an approximation, an exact match
+to 2 decimal places on real floating-point numbers. **The rendered value is correct: it is what the emitted
+G-code's own incremental math genuinely does.** The declared value (`(-43, 7)`) is the one that does not match
+reality — it is `opSimStarts`'s own PRE-PROBE placeholder, and it cannot be otherwise (see "the layer" below).
+
+### The layer above the symptom
+
+Traced `declared[1]` to its source: `cornerData.js`'s `cornerSimStartsProvider` → `cornerWizard.js`'s
+`cornerReposOffsets`. Wall 2's declared marker is computed as `wall1 + off.wall2` where `wall1` itself is a fixed
+FRACTIONAL-STOCK anchor (`fx:0.07, fy:0.0875` of the stock dimensions) plus a fixed `travelDist`-based offset —
+entirely PARAMETRIC, with zero dependency on wall 1's own real probe outcome. (The algebra even shows why Y
+"should" cancel back to the same fractional anchor when wall 1 and the wall1→wall2 traverse share the same
+`travelDist` magnitude and opposite sign — `zsurf.y - travelDist + travelDist = zsurf.y` — a coincidence of the
+formula's own shape, not evidence it tracks reality.)
+
+This is not a bug in the sense of a wrong formula to correct — it is STRUCTURAL: wall 2's real dogleg
+destination depends on wall 1's real probe-contact point, which is UNKNOWABLE before the machine actually
+probes. `opSimStarts`'s declared value for an `anchorsAtPrev` pass can therefore never be exactly right for any
+real job; it is necessarily a placeholder. `markerWorldOf`'s reconciliation exists precisely to correct this
+once a trace has actually run — and it does so correctly, matching the real G-code math exactly, as shown above.
+
+### anchorsAtPrev — confirmed, this only bites there, and why
+
+`markerWorldOf` applies its reconciliation ONLY when `row.anchorsAtPrev && p > 0 && end && prev` — every other
+pass (pass 0, a manual/non-auto reposition, any non-corner op) returns the raw declared row unchanged, no
+divergence possible. Confirmed structurally, not just observed: `anchorsAtPrev` is set (`cornerData.js:179`)
+specifically on auto-reposition DESTINATION passes — exactly the passes whose start position is a machine
+outcome (probe result + retract + a programmed dogleg), not a fixed operator hover point. That relationship is
+precisely where a Y (or X, on a different wall order) can legitimately come from a different source than the
+declared row: the declared row answers "where do we expect to be," the reconciled value answers "where the
+machine's own incremental math actually puts us," and only the second one can be physically accurate for this
+class of pass.
+
+### Open thread, not chased further this turn (in scope for whoever designs the fix)
+
+`markerWorldOf` is consistently used by all three visual consumers I found (`gcodeViz3d.js`'s 3D sprite,
+`createPreviewPanel.js`'s connector far-end, `panelTypes.js`'s 2D Layout handle — all three literally cite `t301
+Seam C — the ONE per-pass marker-world fn` in their own imports) — so the SPRITE and the DRAWN ROUTE (which
+comes from the same real trace I used above) should already coincide in the live app once a trace has run, which
+`createPreviewPanel.js`'s own `setGcode()` does on every render, not only on Play. A live screenshot of the
+corner wizard's default 2D view (`verification/t1854-corner-live-check.png`, FL/YX, this app's own current
+default stock — NOT the test's hardcoded 100×80×20) did not show a dramatic visible gap at that geometry — worth
+being honest about rather than overclaiming a screenshot I don't have. This does NOT contradict the diagnosis
+above (the algorithmic mismatch is confirmed with hard numbers, independent of any screenshot), but it does mean
+whoever designs the fix should either reproduce the SAME stock scenario `picture-parity-1772` uses to get a
+visually dramatic before/after, or check whether the user's own report came from a DIFFERENT surface than the
+sprite/route pair (e.g., a coordinate readout/label reading the raw declared value directly, which I did not
+find but also did not exhaustively rule out) before finalizing a fix's own scope.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched, investigation only).
+- `picture-parity-1772.spec.js`: 1/1 pass (this test's own expectation is that corner IS in the failed list —
+  unchanged, reproduced identically: `user_corner_data pass 1 (anchorsAtPrev=true): declared (-43,7) vs rendered
+  (-43,43) — gap 36mm`, byte-identical to the dispatch's own numbers).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- Two throwaway diagnostic specs built and deleted after use (`zzdiag-36mm-1854.spec.js`,
+  `zzdiag-corner-visual-1854.spec.js`); one screenshot kept as evidence
+  (`verification/t1854-corner-live-check.png`).
+- `git status --short`: zero source changes, as the dispatch required.
+
+### For the advisor
+
+36mm is not a parameter — it is the net Y-distance wall 1's probe search actually travels (net of its own
+retract) beyond where the operator's declared hover/start position was; unique to the specific stock, never
+zero, never knowable in advance. The RENDERED (reconciled) value is the correct one — proven by directly
+computing the emitted G-code's own incremental reposition math (`G0 X#23; G0 Y#24`, applied from wall 1's real
+runtime end) and getting an exact match to the rendered marker, not the declared one. The DECLARED value is a
+structural pre-probe placeholder — `opSimStarts`'s own corner provider computes it from a fixed fractional-stock
+anchor with zero dependency on wall 1's real probe outcome, which cannot be otherwise, since that outcome is
+physically unknowable before the probe fires. Confirmed gated to `anchorsAtPrev` passes specifically, and why:
+that flag marks exactly the passes whose start is a machine outcome, not an operator hover point. One open
+thread not chased down this turn: whether the user's own visual report traces to the sprite/route pair (which my
+analysis says should already coincide, live, via the shared `markerWorldOf` reconciliation) or to some other
+surface reading the raw declared value directly — flagged for whoever scopes the fix, not resolved here.
+
+🔨 turn 1854
