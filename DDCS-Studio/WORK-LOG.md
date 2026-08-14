@@ -32584,3 +32584,107 @@ a real starting position at all. I have not traced the source; this is a screens
 a diagnosis, exactly as scoped. Their picture is NOT correct yet — I cannot say we close their report.
 
 🔨 turn 1856
+
+## turn 1858 — corner under Expert vs V4.1, side by side; is zero-motion homing correct or a gap
+
+Dispatch: build the SAME corner scenario (same op, same params, same gesture) under both controller profiles and
+compare the pictures. Identify which profile the user's restored workspace actually carries. First establish,
+from the dialect's own declared evidence, whether V4.1 genuinely has no G-code homing (zero motion correct) or
+this is an unaddressed gap. Do not fix. No source changes; gate is node tier only.
+
+### Which profile their workspace carries
+
+Re-confirmed from t1856's own screenshot: their file's emitted G-code header reads `( HOMING — none | DDCS V4.1 )`
+— their restored workspace is DDCS V4.1, stated plainly as asked.
+
+### Is zero-motion homing correct for V4.1, or a gap? — evidence from the dialect, not assumption
+
+Read `web/wizards/dialects/ddcs-v41.js` in full. Its own header states what IS confirmed against the live
+controller (2026-06-13, read-only over SMB): "probe form, the #1500-1503 machine-position vars, probe-result
+#1502, G0 G53 machine moves, and G92 zeroing." **Homing is not in that list, in either direction** — not
+confirmed present, not confirmed absent. The dialect's own `caps` object (`vars, flow, probeStatusCheck, hmi,
+toolTable, probePort, atc, helicalArc, wcsAuto, wcsFixed, wcsSync`) has **no `homing` field at all** — there is
+no place in the dialect's own declared capability model to say either way.
+
+The actual gate lives in `web/wizards/stacks/homingWizard.js:159,166-173`: `const expert = dialect.id ===
+'ddcs-expert-m350'` — a blanket "not Expert → refuse" rule, with its own stated reason: "the M98 P501/P503
+subprograms and the #[1045+]/#[607+]/#[880+] param map are only verified on Expert M350. We do NOT emit a
+guessed homing sequence for V4.1 / DM500." That reasoning is about EXPERT's own subprogram numbers being
+unconfirmed elsewhere for other controllers — it is a conservative refusal to guess, not a positive claim that
+V4.1 lacks G-code-drivable homing or that homing is a panel-only action there.
+
+**Verdict: UNCONFIRMED either way, from the dialect's own evidence — not "zero motion is correct" and not
+"this is a known gap."** The refusal to emit a guessed sequence is very likely the right machine-safety call
+regardless (guessing wrong subprogram numbers on real hardware is worse than emitting nothing) — but that is a
+separate question from whether the SIM/PREVIEW should have a sensible anchor for what follows. Not settled by
+this dialect's own declarations; would need a real V4.1-specific investigation (matching the S5 bench-kit
+convention's own live-verification discipline) to settle for real, not assumed here.
+
+### The comparison — built fresh, same defaults, only the profile switched
+
+Two throwaway specs, deleted after use, built the identical Homing→Corner sequence (same real bar gesture, same
+default params, same default stock) under each profile via `setMachine({controllerId}, true)`, screenshotted
+into `.repro/` (not personal data — default params only — but kept to the same discipline as last turn anyway).
+
+**Corner's own declared marker positions are BYTE-IDENTICAL between the two profiles** — same 3-pass array,
+same x/y/z, same `anchorsAtPrev` flags, confirmed by direct comparison, not assumed. Traced why: `opSimStarts`'s
+corner provider (`cornerSimStartsProvider`/`cornerReposOffsets`, t1854's own trace) reads only the op's own
+params and stock — it has no dialect awareness at all. The marker computation itself cannot differ by profile.
+
+**Visually, under matched defaults, neither picture is dramatically broken.** Both show the workpiece block, the
+corner probe's own route, and its markers in the same visual vicinity — a traverse connects Homing's own
+declared position down to the corner probe area in both cases. The Z DRO differs modestly between profiles (a
+real, expected difference — V4.1's own safe-Z retract bakes a literal margin where Expert reads a controller
+register, per the dialect's own declared `safeRetract`/`safeHop` — not evidence of a broken picture). Confirmed
+switching `controllerId` alone does not touch machine envelope/travel settings (`controllerProfiles.js`'s own
+profile objects carry no envelope fields) — the comparison is a fair, controlled one: only the dialect differed.
+
+### This changes what t1856's own finding most likely means
+
+t1856 reported a dramatic disconnect (the corner route rendering with no visible relationship to the actual
+stock) using the user's OWN real restored workspace. THIS turn's matched comparison — same small default stock,
+only the profile differing — does NOT reproduce that dramatic disconnect under V4.1 alone. That means V4.1's own
+zero-motion homing is very likely NOT, by itself, sufficient to cause what t1856 saw. The more likely
+explanation, given what t1856's own screenshot showed (extreme DRO values, a camera that had to be manually
+re-fit past what looked like the machine's own full-envelope framing before anything was even visible) is that
+the user's REAL machine's own configured travel/envelope size is genuinely large relative to a small stock —
+a normal property of a real machine, not a defect — and the DEFAULT camera fit strategy (fit-to-whole-scene)
+made a small, correct corner-probe picture look tiny and disconnected purely as a FRAMING artifact, unrelated to
+whether the underlying coordinates are right. I have NOT confirmed this explanation directly (their real
+machine's own envelope size is exactly the kind of value I must not report even qualitatively-precisely, and I
+did not re-load their file this turn to re-check) — naming it as the more likely explanation given this turn's
+own controlled evidence, not as a settled fact.
+
+### Data hygiene, repeated per the dispatch
+
+`.repro/` screenshots from this turn (`t1858-expert.png`, `t1858-v41.png`) are NOT derived from the user's file
+(default params only) but were still written to the same gitignored folder as a matter of discipline. Confirmed
+via `git check-ignore -v` (both matched by `.repro/.gitignore`'s own `*` pattern) and a dry-run `git add -A`
+(picks up nothing from `.repro/` except its own pre-existing `.gitignore`). No value from their file appears
+anywhere in this entry or was touched this turn.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: zero tracked files changed — no source changes, per the dispatch.
+
+### For the advisor
+
+Their workspace is confirmed DDCS V4.1. The dialect's own declared evidence does not settle whether zero-motion
+homing is correct or a gap — homing is absent from both the confirmed-live list and the caps object entirely;
+the refusal is a blanket "not Expert" rule reasoned from EXPERT's own unconfirmed subprogram numbers, not a
+positive claim about V4.1. The side-by-side comparison is the more load-bearing result: under matched default
+conditions, corner's own declared markers are byte-identical across profiles (the marker math has no dialect
+awareness at all), and neither profile's picture is dramatically broken. That weakens "V4.1 causes a broken
+corner picture" as the explanation for t1856's own dramatic finding, and points instead toward the user's own
+real machine's own (likely large, entirely normal) travel/envelope dimensions combined with the default
+whole-scene camera fit as the more probable cause — a framing artifact, not necessarily a coordinate defect.
+Not confirmed directly this turn (would mean re-touching their file, and I did not chase it further, per scope).
+Flagging as the next thing worth checking, if this line of investigation continues: does the PREVIEW'S OWN
+camera-fit strategy already account for "declared markers are far tighter than the machine envelope" the way it
+was made to for the earlier bug-3 marker-rebuild fix, or does it still default to fitting the whole machine
+frame whenever one is present.
+
+🔨 turn 1858
