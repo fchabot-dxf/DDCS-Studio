@@ -2142,3 +2142,37 @@ is the claim ([[ddcs-ground-truth-reference]]).
 was invisible to a green suite because the specs reach the pane through doors the user does not use. Fix a
 corner bug now and it would pass its test while possibly still being broken for them. **Do the doors work
 first, then this.** Do not drop it — a symptom the user can see is worth more than any reasoning.
+
+---
+
+# 🧪 THE TESTS THAT CHECK THE APP — the audit the user keeps asking for (2026-08-13)
+*"we need to fix the tests that check the app."* Not the one new check — the BODY of specs that assert
+about the app's behaviour while never driving it.
+
+**What exists after today:** `picture-parity-1772.spec.js` (declared markers vs traced path, red on corner)
+and `pane-visual-host-real-gesture-1762.spec.js` (drives the real bar→Insert→Blocks chain). **Two specs.**
+
+**What does not:** ~95 specs build state with `ddcsLoadBlockStack` and assert against it. That is where
+every green-but-broken result this week came from — the empty pane, the wrong branch, the missing visual
+host, the unstyled surface. All green. All broken for the user.
+
+**The map (t1770) gives the fix, and it is NOT "rewrite 95 specs":**
+> the three doors converge on the SAME form-structure rendering (hasTree/userRoot resolves from the
+> registry template, never from the stack's own children). They differ ONLY in which VALUES populate
+> fields, and in editable-vs-read-only — both gated by one clean fact (`authoringWizardType()`).
+
+**So split them by what they ASSERT:**
+| the spec asserts | verdict |
+|---|---|
+| STRUCTURE (fields exist, rows render, a form is produced) | **fine as-is** — the doors converge here; the fast path is legitimate |
+| LIVE VALUES against a synthetic `params:{}` fixture | **proves nothing** — asserts about a state no gesture produces. Repoint these. |
+| what the user SEES (the picture, the surface, placement) | **needs the real gesture** — this is the class that was invisible all week |
+
+## THE ACT
+1. **AUDIT** — classify the ~95 by the table above. Report counts + the list needing work. Do not fix yet.
+2. **PROMOTE the sanctioned shortcut** — t1770 recommends `wizard-face-1599`'s own placed-twin test
+   (`:161-194`) as the pattern: `makeOp` + `instantiate`, the SAME primitives `commitActiveOp` uses. If a
+   spec needs a placed op, it should build one THAT way rather than inventing a fixture.
+3. **REPOINT** the value-asserting ones onto it, in slices small enough to review — not one act.
+⚠ The point is not more tests. It is that a GREEN result should mean the app works **for the routes the
+user actually takes**. Today it does not, and the user has had to be the integration test all week.
