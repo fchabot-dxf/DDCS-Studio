@@ -2176,3 +2176,45 @@ host, the unstyled surface. All green. All broken for the user.
 3. **REPOINT** the value-asserting ones onto it, in slices small enough to review — not one act.
 ⚠ The point is not more tests. It is that a GREEN result should mean the app works **for the routes the
 user actually takes**. Today it does not, and the user has had to be the integration test all week.
+
+---
+
+# 🧪 SUITE AUDIT RESULT (parallel read-only agent, 2026-08-13) — the numbers
+775 spec files · 2312 tests. **The user's primary route has NO end-to-end spec at any point in its chain.**
+
+| exact grep | count |
+|---|---|
+| specs that Playwright-click a wizard-bar entry | **0** |
+| specs that click the INSERT button (`index.html:1156`) | **1** |
+| specs that click the BLOCKS tab (`index.html:136`) | **0** |
+| files with NO input of any kind (pure `page.evaluate`) | **416 of 775** |
+| `toHaveScreenshot`/`toMatchSnapshot` baselines | **0** |
+| specs reading canvas PIXELS (`getImageData`) | 10 (of 83 referencing a canvas) |
+
+⚠ **The file named `pane-visual-host-real-gesture-1762.spec.js` drives no real gesture** — `window.openWiz`
+`:18`, `window.insertWiz` `:20`, `window.showApp` `:21`. The advisor cited it to the user as covering their
+route. It does not.
+⚠ **The `*-in-place.spec.js` family (16 files) asserts `canvas ? 1 : 0`** — e.g. `pocket-in-place.spec.js:44,55`
+proves a `<canvas>` ELEMENT EXISTS while its name claims "the sim renders the toolpath".
+
+## THE FIVE ADDITIONS (audit's own ranking — cheapest first, highest value first)
+1. **The primary route, once, end to end.** Click `button[data-optype]` → `.fill()` a distinctive value →
+   click INSERT → click `[data-app="blocks"]` → assert the Wizard View shows THAT value.
+   **One spec closes bugs 1, 2 and all three zero-coverage gestures.** It is the only test that would have
+   caught the `b.opType` scan bug.
+2. **Both renderer branches from the same gesture** — one `hasTree` twin, one flat-bindings twin, same
+   visible outcome asserted. Bug 2 shipped because `blocksApp.js:667` and `:731` have no test that tells
+   them apart.
+3. **A visual host must contain a DRAWING, not a canvas** — `getImageData` on the 3D + 2D containers,
+   assert non-uniform pixels. Kills bug 3 and the whole `vizEls > 0` family.
+4. **Painted surface via the real chain** — `pane-surface-1764/1766` already assert the right thing from
+   the wrong setup. A repoint, not new work.
+5. **Drawn position vs numeric readout, absolute branch** — model on `corner-marker-parity.spec.js:45`,
+   the suite's ONE exemplar using a real `page.mouse` drag and asserting drawn positions. That is the live
+   start-clamp bug, and it is the branch `toolpath2d-anchor.spec.js:55` leaves open.
+
+**Cross-cutting cheap win:** zero screenshot baselines exist. Baselines for the wizard modal and the
+Wizard View pane would have caught bugs 3 and 4 with no assertion logic at all.
+
+**Repointing pool:** 200 files / 564 tests classed as user-visible or live-value with no Playwright
+gesture. Top 25 listed in the audit; 175 more exist. **Slice into reviewable acts — never one pass.**
