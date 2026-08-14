@@ -2233,7 +2233,13 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
                                              clicks the Probe menu, the corner entry, fills dist=777,
                                              clicks INSERT, clicks the Blocks tab; asserts #1=777.
                                              ZERO function shortcuts (advisor-verified by grep).
-  2  GESTURE==PROGRAMMATIC equivalence   [ ]   <- user, 2026-08-13
+  2  GESTURE==PROGRAMMATIC equivalence   [x]  t1778 -- gesture-programmatic-equivalence-1778.spec.js
+                                             POSITIVE RESULT: the shortcut IS equivalent. Deep-equal on
+                                             ddcsGetBlockProgram() with ONE exception (block id), matched
+                                             first attempt -- no 2nd/3rd normalisation needed. Canvas
+                                             checked narrowly (same types/count + planted value visible)
+                                             rather than deep-equalling position, deliberately avoiding a
+                                             second exception. => the ~95 shortcut specs are LICENSED.
   3  both renderer branches              [ ]
   4  pixels not element-exists           [ ]
   5  surface via the real chain          [ ]
