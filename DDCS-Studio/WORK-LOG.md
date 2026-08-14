@@ -31387,3 +31387,128 @@ Bug 3 re-measured twice more, unmoved both times. Gate: node 118/118 (one archit
 the way), 172/174 real (2 pre-existing unrelated), both baselines clean.
 
 🔨 turn 1836
+
+## Turn 1838 — Slice 1 (derivation only): reproduced B's REAL motivating case, found + sidestepped a latent opAtLine bug
+
+### Dispatch
+
+Two rulings, then the act. RULING 1: frame stays a per-type lookup (my own t1836 recommendation) — embedding it
+in the export marker would be duplicating a declared fact, not declaring a new one; a hand-edited opType would
+then contradict its own embedded flag. RULING 2: STOP-mid-segment needs no new rule — the panel's own Run/Stop
+already means "stop and reset to the start" (its own tooltip), landing on the idle picture with the workpiece
+shown; if the tooltip and code disagree, that's a separate bug to report, not reconcile inside B. THE ACT: slice
+1 of the 3-slice plan, DERIVATION ONLY — for a real program, which line ranges belong to which op, and what
+frame each declares. No positioning, no visibility, no render change; both screenshot baselines must stay
+zero-diff, and if either moves, STOP (the derivation leaked into rendering). Assert against a real Homing+Corner
+program by real gesture. Carry the checkEnvelope `testPoint`/`stats.absolute` concern forward as its own item,
+untouched this slice. Gate: node tier + the new derivation test + both baselines.
+
+**A mid-turn amendment landed before I finished slice 1** (polled and absorbed before continuing, same
+checkpoint discipline as t1836): the user directly challenged B's own premise — nobody stacks Homing and Corner
+in one program in real use (you home from the controller, then run a separate job). The advisor checked rather
+than defending it, and found the REAL justification hiding in the same declaration: `opSimContext.js:34`'s
+`MACHINE_FRAME_TOOL` set has FOUR members, not one — `homing`, `atc_change`, `atc_test`, `atc_table` — and
+`atc_change` is a TOOL CHANGE. Cut with tool 1, change tool, cut with tool 2 is an ORDINARY multi-tool job, not
+a rare combination — so the SAME whole-program union that blanks the workpiece for a Homing program would blank
+it for any program with a mid-job tool change. Explicitly flagged as read-off-a-declaration, not yet
+REPRODUCED — told to build a real Drill+ATC-Tool-Change+Drill program by real gesture, screenshot it, and only
+continue slice 1 if it actually reproduces; STOP AND REPORT if it doesn't. Also asked whether `atc_test`/
+`atc_table` are reachable in a normal program or setup-only surfaces.
+
+### The real justification, checked — not just read off the declaration
+
+Built a real, UNCONFIGURED (default settings, no ATC magazine/grip setup) Drill → ATC Tool Change → Drill
+program via the real bar (`Mill` → Drill → Insert, `ATC` → Tool Change → Insert, `Mill` → Drill → Insert),
+switched to Blocks, read the whole-program panel. **Result — it reproduces, cleanly, with zero configuration:**
+```
+stock: null
+noteVisible: true
+noteText: "Workpiece hidden — Tool Change (data) runs in machine coordinates; this workspace has no WCS
+           offsets recorded, so there's nothing on file to place it against."
+opTypesInOrder: ["user_drill_data", "user_atc_change_data", "user_drill_data"]
+```
+The Tool Change op's own DEFAULT method needed no ATC settings at all (`m6`, "delegate to the controller M6" —
+confirmed from its own live code preview before insert) — a user gets this the moment they insert a tool change
+into a plain two-tool job, not only after configuring a magazine. **This is B's real motivating case, not the
+Homing+Corner one t1832/t1834/t1836 used** — recording this explicitly so nobody later re-litigates B as
+solving a homing-only edge case. A screenshot was attempted (`verification/t1838-atc-toolchange-blank-check.png`)
+but landed on the freshly-inserted Drill block's own single-op edit view rather than the whole-program panel
+(inserting an op auto-opens its own editor, occupying the Wizard View pane at this viewport) — the numeric/DOM
+evidence above is the actual record; noting the screenshot attempt's limitation honestly rather than presenting
+it as full visual confirmation.
+
+**`atc_test`/`atc_table` — reachable, but read as setup-only, stated as a judgment not a measurement.** Both
+sit in the same `atc` bar group as `atc_change`, reached via the identical bar gesture — nothing at the code
+level gates them differently, so they are technically reachable mid-program exactly like Tool Change. But their
+own purpose, per their own doc comments (`wizardLibrary.js:65-66`): Tool Table "push[es]... lengths/pockets to
+the controller" (commissioning data, not a cutting action) and ATC Test is a self-test of the changer mechanism
+— both read as one-time/commissioning actions a shop runs during machine setup, not something inserted into an
+ordinary per-job cutting program the way a tool CHANGE is. This is inference from naming and doc comments, not
+a hard reachability restriction or a usage measurement — stated as my own read, not a proven fact.
+
+### The derivation module (`web/viz/segmentFrame.js`) — and a real bug it caught, not introduced
+
+Built `frameOwnerAtLine(i)` + `frameSegments(lineCount)`, joining two already-declared sources per the t1836
+design: `programModel.js`'s own `proj.map[i]` (line→op ancestry) and `opSimContext.js`'s own per-type
+`toolMachineFrame`. Not imported by any render/positioning code this turn — nothing else can call it yet.
+
+**First version used `programModel.js`'s own `opAtLine(i)` helper** (the existing, general-purpose line→op
+lookup, also used by the editor's hover-to-edit). The guard test caught it returning a WRONG match for Corner's
+own lines in a real Homing+Corner program: an object with `opType: 'homing'` and no `id` at all — not Corner.
+**Traced to a real, pre-existing bug in `opAtLine`'s own `findOpInStack`, not something this turn introduced:**
+Homing's own builder self-wraps with an INTERNAL `{type:'op', opType:'homing'}` fragment
+(`op1.children[0].children[0]`) that is never assigned an `id` (only the top-level `makeOp()` call assigns one
+— this session's own earlier `_framed()`/`'op'`-vs-`'user_root'` finding, from a different angle). `proj.map[31]`
+(Corner's own first line) is `['op2', undefined, undefined, undefined]` — genuine `undefined`, confirmed by
+typeof-checking each slot rather than trusting a JSON dump (which silently renders `undefined` as `null` inside
+an array, the exact confusion that cost real diagnostic time here). `Array.prototype.includes` treats `undefined`
+as a real value, so `findOpInStack`'s `anc.includes(b.id)` check matches ANY id-less `type:'op'` descendant,
+ANYWHERE in the whole stack, whenever the ancestry being resolved happens to pad out with `undefined` at that
+depth — regardless of which op actually owns the line being looked up.
+
+**Not fixed here — flagged as its own item, per this session's own established discipline for out-of-scope
+findings (mirroring how the checkEnvelope `testPoint` concern was carried forward at t1836).** `opAtLine` has
+other, unrelated live consumers (the editor's own hover-to-edit); patching its general recursive search inside
+a derivation-only slice risks perturbing behavior well outside this slice's own stated scope, and slice 1's own
+hard constraint is that NOTHING outside the new module may change. Sidestepped instead: `frameOwnerAtLine` only
+ever needs TOP-LEVEL attribution (which op owns this line — never a nested atom), so it reads `proj.map[i][0]`
+directly and does a plain top-level lookup in `getStack()`, never calling `opAtLine`/`findOpInStack` at all —
+correct for this module's own narrow need, and provably unaffected by the bug rather than depending on it.
+
+### Non-vacuity
+
+Swapped in the earlier (buggy, `opAtLine`-based) version of the module, re-ran the guard test: **fails 3/3**,
+`cornerSeg.opType` reads `"homing"` — the exact wrong value diagnosed above. Restored the corrected
+(`proj.map[i][0]`-based) version from a scratch backup, diffed byte-identical, re-ran: **1/1 pass.**
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- `tests/segment-frame-derivation-1838.spec.js` (real Homing+Corner program, real gesture): asserts the two
+  segments' `opType`/`toolMachineFrame` against the program's OWN real op types (not hardcoded bare names — the
+  real twin opTypes, `user_homing_data`/`user_corner_data`), non-overlapping line ranges in program order, AND a
+  cross-check (`frameOwnerAtLine` agrees with `frameSegments` at every segment's own start line — no compaction
+  drift) plus a claimed-vs-owned line-count check (no dropped/double-counted lines). **1/1 pass.**
+- Both screenshot baselines (`screenshot-baselines-1792.spec.js`, `render-equivalence-1796.spec.js`), run
+  together with the new test: **7/7 passed, ZERO diff on both baselines** — `git status` after the run shows no
+  incidentally-regenerated PNGs either, confirming nothing visual moved, exactly the slice-1 constraint.
+- `handoff.py amendments --role worker`: 1 landed mid-turn (the B-premise challenge + the ATC-reproduction
+  requirement), polled and absorbed before continuing past the reproduction check. Epoch re-checked (`4`,
+  matches).
+- `proc_health.py mark --turn 1838` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+B's real justification CHECKED, not just read off the declaration: a plain, unconfigured Drill+ToolChange+Drill
+program blanks the workpiece exactly like Homing+Corner did — recorded as B's actual motivating case. Slice 1
+shipped: `viz/segmentFrame.js`, zero new declarations (exactly as the t1836 design promised), not imported by
+anything else this turn. Along the way, the guard test caught a REAL, pre-existing bug in `programModel.js`'s
+own `opAtLine`/`findOpInStack` — an id-less nested `type:'op'` fragment inside Homing's own builder output can
+be mismatched via `Array.prototype.includes(undefined)` whenever a DIFFERENT line's ancestry pads out with
+genuine `undefined` (not `null`) at the same depth. Not fixed (other live consumers, out of this slice's own
+scope) — flagged as its own item, alongside the still-open checkEnvelope `testPoint` concern from t1836. Both
+screenshot baselines zero-diff, confirming nothing visual changed. `atc_test`/`atc_table` reachable via the same
+bar gesture as Tool Change but read (by naming/purpose, not measured) as setup/commissioning surfaces, not
+per-job insertions — reported as a judgment, not a fact.
+
+🔨 turn 1838
