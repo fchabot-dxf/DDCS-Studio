@@ -31512,3 +31512,132 @@ bar gesture as Tool Change but read (by naming/purpose, not measured) as setup/c
 per-job insertions — reported as a judgment, not a fact.
 
 🔨 turn 1838
+
+## Turn 1840 — the opAtLine bug: CONFIRMED reachable by real gesture, worse than the guard test showed; not fixed
+
+### Dispatch
+
+RELEASED V2026.08.14.4, full suite zero failed. Investigate — not fix — the `opAtLine`/`findOpInStack` bug the
+t1838 guard test tripped over, before slice 2 builds more on that neighbourhood. STEP 1: enumerate every caller
+of `opAtLine`/`findOpInStack`, say what each does with the answer, name the user-visible consequence if any can
+act on a wrong op. Confirm BY GESTURE, not a code-read — build a program that actually contains the id-less
+fragment and check whether a real consumer actually misbehaves; screenshot it if visible. If unreachable, say so
+plainly (documented as unreachable, like the two census entries). If reachable, report the mechanism and STOP —
+no fix, since a fix may be a contract change across several consumers, a design call reserved for the advisor.
+Also: does Homing's builder emitting an id-less fragment indicate a builder-level defect rather than an
+`opAtLine` one — if every other builder stamps ids and homing doesn't, the honest fix may sit upstream. Gate:
+node tier + whatever is touched (nothing, this turn — investigation only).
+
+### STEP 1 — every caller, and what it does
+
+Grepped the whole `web/` tree for both names. `findOpInStack` has exactly ONE caller: `opAtLine` itself
+(`programModel.js:56-59`, plus its own recursion). `opAtLine` has exactly THREE real consumers:
+
+1. **`serializeWithMarkers()`** (`programModel.js:112`, internal) — the .nc EXPORT path. Calls `opAtLine(i)` for
+   EVERY line to decide where to insert a new `@DDCS:1` marker (on an op change). **No guard on the result at
+   all** — uses `op.id`/`op.opType`/`op.params` directly.
+2. **`editorOpHover.js`'s hover chip** (`updateChipForLine`, line 149-193) — the Studio editor's hover-to-edit
+   affordance (mousemove → highlight the hovered op's lines + a floating "✎ Edit" chip). Reads `op.id`,
+   `op.label`, `op.opType`, calls `window.ddcsCanEditOp(op.opType)` to decide lock state.
+3. **`editorOpHover.js`'s right-click menu** (`contextmenu` handler, line 220-227) — calls `showOpMenu(op, ...)`
+   for a real op, or a "Group" menu for a loose run. `showOpMenu` (`opContextMenu.js:122-123`) has its OWN
+   guard: `if (!op || !op.id) return;` — refuses to render anything without a real id.
+
+### Confirmed BY GESTURE — reachable, and worse in one place than expected
+
+Built the real Homing+Corner program (the exact scenario the t1838 guard test used — Homing's own builder
+produces the id-less fragment), stayed on the STUDIO tab (not Blocks — this is where `opAtLine`'s real consumers
+live), and drove REAL DOM events, not a direct function call disguised as one.
+
+**Consumer 2 (hover chip) — reachable, confirmed, but self-limiting.** A real `mousemove` dispatched over
+Corner's own FIRST line produces: `chipText: "🔒 Home · ≈ 25 min"`, `chipOpId: "undefined"` (the string, via
+`dataset`), `directCallOpType: "homing"`. **Checked whether this is a one-line edge case or systemic — it is
+systemic**: every line I sampled across Corner's ENTIRE 91-line range (first, mid-range, last) returns the SAME
+wrong `opType: "homing"` — hovering ANYWHERE over Corner's own G-code shows Homing's phantom fragment instead,
+for the whole op, not just near the boundary. The chip is LOCKED (🔒, not ✎) because
+`ddcsCanEditOp('homing')` reads false for the bare built-in type — so clicking it does nothing; the
+CONSEQUENCE is a wrong, confusing, but non-functional chip, not a wrong edit.
+
+**Right-click — reachable in the sense the handler runs, but SAFE, confirmed not just reasoned.** Dispatched a
+real `contextmenu` event on the same line: `menuPresent: false`, `opCountBefore: 2`, `opCountAfter: 2` (unchanged).
+`showOpMenu`'s own `if (!op || !op.id) return;` guard (a PRE-EXISTING safety check, not something this turn
+added) silently refuses to render — the caller's own `e.preventDefault()` still suppresses the native browser
+menu, so a right-click on one of these lines produces nothing at all (no menu, no danger), which is a real UX
+defect (right-click silently swallowed) but not a destructive one.
+
+**Consumer 1 (export markers) — reachable, confirmed, and this is the SERIOUS one: SILENT DATA LOSS on
+export/reimport, not just a cosmetic chip.** `serializeWithMarkers()` has no `id`/truthiness guard, so the
+phantom's `id: undefined` reaches it directly. Traced the exact mechanism, then proved it: the loop tracks
+`lastOpId` to decide when to emit a new marker (`op.id !== lastOpId`). For Homing's own lines, `op.id` is the
+real `'op1'`, a marker is correctly emitted, `lastOpId='op1'`. For Corner's FIRST line, `opAtLine` returns the
+phantom (`id: undefined`, `opType: 'homing'`, no `params`) — `undefined !== 'op1'` is true, so a SECOND,
+SPURIOUS marker is emitted: `{"op":"homing"}` with NO params. `lastOpId` becomes `undefined`. For every
+SUBSEQUENT line of Corner's own range, `opAtLine` returns the SAME phantom again, so `undefined !== undefined`
+is false — no further markers, but Corner's own real marker NEVER FIRES AT ALL. Called the real, exported
+`window.ddcsSerializeWithMarkers()` on this program: **exactly 2 markers, not 3** —
+`{"op":"user_homing_data",...real params...}` and `{"op":"homing"}` (bare type, empty params) — Corner is
+absent. Reimported that exact text via `importMarkedNc`: **`[{opType:'user_homing_data'}, {opType:'homing'}]`**
+— two ops, NEITHER is Corner. **Corner is silently and completely lost on export/reimport, replaced by a
+garbage duplicate "homing" op with no params.** The MACHINED G-code text itself is untouched (the raw line is
+pushed unconditionally regardless of the marker decision) — this is a data-INTEGRITY defect in the .nc file's
+own self-describing round-trip metadata, not a machine-safety one, but a real one: a user who exports mid-work
+to keep editing later, or hands a file to someone else's Studio, gets Corner deleted out from under them with no
+error, no warning, nothing — silent.
+
+### Builder vs `opAtLine` — checked, not assumed either way; it's genuinely both, at different layers
+
+Traced the fragment's own origin: `homingData.js:59-70`'s `homingDataStack()` sets `children: exec` where
+`exec = homingStack(params, {superset:true})` — the LEGACY BUILT-IN's raw output, embedded VERBATIM as internal
+children, never stripped. `homingStack()` is this session's own earlier-established "only homing today" case —
+the ONE built-in whose own top-level output self-wraps as `{type:'op', opType:'homing', children:[...]}}` rather
+than the `user_root`/guard-based shapes every other twin uses. **Checked the other 3 `MACHINE_FRAME_TOOL`
+members directly rather than assuming they share this — they do NOT:** `atcChangeStack()`
+(`wizards/stacks/atcChangeWizard.js:186-195`) returns an array of `guard`-typed blocks in superset mode, no
+`type:'op'` anywhere; `atcTestStack()` (`wizards/stacks/atcTestWizard.js:116+`) is the same guard-based superset
+shape (spot-checked, not exhaustively line-read). `atc_table` not directly checked this turn — flagged as
+UNVERIFIED rather than assumed clean by extension.
+
+**So: TWO real, separate things, at two different layers — not one bug with one owner.**
+- **Builder layer:** `homingDataStack()` embeds an id-less `type:'op'`-tagged fragment nowhere else does — this
+  IS the upstream asymmetry the advisor asked about, confirmed, not inferred. A `type:'op'` node with no id is
+  itself an odd shape to leave sitting inside a stored program's own tree, regardless of what reads it later.
+- **`opAtLine`/`findOpInStack` layer:** the algorithm's own `anc.includes(b.id)` check has no defense against
+  `b.id` being `undefined` — it silently treats "no id" as a valid, matchable value via array membership, rather
+  than requiring a genuine, non-empty identity. Fixing ONLY the builder closes this SPECIFIC instance; fixing
+  ONLY the algorithm forecloses the whole CLASS (any future id-less `type:'op'` node, from any cause, would hit
+  the same failure). Both are real; which to fix (one, or both) is the ruling reserved for the advisor, per the
+  dispatch's own framing — not decided here.
+
+### Not fixed, per the dispatch's own explicit instruction
+
+No source change this turn. `homingData.js`, `programModel.js`, `editorOpHover.js`, `opContextMenu.js` all
+untouched.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched; run as hygiene per the dispatch's own "+ whatever you touch,"
+  which this turn is nothing).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1840` at start; `watch` at end: self tree clean, 0 flagged.
+- Two throwaway diagnostics built, run, and deleted after use (the hover/right-click/export gesture chain; an
+  earlier exploratory dump used to locate the exact fragment path at t1838, already reported there).
+
+### For the advisor
+
+Reachable, confirmed by real DOM events, not a code-read: the hover chip is wrong across Corner's ENTIRE range
+(not just near the boundary) but self-limiting (locked, no edit possible); the right-click path is safe (an
+existing, unrelated guard in `showOpMenu` refuses to render for an id-less op, confirmed by gesture — no menu,
+no destructive action, op count unchanged before/after). **The serious one: `serializeWithMarkers()` has no
+such guard, and a real export+reimport of this exact program SILENTLY DELETES Corner, replacing it with a
+garbage duplicate "homing" op with no params** — confirmed with the actual exported marker text and the actual
+reimported stack, not reasoned about. The machined G-code text itself is unaffected (only the marker metadata),
+so this is a round-trip/persistence integrity defect, not a machine-safety one — but it is real, silent, and
+already reachable today by any user who exports a Homing-then-something-else program and reimports it. Traced
+the fragment's own origin to `homingData.js`'s `homingDataStack()` embedding the legacy `homingStack()`'s raw,
+un-stripped self-wrap — confirmed this is unique to homing among the 3 other `MACHINE_FRAME_TOOL` members
+checked (atc_table not directly verified, flagged UNVERIFIED). Reporting this as TWO separate, real defects at
+two layers (the builder's own odd shape; the matching algorithm's own missing identity check) rather than
+picking one — the ruling on whether to fix one or both is explicitly not made here, per the dispatch. No source
+changed. Node 118/118.
+
+🔨 turn 1840
