@@ -2240,7 +2240,18 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
                                              checked narrowly (same types/count + planted value visible)
                                              rather than deep-equalling position, deliberately avoiding a
                                              second exception. => the ~95 shortcut specs are LICENSED.
-  3  both renderer branches              [ ]
+  3  both renderer branches              [x]  t1780 -- renderer-branch-parity-1780.spec.js
+                                             FLAT twins found by reading checkLayoutNodes' own predicate:
+                                             user_pause_confirm + user_io_step (param_group only). Drives
+                                             corner (hasTree) AND pause_confirm (flat) through the real
+                                             chain. HONEST CEILING, in its docblock: no branch-naming
+                                             surface exists, so it proves both branches are reachable and
+                                             correct -- NOT that a branch swap would be caught by content
+                                             alone. Worker did NOT add app instrumentation to make its own
+                                             test easier (right call). FLAGGED: the branches are now
+                                             byte-identical except a live-canvas-template override that
+                                             only matters MID-AUTHORING -- a fresh insert cannot
+                                             distinguish it, so that case stays uncovered.
   4  pixels not element-exists           [ ]
   5  surface via the real chain          [ ]
   6  drawn position vs readout           [ ]
