@@ -24,6 +24,15 @@ import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.j
  * (a) the search failed to resolve any op for the line, AND (b) that line's own ancestry carries the specific
  * `undefined` (not `null`) padding that an id-less node could otherwise have matched by accident — the actual
  * cost, not just the node's mere existence somewhere in the tree.
+ *
+ * t1846 sharpened it ONE MORE TIME. t1844's own condition still fired on a real, ordinary program's own trailing
+ * M30 line — program-level framing (`progend`/`endprogram`, `programFraming.js`) is a real, declared, id-less
+ * top-level sibling too, and a framing line resolving to no op is the CORRECT answer, not an anomaly. Checked,
+ * not assumed, that framing is identifiable at the resolution point: `stack`'s own top-level elements carry a
+ * DECLARED type (`progstart`/`progend`/`endprogram`/`xform`/`entry`/`flip`) — the same vocabulary
+ * `_isLooseTop`'s own existing exclusion already partially uses. The log now stays quiet whenever the stack
+ * contains a declared framing element (every real program), while still firing on a genuinely odd shape that
+ * carries none (the synthetic test below).
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
@@ -89,8 +98,38 @@ test('ALGORITHM: a line that genuinely cannot be resolved, in the accident-prone
     expect(r.anc0HasUndefined, 'sanity: this line\'s own ancestry carries the accident-prone undefined padding').toBe(true);
     expect(
         errors.some((e) => e.includes('could not be resolved to an op') && e.includes('line 0')),
-        'an unresolved line in the accident-prone shape IS logged, naming the line — the condition is reachable, not dead code'
+        'an unresolved line in the accident-prone shape IS logged, naming the line — the condition is reachable, not dead code (this hand-built stack deliberately carries NO progstart/progend/endprogram/xform/entry/flip element, so t1846\'s own framing exclusion does not apply here — the odd shape is genuinely unexplained)'
     ).toBe(true);
+});
+
+test('ALGORITHM: a normal program\'s own trailing M30 (program framing, not a missing op) stays silent', async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = [];
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+    await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+
+    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
+    await clickInsert(page);
+    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
+    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
+    await page.locator('#wiz_user_form [data-param="dist"]').waitFor({ state: 'visible', timeout: 5000 });
+    await clickInsert(page);
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+
+    const r = await page.evaluate(() => {
+        const proj = window.ddcsGetProjection();
+        const nullLines = [];
+        for (let i = 0; i < proj.lines.length; i++) { const op = window.ddcsOpAtLine(i); if (!op) nullLines.push(i); }
+        return { lastLine: proj.lines[proj.lines.length - 1], nullLines };
+    });
+
+    expect(r.lastLine, 'sanity: the program genuinely ends with the M30 program-framing line').toBe('M30');
+    expect(r.nullLines.length, 'M30 is the one and only unresolved line — correctly unowned, not a symptom').toBe(1);
+    expect(
+        errors.some((e) => e.includes('could not be resolved to an op')),
+        'a REAL program\'s own framing line stays quiet — t1846\'s own framing exclusion, verified on a real gesture, not just reasoned about'
+    ).toBe(false);
 });
 
 test('OUTCOME: export a Homing+Corner program, reimport it — BOTH ops survive with their real params (the algorithm fix alone closes this)', async ({ page }) => {

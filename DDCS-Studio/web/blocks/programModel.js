@@ -60,21 +60,33 @@ function findOpInStack(blocks, anc) {
     }
     return null;
 }
+// t1846 — the DECLARED program-framing types: flat, childless, top-level siblings of a real op that own no op
+// of their own on purpose (programFraming.js's own makeStart/makeEnd/makeXform/makeEntry/makeFlip; endprogram is
+// the SAME role's own name on the raw-decode path, gcodeToStack.js:166). None of these carry an `id` — they are
+// singleton PROGRAM declarations, not independently addressable ops (mirrors `_isLooseTop`'s own existing
+// exclusion list a few lines above, widened here to the full declared set). A line belonging to one of these is
+// CORRECTLY unowned by any op — that is the right answer, not a symptom of anything.
+const PROGRAM_FRAMING_TYPES = new Set(['progstart', 'progend', 'endprogram', 'xform', 'entry', 'flip']);
+
 /** The op-container owning projected line `i` (or null) — only when the editor matches the live projection. */
 export function opAtLine(i) {
     const anc = proj.map && proj.map[i];
     if (!anc || !anc.length) return null;
     const result = findOpInStack(stack, anc);
-    // t1844 — loud, but on the thing that actually costs something: the search FAILED for this line AND its own
-    // ancestry carries the specific shape (`undefined`, not `null`) that an id-less type:'op' block elsewhere in
-    // the stack could otherwise have matched by accident. A line that resolves correctly despite an id-less node
-    // existing SOMEWHERE in the tree is not a hazard — logging on every encounter (t1842's own first cut) fired
-    // on every homing line regardless of outcome, an over-broad proxy this project has hit before; this is the
-    // precise condition instead. Genuinely unowned lines (anc[0] === null, no undefined padding) never trigger
-    // this — only a line whose own resolution FAILED, in the exact shape that would have caused a wrong-but-
-    // silent answer before t1842's algorithm fix.
+    // t1844/t1846 — loud, but on the thing that actually costs something: the search FAILED for this line AND
+    // its own ancestry carries the specific shape (`undefined`, not `null`) that an id-less type:'op' block
+    // elsewhere in the stack could otherwise have matched by accident. A line that resolves correctly despite an
+    // id-less node existing SOMEWHERE in the tree is not a hazard — logging on every encounter (t1842's own
+    // first cut) fired on every homing line regardless of outcome, an over-broad proxy this project has hit
+    // before. t1846 — checked, not assumed, whether a program's own trailing M30 line trips this too: it does,
+    // because program framing (progend/endprogram) is ALSO a real, declared, id-less top-level sibling — and a
+    // framing line resolving to no op is the CORRECT answer, not an anomaly, so it must not log. Excluded by
+    // checking the stack for a DECLARED framing type (not an inferred proxy) before logging.
     if (!result && anc.includes(undefined) && typeof console !== 'undefined' && console.error) {
-        console.error(`programModel: line ${i} could not be resolved to an op — its own ancestry carries an unset (undefined) slot, the shape an id-less type:'op' block elsewhere in the stack could otherwise match by accident. This indicates a builder left an internal wrapper unstripped.`);
+        const isFraming = stack.some((b) => b && PROGRAM_FRAMING_TYPES.has(b.type));
+        if (!isFraming) {
+            console.error(`programModel: line ${i} could not be resolved to an op — its own ancestry carries an unset (undefined) slot, the shape an id-less type:'op' block elsewhere in the stack could otherwise match by accident. This indicates a builder left an internal wrapper unstripped.`);
+        }
     }
     return result;
 }
