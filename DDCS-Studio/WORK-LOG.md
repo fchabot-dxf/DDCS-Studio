@@ -28321,3 +28321,88 @@ marker-array desync. All three live in the SAME general area (`createPreviewPane
 state management across a re-render) as the bug this act closes — worth considering whether they share a root
 with each other, even though none of them share a root with t1774's own latch. I did not chase that question
 this act; it's a real candidate for a future one. Six additions done — this was the last of the standing queue.
+
+## 🔨 turn 1788 (epoch 4) — THE 2D PREVIEW IS MISSING FROM EVERY WIZARD: exhaustive search, no reproduction found
+
+### Dispatch
+
+User regression: NO wizard has its 2D feature preview in the MODAL (Generator, desktop ~1730px) — the 3D pane
+is present and drawing, the 2D pane is simply not there, on every wizard. The advisor's own earlier measurements
+were explicitly retracted ("ignore my measurements entirely... my selectors are probably wrong") — a genuinely
+incoherent reading (`.wiz-visual` 0×0 while `#userVizContainer` sized 1041×354, and while the user can plainly
+see the 3D drawing). Measure it myself from the elements the modal actually uses. Prime suspect named: t1766
+removed `.wiz-body`'s max-height cap for `#blk_wiz_user`, and the modal now shares selectors with the pane it
+didn't share this morning (t1764 extended `.wiz-box` rules onto `#blk_wiz_user` too). Fix it, then prove it
+across several wizards at 1730px and 1440px in the modal, screenshotted. The structural finding (are the modal
+and the pane now coupled such that this recurs?) matters more than the fix.
+
+### Measured it myself, from the real modal markup — found nothing wrong
+
+Read `index.html`'s actual `#wiz_user` modal body first (not assumed): `.wiz-2pane > .wiz-visual > .viz-split >
+[#userViz3dBox (3D), a sibling `.viz-container[data-viz-pane="layout2d"]` holding `#userVizContainer` (2D)]`.
+Built a fresh measurement against these EXACT ids/classes (not inherited from the advisor's own retracted
+selectors) and ran it every way the dispatch asked for, plus a few more, checking real rendered geometry AND a
+screenshot each time — not just computed-style numbers, which can look plausible and still be wrong:
+
+- **4 wizards (corner/middle/edge/alignment) × 2 widths (1730px/1440px), via the REAL bar-click chain** (not
+  `openWiz()`): all 8 combinations show `#userVizContainer` correctly sized (900–1050px wide × ~354px tall)
+  with a populated `<svg class="feature-canvas">` carrying real children (markers, dashed lines, the stock
+  outline).
+- **Resize while the modal stays open** (1730px → 1440px, no reload): the 2D container tracks the resize
+  correctly (1041→923px wide), stays populated.
+- **Cancel, then open a DIFFERENT wizard, same session**: still correct.
+- **All 5 themes** (normal/studio/steampunk/futuristic/organic) at 1730px: all correct, `display:flex`,
+  `visibility:visible`, `opacity:1`, non-trivial width/height every time.
+- **The user's own real workspace** (`.repro/user-workspace-2026-08-13.ddcs` — restored via the same
+  `restoreBackup()` mechanism used at t1774, their real settings/machine/WCS, never baked into any committed
+  file) — corner, 1730px, real bar gesture: still correct. A screenshot shows the full 2D pane, grid, corner
+  markers, "Start" label, all present.
+
+Every one of these was screenshotted and visually confirmed, not just measured — the advisor's own retraction
+("my selectors are probably wrong") was a warning that a coherent-looking number can still be a false read, so
+numbers alone weren't trusted here either.
+
+### No source change made — nothing found to fix
+
+Seven independent reproduction attempts (wizard × width × real gesture, resize, cancel/reopen, theme, and the
+user's actual workspace), all clean. Per this session's own established rule (t1772, t1785): a check that
+cannot be made to fail is not evidence of nothing wrong, but it is also not license to invent a fix for code
+that measurably works — that would be exactly the "fix that doesn't explain the symptom" this whole session has
+been careful to avoid. No `git diff` on any source file this act.
+
+### The leading hypothesis — a stale served-module cache, and the app already has a self-check for exactly this
+
+`app.js:389-414` carries a deliberate, already-built diagnostic for precisely this class of report (its own
+comment: "deleted — five 'it came back' reports in one day, each spent hunting code that was already gone"): on
+load it compares the `force-cache` (browser-cached) `last-modified` of `app.js` against a fresh `no-store` HEAD
+request, sets `window.__ddcsStale`, and — if the two disagree — logs "STALE MODULE CACHE: your browser is
+holding app.js from <old date> but the server has <new date>. What you see is NOT this code — hard-reload
+(Ctrl+Shift+R)" and updates the version-chip tooltip to say so. Five acts landed on this rendering TODAY
+(t1760/1764/1766/1768/1774) plus the six-addition test series after — a browser tab that has been open across
+that whole window, without an intervening hard reload, is exactly the scenario this self-check exists to catch.
+Given every fresh, current-code measurement I could construct shows the 2D pane working, and the advisor's own
+first measurement was independently incoherent (contradicting what the user could visibly see), a stale client
+module cache is the leading explanation — not a confirmed one, since I cannot inspect the user's actual browser
+tab, but the most-supported one available from here.
+
+### Structural question the dispatch asked for either way
+
+Whether the modal and the Blocks pane are now coupled such that a pane-only change can break the modal: checked
+the actual CSS. t1764's own change was additive (`.wiz-box, #blk_wiz_user { ... }` — a shared RULE, not a
+shared selector scope) and t1766's change removed a cap SPECIFICALLY scoped to `#blk_wiz_user` (`#blk_wiz_user
+{ max-height: none; overflow-y: visible; }` — an id selector, not a class the modal also carries). Read both
+rules again start to finish: neither touches `.wiz-visual`/`.viz-split`/`.viz-container`/`#userVizContainer` —
+the modal's OWN 2D-pane chain — at all. So on the CSS actually shipped, the modal and the pane are NOT
+currently coupled through either of the two most-suspected changes; if today's regression is real (not stale
+cache), its cause is somewhere this act's search didn't reach, not the two rules named as prime suspects.
+
+### For the advisor
+
+I could not reproduce this anywhere, across seven different real-gesture attempts including the user's own
+workspace, and the two CSS changes named as prime suspects don't touch the modal's 2D-pane chain on inspection.
+Before spending more of a future act chasing a code fix, worth asking the user to hard-reload (Ctrl+Shift+R) or
+hover the version chip (it now says "STALE" outright if `window.__ddcsBuild` doesn't match what the server
+serves) — the app already built the exact diagnostic this situation calls for. If they confirm a hard reload
+still shows the bug, that would be the strongest possible signal this act's search missed something real, and
+I'd want their fresh screenshot + browser/viewport specifics before the next attempt, rather than re-guessing
+blind a second time.
