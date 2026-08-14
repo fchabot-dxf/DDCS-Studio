@@ -103,6 +103,18 @@ export function programSimContext(opTypes) {
 }
 
 /**
+ * t1834 — which op TYPE(S) in a program are the reason `programSimContext`'s union set `toolMachineFrame` (and so
+ * `forceMachine`, which it implies). Pure and read-only: derived from the SAME per-type `opSimContext` the union
+ * itself folds over, so it can never name a contributor the union didn't actually count, and it can never drift out
+ * of sync with what the union means — there is exactly one place (`opSimContext`) that decides `toolMachineFrame`
+ * per type, and both the union and this list read it. Exists so a whole-program consumer can EXPLAIN the union's
+ * effect (the workpiece is withheld) instead of just applying it silently — see applyProgramIntent below.
+ */
+export function machineFrameContributors(opTypes) {
+    return (opTypes || []).filter((t) => opSimContext(t).toolMachineFrame);
+}
+
+/**
  * t756 (R-C) — THE ONE seam that applies a WHOLE-PROGRAM declared intent to a preview PANEL (the shared
  * createPreviewPanel return). Both the EDITOR preview and the BLOCKS preview call this with their program's op types,
  * so editor == Blocks == wizard BY CONSTRUCTION (they all resolve from opSimContext / programSimContext; the wizard
@@ -120,5 +132,8 @@ export function applyProgramIntent(panel, opTypes) {
         if (panel.setSeatAtStart) panel.setSeatAtStart(!!ctx.seatAtStart);               // seat the initial pos at the Start (alignment)
         if (panel.setProbesForWcs) panel.setProbesForWcs(!!ctx.probesForWcs);            // t1203 — a probe program never renders through the declared WCS table
         if (panel.setShowMagazine) panel.setShowMagazine(!!ctx.showMagazine);            // t1241 D15 — the union already carried it; nothing applied it (an ATC op in the editor showed no magazine)
+        // t1834 — the union hides the workpiece (toolMachineFrame/forceMachine); SAY SO instead of doing it silently.
+        // Purely descriptive — does not touch ctx or any panel geometry/frame setter above.
+        if (panel.setFrameNote) panel.setFrameNote(ctx.toolMachineFrame ? machineFrameContributors(opTypes) : []);
     } catch (_) { /* a panel may lack a setter — harmless */ }
 }

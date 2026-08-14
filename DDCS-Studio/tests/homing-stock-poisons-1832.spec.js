@@ -2,31 +2,29 @@ import { test, expect } from '@playwright/test';
 import { openWizardViaBar, clickInsert } from './support/barGesture.js';
 
 /**
- * t1832 — BUG 2 of the three t1786 trace bugs (WORK-LOG t1826 confirmed all three by real gesture, cross-check
- * proved them independent of bug 1/bug 3): Homing poisons `forceMachine`/`machineFrameTool` for the WHOLE
- * `blk-preview-panel`, not just its own segment. A user builds a real, common program — Home the machine, then
- * probe a corner — switches to the Blocks tab, and the workpiece silently vanishes from the live preview for
- * the WHOLE program, including corner's own segment, which genuinely does interact with the stock (it probes
- * the stock's own corner).
+ * t1832/t1834 — BUG 2 of the three t1786 trace bugs, RE-RULED. Homing's own machine-frame intent unions across the
+ * WHOLE `blk-preview-panel` program (`programSimContext`'s own documented "force it if ANY op needs it" design),
+ * so `simStock()` withholds the workpiece for the entire trace, including a later op (Corner) that genuinely
+ * probes it.
  *
- * Asserts the OUTCOME a user sees — the stock is actually there — not that an internal flag has some value.
+ * t1832's ORIGINAL version of this test asserted the stock stays VISIBLE — that expectation was WRONG, and is
+ * corrected here, not just patched. The advisor's t1834 ruling: THE HIDING IS CORRECT. A probe op PRODUCES the WCS
+ * (this project's own standing rule, [[probes-never-read-wcs]]) — it never READS one. In a machine-frame view, the
+ * stock's part-frame position is genuinely UNKNOWN until a probe runs, so drawing it beside those moves would
+ * assert a spatial relationship nobody has measured yet — the false-picture failure this project treats as worst.
+ * Hiding it is the honest answer; do NOT restore the old expectation thinking this is a regression.
+ *
+ * THE ACTUAL DEFECT was that the hiding was SILENT — a user watching the workpiece vanish had no way to tell this
+ * apart from something broken. t1834's fix (opSimContext.js's `machineFrameContributors` + createPreviewPanel.js's
+ * `setFrameNote`) makes the panel SAY what is withheld and why, in the user's language, as an honest caption (the
+ * same neutral, non-alarming treatment as the existing `.pp-carve-note`) — not an error, not a warning. This test
+ * now asserts THAT outcome: the stock stays hidden, AND the panel explains why, naming Homing.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('after a Homing op is in the program, the live preview still shows the stock', async ({ page }) => {
+test('after a Homing op hides the workpiece for the whole preview, the panel explains why', async ({ page }) => {
     test.setTimeout(60_000);
-    // t1832 — REAL, CONFIRMED FINDING, NOT FIXED HERE. `programSimContext`'s own documented design
-    // (viz/opSimContext.js) unions EVERY op's declared intent into ONE flag applied to the whole-program
-    // preview panel — "force the envelope if ANY op needs it." Homing's own toolMachineFrame intent implies
-    // machineFrameTool, which `simStock()` (createPreviewPanel.js) reads as "ignore the workpiece for
-    // collision" — correct for Homing's OWN switch-seeking motion, but the SAME flag then hides the stock for
-    // corner's own segment too, even though corner genuinely probes it. The honest fix needs the trace/
-    // collision machinery to be PER-SEGMENT aware of which op a move belongs to, not a single whole-panel flag
-    // — a domain call about how machine-frame is applied (this project's own explicit standing rule: that
-    // distinction is not a display toggle), reserved for the advisor, not made here. `test.fail()` keeps this
-    // TRACKED and visible rather than silently red or silently deleted — see WORK-LOG t1832.
-    test.fail(true, 'programSimContext unions every op\'s machine-frame intent onto the whole-program preview panel — Homing correctly hides the stock for its own segment, but the same flag also hides it for corner\'s own, genuinely stock-interacting segment; the honest fix needs per-segment awareness, a domain call reserved for the advisor (see WORK-LOG t1832)');
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 
@@ -48,10 +46,20 @@ test('after a Homing op is in the program, the live preview still shows the stoc
         const host = document.getElementById('blk-preview-panel');
         const panel = host && host.__panel;
         const simConfig = panel && panel.getSimConfig ? panel.getSimConfig() : null;
-        return { hasPanel: !!panel, stock: simConfig && simConfig.stock };
+        const noteEl = host && host.querySelector('.pp-frame-note');
+        return {
+            hasPanel: !!panel,
+            stock: simConfig && simConfig.stock,
+            noteText: noteEl ? noteEl.textContent : null,
+            noteVisible: noteEl ? noteEl.style.display !== 'none' : false,
+        };
     });
 
     expect(r.hasPanel, 'sanity: the whole-program preview panel exists').toBe(true);
-    // THE OUTCOME: the workpiece is actually there for the user to see, not just a flag reading a particular value.
-    expect(r.stock, 'the live preview still shows the stock after a Homing op is in the program').not.toBeNull();
+    // THE (now-confirmed-correct) HIDING: still null. A probe's part-frame position is genuinely unknown here.
+    expect(r.stock, 'the workpiece stays hidden — its part-frame position is unknown in a machine-frame view').toBeNull();
+    // THE FIX: the omission SPEAKS. Neutral caption, names the responsible op, explains the reason in plain words.
+    expect(r.noteVisible, 'the frame note is shown when the stock is withheld').toBe(true);
+    expect(r.noteText || '', 'the note names the reason (machine coordinates)').toMatch(/machine coordinates/i);
+    expect(r.noteText || '', 'the note names Homing as the responsible op').toMatch(/homing/i);
 });

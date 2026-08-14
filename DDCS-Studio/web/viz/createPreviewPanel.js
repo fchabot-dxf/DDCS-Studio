@@ -30,7 +30,7 @@ import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';
 import { droAxisLabel, droValue, droWorkShift } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
-import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
+import { builderOf, opLabelOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2); opLabelOf: t1834's frame-note wording
 import { magazinePockets, magazineOccupiedPockets } from '../wizards/views/atcViews.js';   // shared ATC magazine layout (handles the disk RING + a rotation) — reused for the pick-place occupancy swap; magazineOccupiedPockets (t1722) is the ONE function both this whole-program host and the single-op wizard preview call for the static "which pockets have tools" fact
 
 // DISC-ON-SURFACE (inc2): read the DECLARED radiuscomp atoms of the ops being previewed → { resultVar → { axis, sign } } for
@@ -118,6 +118,7 @@ const PANEL_HTML = `
   </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan · dbl-click fit work/machine</div>
   <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat, ball-nose, and V-bit / chamfer / engraver tips are modelled from the tool type (a vee carves a V groove that widens with depth); with no tool picked, an op carves at its typed Ø (Ø6 default)."></div>
+  <div class="pp-frame-note" style="display:none"></div>
 `;
 
 // SLICE 2 (WCS VISIBLE): classify an executing line as a WCS call or a spindle/start call, from the RAW text only
@@ -1389,6 +1390,26 @@ export function createPreviewPanel(container, opts = {}) {
         retraceAndReseed();
     }
 
+    // t1834 — Host hint: WHICH op type(s) are forcing this whole-program preview into the machine frame (so the
+    // stock is withheld — see simStock()). An HONEST NOTE, not an error: nothing is broken, the stock's part-frame
+    // position is genuinely unknown here (a probe op PRODUCES the WCS, per [[probes-never-read-wcs]] — it never reads
+    // one, so a machine-frame op earlier in the program leaves no declared datum to place the stock against). Same
+    // pattern as the existing `.pp-carve-note` (an always-neutral caption, never styled as a warning/error) — reused
+    // rather than inventing a second notification style. Purely descriptive: does not touch forceMachine/
+    // machineFrameTool or any render/collision decision. Forward-compatible by construction — this is driven by the
+    // SAME opTypes list applyProgramIntent already computes the union from, so if per-segment frame-awareness ever
+    // replaces that whole-program union, whoever changes applyProgramIntent's call to this function changes both at
+    // once; there's no separate copy of the condition to fall out of sync.
+    const frameNoteEl = q('.pp-frame-note');
+    function setFrameNote(opTypes) {
+        if (!frameNoteEl) return;
+        const list = Array.isArray(opTypes) ? opTypes.filter(Boolean) : [];
+        if (!list.length) { frameNoteEl.textContent = ''; frameNoteEl.style.display = 'none'; return; }
+        const names = [...new Set(list.map((t) => opLabelOf(t)))].join(' + ');
+        frameNoteEl.textContent = `Workpiece hidden — ${names} runs in machine coordinates; its part-frame position isn't known until a probe sets the WCS.`;
+        frameNoteEl.style.display = '';
+    }
+
     // Host hint: SEAT the trace/engine initial position at the draggable Start (marker A) — the homing initialPos seam WITHOUT
     // the machine-frame tool RENDER (alignment: an in-place probe whose drawn path must begin at A, on the part frame). t570.
     function setSeatAtStart(on) {
@@ -1511,7 +1532,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setProbesForWcs, setShowMagazine, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setFrameNote, setSeatAtStart, setProbesForWcs, setShowMagazine, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         // t1187 — a CLEAN geometry-only PNG data-URL of the sim (stock + toolpath, NO overlay: grid/axes/handles/markers/HUD).
         // 2D-toolpath capture (the WebGL 3D clean-capture is a follow-on — no preserveDrawingBuffer + no clean-overlay toggle

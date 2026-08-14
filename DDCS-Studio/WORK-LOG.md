@@ -30926,3 +30926,114 @@ exact match to t1826. No source code changed this turn — only the new guard te
 this log. Gate: node 118/118, the 27-file symbol-grepped homing/forceMachine gate 72/72, both clean single runs.
 
 🔨 turn 1832
+
+## Turn 1834 — Bug 2 re-ruled: the hiding is correct; made the omission SPEAK (reused the existing honest-note convention)
+
+### Dispatch
+
+The advisor's ruling: THE HIDING IS CORRECT (a probe PRODUCES the WCS, never reads one — [[probes-never-read-wcs]] —
+so a machine-frame view genuinely doesn't know the stock's part-frame position). THE DEFECT is that it hides
+SILENTLY. Fix: make the panel STATE the omission — what's hidden, why, naming Homing, in the user's language, as
+an explanation not an error. Reuse whatever honest-limitation convention this codebase already has and say which;
+if none, propose the smallest thing that fits. Do NOT touch the frame model (no per-segment awareness, no stock
+reappearing). Build it so a future per-segment fix makes the note simply stop appearing, not need unpicking, and
+say I checked that. Replace the t1832 guard test (it now encodes the WRONG expectation) — assert the explanation
+shows, remove `test.fail()`, and say plainly the original expectation was wrong so nobody "fixes" it back. Re-check
+bug 3. Gate: node + the revised test + every spec touching the preview panel + both screenshot baselines (expect a
+diff only if the note renders in the baselined region; if so, re-record deliberately and say I looked at the diff).
+
+### Which convention — and why it's the right one, not the closest one
+
+Two existing "honest note" conventions were candidates:
+
+1. **`def.statusHint(params)`** (t554) — a DECLARED per-op-type hook, read by `userOpView.js`, rendered into
+   `#userVizStatus`/`#blk_userVizStatus` (`.viz-status`, green-on-black, neutral). Homing already uses exactly this
+   shape for an analogous "config gap, here's what's skipped" message (unset axis travel). Strong TONE precedent —
+   but architecturally the WRONG SURFACE: it's called with ONE op's own params, on the SINGLE-OP wizard panel. Bug
+   2 is about the WHOLE-PROGRAM `blk-preview-panel`/editor `gpPanel`, a different component (`createPreviewPanel.js`)
+   that this hook never reaches and can't be made to reach without changing what it means (a per-op hook can't
+   describe a program-level union).
+2. **`.pp-carve-note`** (t680/t722) — a dedicated element ALREADY LIVING INSIDE `createPreviewPanel.js` itself (the
+   exact component both `blk-preview-panel` and `gpPanel` are built from), toggled visible/hidden by a condition,
+   holding one line of plain text. Its own CSS comment calls it "a small caption owning up to... an approximation"
+   and its color (`#cbb98a`, warm neutral tan) is never the error red used elsewhere in the same file
+   (`.has-error`/`refusedWhy`/`cappedWhy`). This is the SAME shape of thing bug 2 needs (an honest caption on THIS
+   component), on the RIGHT surface, with a tone already proven non-alarming by its own existing use.
+
+**Reused #2's pattern** — a new sibling element (`.pp-frame-note`, same font/color/background/pointer-events:none
+treatment as `.pp-carve-note`, stacked 18px below it so the rare program where both could show doesn't overlap) —
+rather than #1's mechanism, because the surface is what has to be right, not just the tone; and rather than
+inventing anything new, since the exact "quiet caption living in this component" shape already exists here.
+
+### The fix — three files, purely additive, the frame model untouched
+
+- **`web/viz/opSimContext.js`**: added `machineFrameContributors(opTypes)` — pure, filters `opTypes` down to
+  those whose `opSimContext(t).toolMachineFrame` is true. Reads the SAME per-type function `programSimContext`'s
+  own union already folds over; adds no new source of truth. `applyProgramIntent` gained ONE new line after its
+  existing setter calls: `if (panel.setFrameNote) panel.setFrameNote(ctx.toolMachineFrame ? machineFrameContributors(opTypes) : [])`
+  — purely descriptive, runs after every frame/geometry setter, touches none of them.
+- **`web/viz/createPreviewPanel.js`**: added the `.pp-frame-note` template element + a `setFrameNote(opTypes)`
+  function (writes a sentence naming the op(s) via `opLabelOf` — already imported from `opBuilders.js` for an
+  unrelated reason, so no new import edge) — and exposed it in the panel's returned API object, alongside
+  `setToolMachineFrame`. No `retraceAndReseed()`, no `viz.*` call, no read of `forceMachine`/`machineFrameTool` —
+  it never touches the trace, the collision geometry, or any existing setter's behavior.
+- **`web/styles.css`**: `.pp-frame-note` — byte-identical treatment to `.pp-carve-note` except `top: 26px` (stacked).
+
+**Forward-compatibility, checked, not assumed:** the note fires from exactly the same `opTypes`/`ctx.toolMachineFrame`
+`applyProgramIntent` already computes for the union it applies to the panel — there is no second copy of "is this
+program machine-frame" for the note to fall out of sync with. If a future act replaces the whole-program union with
+per-segment frame awareness, that act edits `applyProgramIntent`/`programSimContext` — the SAME function this note's
+call lives in — so whoever makes that change sees this line and either updates or deletes it in the same edit; it
+cannot silently keep firing on stale logic, because it has no logic of its own to go stale.
+
+### The guard test — replaced, not patched
+
+`tests/homing-stock-poisons-1832.spec.js` REWRITTEN. The docblock now states plainly: the ORIGINAL t1832 version
+asserted the stock stays VISIBLE — that expectation was WRONG (written before the ruling that hiding is correct)
+— and says so explicitly so nobody restores it later mistaking this fix for a regression. The test now asserts
+BOTH halves of the ruling together: `stock` stays `null` (the now-confirmed-correct hiding), AND
+`.pp-frame-note` is visible with text matching `/machine coordinates/i` and `/homing/i` (the fix).
+
+**Non-vacuity, both directions, proven not argued:** backed up the 3 changed files to scratch, `git checkout HEAD`
+reverted them to the pre-fix (already-committed) state, ran the revised test: **fails 3/3** — `noteVisible: false`
+(the note-visibility assertion is what breaks; `stock: null` still held, since that half was already true before
+this turn). Restored from the scratch backups, diffed byte-identical against the working fix, re-ran: **1/1 pass**.
+
+### Bug 3 re-check
+
+Source WAS changed this turn (3 files), so this needed a real re-measurement, not an inference. Same t1826
+gesture + `panel.viz.spindleMarkers.length` (throwaway diagnostic, deleted after use): **`markerCount: 1`** —
+exact match to t1826/t1832. Unmoved.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- Every spec touching the preview panel: grepped for the actual symbols
+  (`createPreviewPanel|blk-preview-panel|gcodePreviewTab|pp-frame-note|pp-carve-note`), not filenames — 45 files.
+- Both screenshot baselines, identified precisely (not guessed): the only 2 files in the whole suite using
+  `toHaveScreenshot` are `screenshot-baselines-1792.spec.js` and `render-equivalence-1796.spec.js`. Traced BEFORE
+  running them that neither could be affected: both baseline `.wiz-box`/`#blk_wiz_user` (the SINGLE-OP wizard
+  panel, driven by `userOpView.js`'s `applySimIntent`, which never calls `applyProgramIntent`/`setFrameNote` at
+  all) and both already `mask` the entire 3D box regardless. Ran them anyway rather than trusting the trace alone.
+- All 47 files + node tier together: **173 tests, 171 passed, 2 pre-existing `test.fixme()`** (`blocks-exec-glow
+  .spec.js` citing t1734, `editor-sim-disc.spec.js` citing t1732 — read both reason strings directly: neither
+  mentions forceMachine/machineFrameTool/the frame note; unrelated features (sim execution-line glow; radiuscomp
+  atom flattening) confirmed pre-existing, not something this turn's change caused). **0 failures, 0 flakes.**
+  Both screenshot baselines passed with **zero diff** — confirmed by the gate itself, not merely predicted from
+  the trace; no re-record needed, nothing to look at a diff for.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py mark --turn 1834` at start; `watch` at end: self tree clean, 0 flagged.
+
+### For the advisor
+
+Reused `.pp-carve-note`'s own established pattern (a quiet, always-neutral caption already living inside
+`createPreviewPanel.js`) rather than `def.statusHint`'s pattern (right tone, wrong surface — it's per-op, bug 2 is
+whole-program) or inventing anything new. The fix is 3 small additive pieces: `machineFrameContributors` (reads
+the same per-type source the union already reads, adds none), `setFrameNote` (writes one sentence, touches no
+frame/geometry/trace state), and its CSS twin. Forward-compat is structural, not promised — the note has no logic
+of its own to fall out of sync with; it lives in the same function a future per-segment rewrite would have to
+touch anyway. Replaced (not patched) the t1832 test, with the wrong-expectation history stated in its own
+docblock. Proved non-vacuous both directions. Bug 3 re-measured: unmoved (`markerCount: 1`). Gate: node 118/118,
+173/173 real (2 pre-existing unrelated fixme), both screenshot baselines clean with zero diff.
+
+🔨 turn 1834

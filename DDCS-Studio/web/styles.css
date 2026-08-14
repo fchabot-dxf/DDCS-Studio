@@ -4758,6 +4758,17 @@ svg [id$="_wcs"] { display: none; }
     z-index: 4; white-space: nowrap; pointer-events: none; max-width: calc(100% - 240px);
     overflow: hidden; text-overflow: ellipsis;
 }
+/* t1834 — WHOLE-PROGRAM machine-frame honest note: same treatment as .pp-carve-note (an always-neutral caption, never
+   styled as a warning/error — nothing is wrong) so the two read as one family of "the preview is telling you
+   something" caption rather than a new visual language. Stacked directly below the carve note (both top-centre) so
+   they never overlap on the rare program where both could show. */
+.pp-frame-note {
+    position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+    font-family: monospace; font-size: 10px; color: #cbb98a;
+    background: rgba(0, 0, 0, 0.5); padding: 2px 8px; border-radius: 3px;
+    z-index: 4; white-space: nowrap; pointer-events: none; max-width: calc(100% - 240px);
+    overflow: hidden; text-overflow: ellipsis;
+}
 .viz3d-controls {
     position: absolute; bottom: 6px; right: 8px; z-index: 6;
     display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
