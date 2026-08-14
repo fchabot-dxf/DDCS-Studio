@@ -28973,3 +28973,130 @@ right order. Next probe: dump `ps` itself at that exact line, cold vs warm — e
 same shape as this turn's own gate.
 
 🔨 turn 1800
+
+## Turn 1802 — TEST the third-state hypothesis (no fix)
+
+### Dispatch
+
+Traced lead: `createPreviewPanel.js:1514`'s `getPassStarts` closes over `passStarts`, panel RUNTIME state,
+populated only when the panel actually traces. `panelTypes.js:392` prefers this live `panelStarts` over a fresh
+`opSimStarts()` call — "so the two panels can't diverge by construction" — and if a cold page reaches that line
+with an EMPTY `passStarts` and `ri == null`, no handle is built, matching the "absent, not miscoloured" finding.
+Check: log `panel.getPassStarts().length` and `ri` at that line, cold vs warm. If confirmed, this is a missing
+THIRD STATE in the declaration (panel-wired-but-not-yet-computed, distinct from the two states the code's own
+comment names) — report the mechanism + options, say which I'd pick and why, and say whether the same third
+state is reachable anywhere else that reads `panelStarts` — one grep. Report and STOP, do not fix.
+
+### The traced hypothesis: FALSIFIED — but it pointed at the right neighbourhood
+
+Instrumented `panelTypes.js:392-394` with a temporary `console.log` (reverted after the check, confirmed
+byte-identical via `git diff`). Result, cold vs warm, both BEFORE and AFTER the real file-Load:
+
+```
+WARM: {"panelStartsLen":2,"ri":0,"srcLen":2}
+COLD: {"panelStartsLen":2,"ri":0,"srcLen":2}   (identical, every capture)
+```
+
+`panelStarts` is NOT empty on cold. `ri` is NOT null. Both are byte-identical to warm. The advisor's specific
+traced line is not where the defect lives.
+
+### The REAL mechanism — found by continuing to instrument downstream of the falsified line
+
+Since `panelStarts`/`ri`/`src` are all correct, the missing handle must be built AFTER line 394 but never
+committed. Added a second temporary probe right before the `decls.push` that actually creates this handle
+(`panelTypes.js:427`, the `if (wr('x') && wr('y')) decls.push(...)` line — confirmed this is the ONLY gate
+between correct upstream data and the handle existing). Cold vs warm:
+
+```
+WARM: {"wrX":true,  "wrY":true,  "formHostExists":true, "fieldFound":true}
+COLD: {"wrX":false, "wrY":false, "formHostExists":true, "fieldFound":false}
+```
+
+`wr('x')`/`wr('y')` call `_writable(name)` (`panelTypes.js:250`):
+`_declaredParams.has(name) && !_unwritable.has(name) && (!_formHostExists || !!_field(name))`.
+
+`_field(name)` (`panelTypes.js:75`) is **hardcoded**: `document.querySelector('#wiz_user_form [data-param="'
++ name + '"]')` — the MODAL's form id, not namespaced per surface. On warm, `#wiz_user_form` exists AND still
+contains corner's `cross1_x` field — left over in the DOM from when the user opened corner through the real
+bar/modal earlier in the session (the modal is hidden on close, not destroyed). On cold, `#wiz_user_form` exists
+(an empty shell, always present per the app's own markup) but has never been populated with corner's fields —
+because the modal was never opened for this op type this session — so `_field('cross1_x')` finds nothing,
+`_writable` returns false, and the `decls.push` for the handle is silently skipped. No exception, no warning —
+exactly the "absent, not miscoloured" symptom, confirmed by the WR-PROBE numbers directly, not inferred.
+
+**This IS the third-state gap the dispatch predicted — just one call deeper than the traced line, and gated on
+a different piece of state than `panelStarts`.** The code's own comment at `panelTypes.js:390-391` ("no panel
+wired" vs "panel wired") never anticipated this: the PANE's own panel is wired and its own `panelStarts` is
+correctly populated — the gap is that `_writable`'s writability check reads a **different, wrong-surface DOM
+tree** (the modal's, not the pane's) to decide whether a field the pane itself already has bound and rendering
+correctly should be treated as "settable." The panel-state precedence comment is not wrong; a completely
+separate hardcoded selector, a few calls downstream of it, is.
+
+### Reachable elsewhere? Yes — broadly, by construction, not by luck
+
+`grep -rn "#wiz_user_form" web/` finds it in exactly 3 places inside `panelTypes.js` (`_field:75`,
+`_formHostExists:249`, and two write-back handlers — `onEdgePick:573`, `onCornerPick:581`) plus one more in
+`formWidgets.js:791` (a different, unrelated concern — closest-form lookup for a token-drop target). `_writable`
+gates **every** declared draggable dimension/position handle `layoutSpecFromOp` can build for **any** op type —
+rect size, radial Ø, scaleX, projLength (A/B/width), 1D length, and the relTo point this turn traced — not a
+corner-only or marker-only mechanism. So the class is: **any op's any declared-binding canvas handle on the
+Blocks-pane Layout view, the first time that op is viewed in a session without its modal having been opened
+first, silently fails to render** — corner's wall-2 marker is one instance of a generic gap, not a special case.
+The two write-back handlers (`onEdgePick`/`onCornerPick`) are a second-order version of the same gap: clicking
+a GUI corner/edge picker on a cold pane would also silently no-op (guarded by `s && ...`, so it fails safe —
+no corruption, just does nothing) rather than write to the pane's own form.
+
+### Options, and which I'd pick
+
+1. **Namespace `_field`/`_formHostExists`/the two write-back handlers** to read whichever form is actually live
+   for the CURRENT render context (the pane's own `#blk_wiz_user_form` when rendering there, the modal's
+   `#wiz_user_form` otherwise) — fixes the root cause once, covers the whole class (every op, every declared
+   handle, both write-back pickers), and keeps `_writable`'s actual intent ("is there a live settable field for
+   this param, in THIS surface") intact rather than widening what counts as writable.
+2. **Widen the `!_formHostExists || !!_field(name)` fallback** (the "obvious quick fix" the dispatch already
+   flagged) — reintroduces exactly the parallel-derivation risk the surrounding comment (`panelTypes.js:390-391`)
+   exists to forbid: a field that's genuinely non-writable (e.g. gated off by `postGating`) would then render as
+   draggable, a correctness regression in the other direction.
+3. **Force the pane to open the modal once (or otherwise populate `#wiz_user_form`) before its own first
+   render** — a workaround at the call site, not the declaration; leaves the wrong-surface read in place for
+   the two write-back handlers and any future caller of `_writable`.
+
+I'd pick **option 1**: it's a one-concept fix (make the form lookup surface-aware) rather than a one-marker
+patch, closes the whole class this grep just surfaced, and doesn't touch the panel-state precedence design
+you're protecting. It is a bigger, more deliberate change than a glyph fix (touches 4 call sites, needs a
+render-context/`ns` thread into `layoutSpecFromOp` or its caller) — exactly the kind of call the dispatch asked
+me to bring to you rather than make myself.
+
+### Non-vacuity / evidence
+
+- Both temporary probes reverted; `git diff web/wizards/ops/panelTypes.js` empty — confirmed byte-identical to
+  before this turn.
+- The WR-PROBE numbers are the direct, unambiguous evidence (not inferred from screenshots or debug hooks on
+  the wrong element, per t1800's own corrective lesson) — `_writable` genuinely returns `false` on cold and
+  `true` on warm, traced to the exact selector responsible.
+- `grep -rn "#wiz_user_form" web/` — the full, exhaustive list of call sites is in this entry, not summarized
+  from memory.
+
+### Verify
+
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source touched in the final state — both temporary instrumentation edits added and reverted within this
+  turn; confirmed via `git diff` showing zero changes to `panelTypes.js`.
+- `handoff.py amendments --role worker`: none pending.
+- t1796's `test.fail()` line: unchanged (still tracking the real, unfixed defect).
+
+### For the advisor
+
+Your traced line wasn't it — `panelStarts`/`ri` are correct cold and warm, confirmed directly. But one call
+deeper, at the actual `decls.push` gate, `_writable` (`panelTypes.js:250`) returns false on cold because its
+own `_field()` helper (`panelTypes.js:75`) hardcodes `#wiz_user_form` — the MODAL's form — with no awareness
+that this same code also renders the Blocks pane's Layout canvas, which has (or should have) its own form. On
+warm it accidentally works because the modal's DOM is left populated (hidden, not destroyed) from an earlier
+real Insert. This is the third state you named, just filed under a different piece of state than the one you
+traced — and it's not corner-specific: every declared draggable handle `layoutSpecFromOp` builds, for any op,
+in the pane, on a session that never opened that op's modal first, is affected the same way, plus the two GUI
+picker write-backs (silently, safely no-op instead of misfiring). Three options above; my pick is namespacing
+the form lookup (option 1) — it's the one that fixes the class, not the instance, without reintroducing the
+parallel-derivation risk your own comment at panelTypes.js:390-391 already flags against widening the fallback.
+
+🔨 turn 1802
