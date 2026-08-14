@@ -2230,10 +2230,19 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
 **Track it here, and update this line every time one lands:**
 ```
   1  primary route, 4 real clicks        [ ]
-  2  both renderer branches              [ ]
-  3  pixels not element-exists           [ ]
-  4  surface via the real chain          [ ]
-  5  drawn position vs readout           [ ]
+  2  GESTURE==PROGRAMMATIC equivalence   [ ]   <- user, 2026-08-13
+  3  both renderer branches              [ ]
+  4  pixels not element-exists           [ ]
+  5  surface via the real chain          [ ]
+  6  drawn position vs readout           [ ]
+
+  #2 is the user's own: "if it call programatically it needs to be the same path
+  as the ui, is that verifiable" -- YES. Drive BOTH once, deep-equal the resulting
+  program+canvas with ids stripped. ONE cheap spec LICENSES the ~95 that use the
+  shortcut, and fails loudly the moment someone changes one path and not the other.
+  Limit, stated: it proves the ENTRY paths converge, not that rendering is right --
+  that is #4 and #6. If they genuinely CANNOT be made equal, that is a fine answer
+  too: the shortcut is then banned on that surface and those specs drive the UI.
 ```
 **If the advisor dispatches anything else while a box is unticked, that is the failure this note exists to
 prevent.** The reason is not tidiness: until #1 exists, a green suite says nothing about the route the user
