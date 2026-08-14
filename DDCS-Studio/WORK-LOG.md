@@ -27470,3 +27470,197 @@ all 5 looped ops. The genuine, actionable gap is narrower than "collapse the doo
 audit, not architectural surgery. Did not write or run the equivalence test itself (read-only act, and it
 touches the same shared path every wizard flows through) — recommending it as the next act if this diagnosis
 holds up to your own review.
+
+## 🔨 turn 1772 (epoch 4) — MAKE THE PICTURE CHECKABLE: markers vs. traced path, for every shipped twin
+
+New sibling spec (`tests/picture-parity-1772.spec.js`), not an extension of `fork-parity-1593.spec.js` — see
+"why a sibling" below. Asserts the two sources the advisor named — DECLARED markers (`opSimStarts`) and the
+TRACED path (executing the emitted G-code) — agree with each other, for every shipped twin with something
+genuinely comparable. Traced the actual render/engine wiring empirically before writing anything (several dead
+ends corrected along the way — recorded here so the next act doesn't re-walk them).
+
+### Why a sibling, not an extension of fork-parity
+
+`fork-parity-1593.spec.js`'s own docstring is precisely scoped: BUILT-IN vs. its FORKED COPY must behave
+identically (form/values/emit). This act's invariant is unrelated — a SINGLE twin's own DECLARED markers vs. its
+own TRACED path, no forking involved. Bolting it onto fork-parity would conflate two different axes the file's
+own header explicitly separates ("deliberately NOT asserted, because they differ legitimately"). Matches this
+session's own established pattern (`corner-marker-truth.spec.js` etc. are their own files, not folded into an
+unrelated existing one).
+
+### Tracing the mechanism — three dead ends before the real one, kept here so they aren't re-walked
+
+1. **First attempt**: feed `opSimStarts`' declared markers into `traceToolpath` as `passStarts`, then check
+   `passEnds` against the SAME declared markers. Tautological — feeding the declared value predetermines the
+   trace's own starting point for each pass, so the check could never fail regardless of a real bug.
+2. **Second attempt**: check whether the trace's raw SEGMENT list contains a point near each declared marker.
+   Found a 0mm match everywhere, including corner — looked like NO bug at all. Traced why: corner's probe
+   SEARCHES travel a long declared distance, so a segment can pass near almost any point along its own search
+   ray; "closest segment point" is too permissive to mean anything (a false-negative machine, not a real check).
+3. **The actual mechanism, found by reading `gcodeViz3d.js`'s live render code, then verifying live against the
+   real app** (`openWiz('user_corner_data')`, reading the ACTUAL rendered state, not a reconstruction): the
+   marker SPRITE renders at `markerWorldOf(starts, passEnds, p)` (`gcodeViz3d.js:393`) — for an `anchorsAtPrev`
+   pass, this RECONCILES the raw declared row against the trace's own runtime pass-end. But the ENGINE's own
+   probe SEARCH is fed the RAW declared `starts` array as ITS target (`traceToolpath`'s `opts.passStarts` —
+   the exact values `opSimStarts` returns, never the reconciled ones). So the rendered marker sprite and the
+   engine's own probe target CAN point at different places for the identical pass, and nothing compares them.
+   **Live-verified, not assumed**: for corner (FL/YX, probeZFirst off, travelDist 50) — `viz.starts[1]` (raw
+   declared wall2) = `(-43, 7)`; `viz.spindleMarkers[1].position` (what actually renders — `markerWorldOf`'s
+   output) = `(-43, 43)`. A 36mm gap, for the exact scenario the user reported broken.
+
+### THE CHECK
+
+For every twin in `U.listUserOps()`: get `opSimStarts(opType, defaultParams(def), STOCK)`; exclude anything with
+fewer than 2 declared passes (nothing to reconcile against a "previous" pass); build + emit the G-code; trace it
+(seeded at the declared pass-0 start, the one genuinely operator-jogged/independent point); exclude anything
+whose emit is empty or produces no traceable motion (a preview-only visual with no G-code behind it). For every
+remaining pass p≥1, compare `markerWorldOf(declared, tracedPassEnds, p)` (what actually renders) against
+`declared[p]` itself (what `opSimStarts` says the pass IS) — flag anything beyond a 3mm tolerance (generously
+above ordinary retract-scale drift, tight enough to catch a genuine disagreement).
+
+### Result: exactly what the dispatch predicted
+
+- **29 of 32 twins excluded**, with an explicit reason logged for each (mostly: single-pass or no declared
+  starts at all — most ops are one probe, not a repositioning chain; none silently dropped).
+- **3 twins checked** (genuinely multi-pass, comparable): `user_corner_data`, `user_rotary_clock_data`,
+  `user_alignment_data`.
+- **1 failed: `user_corner_data`** — pass 1 (wall2, `anchorsAtPrev`), declared `(-43,7)` vs. rendered `(-43,43)`,
+  a 36mm gap. Exactly the user's own reported bug, now a concrete, numeric, reproducible assertion instead of a
+  screenshot.
+- `rotary_clock` and `alignment` — the only OTHER multi-pass twins — both clean, even re-run at a 0.001mm
+  tolerance (see non-vacuity below): confirms the check has teeth in BOTH directions, not just a blanket
+  false-positive machine that happens to also catch corner.
+
+### Non-vacuous — twice, deliberately
+
+Ran the SAME check at `TOLERANCE_MM = 0.001`: identical result (corner only) — proves the comparison computes a
+REAL numeric delta, not something that only clears a generous threshold by luck. Then mutated the check itself
+(bypassed `markerWorldOf`, compared `declared[p]` to itself — an intentionally-broken version) and re-ran: the
+`toContain('user_corner_data')` assertion correctly FAILED (`Received array: []` — nothing flagged at all),
+proving the real check's positive result depends on the actual `markerWorldOf` reconciliation, not a hardcoded
+or coincidental match. Restored, re-ran — back to the correct single-failure result, deterministic across 3
+repeated runs.
+
+### What this turn deliberately did NOT do
+
+Per the dispatch's own instruction ("if it goes red on OTHERS too, report the list rather than fixing them"):
+no fix to corner's actual marker math this turn — the check's existence + its documented result IS the
+deliverable. Also did not sweep multiple param combinations per twin (`corner-marker-truth.spec.js`'s own
+16-config sweep is the precedent for that depth) — this act used one representative (defaultParams) config per
+twin, sufficient to make the picture checkable and to confirm the dispatch's own expectation; a per-twin
+multi-config sweep would be a natural deepening, not required to satisfy this act.
+
+### Verify
+
+- `npm run test:node`: 118/118 (no source files touched — new test file only, confirmed via `git status`).
+- New `picture-parity-1772.spec.js`: 1/1, deterministic across 3 repeated runs, proven non-vacuous twice (a
+  tightened tolerance and a deliberately-broken mutation, both behaving as predicted).
+- No other files changed this turn.
+
+### For the advisor
+
+The check exists, is green where it should be (29 excluded honestly, 2 other multi-pass twins clean), and red
+exactly where you said it would be (corner, 36mm). The root mechanism: the marker sprite's render formula
+(`markerWorldOf`, machine-faithful reconciliation via the trace's `passEnds`) and the engine's own probe-search
+target (fed the RAW declared `starts`, never reconciled) can disagree for an `anchorsAtPrev` pass — corner is the
+only twin using that flag today, which is presumably why it's the only one exposed. Not fixed this turn, per
+your own instruction. Worth naming for whoever picks up the actual fix: the disagreement isn't a sign check or a
+loose calculation — it's two DIFFERENT reference frames for "where does the next pass start" (the trace's own
+runtime probe-touch result vs. a declared delta chain), and reconciling them will mean deciding which one the
+G-code's OWN `#23/#24` values should track, not just tweaking a formula.
+
+## t1772 (continued) — 3 amendments sharpened the target to "the START is clamped to the stock's 0,0,0"; the check as originally built does NOT name that cause
+
+Three amendments landed after the check above was built and passed. In order, the user's own words got
+progressively sharper: "there is an offset in positions" → "the path is offset, the path in the sim" →
+"markers and path aren't aligned" → **"PATH IS CLAMPED TO THE STOCK"** → **"THE START IS CLAMPED TO THE 0,0,0 OF
+THE STOCK"** — the last one flagged as a possible RECURRENCE of a 2026-08-10 report ("start position is also
+wired wrong, the path is always clamped to origin, changing start does alter the path but not the start"),
+closed then as sim-only. Hard boundary on this continuation: test only, prove red, NAME the cause, stop — do not
+fix, and if the check genuinely cannot expose the clamp, say so rather than force a red.
+
+### Searched for the earlier fix — not found, despite a thorough search
+
+Per the amendment's own instruction ("find the earlier fix before writing a new one — if it regressed, that's
+the more important finding"), searched: `WORK-LOG.md` full text (both "clamp" and "origin"/"start... wired"
+patterns), `docs/archive/WORK-LOG-early-eras.md` (the archived early history), `git log --all` (grep for
+"clamped.*origin"/"origin.*clamp"/"start.*clamp" across every commit message), and `PREVIEW-AS-DATA.md` (the
+t1720 survey document, since its own dispatch quotes the SAME 2026-08-10 date with matching symptom language:
+"path drawn outside the stock, 3D/2D disagreeing, a marker solid in one pane and hollow in another"). Found
+CLOSE matches, none exact: `93b0f05d` ("unclamp sim-start handles from the stock to the machine envelope",
+2026-07-08 — a DIFFERENT bug, about the DRAG-BOUNDS UI clamp, not the rendered start position) and turn 293's
+much older "moving Start moves the other marker" report (dismissed then as "might be simulation only" by the
+human) — also a different symptom (coupling between markers on drag, not a render collapsing to the origin).
+t1720's own survey (2026-08-10, the exact date) logged "24 broken/missing previews... zero fixed" and t1722
+fixed exactly 4 of them (middle stock shape, rotary_center mutation, lathe tool identity, ATC magazine) — NONE
+of the four is a start/origin issue. **Conclusion: no specific prior commit or WORK-LOG entry for "the start
+render collapses to the stock's 0,0,0" was found** — either the closure was conversational only (never logged),
+or it's one of the ~20 UN-fixed items from `PREVIEW-AS-DATA.md`'s own punch list that was never traced to this
+level of detail. Flagging the gap itself: if this really is a recurrence, there may be no code history to learn
+from, which the next act should know going in rather than assume away.
+
+### Traced the CANDIDATE mechanism precisely — a real fallback chain that CAN produce exactly this collapse
+
+`createPreviewPanel.js`'s `getStartPos()` (`:741`): `curStart || get('getStart') || (viz && viz.starts &&
+viz.starts[0]) || null` — three fallbacks, `null` if all fail. `simConfig()` (`:832`) then does
+`start: st || { x: 0, y: 0, z: 0 }` — feeding the trace's own `start` (which OFFSETS THE ENTIRE DRAWN ROUTE,
+per `trace.js`'s own doc comment: "the route stays origin-relative; the viz offsets it by the start"). If
+`getStartPos()` ever returns `null` — plausible on a genuinely first render, before `host.__start` (the `get
+('getStart')` term) or `viz.starts` (the third fallback) have EVER been populated even once — the drawn route
+gets offset by `{0,0,0}` instead of the real start: **exactly** "the path is clamped to the stock's origin, the
+markers keep their true positions" (since the MARKER read path — `markerWorldOf`, fed the `passStarts` array
+computed the SAME render, not `simConfig`'s independent `start` — doesn't share this exact fallback). This is a
+real, structurally plausible mechanism, precisely located, not a guess.
+
+### Could NOT reproduce it live — tried every context available, all clean
+
+Tested, all via the REAL gesture (never synthetic): (1) fresh `openWiz` modal, settled — pass-0 matches declared
+exactly. (2) fresh Blocks pane (`openWiz→insertWiz→showApp('blocks')`), settled — same. (3) the EARLIEST possible
+render (checked immediately after the sim handle first appears in the DOM, no settle wait at all) — still
+matches. (4) after a LIVE param edit (changed `corner` from FL to BR on an already-open form, the actual daily
+gesture) — the whole chain re-derives correctly, `getStartPos()` tracks the new corner. (5) mobile 393px, the
+Blocks drawer, matching the viewport this session's OWN earlier screenshots used — also clean, DRO reads a real
+non-zero value (`14.000`), not `0.000`. In every context tried, `getStartPos()`, `viz.starts[0]`, and
+`opSimStarts`'s own declared pass-0 value all agreed. The candidate mechanism (§ above) requires catching the
+FIRST-EVER `setGcode()` call before any fallback has a chance to populate — every `waitForSelector`/settle-based
+test, by construction, waits PAST that moment.
+
+### Invoking the amendment's own exception — reporting rather than forcing a red
+
+Per the amendment's explicit permission ("if you find the check CANNOT expose the clamp... say so plainly and
+propose what would catch it — do not widen it into a fix to make it red"): **the picture-parity check as built
+does not name a start-clamped-to-origin cause, because I could not get that specific symptom to manifest under
+any real gesture I could drive.** What it DOES catch — the `markerWorldOf` wall2 reconciliation gap (36mm,
+documented above) — is a genuine, verified, different-but-related "markers and path don't visually agree"
+finding, not a relabeling of the start-clamp report. I am not confident these are the same bug wearing two
+descriptions, or two separate bugs; I could not settle that from the evidence available this act.
+
+**What WOULD catch the start-clamp, if it's real**: instrument `createPreviewPanel.js` itself (not black-box
+testing from outside) — a one-line hook logging `getStartPos()`'s result on every `setGcode()` call, then drive
+the EXACT gesture the user performed (their own session's sequence, not a fresh-boot approximation) and check
+whether ANY call in that sequence returns `null`/falls through to the `{0,0,0}` fallback. Alternatively, ask the
+user for the precise repro steps or a fresh screenshot on the CURRENT deployed build (post t1764/1766/1768 —
+several unrelated layout/sizing fixes landed in this same session and could plausibly have changed timing enough
+to mask or unmask a transient first-render race). Did not build either of these this act — the first requires
+editing source (out of scope for a test-only act with a hard boundary), the second needs the user's own input.
+
+### Verify (continued)
+
+- `picture-parity-1772.spec.js` unchanged from the original write-up above, re-confirmed green (1/1, corner
+  flagged for the `markerWorldOf` reason, deterministic).
+- All `tests/zzdebug-1772-*.spec.js` scratch diagnostics from this continued investigation (6 files: live-state
+  traces across modal/blocks-pane/mobile/earliest-render/live-edit contexts) deleted, none committed.
+- No source files touched this continuation either — confirmed via `git status` before finalizing.
+
+### For the advisor (continued)
+
+I don't have a red that names "start clamped to origin" — I have a precisely-traced CANDIDATE mechanism
+(`simConfig()`'s `start: st || {0,0,0}` fallback) that could produce exactly that symptom under a timing
+condition I couldn't force to occur, across 5 different real-gesture contexts including the exact mobile
+viewport this session's own screenshots used. Two honest possibilities: either the mechanism is real but needs a
+harder-to-drive trigger than anything I tried (a genuinely-first render on a cold cache, a specific op-switch
+sequence, something session-state-dependent my fresh-boot tests structurally can't reach), or the bug the user
+is now describing is the SAME wall2 `markerWorldOf` disagreement my original check already caught, described
+from a different angle as they looked more closely at the picture. I'd want your read on which, or the user's
+own fresh repro, before spending more of this act's budget guessing at scenarios — per the hard boundary, I'm
+stopping here rather than either faking a red or fixing blind.
