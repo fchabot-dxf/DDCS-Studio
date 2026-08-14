@@ -156,7 +156,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1119, lineEnd: 1120, find: /z-index/ },
     { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2779, find: /attach/ },
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
-    { id: 'TRAP9 _layout is a module-level singleton', file: 'web/wizards/ops/panelTypes.js', line: 675, find: /_layout/ },
+    { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 681, find: /container\.__layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
     { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 666, find: /renderLayout2D|el\('userVizContainer'\)/ },
 ];

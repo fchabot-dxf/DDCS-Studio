@@ -620,21 +620,30 @@ appended **in flow** (`gcodeViz3d.js:68`) and the toggle works because `setMode`
 rg -n "\.attach\(" DDCS-Studio/web --glob '*.js'
 ```
 
-### 9 · `renderDeclaredLayout` is an exported function with ZERO callers. Its SIBLING risk — the shared `_layout`
-singleton reparenting across the modal and the Blocks pane — is not hypothetical: t1806 hit it live.
-`_layout` is a module-level singleton (`panelTypes.js:675`) and `FeatureCanvas._mount` wipes `container.innerHTML`
-when the container changes (`featureCanvas.js:92-95`). `renderDeclaredLayout` itself genuinely has zero callers
-(`rg` below still returns one hit, the definition) — but it shares `_layout` with `renderLayout2D`, whose own TWO
-real call sites (`userOpView.js:665,682`) pass DIFFERENT containers depending on which instance is rendering: the
-modal's `elNS(null,'userVizContainer')` = `#userVizContainer`, the pane's `elNS('blk','userVizContainer')` =
-`#blk_userVizContainer`. **CORRECTING THE EARLIER "so it never fires" CLAIM ON THIS LINE**: t1806's real
-"Open as modal" repro (opens the SAME op as a modal overlay without leaving the Blocks tab) rendered the modal
-through this shared singleton, then closing the modal left the pane's own container's SVG with no live path back
-to the singleton's current state — a drag on the pane's still-visible, already-built handle stopped reaching any
-`onDrag` handler at all (traced live: the write-back function was never even called). Confirmed a REAL,
-demonstrated failure mode this turn, not a dormant one — NOT fixed (out of t1806's scope, a harder problem: making
-`_layout` per-surface rather than shared). `container.__animOverlay` holding a detached canvas
-(`userOpView.js:86`) remains the SAME class of risk, still unconfirmed live as of this entry.
+### 9 · `renderDeclaredLayout` is an exported function with ZERO callers. Its former sibling risk — the shared
+`_layout` singleton reparenting across the modal and the Blocks pane — was real, demonstrated live at t1806, and
+**FIXED at t1816.**
+`renderLayout2D` (`panelTypes.js:679-684`) used to lazily build ONE module-level `FeatureCanvas` (`_layout`) and
+reuse it for every caller regardless of surface. `FeatureCanvas._mount` wipes `container.innerHTML` when the
+container changes (`featureCanvas.js:92-95`), so whichever surface rendered LAST reparented the ONE instance into
+its own container, leaving the OTHER surface's still-visible SVG (and its still-attached event listeners) with no
+live path back to the singleton's current state — t1806's "Open as modal" repro demonstrated a drag on the pane's
+own already-built handle silently reaching no `onDrag` handler at all once the modal had rendered after it. t1814
+turned that into a genuine failing test (`tests/layout-singleton-reparent-1814.spec.js`) and found a SECOND
+symptom of the same root cause: `FeatureCanvas.onTransform(cb)` is a single-slot assignment
+(`featureCanvas.js:89`), so `userOpView.js`'s `wireAnimOverlay` re-pin callback for whichever surface registered
+FIRST was silently overwritten the moment the OTHER surface's own `wireAnimOverlay` first ran against the same
+shared instance.
+t1816 converted `renderLayout2D` to cache its `FeatureCanvas` **per container** (`container.__layout ||
+(container.__layout = new FeatureCanvas())`, `panelTypes.js:681`) — the same precedent already used by
+`atcSetupCanvas.js:36`'s `container.__atcFc` and by `wireAnimOverlay`'s own `container.__animOverlay`
+(`userOpView.js:119`) — rather than a module-level `Map` keyed by container (rejected: a `Map` keeps a
+module-level singleton and adds an eviction-lifetime question a container-keyed property doesn't have, since it's
+garbage-collected with its container). This makes `onTransform` per-instance for free, closing BOTH symptoms with
+the one change — proved with two separate tests, not asserted: `layout-singleton-reparent-1814.spec.js` (the
+drag hit-test, now green on its own terms) and `layout-ontransform-per-container-1816.spec.js` (the re-pin theft,
+new). `renderDeclaredLayout` itself still genuinely has zero callers (`rg` below still returns one hit, the
+definition) and is otherwise unaffected — it merely forwards to `renderLayout2D`.
 ```bash
 rg -n "renderDeclaredLayout" DDCS-Studio/web        # → one hit: the definition
 ```

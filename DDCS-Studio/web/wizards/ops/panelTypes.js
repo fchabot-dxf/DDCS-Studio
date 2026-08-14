@@ -671,13 +671,16 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, onEdit, placement: { x: _pz.x, y: _pz.y }, ...machSpread, ...cornerPick, ...edgePick };
 }
 
-// One shared FeatureCanvas for the custom panel's 2D mode (lazy).
-let _layout = null;
+// A FeatureCanvas per CONTAINER (t1816 — was one shared module-level singleton; two surfaces reparenting the
+// same instance orphaned whichever surface's DOM had rendered least recently, silently dropping its drags and
+// stealing its onTransform re-pin — see WORK-LOG t1806/t1810/t1814). Cached on the container itself, matching
+// atcSetupCanvas.js's own `container.__atcFc ||= new FeatureCanvas()` convention — the instance's lifetime is
+// tied to the container's, so there's no separate registry/eviction question to own.
 export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
     if (!container) return null;
-    if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers));
-    return _layout;   // t309 — hand back the FeatureCanvas so the Layout host can pin an animation overlay to its transform (getTransform/onTransform)
+    const layout = container.__layout || (container.__layout = new FeatureCanvas());
+    layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers));
+    return layout;   // t309 — hand back the FeatureCanvas so the Layout host can pin an animation overlay to its transform (getTransform/onTransform)
 }
 
 export function renderDeclaredLayout(container, def, params) {

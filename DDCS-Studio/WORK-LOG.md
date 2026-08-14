@@ -29858,3 +29858,133 @@ separate bug. Left the test in the suite, tracked and visible, per the establish
 or deleted.
 
 🔨 turn 1814
+
+## Turn 1816 — _layout: converted to a per-container factory. Both symptoms closed, proved with two tests
+
+### Dispatch
+
+Ruling: convert featureCanvas's _layout singleton into a PER-SURFACE FACTORY, not a Map keyed by container
+(reason given: createPreviewPanel/createToolpath2d/createUserOpView are all per-call factories and t1810's
+census confirmed all three are correct BECAUSE of it; a module-level Map trades the singleton for a new
+eviction-lifetime question). STEP 1: enumerate every consumer of _layout/renderLayout2D before converting,
+STOP AND REPORT if bigger than "roughly a handful of sites" or if any consumer needs the sharing to stay shared.
+STEP 2: convert, mirroring the sibling factories' construction/return convention; layout-singleton-reparent-1814
+must go GREEN on its own terms with test.fail() removed; guard the _onTransform theft symptom with its OWN
+test, not just an assertion; decide whether the t1808 loud-signal convention fits.
+
+### STEP 1 — enumeration
+
+Grepped every renderLayout2D(/renderDeclaredLayout(/new FeatureCanvas( site across web/ and tests/. The
+shared-singleton consumer is narrow: panelTypes.js's _layout is reached ONLY via renderLayout2D, which has
+exactly TWO real production callers, both in userOpView.js (line 666, the form3d+2d branch; line 683, the plain
+2d branch) — both already correctly injecting setFormHost per t1804/t1806. renderDeclaredLayout wraps
+renderLayout2D and has ZERO real callers (confirmed again by fresh grep, matching t1810's own finding).
+
+The same grep also surfaced ~15 OTHER new FeatureCanvas() sites — formWidgets.js (3), globalFunctions.js (2),
+settingsPanel.js (1), stockEditor.js (1), atcSetupCanvas.js (1, already using the container-cache pattern), six
+still-active legacy *View.js modules (drillView.js/pocketView.js/contourView.js/slotView.js/surfacingView.js/
+textView.js, each declaring its own separate module-level `const layout = new FeatureCanvas()`), and four test
+files building throwaway instances directly. Read wizards/views/index.js to check whether the six legacy views
+are reachable from the Blocks pane (which would make them the SAME class of bug via a parallel mechanism):
+confirmed they're still ACTIVE (unlike corner/middle/edge/etc., explicitly retired at t1730 with opensAs twins)
+but registered only in WIZARD_VIEWS/viewByType, consumed by wizardManager.js's generic open(type) for the MODAL
+surface — the Blocks pane renders custom ops exclusively through createUserOpView('blk', ...)/renderLayout2D,
+never through this registry. None of these ~15 sites touch panelTypes.js's _layout or renderLayout2D at all —
+each owns its own independent instance for its own single surface, out of scope for this conversion, no
+cross-surface sharing risk to begin with.
+
+Enumeration: 2 real sites (both in userOpView.js), well within "a handful." Checked whether either depends on
+the sharing being shared: FeatureCanvas._mount's own early-return (this.container === container && this.svg →
+return) already exists to preserve pan/zoom/_userAdjusted state across REPEATED renders of the SAME container —
+a per-container factory preserves exactly that (each surface keeps its own persistent instance across its own
+re-renders); what's eliminated is only the WRONG kind of persistence (reuse ACROSS different containers). Neither
+call site needs cross-surface sharing. Proceeded to STEP 2.
+
+### STEP 2 — the conversion
+
+panelTypes.js's renderLayout2D (was line 675-681) now caches its FeatureCanvas on the container itself:
+
+    export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
+        if (!container) return null;
+        const layout = container.__layout || (container.__layout = new FeatureCanvas());
+        layout.render(container, layoutSpecFromOp(...));
+        return layout;
+    }
+
+This mirrors atcSetupCanvas.js:36's OWN existing `container.__atcFc || (container.__atcFc = new
+FeatureCanvas())` — already the established convention in this exact viz/ file family — and wireAnimOverlay's
+own container.__animOverlay (userOpView.js:119), rather than inventing a new shape. No module-level state at all
+now; the instance's lifetime is tied to its container's, so there's no separate registry or eviction question
+(the specific hazard the advisor ruled out a Map for). userOpView.js's two call sites needed NO changes —
+renderLayout2D's external signature is unchanged, c (elNS('userVizContainer')) is already a stable, per-instance
+DOM element, distinct between the modal and the pane and persistent across a given surface's own re-renders.
+
+### Both symptoms, one fix — proved, not asserted
+
+wireAnimOverlay (userOpView.js:117-139) calls fc.onTransform(cb) once per container (gated by its own
+container.__animOverlay check) — but fc used to be the SAME shared _layout singleton for every container, so the
+second surface's wireAnimOverlay call overwrote the FIRST surface's _onTransform slot (single-slot assignment,
+featureCanvas.js:89). With fc now per-container, each surface's onTransform slot is on its own instance — closed
+for free, exactly as the advisor predicted, because the drag hit-test symptom and the _onTransform theft symptom
+share the identical root cause.
+
+Non-vacuity, both directions, proved by temporarily reverting the fix (scratch-copy restore, not git checkout
+HEAD — the fix wasn't committed yet):
+- layout-singleton-reparent-1814.spec.js: fails 3/3 against the reverted code (same as t1814's own proof); passes
+  against the fix.
+- NEW layout-ontransform-per-container-1816.spec.js: a deterministic, gesture-free test (same style as
+  canvas-handle-writable-1804.spec.js's t1806 host-A/host-B test — t1806 hit exactly this kind of confound when
+  it tried to drive the onTransform theft through a real gesture, since _layout's OTHER symptom swallowed the
+  drag first) — calls renderLayout2D on two containers, registers a distinct onTransform callback on each
+  returned instance, then re-renders container A only and asserts A's callback fired and B's did not. Against the
+  reverted code: sameInstance is true (both calls return the identical shared object) and the assertion fails
+  exactly as expected. Against the fix: sameInstance is false, A's callback fires, B's stays at 0.
+- Restored the fix from a scratch backup (cp to the scratchpad dir before reverting, cp back after) — confirmed
+  via grep that container.__layout is back in the file before re-running anything.
+
+### Does the t1808 loud-signal convention fit here? No — explained why
+
+t1808's convention exists for a caller that must remember an explicit opt-in step (setFormHost) it can forget.
+This conversion has no analogous gap: renderLayout2D's external call signature is byte-identical to before, the
+container-caching happens transparently INSIDE the function, and there is no separate "get the instance" step any
+caller could skip. Grepped for any reference to the old module-level _layout variable outside panelTypes.js —
+none exist (it was never exported), so nothing could have been "quietly working off the global." No consumer can
+silently get nothing here; the loud-signal convention doesn't apply.
+
+### Architecture-map repair
+
+ARCHITECTURE.md §9 rewritten: was "the shared _layout singleton... NOT fixed"; now documents the t1816 fix, cites
+the container-cache line, the atcSetupCanvas.js/wireAnimOverlay precedent, the Map-vs-factory reasoning, and both
+guard tests. tests/node/architecture-map-1698.test.mjs's TRAP9 first entry updated from asserting /_layout/ at
+the old singleton's line to asserting /container\.__layout/ at the new cache line — the other two TRAP9 entries
+(_mount wiping innerHTML, renderDeclaredLayout's zero callers) were unaffected by this edit's line range and
+needed no change.
+
+### Verify
+
+- layout-singleton-reparent-1814.spec.js + layout-ontransform-per-container-1816.spec.js: both green against the
+  fix, both proved to fail against the reverted code (non-vacuous both directions).
+- canvas-handle-writable-1804.spec.js (4 tests) + render-equivalence-1796.spec.js (4) +
+  screenshot-baselines-1792.spec.js (2): all pass.
+- Every other spec touching panelTypes.js (28 files, ~90 tests total across corner/middle/edge/rotary/custom-op/
+  pointpick/wizard-shapes/layout-* suites): all pass, 1 pre-existing skip.
+- Node tier (npm run test:node): 118/118 pass, including the repaired architecture-map citation.
+- handoff.py amendments --role worker: none pending. Epoch re-checked (4, matches).
+- proc_health.py watch: self tree clean, 0 flagged, nothing to reap.
+- cwd explicitly re-anchored to DDCS-Studio/ (verified via pwd) immediately before this append, given the
+  cwd-drift trap bit twice already this session (t1812, t1814).
+
+### For the advisor
+
+Enumeration stayed at 2 real sites (both userOpView.js, both unaffected by signature — no source change needed
+there); the other ~15 new FeatureCanvas() sites in the codebase are confirmed separate, single-surface, out of
+scope. Converted renderLayout2D to cache its FeatureCanvas on container.__layout, matching atcSetupCanvas.js's
+and wireAnimOverlay's own existing per-container-cache convention rather than a bare factory function or a
+module-level Map. Both layout-singleton-reparent-1814 (drag hit-test) and the new
+layout-ontransform-per-container-1816 (re-pin theft) are green on their own terms and proved non-vacuous by
+reverting the fix and confirming both fail — one fix, two tests, no assertion-only claim. The t1808 loud-signal
+convention doesn't fit here (no opt-in step for a caller to forget); explained why rather than reusing it anyway.
+Full requested gate green (node tier + the two 1814/1816 tests + 1804 + 1796 + both baselines + every spec
+touching panelTypes.js). Did not run the full suite — that's still yours before release.
+
+🔨 turn 1816
