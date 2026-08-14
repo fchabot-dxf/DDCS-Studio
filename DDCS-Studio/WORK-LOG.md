@@ -28630,3 +28630,95 @@ Both findings landed exactly as your framing anticipated: the toast was a real g
 gate can't see, not a diligence gap — noted and agreed), and the path-line question was the "may simply be the
 downscale" case, confirmed with real pixel evidence rather than presumed from the screenshots alone. Nothing new
 to add to the bug list from either half of this act.
+
+## Turn 1796 — SUITE FIX 3: prove the render equivalence, so 175 files need no repointing
+
+### Dispatch
+
+Cross-tabbing all 782 specs against the license t1778 actually grants (that spec's own docblock says it proves
+the two entry paths produce the same PROGRAM, and explicitly NOT that the render is correct) found the real
+gap: 175 files assert something about the RENDER (136 assert both program and render, 39 render only) while
+only 9 drive the real gesture. Repointing 175 files one at a time is hand-rolling the same edit 175 times —
+prove the property once instead, the way t1778 proved the program half. Cover both dominant idioms as separate
+seams with separate risk: `openWiz` (185 files, → modal) and `ddcsLoadBlockStack` (96 files/229 uses, → pane).
+Sample more than one op — a hasTree op and a flat twin, since t1780/Addition 3 established they take different
+renderer branches. Explicit permission: this spec is ALLOWED TO FAIL and that is a result, not a blocker — if
+the two entries render differently, STOP, do not fix it, report with the diff image; do not mask/loosen/
+normalise a difference away. State the scope in the docblock as plainly as t1778 did. Gate: node tier + this
+spec 3× consecutive; no full suite.
+
+### Design
+
+New `tests/render-equivalence-1796.spec.js`. Two idioms × two ops = 4 tests:
+- **Modal idiom** (`openWiz`): path A is the real bar gesture into `.wiz-box`; path B is `window.openWiz(type)`
+  on a fresh page/context, same fill. No stored baseline needed for either — both are captured live and
+  compared to each other via `testInfo.snapshotPath(name)`: path A's buffer is written to the exact path
+  `toHaveScreenshot` would read as "expected," then path B is asserted against it with the standard comparator
+  (the SAME one `screenshot-baselines-1792.spec.js` uses), and the file is deleted in `finally` regardless of
+  outcome — a throwaway comparison target for that run, never a committed baseline.
+- **Pane idiom** (`ddcsLoadBlockStack`): path A drives the real bar→fill→INSERT→Blocks-tab chain, captures its
+  own render AND its resulting `ddcsGetBlockProgram()`. Path B feeds that captured program VERBATIM into
+  `ddcsLoadBlockStack` on a fresh page, then opens the Blocks tab. Feeding the SAME program (not a hand-built
+  approximation) isolates the question to "does the shortcut loader render the same program the same way" —
+  it deliberately does not re-litigate whether the shortcut PRODUCES the same program, which t1778 already
+  proved separately.
+- `settleModal`/`settlePane` helpers reuse `stopLiveSim`/`dismissToasts` (t1792/t1794) verbatim and return the
+  live mask (empty for `pause_confirm`, which declares no 3D box at all — same detection t1790's spec uses).
+- Ops: `corner` (hasTree, `form3d+2d`) and `pause_confirm` (flat twin, `panel:'form'`, nothing to mask).
+
+### The finding — a real, reproducible render divergence, NOT fixed here
+
+3 of 4 comparisons are clean equivalence proofs (both modal tests, and the pause_confirm pane test). The 4th
+(`ddcsLoadBlockStack` + corner, into the pane) is a genuine, reproducible divergence: the wall1 marker renders
+as a solid filled cyan square with its "1" label via the real bar→Insert→Blocks chain, but as a small hollow
+circle with no label when the IDENTICAL captured program is fed through `ddcsLoadBlockStack` instead — a
+different glyph family (t1688's own shape convention: filled square = AUTO/emitting vs. a different glyph for
+a different emits/source classification), not a subtle pixel/AA difference. 104px diff, reproduced identically
+across 3 consecutive full runs — not flaky. Per the dispatch's explicit instruction ("STOP, do not fix it, and
+report"), this is NOT fixed, masked, or normalised away. Marked with `test.fail(true, '...')` — Playwright's
+tracked-known-failure mechanism: keeps the overall run reporting "N passed" (the `x` marker is itself visible
+in the test list, not hidden), and — this is the point of choosing `test.fail` over silently skipping or
+deleting the test — if this line ever starts failing (meaning the underlying test starts PASSING), that is
+itself the signal the divergence was fixed and this line should be removed. `pause_confirm` (the flat twin, no
+visualization at all) is unaffected — confirmed in its own separate run, not assumed from the corner result.
+
+**What this means for the 175 files**: the modal idiom (`openWiz`, 185 files) is licensed on both sampled
+branches. The pane idiom (`ddcsLoadBlockStack`, 96 files/229 uses) is licensed for flat twins but NOT
+unconditionally for hasTree ops with markers — any of those 96 files asserting on a hasTree op's marker
+rendering specifically inherits this same divergence and should not be treated as covered by this proof.
+
+### Non-vacuity — two separate proofs
+
+1. **The natural finding itself** is the primary proof the technique is sensitive — it caught a real,
+   independently-reproducible divergence without being tuned to look for one.
+2. **An artificial-perturbation check**, done separately to confirm the mechanism doesn't rely solely on that
+   one finding: temporarily changed path B's fill value on the (otherwise-clean) MODAL tests only
+   (`op.fillValue + '_DIFFERENT'`), re-ran — both MODAL tests (corner and pause_confirm) failed as expected,
+   each reporting real pixel diffs against path A's unperturbed capture. Reverted the change, re-ran the full
+   spec 3× consecutively — identical clean result each time (`ok / ok / x [tracked] / ok`, "4 passed").
+
+### Verify
+
+- `tests/render-equivalence-1796.spec.js` — 3× consecutive full runs, byte-identical pattern each time: 3
+  genuine passes + 1 tracked `test.fail()`, reported as "4 passed."
+- Non-vacuity: natural finding (above) + artificial-perturbation check on the 2 passing modal comparisons,
+  both caught correctly, then reverted and re-verified clean 3×.
+- Throwaway snapshot directory (`tests/render-equivalence-1796.spec.js-snapshots/`) confirmed empty after every
+  run (the `finally fs.rmSync` cleanup holds every time); `git status --porcelain` on that path is empty — it's
+  never staged, nothing here is a committed baseline.
+- Node tier (`npm run test:node`): 118/118 pass.
+- `handoff.py amendments --role worker`: none pending.
+
+### For the advisor
+
+3 of 4 comparisons are clean, real equivalence proofs — the modal idiom is licensed on both branches sampled,
+and the pane idiom is licensed for flat twins. The pane idiom is NOT licensed for hasTree ops with markers: a
+real, reproducible glyph-family divergence on corner's wall1 marker (filled square+label via the real chain vs.
+hollow circle via `ddcsLoadBlockStack`), tracked via `test.fail()` rather than fixed, masked, or normalised
+away, per this act's own explicit instruction. This narrows (doesn't fully grant) the blanket license for the
+96 `ddcsLoadBlockStack` files — any of them asserting on a hasTree op's marker rendering specifically should
+not be treated as covered. Whether/how to fix the marker-glyph divergence itself, and whether to now repoint
+just the narrower affected subset vs. leave `ddcsLoadBlockStack` as pane-only-safe-for-flat-twins, is a call
+for you.
+
+🔨 turn 1796
