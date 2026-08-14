@@ -293,7 +293,9 @@ export function middleStack(params = {}, opts = {}) {
     S.push(...probeZOnly([
         mkC('Z Surface - set Z datum first'),
         ...touchR('Z', false, '#57'),                       // two-pass down-probe the top → #57 = the TRUE surface (the block comps it; −#6 relocated here)
-        ...wcsFork((w, label) => [mkWcsWrite({ axis: 'Z', wcs: wcsArgOf(w), offset: 2, value: '#57', note: `Save ${label} Z offset`, direct: true })]),   // Z0 write (#57 comped); Expert #[#70+2]=#57 / else G92 Z#57
+        // t1868 — restore:'inc': repositionR below runs in the same G91 body; same machine-safety gap as
+        // corner's own wall writes (G90/G91 are persistent modal codes on real hardware, not just in the sim).
+        ...wcsFork((w, label) => [mkWcsWrite({ axis: 'Z', wcs: wcsArgOf(w), offset: 2, value: '#57', note: `Save ${label} Z offset`, direct: true, restore: 'inc' })]),   // Z0 write (#57 comped); Expert #[#70+2]=#57 / else G92 Z#57 + G91 restore
         ...repositionR('jog clear, to the first wall'),      // Z pass done → reposition to the XY start (existing helper)
     ]));
 

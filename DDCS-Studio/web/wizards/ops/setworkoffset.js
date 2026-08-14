@@ -6,6 +6,7 @@
  * RS274NGC → `G10 L20 P<wcs> <axis>value`. `wcs` defaults to `#578` (the active-WCS index).
  */
 import { num } from './util.js';
+import { wrapMachineFrame } from './safeZframe.js';   // t1868 — the ONE declared modal-restore mechanism, reused not hand-rolled
 
 /** Resolve a WCS selector to the emit-form index, IDEMPOTENTLY — the SAFETY NET so no block can leak the raw word into
  *  the G-code: `active` → the active-WCS register `#578` · `G54`..`G59` → the 1-based index (Gnn − 53) · an ALREADY-
@@ -34,6 +35,11 @@ export const setWorkOffsetBlock = {
     defaults: { wcs: '#578', axis: 'X', value: '#50' }, fields: ['wcs', 'axis', 'value'],
     selects: { wcs: WCS_SELECTORS_REG },   // t1520 — its own default `#578` is IN the vocabulary it offers
     scratch: [[50, 50]],   // t1085 — the default value var it READS (#578 is the firmware active-WCS reg)
-    emit: (p, dx, dy, dialect) => dialect.setWorkOffset(resolveWcsIndex(p.wcs || '#578'), p.axis || 'X',
-        (p.value === '' || p.value == null) ? 0 : (typeof p.value === 'number' ? num(p.value, 0) : p.value)),
+    emit: (p, dx, dy, dialect) => {
+        const core = dialect.setWorkOffset(resolveWcsIndex(p.wcs || '#578'), p.axis || 'X',
+            (p.value === '' || p.value == null) ? 0 : (typeof p.value === 'number' ? num(p.value, 0) : p.value));
+        // t1868 — see wcsIndirect.js's own identical note: setWorkOffset's G92 datum forms carry a G90 that
+        // otherwise leaks into the next relative move. Opt-in restore, wizard-set, mirrors saferetractNode.
+        return (p.restore === 'inc' || p.restore === 'G91') ? wrapMachineFrame(dialect, core, p.restore) : core;
+    },
 };

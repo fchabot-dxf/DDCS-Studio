@@ -12,6 +12,7 @@
  */
 import { num } from './util.js';
 import { WCS_SELECTORS_REG } from './setworkoffset.js';   // the ONE wcs vocabulary, declared beside resolveWcsIndex
+import { wrapMachineFrame } from './safeZframe.js';   // t1868 — the ONE declared modal-restore mechanism (already used by saferetract/safeZParkBlock); reused here, not hand-rolled
 
 export const wcsBaseIntoBlock = {
     type: 'wcsbaseinto', label: 'WCS Base', kind: 'leaf', category: 'Coordinates',
@@ -47,6 +48,11 @@ export const wcsWriteBlock = {
         // Non-Expert: an Expert-only value with no cross-post equivalent (the #883 sync) → honest comment, no G92 guess
         if (p.offComment) return [`( ${p.offComment} )`];
         if (value == null) return degrade('no probe-trigger readback on this controller');
-        return dialect.setWorkOffset(p.wcs || '#578', p.axis || 'X', value);
+        const core = dialect.setWorkOffset(p.wcs || '#578', p.axis || 'X', value);
+        // t1868 — setWorkOffset's own G92 datum forms carry a G90 (a real machine-safety gap, not a preview one:
+        // G90/G91 are persistent modal codes on real hardware, and the NEXT relative move in a G91 body would
+        // otherwise execute absolute). restore is opt-in (mirrors safeRetractNode) — the WIZARD, which knows its
+        // own body's mode, sets p.restore='inc' only where a relative move genuinely follows in the same body.
+        return (p.restore === 'inc' || p.restore === 'G91') ? wrapMachineFrame(dialect, core, p.restore) : core;
     },
 };

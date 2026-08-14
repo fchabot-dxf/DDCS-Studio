@@ -216,10 +216,16 @@ export function cornerStack(params = {}, opts = {}) {
             twoPass: true, raw: av.result, rawAxis: ax, result: ax === 'X' ? '#102' : '#101', radius: '#6',
             compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
         })];   // rawAxis → the trigger register folds per post (Expert #1925/#1926 byte-identical; V4.1 #1500+; DM500 #864+)
+        // t1868 — restore:'inc': this write is immediately followed by mkMV(ax, retractVar) below, a RELATIVE
+        // retract inside the SAME G91 probe body. On the non-Expert (G92) arm the write's own G90 is a real
+        // machine-safety gap (G90/G91 are persistent modal codes on real hardware, not just in the sim) — without
+        // the restore, that next retract executes absolute instead of relative. Expert's own indirect-register
+        // arm never emits G90 at all, so restore is a no-op there (verified, not assumed — wcsWriteIndirect
+        // never returns to the wrapMachineFrame branch).
         if (ax === 'X') {
-            out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'X', wcs: wcsArgOf(w), offset: 0, value: '#102', note: `Save to ${label} X` })]));   // Expert `#[#70]=#102`; V4.1/DM500 `G90 G92 X#102`
+            out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'X', wcs: wcsArgOf(w), offset: 0, value: '#102', note: `Save to ${label} X`, restore: 'inc' })]));   // Expert `#[#70]=#102`; V4.1/DM500 `G90 G92 X#102` + G91 restore
         } else {
-            out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'Y', wcs: wcsArgOf(w), offset: 1, addrVar: '#73', addrNote: 'WCS Y Address', value: '#101', note: `Save to ${label} Y` })]));   // Expert `#73=[#70+1]`+`#[#73]=#101`; else `G90 G92 Y#101`
+            out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'Y', wcs: wcsArgOf(w), offset: 1, addrVar: '#73', addrNote: 'WCS Y Address', value: '#101', note: `Save to ${label} Y`, restore: 'inc' })]));   // Expert `#73=[#70+1]`+`#[#73]=#101`; else `G90 G92 Y#101` + G91 restore
         }
         // t824 amendment (RULING D REVERSED — field evidence: the user probed the first wall then THIS lift walked into the Z
         // limit) + t826 (preview now models a mid-program G53): the per-wall retreat was an INCREMENTAL Z#17/#19 that lands safeZ
@@ -293,7 +299,9 @@ export function cornerStack(params = {}, opts = {}) {
             axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
             twoPass: true, raw: '#1927', rawAxis: 'Z', radius: '#6', compEnable: true, trailingRetract: false, skipComp: true,
         }),
-        mkWcsWrite({ axis: 'Z', wcs: wcsArgOf(w), offset: 2, addrVar: '#73', addrNote: 'WCS Z Address', rawAxis: 'Z', radius: '#6', compDir: '-', note: `Save ${label} Z offset - machine coord (− stylus radius)` }),
+        // t1868 — restore:'inc': the next step (zWall1's own safetraverse, line ~316) runs in the same G91 body;
+        // same machine-safety gap as the two wall writes above, same fix.
+        mkWcsWrite({ axis: 'Z', wcs: wcsArgOf(w), offset: 2, addrVar: '#73', addrNote: 'WCS Z Address', rawAxis: 'Z', radius: '#6', compDir: '-', note: `Save ${label} Z offset - machine coord (− stylus radius)`, restore: 'inc' }),
     ];
     // ② B4 step 3 (anchor): the 'REPOSITION:' comment makes the engine count Z→wall1 as its own pass (3 passes = 3 markers
     // under probeZFirst). ② B4 step 4b: it forks on travelApproach (auto seq move vs #1505 jog prompt) → taPair NESTED inside

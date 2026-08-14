@@ -33159,3 +33159,137 @@ wrong preview. Not verified against real hardware or the corpus. The design call
 missing `G91` to the emit, or both — is exactly as reserved as asked; not attempted here.
 
 🔨 turn 1866
+
+## turn 1868 — THE FIX: restore G91 after the probe-zero G90 (machine-safety), V4.1 + DM500, reused mechanism
+
+Dispatched to FIX what t1866 found: `setWorkOffset`'s own `G90 G92 <axis>[...]` datum write leaves distance
+mode in G90 with nothing resetting it before the next relative move in the same G91 body, so that move executes
+absolute instead of relative — advisor independently verified this in the code and confirmed it as a genuine
+machine-safety defect, not merely a preview one. Constraints: reuse the existing modal-restore mechanism, assert
+the emitted G-code as primary evidence, check every V4.1 probe op, also check V3/DM500 and Expert, don't reshape
+the probe form, gate on node tier + new emit test + every V4.1/probe-touching spec.
+
+### The fix
+
+Reused `wrapMachineFrame(dialect, core, restore)` (`web/wizards/ops/safeZframe.js:86-97`) — the SAME mechanism
+`safeRetractNode`/`safeHop`/`clearLiftNode` already use for their own G53 restores. No second modal-restore
+method hand-rolled. `wcsWriteBlock.emit` (`wcsIndirect.js`) and `setWorkOffsetBlock.emit` (`setworkoffset.js`)
+now accept an opt-in `restore` param, `p.restore === 'inc'|'G91'`, mirroring `safeRetractNode`'s own established
+convention (unset → byte-identical to before). Default stays unset everywhere; only the specific wizard call
+sites below now pass `restore: 'inc'`.
+
+### Per-call-site verification (read the actual surrounding code at every site, not assumed)
+
+| Wizard | Call | Next thing in the body | Verdict |
+|---|---|---|---|
+| `cornerWizard.js` `probeWallR` | X wall write | `mkMV(ax, retractVar)` — a relative retract, same body | **FIXED** |
+| `cornerWizard.js` `probeWallR` | Y wall write | same shape | **FIXED** |
+| `cornerWizard.js` `probeZFirst` | Z-surface write | `zWall1`/`repositionR`'s own reposition traverse | **FIXED**, defensively (not step-trail-verified like the wall writes, added on the identical shape) |
+| `cornerWizard.js` A-axis dual-gantry sync | — | has `offComment` set → degrades to a comment BEFORE reaching `dialect.setWorkOffset` at all | unchanged — architecturally immune |
+| `middleWizard.js` `probeZOnly` | Z-surface write | `...repositionR('jog clear, to the first wall')` | **FIXED** |
+| `middleWizard.js` `twoAxisOn`/`twoAxisOff` | 2 writes | eventually `mkDM('abs')` in the footer, no relative move between | unchanged, confirmed |
+| `middleWizard.js` `syncKids` | A-axis sync | `offComment` set, same degrade shape as corner's | unchanged — architecturally immune |
+| `edgeWizard.js` `wcsWriteArm` | 1 write | `DM('abs')` immediately after | unchanged, confirmed |
+| `rotaryCenterWizard.js` | Y, Z SWO calls | `DM('abs')` after both | unchanged, confirmed |
+| `rotaryClockWizard.js` `setKids`/`rotateKids` | 2 mkSWO calls | eventually `safeRetractNode({restore:'inc'})`, whose own G53 wrap forces G90 unconditionally regardless of ambient mode (t858's "MODE-EXPLICIT" design) — a leaked G90 is harmless there | unchanged, confirmed |
+
+DM500 (`ddcs-v3-dm500.js:55`) has the **identical** `G90 G92 <axis>[#864+ax-value]` shape as V4.1 (different
+register base only) — fixed by the same atom-level change, no wizard-side difference (the wizards call the
+shared atoms, not the dialect directly). Expert (`ddcs-expert-m350.js:89`, `:106`) is a pure register write —
+`#[805+...]=value` / `#[#70]=value` — never touches G90/G91 at all; `restore` is a no-op there because
+`wcsWriteBlock`'s Expert arm (`dialect.wcsWriteIndirect`) never reaches the `wrapMachineFrame` branch, and
+`setWorkOffsetBlock`'s Expert core carries no G90/G91 for `wrapMachineFrame` to act on either way.
+
+### New test — `tests/gcode-v41-modal-restore-1868.spec.js`, 5/5 passing
+
+Asserts the EMITTED G-CODE (primary), not the drawing:
+1. V4.1 corner — every `G90 G92` line immediately followed by `G91` (sanity-gated: corner's default params
+   genuinely emit ≥1 G92 line first, so the check isn't vacuously true on an empty set).
+2. DM500 corner — identical check.
+3. Expert — no `G92` anywhere in corner's own program at all.
+4. **(added this turn, per amendment)** Expert CONTROL, stated as its own separate assertion so it can't
+   silently collapse with #3: called `dialect.setWorkOffset` and `dialect.wcsWriteIndirect` DIRECTLY (not
+   scanned out of the full program, where an unrelated op could coincidentally carry a G90/G91) and asserted
+   neither atom's own return value contains `G90`/`G91` at all — a genuinely different claim from "no G92 line"
+   (that one is about datum-write SHAPE; this one is about the atom touching distance mode AT ALL).
+5. The drawing, as a consequence: V4.1 corner's own reconciled pass-0 Y now lands within 20mm of the touch
+   (physically-plausible small retract), not the ~-48 the bug produced.
+
+**Non-vacuity, proven by full revert/restore cycle** (fixed files backed up to scratch first, reverted via
+`git checkout`, re-run, restored from the scratch copies, re-run again — `git diff --stat` after restore matched
+the intended fix scope exactly): pre-fix, tests 1/2/5 failed with the EXACT predicted signatures —
+unrestored-G92 at V4.1 corner's own wall-write lines (`{"line":35,...,"next":"G0 Y#9"}`, `{"line":62,...,"next":
+"G0 X#9"}`), the identical shape for DM500 (lines 39/63), and the drawing test failing `Expected: < 20, Received:
+48`. Test 3 (Expert) passed regardless pre- and post-fix, as expected (architecturally unaffected either way).
+Post-restore: 5/5 pass.
+
+**Empirical cross-check (throwaway, deleted after use):** built all 5 probe ops × 2 dialects post-fix and
+scanned for unrestored G92 lines by the same naive "is the very next line G91" heuristic. Corner: clean both
+dialects (`unrestored: []`). Edge/middle/rotaryCenter/rotaryClock: the naive sweep flagged entries — but these
+are FALSE POSITIVES of that heuristic, not real gaps: in every one of those cases the actual next code is an
+explicit `G90` (already-absolute, no leak), another G92 (same mode, no leak), or an already-G90-forced G53 move
+via `safeRetractNode` (the mechanism above). The by-hand table above is the trustworthy source; the sweep's own
+false positives are the reason it isn't kept as a permanent test — a heuristic that can't tell "already-forced"
+from "leaking" would need per-site knowledge it doesn't have, which is exactly what the by-hand table encodes
+instead.
+
+### Amendment incorporated mid-task
+
+Advisor amendment (polled before commit, confirmed independently that DM500 shares the bug and Expert is safe
+for a structural reason): DM500 was already covered by this act's own design (the fix lives in the shared atoms,
+not per-dialect wizard code) — added its own dedicated PRIMARY-EVIDENCE test (#2 above) rather than assuming the
+existing V4.1 test implied it. Added the separate Expert CONTROL assertion (#4 above), stated distinctly from
+"no G92 at all" per the amendment's own explicit instruction that the two claims must not collapse.
+
+**The one-paragraph design call asked for, not built:** given a choice between parameterizing every existing
+probe spec to run per-dialect versus a dedicated cross-dialect emit suite, I'd choose the dedicated suite (the
+shape this test already is). Most existing probe specs assert UI/gesture/drawing behavior under one
+representative profile — tripling each of those to cover 3 dialects would triple runtime and entangle two
+orthogonal concerns (interaction correctness vs. which dialect's G-code text is correct) into every spec's
+maintenance surface. A dedicated emit-only suite (`page.evaluate` → build stack → `emitMapped` → assert G-code
+text, no DOM/canvas) is cheap (5 tests, 5.2s) and scales additively as new dialect-sensitive atoms appear — the
+natural standing gate for "does the right dialect variant get emitted." The gap that leaves: dialect-sensitive
+WIZARD-LEVEL behavior beyond raw emit (field gating, dialect-conditional branches) isn't covered by an emit-only
+suite — that's a narrower, separate audit best scoped by naming the SPECIFIC specs whose behavior is genuinely
+dialect-sensitive and parameterizing only those, not a blanket multiplier across the whole probe-spec surface.
+
+### Gate
+
+- New test: 5/5, non-vacuous (proven above).
+- `npm run test:node`: 118/118.
+- Full batch (141 files / 370 sub-tests, grepped on `wcsIndirect|setworkoffset|cornerWizard|middleWizard|
+  user_corner_data|user_middle_data|wcswrite`, `--workers=4`): 355 passed, 2 failed, 13 skipped. Both failures
+  (`open-as-modal-1625.spec.js`, `param-group-rows-1605.spec.js`) are generic app-boot `waitForFunction` timeouts
+  unrelated in content to this fix's scope (WCS-write emit text) — re-ran BOTH FILES IN ISOLATION (not assumed):
+  6/6 passed cleanly, 22.6s. Confirmed load-contention flakes under the 4-worker batch, not regressions —
+  matching this session's own established pattern for exactly this symptom class.
+- `handoff.py amendments --role worker`: polled twice (mid-task, incorporated; pre-commit, none new). Epoch
+  re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean (9 procs), 0 flagged.
+- `git status --short` after the gate run showed 3 incidental `verification/t1617-*.png` regenerations from the
+  large batch — reverted via `git checkout HEAD -- <path>` (already-committed, safe); everything else untracked
+  in the tree is pre-existing cruft from other turns, not touched.
+- No personal data touched this turn (synthetic default corner/middle builds only).
+
+### For the advisor
+
+This is a MACHINE-SAFETY fix, not a preview one — t1866 found the mechanism, t1868 fixes it: V4.1 and DM500's
+shared `setWorkOffset` G92 datum write leaves G90 active with nothing resetting it before the next relative move
+in the same probe body, so that move executes absolute instead of relative on real hardware, not only in the
+sim. Fixed at the one shared atom level (`wcsWriteBlock`/`setWorkOffsetBlock`), reusing `wrapMachineFrame`
+exactly as instructed — no second restore mechanism, no change to either dialect's own probe form. 4 call sites
+across corner + middle now opt in to `restore:'inc'`; 6+ other call sites across corner/middle/edge/
+rotaryCenter/rotaryClock verified NOT to need it (either already followed by an explicit `DM('abs')`, or already
+degrading to a comment before reaching the dialect at all, or already covered by `safeRetractNode`'s own
+unconditional G90 force) — each individually confirmed by reading the code, not assumed, and cross-checked by
+an empirical sweep (now deleted, its own false-positive shape documented above so it isn't mistaken for
+evidence). DM500 was newly confirmed to share the identical bug and is fixed by the same one-line-shape change;
+Expert confirmed architecturally immune, now with its own dedicated CONTROL assertion per your amendment.
+Non-vacuity proven by full revert/restore with exact predicted failure signatures. Full gate: 355+118 clean
+outright, 2 flakes confirmed unrelated by isolated re-run (6/6), node tier 118/118. Six files changed:
+`web/wizards/ops/wcsIndirect.js`, `web/wizards/ops/setworkoffset.js`, `web/wizards/stacks/cornerWizard.js`,
+`web/wizards/stacks/middleWizard.js`, the new `tests/gcode-v41-modal-restore-1868.spec.js`, this WORK-LOG entry.
+Given you said the user's been told not to run a V4.1 corner probe until this is settled — this is ready for
+your review and release.
+
+🔨 turn 1868
