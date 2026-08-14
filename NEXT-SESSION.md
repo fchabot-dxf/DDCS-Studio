@@ -2272,7 +2272,24 @@ jumps ahead of them. A new user-reported bug may interrupt — nothing else may.
                                              record WHY they stay on the long route despite addition 2
                                              (program-state equivalence != rendering/styling equivalence)
                                              so nobody folds them back citing #2.
-  6  drawn position vs readout           [ ]
+  6  drawn position vs readout           [x]  t1786 -- anchor-contamination-1786.spec.js
+                                             PERMANENT GUARD on the t1774 fix. Real bar-built 2-op program
+                                             (shipped Raw-G-code absolute prefix + corner via the full real
+                                             chain); asserts getAnchor() and an independent re-trace's
+                                             stats.absolute agree. REVERT-PROOF PROVEN: reverting t1774
+                                             fails 3/3 reproducing the user's own symptom; restore
+                                             confirmed byte-identical.
+  ==> ALL SIX ADDITIONS DONE (t1776-t1786).
+
+  ⚠ THREE NEW BUGS found while building #6, named + NOT fixed, suspected shared root:
+     (a) M5 halts the static trace before a later op's section ever runs
+     (b) Homing poisons forceMachine for the WHOLE panel, with zero call sites in
+         blocksApp.js explaining why
+     (c) even neutralised, the 3D marker array never rebuilds for corner (stays at
+         Homing's own single marker)
+  ⚠ GAP THE ADVISOR CREATED: all six additions guard THE PANE. Nothing guards THE MODAL --
+     and the modal is where the user's 2D-preview regression just appeared. A seventh
+     addition should point the same real-gesture assertions at the modal.
 
   #2 is the user's own: "if it call programatically it needs to be the same path
   as the ui, is that verifiable" -- YES. Drive BOTH once, deep-equal the resulting
