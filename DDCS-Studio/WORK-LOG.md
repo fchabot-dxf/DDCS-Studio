@@ -28859,3 +28859,117 @@ fix precedent noted at `toolpath2d.js:231-234`). The shared-root question with "
 open — different panel, same op, not empirically compared.
 
 🔨 turn 1798
+
+## Turn 1800 — RESOLVE the data-vs-pixels fork by IDENTITY (still no fix)
+
+### Dispatch
+
+Two live hypotheses to test, either disposable: (1) t1798's __t2starts read may have come from the WRONG canvas
+— settle by IDENTITY (bounding-box match / tagging), not selector guesswork, and report the emits value for
+wall1 from the PROVABLY-VISIBLE canvas, cold and warm. (2) `opSimStarts` being pure over its arguments is not
+the same as pure — it can read a LAZILY-POPULATED REGISTRY; test whether it returns the SAME THING cold and
+warm when called directly at the console on each page state. If confirmed a lazy-registration gap, say so and
+STOP before fixing (a bigger call than a glyph). Once the mechanism is known, add the regression test at the
+COLD entry and remove t1796's `test.fail()` line once actually fixed. Gate: node tier + touched specs.
+Screenshots + the two emits numbers are the deliverable.
+
+### Step 1 — IDENTITY resolved: the earlier `__t2starts` read WAS the wrong canvas (advisor's suspicion confirmed)
+
+Dumped every `<canvas>` under `#blk_wiz_user` (both label + bounding rect) on warm and cold: THREE canvases
+exist, not one — `pp-2d` (class, inside `.wiz-viz3d.preview-panel`, rect **0×0** — hidden, the TOP box's dormant
+2D sub-view while it's in 3D mode), an unnamed one at 1168,154/314×200 (the TOP box's actual visible 3D canvas,
+no `__t2starts`), and `fc-anim-overlay` (inside `.viz-canvas`, at 1168,388/314×200 — the BOTTOM "Corner (data) ·
+92 lines" Layout box, the one that actually carries the glyph I've been screenshotting). t1798's `__t2starts`
+read grabbed the FIRST canvas matching `.__t2starts` — the hidden `pp-2d` one — which is real `toolpath2d.js`
+data, correctly computed, but **not the renderer that draws what I've been calling the bug**. That renderer is
+`viz/featureCanvas.js` (SVG, not canvas) — confirmed by grepping its own `resolveStartGlyph` call
+(`featureCanvas.js:507`) and the "· N lines" title string (`userOpView.js:696`, `zRulerStrip.js:13`'s own
+comment names this exact title as "the 2D panel TITLE").
+
+Corrected the approach entirely: instead of a debug hook, read the ACTUAL rendered SVG (`.fc-handle`/
+`.fc-handle-move`/`.fc-handle-sim` elements, `data-hid` attribute) directly — ground truth by construction, no
+selector ambiguity possible.
+
+**WARM**: 2 handles. `__simstart0` (circle, hollow, amber stroke `#ffb300`, `fill:none`) — pass 0, the "Start"
+marker, always hollow by design (`isManualStart`'s `pass===0` rule). `reposition_pos` (rect/square, filled cyan
+`#22d3ee`) — the wall-2 emitting reposition handle (`cross1_x`/`cross1_y`, `relTo:{row:'wall1'}`,
+`panelTypes.js:375-420`'s relTo-anchored handle).
+
+**COLD**: **1 handle only** — `__simstart0`, byte-identical to warm (same position, same hollow-amber glyph).
+**`reposition_pos` is completely ABSENT from the DOM.**
+
+**This corrects the whole shape of the finding.** It is not "a marker renders with the wrong glyph" — the
+`__simstart0` "Start" circle (always hollow, always present) is exactly correct in both states and was
+misidentified as "the bug" by eye in the t1798 screenshots. The actual defect: **the reposition handle for
+wall-2 fails to render at all on a cold-loaded op** — the square marker doesn't degrade to a circle, it
+vanishes, leaving only the pre-existing Start circle visible where a glance reads "a marker turned into the
+wrong shape."
+
+### Step 2 — BOTH advisor hypotheses killed with direct console evidence
+
+Called `opSimStarts('user_corner_data', params, stock)` AND `resolveRelToIndex('user_corner_data', params,
+{row:'wall1'})` directly via a dynamic `import('/viz/opSimStarts.js')` in the page — no canvas, no panel, no
+render pipeline involved at all — at three points: cold BEFORE any file load (the purest possible registry
+read, before touching a single wizard), cold AFTER the real Load, and warm.
+
+```
+opSimStarts        WARM:               [{emits:false,...},{emits:true,...}]
+opSimStarts        COLD BEFORE LOAD:   [{emits:false,...},{emits:true,...}]   (byte-identical)
+opSimStarts        COLD AFTER LOAD:    [{emits:false,...},{emits:true,...}]   (byte-identical)
+resolveRelToIndex(wall1)  WARM:  0
+resolveRelToIndex(wall1)  COLD:  0   (every run, before AND after load)
+```
+
+**Lazy-registration hypothesis: killed.** The registry is populated before the page has done anything at all —
+`registerUserOp` runs at boot, not on first wizard-open or first file-load. `opSimStarts`/`resolveRelToIndex`
+are correct and identical in every state tested.
+
+**Session-state hypothesis (t1798): stays killed**, now on firmer ground — t1798's evidence was itself drawn
+from the wrong canvas, but re-tested by IDENTITY here, the conclusion holds: the declared per-pass data is not
+the problem.
+
+### What's left — narrowed to one specific, untested link
+
+Every data source I can call directly is proven correct. The one remaining link in the chain I have NOT yet
+instrumented: `panelStarts` (userOpView.js's `ps`, threaded into `panelTypes.js:392`'s handle-builder) is NOT
+the same thing as a raw `opSimStarts()` call — it's `computePassStarts()`'s own output
+(`createPreviewPanel.js:776-795`), a LIVE PANEL INSTANCE value with its own precedence chain (`userStarts[p] ||
+... || hintFor(p) || ...`) reading `host.__startHints`, which is itself SET as an explicit argument on each
+`preview3D()` call (`wizardManager.js:574`) — a per-panel-instance mutable field, not a pure registry read.
+`panelTypes.js:392-393` PREFERS `panelStarts` over a fresh `opSimStarts()` call specifically "so the two panels
+can't diverge BY CONSTRUCTION" (its own comment) — which is exactly the kind of construction that could go
+stale or arrive empty on a freshly-built panel instance without ever having been fed a real preview3D() call in
+the right order. I did not instrument `ps`/`panelStarts` itself before running out of turn scope — that is the
+next, sharply-scoped probe (dump `ps` right where `panelTypes.js:392` reads it, cold vs warm), not a full
+re-open of the investigation.
+
+### Non-vacuity / evidence
+
+- `data-hid`-tagged SVG handle dumps, cold vs warm — the decisive, identity-verified evidence (not a debug hook,
+  not a selector guess: the literal rendered DOM).
+- Direct console calls to `opSimStarts`/`resolveRelToIndex`, 3 page-states, all consistent.
+- Both diagnostics run via a throwaway spec (`tests/zzdebug-1800-identity.spec.js`), deleted after use.
+
+### Verify
+
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source touched — identity-resolution + hypothesis-testing only, per dispatch's explicit "still no fix."
+- `handoff.py amendments --role worker`: none pending.
+- t1796's `test.fail()` line is UNCHANGED (correctly still tracking a real, unfixed defect) — not touched, since
+  nothing was fixed this turn.
+
+### For the advisor
+
+Your suspicion about the wrong canvas was right — corrected by identity, not by re-asserting the old read. The
+real defect is sharper than either of us had it: the wall-2 reposition handle doesn't change glyph, it fails to
+exist at all on a cold-loaded op, while the Start circle (always hollow, always present) is exactly correct in
+both states — which is what made the screenshot read as "hollow circle" at a glance. Both your hypotheses are
+now dead on hard evidence, not inference: not session-state, not lazy registration — `opSimStarts` and
+`resolveRelToIndex` are proven identical cold-before-any-load, cold-after-load, and warm. The one remaining
+untested link is `panelStarts`/`ps` — the live per-panel-instance value `panelTypes.js:392` prefers over a raw
+registry call specifically to keep two panels in sync "by construction" (its own words) — which is exactly the
+kind of construction that can go empty/stale on an instance that never got a real `preview3D()` call in the
+right order. Next probe: dump `ps` itself at that exact line, cold vs warm — everything else waits on that,
+same shape as this turn's own gate.
+
+🔨 turn 1800
