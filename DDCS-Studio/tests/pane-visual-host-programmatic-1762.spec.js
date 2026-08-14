@@ -1,15 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 // t1762 — t1760's own pane-visual-host-1760.spec.js proved the visual host via a SYNTHETIC
-// ddcsLoadBlockStack([{type:'op',opType,params:{}}]) call, not the REAL user gesture. The advisor
-// dispatched this act because that gap was real: `insertWiz()` (bar -> Insert -> Blocks) does NOT
-// place a plain {type:'op'} block — `commitActiveOp()` EXPANDS it into a full "Define Custom Wizard"
-// block tree (a round-trip toast confirms it: "This op is now an editable block stack"), which makes
-// `deriveLiveWizard()` take the AUTHORED-HERE branch (a `user_root` at the top of the stack), not the
-// placedOpFallback/registry-overlay branch t1760's test exercised. Both branches converge on the same
-// hasTree rendering code, but only a test using the REAL gesture proves that convergence actually holds.
-// Covers BOTH real routes the dispatch named: the placed-op route (openWiz->insertWiz->showApp) and the
-// authoring/Customize route (ddcsEditWizardDef->showApp).
+// ddcsLoadBlockStack([{type:'op',opType,params:{}}]) call, not the shape a real gesture actually produces.
+// This act closed THAT gap: `insertWiz()` (bar -> Insert -> Blocks) does NOT place a plain {type:'op'}
+// block — `commitActiveOp()` EXPANDS it into a full "Define Custom Wizard" block tree (a round-trip toast
+// confirms it: "This op is now an editable block stack"), which makes `deriveLiveWizard()` take the
+// AUTHORED-HERE branch (a `user_root` at the top of the stack), not the placedOpFallback/registry-overlay
+// branch t1760's test exercised. Both branches converge on the same hasTree rendering code; these two tests
+// prove that convergence by driving the SAME PROGRAM SHAPE each route actually produces.
+//
+// ⚠ RENAMED at t1776 (was pane-visual-host-real-gesture-1762.spec.js) — despite the old name, this file
+// calls window.openWiz/insertWiz/showApp/ddcsEditWizardDef DIRECTLY (page.evaluate), never a real click or
+// fill. That is a legitimate, narrower check (the render pipeline given the correct program SHAPE) but it
+// is NOT a real-gesture test — the advisor cited it to the user as covering the primary click-through route
+// and it does not; see tests/primary-route-real-gesture-1776.spec.js for the one that actually drives the
+// bar entry, the form fill, the INSERT button, and the Blocks tab via real Playwright clicks.
 
 test('placed-op route (openWiz -> insertWiz -> showApp) draws the real 3D scene + 2D path at 393px', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 800 });

@@ -27815,3 +27815,94 @@ this was a large single-turn investigation (three amendments, several dead-end h
 evidence before the real one). I had enough room to land the fix + regression test + wide gate cleanly, but the
 5-item "widen the audit" queue is a full act (or more) of its own — next wake should treat it as fresh, not a
 continuation.
+
+## 🔨 turn 1776 (epoch 4) — ADDITION 1: THE PRIMARY ROUTE, END TO END, ALL REAL CLICKS
+
+### Dispatch
+
+The clamp fix was accepted. This is the first of six queued audit-remediation acts (one per wake, nothing else
+jumps ahead except a new user-reported bug): build ONE spec that drives the user's primary route with real
+Playwright gestures at every step — CLICK a `button[data-optype]` on the command bar → `.fill()` a distinctive
+value → CLICK the real INSERT button (`index.html:1156`) → CLICK the real BLOCKS tab (`[data-app="blocks"]`,
+`index.html:136`) → assert the Wizard View shows that value. No `window.openWiz`/`insertWiz`/`showApp` calls
+anywhere in it. If a step needs a menu opened first, drive the menu — don't fall back to a function call (that's
+exactly what made `pane-visual-host-real-gesture-1762.spec.js` worthless despite its name; fix the file's name
+or docblock while in there, the advisor's own citation error).
+
+### Driving the real command-bar dropdown
+
+Traced `commandDeck.js:741` (`_bindWizardDropdowns`) before writing anything: the group dropdown
+(`.toolbar-dropdown > button.wizard-btn`, e.g. "Probe ▾") is **click-to-toggle**, not CSS `:hover` — a real
+click listener toggles `.active` on the parent, which is what makes `.toolbar-dropdown-content { display:
+flex }` apply (`styles.css:1294`). So a genuine `page.locator(...).click()` on the group button is the correct,
+real gesture — no forced style manipulation needed (unlike `context-menu-wizbar-1458.spec.js`'s own
+`dd.style.display='block'` shortcut, which that file's own docblock is honest about: "forcing its dropdown
+visible first, as hovering would"). `e.stopPropagation()` on the group button's click keeps the
+document-level outside-click-closes-all listener from firing on the SAME click; a later click on an item inside
+`.toolbar-dropdown-content` does bubble to that listener, but the item's own `onclick` (`openWiz(...)`) has
+already fired by then, so the close-on-bubble is harmless.
+
+**One real mistake caught before it shipped**: `wizItemHtml` stamps `data-optype` from `e.type || e.opensAs ||
+e.id` — corner's library entry (`wizardLibrary.js`) declares `type: 'corner'`, which wins over its `opensAs:
+'user_corner_data'`. My first draft selector (`[data-optype="user_corner_data"]`) matched nothing; the real DOM
+attribute is `[data-optype="corner"]`. Found this from the failing locator's `toBeVisible` timeout, not assumed.
+
+### The spec — `tests/primary-route-real-gesture-1776.spec.js`
+
+One test, five real steps, zero fallbacks to a JS function call:
+1. `page.locator('.dock-header .toolbar-dropdown > button.wizard-btn', {hasText:'Probe'}).click()` — opens the
+   group.
+2. `page.locator('...button[data-optype="corner"]').click()` — the real bar entry (routes through `openWiz`
+   via `wizItemOnclick`, same as a user's own click would — I did not call `openWiz` myself).
+3. `page.locator('#wiz_user_form [data-param="dist"]').fill('777')` + a `change` dispatch (matches what a real
+   keystroke-then-blur produces; `formWidgets.js` listens on `change`/`input`) — a distinctive, non-default
+   value (corner's `dist` default is 500).
+4. `page.locator('.wiz-foot button.primary', {hasText:'INSERT'}).click()` — the real footer button
+   (`index.html:1156`), not `insertWiz()`.
+5. `page.locator('[data-app="blocks"]').click()` — the real tab button (`index.html:136`), not `showApp()`.
+
+Then asserts the Wizard View carries `777` — checked BOTH as a live form field value (`[data-param="dist"]`)
+and in the rendered G-code preview text (`#1=777`), reporting which one actually matched rather than assuming;
+in practice the code-preview match fired (the form field re-render lagged slightly behind the pane settle).
+
+### Non-vacuity — proven by disabling the real step, not by argument
+
+Temporarily commented out the `.fill()`/`change`-dispatch (step 3) and re-ran: failed 3/3, with the assertion
+message itself showing the smoking gun — `code line=#1=500 ( Max probe distance )` (the untouched default),
+proving the check reads the ACTUAL rendered code, not a fixture. Restored the fill, re-ran green. This also
+incidentally proves the whole chain (bar click → form → Insert → tab → Blocks-tab render) is load-bearing: with
+the fill disabled, everything else in the chain still ran to completion and the ONLY thing that changed was the
+one value — no other step masks or compensates for a broken one.
+
+### Fixed `pane-visual-host-real-gesture-1762.spec.js`'s name (the advisor's own citation error)
+
+Read its actual body: every step is `page.evaluate(() => window.openWiz/insertWiz/showApp/ddcsEditWizardDef(...))`
+— zero real clicks. Its own docblock never claimed otherwise (it's a legitimate, narrower "does the render
+pipeline converge on the two program shapes a real gesture can produce" check), but the FILENAME says
+"real-gesture," which is what let it get cited as covering ground it doesn't. `git mv`'d it to
+`pane-visual-host-programmatic-1762.spec.js` and added a note at the top pointing at this act's actual
+real-gesture spec. Checked for other references to the old name before renaming: `NEXT-SESSION.md` cites it
+twice (lines ~2153, ~2194) — that file is the advisor's, not mine to edit; flagged below instead.
+
+### Verify
+
+- `tests/primary-route-real-gesture-1776.spec.js` — 1/1 green; non-vacuity proven (3/3 fail with the fill step
+  disabled, exact default-value evidence in the failure message; 1/1 green restored).
+- `tests/pane-visual-host-programmatic-1762.spec.js` (renamed, docblock corrected, body untouched) — 2/2 still
+  green, no regression from the rename.
+- Node tier (`npm run test:node`): 118/118 pass.
+- Hit the known stale-transform-cache `test.use()` collection error twice after the `git mv` (memory:
+  `playwright-stale-cache-testuse-error`) — root cause was MY OWN cwd drift (an intervening `cd
+  /c/.../ddcs-studio-project && git mv/status` left the shell at the repo root, not `DDCS-Studio`, so `npx
+  playwright` fetched a second package). Fixed by re-anchoring `cd .../DDCS-Studio` in the same command as the
+  `npx playwright` call — not a real collection bug, confirmed via the memory's own documented Cause #1.
+- Gate scope matched the dispatch exactly (node tier + this spec + the file it touches) — no full-suite run,
+  no shared/registry file touched this act.
+
+### For the advisor
+
+Addition 1 done. Two small things worth surfacing rather than silently carrying forward: (1) `NEXT-SESSION.md`
+still cites the OLD filename twice (I can't touch that file); (2) worth deciding, when Addition 2 lands (the two
+renderer branches from the same real gesture), whether it should EXTEND this spec (same click chain, assert
+both branches converge) or stay a separate file — I didn't pre-judge that here since the dispatch scoped this
+act to Addition 1 only.
