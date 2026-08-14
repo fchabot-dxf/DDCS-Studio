@@ -32474,3 +32474,113 @@ analysis says should already coincide, live, via the shared `markerWorldOf` reco
 surface reading the raw declared value directly — flagged for whoever scopes the fix, not resolved here.
 
 🔨 turn 1854
+
+## turn 1856 — TWO PARTS: correct the impossible test assertion; find the user's own actual remaining symptom
+
+Dispatch, two separate things, explicitly not to be conflated: PART 1 — `picture-parity-1772` asserts a
+placeholder equals a measurement for `anchorsAtPrev` passes, which can never hold by construction; fix the
+ASSERTION (check against the trace, or exclude with the reason stated), and prove it still catches a real
+misplacement where declared/rendered SHOULD agree. PART 2 — find the user's own actual visible symptom, which
+may already be fixed; use their real workspace (`.repro/user-workspace-2026-08-13.ddcs`, gitignored, personal
+data) to reproduce ONLY, never bake any value from it into anything committed; report what is SEEN, do not fix.
+
+### PART 1 — the test was defective in TWO ways, not one
+
+Started implementing the advisor's own suggestion (check `anchorsAtPrev` passes against the trace's own segments,
+converted to world coordinates via `passAnchorFor`) and found a SECOND, independent defect while proving it:
+`passAnchorFor` — the function the LIVE engine itself uses to anchor a pass's local motion frame — degenerates to
+`return row` (the declared value, unchanged) for any NON-`anchorsAtPrev` pass, for the SAME underlying reason
+`markerWorldOf` does: a non-`anchorsAtPrev` pass is a MANUAL reposition — the operator physically moves the tool
+there by hand, so there is no accompanying G-code move to check it against at all. This means the ORIGINAL
+test's comparison (`declared[p]` vs `markerWorldOf(declared[p])`) could never fail for ANY non-`anchorsAtPrev`
+pass, for any op, ever — `dist(x,x)` is always 0. Confirmed empirically against a real op, not just reasoned:
+a first draft of this fix (checking EVERY pass against traced segments uniformly) flagged `user_rotary_clock_data`
+pass 1 (`anchorsAtPrev: false`) as a fabricated failure — "no real motion for this pass" — which is exactly
+correct: that pass IS operator-jogged, there genuinely is no G-code move to verify it against, and forcing a
+check there produces a false positive, not a real defect.
+
+**The fix, narrowed to where a real ground truth exists:** the check now applies ONLY to `anchorsAtPrev` passes.
+For those, it asserts the CLAIMED marker (`markerWorldOf`'s own reconciled output) is a position the REAL TRACED
+ROUTE actually reaches — segments converted from their pass-local frame to world coordinates via `passAnchorFor`
+(the SAME anchor the live engine uses), checked for proximity to the claim. Every other pass is EXCLUDED, by
+name, with the reason stated in both the docblock and the console output (`EXCLUDED PASSES`), so the next reader
+does not re-add the impossible/vacuous assertion thinking they found a regression.
+
+**Non-vacuity, proven by perturbation as instructed, not asserted:** a permanent second test in the same file
+constructs corner's own real shape as synthetic data (declared pass 0/1, a real trace runtime-end for pass 0)
+and confirms: honest segments (reaching the reconciled truth) PASS; corrupted segments (reaching only the raw
+declared placeholder — the exact impossible value t1854 diagnosed) FAIL; zero segments for the pass also FAIL,
+not silently pass. All three assertions hold.
+
+**Result:** corner's own `anchorsAtPrev` pass 1 now PASSES the corrected check (0 failed) — t1854's own proof
+that the reconciled marker exactly matches the emitted G-code's incremental reposition math is what makes this
+true, not a loosened tolerance. `user_rotary_clock_data` and `user_alignment_data`'s own non-`anchorsAtPrev`
+passes are excluded with the stated reason, not silently dropped.
+
+### PART 2 — the user's actual symptom, using their real workspace, values never leaving that sandbox
+
+Loaded `.repro/user-workspace-2026-08-13.ddcs` via `window.ddcsRestoreBackup` (the app's own real restore path)
++ reload, in a throwaway test deleted after use. Their backup's `stores.projects` is genuinely empty
+(`"projects": []`, verified directly against the raw file) — their reported symptom happened in an unsaved,
+in-progress wizard session this backup never captured, so their EXACT scenario cannot be replayed byte-for-byte.
+Their real settings/machine/stock DO restore, so built the same Homing+Corner sequence this whole investigation
+concerns under THEIR real configuration and looked. Screenshots stayed in the already-gitignored `.repro/`
+folder throughout (verified: `git check-ignore` confirms both their file and every screenshot taken from it are
+excluded by `.repro/.gitignore`'s own `*` pattern; a dry-run `git add -A` picks up nothing from that folder).
+No value from their file appears below — only structural/qualitative observations.
+
+**Finding 1 — their machine uses a different controller profile than this whole investigation assumed.** The
+emitted G-code opens with an explicit, visible app warning that Homing macros are UNVERIFIED for their profile
+and Studio will not emit a homing sequence for it at all — only an informational comment. Every corner
+investigation this session (t1848 through t1854) used the app's own DEFAULT profile, where Homing emits a real
+G53 macro. Their profile's Homing contributes ZERO motion to the trace.
+
+**Finding 2 — under their real configuration, the corner probe's own drawn route and its markers render nowhere
+near the actual stock.** With the default camera (fits the whole scene), the picture was unreadable — dominated
+by what looks like the machine's own large home/travel excursion, no stock visible at all. Re-fit the camera
+manually to just the declared pass-start geometry (the same technique t1850 used for an unrelated diagnostic)
+and the picture became readable: a small stock block sits in one corner of the frame; the corner probe's own
+traverse and markers render far outside it, with no visual relationship to the stock block at all. This is a
+real, visible, still-present picture defect, and it plausibly explains BOTH of the user's own original two
+complaints as ONE mechanism, not two: if Homing contributes no real motion under their profile, the trace's own
+"where is the tool right now" state has nothing to anchor to except an unrelated default position — matching
+"the start is clamped to the 000 of the stock" — and every SUBSEQUENT op's own incremental (`G91`) motion,
+including corner's, then plays out relative to THAT unrelated position rather than anywhere near the real stock
+— matching "markers and path aren't aligned." I have not traced the exact code path (out of scope — report,
+don't fix); this is a visual finding, not a source-level diagnosis.
+
+**This does NOT overturn the "start clamp is already fixed" belief for the case that fix targeted** — it
+suggests that fix may not extend to a controller profile whose own Homing wizard is a structurally different,
+motion-free path (a comment-only emit), which is very plausibly a code path the original fix never touched,
+since it was written against the profile where Homing DOES emit real G53 motion.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- `picture-parity-1772.spec.js`: 2/2 (the corrected check + the perturbation proof), `--retries=0`.
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: only `tests/picture-parity-1772.spec.js` modified — verified nothing under `.repro/` is
+  staged or stageable (dry-run `git add -A` confirmed).
+- No app source changes this turn, per the dispatch.
+
+### For the advisor
+
+PART 1: fixed, and it was two defects, not one — the non-`anchorsAtPrev` branch was ALSO vacuous (comparing a
+value to itself), caught while implementing your own suggestion and confirmed against a real op
+(`user_rotary_clock_data`), not just reasoned abstractly. The check is now narrowed to exactly where a real
+ground truth exists (a programmed G-code move connects the pass to the previous one), proven non-vacuous by
+perturbation (3 synthetic cases: honest passes, corrupted fails, empty-segments fails), and every excluded pass
+is named with its reason in both the docblock and the console output.
+
+PART 2: their exact session is gone (no saved project in their backup), but their real settings restore, and
+under those I found something real and still visible: their machine's own controller profile makes Homing a
+motion-free, comment-only op — different from every scenario this whole investigation tested — and under that
+profile the corner probe's route and markers render with no visible relationship to the actual stock at all,
+plausibly explaining BOTH of their original complaints as one mechanism (an unanchored trace start, propagating
+through every subsequent op's incremental motion). This is NOT the 36mm/`anchorsAtPrev` reconciliation bug PART
+1 concerns — it looks upstream of it, in how (or whether) a controller-profile-specific Homing path establishes
+a real starting position at all. I have not traced the source; this is a screenshot-verified visual finding, not
+a diagnosis, exactly as scoped. Their picture is NOT correct yet — I cannot say we close their report.
+
+🔨 turn 1856
