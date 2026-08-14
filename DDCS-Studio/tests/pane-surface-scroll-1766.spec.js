@@ -13,6 +13,13 @@ import { test, expect } from '@playwright/test';
 // cap). Pins: a field FAR down a long form (contour's "Attach to Stock", well past the old 640px cap) is
 // painted, not raw black, across all 5 themes; and #blk_wiz_user no longer internally scrolls at all
 // (scrollHeight === clientHeight) — the outer pane owns scrolling instead.
+//
+// t1784 ADDITION 5 — REPOINTED onto the real bar->entry->INSERT->Blocks-tab chain (tests/primary-route-real-
+// gesture-1776.spec.js's own pattern), replacing window.openWiz/insertWiz/showApp. Addition 2 (t1778) proved
+// the openWiz/insertWiz shortcut produces the SAME PROGRAM STATE as a real click, ids stripped — it did NOT
+// prove the same RENDERING/STYLING (a painted background + scroll-container behaviour), which is what this
+// file asserts. So this repoint checks a layer Addition 2's equivalence result never covered; don't fold it
+// back into "the shortcut is proven equivalent, use it here too" without re-checking that claim specifically.
 
 const THEMES = ['normal', 'studio', 'steampunk', 'futuristic', 'organic'];
 
@@ -20,12 +27,13 @@ for (const theme of THEMES) {
   test(`theme ${theme}: a field scrolled past the old 640px cap is still painted, not raw black`, async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 1000 });
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.showApp && window.openWiz && window.insertWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate((t) => document.body.setAttribute('data-theme', t), theme);
-    await page.evaluate(() => window.openWiz('user_contour_data'));
-    await page.waitForTimeout(400);
-    await page.evaluate(() => window.insertWiz());
-    await page.evaluate(() => window.showApp('blocks'));
+    await page.locator('.dock-header .toolbar-dropdown > button.wizard-btn', { hasText: 'Mill' }).click();
+    await page.locator('.dock-header .toolbar-dropdown-content button[data-optype="contour"]').click();
+    await page.locator('.wiz-foot button.primary', { hasText: 'INSERT' }).waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('.wiz-foot button.primary', { hasText: 'INSERT' }).click();
+    await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => !!window.__blkws);
     await page.waitForTimeout(500);
 

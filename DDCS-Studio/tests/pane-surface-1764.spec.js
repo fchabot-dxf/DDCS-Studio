@@ -9,6 +9,14 @@ import { test, expect } from '@playwright/test';
 // .wiz-box surface rule on BOTH `.wiz-box` and `#blk_wiz_user` (styles.css) rather than duplicating the rules
 // into a second block. Pins: the pane's own background-image/background-color is non-default across all 5
 // themes, not the raw page black / transparent it was before.
+//
+// t1784 ADDITION 5 — REPOINTED onto the real bar->entry->INSERT->Blocks-tab chain (tests/primary-route-real-
+// gesture-1776.spec.js's own pattern), replacing window.openWiz/insertWiz/showApp. Addition 2 (t1778) proved
+// the openWiz/insertWiz shortcut produces the SAME PROGRAM STATE as a real click, ids stripped — it did NOT
+// prove the same RENDERING/STYLING, which is exactly what this file asserts (a painted background is a CSS/DOM
+// fact, invisible to a program-state deep-equal). So this repoint is not redundant with Addition 2's result —
+// it is checking a different layer that equivalence result never covered. Do not "simplify" this back to the
+// shortcut citing Addition 2 without re-establishing that the two routes paint identically too.
 
 const THEMES = ['normal', 'studio', 'steampunk', 'futuristic', 'organic'];
 
@@ -16,12 +24,13 @@ for (const theme of THEMES) {
   test(`theme ${theme}: the Wizard View pane paints its own surface, not the raw page background`, async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 1000 });
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.showApp && window.openWiz && window.insertWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     await page.evaluate((t) => document.body.setAttribute('data-theme', t), theme);
-    await page.evaluate(() => window.openWiz('user_corner_data'));
-    await page.waitForTimeout(400);
-    await page.evaluate(() => window.insertWiz());
-    await page.evaluate(() => window.showApp('blocks'));
+    await page.locator('.dock-header .toolbar-dropdown > button.wizard-btn', { hasText: 'Probe' }).click();
+    await page.locator('.dock-header .toolbar-dropdown-content button[data-optype="corner"]').click();
+    await page.locator('.wiz-foot button.primary', { hasText: 'INSERT' }).waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('.wiz-foot button.primary', { hasText: 'INSERT' }).click();
+    await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => !!window.__blkws);
     await page.waitForTimeout(500);
 

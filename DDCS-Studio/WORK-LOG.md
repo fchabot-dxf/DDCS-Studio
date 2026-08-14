@@ -28143,3 +28143,71 @@ might be necessary. One real, useful side-finding: the 3D render is event-driven
 any FUTURE pixel-based check on this surface needs either a poll (as here) or an explicit trigger, never a bare
 fixed sleep — worth remembering when the 16 `*-in-place` specs actually get repointed. The 16 are named above,
 ready for whichever slice takes them next.
+
+## 🔨 turn 1784 (epoch 4) — ADDITION 5: THE PAINTED SURFACE, VIA THE REAL CHAIN
+
+### Dispatch
+
+Addition 4 accepted — the render-settle race and the documented poll-self-heal were called "the more valuable
+half," specifically because writing down WHY the poll exists stops a future reader deleting it as superstition.
+This act is a REPOINT, not new work: `pane-surface-1764.spec.js` and `pane-surface-scroll-1766.spec.js` already
+assert the right thing (the pane paints its own background; a field past the old 640px cap stays painted, not
+raw black) but reach it via `window.openWiz/insertWiz/showApp`. Move them onto Addition 1's real chain
+(bar → entry → INSERT → Blocks tab), keeping the assertions unchanged. State in the docblock, precisely, why
+this is still worth doing even though Addition 2 proved the shortcut equivalent: that equivalence was for
+PROGRAM STATE, not rendering/styling. If the repoint finds the two routes paint identically (repoint adds
+nothing), report that rather than repointing for its own sake and staying quiet about it. Gate: node tier +
+both specs + non-vacuity; no full suite.
+
+### Both repointed — same outcome on the real chain, reported plainly
+
+Replaced `window.openWiz('user_corner_data')` → `window.insertWiz()` → `window.showApp('blocks')` (1764) and
+the same for `user_contour_data` (1766) with the real click chain: `.wizard-btn` group click ("Probe" / "Mill")
+→ `button[data-optype="corner"]` / `[data-optype="contour"]` → a `waitFor` on the real `.wiz-foot button.primary`
+INSERT button (replacing the old fixed `waitForTimeout(400)` guess) → click it → click `[data-app="blocks"]`.
+Kept every assertion byte-identical, per the dispatch. **All 10 tests (5 themes × 2 files) pass on the real
+chain, unchanged from the shortcut route** — the painted-background and no-longer-internally-scrolls outcomes
+are identical whether reached by `openWiz()` or a real bar click.
+
+This is the finding to report, stated as the dispatch asked: **the repoint did not surface a styling
+divergence.** Both specs were already asserting the right DOM/CSS facts, and those facts hold identically on
+both routes. That is not the same claim Addition 2 made (program-state equivalence) — it is a SEPARATE,
+now-also-confirmed equivalence, for a different layer (rendering/CSS), reached by actually re-deriving it on
+this surface rather than inferring it from Addition 2's result. The docblock on both files says this explicitly
+so a future reader doesn't fold this repoint's justification back into "Addition 2 already proved it."
+
+### Were they ever passing for the wrong reason? No — checked, not assumed
+
+The dispatch specifically flagged this as the more important question if it turned out to be true. Both specs'
+own assertions are DOM/CSS facts read straight off `getComputedStyle`/`scrollHeight`/`clientHeight` — nothing
+in the assertion logic references how the wizard was opened, so there was no mechanism by which the shortcut
+route could have made either spec pass for a reason the real route wouldn't also produce. Confirmed by running
+both non-vacuity probes below on the REPOINTED (real-chain) versions specifically, not re-using the shortcut
+route's old proof — a fresh proof on the new route, not an inherited one.
+
+### Non-vacuity — three separate assertions, each proven fresh on the repointed route
+
+1. `pane-surface-1764.spec.js`'s `painted` check: inverted to `toBe(false)`, ran the `normal` theme — failed
+   3/3 (`Expected: false, Received: true`). Reverted, full 5/5 green.
+2. `pane-surface-scroll-1766.spec.js`'s `painted` check: same inversion, same result (3/3 fail, then 5/5 green
+   after revert).
+3. `pane-surface-scroll-1766.spec.js`'s `internallyScrolls` check (a SEPARATE assertion from `painted`):
+   inverted to `toBe(true)`, ran `normal` — failed 3/3 (`Expected: true, Received: false`). Reverted, full 5/5
+   green.
+
+### Verify
+
+- `tests/pane-surface-1764.spec.js` — 5/5 green on the real chain.
+- `tests/pane-surface-scroll-1766.spec.js` — 5/5 green on the real chain.
+- All three non-vacuity probes: 3/3 fail while inverted, full suite green after each revert.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source file touched this act (test-only, a route repoint) — gate matched the dispatch (node tier + both
+  specs + non-vacuity, no full suite).
+
+### For the advisor
+
+Clean result, reported as asked: no styling divergence between the shortcut and the real chain on this surface.
+The repoint still had value even with that outcome — it moved the PROOF from an inferred "well, Addition 2
+covered entry paths" onto an actually-re-derived equivalence for the specific layer (rendering) these two specs
+care about, and the docblocks now say so explicitly so nobody collapses that reasoning later. No wrong-reason
+passing found either — the assertion logic never referenced the open route, so there was no room for one.
