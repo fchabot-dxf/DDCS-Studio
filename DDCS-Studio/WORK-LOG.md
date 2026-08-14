@@ -27981,3 +27981,83 @@ for the canvas) rather than deep-equalling both the same way, specifically to av
 normalisation exception. If a later addition needs a STRICTER canvas comparison (e.g. actual block nesting/
 connections, not just the type set), that's a legitimate escalation, but I didn't pre-build it speculatively
 here — flagging the asymmetry so it's a visible decision, not a quietly-inherited pattern.
+
+## 🔨 turn 1780 (epoch 4) — ADDITION 3: BOTH RENDERER BRANCHES, FROM THE SAME GESTURE
+
+### Dispatch
+
+Addition 2 accepted (clean equivalence, canvas checked narrowly on purpose — the advisor's own read: "a second
+exception is exactly where an equivalence check starts proving nothing"). Addition 3: prove `blocksApp.js`'s
+two Wizard-View renderer branches (`hasTree` at `:667`, flat at `:731`) both work when reached the SAME real
+way — bug 2 this week shipped because `05e5fa44` switched the flat branch and every built-in twin took the
+OTHER one, so the suite stayed green while it broke. Pick one hasTree twin + one FLAT twin, drive both through
+the real gesture chain (bar → entry → fill → INSERT → Blocks tab), assert the SAME visible outcome (fields
+render, with the typed value) for each. The assertion must be one a branch switch would break, not merely
+"fields exist." Name which branch each twin takes if the code already exposes it; if that needs new
+instrumentation, don't add it — assert the strongest thing available without it. **Find a genuinely flat twin
+first and say which — if none exists, the flat branch is dead code, a more interesting finding than the test;
+report and stop rather than manufacture a fixture.**
+
+### Finding a genuinely flat twin — verified against the actual predicate, not assumed
+
+Read `checkLayoutNodes` (`blocksApp.js:614-624`) first: it returns true if a twin's `uiChildren` contains ANY of
+`split_horizontal/split_vertical/grid_container/tab_group/group_box/section/sim/panel`, recursively through
+`children`/`uiChildren`. Then grepped every file in `blocks/dataOps/` for those type strings inside its OWN
+`uiChildren` construction — a static read of the same predicate the app runs, not a live app query (this act's
+own docblock says so plainly, since "verified live" would have been the stronger claim and this isn't quite
+that). Result: **every sampled twin except two** builds at least a `panel` block into `uiChildren` (WCS,
+Homing, Text, Tap, ATC Warmup, etc. all do — matching t1744's prior finding that every SAMPLED built-in is
+sectioned). Two are genuinely flat: `pauseConfirmData.js` (`user_pause_confirm` — `uiChildren: [{type:
+'param_group', ...}]`, ONE field `msg`) and `ioStepData.js` (`user_io_step`, same shape). **`user_pause_confirm`
+is the flat twin this act drives** — reachable from the real bar (`Setup ▾ → Pause / Confirm`,
+`data-optype="pause_confirm"`), so this is a real shipped op the flat branch actually serves today, not a
+fixture built to exercise otherwise-dead code. `user_corner_data` (already exercised in Additions 1/2) is the
+hasTree side — `cornerDataStack` explicitly builds `sec(...)`/`panel`/`sim` blocks.
+
+### No branch-naming surface exists — checked, not assumed, then reported per the dispatch's own instruction
+
+Grepped every reference to `hasTree` in `blocksApp.js`: it's a local `const` inside `renderLiveForm`, computed
+fresh every render, never written to the DOM or `window`. Nothing external names which branch fired. Per the
+dispatch's explicit instruction NOT to add instrumentation to make this easier, the spec instead asserts the
+strongest thing available without it: that each twin's OWN field renders on the Wizard View canvas and carries
+the value a real user just typed, via the identical real-gesture chain, for BOTH the twin that structurally
+must take `hasTree` and the twin that structurally must take flat (per `checkLayoutNodes`'s own definition,
+read above — not observed at runtime, since nothing observable exists to read). The docblock says plainly what
+this does and does not prove: it shows BOTH branches are independently reachable and correct for the
+field-render-with-value outcome via a real gesture — closing the actual gap `05e5fa44` shipped through (no spec
+drove either branch this way before) — not that an assertion here would by itself detect a future branch swap.
+
+### The spec — `tests/renderer-branch-parity-1780.spec.js`
+
+Two tests sharing one `bootAndFillReal(page, {group, optype, fieldParam, value})` helper (same click chain as
+Addition 1: bar dropdown → entry → `.fill()` → real INSERT → real Blocks tab click): Corner (`Probe` group,
+`dist` field, `741`) and Pause/Confirm (`Setup` group, `msg` field, a distinctive string). Both assert the
+Wizard View's `[data-param]` field is present AND carries the exact typed value.
+
+### Non-vacuity — the flat-twin test specifically
+
+Temporarily swapped the flat-twin test's expected value to a wrong string and re-ran: failed 3/3, with the
+actual rendered value shown in the failure message (`saw: ["DISTINCT-MSG-1780","DISTINCT-MSG-1780"]`) —
+confirming the check reads the real DOM, not a hardcoded pass. Reverted, re-ran green (Addition 1/2 already
+covers the corner-side non-vacuity pattern, so this act only re-proved the NEW half).
+
+### Verify
+
+- `tests/renderer-branch-parity-1780.spec.js` — 2/2 green.
+- Non-vacuity (flat-twin test): 3/3 fail with wrong expected value, 2/2 green after revert.
+- Node tier (`npm run test:node`): 118/118 pass.
+- No source file touched this act — gate matched the dispatch (node tier + this spec + non-vacuity, no full
+  suite).
+
+### For the advisor
+
+Both branches are now driven by a real gesture for the first time, closing the exact gap `05e5fa44` shipped
+through. One thing to flag rather than quietly assume: reading the two branches side by side (`:667`/`:731`)
+they are now byte-identical in their own calls (`setUserOpDef`/`onShow`/`refresh`/`update`/
+`makePanesCollapsible`/`applyBlkReadOnly`) — the ONE remaining difference is whether `setUserOpDef` receives
+`{...def, template:[userRoot]}` (hasTree, a LIVE canvas override) or plain `def` (flat, the registry snapshot).
+For a freshly-inserted, non-editing op (what both my tests drive) those are the same object, so this act cannot
+distinguish "the branches converged because they're supposed to" from "the branches converged because my
+gesture never reaches the one case where they'd differ" (a live canvas edit mid-authoring). That narrower case
+is worth a name if a future addition wants it — I didn't invent a fixture for it here since the dispatch scoped
+this act to reachability + field-render-with-value, which both twins now have.
