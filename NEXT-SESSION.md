@@ -2113,3 +2113,32 @@ to attribute when it bites (the user will report "it undid my change", months fr
 ⚠ Do NOT bundle it with presentation work. It wants: a deliberate stress reproduction (rapid
 clear-then-load, undo storms), the Blockly-side race named precisely, and a fix that makes a stale echo
 STRUCTURALLY unable to land rather than losing a race less often.
+
+---
+
+## 🐛 USER-REPORTED (2026-08-13) — the SIM PATH is offset in corner
+*"there's an offset in positions"* … *"the path is offset, the path in the sim."* **The PATH, not the
+markers** — the traced toolpath is displaced from where the geometry says it should be.
+
+**Evidence (screenshot, Corner (data), the real modal, desktop):** Front-Left · Y-then-X · Dogleg · WCS
+Active. The 3D DRO reads `X −2.813 · Y 40.000 · Z −5.000` (Work AND Mach identical). The 2D shows the
+stock rectangle with probe points at its corners, the Start marker BELOW-RIGHT of the stock's bottom-left,
+and the reposition square OUTSIDE the stock to its left.
+
+⚠ **THIS IS THE MONDAY FAMILY, possibly recurring:** the user reported on 2026-08-10 *"i see the problem
+it drawn outside of the stock"* / *"by exactly the WCS"* — closed then. If it is back, or never fully
+went, that matters more than the individual symptom.
+
+**THE DISCRIMINATING TEST — do this FIRST, do not chase from the picture:**
+**does the EMITTED G-CODE put the probe where the PICTURE puts it?** The program is the truth, the picture
+is the claim ([[ddcs-ground-truth-reference]]).
+- **They AGREE** → the path is correct and the drawing merely reads oddly (a corner probe legitimately
+  approaches from outside the stock). Then the question is presentation, not correctness.
+- **They DISAGREE** → the sim is rendering in a different frame from the one the program runs in. Then
+  find WHICH transform is applied twice or not at all — and note `[[probes-never-read-wcs]]`: a probe's WCS
+  is its OUTPUT, so the sim must never map a probe op THROUGH the WCS table.
+
+⚠ **SEQUENCING (user's own call, and it is right): the TESTS come first.** Every corner symptom this week
+was invisible to a green suite because the specs reach the pane through doors the user does not use. Fix a
+corner bug now and it would pass its test while possibly still being broken for them. **Do the doors work
+first, then this.** Do not drop it — a symptom the user can see is worth more than any reasoning.
