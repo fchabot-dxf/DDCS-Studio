@@ -2377,9 +2377,21 @@ declaration was simply never extended to the second population. Save-as-custom t
   knob -> PREVIEW GEOMETRY   Studio must DRAW with it; it cannot compute a shape from a reference
 ```
 
-**RULED: allow it. Where the preview genuinely cannot draw, SAY SO — do not refuse the value.** Refusing
-protects Studio's picture at the cost of the user's intent. Same honest-omission pattern as t1834's frame
-note (the workpiece is withheld AND the panel explains why).
+**RULED: allow it. And the preview SIMULATES the variable rather than giving up on it** — user's own
+correction: *"live variables are the same as simulated start position though we can simulate it"*. A
+variable's value is unknown at design time exactly like a probe's start position, and the sim already assumes
+one of those.
+
+⚠ **THE MECHANISM ALREADY EXISTS AND IS ALREADY DECLARED** — `previewVarSeed`, used today by Surfacing Skim
+for `#790-792` (`userOps.js:982`, `surfacingData.js:256`). Its contract is already the right one:
+*"PREVIEW TRACE only — never emitted, never pushed to the controller"* (`userOps.js:45`), so a simulated
+value cannot leak to the machine. This is an EXTENSION of a declared hook to authored ops, not a new feature.
+My earlier framing here ("say what it cannot draw") was the weaker answer and is superseded.
+
+**WHO SUPPLIES THE SEED for an authored wizard: the AUTHOR.** They know roughly what `#805` is on their own
+machine — and that follows directly from the scoping principle above. A variable for the EMIT, a plain number
+for the PICTURE, both declared by the person who knows. ⚠ The picture must still read as SIMULATED, not
+measured — it may be a guess, it may not be a SILENT guess.
 
 **PROPOSED SHAPE, not yet ruled:** declare token-eligibility on the ATOM, not on each binding. An atom already
 knows whether a param is geometry or a pass-through value; declaring it once there lets BOTH the built-in
