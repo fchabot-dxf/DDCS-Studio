@@ -32814,3 +32814,99 @@ user's own trade-off to make. `homingWizard.js`'s V4.1 refusal recorded as the f
 today, unchanged, needing real hardware to settle.
 
 🔨 turn 1860
+
+## turn 1862 — Option B Slice 2: consumer enumeration only, STOPPED mid-turn by amendment (zero source changes)
+
+Dispatch: implement Slice 2 (B1 positioning) of the 3-slice Option B plan — re-read the t1836 design first, and
+say plainly if anything learned since (the camera ruling, t1854-t1860) changes what Slice 2 should be, rather
+than building the pre-planned version blind. Same stop clause as Slice 1: if the consumer list is bigger than a
+handful, or any consumer depends on the current single-frame assumption, report before converting.
+
+### Consumer enumeration, done before writing a single line
+
+t1836's own §2 named three sites needing conversion from "whole-trace flag" to "per-pass lookup": the live tool
+(`gcodeViz3d.js:824`), the static route loop (`:1141-1148`), and the 2D mirror (flagged UNVERIFIED). Re-reading
+the actual code before touching anything found the real count is larger, and one of the three named sites is a
+structurally bigger job than the design assumed:
+
+1. **Live tool** (`setToolPosition`, `:824`) — already receives a `pass` parameter for an unrelated reason
+   (`passAnchorFor`). Converting is a straightforward "read `passOwners[pass]` instead of the outer flag."
+2. **Static route loop** (`:1141-1148`) — already inside a per-pass loop. Same straightforward shape.
+3. **Marker sprite positioning** (`_positionMarkers()`, `:383-394`) — a FOURTH site, not named in t1836. Already
+   loops per-marker (`for (let p = 0; p < this.spindleMarkers.length; p++)`), currently reads the whole-trace
+   flag once outside that loop. Same straightforward shape as 1-2 — but the design never enumerated it, and it
+   directly affects the idle/static picture (the marker sprites are IN the baselined screenshots), so it
+   belongs in Slice 2's own scope if 1-2 do.
+4. **2D mirror** (`toolpath2d.js`'s `machineFrame`) — checked, not left unverified. There is NO per-segment loop
+   here at all — `machineFrame` gates two whole-view computations (`startPin()`, the work-origin offset inside
+   `paint()`) with no per-item structure to hook a per-pass value into. This is a GENUINELY different, bigger
+   task than 1-3 (new structure, not a different read of an existing loop) — the design's own "flagged,
+   unverified" caveat was right to flag it; verifying it confirms it does NOT fit the same shape as the other
+   three.
+5. **DRO frame-labeling during play** (`createPreviewPanel.js:693`, inside `onPositionChange`) — a FIFTH site,
+   not named in t1836: whether the live position readout is quoted as machine-frame or work-frame reads the same
+   whole-trace `viz._toolMachineFrame`. This is a LIVE-PLAYBACK-time concern (tied to `pos.pass`, only relevant
+   while playing), not a static/idle geometric position — arguably Slice 3's own territory (B2, "per-moment"),
+   not Slice 2's (B1, "regardless of playback"). Genuinely ambiguous which slice owns it; not resolved.
+6. **`forceMachine`/`curAnchor`** (`createPreviewPanel.js:923`) — a RELATED but SEPARATE flag (route-anchor-to-
+   start, not frame-of-rendering), driven by its own host-level `forceMachine` boolean (ATC-specific), not the
+   general `toolMachineFrame` set Slice 1's `segmentFrame.js` derives from. Confirmed this is adjacent, not the
+   same concept — Slice 1's own derivation does not cover it. An explicit non-goal for Slice 2 as scoped, stated
+   so it isn't silently assumed included or silently forgotten.
+
+**Does the camera ruling change any of this?** No — checked, not just reasoned: Slice 2's own job is WHERE each
+segment's geometry is positioned; the camera ruling ("leave fit-everything, no change") concerns HOW the
+viewport frames whatever's drawn. `fitAll()`'s own `_dataBounds` reads geometry positions from the SAME per-pass
+loop Slice 2 would correct — once Corner's own geometry moves from its current (wrongly machine-frame-shifted,
+per the union at `opSimContext.js:98`) position to its correct part-frame one, `_dataBounds` picks that up for
+free, no additional wiring needed. This is a natural, intended side effect of fixing positioning, not scope
+creep — and since the camera ruling already settled "leave the fit alone," nothing about Slice 2 needs to change
+because of it either way.
+
+**Where this landed, before the amendment: five real consumers (not the ~3 the design named), one of which
+(the 2D mirror) genuinely needs new structure rather than a converted read — both explicit stop-clause triggers.
+I was about to write up and report this rather than build ahead**, when the amendments below landed.
+
+### Mid-turn amendments — absorbed, turn re-prioritized entirely
+
+Two amendments landed before any code was written (polled per protocol, at the pre-commit checkpoint — since no
+commit had happened yet, this IS that checkpoint). Both say the same underlying thing, the second superseding
+the first's own guesswork with a confirmed fact: **the user's real program had NO Homing op at all** — a single,
+completely untouched, default-params built-in Corner insert under DDCS V4.1. Both explanations built across
+t1856-t1860 (the Homing+Corner combo dwarfing the picture; the earlier start-clamp/`stats.absolute` latch, which
+needs an EARLIER op to leak an anchor into) require a program with more than one op — with exactly one op,
+neither mechanism can be theirs. **Their report is reopened, fully unexplained**, per the advisor's own words:
+"I have now presented two stories as findings today." Instructed explicitly: stop Slice 2 at a clean point,
+revert if incomplete, do not finish it, do not start the next investigation (a fresh-boot single-Corner repro
+under both the user's real V4.1 settings and a synthetic default machine) — that is reserved for the next
+dispatch.
+
+### State left behind
+
+**Zero source changes.** This turn never got past consumer enumeration — no file was edited, so there is nothing
+to revert. `git status --short` (checked below) confirms the tree is exactly as it was at turn start plus this
+WORK-LOG entry. Slice 1 (`viz/segmentFrame.js`) remains exactly as t1838 shipped it — inert, unused, unaffected.
+Slice 2 has NOT started; the consumer enumeration above is left as a work product for whenever it resumes, so
+the next attempt doesn't have to re-derive it — five real consumers, one (2D mirror) needing its own separate,
+bigger treatment, one (DRO frame-labeling) of ambiguous slice ownership, one adjacent-but-separate flag
+(`forceMachine`/`curAnchor`) explicitly out of scope.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched — nothing to break).
+- `handoff.py amendments --role worker`: 2 landed and absorbed above, at the only checkpoint this turn reached
+  (pre-commit — no commit had happened before they arrived). Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: only this WORK-LOG entry — confirmed no source files touched.
+
+### For the advisor
+
+Slice 2 did not start — consumer enumeration only, and it surfaced real findings worth keeping for whenever it
+resumes: five real consumers (not the ~3 the t1836 design named), the 2D mirror confirmed as a genuinely
+different, bigger task (no per-segment loop exists there at all, unlike the other three), and the DRO frame-
+label site's own slice ownership (2 vs 3) left unresolved rather than guessed at. The camera ruling doesn't
+change Slice 2's own scope either way — positioning and framing are orthogonal, and `fitAll()` inherits corrected
+positions for free once Slice 2 lands, whenever that is. Stopped clean per both amendments — no code changed, so
+no revert was needed. Not starting the reopened-report investigation; waiting for that dispatch.
+
+🔨 turn 1862
