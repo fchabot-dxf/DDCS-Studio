@@ -197,7 +197,11 @@ export function createToolpath2d(canvas, opts = {}) {
         if (!clean) drawPosChip(ctx);   // t746 — the position readout riding the head
         if (!clean) drawLabels(ctx, foot, step, w, h);
         if (!clean && starts.length && dv('markers')) drawStartHandles(ctx);
-        canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
+        // t1774 — sx/sy must be the DRAWN glyph position: drawStartHandles paints at markerWorld(i) (a reposition-
+        // destination pass relocates to its runtime dog-leg end), not at the raw declared start. Reporting sptx/spty
+        // of the raw `s` here disagreed with the actual pixels for any anchorsAtPrev pass, silently passing a spec
+        // that read __t2starts as "the drawn marker" — masking exactly the verification this turn needed.
+        canvas.__t2starts = starts.map((s, i) => { const w = markerWorld(i); return { i, sx: sptx(w.x), sy: spty(w.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }; });   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
         { const e = dv('envelope') ? envelopeRect() : null; canvas.__t2env = e ? { minX: e.minX, minY: e.minY, maxX: e.maxX, maxY: e.maxY } : null; }   // t652/t744 — the DRAWN envelope's MACHINE bounds (null when the registry hides it) — the marker's machine coord must fall inside
         canvas.__t2disp = { stock: dv('stock'), envelope: dv('envelope'), grid: dv('grid'), axes: dv('axes'), markers: dv('markers'), cut: dv('cut'), rapid: dv('rapid'), probe: dv('probe'), envAlpha: da('envelope'), stockAlpha: da('stock') };   // t744 — debug + tests: what the registry drew (value asserts for the 2D toggles/alphas)
         canvas.__t2cursor = cursor;   // debug + tests

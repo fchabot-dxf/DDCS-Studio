@@ -27664,3 +27664,154 @@ is now describing is the SAME wall2 `markerWorldOf` disagreement my original che
 from a different angle as they looked more closely at the picture. I'd want your read on which, or the user's
 own fresh repro, before spending more of this act's budget guessing at scenarios — per the hard boundary, I'm
 stopping here rather than either faking a red or fixing blind.
+
+## 🔨 turn 1774 (epoch 4) — FIX THE START CLAMP: the real mechanism was cross-op contamination of `stats.absolute`, not a null-start fallback
+
+### Dispatch
+
+FIX THE START CLAMP using the user's actual workspace (`.repro/user-workspace-2026-08-13.ddcs` — gitignored,
+never committed, never baked into code/tests/defaults). Reproduce with their real `workOrigin {10,-700,-100}` +
+stock + saved corner values; determine whether the t1772 36mm `markerWorldOf` gap is the same defect or
+separate; fix at the source; prove it; explain the 2026-08-10 recurrence. Mid-turn, three amendments landed:
+(1) the workspace path was corrected and the user sharpened the symptom — **"it looks like 0,0,0 but the DRO
+says it's not"** — which rules out my own t1772 candidate mechanism outright (a null-`getStartPos()` fallback
+would zero the DRO too); (2) a "widen the audit to the whole suite" item explicitly queued for AFTER this act,
+five sub-items, do not switch now; (3) a parallel read-only audit named a precise 3-file mechanism and said
+"stop searching, verify this."
+
+### Reproducing with the user's real workspace — and ruling out my own prior hypothesis
+
+Restored `.repro/user-workspace-2026-08-13.ddcs` into a running instance via `data/backup.js`'s `restoreBackup()`
+(read at runtime by a scratch spec, never committed, never copied into a tracked file). Confirmed the restore
+took: `settings.machine.workOrigin` = the real non-zero value, matches `wcs.table[0]` (`wcsActive:1`), and
+`machine.controllerId` = `"ddcs-v41"` (their real profile, confirming `restoreBackup`'s controller-retarget
+works). Opened `user_corner_data` via `ddcsEditWizardDef` (their saved corner values turned out to be byte-equal
+to `CORNER_DEFAULTS` — they never touched the corner form off its defaults, and their `stock` also matches the
+shipped default exactly; the ONLY real difference from a fresh boot is `workOrigin`).
+
+Checked `getStartPos()`, `getSimConfig().start`, `getSimConfig().wcsOffset`, and `getPassStarts()` on BOTH the
+corner wizard pane's own preview panel (`blk_userViz3dContainer`) and the Blocks-tab main preview
+(`blk-preview-panel`) — all three agreed, all correctly non-null, and `wcsOffset` correctly read
+`{10,-700,-100}`. A direct `opSimStarts('user_corner_data', ...)` call under their restored stock also never
+threw. **My t1772 candidate mechanism (`simConfig()`'s `start: st || {0,0,0}` fallback) does not reproduce
+anywhere I could drive it, even now armed with their real non-zero workOrigin — three independent surfaces,
+all clean.** This matches the amendment's own logic: a null-start collapse would zero the DRO too, and the user
+said the DRO is right.
+
+### The real mechanism (amendment 3, verified precisely, file:line)
+
+`createPreviewPanel.js:921` — `curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute)`. When
+`stats.absolute` is true, `toolpath2d.js:98`'s `passOff()` falls back to `stockPin()` (the stock's WCS-pin
+position) instead of the operator start, and `gcodeViz3d.js:1121-1122`'s 3D twin does the identical
+`{x:0,y:0,z:0}`-relative fallback via `_anchorToStart` (fed the SAME `curAnchor`). Meanwhile
+`viz/jogPendant.js:94` — `(viz.starts && viz.starts[viz.selectedStart || 0]) || {x:0,y:0,z:0}` — reads the RAW
+declared start with NO anchor logic at all. **This is exactly "the picture looks wrong, the DRO doesn't":** the
+DRO reads the correct raw value unconditionally; the DRAWING reads it only when `curAnchor` is true, and falls
+back to a position that visually reads as "the stock's origin" when it's false.
+
+`stats.absolute` itself (`GcodeExecutionEngine.js:1206`, pre-fix): `if (this.absolute && !g53) this.stats.absolute
+= true;` — **a ONE-WAY LATCH** ("did the program EVER establish an absolute position"), never reset back to
+false. Correct for a SINGLE op's own trace (a mill program stays G90 throughout). But `createPreviewPanel.js`
+feeds this SAME engine a CONCATENATED multi-op program when rendering the Blocks-tab main preview
+(`blkPanelHost`'s `getGcode: () => getProjection().text` — every op's emit joined into one trace, per
+`blocksApp.js:171`). Corner's own macro is G91 throughout (`DM('inc')` at Confirm Start; the only G90 lines are
+either `t856`'s already-excluded G53-wrap or a single bare trailing `DM('abs')` footer with no following move) —
+so corner ALONE never latches. But if ANY op earlier in the same concatenated trace does a genuine absolute move
+(a normal mill cut) — or hits the native-homing latch at line 1076, `this.stats.absolute = true;   // a homed
+axis is a fixed machine position` — the ONE-WAY latch stays true for the REST of the trace, poisoning corner's
+OWN `curAnchor` even though corner's own section is entirely incremental.
+
+**Verified live** (synthetic G-code only, no user values): traced corner's own emit alone under the user's
+restored settings → `stats.absolute: false` (correct, matches the 3 clean surfaces above). Prepended a 3-line
+synthetic absolute move (`G90\nG0 X10 Y10 Z5\nG91\n`) ahead of the SAME corner emit → `stats.absolute: true` —
+reproduced the exact contamination, using no baked user values (a bare rapid move, not anything from their file).
+
+### Fix — GcodeExecutionEngine.js:1206
+
+Changed the one-way OR-latch to reflect the mode at the LATEST real (non-G53) move:
+```js
+// before: if (this.absolute && !g53) this.stats.absolute = true;
+if (!g53) this.stats.absolute = this.absolute;
+```
+This self-heals both contamination sources (an earlier absolute move, an earlier native-homing latch) as long as
+the CURRENT op has at least one real move under its own G91 — which corner's own probe body always does (its
+first real line is a `G31` probe with a Y word, which reaches this same code path). A genuinely absolute mill op
+is unaffected: its own LAST real move is still under G90, so `stats.absolute` still reports `true` at trace end
+— no regression (the existing `toolpath2d-anchor.spec.js`'s ABSOLUTE branch confirms this, unchanged, still
+green).
+
+**Also fixed** (amendment 1's flag, "in the same act since it will mask your verification"): `toolpath2d.js:200`'s
+`canvas.__t2starts` debug/test hook reported `sptx(s.x), spty(s.y)` off the RAW `starts[i]`, but
+`drawStartHandles` (the code that actually PAINTS the glyph, line 225) paints at `markerWorld(i)` — the
+reconciled position for an `anchorsAtPrev` pass. Any spec reading `__t2starts` to assert "where the marker was
+drawn" was reading a value that disagreed with the actual pixels. Now computes `markerWorld(i)` first, same as
+the real paint call.
+
+### Did NOT touch: `createPreviewPanel.js`, `toolpath2d-anchor.spec.js`'s ABSOLUTE branch extension
+
+The wizard-pane's per-op preview (`getGcode` scoped to ONE op) never concatenates, so it was never broken by this
+— `curAnchor`'s formula itself is correct, only the flag it reads was contaminated across op boundaries. Nothing
+in `createPreviewPanel.js` needed changing. The amendment's item (5) — extending `toolpath2d-anchor.spec.js`'s
+ABSOLUTE branch (`:55`) to also assert the marker invariant, modeled on `corner-marker-parity.spec.js:45` — is
+explicitly QUEUED as part of the "widen the audit" 5-item follow-up ("do not switch now"), not this act.
+
+### Is the 36mm t1772 gap the same defect? NO — verified, not assumed
+
+Re-ran `picture-parity-1772.spec.js` after the fix: **identical result**, byte-for-byte — `user_corner_data`
+pass 1 still fails, declared `(-43,7)` vs rendered `(-43,43)`, gap `36mm`, unchanged. The anchor-contamination
+fix touches `curAnchor`/`stats.absolute` (whether the render is start-relative at all); the 36mm gap is a
+SEPARATE geometric mismatch inside `cornerSimStartsProvider`'s own chain math (`cornerData.js:149-182`): wall1's
+DECLARED/preview position (a pre-probe jog-to point) is not the same point as wall1's ACTUAL simulated
+touch-then-retract rest position (`traced.passEnds[0]`) — I measured them 36 units apart in Y under the user's
+own settings (`{7,-43}` declared vs `{7,-7}` actual pass-end). `markerWorldOf`'s reconciliation for wall2
+(`anchorsAtPrev`) anchors off the REAL rest point (physically correct — matches what the controller's own
+relative reposition move would do), while `cornerSimStartsProvider`'s STATIC preview chain anchors wall2 off the
+declared JOG point instead — two different, both-internally-consistent anchors that happen to disagree by
+however far the probe travels before touching. **This is a real, separate, still-open defect** — not fixed this
+act (it needs a static geometric model of "where does the probe actually touch + retract to," matching what the
+trace engine derives dynamically, which is a design question of its own, not a one-line latch fix). Reported,
+not silently left implied-fixed.
+
+### Why did it survive the 2026-08-10 closure? A plausible, evidenced story, not a certainty
+
+t856 already patched ONE contamination avenue: a G53-wrapped retract's OWN `G90` line self-poisoning its own op
+(the exact `g53-move-breaks-preview-start-anchor` memory entry). That fix (`&& !g53`) is real and still holds —
+verified: none of corner's own G53 wraps break its solo trace. But the STATS LATCH's fundamental shape — a
+one-way "ever absolute" flag — was never revisited, because nobody had reason to trace a CONCATENATED multi-op
+program through it before; a single-op trace never exposes the difference between "ever" and "currently." The
+Blocks-tab main preview (which DOES concatenate) is exactly the surface a real, growing 32-op program exercises
+that a fresh-boot single-op test never does — which is also why my own t1772 reproduction attempts (5 contexts,
+all single-op) never found anything: I was always testing the ONE frame this bug can't occur in.
+
+### Verify
+
+- New: `tests/gcode-absolute-latch-1774.spec.js` — 1 test, 3 assertions (solo-incremental stays false, an
+  EARLIER absolute move must not poison a LATER op's own incremental mode, a genuinely-absolute program still
+  reports absolute). Synthetic G-code only, no user values. **Non-vacuity proven**: reverted the fix in place,
+  re-ran — failed on exactly the contamination assertion (3/3 runs, `expect(false)` received `true`), restored
+  the fix from a saved copy (diffed byte-identical against the original edit), re-ran green.
+- `toolpath2d-anchor.spec.js` (both tests, unchanged) — still green, confirms no regression on the genuinely
+  single-op ANCHORED/ABSOLUTE cases.
+- `picture-parity-1772.spec.js` — still green (still correctly red on corner for the SEPARATE 36mm reason,
+  confirmed identical before/after this fix).
+- Node tier (`npm run test:node`): 118/118 pass.
+- Wider gate (shared-engine change, per the amended-tier exception): `--grep "absolute|homing|corner|anchor|
+  mill|probe"` — 511 passed, 6 skipped, 1 flaky (`homing-limit-trip.spec.js`'s first test, a `waitForFunction`
+  boot-readiness timeout under load) — re-ran that file alone: 5/5 clean, confirmed load-induced, not a
+  regression.
+- Deleted the scratch reproduction spec (read `.repro/`'s file at runtime, restored it into a live instance,
+  never committed) after extracting every finding above into this log — no personal values (workOrigin, stock,
+  corner params) appear in any committed file.
+
+### For the advisor
+
+The start-clamp is real and fixed, but it was never the mechanism either of us guessed first (my own t1772 null-
+fallback theory, or the dispatch's initial framing) — it's a one-way stats latch leaking across op boundaries in
+a concatenated multi-op trace, which is why it only ever shows up in a real, multi-op working session and never
+in a single-op fresh-boot test. The 36mm `markerWorldOf` gap is a confirmed SEPARATE, still-open defect in
+`cornerSimStartsProvider`'s own anchor math — I did not attempt a fix for it this act (it's a static-geometry
+design question, not a latch bug) and flagged it plainly rather than leaving it implied-closed. Capacity note:
+this was a large single-turn investigation (three amendments, several dead-end hypotheses ruled out with hard
+evidence before the real one). I had enough room to land the fix + regression test + wide gate cleanly, but the
+5-item "widen the audit" queue is a full act (or more) of its own — next wake should treat it as fresh, not a
+continuation.

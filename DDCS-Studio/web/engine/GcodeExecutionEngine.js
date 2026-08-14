@@ -1203,7 +1203,18 @@ export class GcodeExecutionEngine {
         // so without this guard it would set stats.absolute inside a G91 macro — exactly the t826 re-anchor collapse. A G53
         // is a machine-frame excursion, never the signal that the PROGRAM is absolute; the surrounding real (non-G53) moves
         // are. This makes the wrap stats.absolute-NEUTRAL (positions were already identical — G53 is machine-absolute regardless).
-        if (this.absolute && !g53) this.stats.absolute = true;
+        // t1774 — REFLECTS the mode at the LATEST real move, no longer a one-way OR-latch (`= true` once, forever).
+        // A one-way latch is correct for a single op's OWN trace (a mill program stays G90 the whole way), but this
+        // engine is also fed a CONCATENATED multi-op program (the Blocks-tab main preview: getProjection().text —
+        // every op's emit joined into one trace). There, an EARLIER op's genuine absolute move (a mill cut, or the
+        // native-homing latch just above) permanently poisoned every LATER op's own curAnchor/_anchorToStart, even
+        // one whose own macro is entirely G91 (e.g. corner's probe body) — the drawn path fell back to stockPin()
+        // (createPreviewPanel.js:921, toolpath2d.js:98, gcodeViz3d.js's twin) while jogPendant.js's DRO kept reading
+        // the correct raw start, producing exactly "the picture shows 0,0,0 but the DRO doesn't" (verified live:
+        // an op preceded by ANY absolute move reports stats.absolute=true even when its OWN last real move is G91).
+        // Reflecting the CURRENT mode at each real (non-G53) move self-heals this: the op's OWN closing moves are
+        // what determine its OWN anchor, matching what the controller would actually do once it reaches that op.
+        if (!g53) this.stats.absolute = this.absolute;
 
         const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
         // G53 (machine-coord positioning, e.g. the end "safe Z" park) is a RAPID, not a cut — but on DDCS it's
