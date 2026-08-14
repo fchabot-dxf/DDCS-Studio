@@ -29749,3 +29749,112 @@ did not fix, did not design a fix. The one harness does not exercise both bugs; 
 same-severity-tier, unfixed. Your call on which (or whether a shared structural answer) comes next.
 
 🔨 turn 1812
+
+## Turn 1814 — _layout: the one that IS broken today. Repro as a test first, then the fix judgment (no fix landed)
+
+### Dispatch
+
+`_activePanel`'s severity claim didn't survive t1812 — corrected, and the repro-first discipline is confirmed
+working as intended. `_layout` is now the top item: BROKEN TODAY, SILENT (the census's own traced mechanism —
+after the shared FeatureCanvas reparents, `_hit()` tests against the wrong spec, the gesture falls into pan
+instead of drag, `onDrag` never fires — no error, nothing to report, the handle just stops responding). STEP 1:
+turn the t1806 hand-repro into a REAL FAILING TEST before touching source — pane live, "Open as modal", close,
+drag a pane handle, assert the OUTCOME (a value actually changed), not an internal predicate. It should fail on
+today's code. STEP 2: fix with the SAME capture-at-call-time discipline `_formHost` used, NOT a per-surface
+context object (the advisor's own structural call). If the pattern genuinely doesn't fit — reparenting a shared
+DOM node is a different problem from re-pointing a variable — STOP AND SAY WHY rather than inventing a
+mechanism; if the honest fix is "each surface needs its own FeatureCanvas," say that and STOP, that's a bigger
+call reserved for the advisor. Also: does the reparenting affect anything besides the drag hit-test — one
+paragraph, evidence-based. Gate: node tier + the new test + touched specs.
+
+### STEP 1 — the failing test, built before any source change
+
+`tests/layout-singleton-reparent-1814.spec.js`: real Insert → Blocks tab (pane live), click `#blkOpenModal`
+("Open as modal" — the exact trigger t1806 traced), close the preview, drag the pane's own still-visible
+`reposition_pos` handle, and assert **the field's value actually changed** — not that a particular branch ran,
+not `_hit`'s return, not `_activePanel`'s identity. Ran against today's (unfixed) code: **fails 3/3**, the
+dragged value stays exactly what it was before (`before === after`) — matching the t1806 hand-repro exactly.
+This is genuine non-vacuity by construction: the test is asserting the pre-existing bug's own real symptom, not
+a contrived condition.
+
+### STEP 2 — the capture-at-call-time pattern does NOT fit; said why instead of inventing something
+
+Read `renderLayout2D` in full — it is five lines:
+
+```js
+let _layout = null;
+export function renderLayout2D(container, def, params, ...) {
+    if (!container) return null;
+    if (!_layout) _layout = new FeatureCanvas();
+    _layout.render(container, layoutSpecFromOp(container, def, params, ...));
+    return _layout;
+}
+```
+
+`_formHost`'s bug was a VALUE read too late — a module-level reference re-read at gesture time, after a later
+render had re-pointed it, fixed by capturing it once into a closure so every deferred handler stays loyal to
+what was true when its OWN render ran. `_layout`'s bug has a different shape entirely: `_layout.render(container,
+spec)` is synchronous and always correct FOR ITS OWN CALL — there is no "stale read" moment to capture around.
+The defect is that ONE stateful, mutable `FeatureCanvas` OBJECT (owning `this.container`/`this.svg`/`this.spec`/
+`this.active`/`this._tf`/`this._onTransform`, per its own constructor, read at t1810) is being asked to BE two
+logically-independent views (the modal's Layout-2D and the pane's Layout-2D) at once, and it can only ever
+represent whichever one mounted MOST RECENTLY — the previous surface's own DOM (its SVG, its still-attached
+event listeners) is left orphaned relative to the object's current internal state. Capturing "the right value at
+the right time" cannot fix a problem that isn't about timing a read; it's about one mutable instance not having
+room for two live owners.
+
+**The honest fix is that each surface needs its own `FeatureCanvas` instance, not one shared instance that
+reparents.** This matches the pattern ALREADY used correctly elsewhere in this exact codebase, confirmed at
+t1810: `createPreviewPanel(host, opts)` and `createToolpath2d(canvas, opts)` are both genuine per-call factories
+— called once per real caller, each returning independent state, never shared across surfaces. `_layout` is the
+one place `renderLayout2D` didn't get this treatment, plausibly because `renderLayout2D`/`layoutSpecFromOp` are
+bare module-level functions rather than part of a per-instance factory the way `userOpView.js`'s own state is —
+there was no natural per-instance home to hang a `FeatureCanvas` off of, so a lazy module singleton filled the
+gap instead. **Not implementing this** — it is a bigger, structural call (how many instances, keyed by what —
+by container reference in a `Map`/`WeakMap` is the shape that suggests itself, but the exact mechanism is a
+design decision, not a patch) and the dispatch reserved it for the advisor to decide, deliberately.
+
+### Does the reparenting affect anything besides the drag hit-test? Yes — evidence, not speculation
+
+`FeatureCanvas.onTransform(cb) { this._onTransform = cb; }` (`featureCanvas.js:89`) is a SINGLE-SLOT callback,
+an assignment, not a subscriber list — its own constructor comment names it "the single choke point" (line 71).
+It fires on every `_draw` (pan/zoom/fit/resize/render, `featureCanvas.js:383`). `userOpView.js`'s
+`wireAnimOverlay` (the 2D-animation-overlay wiring, `container.__animOverlay`) calls `fc.onTransform((tf) =>
+tp.setViewTransform(...))` once per container the first time its own overlay is created — but `fc` is the
+RETURN VALUE of `renderLayout2D`, i.e. the SAME shared `_layout` singleton, for both surfaces. So whichever
+surface's `wireAnimOverlay` ran most recently OWNS the one `_onTransform` slot — exactly the same "last one
+wins" shape as `_onPreviewOnlyWrite` (t1810's census, still unfixed). The consequence: after the modal's own
+"Open as modal" preview registers its own overlay, the PANE's own animation overlay (the dashed traverse/probe
+path canvas, `.fc-anim-overlay`) stops receiving re-pin updates from its OWN surface's pan/zoom/render events —
+it goes stale, or worse, receives the MODAL's transform data instead of its own if the shared instance's `_draw`
+still fires while mounted to the modal's container. This is the SAME family of bug as the drag hit-test failure
+(a single shared slot standing in for what should be per-surface state), just a second symptom of the identical
+root cause, not a separate defect.
+
+### Verify
+
+- New test (`layout-singleton-reparent-1814.spec.js`): fails 3/3 against today's code (the non-vacuity proof,
+  since the test asserts the real, pre-existing bug); `test.fail()`-tracked per the t1796 convention so the
+  suite stays green ("1 passed", one visible "x") while the finding stays visible rather than silently red or
+  silently deleted. Remove the `test.fail()` line once the real (structural) fix lands, per its own comment.
+- Node tier (`npm run test:node`): 118/118 pass — no source touched, since STEP 2 concluded a structural
+  decision was needed rather than a patch.
+- `handoff.py amendments --role worker`: none pending.
+- Process note: hit the SAME cwd-drift trap as t1812 again — caught it this time BEFORE writing (a stray `pwd`
+  check right before this WORK-LOG append showed the repo root, not `DDCS-Studio/`), re-anchored, no stray file
+  created this time.
+
+### For the advisor
+
+Confirmed as a real, failing test (not just a hand-repro) — non-vacuous by construction, since it asserts the
+actual pre-existing bug. The capture-at-call-time pattern genuinely does not fit, for the reason you anticipated
+in the dispatch: this is DOM-node/object-instance sharing, not value-read timing. The honest fix is one
+`FeatureCanvas` per surface instead of one shared and reparented — matching the pattern this codebase already
+uses correctly for `createPreviewPanel`/`createToolpath2d` — but the exact mechanism (a `Map` keyed by
+container, or restructuring `renderLayout2D` into its own per-caller factory, or something else) is a design
+call, not something I chose for you. Reparenting also silently steals the OTHER surface's animation-overlay
+re-pin callback (`_onTransform`, single-slot, "last render wins") — same root cause, second symptom, not a
+separate bug. Left the test in the suite, tracked and visible, per the established convention, rather than red
+or deleted.
+
+🔨 turn 1814
