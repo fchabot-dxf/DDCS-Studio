@@ -35625,3 +35625,101 @@ more code.
 --role worker`: none pending, epoch re-checked (4, matches).
 
 🔨 turn 1914
+
+## t1916 — STEP 1 of the one-op sequence: a multi-op .nc imports as ONE op carrying N steps
+
+### Dispatch
+
+The user ruled the import question t1914 flagged: a multi-op `.nc` (today's own accumulation-export shape)
+imports as ONE op carrying N steps — nothing discarded, no refusal, no keep-first-drop-rest. Prove losslessness
+FIRST, on a real exported multi-op program, before writing anything: every op present as a step, params intact,
+re-emitted G-code equivalent — STOP AND REPORT if it can't. Do not touch `appendIntoProgram`/`normalizeEnds`/
+`_framed` this act (step 2). Gate: node tier + the new spec + every spec touching programModel/opSchema/opSession.
+
+### The mechanism — nesting costs nothing, `blockEmitter.js` already recurses through `op`-in-`op`
+
+`blockEmitter.js:224-228`'s `op` container branch is fully generic — `(block.children||[]).forEach(c => emit(c,…))`
+— it doesn't switch on `opType`, so an `op`-typed CHILD inside another `op`'s children is already handled with
+zero special-casing. This meant "wrap N reconstructed ops as the children of ONE new wrapper op" costs nothing at
+emit time — confirmed structurally before writing anything, then proven live. `groupConsecutiveOps` (new,
+`programModel.js`) wraps any run of consecutive top-level marked ops (`makeOp('multi_step', {steps:N}, run)`); a
+run of 1 passes through unwrapped — byte-identical to today for the overwhelmingly common single-op import.
+
+### Two pre-existing bugs found and fixed en route — both would have failed the lossless proof for reasons
+### having nothing to do with the new grouping itself
+
+1. **Trailing content after the LAST marker was silently discarded — even for a single-op import.** The old
+   `importMarkedNc` skip loop ran "until the next marker (or EOF)" after reconstructing a marked op. For the
+   FINAL marker in a file there IS no next marker, so the skip ran to EOF and ate whatever followed — progend's
+   own M5/M9/retract/M30 (progstart/progend never carry a marker of their own). Confirmed live on a SINGLE
+   marked-op import: the exported file had `M30`, the reimport had none. Fixed: an op's own body is deterministic
+   from its declared params (the same forward-only premise `opFromMarker`'s own doc comment already states), so
+   the skip now consumes the op's own TRUE line count instead of guessing at "the next marker."
+2. **That count has to be MARGINAL, not isolated.** A naive `emitMapped([op]).lines.length` ignores whole-program
+   passes that inject or renumber based on what sits ALONGSIDE an op — `applyEntryWaypoint` (routes the opening
+   rapid through a declared `entry` waypoint), `uniquifyFlowLabels`, `applyToolChanges`. Found live via
+   `prog-marker-slot-812.spec.js`'s own pre-existing entry-waypoint test: an isolated count for a wall-finish op
+   carrying an `entry` sibling was one line SHORT of its true in-file span, under-skipping into the op's own final
+   label line — which then got leaf-parsed a SECOND time as a stray top-level `label` atom (a genuine duplicate,
+   caught by that test's own `emitByteIdentical` check, not a harmless recovery). Fixed: measure the op's
+   MARGINAL contribution against `items` accumulated so far (`emitMapped(items+op) − emitMapped(items)`) — the
+   same context, built in the same order, the original export saw.
+3. **A probe/snippet op can carry its own internal terminator** (corner: `GOTO2 / N2 / M30`, by original design —
+   "NO end-of-program park", no final move). When corner is the accumulation's first/only op, that IS the real
+   terminator (`appendIntoProgram`'s "first op: keep as-is" branch never runs `normalizeEnds`). When it's NOT
+   first, `normalizeEnds` already stripped it from the SOURCE TEXT at export time — but `opFromMarker`'s fresh
+   rebuild-from-params doesn't know that, so measuring it unstripped over-counts by exactly that line, eating
+   into progend's own leading content (found live: a missing M5). Fixed with `stripEndprogram` (local to
+   `programModel.js`, NOT a call into `opSession.js`'s own `normalizeEnds` — that file stays untouched per the
+   dispatch): strips an op's own internal `endprogram` BEFORE measuring, and `collapseImportTerminators` keeps
+   only the LAST one seen across the whole assembled result, wherever it ends up. Checked the inverse case
+   explicitly (corner ALONE, no other op) — an under-count there self-corrects: the unconsumed `M30` line falls
+   through to the existing marker-free leaf-parse, which reconstructs it as its own `endprogram` atom; nothing is
+   lost. Proven with a dedicated third test, not just reasoned about.
+4. **The `PROG_KEY` (xform/entry/flip) header had the identical bug**, unnoticed because no prior test exercised
+   its own trailing skip: "the header owns no body" was the comment justifying a skip-until-next-marker loop that
+   in fact owned NO body to skip — it was silently eating whatever unmarked content (progstart's own leaf lines)
+   followed it. Removed; a bare `i++` is correct.
+
+### Proof — `multi-op-import-1916.spec.js`, three tests, real gestures (mirrors t1828's own Drill+Corner pattern)
+
+1. **Real multi-op** (Drill, Corner): exactly one top-level `multi_step` op; both step opTypes and params match
+   the pre-export originals exactly; re-emitted G-code carries exactly one M30 and is code-equivalent (comments
+   aside — leaf-decoded progstart/progend don't preserve every comment verbatim, pre-existing, unrelated) to the
+   original projection.
+2. **Single marked op**: no wrapper introduced — byte-identical shape to today, confirming the common case is
+   untouched.
+3. **Standalone probe op** (corner alone): its own internal M30 survives as the sole terminator — the specific
+   case bug-3's fix depends on not regressing.
+
+**Non-vacuity**: reverted `programModel.js` to HEAD, reran all three — tests 1 and 2 fail for exactly the
+predicted reasons (no `multi_step` wrapper; the trailing M5/M9/retract/M30 all missing), test 3 passes on both
+(no bug existed in that specific scenario — a regression guard, not a bug-proof, named as such). Restored from a
+scratch backup, reran — all three green again.
+
+### A pre-existing test updated for the new (intended) shape, not silently left red
+
+`opatline-identity-1842.spec.js`'s own "OUTCOME" test asserted the flat top-level shape (`after[0].opType`,
+`after[1].opType`) the OLD `importMarkedNc` produced. Its own stated purpose — "both ops survive export+reimport
+with real params" — is fully satisfied by the new shape, just one level deeper (`multi_step.children[0/1]`).
+Updated the assertions to find the wrapper and read its steps; left the algorithm-fix claim (`findOpInStack`'s
+own identity check, t1842/t1844/t1846 — untouched this turn) exactly as documented in the test's own header
+comment, since nothing about that fix changed.
+
+### Citation shift
+
+`INV3 subscriber isolation logs, never swallows` (`console.error` in `setStack`'s own subscriber-isolation
+guard) shifted from line 269 to 347 by the new code above it. Updated `architecture-map-1698.test.mjs`. Also
+found `ARCHITECTURE.md`'s own matching citation (§3) was ALREADY stale at 236 (t1846 had shifted it to 269 and
+never updated the prose copy) — corrected to 347 with a note on both shifts, since I was touching this citation
+anyway.
+
+### Gate
+
+`npm run test:node`: 118/118. 46 specs referencing `programModel.js`/`opSchema.js`/`opSession.js`: 165 passed, 1
+flaky (`def-change-notice.spec.js` — a page-load timeout, content unrelated to import/multi-op grouping by any
+reading), re-run in isolation 3 consecutive times: clean every time, confirmed a load flake from the broad batch,
+not a regression. `proc_health.py watch`: clean. `git status` on `verification/`: no tracked baseline PNGs
+touched this turn.
+
+🔨 turn 1916

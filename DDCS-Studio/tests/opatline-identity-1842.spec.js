@@ -151,22 +151,30 @@ test('OUTCOME: export a Homing+Corner program, reimport it — BOTH ops survive 
         const text = window.ddcsSerializeWithMarkers();
         const pm = await import('/blocks/programModel.js');
         const after = pm.importMarkedNc(text);
+        // t1916 — the user's own ruling: a multi-op .nc imports as ONE op carrying N steps, not N flat top-level
+        // ops. Find the wrapper and read ITS children — the algorithm fix this test names is unchanged underneath
+        // (both ops still resolve correctly by identity, per findOpInStack's own fix); only the TOP-LEVEL shape
+        // importMarkedNc now produces changed, deliberately, per the user's own ruling.
+        const wrapper = after.find((b) => b && b.type === 'op' && b.opType === 'multi_step');
+        const steps = (wrapper && wrapper.children) || [];
         return {
             beforeCount: before.length,
             beforeTypes: before.map((b) => b.opType),
             beforeCornerDist: (before[1] && before[1].params && before[1].params.dist) || null,
-            afterCount: after.length,
-            afterTypes: after.map((b) => b.opType),
-            afterCornerDist: (after[1] && after[1].params && after[1].params.dist) || null,
+            hasWrapper: !!wrapper,
+            stepCount: steps.length,
+            stepTypes: steps.map((b) => b.opType),
+            afterCornerDist: (steps[1] && steps[1].params && steps[1].params.dist) || null,
         };
     });
 
     expect(r.beforeCount, 'sanity: the real program has 2 ops before export').toBe(2);
     // THE OUTCOME, not a marker count: BOTH ops survive the export+reimport round trip — with ONLY the
     // algorithm fix in place (homing's own raw self-wrap is back, unchanged, per t1844's own ruling).
-    expect(r.afterCount, 'BOTH ops survive export+reimport — not one silently replaced by a garbage duplicate').toBe(2);
-    expect(r.afterTypes[0], 'op 1 is still the homing twin').toBe(r.beforeTypes[0]);
-    expect(r.afterTypes[1], 'op 2 is still the corner twin — NOT lost, NOT a garbage duplicate homing op').toBe(r.beforeTypes[1]);
+    expect(r.hasWrapper, 'a multi-op import wraps into ONE multi_step op (t1916 — the user\'s own ruling)').toBe(true);
+    expect(r.stepCount, 'BOTH ops survive export+reimport, as steps — not one silently replaced by a garbage duplicate').toBe(2);
+    expect(r.stepTypes[0], 'step 1 is still the homing twin').toBe(r.beforeTypes[0]);
+    expect(r.stepTypes[1], 'step 2 is still the corner twin — NOT lost, NOT a garbage duplicate homing op').toBe(r.beforeTypes[1]);
     // AND with its real params, not empty/default ones (the actual failure mode this bug produced).
     expect(String(r.afterCornerDist), 'corner\'s own real param (dist=741) survives, not an empty/default param set').toBe(String(r.beforeCornerDist));
 });

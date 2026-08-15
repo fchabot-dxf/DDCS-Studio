@@ -409,7 +409,7 @@ relative plunge silently becomes absolute. Note the resolution shape: `_group` i
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 
 **3 · A fail-loud guard is worthless if the path carrying its throw swallows it.**
-Guard: `blocks/programModel.js:236` — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
+Guard: `blocks/programModel.js:347` (t1916 — was stale at 236, already shifted to 269 by t1846 and never updated here) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
 the guards above fired into a silent catch for their entire early life, on the only path an operator's
 paste-then-open-Blocks gesture takes.
 

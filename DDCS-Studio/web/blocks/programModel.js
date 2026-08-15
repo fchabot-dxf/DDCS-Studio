@@ -189,35 +189,123 @@ export function opFromMarker(opType, params) {
     return makeOp(opType, params, _builderAtoms(opType, params));   // _builderAtoms unwraps a self-wrapping builder (homing)
 }
 
+// t1916 — strip every `endprogram` found anywhere under `node` (recursing into `.children`), returning the LAST
+// one found (or null). A probe/snippet-style op (corner, found live: it carries its own `endprogram` M30 as part
+// of its own success/error convergence, by original design — WORK-LOG: "NO end-of-program park... GOTO2, N2,
+// M30, no final move") is free to declare its own terminator when it is the WHOLE program. Shared by two call
+// sites below: PER-OP (so a reconstructed op's measured line count matches its TRUE in-file footprint — see the
+// import loop's own comment) and over the WHOLE imported result (so only one terminator survives program-wide).
+// This is the same problem opSession.js's own `normalizeEnds` solves for the accumulation path — a local twin,
+// not a shared call, because that file is step 2's own scope and stays untouched this act.
+function stripEndprogram(node) {
+    let end = null;
+    const strip = (arr) => {
+        const out = [];
+        for (const b of (arr || [])) {
+            if (b && b.type === 'endprogram') { end = b; continue; }
+            if (b && b.children) b.children = strip(b.children);
+            out.push(b);
+        }
+        return out;
+    };
+    if (Array.isArray(node)) return { cleaned: strip(node), end };
+    if (node && node.children) node.children = strip(node.children);
+    return { cleaned: node, end };
+}
+
+/** Collapse to a SINGLE program terminator across the imported items — keeping only the LAST `endprogram` seen
+ *  (progend's own, since it is physically last in a well-formed export) and re-appending it at the very end. */
+function collapseImportTerminators(items) {
+    const { cleaned, end } = stripEndprogram(items);
+    if (end) cleaned.push(end);
+    return cleaned;
+}
+
+// t1916 — GROUP consecutive top-level marked ops into ONE `multi_step` op whose children are those steps.
+// The user's own ruling: a program is always exactly one op; a multi-op .nc (today's own accumulation export)
+// imports as ONE op carrying N steps — nothing discarded, no refusal, no keep-first-drop-rest. Each step keeps
+// its OWN id/opType/params/children verbatim (only its POSITION changes, one level deeper) — blockEmitter's `op`
+// container is already transparent and already recurses into an `op`-typed child with zero special-casing
+// (blockEmitter.js:224-228), so nesting costs nothing at emit time: byte-identical G-code, proven in
+// multi-op-import-1916.spec.js. A run of length 1 is returned unwrapped — byte-identical to today for the
+// (overwhelmingly common) single-op import, no new wrapper introduced where none is needed.
+function groupConsecutiveOps(items) {
+    const out = [];
+    let run = [];
+    const flush = () => {
+        if (run.length > 1) out.push(makeOp('multi_step', { steps: run.length }, run));
+        else if (run.length === 1) out.push(run[0]);
+        run = [];
+    };
+    for (const b of items) {
+        if (b && b.type === 'op') run.push(b); else { flush(); out.push(b); }
+    }
+    flush();
+    return out;
+}
+
 /** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
- *  reconstructed from BUILDERS and its file body (up to the next marker) is consumed; marker-free spans are
- *  leaf-parsed (the sanctioned declaration path). A marker-free .nc → pure leaf parse, exactly as today. */
+ *  reconstructed from BUILDERS; marker-free spans are leaf-parsed (the sanctioned declaration path). A
+ *  marker-free .nc → pure leaf parse, exactly as today. Consecutive marked ops group into one `multi_step` op
+ *  (t1916 — see groupConsecutiveOps).
+ *
+ *  t1916 — FIXED: skipping "until the next marker" silently discarded whatever text followed the LAST marker in
+ *  the file (progend's own M5/M9/retract/M30 — progstart/progend never carry a marker of their own) because there
+ *  IS no next marker to stop at; the skip ran to EOF and ate it. Confirmed live: even a SINGLE marked-op import
+ *  lost its own trailing M30. An op's own body is deterministic from its declared params (forward-only, the same
+ *  premise `opFromMarker`'s own doc comment states), so the skip now consumes exactly that many lines instead of
+ *  guessing at "the next marker" — but the count must be MARGINAL (emitMapped(items+op) − emitMapped(items)), not
+ *  ISOLATED (emitMapped([op]) alone): whole-program passes (`applyEntryWaypoint` routing the opening rapid through
+ *  a declared entry waypoint, `uniquifyFlowLabels` renumbering around labels already used, `applyToolChanges`
+ *  reading prior op ranges…) can inject or renumber lines based on what already sits alongside an op, and an
+ *  isolated re-emit sees none of that context. Found live: an isolated count for a wall-finish op that carries an
+ *  `entry` sibling was one line SHORT of its true in-file span (missing the injected rapid) — the under-count left
+ *  the op's own final label line unconsumed, which then got leaf-parsed a SECOND time as a stray top-level `label`
+ *  atom (a real duplicate, not a harmless recovery — `emitByteIdentical` caught it). `items` accumulated so far is
+ *  the SAME context, built in the SAME order, the original export saw — measuring the op's MARGINAL contribution
+ *  against it reproduces those whole-program effects instead of guessing around them.
+ *  Separately: a probe/snippet op's own internal `endprogram` (corner's own M30, see `stripEndprogram`'s comment)
+ *  is ALREADY gone from the SOURCE TEXT whenever `normalizeEnds` stripped it at the original insert/export time
+ *  (any op that wasn't the program's first) — but `opFromMarker`'s fresh rebuild-from-params doesn't know that, so
+ *  its own line count would be one LONGER than the op's true in-file span without stripping it first too (measured:
+ *  corner's own count ate progend's own leading M5 before this was added). Stripped BEFORE measuring so the count
+ *  matches the source text either way; `collapseImportTerminators` below independently finds and keeps whichever
+ *  `endprogram` is genuinely last once the whole import is assembled — the two don't need to agree on which one
+ *  "is" the real terminator, only that exactly one survives, wherever it ends up.
+ *  The PROG_KEY (xform/entry/flip) header owns no body at all (progMarkerLine emits it BEFORE the per-line loop,
+ *  nothing of its own follows) — its own "skip until next marker" was the identical bug: it doesn't skip its OWN
+ *  content (it has none), it was accidentally eating whatever unmarked content follows it (progstart's own leaf
+ *  lines). Removed; a bare `i++` is correct. */
 export function importMarkedNc(text, opts) {
     const lines = String(text).split('\n');
     const o = opts || dialectOpts();
-    const stack = [];
+    const items = [];
     let i = 0;
     while (i < lines.length) {
         if (isMarker(lines[i])) {
             const rec = parseMarker(lines[i]);
             if (rec && rec.opType === PROG_KEY) {                                // t812 — the program-level slot: restore the xform / entry siblings (opFromMarker would drop a non-builder type)
-                stack.push(...progBlocksFromMarker(rec.params || {}));
-                i++;
-                while (i < lines.length && !isMarker(lines[i])) i++;             // the header owns no body
+                items.push(...progBlocksFromMarker(rec.params || {}));
+                i++;                                                             // the header owns no body — nothing to skip past
             } else {
-                const op = rec && opFromMarker(rec.opType, rec.params);
-                if (op) stack.push(op);
+                let op = rec && opFromMarker(rec.opType, rec.params);
                 i++;
-                while (i < lines.length && !isMarker(lines[i])) i++;             // consume the declared op's body
+                if (op) {
+                    op = stripEndprogram(op).cleaned;                            // match the SOURCE TEXT's own footprint (see doc comment)
+                    const before = emitMapped(items, o).lines.length;            // MARGINAL, not isolated (see doc comment) — a whole-
+                    items.push(op);                                             // program pass (applyEntryWaypoint, uniquifyFlowLabels,
+                    const n = emitMapped(items, o).lines.length - before;        // applyToolChanges…) can inject/renumber based on what
+                    for (let k = 0; k < n && i < lines.length; k++) i++;         // already sits alongside this op — `items` so far IS that
+                }                                                                // same context, in the same order the export saw it.
             }
         } else {
             const seg = [];
             while (i < lines.length && !isMarker(lines[i])) { seg.push(lines[i]); i++; }
             let leaf; try { leaf = parseGcodeToStack(seg.join('\n'), o); } catch (_) { leaf = null; }
-            if (Array.isArray(leaf)) stack.push(...leaf);
+            if (Array.isArray(leaf)) items.push(...leaf);
         }
     }
-    return stack;
+    return collapseImportTerminators(groupConsecutiveOps(items));
 }
 // ── N2: def-change → rebuild TRANSPARENCY (import-time detect, a LOOKUP not a diff) ──────────────────────────
 /** Scan a marked .nc for ops whose stamped def-version is BEHIND the current registered def → they were built with
