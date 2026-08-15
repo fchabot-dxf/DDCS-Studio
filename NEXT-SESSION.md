@@ -2543,3 +2543,80 @@ not simply "bolder".
 
 ⚠ Re-verify at TRUE render size with the 4x DPI capture t1911 already used, and re-check the group icon
 against Mill + Custom. Show the picture, do not describe it.
+
+# ═══ ADVISOR HANDOVER — live state as of turn 1927 (2026-08-15) ═══
+
+Written so a FRESH ADVISOR can take the seat without re-deriving anything. Everything below is either
+IN FLIGHT or DECIDED-BUT-UNBUILT. Completed work is in the release commits and WORK-LOG.
+
+## ⚠ IN FLIGHT RIGHT NOW — turn 1928, worker holds the ball
+**Fixing the advisor's OWN regression from t1920.** Step 2 deleted the accumulation machinery and broke four
+features that legitimately need to ADDRESS several operations individually:
+`flow-labels-unique-1408` (a regression guard on a REAL shipped bug — drill+surfacing colliding flow labels,
+silently skipping the 2nd operation — treat as the most important) · `setup-sheet-850` (the printable job
+sheet: 3 operations, 3 DIFFERENT tools) · `time-estimate-844` (per-operation time split) ·
+`editor-sim-real-insert` (per-instance sim hints).
+
+**The fix is small and already diagnosed (t1922, proven live):** `ddcsLinesForOp` ALREADY resolves correctly
+for an operation nested in a `multi_step` (74+25=99, exact split — it checks ancestry MEMBERSHIP at any
+depth). `secondsForLines` is hierarchy-agnostic. **Only the SHALLOW ENUMERATION those four share is broken** —
+it does not flatten a `multi_step` wrapper's children. One enumeration, not four patches.
+
+## ⚠ STEP 2 IS COMMITTED BUT NOT RELEASED — do not release until the above is green.
+
+## THE ONE-OP SEQUENCE — user-ruled, 2 of 3 done
+1. ✅ **Import** — a multi-op `.nc` imports as ONE operation carrying N steps (shipped V2026.08.15.10).
+2. ✅ **Delete accumulation** — committed (30a95c2b), NOT released, regression above outstanding.
+3. ○ **Replace-on-insert** — insert REPLACES the canvas, with a **REFUSABLE notice BEFORE** the destruction.
+   NOT STARTED. `multi_step` is now judged **retirable** (t1926) if `operation` is the one word at every
+   depth — that decision belongs to step 3's authoring UI.
+
+## THE VOCABULARY RENAME — user-ruled, 1 of 4 slices done
+**Industry words win:** PROGRAM = the file you run, one per canvas. OPERATION = face/drill/bore, several per
+program, each with its own tool. The code's `step` IS the industry's `operation`; the code's op-container IS
+the `program`.
+- ✅ **Slice 1 — strings** (f9900ab2): 28 files, every user-facing + internal string literal.
+- ○ **Slice 2 — internal identifiers**
+- ○ **Slice 3 — `.opType`** (203 occurrences / 32 files — largest)
+- ○ **Slice 4 — `type:'op'`** (58 occurrences — RISKIEST: shares blockEmitter's dispatch branch, **must land
+  in the same commit as its own check**)
+
+**RULED (advisor, t1926):** the `@DDCS` marker JSON key **DOES change** — a marker lives inside a `( … )`
+comment, so the machine never reads it; it is Studio talking to itself. **Not yet acted on — its own slice.**
+⚠ **The proof obligation for every slice: MACHINE-RELEVANT LINES BYTE-IDENTICAL; the marker comment is the
+one expected diff and must be called out, never absorbed silently into a fixture.** If a slice changes a line
+the controller would execute, it is not a rename and it stops.
+⚠ No shim, no migration, no dual reading — no install base (user ruling: *"i can do new ones, there is no
+production yet"*).
+
+## KNOWN-CHRONIC GATE FLAKES — do NOT chase these as regressions
+They fail under full-suite load and pass in isolation, every time. Four were root-caused and fixed this
+session (four DIFFERENT causes; no fix transferred). Remaining recurring names: `open-as-modal-1625`,
+`middle-superset`, `probe-input-select-revival-1888`, `pane-visual-host-programmatic-1762`,
+`cam-slot-edit-s3`, `formfield-*`, `group-auto`, `group-gesture`. **Always isolate before believing a red.**
+
+## OPEN, NAMED, NOT STARTED
+- **CAM slot composition has the SAME multi-op bug class one level down** — `slotPack.js:92-99` names it in
+  its own comment as *"the shipped multi-op + sub-stack bug"*, already patched independently. Still open.
+- `segment-frame-derivation`'s `opAtLine` multi-op logic has no live-gesture path and does not work on
+  `multi_step`'s nested children (flagged t1920).
+- 5 frozen-template rows are safe **by absence of a dialect branch today**, not future-proof · 2 latent
+  value-freeze risks.
+- `homingWizard`'s blanket V4.1 refusal is an over-broad proxy — needs real hardware to settle.
+- The `M30` playback halt is CORRECT (user-ruled) but **SILENT** — saying *"stopped — program end"* is honest
+  and does not reopen multi-op playback.
+- Captured feature rulings, not started: **Wizard View form goes LIVE** · **custom wizards accept `#`
+  variables** (preview SIMULATES them via the existing `previewVarSeed` hook) · **token-eligibility declared
+  on the ATOM** · **let the user supply their own tool-table register**.
+
+## ⚠ PROCESS FACTS A FRESH SEAT WOULD OTHERWISE RE-LEARN THE HARD WAY
+- **The worker's waiter was not auto-waking** — the human prodded it by hand for several turns. Amended
+  (t1920) to arm as ONE self-looping command with no shell background marker. **Verify it wakes on its own.**
+- **Both roles were running skill copies loaded at session start**, missing rules added mid-session. **Reload
+  the skill before trusting it.** Four rules were added to the advisor skill today, including the one naming
+  the stall trigger.
+- **The user views the app in VS Code LIVE PREVIEW**, which serves stale modules and does not respond to a
+  hard refresh. Live Server (:5500) is correct. Ask *"does it look right in a real browser?"* before
+  dispatching any unreproducible visual symptom.
+- **The user's machine is V4.1** (their workspace confirms it), and **V4.1 + V3/DM500 are arguably MORE common
+  than Expert** — while every spec runs Expert. A V4.1/V3-only defect is an ESCALATION, not an edge case.
