@@ -36767,3 +36767,164 @@ one comment fix + its one citation update. Only `WORK-LOG.md`, `ARCHITECTURE.md`
 in `wizardManager.js` changed — every other source file untouched, confirmed by `git status`.
 
 🔨 turn 1932
+
+
+## 🔨 turn 1934 — DESIGN: the add-operation gesture (plan only, the fork written, not resolved)
+
+### Dispatch
+Design, not build — the advisor's own release gate is still running. The gap named plainly: import can CREATE
+a multi-operation program; nothing can GROW one. Five questions, and the user has NOT ruled on any of them —
+write the fork, don't resolve it. This is also the concrete moment t1926 parked: is `multi_step` retirable if
+"operation" becomes the one word at every depth?
+
+### (1) Where does an added operation go — promote, always-wrap, or retire the wrapper? Three real options
+
+Checked the exact machinery before designing around it, not assumed: `groupConsecutiveOps` (`programModel.js:257`)
+and `collapseImportTerminators` (`:243`) are **not currently exported** — private to `programModel.js`, called
+only from inside `importMarkedNc`. Reusing them for a live gesture is a small, real API-surface change (export
+two functions), not something already callable for free — stated precisely so the cost isn't understated.
+
+**Option A — PROMOTE on the second operation.** A one-op canvas stays bare (today's shape, unchanged) until a
+second operation is added, at which point the two are wrapped into one `multi_step`. Concretely: reuse
+`groupConsecutiveOps([currentOp, newOp])` — the SAME function import already trusts, now exported and called
+from the Add gesture instead of only from `importMarkedNc`. Its own doc comment already states the exact
+invariant this option wants: *"A run of length 1 is returned unwrapped... no new wrapper introduced where none
+is needed."* Then `collapseImportTerminators` (also exported) collapses the pair's two terminators into one, the
+same way it already does for an imported multi-op file. **Cost:** the top-level shape changes at the moment of
+the 2nd op — anything reading `ddcsGetBlockProgram()[0]` and assuming it's always the real op (not a wrapper)
+needs to already route through `flattenOps`, or gains a bug at exactly that transition. Traced: every currently-
+shallow consumer that DOESN'T yet use `flattenOps` (`opAtLine`'s own top-level match, `opContextMenu`'s fallback
+label, `wizardManager.js`'s `editingOpId` lookup, `collectOps`) already had this exposure the moment `importMarkedNc`
+could produce a wrapper — Add doesn't introduce a NEW class of exposure, it makes an EXISTING one reachable by a
+second, more common door.
+
+**Option B — ALWAYS wrap, from the very first operation.** Every fresh program is a `multi_step{steps:1}` from
+insert #1, so growing to 2 never changes the top-level shape — the wrapper is just always there. **Cost:**
+large. EVERY shallow `.filter(b.type==='op')`/`.find(b.id===X)` site anywhere in the codebase — not just the 5
+t1928 already found and fixed, but the WHOLE surface t1932 explicitly declined to widen (`opSession.js`'s own
+id-based edit/delete/duplicate lookups, `wizardManager.js`'s `editingOpId` resolution, `opContextMenu`) — would
+need the SAME fix, immediately, for the single-op case that is by far the most common program shape in the app
+today. This is not "the same small fix, generalized" — it's re-running t1928's own sweep against a much larger,
+now-mandatory surface, to buy uniformity the common case doesn't need.
+
+**Option C — RETIRE `multi_step` entirely; the program IS the flat list.** No wrapper, ever — a program holding
+N operations is N top-level `type:'op'` siblings, directly, the same shape a pre-t1920 accumulated program had.
+This is the literal t1926 parking note, taken to its conclusion: if "operation" is the one word at every depth,
+there is no depth left to distinguish. **Cost:** this REOPENS exactly what t1920 closed — the t1828/t1830 label/
+terminator-collision bug class `normalizeEnds`/`maxLabelNum`/`offsetLabels` existed to prevent, and that
+machinery is deleted, not parked. A live "no wrapper" model would need the SAME safe-composition logic
+`importMarkedNc` already has (`groupConsecutiveOps`'s own label-safety + `collapseImportTerminators`) but applied
+to keep operations UNWRAPPED as flat siblings instead of nested children — a real, if small, divergence from the
+existing, proven import path, not a reuse of it as directly as Option A's.
+
+**Recommendation, not a ruling:** Option A. It is the only one of the three that REUSES existing, proven
+machinery verbatim (Option C needs a variant of it; Option B needs none of it but pays for uniformity nothing
+requires) and its blast radius is exactly the surface t1932 ALREADY enumerated and priced (`collectOps` +
+`opAtLine`'s nested-descent gap) — no new exposure class, just a second door to an already-known one. Option C
+is the philosophically cleanest per t1926's own framing and deserves to be named as a real option, not a straw
+man, but its cost is a re-derivation of import's own safety logic that Option A gets for the price of two
+`export` keywords.
+
+### (2) When it drops back to one — ONE rule, both directions
+
+Named plainly per the dispatch's own instruction ("state ONE rule," not "pick a default and hope"): **the
+wrapper exists if and only if the program holds 2 or more operations — checked and enforced on every mutation
+that changes the count, both growing and shrinking.** Concretely: deleting a step out of a `multi_step` down to
+1 remaining child re-runs the SAME `groupConsecutiveOps`-shaped decision on what remains (1 → unwrap to the bare
+op directly; ≥2 → stays wrapped) — the identical function Option A's own Add gesture already calls, not a
+mirror-image rule hand-rolled at the delete call site. This is deterministic and symmetric: the user never sees
+an "empty-handed" `multi_step{steps:1}` sitting around after a delete (which WOULD be the "appears and
+disappears unpredictably" hazard the dispatch warns about — a wrapper whose own displayed count doesn't match
+its declared reason for existing). The alternative — keep the wrapper once created, even at 1 — trades that
+symmetry for permanence, at the cost of Option B's own wider blast radius creeping back in through every
+subsequent delete-to-one. Named as the real alternative, not hidden; the stated rule above is the recommendation.
+
+### (3) The gesture itself — three sketches, one recommended
+
+Current real markup (`index.html:1154-1157`), unchanged today:
+```
+┌──────────────────────────────┐
+│  [ CANCEL ]     [ INSERT ]   │
+└──────────────────────────────┘
+```
+
+**Option 1 — extend t1930's own notice, don't invent a new one.** The destructive-load dialog t1930 already
+designed (Cancel / Replace) gains a third choice, ONLY shown when the canvas is non-empty (t1930's own silent-
+pass condition is unchanged — an empty canvas still inserts with zero dialog):
+```
+┌───────────────────────────────────────────────────────┐
+│  Insert this operation?                                │
+│                                                          │
+│  Your canvas already has: Facing (1 operation)          │
+│                                                          │
+│  [ + Add as a 2nd operation ]   [ ↺ Replace it ]        │
+│                        [ Cancel ]                        │
+└───────────────────────────────────────────────────────┘
+```
+**Option 2 — a permanent second button on the wizard footer**, decided before the dialog even opens:
+```
+┌────────────────────────────────────────────┐
+│  [ CANCEL ]   [ + ADD ]   [ INSERT ]        │
+└────────────────────────────────────────────┘
+```
+**Option 3 — a mode toggle beside Insert**, remembered per-session (last choice sticks):
+```
+┌────────────────────────────────────────────┐
+│  [ CANCEL ]     Insert as: (●Replace ○Add)  │
+│                              [ INSERT ]     │
+└────────────────────────────────────────────┘
+```
+
+**Recommendation: Option 1.** It reuses the ONE seam t1930 already designed and costs zero new permanent UI —
+Options 2 and 3 both put a control on EVERY wizard footer, EVERY time, including the overwhelmingly common case
+(empty canvas, nothing to add to or replace) where it means nothing and there is nothing to decide; Option 1's
+whole point is that it only ever appears at the moment a real choice exists, which is also exactly when t1930's
+own notice was already going to appear anyway — one dialog, one extra button on it, not a second permanent
+control surface. Presented as real options per the dispatch's own instruction, not offered alone.
+
+### (4) The cost to the four features t1928 just fixed
+
+None, for three of the four — restated plainly, not assumed: `setupSheet.js` (via `flattenOps`), the two
+`gcodePreviewTab.js` sites (`gpStartHints`, `editorOpTypes`/`getOps`), `blocksApp.js`'s
+`applyProgramIntent`, and `envelopeCheck.js` all already flatten through a `multi_step` wrapper regardless of
+HOW it was created — `blockEmitter.js:224-228`'s own transparent op-in-op recursion (verified by the advisor
+directly) means emit needs nothing new either. A live-Add-produced wrapper is byte-for-byte the same shape as
+an import-produced one; every already-fixed consumer is origin-blind by construction.
+
+The ONE real cost is `collectOps` — t1932's own over-deep twin, proven REACHABLE via manual Blocks-tab dragging
+already, independent of whether Add ships. Add does not, on its own design, increase `collectOps`'s reachability
+further (the wizard-bar Insert/Add gesture commits at the TOP LEVEL of the program, never inside a nested
+`setup` container — those are built separately, in the Blocks tab). But shipping a SECOND live door to a
+`multi_step`-holding program (Add, alongside import) raises the ODDS a real user encounters the already-known
+phantom-row bug in ordinary use, not just via a deliberate drag. Recommend `collectOps` gets its own fix
+(mirror `flattenOps`'s own substitute-not-both rule) BEFORE or ALONGSIDE Add ships, not left for whenever it's
+next noticed — not designed here, named as a prerequisite.
+
+### (5) Order and reordering — explicitly out of scope for this design, and a candidate answer named, not assumed
+
+Stated plainly, per the dispatch's own instruction not to silently assume: **this design, as scoped (Option A +
+Option 1), is append-only.** `groupConsecutiveOps` preserves input order; a plain "Add" pushes the new operation
+onto the end of whatever's already there. Nothing here proposes a reorder control, and reordering a REAL job
+(face, then drill, then contour, with tool changes between) is a genuinely separate capability this plan does
+not design.
+
+One candidate answer worth naming rather than treating as unsolved: once a `multi_step`'s children are real
+Blockly blocks in the Blocks tab (the same mechanism t1932 traced for `setup`), Blockly's OWN default drag
+engine already lets a user reorder sibling blocks within one C-block's statement chain — no new code, a base
+capability every block chain gets for free. So a `multi_step`'s own steps may ALREADY be manually reorderable
+today, in the Blocks tab, for anyone who currently gets one via import — untested this turn (no browser
+allowed), named as a candidate to VERIFY before assuming reorder needs its own design work, not asserted as
+confirmed. Whether a STUDIO-tab (non-Blocks) reorder affordance is also wanted is the open question to take to
+the human, not decided here.
+
+### Explicitly not done, per the dispatch's own instructions
+No code, no specs, no suite run. No ruling made on the human's own fork (Option A/B/C for the wrapper question,
+Option 1/2/3 for the gesture) — recommendations given with reasoning, per the dispatch's own "if one is clearly
+right, say which and why," but the choice is named as the human's, not resolved here. No slice 2 of the rename.
+
+### Gate
+Read-only greps + verification of exact function signatures/exports cited (`groupConsecutiveOps`,
+`collapseImportTerminators` confirmed private; `blockEmitter.js:224-228` confirmed as described). No source
+files touched — `git status` clean on every tracked file except `WORK-LOG.md`.
+
+🔨 turn 1934
