@@ -2804,3 +2804,45 @@ user's work with NO warning today:
 ⚠ Use `npm run test:e2e -- --grep "<name>"`; bare `npx playwright test <file>` is broken here.
 ⚠ No new affordances beyond the notice: no "save first" button, no undo UI, nothing unasked.
 ⚠ DO NOT start slice 2 of the rename.
+
+# ═══ t1940 — THE ADD MECHANISM (data level, no UI) + the wording defect ═══
+
+t1938 accepted. Three things beyond the ask: you found a **4th** `loadProject` caller my dispatch miscounted
+(`projectModal.js:194` via `openMacroText`); you put the guard INSIDE `loadProject` instead of at 4 call sites,
+which is the better answer to my own "one guard beats three"; and you **proved non-vacuity by reverting the
+guard and watching the test fail** rather than asserting the test was meaningful. That last one is the
+difference between a test and a decoration.
+
+## ⚠ FIRST — A WORDING DEFECT IN WHAT YOU JUST SHIPPED. Fix before anything else.
+All three new dialogs say *"replaces your current **operation**"* while one title says *"Open this
+**program**?"* — two words for one thing, inside a single dialog, in the week we ruled the vocabulary.
+**And the body text is factually wrong:** what is replaced is the whole PROGRAM. Import a face+drill+bore job
+and the dialog claims ONE operation is at risk while THREE are destroyed. Fix all three to **program**
+(`commandDeck.js`, `programFile.js`, `editorManager.js`) and check the seam's own default string too.
+
+## THEN — THE ADD MECHANISM, DATA LEVEL ONLY. NO UI, NO DIALOG, NO BUTTON.
+The human ruled Add-to-program. This turn builds only the mechanism underneath it, so the UI turn that follows
+is pure wiring onto something already proven.
+
+1. **A DECLARED `addOperation(program, incoming)`** in `programModel.js`, beside `flattenOps`. Promote-on-2nd
+   (Option A): a program holding ONE operation and no wrapper becomes a wrapper holding BOTH; a program already
+   holding a wrapper appends into it. Reuse `groupConsecutiveOps` / `collapseImportTerminators` — you noted both
+   are **private**; export them rather than duplicating their logic.
+2. **THE SYMMETRIC RULE, ONE FUNCTION, BOTH DIRECTIONS:** wrapper iff `count >= 2`. Removing back down to one
+   collapses the wrapper. **The same function decides growing and shrinking** — no hand-rolled mirror at delete.
+3. **⭐ THE ASSERTION THAT MATTERS — AN EQUIVALENCE BRIDGE, NOT A SHAPE CHECK.** `addOperation(A, B)` must emit
+   **BYTE-IDENTICAL G-code** to importing a file containing A then B. The import path is already proven
+   (`multi-op-import-1916.spec.js`) — bridge to it. A test that only asserts the tree shape would pass while the
+   emitted program was wrong.
+4. **ASSERT WHAT THE USER GETS:** after adding a 2nd operation, the setup sheet lists 2 operations with their
+   own tools, the time estimate splits 2 ways and sums to the total, and both bodies appear in the G-code.
+5. **🛑 STOP CONDITION — the single-operation case is the overwhelmingly common one.** If ANY of this changes
+   the emitted G-code for a one-operation program, **stop and tell me** rather than adjusting a fixture.
+
+⚠ **NO UI THIS TURN.** No dialog, no third button, no wizard-bar change. `wizardManager.js:512` stays untouched
+— it lands next turn wiring onto this.
+⚠ **QUEUED, do not do now:** the marker-FREE raw-text fallback door you named in `commandDeck.js` (same onload
+handler, reflects through the editor's debounced sync). It IS a real door — same loss, different mechanism —
+and it gets its own turn. Good call surfacing it instead of quietly widening scope.
+⚠ Gate: your new specs + the 4 t1928 features by name + the node tier. NOT the full suite.
+⚠ DO NOT start slice 2 of the rename.
