@@ -145,6 +145,15 @@ window.loadGcodeFile = function loadGcodeFile() {
                         const { importMarkedNc, staleMarkedOps, defChangeSummary } = await import('../blocks/programModel.js');
                         const stack = importMarkedNc(text);
                         if (stack && stack.length) {
+                            // t1938 — the ONE destructive-load seam: loading this file replaces whatever's on the
+                            // canvas now. Cancel leaves the editor untouched (the raw-load fallback below never runs).
+                            const { confirmDestructiveLoad } = await import('../blocks/saveStates.js');
+                            const proceed = await confirmDestructiveLoad(stack, {
+                                what: f.name, label: 'before open',
+                                message: `Loading "${f.name}" replaces your current operation — it's saved to Undo, or Cancel to keep it.`,
+                                title: 'Load this file?', okLabel: 'Load (replace)',
+                            });
+                            if (!proceed) return;
                             window.ddcsLoadBlockStack(stack);
                             // N2 — TRANSPARENCY: ops built with an older wizard version were regenerated from the current
                             // builder on import (forward-only). Tell the operator once, naming the op(s) + version jump.

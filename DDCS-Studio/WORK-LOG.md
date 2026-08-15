@@ -37012,3 +37012,92 @@ one-line fix, no full suite (the advisor's own gate is running it). `git status`
 tracked file before committing.
 
 🔨 turn 1936
+
+
+## 🔨 turn 1938 — CLOSE THE THREE SILENT DOORS: routed, not reinvented
+
+### Dispatch
+Route the three doors that destroy the user's work with no warning — `.nc` file import (`commandDeck.js:148`),
+open a saved project (`programFile.js`'s `loadProject`, 3+ UI callers), the editor Clear button
+(`editorManager.js:165`) — through the ONE seam that already exists (`saveStates.js:66`
+`confirmDestructiveLoad`), never a second one. The message becomes a parameter of the seam. Prove Cancel leaves
+the program byte-identical (the G-code, not a flag) and the surface untouched; prove Proceed is Undo-recoverable.
+Do NOT touch the wizard-bar Insert door — it gets its own 3-way dialog next turn, with Add.
+
+### (1) The seam, parameterized — one function, every caller's own wording
+
+`confirmDestructiveLoad`'s hard-coded "Opening X in Blocks replaces the program in the editor" template is now
+the DEFAULT, overridable via `opts.message`/`title`/`okLabel`/`cancelLabel`. A caller passing none of these
+(`devMode.js`'s two existing calls) gets byte-identical behavior to before this turn — confirmed by re-running
+`blocks-load-guard-s41.spec.js` unchanged, still green. Every new caller supplies its own machinist-worded
+message, per t1930's own proposed shape, e.g. the Clear door: *"Clearing replaces your current operation with a
+blank canvas — it's saved to Undo, or Cancel to keep it."*
+
+### (2) `loadProject` — the guard moved INSIDE it, and it's not 3 callers, it's 4
+
+Traced every real caller before deciding where the guard belongs, per the dispatch's own instruction. Found
+FOUR, not the three named — `libraryModal.js:123`, `projectModal.js:112`, `projectModal.js:213`, plus a fourth
+the dispatch's own count didn't reach: `projectModal.js:194`'s `onImportFile` (a raw `<input type=file>`
+`FileReader.onload`), which calls `openMacroText(text)` → `loadProject(JSON.parse(text))`. Put the guard INSIDE
+`loadProject` itself (now `async`, returns the loaded object on success or `null` on Cancel) rather than at any
+caller — one choke point serves all four, `openMacroText` inherits it for free since it's a pure pass-through.
+Every caller updated to the same one-line shape: only close its own modal/drawer when `loadProject` actually
+returned something (`if (loaded) ctx.close()` / `closeDrawer()` / `onClose()`), so Cancel leaves the caller's
+own surface open, not just the program untouched.
+
+### (3)+(4) The proofs, per door — a new spec, `destructive-load-doors-1938.spec.js`
+
+Three doors × three tests each (Cancel-byte-identical, Proceed-then-Undo-byte-identical, empty-canvas-silent):
+
+- **Clear**: fires `window.clearCode()` (now async) without awaiting, waits for `.app-dialog`, clicks Cancel —
+  asserts `ddcsGetBlockGcode()` unchanged. Proceed path: accepts via the established `_appDialog.js` helper,
+  confirms the program actually cleared, then `ddcsUndo()` restores byte-identical G-code.
+- **Open project**: calls `loadProject(otherProject)` directly (the shared choke point every UI caller routes
+  through, so this proves the load-bearing property once rather than four times at the UI layer) — Cancel
+  returns `null` and leaves G-code untouched; Proceed returns the loaded object, and Undo restores the original.
+- **Load .nc file**: built a real marked multi-op `.nc` export first (on a throwaway canvas state, via the same
+  insert→`ddcsSerializeWithMarkers()` pattern t1928's own fixtures established), THEN seeded the real "current"
+  program, then drove the REAL gesture — `window.loadGcodeFile()` (creates the hidden `#gcode-file-input`) +
+  `page.setInputFiles(...)` with an in-memory buffer, no real file on disk, no native picker blocking (this
+  worked cleanly on the first real run — confirmed empirically, not assumed to work). Cancel leaves BOTH the
+  program AND the editor's raw text untouched (the raw-load fallback never runs either, since Cancel exits the
+  whole handler); Proceed loads the surfacing op, Undo restores the original drill program byte-identically.
+
+Every "empty canvas" test also asserts NO dialog appears at all — `confirmDestructiveLoad`'s own silent-pass
+condition, reused unmodified for all three doors, exactly as t1930's own plan named it.
+
+### Non-vacuity — proven, not assumed
+
+`clear-resets-model.spec.js` (pre-existing) hung on `window.clearCode()` the moment my change landed — a real,
+observed regression signal I fixed by teaching it to accept the new dialog (`autoAppDialog`), confirmed green
+after. For `loadProject` specifically: reverted `programFile.js` to `HEAD` (pre-t1938), re-ran the new "OPEN
+PROJECT: Cancel" test against the OLD code — it timed out waiting for `.app-dialog` that never appears (the old
+code has no guard to fire), a real failure signature proving the test is load-bearing, not decorative. Restored
+from a scratch backup and re-verified all 9 new tests green again on the real code.
+
+### The one thing deliberately not extended, named rather than silently decided
+
+`commandDeck.js`'s marker-aware `.nc` import (line 148, guarded) and its own MARKER-FREE raw-text fallback (the
+same handler, `ed.value = text; ed.dispatchEvent('input')`) sit in the SAME `onload` callback — the fallback
+takes a DIFFERENT path to the same hazard: it writes text into the editor, which the existing debounced
+editor→model sync (`programModel.js`'s `reconcileFromEditor`) then reflects into the program model on its own.
+t1930's own enumeration classified that sync path as "the user's own live edit being reflected back," not a
+foreign replace — but a FILE LOAD synthesizing that same event isn't literally the user typing. Not guarded this
+turn (the dispatch named line 148 specifically, and extending into a differently-mechanised path risks exactly
+the kind of scope creep this session has been careful to flag rather than silently absorb) — named here for the
+advisor's own call, not decided.
+
+### Gate
+
+`npm run test:node`: 118/118, `architecture-map-1698.test.mjs` clean (no citations landed in any touched file —
+checked, not assumed). New spec: 9/9. Existing specs touching the same doors, all re-run and confirmed:
+`blocks-load-guard-s41.spec.js` (the pre-existing guard's own coverage, unchanged behavior) 2/2,
+`clear-resets-model.spec.js` (fixed) 1/1, `editor-chrome.spec.js`, `editor-file-menu-1227.spec.js`,
+`wcs-emit-resolved.spec.js`, `transform-declared-736.spec.js` — one load-contention app-boot timeout on the
+first batched run (the familiar signature this session's own gate discipline names), isolated and confirmed
+4/4 clean, not a regression. `proc_health.py watch` clean. No full suite — the advisor's own release gate.
+Files: `saveStates.js`, `programFile.js` (production, 2), `commandDeck.js`, `editorManager.js` (production, 2),
+`libraryModal.js`, `projectModal.js` (callers, 2), `clear-resets-model.spec.js` (fixed), one new spec file.
+Wizard-bar Insert (`wizardManager.js:512`) untouched, per the dispatch's own instruction.
+
+🔨 turn 1938

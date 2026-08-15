@@ -109,7 +109,7 @@ function buildDrawer() {
     // t805 — SELECT-THEN-LOAD: a project row selects; the dedicated [Open] (disabled until selected) or a
     // double-click opens. Folders navigate on their own click (not sl-rows). Two roots = local vs cloud.
     installSelectLoad(localWrap, async (path) => {
-        try { const obj = await store.readProject(path); if (obj) { loadProject(obj); closeDrawer(); } }
+        try { const obj = await store.readProject(path); if (obj) { const loaded = await loadProject(obj); if (loaded) closeDrawer(); } }
         catch (err) { dlgNotice('open failed: ' + err.message); }
     });
     // t863 — the cloud root is the REUSABLE renderCloudInto (shared with the Library Projects tab); its own folder stack.
@@ -191,7 +191,7 @@ function onImportFile(e) {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     const r = new FileReader();
-    r.onload = () => { try { openMacroText(String(r.result)); closeDrawer(); } catch (err) { dlgNotice('Not a valid .mjson macro: ' + err.message); } };
+    r.onload = async () => { try { const loaded = await openMacroText(String(r.result)); if (loaded) closeDrawer(); } catch (err) { dlgNotice('Not a valid .mjson macro: ' + err.message); } };
     r.readAsText(f);
     importInput.value = '';
 }
@@ -210,7 +210,7 @@ export function renderCloudInto(mount, { onClose } = {}) {
     let stack = [];   // THIS mount's cloud folder path [{id,name}] — replaces the old module-level `cloudStack` singleton
     // t805 — SELECT-THEN-LOAD on this root: a project row selects; [Open]/dblclick opens (folders navigate on their own click).
     installSelectLoad(mount, async (id) => {
-        try { loadProject(await gdrive.read(id)); if (onClose) onClose(); }
+        try { const loaded = await loadProject(await gdrive.read(id)); if (loaded && onClose) onClose(); }
         catch (e) { dlgNotice(cloudErrMsg(e)); }
     });
 

@@ -120,7 +120,7 @@ function renderProjectsTab(body, ctx) {
     installSelectLoad(localWrap, async (path) => {
         const row = localWrap.querySelector(`.sl-row[data-sl-id="${CSS.escape(path)}"]`);
         await busyRow(row, async () => {
-            try { const obj = await store.readProject(path); if (obj) { loadProject(obj); ctx.close(); } }
+            try { const obj = await store.readProject(path); if (obj) { const loaded = await loadProject(obj); if (loaded) ctx.close(); } }
             catch (err) { dlgNotice('Open failed: ' + (err && err.message || err)); }
         }, { keepOnSuccess: false });
     });

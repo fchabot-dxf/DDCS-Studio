@@ -9,6 +9,7 @@
 import { getActivePostId } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { serializeOpEdits, restoreOpEdits } from './opEdits.js';   // declared block-edits ride with the program so they survive reload
+import { confirmDestructiveLoad } from './saveStates.js';   // t1938 — ONE guard here beats one at each of loadProject's own 4 UI callers
 
 const MACRO_KIND = 'ddcs.macro';
 const MACRO_VERSION = 1;
@@ -30,11 +31,22 @@ export function serializeProject(name) {
     };
 }
 
-/** Load a parsed macro object into the program model (→ editor/Blocks re-project from the stack). */
-export function loadProject(obj) {
+/** Load a parsed macro object into the program model (→ editor/Blocks re-project from the stack). Routes through
+ *  the ONE destructive-load guard (t1938) — every UI caller (library shelf, local drawer, cloud drawer, file
+ *  import via openMacroText) shares this single choke point rather than each confirming on its own. Returns the
+ *  loaded object on success, or `null` if the user Cancelled (an unsaved current program would have been
+ *  replaced) — the caller's own surface (modal/drawer) stays open on `null`, exactly as Cancel promises. */
+export async function loadProject(obj) {
     if (!obj || (obj.kind !== MACRO_KIND && obj.kind !== 'ddcs.project') || !Array.isArray(obj.stack)) {
         throw new Error('not a .mjson macro');
     }
+    const name = obj.name || 'this program';
+    const proceed = await confirmDestructiveLoad(obj.stack, {
+        what: name, label: 'before open',
+        message: `Opening "${name}" replaces your current operation — it's saved to Undo, or Cancel to keep it.`,
+        title: 'Open this program?', okLabel: 'Open (replace)',
+    });
+    if (!proceed) return null;
     if (typeof window !== 'undefined' && window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(obj.stack);
     restoreOpEdits(obj.edits);   // re-attach the declared edits (atom ids match the loaded stack); clears for a clean program
     return obj;

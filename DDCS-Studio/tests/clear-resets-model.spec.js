@@ -1,8 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';
 
 // Clear must wipe the block-program MODEL (blocks/programModel.js), not just the editor textarea. Otherwise the
 // accumulated ops linger: a blur re-projects them and the next Insert appends onto them — the "clear keeps it in
 // cache" bug. This drives the real Insert (wizardManager.insert) + Clear (window.clearCode) paths.
+//
+// t1938 — Clear now routes through the shared destructive-load guard (saveStates.confirmDestructiveLoad) on a
+// non-empty program, so this test auto-accepts the confirm it now raises (dedicated Cancel/Undo coverage lives
+// in destructive-load-doors-1938.spec.js).
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const countOps = (page) => page.evaluate(() => (window.ddcsGetBlockProgram() || []).filter((b) => b && b.type === 'op').length);
@@ -25,6 +30,7 @@ test('Clear wipes the program model so the next Insert does not re-accumulate', 
   expect(await countOps(page), 'one op after first insert').toBe(1);
   expect(await editorLen(page), 'editor shows the projected program').toBeGreaterThan(0);
 
+  await autoAppDialog(page, { accept: true });   // t1938 — Clear on a non-empty program now confirms; accept it
   await page.evaluate(() => window.clearCode());
   await page.waitForTimeout(120);
   expect(await countOps(page), 'program model is empty after Clear').toBe(0);

@@ -51,17 +51,25 @@ export const redoLabel = () => (canRedo() ? history[ptr + 1].label : '');
 export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
 
 /**
- * S4-1 — the SHARED destructive-load guard. Loading a stack into the Blocks tab REPLACES the current program
- * (`ddcsLoadBlockStack`). When the program is NON-EMPTY and the incoming stack would actually change it, CONFIRM
- * before it is replaced — so the user never loses visible work silently. An empty program, or a load of the identical
- * stack, proceeds with NO prompt. Returns true if the caller should load, false on Cancel — the caller does its own
- * showApp / ddcsLoadBlockStack after a true, so a Cancel leaves the caller's surface untouched.
+ * S4-1 — the SHARED destructive-load guard, the ONE seam every door that replaces the program routes through
+ * (t1938 — commandDeck.js's .nc import, programFile.js's loadProject, editorManager.js's Clear; the wizard-bar
+ * Insert door is deliberately NOT routed here yet — it gets its own 3-way Add/Replace/Cancel choice next turn,
+ * per the human's Add-to-program ruling, not this 2-way Replace/Cancel). Loading a stack REPLACES the current
+ * program (`ddcsLoadBlockStack`). When the program is NON-EMPTY and the incoming stack would actually change it,
+ * CONFIRM before it is replaced — so the user never loses visible work silently. An empty program, or a load of
+ * the identical stack, proceeds with NO prompt. Returns true if the caller should load, false on Cancel — the
+ * caller does its own showApp / ddcsLoadBlockStack after a true, so a Cancel leaves the caller's surface
+ * untouched.
  *
  * The current program is SNAPSHOTTED into the save-state history first, and the message promises Undo. (t1145 found the
  * program-level Undo could NOT restore a programmatically-loaded prior program; t1161 FIXED that at the source — the
  * reproject echo no longer pollutes the history — so a proceed IS recoverable via Undo now.) Cancel remains the instant
- * protection. (`what` names the thing being opened; `label` is the snapshot entry.) Async — dlgConfirm is lazy-imported
- * to keep this history module free of any top-level UI coupling.
+ * protection. Async — dlgConfirm is lazy-imported to keep this history module free of any top-level UI coupling.
+ *
+ * `opts`: `what` names the thing being opened (the default message's own noun); `label` is the snapshot entry.
+ * `message`/`title`/`okLabel`/`cancelLabel` OVERRIDE the default Blocks-tab-worded dialog — t1938: the seam is
+ * shared, the WORDING is a parameter of it, not hard-coded to one caller's own context. A caller passing none of
+ * these gets byte-identical behaviour to before this turn (devMode.js's two existing callers, unchanged).
  */
 export async function confirmDestructiveLoad(incoming, opts = {}) {
     const cur = getProg();
@@ -70,8 +78,8 @@ export async function confirmDestructiveLoad(incoming, opts = {}) {
     snapshot(opts.label || 'before edit');               // the recovery point → the message promises Undo (t1161 made it work)
     const { dlgConfirm } = await import('../ui/dialog.js');
     return dlgConfirm(
-        `Opening ${opts.what || 'this'} in Blocks replaces the program in the editor — it's saved to Undo, or Cancel to keep it.`,
-        { title: 'Open in Blocks?', okLabel: 'Open (replace)', cancelLabel: 'Cancel' }
+        opts.message || `Opening ${opts.what || 'this'} in Blocks replaces the program in the editor — it's saved to Undo, or Cancel to keep it.`,
+        { title: opts.title || 'Open in Blocks?', okLabel: opts.okLabel || 'Open (replace)', cancelLabel: opts.cancelLabel || 'Cancel' }
     );
 }
 

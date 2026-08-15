@@ -6,6 +6,7 @@
 import { el, UIUtils } from './uiUtils.js';
 import { SNIPPETS } from '../data/snippets.js';
 import { opLabelOf } from '../blocks/opBuilders.js';   // t975 — derive a clean export title from the op model (fixes g90_absolute.nc)
+import { confirmDestructiveLoad } from '../blocks/saveStates.js';   // t1938 — the ONE destructive-load seam Clear routes through
 
 export class EditorManager {
     constructor() {
@@ -157,11 +158,18 @@ export class EditorManager {
         document.execCommand('copy');
     }
 
-    clearCode() {
+    // t1938 — routes through the ONE destructive-load seam (saveStates.js) before wiping: Cancel leaves the
+    // editor and the program model both untouched. The editor is just a VIEW of the block-program model
+    // (blocks/programModel.js) — blanking the text alone leaves the model behind it holding the old program,
+    // which then re-projects on blur, so the model is wiped too (not just the text) once the user confirms.
+    async clearCode() {
+        const proceed = await confirmDestructiveLoad([], {
+            what: 'a blank canvas', label: 'before clear',
+            message: `Clearing replaces your current operation with a blank canvas — it's saved to Undo, or Cancel to keep it.`,
+            title: 'Clear the canvas?', okLabel: 'Clear',
+        });
+        if (!proceed) return;
         this.editor.value = '';
-        // The editor is just a VIEW of the block-program model (blocks/programModel.js). Blanking the text alone
-        // leaves the accumulated ops in the model, which then (a) re-projects on blur and (b) gets appended to by
-        // the next Insert — the "clear keeps it in cache" bug. Wipe the model too so Clear actually clears.
         if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([]);
         this.editor.dispatchEvent(new Event('input'));
     }
