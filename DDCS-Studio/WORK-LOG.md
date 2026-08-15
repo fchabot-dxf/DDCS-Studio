@@ -34131,3 +34131,100 @@ new one — the broader "should the 3-4 conventions be reconciled" question stan
 here. No code, no test, no fix this turn.
 
 🔨 turn 1882
+
+## turn 1884 — THE CAPABILITY-GATE CENSUS (measure only, no code) — and a bigger finding than the gates
+
+### Dispatch
+
+Two for two (probePort, ATC) is not a coincidence. Census the WHOLE CLASS: enumerate every capability gate in
+the codebase, classify LIVE / ORPHANED / UNCLEAR, with evidence for each — including the live ones, so the list
+is auditable. For every ORPHANED row, name the user-visible consequence in one line. Fold the 2 remaining named
+gaps (tap's `_rigidOk`, `ioInputSupported`) in as census rows, not separate acts — classify both with evidence,
+assume neither. Also ask the broader question: does the retired-built-in-view shape orphan anything BESIDES
+capability gates? Name it if so — bigger finding than the gates, surfaced not fixed. No code. Gate: node tier
+only.
+
+### The foundational fact, established first: EVERY wizard is twin-routed, no exceptions
+
+Read `wizardLibrary.js`'s own `BUILTINS` array in full (24 entries): every single one declares `opensAs`,
+pointing its slot at a twin (`user_*_data`). Each entry's own inline comment confirms the same shape repeatedly:
+"built-in X stays the legacy shim." This means: for ANY wizard, ANY mechanism still targeting that wizard's OLD
+static HTML panel by id is now unreachable by construction — not a per-wizard judgment call, a fact that holds
+for the whole catalog. This is WHY the census could be exhaustive rather than a sample: "does this gate target
+`#wiz_user_form` / `data-param` / a `gate:` property (LIVE), or a legacy panel's own hardcoded id (ORPHANED)" is
+a mechanical question once this foundational fact is established, not a judgment call per gate.
+
+### LIVE — confirmed working, with evidence (not just "not found broken")
+
+| Gate | Mechanism | Target | Evidence |
+|---|---|---|---|
+| `_probePortOk` | `userOpView.js` `[data-gate]`, `gate:{param,is,tip}` | `#wiz_user_form`, 6 probe ops' own `port` field | t1880: built + non-vacuous revert-proof + live in `probe-port-gate-1880.spec.js` |
+| `_rigidOk` | same `[data-gate]` mechanism | `#wiz_user_form`, tap's own `rigid` field | Pre-existing (t778), confirmed still live in t1880's own 122-file gate run; `tapData.js:58` is the pattern `_probePortOk` copied |
+| `ioInputSupported()` | `formWidgets.js`'s `SEG_GATE_PREDS.ioInput`, a segmented-button gate | `#wiz_user_form`, io_step's own Mode segmented control (`ioStepData.js:80`) | **Verified empirically this turn** (was one of the 2 remaining named gaps, assumed neither way per instruction): opened `user_io_step` live — Expert: Input segment `data-op-gated="off"`, enabled; V4.1: `disabled:true, data-op-gated:"on"`, tooltip "Wait-Input needs a DDCS Expert (or RS274/grblHAL) post". Fully functional. |
+| `ioEdgeOptions()` | a per-post OPTIONS LIST (not a grey-gate) | `#wiz_user_form`, io_step's own Edge dropdown | Already tested and passing (`io-step-edge-dialect.spec.js`) — noted in t1876 as an INVERSE case (doesn't differ within the DDCS family: none of Expert/V4.1/DM500 has `flow:'oword'`, all show High/Low only) — live but not dialect-differentiating within scope |
+| `optionGate` (clearMode Plane) | `userOpView.js` `[data-option-gate]` | `#wiz_user_form`, corner's own `clearMode` dropdown (`cornerData.js:95`) | A PLANE-GUARANTEE gate (wcs+probeZFirst), not a controller-capability gate — included for completeness since it shares the mechanism family; targets the live twin form by the same wiring `_probePortOk` uses |
+| `fixedT`/`zClear` gates | `userOpView.js` `[data-gate]` | `#wiz_user_form`, ATC-change's own fields (`atcChangeData.js:42,48`) | STRUCTURAL (method/callMacro), not controller-capability — included for completeness, confirmed live by the same wiring |
+| `wcs` gate (Skim) | `userOpView.js` `[data-gate]` | `#wiz_user_form`, surfacing's own `wcs` field (`surfacingData.js:74`) | STRUCTURAL (zMode), not controller-capability — included for completeness, live by the same wiring |
+
+### ORPHANED — confirmed dead, with the user-visible consequence named
+
+| Gate | Old target (dead) | User-visible consequence |
+|---|---|---|
+| `CAP_FIELDS.probePort` (postGating.js) | `c_port`/`m_port`/`p_port`/`al_port`/`circ_q`/`rc_q`/`rcl_q` + level/q siblings, inside 6 retired built-in panels | **FIXED in t1880** (Shape B) — listed here for the census's own completeness, not a live gap anymore |
+| `CAP_FIELDS.wcsSync` (postGating.js) | `w_sync`/`w_slave`, inside `wiz_wcs` (retired — `wcs` has `opensAs:'user_wcs_data'`) | **A CORRECTION TO t1876's OWN FINDING**: `wcs-gating.spec.js` was cited then as "the ALREADY-CORRECT MODEL... genuinely differentiates per dialect" — it does, but on a panel NOBODY SEES. Confirmed empirically this turn: opening `user_wcs_data` shows `#wiz_user_form` (`display:block`); `wiz_wcs` itself is `display:none`, and `#w_sys` inside it has `offsetParent === null` (present in the DOM, invisibly). A V4.1/DM500 user sees the live twin's own dual-gantry sync toggle with NO indication it's a no-op register write on their controller. |
+| `w_sys` option-gate (wcsAuto/wcsFixed) | same `wiz_wcs` panel | Same consequence as above — the "WCS picker inert on V4.1/DM500" behavior `wcs-gating.spec.js` asserts is real code that runs on a hidden panel, invisible to any real user |
+| `data-cap="atc"` (postGating.js) | `wiz_atc_change`, `wiz_atc_test` (both retired) | **t1882's own finding** — a V4.1/DM500 user can freely build/edit an ATC-Change or ATC-Test op with no signal their controller has no tool-changer model |
+| `data-cap="toolTable"` (postGating.js) | `wiz_atc_length`, `wiz_atc_check`, `wiz_atc_warmup`, `wiz_atc_table` (all 4 retired) | **Confirmed this turn** (not previously checked) — same shape: a control offered on a post with no in-program tool table, no signal given. `toolTable:true` for all 3 DDCS dialects though (see t1876's own inverse finding) — so THIS specific one likely never mattered for the DDCS family even when the panel was live; still dead code today regardless |
+
+### UNCLEAR
+
+| Item | Why unclear | What would settle it |
+|---|---|---|
+| `headerPost.js`'s `caps.vars`/`caps.flowStreamable` warning banner | A DIFFERENT UI surface (scans the live editor TEXT for incompatible patterns, shows a header warning) — not a wizard form field, and `vars:true`/`flowStreamable` isn't set to differ for any DDCS dialect (checked: all 3 declare `vars:true`; `flowStreamable` isn't overridden by any of the 3 DDCS dialect files) — likely a grbl/RS274-only concern, out of this census's own DDCS-family scope | Confirm no DDCS dialect ever triggers it (spot-checked, not exhaustively swept) |
+| `app.js`'s `saveDefaults()` | ALSO targets the dead `c_port`/`c_feed_fast`/etc. ids (line 301-306) — but the TWIN system has ITS OWN, separately-working value-persistence (`wizard-value-persistence-1437.spec.js` exists and passes in every gate run this session) — plausibly SUPERSEDED rather than a live gap, but I did not trace the twin's own persistence mechanism this turn to confirm it fully replaces `saveDefaults()`'s specific behavior | Read the twin's own persistence implementation and confirm it covers every field `saveDefaults()` used to |
+
+### THE BROADER QUESTION — yes, the same root cause orphans real FEATURES, not only gates
+
+Checked the other files t1878 found referencing the same dead field ids (`c_port` etc.), which turned out NOT
+to be gates at all:
+
+- **`ui/probeInputSelect.js` — the "Probe Input" friendly dropdown is entirely dead.** Its own header comment:
+  "hides each wizard's raw P/L fields... injects a 'Probe input' dropdown listing the configured probe-type
+  inputs." `ensureDropdown(portId, levelId)` does `document.getElementById(portId)` first thing and returns
+  `null` immediately if it's missing (line 18-19) — which it always is now. This is a REAL, USER-FACING
+  CONVENIENCE FEATURE (pick a named probe input instead of typing a raw port number) that shipped once and now
+  silently does nothing, for corner/middle/edge/alignment alike.
+- **`ui/numericInputGuards.js` — the integer/decimal input-filtering guard is entirely dead** for the same 4+
+  wizards' worth of field ids (`NUMERIC_INPUT_POLICY`'s own `integer`/`decimal` lists are built entirely from
+  the same stale ids). Whether the TWIN form has its own separate numeric filtering wasn't confirmed this turn
+  (see UNCLEAR above) — if it doesn't, this is a second real feature loss, not merely redundant dead code.
+- **`app.js`'s `saveDefaults()`** — see UNCLEAR above; plausibly superseded, not confirmed.
+
+**This is bigger than the gates**, exactly as asked: the retired-built-in-view migration didn't just orphan
+capability-gating — it silently killed at least one confirmed real feature (the probe-input picker) and
+possibly a second (numeric guards), neither related to controller capability at all. The shape is identical
+every time: a module keyed entirely off a closed, hardcoded list of legacy field ids, with no live-DOM check to
+notice when every one of them stopped existing. Surfaced, not fixed — per the dispatch's own explicit scope.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched — measure only, as dispatched).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: clean — no source or spec files changed this turn.
+
+### For the advisor
+
+Full census: 3 LIVE controller-capability gates (`_probePortOk`, `_rigidOk`, `ioInputSupported` — the last
+newly verified this turn, definitively functional, closing one of the 2 remaining named gaps with a POSITIVE
+result) + 4 LIVE structural (non-capability) gates included for completeness + 5 ORPHANED rows (probePort
+already fixed; wcsSync + the w_sys option-gate, both a CORRECTION to t1876's own "already-correct model"
+citation — `wcs-gating.spec.js` tests real code on a panel nobody sees; the atc data-cap; the toolTable data-cap,
+newly checked) + 2 UNCLEAR items with what would settle each. The broader question has a real, surprising
+answer: the SAME root cause killed at least one confirmed non-gate feature outright (the "Probe Input" friendly
+dropdown, `ui/probeInputSelect.js` — entirely dead for corner/middle/edge/alignment) and possibly a second
+(numeric input filtering) — this is a bigger finding than the gate census itself, exactly as you anticipated.
+No code, no fixes — the list is the deliverable, ready to decide the next several acts' order by user-visible
+consequence rather than file count, as instructed.
+
+🔨 turn 1884
