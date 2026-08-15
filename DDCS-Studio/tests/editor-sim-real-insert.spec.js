@@ -57,14 +57,24 @@ test('a second op gets its OWN hints independently; a loaded .nc with markers re
   const r = await page.evaluate(async (setupSrc) => {
     eval(setupSrc);
     const { opSimStarts } = await import('/viz/opSimStarts.js');
+    const progMod = await import('/blocks/programModel.js');
     const stock = window.ddcsGetSettings().stock;
 
-    // TWO real inserts → two ops in the program; each contributes its own hints (the program-model read iterates all ops).
-    // t1730 — a real insert now stores 'user_middle_data' (the twin), not the raw 'middle' type.
+    // t1928 — a real bar-gesture Insert now REPLACES the program (t1916/t1918/t1920's own ruling), so two
+    // sequential inserts can no longer land two sibling ops. Built via the real import path instead: insert
+    // ONE op, export its marked text, repeat, concatenate, reimport — importMarkedNc groups them into one
+    // multi_step op's own steps, which is the ONE way a program holds several operations today (matches
+    // flow-labels-unique-1408.spec.js's own t1928 fix). t1730 — a real insert now stores 'user_middle_data'
+    // (the twin), not the raw 'middle' type.
+    window.ddcsLoadBlockStack([]);
     await insertBoss();
+    const part1 = window.ddcsSerializeWithMarkers();
+    window.ddcsLoadBlockStack([]);
     await insertBoss();
-    const prog = window.ddcsGetBlockProgram() || [];
-    const mids = prog.filter((b) => b && b.type === 'op' && b.opType === 'user_middle_data');
+    const part2 = window.ddcsSerializeWithMarkers();
+    window.ddcsLoadBlockStack(progMod.importMarkedNc(part1 + '\n' + part2));
+
+    const mids = progMod.flattenOps(window.ddcsGetBlockProgram() || []).filter((b) => b && b.opType === 'user_middle_data');
     const perOp = mids.map((m) => opSimStarts('user_middle_data', m.params, stock).length);
 
     // FALLBACK: empty the program, hand-load a .nc that already carries an export @DDCS marker → resolves via the parse.

@@ -12,6 +12,13 @@ const DECLARED_STOCK = { show: true, x: 120, y: 80, z: 20, shape: 'boss', datum:
 
 // Build a real 3-op / 2-tool program: seed the tool table + stock, insert pocket/drill/contour via the wizards,
 // then DECLARE each op's tool number (T1 reused on pocket+contour → dedup to 2 rows). The sheet reads params.toolNum.
+//
+// t1928 — a real bar-gesture Insert now REPLACES the program (t1916/t1918/t1920's own ruling: a Studio canvas
+// program is always exactly one op), so three sequential inserts can no longer land three sibling ops — this
+// fixture used to rely on the accumulation t1920 deliberately deleted. Built via the real import path instead,
+// matching flow-labels-unique-1408.spec.js's own t1928 fix: insert each op alone, export its own marked text,
+// concatenate, reimport — importMarkedNc's own groupConsecutiveOps wraps the three into ONE multi_step op's own
+// steps, which is the ONE way a program holds several operations today (before step 3's own authoring UI exists).
 async function seedProgram(page, stock) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.ddcsGetSettings && window.openWiz && window.ddcsLoadBlockStack && window.openSetupSheet, null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
@@ -24,14 +31,19 @@ async function seedProgram(page, stock) {
             { num: 2, name: '3mm Ballnose', type: 'ballnose', dia: 3, flutes: 2, rpm: 20000, feed: 900, plunge: 300 },
         ];
         s.preview = s.preview || {}; s.preview.autoLoop = false;
-        window.ddcsLoadBlockStack([]);
-        window.openWiz('pocket', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-        window.openWiz('drill', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-        window.openWiz('contour', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-        const ops = (window.ddcsGetBlockProgram() || []).filter((b) => b && b.type === 'op');
+        const parts = [];
+        for (const t of ['pocket', 'drill', 'contour']) {
+            window.ddcsLoadBlockStack([]);
+            window.openWiz(t, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+            parts.push(window.ddcsSerializeWithMarkers());
+        }
+        const progMod = await import('/blocks/programModel.js');
+        const imported = progMod.importMarkedNc(parts.join('\n'));
+        const ops = progMod.flattenOps(imported);
         ops[0].params.toolNum = 1;   // pocket  → T1
         ops[1].params.toolNum = 2;   // drill   → T2
         ops[2].params.toolNum = 1;   // contour → T1 (reused → dedup to 2 tool rows)
+        window.ddcsLoadBlockStack(imported);
     }, stock);
     await page.waitForTimeout(600);
 }

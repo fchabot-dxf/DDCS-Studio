@@ -39,14 +39,25 @@ for (const cfg of PAIRS) {
     test(`EVERY OP RUNS — ${cfg.name}`, async ({ page }) => {
         await boot(page);
         const r = await page.evaluate(async (types) => {
-            window.ddcsLoadBlockStack([]);
+            // t1928 — a bar-gesture Insert REPLACES the program (t1916/t1918/t1920's own ruling), so N sequential
+            // inserts can no longer produce an N-op program to test. Built via the SAME production import path a
+            // real user gets from a multi-op .nc file: insert each op alone, export its own marked text, concatenate,
+            // reimport — importMarkedNc's own groupConsecutiveOps wraps them into ONE multi_step op's own steps
+            // (matching multi-op-import-1916.spec.js's own proven pattern), which is what this file's own claim —
+            // "every op RUNS" — must now mean for a program to hold more than one operation at all.
+            const parts = [];
             for (const t of types) {
+                window.ddcsLoadBlockStack([]);
                 window.openWiz(t, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+                parts.push(window.ddcsSerializeWithMarkers());
             }
+            const progMod = await import('/blocks/programModel.js');
+            const imported = progMod.importMarkedNc(parts.join('\n'));
+            window.ddcsLoadBlockStack(imported);
             const { estimateProgram, secondsForLines } = await import('/engine/timeEstimate.js');
             const nc = window.ddcsGetBlockGcode();
             const est = estimateProgram(nc, { rapidRate: 6000 });
-            const ops = (window.ddcsGetBlockProgram() || []).filter((b) => b && b.type === 'op');
+            const ops = progMod.flattenOps(window.ddcsGetBlockProgram() || []);
             const counts = {};
             for (const m of nc.matchAll(/(?:^|\s)N(\d+)\b/gm)) counts[m[1]] = (counts[m[1]] || 0) + 1;
             return {
@@ -112,10 +123,16 @@ test('THE DIRECT BODY IS UNMOVED — the legacy numbers are the declaration defa
 test('THE LABELS STAY INSIDE DEMONSTRATED FORM — plain integers, and the program still traces', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        window.ddcsLoadBlockStack([]);
+        // t1928 — see the "EVERY OP RUNS" tests above: build the 4-op program via the real import path, not
+        // sequential inserts (which now replace, not accumulate).
+        const parts = [];
         for (const t of ['pocket', 'surfacing', 'pocket', 'drill']) {
+            window.ddcsLoadBlockStack([]);
             window.openWiz(t, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+            parts.push(window.ddcsSerializeWithMarkers());
         }
+        const progMod = await import('/blocks/programModel.js');
+        window.ddcsLoadBlockStack(progMod.importMarkedNc(parts.join('\n')));
         const { traceToolpath } = await import('/engine/trace.js');
         const nc = window.ddcsGetBlockGcode();
         const labels = [...new Set([...nc.matchAll(/(?:^|\s)N(\d+)\b/gm)].map((m) => Number(m[1])))];

@@ -12,7 +12,7 @@ import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { isMarker, parseMarker } from '../blocks/opSchema.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 import { applyProgramIntent } from '../viz/opSimContext.js';   // t756 — the WHOLE-PROGRAM declared render intent (seat / machine-frame / rig)
-import { onChange } from '../blocks/programModel.js';          // t756 — re-apply the intent when the program's ops change
+import { onChange, flattenOps } from '../blocks/programModel.js';          // t756 — re-apply the intent when the program's ops change; t1928 — the declared enumeration (sees inside a multi_step import wrapper)
 import { simUserVarStore } from '../engine/simUserVars.js';    // t764 — the persistent sim uservar store (a {SN} serial bumps across Plays)
 
 // Per-pass sim-start HINTS for the editor's program — the SAME federated registry the wizards use (opSimStarts). So the
@@ -30,8 +30,8 @@ function gpStartHints() {
     // PRIMARY — the live program model (each op record → its per-pass starts, concatenated in program order).
     const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
     const fromProg = [];
-    for (const b of prog) {
-        if (!b || b.type !== 'op' || !b.opType) continue;
+    for (const b of flattenOps(prog)) {
+        if (!b.opType) continue;
         const h = opSimStarts(b.opType, b.params || {}, stock);
         if (Array.isArray(h) && h.length) fromProg.push(...h);
     }
@@ -84,7 +84,7 @@ function gpSeededVarStore(opts) {
 // t756 (R-C) — the EDITOR preview consumes the WHOLE-PROGRAM declared intent (opSimContext), so a program with an
 // alignment op seats at the Start, a machine op (ATC/homing) draws the machine frame, a rotary program shows the rig
 // — the SAME truths the wizard/Blocks previews honor, via the ONE applyProgramIntent seam (no imperative preview* here).
-const editorOpTypes = () => (window.ddcsGetBlockProgram ? (window.ddcsGetBlockProgram() || []) : []).filter((b) => b && b.type === 'op' && b.opType).map((b) => b.opType);
+const editorOpTypes = () => flattenOps(window.ddcsGetBlockProgram ? window.ddcsGetBlockProgram() : []).map((b) => b.opType).filter(Boolean);
 const applyEditorIntent = () => { if (gpPanel) applyProgramIntent(gpPanel, editorOpTypes()); };
 
 let gpPanel = null;
@@ -119,7 +119,7 @@ function ensurePanel() {
         // DISC-ON-SURFACE (multi-op, t149): the declared radius-comps the disc nudges to come from the WHOLE program model
         // (every op's builderOf stack), so editor Simulate lands the probe disc on the TRUE surface for ANY probe op — the
         // same declared-driven nudge as the wizard preview, read SIM-SIDE from the model (Option B, never an editor-text marker).
-        getOps: () => (window.ddcsGetBlockProgram ? (window.ddcsGetBlockProgram() || []) : []).filter((b) => b && b.type === 'op' && b.opType).map((b) => ({ type: b.opType, params: b.params || {} })),
+        getOps: () => flattenOps(window.ddcsGetBlockProgram ? window.ddcsGetBlockProgram() : []).filter((b) => b.opType).map((b) => ({ type: b.opType, params: b.params || {} })),
         createVarStore: gpSeededVarStore,
     });
     // Spindle / program-zero start hooks (read/write the panel's draggable 3D marker) — used by the wizard insert.

@@ -97,6 +97,25 @@ export function linesForOp(opId) {
     return out;
 }
 
+// t1928 — THE ONE DECLARED ENUMERATION. t1920 deleted program accumulation (a program is always exactly one op),
+// so the only way a program holds several operations TODAY is `importMarkedNc`'s own `multi_step` wrapper (t1916)
+// — a real op (`type:'op'`, `opType:'multi_step'`) whose `children` are the actual operations. `ddcsLinesForOp`
+// already resolves a nested child correctly (ancestry membership at any depth, proven t1922), but every consumer
+// that asks "what operations does this program hold" was still filtering the TOP-LEVEL array only, so a
+// multi_step's own children were invisible to the setup sheet, the time estimate, the editor sim hints, and
+// program-intent detection alike — four call sites duplicating the same broken shape (t1928's own regression
+// report). Declared once here so every consumer shares it, instead of four sites each re-implementing (or each
+// forgetting) the same one-level flatten.
+export function flattenOps(program) {
+    const out = [];
+    for (const b of (program || [])) {
+        if (!b || b.type !== 'op') continue;
+        if (b.opType === 'multi_step') { out.push(...flattenOps(b.children)); continue; }
+        out.push(b);
+    }
+    return out;
+}
+
 // ── loose-run resolution (the in-context "Group" gesture) ───────────────────────────────────────────────────
 // A hand-built atom has no op wrapper, so opAtLine returns null. For the right-click "Group" gesture we instead
 // resolve the CONTIGUOUS run of loose top-level atoms the clicked line belongs to (bounded by a real op / framing),
@@ -420,6 +439,7 @@ export function initProgramModel() {
     window.ddcsLooseRunAtLine = (i) => (editorMatchesProjection() ? looseRunAtLine(i) : null);   // the in-context "Group" gesture
     window.ddcsAutoGroupRunAtLine = (i) => (editorMatchesProjection() ? autoGroupRunAtLine(i) : null);   // AUTO: pure stack auto-shows the chip
     window.ddcsLinesForOp = linesForOp;
+    window.ddcsFlattenOps = flattenOps;   // t1928 — every real operation, one level through a multi_step import wrapper
     window.ddcsLinesForRun = linesForRun;   // AUTO chip highlight (a loose run's lines)
     window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
     window.ddcsSerializeWithMarkers = serializeWithMarkers;   // .nc text + self-describing op markers (export only; editor stays clean)

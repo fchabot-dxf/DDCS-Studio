@@ -26,6 +26,7 @@ import { wcsOffsetAt } from '../viz/sceneFrame.js';
 import { getMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record (the profile library is retired)
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { flipForSetup } from '../wizards/ops/transform.js';   // t879 — the two-sided FLIP declaration (per-setup page + instruction)
+import { flattenOps } from '../blocks/programModel.js';   // t1928 — the ONE declared enumeration: every real op, one level through a multi_step import wrapper
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtN = (v) => { const n = Number(v); return Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : String(v == null ? '' : v); };
@@ -181,7 +182,7 @@ export function buildSheetHTML() {
     const stock = S.stock;
     const raw = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
     const groups = setupGroups(raw);   // t879 — per-setup pages when the stack declares setup boundaries; else null (single page)
-    const ops = groups ? groups.flatMap((g) => g.ops) : raw.filter((b) => b && b.type === 'op');   // all ops → Tools + the whole-program estimate
+    const ops = groups ? groups.flatMap((g) => g.ops) : flattenOps(raw);   // all ops → Tools + the whole-program estimate
     const editor = document.getElementById('editor');
     const prog = editor ? editor.value : '';
     let est = (window.ddcsTimeEstimate && window.ddcsTimeEstimate()) || null;

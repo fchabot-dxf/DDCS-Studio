@@ -14,7 +14,7 @@ import { suggestNext, recordProgram } from './suggest.js';   // next-block sugge
 import { workspaceToStack, stackToWorkspace } from './blockly/stackBridge.js';
 import { installTokenGuard } from './blockly/tokenGuard.js';   // t1712 (cycle ACT 5) — REFUSE an ineligible live-value connection on the canvas
 import { ddcsTheme } from './blockly/theme.js';
-import { setStack, getStack, getProjection, onChange, getGen } from './programModel.js';   // blocks = a VIEW of the shared program model
+import { setStack, getStack, getProjection, onChange, getGen, flattenOps } from './programModel.js';   // blocks = a VIEW of the shared program model; t1928 — flattenOps sees inside a multi_step import wrapper
 import { mountDevMode, deriveAuthoredDef, editingWizardType, authoringWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back; t1599 — authoringWizardType: the DECLARED 'this canvas is customizing a wizard' fact the right pane's face reads
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
@@ -364,7 +364,7 @@ async function buildWorkspace() {
     // t756 (R-C) — the Blocks tab renders the WHOLE program, so apply the full UNION render-intent via the ONE seam
     // (rotary rig · machine frame · machine-frame tool · seat-at-start) — IDENTICAL to the editor preview by
     // construction (both call applyProgramIntent with their program's op types; the wizard derives the same per op).
-    applyProgramIntent(panel, getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
+    applyProgramIntent(panel, flattenOps(getStack()).map((b) => b.opType).filter(Boolean));
   }
   function renderViews(p) { renderViewsPreview(p); renderLiveForm(); }
 

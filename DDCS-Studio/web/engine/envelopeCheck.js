@@ -181,8 +181,9 @@ export function checkEnvelope(program, settings) {
         let passStarts = null;
         try {
             const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+            const ops = (typeof window !== 'undefined' && window.ddcsFlattenOps) ? window.ddcsFlattenOps(prog) : prog.filter((b) => b && b.type === 'op');   // t1928 — sees inside a multi_step import wrapper
             const hints = [];
-            for (const b of prog) { if (b && b.type === 'op' && b.opType) { const h = opSimStarts(b.opType, b.params || {}, stk); if (Array.isArray(h) && h.length) hints.push(...h); } }
+            for (const b of ops) { if (b && b.opType) { const h = opSimStarts(b.opType, b.params || {}, stk); if (Array.isArray(h) && h.length) hints.push(...h); } }
             passStarts = hints.length ? hints : null;
         } catch (_) { passStarts = null; }
         const dxy = datumXY(stk);

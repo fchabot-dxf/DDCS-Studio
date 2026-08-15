@@ -56,16 +56,26 @@ test('the estimate matches the SIM PLAYBACK MODEL (the engine per-move formula, 
 });
 
 test('PER-OP split sums to the total move time (each op positive)', async ({ page }) => {
+    // t1928 — a bar-gesture Insert REPLACES the program, so 2 sequential inserts can no longer build a 2-op
+    // program to test. Built via the real import path instead (matching flow-labels-unique-1408's own fix):
+    // insert each op alone, export its marked text, concatenate, reimport — importMarkedNc groups them into
+    // one multi_step op's own steps.
     await page.evaluate(async () => {
-        window.ddcsLoadBlockStack([]);
-        window.openWiz('surfacing', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-        window.openWiz('pocket', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+        const parts = [];
+        for (const t of ['surfacing', 'pocket']) {
+            window.ddcsLoadBlockStack([]);
+            window.openWiz(t, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+            parts.push(window.ddcsSerializeWithMarkers());
+        }
+        const progMod = await import('/blocks/programModel.js');
+        window.ddcsLoadBlockStack(progMod.importMarkedNc(parts.join('\n')));
     });
     await page.waitForTimeout(450);
     const r = await page.evaluate(async () => {
         const { estimateProgram, secondsForLines } = await import('/engine/timeEstimate.js');
+        const progMod = await import('/blocks/programModel.js');
         const est = estimateProgram(window.ddcsGetBlockGcode(), { rapidRate: 6000 });
-        const ops = (window.ddcsGetBlockProgram() || []).filter((b) => b && b.type === 'op');
+        const ops = progMod.flattenOps(window.ddcsGetBlockProgram() || []);
         let sum = 0; const per = [];
         for (const op of ops) { const s = secondsForLines(est.perLine, window.ddcsLinesForOp(op.id) || []); per.push(s); sum += s; }
         return { moveSec: est.moveSec, sum, nOps: ops.length, per };

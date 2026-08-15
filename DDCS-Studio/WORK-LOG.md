@@ -36399,3 +36399,122 @@ corrected to match (`blocks-live-form.spec.js`, `pane-visual-host-programmatic-1
 clean.
 
 🔨 turn 1926
+
+
+## 🔨 turn 1928 — FIX THE STEP-2 REGRESSION: ONE declared enumeration sees inside a multi_step wrapper
+
+### Dispatch
+Advisor's own mess to clear, its words: t1920 deleted the accumulation machinery and broke four features that
+legitimately need to address several operations individually — `flow-labels-unique-1408` (a regression guard on
+a bug that reached RELEASE), `setup-sheet-850` (the printable job sheet, 3 operations/3 tools), `time-estimate-844`
+(the per-operation time split), `editor-sim-real-insert` (per-instance sim hints). The advisor's own diagnosis:
+`ddcsLinesForOp` already resolves correctly for an operation nested inside a `multi_step` wrapper (proven live at
+t1922, ancestry membership at any depth) — the only broken piece is the SHALLOW ENUMERATION all four features
+share to find the operations in the first place; it never flattens a `multi_step`'s own children. Fix it once,
+declared, not four patches. Assert what the user sees, not the traversal. Do not start slice 2 of the rename.
+
+### The premise, checked before trusting it — and found incomplete
+
+Ran `flow-labels-unique-1408.spec.js` cold to see the REAL failure before writing any fix. It wasn't a
+label-uniqueness or per-op-time defect — `r.per.length` came back `1`, expected `2`/`3`. Traced why: `insertWiz()`
+now goes through `commitActiveOp` → `loadOpAsProgram`, which REPLACES the whole canvas on every commit (t1920's
+own ruling, confirmed at `opSession.js:499-504`). Three sequential `openWiz/insertWiz` calls — the fixture shape
+all four failing tests share — leave exactly ONE op on the canvas: the last one inserted. No `multi_step` wrapper
+forms this way at all; that wrapper is `importMarkedNc`'s own creation (t1916), reachable today only by
+IMPORTING a multi-op `.nc` file, not by any live sequential-insert gesture.
+
+So the advisor's own diagnosis was half the picture, not wrong: the shallow-enumeration bug is real and
+exactly as described — once a `multi_step` wrapper exists, nothing currently looks inside it. But for these
+four SPECIFIC tests, no wrapper existed yet to look inside, because their own fixtures still simulated
+"multiple operations" via a gesture (sequential insert) that t1920 itself made incapable of producing that
+shape. Fixing the enumeration alone would have left `r.per.length === 1` unchanged — a correct fix to the wrong
+half of the problem, caught by running the test before writing one, not by re-deriving the dispatch's own claim
+from memory. Named here rather than silently worked around, per this session's own "confirm premise" discipline.
+
+### The two-part fix, both declared once
+
+**(1) `flattenOps(program)`** — new export in `programModel.js` (blocks/programModel.js:100-116, right after
+`linesForOp`): every real operation in the program, substituting a `multi_step` wrapper's own `children` in its
+place rather than the wrapper itself, recursively (costs nothing extra for today's one-level nesting, and
+doesn't assume it stays one level). Hooked as `window.ddcsFlattenOps` (programModel.js:442, beside
+`ddcsLinesForOp`) for the one file (`envelopeCheck.js`) that reads the program via the window-hook convention
+rather than a module import.
+
+Swapped into every production site that shared the exact broken shape — "filter the top-level array for
+`type==='op'`" to answer "what operations does this program hold":
+- `ui/setupSheet.js:184` — the Operations table + Tools list + whole-program estimate (the direct cause of
+  `setup-sheet-850`'s own 4 failures).
+- `ui/gcodePreviewTab.js` — `gpStartHints()` (the editor sim per-pass start hints, `editor-sim-real-insert`'s own
+  feature), plus `editorOpTypes()` and `getOps()` (the whole-program render-intent detector and the DISC-ON-SURFACE
+  radius-comp nudge) — same declared concern, fixed alongside since the helper already existed and leaving two
+  of three same-file consumers on the old broken pattern while one used the new one would have been exactly the
+  "one name, two meanings" shape this session keeps finding and deleting.
+- `blocks/blocksApp.js:367` — the Blocks-tab twin of `gpStartHints`'s program-intent call (`applyProgramIntent`),
+  same reasoning.
+- `engine/envelopeCheck.js:184-185` — the pre-flight envelope trace's own per-op sim-start hint collection, a
+  near-identical duplicate of `gpStartHints`'s own loop (not touched beyond the swap — merging the two loops is
+  a separate dedup question, out of scope here, same judgment call as t1926's `REBUILD_REFUSAL` duplication).
+
+Did NOT touch: `opSession.js`'s own id-based op lookups (`.find(b.id === opId)`, top-level only) or
+`editorManager.js`/`wizardManager.js`/`segmentFrame.js`'s similar single-op-by-id finds — re-editing a
+nested `multi_step` step via the wizard-edit gesture isn't a currently-supported UI path (that's step 3's own
+future authoring UI), so widening those lookups without a driving test or a real gesture to exercise them would
+be speculative, not a fix for anything broken today.
+
+**(2) The four fixtures, rebuilt to represent "several operations in one program" via the ONE real mechanism
+that produces that today** — matching t1920's own established "declare, don't hand-roll, reuse the real
+production functions" precedent (`multi-op-import-1916.spec.js`'s own pattern, reused verbatim): insert each op
+alone via the real wizard gesture, export its own marked text (`ddcsSerializeWithMarkers()`), concatenate N
+single-op exports, reimport via `programModel.js`'s own `importMarkedNc` (which `groupConsecutiveOps` wraps into
+one `multi_step`'s own steps) — exactly what a real user gets from importing a legacy multi-op `.nc` file, the
+one path that exists before step 3's own authoring UI is built.
+- `flow-labels-unique-1408.spec.js` — both the 4 "EVERY OP RUNS" cases and the "LABELS STAY INSIDE DEMONSTRATED
+  FORM" 4-op case rebuilt this way; their own inline `.filter(b.type==='op')` swapped for `progMod.flattenOps`.
+- `time-estimate-844.spec.js` — "PER-OP split sums to the total" rebuilt the same way.
+- `editor-sim-real-insert.spec.js` — its second test ("a second op gets its OWN hints independently") rebuilt;
+  the first test (a single insert) was already correct and untouched — only one op ever existed there, no
+  wrapper needed.
+- `setup-sheet-850.spec.js`'s `seedProgram()` — rebuilt the same way; the per-op `toolNum` DECLARE step (pocket
+  → T1, drill → T2, contour → T1 reused) now mutates each `flattenOps`-returned step in place (same object
+  references as the imported tree's own `children`) before the mutated stack is reloaded.
+
+### Non-vacuity
+
+All four named tests run in full isolation before AND after: before, `flow-labels-unique-1408` 5/6 failed
+(op-count mismatch), `time-estimate-844`'s per-op test failed the same way, `editor-sim-real-insert`'s second
+test failed the same way, `setup-sheet-850` 4/4 failed (`TypeError` in its own fixture). After: **all four files
+green** — `flow-labels-unique-1408` 6/6, `time-estimate-844` 7/7, `editor-sim-real-insert` 2/2,
+`setup-sheet-850` 4/4.
+
+Every spec touching the enumeration's own production call sites, run in isolation: `whole-program-intent-756`
+(3/3 — the exact `applyProgramIntent`/`gpStartHints` twin the dispatch's own feature list names),
+`preview-intent-single-source-714` (1/1), `envelope-check-838` (5/5), `envelope-extent-1323` (4/4) — 13/13.
+
+Every other `multi_step`/`programModel.js`-dependent spec from t1920's own rewrite, re-run to confirm this
+turn's edit to a heavily-shared file didn't regress them: `multi-op-import-1916` (3/3),
+`multi-op-progend-1828` (2/2), `blocks-accumulate` (1/1), `segment-frame-derivation-1838` (1/1),
+`marker-rebuild-1848` (2/2), `homing-stock-poisons-1832` (2/2), `opatline-identity-1842` (4/4) — 15/15.
+
+`npm run test:node`: 118/118, including the untouched byte-identical-emit family — `flattenOps` and its four
+call sites are all UI/sim-consumption code, none on the emit path (`blockEmitter.js`, `opBuilders.js`,
+`opSchema.js` untouched), so G-code is unaffected by construction, not just by proof.
+
+### Architecture-map upkeep
+
+The `flattenOps` insert (17 lines) landed inside `programModel.js`, ahead of two live citations: INV3's own
+`console.error` guard shifted 388→407 (test file `tests/node/architecture-map-1698.test.mjs`'s own hardcoded
+`{file, line}` registry entry updated — this is the MACHINE-CHECKED source of truth, distinct from
+`ARCHITECTURE.md`'s own prose, which cites the same line twice more and was updated in both places too), and
+`collapseImportTerminators`'s own `:226` prose citation (two mentions) shifted to `:245`. `t<turn> — shifted
+from X by Y` comments added at both. Re-ran `architecture-map-1698.test.mjs` clean after.
+
+### Gate
+
+`npm run test:node`: 118/118. The 4 named tests: 6+7+2+4 = 19/19, all previously-failing cases now passing.
+Every spec touching the enumeration's own production call sites + every other `multi_step`-dependent spec from
+t1920: 28/28. `proc_health.py watch` clean. Files touched: `programModel.js`, `setupSheet.js`,
+`gcodePreviewTab.js`, `blocksApp.js`, `envelopeCheck.js` (production), 4 test files, `ARCHITECTURE.md` +
+`architecture-map-1698.test.mjs` (citation upkeep). No rename-slice work touched, per the dispatch's own
+instruction.
+
+🔨 turn 1928

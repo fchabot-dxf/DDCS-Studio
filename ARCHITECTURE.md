@@ -199,7 +199,7 @@ stack and unrunnable lines become `( gated: … )` comments.
 rg -n "emitMapped\(" DDCS-Studio/web --glob '!blocks/blockEmitter.js'
 ```
 The four **program-shaped** call sites: `wizards/views/userOpView.js:428` (the wizard's live code panel + the sim
-source; `:424` for the group path), `blocks/programModel.js:226` (committed program → editor text),
+source; `:424` for the group path), `blocks/programModel.js:245` (t1928 — shifted from 226 by +19; committed program → editor text),
 `blocks/opGlow.js:81,110,145,168,203` (emit twice, diff for per-word glow), `data/stackToSlot.js:164,166` (CAM
 slot body). **Correction to an earlier survey:** that is not the complete set — the legacy `wizards/*Wizard.js`
 `generate()` methods call it too (e.g. `wizards/atcChangeWizard.js:226`), and they are still reachable through the
@@ -409,7 +409,7 @@ relative plunge silently becomes absolute. Note the resolution shape: `_group` i
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 
 **3 · A fail-loud guard is worthless if the path carrying its throw swallows it.**
-Guard: `blocks/programModel.js:388` (t1920 — shifted from 364 by +24; previously stale at 236, then 269, then 347, then 357) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
+Guard: `blocks/programModel.js:407` (t1928 — shifted from 388 by +19; previously stale at 236, then 269, then 347, then 357, then 364) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
 the guards above fired into a silent catch for their entire early life, on the only path an operator's
 paste-then-open-Blocks gesture takes.
 
@@ -572,7 +572,7 @@ blocks/opSession.js:18      () => ({ dialect })
 ```
 `applyIndentStyle` no-ops unless `settings.indentStyle === 'flush'` (`data/indentStyle.js:51`). So setting indent
 style to `flush` appears to change the **wizard preview panel** but not the committed program projection
-(`programModel.js:226`), the glow diff, or the exported `.nc`.
+(`programModel.js:245`), the glow diff, or the exported `.nc`.
 ```bash
 rg -n "indentStyle" DDCS-Studio/web --glob '!data/indentStyle.js'
 ```
