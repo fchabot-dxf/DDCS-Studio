@@ -35062,3 +35062,64 @@ before, 0/2 failed across 3 separate post-fix runs (6/6 clean). `npm run test:no
 change, no source touched).
 
 🔨 turn 1902
+
+---
+
+## t1904 — canvas-handle-writable-1804's chronic flake: a real async render boundary, found live, fixed by waiting for it correctly — the first fix wasn't enough, caught and corrected before shipping
+
+Dispatch: the last recurring entry from t1902's own load runs, flagged and explicitly NOT diagnosed there. It
+guards a real shipped fix (t1804's form-host injection — every draggable handle either dead or writing into the
+wrong surface, before that fix). Same discipline: reproduce with a mechanism-targeted batch, confirm the cause
+LIVE, don't assume either known class. Cold-page-specific: name it if that's what makes it fragile. If racing a
+legitimate app async boundary, say so and stop rather than engineer around it.
+
+REPRODUCED with the SAME ~209-file batch t1902 built and reused (reusing a proven reproduction method, per the
+advisor's own praise of that choice last turn): isolation 4/4 clean; under load, `TypeError: Cannot read
+properties of null (reading 'x')` at `box.x` — `handle.boundingBox()` returned `null` immediately after
+`await expect(handle).toHaveCount(1)` had just passed.
+
+THE CAUSE, read from source, not guessed: `web/viz/featureCanvas.js`'s own `_mount()` (`:91-117`) sets up a
+`ResizeObserver` on the container that fires on its FIRST observation (always, per spec) and schedules a
+`requestAnimationFrame`-deferred `render()` once the container's real, post-layout size is known — separate from
+whatever render already ran synchronously at mount time with whatever size was available at that instant.
+`_draw()` (`:376+`) calls `handles.replaceChildren()` on EVERY render call, cold or deferred, wiping and
+rebuilding the handle element. `toHaveCount(1)` only proves a node exists somewhere in the DOM; it says nothing
+about visibility or a settled layout. This IS the cold-page tension the dispatch asked about, named directly: a
+WARM page would have already exercised this render pipeline once, giving the ResizeObserver's deferred pass
+time to land before any test ever samples state; THIS test is cold BY DESIGN (its own header: "never opened this
+op's own wizard... the very common real flow") — the exact case with the least settle margin, and the fixed
+`waitForTimeout(1000)` before it happened to be enough on a light machine but not under the same real load that
+already broke `open-as-modal-1625`.
+
+THE FIRST FIX WASN'T ENOUGH — caught by re-verifying under load, not by trusting a clean isolation run. Attempt 1:
+`await expect(handle).toBeVisible()` before `boundingBox()` (Playwright's own auto-retrying visibility poll,
+reusing its mechanism rather than hand-rolling one). Isolation: 4/4 clean. Under the SAME load batch, run again:
+STILL FAILED — `toBeVisible()` passed, and the VERY NEXT `boundingBox()` call returned `null` again, confirming
+the render cycle can fire MORE THAN ONCE under sustained contention (the container's own layout still settling
+around it), not just the single cold-to-settled transition assumed. A single settle check between two separate
+CDP round-trips isn't enough while a re-render storm is still in progress.
+
+THE ACTUAL FIX: retry the PAIR together — re-check `toBeVisible()` AND capture `boundingBox()` in the same short
+loop iteration, using the box immediately, up to 20 tries at 100ms apart, failing loudly (not silently) if it
+never stabilizes. A real poll for the true completion signal (a genuinely non-null, freshly-captured box), not a
+bigger fixed wait and not a retry count on the TEST'S OWN pass/fail (the dispatch's own named trap — this retries
+an internal state-capture step, not the test itself).
+
+RACING A LEGITIMATE APP BOUNDARY — said plainly, and NOT stopped on, because waiting for it CORRECTLY (not
+disabling or weakening the check) is what actually resolved it: this is the case where the right answer is a
+proper wait, not an escalation. The render pipeline's own real characteristic — a cold mount can trigger more
+than one render pass under contention, not exactly one — is named here as a fact worth keeping for whoever debugs
+a future canvas-adjacent flake (both `blocks-mmb-pan.spec.js` and `blocks-render.spec.js` failed at least once in
+my own load runs today, with signatures at least consistent with the same general class of pressure, though NOT
+diagnosed or claimed as the same cause — out of this turn's scope).
+
+PROVEN UNDER LOAD, 3x, per the dispatch's own explicit gate: the SAME ~209-file batch — 0/4 failed on run 1
+(post-improved-fix), 0/4 on run 2, 0/4 on run 3 (one unrelated spec, `blocks-rotary-rig.spec.js`, failed in run 3
+— a basic page-boot timeout, a recurring-but-different signature noted across multiple turns now, not this
+turn's mechanism). Isolation re-confirmed 4/4 clean after the final fix.
+
+Gate: `canvas-handle-writable-1804.spec.js` isolated 4/4 (before, after attempt 1, and after the final fix);
+under the identical load batch — 1 failed pre-fix, 1 STILL failed after the first (insufficient) fix attempt, 0
+failed across 3 separate runs after the corrected fix. `npm run test:node`: 118/118 (test-file-only change).
+
+🔨 turn 1904

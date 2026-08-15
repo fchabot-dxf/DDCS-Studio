@@ -134,8 +134,29 @@ test('COLD page: a declared draggable handle on a SYNTHETIC non-corner op is wri
 
     const handle = page.locator('#blk_wiz_user svg .fc-handle-move');
     await expect(handle).toHaveCount(1);
-
-    const box = await handle.boundingBox();
+    // t1904 — a LEGITIMATE async render boundary in the app, confirmed by reading featureCanvas.js, not guessed:
+    // `_mount()` sets up a `ResizeObserver` that fires on first observe and schedules a `requestAnimationFrame`
+    // -deferred `render()` once the container's REAL (post-layout) size is known (`:111-116`) — separate from
+    // the render this test's own tab-switch already triggered synchronously with whatever size was available at
+    // that moment. `_draw()` (`:376-378`) wipes and rebuilds the handles group (`handles.replaceChildren()`) on
+    // EVERY render call, cold or deferred, and under sustained CPU contention this can keep re-firing (the
+    // container's own layout still settling around it) rather than firing exactly once. `toHaveCount(1)` only
+    // proves the node exists somewhere in the DOM, not that it is visible or sized. This element is COLD by the
+    // test's own design (its wizard/pane has never rendered before — no warm layout cache to lean on).
+    //
+    // A SINGLE `toBeVisible()` check is NOT enough — confirmed empirically, not assumed: under the same load
+    // batch that first reproduced the crash, `toBeVisible()` PASSED and the very next `boundingBox()` call STILL
+    // returned `null` (the render cycle fired again in the gap between those two separate CDP round-trips). So
+    // this retries the PAIR together — re-check visibility AND capture the box in the same short window, using
+    // the box immediately — rather than trusting one settle check to outlast an ongoing re-render storm. A real
+    // poll for the actual completion signal, not a bigger fixed wait.
+    let box = null;
+    for (let i = 0; i < 20 && !box; i++) {
+        await expect(handle).toBeVisible();
+        box = await handle.boundingBox();
+        if (!box) await page.waitForTimeout(100);
+    }
+    if (!box) throw new Error('t1904 — the handle never produced a stable bounding box under load (20 retries)');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2 + 10, { steps: 6 });
