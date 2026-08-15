@@ -34928,3 +34928,63 @@ Gate: node tier 118/118 (0 failed, post-fix). 27-file homing sweep (every `tests
 on the first pass.
 
 🔨 turn 1898
+
+---
+
+## t1900 — WIDEN THE BYTE-IDENTICAL SPECS TO THE FULL DIALECT REGISTRY. Proven to catch t1898's bug. 0 disagreements with the census.
+
+Dispatch: my own t1896 design opinion, now actioned — the per-op byte-identical specs only ever compared 2
+dialects (studio + Expert), never the full registry, and that blind spot is exactly how `homing_data` hid. Widen
+the ops that BRANCH on dialect (named in the census); cover the 5 safe-by-absence rows if cheap; prove the
+widening actually catches t1898's bug by reverting the fix with the new spec in place; use the census as the
+oracle (every SAFE row should still agree). No blanket multiplier — targeted, not tripling the whole gate.
+
+SCOPE, split by census category:
+- **The 6 dialect-reading ops** (builders that call `getDialect()`/`resolveActivePost()` at BUILD time —
+  `homingWizard`, `atcLengthWizard`, `atcToolCheckWizard`, `atcTestWizard`, `atcChangeWizard`, `atcTableWizard` —
+  the last one newly confirmed this turn, missed as a named row in t1896's own table though its build-time read
+  was noted in the census narrative): each op's own existing byte-identical spec widened (or a new CROSS-DIALECT
+  test added where none existed) to cycle ALL 7 registered dialects via `setActivePostId` (not `setActiveProfile`
+  — the latter only reaches the 4 machine profiles; `setActivePostId` reaches grbl/centroid/rs274ngc/grblhal too,
+  which are POST overrides, never a selectable profile). A SMALL representative param set per test, not the full
+  existing sweep × 7 — the point is catching the class, not multiplying runs (the dispatch's own explicit line).
+- **The 5 safe-by-absence ops** (`partingData`, `pocketData`, `rotaryCenterData`, `rotaryClockData`, `slotData` —
+  no build-time dialect read TODAY, so only a future branch could break them): covered via the CHEAPER path —
+  these ops resolve dialect entirely at EMIT time, so `emitMapped(stack, {dialect})`'s own option reaches every
+  case with NO `setActivePostId`/page-reload needed. `pocketData` already had a 2-dialect (grbl+rs274ngc) start;
+  widened to all 7. The other 4 got a new, small CROSS-DIALECT test each. `partingData` had NO prior
+  byte-identical coverage of any kind — a new file (`tests/parting-cross-dialect-1900.spec.js`) was the cheapest
+  way to close that, mirroring the same minimal pattern.
+
+**PROVEN TO CATCH THE THING IT EXISTS FOR** (the dispatch's own explicit demand, not skipped): reverted
+`homingData.js` to the pre-t1898 commit (`b21ab774`, the LAST commit touching the file before the fix — `git
+checkout <commit> -- <path>`, confirmed via `git diff HEAD` showing the restored diff, not the no-op `git diff`
+default-vs-index comparison that looked deceptively empty on the first attempt) with the WIDENED
+`homing-data-emit.spec.js` in place. Result: the new CROSS-DIALECT test went RED — exactly the bug (a V4.1/DM500
+render showing Expert's own stored seek content). The E2-SUPERSEDED test (asserting the NEW no-edit-survives
+behavior) also correctly failed, since that behavior didn't exist yet in the reverted code — both failures
+expected, neither surprising. Restored the fix from a scratch backup, `git diff HEAD` matched the intended commit
+exactly, re-ran green. This is the ONE piece of direct, non-inferred evidence that the widening isn't decoration.
+
+**CENSUS AS ORACLE — 0 DISAGREEMENTS.** Every widened/new test passed cleanly against ALL 7 dialects for every op
+touched: `atcLength`/`atcCheck` (the refusal branch itself, now fixed, confirmed structurally correct on every
+dialect — not just V4.1/DM500), `atcTest`/`atcChange`/`atcTable` (the full-recompose safety net verified directly
+rather than trusted from the census's own reading), and `parting`/`pocket`/`rotaryCenter`/`rotaryClock`/`slot`
+(confirmed SAFE with no build-time dialect dependency, exactly as read). No new finding, no census correction —
+the census's own classifications held up under the widened check, which is itself the useful result: the SAFE
+rows are now PROVEN, not merely reasoned from a source read.
+
+New/changed: `homing-data-emit.spec.js`, `atc-length-in-place.spec.js`, `atc-check-in-place.spec.js`,
+`atc-test-twin.spec.js` (new CROSS-DIALECT tests added); `atc-change-twin.spec.js`, `atc-table-twin.spec.js`,
+`pocket-data-emit.spec.js` (existing 2-dialect tests widened to 7); `rotary-center-data-emit.spec.js`,
+`rotary-clock-data-emit.spec.js`, `slot-as-data.spec.js` (new CROSS-DIALECT tests added); NEW FILE
+`tests/parting-cross-dialect-1900.spec.js` (5 lines of scope-header + one test, no prior harness existed for
+this op at all). 10 files, 11 dialect-sweep assertions total (one op — homing — got a dedicated new test rather
+than widening its own already-large 66-combo sweep, matching the "don't add runs to the big sweep" instruction
+applied consistently across every op, not just the ones explicitly named).
+
+Gate: node tier 118/118 (no architecture-map drift — spec-only changes touch nothing TRAP/INV cites). All 36
+tests across the 11 touched/new spec files green; the cross-dialect emit invariant suite
+(`gcode-dialect-emit-invariants-1870`) unaffected, still green.
+
+🔨 turn 1900

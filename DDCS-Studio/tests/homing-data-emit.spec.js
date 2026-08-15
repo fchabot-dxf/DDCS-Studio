@@ -48,6 +48,50 @@ test('E1: the twin emit == homingStack byte-diff ZERO across the selection × Z-
     expect(r.diffs, 'twin emit == homingStack for ALL combos incl. reordered permutations (byte-diff = ZERO)').toBe(0);
 });
 
+/**
+ * t1900 — CROSS-DIALECT (t1896's own design opinion, dispatched): the E1 sweep above never varies the ACTIVE
+ * DIALECT — it is the exact blind spot that let t1896's BROKEN `homing_data` row hide undetected. `homingStack`
+ * reads the dialect at BUILD time (`getDialect()`), so this needs `setActivePostId` cycling the FULL registry
+ * BEFORE calling the builder — `emitMapped`'s own `{dialect}` option (the cheap way for a SAFE/emit-time-only op)
+ * cannot reach a build-time read. A SMALL representative param set × every registered dialect — not the full
+ * 66-combo sweep × 7, which would be the same blanket multiplier already rejected once.
+ */
+test('CROSS-DIALECT: user_homing_data == homingStack for EVERY registered dialect, not just the default (t1900)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { homingDataDef, HOMING_DEFAULTS } = await import('/blocks/dataOps/homingData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { homingStack } = await import('/wizards/homingWizard.js');
+        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        registerUserOp(homingDataDef());
+        const build = builderOf('user_homing_data');
+        const cfg = { x: { enable: true, backoff: 5, seekFeed: 800, slowFeed: 100 }, y: { enable: true, backoff: 5 }, z: { enable: true, backoff: 5 } };
+        const reps = [{ axes: ['x', 'y', 'z'] }, { axes: ['z'] }];
+        window.__homingSettings = { machine: { x: 600, y: 400, z: -120 }, limits: { zMaxHome: true, xMinHome: true, yMinHome: true }, homing: { axes: cfg } };
+        window.ddcsGetSettings = () => window.__homingSettings;
+        const dialects = listPosts().map((p) => p.id);
+        let diffs = 0, first = null, combos = 0;
+        for (const dialectId of dialects) {
+            setActivePostId(dialectId);
+            for (const p of reps) {
+                combos++;
+                const twin = emitMapped(build({ ...p, softLimits: true })).text;
+                const builtin = emitMapped(homingStack({ ...p, config: cfg, machine: { x: 600, y: 400, z: -120 }, limits: { zMaxHome: true, xMinHome: true, yMinHome: true }, softLimits: true })).text;
+                if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p, twin: twin.slice(0, 400), builtin: builtin.slice(0, 400) }; }
+            }
+        }
+        setActivePostId('auto');
+        return { diffs, first, combos, dialectCount: dialects.length };
+    });
+    if (r.first) console.log('HOMING XDIALECT DIFF ' + JSON.stringify(r.first));
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.combos, 'the sweep = 7 dialects × 2 representative axis-selections').toBe(14);
+    expect(r.diffs, 'twin emit == homingStack for EVERY registered dialect (byte-diff = ZERO) — this is the check that would have caught t1896\'s BROKEN row').toBe(0);
+});
+
 test('E1: the twin emit TRACKS live settings — change the Z travel / flip a Home flag → the NEXT emit reflects it (no snapshot)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);

@@ -46,6 +46,36 @@ test('emit BYTE-IDENTICAL to atcToolCheckStack across a scalar sweep — studio 
     expect(r.expertDiffs, 'EXPERT: twin emit == atcToolCheckStack (source-chips #5/#6 → registers)').toBe(0);
 });
 
+/**
+ * t1900 — CROSS-DIALECT. `atcToolCheckStack` branches STRUCTURALLY on `hasCurrentTool` (t1894 — the fix this op's
+ * own postInstantiate now fully recomposes from). "studio AND Expert" above never switches the ACTIVE DIALECT.
+ * Every registered dialect, one representative param set.
+ */
+test('CROSS-DIALECT: the twin emit == atcToolCheckStack for EVERY registered dialect, incl. the refusal branch (t1900)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async (OPTYPE) => {
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { atcToolCheckStack } = await import('/wizards/atcToolCheckWizard.js');
+        const { ATC_CHECK_DEFAULTS } = await import('/blocks/dataOps/atcCheckData.js');
+        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        const dialects = listPosts().map((p) => p.id);
+        let diffs = 0, first = null;
+        for (const dialectId of dialects) {
+            setActivePostId(dialectId);
+            const twin = emitMapped(builderOf(OPTYPE)(ATC_CHECK_DEFAULTS)).text;
+            const builtin = emitMapped(atcToolCheckStack(ATC_CHECK_DEFAULTS)).text;
+            if (twin !== builtin) { diffs++; if (!first) first = { dialectId, twin: twin.slice(0, 600), builtin: builtin.slice(0, 600) }; }
+        }
+        setActivePostId('auto');
+        return { diffs, first, dialectCount: dialects.length };
+    }, OPTYPE);
+    if (r.first) console.log('ATC-CHECK XDIALECT DIFF ' + JSON.stringify(r.first.dialectId) + '\n--TWIN--\n' + r.first.twin + '\n--BUILTIN--\n' + r.first.builtin);
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.diffs, 'twin emit == atcToolCheckStack for EVERY registered dialect (byte-diff = ZERO), including the register-refusal branch').toBe(0);
+});
+
 test('opensAs wiring: ATC Tool Check opens the twin IN-PLACE (plain title, twin retired from atc_datawiz)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);

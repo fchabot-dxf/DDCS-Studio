@@ -71,3 +71,42 @@ test('E1 byte-diff ZERO: user_rotary_center_data == rotaryCenterStack across 112
     expect(r.wireDia, 'WIRING: diameter=12.7 lands in the #57 socket (E0 dissolve)').toBe(true);
     expect(r.fitAdvanced, 'the FIT ADVANCED banner stays in the twin').toBe(true);
 });
+
+/**
+ * t1900 — CROSS-DIALECT. `rotaryCenterWizard.js` has NO build-time dialect read (t1896 census, SAFE — the
+ * per-post variation is delegated to `probeSurfaceStack`'s own atoms, resolved at emit). "studio AND Expert"
+ * above never actually switches the dialect. A small representative set × every registered dialect via
+ * `emitMapped`'s own `{dialect}` option (cheap — no setActivePostId/reload needed for a SAFE, emit-time-only op).
+ */
+test('CROSS-DIALECT: user_rotary_center_data == rotaryCenterStack for EVERY registered dialect (t1900)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { rotaryCenterDataDef, ROTARY_CENTER_DEFAULTS } = await import('/blocks/dataOps/rotaryCenterData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { rotaryCenterStack } = await import('/wizards/rotaryCenterWizard.js');
+        const { resolveActivePost, listPosts } = await import('/wizards/dialects/index.js');
+        registerUserOp(rotaryCenterDataDef());
+        const build = builderOf('user_rotary_center_data');
+        const D = ROTARY_CENTER_DEFAULTS;
+        const reps = [D, { ...D, method: 'fit', dist: 55 }];
+        const dialects = listPosts().map((p) => p.id);
+        let diffs = 0, first = null, combos = 0;
+        for (const dialectId of dialects) {
+            const post = resolveActivePost(dialectId);
+            for (const p of reps) {
+                combos++;
+                const twin = emitMapped(build(p), post).text;
+                const builtin = emitMapped(rotaryCenterStack(p), post).text;
+                if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p: { method: p.method }, twin: twin.slice(0, 600), builtin: builtin.slice(0, 600) }; }
+            }
+        }
+        return { diffs, first, combos, dialectCount: dialects.length };
+    });
+    if (r.first) console.log('ROTARY-CENTER XDIALECT DIFF ' + JSON.stringify(r.first));
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.combos, 'the sweep = 7 dialects × 2 representative methods').toBe(14);
+    expect(r.diffs, 'twin emit == rotaryCenterStack for EVERY registered dialect (byte-diff = ZERO)').toBe(0);
+});

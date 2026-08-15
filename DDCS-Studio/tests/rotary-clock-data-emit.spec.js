@@ -83,3 +83,40 @@ test('E1 byte-diff ZERO: user_rotary_clock_data == rotaryClockStack across 84 st
     expect(r.rotHasAtoms, 'A-AXIS: the twin emits the computed #58=[0-#53-90] + the A rotate move (A#58) + the A read/set (A#59)').toBe(true);
     expect(r.reportNoSWO, 'REPORT: no A work-offset write (measure only) — the action guard pruned the SWO').toBe(true);
 });
+
+/**
+ * t1900 — CROSS-DIALECT. `rotaryClockWizard.js` has NO build-time dialect read (t1896 census, SAFE — per-post
+ * variation delegated to atoms, resolved at emit). "studio AND Expert" above never switches the dialect.
+ */
+test('CROSS-DIALECT: user_rotary_clock_data == rotaryClockStack for EVERY registered dialect (t1900)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { rotaryClockDataDef, ROTARY_CLOCK_DEFAULTS } = await import('/blocks/dataOps/rotaryClockData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { rotaryClockStack } = await import('/wizards/rotaryClockWizard.js');
+        const { resolveActivePost, listPosts } = await import('/wizards/dialects/index.js');
+        registerUserOp(rotaryClockDataDef());
+        const build = builderOf('user_rotary_clock_data');
+        const D = ROTARY_CLOCK_DEFAULTS;
+        const reps = [D, { ...D, action: 'rotate', reference: 'side', span: 12.5 }];
+        const dialects = listPosts().map((p) => p.id);
+        let diffs = 0, first = null, combos = 0;
+        for (const dialectId of dialects) {
+            const post = resolveActivePost(dialectId);
+            for (const p of reps) {
+                combos++;
+                const twin = emitMapped(build(p), post).text;
+                const builtin = emitMapped(rotaryClockStack(p), post).text;
+                if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p: { action: p.action }, twin: twin.slice(0, 600), builtin: builtin.slice(0, 600) }; }
+            }
+        }
+        return { diffs, first, combos, dialectCount: dialects.length };
+    });
+    if (r.first) console.log('ROTARY-CLOCK XDIALECT DIFF ' + JSON.stringify(r.first));
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.combos, 'the sweep = 7 dialects × 2 representative actions').toBe(14);
+    expect(r.diffs, 'twin emit == rotaryClockStack for EVERY registered dialect (byte-diff = ZERO)').toBe(0);
+});

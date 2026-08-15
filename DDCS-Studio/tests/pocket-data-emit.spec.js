@@ -67,32 +67,38 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
     expect(r.diffs, 'the twin emit is BYTE-IDENTICAL to pocketStack across the full sweep (byte-diff ZERO)').toBe(0);
 });
 
-test('cross-dialect: user_pocket_data == pocketStack under grbl + rs274ngc (byte-identical)', async ({ page }) => {
+test('cross-dialect: user_pocket_data == pocketStack for EVERY registered dialect (t1900, was grbl + rs274ngc only)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
-        const { resolveActivePost } = await import('/wizards/dialects/index.js');
+        const { resolveActivePost, listPosts } = await import('/wizards/dialects/index.js');
         const build = builderOf('user_pocket_data');
         const sweep = [
             { shape: 'rect', strategy: 'raster', w: 80, h: 60, wcs: 'G55' },
             { shape: 'circle', strategy: 'spiral', dia: 50 },
             { shape: 'rect', strategy: 'spiral', w: 4, h: 4 },   // tooSmall → drill
         ];
-        let diffs = 0, first = null;
-        for (const dialect of ['grbl', 'rs274ngc']) {
-            const post = resolveActivePost ? resolveActivePost(dialect) : dialect;
+        // pocketWizard.js has NO build-time dialect read (t1896 census, SAFE) — the dialect only matters at EMIT,
+        // so passing it as emitMapped's own {dialect}-shaped 2nd arg is sufficient; no setActivePostId/reload needed.
+        const dialects = listPosts().map((p) => p.id);
+        let diffs = 0, first = null, combos = 0;
+        for (const dialectId of dialects) {
+            const post = resolveActivePost ? resolveActivePost(dialectId) : dialectId;
             for (const p of sweep) {
+                combos++;
                 const twin = emitMapped(build(p), post).text;
                 // t945 — the data-op inherits the Head at build; seed the same live Head into the reference pocketStack so the M3 header matches.
                 const builtin = emitMapped(pocketStack({ ...p, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} }), post).text;
-                if (twin !== builtin) { diffs++; if (!first) first = { dialect, p, twin: twin.slice(0, 800), builtin: builtin.slice(0, 800) }; }
+                if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p, twin: twin.slice(0, 800), builtin: builtin.slice(0, 800) }; }
             }
         }
-        return { diffs, first };
+        return { diffs, first, combos, dialectCount: dialects.length };
     });
-    if (r.first) console.log('XDIALECT DIFF ' + JSON.stringify(r.first.dialect) + ' @ ' + JSON.stringify(r.first.p) + '\n--TWIN--\n' + r.first.twin + '\n--BUILTIN--\n' + r.first.builtin);
-    expect(r.diffs, 'cross-dialect byte-identical (grbl + rs274ngc)').toBe(0);
+    if (r.first) console.log('XDIALECT DIFF ' + JSON.stringify(r.first.dialectId) + ' @ ' + JSON.stringify(r.first.p) + '\n--TWIN--\n' + r.first.twin + '\n--BUILTIN--\n' + r.first.builtin);
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.combos, 'the sweep = 7 dialects × 3 representative shapes').toBe(21);
+    expect(r.diffs, 'cross-dialect byte-identical for EVERY registered dialect').toBe(0);
 });

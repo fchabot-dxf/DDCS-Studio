@@ -219,3 +219,42 @@ test('slot-as-data: the CLEARANCE fan-out frontier is CLOSED — one field, ever
   expect(r.para.twin, '…exactly as the form path does').toEqual(r.para.form);
   expect(r.literal.same && r.para.same, 'and both arms emit identically').toBe(true);
 });
+
+/**
+ * t1900 — CROSS-DIALECT (safe-by-absence-today, t1896's own flag: no build-time dialect read exists in slotWizard
+ * .js currently, so this can only ever catch a FUTURE branch introduced without updating the value-patch
+ * postInstantiate — the exact state homing_data was in before someone added one). Cheap: `emitMapped`'s own
+ * `{dialect}` option, no setActivePostId/reload needed for a SAFE, emit-time-only op.
+ */
+test('CROSS-DIALECT: slot-as-data == slotStack for EVERY registered dialect, both arms (t1900)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { slotStack } = await import('/wizards/slotWizard.js');
+    const { slotDataDef, SLOT_DEFAULTS, SLOT_DATA_OPTYPE } = await import('/blocks/dataOps/slotData.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { resolveActivePost, listPosts } = await import('/wizards/dialects/index.js');
+    registerUserOp(slotDataDef());
+    const build = builderOf(SLOT_DATA_OPTYPE);
+    const base = { ...SLOT_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
+    const reps = [base, { ...base, width: 16, toolDia: 6 }];   // literal arm + the re-pointed parametric arm
+    const dialects = listPosts().map((p) => p.id);
+    let diffs = 0, first = null, combos = 0;
+    for (const dialectId of dialects) {
+      const post = resolveActivePost(dialectId);
+      for (const p of reps) {
+        combos++;
+        const twin = emitMapped(build(p), post).text;
+        const builtin = emitMapped(slotStack(p), post).text;
+        if (twin !== builtin) { diffs++; if (!first) first = { dialectId, twin: twin.slice(0, 600), builtin: builtin.slice(0, 600) }; }
+      }
+    }
+    return { diffs, first, combos, dialectCount: dialects.length };
+  });
+  if (r.first) console.log('SLOT XDIALECT DIFF ' + JSON.stringify(r.first));
+  expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+  expect(r.combos, 'the sweep = 7 dialects × 2 representative arms').toBe(14);
+  expect(r.diffs, 'twin emit == slotStack for EVERY registered dialect, both arms (byte-diff = ZERO)').toBe(0);
+});

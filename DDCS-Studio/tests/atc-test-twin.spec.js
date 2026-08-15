@@ -48,6 +48,49 @@ test('E1: the twin emit == atcTestStack byte-diff ZERO across mode × magazine s
     expect(r.diffs, 'twin emit == atcTestStack for ALL combos (byte-diff = ZERO)').toBe(0);
 });
 
+/**
+ * t1900 — CROSS-DIALECT. `atcTestStack` reads the dialect at BUILD time (`atcTestWizard.js:81/83/95` — the
+ * whole-pockets-arm refusal on a non-ATC post, t1896's own census). SAFE only because `atcTestData.js`'s own
+ * `postInstantiate` already does a full, fresh-sourced recompose (t1896 traced this concretely both directions) —
+ * checked here directly rather than trusted from the census read. A SMALL representative param set × every
+ * registered dialect, not the full 72-combo sweep × 7.
+ */
+test('CROSS-DIALECT: user_atc_test_data == atcTestStack for EVERY registered dialect, incl. the pockets no-ATC-post refusal (t1900)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { atcTestDataDef } = await import('/blocks/dataOps/atcTestData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { atcTestStack } = await import('/wizards/atcTestWizard.js');
+        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        registerUserOp(atcTestDataDef());
+        const build = builderOf('user_atc_test_data');
+        const magazine = [{ tool: 1, x: 100, y: 40, z: -20 }, { tool: 2, x: 112, y: 45, z: -21 }];
+        window.__atc = { atc: { magazine }, outputs: [], inputs: [] };
+        window.ddcsGetSettings = () => window.__atc;
+        const reps = [{ mode: 'pockets', first: 1, count: 8, zClear: 0, descend: false }, { mode: 'drawbar', cycles: 3, dwellMs: 500 }];
+        const dialects = listPosts().map((p) => p.id);
+        let diffs = 0, first = null, combos = 0;
+        for (const dialectId of dialects) {
+            setActivePostId(dialectId);
+            for (const p of reps) {
+                combos++;
+                const twin = emitMapped(build(p)).text;
+                const builtin = emitMapped(atcTestStack({ ...p, magazine })).text;
+                if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p, twin: twin.slice(0, 400), builtin: builtin.slice(0, 400) }; }
+            }
+        }
+        setActivePostId('auto');
+        return { diffs, first, combos, dialectCount: dialects.length };
+    });
+    if (r.first) console.log('ATC-TEST XDIALECT DIFF ' + JSON.stringify(r.first));
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.combos, 'the sweep = 7 dialects × 2 representative modes').toBe(14);
+    expect(r.diffs, 'twin emit == atcTestStack for EVERY registered dialect (byte-diff = ZERO), including the non-ATC-post pockets refusal').toBe(0);
+});
+
 test('E1: the pockets unroll TRACKS the live magazine — add / edit a pocket → the NEXT emit reflects it (no snapshot)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);

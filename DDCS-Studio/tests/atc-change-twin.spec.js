@@ -14,7 +14,7 @@ const CFG_ATC = {
     inputs: [{ group: 'atc', id: 'drawbar_released_atc', waitCode: 'M301' }, { group: 'atc', id: 'drawbar_clamped_atc', waitCode: 'M302' }, { group: 'atc', id: 'spindle_stopped_atc', waitCode: 'M300' }],
 };
 
-test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMacro × config on Expert + V4.1', async ({ page }) => {
+test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMacro × config, EVERY registered dialect (t1900, was Expert + V4.1)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async ({ CFG_ATC }) => {
@@ -23,15 +23,18 @@ test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMa
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
-        const { setActiveProfile, DEFAULT_PROFILE_ID } = await import('/shared/js/profiles/controllerProfiles.js');
+        // t1900 — setActivePostId (not setActiveProfile) reaches ALL 7 registered dialects, not just the 4 machine
+        // profiles: grbl/centroid/rs274ngc/grblhal are POST overrides, never a selectable profile.
+        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
         registerUserOp(atcChangeDataDef());
         const build = builderOf('user_atc_change_data');
         const methods = ['m6', 'firmware', 'manual', 'generic', 'disk'];
         const callMacros = [true, false, undefined];
         const base = { x: 120, y: 80, z: -5, zClear: 3, fixedT: 4, orient: true };
+        const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null, combos = 0;
-        for (const profile of ['ddcs-expert-m350', 'ddcs-v41']) {
-            setActiveProfile(profile);
+        for (const dialectId of dialects) {
+            setActivePostId(dialectId);
             for (const cfg of [{ atc: {}, outputs: [], inputs: [] }, CFG_ATC]) {
                 window.__atcS = cfg; window.ddcsGetSettings = () => window.__atcS;
                 for (const method of methods) for (const callMacro of callMacros) {
@@ -39,16 +42,17 @@ test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMa
                     const p = { ...base, method, ...(callMacro === undefined ? {} : { callMacro }) };
                     const twin = emitMapped(build(p)).text;
                     const builtin = emitMapped(atcChangeStack(p)).text;
-                    if (twin !== builtin) { diffs++; if (!first) { const tl = twin.split('\n'), bl = builtin.split('\n'); let i = 0; while (i < tl.length && tl[i] === bl[i]) i++; first = { profile, method, callMacro, line: i, twin: tl.slice(i, i + 3), builtin: bl.slice(i, i + 3) }; } }
+                    if (twin !== builtin) { diffs++; if (!first) { const tl = twin.split('\n'), bl = builtin.split('\n'); let i = 0; while (i < tl.length && tl[i] === bl[i]) i++; first = { dialectId, method, callMacro, line: i, twin: tl.slice(i, i + 3), builtin: bl.slice(i, i + 3) }; } }
                 }
             }
         }
-        setActiveProfile(DEFAULT_PROFILE_ID);   // restore (localStorage persists across pages)
-        return { diffs, first, combos };
+        setActivePostId('auto');   // restore (localStorage persists across pages)
+        return { diffs, first, combos, dialectCount: dialects.length };
     }, { CFG_ATC });
     if (r.first) console.log('ATC-CHANGE E1 DIFF ' + JSON.stringify(r.first));
-    expect(r.combos, 'the sweep = 2 profiles × 2 configs × 5 methods × 3 callMacro').toBe(60);
-    expect(r.diffs, 'twin emit == atcChangeStack for ALL combos on both profiles (byte-diff = ZERO)').toBe(0);
+    expect(r.dialectCount, 'sanity: 7 registered dialects').toBe(7);
+    expect(r.combos, 'the sweep = 7 dialects × 2 configs × 5 methods × 3 callMacro').toBe(210);
+    expect(r.diffs, 'twin emit == atcChangeStack for ALL combos on EVERY dialect (byte-diff = ZERO) — this is the t1896-flagged latent dro risk, checked, not just asserted safe by reading').toBe(0);
 });
 
 test('E1: the inlineTnc arm is a LIVE VIEW — change an ATC I/O code → the NEXT emit tracks (no snapshot)', async ({ page }) => {
