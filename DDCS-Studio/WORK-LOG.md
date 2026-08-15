@@ -35232,3 +35232,99 @@ confirmed clean before staging (the corrected `saveDefaults()`/`globalFunctions.
 against HEAD, confirming the revert was byte-exact).
 
 🔨 turn 1906
+
+---
+
+## t1908 — saveDefaults: NOT unfulfilled-but-reachable as t1906 reported — UNREACHABLE, full stop. A correction to my own prior turn, caught the same way the prior one was.
+
+Dispatch: investigate `saveDefaults()` precisely — what does it PROMISE, what does it ACTUALLY write, what
+SHOULD it write (a fact or a design question), and name the consequence exactly: empty file, wrong file, or
+nothing at all. Confirm genuine reachability by a real gesture. Report only, no fix, no source changes.
+
+### THE PROMISE, quoted exactly
+
+`ui/downloadMenu.js`'s own header: "the header DOWNLOAD button: a small menu with the two ways to take the app
+home... HTML: the standalone single-file Studio with the user's defaults baked in." The button itself: label "🌐
+App as HTML — portable, your defaults", title "Single-file Studio with your current defaults baked in". The
+promise is unambiguous: download a portable, single-file copy of Studio that, opened anywhere, arrives already
+configured the way you left it — no re-typing your usual settings on a new machine.
+
+### REACHABILITY: ZERO, confirmed live — a CORRECTION to my own t1906 report, caught the same way the last one was
+
+t1906 reported this as "a REAL, currently-shipped feature... the header's own DOWNLOAD button" because I found
+`downloadMenu.js` calling `window.saveDefaults?.()` and stopped there — the same class of incomplete check as
+the one I caught and fixed mid-turn last time, just one layer further out. This turn's own explicit instruction
+("confirm it is genuinely reachable... three mechanisms today were real in the code and unreachable in
+practice") is what made me check the NEXT layer, and it wasn't reachable either: `initDownloadMenu()` — the
+function that would attach the click listener that eventually calls `saveDefaults()` — has **zero callers
+anywhere in the codebase** (grepped the whole `web/` tree, not just `app.js`/`ui/*.js`). `#downloadBtn` — the
+button `initDownloadMenu()` itself looks up before doing anything else — **does not exist anywhere in
+`index.html`, and confirmed live: `document.getElementById('downloadBtn')` returns `null` on a real page, and no
+element anywhere in the DOM has an id containing "download" at all.**
+
+So the actual state is: the ENTIRE download-menu feature — not just `saveDefaults()`'s own field capture — is
+orphaned. Nothing calls the function that would show the menu; the button the whole chain depends on isn't in
+the page. `window.saveDefaults` is still exposed globally (`globalFunctions.js`), so it CAN be invoked — but
+only from a devtools console, never from any gesture a real user could stumble into. Named plainly: **this is
+"NOTHING AT ALL," the dispatch's own third category, not "wrong file" — no user, ever, reaches a state where
+this promise gets tested, because the menu that would let them try never renders.** This is a real, humbling
+correction to my own immediately-prior turn's conclusion, caught by the same discipline (check the NEXT layer,
+don't stop at the first confirming reference) rather than by luck.
+
+### CONTENT, if force-invoked anyway — driven live, not read from source: WRONG, not empty
+
+Since nobody can reach it normally, I force-called `window.saveDefaults()` directly (bypassing the missing menu
+entirely) to settle what it WOULD produce if it fired, for completeness. Customized a real, current setting first
+(opened `user_corner_data`, set `dist` to 777 via the twin form's own `[data-param="dist"]`, inserted it) then
+triggered the download and read the embedded restore script verbatim:
+
+```
+values = {"p_wcs":"active","w_sys":"0","w_slave":"3","c_type":"popup"}
+checked = {"w_x":false,"w_y":false,"w_z":false,"w_sync":true}
+window.__ddcs_user_vars = [{"i":"#300",...,"n":"This is an example user-provided variable",...}, {"i":"#301",...}]
+```
+
+NOT empty — but WRONG, precisely: my own `dist=777` customization is nowhere in it. Of the ~50 legacy ids the
+function's own `inputIds`/`checkboxIds` lists try to capture, only 4 (`p_wcs`, `c_type`, `w_sys`, `w_slave`)
+still physically exist anywhere in `index.html` — leftover markup from legacy panels that were never fully
+deleted (grepped and confirmed each one's own `<select id="...">` line) — the other ~46 are genuinely gone.
+`document.getElementById(id)` finds those 4 regardless of the panel's own `display:none`, so it captures
+whatever STATIC DEFAULT those buried `<option>`/`<input>` elements were originally authored with — values that
+can never change no matter what a user does, because nothing ever writes to them. The twin form's own number
+widget (`formWidgets.js`'s own `numberWidget`) sets `dataset.param`, never an `id` at all — so this mechanism is
+not merely reading STALE ids, it is STRUCTURALLY INCAPABLE of ever reading a twin-form value, by construction.
+The ONE part that genuinely works is `window.__ddcs_user_vars` — `variableDB.getAll().filter(e => !e.isSys)`
+reads LIVE, correct data (confirmed: the captured entries matched the actual variableDB content at the moment of
+the call). So: the promise is HALF kept (custom variables, real) and HALF actively wrong (wizard "defaults" —
+static leftover garbage from dead panels, never the user's own settings) — moot today only because nobody can
+reach either half.
+
+### WHAT IT SHOULD WRITE — a design question, not a discoverable fact. Said plainly, per the dispatch's own instruction.
+
+The variable-entries half needs no design call — it already reads the right live source. The wizard-field half
+does not have one obvious correct answer to discover:
+- Rebuilding a hand-maintained id list against the MODERN twin system means enumerating field ids across every
+  registered `user_*` op type — a much larger, structurally different surface than the original ~6 wizards, and
+  the twin's own fields mostly carry no `id` at all (only `data-param`), so the CAPTURE mechanism itself, not
+  just the list, would need to change.
+- A cleaner-looking alternative exists structurally but is still a DESIGN CHOICE, not a fact: `wizard-value-
+  persistence-1437.spec.js`'s own already-shipped, already-correct localStorage mechanism already tracks "the
+  last values used per op type" — `saveDefaults()` could read and re-embed THAT, rather than re-deriving values
+  from live DOM elements at all. This is technically simpler, but whether "your portable defaults" SHOULD mean
+  "your last-used values per op" (t1437's own definition) is itself a product decision, not something the code
+  reveals on its own.
+- Underneath both: whether this feature is even still wanted at all, given it has been completely unreachable
+  with nobody noticing for long enough that even ITS OWN caller chain quietly disappeared, is the more basic
+  question and is not mine to answer.
+
+Not fixed, not designed — reported, per the dispatch's own explicit instruction, since "what a user's defaults
+means" is a call for the advisor or the user, not a fact this investigation can settle by reading more code.
+
+### Gate
+
+`npm run test:node`: 118/118. No source changes — the only artifact this turn was a disposable, uncommitted probe
+spec (deleted before finishing) used to force-invoke `saveDefaults()` and inspect the real downloaded file, since
+static reading alone would have missed the "4 of ~50 ids still physically exist" nuance the same way it nearly
+caused a wrong conclusion last turn. `git status --short`: clean, no tracked files changed.
+
+🔨 turn 1908
