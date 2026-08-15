@@ -33677,3 +33677,123 @@ line-citation maintenance), new test 4/4 non-vacuous, both baselines zero-diff, 
 58-file gate 184/186 clean on the first run, no flakes to chase this time.
 
 🔨 turn 1874
+
+## turn 1876 — THE WIZARD-LEVEL DIALECT AUDIT (measure only, no code, no spec changes)
+
+### Dispatch
+
+Option B released clean (V2026.08.14.9, all 3 slices). The audit I scoped myself in t1870: the cross-dialect
+emit suite covers the EMIT boundary; it structurally cannot see dialect-sensitive WIZARD-LEVEL behavior — field
+gating, dialect-conditional branches, anything where the dialect changes what the user SEES or CAN DO. Name the
+specific specs that are genuinely dialect-sensitive, for each say what dialect-dependent behavior it exercises
+and whether running it under V4.1/V3 asserts something DIFFERENT (not merely repeats Expert). Also report the
+INVERSE: specs that look dialect-sensitive but aren't. `postGating` is the obvious first place — caps-driven by
+design — check whether ANY spec asserts it under a non-Expert dialect; if none does, say so as a headline. Why
+this matters: V4.1/V3 are arguably MORE COMMON than Expert among real users, yet every spec in this suite runs
+Expert — the best-tested dialect is the least-used one. Gate: node tier only. The list is the deliverable.
+
+### Method
+
+Read `postGating.js` in full first (the named starting point), then traced every mechanism it drives to its
+actual field/panel IDs, checked each against the real per-dialect cap VALUES (`ddcs-expert-m350.js` /
+`ddcs-v41.js` / `ddcs-v3-dm500.js`'s own `caps:` declarations — not assumed from names), then grepped the whole
+suite for those exact field IDs / function names to find (a) whether ANY spec touches them and (b) whether any
+spec that does ALSO sets a non-Expert profile before checking. Then swept `web/wizards/*.js` for direct
+`resolveActivePost`/`resolveActiveCaps`/`getActiveProfile` reads OUTSIDE `dialects/`, `postGating.js`, and plain
+`activeDialectOpts()` emit calls (the LATTER is what t1870's own suite already covers) — found two more real
+gates (`userOpView.js`'s `_oword`/`_rigidOk`, `ioStepWizard.js`'s `ioInputSupported`/`ioEdgeOptions`) that live
+outside `postGating.js` entirely, confirming the sweep needed to go wider than the one named file.
+
+### The real per-dialect cap DELTA within the DDCS family (Expert vs V4.1 vs DM500) — read directly, not assumed
+
+V4.1 and DM500 declare IDENTICAL caps overrides (checked both files side by side): `probePort: false,
+probeStatusCheck: false, hmi: false, atc: false, helicalArc: false, wcsAuto: false, wcsFixed: false,
+wcsSync: false` — everything else (including `toolTable: true`, `vars: true`, `flow: 'goto'`) matches Expert's
+own `DEFAULT_CAPS`. So within the 3-dialect family this whole audit (and t1870's own suite) is scoped to,
+**V4.1 and DM500 are behaviorally identical for every cap postGating/the wizards read** — a real, useful fact:
+any gap found for one is the same gap for the other; any test written for one dialect's OWN behavior should
+cover both, or explicitly say why it only needs one.
+
+### GAPS — dialect-sensitive at the wizard/UI level, genuinely untested under V4.1/DM500 (or at all)
+
+1. **`postGating.js`'s `probePort` field gating — ZERO coverage, any dialect, not just non-Expert.** 15 field
+   IDs across corner/middle/probe/alignment/rotaryCenter/rotaryClock's own P/L/Q port fields (`c_port, c_level,
+   c_q, m_port, m_level, m_q, p_port, p_level, p_q, al_port, al_level, al_q, circ_q, rc_q, rcl_q`). Grepped the
+   WHOLE suite for every one of these IDs: zero matches, in any file. Under V4.1/DM500 these should all be
+   `disabled=true` (probePort:false); under Expert, enabled. Nothing asserts either state. **This is the
+   headline** — not just "under-tested for non-Expert," genuinely untested, period, for a gate that spans 6+
+   wizards.
+2. **`postGating.js`'s `data-cap="atc"` panel gating — emit is tested, the actual UI greying is not.**
+   `atc_change`/`atc_test` panels (`index.html:884,948`) should grey entirely under V4.1/DM500 (`atc:false`).
+   `atc-change-twin.spec.js` sweeps Expert+V4.1 but ONLY for emit byte-parity (twin==built-in) — never calls
+   `applyPostGating()` or checks `.classList.contains('cap-off')`/`.disabled` on the panel itself. A spec
+   asserting the panel-greying under V4.1 would assert something genuinely NEW: today nothing proves the whole
+   ATC-change wizard actually becomes inert in the UI for the 2 most common controllers.
+3. **`ioStepWizard.js`'s `ioInputSupported()` — tested under Expert only; the false case never asserted.**
+   Governs whether "Wait Input" mode is even selectable (`caps.flow==='oword' || caps.inputRead`) — true for
+   Expert (`inputRead:true`), false for V4.1/DM500 (neither cap set, DEFAULT_CAPS `inputRead:false`, `flow:
+   'goto'`). `io-step-emit.spec.js`'s own test name says "(Expert)" explicitly and only calls
+   `setActiveProfile('ddcs-expert-m350')` before reading it; a LATER loop in the same file sweeps Expert+V4.1
+   but for a DIFFERENT thing (superset/concrete emit parity), never touching `ioInputSupported()`. The fixture
+   (declared outputs/inputs, `setActiveProfile`) already exists in this exact file — adding
+   `setActiveProfile('ddcs-v41'); expect(ioInputSupported()).toBe(false)` would assert something the suite has
+   never checked, cheaply, in the file that already has everything wired.
+4. **`tapData.js`'s `_rigidOk` gate — the "off-Expert" case is tested via `grbl`, not V4.1/DM500.**
+   `tap-twin-778.spec.js`'s own test explicitly compares `ddcs-expert-m350` vs `grbl` for the rigid→floating
+   emit degradation. `grbl` is a structurally different, non-DDCS dialect (different `programModel`/`flow`) —
+   passing there does NOT prove the SAME code path is exercised correctly for V4.1/DM500, the dialects the
+   comment on the gate itself names explicitly ("the Expert post — the only firmware with dump evidence").
+   Never independently checked for either of the 2 real controllers this audit is about.
+
+### ALREADY COVERED — a model example, named so it isn't mistaken for a gap
+
+5. **`postGating.js`'s WCS-wizard gating (`w_sys` picker + `w_sync`/`w_slave`) — `wcs-gating.spec.js`.**
+   Comprehensively tests M350/rs274/V4.1/DM500 together, and the assertions genuinely DIFFER per dialect (V4.1/
+   DM500: `sysDisabled:true` — the whole picker goes inert, `wcsAuto`/`wcsFixed` both false; rs274: partial —
+   auto gated, G54 live; M350: everything enabled). This is exactly the shape the other 4 gaps above are
+   missing — cited as the pattern to copy, not re-argued.
+
+### INVERSE — look dialect-sensitive, do NOT actually differ within the DDCS family (Expert/V4.1/DM500 agree)
+
+6. **`postGating.js`'s `data-cap="toolTable"` panel gating** (`atc_length`/`atc_check`/`atc_warmup`/
+   `atc_table`) — `toolTable:true` for all 3 DDCS dialects (confirmed above); only differs for a non-DDCS post
+   (e.g. grbl). Parameterizing this across V4.1/DM500 within the DDCS-only suite would assert the same true
+   three times — cost with no coverage, per the dispatch's own framing.
+7. **`ioStepWizard.js`'s `ioEdgeOptions()`** (Rise/Fall/High/Low vs High/Low-only) — gated on `flow==='oword'`,
+   which is `'goto'` for all 3 DDCS dialects; V4.1/DM500 would show the identical High/Low-only set Expert
+   shows. Already correctly tested as an Expert-vs-RS274 split (`io-step-edge-dialect.spec.js`) — naming this
+   so nobody later "completes" it with V4.1/DM500 variants expecting a different result they won't get.
+8. **`ioStepData.js`'s `_oword`-gated fields** (`timeout`/`var`, RS274/grblHAL M66-specific) — same reasoning
+   as #7, same underlying flag: false for all 3 DDCS dialects, only meaningful off-DDCS. Not currently tested
+   at all under any dialect (a real gap in isolation), but explicitly NOT a "parameterize across V4.1/DM500"
+   candidate — if it's ever tested, Expert-vs-non-DDCS is the only split that would assert anything different.
+
+### A declared-but-unconsumed cap, noted not chased
+
+`hmi` appears in every dialect's own `caps:` table (Expert:true, V4.1/DM500:false) and in `postGating.js`'s own
+`CAP_WHY` explanation table, but grepping for `caps.hmi`/`.hmi` across every wizard and dataOp file found no
+consumer at all — it's declared but not wired to any field/panel gate today. Not a test gap (nothing to test);
+flagged in case a future "operator prompt" feature is meant to read it and doesn't yet.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched this turn — measure only, as dispatched).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: only this WORK-LOG entry — confirmed no source or spec files touched.
+
+### For the advisor
+
+Headline: `postGating.js`'s own `probePort` field gating — the one CAP_FIELDS mechanism spanning 6+ probe
+wizards — has ZERO test coverage anywhere in the suite, not narrowly "under-tested for V4.1." Three more real
+gaps, each with the exact spec name, the exact fixture that already exists to extend, and what NEW assertion
+would need to be added (not a blanket re-run): `atc-change-twin.spec.js` (panel greying, not just emit),
+`io-step-emit.spec.js` (the `ioInputSupported()` false case — the fixture is already built in that file),
+`tap-twin-778.spec.js` (swap/add V4.1 or DM500 alongside the existing grbl comparison). One already-correct
+model (`wcs-gating.spec.js`) named as the pattern the other 4 should copy. Four inverse findings named so no
+one wastes effort parameterizing something that can't diverge within the DDCS family (V4.1 and DM500 share
+IDENTICAL caps — confirmed by reading both files side by side, not assumed — so a fix or test for one covers
+both, or a divergence claim for one without the other should be treated as suspicious). No code or spec files
+touched this turn, per the dispatch's own explicit "list, not a change."
+
+🔨 turn 1876
