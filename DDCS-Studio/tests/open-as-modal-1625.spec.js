@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { stopLiveSim, dismissToasts } from './support/simControls.js';
 
 /**
  * t1625 — "OPEN AS MODAL": the Blocks tab's live Wizard View at FULL SIZE, in the REAL modal chrome, rendered
@@ -36,6 +37,14 @@ const customizeCorner = async (page) => {
         await page.waitForTimeout(250);
     }
     await expect(page.locator('#blkOpenModal')).toBeVisible({ timeout: 30000 });
+    // t1902 — the Blocks-pane's own Wizard-view preview auto-plays AND loops the instant a wizard mounts
+    // (simControls.js's own header — confirmed live: `.pp-run.on`/`.pp-loop.on` both true right here, every
+    // time). Under real load, that ongoing repaint is what destabilizes `#blkOpenModal`'s own actionability
+    // check for the click every caller makes next (reproduced under a ~209-file/6-worker batch: 2/2 open-as-modal
+    // tests failed — one on `page.click` itself timing out waiting for the locator, the SAME class t1818 fixed
+    // elsewhere in the pane). Stop it here, once, for every caller.
+    await stopLiveSim(page, '#blk_wiz_user');
+    await dismissToasts(page);
 };
 
 const snapshot = (page) => page.evaluate(async () => {
@@ -59,6 +68,12 @@ test('THE GESTURE — the current canvas stack opens in the real chrome, full wi
     const btn = page.locator('#blkOpenModal');
     await expect(btn, 'the door is visible while a wizard is on the canvas').toBeVisible();
     await btn.click();
+    // t1902 — MISSING WAIT, found reproducing the load flake: opening the overlay is genuinely async
+    // (wizardManager.open()'s own render pipeline), and this test read state synchronously right after the
+    // click with no settle at all — test 3, below, already waits for exactly this transition after its own
+    // click. This aligns test 1 with that ALREADY-ESTABLISHED, correct pattern for the same async boundary,
+    // not a new wait invented to hide a flake — under load the click can genuinely outrace the open.
+    await page.waitForFunction(() => document.getElementById('wizard').classList.contains('active'), null, { timeout: 8000 });
 
     const st = await page.evaluate(() => {
         const w = document.getElementById('wizard');
@@ -89,6 +104,10 @@ test('THE GESTURE — the current canvas stack opens in the real chrome, full wi
     expect(st.rows, 'the full corner form rendered').toBeGreaterThanOrEqual(20);
     expect(st.previewing && st.insertHidden, 'INSERT is hidden — the preview’s one exit is close').toBe(true);
 
+    // t1902 — the MODAL's own preview ALSO auto-plays/loops once open (simControls.js: "both the modal's AND
+    // the pane's" — a second, independent instance of the same mechanism). Stop it before the next
+    // actionability-checked click.
+    await stopLiveSim(page, '#wiz_user');
     await page.click('.wiz-close');
     await page.waitForFunction(() => !document.getElementById('wizard').classList.contains('active'), null, { timeout: 8000 });
     const after = await snapshot(page);
@@ -110,6 +129,8 @@ test('A REAL OPEN AFTER A PREVIEW gets its INSERT back — the preview chrome ca
     await customizeCorner(page);
     await page.click('#blkOpenModal');
     await page.waitForFunction(() => document.getElementById('wizard').classList.contains('active'), null, { timeout: 8000 });
+    // t1902 — same second instance as test 1: the modal's own preview auto-plays once open.
+    await stopLiveSim(page, '#wiz_user');
     await page.click('.wiz-close');
     await page.waitForFunction(() => !document.getElementById('wizard').classList.contains('active'), null, { timeout: 8000 });
     await page.evaluate(() => window.openWiz('user_pause_confirm'));

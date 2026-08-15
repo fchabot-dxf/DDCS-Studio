@@ -34988,3 +34988,77 @@ tests across the 11 touched/new spec files green; the cross-dialect emit invaria
 (`gcode-dialect-emit-invariants-1870`) unaffected, still green.
 
 🔨 turn 1900
+
+---
+
+## t1902 — open-as-modal-1625's chronic flake: found the real cause (unstopped autoplay, t1818's class), fixed, proven under load 3x
+
+Dispatch: `open-as-modal-1625.spec.js` — chronic in the advisor's own release gate (red/flaky across 4 separate
+full-suite runs today), clean every time in isolation. Find the cause, don't paper it — the two ALREADY-KNOWN
+causes from this project's own precedent (t1818: an unstopped in-page animation destabilizing the actionability
+check; t1852: Playwright's own input-dispatch pipeline stalling under cross-process GPU contention, no animation
+running) are different mechanisms with different fixes; diagnose which this one is, or a third. Prove under a real
+load batch, before AND after, same batch both times. No bare timeout bumps, no retries, no weakened assertions.
+
+REPRODUCED FIRST, not assumed. Isolation: 3/3 clean (baseline, matches the dispatch's own framing). Built a
+representative load batch (~209 files: the first 180 alphabetically + every spec referencing `blocksApp`/
+`blkOpenModal`/`#wizard`/`deriveLiveWizard` for genuine mechanism-relevant contention, `--retries=0`, the
+project's default 6 workers) — a 220-file general-alphabetical batch did NOT reproduce it (0/3 open-as-modal
+tests failed); the ~209-file mechanism-targeted batch DID: **2 of 3 tests failed on the first attempt** — "THE
+GESTURE" (`st.active && st.visible` read `false` right after the click) and "A REAL OPEN AFTER A PREVIEW"
+(`page.click('#blkOpenModal')` itself timed out — Playwright's own actionability wait on the locator never
+resolved within 5000ms).
+
+THE CAUSE, CONFIRMED LIVE — t1818's class, not t1852's. `tests/support/simControls.js`'s own header names it
+already: "both the modal's and the pane's 3D/2D visualization panels auto-play AND loop by default." Probed
+directly: right after `customizeCorner` finishes (the exact moment every failing click follows), `#blk_wiz_user`
+(the Blocks-tab's own live Wizard-view preview) has `.pp-run.on` AND `.pp-loop.on` both TRUE — an ongoing,
+continuously-repainting animation, unstopped, the whole time this spec runs its interactions. This spec never
+called `stopLiveSim`/`dismissToasts` anywhere — under real CPU/GPU contention, that ongoing repaint is exactly
+what destabilizes `#blkOpenModal`'s own bounding-box stability for Playwright's actionability check (the SAME
+mechanism t1818 fixed for `pane-surface-scroll-1766`), not Playwright's own dispatch pipeline stalling with
+nothing animating (t1852's, different, already-ruled-out-by-precedent shape — no attempt was made to blindly
+reapply t1852's own fix, since the animation IS present here, unlike there).
+
+TWO FIXES, ONE MECHANISM PLUS ONE GENUINE TEST GAP:
+1. `stopLiveSim(page, '#blk_wiz_user')` + `dismissToasts(page)` added to `customizeCorner` (the ONE place every
+   test calls before its own risky click) — stops the PANE's own preview once, for every caller.
+2. `stopLiveSim(page, '#wiz_user')` added before EACH `.wiz-close` click, in both tests that reach it — the MODAL
+   has its OWN independent autoplay instance once opened (simControls.js's own "both... AND" — a second, distinct
+   occurrence of the identical mechanism, not the same one twice).
+3. A GENUINE, SEPARATE TEST BUG found alongside, not a paper-over: "THE GESTURE" read `st` synchronously
+   immediately after `.click()`, with ZERO wait for the overlay's own open transition — test 3, right below it in
+   the SAME file, already correctly waits `document.getElementById('wizard').classList.contains('active')` after
+   ITS OWN click. Test 1 was simply never given this wait. Aligning it with test 3's own ALREADY-ESTABLISHED
+   pattern for the identical async boundary is not "hiding an app race behind a wait" (the dispatch's own named
+   trap) — it is fixing an inconsistency against a wait ALREADY PROVEN correct one test down, for the exact same
+   transition. No new async boundary was invented or excused; `wizardManager.open()`'s own completion signal is
+   the SAME one test 3 already trusted.
+
+PROVEN UNDER LOAD, same batch both times, per the dispatch's own explicit condition: **before the fix, the SAME
+~209-file batch: 2/2 open-as-modal tests failed on the first attempt.** After the fix, the IDENTICAL batch, run
+THREE separate times, `--retries=0` every time: **0/2 failed, all three runs, both tests clean every time** (6/6
+across the three post-fix runs). Isolation re-confirmed clean (3/3) after the fix too — no regression to the
+baseline behaviour.
+
+THE OTHER FLAKY ENTRIES — reported precisely, not overclaimed. I do not have direct visibility into the
+advisor's own gate run's specific 11-entry list (a different composition/worker count, the same limitation noted
+at t1818/t1852). Across my OWN 4 load-batch executions today (1 before-fix reproduction + 3 post-fix proof runs,
+same ~209-file composition, `--retries=0`), the OTHER failures observed were NOT the same set run to run:
+`blocks-rotary-rig.spec.js` (basic page-boot `waitForFunction` timeout, 3 of 4 runs), `wizard-face-1599.spec.js`
+(multiple different tests across runs; ONE run's own error message NAMES its own cause explicitly — "the
+reproject echo race (t1766) did not resolve" — an ALREADY-RECOGNIZED, separately-tracked pre-existing race, NOT
+this turn's mechanism), `canvas-handle-writable-1804.spec.js` (`TypeError: Cannot read properties of null` on a
+`boundingBox()` call — recurred in EVERY one of my 4 runs, the most consistent repeat offender I saw, though I
+have NOT diagnosed its own root cause this turn — out of the dispatched scope, but worth naming as the strongest
+CANDIDATE for sharing a similar "unstopped element/animation" class given how reliably it recurs), plus one-off
+appearances of `blocks-render.spec.js`, `blocks-mobile-drawers.spec.js`, `clearance-modes-909.spec.js`. None of
+these share `open-as-modal-1625`'s own specific signature (the `#blkOpenModal` locator/click-state race) in my
+own reproduction; `canvas-handle-writable-1804.spec.js` is the one I'd flag for the advisor's own "scope it as
+its own act" offer, given its consistency across every batch I ran.
+
+Gate: `open-as-modal-1625.spec.js` isolated 3/3 before and after; under the identical load batch — 2/2 failed
+before, 0/2 failed across 3 separate post-fix runs (6/6 clean). `npm run test:node`: 118/118 (test-file-only
+change, no source touched).
+
+🔨 turn 1902
