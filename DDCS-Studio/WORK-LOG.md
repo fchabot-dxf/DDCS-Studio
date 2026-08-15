@@ -34580,3 +34580,44 @@ atcWarmupData/atcLengthWizard/atcToolCheckWizard/_toolTableOk/the 4 op-type stri
 process health: clean, 0 lingering ephemeral processes (proc_health.py watch).
 
 🔨 turn 1890
+
+---
+
+## t1892 — THE #1300 FALLBACK: CONFIRMED REACHABLE, EVERY WHICH WAY. STOPPED, no fix.
+
+Dispatch: before ranking the t1890 #1300-fallback finding's severity, establish what actually reaches the
+machine — build the affected ops under V4.1 and DM500 by REAL GESTURE and read the emitted text verbatim, not
+a code read. If nothing reaches the emit, it drops to a code-hygiene item; if it does, stop and report (no fix —
+the remedy, silent-wrong-register vs honest-refuse vs emit-nothing-but-say-why, is a genuinely open design call).
+
+DRIVEN LIVE (a throwaway Playwright probe, `window.openWiz('user_atc_length_data'|'user_atc_check_data')` after
+`setActiveProfile('ddcs-v41'|'ddcs-v3-dm500')`, reading `#wiz_user_code`'s own live-preview textContent — the
+exact element a real user sees, not `emitMapped` called out-of-band): all 4 combinations (V4.1×length, V4.1×check,
+DM500×length, DM500×check) show `#103=#1300 ( Read current tool number )` (length) / `#53=#1300 ( Current tool
+number )` (check) VERBATIM in the on-screen preview, plus the SAME literal `#1300` baked into an operator-facing
+error-message string on BOTH ops ("ERROR: No tool number set - check #1300" / "ERROR: no tool number set - check
+#1300") — so even the FAULT path names Expert's own register to a V4.1/DM500 operator. No cap, gate, or fold
+intercepts any of it — confirmed by t1890's own census: `_toolTableOk` (the only gate touching these ops) reads
+`caps.toolTable`, which is TRUE for both dialects, so these fields/lines stay fully live. Nothing upstream
+refuses. The probe spec was throwaway (not committed — the dispatch's own "no source changes"); its raw output is
+reproduced above for the record.
+
+REACHABILITY, both dimensions the dispatch asked for:
+- Op reachability: `atc_length` ("Tool Length" 📏) and `atc_check` ("Tool Check" 🛡) are both plain, labelled
+  entries in `wizardLibrary.js`'s own `BUILTINS` array (group 'atc'), rendered on the wizard bar with no
+  cap/gate filter at that layer (`wizard-bar.spec.js`, already green in t1890's own gate sweep, asserts the bar
+  renders straight from the library) — a V4.1/DM500 user reaches them by clicking a normal bar button, same as
+  any other wizard.
+- Gesture reachability: the `#1300` lines appear at DEFAULT params, on FIRST OPEN — no odd setting, no
+  non-default toggle, no edge-case input required. This is the plain, first-thing-a-user-sees path, not a
+  corner someone would need to hunt for.
+
+VERDICT ON SEVERITY (per the dispatch's own explicit reservation — established, not ranked further here): this is
+real and reachable on the two profiles the user has repeatedly named as most common, at default settings, via the
+normal wizard bar — the same reachability class as t1868's own G91 machine-safety fix, not a theoretical code-read
+concern. STOPPED, no fix: the remedy is the open design call the dispatch named (silent-wrong-register / honest
+refusal / emit-nothing-with-a-reason, mirroring the hidden-workpiece precedent) — not mine to pick.
+
+No source changes (per the dispatch). Gate: node tier 118/118, 0 failed.
+
+🔨 turn 1892
