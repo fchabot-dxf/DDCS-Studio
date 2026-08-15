@@ -33797,3 +33797,106 @@ both, or a divergence claim for one without the other should be treated as suspi
 touched this turn, per the dispatch's own explicit "list, not a change."
 
 🔨 turn 1876
+
+## turn 1878 — probePort gating: NOT untested, NON-FUNCTIONAL — STOP AND REPORT, no code
+
+### Dispatch
+
+Cover `postGating.js`'s probePort field gating (15 fields, 6+ probe wizards, zero coverage per t1876), modelled
+on `wcs-gating.spec.js`: assert the VISIBLE state (disabled + tooltip) both directions, use the identical-caps
+economy (V4.1/DM500 share caps — cover once, cite file:line), non-vacuous via a deliberately mis-gated state.
+Scope: probePort only. Gate: node tier + new spec + every probe-wizard spec touched.
+
+### What I found before writing a single assertion — the fields don't exist
+
+Before writing a test against `CAP_FIELDS.probePort`'s own 15 IDs (`c_port, c_level, c_q, m_port, m_level, m_q,
+p_port, p_level, p_q, al_port, al_level, al_q, circ_q, rc_q, rcl_q`), checked whether they're even reachable —
+grepped the whole `web/` tree: **zero matches for any of the 15 as a literal `id="..."` anywhere in
+`index.html`.** Confirmed empirically, not just by grep: opened each of the 6 wizards for real
+(`window.openWiz('corner'|'middle'|'edge'|'alignment'|'rotary_center'|'rotary_clock')`) and checked
+`document.getElementById(id)` for all 15 — every single one is `null`. These IDs belong to the OLD, pre-
+wizards-as-data built-in wizard HTML; that static markup no longer exists for any of these 6 (all migrated to
+the generic twin form, `data-param="..."` attributes, rendered by the ONE shared `userOpView.js`).
+
+**The live field that DOES exist today is different in shape, not just in selector.** Checked all 6 ops' own
+current param declarations (`cornerData.js`, `middleData.js`, `edgeData.js`, `alignmentData.js`,
+`rotaryCenterData.js`, `rotaryClockData.js`): each declares exactly ONE editable field relevant here — `port`
+(`{param:'port', type:'number', ..., help:'The controller input port the probe signal is wired to (the G31 P
+word).'}`, byte-identical help text across all 6, `cornerData.js:81` etc.) — **`level` and `q`/`qStop` are not
+declared as editable params anywhere in the twin system at all** (grepped for both, zero matches in all 6
+files) — they must be baked to fixed defaults or handled automatically now, not user-facing fields the mechanism
+needs to grey. So CAP_FIELDS' own claimed shape (3 fields × 5 ops + 1 for the rotary pair = 15) is stale in BOTH
+selector AND field-count: the real, current surface needing this gate is 6 fields (`port`, once per op), not 15.
+
+**And the real, live `port` field has NO gate at all — from any mechanism.** Checked each of the 6 declarations
+for a `gate:` property (the pattern `tapData.js:58` already establishes for exactly this shape —
+`_rigidOk`, computed in `userOpView.js:468`, Expert-only): none of the 6 `port` params carry one. Confirmed
+directly in the live app: opened Corner's own twin form, read `document.querySelectorAll('[data-param="port"]')`
+— one real `<input>`, `disabled:false`, regardless of active profile (nothing computes or applies a per-profile
+value to it at all).
+
+### Why this is not "cover it with a test" — the mechanism does nothing, on every dialect, today
+
+The dispatch's own framing assumes a working gate that's simply untested — "the test should fail if a field a
+post cannot use is left ENABLED... non-vacuous... show the new assertions failing against a deliberately
+mis-gated state." That framing needs a REAL gate to mis-gate. There isn't one. A test written against the
+CURRENT live `port` field, asserting it's disabled under V4.1/DM500, would fail immediately against PRODUCTION
+code — not a deliberately-broken scratch copy, the actual shipped app. That is a materially different finding
+than "add coverage," and — per this project's own established discipline for exactly this shape of surprise (t1862's
+5-vs-3 consumers, t1868's G91 restore, t1874's Slice-1-orphan question) — worth reporting BEFORE building,
+not silently absorbed into "the test."
+
+### The two fix shapes, not chosen between — this is the actual decision the advisor asked me not to make silently
+
+- **A — patch `postGating.js`'s own `CAP_FIELDS.probePort`** to target `[data-param="port"]` selectors instead
+  of the stale IDs. Keeps the mechanism centralized in one file, but `[data-param="port"]` is NOT unique per op
+  (`userOpView.js` renders exactly one op's own form at a time, so at any moment there's exactly one live
+  `port` input — but this couples postGating.js to knowing the twin-form's own generic attribute convention,
+  a layer it doesn't otherwise touch) — and it would need to run on EVERY twin-form render (op switch), not
+  just on load + `ddcs:settings-changed`, since postGating today only re-runs on the latter.
+- **B — give `port` a `gate:` property**, mirroring `tapData.js`'s own established, ALREADY-WORKING pattern
+  exactly: add `_probePortOk` (computed in `userOpView.js` alongside `_oword`/`_rigidOk`, from
+  `caps.probePort`) and `gate: { param: '_probePortOk', is: false, tip: '...' }` on each of the 6 ops' own
+  `port` declaration. This is the SAME shape the codebase already chose for `_rigidOk` (Expert-only) and
+  `_oword` (RS274/grblHAL-only) — a proven, in-use idiom for exactly this class of per-op, dialect-conditional
+  field gate, computed once per render in the ONE shared view rather than re-selector-matched from a second,
+  parallel file. Removes `probePort` from `CAP_FIELDS` entirely (dead weight once B lands — nothing in
+  `postGating.js` would need to know about these 6 ops' own fields at all).
+
+I lean B — it reuses an EXISTING, proven pattern rather than teaching `postGating.js` a new selector convention,
+and it naturally fires on every render (the twin form's own re-render path), not needing a settings-change
+listener to catch an op switch. But this is a real design call (which file owns the gate, whether postGating.js
+should even know about per-op twin fields at all) — not mine to choose silently, per the dispatch's own explicit
+instruction not to fix beyond the named scope without it being decided.
+
+### STOP AND REPORT — no code, no spec written this turn
+
+Per the pattern this project has followed every time investigation revealed the task's true shape differs from
+what was dispatched: reporting rather than choosing a fix shape or writing a test against either a dead selector
+or an unbuilt mechanism. Zero source or spec files touched — confirmed via `git status --short` below.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched — nothing to break).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: clean — no source or spec files changed this turn.
+
+### For the advisor
+
+t1876's own "zero coverage" was an understatement, not an overstatement: the probePort field-gating mechanism
+is not merely untested, it's non-functional, on every dialect, today. All 15 of `CAP_FIELDS.probePort`'s own
+field IDs are stale — pre-migration artifacts with zero DOM presence anywhere, confirmed both by grep and by
+opening all 6 wizards live. The REAL, current surface is smaller than claimed too: only `port` survives as an
+editable param per op (level/Q were dropped from the twin system entirely, not merely relabeled) — 6 fields,
+not 15. And the real, live `port` field has no gate from any source — the input is always enabled, regardless
+of profile, confirmed directly in the running app. A V4.1/DM500 user is offered a live Port field today for
+every one of these 6 probe wizards, though their controller's own G31 form never uses a port number — the exact
+hazard `postGating.js`'s own header comment says the mechanism exists to prevent, currently not prevented.
+Two fix shapes laid out, not chosen between (A: patch postGating.js's selectors to the twin form's own
+`data-param` convention; B: give `port` a `gate:` property mirroring `tapData.js`'s own `_rigidOk`, the pattern
+I'd lean toward since it reuses an established idiom rather than teaching postGating.js a new one) — this is a
+real design call, not mine to make silently. No code, no test, no fix this turn — reporting per this project's
+own established practice for exactly this shape of surprise.
+
+🔨 turn 1878
