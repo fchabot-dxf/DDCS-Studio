@@ -2428,3 +2428,39 @@ manual camera re-fit is the existing escape.
 ⚠ The user's picture was verified against their real (V4.1) settings, but their exact session is
 unrecoverable — the backup's projects store is genuinely empty. Their file is personal: reproduction only,
 never a source of values.
+
+## THE FROZEN TEMPLATE CANNOT EXPRESS A DIALECT-STRUCTURAL BRANCH  [FOUND t1894, census NOT run]
+
+**OBSERVED, live** (not a code read): a data-op twin whose stack builder branches STRUCTURALLY on the active
+dialect can never reach the live twin form through a value-only `postInstantiate` patch — `def.template`
+freezes ONE branch's lines forever, at registration time.
+
+**Why it stayed invisible:** the old `#1300` fallback happened to produce the SAME STRING on every dialect, so
+a frozen Expert branch and a correct V4.1 branch were byte-identical. t1894's refusal emits genuinely
+different lines, and that is what exposed it.
+
+**Fixed for two ops only** — `atcLengthData.js` / `atcCheckData.js` switched to a full `postInstantiate`
+recompose, mirroring `atcTableData.js`'s own `applyAtcTableRecompose`.
+
+⚠ **NOT AUDITED — this is a CLASS.** Any other data-op twin whose builder branches on the active dialect while
+carrying only a value-patch `postInstantiate` has the same defect, and would emit the REGISTRATION-TIME
+dialect's structure to every other dialect. Given that every spec runs Expert
+([[v41-and-v3-outnumber-expert]]), such a twin would be green in the suite and wrong on the two most common
+controllers. **Census it the way t1810 and t1884 were censused: classify every data-op twin, include the SAFE
+ones with their reason.**
+
+⚠ Refines, does not contradict, [[dataop-live-values-postinstantiate-not-emit]]: emit IS a frozen template,
+and that memory is about VALUES. The new fact is that STRUCTURE cannot be patched by a value-only hook at all.
+
+## PROPOSAL — let the USER supply their controller's tool-table register  [worker's, t1894; not a plan]
+
+t1894 ships a refusal: on V4.1/DM500, `atc_length`/`atc_check` say Studio does not have the tool-table
+register map rather than guessing Expert's `#1300`. Honest, but the capability stays unavailable.
+
+**The real answer turns an unknown into a DECLARED fact:** let the user enter their own controller's
+tool-table base. They know their machine; we do not. Follows the user's own scoping principle — *"most people
+use it for themself; if they want to share it, it's the other user's responsibility to verify"* — and the
+same direction as variables-in-custom-wizards + `previewVarSeed`.
+
+⚠ NOT RULED. Needs a decision on where that value lives (the workspace's machine block, presumably, since one
+`.ddcs` is one machine) and whether a wrong entry is recoverable.
