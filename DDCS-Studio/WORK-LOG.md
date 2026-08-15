@@ -35328,3 +35328,80 @@ static reading alone would have missed the "4 of ~50 ids still physically exist"
 caused a wrong conclusion last turn. `git status --short`: clean, no tracked files changed.
 
 🔨 turn 1908
+
+## t1910 — DELETE THE DOWNLOAD MENU (ACT, user-ruled) + lathe toolbar icon (direct user request)
+
+### The download menu — deleted, exactly as scoped
+
+Reference sweep (completed before touching anything, mirroring the discipline that rescued `saveDefaults` in
+t1906): grepped `downloadMenu|saveDefaults|initDownloadMenu|dl-html|dl-exe|dl-ctl|dl-menu|downloadBtn` across
+`web/` and `tests/`. Findings, one per symbol:
+
+- **`ui/downloadMenu.js`** — zero callers anywhere (confirmed again, t1908's own finding held). Deleted whole.
+- **`app.js`'s `saveDefaults()`** — its only real caller was `downloadMenu.js`'s `#dl-html` click handler
+  (t1906/t1908's own finding). No other reference anywhere. Deleted the method body (lines 304-389) and its own
+  t1906 explanatory comment, replaced with a one-line retirement note citing this turn and the user ruling.
+- **`globalFunctions.js`'s `window.saveDefaults = () => app.saveDefaults();`** — served no purpose once
+  `saveDefaults()` itself is gone (nothing else called the global). Deleted.
+- **`styles.css`'s `.dl-ctl` / `.dl-menu` / `.dl-menu .op-btn`** (3 rules) plus their explanatory comment —
+  deleted. **`.scale-pop` itself left untouched** and re-verified genuinely shared: `index.html:111` stamps
+  `<div id="hdrPostMenu" class="scale-pop hdr-quick-menu" ...>` directly, so the base popover class has a real,
+  live, unrelated consumer. Rewrote the now-orphaned comment above `.scale-pop` to name that real consumer
+  instead of the deleted one.
+- **`EXE_DOWNLOAD_URL` (`gatewayStatus.js`) — NOT touched**, per the explicit warning. Re-confirmed its two
+  other real consumers this turn (`gateway/views/status.js:44`, `headerPost.js:57`) are untouched by this diff.
+- **`tests/standalone-download.spec.js`** — read in full. It does NOT test anything being deleted: its own
+  header comment cites `gatewayStatus.EXE_DOWNLOAD_URL` only to explain that its target (the header **quick-menu**
+  `#hdrPostBtn`/`#hdrPostMenu`/`[data-act="standalone"]`, a separate, real, currently-shipped mechanism) shares
+  that one constant with the Gateway page — not with the deleted download menu. The test itself is already
+  `test.skip(...)`. No update needed; left as-is.
+- **`index.html`** — re-confirmed (t1908's finding held) no `#downloadBtn` markup exists anywhere; nothing to
+  remove there.
+
+Net: `web/ui/downloadMenu.js` deleted (39 lines); `app.js` −89/+3; `globalFunctions.js` −1; `styles.css` −5/+2
+(comment rewritten, not just shrunk). `git diff --stat` confirmed the scope lands on exactly these four files
+plus the citation-shift fix below — nothing else moved.
+
+### Citation shift — commandDeck.js (from the lathe-icon fix below, not the deletion)
+
+Adding `HEADER_ICONS.lathe` shifted every line after it in `commandDeck.js` by +2. TRAP7 in
+`architecture-map-1698.test.mjs` (`commandDeck stamps type||opensAs||id`) cited line 103; now 105. Updated the
+test's own citation and the matching `ARCHITECTURE.md` §7 prose citation, both with a `t1910 — shifted from 103
+by +2` note. `node --test tests/node/architecture-map-1698.test.mjs`: 5/5 green after the fix.
+
+### Lathe toolbar icon — direct user request, addressed mid-turn
+
+A genuine user message interrupted this turn: "change the lathe icon to something better than the spark." Traced
+via a disposable live-DOM probe (deleted before finishing, per the session's own throwaway-file discipline) to
+`commandDeck.js`'s `WIZ_GROUP_ICON` lookup map (line 52): it declares `setup`/`probe`/`atc`/`mill`/`custom` but
+**no `lathe` entry**, so the Lathe toolbar dropdown's icon lookup (`WIZ_GROUP_ICON[group.id] || HEADER_ICONS.custom`,
+line 106 pre-fix) silently fell through to `HEADER_ICONS.custom` — a generic 4-point sparkle meant as the
+miscellaneous/user-wizard fallback, not anything lathe-specific. Confirmed `lathe` is a real, registered group id
+(`wizardLibrary.js:36`), so the fallback was a genuine lookup gap, not an intentional choice.
+
+Designed a replacement in the same inline-SVG line-art style (24×24 stroke grid, per-icon accent colour):
+a turned rod with curved spiral toolmarks (evoking a lathe-cut surface) plus an amber wedge tool touching it,
+steel-grey body matching `mill`/`probe`'s own accent. Iterated through several candidates (chuck-circle + bar
+shapes) that read fine large but collapsed into an unrelated "key" glyph at real 16-20px toolbar size — rejected
+those and landed on the spiral-marked rod, which stays legible at all three sizes tested (96px/32px/16px,
+screenshotted and visually reviewed before wiring in, since this is a spatial/visual change per the user's own
+stated preference). Verified live: started a scratch `http-server` on a free port (3000 was held by an unrelated
+pre-existing process — left it alone, used 3212 instead), screenshotted the real toolbar button and the opened
+Lathe dropdown. Icon renders correctly next to Probe/ATC/Mill; dropdown still lists all 7 lathe ops with no
+regression. Ran the 5 specs referencing `WIZ_GROUP_ICON`/`HEADER_ICONS`/`commandDeck` (`header-never-clips-748`,
+`middle-feature-draw`, `op-params-complete`, `wiz-bar-canvas-route`, `wizard-bar`) — 12 passed, 1 pre-existing
+unrelated skip. Stopped both scratch server tasks before finishing.
+
+### Gate
+
+`npm run test:node`: 118/118. Full batch of 18 specs referencing `globalFunctions.js`/header-popover mechanisms
+(`editor-chrome`, `editor-file-menu-1227`, `form-hidden-handle-1303`, `header-account-row-742`,
+`header-never-clips-748` [already run above], `header-profile-menu`, `header-responsive`, `lathe-model-1267`,
+`library-854`, `project-drawer-smoke`, `rate-prompt`, `settings-done-faq`, `settings-ia-regroup-1245`,
+`settings-modal`, `setup-sheet-850`, `standalone-download`, `wizard-manager-1617`, `workspace-manager-1223`,
+`workspace-manager-truth-1231`): 94 passed, 2 skipped (both pre-existing, unrelated to this turn). Nothing went
+red — the guard holds: nothing was reachable, so nothing broke. `proc_health.py watch`: clean, 0 flagged.
+Restored 3 `verification/t1617-*.png` files that Playwright regenerated as a side effect of running
+`wizard-manager-1617.spec.js` (unrelated to this turn's own diff — `git checkout HEAD --` on those 3 paths only).
+
+🔨 turn 1910

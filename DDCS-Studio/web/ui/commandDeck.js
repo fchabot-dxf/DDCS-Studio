@@ -40,6 +40,8 @@ const HEADER_ICONS = {
     io:     _svg('<line x1="3" y1="8" x2="14" y2="8" stroke="#22c55e"/><polyline points="11 5 14 8 11 11" stroke="#22c55e"/><line x1="21" y1="16" x2="10" y2="16" stroke="#38bdf8"/><polyline points="13 13 10 16 13 19" stroke="#38bdf8"/>', '#22c55e'),
     // Custom (user wizards) = a four-point sparkle, matching the ✦ used as the user-op item marker
     custom: _svg('<path d="M12 2.5c.6 4.3 2.7 6.4 7 7-4.3.6-6.4 2.7-7 7-.6-4.3-2.7-6.4-7-7 4.3-.6 6.4-2.7 7-7z" fill="#fbbf24" stroke="#f59e0b"/>', '#f59e0b'),
+    // Lathe = a turned rod (curved spiral toolmarks) with an amber cutting tool touching it — t1910, replaces the fallback sparkle
+    lathe:  _svg('<rect x="2" y="9.3" width="14" height="5.4" rx="2.7" stroke="#64748b"/><path d="M4.5 9.8c1.5 1.5 1.5 3.4 0 4.9M8 9.4c1.8 1.7 1.8 3.9 0 5.6M11.5 9.8c1.5 1.5 1.5 3.4 0 4.9" stroke="#94a3b8"/><path d="M14 16.3l3-2.9 1.5.6-1.1 3.1z" fill="#f59e0b" stroke="#f59e0b"/>', '#64748b'),
 };
 
 // ── Data-driven wizard bar (stage 4) ─────────────────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ const HEADER_ICONS = {
 // section, and the 3D-animated openers a few probe wizards use instead of the generic openWiz(type).
 
 // Per-group header icon (the library carries the label; the icon lives here).
-const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, atc: HEADER_ICONS.atc, mill: HEADER_ICONS.mill, custom: HEADER_ICONS.custom };
+const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, atc: HEADER_ICONS.atc, mill: HEADER_ICONS.mill, lathe: HEADER_ICONS.lathe, custom: HEADER_ICONS.custom };
 
 // Item icons + the ic:<id> registry live in ./wizIcons.js (shared with the Settings icon picker). An explicit
 // user iconOverride (emoji or ic:<id>) wins over the built-in default — see entryIconHtml.

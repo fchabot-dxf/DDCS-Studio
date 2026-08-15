@@ -301,92 +301,9 @@ class DDCSStudio {
     // had zero callers already (globalFunctions.js's window.openMiddleWiz/openEdgeWiz call
     // wizardManager.openMiddle()/openEdge() — a DIFFERENT class's methods — not these).
 
-    // t1906 — CORRECTION to an initial premature deletion this same turn: saveDefaults() is REACHABLE (the
-    // header Download button → "🌐 App as HTML — portable, your defaults", ui/downloadMenu.js's own #dl-html
-    // click handler) and serves a DIFFERENT purpose than the twin's own t1437 persistence (that's same-machine,
-    // localStorage-backed "remember my last Insert"; this is "bake my current settings into a downloadable,
-    // portable HTML file to carry to another machine") — NOT superseded. Its own field-id list IS confirmed
-    // 100% stale (the same dead pre-wizards-as-data ids as postGating.js's own deleted CAP_FIELDS.probePort), so
-    // the shipped "your defaults" promise is silently unfulfilled today — a real, advertised, currently-broken
-    // feature (probeInputSelect.js's own class), not dead code. Restored, not fixed — updating the captured
-    // id list to the modern twin-form fields is its own investigation, out of this turn's own "genuinely small"
-    // scope; reported to the advisor instead of guessed at.
-    saveDefaults() {
-        // All wizard input IDs to snapshot
-        const inputIds = [
-            'c_corner', 'c_probe_seq', 'c_wcs',
-            'c_dist', 'c_retract', 'c_safe_z', 'c_travel_dist', 'c_scan_depth',
-            'c_feed_fast', 'c_feed_slow', 'c_port', 'c_level', 'c_q', 'c_slave',
-            'm_type', 'm_axis', 'm_dir', 'm_dir2', 'm_wcs',
-            'm_dist', 'm_retract', 'm_safe_z', 'm_feed_fast', 'm_feed_slow',
-            'm_port', 'm_level', 'm_q', 'm_slave',
-            'p_axis', 'p_dir', 'p_wcs',
-            'p_dist', 'p_retract', 'p_feed_fast', 'p_feed_slow',
-            'p_port', 'p_level', 'p_q', 'p_slave',
-            'al_check_axis', 'al_probe_dir',
-            'al_dist', 'al_retract', 'al_safe_z', 'al_tolerance',
-            'al_feed_fast', 'al_feed_slow', 'al_port', 'al_level', 'al_q',
-            'w_sys', 'w_slave',
-            'c_type'
-        ];
-        const checkboxIds = [
-            'c_probe_z_first', 'c_sync_a',
-            'm_both', 'm_probe_z_first', 'm_sync_a',
-            'p_sync_a',
-            'w_x', 'w_y', 'w_z', 'w_sync'
-        ];
-
-        // Capture live values
-        const values = {};
-        inputIds.forEach(id => {
-            const elem = document.getElementById(id);
-            if (elem) values[id] = elem.value;
-        });
-        const checked = {};
-        checkboxIds.forEach(id => {
-            const elem = document.getElementById(id);
-            if (elem) checked[id] = elem.checked;
-        });
-
-        // Snapshot only user-defined variable entries (tiny — system defaults are baked into the build)
-        // Embed as window.__ddcs_user_vars so variableDB.js can read it synchronously at init,
-        // before any async module loading — localStorage timing is unreliable on a fresh machine.
-        const userEntries = this.variableDB ? this.variableDB.getAll().filter(e => !e.isSys) : [];
-
-        // Build patched HTML with saved defaults block
-        const buildHtml = () => {
-            let html = document.documentElement.outerHTML;
-            const restoreScript = `<script id="__saved_defaults">
-(function(){
-    var values = ${JSON.stringify(values)};
-    var checked = ${JSON.stringify(checked)};
-    // User variable entries embedded at download time — read synchronously by variableDB.js
-    window.__ddcs_user_vars = ${JSON.stringify(userEntries)};
-    function restore() {
-        Object.keys(values).forEach(function(id){ var e=document.getElementById(id); if(e) e.value=values[id]; });
-        Object.keys(checked).forEach(function(id){ var e=document.getElementById(id); if(e) e.checked=checked[id]; });
-    }
-    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', restore); } else { restore(); }
-    window.addEventListener('load', function(){ setTimeout(restore, 300); });
-})();
-<\/script>`;
-            html = html.replace(/<script id="__saved_defaults"[\s\S]*?<\/script>\s*/g, '');
-            html = html.replace('</body>', restoreScript + '\n</body>');
-            return html;
-        };
-
-        // Download the patched HTML
-        const html = buildHtml();
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'ddcs-studio-standalone.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
-    }
+    // t1910 — saveDefaults() deleted: its only real caller was ui/downloadMenu.js's "App as HTML" menu item
+    // (the header Download button), which the user ruled dead ("oh thats an old button yeah we can delete
+    // it") — see WORK-LOG t1910. downloadMenu.js is deleted alongside this method.
 }
 
 // t538 — DEV BUILD STAMP: when a dev server / the ES-module session cache serves STALE modules, the header version chip

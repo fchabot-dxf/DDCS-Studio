@@ -608,7 +608,7 @@ rg -n "setup_datawiz" DDCS-Studio/web
 ```
 
 ### 7 · The bar's `data-optype` stamp is the BUILT-IN type, not the twin.
-`commandDeck.js:103` — `e.type || e.opensAs || e.id`. So `ui/axisGating.js` gates the Pocket button on `'pocket'`
+`commandDeck.js:105` — `e.type || e.opensAs || e.id` (t1910 — shifted from 103 by +2, new `HEADER_ICONS.lathe` entry). So `ui/axisGating.js` gates the Pocket button on `'pocket'`
 while the click opens `'user_pocket_data'`. For `io_step` / `pause_confirm` / `tap` the stamped value is a type no
 builder registry knows.
 

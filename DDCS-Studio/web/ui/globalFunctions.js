@@ -15,7 +15,6 @@ import { openStockEditor } from './stockEditor.js';
 export function setupGlobalFunctions(app) {
         // Expose key functions to global scope for HTML onclick handlers
         window.toggleStyle = () => app.themeManager.toggle();
-        window.saveDefaults = () => app.saveDefaults();
         window.copyCode = () => app.editorManager.copyCode();
         window.clearCode = () => app.editorManager.clearCode();
         window.downloadFile = () => { window.ddcsTrack?.('feature', 'export'); return app.editorManager.downloadFile(); };

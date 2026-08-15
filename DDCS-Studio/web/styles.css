@@ -325,10 +325,7 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .app-header .op-btn.unavailable,
 .app-header .op-btn.unavailable:hover { opacity: .45; cursor: default; }
 
-/* Header popover base (.scale-pop) — used by the DOWNLOAD menu (ui/downloadMenu.js, .dl-menu). */
-.dl-ctl { position: relative; }
-.dl-menu { display: flex; flex-direction: column; gap: 8px; min-width: 280px; }
-.dl-menu .op-btn { width: 100%; text-decoration: none; text-align: left; }
+/* Header popover base (.scale-pop) — used by #hdrPostMenu (ui/headerPost.js). */
 .scale-pop {
     position: absolute;
     top: calc(100% + 6px);
