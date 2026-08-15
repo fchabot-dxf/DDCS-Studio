@@ -40,8 +40,10 @@ const HEADER_ICONS = {
     io:     _svg('<line x1="3" y1="8" x2="14" y2="8" stroke="#22c55e"/><polyline points="11 5 14 8 11 11" stroke="#22c55e"/><line x1="21" y1="16" x2="10" y2="16" stroke="#38bdf8"/><polyline points="13 13 10 16 13 19" stroke="#38bdf8"/>', '#22c55e'),
     // Custom (user wizards) = a four-point sparkle, matching the ✦ used as the user-op item marker
     custom: _svg('<path d="M12 2.5c.6 4.3 2.7 6.4 7 7-4.3.6-6.4 2.7-7 7-.6-4.3-2.7-6.4-7-7 4.3-.6 6.4-2.7 7-7z" fill="#fbbf24" stroke="#f59e0b"/>', '#f59e0b'),
-    // Lathe = a turned rod (curved spiral toolmarks) with an amber cutting tool touching it — t1910, replaces the fallback sparkle
-    lathe:  _svg('<rect x="2" y="9.3" width="14" height="5.4" rx="2.7" stroke="#64748b"/><path d="M4.5 9.8c1.5 1.5 1.5 3.4 0 4.9M8 9.4c1.8 1.7 1.8 3.9 0 5.6M11.5 9.8c1.5 1.5 1.5 3.4 0 4.9" stroke="#94a3b8"/><path d="M14 16.3l3-2.9 1.5.6-1.1 3.1z" fill="#f59e0b" stroke="#f59e0b"/>', '#64748b'),
+    // Lathe = the stock bar on its spinning axis (red dashed centreline, the SAME convention wizIcons.js's own
+    // rotary_center already uses for "this rotates") + an amber tool touching it. t1910 replaced the fallback
+    // sparkle; t1911 restyled to this bar+axis motif so the group icon reads as kin to its own item icons below.
+    lathe:  _svg('<rect x="2" y="10" width="20" height="4" rx="2" stroke="#94a3b8"/><line x1="0.5" y1="12" x2="23.5" y2="12" stroke="#e11d48" stroke-width="1.4" stroke-dasharray="2.4 1.8"/><path d="M14 16.5l3-2.7 1.6.5-1 3.2z" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"/>', '#64748b'),
 };
 
 // ── Data-driven wizard bar (stage 4) ─────────────────────────────────────────────────────────────────────────

@@ -35405,3 +35405,86 @@ Restored 3 `verification/t1617-*.png` files that Playwright regenerated as a sid
 `wizard-manager-1617.spec.js` (unrelated to this turn's own diff — `git checkout HEAD --` on those 3 paths only).
 
 🔨 turn 1910
+
+## t1911 — DRAW THE LATHE ICON FAMILY (design act, user-visual request)
+
+Follow-on to t1910's group-icon fix: the user clarified live ("so i mean change the dropdown icon and all the
+icon within it, make new costom icons"), and the advisor's dispatch added the second half of the same problem —
+`ui/wizIcons.js`'s `ICON_REGISTRY` holds 8 icons and every one is a mill op (drill/bore/pocket/contour/slot/
+surfacing/text/rotary_center); zero lathe entries, so every lathe dropdown item fell through to the ✦ sparkle
+default emoji. Lathe was the only bar group drawn entirely in fallbacks, at both levels (group header AND items).
+
+### The set — checked against the live library, not guessed from the file list
+
+`web/wizards/lathe/` holds 8 files (facing, odTurn, parting, polygon, centerDrill, faceProbe, odProbe,
+latheProbe), but a live `getLibrary()` dump of the `lathe` group's `items` (`node`+Playwright, evaluated in-page)
+showed only **7** actually appear as bar entries: `user_lathe_facing`, `user_lathe_odturn`, `user_lathe_parting`,
+`user_lathe_centerdrill`, `user_lathe_polygon`, `user_lathe_faceprobe`, `user_lathe_odprobe` — `latheProbe.js` is
+confirmed a shared base class for `faceProbe`/`odProbe`, not its own item, matching the dispatch's own warning not
+to draw one nobody sees. Every one of the 7 carried `icon: "✦"` (the default), confirming the "emoji-or-nothing"
+claim directly rather than trusting the file list.
+
+### The shared constant — reused from the house style, not invented
+
+Chose: a horizontal stock bar (`#94a3b8` steel stroke, matching the mill set's own outline colour) with a red
+dashed centreline (`#e11d48`, `stroke-dasharray`) running its full length. This is NOT a new convention — it is
+the exact same "this rotates" language `wizIcons.js`'s own pre-existing `rotary_center` icon already uses for its
+spin axis. Reusing it means the lathe family reads as kin to an idiom already in the house style rather than
+introducing a second one. Every one of the 8 icons (group + 7 items) carries this bar+axis pair; each op then
+differs only in what happens TO the bar — never by tool angle, per the dispatch's own explicit warning that
+facing/parting/OD-turn drawn as "a tool meeting a bar at different angles" would be indistinguishable at dropdown
+size. Differentiated by what the CUT does instead: Facing removes the END (dark fill at the right edge, full
+height); Part/Groove removes a full-height slice at mid-length; OD Turn steps the bar's own OD down for a length
+(not a removal mark at all — a literal profile change); Centre Drill puts a conical point on-axis at the end;
+Polygon Turn breaks the round profile into a hexagon at the end; Face probe touches the END on a diagonal (probe
+ball `#e11d48`, matching `HEADER_ICONS.probe`'s own ruby-ball convention); OD probe touches the TOP/side from
+directly above. Cut material uses `#1e293b` dark fill, matching the mill set's own removed-material convention;
+the cutting tool (group icon only) is amber `#f59e0b`.
+
+### Iterated, not first-guessed — three rounds of screenshot review before wiring in anything
+
+Round 1 (group icon only, before this turn's own dispatch existed — see t1910): chuck-circle + bar shapes read
+fine large but collapsed into an unrelated "key" glyph at real 16-20px size — rejected, not shipped.
+Round 2 (this turn, full family): built all 8 as an isolated HTML mockup, screenshotted at 96/32/16px — legible
+at all three, but only a loose check.
+Round 3 (rigor pass): rendered the 7 item icons at their ACTUAL production size (14×14, `deviceScaleFactor:4` for
+a true-resolution capture, not a manually-upscaled mockup) inside a row styled like the real dropdown — confirmed
+each of the 7 stays visually distinct from its siblings at true size (screenshot reviewed directly, not assumed).
+Also rendered the group icon beside Probe/ATC/Mill/Custom using the exact same `_svg()` source strings — confirmed
+Lathe's bar+axis silhouette is not confusable with Mill's vertical bit shape or Custom's sparkle, the two the
+dispatch named as its actual neighbours.
+
+### Wired in
+
+`commandDeck.js`'s `HEADER_ICONS.lathe` restyled from t1910's standalone "turned rod, spiral marks" version to
+the bar+axis+wedge motif, so the group icon is visibly kin to the item family below it (comment updated to say
+why). `wizIcons.js`'s `WIZ_ITEM_SVG` gained the 7 entries above, keyed by the exact registered op id — confirmed
+`entryIconHtml()` (`wizIcons.js:35-39`) reads `ICON_REGISTRY[entry.id]` directly, so no `wizardLibrary.js` change
+was needed to wire them in. No relabelling, no reordering, no regrouping — icons only, per the dispatch's own
+explicit boundary.
+
+### Shown, not described
+
+Reloaded the live app (scratch `http-server` on a free port, killed after use), opened the real Lathe dropdown —
+screenshotted full and at 3x-DPI zoom-crop: all 7 items now show their own real icon, no sparkle. Screenshotted
+the live bar with Probe/ATC/Mill/Lathe visible together (Custom doesn't render by default — no custom wizards
+exist in a fresh session — so the isolated same-source-string mockup from Round 3 stands in for that one
+comparison, noted here rather than silently substituted).
+
+### Citation shift (again)
+
+Restyling `HEADER_ICONS.lathe` added 2 more lines to `commandDeck.js`, shifting TRAP7 a second time this session
+(105→107). Updated `architecture-map-1698.test.mjs` and the matching `ARCHITECTURE.md` §7 citation, both noting
+the new shift. `node --test tests/node/architecture-map-1698.test.mjs`: 5/5 green after the fix (caught it via a
+went-red `npm run test:node` run first — not assumed clean).
+
+### Gate
+
+`npm run test:node`: 118/118. Six specs referencing `commandDeck`/`wizIcons`/`WIZ_ITEM_SVG`/`ICON_REGISTRY`
+(`header-never-clips-748`, `middle-feature-draw`, `op-params-complete`, `wiz-bar-canvas-route`, `wizard-bar`,
+`wizbar-icon-picker`): 14 passed, 1 pre-existing unrelated skip. Re-ran `wizard-manager-1617.spec.js` specifically
+per the dispatch's own instruction to check its two screenshot baselines rather than assume — 7/7 green, and
+`git status` on `verification/` confirmed the 3 `t1617-*.png` files it touches came back byte-identical to their
+tracked baseline (restored via `git checkout HEAD --` after the run, as in t1910). `proc_health.py watch`: clean.
+
+🔨 turn 1911
