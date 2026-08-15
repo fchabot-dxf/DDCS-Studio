@@ -33403,3 +33403,135 @@ independent lean. Only source change this turn: the new test file (+ deletion of
 source touched net (the revert/restore for non-vacuity proof left both files byte-identical to HEAD).
 
 🔨 turn 1870
+
+## turn 1872 — Option B Slice 2 (positioning): re-scoped, re-derived, and shipped — additive, union untouched
+
+### Dispatch
+
+Resume Slice 2. Advisor accepted t1870's suite with specific praise (forward-scan invariant, the honest no-op
+finding, verified-not-assumed bore/alignment). START by re-reading t1862's own 5-consumer enumeration and saying
+whether Slice 2 should still be all five — particularly worried the 2D mirror (no per-segment loop) might be
+bigger than the other four and should be sliced out; DRO-labeling defaults to Slice 3 unless I can argue
+otherwise. Same stop clause: report before converting if a consumer depends on the single-frame assumption
+unsafely. Screenshot baselines must be zero-diff unless positioning legitimately changes a picture. checkEnvelope
+stays out of scope. Gate: node tier + slice-2 test + both baselines + the new dialect suite + every spec touching
+what changes.
+
+### Re-reading t1862, verified against current code — the scoping call
+
+Re-read t1862's own WORK-LOG entry in full, then re-verified every citation against the CURRENT file (not
+assumed unchanged): structurally identical, line numbers drifted only slightly (`setToolPosition` ~806/824 vs
+t1862's `:824`, static route loop ~1141 vs `:1141-1148`, `_positionMarkers` ~383/388 vs `:383-394` — same shapes).
+
+**The 2D mirror (site 4): sliced out, confirmed again.** `toolpath2d.js`'s `machineFrame` still gates two
+whole-view computations with no per-segment loop to hook into — re-verified, not re-assumed. Its own `setStarts`
+explicitly rebuilds each row to `{x,y,z,anchorsAtPrev}` only (checked directly), so it's PROVABLY inert to
+anything this turn adds — confirmed empirically too (the new test's 3rd case).
+
+**DRO-labeling (site 5): deferred to Slice 3, no argument found for pulling it in.** It only matters DURING PLAY
+(tied to `pos.pass`) — structurally Slice 3's own territory (B2, "per-moment"), not Slice 2's (B1, "regardless of
+playback"). Took the default.
+
+**Sites 1-3: re-derived, not just re-confirmed — found a real correction to t1862's own characterization.**
+t1862 called sites 1-3 "the same straightforward shape... a different read of an existing loop," implicitly
+assuming Slice 1's line-indexed `frameOwnerAtLine`/`frameSegments` would apply directly. Reading the actual code
+this turn found otherwise: `this.starts[p]` / `s.pass` (the trace engine's own `_pass` counter, `GcodeExecution
+Engine.js:624`) is a PASS index, not a line index — Slice 1's line-based derivation doesn't directly reach these
+3 sites at all. A genuinely NEW per-pass mapping was needed, not a reuse.
+
+**Deeper still: `_toolMachineFrame` is not a bug in isolation, it's a DELIBERATE union.** `opSimContext.js`'s
+`programSimContext` (line 91-103) explicitly ORs `toolMachineFrame` across every op in a program ("force it if
+ANY op needs it" — t714/R-B#6), applied once via `applyProgramIntent` (t756/R-C), the SAME seam that drives
+`forceMachine`'s envelope, `seatAtStart`, and `simStock()`'s stock-hiding (Bug 2, t1832/t1834 — explicitly RULED
+"do not touch the frame model"). Confirmed by re-reading t1832/t1834's own entries: this whole Option B
+initiative is the SANCTIONED continuation of exactly what those turns deferred as "a domain call reserved for
+the advisor" — not a new unsanctioned direction. But it meant Slice 2 could not simply flip `_toolMachineFrame`
+to a per-pass read; other consumers of the SAME union still need it exactly as today. This is the STOP CLAUSE's
+own "unsafe conversion" concern, made concrete — resolved not by stopping, but by making the change strictly
+ADDITIVE: a new, separate, per-pass OVERRIDE that only positioning reads, coexisting with the untouched union.
+
+### The fix — additive, 3 files
+
+`web/blocks/blocksApp.js`'s `blkStartHints` (the ONE place that concatenates per-op `opSimStarts` hints into one
+whole-program array — the Blocks tab's own multi-op preview) now tags each contributed hint with its OWN op's
+`opSimContext(opType).toolMachineFrame` — the SAME source the union already reads, applied per-pass instead of
+per-program. Threaded through `createPreviewPanel.js`'s `computePassStarts` row (already carries `emits`/
+`source`/`anchorsAtPrev` the identical way) and `gcodeViz3d.js`'s own `setStarts` (same pattern). The 3 read
+sites (`_positionMarkers`, `setToolPosition`, the static route loop) resolve `row.toolMachineFrame != null ?
+row.toolMachineFrame : this._toolMachineFrame` — override when tagged, fallback to the untouched whole-trace
+flag otherwise. `wizardManager.js`'s own single-op hint supply (the common "edit one wizard" preview) was NOT
+touched at all — its rows simply never carry the field, so every read site's fallback keeps it byte-identical,
+verified by the 2 pre-existing screenshot baselines (both single-op Corner) staying zero-diff.
+
+### New test — `tests/option-b-slice2-positioning-1872.spec.js`, 3/3 passing, non-vacuous
+
+Built via `ddcsLoadBlockStack` (not bar gesture — faster, matches `whole-program-intent-756.spec.js`'s own
+established pattern). One real bug caught before trusting results: the established `bare(opType)` helper uses
+the BARE built-in type string ('homing'/'corner'); `opSimContext` resolves that fine (its `MACHINE_FRAME_TOOL`
+set matches bare names), but `opSimStarts`'s own HINT dispatch only recognizes the wizards-as-data TWIN type
+(`user_homing_data`), registered via `setUserSimStarts` — confirmed directly (`opSimStarts('homing', {}, stock)`
+returns `null`). Switched to twin types, matching what a real bar-gesture Insert actually produces.
+
+1. **PRIMARY EVIDENCE**: a Homing-then-Corner Blocks program — the whole-program union stays `true` (Homing
+   still wins the OR, UNTOUCHED, per the explicit t1832/t1834 ruling) while the per-pass tags correctly diverge:
+   at least one row explicitly `true` (Homing's), at least one explicitly `false` (Corner's) — not merely
+   "some rows lack the field," a genuinely different claim from vacuous.
+2. A single-op program tags its one pass to MATCH the (also true) union — no divergence to prove there, the
+   interesting byte-identical claim instead carried by the untouched screenshot baselines.
+3. The 2D mirror stays provably untouched (checked its own handle, if reachable, never receives the tag).
+
+**Non-vacuity, proven by revert/restore** (backed up all 3 fixed files, reverted the ONE tagging line in
+`blocksApp.js`, re-ran, restored, re-ran again — `git diff --stat` on the restored `blocksApp.js` matched the
+intended fix scope, non-empty as expected since this file genuinely changed net): pre-fix, tests 1 and 2 failed
+with the exact predicted signature (`explicitlyTrue.length` / `explicitlyFalse.length` both 0, every row `{}`);
+test 3 (2D mirror) passed regardless, as expected. Post-restore: 3/3 pass.
+
+### Architecture map maintenance — caught and fixed in the same act, per the worker skill's own instruction
+
+`npm run test:node` first failed: `architecture-map-1698.test.mjs`'s own TRAP8 entries hardcode line numbers
+(`createPreviewPanel.js:1124-1125`, `gcodeViz3d.js:2803`) that my edits shifted (+3, +16 respectively, from the
+new per-pass rows/reads inserted above them) — the SAME recurring maintenance t1850 already did once for the
+same trap, per its own comment ("shifted from 1121-1122 by the setStarts()-wiring edit above it"). Found the new
+correct lines by direct search (not guessed): `createPreviewPanel.js:1127-1128`, `gcodeViz3d.js:2819`. Updated
+BOTH the test's own hardcoded citations AND `ARCHITECTURE.md`'s own prose (§8), each citing the verified new
+line, with a `t1872 — shifted from X by Y` comment matching the existing convention. Re-ran node tier clean.
+
+### Gate
+
+- New test: 3/3, non-vacuous (proven above).
+- Both screenshot baselines (`screenshot-baselines-1792.spec.js`): 2/2, zero-diff — confirmed additive/inert for
+  the single-op case exactly as designed.
+- Slice 1's own guard test (`segment-frame-derivation-1838.spec.js`): still passes, untouched.
+- `npm run test:node`: 118/118 (after the architecture-map fix above; failed once before that fix, root-caused
+  and corrected rather than worked around).
+- 85-file symbol-grepped gate (`blocksApp|createPreviewPanel|gcodeViz3d|blkStartHints|toolMachineFrame`,
+  `--workers=4`): 234 passed, 4 failed, 11 skipped. Investigated rather than dismissed: re-ran all 4 failing
+  files' full test sets (11 sub-tests) in isolation, chained cd + verified `node_modules/@playwright` present
+  first (this session's own known cwd-drift trap, hit again and worked around, not fallen for) at
+  `--workers=1`: **11/11 passed.** Confirmed load-contention flakes under the 4-worker batch, none of the 4
+  file names relate to positioning/frame content by their own titles (alignment seatAtStart, ATC in-place
+  gating, a subscriber-error guard, wizard-face rendering) — consistent with the flake read, not asserted from
+  that alone.
+- `handoff.py amendments --role worker`: polled twice (mid-task, none; pre-commit, none). Epoch re-checked (`4`).
+- `proc_health.py watch`: self tree clean throughout, 0 flagged.
+- checkEnvelope: not touched, out of scope as instructed.
+- No personal data touched this turn.
+
+### For the advisor
+
+Slice 2 shipped, re-scoped from t1862's own 5 to 3 (2D mirror sliced out as its own follow-up, DRO-labeling
+deferred to Slice 3, both per your own lean/default) — plus a deeper correction found by reading the code rather
+than reusing t1862's own characterization: sites 1-3 are pass-indexed, not line-indexed, so Slice 1's
+`segmentFrame.js` doesn't directly reach them; and `_toolMachineFrame` is a DELIBERATE whole-program union
+(t714/t756) other consumers (forceMachine, seatAtStart, Bug 2's stock-hiding) still correctly depend on — so the
+fix is a NEW, separate, per-pass override threaded through `blocksApp.js`→`createPreviewPanel.js`→
+`gcodeViz3d.js`, purely additive, leaving the union and everything reading it untouched. This IS the sanctioned
+continuation of what t1832/t1834 explicitly deferred as a domain call, confirmed by re-reading those entries,
+not a new unsanctioned direction. A real Homing-then-Corner Blocks program now positions each pass in its OWN
+op's frame instead of one flag applied uniformly; non-vacuity proven by revert with the exact predicted failure.
+Caught and fixed a stale architecture-map citation as a direct consequence of my own edit, per the worker skill's
+own "fix it when you prove it wrong" instruction — same maintenance t1850 already did once for the same trap.
+Gate: node 118/118 (after the map fix), new test 3/3 non-vacuous, both baselines zero-diff, 85-file gate
+234+11/249 clean once 4 flakes were isolated and confirmed (not dismissed on the say-so).
+
+🔨 turn 1872

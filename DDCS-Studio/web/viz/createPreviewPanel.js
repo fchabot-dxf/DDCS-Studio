@@ -788,7 +788,10 @@ export function createPreviewPanel(container, opts = {}) {
             // per-pass emits, true/false = corner's own opSimStarts computation): the old `!!` coerced every non-declaring
             // op's undefined to a hard false, which the renderers would have read as "declared sim-only" and hollowed out
             // every other op's reposition marker. Only a genuine `false` (corner's own zsurf/pass-0) means sim-only now.
-            const row = { x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: hint ? hint.emits : undefined, source: hint && hint.source, anchorsAtPrev: !!(hint && hint.anchorsAtPrev) };
+            // t1872 (Option B Slice 2) — toolMachineFrame: undefined unless the hint DECLARES it (only blocksApp.js's
+            // blkStartHints tags it, for a multi-op program). undefined → the read sites fall back to the whole-trace
+            // flag, so a single-op wizard preview (this hint's usual source) stays byte-identical.
+            const row = { x: +h.x || 0, y: +h.y || 0, z: +h.z || 0, emits: hint ? hint.emits : undefined, source: hint && hint.source, anchorsAtPrev: !!(hint && hint.anchorsAtPrev), toolMachineFrame: hint ? hint.toolMachineFrame : undefined };
             const pin = pinned && pinned[p];   // t301 — the operator PINNED this wall (a Layout spot): its world is ABSOLUTE (stock-datum-relative). Override x/y + flag `pinned` so _markerWorld skips the passEnds relocation → the 3D marker HOLDS like the Layout (no spot → the pure-auto chain, byte-identical).
             if (pin && Number.isFinite(+pin.x) && Number.isFinite(+pin.y)) { row.x = +pin.x; row.y = +pin.y; row.pinned = true; }
             next.push(row);

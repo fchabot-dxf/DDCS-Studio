@@ -385,8 +385,13 @@ export class GcodeViz3D {
         // t652 — a machine-frame op's Start is ALREADY in machine coords; the markers ride the part frame (offset by the WCS
         // shift), so CANCEL that shift for a machine-frame op — exactly how the tool (:586) and the route (:823) already do it.
         // Without this the Start marker double-shifts by the work origin (user-reported: G54 Y-500 pushed it outside the envelope).
-        const sh = this._toolMachineFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
+        // t1872 (Option B Slice 2) — PER-MARKER now: this.starts[p].toolMachineFrame (set only for a multi-op program,
+        // blocksApp.js's blkStartHints) overrides the whole-trace flag for THIS pass; undefined (every single-op preview)
+        // falls back to it, byte-identical to before.
         for (let p = 0; p < this.spindleMarkers.length; p++) {
+            const row = this.starts[p];
+            const machTool = (row && row.toolMachineFrame != null) ? !!row.toolMachineFrame : !!this._toolMachineFrame;
+            const sh = machTool ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
             const s = this._markerWorld(p);
             this.spindleMarkers[p].position.set(s.x - off.x - sh.x, s.y - off.y - sh.y, s.z - sh.z);
         }
@@ -450,7 +455,11 @@ export class GcodeViz3D {
     // wholesale on every call (no partial-merge with a prior drag: a drag writes back through `onStartChange`
     // into the DECLARED model, so the next recompute already carries it — same contract the 2D view relies on).
     setStarts(arr) {
-        this.starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, anchorsAtPrev: !!p.anchorsAtPrev, pinned: !!p.pinned })) : [{ x: 0, y: 0, z: 0 }];
+        // t1872 (Option B Slice 2) — toolMachineFrame carried through UNDISTURBED (undefined stays undefined): a
+        // per-pass override of the whole-trace flag below, only ever set for a multi-op program (blocksApp.js's
+        // blkStartHints); every other caller's rows lack the field, so the fallback in each read site keeps this
+        // byte-identical there.
+        this.starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, anchorsAtPrev: !!p.anchorsAtPrev, pinned: !!p.pinned, toolMachineFrame: p.toolMachineFrame })) : [{ x: 0, y: 0, z: 0 }];
         this._ensureMarkers();
     }
     // Per-pass reposition sources (['auto'|'manual',…]) → start-marker colour. Re-applies via the highlight pass.
@@ -821,7 +830,12 @@ export class GcodeViz3D {
         // = the "plunge" the operator watches while the engine + emit are correct. Subtract the part-frame shift so the
         // animTool's WORLD position lands at the raw machine coord (= engine.pos). The STOCK still rides the shifted frame
         // (right for cutting ops). Off (default) → the normal part-frame tool.
-        const sh = this._toolMachineFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
+        // t1872 (Option B Slice 2) — this.starts[pass].toolMachineFrame (this pass's own op, multi-op programs only)
+        // overrides the whole-trace flag as PLAY crosses from one op's G-code into another's; undefined (every
+        // single-op preview, and every pass in one) falls back to it, byte-identical to before.
+        const passRow = this.starts[pass];
+        const machTool = (passRow && passRow.toolMachineFrame != null) ? !!passRow.toolMachineFrame : !!this._toolMachineFrame;
+        const sh = machTool ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
         this._lastToolPos = pos;
         this._animTool.position.set((pos.x || 0) + o.x - doff.x - sh.x, (pos.y || 0) + o.y - doff.y - sh.y, (pos.z || 0) + o.z - sh.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
@@ -1138,7 +1152,9 @@ export class GcodeViz3D {
             // like the live tool at ~line 588 — so the drawn seek path EMANATES FROM the Start and coincides with the
             // animated tool (which rides engine.pos, seeded at the Start via initialPos). A Start drag re-traces (new deltas)
             // + repositions the route here. Cutting ops (toolMachineFrame off) keep the normal part-frame off (unchanged).
-            const machTool = !!this._toolMachineFrame;
+            // t1872 (Option B Slice 2) — mk.toolMachineFrame (this pass's own op, multi-op programs only) overrides the
+            // whole-trace flag; undefined (every single-op preview) falls back to it, byte-identical to before.
+            const machTool = (mk && mk.toolMachineFrame != null) ? !!mk.toolMachineFrame : !!this._toolMachineFrame;
             // t674 — a SEATED op (alignment) anchors its DRAWN route to the Start even when a final absolute/G53 park sets
             // stats.absolute (which turns _anchorToStart OFF). Without this the whole trace drew from the origin while the
             // animation (engine.pos, seeded at the Start) sat correctly at A. _seatAtStart makes the trace match the seat.

@@ -25,7 +25,7 @@ import { isOpBlockEdited } from './opGlow.js';   // op-edit guard (drives the me
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
 import { makePanesCollapsible } from '../ui/paneAccordion.js';   // t1760 — the Wizard View pane's own visual host needs the SAME accordion setup (wraps each viz pane's content in .wiz-pane-body + writes --viz-stack-h) the modal's own open() already gets; without it the pane's #blk_wiz_user visual content-sizes to its bare control-bar height instead of a real preview height
-import { applyProgramIntent } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview
+import { applyProgramIntent, opSimContext } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview; opSimContext (t1872) — this op's OWN frame intent, tagged per contributed hint below
 import { opSimStarts } from '../viz/opSimStarts.js';                  // t756 — the DECLARED per-op start source (retires the legacy inferStart)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -161,7 +161,14 @@ async function buildWorkspace() {
     for (const b of (getStack() || [])) {
       if (!b || b.type !== 'op' || !b.opType) continue;
       const h = opSimStarts(b.opType, b.params || {}, stock);
-      if (Array.isArray(h) && h.length) hints.push(...h);
+      // t1872 (Option B Slice 2) — tag each hint with ITS OWN contributing op's declared toolMachineFrame, the
+      // SAME source applyProgramIntent's whole-program UNION already reads (opSimContext.js). The union stays
+      // exactly as-is for forceMachine/seatAtStart/stock-hiding (t1832/t1834's own ruling: do not touch that
+      // frame model) — this is a SEPARATE, per-pass tag that ONLY gcodeViz3d.js's positioning sites consult,
+      // falling back to the whole-trace flag when absent (every other caller of getStartHints, single-op, never
+      // sets this field — byte-identical there). A multi-op program (Homing then Corner) now lets EACH pass
+      // carry its OWN op's frame, instead of one flag applied uniformly to every pass in the trace.
+      if (Array.isArray(h) && h.length) hints.push(...h.map((row) => ({ ...row, toolMachineFrame: !!opSimContext(b.opType).toolMachineFrame })));
     }
     return hints.length ? hints : null;
   };
