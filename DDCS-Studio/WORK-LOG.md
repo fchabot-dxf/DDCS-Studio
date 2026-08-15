@@ -35923,3 +35923,119 @@ disposable debug probe (`zzdebug-handbuilt-import-probe.spec.js`) and a temporar
 `programModel.js` while diagnosing the interstitial-endprogram bug were both removed before finishing.
 
 🔨 turn 1920
+
+## t1922 — STOP AND REPORT: which of the 11 full-suite failures need SIBLING ops vs STEPS WITHIN ONE OP
+
+### Dispatch
+
+The advisor's own full-suite gate found 16 failed / 11 failing in isolation after t1920 — a real regression, not
+load (my own 170-file gate was too narrowly scoped to catch it — a tiering gap, not a mistake). Per failing
+feature: does it need multiple ops IN THE PROGRAM MODEL, or would it work if the several operations were STEPS
+INSIDE ONE OP (the user's own model)? Report only — do not fix, do not rewrite tests to preserve the invariant at
+the cost of the feature. Also determine whether 5 of the 11 (probe-input-select-revival-1888 ×3, pane-visual-
+host-programmatic-1762, middle-superset) share the same cause as the other 6, or are separate. Gate: node tier +
+these 11 by name, no code changes.
+
+### First split: 5 of the 11 are unrelated load flakes, not this regression
+
+Re-ran `probe-input-select-revival-1888.spec.js`, `pane-visual-host-programmatic-1762.spec.js`, and
+`middle-superset.spec.js` each in FULL isolation (single file, no batch): **13/13 clean**, twice for
+probe-input-select-revival (5/5 both times — the third confirmation this session). None of the three call
+`commitActiveOp`/`ddcsGetBlockProgram`/multi-op machinery at all in their own failing assertions — their
+failures were batch-contention timeouts/races, the same signature t1920's own gate already characterized twice.
+**Separate cause, not this regression** — leaves exactly 4 real, reproducible-in-isolation regressions:
+`flow-labels-unique-1408.spec.js` (5 tests), `setup-sheet-850.spec.js` (4 tests), `time-estimate-844.spec.js` (1
+test), `editor-sim-real-insert.spec.js` (1 test).
+
+### The 4 real regressions — read what each ACTUALLY asserts, not just that it fails
+
+- **`flow-labels-unique-1408.spec.js`** — a regression guard on a REAL SHIPPED BUG (WORK-LOG t1408): two
+  label-bearing op bodies (e.g. Drill + Surfacing) in ONE program used to collide their own flow labels (`N91`
+  written twice), silently skipping the SECOND op's own execution (0 seconds where a real duration belonged).
+  Builds its fixture with 2-4 sequential `openWiz→insertWiz` calls of DIFFERENT op types, asserting every op
+  committed AND every op's own time is nonzero.
+- **`setup-sheet-850.spec.js`** — a printable job sheet: 3 DISTINCT operations (Pocket/Drill/Contour), each
+  carrying its OWN, individually-assigned tool (`ops[0].params.toolNum = 1`, `ops[1] = 2`, `ops[2] = 1` — T1
+  reused → dedups to 2 tool rows), each with its own per-op time. This is not incidental multiplicity — a job
+  using two different tools genuinely needs a PHYSICAL tool change between operations; the sheet exists to tell
+  a machinist that.
+- **`time-estimate-844.spec.js`** ("PER-OP split sums to the total") — 2 different ops (Surfacing + Pocket),
+  asserting each op's own time is positive and the per-op split partitions the whole program's move time.
+- **`editor-sim-real-insert.spec.js`** ("a second op gets its OWN hints") — the SAME op type (`user_middle_data`)
+  inserted TWICE, asserting each of the two INSTANCES resolves its own, independent per-pass sim hints (e.g. two
+  bosses at different locations in one job).
+
+All four are the SAME underlying shape: **can the program represent N individually-addressable operations
+(same or different types), each carrying its own params/tool/time/hints, correctly attributed** — none of them
+care whether that's "several sibling ops" or "several steps" as a matter of their own stated claim.
+
+### The precise mechanism check — verified live, not assumed
+
+`(window.ddcsGetBlockProgram() || []).filter(b => b.type === 'op')` is the ENUMERATION pattern all 4 features use
+to find "the operations." This only sees TOP-LEVEL entries — for a `multi_step`-wrapped program (t1916's own
+surviving multi-op shape, produced by `importMarkedNc`), it finds ONE entry (the wrapper itself), never its own
+children. This is the direct cause of every failure: `setup-sheet-850`'s own `ops[1]`/`ops[2]` are `undefined`
+after a REPLACE-semantics 3x-insert (only the LAST op survives) → `ops[1].params.toolNum = 2` throws; the other
+three read `ops.length`/`ops.map` and get 1 where 2-4 was expected.
+
+**But the ATTRIBUTION mechanism underneath is NOT broken the same way — checked directly, with a disposable
+probe (deleted after use), not assumed from the enumeration bug alone.** Built a `multi_step`-wrapped 2-op
+program directly (`opBuilders.js`'s own `makeOp`, mirroring what `groupConsecutiveOps` produces) and read both
+directions: `opAtLine` (line → owning op) resolves EVERY line in the whole program to the SAME wrapper id, never
+to either step individually — confirms my own t1914 finding, `findOpInStack` only matches the first TOP-LEVEL
+op. But `ddcsLinesForOp(opId)` (the OPPOSITE direction — op → its own lines) resolved CORRECTLY and
+INDEPENDENTLY for each step (74 lines for the pocket step, 25 for the drill step, summing exactly to the
+program's 99 total) — because `programModel.js`'s own `linesForOp` checks `anc.includes(opId)` (ancestry
+MEMBERSHIP, at any depth) rather than reusing `opAtLine`'s own "first top-level match" shortcut.
+`engine/timeEstimate.js`'s `secondsForLines(perLine, lines)` is purely a sum over a given set of line indices —
+zero awareness of hierarchy, so it inherits whichever line-list it's handed correctly either way.
+
+**This means the per-op TIME/LABEL attribution that `flow-labels-unique-1408`/`setup-sheet-850`/
+`time-estimate-844` actually depend on (`ddcsLinesForOp` + `secondsForLines`) already works correctly on a
+`multi_step`-nested step today, with ZERO further engine changes** — the only thing broken is the SHALLOW
+enumeration (`filter(b => b.type === 'op')`) that doesn't know to also look inside a `multi_step`'s own
+children. `editor-sim-real-insert.spec.js` is closer to the boundary: it reads `mid.params` directly (not via
+line attribution) — also fine off a `multi_step` step's own params, since each step keeps its own full record —
+but its own SECOND assertion (`nOps: 2`, two DISTINCT ids resolving two DISTINCT instances) needs SOME mechanism
+to hold two occurrences of the same op type addressably, which `multi_step`'s children shape already provides
+too.
+
+### The honest answer, stated plainly
+
+**None of the 4 need SIBLING ops in the program model specifically.** All 4 would be served by "steps inside one
+op" (the user's own model) IF two things exist, NEITHER of which does today:
+
+1. **A live authoring path.** There is currently NO way for a user to build a multi-step program via the Studio
+   canvas at all — replace-on-insert deleted the only accumulation mechanism (t1920), and the replacement (a
+   user composing "Pocket, then Drill, then Contour" as steps within one op) is step 3's own job, not yet
+   dispatched. `multi_step` exists ONLY as an import-time reconstruction of a LEGACY multi-marker `.nc` file —
+   nothing produces it from a live insert gesture.
+2. **The shallow enumeration extended.** `filter(b => b.type === 'op')` (used pervasively, not just by these 4
+   files) needs to also flatten a `multi_step`'s own children when counting/listing "the operations" — a
+   small, targeted, well-scoped change (the deep attribution machinery underneath already works), not a redesign.
+
+**t1914's own conclusion was too narrow, exactly as you named it — but the reason is more specific than "there
+are more cases."** t1914 asked what breaks STRUCTURALLY (does anything refuse to emit correct G-code without
+sibling ops) and correctly found only `importMarkedNc`. It did not ask what FEATURES depend on being able to
+ADDRESS multiple operations individually for reasons OTHER than emitting G-code — time estimation, tool-change
+documentation, and per-instance preview hints all need that addressability even though the G-CODE ITSELF has
+never needed sibling ops (transparent nesting, confirmed t1916). Those are different questions, and only the
+first was asked.
+
+**One-op-per-program does not need to be walked back as an invariant** — the DATA model (a `multi_step`-style
+wrapper whose children retain full individual identity) can serve every one of these 4 features. What's missing
+is the AUTHORING path (step 3) and a small, mechanical extension to the enumeration pattern these features (and
+likely others not yet found) share. Whether step 3 should build "steps within one op" with this addressability
+requirement EXPLICITLY in scope — rather than the narrower "replace + a notice" — is the design call this report
+is for.
+
+### Gate
+
+`npm run test:node`: 118/118. The 11 named tests re-run individually/in isolation as described above: 6 real
+failures confirmed (flow-labels-unique-1408 ×5 threaded through 2 test blocks, setup-sheet-850 ×4,
+time-estimate-844 ×1, editor-sim-real-insert ×1 — matches the advisor's own count once the 5 flakes are
+excluded), 5 confirmed clean/unrelated. No source changes this turn — `git status` confirmed clean on every
+tracked file (3 regenerated `verification/t1617-*.png` restored via `git checkout HEAD --`, same load-side-effect
+already characterized in prior turns). The disposable `multi_step`-addressability probe deleted after use.
+
+🔨 turn 1922
