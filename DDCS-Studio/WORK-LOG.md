@@ -36039,3 +36039,211 @@ tracked file (3 regenerated `verification/t1617-*.png` restored via `git checkou
 already characterized in prior turns). The disposable `multi_step`-addressability probe deleted after use.
 
 🔨 turn 1922
+
+## t1924 — THE VOCABULARY PASS: op/step/program vs the machinist's PROGRAM/OPERATION. Analysis + proposal, no code.
+
+### Dispatch, and three amendments that reversed its own stated priority
+
+The user ruled on naming, from what a machinist actually expects: a PROGRAM is the file you run, the job — ONE
+per canvas. An OPERATION is what the machine does — face, drill, bore — SEVERAL per program, each its own tool.
+The code has a collision: `op` currently means BOTH the container (one per program) AND the thing a machinist
+does (several per program) — the same word while a program held many ops, not the same thing anymore. The
+dispatch's own original framing ("user-facing words matter most, code identifiers can lag") was OVERRULED by
+three amendments landing while this act was in flight, each read and incorporated before finalizing:
+1. The rename is authorised INCLUDING code identifiers — a second agent works in this tree and reads only the
+   names; UI-correct-but-internals-misleading is the same divergence this whole session has been deleting.
+   Deliverable gains: per-identifier BLAST RADIUS (call sites, persisted-boundary crossings, whether it changes
+   data a user already has), proposed as REVIEWABLE SLICES (not one sweep), riskiest slice named.
+2. Persisted names are IN SCOPE too — no compatibility shim, no migration, no dual-reading (this project's own
+   standing pre-release rule). Simplifies the map: no carve-out set of names that must stay behind.
+3. UNIFICATION is the objective, not a secondary goal — ONE WORD end to end (form label = identifier = marker
+   record = stored key = test name = doc), no translation layer. Where code and user words disagree, the
+   INDUSTRY WORD WINS regardless of call-site count. Any place the two genuinely CANNOT be the same is its own
+   reportable finding, not a footnote. The one hard constraint across all three: the EMITTED G-CODE must not
+   change, proven byte-identical in every slice.
+
+Still: MAP FIRST, nothing renamed this turn. Deliver (a) every user-visible surface + which meaning it carries,
+(b) every code-level use, named by declaration, (c) a proposed mapping with blast radius and slices. Flag any
+wrong word ALREADY visible today. Note what step 3's authoring UI will need to call things. Gate: node tier only.
+
+### (a) Every user-facing surface, and which meaning it carries
+
+**Already correctly using "Operation(s)" — the target word, no change needed:**
+- `setupSheet.js:166,242` — the sheet's own `<h3>Operations</h3>` section + its table's `<th>Operation</th>`
+  column. This is the ONE surface already speaking the machinist's own word.
+
+**Already correctly using "Program" (the whole-canvas/job sense) — matches the user's own ruling, which
+explicitly equates "program" and "job" ("the file you run, the job"), so these are NOT a collision to resolve:**
+- `settingsPanel.js:1121,1296,1298,1312` — the "Program" settings tab, "END OF PROGRAM" section, "Program end"
+  field.
+- `editorManager.js:209,215` — the exported filename/title fallback `'Program'`.
+- `wizards/ops/index.js:137`, `wizards/ops/program.js:14,28`, `wizards/ops/macro.js:35` — the Blocks palette's
+  `'Program'` category and its `'Program Start'`/`'Program End'`/`'End Program'` block labels.
+- `editorOpHover.js:75` — the program-rotation badge tooltip, explicitly commented (line 52-55) as
+  "program-level, NOT on an op pill."
+- `setupSheet.js:256` — `title="Click to edit job name"` — same whole-canvas meaning, spelled "job" instead of
+  "program" in this ONE surface; licensed by the user's own ruling text treating the two as synonyms.
+
+**Raw "op"/"ops" visible to the user TODAY, unglossed — the actual collision, live in front of real users:**
+- `wizardManagerPanel.js:216` — Settings → Wizard Library shelf item descriptor literally renders
+  `` `${op.opType ? 'op' : 'wizard'} · ${n} fields}` `` under every `.wiz` thumbnail — a bare, undefined "op" a
+  non-developer would have to guess at. **Flagged as the single highest-priority fix** — no other surface uses
+  the raw word this nakedly, in a place every Library-browsing user sees.
+- `wizardManager.js:72` — the one-time round-trip toast, shown to literally every user on their first insert:
+  *"This op is now an editable block stack — open the Blocks tab to edit or extend it."*
+- `ui/blockEditNotice.js:23,27,28` — the edit-conflict dialog: *`"${label}" was edited in Blocks`* / *"This op was
+  edited in Blocks..."* / *"Replace would discard these Blocks edits"* — fires on a real, common gesture
+  (re-inserting over a hand-edited op).
+- `ui/headerPost.js:51`, `ui/libraryModal.js:171,165` — refusal toast/tooltip *"Open an op in the Blocks tab
+  first..."* (Quick-menu Save-as-wizard / Library New-from-current).
+- `wizardManagerPanel.js:198,399` — factory-reset confirm dialogs: *"Your custom .wizard ops are kept"* / *"your
+  custom ops are untouched"* — "ops" used as a bare plural noun in dialog prose a user reads before confirming a
+  destructive action.
+- `opContextMenu.js:127` and `blocksApp.js:868,878` — `` `✎ Edit ${op.label || op.opType || 'op'}` `` — the bare
+  `'op'` fallback only surfaces when an op has neither label nor opType (an edge case, not a live default path,
+  but a real leak if ever hit).
+- `blocks/blockly/bridge.js:440` — the CAM `opunit` chip renders literally `` `${label} unit` `` (e.g. "Surface /
+  face unit") on the Blockly canvas — not the raw word "op," but "unit" is ALSO not the machinist's word
+  ("operation"); a second, narrower misalignment, scoped to the CAM sub-stack authoring surface (wizard-makers,
+  not general users).
+
+**A third, unrelated meaning sharing the SAME words — not part of the collision, but worth naming so it isn't
+conflated with it while proposing fixes:**
+- "Setup" — the wizard-bar's OWN dropdown group (`commandDeck.js:113`, Comm/Warm-up/I/O) vs `setupSheet.js`'s own
+  two-sided-job "Setup 1"/"Setup 2" fixture-stage sense (`setupSheet.js:118,233,236`) — same English word, two
+  unrelated meanings, both user-visible, neither is "program" or "operation."
+- "Step" — FOUR distinct senses found, none of them the machinist's "operation": (1) the wizard-bar's own
+  `'I/O Step'` item (a quick G-code action, `wizardLibrary.js:44`); (2) literal `( Step 1: ... )` / `( Step 2:
+  ... )` G-code comments a single wizard's OWN internal probing routine emits (`atcLengthWizard.js`,
+  `cornerWizard.js`) — stages WITHIN one op, not across ops; (3) the pocket ramp-mode option `'Step'` vs `'Helix'`
+  (`index.html:324-325`) — a CAM descent-strategy name; (4) "Step Down"/"Step Over" field labels
+  (`stepdown.js:12`, `stepover.js:83`) — CAM depth/radial dimensions. None of these should be touched by a
+  program/operation rename — they're pre-existing, legitimate, unrelated uses of the same English word.
+- `pinLabel()`'s `'Program zero'` (`setupSheet.js:41`, `stockEditor.js:174`) — the WCS-origin term, unrelated to
+  the whole-canvas "program" sense.
+
+### (b) Every code-level use, by declared concept (not a copied grep list)
+
+1. **The `op` container** (`opBuilders.js`'s `makeOp()` → `{type:'op', opType, id, params, requires, children}`).
+   Under the pre-t1920 model this was ALWAYS "one operation, possibly one of several siblings." Under the
+   current model it is the top-level canvas content — ONE per program — UNLESS it sits inside a `multi_step`.
+   Consumed by `opSession.js` (file name, and its own `commitActiveOp`/`replaceOp`/`deleteOp`/`duplicateOp`),
+   `opRecord.js` (`getLastOp`/`recordOp`), `opAtLine`/`findOpInStack` (`programModel.js`), `opContextMenu.js`,
+   `editorOpHover.js`'s per-op chip, `opBuilders.js`'s own `opLabelOf`/`OP_LABELS`.
+2. **The `multi_step` wrapper's own children** (t1916) — structurally the SAME `{type:'op', ...}` shape as #1,
+   just nested one level deeper. This is the actual mechanical root of the collision: ONE type tag (`'op'`)
+   serves two different real-world things depending on nesting depth. Per t1922's own finding, `linesForOp`
+   already resolves these correctly by ancestry membership; only the shallow `filter(b => b.type === 'op')`
+   pattern (used by `setupSheet.js`, `time-estimate` fixtures, `flow-labels-unique`'s own test, and likely
+   others not yet audited) doesn't know to look inside a `multi_step`.
+3. **`multi_step` itself** — the wrapper TYPE. Represents "the program" in the N>1 case; in the N=1 case, the
+   sole top-level `op` (#1) plays that role directly, with no wrapper needed. So "the program" today is really
+   "whatever `ddcsGetBlockProgram()` returns at the top level," regardless of whether that's a bare op or a
+   `multi_step`.
+4. **`ddcsGetBlockProgram()`/`ddcsLoadBlockStack()`** (`programModel.js`) — ALREADY correctly named "Program" at
+   the API boundary. Its return value's own top-level entries are what everything downstream calls "op(s)" —
+   meaning the API-naming layer is already partially aligned; the collision lives one level down, in what those
+   entries are called once read.
+5. **Program-level SIBLING declarations** (`xform`/`entry`/`flip`, `progstart`/`progend`) — outside this
+   collision entirely; they're neither "program" nor "operation," they're machine-framing/whole-program
+   transform declarations that sit alongside whichever op(s) exist, named precisely already (t1914's own finding).
+
+### (c) Proposed mapping — ONE word end to end, per amendment 3
+
+| Meaning | The one word | Replaces |
+|---|---|---|
+| The whole canvas content, one per program | **Program** (the user's own ruling treats "job" as a synonym; `setupSheet.js`'s "job name" title can stay — it's the same word in the user's own framing, not a second one) | already correct at the API boundary (`ddcsGetBlockProgram`/`ddcsLoadBlockStack`) — no change needed here |
+| A single machining/probing action, several per program, each its own tool | **Operation** | `op` / `opType` / `type:'op'`, at every nesting depth — no positional exception |
+
+Scope note: this targets the STRUCTURAL vocabulary (container/action/program), not the individual wizard-type
+name strings (`'drill'`, `'pocket'`, `'contour'`, …) — those already ARE the machinist's own words and are
+untouched by this rename.
+
+### Blast radius — every identifier that would change, with real numbers (not estimated)
+
+Counted directly (`grep -rl`/`grep -ro` across `web/`, not sampled):
+
+| Identifier | Files | Occurrences | Persisted boundary? | Reaches emitted text? |
+|---|---|---|---|---|
+| `type:'op'` / `b.type === 'op'` (the structural type tag) | 9 + 17 | 16 + 42 = 58 | No (the type TAG itself is never serialized as a string a user's file depends on — only the marker's own separate `"op"` JSON key is, see below) | **Yes, indirectly** — `blockEmitter.js`'s own `if (block.type === 'op')` branch IS the transparent emit-passthrough dispatch; the tag must be updated in the SAME commit as its own emit-dispatch check or emit breaks outright (not a byte change, a program-doesn't-run change) |
+| `.opType` (the property holding WHICH kind of operation) | 32 | 203 | No — a property NAME, not a value; the STRING VALUES it holds (`'user_drill_data'` etc.) are unaffected and are what's actually persisted | No — never itself emitted as text, only read to resolve a builder/label |
+| `makeOp()` | 5 | 14 | No | No — a constructor function, called before emit, produces the (renamed) type tag |
+| `opLabelOf()` / `OP_LABELS` | 6 + 2 | 7 + 7 = 14 | No | No — display-label lookup only |
+| `opAtLine()` / `findOpInStack()` | 1 each | 3 + 3 = 6 | No | No — editor hover-to-edit resolution |
+| `linesForOp()` | 2 | 2 | No | No — the per-op line-range lookup t1922 proved already handles nesting |
+| `getLastOp()` / `recordOp()` | 7 + 18 | 12 + 20 = 32 | No | No — the "about-to-commit" op snapshot |
+| `opSession.js` / `opBuilders.js` / `opRecord.js` / `opContextMenu.js` (file names, imported by) | 13 / 14 / 22 / 6 | 18 / 15 / 24 / 9 | No | No — module boundaries, not data |
+| `commitActiveOp` / `replaceOp` / `deleteOp` / `duplicateOp` / `hasActiveOpStack` / `buildActiveOpStack` | 4/4/2/2/1/2 | 4/5/2/2/1/4 = 18 | No | No — session-mutation API |
+| `multi_step` (the wrapper type) | 2 | 5 | No | Yes, if kept (see observation below — recommend retiring it instead) |
+| **The marker's own JSON key** — `opSchema.js:220`, `const rec = { op: opType }`, emitted as `( @DDCS:1 {"op":"user_drill_data",…} )` | 1 definition site, consumed by `parseMarker`'s own inverse (1 file) | n/a — but every EXPORTED `.nc` FILE carries one such line per operation | **Yes — this IS the one persisted boundary in the whole surface** | **Yes, literally** — the key name is BYTE CONTENT of a comment line in every exported file |
+
+**Total mechanical surface (excluding the marker key and its own tests): roughly 140 call sites across ~35
+files** for the identifiers alone (the `.opType` property read is the overwhelming majority at 203 occurrences —
+the single biggest, and safest, slice: a property-name find-replace with no shape or dispatch change). Plus
+every test file asserting `b.type === 'op'` or `.opType` needs its own assertions updated to match — not counted
+separately above since they're included in the same grep (test files are `web`-relative `tests/` siblings, not
+scanned by the `web/`-scoped grep above; a real slice would need a second pass over `tests/*.spec.js` +
+`tests/node/*.test.mjs`, not sized here since this act's own scope is the map, not the execution).
+
+### Reviewable slices, ordered least-risky first — each independently provable
+
+1. **User-facing string literals** (the 7 raw "op" instances in (a), plus `opunit`'s own "unit"→"operation"
+   wording). Zero identifier change, zero data-model change, zero emit risk. Provable by: the literal strings
+   changed, screenshots of each surface, no other diff. `wizardManagerPanel.js:216`'s shelf descriptor first —
+   most naked, most frequently seen.
+2. **Pure internal identifiers with no persisted footprint** — file names (`opSession.js`→`operationSession.js`
+   etc.), function names (`makeOp`→`makeOperation`, `opAtLine`→`operationAtLine`, `getLastOp`→`getLastOperation`,
+   `commitActiveOp`→`commitActiveOperation`, …), `OP_LABELS`→`OPERATION_LABELS`. ~65 call sites across ~15 files
+   (the file-name + function-name rows above, excluding `.opType` and the type tag). Provable by: every import
+   resolves, every test still passes unmodified in ASSERTION content (only identifier names in the test's OWN
+   source change, not what it checks), full suite green.
+3. **`.opType` → `.operationType`** (the property name, 203 occurrences / 32 files — the single largest count,
+   but the LOWEST-RISK large slice: a property rename never touches the emit dispatch, never touches a stored
+   value, only how code READS a record it already has). Provable the same way as slice 2, at larger scale.
+4. **`type:'op'` → `type:'operation'`** (58 occurrences / ~24 files) **— THE RISKIEST SLICE, flagged as such.**
+   This is the one identifier whose rename must land in the SAME commit as `blockEmitter.js`'s own dispatch
+   branch (`if (block.type === 'op')`) — split across two commits and the emit path silently stops recognizing
+   op containers between them. Also the one slice touching every `b.type === 'op'` test assertion (42
+   occurrences across the 17 already-counted files, PLUS whatever `tests/*.spec.js` count a second pass would
+   add — not sized here). Byte-identical emit across the FULL suite is the proof this slice lives or dies by,
+   not just the node tier. Recommend running the specific byte-identical-emit specs this session has already
+   built (the "twin == built-in byte-identical" family) as the FIRST check after this slice, before the broader
+   gate, since that's where a dispatch-branch slip would show first and most legibly.
+5. **`multi_step` — retire or rename, a decision this map surfaces but does not make.** See the observation
+   below; if retired, this slice is a deletion (simpler, and removes the exact enumeration gap t1922 found) —
+   if kept, it needs its own new name matching the rest.
+6. **The marker's own JSON key — held last, deliberately, pending an explicit ruling.** This is the ONE place
+   this map found where the code word and the user word may genuinely need to stay different, or where "the
+   emitted text must not change" and "one word end to end" directly conflict — see next section.
+
+### The one place the map found where the two rules collide — reported on its own, per amendment 3
+
+`opSchema.js:220`'s marker key (`{ op: opType }`) is BOTH a "stored/persisted name" (amendment 2: in scope, no
+shim needed) AND something that "reaches the emitted text" (amendment 3: must not change, full stop) — it is a
+G-code COMMENT line's own literal bytes in every exported `.nc` file. The two amendments point opposite ways for
+this ONE identifier specifically. My own reading, offered as input not as a resolution: the marker is metadata
+a controller ignores (a comment, never an executable instruction), so renaming its key would not change what a
+machine DOES — but it WOULD change the FILE'S OWN BYTES, which is exactly what several of this session's own
+"byte-identical emit" tests check literally (including comment text, not just G-code words) — so this slice is
+real work (updating those tests' own expected marker text) even if it's not a "the machine runs differently"
+risk. **Flagging this as the one identifier needing an explicit ruling before slice 6 is scoped at all**: does
+"the emitted text must not change" mean the ACTIVE G-code specifically, or literally every byte including
+comments? If the latter, "one word end to end" cannot include the marker key, and that is the one place this
+map's own map-first promise says should be named rather than silently decided.
+
+### Observation for step 3, not a decision
+
+If "operation" becomes the ONE word for a single machining action at every nesting depth (slice 4 above), the
+`multi_step` WRAPPER TYPE may not need to exist as a separate concept at all — "the program" could simply BE
+"the top-level array `ddcsGetBlockProgram()` already returns," holding 1-to-N operation records directly, with
+no special wrapper block for the N>1 case. That would also retire the exact enumeration gap t1922 found (nothing
+to "look inside" if operations are never nested a level deeper than the program itself) and shortens slice 5 to
+a deletion rather than a rename. Named because step 3's own authoring UI is "the thing about to bake the
+vocabulary in" — worth knowing before, not after, it's built. Not decided here; a design call for whoever scopes
+step 3.
+
+### Gate
+
+`npm run test:node`: 118/118. No source changes this turn — `git status` confirmed clean on every tracked file.
+
+🔨 turn 1924
