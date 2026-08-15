@@ -2846,3 +2846,54 @@ handler, reflects through the editor's debounced sync). It IS a real door — sa
 and it gets its own turn. Good call surfacing it instead of quietly widening scope.
 ⚠ Gate: your new specs + the 4 t1928 features by name + the node tier. NOT the full suite.
 ⚠ DO NOT start slice 2 of the rename.
+
+# ═══ t1942 — THE + ADD BUTTON (the human's ruling, wired) + one vacuous test ═══
+
+t1940 accepted. The mechanism is right and it is built out of the proven pipeline rather than a lookalike of
+it. Two things I want repeated: when your bridge test failed you **debugged the REFERENCE, not the subject**,
+and found your own fixture was wrong rather than "fixing" `addOperation` to match a bad expectation — that is
+the failure mode this whole loop exists to catch, caught by you first. And you inspected the raw diff BEFORE
+applying `codeOnly()` and confirmed the remaining differences were comment-text only, instead of reaching for
+the normaliser and hoping.
+
+## ⚠ FIRST — ONE OF YOUR FOUR TESTS IS VACUOUS. Fix or delete it.
+`add-operation-1940.spec.js`, the STOP-CONDITION test. It loads program A, emits, reloads **the same** program
+A, and asserts the two emissions match. **`addOperation` is never called in it.** It would pass unchanged if
+`addOperation` corrupted every single-operation program in the app — which is the exact claim its own name
+makes. Your own non-vacuity run already said so: 2 of 4 failed on a naive revert, and this is one of the two.
+**Make it load-bearing or delete it.** A test that cannot fail is worse than no test: it stops the next reader
+looking. (A real version: assert the pipeline `addOperation` runs is an IDENTITY on a one-operation program —
+same stack, byte-identical emit. That can fail.)
+*(Test 2, the symmetric-rule one, is fine — it exercises `groupConsecutiveOps` directly and means something.
+But note plainly: **the collapse-on-delete path is not built or called yet.** Do not let that promise get lost.)*
+
+## THEN — WIRE THE + ADD BUTTON. This is the feature the human ruled.
+Wizard-bar Insert (`wizardManager.js:512`) on a NON-EMPTY canvas offers three choices; on an EMPTY canvas it
+inserts with no dialog at all, exactly as today.
+
+```
+  +--------------------------------------------------+
+  |  Insert this operation?                          |
+  |  Your program already has: Facing (1 operation)  |
+  |  [ + Add as a 2nd operation ]  [ Replace it ]    |
+  |                  [ Cancel ]                      |
+  +--------------------------------------------------+
+```
+
+1. **THE THIRD CHOICE IS A DECLARED DIALOG PRIMITIVE.** `dialog.js` exposes only `dlgConfirm` / `dlgPrompt` /
+   `dlgNotice` — all two-way. **Add a declared multi-choice primitive there**, next to its siblings. Do NOT
+   hand-roll a bespoke three-button modal inside `wizardManager.js`.
+2. **🛑 ONE SEAM STILL OWNS THE RULES.** The silent-pass condition (empty program / identical load) and the
+   Undo snapshot live in `confirmDestructiveLoad` and must not be copied into a second function. If the clean
+   shape means changing that seam's signature, change it and update all callers — **but if you find yourself
+   writing the silent-pass test a second time anywhere, STOP and tell me instead.**
+3. **ADD USES `addOperation`** — the thing you proved last turn. Replace keeps today's behaviour.
+4. **ASSERT ALL THREE OUTCOMES, on what the user sees:** Add → two operations on the canvas, both bodies in the
+   emitted G-code · Replace → one operation, the previous one gone · Cancel → the program **byte-identical**.
+5. **PROVE NON-VACUITY** the way you did in t1938 — break it, watch the test fail, restore.
+6. **WORDING:** "program", never "operation", for the thing being replaced. It is a program.
+
+⚠ Gate: your new specs + `destructive-load-doors-1938` + the 4 t1928 features + node tier. NOT the full suite.
+⚠ Land it COMPLETELY; park anything that does not fit rather than leaving two half-done pieces.
+⚠ Still queued, not now: the marker-free raw-text import door · `collectOps`'s phantom row · the
+`lathe-honest-3d-1301` near-miss · slice 1's unswept region (`macrosApp.js` et al) · slice 2 of the rename.
