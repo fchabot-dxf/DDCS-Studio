@@ -2653,3 +2653,37 @@ first act in this arc that DESTROYS the user's work, so the plan gets gated befo
 plan if you think it matters; shipping it is not this task.
 ⚠ **DO NOT** start slice 2 of the vocabulary rename.
 ⚠ If a step-3 decision needs a human ruling, write the question INTO the plan — do not stop and wait.
+
+# ═══ t1932 — WHERE ELSE IS THE OPERATION ENUMERATION STILL BLIND? (read-only sweep) ═══
+
+t1930's plan ACCEPTED, claim verified by the advisor: `confirmDestructiveLoad` is real at `saveStates.js:66`,
+exactly 2 callers (devMode), and it ALREADY encodes the silent-pass rule (non-empty AND signature differs) and
+already snapshots to Undo. Step 3 is routing 4 unguarded doors through it. **Not dispatched yet** — the build
+waits on the advisor's release gate finishing, and on the human's ruling on the multi-op fork.
+
+**FOR WHOEVER BUILDS STEP 3 (do not act now):** the seam's message is hard-coded to the Blocks-tab context —
+*"Opening X in Blocks replaces the program in the editor."* Wrong for file-import, open-project and Clear. The
+message becomes a parameter of the seam; it does not become four messages at four doors.
+
+## THE TASK — read-only. NO product code, NO specs, NO suite run. The advisor's gate is still running.
+`flattenOps` fixed the SHALLOW enumeration. This sweep hunts the same family's other shapes.
+
+1. **THE OVER-DEEP TWIN, in the file you just edited.** `setupSheet.js:106-113` `collectOps` recurses and
+   pushes EVERY `type:'op'` it meets — so a `multi_step` wrapper is pushed **and then its children are pushed
+   too**. `buildSheetHTML` takes that branch whenever the program declares `setup` containers, so the
+   `flattenOps` fix does not cover it. **Determine REACHABILITY and say so plainly:** can an imported
+   `multi_step` end up inside a `setup` container (`transform.js:41` is the only declaration site)? If yes, the
+   sheet prints a phantom operation row plus the real ones. Report REACHABLE / NOT-REACHABLE with the evidence
+   — do not fix it yet.
+2. **THE SAME CLASS ONE LEVEL DOWN — CAM.** `slotPack.js:92-99` names *"the shipped multi-op + sub-stack bug"*
+   in its own comment and was patched independently. Does `flattenOps` subsume that patch, or is CAM's case
+   genuinely different? One declaration or two — answer it, don't assume.
+3. **ANY OTHER SITE that asks "what operations does this program hold"** and still answers wrong. You wired 5;
+   name what you deliberately left and why (`opAtLine`'s multi-op logic in `segment-frame-derivation` is
+   already flagged as having no live-gesture path — confirm or correct that).
+4. **The stale accumulation-era comment you flagged at `wizardManager.js:478-480`** — quote it and say what it
+   should say. A comment asserting a behaviour the code no longer has is a lie the codebase tells about itself.
+   Fixing a comment is not code; **you may fix this one** in the same docs commit.
+
+⚠ Report REACHABLE/NOT with evidence, not a theory. "Unlocated" is an acceptable answer; a guess is not.
+⚠ DO NOT start slice 2 of the rename. DO NOT build step 3.
