@@ -7,7 +7,7 @@
  * atcToolCheckHeaderComments; the #5/#6 source-chips re-applied via srcVal/srcNote on Expert). `level` baked. Static shape →
  * no superset; no sim-starts. (Only difference vs Tool Length: +tolerance #20 + a SINGLE interpolated header line.)
  */
-import { atcToolCheckStack, atcToolCheckHeaderComments } from '../../wizards/stacks/atcToolCheckWizard.js';
+import { atcToolCheckStack } from '../../wizards/stacks/atcToolCheckWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';
@@ -70,24 +70,25 @@ function applyProbeSources(stack) {
     return stack;
 }
 
-// HEADER RECOMPOSE (the atcLength precedent): recompose the frozen SUMMARY comment from the RESOLVED params via the SAME
-// atcToolCheckHeaderComments format → twin==built-in byte-identical for ALL scalars. Match by the frozen default text.
-function applyHeaderComments(stack, resolved) {
-    const [d1] = atcToolCheckHeaderComments(ATC_CHECK_DEFAULTS);
-    const [r1] = atcToolCheckHeaderComments(resolved || {});
-    if (d1 === r1) return stack;   // scalars at defaults → nothing to rewrite (byte-identical)
-    for (const b of flattenBlocks(stack)) {
-        if (b && b.type === 'comment' && b.params && b.params.text === d1) b.params.text = r1;
-    }
+// FULL RECOMPOSE (t1894, replacing the old header-only patch — mirrors atcLengthData.js's own note + atcTableData.js's
+// `applyAtcTableRecompose` precedent): the frozen-template model means a STRUCTURAL dialect difference — atcToolCheckWizard
+// .js's own `hasCurrentTool` branch (t1894, the register-refusal fix) — can never surface via a #N-value-only patch; the
+// twin's `def.template` freezes ONE branch's lines forever, from whichever dialect was active at registration. Confirmed
+// live (WORK-LOG t1894). Fixed by rebuilding the whole body from `atcToolCheckStack(resolved)` fresh on every
+// instantiation — byte-identical BY CONSTRUCTION, not by text-patch, so structural differences propagate correctly.
+function applyAtcCheckRecompose(stack, resolved) {
+    const root = (Array.isArray(stack) ? stack : []).find((b) => b && b.type === 'user_root');
+    if (!root) return stack;
+    root.children = atcToolCheckStack(resolved);
     return stack;
 }
 
-/** Build the tool-check-as-data def — the atcLengthData recipe (bindingSpecs + header recompose + source-chips). */
+/** Build the tool-check-as-data def — the atcLengthData recipe (bindingSpecs + full recompose + source-chips). */
 export function atcCheckDataDef() {
     const SRC_BY_PARAM = { port: 'setterPort', blockHeight: 'blockHeight' };
     const bindings = ATC_CHECK_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
     const def = userOpFromStack('atc_check_data', 'Tool Check (data)', atcCheckDataStack(ATC_CHECK_DEFAULTS), bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
     def.bindingSpecs = ATC_CHECK_BINDING_SPECS;
-    def.postInstantiate = (stack, resolved) => applyHeaderComments(applyProbeSources(stack), resolved);
+    def.postInstantiate = (stack, resolved) => applyProbeSources(applyAtcCheckRecompose(stack, resolved));
     return def;
 }

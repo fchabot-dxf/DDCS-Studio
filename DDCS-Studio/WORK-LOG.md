@@ -34621,3 +34621,88 @@ refusal / emit-nothing-with-a-reason, mirroring the hidden-workpiece precedent) 
 No source changes (per the dispatch). Gate: node tier 118/118, 0 failed.
 
 🔨 turn 1892
+
+---
+
+## t1894 — THE #1300 RULING IMPLEMENTED: REFUSE AND SAY WHY (Option C) — plus a deeper bug it forced into view
+
+RULING (advisor, t1894): Option C, the shape already shipped for the hidden workpiece. atc_length/atc_check stay
+available and still MEASURE (register-independent geometry); the SAVE/COMPARE step, which needs to know which
+tool-table slot to use, REFUSES instead of guessing Expert's own #1300, and says why in Studio's own terms
+(unmapped, not unsupported) — never claiming the machine lacks the capability.
+
+THE FIX — `atcLengthWizard.js`/`atcToolCheckWizard.js`: both now compute `hasCurrentTool = !!(d && d.vars &&
+d.vars.atc && d.vars.atc.currentTool)`. TRUE (Expert): byte-identical to before. FALSE (V4.1/DM500): the
+touch-off + length calc (`#101`/`#102` resp. `#51`/`#52`) still run — kept, useful, register-independent — but the
+tool-identify → table-write (length) / table-address-compute → compare → pass/fail (check) segment, PLUS the
+`#1300`-naming error branches, are replaced by one loud comment block + an honest MSG naming the measured value
+and the reason. The probe-miss fault handler (LB 1, nothing to do with the current-tool register) is untouched on
+both ops — asserted as a vacuity trap.
+
+THE LOUD-REFUSAL CONVENTION, per the dispatch's own "say which you reused": `formWidgets.js`'s own
+`unwiredPlaceholder()` — the codebase's established loud, unmissable "what — why" stand-in (⚠-prefixed), used
+today to replace a UI-tree node that can't render. Considered and REJECTED: the t1834 `pp-frame-note` — its own
+CSS (`styles.css:4761-4763`) and its own WORK-LOG entry both say, explicitly, "an always-neutral caption, never
+styled as a warning/error — nothing is wrong"; the wrong tone for a refusal. Since `#wiz_user_code` is PLAIN
+TEXT — the actual content of a real .nc file, not a DOM tree `unwiredPlaceholder` could style — the SAME
+⚠-prefixed "what — why" textual shape is reused as a G-code COMMENT BLOCK rather than literal reused HTML: a
+styled DOM banner can't travel with a copied/exported .nc file the way an in-band comment does, and the G-code
+preview IS "the point a user would otherwise get G-code." THE ERROR MESSAGE FIX (the dispatch's own second ⚠):
+folded into the same change — the `#1300`-naming error branch is REMOVED (not renamed) on V4.1/DM500, since there
+is no right register to name; the broader refusal block already says the register is unknown, which subsumes it.
+
+A DEEPER BUG THIS FORCED INTO VIEW, ALSO FIXED (not merely the #1300 guess — discovered while proving the fix
+live, per the dispatch's own "confirm it live, not from a code read" instruction, exactly as t1892 did): the
+wizards-as-data FROZEN-TEMPLATE model (`def.template` captured ONCE at registration, whichever dialect happened
+to be active then — confirmed via `userOps.js`'s own `instantiate`/`builder` — a CLONE of `def.template` is
+value-patched by bindings, then `postInstantiate(stack, resolved)` runs on THAT clone) means a STRUCTURAL
+difference between dialects can NEVER surface in the live twin form via a value-only patch: the frozen template
+bakes in ONE branch's LINES forever, regardless of which dialect is active when a user later opens the wizard.
+DISCOVERED empirically, not by inspection: driving `openWiz` live (the established `preview-dialect-parity.spec.js`
+pattern — `setActiveProfile` before `openWiz`, `waitForFunction` on `#wiz_user_code` content, NOT a fixed
+timeout) showed the twin ALWAYS emitting the Expert-flavored (#1300) text on V4.1/DM500 too, no matter the active
+profile — while a DIRECT `emitMapped(atcLengthStack(...))` call (bypassing the twin's frozen template entirely)
+correctly showed the refusal. Cross-checked against `preview-dialect-parity.spec.js`'s OWN corner/edge test
+(genuinely reactive to profile switches) to rule out a test-harness mistake before concluding the twin itself was
+wrong. This bug was INVISIBLE before this act: the old code's `curToolVar`/`curTool`'s own `||1300` fallback
+happened to produce the IDENTICAL literal string "#1300" whichever dialect the template got frozen under
+(Expert's real value == V4.1's own fallback value) — so the frozen-template gap existed but was silently masked
+by two branches computing the same text. My refusal branch's genuinely DIFFERENT lines is what exposed it.
+FIXED by replacing the old header-only value-patch (`applyHeaderComments`, now deleted from both files, along with
+its now-unused `atcLengthHeaderComments`/`atcToolCheckHeaderComments` imports) with a FULL RECOMPOSE in
+`postInstantiate` — `atcLengthData.js`'s new `applyAtcLengthRecompose`/`atcCheckData.js`'s new
+`applyAtcCheckRecompose`, each finding the stack's `user_root` and setting `root.children =
+atcLengthStack(resolved)` / `atcToolCheckStack(resolved)` fresh — mirroring `atcTableData.js`'s OWN
+`applyAtcTableRecompose` precedent (rebuild the whole body from a live source every instantiation, don't patch a
+frozen one). `applyProbeSources` (the source-chip #5/#6 rewrite) still runs AFTER, on the recomposed stack,
+unchanged in shape. Re-verified live post-fix: all 6 combinations (V4.1/DM500/Expert × length/check) now correct.
+
+⚠ WORTH FLAGGING, NOT ACTIONED: this frozen-template gap is almost certainly not unique to these 2 ops — ANY
+data-op twin whose underlying stack builder branches on the ACTIVE DIALECT (not just resolved params) structurally,
+and whose OWN postInstantiate does only value-patches (not a full recompose), likely carries the same latent
+staleness. Not audited this turn (out of the dispatched scope — atc_length/atc_check only); worth a future census.
+
+EXPERT BYTE-IDENTICAL, proven two ways: (1) the EXISTING, unmodified `atc-length-in-place.spec.js` /
+`atc-check-in-place.spec.js` (twin-vs-builtin byte-identical sweep, studio+Expert) — still green, unchanged. (2)
+the new spec's own PRIMARY EVIDENCE tests assert Expert keeps `#1300` and shows no `REFUSED` text, both directions.
+
+New: `tests/atc-currenttool-refusal-1894.spec.js` (4 tests — primary evidence both ops, DM500-identical-caps note,
+a vacuity trap on the unrelated probe-miss fault handler). NON-VACUOUS: full revert to the pre-change tree (`git
+checkout HEAD --`, all 4 changed files, `git diff --stat` confirmed empty before re-editing) — 3/4 fail against
+the pre-change tree (exactly the refusal-asserting ones); the 4th (the fault-handler vacuity trap) correctly
+passes either way, since the fix never touches it. Restored from scratch backup, diff matched exactly, re-ran green.
+
+THE FOLLOW-UP, NAMED NOT BUILT (the dispatch's own explicit ask): let the user SUPPLY their own controller's
+current-tool register (Settings → a declared field, "ATC current-tool register", used when `vars.atc.currentTool`
+is null) — turning an unknown into a user-declared fact, fitting the project's own "most people use it for
+themself" ruling and the variables-in-custom-wizards direction. ⚠ PROTOCOL NOTE: the dispatch says to put this in
+NEXT-SESSION.md; the worker skill's own hard rule is NEXT-SESSION.md is advisor-owned, never worker-edited ("if
+the plan looks wrong, log the objection... don't change the plan yourself"). Not edited here — the proposal is
+recorded in this WORK-LOG entry and in the pass-note instead, for the advisor's own hand to add.
+
+Gate: node tier 118/118 (0 failed, no architecture-map drift this turn — files touched aren't TRAP/INV-cited).
+22-file/-test sweep: every ATC-symbol-referencing spec (atc-cap-gate, atc-check-in-place, atc-length-in-place,
+preview-intent-single-source-714, tooltable-gate-1890, wizard-bar) + the cross-dialect emit invariant suite
+(gcode-dialect-emit-invariants-1870, per the dispatch's own explicit name) + the new spec — 0 failed.
+
+🔨 turn 1894

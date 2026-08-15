@@ -27,6 +27,12 @@ export function atcToolCheckStack(params = {}) {
     const d = getDialect();
     const toolBase = (d && d.vars && d.vars.toolTable) || 1430;                       // tool-length table base (Expert/DM500 #1430, V4.1 #1560)
     const curTool = '#' + ((d && d.vars && d.vars.atc && d.vars.atc.currentTool) || 1300);
+    // t1894 — REFUSE, DON'T GUESS. Same finding + ruling as atcLengthWizard.js's own note (WORK-LOG t1890/t1892/
+    // t1894): `curTool` above silently falls back to Expert's #1300 when `vars.atc.currentTool` is unmapped
+    // (V4.1/DM500) — confirmed live to reach the preview AND an error message. The measurement (touch-off +
+    // length calc) stays register-independent and still runs; only the table LOOKUP/COMPARE, which needs to know
+    // which slot to read, is refused.
+    const hasCurrentTool = !!(d && d.vars && d.vars.atc && d.vars.atc.currentTool);
     const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
     const retract = num(params.retract, 3), fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
     const port = num(params.port, 2), level = num(params.level, 0), tol = num(params.tolerance, 0.5);
@@ -73,22 +79,35 @@ export function atcToolCheckStack(params = {}) {
     C('Measure + compare to the stored tool length');
     RD('#51');                                // machine Z trigger
     A('#52', '[#51-#6]', 'Measured length = MachineZ - block height');
-    A('#53', curTool, 'Current tool number');
-    IF('#53', '<', '1', 3);
-    A('#54', `[${toolBase}+#53-1]`, 'Tool table address');
-    A('#55', '#[#54]', 'Expected stored length');
-    A('#56', '[#52-#55]', 'Deviation');
-    IF('#56', '>', '#20', 4);
-    IF('#56', '<', '#21', 4);
-    C('Tool OK');
-    MV('Z', '#19');                           // retract to safe Z
-    MSG('Tool OK - length deviation #56 mm');
-    GO(2);
+    if (hasCurrentTool) {
+        A('#53', curTool, 'Current tool number');
+        IF('#53', '<', '1', 3);
+        A('#54', `[${toolBase}+#53-1]`, 'Tool table address');
+        A('#55', '#[#54]', 'Expected stored length');
+        A('#56', '[#52-#55]', 'Deviation');
+        IF('#56', '>', '#20', 4);
+        IF('#56', '<', '#21', 4);
+        C('Tool OK');
+        MV('Z', '#19');                           // retract to safe Z
+        MSG('Tool OK - length deviation #56 mm');
+        GO(2);
+    } else {
+        // t1894 — the honest refusal (same reused ⚠-prefixed convention as atcLengthWizard.js's own note — see
+        // there for why a G-code comment, not a DOM banner, is the right medium for "the point a user gets G-code").
+        C('⚠ REFUSED - Studio has no current-tool register mapped for this controller');
+        C('  (UNMAPPED, not unsupported - Studio does not know which register holds the');
+        C('  current tool number here, so it cannot look up a stored length to compare).');
+        MV('Z', '#19');                           // retract to safe Z
+        MSG('Measured #52 mm - NOT compared: no current-tool register mapped on this controller');
+        GO(2);
+    }
 
     C('=== FAULT HANDLERS ===');
     LB(1); DM('abs'); A('#1505', '1', 'FAULT: no contact - tool broken or missing'); GO(2);
-    LB(3); DM('abs'); A('#1505', '1', 'ERROR: no tool number set - check #1300'); GO(2);
-    LB(4); DM('abs'); MV('Z', '#19'); A('#1505', '1', 'FAULT: length off by #56 mm - broken or wrong tool'); GO(2);
+    if (hasCurrentTool) {
+        LB(3); DM('abs'); A('#1505', '1', 'ERROR: no tool number set - check #1300'); GO(2);
+        LB(4); DM('abs'); MV('Z', '#19'); A('#1505', '1', 'FAULT: length off by #56 mm - broken or wrong tool'); GO(2);
+    }
     LB(2); END();
     return S;
 }

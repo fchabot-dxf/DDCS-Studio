@@ -34,6 +34,15 @@ export function atcLengthStack(params = {}) {
     const retract = num(params.retract, 3), fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
     const port = num(params.port, 2), level = num(params.level, 0);
     const src = params.sources || {};
+    // t1894 — REFUSE, DON'T GUESS. t1890 found this wizard silently reused Expert's own #1300 current-tool
+    // register when `vars.atc.currentTool` is unmapped (true for V4.1/DM500) — confirmed live (WORK-LOG t1892)
+    // to reach the on-screen preview AND an operator-facing error message, at default params, on first open, via
+    // a normal wizard-bar click. RULED (t1894): the op stays available and still MEASURES (the touch-off + length
+    // calc below are pure geometry, register-independent) — only the SAVE step, which needs to know which
+    // tool-table slot to write, is refused. The reason names Studio's own knowledge gap, not the machine's
+    // capability (`unmapped`, never `unsupported`) — the same distinction that kept `atc` itself un-gated (t1890).
+    const d = getDialect();
+    const hasCurrentTool = !!(d && d.vars && d.vars.atc && d.vars.atc.currentTool);
 
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
@@ -83,16 +92,29 @@ export function atcLengthStack(params = {}) {
     C('Calculate and store the tool length offset');
     RD('#101');                               // machine Z trigger (dialect: #1927 / #1502 / #866)
     A('#102', '[#101 - #6]', 'Length = MachineZ - BlockHeight');
-    A('#103', curToolVar(getDialect()), 'Read current tool number');
-    IF('#103', '<', '1', 3);
-    TO('#103', '#102');                        // tool table write (dialect base #1430/#1560)
-    MV('Z', '#19');                           // retract to safe Z
-    MSG('Tool length successfully saved');
-    GO(2);
+    if (hasCurrentTool) {
+        A('#103', curToolVar(d), 'Read current tool number');
+        IF('#103', '<', '1', 3);
+        TO('#103', '#102');                        // tool table write (dialect base #1430/#1560)
+        MV('Z', '#19');                           // retract to safe Z
+        MSG('Tool length successfully saved');
+        GO(2);
+    } else {
+        // t1894 — the honest refusal (loud text is the reused convention here, translated to a text medium: the
+        // ⚠-prefixed "what — why" shape formWidgets.js's own unwiredPlaceholder() uses for a loud, unmissable
+        // stand-in — the G-code preview IS the point a user would otherwise get G-code, and is plain text, so a
+        // styled DOM banner can't travel with a copied/exported .nc file the way this comment block does).
+        C('⚠ REFUSED - Studio has no current-tool register mapped for this controller');
+        C('  (UNMAPPED, not unsupported - Studio does not know which register holds the');
+        C('  current tool number here, so it cannot pick a tool-table slot to write to).');
+        MV('Z', '#19');                           // retract to safe Z
+        MSG('Measured #102 mm - NOT saved: no current-tool register mapped on this controller');
+        GO(2);
+    }
 
     C('=== ERROR HANDLERS ===');
     LB(1); DM('abs'); A('#1505', '1', 'ERROR: Tool Setter missed'); GO(2);
-    LB(3); DM('abs'); A('#1505', '1', 'ERROR: No tool number set - check #1300');
+    if (hasCurrentTool) { LB(3); DM('abs'); A('#1505', '1', 'ERROR: No tool number set - check #1300'); }
     LB(2); END();
     return S;
 }

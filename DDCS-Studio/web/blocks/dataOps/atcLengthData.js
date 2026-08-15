@@ -11,7 +11,7 @@
  * the built-in uses. `level` stays baked (a machine constant — the corner/edge/middle convention). Static shape → no
  * bindingSpecs superset (the template IS atcLengthStack(defaults)); no sim-starts (milling/ATC sim renders from the EMIT).
  */
-import { atcLengthStack, atcLengthHeaderComments } from '../../wizards/stacks/atcLengthWizard.js';
+import { atcLengthStack } from '../../wizards/stacks/atcLengthWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';   // the SAME source functions the built-in uses (controller register over the literal on Expert)
 import { deriveBindingsFor } from './deriveBindings.js';
@@ -75,29 +75,34 @@ function applyProbeSources(stack) {
     return stack;
 }
 
-// HEADER RECOMPOSE (the cornerData precedent): the static template froze the 2 SUMMARY comments at ATC_LENGTH_DEFAULTS
-// (bindings only touch the #N VALUES, not composed comment text). Recompose them from the RESOLVED params via the SAME
-// atcLengthHeaderComments format → twin==built-in byte-identical for ALL scalars, not just defaults. Match by the frozen text.
-function applyHeaderComments(stack, resolved) {
-    const [d1, d2] = atcLengthHeaderComments(ATC_LENGTH_DEFAULTS);
-    const [r1, r2] = atcLengthHeaderComments(resolved || {});
-    if (d1 === r1 && d2 === r2) return stack;   // scalars at defaults → nothing to rewrite (byte-identical)
-    for (const b of flattenBlocks(stack)) {
-        if (!b || b.type !== 'comment' || !b.params) continue;
-        if (b.params.text === d1) b.params.text = r1;
-        else if (b.params.text === d2) b.params.text = r2;
-    }
+// FULL RECOMPOSE (t1894, replacing the old header-only patch — the atcTableData.js precedent, `applyAtcTableRecompose`):
+// t1890/t1892/t1894 found the frozen-template model (`def.template` captured ONCE, at registration, under whichever
+// dialect happened to be active then) means a STRUCTURAL difference between dialects — atcLengthWizard.js's own
+// `hasCurrentTool` branch (t1894, the register-refusal fix) — can NEVER show up in the live twin form via a mere
+// #N-value patch: the frozen template only ever has ONE branch's LINES baked in, forever, regardless of which
+// dialect is active when a user later opens the wizard. Confirmed live: a value-only patch left the twin ALWAYS
+// showing the branch frozen at registration time, never reacting to a real profile switch. The header-only patch
+// this replaces had the SAME latent gap — invisible only because both branches happened to produce identical
+// header TEXT, unlike the register lines, which don't). FIXED by rebuilding the WHOLE body from `atcLengthStack
+// (resolved)` fresh on every instantiation — the SAME function the built-in and every emit path already use,
+// so the twin is byte-identical BY CONSTRUCTION (a call, not a text-patch), and structural dialect differences
+// (the refusal branch) now propagate correctly. Source-chips still apply AFTER (recompose seeds #5/#6 literal).
+function applyAtcLengthRecompose(stack, resolved) {
+    const root = (Array.isArray(stack) ? stack : []).find((b) => b && b.type === 'user_root');
+    if (!root) return stack;
+    root.children = atcLengthStack(resolved);
     return stack;
 }
 
-/** Build the tool-length-as-data def — userOpFromStack + bindingSpecs (re-derive by #var identity) + the two source-touches
- *  (header recompose + source-chips) in postInstantiate, so the twin is byte-identical to atcLengthStack on ALL scalars + BOTH profiles. */
+/** Build the tool-length-as-data def — userOpFromStack + bindingSpecs (re-derive by #var identity) + a full
+ *  recompose + source-chips in postInstantiate, so the twin is byte-identical to atcLengthStack BY CONSTRUCTION,
+ *  on ALL scalars, BOTH profiles, AND every dialect (t1894 — the recompose is what makes THAT last one true). */
 export function atcLengthDataDef() {
     // tag the source-chip bindings so the form greys them when 'ctrl'-sourced (the value then comes from the register).
     const SRC_BY_PARAM = { port: 'setterPort', blockHeight: 'blockHeight' };
     const bindings = ATC_LENGTH_BINDINGS.map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
     const def = userOpFromStack('atc_length_data', 'Tool Length (data)', atcLengthDataStack(ATC_LENGTH_DEFAULTS), bindings, 'form3d', { forceMachine: true }, 'atc_datawiz');
     def.bindingSpecs = ATC_LENGTH_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY every build
-    def.postInstantiate = (stack, resolved) => applyHeaderComments(applyProbeSources(stack), resolved);   // header recompose + source-chips (both rewrite from resolved state)
+    def.postInstantiate = (stack, resolved) => applyProbeSources(applyAtcLengthRecompose(stack, resolved));
     return def;
 }
