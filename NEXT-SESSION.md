@@ -2897,3 +2897,40 @@ inserts with no dialog at all, exactly as today.
 ⚠ Land it COMPLETELY; park anything that does not fit rather than leaving two half-done pieces.
 ⚠ Still queued, not now: the marker-free raw-text import door · `collectOps`'s phantom row · the
 `lathe-honest-3d-1301` near-miss · slice 1's unswept region (`macrosApp.js` et al) · slice 2 of the rename.
+
+# ═══ t1944 — MAKE THE SUITE DIALOG-AWARE (release gate blocker) ═══
+
+t1942 accepted, both pieces, and both constraints I set were held: `dlgChoice` is a real sibling of
+`dlgConfirm`/`dlgPrompt`/`dlgNotice` sharing `openDialog` — not a bespoke modal — and `confirmDestructiveLoad`
+still writes the silent-pass condition **exactly once**, branching only on which dialog to show. The
+`buildActiveOpRecord` / `commitActiveOp` / `addActiveOp` split means Add and Replace share one record builder
+instead of becoming two mechanisms.
+
+**The best thing in that turn was a refusal:** when `destructive-load-doors-1938` started hanging you
+**reproduced it in isolation before concluding it was the fixture**, rather than assuming your own new code was
+innocent. Concluding "not my bug" is exactly where a real regression hides, and you didn't take the shortcut.
+
+## THE TASK — the systemic risk YOU named. It blocks my release gate, so it is the whole turn.
+Insert now shows a dialog on a non-empty canvas. **Any spec that inserts a 2nd operation onto an already-
+populated canvas without clearing first will HANG on it** — you hit exactly one and fixed it. Your scoped gate
+(36/36) could not see the rest, correctly, because I told you not to run the full suite.
+
+1. **FIND THE CLASS, not the instances.** Sweep `tests/` for every spec that reaches `insertWiz()` (or any
+   insert gesture) while the canvas is already non-empty — the tell is two inserts with no
+   `ddcsLoadBlockStack([])` between them, but do not trust that single pattern; a canvas can be populated by an
+   import, a project load, or a previous test's leftovers too.
+2. **REPORT THE FULL LIST FIRST, WITH A COUNT**, then fix. If the answer is "only the one you already fixed",
+   say that plainly — a negative sweep is a real result and I will act on it.
+3. **FIX MINIMALLY, PRESERVING EACH TEST'S ORIGINAL INTENT.** Use the established clear-then-insert pattern, or
+   accept the dialog via the existing `_appDialog.js` helper — whichever matches what that test was proving.
+   ⚠ **Do NOT rewrite a test to exercise the new Add gesture** because it now can. A test that was proving
+   something else keeps proving that thing.
+4. **⚠ IF A SPEC HANGS FOR A DIFFERENT REASON, STOP AND TELL ME** — do not fix it into passing. A hang that is
+   not the dialog is a different bug and I want to see it before it is absorbed.
+5. **You MAY run broadly this turn** — this task IS a suite-wide sweep. I am NOT running my gate concurrently;
+   the machine is yours. Report the failed COUNT, not just the tail (a tail showing "N passed" can hide "N
+   failed" above it).
+
+⚠ Still queued, not now: `collectOps`'s phantom row · the marker-free raw-text import door · the
+`lathe-honest-3d-1301` near-miss · slice 1's unswept region (`macrosApp.js` et al) · slice 2 of the rename ·
+collapse-on-delete (the symmetric rule's other half, still not built).
