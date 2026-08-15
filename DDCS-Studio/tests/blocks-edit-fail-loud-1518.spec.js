@@ -106,7 +106,7 @@ test('PROOF 2 — the multi-op re-author refuses on the same declaration', async
         return { loaded: !!(save.ws && save.ws.getAllBlocks && save.ws.getAllBlocks(false).length) };
     }`);
     expect(dialogs.length, 'the multi-op path speaks too — it used to return silently').toBe(1);
-    expect(dialogs[0], '…naming what it could not open').toMatch(/2 ops/);
+    expect(dialogs[0], '…naming what it could not open').toMatch(/2 operations/);
     expect(dialogs[0], '…for the same reason, from the same declaration').toMatch(/Blocks editor did not finish loading/);
     expect(r.loaded, 'and nothing loaded, which is why the message matters').toBe(false);
 });

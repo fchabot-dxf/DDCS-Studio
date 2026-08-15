@@ -36928,3 +36928,87 @@ Read-only greps + verification of exact function signatures/exports cited (`grou
 files touched — `git status` clean on every tracked file except `WORK-LOG.md`.
 
 🔨 turn 1934
+
+
+## 🔨 turn 1936 — THE RENAME LEFT STALE ASSERTIONS: fixed the one, swept for siblings, found a bigger gap alongside
+
+### Dispatch
+Fix the one stale assertion `blocks-edit-fail-loud-1518.spec.js:109` (the app's own wording is the truth after
+slice 1, f9900ab2). Then find its SIBLINGS by sweeping `tests/` for every assertion still matching the old
+vocabulary — report the full list, say how many, verify by name + node tier, no full suite (the advisor's own
+release gate is running it).
+
+### (1) Fixed
+`blocks-edit-fail-loud-1518.spec.js:109` — `toMatch(/2 ops/)` → `toMatch(/2 operations/)`, matching
+`devMode.js`'s own `blocksAppReady`/`confirmDestructiveLoad` refusal text (renamed in slice 1, `f9900ab2`):
+"Could not open 2 operations in Blocks — the Blocks editor did not finish loading."
+
+### (2)+(3) The sweep — precise, not a raw grep count
+
+Searched `tests/` for `\bops?\b` inside `toMatch`/`toContain`/`toBe`/`toEqual` calls and plain string-literal
+assertion arguments (not comments, not test titles/descriptions, not local variables/property accesses that
+happen to be named `op`/`ops`). ~20 raw candidates surfaced; each checked against its actual current app source
+before counting it as anything:
+
+**Genuinely stale (app text WAS renamed in slice 1, test wasn't updated) — exactly ONE, now fixed, no others
+found.** Ruled out as false positives after checking source: `blocks-edit-reconcile.spec.js:57` (checks the
+structural `type` TAG `'op'`, not a rename target — that's slice 4, untouched), `cam-slot-edit-s3.spec.js`/
+`library-sources-1247.spec.js` (`.ops`/`'ops'` as a JSON schema KEY or JS property name, never in scope —
+slice 1 was string literals only), `feed-modal-1377.spec.js`/`mill-atc-in-place.spec.js` (a local loop
+variable/config property named `op`, not a literal string), `flow-labels-unique-1408.spec.js`/
+`setup-sheet-850.spec.js` (my own t1928 fixture code / test titles, not app-text assertions),
+`hardening-1241.spec.js` (a filename string), `opatline-identity-1842.spec.js`/`probe-port-gate-1880.spec.js`/
+`roundtrip-whole-program-1319.spec.js`/`tooltable-gate-1890.spec.js` (the assertion's own description-string
+argument or a comment, never checked against app output), `lathe-honest-3d-1301.spec.js:169` (`toMatch(/Drill
+op/)` against `axisGating.js`'s renamed "Drill op**eration**" — still passes, coincidentally, since "Drill op"
+is a literal substring of "Drill operation"; not broken, but flagged as a near-miss rather than silently
+folded into "zero found").
+
+**Say plainly: only one. The sweep, run precisely rather than by raw pattern count, found no other currently-
+red assertion.** Confirmed, not assumed: ran every remaining candidate file by name (below) — all green.
+
+### A separate, larger finding: a whole file slice 1 never reached
+
+Four of the raw candidates (`cam-build-mode.spec.js:175`, `cam-multiop-edit-blocks-s45.spec.js:67-68`,
+`cam-universal-route.spec.js:123`, `cam-substack.spec.js:129-130`, `wizard-polish-722.spec.js:64`) trace to
+REAL, live user-facing strings that were simply **never renamed** — not stale assertions (the tests correctly
+match today's app text and are green), but evidence slice 1's own survey missed an entire file:
+**`web/ui/macrosApp.js`** (the CAM-pack builder's own settings panel), plus its data-layer siblings
+`data/stackToSlot.js:39`, `data/subStackToSlot.js:106`, and `viz/createPreviewPanel.js:1051`. A full scan of
+`macrosApp.js` alone (worked around a stray null byte at ~offset 59017 that made both Bash `grep` and the Grep
+tool report "binary file" — PowerShell's `Select-String` read it fine; the byte itself is an unrelated, pre-
+existing oddity, not investigated further, out of scope for this sweep) turned up on the order of 15
+independent "op"/"ops" informal-shorthand strings — dialog text, button titles, empty-state hints, the "N of M"
+load-partial hint — the same category slice 1 targeted everywhere else, simply never surveyed here.
+
+**Deliberately not fixed this turn.** These are not stale assertions (nothing is red), so they fall outside
+"finishing slice 1's test-side sweep" as dispatched — renaming an entire additional file's worth of app strings
+(plus their now-necessarily-updated test counterparts) is a materially bigger unit of work than the one-line
+fix + sibling-sweep this turn asked for, and doing it unasked risks exactly the scope creep "do not start slice
+2" was warning against, even though this is still slice 1's own territory by definition. Reported precisely
+instead: the file, the approximate count, and that nothing here is currently broken — a decision for the
+advisor on whether it's its own follow-up act.
+
+### Verification — the working test-runner form, per the advisor's own note
+
+`npx playwright test <file>` reproduced the advisor's own "did not expect test() to be called here" failure
+this turn too — used `npm run test:e2e -- --grep "<name>"` throughout, as directed.
+
+- `blocks-edit-fail-loud-1518.spec.js` (the fix): 3/3 green.
+- Every category-B candidate file, run by name to CONFIRM (not assume) they're currently green, matching the
+  still-unrenamed app text: `cam-build-mode.spec.js`, `cam-multiop-edit-blocks-s45.spec.js`,
+  `cam-universal-route.spec.js`, `cam-substack.spec.js` (+ its `-fork`/`-modal`/`-s5`/`-save-fork`/
+  `-edit-blocks-s44` siblings, caught in the same grep net), `wizard-polish-722.spec.js`,
+  `lathe-honest-3d-1301.spec.js` — 40/40 passed across both runs.
+- `npm run test:node`: 118/118.
+
+Two verification screenshots (`t1512-cam-pack/1-field-table.png`, `t1617-drive-shelf.png`) were refreshed as a
+pure side effect of running spec files that happen to screenshot, unrelated to this turn's one-line change —
+restored from HEAD rather than committed, since nothing about this turn's actual edit changed what they show.
+
+### Gate
+Exactly one file changed: `tests/blocks-edit-fail-loud-1518.spec.js`. No product code, no new specs beyond the
+one-line fix, no full suite (the advisor's own gate is running it). `git status` confirmed clean on every other
+tracked file before committing.
+
+🔨 turn 1936
