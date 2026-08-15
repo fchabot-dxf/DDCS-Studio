@@ -2469,6 +2469,12 @@ same direction as variables-in-custom-wizards + `previewVarSeed`.
 
 **Their words:** *"so multi op, i dont think i want it, we can let users deal with that themselves."*
 
+**THE REASON, and it is what closes the question rather than merely answering it** — their follow-up:
+*"they can program the multiop within one op."* A user who wants several operations to run continuously
+authors them as ONE op carrying multiple steps. Same direction as their earlier *"we can simply add steps."*
+So this is not a capability we are declining — **the capability already exists one level down**, and `M30`
+correctly marks the end of A PROGRAM, which is one op. Nothing is missing.
+
 **So the engine halting unconditionally on `M30`/`M02`/`M99` is CORRECT BEHAVIOUR, not a limitation.**
 t1874 found that a multi-op Blocks program cannot PLAY past the first op's own `M30` and flagged it as a
 product question. Answered: playback stops at a program terminator, by design. **Closed, not deferred.**
