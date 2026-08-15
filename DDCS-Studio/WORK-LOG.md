@@ -34228,3 +34228,127 @@ No code, no fixes — the list is the deliverable, ready to decide the next seve
 consequence rather than file count, as instructed.
 
 🔨 turn 1884
+
+## turn 1886 — Reviving the Probe Input dropdown: STOP AND REPORT — its own target field grew two new features
+
+### Dispatch
+
+Revive `ui/probeInputSelect.js`'s "Probe Input" dropdown (corner/middle/edge/alignment) — a RESTORATION, not a
+new affordance: don't redesign, don't add options, make the intended thing reappear. FIRST check it's still
+CORRECT against today's params, not just still present — if its behaviour no longer matches the live twin, STOP
+AND REPORT rather than reviving something that writes the wrong value. Guard with a real-gesture, non-vacuous
+test. Scope: this one feature.
+
+### Read the whole file first (65 lines) — its own contract, precisely
+
+`ensureDropdown(portId, levelId)` finds the raw P/L fields by legacy id, hides their row, injects a `<select>`
+before it. `fill()` populates it from `getInputs()` (Settings → Hardware → Input), filtered to
+`probe/touch/setter` types. `applyToFields()`, on pick, writes `port.value = pin` AND `level.value = the input's
+own declared level`. Re-runs on `ddcs:settings-changed`.
+
+### Checked correctness against today's twin form — two things check out clean, one does not
+
+**Checks out: the port half.** `port` still exists as a live, editable field (`[data-param="port"]`) in all 4
+target ops' own twin forms, and `formWidgets.js`'s own widget `.read()` functions re-read `.value` FRESH at
+read-time (not from a cached/event-tracked state) — confirmed by reading `read: () => ({[b.param]: numOr(num
+.value, ...)})` — so a raw `.value =` assignment WOULD reach the emitted G-code correctly, no event-dispatch
+correctness bug there (though a `dispatchEvent` IS still needed for the LIVE PREVIEW to update immediately,
+matching every other widget's own convention — a mechanical adaptation, not a design question).
+
+**Checks out, but changes the feature's own scope, safely: the level half is now moot, independent of this
+turn.** `level` is NOT a declared, editable param in ANY of the 4 target ops' own twin forms anymore — confirmed
+in t1878 (dropped from the twin system entirely) and re-confirmed here directly in `cornerData.js`'s own header:
+"level = the G31 probe LEVEL... NON-OPERATOR-FACING... baked at level=0 by design... FINAL state... do NOT
+relitigate." This predates and is INDEPENDENT of the migration — even a perfectly restored dropdown couldn't
+write a live `level` value today, because nothing reads one. Dropping that half isn't a redesign; it's
+adaptation to an ALREADY-RATIFIED, unrelated decision.
+
+**Does NOT check out: the field the dropdown wants to replace has grown TWO new, independent mechanisms since
+this code was written, and hiding the row (the original strategy) collides with one of them.**
+
+1. `probeSrcGlyph.js`'s own controller-register source toggle (`sourceField`/`decorateInputEl`) is LIVE on
+   `port` for 3 of the 4 target ops — confirmed by reading `cornerData.js:370`, `edgeData.js:112`,
+   `alignmentData.js:136` (all declare `sourceField` via a shared `SRC_BY_PARAM` map) — `middleData.js` does
+   NOT (grepped, zero matches; middle's own `port` has no source toggle). The rendered DOM for a sourced field
+   is `<div>...<span class="psrc-wrap"><button class="psrc-glyph">...</button><input data-param="port">
+   </span>...</div>` — the glyph is NESTED INSIDE the same row the dropdown's own `ensureDropdown` would hide
+   entirely. Reviving the ORIGINAL hide-the-row strategy would silently take away the "read this port from a
+   controller register at runtime" toggle for corner, edge, and alignment — a real, currently-working, unrelated
+   feature this code predates. This is exactly what t1880 found live and tested (`corner-source-chips.spec.js`,
+   `port` was one of the 3 fields it exercises with a real `Pr578`/`#1078` register mapping).
+2. `_probePortOk` (t1880, this session, today) — a dialect-capability gate on `port` for ALL 6 probe ops
+   (including middle) — a control that's now CORRECTLY offered-or-greyed depending on whether the active post's
+   own probe form reads a port number at all. The dropdown, as originally designed, has no concept of this: it
+   would let a user pick a friendly probe-input name on V4.1/DM500 for a field that (correctly, by the SAME
+   day's own earlier fix) is greyed out and never read by the emit.
+
+### Why this is a STOP, not a judgment call I made unilaterally
+
+The dispatch's own explicit standard: "if its behaviour no longer matches the live twin, STOP AND REPORT rather
+than reviving something that would write the wrong value." The port/level correctness check passes cleanly. But
+"correct value, wrong composition with two features that now share the same field" is the SAME class of hazard
+in spirit — reviving the ORIGINAL hide-the-row design would not write a WRONG number, but it WOULD silently
+regress an existing, working, unrelated feature (the source toggle) for 3 of 4 wizards, and it has no defined
+behavior for the fourth mechanism (the dialect gate) at all. Both of these post-date the original code and
+neither was named in the dispatch's own scope — composing three independent field-level mechanisms (a value
+source, a friendly picker, a capability gate) is a real design question, not a restoration detail, and I don't
+think it's mine to resolve silently given how explicitly today's own thread has been about exactly this: naming
+a composition question rather than picking an answer and hoping it's the one wanted.
+
+### Options, not chosen between
+
+- **A — Skip the row-hide for sourced fields.** Only inject the dropdown when the field is in STUDIO mode
+  (`probeSrc('port')` returns null/no register mapping active) and NOT V4.1/DM500-gated; fall back to showing
+  the raw field (with its own glyph) otherwise. Closest to "restore what was intended" for the common case, but
+  now has 2 additional conditions the original never had, and needs a decision on whether re-entering Studio
+  mode (clicking the glyph to un-lock) should re-summon the dropdown live.
+- **B — Compose visually: dropdown ABOVE/BESIDE the row instead of replacing it**, leaving the glyph and gate
+  exactly as they are, never hiding anything. Simpler composition, but changes the ORIGINAL layout contract
+  ("hides the raw fields, injects the dropdown in their place") — arguably a redesign of the visual shape, which
+  the dispatch asked me not to do.
+- **C — Middle-only for now** (the one target op with no source-toggle conflict), defer corner/edge/alignment
+  to a follow-up act once A or B is decided. Ships SOMETHING this turn, narrows the open question to 3 ops
+  instead of 4, but splits one named feature into two acts.
+
+### What's SETTLED and reusable whichever way this goes (so the eventual fix is cheap)
+
+- Field lookup: `[data-param="port"]` inside `#wiz_user_form`, not a legacy id.
+- Op detection: `getLastOp().type` (`blocks/opRecord.js`) — verified empirically to update immediately and
+  reliably the instant a wizard opens (no race, no timing workaround needed) — the RIGHT existing, declared
+  utility to gate the dropdown to exactly the 4 named ops (not accidentally widening to rotaryCenter/rotaryClock,
+  which also carry a `port` field after t1880 but were never in this feature's own original scope).
+  Re-trigger on both `ddcs:settings-changed` (the original's own event) and a form re-render (a
+  MutationObserver on `#wiz_user_form`, since op-switching isn't a settings change).
+  Dispatching an `input` event after any programmatic `.value` write, matching every other widget's own
+  convention (needed for the live preview, not for emit-correctness, which already reads fresh).
+- The `level` write: drop entirely, doesn't need a decision — already moot for an independent, ratified reason.
+- `middleData.js`'s own `port` is the ONLY one of the 4 with zero composition conflict today.
+
+### No code, no test written this turn
+
+Per this session's own repeatedly-established practice for exactly this shape of surprise: report the real
+composition question with evidence and reusable groundwork, rather than picking a resolution unilaterally on a
+feature request framed as pure restoration. Zero source or spec files touched.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: clean — no source or spec files changed this turn.
+
+### For the advisor
+
+The port/level correctness check you asked for passes cleanly — no value-writing bug, `.read()` reads fresh so
+even a raw `.value=` reaches the emit correctly, and the level-write is safely droppable (already, independently
+moot per the ratified baked-frontier decision, not something this turn needs to decide). What stopped me is
+composition: the field this dropdown wants to replace has grown TWO real, working, independent mechanisms since
+2020 — `probeSrcGlyph.js`'s own controller-register source toggle (live on `port` for corner/edge/alignment,
+not middle) and today's own `_probePortOk` dialect gate (live on `port` for all 6 probe ops) — and the
+original's own "hide the whole row" strategy would silently take the source-toggle away from 3 of 4 target
+wizards while never triggered the dialect gate at all. 3 options laid out, not chosen between (skip-for-sourced-
+fields / compose-without-hiding / middle-only-now-defer-the-rest), plus the groundwork that's genuinely settled
+either way (the `data-param` lookup, `getLastOp()` for reliable op detection, the input-event dispatch, the
+level-drop) so whichever shape you pick is cheap to build. No code, no test, no fix this turn.
+
+🔨 turn 1886
