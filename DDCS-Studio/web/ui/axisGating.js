@@ -86,7 +86,7 @@ export const OP_FRAME_NEEDS = {
     },
     lathe_centerdrill: {
         kind: 'lathe',
-        why: 'drills down the axis of a bar that is turning in the chuck. On a mill the work does not turn — use the Drill op, which spins the tool instead.',
+        why: 'drills down the axis of a bar that is turning in the chuck. On a mill the work does not turn — use the Drill operation, which spins the tool instead.',
     },
     lathe_polygon: {
         kind: 'lathe',

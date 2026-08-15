@@ -413,7 +413,7 @@ export function createUserOpView(ns, opts) {
         const usage = elNS('wiz_user_usage');
         // t343 E5 — SEAMLESS TITLE: an IN-PLACE port (opensAs) reads the built-in's PLAIN label ('Edge'/'Corner', no '(data)', no
         // "custom wizard" suffix) so the user sees the wizard exactly where it always was. A normal user op keeps its custom heading.
-        if (usage) { const seamless = builtinLabelForTwin(_def.opType); usage.textContent = seamless || ((_def.label || 'Custom op') + ' — your custom wizard.'); }
+        if (usage) { const seamless = builtinLabelForTwin(_def.opType); usage.textContent = seamless || ((_def.label || 'Custom operation') + ' — your custom wizard.'); }
     }
 
     view = {

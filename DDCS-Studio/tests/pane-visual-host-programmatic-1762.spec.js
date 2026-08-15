@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // ddcsLoadBlockStack([{type:'op',opType,params:{}}]) call, not the shape a real gesture actually produces.
 // This act closed THAT gap: `insertWiz()` (bar -> Insert -> Blocks) does NOT place a plain {type:'op'}
 // block — `commitActiveOp()` EXPANDS it into a full "Define Custom Wizard" block tree (a round-trip toast
-// confirms it: "This op is now an editable block stack"), which makes `deriveLiveWizard()` take the
+// confirms it: "This operation is now an editable block stack"), which makes `deriveLiveWizard()` take the
 // AUTHORED-HERE branch (a `user_root` at the top of the stack), not the placedOpFallback/registry-overlay
 // branch t1760's test exercised. Both branches converge on the same hasTree rendering code; these two tests
 // prove that convergence by driving the SAME PROGRAM SHAPE each route actually produces.

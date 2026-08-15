@@ -69,7 +69,7 @@ function showRoundTripToastOnce() {
     try {
         if (localStorage.getItem(BLOCKS_ROUNDTRIP_SEEN)) return;
         localStorage.setItem(BLOCKS_ROUNDTRIP_SEEN, '1');
-        toast('This op is now an editable block stack — open the Blocks tab to edit or extend it.');
+        toast('This operation is now an editable block stack — open the Blocks tab to edit or extend it.');
     } catch (_) { /* localStorage / toast optional — never block an insert */ }
 }
 

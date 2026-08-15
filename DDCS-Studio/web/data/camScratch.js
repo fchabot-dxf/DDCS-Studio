@@ -169,12 +169,12 @@ export function fieldVarCollisions(fields, ops, bandsOf = bandsFor) {
 /** A human refusal message naming the colliding var, the field that owns it and the part that clobbers it. */
 export function collisionMessage(cols) {
     if (!cols || !cols.length) return '';
-    const lines = cols.map((c) => `• #${c.varNum} — "${c.field}"${c.ownerOp ? ` (op ${c.ownerOp})` : ''} is overwritten by the ${c.clashType} generator's own working variables`);
+    const lines = cols.map((c) => `• #${c.varNum} — "${c.field}"${c.ownerOp ? ` (operation ${c.ownerOp})` : ''} is overwritten by the ${c.clashType} generator's own working variables`);
     return [
         `This slot cannot be built: ${cols.length} form value${cols.length === 1 ? '' : 's'} would be overwritten by a generator's working variables.`,
         ...lines,
         '',
-        'Composing these ops pushes the form values into the range the generator uses for its own maths, so the machine would run with the wrong numbers (e.g. spindle speed forced to 0).',
+        'Composing these operations pushes the form values into the range the generator uses for its own maths, so the machine would run with the wrong numbers (e.g. spindle speed forced to 0).',
         'Build them as separate slots for now.',
     ].join('\n');
 }

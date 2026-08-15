@@ -22,7 +22,7 @@ export default {
       el('div', { class: 'section-label' }, 'Multi-tool job merge'),
       el('div', { class: 'wiz-usage' },
         'Combine several single-tool programs into one job: ordered by tool, with a tool change (T / M6) and a '
-        + 'safe retract inserted between each, under one program frame (a single end). Pull ops from Studio or '
+        + 'safe retract inserted between each, under one program frame (a single end). Pull operations from Studio or '
         + 'pick controller files, set the tool order, then merge + send as one multi-tool run.'),
       el('div', { class: 'row', style: 'margin-top:10px' }, addStudio),
       drop,

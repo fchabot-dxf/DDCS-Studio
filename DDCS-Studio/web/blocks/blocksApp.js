@@ -599,7 +599,7 @@ async function buildWorkspace() {
   // select, segmented, xy-pad, …) without enumerating each one; the class carries the visual + cursor; the title
   // carries WHY. Called after every onShow/refresh in both branches below, not just once, since a render can flip
   // placed↔authoring (switching which op the canvas holds) without a full page reload in between.
-  const BLK_READONLY_REASON = 'Read-only here — a placed op edits through its wizard (STUDIO tab) or its blocks on this canvas, not this pane.';
+  const BLK_READONLY_REASON = 'Read-only here — a placed operation edits through its wizard (STUDIO tab) or its blocks on this canvas, not this pane.';
   function applyBlkReadOnly(readOnly) {
     const host = document.getElementById('blk_wiz_user_form');
     if (!host) return;

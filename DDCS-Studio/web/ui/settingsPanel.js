@@ -1579,7 +1579,7 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section" id="set_toolchange_section">
                         <div class="settings-section-title">TOOL CHANGE</div>
-                        <div class="settings-hint">How a mill op changes tools when its picked tool differs from the one loaded. <b>Automatic</b> runs your ATC (a T# M6 call); <b>Manual</b> pauses with a "Load T#" prompt for a hand swap; <b>None</b> just leaves a comment (you pre-stage the tool, no mid-program stops). A mill op with no tool picked emits nothing. Studio arms the change once and only on a difference — the controller no-ops if that tool is already in the spindle.</div>
+                        <div class="settings-hint">How a mill operation changes tools when its picked tool differs from the one loaded. <b>Automatic</b> runs your ATC (a T# M6 call); <b>Manual</b> pauses with a "Load T#" prompt for a hand swap; <b>None</b> just leaves a comment (you pre-stage the tool, no mid-program stops). A mill operation with no tool picked emits nothing. Studio arms the change once and only on a difference — the controller no-ops if that tool is already in the spindle.</div>
                         <label>Mode<select id="set_toolchange_mode">
                             <option value="atc">Automatic — run the ATC (T# M6)</option>
                             <option value="manual">Manual — pause + "Load T#" prompt</option>
@@ -3356,7 +3356,7 @@ function wireSettingsOverlay(ov) {
             if (chuck) chuck.value = m.chuck || 'spindle';
             if (cnote) cnote.textContent = (m.chuck === 'axis')
                 ? 'Polygon turning is available: the chuck can be commanded to an angle.'
-                : 'Ops that need the chuck commanded to an angle (polygon turning) stay greyed.';
+                : 'Operations that need the chuck commanded to an angle (polygon turning) stay greyed.';
         };
         if (chuck) {
             chuck.addEventListener('change', () => {

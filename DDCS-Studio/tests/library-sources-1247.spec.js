@@ -157,7 +157,7 @@ test('THE .cam ROUND TRIP: a recipe is the OPS, and importing rebuilds the slot 
     expect(r.fileKeys, 'nor the allocated form params, which the rebuild re-allocates in the receiving pack').not.toContain('fields');
     expect(r.opsIdentical, 'the ops round-trip identically').toBe(true);
     expect(r.name).toBe('Two-hole plate');
-    expect(r.summary).toMatch(/2 ops — drill, bore/);
+    expect(r.summary).toMatch(/2 operations — drill, bore/);
     expect(r.handBuilt, 'a hand-built slot has NO source to share, and says so by refusing rather than shipping its bake').toBeNull();
 });
 

@@ -29,7 +29,7 @@ const WCS_OPTIONS = [['Active WCS', 'active'], ['G54', 'G54'], ['G55', 'G55'], [
 // number into a probe atom's value socket) — the SAME shape corner's `hopDist`/`planeZ` were found to be
 // ("re-resolved by the atom itself... it can't carry a live value yet"), so all 7 are DEFERRABLE-CANDIDATES:
 // eligible if/when rebuildOdProbe's numeric rebuild is replaced with a direct #var-identity bind like corner's.
-const REBUILD_REFUSAL = 'This value is re-resolved by the op\'s own rebuild before the program is built — it can\'t carry a live value yet.';
+const REBUILD_REFUSAL = 'This value is re-resolved by the operation\'s own rebuild before the program is built — it can\'t carry a live value yet.';
 export const OD_PROBE_BINDING_SPECS = [
     // …a DIAMETER field bound to the DIAMETER socket. The rule exists because the failure is silent: a diameter
     // dropped into a radius socket makes every part exactly half size, with nothing on screen looking wrong.

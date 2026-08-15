@@ -49,5 +49,5 @@ export function camFromFile(text) {
 export function camSummary(obj) {
     const ops = (obj && obj.ops) || [];
     const kinds = [...new Set(ops.map((o) => String((o && (o.type || o.opType)) || '?')))];
-    return `${ops.length} op${ops.length === 1 ? '' : 's'} — ${kinds.join(', ')}`;
+    return `${ops.length} operation${ops.length === 1 ? '' : 's'} — ${kinds.join(', ')}`;
 }

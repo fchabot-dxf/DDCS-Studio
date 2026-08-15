@@ -30,7 +30,7 @@ const WCS_OPTIONS = [['Active WCS', 'active'], ['G54', 'G54'], ['G55', 'G55'], [
 // swallowed back to the default today. None decide program SHAPE (faceProbe.js just plugs each resolved number
 // into a probe atom's socket or a controller-side expression, e.g. `ahead` → `[surface-ahead]` computed AT the
 // controller, never branched on in JS) — the corner `hopDist`/`planeZ` shape, so all 7 are DEFERRABLE-CANDIDATES.
-const REBUILD_REFUSAL = 'This value is re-resolved by the op\'s own rebuild before the program is built — it can\'t carry a live value yet.';
+const REBUILD_REFUSAL = 'This value is re-resolved by the operation\'s own rebuild before the program is built — it can\'t carry a live value yet.';
 export const FACE_PROBE_BINDING_SPECS = [
     { param: 'ahead', match: { type: 'assign', var: V.ahead }, key: 'value', type: 'number', tokenRefusal: REBUILD_REFUSAL, tokenDeferrable: true,
       label: 'Touched face is ahead of Z0 by', section: 'IDENTITY', default: FACE_PROBE_DEFAULTS.ahead,

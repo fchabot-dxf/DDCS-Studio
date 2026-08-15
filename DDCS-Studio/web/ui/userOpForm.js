@@ -35,7 +35,7 @@ export function openUserOpForm(def) {
 
     const head = document.createElement('div');
     head.innerHTML = `<div style="font-weight:600; font-size:15px;">${def.label || def.opType}</div>
-        <div style="opacity:.6; font-size:12px; margin-bottom:10px;">Custom op · set parameters</div>`;
+        <div style="opacity:.6; font-size:12px; margin-bottom:10px;">Custom operation · set parameters</div>`;
     box.appendChild(head);
 
     // one WIDGET per UNIT (the form half of the widget library) — shared with the panel view via renderOpForm.

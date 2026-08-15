@@ -198,7 +198,7 @@ function walk(blocks, scope, out) {
             const child = Object.create(scope); child[name] = from;
             walk(b.children || [], child, out);
         } else if (def.kind === 'container' || def.kind === 'path') {
-            if (!(b.children || []).length) add('no child op — add a block to repeat/sweep');
+            if (!(b.children || []).length) add('no child operation — add a block to repeat/sweep');
             walk(b.children || [], scope, out);
         }
     }

@@ -150,7 +150,7 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
 
   // save → exits the editing context (glow + chip clear). The workspace must actually HOLD the re-authored op first:
   // the formpane shows on the editing flag alone, while the save reads the LIVE workspace (collectAuthoring) — saving
-  // before the blocks land alerts "No op to save" and the dialog never opens (the load-time face of the same race).
+  // before the blocks land alerts "No operation to save" and the dialog never opens (the load-time face of the same race).
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
   await page.evaluate(() => window.ddcsSaveAsWizard());
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Chrome Op');
@@ -193,7 +193,7 @@ test('non-destructive save: re-author + "Save as new" creates a copy, leaving th
   await page.waitForFunction(() => window.ddcsLoadBlockStack && window.__blkws);
   await reauthor(page, 'orig', 'Original');
   // …and the workspace must HOLD the re-authored op before saving: the save reads the LIVE workspace
-  // (collectAuthoring) — saved too early it alerts "No op to save" and the dialog never opens
+  // (collectAuthoring) — saved too early it alerts "No operation to save" and the dialog never opens
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length >= 2);
 
   await page.evaluate(() => window.ddcsSaveAsWizard());

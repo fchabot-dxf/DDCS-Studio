@@ -25,9 +25,9 @@ export function showBlockEditNotice(label, summary) {
         </div>` : '';
         ov.innerHTML = `<div style="width:min(${rows.length ? 480 : 400}px,92vw); background:var(--panel,#161b22); color:var(--text-main,#e6ecf2); border:1px solid var(--border,#2a313b); border-radius:10px; padding:16px 18px; box-shadow:0 14px 40px rgba(0,0,0,.6);">
             <h2 style="margin:0 0 6px; font-size:15px;">"${esc(label)}" was edited in Blocks</h2>
-            <p style="margin:0 0 14px; font-size:12px; color:var(--text-dim,#8a93a0); opacity:.95;">This op was edited in Blocks (custom params, interleaved comments). <b style="color:var(--text-main,#e6ecf2);">Keep both</b> merges those edits with your form changes; <b style="color:var(--text-main,#e6ecf2);">Replace with form</b> drops them for the form version.</p>
+            <p style="margin:0 0 14px; font-size:12px; color:var(--text-dim,#8a93a0); opacity:.95;">This operation was edited in Blocks (custom params, interleaved comments). <b style="color:var(--text-main,#e6ecf2);">Keep both</b> merges those edits with your form changes; <b style="color:var(--text-main,#e6ecf2);">Replace with form</b> drops them for the form version.</p>
             ${diff}<div style="display:flex; gap:8px; justify-content:flex-end;">
-                ${btn('cancel', 'Cancel', false, 'Go back to the form — nothing is inserted.')}${btn('replace', 'Replace with form', false, 'Rebuild this op from the form, discarding the Blocks-only edits.')}${btn('merge', 'Keep both', true, "Some edits made in Blocks can't be represented in the form, so merging keeps them alongside your form changes instead of losing them.")}
+                ${btn('cancel', 'Cancel', false, 'Go back to the form — nothing is inserted.')}${btn('replace', 'Replace with form', false, 'Rebuild this operation from the form, discarding the Blocks-only edits.')}${btn('merge', 'Keep both', true, "Some edits made in Blocks can't be represented in the form, so merging keeps them alongside your form changes instead of losing them.")}
             </div></div>`;
         document.body.appendChild(ov);
         const done = (c) => { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(c); };

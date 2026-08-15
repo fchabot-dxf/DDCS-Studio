@@ -164,9 +164,9 @@ export const slotPatternRefusal = (p) => {
     const s = slotPatternPack(p) || { n: 0, kind: 'pattern' };
     const exit = ' Build this one from the Slot wizard, which stamps every instance of the pattern.';
     return s.n > 1
-        ? `this op draws ${s.n} slots in a ${s.kind} pattern, and a CAM slot's macro emits ONE. Packing it would cut a `
+        ? `this operation draws ${s.n} slots in a ${s.kind} pattern, and a CAM slot's macro emits ONE. Packing it would cut a `
             + `single slot and silently drop the other ${s.n - 1} — a different part, not a smaller one.${exit}`
-        : `this op draws its one slot OFF its own A→B line (a ${s.kind} pattern places it at the pattern's first `
+        : `this operation draws its one slot OFF its own A→B line (a ${s.kind} pattern places it at the pattern's first `
             + `point, not at A), and a CAM slot's macro emits one slot ON that line. Packing it would cut the right `
             + `slot in the wrong place.${exit} Or clear the pattern and move A/B to where the slot belongs.`;
 };
@@ -178,7 +178,7 @@ export const slotPatternRefusal = (p) => {
  * one. This one is teachable — nothing here is waiting on the controller.
  */
 export const SLOT_PATTERN_PACK_GAP = {
-    what: 'a CAM slot packs ONE slot body; a patterned slot op asks for N at declared offsets',
+    what: 'a CAM slot packs ONE slot body; a patterned slot operation asks for N at declared offsets',
     whyRefusedRatherThanDegraded: 'cutting one slot where N were drawn is a DIFFERENT PART. The gate-1 rule is that '
         + 'clean-looking G-code cutting the wrong part is the worst failure this project has, and a silent degrade is '
         + 'exactly that shape — the operator sees a complete-looking macro and a table with no pattern row in it',

@@ -48,7 +48,7 @@ function runQuickAction(act) {
     switch (act) {
         case 'open':   document.getElementById('projOpenBtn')?.click(); break;
         case 'save':   document.getElementById('projSaveBtn')?.click(); break;
-        case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an op in the Blocks tab first, then save it as a wizard.'); break;
+        case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an operation in the Blocks tab first, then save it as a wizard.'); break;
         // t1227 — load / insert / export / clear left this router with their rows: they are the EDITOR's file
         // actions and now live in the editor's corner menu (ui/globalFunctions.js EDITOR_FILE_ACTIONS).
         case 'standalone':

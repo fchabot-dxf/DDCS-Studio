@@ -161,7 +161,7 @@ function opsTable(ops, est) {
     if (!ops.length) return `<div class="ss-row ss-undeclared">No operations in this setup.</div>`;
     const rows = ops.map((op, i) => {
         const secs = opTime(op, est);
-        return `<tr><td>${i + 1}</td><td>${esc(op.label || op.opType || 'op')}</td><td>${esc(opKeyParams(op))}</td><td>${secs != null ? esc(fmtDuration(secs)) : '—'}</td></tr>`;
+        return `<tr><td>${i + 1}</td><td>${esc(op.label || op.opType || 'operation')}</td><td>${esc(opKeyParams(op))}</td><td>${secs != null ? esc(fmtDuration(secs)) : '—'}</td></tr>`;
     }).join('');
     return `<table class="ss-table"><thead><tr><th>#</th><th>Operation</th><th>Key params</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
 }

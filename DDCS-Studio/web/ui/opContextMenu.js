@@ -124,7 +124,7 @@ export function showOpMenu(op, x, y) {
     const m = ensure();
     m.innerHTML = '';
     const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
-    item(m, `✎ Edit ${op.label || op.opType || 'op'}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
+    item(m, `✎ Edit ${op.label || op.opType || 'operation'}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
     item(m, '⧉ Duplicate', async () => { try { (await import('../blocks/opSession.js')).duplicateOp(op.id); } catch (_) { /* */ } });
     // the full placed record (params = the truth) for the CAM actions below — re-hydrated from the program by id
     const full = (window.ddcsGetBlockProgram && (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === op.id)) || op;

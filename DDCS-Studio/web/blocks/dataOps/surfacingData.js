@@ -153,9 +153,9 @@ export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack()
 export const SURFACING_STRUCT = [
     // t1704 — not deferrable: Normal (absolute, WCS-referenced) and Skim (whole-op relative, jog-anchored) are
     // different program FRAMINGS (makePlace vs makeSkim, different wrapper atoms) — not two values of one move.
-    { param: 'zMode', type: 'enum', tokenRefusal: 'Normal and Skim are two different program framings (absolute vs. whole-op relative) — picking one decides which framing atoms get built, not a value inside one.', default: SURFACING_DEFAULTS.zMode, label: 'Z-mode', section: 'COORDINATES', widget: 'dropdown',
+    { param: 'zMode', type: 'enum', tokenRefusal: 'Normal and Skim are two different program framings (absolute vs. whole-operation relative) — picking one decides which framing atoms get built, not a value inside one.', default: SURFACING_DEFAULTS.zMode, label: 'Z-mode', section: 'COORDINATES', widget: 'dropdown',
         widgetConfig: { options: [['Normal — WCS Z0', 'normal'], ['Skim — relative', 'skim']] },
-        help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-op RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
+        help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-operation RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
 ];
 
 // t1648 — THE START-POSITION MARKER: ONE declared target, mode-dependent (user-ruled: "the gui serve differently

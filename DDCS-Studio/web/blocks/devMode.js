@@ -279,7 +279,7 @@ export function mountDevMode(ws, B, hostEl) {
     _savebtn.type = 'button';
     _savebtn.className = 'blk-dev-savebtn';
     _savebtn.textContent = '💾 Save wizard…';
-    _savebtn.title = 'Name this op and save it as a reusable custom wizard';
+    _savebtn.title = 'Name this operation and save it as a reusable custom wizard';
     _savebtn.addEventListener('click', () => saveAsCustomOp());
 
     // "✎ Editing: <name>" chip — shown only while re-authoring a saved wizard (keyed on _editingWizard), so the
@@ -560,9 +560,9 @@ export async function editWizardDefs(opTypes) {
     if (!recs.length) return;
     if (recs.length === 1) return editWizardDef(recs[0].def.opType);
     const opCs = recs.map((r) => r.opC);
-    if (!(await confirmDestructiveLoad(opCs, { label: 'before edit', what: recs.length + ' ops' }))) return;
+    if (!(await confirmDestructiveLoad(opCs, { label: 'before edit', what: recs.length + ' operations' }))) return;
     if (window.showApp) window.showApp('blocks');
-    if (!(await blocksAppReady(recs.length + ' ops'))) return;   // t1518 — refuse loudly rather than load nothing quietly
+    if (!(await blocksAppReady(recs.length + ' operations'))) return;   // t1518 — refuse loudly rather than load nothing quietly
     _editingWizard = null; _editingLabel = null; _authoringWizard = null; refreshEditingChrome();   // multi-op: no single-op re-author chrome (t1599 — and no single wizard is being customized either)
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(opCs);
     await new Promise((r) => setTimeout(r, 150));
@@ -638,7 +638,7 @@ function openSaveDialog(init, onConfirm) {
             </select></label>`;
     const rigRow = simDeclared
         ? ''
-        : `<div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this op — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
+        : `<div class="blk-dev-sim">Preview rig <span class="blk-dev-sim-why" title="DECLARE what the preview shows for this operation — never guessed from the G-code. Rotary reveals the 4th-axis rig + the A± jog row; Machine pins to the envelope; Magazine draws the ATC pockets.">ⓘ</span>
                 <label><input type="checkbox" class="blk-dev-sim-rotary"> 4th-axis rotary (jog)</label>
                 <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>
                 <label><input type="checkbox" class="blk-dev-sim-magazine"> ATC magazine</label>
@@ -742,13 +742,13 @@ export function isMaintainedAsData(def) {
 // wizard (add form fields via a formfield/param_group block to add them). Called by the 💾 Save button + the ⌄ quick
 // menu.
 function saveAsCustomOp() {
-    if (!_ws) { alert('Open an op in the Blocks tab first, then save it as a wizard.'); return; }
+    if (!_ws) { alert('Open an operation in the Blocks tab first, then save it as a wizard.'); return; }
     // Read the LIVE workspace SYNCHRONOUSLY here — BEFORE the Save dialog awaits user input — so the bindings/defaults
     // freeze at save-initiation. Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value edited just
     // before Save hasn't reprojected yet; capturing now keeps the saved default = the LIVE value, not a stale-model
     // revert during the dialog.
     const a = collectAuthoring(_ws);
-    if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
+    if (!a) { alert('No operation to save — insert an operation in Blocks first.'); return; }
     if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
 
     // t1636 — a `formfield` whose Match Var names no block in the stack used to save SILENTLY (formfieldBindings'

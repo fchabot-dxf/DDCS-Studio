@@ -162,13 +162,13 @@ function renderProjectsTab(body, ctx) {
 function renderWizardsTab(body, ctx) {
     body.innerHTML = `
         <div class="lib-wizhead">
-            <button type="button" class="toolbar-btn settings-io" data-newwiz title="Turn the op you have open in Blocks into a saved wizard on your bar">＋ New from current</button>
+            <button type="button" class="toolbar-btn settings-io" data-newwiz title="Turn the operation you have open in Blocks into a saved wizard on your bar">＋ New from current</button>
             <span class="settings-hint" style="flex:1; margin:0;">Manage your wizards and arrange them on the toolbar. New wizards land on the bar; drag, group, show/hide here.</span>
         </div>
         <div id="library_wizard_manager"></div>`;
     body.querySelector('[data-newwiz]').addEventListener('click', () => {
         if (window.ddcsSaveAsWizard) { ctx.close(); window.ddcsSaveAsWizard(); }
-        else dlgNotice('Open an op in the Blocks tab first, then New from current turns it into a wizard.');
+        else dlgNotice('Open an operation in the Blocks tab first, then New from current turns it into a wizard.');
     });
     // Reuse the existing bar-designer as-is. Its ✎ Edit switches to the Blocks tab (to re-author the wizard), so close
     // the Library after that click so the user lands on the editor — via a capture listener, NOT a global override.

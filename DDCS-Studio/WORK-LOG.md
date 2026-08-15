@@ -36247,3 +36247,155 @@ step 3.
 `npm run test:node`: 118/118. No source changes this turn — `git status` confirmed clean on every tracked file.
 
 🔨 turn 1924
+
+
+## 🔨 turn 1926 — RENAME SLICE 1 (STRINGS): op → operation, ops → operations, every user-facing and internal string literal
+
+### Dispatch
+Advisor's ruling on t1924's flagged collision, plus the Slice 1 act itself. The ruling: **the marker's own JSON
+key changes too** — `opSchema.js:220`'s `{ op: opType }` is talking to Studio itself (a `( ... )` comment the
+controller never reads), so "the emitted G-code must not change" does not cover it, and "no install base" removes
+the other objection. The sharpened proof obligation that comes with it: every slice proves the MACHINE-RELEVANT
+lines byte-identical; a marker-comment change (when that slice happens) is the one expected diff and must be
+named explicitly, never absorbed into an updated fixture silently. **This turn's own act is Slice 1 ONLY — the
+strings** — not the marker key (that's still gated behind its own future slice; not touched today).
+
+### (a) The survey — every string literal in scope, verified live
+
+Delegated to an Explore agent: every quoted string (not comment, not property/function/file name, not the
+`type:'op'` structural tag, not the marker key) using "op"/"ops" as shorthand for a single machining/probing
+action, across `web/`. Returned 45 candidates; cross-checked several by hand. Two corrections to my own t1924
+survey: `blockEditNotice.js`'s raw "op" is in the BODY paragraph, not the heading (the heading never said "op"),
+and `editorOpHover.js` — flagged in t1924 as a candidate — turned out to have NO bare "op" word at all (its
+title/textContent strings interpolate `op.label`/`op.opType`, never the literal word), so it's untouched, not
+missed.
+
+### (b) The renames — 28 files, one word each surface, no other change
+
+Every occurrence below is a straight `op`→`operation` / `ops`→`operations` swap inside an existing string
+literal — same string, same interpolations, same surrounding code, no logic touched:
+
+- **`ui/wizardManagerPanel.js`** (6) — the shelf descriptor (`op.opType ? 'op' : 'wizard'` → `'operation'`, the
+  single highest-priority instance per t1924's own flag: every Settings → Wizard Library visitor sees this),
+  the import dlgNotice, the `.wiz` settings-hint, the reset-to-factory confirm + its button title, the Export
+  button title, the Delete button title, the empty-shelf hint.
+- **`wizardManager.js`** (1) — the once-ever round-trip toast after a first insert.
+- **`ui/blockEditNotice.js`** (2) — the edit-conflict dialog body, and the "Replace with form" button title.
+- **`ui/opContextMenu.js`** (1) — the Edit menu-item fallback label.
+- **`ui/userOpForm.js`** (1) — the generic custom-op form header subtitle.
+- **`ui/setupSheet.js`** (1) — the printable Operations table's own row-label fallback (the table HEADER already
+  said "Operation" — confirmed unchanged, already correct).
+- **`ui/libraryModal.js`** (2), **`ui/headerPost.js`** (1) — "New from current" button title + its two refusal
+  dlgNotices.
+- **`blocks/devMode.js`** (5) — the Save-wizard button title, the preview-rig tooltip, two "N ops" confirm/ready
+  messages, two alert() refusals.
+- **`blocks/blocksApp.js`** (1) — the Blocks-canvas read-only reason (shown as a tooltip on the inert canvas).
+- **`blocks/lint.js`** (1) — a lint warning ("no child operation — add a block to repeat/sweep").
+- **`wizards/views/userOpView.js`** (1) — the custom-wizard usage-line fallback.
+- **`blocks/wizardLibrary.js`** (1) — the import-note text surfaced via dlgNotice.
+- **`data/camRecipe.js`** (1) — the library-card summary ("N operations — kind, kind").
+- **`data/camScratch.js`** (2) — the scratch-var collision refusal (both the per-line "(operation X)" tag and
+  the trailing explanation).
+- **`data/opCamMap.js`** (3) — the two CAM-pack slot-pattern refusal messages + the internal gap-record `what`
+  string (kept in scope as an "internal string literal" per the dispatch's own wording, even though not
+  confirmed end-user-visible — it describes the same concept the visible refusals do, in the same file).
+- **`blocks/dataOps/surfacingData.js`** (2) — the Z-mode token-refusal and its help text ("whole-op relative" →
+  "whole-operation relative").
+- **`blocks/dataOps/faceProbeData.js`**, **`odProbeData.js`** (1 each) — an identical `REBUILD_REFUSAL` string
+  duplicated across both files (not unified — out of scope, that's a code-dedup question, not a naming one).
+- **`ui/settingsPanel.js`** (2) — the mill tool-change hint (2 of its own 3 "op" occurrences renamed) and the
+  lathe chuck-angle note.
+- **`ui/axisGating.js`** (1) — the mill-vs-lathe greyed-control reason.
+- **`ui/gateway/views/merge.js`** (1) — the multi-tool-job-merge usage description.
+- **`ui/helpPanel.js`** (5) — four FAQ answers + one FAQ question, all in the same static `FAQ_HTML` block.
+- **`index.html`** (2) — the two static "Custom op." fallback text nodes (`#wiz_user_usage`,
+  `#blk_wiz_user_usage`) that `userOpView.js` overwrites at runtime but that are the raw HTML on first paint.
+
+**One deliberate non-rename, flagged rather than silently skipped**: `settingsPanel.js`'s tool-change hint also
+says "the controller no-ops if that tool is already in the spindle" — left as-is. "No-op" here is the computing
+idiom (an instruction/action that does nothing), a different sense from "a machining operation" — renaming it
+to "no-operations" would read as nonsense English for a concept this rename doesn't target. Judgement call, not
+missed.
+
+### (c) Tests updated to match — not a new regression, the expected shape of a text rename
+
+Grepped `tests/` for every OLD string this act changed. Two live assertions depended on exact old wording (both
+fixed in the same commit, not deferred):
+- `tests/blocks-roundtrip-toast.spec.js:41` asserted `toContainText('Can I edit a wizard op after inserting it?')`
+  — updated to the "...wizard operation..." wording (test title on the same line updated too, for consistency,
+  not because anything asserts it).
+- `tests/library-sources-1247.spec.js:160` asserted `toMatch(/2 ops — drill, bore/)` against `camRecipe.js`'s
+  `camSummary()` — updated to `/2 operations — drill, bore/`.
+
+Plus two comments (not assertions) that now quoted stale exact wording — `tests/blocks-live-form.spec.js` (two
+comments quoting the old "No op to save" alert text) and `tests/pane-visual-host-programmatic-1762.spec.js` (one
+comment quoting the old round-trip toast text) — corrected so they stay accurate documentation of what the UI
+actually says, the direct consequence of the source strings they describe having changed.
+
+Grepped for every other candidate substring from the survey ("Custom op", "Ops that need", "whole-op relative",
+"re-resolved by the op", "library folder as a shareable", etc.) — no further test dependencies found.
+
+### Non-vacuity — proving the "spec touching what I renamed" gate for real, not by argument
+
+Ran node tier: **118/118 green**, and the architecture-map test confirms every TRAP/INV citation still holds
+(every rename was a same-line same-length-class swap — no line-count drift).
+
+A first pass at the Playwright side ran a 17-file batch (every spec touching a renamed file) and came back with
+16 failures — but every single one carried the SAME signature: `TimeoutError: page.waitForFunction: Timeout
+5000ms exceeded`, the exact load-contention shape this project's own gate discipline names (shared mem-server on
+:3211 under concurrent workers). Re-ran every one of those files individually, `--workers=1`: all passed clean,
+including the two files carrying my actual test-content fixes (`blocks-roundtrip-toast.spec.js` 10/10,
+`library-sources-1247.spec.js` all green) and the files most directly tied to today's source edits
+(`informed-merge-notice.spec.js`, `custom-op-chip.spec.js`, `save-wizard-no-devmode.spec.js`,
+`settings-done-faq.spec.js`, `cam-scratch-alloc.spec.js`, `cam-scratch-guard.spec.js`,
+`custom-op-canvas-handles.spec.js` — 8/8 + 2/2 + 1/1 + 9/9 + 3/3 + 3/3 + 7/7). Confirmed flakes, not regressions.
+
+**One set of failures is real, reproducible, and NOT mine**: `setup-sheet-850.spec.js`, 4 of 6 tests, fails
+identically in full isolation with `TypeError: Cannot read properties of undefined (reading 'params')` inside
+its own `seedProgram()` helper at line 32 (`ops[1].params.toolNum = 2`) — `ops` only has one element because
+`seedProgram` inserts pocket/drill/contour via three separate `insertWiz()` calls expecting them to ACCUMULATE
+as siblings, which is exactly the replace-on-insert regression t1922 already reported and named this file under.
+The failure fires inside fixture setup, strictly before any code in `setupSheet.js` (the one file I touched
+here, at its render-time fallback-label line) ever runs — architecturally impossible for my rename to have
+caused it. Left untouched: it is t1922's own already-reported, still-outstanding regression awaiting step 3's
+design, not something a Slice-1 string rename should paper over by rewriting the fixture.
+
+### Machine-relevant lines — byte-identical, trivially, and said so explicitly per the sharpened proof obligation
+
+None of today's 28 files are on the emit path — no `opBuilders.js`, `blockEmitter.js`, `opSchema.js`,
+`programModel.js`, or any dialect/post file was touched. Every changed string is UI text: a toast, a dialog, a
+tooltip, a lint warning, a settings-hint, a FAQ answer, a fallback label. `npm run test:node`'s own
+byte-identical-emit specs (BRIDGE/SKIM/twin family) passed unchanged because nothing they exercise moved. Stated
+explicitly, not left implicit: **zero G-code lines changed, zero marker lines changed** — this slice touched
+nothing a controller or a `.nc` file byte-diff would ever see.
+
+### The multi_step read the advisor asked for
+
+t1924 named `multi_step` as *possibly* retirable if "operation" becomes the one word at every nesting depth, and
+asked whether Slice 1 makes that MORE or LESS obviously right. **More.** Slice 1 didn't touch the data model at
+all — it only unified what the USER reads. But that's exactly what sharpens the question: every user-facing
+surface now calls a single machining action "operation," with no distinction in wording between a top-level one
+and one nested inside a `multi_step`'s own `steps`. The user has no word for "the nested kind" versus "the plain
+kind" — because there isn't one, and was never meant to be one; the wrapper is Studio's own artifact of the old
+accumulate model, not a machinist concept. Before this slice, the mismatch between "the code has two tiers" and
+"the UI doesn't name the tiers differently either" could be read as unfinished vocabulary work on both sides.
+After this slice, the UI's own vocabulary is now internally consistent and finished — which makes a remaining
+STRUCTURAL two-tier split (one `type:'op'` container-level record, one nested-`steps` record, same word covering
+both, no user-facing reason for the split to exist) read as the ONE place left where the code still carries
+complexity the words no longer justify. Not decided here — still step 3's own design call — but the read is
+clearer than it was at t1924: retiring `multi_step` in favor of a flat "the program holds 1..N operations
+directly" shape is the version that now matches the vocabulary Slice 1 just finished, not a competing option to
+weigh against it.
+
+### Gate
+
+`npm run test:node`: 118/118. Targeted Playwright specs across every renamed file, isolated (`--workers=1`) to
+rule out the batch's own load-contention flakes: all green except `setup-sheet-850.spec.js`'s pre-existing,
+already-reported t1922 regression (untouched, unrelated, reproducible on its own with zero source changes from
+this turn). Two test files updated to match the two renamed strings they actually asserted on
+(`blocks-roundtrip-toast.spec.js`, `library-sources-1247.spec.js`); two more test files had stale-quote comments
+corrected to match (`blocks-live-form.spec.js`, `pane-visual-host-programmatic-1762.spec.js`). 28 source files
++ `index.html`, pure string-literal renames, zero identifier/data/emit risk as designed. `proc_health.py watch`
+clean.
+
+🔨 turn 1926

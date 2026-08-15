@@ -300,7 +300,7 @@ export function importWizard(text) {
     const got = def.hooksReattached || [];
     const missing = wanted.filter((k) => !(k in def));
     def.importNote = missing.length
-        ? `Its data came across in full. ${missing.length === 1 ? 'One behaviour' : missing.length + ' behaviours'} the author's app adds in code (${missing.join(', ')}) is not part of a wizard file — this build has no ${def.opType} of its own to take it from, so the op runs on its data alone.`
+        ? `Its data came across in full. ${missing.length === 1 ? 'One behaviour' : missing.length + ' behaviours'} the author's app adds in code (${missing.join(', ')}) is not part of a wizard file — this build has no ${def.opType} of its own to take it from, so the operation runs on its data alone.`
         : (got.length ? `Rebuilt from the file, with this app's own ${def.opType} behaviour (${got.join(', ')}) — a wizard file carries data, not code.` : '');
     return def;
 }

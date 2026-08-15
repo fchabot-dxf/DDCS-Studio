@@ -195,8 +195,8 @@ export function renderWizardLibrary(container) {
     actions.className = 'settings-row'; actions.style.marginTop = '8px';
     actions.appendChild(mkBtn('⬆ Import a file…', () => importWizardFile(apply), { title: 'Load a .wiz / .wizard file from anywhere on disk (the shelf below is the folder you keep them in)' }));
     actions.appendChild(mkBtn('↺ Reset to factory', async () => {
-        if (await dlgConfirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard ops are kept.', { danger: true, okLabel: 'Reset' })) { resetLayout(); apply(); }
-    }, { title: 'Discard all bar customisation (keeps your custom ops)' }));
+        if (await dlgConfirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard operations are kept.', { danger: true, okLabel: 'Reset' })) { resetLayout(); apply(); }
+    }, { title: 'Discard all bar customisation (keeps your custom operations)' }));
     head.appendChild(actions);
     container.appendChild(head);
 
@@ -205,7 +205,7 @@ export function renderWizardLibrary(container) {
     const shelf = document.createElement('div');
     shelf.className = 'settings-section';
     shelf.innerHTML = '<div class="settings-section-title">SHARED WIZARDS (.wiz) — YOUR LIBRARY FOLDER</div>'
-        + '<div class="settings-hint">A <code>.wiz</code> is a wizard&rsquo;s SOURCE, not a baked copy: importing one installs it live on your bar, editable in Blocks like any op you wrote. Export writes here too.</div>'
+        + '<div class="settings-hint">A <code>.wiz</code> is a wizard&rsquo;s SOURCE, not a baked copy: importing one installs it live on your bar, editable in Blocks like any operation you wrote. Export writes here too.</div>'
         + '<div id="wiz_library_shelf" style="margin-top:10px"></div>';
     container.appendChild(shelf);
     renderLibraryShelf(shelf.querySelector('#wiz_library_shelf'), {
@@ -213,13 +213,13 @@ export function renderWizardLibrary(container) {
         describe: (e) => {
             const op = (e.obj && e.obj.op) || {};
             const n = ((op.bindings || []).length);
-            return `${op.opType ? 'op' : 'wizard'} · ${n} field${n === 1 ? '' : 's'}`;
+            return `${op.opType ? 'operation' : 'wizard'} · ${n} field${n === 1 ? '' : 's'}`;
         },
-        emptyHint: 'Export one of your own ops above and it will appear here.',
+        emptyHint: 'Export one of your own operations above and it will appear here.',
         onImport: async (e) => {
             const def = importWizard(e.text);   // parse → createUserOp → registerUserOp: LIVE, exactly like a local op
             if (!def) { dlgNotice(`“${e.name}” is not a wizard file this version understands.`); return; }
-            dlgNotice(`“${def.label || def.opType}” is on your bar now — open it, or edit it in Blocks like any op you authored.${def.importNote ? ' ' + def.importNote : ''}`);
+            dlgNotice(`“${def.label || def.opType}” is on your bar now — open it, or edit it in Blocks like any operation you authored.${def.importNote ? ' ' + def.importNote : ''}`);
             apply();
         },
     });
@@ -384,10 +384,10 @@ function renderRow(entry, group, ei, allGroups, apply) {
     if (entry.kind === 'user') {
         row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
             { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
-        row.appendChild(mkBtn('Export .wiz', () => exportEntry(entry, apply), { title: 'Write this op to your library folder as a shareable .wiz source — it imports live and editable, not baked' }));
+        row.appendChild(mkBtn('Export .wiz', () => exportEntry(entry, apply), { title: 'Write this operation to your library folder as a shareable .wiz source — it imports live and editable, not baked' }));
         row.appendChild(mkBtn('Delete', async () => {
             if (await dlgConfirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`, { danger: true, okLabel: 'Delete' })) { deleteWizard(entry.type); apply(); }
-        }, { danger: true, title: 'Remove this custom op' }));
+        }, { danger: true, title: 'Remove this custom operation' }));
     } else {
         // t1107 — a per-BUILT-IN "Restore default": shown ONLY when THIS built-in is actually customized — a layout override
         // (rename/reorder/regroup/re-icon/hide) OR a diverged opensAs twin (its form/pendant param blocks were edited). Reverts
