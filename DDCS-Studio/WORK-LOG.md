@@ -35488,3 +35488,140 @@ per the dispatch's own instruction to check its two screenshot baselines rather 
 tracked baseline (restored via `git checkout HEAD --` after the run, as in t1910). `proc_health.py watch`: clean.
 
 🔨 turn 1911
+
+## t1914 — progstart/progend vs the op wrapper: ANALYSIS ONLY, no code
+
+### Dispatch
+
+Given the user's two rulings (no multi-op continuous playback — "program the multiop within one op"; wizard
+insert should REPLACE the canvas, not accumulate, with a notice), does `progstart`/`progend` (the PROGRAM frame)
+and `user_root` (the OP wrapper) describe the SAME boundary once a program is always exactly one op — the shape
+that produced today's M30 bug (progend and the op wrapper disagreeing about who owns the terminator, with a third
+name `endprogram` in the decode path)? Wanted: (a) what each layer OWNS today, named not coded; (b) where they
+already overlap/conflict, M30 as the known example, are there others; (c) could they collapse under one-op-per-
+program, what would it delete; (d) what would BREAK — CAM slot builder + `.nc` round-trip specifically, since both
+walk the shared program and either may legitimately need several ops. Loud flag if anything genuinely does. Do
+NOT design the collapse. Gate: node tier only (the advisor's own full-suite gate was running; no second suite).
+
+### (a) FOUR responsibilities exist today, not two
+
+1. **`progstart`/`progend`** (`wizards/ops/program.js:13-39`) — the MACHINE bracket. `progstart` emits G90 +
+   spindle-on/dir/spin-up + rapid-to-clearance; `progend` emits spindle/coolant-off + G53 retract + optional park
+   + the ONE terminator (`end`, default M30). Real G-code, directly. These are properties of the PHYSICAL RUN —
+   what happens once before anything moves, once after everything is done — independent of how many ops sit
+   between them.
+2. **`user_root`** (`wizards/ops/userRoot.js:12-22`) — WIZARD-AUTHORING/FORM identity. Two mouths: `uiChildren`
+   (Presentation — FORM fields/3D-sim/layout-2D, what the twin's own editor renders from) and `children`
+   (Execution — the op's own G-code atoms, which for most cutting twins independently include their OWN copy of
+   progstart/wcs/placeonstock/progend — each twin decides for ITSELF whether it's a complete standalone program).
+   Transparent emit (`[...uiChildren, ...children]`). Lives one level INSIDE the op container, never top-level.
+3. **`op` / `makeOp()`** (`opBuilders.js:95-100`) — PROGRAM-COMPOSITION identity: id/opType/params/requires/label.
+   What `replaceOp`/`deleteOp`/`duplicateOp`/`mergeOpBlocks` (`opSession.js`) key off, what `userOpView` reads for
+   the twin form, what `blockEmitter` reads `requires` from for per-post gating, what `serializeWithMarkers()`/
+   `importMarkedNc()` (`programModel.js:139,195`) round-trip as ONE `( @DDCS:1 {…} )` marker per op. Transparent
+   emit.
+4. **`endprogram`** (`gcodeToStack.js:166`) — DECODE-ONLY leaf: a bare M30/M2 recognized in raw/pasted/legacy text
+   with no progstart/progend structure at all (used by `commitDecodedCode` for probe/ATC/comm ops with no builder
+   yet, and by `importMarkedNc`'s marker-free leaf-parse fallback). Not a peer of `progend` — it's what a
+   frame-less TEXT SPAN degrades to once decoded.
+
+A fifth, program-scoped family sits alongside these: **`xform`/`entry`/`flip`** program-level SIBLINGS
+(`programModel.js:156-180`, the `prog` marker) — whole-program transform/entry-waypoint/two-sided-flip metadata
+that belongs to neither progstart/progend's own fields nor any op's own params. Any collapse design has to
+account for these too.
+
+### (b) The M30 bug has a CONFIRMED sibling, already shipped, in a completely separate subsystem
+
+The known example (t1828/t1830, this session, `opBuilders.js:114-157`): `_framed()` needed to find progstart/
+progend to know "does this op bring its own frame," but only recognized homing's raw `{type:'op'}` self-wrap —
+every OTHER twin self-wraps in `{type:'user_root'}`, a different type name the check never matched. So for every
+cutting op, `progend` (which emits M30) stayed buried inside `user_root.children`, invisible to
+`appendIntoProgram`'s and `normalizeEnds`'s top-level lookups — a real M30 landed mid-exported-file. Took three
+attempts to fix correctly (unwrap `user_root` like `'op'` → regressed 4 tests, the Presentation mouth vanished;
+flatten the two mouths into one array → still 0 blocks rendered, `stackBridge.js:310`'s `def.kind==='user_root'`
+gate can't fire on an `op`-typed record; the actual fix leaves `user_root` wrapped and only lifts progstart/
+progend out of its own children onto a copy).
+
+**A DIFFERENT instance of the identical bug shape, independently shipped, independently patched, in CAM slot
+composition** — `data/slotPack.js:92-99`'s own comment names it verbatim: *"Concatenating them raw put an M30 in
+the MIDDLE → the controller stopped after part 1 and every later part was dead code (**the shipped multi-op +
+sub-stack bug**)."* `macrosApp.js`'s `buildSlotFromOps` (composing a CAM slot's own `slot.ops[]`) and
+`data/subStackToSlot.js` (composing a custom op's `opunit` sub-units) both reinvented near-identical machinery —
+`composeParts`/`offsetBodyLabels`/`stripTerminalEnd`/`maxLabelIn` (`slotPack.js:103-138`), operating on RAW TEXT
+— to solve the exact problem `opSession.js`'s `normalizeEnds`/`offsetLabels`/`maxLabelNum` solves for BLOCK
+OBJECTS. Same disease, two organs, two hand-rolled cures, discovered independently. Root cause in both: a builder
+(or a standard-op CAM generator) always emits its OWN complete framing, unconditionally — nothing tells it
+"you're part 2 of 3" — so downstream code has to detect and strip the redundant framing after the fact, in two
+unrelated files.
+
+### (c) Could they collapse under one-op-per-program? Mechanically yes — but merging the TYPES costs more than deleting the machinery
+
+If a Studio program is always exactly `[progstart, opC{user_root{…}}, progend]` (never more, via replace-on-
+insert), the entire ACCUMULATION apparatus in `appendIntoProgram`'s `cur.length` branch — offsetLabels,
+maxLabelNum, the endIdx-splice-before-progend, `normalizeEnds`'s band-aid — becomes unreachable: there is never a
+second op to splice in. `_framed()`'s own "find progstart/progend, possibly buried inside user_root" complexity —
+the whole t1828/t1830 saga — exists ONLY because the accumulation logic needs to locate framing RELATIVE TO an
+already-growing shared stack; with exactly one op, a builder's output IS the program, nothing is relative to
+anything. `replaceOp`/`deleteOp`/`duplicateOp`/`mergeOpBlocks` stop meaning what their names say ("delete the op"
+from a one-op program = clear the canvas; "duplicate" = start a second file, not add a sibling) — repurposed or
+retired, not merely simplified.
+
+Whether progstart/progend should MERGE into the op-wrapper as one block TYPE is a separate, bigger question than
+"delete the now-dead accumulation code," and I want to flag precisely why: progstart/progend hold MACHINE-SETUP
+fields that emit real G-code directly; `user_root`/`op` hold AUTHORING/COMPOSITION metadata with a TRANSPARENT
+emit (they never emit their own G-code, only arrange children). Merging them means one block simultaneously (1)
+emitting real G-code, (2) carrying a form-rendering Presentation mouth, (3) carrying program-composition identity
+(id/opType/requires), and, per the fifth family above, (4) whole-program transform/entry/flip metadata — four
+responsibilities on one type, not one. The cheaper move the one-op rule alone earns, WITHOUT redesigning any
+block type: keep all four/five concepts exactly as they are, delete the multi-op accumulation/reconciliation
+machinery that exists only to handle a case (multiple ops in one program) that can no longer occur. That alone
+removes the entire t1828/t1830 bug class.
+
+### (d) What would BREAK — checked directly, not assumed
+
+**CAM slot builder — not broken, but visibly shares the identical unresolved gap one level down.**
+`stackToSlot`/`subStackToSlot` never go through `opSession.js`'s `appendIntoProgram`/`_framed` at all — they call
+`emitMapped` directly on a def's own `template` and compose via their OWN `composeParts`. Collapsing the Studio-
+canvas boundary would not break CAM slots — they don't depend on it. But `subStackToSlot.js`'s own header comment
+(lines 16-18) says the same shape of problem is UNRESOLVED there today: *"the generators emit self-contained
+framing (progstart…M30), so concatenated parts are not yet a single EXECUTABLE program (framing-normalization is
+a later slice)."* If the Studio-canvas fix removes the NEED for boundary-detection (rather than teaching builders
+their own context), the CAM layer's identical problem stays exactly as unresolved as it is today — a separate,
+already-named-in-source TODO, not something this answer should be read as having also settled.
+
+**`.nc` round-trip — GENUINELY needs multiple ops today, structurally, by design. Flagging loudly per the
+dispatch's own instruction.** `programModel.js:195-221`'s `importMarkedNc(text, opts)` walks EVERY `( @DDCS:1
+{…} )` marker in a text file and pushes ONE `op` per marker found — a `while` loop, unbounded count. This is the
+direct inverse of `serializeWithMarkers()` (`programModel.js:139`), which is exactly what TODAY's Studio produces
+when a user accumulates several wizard inserts and exports — a multi-marker `.nc` file. Two concrete
+consequences: (1) any file exported under the CURRENT (soon-to-be-replaced) accumulation model — including files
+already on a user's disk right now — carries multiple markers, and `importMarkedNc` is the only path that reads
+them back structurally rather than as opaque leaf G-code; if the one-op invariant is enforced at import too,
+re-importing such a file needs a real, explicit answer (refuse and name the N ops found? keep only the first?
+something else?) — not a silent collapse, which is exactly the failure shape this session's own `#1300` ATC bug
+(t1890-t1894) already ruled against. (2) This is orthogonal to whether the CANVAS enforces one op going forward —
+`importMarkedNc` operates on FILE TEXT that may have been hand-edited, exported by an older Studio version, or
+genuinely hand-authored with several M30-terminated programs pasted together; `gcodeToStack.js` has no concept of
+"one op" at all, it's a flat per-line leaf parser — the multiplicity lives entirely in how many markers
+`importMarkedNc`'s own loop happens to find. No third case found beyond the two the dispatch named:
+`commitDecodedCode`'s only real caller (`wizardManager.js:512`) always decodes ONE just-generated op's own text,
+never a whole file — no multi-op tension there.
+
+### Verdict, stated plainly
+
+Four responsibilities, not two (plus a fifth program-scoped sibling family). The M30 bug is not a one-off — it
+has a confirmed sibling, already shipped and independently patched, in CAM slot composition, naming itself in its
+own source comment. Under one-op-per-program, progstart/progend and the op-wrapper(s) don't NEED to merge into
+one type to fix the bug class — deleting the accumulation machinery that only multi-op ever required does that on
+its own, more cheaply than a type merge that would fold four distinct responsibilities onto one block. CAM slots
+are unaffected by the collapse but sit on the identical unresolved problem one level down. The `.nc` round-trip
+is the one place with a REAL, load-bearing "needs multiple ops" case today — not hypothetical, and it's a decision
+(refuse / pick-one / something else) for the advisor or the user, not a fact this analysis can settle by reading
+more code.
+
+### Gate
+
+`npm run test:node`: 118/118 (no source changes this turn). `proc_health.py watch`: clean. `handoff.py amendments
+--role worker`: none pending, epoch re-checked (4, matches).
+
+🔨 turn 1914
