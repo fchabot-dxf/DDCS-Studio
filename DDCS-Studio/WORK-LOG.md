@@ -35792,3 +35792,134 @@ reason — my own `HEADER_ICONS.lathe` edit this turn added 2 lines above it, 10
 temporary revert-for-screenshot swap) killed before finishing.
 
 🔨 turn 1918
+
+## t1920 — STEP 2 OF 3: DELETE THE ACCUMULATION MACHINERY
+
+### Dispatch
+
+Under one-op-per-program, `opSession.js`'s multi-op accumulation machinery is dead weight — `appendIntoProgram`'s
+splice branch, `normalizeEnds`, and the `_framed` user_root-unwrap complexity that took three attempts across
+t1828/t1830. Delete it — my own t1914 analysis is the plan of record: delete the accumulation, do NOT collapse
+the four frame responsibilities. Reconcile the `stripEndprogram`/`collapseImportTerminators` twin t1916 built as
+a deliberate LOCAL copy of `normalizeEnds` (that file was step 2's own scope then; now it is). Extract before you
+cut — classify every dependency, shared helpers stay shared, code survivors run THROUGH comes out first. Prove
+the bug class is dead, not merely that nothing broke. Expect tests to need REWRITING, not deleting. Step 3
+(replace-on-insert + its refusable notice) stays separate. Gate: node tier + every spec touching
+opSession/programModel/opBuilders + the multi-op import spec.
+
+### What actually got deleted, and what didn't — extract-before-cut, applied
+
+Deleted from `opSession.js`: `maxLabelNum`, `offsetLabels`, `normalizeEnds`, and `appendIntoProgram`'s own
+multi-op splice branch (~90 lines total) — all of it existed ONLY to deconflict two ops' labels/terminators when
+splicing a second op into an already-framed program, a case that can no longer arise. `appendIntoProgram` itself
+survives, renamed `loadOpAsProgram` and reduced to its true remaining job: load `framed || bare` as the WHOLE
+program (replace), used by both its real callers (`commitActiveOp`, `commitDecodedCode`).
+
+**NOT deleted, despite being named alongside the machinery in the dispatch's own framing — checked, not
+assumed:** `opBuilders.js`'s `_framed()` (the user_root-progstart/progend lift). Its own job is NOT accumulation-
+specific — `buildActiveOpStack`/`commitActiveOp`/`replaceOp`/`duplicateOp` (all four, still alive) need progstart/
+progend kept as SEPARATE top-level siblings of the op, not buried inside it, so they stay independently
+addressable (`opAtLine`'s own `PROGRAM_FRAMING_TYPES` exclusion — a click on the M30 line correctly resolving to
+"no op") and so the Blocks-tab preview can present `[progstart, opC, progend]` as three editable top-level
+blocks — regardless of how many ops the canvas ever holds. Deleting or simplifying it would have broken a
+SURVIVING presentation need to save a few lines. Doc comment updated to say so plainly (removed the now-stale
+"for the multi-op-assembly question" framing) — code untouched.
+
+**NOT touched at all: `replaceOp`/`deleteOp`/`duplicateOp`/`mergeOpBlocks`.** These serve EDIT-IN-PLACE (the
+SAME, only op, re-derived from new params or edited blocks) — a genuinely different job from accumulation, not
+named in the dispatch's own deletion list, and whether "Duplicate" still means anything under a strict one-op
+invariant is a design question for step 3 (replace-on-insert), not this act.
+
+### The twin, reconciled — not merged, the other side simply stopped existing
+
+`programModel.js`'s `stripEndprogram`/`collapseImportTerminators` (t1916) was built as a deliberate LOCAL copy of
+`normalizeEnds` because that file was step 2's own scope then. Now `normalizeEnds` is deleted — its own only
+caller (the accumulation splice) is gone, so there was nothing left to reconcile BY MERGING. Updated the comment
+to say precisely that: what was a twin is now the SOLE surviving implementation of "deconflict multiple potential
+terminators," kept alive by a genuinely different, still-real need (`importMarkedNc`'s own `multi_step` grouping
+of a legacy or hand-authored multi-op `.nc` file, t1916 — untouched, unaffected by this deletion).
+
+### Comment-accuracy sweep — every dangling reference to the deleted functions found and fixed, not just the code
+
+`blockEmitter.js:475`'s own comment named `offsetLabels` as "the cross-op accumulation case" it subsumed —
+updated to state its own surviving scope without depending on a function that no longer exists. `data/slotPack.js
+:103`'s own comment said its `maxLabelIn` "mirrors opSession.js maxLabelNum" — updated: that function is CAM
+slot composition's own, unrelated, unaffected sibling (a different domain — a slot's own generated parts, not
+the Studio canvas), not a mirror of something now deleted. `opSession.js`'s own file-level doc comment ("commit
+it INTO the one shared program frame so inserts ACCUMULATE") and `commitDecodedCode`'s own doc comment (still
+said "accumulate them as a frameless snippet") both corrected to describe REPLACE.
+
+### TWO more bugs found and fixed in `importMarkedNc` (programModel.js) — while building the non-vacuity fixtures
+
+Building hand-constructed 2-op fixtures (see next section) to replace the now-impossible live-accumulation test
+setups surfaced two real gaps in t1916's own import fix that its own drill+corner proof never exercised:
+
+1. **A hand-built or freshly-authored program's FIRST op can also carry its own internal terminator** (homing —
+   same "own success/error convergence ends in M30" shape corner has, found live when homing became the first op
+   in a 2-op fixture for the first time). t1916's own "always strip an op's own internal `endprogram` before
+   measuring its skip length" assumed the op was NOT first (legacy `normalizeEnds` only stripped non-first ops).
+   For a first op, or ANY hand-built stack that never went through that now-deleted pipeline, the terminator is
+   genuinely IN the source text — stripping it anyway under-measured the skip, leaving the op's own real M30 text
+   unconsumed, which then got leaf-parsed a second time as a stray interstitial `endprogram` atom SITTING BETWEEN
+   the two ops — breaking `groupConsecutiveOps`' own "consecutive" check, so the import silently stopped wrapping
+   into `multi_step` at all (confirmed: `items` showed `["op","endprogram","op","endprogram"]` instead of two
+   adjacent ops).
+2. **Fixed by VERIFYING instead of assuming**: try the op's own FULL (unstripped) reconstruction first; only fall
+   back to the stripped one if the full version's marginal length doesn't land exactly on the real next boundary
+   (the next marker, or EOF) in the source text. Checked against the actual text, not inferred from "is this the
+   first op" or any other indirect signal — `collapseImportTerminators` cleans up whichever terminator survives
+   regardless of which op carried it, so the two passes don't need to agree on which one "is" the real one.
+
+Both confirmed live via a disposable debug probe (deleted after use) showing the exact `items` array before and
+after the fix, then verified against the FULL affected test suite (below) with zero regressions on the original
+drill+corner (twin-first, snippet-second) and standalone-corner (snippet-alone) scenarios t1916 already proved.
+
+### Seven tests rewritten (not deleted) — each says what changed and why, per the dispatch's own instruction
+
+- **`blocks-accumulate.spec.js`** — its ENTIRE purpose was guarding `normalizeEnds`' own label/terminator
+  cleanup. Rewritten to prove the NEW invariant instead: a second, different op REPLACES the program (checked
+  structurally — the op array, not just the end-state text), and the bug class (M30/label collision) cannot
+  arise because there is no longer a second op's content to collide WITH.
+- **`multi-op-progend-1828.spec.js`** — split into two tests: "Drill alone" (t1828's own original fix, still
+  load-bearing, re-verified under the new regime since `_framed`'s lift is what makes it true regardless of
+  accumulation) and "Corner inserted after Drill REPLACES it" (the bug class proven dead from the other end).
+- **`segment-frame-derivation-1838.spec.js`**, **`marker-rebuild-1848.spec.js`**, **`homing-stock-poisons-1832
+  .spec.js`**, both fixture-needing tests in **`opatline-identity-1842.spec.js`**, and the "real multi-op" test
+  in **`multi-op-import-1916.spec.js`** — a real bar-gesture Insert can no longer produce a 2-op program to feed
+  these tests' own claims. Rewritten to build the fixture DIRECTLY via `opBuilders.js`'s own `makeOp`/
+  `_builderAtoms` + `window.ddcsLoadBlockStack`, matching the pattern `prog-marker-slot-812.spec.js` already
+  established for hand-built (not live-gesture) fixtures — the SAME production functions the deleted
+  accumulation path used to call, just orchestrated directly. Params captured from real single-op live inserts
+  (homing/corner/drill's own shipped defaults), not invented. `opAtLine`-dependent tests (segment-frame-
+  derivation, the M30-framing test in opatline-identity) needed the ops kept as two TOP-LEVEL siblings, with
+  corner's own internal terminator explicitly stripped and replaced with one clean top-level one — reproducing
+  exactly what `normalizeEnds` used to produce, since `opAtLine`/`findOpInStack` only resolve the FIRST top-level
+  op match and do not descend into a `multi_step` wrapper's own children (an import-only concern, not exercised
+  by this reproduction).
+
+**OPEN QUESTION, flagged not resolved**: `segment-frame-derivation-1838.spec.js`'s own note names it explicitly
+— does `frameSegments`'/`opAtLine`'s own multi-op logic still have a real future now that the canvas can't
+produce a 2-top-level-op program live? The only surviving multi-op shape (`importMarkedNc`'s `multi_step`) is
+NOT top-level-addressable this way. Not decided here — a question for step 3 or a future act.
+
+### Non-vacuity — proven both directions, not assumed
+
+Reverted `opSession.js` to HEAD (pre-t1920, `git checkout HEAD --`), confirmed the rewritten
+`blocks-accumulate.spec.js` and `multi-op-progend-1828.spec.js`'s own "REPLACES it" test both FAIL against the
+old code for exactly the predicted reason (both ops still present — the old code accumulates). Restored from a
+scratch backup (verified byte-identical to the pre-revert state via `diff`), re-ran the full affected suite (19
+tests across 8 files): 19/19 green.
+
+### Gate
+
+`npm run test:node`: 118/118. 170 specs referencing `opSession.js`/`programModel.js`/`opBuilders.js` (split into
+2 batches for Windows' own command-line length limit): first full run — 8 failures, ALL timeout-shaped except one
+non-timeout (`probe-input-select-revival-1888.spec.js`, 3 sub-tests). Re-ran the full 170-file gate a SECOND time:
+a DIFFERENT set of 9 failures (2 new, 5 gone from the first set) — the load-contention flake signature, not a
+consistent regression. Every single failing test from BOTH runs re-verified in FULL ISOLATION (single file, no
+batch contention): 100% clean across all of them, including `probe-input-select-revival-1888.spec.js` (5/5,
+twice). `proc_health.py watch`: clean. `git status` on `verification/`: no tracked baseline PNGs touched. The
+disposable debug probe (`zzdebug-handbuilt-import-probe.spec.js`) and a temporary `console.log` guard added to
+`programModel.js` while diagnosing the interstitial-endprogram bug were both removed before finishing.
+
+🔨 turn 1920

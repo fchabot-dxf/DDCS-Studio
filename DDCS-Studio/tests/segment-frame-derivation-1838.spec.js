@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { openWizardViaBar, clickInsert } from './support/barGesture.js';
 
 /**
  * t1838 — Option B, SLICE 1 of the t1836 3-slice plan: DERIVATION ONLY. `viz/segmentFrame.js` joins two already-
@@ -8,25 +7,43 @@ import { openWizardViaBar, clickInsert } from './support/barGesture.js';
  * positioning, no visibility, no render change. This is the ONLY thing this slice ships; slices 2/3 (future acts)
  * will consume its output.
  *
- * Built and asserted against a REAL Homing-then-Corner program, built by real bar gesture (not a hand-built stack),
- * matching t1832/t1834/t1836's own established scenario for this bug family.
+ * t1920 — FIXTURE CHANGED, claim unchanged. This test's own claim is that `frameSegments` correctly splits a
+ * program with TWO TOP-LEVEL, independently-addressable ops — which needs `opAtLine`/`findOpInStack` to resolve
+ * each line to ITS OWN op, something that only works when both ops sit at the top level of the program array
+ * (`findOpInStack` matches the FIRST top-level `op` it finds and does not descend further once a run-of-2 no
+ * longer exists via live insert). t1916/t1918/t1920's own ruling means a STUDIO-CANVAS program is now always
+ * exactly one op — a real bar-gesture Insert can no longer produce a 2-top-level-op program at all, which is
+ * exactly the shape this test needs to exercise `frameSegments`' own multi-op logic. Built directly instead, via
+ * the SAME production functions the (deleted) accumulation path used to call — `opBuilders.js`'s own
+ * `makeOp`/`_builderAtoms` — matching the established pattern `prog-marker-slot-812.spec.js` already uses for
+ * hand-built (not live-gesture) fixtures. Params captured from a real single-op live insert (homing's own
+ * shipped defaults; corner's own shipped defaults with `dist:741`, matching this file's own prior `dist` fill) —
+ * not invented. OPEN QUESTION, not resolved here: whether `frameSegments`'/`opAtLine`'s own multi-op logic still
+ * has a real consumer now that the canvas can't produce this shape live (the only surviving multi-op shape,
+ * `importMarkedNc`'s `multi_step` wrapper, is NOT top-level-addressable this way — `findOpInStack` would resolve
+ * every line inside it to the SAME wrapper, not to its own steps) — flagged for the advisor, not decided here.
  */
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('frameSegments correctly attributes a real Homing+Corner program to its two ops and their declared frames', async ({ page }) => {
-    test.setTimeout(60_000);
+const HOMING_PARAMS = { run_z: true, run_x: true, run_y: true, run_a: false, run_b: false, softLimits: true };
+const CORNER_PARAMS = { corner: 'FL', probeSeq: 'YX', travelDist: 50, safeZ: 10, scanDepth: 5, clearMode: 'hop', hopDist: 15, planeZ: 10, probeZFirst: false, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active', syncA: false, dist: 741, retract: 5, f_fast: 200, f_slow: 50, port: 3, radius: 2 };
+
+async function buildHomingThenCorner(page) {
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+    await page.evaluate(async ({ homingParams, cornerParams }) => {
+        const OB = await import('/blocks/opBuilders.js');
+        const homingOp = OB.makeOp('user_homing_data', homingParams, OB._builderAtoms('user_homing_data', homingParams));
+        const cornerOp = OB.makeOp('user_corner_data', cornerParams, OB._builderAtoms('user_corner_data', cornerParams));
+        window.ddcsLoadBlockStack([homingOp, cornerOp]);
+    }, { homingParams: HOMING_PARAMS, cornerParams: CORNER_PARAMS });
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length === 2, null, { timeout: 10000 });
+}
 
-    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await page.locator('#wiz_user_form [data-param="dist"]').waitFor({ state: 'visible', timeout: 5000 });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+test('frameSegments correctly attributes a Homing+Corner program to its two ops and their declared frames', async ({ page }) => {
+    test.setTimeout(60_000);
+    await buildHomingThenCorner(page);
 
     const r = await page.evaluate(async () => {
         const { frameSegments, frameOwnerAtLine } = await import('/viz/segmentFrame.js');

@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.js';
 
 /**
  * t1842/t1844 — the opAtLine bug (WORK-LOG t1838/t1840/t1842/t1844), ALGORITHM layer only.
@@ -102,6 +101,16 @@ test('ALGORITHM: a line that genuinely cannot be resolved, in the accident-prone
     ).toBe(true);
 });
 
+// t1920 — FIXTURE CHANGED, claim unchanged. A real bar-gesture Insert now REPLACES the program (t1916/t1918/
+// t1920's own ruling: a Studio-canvas program is always exactly one op) — two live inserts can no longer produce
+// a 2-op program at all. Built directly instead, via the SAME production functions the (deleted) accumulation
+// path used to call (`opBuilders.js`'s own `makeOp`/`_builderAtoms`), matching `prog-marker-slot-812.spec.js`'s
+// own established hand-built-fixture pattern. Two TOP-LEVEL ops (not nested) because this test's own claim needs
+// `opAtLine` to resolve each — same reasoning as `segment-frame-derivation-1838.spec.js`. Params captured from a
+// real single-op live insert (homing's own shipped defaults; corner's own shipped defaults).
+const HOMING_PARAMS = { run_z: true, run_x: true, run_y: true, run_a: false, run_b: false, softLimits: true };
+const CORNER_PARAMS = { corner: 'FL', probeSeq: 'YX', travelDist: 50, safeZ: 10, scanDepth: 5, clearMode: 'hop', hopDist: 15, planeZ: 10, probeZFirst: false, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active', syncA: false, dist: 741, retract: 5, f_fast: 200, f_slow: 50, port: 3, radius: 2 };
+
 test('ALGORITHM: a normal program\'s own trailing M30 (program framing, not a missing op) stays silent', async ({ page }) => {
     test.setTimeout(60_000);
     const errors = [];
@@ -109,13 +118,24 @@ test('ALGORITHM: a normal program\'s own trailing M30 (program framing, not a mi
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 
-    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await page.locator('#wiz_user_form [data-param="dist"]').waitFor({ state: 'visible', timeout: 5000 });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+    await page.evaluate(async ({ homingParams, cornerParams }) => {
+        const OB = await import('/blocks/opBuilders.js');
+        const homingOp = OB.makeOp('user_homing_data', homingParams, OB._builderAtoms('user_homing_data', homingParams));
+        const cornerOp = OB.makeOp('user_corner_data', cornerParams, OB._builderAtoms('user_corner_data', cornerParams));
+        // This test's own claim needs the M30 to be a TOP-LEVEL, unowned framing sibling — the shape a real
+        // accumulated program used to have (progend's own separate M30, corner's own internal one stripped by
+        // opSession.js's now-deleted normalizeEnds since corner wasn't first). Reproduced by hand here: strip
+        // corner's own internal `endprogram` (it carries one by original design, same as t1916's own finding) and
+        // add ONE fresh top-level terminator, matching normalizeEnds' own old output shape exactly.
+        const stripEndprogram = (arr) => (arr || []).filter((b) => {
+            if (b && b.type === 'endprogram') return false;
+            if (b && b.children) b.children = stripEndprogram(b.children);
+            return true;
+        });
+        cornerOp.children = stripEndprogram(cornerOp.children);
+        window.ddcsLoadBlockStack([homingOp, cornerOp, { type: 'endprogram', params: {} }]);
+    }, { homingParams: HOMING_PARAMS, cornerParams: CORNER_PARAMS });
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length === 2, null, { timeout: 10000 });
 
     const r = await page.evaluate(() => {
         const proj = window.ddcsGetProjection();
@@ -137,14 +157,18 @@ test('OUTCOME: export a Homing+Corner program, reimport it — BOTH ops survive 
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 
-    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '741' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+    // t1920 — this test's own EXPORT-SIDE fixture can no longer come from two live inserts (a real bar-gesture
+    // Insert now REPLACES; see this file's own earlier note). Built directly instead — serializeWithMarkers/
+    // importMarkedNc don't care how the 2-op stack was built, only its resulting shape, so this substitution is
+    // exact for this test's own purpose. The IMPORT-SIDE behavior under test (multi_step wrapping) is unaffected —
+    // that's t1916's own surviving feature, untouched this turn.
+    await page.evaluate(async ({ homingParams, cornerParams }) => {
+        const OB = await import('/blocks/opBuilders.js');
+        const homingOp = OB.makeOp('user_homing_data', homingParams, OB._builderAtoms('user_homing_data', homingParams));
+        const cornerOp = OB.makeOp('user_corner_data', cornerParams, OB._builderAtoms('user_corner_data', cornerParams));
+        window.ddcsLoadBlockStack([homingOp, cornerOp]);
+    }, { homingParams: HOMING_PARAMS, cornerParams: CORNER_PARAMS });
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length === 2, null, { timeout: 10000 });
 
     const r = await page.evaluate(async () => {
         const before = window.ddcsGetBlockProgram().filter((b) => b.type === 'op');

@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { openWizardViaBar, clickInsert } from './support/barGesture.js';
 
 /**
  * t1832/t1834/t1836 — BUG 2 of the three t1786 trace bugs, RE-RULED TWICE. Homing's own machine-frame intent
@@ -32,19 +31,28 @@ import { openWizardViaBar, clickInsert } from './support/barGesture.js';
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 
+// t1920 — FIXTURE CHANGED, claim unchanged. A real bar-gesture Insert now REPLACES the program (t1916/t1918/
+// t1920's own ruling: a Studio-canvas program is always exactly one op) — two live inserts can no longer produce
+// a Homing+Corner program at all. Built directly instead, via the SAME production functions the (deleted)
+// accumulation path used to call (`opBuilders.js`'s own `makeOp`/`_builderAtoms`), matching
+// `prog-marker-slot-812.spec.js`'s own established hand-built-fixture pattern. This test's own claim (the
+// whole-program union-hiding + frame note) operates on `programSimContext`'s own whole-program union, not on
+// per-op resolution, so two top-level ops (rather than nesting) is a choice of convenience, not a requirement.
+// Params captured from a real single-op live insert (homing's own shipped defaults; corner's own shipped
+// defaults with `dist:741`).
+const HOMING_PARAMS = { run_z: true, run_x: true, run_y: true, run_a: false, run_b: false, softLimits: true };
+const CORNER_PARAMS = { corner: 'FL', probeSeq: 'YX', travelDist: 50, safeZ: 10, scanDepth: 5, clearMode: 'hop', hopDist: 15, planeZ: 10, probeZFirst: false, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active', syncA: false, dist: 741, retract: 5, f_fast: 200, f_slow: 50, port: 3, radius: 2 };
+
 async function buildHomingThenCornerProgram(page) {
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
-
-    // Real bar: Homing first (a genuine machine-frame op), then Corner (a genuine part-frame probe), one program.
-    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await expect(page.locator('#wiz_user_form [data-param="dist"]')).toBeVisible({ timeout: 5000 });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+    await page.evaluate(async ({ homingParams, cornerParams }) => {
+        const OB = await import('/blocks/opBuilders.js');
+        const homingOp = OB.makeOp('user_homing_data', homingParams, OB._builderAtoms('user_homing_data', homingParams));
+        const cornerOp = OB.makeOp('user_corner_data', cornerParams, OB._builderAtoms('user_corner_data', cornerParams));
+        window.ddcsLoadBlockStack([homingOp, cornerOp]);
+    }, { homingParams: HOMING_PARAMS, cornerParams: CORNER_PARAMS });
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length === 2, null, { timeout: 10000 });
 
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => window.__blkws, null, { timeout: 10000 });
@@ -93,14 +101,13 @@ test('a WCS IS on file: the note is suppressed (the "nothing on file" reason no 
         s.machine.wcs = { active: 1, table: [{ x: 10, y: 20, z: 0 }] };
     });
 
-    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await expect(page.locator('#wiz_user_form [data-param="dist"]')).toBeVisible({ timeout: 5000 });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+    await page.evaluate(async ({ homingParams, cornerParams }) => {
+        const OB = await import('/blocks/opBuilders.js');
+        const homingOp = OB.makeOp('user_homing_data', homingParams, OB._builderAtoms('user_homing_data', homingParams));
+        const cornerOp = OB.makeOp('user_corner_data', cornerParams, OB._builderAtoms('user_corner_data', cornerParams));
+        window.ddcsLoadBlockStack([homingOp, cornerOp]);
+    }, { homingParams: HOMING_PARAMS, cornerParams: CORNER_PARAMS });
+    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length === 2, null, { timeout: 10000 });
 
     await page.locator('[data-app="blocks"]').click();
     await page.waitForFunction(() => window.__blkws, null, { timeout: 10000 });

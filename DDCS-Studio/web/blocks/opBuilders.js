@@ -133,14 +133,20 @@ export function removeOpLabel(opType) { if (opType) delete USER_LABELS[opType]; 
 // sections either landed in the wrong mouth or rendered nowhere at all, and the Class-B render guards in
 // formfield-block.spec.js/pointpick-block.spec.js found ZERO blocks on the canvas.
 // The correct move: leave `user_root` WRAPPED (so it renders itself, recursively, exactly as before t1828) —
-// only reach INSIDE its own `.children` to find and lift out `progstart`/`progend` (the ONLY things that ever
-// needed finding at the top level, for the "does this op bring its own program frame" multi-op-assembly
-// question) onto a COPY of the user_root block with those two stripped from its `children`. `_framed()` still
-// returns one flat, searchable array — now `[progstart, user_root{…, children: without progstart/progend},
-// progend]` (either terminator omitted if this op declares none) — so every existing `.find`/`.filter` caller
-// keeps working unchanged, `bare` (the filtered non-progstart/progend elements) is `[user_root{…}]`, and that
-// ONE wrapped element is exactly what `makeOp()` should wrap as the op's own `children` — nothing new for the
-// four `opSession.js` callers to thread through separately.
+// only reach INSIDE its own `.children` to find and lift out `progstart`/`progend` onto a COPY of the user_root
+// block with those two stripped from its `children`. `_framed()` still returns one flat, searchable array —
+// now `[progstart, user_root{…, children: without progstart/progend}, progend]` (either terminator omitted if
+// this op declares none) — so every existing `.find`/`.filter` caller keeps working unchanged, `bare` (the
+// filtered non-progstart/progend elements) is `[user_root{…}]`, and that ONE wrapped element is exactly what
+// `makeOp()` should wrap as the op's own `children`.
+// t1920 — this lift is NOT accumulation machinery and was not deleted alongside it (`opSession.js`'s own
+// `appendIntoProgram`/`normalizeEnds`/label-offsetting, which existed only to splice a SECOND op's bare blocks
+// into an already-framed program — dead now that a program is always exactly one op). `_framed()`'s own job is
+// narrower and still real: keep progstart/progend as separate, TOP-LEVEL siblings of the op — not buried inside
+// it — so they stay independently addressable (`opAtLine`'s own `PROGRAM_FRAMING_TYPES` exclusion, a click on
+// the M30 line correctly resolving to "no op") and so `buildActiveOpStack`'s own Blocks-tab preview can present
+// `[progstart, opC, progend]` as three top-level blocks a user can edit independently, regardless of how many
+// ops the canvas ever holds at once.
 export function _framed(opType, params) {
     let f = builderOf(opType)(params || {}) || [];
     if (f.length === 1 && f[0] && f[0].type === 'op') { f = f[0].children || []; }

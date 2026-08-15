@@ -195,8 +195,14 @@ export function opFromMarker(opType, params) {
 // M30, no final move") is free to declare its own terminator when it is the WHOLE program. Shared by two call
 // sites below: PER-OP (so a reconstructed op's measured line count matches its TRUE in-file footprint — see the
 // import loop's own comment) and over the WHOLE imported result (so only one terminator survives program-wide).
-// This is the same problem opSession.js's own `normalizeEnds` solves for the accumulation path — a local twin,
-// not a shared call, because that file is step 2's own scope and stays untouched this act.
+// t1916 built this as a LOCAL twin of `opSession.js`'s own `normalizeEnds` (same problem, different data shape —
+// block objects here, raw text there) because that file was step 2's own scope, not yet touched. t1920 DELETED
+// `normalizeEnds`: it existed only to deconflict terminators when SPLICING a second op into an already-framed
+// program, and a program can never hold more than one op anymore, so its own case never arises. This function's
+// OWN case still does — `importMarkedNc`'s `multi_step` grouping (t1916, unaffected by t1920) can legitimately
+// wrap several reconstructed ops, each free to carry its own terminator, under ONE program. What was a twin is
+// now the sole surviving implementation of "deconflict multiple potential terminators" in the codebase — not
+// reconciled by merging, but by the other side's own caller ceasing to exist.
 function stripEndprogram(node) {
     let end = null;
     const strip = (arr) => {
@@ -265,13 +271,19 @@ function groupConsecutiveOps(items) {
  *  the SAME context, built in the SAME order, the original export saw — measuring the op's MARGINAL contribution
  *  against it reproduces those whole-program effects instead of guessing around them.
  *  Separately: a probe/snippet op's own internal `endprogram` (corner's own M30, see `stripEndprogram`'s comment)
- *  is ALREADY gone from the SOURCE TEXT whenever `normalizeEnds` stripped it at the original insert/export time
- *  (any op that wasn't the program's first) — but `opFromMarker`'s fresh rebuild-from-params doesn't know that, so
- *  its own line count would be one LONGER than the op's true in-file span without stripping it first too (measured:
- *  corner's own count ate progend's own leading M5 before this was added). Stripped BEFORE measuring so the count
- *  matches the source text either way; `collapseImportTerminators` below independently finds and keeps whichever
- *  `endprogram` is genuinely last once the whole import is assembled — the two don't need to agree on which one
- *  "is" the real terminator, only that exactly one survives, wherever it ends up.
+ *  may or may not still be in the SOURCE TEXT for this op's own span — it's GONE whenever `opSession.js`'s own
+ *  `normalizeEnds` stripped it at the original insert/export time (a historical fact about files exported before
+ *  t1920 deleted that function — any accumulated op that wasn't the program's first got this treatment), but it is
+ *  genuinely PRESENT for an op that WAS first (accumulation never touches the first op's own framing) or for any
+ *  hand-built/freshly-authored stack that never went through that pipeline at all (confirmed live: a hand-built
+ *  fixture where the FIRST op also carried its own internal terminator broke an earlier "always strip before
+ *  measuring" version of this fix, which had implicitly assumed "not first" without checking). t1920 — VERIFIED
+ *  instead of assumed: try the op's own FULL (unstripped) reconstruction first; only fall back to the
+ *  terminator-stripped one if the full version's own marginal length does not land exactly on the real next
+ *  boundary (the next marker, or EOF) in the source text. `collapseImportTerminators` below independently finds
+ *  and keeps whichever `endprogram` is genuinely last once the whole import is assembled, regardless of which op
+ *  carried it in the meantime — the two passes don't need to agree on which one "is" the real terminator, only
+ *  that exactly one survives, wherever it ends up.
  *  The PROG_KEY (xform/entry/flip) header owns no body at all (progMarkerLine emits it BEFORE the per-line loop,
  *  nothing of its own follows) — its own "skip until next marker" was the identical bug: it doesn't skip its OWN
  *  content (it has none), it was accidentally eating whatever unmarked content follows it (progstart's own leaf
@@ -288,15 +300,34 @@ export function importMarkedNc(text, opts) {
                 items.push(...progBlocksFromMarker(rec.params || {}));
                 i++;                                                             // the header owns no body — nothing to skip past
             } else {
-                let op = rec && opFromMarker(rec.opType, rec.params);
+                const opRaw = rec && opFromMarker(rec.opType, rec.params);
                 i++;
-                if (op) {
-                    op = stripEndprogram(op).cleaned;                            // match the SOURCE TEXT's own footprint (see doc comment)
-                    const before = emitMapped(items, o).lines.length;            // MARGINAL, not isolated (see doc comment) — a whole-
-                    items.push(op);                                             // program pass (applyEntryWaypoint, uniquifyFlowLabels,
-                    const n = emitMapped(items, o).lines.length - before;        // applyToolChanges…) can inject/renumber based on what
-                    for (let k = 0; k < n && i < lines.length; k++) i++;         // already sits alongside this op — `items` so far IS that
-                }                                                                // same context, in the same order the export saw it.
+                if (opRaw) {
+                    // t1920 — VERIFIED, not assumed: try BOTH the op's own full reconstruction and its
+                    // terminator-stripped one (see doc comment), and pick whichever's MARGINAL length actually
+                    // lands on the real next boundary (the next marker, or EOF) in the SOURCE TEXT — checked
+                    // against the text itself, not inferred from "is this the first op." Found live: a hand-built
+                    // (not live-accumulated) fixture where the FIRST op ALSO carries its own internal terminator
+                    // (homing, same shape as corner's own) broke the old unconditional-strip rule, which only
+                    // held for a LEGACY export where `normalizeEnds` (now deleted) had already stripped every
+                    // non-first op's own terminator — an assumption a hand-built or freshly-authored file need
+                    // not satisfy.
+                    const before = emitMapped(items, o).lines.length;
+                    let nextBoundary = lines.length;
+                    for (let k = i; k < lines.length; k++) { if (isMarker(lines[k])) { nextBoundary = k; break; } }
+                    const opFull = JSON.parse(JSON.stringify(opRaw));
+                    const nFull = emitMapped([...items, opFull], o).lines.length - before;
+                    let op, n;
+                    if (i + nFull === nextBoundary) {
+                        op = opFull; n = nFull;                                  // this op's own terminator IS genuinely in the source text
+                    } else {
+                        const opStripped = stripEndprogram(JSON.parse(JSON.stringify(opRaw))).cleaned;
+                        n = emitMapped([...items, opStripped], o).lines.length - before;
+                        op = opStripped;                                        // matches (or, if neither matches exactly, the safer default —
+                    }                                                            // collapseImportTerminators still cleans up either way)
+                    items.push(op);
+                    for (let k = 0; k < n && i < lines.length; k++) i++;
+                }
             }
         } else {
             const seg = [];

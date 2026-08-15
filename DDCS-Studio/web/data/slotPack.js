@@ -100,9 +100,12 @@ export function slotMacro(slot) {
 // The last part keeps its own end; slotMacro's hasEnd then leaves it (or appends the single M99). One terminal end, in order.
 // (Loop DO/END labels are sequential+balanced across parts → not rewritten. Spindle M5→M3 brackets are KEPT — safe teardown.)
 
-// Max N-label / GOTO-target number in a body (mirrors opSession.js maxLabelNum, but over raw macro TEXT). GOTO spacing
-// varies by controller — the hand-written generators emit `GOTO 2` (space) but the DDCS Expert dialect emits `GOTO2` (no
-// space) for flow/saferetract atoms (ddcs-expert-m350.js) — so `\s*` matches BOTH, else a no-space GOTO is missed.
+// Max N-label / GOTO-target number in a body, over raw macro TEXT (the CAM-slot composition domain — a slot's own
+// generated parts, not the Studio canvas; t1920 deleted opSession.js's own analogous maxLabelNum, which served
+// the now-gone cross-op accumulation there, but this one's own job — composing a CAM slot's several parts — is
+// unaffected and still real). GOTO spacing varies by controller — the hand-written generators emit `GOTO 2` (space)
+// but the DDCS Expert dialect emits `GOTO2` (no space) for flow/saferetract atoms (ddcs-expert-m350.js) — so `\s*`
+// matches BOTH, else a no-space GOTO is missed.
 function maxLabelIn(body) {
     let max = 0, m;
     const nre = /^\s*N(\d+)\b/gm; while ((m = nre.exec(body)) !== null) max = Math.max(max, Number(m[1]));

@@ -472,7 +472,9 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 // t826 — the safe-Z retract's Expert unset-guard emits a forward-jump label (N<label>). A program can now hold SEVERAL
 // safe-Z retracts (per-wall retreats + the error handler), so give each a UNIQUE label in emit order (base 91, unused by any
 // wizard) — else duplicate N91s make the guard's GOTO ambiguous. Deterministic (walk order) → the twin + built-in match, and
-// this subsumes the cross-op accumulation case (offsetLabels no longer special-cases saferetract). Idempotent (re-run safe).
+// this covers every safe-Z retract in a program regardless of how many ops it holds. Idempotent (re-run safe).
+// t1920 — `opSession.js`'s own `offsetLabels` (the cross-op accumulation case this comment used to name) is deleted;
+// a program can no longer hold more than one op, so this pass no longer needs to special-case anything it once ran alongside.
 // t1381 — READ FROM A DECLARATION, not from a switch on three type names. The mechanism above was a hand-written list,
 // and t1379 measured what that costs: the parametric drill cycle carries its own forward-jump labels, so a program
 // holding TWO hole ops emitted two copies of the same `N`, the second op's `GOTO` bound to the FIRST op's label, and

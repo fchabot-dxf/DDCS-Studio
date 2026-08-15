@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { openWizardViaBar, clickInsert, fillField } from './support/barGesture.js';
 import { stopLiveSim, dismissToasts } from './support/simControls.js';
 
 /**
@@ -106,22 +105,39 @@ async function clickNow(page, selector) {
     }, selector);
 }
 
+// t1920 — FIXTURE CHANGED, claim unchanged. A real bar-gesture Insert now REPLACES the program (t1916/t1918/
+// t1920's own ruling: a Studio-canvas program is always exactly one op) — two live inserts can no longer produce
+// a 2-op program at all. Built directly instead, via the SAME production functions the (deleted) accumulation
+// path used to call (`opBuilders.js`'s own `makeOp`/`_builderAtoms`), matching `prog-marker-slot-812.spec.js`'s
+// own established hand-built-fixture pattern. This test's own claim (`getPassStarts()`/the 3D marker rebuild)
+// operates on the WHOLE PROGRAM's own concatenated G-code/trace, not on per-op `opAtLine` resolution — so, unlike
+// `segment-frame-derivation-1838.spec.js`, it does not matter here whether the two ops are top-level siblings or
+// nested; two top-level ops were chosen for consistency with that file and because `blockEmitter.js`'s transparent
+// op-in-op recursion (confirmed t1916) makes the emitted G-code identical either way. Params captured from a real
+// single-op live insert (homing's own shipped defaults; corner's own shipped defaults with `dist:741`).
+const HOMING_PARAMS = { run_z: true, run_x: true, run_y: true, run_a: false, run_b: false, softLimits: true };
+const CORNER_PARAMS = { corner: 'FL', probeSeq: 'YX', travelDist: 50, safeZ: 10, scanDepth: 5, clearMode: 'hop', hopDist: 15, planeZ: 10, probeZFirst: false, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active', syncA: false, dist: 741, retract: 5, f_fast: 200, f_slow: 50, port: 3, radius: 2 };
+const CORNER2_PARAMS = { ...CORNER_PARAMS, dist: 900 };   // a second, genuinely different corner — matches the old test's own second-insert dist
+
+async function loadStack(page, ops) {
+    await page.evaluate(async (opDefs) => {
+        const OB = await import('/blocks/opBuilders.js');
+        const built = opDefs.map(({ opType, params }) => OB.makeOp(opType, params, OB._builderAtoms(opType, params)));
+        window.ddcsLoadBlockStack(built);
+    }, ops);
+    await page.waitForFunction((n) => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length === n, ops.length, { timeout: 10000 });
+}
+
 async function buildHomingThenCorner(page) {
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
-    await openWizardViaBar(page, { group: 'Probe', optype: 'homing' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetBlockProgram().length > 0, null, { timeout: 10000 });
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '741' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 2, null, { timeout: 10000 });
+    await loadStack(page, [{ opType: 'user_homing_data', params: HOMING_PARAMS }, { opType: 'user_corner_data', params: CORNER_PARAMS }]);
     await clickNow(page, '[data-app="blocks"]');
     await page.waitForFunction(() => window.__blkws, null, { timeout: 10000 });
     await page.waitForTimeout(1500);
-    // Inserting an op auto-selects it for editing (the Wizard view), which collapses #blk-preview-panel to 0x0
-    // (styles.css:5416, confirmed by direct measurement) — switch to the Blocks tab's own 3D view to see the
-    // whole-program preview this bug is actually about.
+    // A directly-loaded stack has no "active op" to auto-select, so the Wizard-view's own autoplay concern
+    // (t1852's own round 1) does not apply here — but switch to the Blocks tab's own 3D view the same way,
+    // since that is still the whole-program preview this bug is about.
     await switchToWholeProgram3D(page);
 }
 
@@ -203,21 +219,20 @@ test('the markers REBUILD when a param change alters the declared pass starts (n
     await buildHomingThenCorner(page);
     const before = await readMarkers(page);
 
-    // Change the declared pass starts via the real, common "insert another pass" gesture (a second Corner probe,
-    // a genuinely different set of declared pass starts the panel must pick up) rather than an in-place field
-    // edit — simpler and equally real: a user adding a second probe to their program. Switch back to Studio
-    // first — the top command bar's own dropdown is not reliably clickable from inside the Blocks tab at all
-    // (confirmed: the bar gesture times out from either of its own Wizard/3D sub-views).
+    // t1920 — Change the declared pass starts by loading a DIFFERENT program (homing + TWO corners — a genuinely
+    // different, larger set of declared pass starts the panel must pick up), replacing the "insert another pass"
+    // live gesture the old test used — a real bar-gesture Insert now REPLACES rather than adds a THIRD op (see
+    // this file's own top comment). Same underlying claim: the program changed, the markers must not stay frozen
+    // from the first render.
     await clickNow(page, '[data-app="studio"]');
     await page.waitForTimeout(300);
-    await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
-    await fillField(page, { formSelector: '#wiz_user_form', param: 'dist', value: '900' });
-    await clickInsert(page);
-    await page.waitForFunction(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').length >= 3, null, { timeout: 10000 });
+    await loadStack(page, [
+        { opType: 'user_homing_data', params: HOMING_PARAMS },
+        { opType: 'user_corner_data', params: CORNER_PARAMS },
+        { opType: 'user_corner_data', params: CORNER2_PARAMS },
+    ]);
     await clickNow(page, '[data-app="blocks"]');
     await page.waitForTimeout(500);
-    // t1852 — same contention as the first switch inside buildHomingThenCorner: re-inserting a corner just now
-    // auto-selected IT for editing, restarting the Wizard-view's own autoplay loop right before this click.
     await switchToWholeProgram3D(page);
 
     const after = await readMarkers(page);

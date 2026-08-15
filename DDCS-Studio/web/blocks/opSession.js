@@ -2,8 +2,10 @@
  * blocks/opSession.js — the active wizard SESSION + program mutations + reverse-sync.
  *
  * The wizard session: build the active op's block stack (buildActiveOpStack), preview it into the Blocks model
- * (previewActiveOp), and commit it INTO the one shared program frame so inserts ACCUMULATE (commitActiveOp).
- * Mutations on the committed stack: replaceOp / deleteOp / duplicateOp / commitDecodedCode / mergeOpBlocks.
+ * (previewActiveOp), and commit it AS the program — a program is always exactly one op (t1916/t1918/t1920's own
+ * ruling), so a commit REPLACES whatever was there (commitActiveOp; see `loadOpAsProgram`'s own doc comment for
+ * the deleted accumulation machinery this replaced). Mutations on the committed stack: replaceOp (edit the
+ * SAME op in place) / deleteOp / duplicateOp / commitDecodedCode / mergeOpBlocks.
  * RECONCILERS reverse-sync an edited block stack back to STUDIO form fields (reconcileActiveOp) — reading the
  * DECLARED params off the structured block model (declaration, NOT the banned motion-inference).
  *
@@ -477,76 +479,26 @@ export function previewActiveOp() {
 }
 
 /**
- * Commit the active (just-generated) op INTO the shared program — so wizard inserts ACCUMULATE instead of
- * concatenating whole framed programs (which would put an M30 mid-file and lose all but the last in Blocks).
- * A program is ONE frame (Program Start … Program End); the FIRST op brings the frame, later ops slot their
- * BARE blocks in just before Program End. Returns false for an op with no block builder (probe/ATC families
- * still text-only) so the caller can fall back to a plain text insert. Goes through the window program hooks
- * (no import cycle): ddcsGetBlockProgram (current stack) + ddcsLoadBlockStack (set it; editor re-projects).
+ * Commit the active (just-generated) op AS the program — REPLACING whatever was there. t1916/t1918/t1920's own
+ * ruling: a Studio program is always exactly one op (with multi-step work living INSIDE that one op, or, for an
+ * imported multi-op file, wrapped as one `multi_step` op's own steps — programModel.js's own surviving concern,
+ * untouched here). Returns false for an op with no block builder (probe/ATC families still text-only) so the
+ * caller can fall back to a plain text insert. Goes through the window program hook (no import cycle):
+ * ddcsLoadBlockStack (set the stack; editor re-projects).
+ *
+ * t1920 — DELETED the accumulation machinery this function used to need: the old `appendIntoProgram` read the
+ * CURRENT program and, if non-empty, spliced the new op's bare blocks in before the shared Program End (renumbering
+ * its labels via `offsetLabels`/`maxLabelNum` and de-duplicating terminators via `normalizeEnds` — a probe/snippet
+ * op is free to carry its own error-handler M30, and concatenating two such ops without this collided both labels
+ * and terminators). None of that machinery has a live case left to serve once a program can never hold more than
+ * one op — deleting it removes the entire t1828/t1830 bug class structurally (there is no second op to collide
+ * with), not just the symptom a test happened to check. Proven in `blocks-accumulate-1920.spec.js` (rewritten from
+ * the retired `blocks-accumulate.spec.js`, which asserted the OLD accumulate contract) and
+ * `multi-op-progend-1828.spec.js` (rewritten to assert REPLACE).
  */
-// ── Accumulation hygiene: keep ONE program terminator + non-colliding jump labels when ops concatenate ──
-// Snippet/probe ops each carry their own error-handler labels (1/2) and a trailing M30. Concatenated naively
-// that gives DUPLICATE labels (a GOTO resolves to the wrong target) and a mid-program M30 (halts after op 1).
-const _walk = (arr, fn) => { for (const b of (arr || [])) { if (!b) continue; fn(b); if (b.children) _walk(b.children, fn); } };
-
-/** Highest label number anywhere in a stack (0 if none) — used to offset an appended snippet's labels. */
-function maxLabelNum(blocks) {
-    let m = 0;
-    _walk(blocks, (b) => { if (b.type === 'label' && b.params) m = Math.max(m, Math.round(num(b.params.n, 0))); });
-    return m;
-}
-
-/** Shift every label / goto / ifgoto target in a stack by `off` (in place) so an appended snippet can't collide.
- *  (The safe-Z retract's guard label is NOT renumbered here — emitMapped uniquifies saferetract labels per program, t826.) */
-function offsetLabels(blocks, off) {
-    if (!off) return blocks;
-    _walk(blocks, (b) => {
-        if (!b.params) return;
-        if (b.type === 'label' || b.type === 'goto') b.params.n = Math.round(num(b.params.n, 1)) + off;
-        else if (b.type === 'ifgoto') b.params.goto = Math.round(num(b.params.goto, 1)) + off;
-    });
-    return blocks;
-}
-
-/** Collapse to a SINGLE program terminator: a framed program (has progend, which emits its own M30) drops every
- *  endprogram atom; a frameless one keeps just one, moved to the very end. Recurses into op-container children. */
-function normalizeEnds(blocks) {
-    const hasProgend = blocks.some((b) => b && b.type === 'progend');
-    let end = null;
-    const strip = (arr) => {
-        const out = [];
-        for (const b of (arr || [])) {
-            if (b && b.type === 'endprogram') { end = b; continue; }   // pull it out (keep the last seen)
-            if (b && b.children) b.children = strip(b.children);
-            out.push(b);
-        }
-        return out;
-    };
-    const cleaned = strip(blocks);
-    if (!hasProgend && end) cleaned.push(end);   // re-add a single terminator at the top-level end
-    return cleaned;
-}
-
-// Append blocks INTO the one program frame. `framed` (the op's full builder output incl progstart/progend) is the
-// framing source: empty program → use it as-is (a cutting op brings the frame) or the bare snippet (probe/ATC has
-// none); a framed program → slot the bare blocks before progend; a frameless program + a framed op → wrap the lot.
-function appendIntoProgram(bare, framed) {
+function loadOpAsProgram(bare, framed) {
     if (!bare || !bare.length) return false;
-    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    let next;
-    if (!cur.length) {
-        next = framed || bare;                                        // first op: keep as-is (its own single frame/end)
-    } else {
-        offsetLabels(bare, maxLabelNum(cur));                         // renumber the appended op so labels don't collide
-        const endIdx = cur.findIndex((b) => b && b.type === 'progend');
-        if (endIdx >= 0) next = [...cur.slice(0, endIdx), ...bare, ...cur.slice(endIdx)];   // slot before Program End
-        else if (framed) {                                            // frameless program + a framed op → wrap everything
-            const start = framed.find((b) => b && b.type === 'progstart'), end = framed.find((b) => b && b.type === 'progend');
-            next = (start && end) ? [start, ...cur, ...bare, end] : [...cur, ...bare];
-        } else next = [...cur, ...bare];                              // both frameless → append
-        next = normalizeEnds(next);                                   // one terminator, no interior M30 (halts the run)
-    }
-    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(framed || bare);
     loadedSig = null;   // the program changed → next Blocks open re-renders it
     return true;
 }
@@ -559,7 +511,7 @@ export function commitActiveOp() {
     const end = framed.find((b) => b && b.type === 'progend');
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const opC = makeOp(op.type, op.params, bare);                      // wrap: keep the op record; emit gates per post
-    return appendIntoProgram([opC], (start && end) ? [start, opC, end] : [opC]);
+    return loadOpAsProgram([opC], (start && end) ? [start, opC, end] : [opC]);
 }
 
 /**
@@ -674,13 +626,13 @@ export function setGroupChildParams(groupId, edits) {
 /**
  * For ops with no block builder yet (corner / alignment / ATC / comms): DECODE their generated G-code into blocks
  * (the active dialect's recognizers turn probe / IF-GOTO / WCS into proper blocks; the rest become leaf/raw) and
- * accumulate them as a frameless snippet — so they coexist in the program and show in Blocks instead of being
- * lost. Not parametric like a real builder, but they round-trip and accumulate.
+ * load them AS the program (t1920 — replaces, doesn't accumulate; see `loadOpAsProgram`'s own doc comment) so
+ * the decoded op shows in Blocks instead of being lost. Not parametric like a real builder, but it round-trips.
  */
 export function commitDecodedCode(code) {
     if (!code || !code.trim()) return false;
     let bare; try { bare = parseGcodeToStack(code, dialectOpts()); } catch (_) { return false; }
-    return appendIntoProgram(bare, null);
+    return loadOpAsProgram(bare, null);
 }
 
 /**
