@@ -2518,3 +2518,28 @@ source, still open.
 ⚠ **Sequence matters:** the import answer and the accumulation deletion shape replace-on-insert, so they come
 first. And the notice must be REFUSABLE and land BEFORE the destruction — losing an authored op to a silent
 wipe is unrecoverable, unlike a wrong picture.
+
+## LATHE ICONS — TOO FINE, COARSEN THEM  [USER 2026-08-15, next act]
+
+**Their words:** *"the lathe icons are too small, make them abit more coarse."*
+
+The family (t1911, shipped V2026.08.15.9) is right in CONCEPT — shared bar + centreline, differentiated by
+what the cut does — but too delicate at the size it actually renders. Concretely, in a 24-unit viewBox drawn
+at 14px:
+
+```
+  bar          4 units tall  -> ~2.3px on screen
+  centreline   1.1 stroke, 2/1.6 dash -> nearly invisible
+  probe ball   r=1.8 -> ~1px
+  polygon/hex  1.6 stroke -> the facets vanish
+```
+
+**Coarsen: thicker strokes, taller bar, fewer + longer dashes, bigger probe ball, and drop any detail that
+cannot survive 14px.** Fewer marks, each one heavier.
+
+⚠ **CHECK AGAINST THE MILL SET AT THE SAME SIZE.** If the lathe icons read LIGHTER than their neighbours, the
+defect is family inconsistency, not absolute weight — and matching the mill set's visual weight is the target,
+not simply "bolder".
+
+⚠ Re-verify at TRUE render size with the 4x DPI capture t1911 already used, and re-check the group icon
+against Mill + Custom. Show the picture, do not describe it.
