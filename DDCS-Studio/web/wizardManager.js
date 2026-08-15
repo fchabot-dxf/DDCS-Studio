@@ -475,11 +475,12 @@ export class WizardManager {
         const view = this.activeView();
         const code = view ? el(view.codeElId)?.textContent : '';
 
-        // t1916/t1918/t1920 — REPLACES the program (a Studio canvas is always exactly one op; loadOpAsProgram's
-        // own doc comment names the deleted accumulation machinery this used to need). This branch is reached
-        // only for a FRESH insert (not editing an existing op — see the `this.editingOpId` branch above), so it
-        // is the one gesture t1930's own plan names as the primary unguarded destructive-load door. Ops with no
-        // block builder yet (probe/ATC families) fall back to a plain text insert.
+        // t1942 — a FRESH insert on a non-empty canvas now offers Add/Replace/Cancel, per the human's own
+        // Add-to-program ruling; an EMPTY canvas commits straight through with NO dialog, exactly as before
+        // (confirmDestructiveLoad's own silent-pass condition decides this — the ONE seam, not re-checked here).
+        // t1916/t1918/t1920 — Replace REPLACES the program (loadOpAsProgram's own doc comment names the deleted
+        // accumulation machinery this used to need); Add grows it via addOperation (t1940). Ops with no block
+        // builder yet (probe/ATC families) fall back to a plain text insert either way.
         let committed = false;
         try {
             const ops = await import('./blocks/opSession.js');
@@ -511,7 +512,34 @@ export class WizardManager {
                     committed = op ? ops.replaceOp(this.editingOpId, op.params) : false;   // 'replace' / no edit → rebuild from form
                 }
             } else {
-                committed = ops.commitActiveOp() || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
+                const built = ops.buildActiveOpRecord ? ops.buildActiveOpRecord() : null;
+                let choice = 'replace';   // no builder → straight to the text-insert fallback below, same as always
+                if (built) {
+                    const { opC, start, end } = built;
+                    const framed = (start && end) ? [start, opC, end] : [opC];
+                    const { confirmDestructiveLoad } = await import('./blocks/saveStates.js');
+                    const cur = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+                    const existing = (window.ddcsFlattenOps ? window.ddcsFlattenOps(cur) : cur.filter((b) => b && b.type === 'op'))
+                        .map((b) => b.label || b.opType || 'operation');
+                    const already = existing.length === 1 ? existing[0]
+                        : existing.length > 1 ? `${existing.length} operations` : '';
+                    choice = await confirmDestructiveLoad(framed, {
+                        label: 'before insert',
+                        silentKey: 'replace',
+                        title: 'Insert this operation?',
+                        message: already
+                            ? `Your canvas already has: ${already}.\n\nAdd this as another operation, replace your current program, or cancel — it's saved to Undo either way.`
+                            : `Insert this operation?`,
+                        choices: [
+                            { key: 'add', label: '+ Add as a 2nd operation', primary: true },
+                            { key: 'replace', label: '↺ Replace it' },
+                            { key: 'cancel', label: 'Cancel' },
+                        ],
+                        cancelKey: 'cancel',
+                    });
+                }
+                if (choice === 'cancel') return;                         // back to the form, nothing inserted — the wizard stays open
+                committed = (choice === 'add' ? ops.addActiveOp() : ops.commitActiveOp()) || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
                 if (committed) showRoundTripToastOnce();   // ROUND-TRIP DISCOVERABILITY: a fresh op is now an editable block stack — hint ONCE
             }
         } catch (e) { console.warn('commit op failed', e); }

@@ -37201,3 +37201,102 @@ advisor's own release gate. No UI touched: no dialog, no third button, no wizard
 `wizardManager.js:512` untouched. No slice 2 of the rename.
 
 🔨 turn 1940
+
+
+## 🔨 turn 1942 — THE VACUOUS TEST FIXED, THEN THE + ADD BUTTON WIRED FOR REAL
+
+### Part 1 — the vacuous test
+
+`add-operation-1940.spec.js`'s own STOP-CONDITION test reloaded the SAME program and never called
+`addOperation` or any of its own machinery — it would have passed unchanged even if `addOperation` corrupted
+every single-operation program in the app, exactly contradicting its own name. Rewrote it to run
+`groupConsecutiveOps` + `collapseImportTerminators` — the EXACT shared pipeline `addOperation` is composed
+from — directly against a real single-op program with nothing added, asserting a true IDENTITY: no wrapper
+introduced, byte-identical emit. Proven non-vacuous by injecting the obvious bug (`run.length >= 1` instead of
+`> 1`) and confirming this test AND the symmetric-rule test both correctly fail; restored, re-verified green.
+Also added an explicit note to the symmetric-rule test: it proves the GROW direction only — the SHRINK
+(collapse-on-delete) path is not built or called anywhere yet, named so that promise doesn't get lost.
+
+### Part 2 — the + Add button, wired for real
+
+### (1) A declared multi-choice dialog primitive
+
+`ui/dialog.js` gains `dlgChoice(message, choices, opts)` beside `dlgConfirm`/`dlgPrompt`/`dlgNotice`, sharing
+the SAME `openDialog` machinery (backdrop, Esc/Enter handling, theming) rather than a bespoke modal in
+`wizardManager.js`. `choices`: `[{key, label, primary?, danger?}, …]` in display order; resolves the clicked
+choice's own key; Esc/backdrop resolves `opts.cancelKey` (or, unset, the LAST choice's key — the conventional
+Cancel slot, matching `dlgConfirm`'s own "Cancel is last" convention); Enter submits whichever choice is marked
+`primary`. The existing 2-way functions are untouched — `openDialog`'s new `isChoice` branch is additive.
+
+### (2) One seam, still owning the rules — extended, not duplicated
+
+`confirmDestructiveLoad` gained an opt-in `opts.choices` parameter: when present, it calls `dlgChoice` instead
+of `dlgConfirm` and resolves the chosen KEY instead of a boolean — but the SILENT-PASS check (`willReplace`)
+and the Undo snapshot are exercised exactly ONCE, in this ONE function, for BOTH 2-way and N-way callers alike.
+`opts.silentKey` names which key the silent path resolves to for an N-way caller (the wizard-bar door passes
+`'replace'`, since replacing an empty canvas and adding to one produce the identical result —
+`addOperation([], op)` is just `[op]`). Checked explicitly, per the dispatch's own instruction: at no point does
+`wizardManager.js` re-derive "is the program empty / does it differ" itself — it always calls
+`confirmDestructiveLoad` and lets the ONE seam decide whether a dialog is even shown.
+
+### (3) Add uses `addOperation`; Replace unchanged
+
+`opSession.js`'s `commitActiveOp` (Replace) was refactored to extract a shared `buildActiveOpRecord()` — the
+bare-op-plus-framing construction it always did — so a new `addActiveOp()` (Add) can reuse it rather than
+re-deriving. `addActiveOp` calls `window.ddcsAddOperation` (t1940) with the current program and the freshly
+built bare op, then loads the result. `wizardManager.js`'s own `insert()` (the fresh-insert branch, not the
+edit-in-place one) now: builds the record once, asks `confirmDestructiveLoad` for a 3-way choice
+(`add`/`replace`/`cancel`), and dispatches — `choice === 'cancel'` returns early (the established
+`showBlockEditNotice`-style idiom already used one branch up in the same method), leaving the wizard form open
+and nothing committed.
+
+### (4)+(5) All three outcomes asserted, non-vacuity proven
+
+New spec `insert-add-replace-1942.spec.js`, 4 tests, driving the REAL wizard-bar `insertWiz()` gesture (not a
+shortcut): empty canvas → no dialog at all (unchanged); Add → both operations present (`flattenOps`), both
+`DRILL`/`SURFACING` bodies in the emitted G-code; Replace → only the new operation remains, the old one's body
+gone from the G-code; Cancel → G-code byte-identical, the program's own op list unchanged, and the wizard
+overlay (`#wizard.active`) is still open — Cancel really does leave the caller's surface untouched, not just
+the data. All 4 passed on the first real run. Proven non-vacuous the t1938 way: temporarily made Add silently
+behave like Replace, confirmed the ADD test (and only that one) failed, restored, re-verified all 4 green.
+
+### A real regression found and fixed along the way — not a fixture assumption pushed through
+
+The scoped gate run (destructive-load-doors-1938.spec.js) surfaced two genuine hangs: its own
+`buildMarkedNcText` helper built a throwaway `surfacing` op to capture marker text but never cleared the canvas
+back to empty afterward — harmless before (a plain Insert always silently replaced regardless of what was
+there), but the immediately-following `insertDrill()` call now finds a non-empty canvas and raises a real 3-way
+dialog nothing in that test answers, hanging until timeout. Fixed the helper to clear back to empty after
+capturing its export text (matching what its own neighboring test comment already assumed:
+`await insertDrill(page); // NOW seed the real "current" program`) — not by suppressing the dialog or reverting
+my own change. Reproduced in full isolation (not a load-batch artifact) before fixing, confirmed 9/9 green after.
+
+**A systemic risk, named for the advisor's own full-suite gate, not silently swept**: this session's own
+established multi-insert fixture pattern (`ddcsLoadBlockStack([])` immediately before EVERY `insertWiz()` call,
+used throughout `flow-labels-unique-1408.spec.js`/`time-estimate-844.spec.js`/t1928's whole fixture family) is
+inherently safe — each insert always starts from empty, so the silent-pass condition holds every time, checked
+directly in this turn's own gate run (36/36 green). But ANY test elsewhere that inserts a SECOND op onto an
+ALREADY-populated canvas without an intervening clear — the exact shape `buildMarkedNcText` had — would hang
+the same way until it's taught to handle (or avoid triggering) the new dialog. Not swept beyond this turn's own
+scoped gate, per the dispatch's own "not the full suite, that is mine" instruction — flagged here as a concrete
+category to watch for, not asserted as fully checked.
+
+### Architecture-map upkeep
+
+`wizardManager.js`'s own insert() grew by ~24 lines; the one prose citation past that point
+(`.wiz-viz3d` → `preview3D`) shifted 540-544→569-573, updated with a `t1942 — shifted` note. No machine-checked
+TRAP/INV citation in any touched file landed past this turn's own edits (`opSession.js` TRAP4 at line 18,
+`wizardManager.js` TRAP5 at line 322, both before every edit point this turn) — confirmed, not assumed.
+
+### Explicitly not touched, per the dispatch's own "still queued" list
+The marker-free raw-text import door, `collectOps`'s phantom row, the `lathe-honest-3d-1301` near-miss, slice
+1's unswept region (`macrosApp.js` et al), and slice 2 of the rename — all named again as still queued, not
+acted on.
+
+### Gate
+`npm run test:node`: 118/118. `add-operation-1940.spec.js` 4/4, `insert-add-replace-1942.spec.js` 4/4,
+`destructive-load-doors-1938.spec.js` 9/9 (after the fixture fix), the 4 t1928 features 26/26 — 36/36 total
+in one combined run. `architecture-map-1698.test.mjs` clean. `proc_health.py watch` clean. No full suite — the
+advisor's own release gate. No slice 2 of the rename.
+
+🔨 turn 1942

@@ -128,12 +128,17 @@ test('OPEN PROJECT: an empty canvas gets no prompt at all', async ({ page }) => 
 
 /** A real marked multi-op .nc export, built via the real import-fixture pattern this session already established
  *  (flow-labels-unique-1408.spec.js / t1928): insert an op, export its marker text, on a THROWAWAY canvas state —
- *  discarded before the door-under-test ever sees it. */
+ *  discarded before the door-under-test ever sees it. t1942 — clears back to empty afterward too: the caller's
+ *  own next step (`insertDrill`) assumes an empty canvas (a bare `insertWiz()`, no dialog to click), which this
+ *  helper's own leftover `surfacing` op used to silently satisfy anyway (a plain insert always replaced) but no
+ *  longer does now that Insert on a non-empty canvas raises a real 3-way dialog nothing here would answer. */
 async function buildMarkedNcText(page) {
     return page.evaluate(async () => {
         window.ddcsLoadBlockStack([]);
         window.openWiz('surfacing', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-        return window.ddcsSerializeWithMarkers();
+        const text = window.ddcsSerializeWithMarkers();
+        window.ddcsLoadBlockStack([]);
+        return text;
     });
 }
 

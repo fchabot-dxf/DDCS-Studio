@@ -52,10 +52,9 @@ export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
 
 /**
  * S4-1 — the SHARED destructive-load guard, the ONE seam every door that replaces the program routes through
- * (t1938 — commandDeck.js's .nc import, programFile.js's loadProject, editorManager.js's Clear; the wizard-bar
- * Insert door is deliberately NOT routed here yet — it gets its own 3-way Add/Replace/Cancel choice next turn,
- * per the human's Add-to-program ruling, not this 2-way Replace/Cancel). Loading a stack REPLACES the current
- * program (`ddcsLoadBlockStack`). When the program is NON-EMPTY and the incoming stack would actually change it,
+ * (t1938 — commandDeck.js's .nc import, programFile.js's loadProject, editorManager.js's Clear; t1942 —
+ * wizardManager.js's own Insert, now 3-way). Loading a stack REPLACES the current program
+ * (`ddcsLoadBlockStack`). When the program is NON-EMPTY and the incoming stack would actually change it,
  * CONFIRM before it is replaced — so the user never loses visible work silently. An empty program, or a load of
  * the identical stack, proceeds with NO prompt. Returns true if the caller should load, false on Cancel — the
  * caller does its own showApp / ddcsLoadBlockStack after a true, so a Cancel leaves the caller's surface
@@ -64,18 +63,35 @@ export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
  * The current program is SNAPSHOTTED into the save-state history first, and the message promises Undo. (t1145 found the
  * program-level Undo could NOT restore a programmatically-loaded prior program; t1161 FIXED that at the source — the
  * reproject echo no longer pollutes the history — so a proceed IS recoverable via Undo now.) Cancel remains the instant
- * protection. Async — dlgConfirm is lazy-imported to keep this history module free of any top-level UI coupling.
+ * protection. Async — dlgConfirm/dlgChoice are lazy-imported to keep this history module free of any top-level UI
+ * coupling.
  *
  * `opts`: `what` names the thing being opened (the default message's own noun); `label` is the snapshot entry.
  * `message`/`title`/`okLabel`/`cancelLabel` OVERRIDE the default Blocks-tab-worded dialog — t1938: the seam is
  * shared, the WORDING is a parameter of it, not hard-coded to one caller's own context. A caller passing none of
  * these gets byte-identical behaviour to before this turn (devMode.js's two existing callers, unchanged).
+ *
+ * t1942 — `opts.choices` (an array, `dlgChoice`'s own shape) switches this to N-WAY mode: shows `dlgChoice`
+ * instead of `dlgConfirm` and resolves the CHOSEN KEY (a string), not a boolean — but the SILENT-PASS condition
+ * and the Undo snapshot above are UNCHANGED, exercised exactly once, here, regardless of 2-way or N-way mode.
+ * `opts.silentKey` names which key the silent (nothing-to-lose) path should resolve to, since an N-way caller
+ * needs a KEY to act on even when no dialog appears — defaults to `true` (meaningless to an N-way caller, so
+ * pass it explicitly for choices mode; the wizard-bar Insert door passes `'replace'`, since replacing an EMPTY
+ * program is identical to adding to one — `addOperation([], op)` and a plain replace produce the same result).
  */
 export async function confirmDestructiveLoad(incoming, opts = {}) {
     const cur = getProg();
     const willReplace = Array.isArray(cur) && cur.length > 0 && sig(cur) !== sig(incoming);
-    if (!willReplace) return true;                       // empty program or an identical load → nothing to lose → silent
+    if (!willReplace) return opts.choices ? (opts.silentKey != null ? opts.silentKey : true) : true;   // nothing to lose → silent
     snapshot(opts.label || 'before edit');               // the recovery point → the message promises Undo (t1161 made it work)
+    if (opts.choices) {
+        const { dlgChoice } = await import('../ui/dialog.js');
+        return dlgChoice(
+            opts.message || `Opening ${opts.what || 'this'} in Blocks replaces the program in the editor — it's saved to Undo, or Cancel to keep it.`,
+            opts.choices,
+            { title: opts.title || 'Open in Blocks?' }
+        );
+    }
     const { dlgConfirm } = await import('../ui/dialog.js');
     return dlgConfirm(
         opts.message || `Opening ${opts.what || 'this'} in Blocks replaces the program in the editor — it's saved to Undo, or Cancel to keep it.`,

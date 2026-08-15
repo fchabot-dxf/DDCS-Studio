@@ -503,15 +503,41 @@ function loadOpAsProgram(bare, framed) {
     return true;
 }
 
-export function commitActiveOp() {
+/** t1942 — the bare op record `commitActiveOp` (Replace) and `addActiveOp` (Add) BOTH need, built once so
+ *  neither re-derives the other's own logic. Returns null for an op with no block builder yet (the caller falls
+ *  back to a plain text insert, same as `commitActiveOp` always has). */
+export function buildActiveOpRecord() {
     const op = getLastOp();
-    if (!op || !builderOf(op.type)) return false;
+    if (!op || !builderOf(op.type)) return null;
     const framed = _framed(op.type, op.params);                        // [progstart, …op…, progend] (homing unwrapped)
     const start = framed.find((b) => b && b.type === 'progstart');
     const end = framed.find((b) => b && b.type === 'progend');
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const opC = makeOp(op.type, op.params, bare);                      // wrap: keep the op record; emit gates per post
+    return { opC, start, end };
+}
+
+export function commitActiveOp() {
+    const r = buildActiveOpRecord();
+    if (!r) return false;
+    const { opC, start, end } = r;
     return loadOpAsProgram([opC], (start && end) ? [start, opC, end] : [opC]);
+}
+
+/** t1942 — ADD the active op as a further operation in the CURRENT program (the human's own Add-to-program
+ *  ruling), via `addOperation` (t1940, `programModel.js`) — never a second composition mechanism. Same
+ *  no-builder fallback as `commitActiveOp`. Returns false (not a thrown error) if the program hook is missing
+ *  or `addOperation` refuses, so the caller's own fallback path (plain text insert) still applies. */
+export function addActiveOp() {
+    const r = buildActiveOpRecord();
+    if (!r) return false;
+    const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+    if (typeof window === 'undefined' || !window.ddcsAddOperation) return false;
+    const added = window.ddcsAddOperation(cur, r.opC);
+    if (!added || !added.length) return false;
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(added);
+    loadedSig = null;
+    return true;
 }
 
 /**

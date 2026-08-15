@@ -215,7 +215,7 @@ slot body). **Correction to an earlier survey:** that is not the complete set �
 WIZARD BODY (twin, panel = form3d+2d)      index.html:353-355
 │
 ├─ #userViz3dBox / #userViz3dContainer ── the 3D box ─────────────────────────
-│   └─ .wiz-viz3d           wizardManager.js:540-544  (position:relative; t1932 — shifted from 539-543 by +1)
+│   └─ .wiz-viz3d           wizardManager.js:569-573  (position:relative; t1942 — shifted from 540-544 by +29)
 │        └─ createPreviewPanel        ONE trace, ONE engine, TWO renderers
 │             ├─ WebGL canvas   viz/gcodeViz3d.js:68  — appended IN FLOW
 │             │      display:none when mode==='2d'    createPreviewPanel.js:1106

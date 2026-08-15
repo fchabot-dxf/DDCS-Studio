@@ -82,6 +82,9 @@ test('addOperation(A,B) bridges to the import path — byte-identical G-code, no
     expect(r.addedOpTypes, 'both operations present, in order, flattened').toEqual(['drill', 'surfacing']);
 });
 
+// t1942 — this proves the GROW direction only. The SHRINK direction (deleting a step back down to one collapses
+// the wrapper, via this SAME groupConsecutiveOps, not a hand-rolled mirror rule) is t1934's own stated design —
+// it is NOT built or called anywhere yet. Do not read this test as covering that path; it doesn't exist to cover.
 test('the symmetric rule: a run of ONE stays unwrapped — the same function that wraps a run of 2 also refuses to wrap 1', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
@@ -133,13 +136,32 @@ test('ASSERT WHAT THE USER GETS: after adding a 2nd operation, the setup sheet l
     expect(r.hasSurfacingBody, 'the surfacing body is present in the emitted G-code too — not dropped').toBe(true);
 });
 
-test('STOP-CONDITION CHECK: the single-operation program is untouched — addOperation is never on that path', async ({ page }) => {
+// t1942 — FIXED: the prior version of this test reloaded the SAME program and never called addOperation or any
+// of its own machinery at all — it would have passed unchanged even if addOperation corrupted every
+// single-operation program in the app, which is the exact claim its own name made. A test that cannot fail is
+// worse than no test: it stops the next reader looking. This version runs `groupConsecutiveOps` +
+// `collapseImportTerminators` — the EXACT shared pipeline addOperation is composed from — directly against the
+// program, with nothing added, and asserts that pipeline is a true IDENTITY on the overwhelmingly common
+// single-operation case: no wrapper introduced, byte-identical emit. A bug that wrapped even a run of ONE
+// (e.g. `run.length >= 1` instead of `> 1`) would fail this.
+test('STOP-CONDITION CHECK: the shared pipeline addOperation is built from is an IDENTITY on a one-operation program', async ({ page }) => {
     await boot(page);
-    // A plain single-op program (the overwhelmingly common case) never calls addOperation at all — this is the
-    // baseline this turn's own code must not have moved. Proven by the existing byte-identical-emit suite (node
-    // tier) staying green, since addOperation touches no file on the emit path; asserted directly here too.
     const programA = await insertAndCapture(page, 'drill');
     const gcodeBefore = await page.evaluate(() => window.ddcsGetBlockGcode());
-    await page.evaluate((programA) => window.ddcsLoadBlockStack(programA), programA);
-    expect(await page.evaluate(() => window.ddcsGetBlockGcode()), 'reloading the same single-op program is byte-identical').toBe(gcodeBefore);
+
+    const r = await page.evaluate(async (programA) => {
+        const progMod = await import('/blocks/programModel.js');
+        const emitMod = await import('/blocks/blockEmitter.js');
+        const dialectsMod = await import('/wizards/dialects/index.js');
+        const profileMod = await import('/shared/js/profiles/controllerProfiles.js');
+        const dopts = { dialect: dialectsMod.resolveActivePost(profileMod.getActiveProfile().id) };
+        const rebuilt = progMod.collapseImportTerminators(progMod.groupConsecutiveOps(programA));
+        return {
+            rebuiltShape: rebuilt.map((b) => (b.type === 'op' ? b.opType : b.type)),
+            rebuiltText: emitMod.emitMapped(rebuilt, dopts).text,
+        };
+    }, programA);
+
+    expect(r.rebuiltShape.includes('multi_step'), 'a lone operation is never wrapped by the pipeline addOperation shares').toBe(false);
+    expect(r.rebuiltText, 'the shared pipeline, run with nothing added, is byte-identical').toBe(gcodeBefore);
 });
