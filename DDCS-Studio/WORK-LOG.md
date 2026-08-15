@@ -34043,3 +34043,91 @@ gate + the new spec: 329/344 clean on the second pass, exactly the 2 real, root-
 the first.
 
 🔨 turn 1880
+
+## turn 1882 — Gap 2 (ATC panel greying): ALSO non-functional — STOP AND REPORT, no code
+
+### Dispatch
+
+Gap 2 of 4 from t1876's own audit: `atc-change-twin.spec.js` tests the ATC-change emit across Expert+V4.1 but
+never asserts the `data-cap="atc"` panel greying itself. FIRST check whether it's functional at all — probePort
+turned out to be dead rather than merely untested, and that's now the default suspicion. If ATC greying is also
+non-functional, STOP AND REPORT exactly as before. If functional, cover both directions + the vacuity trap +
+the identical-caps economy, watching for a `data-op-gated` convention collision again. Scope: this gap only.
+Gate: node tier + new assertions + every spec touching what changes.
+
+### Checked functionality first — same shape as probePort, confirmed by opening the real UI, not assumed
+
+`data-cap="atc"` sits on two STATIC HTML panels (`index.html:884,948`: `wiz_atc_change`, `wiz_atc_test`) — the
+OLD built-in wizard screens. Checked whether either is still the LIVE surface a user sees, the same way
+corner's own `c_port` turned out not to be (t1878): opened `user_atc_change_data` via `window.openWiz` (the
+real gesture) and read the DOM directly.
+
+**`wiz_atc_change` exists, still carries `data-cap="atc"`, and postGating's own `[data-cap]` loop genuinely
+still runs and greys it correctly — but its own `display` is permanently `none`.** The panel the user actually
+sees is `#wiz_user_form` (`display:block`) — the SAME generic twin-form renderer corner/middle/etc. use. This
+matches `atc-change-in-place.spec.js`'s own docblock exactly: "Tool Change opens the twin IN-PLACE... twin
+retired" — the built-in view was retired from the LIVE routing (its own HTML never got deleted, just orphaned).
+Confirmed the identical shape for `wiz_atc_test`/`user_atc_test_data` too (same check, same result: panel
+exists, `display:none`, `#wiz_user_form` is what renders).
+
+**And the LIVE twin form has no ATC-capability gate of its own, from any source.** Grepped `userOpView.js` and
+both ops' own data definitions (`atcChangeData.js`, `atcTestData.js`) for `caps.atc`/an `_atcOk`-style flag
+(the pattern `_probePortOk`/`_rigidOk` already establish): zero matches. The ONLY thing that ever read
+`caps.atc` for gating purposes is `postGating.js`'s own `[data-cap="atc"]` loop, and it operates exclusively on
+the now-permanently-hidden panel.
+
+**So today: a V4.1/DM500 user can open and freely edit an ATC-Change or ATC-Test op's own LIVE twin form with
+NO indication their controller has no pneumatic-tool-changer model at all** — the exact hazard `postGating.js`'s
+own header exists to prevent, not prevented, on the two most common controllers, for the SECOND named gap in a
+row. Not a coincidence worth glossing over: both probePort and this one share the identical root cause (a
+migration to the generic twin-form system left the OLD, field/panel-specific gating mechanism pointed at dead
+DOM), which suggests the REMAINING two named gaps (`ioInputSupported`, `tap`'s `_rigidOk`) are worth re-checking
+for the same pattern when their own turns come, not assumed functional just because `_rigidOk` already uses the
+CORRECT (twin-form `gate:`) mechanism — `tap`'s own gate was confirmed working in t1880's gate run (the model
+`tapData.js:58` cites), so it is NOT expected to have this problem, but `ioInputSupported` has not yet been
+checked this way and shouldn't be assumed either way until it is.
+
+### The data-op-gated convention question, addressed even though there's no live collision here (yet)
+
+No collision to report for the CURRENT state (nothing gates the twin form's own ATC fields at all, so there's
+nothing for a new gate to collide with) — but the eventual fix (mirroring Shape B: an `_atcOk` flag + `gate:`
+properties on the twin's own relevant fields) WOULD use the SAME `'on'`/`'off'` convention `_probePortOk`/
+`_rigidOk` already use in `userOpView.js`'s own `[data-gate]` loop — no new convention, no new collision risk,
+assuming the fix follows the SAME established pattern. The advisor's own question — whether the 3-4 coexisting
+`data-op-gated` value-conventions across `userOpView.js`'s two loops, `formWidgets.js`'s segmented-button gate,
+and `probeSrcGlyph.js`'s empty-string convention should be reconciled into one — is a real, standing question
+but not urgent FOR THIS gap specifically (the fix, when built, adds to the ALREADY-dominant 'on'/'off'
+convention, not a new one). Recording it as a declaration question worth its own act, per the advisor's own
+framing, not resolving it here.
+
+### STOP AND REPORT — no code, no test written this turn
+
+Per the exact same pattern as t1878, now confirmed as the SECOND instance of the SAME root cause rather than an
+isolated surprise: reporting rather than choosing a fix shape without confirmation. Zero source or spec files
+touched — confirmed via `git status --short` below.
+
+### Gate
+
+- `npm run test:node`: 118/118 (no source touched — nothing to break).
+- `handoff.py amendments --role worker`: none pending. Epoch re-checked (`4`, matches).
+- `proc_health.py watch`: self tree clean, 0 flagged.
+- `git status --short`: clean — no source or spec files changed this turn.
+
+### For the advisor
+
+ATC panel greying is non-functional, the same shape as probePort: `data-cap="atc"` on `wiz_atc_change`/
+`wiz_atc_test` still greys correctly in isolation, but both panels are permanently `display:none` — the live
+surface is the generic twin form (`#wiz_user_form`), confirmed by opening both ops for real, not assumed from
+`atc-change-in-place.spec.js`'s own docblock alone (though it independently corroborates: "twin retired"). The
+live twin form has zero ATC-capability gate from any source — a V4.1/DM500 user can freely build an ATC op
+today with no signal their controller doesn't support it. This is the SECOND gap sharing the identical root
+cause (the twin-form migration orphaned the old panel/field-specific gate, leaving it pointed at dead DOM) —
+worth treating as a pattern, not two coincidences, when the remaining two named gaps come up (`tap`'s own
+`_rigidOk` already uses the CORRECT twin-form mechanism, confirmed working in t1880's own gate — not expected
+to share this problem; `ioInputSupported` hasn't been checked this way yet and shouldn't be assumed either way).
+No collision to report on `data-op-gated` for the current state (nothing gates the twin form yet), but the
+eventual fix would extend the SAME `'on'`/`'off'` convention `_probePortOk`/`_rigidOk` already use, not add a
+new one — the broader "should the 3-4 conventions be reconciled" question stands as its own act, not resolved
+here. No code, no test, no fix this turn.
+
+🔨 turn 1882
