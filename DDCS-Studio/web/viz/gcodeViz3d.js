@@ -85,6 +85,7 @@ export class GcodeViz3D {
         this._machine = null;
         this.stockMesh = null;
         this.stockEdges = null;
+        this._playFrameStockHidden = false;   // t1874 (Option B Slice 3) — starts false: the idle picture is unchanged
         this.machineBox = null;
         this._segs = [];
         this._passCount = 1;
@@ -635,6 +636,19 @@ export class GcodeViz3D {
     _stockOpacity() { return displayOf('stock').alpha * (this._simMode === 'probe' ? (0.16 / 0.72) : 1); }
     setSimMode(mode) { if (mode === this._simMode) return; this._simMode = mode; if (this.stockMesh && this.stockMesh.material) { this.stockMesh.material.opacity = this._stockOpacity(); this.render(); } }
 
+    // t1874 (Option B Slice 3, LIVE VISIBILITY) — while PLAYBACK executes a machine-frame segment, the workpiece is
+    // HIDDEN (it may not even be loaded during a machine-frame move); a part-frame segment SHOWS it. The appearing/
+    // disappearing IS the feature (the operator's cue for which frame the machine is in), not a flicker to smooth —
+    // no fade/ghost/dim. The IDLE picture (before play, or after STOP resets to it) is UNCHANGED: this flag starts
+    // false and `createPreviewPanel.js`'s own `stopPlay()` resets it, so the idle/stopped picture always shows the
+    // workpiece exactly as it does today (only PLAY, mid-machine-frame-segment, ever sets it true).
+    setPlayFrameHidden(hidden) {
+        hidden = !!hidden;
+        if (this._playFrameStockHidden === hidden) return;
+        this._playFrameStockHidden = hidden;
+        this.applyDisplay();
+    }
+
     /** t738 — apply the ONE declared visibility registry (displayPrefs) across every 3D element: `.visible` per element +
      *  the BASE opacity (the probe-mode / play scales in _stockOpacity + _dimRoute multiply this base). Called after every
      *  rebuild (setGcode) and LIVE on a modal change. Colours stay in pathStyle; this owns visible + alpha. */
@@ -643,8 +657,10 @@ export class GcodeViz3D {
         const base = (o, a) => { if (o && o.material) { o.material.transparent = true; o.material.opacity = a; if (o.material.__op0 != null) o.material.__op0 = a; } };   // store the base so _dimRoute composes
         const show = (o, on) => { if (o) o.visible = on; };
         // stock box (+ edges) — hidden anyway while the carve grid stands in for it; opacity via _stockOpacity (probe scale)
-        show(this.stockMesh, vis('stock') && !this._carveMesh); if (this.stockMesh) base(this.stockMesh, this._stockOpacity());
-        show(this.stockEdges, vis('stock') && !this._carveMesh);
+        // t1874 — !this._playFrameStockHidden folds in Slice 3's own play-time gate, composing with the user's own
+        // stock-visibility preference (vis('stock')): if the user already hid stock entirely, this can't force it on.
+        show(this.stockMesh, vis('stock') && !this._carveMesh && !this._playFrameStockHidden); if (this.stockMesh) base(this.stockMesh, this._stockOpacity());
+        show(this.stockEdges, vis('stock') && !this._carveMesh && !this._playFrameStockHidden);
         show(this._carveMesh, vis('carve')); if (this._carveMesh) base(this._carveMesh, alp('carve'));
         // toolpath line groups — cut=feed · rapid=rapid+retract+jog (travel family) · probe=probe+probeSlow
         const lg = this.lineGroups || {};

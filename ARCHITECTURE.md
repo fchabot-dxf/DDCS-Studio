@@ -612,8 +612,8 @@ rg -n "setup_datawiz" DDCS-Studio/web
 while the click opens `'user_pocket_data'`. For `io_step` / `pause_confirm` / `tap` the stamped value is a type no
 builder registry knows.
 
-### 8 · The z-index comment in `createPreviewPanel.js:1127-1128` describes code that no longer runs.
-It says the 3D canvas is z-index 2 above the 2D canvas. The only code that sets that is `gcodeViz3d.js:2819`
+### 8 · The z-index comment in `createPreviewPanel.js:1147-1148` describes code that no longer runs.
+It says the 3D canvas is z-index 2 above the 2D canvas. The only code that sets that is `gcodeViz3d.js:2835`
 `attach()`, whose sole caller is the retired `wizards/_svgPreview.bak.js:94`. In the live path the WebGL canvas is
 appended **in flow** (`gcodeViz3d.js:68`) and the toggle works because `setMode` sets `display:'none'`.
 ```bash

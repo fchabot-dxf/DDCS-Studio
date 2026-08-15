@@ -153,8 +153,8 @@ const TRAP_CLAIMS = [
     { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 167, find: /setup_datawiz/ },
     { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', line: 28, lineEnd: 41, find: /_datawiz/ },
     { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 103, find: /opensAs/ },
-    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1127, lineEnd: 1128, find: /z-index/ },   // t1872 — shifted from 1124-1125 by the toolMachineFrame per-pass row-wiring edit above it (Option B Slice 2)
-    { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2819, find: /attach/ },   // t1872 — shifted from 2803 by the toolMachineFrame per-pass edits above it (Option B Slice 2)
+    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1147, lineEnd: 1148, find: /z-index/ },   // t1874 — shifted from 1127-1128 by the Slice 3 live-visibility wiring above it (Option B Slice 3)
+    { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2835, find: /attach/ },   // t1874 — shifted from 2819 by the setPlayFrameHidden edits above it (Option B Slice 3)
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
     { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 706, find: /container\.__layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },

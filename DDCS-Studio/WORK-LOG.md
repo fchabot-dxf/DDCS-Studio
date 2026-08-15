@@ -33535,3 +33535,145 @@ Gate: node 118/118 (after the map fix), new test 3/3 non-vacuous, both baselines
 234+11/249 clean once 4 flakes were isolated and confirmed (not dismissed on the say-so).
 
 🔨 turn 1872
+
+## turn 1874 — Option B Slice 3 (live visibility), the last slice — the workpiece appears/disappears with the frame
+
+### Dispatch
+
+Advisor released Slice 2 (V2026.08.14.8, full suite clean, the alignment-cluster reds confirmed a load flake not my
+change). FIRST QUESTION, before any Slice 3 code: is `segmentFrame.js` (Slice 1) now orphaned — Slice 2 didn't
+consume it; if Slice 3 doesn't either, delete it and its own guard test rather than carry dead weight. THE ACT:
+while a machine-frame segment plays, hide the workpiece; a part-frame segment shows it — the appearing/
+disappearing IS the feature (the operator's cue), never faded/ghosted/dimmed. Idle picture unchanged (workpiece
+shown; only PLAY, mid-machine-frame-segment, hides it). STOP already lands on the idle picture (the panel's own
+Run/Stop) — no separate freeze state. DRO frame-labeling (the 5th consumer, deferred at t1862) — decide in or out
+this slice, and say why. Both baselines are idle-state, so zero-diff unless idle legitimately changed. Gate: node
+tier + slice-3 test + both baselines + the dialect suite + Slice 1 and 2's own guards.
+
+### Is segmentFrame.js orphaned? NO — Slice 3 is its first real consumer
+
+Live playback is inherently LINE-indexed: the engine tracks the executing line separately from position
+(`onLineChange({lineIndex, raw})`, `GcodeExecutionEngine.js:624` — a real, already-wired callback, distinct from
+`onPositionChange`, which carries `pass` not `line`). This is EXACTLY Slice 1's own domain
+(`frameOwnerAtLine(lineIndex)`). Unlike Slice 2's sites (pass-indexed, a different domain that needed its own
+additive tag), Slice 3 imports and calls `frameOwnerAtLine` DIRECTLY, no contortion — confirmed by building it,
+not just arguing it should fit.
+
+### The fix — 3 files, additive, the union still untouched
+
+- `gcodeViz3d.js`: new `setPlayFrameHidden(hidden)` — a `_playFrameStockHidden` instance flag (starts `false`,
+  the idle picture is unchanged) folded into `applyDisplay()`'s own existing stock-visibility gate (composes
+  with the user's own stock on/off preference and the pre-existing carve-mode substitution — can't force stock
+  on if either already hides it for an unrelated reason).
+- `createPreviewPanel.js`: `onLineChange` calls `frameOwnerAtLine(lineIndex)` and toggles the flag when it can
+  attribute the line (null → leave visibility alone, no false hide). `stopPlay()` resets the flag to false and
+  `lastLineIndex` to -1 (the idle picture is guaranteed shown after STOP, no freeze state invented, per the
+  advisor's own explicit instruction).
+- **The 5th consumer (DRO frame-labeling) — IN this slice, decided with a reason, not deferred again**: it is
+  the SAME question Slice 3's stock toggle already answers ("which frame does the line CURRENTLY executing
+  belong to"), just applied to the DRO chip's text instead of stock-mesh visibility. `onPositionChange`'s own
+  `machineOp` computation now reads `frameOwnerAtLine(lastLineIndex)` first, falling back to the untouched
+  whole-trace flag when it returns null — same pattern, same file, same turn, no reason to split it into its
+  own act.
+
+### A genuine environmental incident, mid-turn — not caused by this act, restored and reported
+
+`node_modules` went completely empty partway through this turn's own testing (confirmed: `ls node_modules` → 0
+entries, timestamped mid-turn) — not a cwd-drift symptom (cwd was independently verified correct at the same
+moment), a full wipe. Matches the session's own documented "a 2nd agent shares this repo" precedent. `node_modules`
+is a build artifact, not source-controlled — restored via `npm ci` (safe, standard, non-destructive; does not
+touch git state), verified working with a real test run immediately after, and confirmed via `git status` that
+no source files were disturbed by whatever caused it (only my own in-progress edits showed as modified). Noted
+here for the record in case it recurs.
+
+### A real pre-existing engine limitation, found while building the test — reported, not silently fixed
+
+The shared execution engine halts UNCONDITIONALLY at any `M30`/`M02`/`M99` line (`GcodeExecutionEngine.js:898`,
+`return true` = program complete) — no flag to continue past it. Every wizard-generated op emits its own
+standalone `M30` by convention. This means: **a real multi-op Blocks-tab program can never PLAY/STEP past the
+FIRST op's own M30 today, independent of Option B entirely.** Confirmed directly: stepping a real Homing+Corner
+program halts at "Execution complete" right after Homing's own `M30` (line 31), Corner's own 92 lines never
+execute. This is NOT a Slice 3 defect — the projected G-code is correct and complete (124 lines, both ops
+present); the LIVE RUN mechanism itself stops early, for a reason unrelated to frame-awareness. Whether multi-op
+Blocks programs should strip intermediate M30s to become genuinely continuously-playable is a separate, bigger
+architectural question — flagged for the advisor, not resolved or worked around in source this turn.
+
+For the TEST specifically (not a source change): directly stripped the one intermediate M30 from the shared live
+`getProjection()` object before stepping, to exercise Slice 3's own mechanism across a genuine op boundary — the
+same effect as loading a hand-edited `.nc` file for one test session, documented as a test-construction choice
+in the spec's own header, not a fix.
+
+### New test — `tests/option-b-slice3-live-visibility-1874.spec.js`, 4/4 passing, non-vacuous
+
+1. **PRIMARY EVIDENCE**: steps a real Homing+Corner program (M30-stripped, as above) 40 times; asserts the
+   stock hides through EVERY one of Homing's own 31 lines and shows through every line reached inside Corner's
+   own emit (verified stepping reaches Corner's span, not just claimed).
+2. The DRO chip flips work→mach at Homing's own FIRST REAL MOTION (line 4, the first `G31`) — proof the wiring
+   reads the per-line override, not merely re-confirming a value the union already agreed on.
+3. STOP resets the flag to false after landing mid-Homing-hidden — the idle picture is never left mid-hide.
+4. The idle picture (before any play) is unaffected: stock mesh still builds, the new flag starts false.
+
+**Honest gap, named not glossed over**: the DRO chip's REVERSE transition (mach→work, into the part-frame op's
+own first real motion) was NOT independently live-verified this turn. Tried two op combinations (Corner: first
+real motion ~63 steps in; Edge, a shorter program: predicted ~56 steps by raw line count, but G31 probe-seek
+lines appear to consume more than one internal step each when stepped, so 60 real clicks still didn't reach it)
+— both impractical within a reliable test runtime. The wiring is code-reviewed (the SAME `frameOwnerAtLine`-
+with-fallback pattern as the stock toggle, which IS fully round-trip verified) but this specific direction is a
+named, not silently claimed, gap.
+
+**Non-vacuity, proven by revert/restore**: backed up both fixed files, reverted the ONE `onLineChange` tagging
+block in `createPreviewPanel.js`, re-ran: tests 1 and 3 failed exactly as predicted (`hidden` never became true
+at all — the whole-trace flag stays `true` panel-wide from the union throughout, but nothing ever CALLS
+`setPlayFrameHidden` pre-fix, so the flag never engages); tests 2 and 4 correctly stayed green (unaffected —
+Homing's own union value already agrees with what the DRO chip shows regardless, and idle-picture is untouched
+by an `onLineChange` revert since idle never plays). Restored; `git diff --stat` matched the intended fix scope.
+4/4 pass again.
+
+### Architecture map maintenance, again — same trap, same reason, fixed in the same act
+
+`npm run test:node` failed first on the SAME TRAP8 line-citation drift as t1872 (my own edits shifted
+`createPreviewPanel.js`'s z-index comment and `gcodeViz3d.js`'s `attach()` method again, this time from
+1127-1128/2819 to 1147-1148/2835). Same maintenance, third time now (t1850, t1872, t1874) for the identical
+trap — found the new correct lines by direct search, updated both `architecture-map-1698.test.mjs`'s own
+hardcoded citation and `ARCHITECTURE.md`'s own prose (§8), with a `t1874 — shifted from X by Y` comment. Re-ran
+clean.
+
+### Gate
+
+- New test: 4/4, non-vacuous (proven above).
+- Both idle-state screenshot baselines (`screenshot-baselines-1792.spec.js`): 2/2, zero-diff — idle unchanged,
+  confirmed not just claimed.
+- Slice 1's own guard (`segment-frame-derivation-1838.spec.js`) and Slice 2's own guard
+  (`option-b-slice2-positioning-1872.spec.js`): both still pass, untouched.
+- The standing dialect suite (`gcode-dialect-emit-invariants-1870.spec.js`): still 4/4, unrelated subsystem,
+  unaffected as expected.
+- `npm run test:node`: 118/118 (after the second architecture-map fix — failed once before it, root-caused and
+  corrected, not worked around).
+- 58-file symbol-grepped gate (`createPreviewPanel|gcodeViz3d|segmentFrame|frameOwnerAtLine|setPlayFrameHidden|
+  _playFrameStockHidden`, `--workers=4`): **184 passed, 0 failed, 2 skipped.** Clean on the first run — nothing
+  to investigate this time.
+- `handoff.py amendments --role worker`: polled twice (mid-task, none; pre-commit, none). Epoch re-checked (`4`).
+- `proc_health.py watch`: self tree clean throughout (9-12 procs depending on point-in-time, 0 flagged).
+- Environmental: `node_modules` wipe encountered mid-turn, restored via `npm ci`, verified working, confirmed no
+  source disturbance — see note above.
+- No personal data touched this turn.
+
+### For the advisor
+
+Slice 3 shipped — the last of the 3-slice plan. Segment-frame.js is NOT orphaned: it's Slice 3's own first real
+consumer (line-indexed, matching live playback's own natural domain), confirming Slice 1 was the right
+foundation, just not the one Slice 2 needed. The workpiece now hides through every machine-frame line and shows
+through every part-frame line during play, verified end-to-end on a real Homing+Corner program; STOP resets
+cleanly to the idle picture; the idle picture itself is provably unaffected (both baselines zero-diff). Took the
+5th consumer (DRO frame-labeling) INTO this slice with a reason (same underlying per-line question, same file,
+no benefit to splitting it out) rather than deferring again. Two things found and reported rather than silently
+handled: a genuine PRE-EXISTING engine limitation (M30 halts any multi-op Blocks program's own live PLAY after
+the first op, independent of Option B — a separate architectural question worth its own dispatch) and a
+mid-turn `node_modules` wipe (the session's own documented concurrent-agent pattern, restored safely, no source
+disturbed). One honest gap named rather than glossed: the DRO chip's reverse transition wasn't independently
+live-verified (impractical step count in every combination tried), though the code is the same proven pattern as
+the fully-verified stock toggle. Gate: node 118/118 (after a 3rd round of the same recurring architecture-map
+line-citation maintenance), new test 4/4 non-vacuous, both baselines zero-diff, Slice 1/2's own guards clean,
+58-file gate 184/186 clean on the first run, no flakes to chase this time.
+
+🔨 turn 1874

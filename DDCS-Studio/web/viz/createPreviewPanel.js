@@ -28,6 +28,7 @@ import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — 
 import { onDisplayChange } from './displayPrefs.js';   // t738 — re-apply the visibility registry to THIS panel on any modal change
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { placementDeclared } from '../engine/envelopeCheck.js';   // t1836 — the ONE existing "is a WCS placement on file" gate (pre-flight's own predicate), reused by the frame note rather than re-derived
+import { frameOwnerAtLine } from './segmentFrame.js';   // t1874 (Option B Slice 3) — which op owns the line CURRENTLY executing during play, and what frame it declares (Slice 1's own derivation, first real consumer)
 import { toggleStockEditor } from '../ui/stockEditor.js';
 import { droAxisLabel, droValue, droWorkShift } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
@@ -571,6 +572,9 @@ export function createPreviewPanel(container, opts = {}) {
     }
 
     let engine = null;
+    // t1874 — Option B's OWN Slice 3 (LIVE VISIBILITY), unrelated to the pre-existing "SLICE 3" label below (an
+    // older, differently-scoped probe-completion mechanism — same word, two unrelated features, not to conflate).
+    let lastLineIndex = -1;   // the line CURRENTLY executing during play, set in onLineChange, read in onPositionChange for the DRO frame label (the SAME per-line lookup that gates the stock visibility below)
     let pendingProbe = null;   // SLICE 3: the axis of a G31 awaiting completion (resolved on the next onLineChange)
     let pendingDatum = null;   // a WCS-offset write awaiting its COMMITTED value — onLineChange fires BEFORE the assign runs, so read the target var on the NEXT line (robust to ANY RHS expr, incl. the comp's bracketed [#1927-#6])
     let compMap = {};   // DISC-ON-SURFACE (inc2): the previewed ops' enabled-comp { resultVar → { axis, sign } } map (read per run)
@@ -631,6 +635,16 @@ export function createPreviewPanel(container, opts = {}) {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw != null) setStatus(fmtExecLine(lineIndex + 1, raw));   // t867 rider — the RAW executing line (one source with the editor highlight), not a paraphrase
                 setProgress(lineIndex);   // t865 — the progress bar fills from the SAME line index the counter shows (one source)
+                lastLineIndex = lineIndex;
+                // t1874 (Option B Slice 3) — while THIS line's own op is machine-frame, hide the workpiece (the
+                // shop-floor reality: it may not even be loaded during a machine-frame move); a part-frame line
+                // shows it. Appearing/disappearing IS the cue, not a flicker — no fade, `setPlayFrameHidden` is a
+                // hard toggle. `frameOwnerAtLine` returning null (a line this whole-program join can't attribute,
+                // or a host with no projection at all) leaves the CURRENT visibility alone — no false hide.
+                if (viz && viz.setPlayFrameHidden) {
+                    const fr = frameOwnerAtLine(lineIndex);
+                    if (fr) viz.setPlayFrameHidden(!!fr.toolMachineFrame);
+                }
                 // t881 — TWO-SIDED FLIP: crossing a setup-2 boundary turns the stock over about the declared axis + carries the
                 // carve field (side-1's through-holes) to the new top. Once per boundary per run.
                 if (_flipBoundaries.length && viz) {
@@ -690,7 +704,13 @@ export function createPreviewPanel(container, opts = {}) {
                 const kSeg = segs.length ? nearest2d(pos) : 0;
                 const sg = segs[kSeg];
                 const probeSeg = pos.probing != null ? !!(pos.probing || pos.g53) : !!(sg && (sg.probe || /probe/i.test(sg.type || '')));   // t780 (user) — the ENGINE's own move semantics win (probe OR G53 = machine-frame motion); the traced segment is the fallback
-                const machineOp = !!(viz && (viz._toolMachineFrame || viz._forceMachineBox));
+                // t1874 (Option B Slice 3, the 5th consumer t1862 deferred) — the DRO's own frame label is the SAME
+                // question Slice 3's stock toggle already answers: which frame does the line CURRENTLY executing
+                // belong to. `frameOwnerAtLine(lastLineIndex)` overrides the whole-trace flag when it can attribute
+                // the line (a multi-op program); null (no projection, or a host outside a whole-program context)
+                // falls back to the untouched flag, unchanged from before this turn.
+                const lineFrame = frameOwnerAtLine(lastLineIndex);
+                const machineOp = lineFrame ? !!lineFrame.toolMachineFrame : !!(viz && (viz._toolMachineFrame || viz._forceMachineBox));
                 const off = activeWcsOffset();
                 pos.frame = (machineOp || probeSeg) ? 'mach' : 'work';
                 // t1205 — the quoted machine coords are WORLD + the WCS offset. `pos` itself stays PASS-LOCAL because
@@ -1192,6 +1212,12 @@ export function createPreviewPanel(container, opts = {}) {
         if (engine && engine.running) engine.stop();
         t2.stop();
         if (viz) viz.setAnimate(false);
+        // t1874 (Option B Slice 3) — STOP resets to the idle picture (the panel's own Run/Stop, per the advisor's
+        // own ruling — no separate freeze state invented): the workpiece must be shown again, whatever frame the
+        // LAST executed line happened to be. lastLineIndex resets too, so a stale line can't leak into the next
+        // onPositionChange before the next run's own onLineChange fires.
+        if (viz && viz.setPlayFrameHidden) viz.setPlayFrameHidden(false);
+        lastLineIndex = -1;
         if (typeof opts.onLine === 'function') opts.onLine(null);
         setProgress(null);   // t865 — playback stopped → hide the progress bar (visible only while playing)
         for (const cb of toolPosSubs) cb(null, 0);   // t309 — tell the Layout overlay the sim stopped (clears its red head, redraws the static path)
