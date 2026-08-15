@@ -42,6 +42,13 @@ import { getActiveProfile } from '../../shared/js/profiles/controllerProfiles.js
 // dialect-specific field (e.g. the I/O-step Result-var/Timeout, which are M66-only and dead on a DDCS WHILE-poll).
 const activePostOword = () => { try { return getCaps(resolveActivePost(getActiveProfile().id).id).flow === 'oword'; } catch (_) { return false; } };
 const activePostId = () => { try { return resolveActivePost(getActiveProfile().id).id || ''; } catch (_) { return ''; } };   // t778 — for the tapping rigid gate (Expert-only)
+// t1880 — probePort: does the active post's own G31 probe move even ACCEPT a port number? Confirmed from each
+// dialect's own probeMove signature (not guessed): Expert's `probeMove(axis, dist, {port=3, level=0})` reads
+// and emits P${port} L${level}; V4.1's `probeMove(axis, dist, {feed})` has NO port/level param at all — it
+// emits a FIXED `L#682 Q1 K0` (the port is firmware-selected, not Studio-editable); DM500 doesn't use G31 at
+// all (move-until-input). So probePort:false means "the port field is dead weight, never read by this
+// dialect's own emit" — NOT "cannot probe" (V4.1/DM500 both probe, via their own fixed/different forms).
+const activePostProbePort = () => { try { return !!getCaps(resolveActivePost(getActiveProfile().id).id).probePort; } catch (_) { return true; } };
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
 import { latheProbeTool, latheBarOf } from '../../viz/latheScene.js';   // t1301 — a lathe probe's stylus is the form's declared radius, scaled to the bar
 
@@ -464,8 +471,9 @@ export function createUserOpView(ns, opts) {
             const fhost = elNS('wiz_user_form');
             // t538 — the live params + a dialect gate flag (`_oword`); t778 — `_rigidOk` for the tapping rigid gate: a DECLARED
             // encoder/servo spindle (settings.spindle.tapCapable) AND the Expert post (the only dump-evidenced firmware).
+            // t1880 — `_probePortOk`: does the active post's own probeMove even read a port number (Expert: yes; V4.1/DM500: no).
             const _spin = (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {};
-            const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert') };
+            const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert'), _probePortOk: activePostProbePort() };
             if (fhost) fhost.querySelectorAll('[data-when], [data-when-all]').forEach((row) => {
                 let ok;
                 if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions

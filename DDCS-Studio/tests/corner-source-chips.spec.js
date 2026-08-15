@@ -85,19 +85,30 @@ test('source-chips: the data-op form shows the inline source dot; click flips ct
   expect(dots.retract, 'retract has the source dot').toBe(true);
   expect(dots.f_slow, 'a non-sourced field (slow feed) has NO dot').toBe(false);
 
+  // t1880 — `port` now ALSO carries an UNRELATED dialect-capability gate (probePort: greys the field on a post
+  // whose own probe move never reads a port number, e.g. V4.1/DM500 — see gcode-dialect-emit-invariants and
+  // probe-port-gate-1880.spec.js). That gate ALSO uses `data-op-gated` (userOpView.js's own generic marker,
+  // 'on'/'off' — always PRESENT once a `gate:` exists on the binding, regardless of whether it's currently
+  // active), which is a DIFFERENT convention from probeSrcGlyph.js's own (present with an EMPTY STRING when
+  // locked, attribute REMOVED entirely when unlocked — probeSrcGlyph.js:39,57). Under Expert (this test's own
+  // profile), the probePort gate is never active — but it still sets the attribute to 'off', so a bare
+  // `hasAttribute` check can no longer distinguish "probeSrcGlyph's OWN lock" from "some other gate declared
+  // but currently off." Check the VALUE specifically (empty string = probeSrcGlyph's own lock), not mere
+  // presence — precise to the mechanism this test is actually about, robust to whichever other gates a field
+  // may also carry.
   // studio (default): editable, not gated, dot unlit
-  const studio = await page.evaluate((sel) => { const i = document.querySelector(sel); const btn = i.closest('.psrc-wrap').querySelector('.psrc-glyph'); return { readOnly: i.readOnly, gated: i.hasAttribute('data-op-gated'), lit: btn.classList.contains('psrc-lit') }; }, glyphSel('port'));
+  const studio = await page.evaluate((sel) => { const i = document.querySelector(sel); const btn = i.closest('.psrc-wrap').querySelector('.psrc-glyph'); return { readOnly: i.readOnly, gated: i.getAttribute('data-op-gated') === '', lit: btn.classList.contains('psrc-lit') }; }, glyphSel('port'));
   expect(studio.readOnly, 'studio: editable (not readOnly)').toBe(false);
-  expect(studio.gated, 'studio: not gated').toBe(false);
+  expect(studio.gated, 'studio: probeSrcGlyph\'s own lock is not active (an unrelated dialect gate may still be present with a non-empty value)').toBe(false);
   expect(studio.lit, 'studio: dot unlit').toBe(false);
 
   // CLICK the port dot → flips to ctrl: locked (readOnly + data-op-gated + value=#1078, NOT disabled), dot lit, glyph names Pr578
   await page.evaluate((sel) => document.querySelector(sel).closest('.psrc-wrap').querySelector('.psrc-glyph').click(), glyphSel('port'));
   await page.waitForTimeout(250);   // setProbeSrc → ddcs:settings-changed → wizardManager.update() re-renders
-  const ctrl = await page.evaluate((sel) => { const i = document.querySelector(sel); const btn = i.closest('.psrc-wrap').querySelector('.psrc-glyph'); return { readOnly: i.readOnly, disabled: i.disabled, gated: i.hasAttribute('data-op-gated'), value: i.value, lit: btn.classList.contains('psrc-lit'), title: btn.title }; }, glyphSel('port'));
+  const ctrl = await page.evaluate((sel) => { const i = document.querySelector(sel); const btn = i.closest('.psrc-wrap').querySelector('.psrc-glyph'); return { readOnly: i.readOnly, disabled: i.disabled, gated: i.getAttribute('data-op-gated') === '', value: i.value, lit: btn.classList.contains('psrc-lit'), title: btn.title }; }, glyphSel('port'));
   expect(ctrl.readOnly, 'ctrl: locked via readOnly').toBe(true);
   expect(ctrl.disabled, 'ctrl: NOT disabled (postGating re-enables disabled)').toBe(false);
-  expect(ctrl.gated, 'ctrl: data-op-gated declared (survives postGating)').toBe(true);
+  expect(ctrl.gated, 'ctrl: probeSrcGlyph\'s own data-op-gated declared (empty-string convention, survives postGating)').toBe(true);
   expect(ctrl.value, 'ctrl: the field shows the controller register').toBe('#1078');
   expect(ctrl.lit, 'ctrl: the dot is lit').toBe(true);
   expect(ctrl.title, 'the glyph names the controller Pr578').toContain('Pr578');

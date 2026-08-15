@@ -387,6 +387,9 @@ export function bindingsFromStack(children) {
         if (p.optional === true || p.optional === 'true' || p.optional === 'TRUE') spec.optional = true;
         if (p.readonly === true || p.readonly === 'true' || p.readonly === 'TRUE') { spec.readonly = true; if (p.readonlyhint) spec.readonlyHint = String(p.readonlyhint); }
         if (p.whenparam) spec.when = { param: String(p.whenparam), is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : String(p.whenis) };
+        // t1880 — the GREY-gate's own reverse half (see bindingsToBlocks' own t1880 note: named in this file's t1756
+        // comment as an example of the allow-list-drop class, but never actually wired until now).
+        if (p.gate) { try { spec.gate = JSON.parse(p.gate); } catch (_) { /* malformed — drop rather than throw */ } }
         // t1756 — CARRY THE TOKEN-POLICY DECLARATION (tokenEligible/tokenRefusal/tokenDeferrable, t1704) through the
         // round-trip — the same allow-list-drop class as widgetConfig/gate/derived above (deriveBindings.js hit this
         // exact bug for its own derivation and was fixed at t1704; this is the SAME fix for the formfield-block
@@ -574,6 +577,12 @@ export function bindingsToBlocks(specs) {
             nstep: wc.step != null ? String(wc.step) : '', units: wc.units || '',
             // t1756 — the reverse half of the token-policy carry-through (see bindingsFromStack's own t1756 note).
             tokenEligible: !!s.tokenEligible, tokenRefusal: s.tokenRefusal || '', tokenDeferrable: !!s.tokenDeferrable,
+            // t1880 — the GREY-gate (`data-gate`, distinct from `when`'s hide/show), same allow-list-drop class as
+            // widgetConfig/derived/writes above — named in bindingsFromStack's own t1756 comment but never actually
+            // wired until formfield-block.spec.js's own lossless round-trip went red the moment a real fixture
+            // (MIDDLE_BINDING_SPECS, this turn's probePort gate) carried a `gate` property. JSON round-trip, same
+            // shape as `when`'s own reconstruction below, robust to the tip string's own punctuation.
+            gate: s.gate ? JSON.stringify(s.gate) : '',
         } };
     });
 }

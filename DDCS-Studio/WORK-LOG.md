@@ -33900,3 +33900,146 @@ real design call, not mine to make silently. No code, no test, no fix this turn 
 own established practice for exactly this shape of surprise.
 
 🔨 turn 1878
+
+## turn 1880 — probePort field gating: SHAPE B shipped, semantic confirmed from primary source, 2 real regressions found and fixed
+
+### Dispatch
+
+RULING: Shape B (a `gate:` property on `port`, mirroring `tapData.js`'s own `_rigidOk`), plus delete the dead
+`CAP_FIELDS.probePort` entry in the same act. CONFIRM THE SEMANTIC FIRST: since `ddcs-v41.js` declares
+`probePort:false` yet V4.1 probing demonstrably works (G31, confirmed live), `probePort:false` cannot mean
+"cannot probe" — establish what it actually means and cite where. If unclear, STOP AGAIN — no gate is better
+than a wrong gate. Then the test: both directions, non-vacuous, identical-caps economy. Gate: node tier + new
+spec + every probe-wizard spec touched.
+
+### The semantic, established from primary source before gating anything
+
+Read each DDCS dialect's own `probeMove` function signature directly (not inferred from names or the CAP_WHY
+prose):
+- `ddcs-expert-m350.js:34`: `probeMove(axis, dist, {feed, port=3, level=0})` → emits `P${port} L${level}`. The
+  port IS a live, per-call G-code word here.
+- `ddcs-v41.js:22`: `probeMove(axis, dist, {feed})` — **no port/level parameter in the signature at all** —
+  emits a FIXED `L#682 Q1 K0`. The controller selects the probe-signal source in firmware (`L#682`, a
+  macro-variable selector); nothing Studio emits could change it even if the field were live.
+- `ddcs-v3-dm500.js:26`: `probeMove` doesn't use G31 at all (`M101` arm / `G91` move / `M102` disarm,
+  move-until-input) — no port concept whatsoever.
+
+So `caps.probePort:false` means: the Port NUMBER is never read by this dialect's own probe-move emit — editing
+it does nothing, silently. NOT "cannot probe" (V4.1/DM500 both probe live, via their own forms). The hazard is
+real either way: an EDITABLE field that quietly does nothing is exactly what postGating.js's own header
+("don't offer a control the controller can't honour") exists to prevent — this confirms the semantic makes
+greying SAFE and CORRECT, not a self-inflicted version of today's bug.
+
+### The fix
+
+`web/wizards/views/userOpView.js`: new `activePostProbePort()` helper (mirrors `activePostOword()`'s own
+shape exactly), `_probePortOk` threaded into `gp` (the live gate-params object, alongside `_oword`/`_rigidOk`).
+Each of the 6 ops' own `port` param declaration (`cornerData.js`, `middleData.js`, `edgeData.js`,
+`alignmentData.js`, `rotaryCenterData.js`, `rotaryClockData.js`) now carries `gate: { param: '_probePortOk',
+is: false, tip: '...' }` — the identical shape `tapData.js:58`'s own `_rigidOk` already uses, wired through the
+SAME existing, already-working consumer (`userOpView.js`'s own `[data-gate]` loop → `formWidgets.js:1193`
+stamps `data-gate` from the binding spec automatically — confirmed by reading, no new wiring needed).
+`postGating.js`'s own dead `CAP_FIELDS.probePort` (15 stale ids) and `CAP_WHY.probePort` are DELETED — leaving
+them would have the file keep claiming to gate probe ports while doing nothing (the advisor's own explicit
+instruction, matching this whole day's "confident-wrong-artifact" theme).
+
+### New test — `tests/probe-port-gate-1880.spec.js`, 3/3 passing, non-vacuous
+
+1. PRIMARY EVIDENCE: Corner's Port field is LIVE (not disabled, no tooltip) under Expert; GREYED with its
+   tooltip reason under V4.1.
+2. All 6 probe ops gate their own Port field under V4.1 — not just Corner (a real cross-op sweep, not asserted
+   from one example).
+3. The vacuity-trap check the dispatch itself named: a DIFFERENT field on the same form (Radius, unrelated to
+   probePort) stays live under V4.1 — proves the gate isn't just greying everything.
+
+**Identical-caps economy, used as instructed**: V4.1 and DM500 declare byte-identical `caps.probePort: false`
+(`ddcs-v41.js:17`, `ddcs-v3-dm500.js:21`, verified side by side) — the suite tests V4.1 as the representative
+case and says why in its own docblock; DM500 is not re-tested live.
+
+**A real test-reliability finding along the way**: a same-page-session profile switch (Expert→V4.1, calling
+`ddcsEditWizardDef` twice) raced the async form re-render — polling `data-op-gated !== undefined` could catch
+the OUTGOING render's already-settled state before the incoming one landed. Fresh `page.goto` per (profile, op)
+check proved 100% reliable in manual testing where same-session switching wasn't; the permanent test uses that
+pattern, documented in its own helper comment so a future edit doesn't reintroduce the flake.
+
+**Non-vacuity, proven by revert/restore**: reverted the `gate:` property on Corner's own `port` binding only,
+re-ran — all 3 tests failed with the EXACT predicted signature (the poll itself times out: "port field never
+settled a gate state" — without any `gate:` property, `data-op-gated` never gets set at all, confirming the
+test's own reliance on it is genuinely tied to the fix). Restored; 3/3 pass again.
+
+### Two real regressions found by the gate, both fixed in the same act (not silently absorbed, not deferred)
+
+**1 — `formfield-block.spec.js`'s own lossless round-trip test.** `bindingsToBlocks`/`bindingsFromStack`
+(`userOps.js`) had a HARD-CODED allow-list of preserved binding keys that never included `gate` — confirmed
+this was a pre-existing, NAMED gap (a comment at `userOps.js:390-394`, predating this turn, literally lists
+"widgetConfig/gate/derived" as the same allow-list-drop bug class already fixed for widgetConfig/derived —
+`gate` was named but never actually wired). My own edit was simply the first thing to exercise it: adding
+`gate:` to a binding this exact test round-trips (`MIDDLE_BINDING_SPECS`). Fixed both directions — `gate:
+s.gate ? JSON.stringify(s.gate) : ''` in `bindingsToBlocks`, `if (p.gate) spec.gate = JSON.parse(p.gate)` in
+`bindingsFromStack` — matching the existing JSON round-trip shape other complex properties use. Re-ran: 4/4
+pass.
+
+**2 — `corner-source-chips.spec.js`'s own ctrl/studio source-lock test.** Traced to a genuine naming COLLISION
+between two independent, both-legitimate gating mechanisms that happen to share the SAME generic attribute:
+`probeSrcGlyph.js` (the controller-register source toggle) sets `data-op-gated` with an EMPTY STRING when
+locked and REMOVES it when unlocked (`probeSrcGlyph.js:39,57`); `userOpView.js`'s own `[data-gate]` processor
+(my NEW mechanism, plus the pre-existing `_rigidOk`/`_oword`) sets it to `'on'`/`'off'` — ALWAYS present once a
+binding carries a `gate:` property, regardless of whether the gate is currently active. The test's own check
+(`hasAttribute('data-op-gated')`, presence-only) was a reliable proxy for "probeSrcGlyph's own lock is active"
+ONLY as long as `port` carried no OTHER gate — which stopped being true the moment my fix landed. Verified
+empirically before touching the test (not assumed): opened the form fresh (full render) — my gate's own value
+('on'/'off') is authoritative; clicked the source-toggle glyph (a narrower, targeted re-decoration) —
+probeSrcGlyph's own empty-string value is authoritative there instead. Fixed the test to check the VALUE
+(`getAttribute('data-op-gated') === ''`) rather than mere presence — precise to the mechanism the test is
+actually about, robust to whichever other gates a field may also carry. Re-ran: 3/3 pass.
+
+### Architecture map maintenance — third and fourth rounds today, same recurring trap family
+
+`npm run test:node` failed twice more this turn, each time on citations my own edits shifted:
+- After the `port` binding edits (6 dataOps files + `userOpView.js`): TRAP1 (`cornerData.js:261→262`) and
+  TRAP9 (`userOpView.js:674→682`).
+- After the `userOps.js` round-trip fix (+9 net lines): INV6 (`884-891→893-900`), INV13 (`1136→1145`), INV14
+  (`956→965`) — plus 8 more prose citations of the SAME shifted lines across `ARCHITECTURE.md` (§ the flow
+  diagram, the 3-facts box, the derived-hooks table row, rules 6/13/14, and the retrospective section) that
+  aren't gate-checked but would have been silently wrong otherwise — updated all of them, each verified against
+  the actual current line content before writing the new number, not computed from the shift alone. Found (and
+  deliberately LEFT alone) 3 more `userOps.js` citations elsewhere in `ARCHITECTURE.md` (674/711/905-912/746)
+  that were ALREADY stale before this turn — confirmed by checking whether their own drift matched my edit's
+  own +2/+9 shift math (it didn't: e.g. `746`'s real drift was +54, meaning something else moved it in an
+  earlier, unrelated turn) — out of scope for a "cover probePort gating" act; not gate-checked either.
+
+### Gate
+
+- New test: 3/3, non-vacuous (proven above).
+- `formfield-block.spec.js`: 4/4 (was 3/4 + 1 real failure my own edit caused, now fixed).
+- `corner-source-chips.spec.js`: 3/3 (was 2/3 + 1 real failure my own edit exposed, now fixed).
+- `npm run test:node`: 118/118 (after 2 rounds of architecture-map fixes this turn — failed twice before those
+  fixes, each root-caused and corrected, not worked around).
+- 122-file symbol-grepped gate (`postGating|userOpView|_probePortOk|_rigidOk|_oword|cornerData.js|middleData.js
+  |edgeData.js|alignmentData.js|rotaryCenterData.js|rotaryClockData.js`) + the new spec, re-run in full after
+  all fixes: **329 passed, 0 failed, 15 skipped.** The first pass of this same gate (before investigating) had
+  found exactly these 2 real failures — investigated both fully (not dismissed as flakes, not blindly re-run
+  hoping they'd pass) — root-caused each to a genuine, traceable mechanism, fixed both, re-verified clean.
+- `handoff.py amendments --role worker`: polled twice (mid-task, none; pre-commit, none). Epoch re-checked
+  (`4`, matches).
+- `proc_health.py watch`: self tree clean throughout, 0 flagged.
+- No personal data touched this turn.
+
+### For the advisor
+
+Shape B shipped exactly as ruled, semantic confirmed from primary source before any gate went live (each
+dialect's own `probeMove` signature, not inference) — V4.1/DM500's `probePort:false` means the port number is
+never read, not that probing fails; greying is safe. `postGating.js`'s dead `probePort` entry is deleted — the
+file no longer claims a mechanism it doesn't run. New suite proves both directions, the vacuity trap you named,
+and the identical-caps economy, all non-vacuous by revert. The gate surfaced 2 REAL regressions, both root-
+caused and fixed in the same act rather than deferred or worked around: a pre-existing, NAMED-but-never-wired
+gap in the Blocks-authoring round-trip (`gate` was listed in a comment as an example of a bug class already
+fixed for other properties, but never actually was — my edit was just the first thing to exercise it), and a
+genuine naming collision between two independent gating mechanisms sharing one generic attribute (fixed by
+making the OTHER test's check precise to its own mechanism, not by weakening either gate). Two more rounds of
+the same recurring architecture-map citation drift, all fixed, plus 3 pre-existing unrelated stale citations
+found and deliberately left alone (out of scope, not gate-checked, drift predates this turn). Full 122-file
+gate + the new spec: 329/344 clean on the second pass, exactly the 2 real, root-caused, and fixed failures on
+the first.
+
+🔨 turn 1880

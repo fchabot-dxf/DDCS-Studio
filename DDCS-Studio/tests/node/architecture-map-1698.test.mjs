@@ -138,7 +138,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP1 Corner view import gone', file: 'web/wizards/views/index.js', line: 20, find: /retired 2026-07-02/ },
     { id: 'TRAP1 Corner opensAs the twin', file: 'web/blocks/wizardLibrary.js', line: 56, find: /opensAs:\s*'user_corner_data'/ },
     { id: 'TRAP1 cornerWizard.js import (cornerData.js:44)', file: 'web/blocks/dataOps/cornerData.js', line: 44, find: /cornerWizard\.js'/ },
-    { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', line: 261, find: /cornerStack\(/ },
+    { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', line: 262, find: /cornerStack\(/ },   // t1880 — shifted from 261 by the probePort gate: property added to the port binding above it
     { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
     { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', line: 233, find: /latheLayoutSpec/ },
     { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 311, find: /_writable/ },
@@ -158,7 +158,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
     { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 706, find: /container\.__layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
-    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 674, find: /renderLayout2D|el\('userVizContainer'\)/ },
+    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 682, find: /renderLayout2D|el\('userVizContainer'\)/ },   // t1880 — shifted from 674 by the _probePortOk gate wiring above it
 ];
 
 test('architecture map ASSERTED: every TRAP citation still holds', () => {
@@ -187,7 +187,7 @@ const INVARIANT_CLAIMS = [
     { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 269, find: /console\.error/ },   // t1846 — shifted from 253 (t1842: 236) by opAtLine's own new framing-exclusion check above it
     { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
     { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
-    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 884, lineEnd: 891, find: /_BASE_DEF_SHAPE|hookKeysOf/ },
+    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 893, lineEnd: 900, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1880 — shifted from 884-891 by the gate round-trip fix above (bindingsToBlocks/bindingsFromStack)
     { id: 'INV7 getTransform folds placement', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
     { id: 'INV7 onTransform relays the same composed value', file: 'web/viz/featureCanvas.js', line: 383, find: /getTransform|onTransform/ },
     { id: 'INV8 fork-parity byte-identity gate exists', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', line: 1, find: /./ },
@@ -196,8 +196,8 @@ const INVARIANT_CLAIMS = [
     { id: 'INV11 UPDATE_PREVIEW_SNAPSHOT rewrites and throws', file: 'DDCS-Studio/tests/node/preview-spec-gate-1688.test.mjs', line: 324, find: /UPDATE_PREVIEW_SNAPSHOT/ },
     { id: 'INV12 tri-state fill: emits !== false', file: 'web/viz/startGlyph.js', line: 20, lineEnd: 24, find: /emits\s*!==\s*false/ },
     { id: 'INV12 pass 0 is manual regardless of source', file: 'web/viz/startGlyph.js', line: 13, find: /pass 0|manual/i },
-    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1136, find: /return null/ },
-    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 956, find: /postInstantiate/ },
+    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1145, find: /return null/ },   // t1880 — shifted from 1136 by the gate round-trip fix above
+    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 965, find: /postInstantiate/ },   // t1880 — shifted from 956 by the gate round-trip fix above
     // no `line`: NEXT-SESSION.md is rewritten wholesale each cycle (advisor-owned, uncommitted mid-edit as this
     // very claim was first checked — a live case, not a hypothetical) — anchored by content, not a position.
     { id: 'INV15 corner is the gated pilot, standing ruling', file: 'NEXT-SESSION.md', find: /Corner is the gated pilot/i },

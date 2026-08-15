@@ -9,16 +9,19 @@ import { resolveActiveCaps, resolveActivePost } from '../wizards/dialects/index.
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
 // Field id → the capability it needs. The field is greyed when the active post lacks that cap.
+// t1880 — probePort REMOVED from here: these 15 ids (c_port/m_port/p_port/al_port/circ_q/rc_q/rcl_q + their
+// level/q siblings) were the OLD built-in wizard's own static field ids — pre-wizards-as-data, zero DOM
+// presence anywhere today (confirmed by grep + by opening all 6 probe wizards live). The corner/middle/edge/
+// alignment/rotaryCenter/rotaryClock twins now gate their own live `port` field with a declared `gate:`
+// property (`_probePortOk`, computed in userOpView.js, mirroring tapData.js's own `_rigidOk`) instead — a
+// mechanism that actually runs on every twin-form render, not just load + settings-change. Leaving the dead
+// entry here would have this file keep CLAIMING to gate probe ports while doing nothing — see WORK-LOG t1878/
+// t1880 for the full trace.
 const CAP_FIELDS = {
-    // The G31 P / L / Q words exist only on a G31-with-port post (DDCS Expert). G38.2 (grbl / LinuxCNC) and
-    // move-until-input (DM500) probe without them, and V4.1 fixes them in firmware — so they're moot there.
-    probePort: ['c_port', 'c_level', 'c_q', 'm_port', 'm_level', 'm_q', 'p_port', 'p_level', 'p_q',
-                'al_port', 'al_level', 'al_q', 'circ_q', 'rc_q', 'rcl_q'],
     // t475 — the WCS dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on other posts.
     wcsSync: ['w_sync', 'w_slave'],
 };
 const CAP_WHY = {
-    probePort: 'probes without a G31 P/L/Q word (G38.2 / move-until-input / fixed in firmware)',
     toolTable: 'no in-program tool table / ATC on this controller (e.g. grbl)',
     atc: 'no pneumatic tool-changer model on this controller — the drawbar/pusher/pocket dance is DDCS-Expert only',
     hmi: 'no in-program operator prompts on this controller',
