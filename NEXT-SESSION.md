@@ -2464,3 +2464,19 @@ same direction as variables-in-custom-wizards + `previewVarSeed`.
 
 ⚠ NOT RULED. Needs a decision on where that value lives (the workspace's machine block, presumably, since one
 `.ddcs` is one machine) and whether a wrong entry is recoverable.
+
+## MULTI-OP CONTINUOUS PLAYBACK — RULED: NOT WANTED  [USER RULING 2026-08-15]
+
+**Their words:** *"so multi op, i dont think i want it, we can let users deal with that themselves."*
+
+**So the engine halting unconditionally on `M30`/`M02`/`M99` is CORRECT BEHAVIOUR, not a limitation.**
+t1874 found that a multi-op Blocks program cannot PLAY past the first op's own `M30` and flagged it as a
+product question. Answered: playback stops at a program terminator, by design. **Closed, not deferred.**
+
+⚠ Do NOT "fix" this later as though it were a bug. A future reader finding the halt will be tempted to make
+playback continue; this entry is why they should not.
+
+**ONE SEPARATE, SMALLER QUESTION — NOT the feature, and NOT ruled:** the halt is currently **SILENT**. A person
+with a two-op program sees playback stop after op 1 with no explanation and reasonably concludes it broke.
+Saying *"stopped — program end (M30)"* is honesty about behaviour the user has now ratified, the same shape as
+t1834's frame note and t1894's ATC refusal. Cheap, and it does not reopen multi-op playback.
