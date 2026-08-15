@@ -34706,3 +34706,158 @@ preview-intent-single-source-714, tooltable-gate-1890, wizard-bar) + the cross-d
 (gcode-dialect-emit-invariants-1870, per the dispatch's own explicit name) + the new spec — 0 failed.
 
 🔨 turn 1894
+
+---
+
+## t1896 — THE FROZEN-TEMPLATE CENSUS. Measure only, no fixes. ONE BROKEN row, confirmed live: homing_data.
+
+Dispatch: census every data-op twin for the t1894 class (a structural dialect branch inside the stack builder,
+paired with a postInstantiate that only patches values). SAFE/BROKEN/UNCLEAR, every row, SAFE included with its
+reason. For BROKEN rows: currently-visible-wrong or coincidentally-correct-today. Plus an opinion (not a build) on
+self-detection. NO CODE.
+
+METHOD: 4 parallel read-only agents covered all 32 data-op-twin files (every `web/blocks/dataOps/*.js` exporting a
+`*Def()`), each tracing the twin → its stack builder → every helper the builder imports, grepping for
+`getDialect`/`resolveActivePost`/`.caps`/`.vars` reads that change which BLOCKS EXIST (not merely a value inside
+an always-present line). 3 files got double coverage (cross-check). I independently verified `atcLengthData.js`/
+`atcCheckData.js`/`atcTableData.js`/`atcWarmupData.js` myself (already read closely in t1890/t1894) rather than
+delegating those 4. The one BROKEN finding was verified LIVE (not trusted from the agent's static read) before
+being written up here — same discipline as t1892/t1894's own "confirm it live" standard.
+
+### THE ONE BROKEN ROW — `homingData.js` / `homingWizard.js` — CONFIRMED LIVE, SAFETY-CRITICAL
+
+`homingWizard.js:157-173`: `const dialect = getDialect(); const expert = dialect.id === 'ddcs-expert-m350'; ...
+if (!expert) { C('Homing macros are UNVERIFIED on ${dialect.name} — Studio will not emit a homing sequence for
+it.'); ...; END(); return S; }` — a genuine, maximal structural fork: non-Expert returns a FLAT array (2 comments
++ endprogram, no wrapper); Expert returns `[{type:'op', opType:'homing', children:S}]` (the full per-axis seek
+sequence). This is exactly the refusal `homingWizard.js` itself was built to enforce — "We do NOT emit a guessed
+homing sequence for V4.1 / DM500" (its own comment, `:166`).
+
+`homingData.js`'s own `applyHomingRecompose` (`:134-162`) is NEITHER a value-patch NOR a full recompose — a THIRD,
+UNSAFE shape: it operates on the FROZEN clone's own stored `op` container (`opBlk = flattenBlocks(stack).find(...
+opType === 'homing')`), calls the builder fresh (`:140`) only to source PER-AXIS-ARM text swaps, and — critically —
+`if (!opBlk || !Array.isArray(opBlk.children)) return stack;` (`:138`) bails out UNCHANGED whenever the container
+shape doesn't match. When the template is frozen under Expert (the app's default boot profile — confirmed this is
+what actually happens: `getActiveProfile()`/registration runs before any of my `setActiveProfile` calls in a fresh
+page load, so EVERY fresh session freezes under Expert regardless of what profile I set afterward) and the LIVE
+dialect is V4.1: `fresh` has no `op` container (the non-Expert flat-array branch), so `freshOp` is `undefined`,
+`fp = partitionArms([])` is empty on all three fields, and the per-axis loop's own `shapeStable` test
+(`sArm && !freshIsSkip && fRoles.every(...)`) is **vacuously true** when `fRoles` is empty — so it pushes every
+STORED (Expert) arm block through **unchanged**, dropping the header/tail from `fp` (both empty).
+
+**CONFIRMED LIVE** (not from the code read alone — driven exactly like t1892/t1894, fresh page + `setActiveProfile
+('ddcs-v41')` + `window.openWiz('user_homing_data')` + read `#wiz_user_code`): the on-screen preview under V4.1
+shows the verbatim Expert homing sequence — `G31 X-320 F600 P#1045 L#1047`, `#880=0 ( X machine coord = 0 home
+datum )`, `#1515=1 ( X homed flag )`, the same for Y/Z with `#1048/#1050/#881/#1516` and `#1051/#1053/#882/#1517`
+— registers that are Expert-specific (V4.1's own DRO lives at `#1500+`, confirmed in `ddcs-v41.js:16`) and mean
+something else entirely, or nothing, on that firmware. NO "UNVERIFIED" refusal text anywhere in the output. This
+is the same severity class as t1868's own G91 machine-safety fix — this one WORSE, because it defeats an explicit,
+already-written safety refusal rather than merely omitting a restore step, and it is reachable via the single most
+ordinary gesture in the whole app: open Homing on a V4.1 machine.
+
+The FLIP direction (template frozen under a non-Expert dialect, then the user switches TO Expert) was reasoned by
+the census agent as "permanently stuck on the refusal text" (`opBlk` never found → `return stack` unchanged at
+`:138`, forever) — I attempted to reproduce this live and did NOT get a stuck refusal (switching to Expert
+correctly showed real Expert content). ⚠ MARKED UNCERTAIN, NOT CONFIRMED: my own reproduction attempt likely
+didn't actually freeze the template under V4.1 in the first place (registration appears to run at a fixed point
+before my `setActiveProfile` calls take effect, matching the "always freezes under the boot-default Expert
+profile" finding above) — meaning MY test didn't isolate the scenario the agent described. Whether a genuine
+V4.1-default user (persisted profile, every fresh load) can get PERMANENTLY stuck on a frozen non-Expert refusal
+is UNRESOLVED — settling it needs tracing exactly when `registerUserOp`/`loadUserOps` runs relative to
+`getActiveProfile()`'s localStorage read, which I did not do (out of the dispatch's "measure, don't chase every
+branch" scope once the SEVERE, confirmed direction was already established). The confirmed direction (A) is
+sufficient on its own to classify this row BROKEN + currently-visible-wrong=YES.
+
+### FULL CENSUS TABLE (32 twins)
+
+| twin | structural dialect branch in builder | postInstantiate | class | if BROKEN: visible today |
+|---|---|---|---|---|
+| alignmentData.js | NO | value-patch | SAFE | — |
+| atcChangeData.js | NO (value-only `dro`, `atcChangeWizard.js:54`) | full recompose | SAFE | — |
+| atcCheckData.js | YES (`hasCurrentTool`, t1894) | full recompose (t1894 fix) | SAFE | — |
+| atcLengthData.js | YES (`hasCurrentTool`, t1894) | full recompose (t1894 fix) | SAFE | — |
+| atcTableData.js | n/a (recompose is settings-driven, not dialect-driven) | full recompose | SAFE | — |
+| atcTestData.js | YES (`atcTestWizard.js:95`, no-ATC-post refusal) | full recompose, fresh-sourced header/arms/tail | SAFE (emit) — Blocks-tab display can still show a stale arm shape (not emit-visible) | — |
+| atcWarmupData.js | NO (no dialect call anywhere in the builder) | n/a | SAFE | — |
+| boreData.js | NO | value-patch | SAFE | — |
+| centerDrillData.js | NO (both arms always emitted; controller picks via `ifgoto`) | value-patch | SAFE | — |
+| commData.js | NO — DELIBERATELY REMOVED (t632: "that build-time bake was the twin freeze") | value-patch | SAFE — the precedent for fixing this class by moving the fork to emit-time atoms | — |
+| contourData.js | NO | value-patch (spindleHeadPatch only) | SAFE | — |
+| cornerData.js | NO | value-patch (4-fn chain) | SAFE | — |
+| drillData.js | NO | value-patch (spindleHeadPatch) | SAFE | — |
+| edgeData.js | NO | value-patch (applyProbeSources) | SAFE | — |
+| faceProbeData.js | NO | full recompose | SAFE | — |
+| facingData.js | NO (dialect); `finish` is a structural PARAM branch, unbound, no hook — a DIFFERENT (param-freeze) class, out of scope, flagged not investigated | none | SAFE for the dialect class | — |
+| **homingData.js** | **YES (`homingWizard.js:157-173`)** | **stored-stack value-swap that bails out on container mismatch — neither value-patch nor full recompose** | **BROKEN** | **YES — CONFIRMED LIVE (Direction A); Direction B uncertain, not reproduced** |
+| ioStepData.js | NO (comments only; dialect resolved in the `waitinput` atom's own emit) | value-patch (re-reads live I/O settings) | SAFE | — |
+| middleData.js | NO; `safeZMarginNeg()`/unbound params freeze at build (settings/param class, out of scope) | none | SAFE for the dialect class | — |
+| odProbeData.js | NO | full recompose | SAFE | — |
+| odTurnData.js | NO | full recompose (added for the analogous PARAM-structural class, t1293) | SAFE | — |
+| partingData.js | NO | value/text patch | SAFE | — |
+| pauseConfirmData.js | NO (no external builder; the HMI fork is an atom-emit fork, `ops/hmi.js:108`) | none | SAFE | — |
+| pocketData.js | NO | value-patch (+ guard/prune machinery for its param forks) | SAFE | — |
+| polygonData.js | NO | full recompose (added for the analogous PARAM-structural class) | SAFE | — |
+| rotaryCenterData.js | NO | value-patch (3-fn chain, re-reads live probe sources) | SAFE | — |
+| rotaryClockData.js | NO | value-patch (3-fn chain) | SAFE | — |
+| slotData.js | NO | value-patch (whole-params rewrite of one atom) | SAFE | — |
+| surfacingData.js | NO (the one structural fork, `zMode==='skim'`, is a PARAM, explicitly hand-mirrored by `applySkimStructure`) | param-structure patch | SAFE | — |
+| tapData.js | NO | none | SAFE | — |
+| textData.js | NO ("dialect-agnostic" by the file's own header) | none | SAFE | — |
+| wcsData.js | NO — the dialect fork lives in the `wcszero` ATOM's own `emit(p,dx,dy,dialect)`, re-resolved every render | none | SAFE — the textbook case this bug class cannot touch | — |
+
+**Zero UNCLEAR rows** — every builder's full import closure was read to a leaf; the "would need a live check to
+settle" language only ever applied to a display-only (not emit) residue (`atcTestData.js`'s Blocks-tab), not to a
+classification itself.
+
+### WORTH CARRYING FORWARD, NOT THIS TURN'S SCOPE
+
+1. **5 rows are SAFE only because nothing currently branches, not because anything PREVENTS a future branch from
+   going unnoticed** (`partingData.js`, `pocketData.js`, `rotaryCenterData.js`, `rotaryClockData.js`,
+   `slotData.js` — flagged explicitly by the Group C agent): their postInstantiate hooks are value-patches: if a
+   future edit ever moves a per-post decision from an atom's `emit` up into one of these builders (as almost
+   happened here, and as `homingWizard.js` and `atcTestWizard.js` already do), it would silently become BROKEN
+   with no test catching it, the same way `homingData.js` did. Only `odTurnData.js`/`polygonData.js`/
+   `faceProbeData.js`/`odProbeData.js` (full recompose) and `commData.js`/`wcsData.js` (fork moved to emit-time
+   entirely) are structurally future-proof against this specific class.
+2. **`atcChangeWizard.js:54`'s `dro` value-freeze** is neutralised only because `atcChangeData.js` happens to do a
+   full recompose for an UNRELATED reason (the `inlineTnc`/static-arm merge). If that recompose were ever narrowed
+   to a value-patch, V4.1/DM500 would start receiving Expert's `#880` register in the manual-arm save lines.
+3. **`facingData.js`'s `finish` and `middleData.js`'s `safeZMarginNeg()`/unbound params** are a DIFFERENT class —
+   frozen at build time by PARAM/SETTINGS value, not by dialect — named because they surfaced during the same
+   read, not investigated further (out of this census's own declared scope).
+
+### THE DESIGN QUESTION — could the frozen-template model detect this itself? OPINION, NOT BUILT.
+
+**Feasible, and cheap, at TEST time — not as a runtime production check.** The reason this class went undetected
+for as long as it did is now clear from reading the EXISTING per-op "byte-identical" specs (`atc-length-in-place
+.spec.js` and its siblings): every one of them compares the twin against the raw builder for exactly TWO cases —
+"studio" (no post override) and "Expert" (stubbed resolver) — and NEVER actually cycles the ACTIVE POST through
+V4.1/DM500/the rest of the registry. That blind spot is mechanical and closeable: widen each such spec's own loop
+from 2 cases to the FULL dialect registry (`wizards/dialects/index.js`'s own `DIALECTS`/`listPosts()`), asserting
+`emitMapped(builderOf(opType)(p), {dialect}).text === emitMapped(rawBuilder(p), {dialect}).text` for every
+registered dialect, not just two. This is a pure widening of an ALREADY-PROVEN, ALREADY-SHIPPED pattern — no new
+mechanism, and it is exactly the check that would have caught `homingData.js` immediately (the two texts diverge
+completely under V4.1). A STANDING, GENERIC version (one test, not 32 hand-written copies) is also feasible but
+needs one new piece of infrastructure that doesn't exist yet: a declared `{opType: rawBuilder}` registry (today
+the mapping only exists implicitly, per-file, in each spec's own import) — cheap to build, a straightforward
+declare-not-infer addition, not attempted here per "no code."
+
+**A RUNTIME self-check (refuse to freeze / fail loud at registration time) is a different, heavier question and I
+would NOT reach for it first.** It would need EITHER (a) static source analysis of the builder function for
+dialect-reading calls — brittle, easy to both false-positive (a dialect read that's genuinely value-only, like
+`atcChangeWizard.js`'s own `dro`) and false-negative (a dialect read reached through a helper two calls deep) — or
+(b) calling the builder once per registered dialect at registration time and diffing STRUCTURAL SHAPE (block-type
+sequence, ignoring values) across them, which is accurate but adds real cost to every app boot for every twin,
+forever, to catch a class that a TEST can catch once, for free, before it ships. My opinion: build (b)'s DIFF
+LOGIC once, but run it as a **node-tier test assertion**, not a boot-time cost — call `registerUserOp`'s target
+builder under every dialect at TEST time, assert the shapes agree OR that `postInstantiate` is present and (via
+the widened byte-identical sweep above) actually reconciles the divergence. That gets the systemic "a class that
+can only be found by censusing will come back" guarantee the dispatch is asking for, without a standing runtime
+tax. Where it would live: a new `tests/node/frozen-template-completeness-XXXX.test.mjs`, generic across the whole
+op registry, not per-op — this is a build I'd recommend for a future act, not something to attempt inside a
+measure-only census.
+
+Gate: node tier 118/118 (no code changed this turn — the ONE live verification used disposable, uncommitted spec
+files, deleted after; `git status --short` confirmed clean before this WORK-LOG-only commit).
+
+🔨 turn 1896
