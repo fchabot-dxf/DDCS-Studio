@@ -33293,3 +33293,113 @@ Given you said the user's been told not to run a V4.1 corner probe until this is
 your review and release.
 
 🔨 turn 1868
+
+## turn 1870 — THE STANDING CROSS-DIALECT EMIT SUITE (t1868's fix released as V2026.08.14.7, 0 failed)
+
+Advisor released the G91-restore fix (V2026.08.14.7, full suite 0 failed, the user cleared to run a V4.1 corner
+probe again). Dispatched to generalize `gcode-v41-modal-restore-1868.spec.js` from one traced defect into a
+STANDING gate: every probe op that shares the dialect-level `setWorkOffset`/`wcsWriteIndirect` atoms, across all
+three DDCS dialects, asserting INVARIANTS (not golden transcripts). Ruled on the design question from t1868:
+DEDICATED emit-only suite, as I'd argued and the advisor leaned independently — my own cost evidence (5 tests,
+5.2s, no DOM/canvas) settled it against tripling a 20-minute gate forever.
+
+### Scope — read the actual wizard code, not assumed
+
+`grep -rl "mkWcsWrite|mkSWO|wcsWriteBlock|setWorkOffsetBlock" web/wizards/stacks/` finds exactly 5: corner, edge,
+middle, rotaryCenter, rotaryClock. The advisor named two more ("bore", "alignment") to check — neither belongs:
+- **"bore"** (`user_bore_data` / `boreData.js`) — its own `BORE_DATA_OPTYPE` constant is referenced NOWHERE
+  outside its own file: no entry in `opBuilders.js`'s `BUILDER_REG`, no entry in `userOps.js`'s registry. An
+  ORPHANED data-op definition, not reachable via `getUserDef`/`builderOf` in the live app. "middle" is the live
+  bore-CENTRE probe (already covered) — almost certainly what was meant informally.
+- **"alignment"** (`alignmentWizard.js`) IS live and wired (`opBuilders.js`'s `alignment: alignmentStack`), but
+  contains zero references to `setWorkOffset`/`wcsWrite`/`G92`/`G90` (grepped directly, confirmed empty) — its
+  own correction path is the measured-rotation one (deferred, see alignment-real-correction memory), not a WCS
+  datum write. This defect class doesn't apply to it. Not a suite gap.
+
+### The invariants (see the new file's own header for the full design rationale)
+
+- **A — distance mode is decided, never silently leaked, before the next move.** Walks FORWARD from every
+  `G90 G92 <axis>[...]` datum write to the first thing that actually matters: an explicit G90/G91 re-declaration
+  (a conscious choice, pass regardless of which mode) or a real non-G53 motion line (a leak). NOT the naive
+  "is the very next line G91" check t1868's own throwaway sweep used — re-verified that heuristic still produces
+  false positives on edge/middle's other calls/rotaryCenter/rotaryClock, all of which legitimately re-declare a
+  mode (often another G90) before anything moves. G53 lines exempt (machine-frame, absolute by design, t858).
+- **B — structural form** (folded into A's own test, same page load): every non-Expert datum write matches
+  `G90 G92 <AXIS>[...]`, nothing divergent.
+- **C — CONTROL, kept as its own separate claim** (t1868 amendment: must never collapse with "no G92 line"):
+  Expert never touches distance mode at all, checked two ways — no G92 anywhere in any of the 5 probe ops' full
+  programs, AND `dialect.setWorkOffset`/`wcsWriteIndirect` called DIRECTLY never return a G90/G91 line.
+
+**"No modal state is left set that a following line depends on"** (the advisor's own 2nd bullet) — read all 3
+dialects' `setWorkOffset`/`wcsWriteIndirect` source: none touches any OTHER modal register (plane G17-19, units
+G20/G21, WCS selection G54-59) — only G90/G91 is ever at risk from this atom family. Stated as a documented
+non-finding in the suite's own header rather than building a generic modal-register scanner with nothing real to
+catch — declaring speculative machinery over a documented non-finding would be backwards.
+
+### Non-vacuity — proven by revert/restore, HONEST result (not the blanket story)
+
+Backed up the fixed `cornerWizard.js`/`middleWizard.js` to scratch, stripped `restore:'inc'` from the 3 mkWcsWrite
+call sites I added in t1868 (left `safeRetractNode({restore:'inc'})`'s own PRE-EXISTING calls untouched — those
+predate t1868, unrelated), re-ran the suite:
+- **Invariant A went RED exactly where predicted**: corner, BOTH non-Expert dialects, all 3 call sites (Z-surface
+  at `probeZFirst:true`, Y-wall, X-wall) — each leak identified at the exact motion line (`G0 Z#19`, `G0 Y#9`,
+  `G0 X#9`), matching t1866's own original finding precisely.
+- **Everything else stayed GREEN, including middle's Z-write** — an HONEST finding, not glossed over: middle's
+  own Z-surface-write restore (added "defensively" in t1868, never step-trail-verified) turns out to be a TRUE
+  NO-OP for this invariant. `safeZframe.wrapMachineFrame`'s own G53 wrap already force-declares G90
+  unconditionally before its own G53 retract regardless of ambient mode, and nothing relative executes between
+  the datum write and that forced re-declaration (the "reposition" between them is an operator manual jog — no
+  G-code motion at all). The leaked G90 is swallowed before any move could misread it, with or without the
+  t1868 restore. Left in place (harmless, out of scope to remove this turn) — reported honestly rather than kept
+  as if it were load-bearing.
+- The drawing test also reproduced the exact original regression (-48) when reverted.
+- Restored from the scratch backups; `git diff --stat` on both files came back EMPTY — confirms the restore
+  matches the committed t1868 fix byte-for-byte, no residue.
+
+### The suite: 4 tests, 3.6s
+
+`tests/gcode-dialect-emit-invariants-1870.spec.js` — one page load for the whole (dialect × op) matrix (10
+combos) rather than 10 separate boots, for speed; failures still come back individually legible via a JSON
+aggregate. Replaces `gcode-v41-modal-restore-1868.spec.js` (deleted — fully subsumed, not left as a duplicate).
+Params overrides (`probeZFirst:true` for corner, `probeZ:true` for middle) route to the branch containing every
+fixed call site, not just whatever the bare defaults happen to reach — verified per-op by reading the actual
+gated branch flag, not assumed.
+
+### Gate
+
+- `npm run test:node`: 118/118.
+- New suite: 4/4, non-vacuous as above.
+- Wizard-scoped gate (86 files, `grep -l` on `wcsIndirect|setworkoffset|cornerWizard|middleWizard|edgeWizard|
+  rotaryCenterWizard|rotaryClockWizard`, `--workers=4`, proportionate to what the temporary revert/restore
+  touched — the dispatch's own gate line was narrower still, "node tier + the new suite + the specs you touch"):
+  **213 passed, 9 failed, 3 skipped.** Investigated rather than dismissed, per this session's own established
+  discipline — and hit the session's own well-documented cwd-drift bug along the way: a bare re-run without an
+  explicit `cd` silently landed back at the repo root (`npm ls`/`ls package.json` confirmed it directly), which
+  produces the KNOWN spurious "Playwright Test did not expect test.use()" collection error the
+  `playwright-stale-cache-testuse-error` memory explicitly warns can MASK real failures if mistaken for a flake —
+  did not fall for it: fixed cwd (chained `cd`+verify+`npx` in ONE command, confirmed `node_modules/@playwright`
+  present before running), cleared the transform cache, re-ran **all 12 sub-tests across the 9 failing spec names
+  at `--workers=1`: 12/12 passed.** Source for both touched wizard files is BYTE-IDENTICAL to HEAD (confirmed via
+  the empty `git diff --stat` above) — a genuine regression from this turn's own net-zero source diff was never
+  plausible, and the isolated clean run confirms it: the original 9 were load-contention flakes under
+  `--workers=4` against a single dev server, matching this session's own repeatedly-documented pattern for
+  exactly this symptom.
+- `handoff.py amendments --role worker`: polled twice (mid-task, none; pre-commit, none). Epoch re-checked (`4`).
+- `proc_health.py watch`: self tree clean throughout (9-12 procs depending on point-in-time, 0 flagged).
+- No personal data touched this turn.
+
+### For the advisor
+
+The standing suite is in: `tests/gcode-dialect-emit-invariants-1870.spec.js`, 4 tests / 3.6s, covering all 5
+dialect-sensitive probe ops × all 3 DDCS dialects with invariants proven non-vacuous by revert (and one honest
+non-finding: middle's Z-write restore is harmless-but-unneeded, left in place). "bore" doesn't exist as a live
+op (orphaned data-op, `boreData.js` unwired) and "alignment" doesn't touch this atom family at all — neither is
+a suite gap, both verified by reading, not assumed. `gcode-v41-modal-restore-1868.spec.js` is deleted, fully
+folded in. Gate: node 118/118, new suite 4/4 non-vacuous, wizard-scoped 213+12/225 clean once 9 load-contention
+flakes were isolated and confirmed (not dismissed on the say-so — re-verified per the suite's own established
+discipline, and caught + worked around the session's own known cwd-drift trap along the way rather than shipping
+a false "still failing" or a false "must be fine"). Design-call answer from t1868 confirmed correct by your own
+independent lean. Only source change this turn: the new test file (+ deletion of the old one) — no wizard/atom
+source touched net (the revert/restore for non-vacuity proof left both files byte-identical to HEAD).
+
+🔨 turn 1870
