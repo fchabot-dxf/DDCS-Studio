@@ -184,7 +184,7 @@ const INVARIANT_CLAIMS = [
     { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', line: 78, find: /mouth/ },
     { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', line: 40, find: /./ },
     { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', line: 265, find: /./ },
-    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 407, find: /console\.error/ },   // t1928 — shifted from 388 by +19 (the flattenOps declared-enumeration insert)
+    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 438, find: /console\.error/ },   // t1940 — shifted from 407 by +31 (the addOperation declared-mechanism insert)
     { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
     { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
     { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 893, lineEnd: 900, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1880 — shifted from 884-891 by the gate round-trip fix above (bindingsToBlocks/bindingsFromStack)

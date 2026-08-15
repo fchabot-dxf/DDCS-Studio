@@ -43,7 +43,7 @@ export async function loadProject(obj) {
     const name = obj.name || 'this program';
     const proceed = await confirmDestructiveLoad(obj.stack, {
         what: name, label: 'before open',
-        message: `Opening "${name}" replaces your current operation — it's saved to Undo, or Cancel to keep it.`,
+        message: `Opening "${name}" replaces your current program — it's saved to Undo, or Cancel to keep it.`,
         title: 'Open this program?', okLabel: 'Open (replace)',
     });
     if (!proceed) return null;

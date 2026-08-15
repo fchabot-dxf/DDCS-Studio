@@ -165,7 +165,7 @@ export class EditorManager {
     async clearCode() {
         const proceed = await confirmDestructiveLoad([], {
             what: 'a blank canvas', label: 'before clear',
-            message: `Clearing replaces your current operation with a blank canvas — it's saved to Undo, or Cancel to keep it.`,
+            message: `Clearing replaces your current program with a blank canvas — it's saved to Undo, or Cancel to keep it.`,
             title: 'Clear the canvas?', okLabel: 'Clear',
         });
         if (!proceed) return;

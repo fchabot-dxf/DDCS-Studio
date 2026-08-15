@@ -37101,3 +37101,103 @@ Files: `saveStates.js`, `programFile.js` (production, 2), `commandDeck.js`, `edi
 Wizard-bar Insert (`wizardManager.js:512`) untouched, per the dispatch's own instruction.
 
 🔨 turn 1938
+
+
+## 🔨 turn 1940 — WORDING FIX, THEN THE ADD MECHANISM (data level, no UI)
+
+### Part 1 — the wording defect, fixed first
+
+All three of t1938's own new dialogs said "replaces your current OPERATION" while `programFile.js`'s own title
+already said "Open this PROGRAM?" — two words for one thing in a single dialog, and factually wrong besides:
+importing a face+drill+bore job replaces the whole PROGRAM (several operations), not one. Fixed all three
+(`commandDeck.js`, `programFile.js`, `editorManager.js`) to say "program," matching what the seam's own default
+string (`saveStates.js`) already correctly said — checked, confirmed already correct, not touched. No test
+asserted the exact old wording (checked via grep before and after), so this was a pure content fix, no test
+fallout. `npm run test:node`: 118/118 after.
+
+### Part 2 — `addOperation`, data level only, no UI
+
+### (1) Declared, reusing rather than duplicating
+
+`groupConsecutiveOps` and `collapseImportTerminators` (both private, `programModel.js`) exported as instructed.
+`addOperation(program, incomingBare)` composes them: `program` is the CURRENT full program array (as
+`ddcsGetBlockProgram()` actually returns it — `[progstart, op, progend]` for today's overwhelmingly common
+single-op canvas); `incomingBare` is the new operation's own bare record (no progstart/progend of its own,
+matching `commitActiveOp`'s own `bare` local). The incoming op is spliced in immediately before the program's
+own trailing terminator (checking for EITHER `progend` — the live/builder-constructed framing type — or
+`endprogram` — the decoded/import-leaf type, since these are two genuinely different vocabularies for the same
+concept, confirmed by tracing `programFraming.js` vs `gcodeToStack.js:166`, not assumed identical), so the two
+operations land ADJACENT — `groupConsecutiveOps` only wraps a CONSECUTIVE run, exactly the interstitial-
+terminator lesson t1920 already learned for import, now applied to the opposite direction (splicing INTO an
+already-framed program rather than parsing one from text).
+
+### (2) The symmetric rule — already satisfied by reuse, not a new rule
+
+`groupConsecutiveOps`'s own existing behavior ("a run of length 1 is returned unwrapped") already IS the
+symmetric rule for both directions — `addOperation` doesn't encode "wrap iff count≥2" itself, it just always
+re-runs the same grouping decision over whatever operations end up adjacent. A future delete-to-one path
+reuses the identical exported function rather than hand-rolling a mirror-image collapse — proven directly:
+`groupConsecutiveOps([oneOp])` returns the op unwrapped, no `multi_step` introduced for a lone operation.
+
+### (3) The equivalence bridge — found and fixed a real bug in the TEST, not in `addOperation`
+
+Wrote the bridge test per the dispatch's own instruction, then debugged a genuine mismatch rather than accept
+or paper over it. Traced empirically (not by re-reasoning from memory): `addOperation`'s own direct output was
+ALREADY correct (verified via a throwaway debug spec printing its raw shape and full emitted text) — the bug
+was in the TEST'S OWN reference construction. `multi-op-import-1916.spec.js`'s own "load `[A,B]` as bare
+siblings, export once, reimport" pattern — the one the dispatch pointed at — omits progstart/progend entirely
+in ITS OWN fixture, which works there only because ITS 2nd op (corner) self-terminates; concatenating two
+INDEPENDENT single-op exports (each carrying its own full progstart+progend, mirroring t1928's OWN fixture
+pattern for a DIFFERENT purpose) is a third, not-byte-clean shape — found live, printed, confirmed, ruled out.
+Fixed by building the reference on the SAME framed footing as `addOperation`'s own real calling context
+(`programA`'s own progstart/progend, not omitted). The two remaining differences after that fix were BOTH pure
+comment-text formatting (progstart/progend decoded-vs-live wording) — the exact class
+`multi-op-import-1916.spec.js`'s own `codeOnly()` helper already exists for; reused verbatim, and named
+explicitly in the test's own comment as a judgment call, not silently applied. Byte-identical CODE confirmed
+between `addOperation`'s output and the proven import path for the same drill+surfacing pair.
+
+### (4) What the user gets
+
+Same test proves, live: `flattenOps` sees both operations after `addOperation` (no separate wiring needed —
+they share the shape, so t1928's own fix already covers this for free), each carries its own declared
+`toolNum`, the per-op time split is positive for both and sums to ~all the move time, and both bodies
+(`DRILL`/`SURFACING` signature comments) are present in the emitted G-code — not silently dropped.
+
+### (5) Stop condition — checked, held
+
+The single-operation program (the common case) never calls `addOperation` at all; asserted directly (reloading
+an unchanged single-op program is byte-identical) and confirmed by the unmoved node-tier byte-identical-emit
+suite (118/118) — `addOperation` touches no emit-path file.
+
+### Non-vacuity, twice
+
+Reverted `addOperation` to a deliberately naive version (plain concatenation, no insertion-point search) —
+2 of 4 tests correctly failed (the bridge and the "what the user gets" test; the symmetric-rule and stop-
+condition tests correctly stayed green, since they don't exercise the insertion logic). Restored from a
+scratch backup, re-verified all 4 green. The earlier back-and-forth fixing the TEST's own reference
+construction is itself a second, more organic form of the same discipline — the test caught a real
+discrepancy three times before landing on the correct comparison, never smoothed over.
+
+### The one unverified edge case, named not asserted
+
+A self-terminating incoming operation (corner-style, carrying its own internal `endprogram` leaf nested in its
+own children) is NOT proven this turn — `collapseImportTerminators`'s own recursive `stripEndprogram` search
+should correctly dedupe it against nothing extra (the program's own outer terminator is a different type,
+`progend`, that function was never asked to touch), but this reasoning wasn't run against a live self-
+terminating op this turn, given time budget. Named in the function's own doc comment, not silently assumed.
+
+### Architecture-map upkeep
+
+`addOperation`'s own insert (30 lines) shifted INV3's `console.error` guard again: 407→438 (+31). Updated both
+the machine-checked test-file entry and the two `ARCHITECTURE.md` prose citations, with `t1940 — shifted from
+X by Y` notes. Re-ran clean.
+
+### Gate
+
+`npm run test:node`: 118/118. New specs: `add-operation-1940.spec.js` 4/4. The 4 t1928 features by name, plus
+`destructive-load-doors-1938.spec.js` (re-verified since this turn's wording fix touched 3 of its own guarded
+files): 28/28 total. `architecture-map-1698.test.mjs` clean. `proc_health.py watch` clean. No full suite — the
+advisor's own release gate. No UI touched: no dialog, no third button, no wizard-bar change —
+`wizardManager.js:512` untouched. No slice 2 of the rename.
+
+🔨 turn 1940

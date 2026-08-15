@@ -240,7 +240,7 @@ function stripEndprogram(node) {
 
 /** Collapse to a SINGLE program terminator across the imported items — keeping only the LAST `endprogram` seen
  *  (progend's own, since it is physically last in a well-formed export) and re-appending it at the very end. */
-function collapseImportTerminators(items) {
+export function collapseImportTerminators(items) {
     const { cleaned, end } = stripEndprogram(items);
     if (end) cleaned.push(end);
     return cleaned;
@@ -254,7 +254,7 @@ function collapseImportTerminators(items) {
 // (blockEmitter.js:224-228), so nesting costs nothing at emit time: byte-identical G-code, proven in
 // multi-op-import-1916.spec.js. A run of length 1 is returned unwrapped — byte-identical to today for the
 // (overwhelmingly common) single-op import, no new wrapper introduced where none is needed.
-function groupConsecutiveOps(items) {
+export function groupConsecutiveOps(items) {
     const out = [];
     let run = [];
     const flush = () => {
@@ -267,6 +267,37 @@ function groupConsecutiveOps(items) {
     }
     flush();
     return out;
+}
+
+/** t1940 — DATA-LEVEL ONLY: grow a program by one more operation (the mechanism under the human's own
+ *  Add-to-program ruling; no UI this turn — the wizard-bar Insert door stays untouched and wires onto this next).
+ *  Promote-on-2nd (Option A, t1934's own recommendation): a program holding one bare op becomes a `multi_step`
+ *  wrapper holding both; a program that already holds a wrapper appends into it. Reuses `groupConsecutiveOps` +
+ *  `collapseImportTerminators` VERBATIM — the SAME pipeline `importMarkedNc` already trusts for exactly this
+ *  "several operations, one shared program frame" composition (t1916/t1920), not a second one built to match it.
+ *  This is also the symmetric-rule promise from t1934: the SAME `groupConsecutiveOps` decides wrapping in both
+ *  directions (a run of 1 stays unwrapped, a run of 2+ wraps) — a future delete-down-to-one path re-runs this
+ *  same function over what remains rather than hand-rolling its own mirror-image collapse rule.
+ *
+ *  `program` is the CURRENT full program array (`[progstart, …, progend]`); `incomingBare` is the new operation's
+ *  own BARE record — no progstart/progend of its own (matching `commitActiveOp`'s own `bare` local: `framed`
+ *  with any outer progstart/progend filtered out). Inserted immediately before the program's own trailing
+ *  `progend`/`endprogram` (whichever framing style it carries), so the two operations land ADJACENT —
+ *  `groupConsecutiveOps` only wraps a CONSECUTIVE run, and an unstripped sibling terminator sitting between them
+ *  would break that the same way an unmerged pair breaks `importMarkedNc` (t1920's own interstitial-terminator
+ *  finding). `collapseImportTerminators`'s own recursive search (into every block's `children`, at any depth)
+ *  then still correctly dedupes an INCOMING self-terminating operation's own internal `endprogram` leaf against
+ *  nothing extra here, since the program's own outer terminator is the STRUCTURAL `progend` type, a different
+ *  vocabulary `stripEndprogram` was never asked to touch — verified for the ordinary (non-self-terminating) case
+ *  this turn; a self-terminating incoming operation (corner-style) is NOT proven here, named as unverified in
+ *  WORK-LOG rather than asserted. */
+export function addOperation(program, incomingBare) {
+    const prog = program || [];
+    const isEnd = (b) => b && (b.type === 'progend' || b.type === 'endprogram');
+    let idx = -1;
+    for (let i = prog.length - 1; i >= 0; i--) { if (isEnd(prog[i])) { idx = i; break; } }
+    const items = idx >= 0 ? [...prog.slice(0, idx), incomingBare, ...prog.slice(idx)] : [...prog, incomingBare];
+    return collapseImportTerminators(groupConsecutiveOps(items));
 }
 
 /** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
@@ -440,6 +471,7 @@ export function initProgramModel() {
     window.ddcsAutoGroupRunAtLine = (i) => (editorMatchesProjection() ? autoGroupRunAtLine(i) : null);   // AUTO: pure stack auto-shows the chip
     window.ddcsLinesForOp = linesForOp;
     window.ddcsFlattenOps = flattenOps;   // t1928 — every real operation, one level through a multi_step import wrapper
+    window.ddcsAddOperation = addOperation;   // t1940 — DATA-LEVEL ONLY: grow a program by one operation; no UI calls this yet
     window.ddcsLinesForRun = linesForRun;   // AUTO chip highlight (a loose run's lines)
     window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
     window.ddcsSerializeWithMarkers = serializeWithMarkers;   // .nc text + self-describing op markers (export only; editor stays clean)

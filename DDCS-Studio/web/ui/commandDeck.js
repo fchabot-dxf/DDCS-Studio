@@ -150,7 +150,7 @@ window.loadGcodeFile = function loadGcodeFile() {
                             const { confirmDestructiveLoad } = await import('../blocks/saveStates.js');
                             const proceed = await confirmDestructiveLoad(stack, {
                                 what: f.name, label: 'before open',
-                                message: `Loading "${f.name}" replaces your current operation — it's saved to Undo, or Cancel to keep it.`,
+                                message: `Loading "${f.name}" replaces your current program — it's saved to Undo, or Cancel to keep it.`,
                                 title: 'Load this file?', okLabel: 'Load (replace)',
                             });
                             if (!proceed) return;
