@@ -36518,3 +36518,134 @@ t1920: 28/28. `proc_health.py watch` clean. Files touched: `programModel.js`, `s
 instruction.
 
 🔨 turn 1928
+
+
+## 🔨 turn 1930 — STEP 3 PLAN ONLY: the destructive-load notice, surfaced not shipped
+
+### Dispatch
+A written plan, gated before a line of product code — step 3 is the first act in this arc that DESTROYS the
+user's work (insert REPLACES the canvas; the user ruled it needs a refusable notice BEFORE the destruction).
+Read-only greps + one docs commit only; the advisor's own full-suite release gate is running on `535fb4b6` for
+this turn's duration, so no Playwright run here (a second concurrent suite manufactures mass timeout reds —
+this session's own "serialize gate and worker suites" discipline). Five deliverables, detailed below. No fix
+designed for deliverable 5's own fork — that's the advisor's own hand-off to the human.
+
+### (1) Every entry point that can replace the canvas — file:line, and the ONE seam some already route through
+
+Traced exhaustively: `window.ddcsLoadBlockStack(` is the ONLY function that reaches `programModel.js`'s
+`setStack(next, 'load')` from outside the model itself (checked `setStack(`'s own 6 direct callers too — all
+either the user's own live edit being reflected back, `blocksApp.js:795/821`, `programModel.js:425`, or the
+undo/redo safety net itself, `saveStates.js:38` — none are a foreign replace). Every `ddcsLoadBlockStack(` call
+site in `web/` (20 total), read in context and classified:
+
+**Genuinely destructive — replaces the canvas with something ELSE, discarding whatever was there:**
+
+| Door | File:line | Guarded today? |
+|---|---|---|
+| Wizard-bar Insert (fresh, not editing) | `wizardManager.js:512` (`commitActiveOp`/`commitDecodedCode` → `opSession.js:501` `loadOpAsProgram`) | **NO** |
+| Load `.nc` file (marker-aware import) | `ui/commandDeck.js:148` | **NO** |
+| Open a saved `.mjson` program | `blocks/programFile.js:38` (`loadProject`) — 3 UI callers: `ui/libraryModal.js:123` (library shelf), `ui/projects/projectModal.js:112` (local drawer), `ui/projects/projectModal.js:213` (Google Drive) | **NO** (all 3) |
+| "Customize as blocks" / re-author a wizard def | `blocks/devMode.js:567` (`editWizardDefs`), `:590` (`editWizardDef`) | **YES** |
+| Editor toolbar "Clear" | `ui/editorManager.js:165` (`clearCode`) | **NO** |
+
+**The ONE declared seam already exists** — `blocks/saveStates.js:66`, `confirmDestructiveLoad(incoming, opts)`
+(built at S4-1, currently wired only to the two `devMode.js` sites). It already does everything deliverable
+(2)-(4) below ask for, for the ONE door that uses it: checks whether the incoming stack would actually change a
+non-empty program (`willReplace`), snapshots to Undo history before replacing, shows a confirm naming what's
+opened, and returns a boolean the caller gates its own `ddcsLoadBlockStack` call on — so Cancel leaves the
+caller's surface untouched by construction, not by convention.
+
+**Step 3's real job, stated plainly, is NOT "design a new notice" — it's "route the other 4 unguarded doors
+through `confirmDestructiveLoad`, the same seam `devMode.js` already proved out."** A hand-rolled confirm at
+each of the 4 remaining doors would be exactly the four-patches shape t1928 just deleted for the enumeration
+question; this is the same question asked of the write side.
+
+**In-place edits of the CURRENT op/program — correctly need no notice, not part of the hazard** (for
+completeness, so nothing reads as an oversight): `opSession.js`'s `replaceOp`/`deleteOp`/`duplicateOp`/
+`groupLooseAtoms`/`setGroupChildParams` (534/544/559/600/622 — all rebuild or prune the SAME program the user
+is already looking at, nothing foreign introduced), `editorOpHover.js:67` (clear the rotation badge — drops one
+declared modifier), `globalFunctions.js:195,386` (the xform/PlaceOnStock program-level declarations — same
+program, re-declared), `blocksApp.js:271` (the Blocks-tab suggestion chip — adds one atom to the currently-open
+stack, not a new operation), `blocksApp.js:795,821` and `programModel.js:425` (the editor⇄Blockly⇄model sync
+echoes — reflecting the user's OWN just-made edit back, not replacing it with something else).
+
+**Checked and does NOT apply:** CAM (the slot-pack builder) never calls `ddcsLoadBlockStack` anywhere in
+`data/` — it owns a wholly separate `ddcs_campack` structure and only ever READS a placed op to seed a slot,
+never writes into the canvas program. "Pull from controller" (the gateway import) writes into settings/WCS
+tables, not the canvas program — also outside this hazard. `blocksApp.js:1095`'s exposed `api.load` has no live
+caller found anywhere in the tree (only `window.__blkws`/`__blkPanel` — explicitly commented "tests /
+debugging" — are exposed alongside it); flagged as low-confidence/likely-unused rather than asserted dead,
+since a negative grep isn't proof, but not counted as a live door.
+
+**A stale comment worth naming, not fixing here**: `wizardManager.js:478-480` still reads "Accumulate this op
+INTO the one program... so multiple inserts coexist" — pre-t1920 prose describing the deleted accumulation
+model, sitting directly above the exact branch that now REPLACES. Whoever implements step 3 will be editing
+this function anyway; worth correcting in the same commit, not a separate cleanup pass.
+
+### (2) The notice's own wording, in a machinist's words
+
+The existing `confirmDestructiveLoad` wording — *"Opening {what} in Blocks replaces the program in the editor —
+it's saved to Undo, or Cancel to keep it."* — is Blocks-tab-specific phrasing (Insert happens from the wizard
+bar / STUDIO tab, not necessarily by opening Blocks) and names "the program," not what the user actually loses.
+Proposed for the Insert door specifically, reusing the same seam's Undo guarantee:
+
+> **"Inserting this replaces your current operation — [op label] will be gone from the canvas (recoverable via
+> Undo). Insert anyway, or Cancel?"**
+
+Machinist framing, not code framing: "operation," not "op"/"stack"/"program model" (t1926's own vocabulary
+ruling applies here directly — this notice is exactly the kind of user-facing surface that rename targeted).
+Names the SPECIFIC thing being lost by its own label when one is available (`op.label`), falling back to its
+opType, matching the pattern already proven at `opContextMenu.js:127`. The `.nc`-import and open-saved-program
+doors want their own small variants of the same sentence shape (*"Loading this file replaces your current
+operation..."* / *"Opening this program replaces your current operation..."*) — one sentence template, one word
+substituted per door, not four independently-worded dialogs.
+
+### (3) When it must not fire
+
+`confirmDestructiveLoad`'s own existing condition is already exactly right and should be the stated condition
+for every door, not re-derived per door: **`willReplace = the current program is non-empty AND the incoming
+content actually differs from what's already there`** (`saveStates.js:68`). An empty canvas has nothing to
+destroy → no prompt. Re-inserting the identical op with identical params → no prompt (nothing would actually
+change). Both cases proceed silently today at the one guarded door; step 3's job is to make the OTHER four
+doors share this same check by routing through the same function, not to re-invent the condition.
+
+### (4) The assertion that would prove Cancel is real — named, not written
+
+A Playwright spec, in the shape `blocks-accumulate.spec.js`/`multi-op-progend-1828.spec.js` already established
+this session for proving a REPLACE claim structurally: build a real op A via the live Insert path, capture
+`window.ddcsGetBlockGcode()` (the emitted text) AND `JSON.stringify(window.ddcsGetBlockProgram())` (the
+structural stack) as the baseline: open a DIFFERENT wizard B, click Insert, and when the confirm dialog appears
+— **Cancel it**. Assert both captured baselines are unchanged: the G-code byte-identical, the stack
+structurally identical (not just "still has one op" — the SAME op, same id, same params). Then, as the
+converse half of the same test (proving the guard isn't a no-op that always cancels), repeat with **Proceed**
+and assert the canvas now holds B, not A, AND that `window.ddcsUndo()` restores A byte-identically — closing
+the loop on the "it's saved to Undo" half of the notice's own promised claim, not just the Cancel half.
+
+### (5) The consequence, stated plainly — no fix designed
+
+Traced cold this session (t1928, `flow-labels-unique-1408.spec.js` failing at `r.per.length === 1`): today,
+**every live wizard-bar Insert REPLACES the canvas**, full stop — there is no "add a second operation" gesture
+anywhere in the running app. The ONLY way a program ends up holding more than one operation is importing a
+marked multi-op `.nc` file (`commandDeck.js:148`, producing `importMarkedNc`'s own `multi_step` wrapper,
+t1916) — or opening a saved `.mjson`/`.ddcs` file that already contains one, which itself could only have been
+produced the same way (by an import, at some point, before being saved). **There is no in-app path to BUILD a
+multi-op program from a blank canvas.** A user who wants "face this, then drill it, then bore it" as one job —
+exactly the setup-sheet/time-estimate/tool-list features t1928 just fixed the READ side of — has no live
+gesture to CREATE that scenario; they can only reach it by hand-writing/concatenating a marked `.nc` file
+outside the app and importing it, or by having one from before this session's own arc began. Once step 3 adds
+the refusable notice, this doesn't change: the notice makes Insert's REPLACE behavior visible and cancelable,
+it does not add a way to compose several operations into one program. Whether that gap matters — whether users
+actually want multi-operation programs built live, or whether "one program, one operation, several programs per
+job" is the intended shape going forward — is exactly the fork the advisor is taking to the human; not decided
+or designed here.
+
+### Explicitly not done, per the dispatch's own instructions
+No export-first affordance, no undo mechanism beyond the one `confirmDestructiveLoad` already has, no option
+nobody asked for. No slice 2 of the vocabulary rename. No code, no new specs, no suite run — this turn is the
+plan alone.
+
+### Gate
+Read-only greps only; no source files touched. `git status` confirms clean on every tracked source file — only
+`WORK-LOG.md` changes this turn.
+
+🔨 turn 1930
