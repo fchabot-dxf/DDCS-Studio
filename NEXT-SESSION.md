@@ -2620,3 +2620,36 @@ session (four DIFFERENT causes; no fix transferred). Remaining recurring names: 
   dispatching any unreproducible visual symptom.
 - **The user's machine is V4.1** (their workspace confirms it), and **V4.1 + V3/DM500 are arguably MORE common
   than Expert** — while every spec runs Expert. A V4.1/V3-only defect is an ESCALATION, not an edge case.
+
+# ═══ t1930 — STEP 3 (replace-on-insert): SURFACE THE PLAN, BUILD NOTHING ═══
+
+t1928 verified by the advisor: 19/19 on the four named specs, independently re-run. `flattenOps` is the one
+declared enumeration, returns LEAVES (a `multi_step` wrapper is replaced by its children, never counted
+alongside them), wired at 5 production sites. Fixture rebuilds accepted — the ASSERTIONS are unchanged; only
+the construction moved off a path that no longer exists.
+
+## THE TASK — a written plan, NO product code, NO new specs, NO suite run.
+The advisor's release gate (full suite) is running on `535fb4b6` **for the duration of this turn**. A second
+Playwright run manufactures mass timeout reds (both suites lose). **Read-only greps and a doc commit only.**
+
+Step 3 is user-ruled: *insert REPLACES the canvas, with a REFUSABLE notice BEFORE the destruction.* It is the
+first act in this arc that DESTROYS the user's work, so the plan gets gated before a line is written.
+
+1. **ENUMERATE EVERY ENTRY POINT that can replace the canvas** — the wizard bar gesture, the Blocks tab, CAM,
+   an import, anything else. `file:line` each. This is the same shape t1928 just fixed: if the notice ends up
+   hand-rolled at each door, it is the four-patches bug again. **Name the ONE declared seam they all route
+   through** (or say plainly that no such seam exists yet and where it would go).
+2. **THE NOTICE'S OWN WORDING**, in a machinist's words, not the codebase's. It must say what is lost.
+3. **WHEN IT MUST NOT FIRE** — an empty canvas has nothing to destroy; a notice there is a nag that trains the
+   user to click through the one that matters. State the exact condition.
+4. **PROVE THE REFUSAL IS REAL** — name the assertion that would show Cancel leaves the program byte-identical.
+   Do not write it yet; name it.
+5. **THE CONSEQUENCE, STATED PLAINLY** — after step 3, is there ANY in-app way to build a program with more
+   than one operation, or is a multi-op `.nc` import the only source? You proved the fixture case cold this
+   turn; say what it means for the user. **Do not design a fix for it** — the advisor is taking that fork to
+   the human.
+
+⚠ **DO NOT** add an export/save-first affordance, an undo, or any option nobody asked for. Surface it in the
+plan if you think it matters; shipping it is not this task.
+⚠ **DO NOT** start slice 2 of the vocabulary rename.
+⚠ If a step-3 decision needs a human ruling, write the question INTO the plan — do not stop and wait.
