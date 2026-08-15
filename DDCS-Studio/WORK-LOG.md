@@ -36649,3 +36649,121 @@ Read-only greps only; no source files touched. `git status` confirms clean on ev
 `WORK-LOG.md` changes this turn.
 
 🔨 turn 1930
+
+
+## 🔨 turn 1932 — READ-ONLY SWEEP: the same enumeration family's other shapes
+
+### Dispatch
+Read-only sweep for the shallow-enumeration bug's OTHER shapes, while the advisor's own release gate keeps
+running. No product code, no specs, no suite run — one exception explicitly granted: the stale
+`wizardManager.js:478-480` comment may be fixed in this same docs commit, since a comment is not code.
+
+### (1) `setupSheet.js`'s `collectOps` — the OVER-DEEP twin, not the shallow one — REACHABLE, with evidence
+
+`collectOps(blocks, out)` (setupSheet.js:106-113) is the OPPOSITE bug from the one t1928 fixed: it pushes EVERY
+`type==='op'` block it meets (line 109) AND THEN unconditionally recurses into `.children` (line 110) regardless
+of whether that block was a `multi_step` wrapper. If a `multi_step` sits inside a `setup` container, this pushes
+the WRAPPER as its own "operation" row, then ALSO pushes each of its own steps — a phantom row, not a missing
+one. `flattenOps` does not cover this branch (`buildSheetHTML` only calls `flattenOps` on the single-page path,
+`raw` with no setup structure — line 184; `setupGroups`'s own per-setup path calls `collectOps` instead, line 121).
+
+**Reachability, traced statically (no browser this turn — a code-mechanics trace, not an observed drag):**
+`setup` (`wizards/ops/transform.js:40-45`) has NO marker-import support at all — grep of `opSchema.js` and
+`programModel.js`'s own `PROG_KEY` vocabulary (xform/entry/flip only) turns up no `'setup'` handling anywhere,
+so `importMarkedNc` can never PRODUCE a `setup` wrapper — it is exclusively a Blocks-tab hand-authored C-block
+(dragged from the Transforms palette category). The question is therefore: can a user drag an imported
+`multi_step` block INTO a `setup` block's own children slot, once both exist on the same Blocks canvas?
+
+Traced the exact mechanism, not assumed: `multi_step` has no dedicated Blockly block registration anywhere in
+`blockly/bridge.js`/`stackBridge.js` — `stackBridge.js:187`'s own `recToJson` resolves it through
+`HAS_CUSTOM_OP[rec.opType + '_op']`, which is false for `'multi_step_op'`, so it falls through to the GENERIC
+`'op'` Blockly block type (`OP_BLOCKS`'s own `makeOpDef('op', 'op')`, `bridge.js:300`) — the exact same block
+TYPE every builder-made op uses. That generic `'op'` block declares an unconstrained `previousStatement: null,
+nextStatement: null` (`bridge.js:294`), and EVERY container's own statement mouth — `setup` included — is built
+via `addMouth`'s `{ type: 'input_statement', name }` (`bridge.js:265`) with **no `check:` property at all**. In
+Blockly, an unchecked `input_statement` accepts any block with a matching (here: `null`, meaning unrestricted)
+connection type. Nothing in this mechanism distinguishes "a real op" from "a `multi_step` wrapper op" — both
+are the SAME generic `'op'` Blockly block type with no type-level barrier stopping either from connecting inside
+`setup`'s own mouth.
+
+**Verdict: REACHABLE.** Import a marked multi-op `.nc` (produces a top-level `multi_step`), open Blocks, drag a
+`Setup` block onto the canvas, drag the `multi_step` block inside it — nothing in the connection-check mechanism
+prevents this. Confidence caveat, stated plainly: this is a static trace of the exact connection rule (absence
+of `check:`, both sides declaring an unrestricted `null` connection), not a live-observed drag this turn (no
+browser allowed) — the mechanism gives no reason to expect a runtime override of what the declared connection
+rules already permit, but it is evidence of the mechanism, not an observed reproduction. Not fixed this turn,
+per the dispatch's own instruction — reachability only.
+
+### (2) `slotPack.js:92-99` — genuinely different, NOT subsumed — two declarations, correctly separate
+
+Read the cited comment and the surrounding `composeParts`/`maxLabelIn` code in full. This is CAM-slot MACRO
+COMPOSITION: concatenating N CAM-slot generators' own RAW G-CODE TEXT bodies (for the controller's on-board CAM
+page, `macro_camN.nc`) into one executable macro — uniquifying N-labels/GOTO targets across TEXT FRAGMENTS and
+stripping all but the last terminator, so a mid-file M30 doesn't leave later parts dead. This never touches
+`ddcsGetBlockProgram()` or any `{type:'op'}` record — it operates on TEXT STRINGS in an entirely separate
+domain (the CAM-pack builder's own `ddcs_campack` structure, confirmed in t1930's own sweep to never call
+`ddcsLoadBlockStack` at all). `flattenOps` answers "what operations does the STUDIO CANVAS PROGRAM MODEL hold";
+`slotPack.js`'s own job answers "how do N already-generated macro TEXT BODIES concatenate into one label-clean
+program" — different data shape, different question, no shared surface to declare once over. The comment ITSELF
+already states this independence (lines 104-106: "this one's own job... is unaffected and still real") —
+confirmed correct, not stale. Two declarations, correctly separate; nothing to merge.
+
+### (3) Other sites asking "what operations does this program hold" — the deliberate exclusions, and the flag checked
+
+t1928's own 5 wired sites (`setupSheet.js`, `gcodePreviewTab.js` ×3, `blocksApp.js`, `envelopeCheck.js`) covered
+every "flatten the WHOLE program into its operations" consumer found in that turn's own exhaustive sweep. Left
+deliberately unwired, restated here for completeness: `opSession.js`'s id-based lookups
+(`replaceOp`/`deleteOp`/`duplicateOp`, top-level-only `.find(b.id===opId)`) and the sibling id-finds in
+`editorManager.js`/`wizardManager.js`/`segmentFrame.js` — none of these ask "give me every operation," they ask
+"find THE op with id X," and re-editing a step nested inside an imported `multi_step` isn't a currently
+supported UI gesture, so widening them has no live gesture to serve.
+
+**The flagged claim, checked, not assumed:** `segment-frame-derivation-1838.spec.js`'s own comment (lines 10-24)
+asks whether `frameSegments`'/`opAtLine`'s TWO-TOP-LEVEL-SIBLING-ops resolution logic still has a live consumer,
+given a bar-gesture Insert can no longer produce that shape. Checked against this turn's own exhaustive
+`ddcsLoadBlockStack` sweep (t1930) plus `groupConsecutiveOps`'s own behavior (t1916): **CONFIRMED, not
+corrected** — `groupConsecutiveOps` merges ANY run of ≥2 consecutive top-level marked ops into ONE `multi_step`
+wrapper on import, so two ops NEVER survive as top-level SIBLINGS through that path either; nothing else found
+this sweep produces siblings (the Blocks-tab suggestion-chip mechanism was checked as a candidate and ruled out
+— `suggest.js`'s own SEED table names `'drill'`/`'bore'`/`'slot'`/`'contour'` as suggestible types, but none of
+those keys exist in `wizards/ops/index.js`'s own `BLOCKS` registry `insertSuggestion` reads from, so those
+suggestions — if ever offered — silently no-op; confirmed by grep, not assumed). The flag stands.
+
+**A related but DIFFERENT live gap, worth distinguishing rather than folding into the same claim**: `opAtLine`
+itself (not the sibling-resolution question, but its own "does it descend into a `multi_step`'s children at
+all" gap, named in this session's own architecture notes) now DOES have a live path to exercise it — hovering
+an editor line that belongs to a step nested inside an IMPORTED `multi_step` (reachable via the same `.nc`
+import door named in this turn's own item 1). That is a genuine, currently-live gap in the opposite direction
+from the flagged comment's own question (nested-child resolution, not top-level-sibling resolution) — named
+here as its own finding, not merged into the "confirmed" verdict above, since it answers a different question
+than the one the flag actually asked.
+
+### (4) The stale comment — quoted, corrected, fixed (permitted this turn)
+
+`wizardManager.js:478-480`, verbatim before this turn:
+> *"Accumulate this op INTO the one program (its high-level blocks slot before Program End) so multiple inserts
+> coexist and all show in Blocks — not two framed programs concatenated (M30 mid-file). Ops with no block
+> builder yet (probe/ATC families) fall back to a plain text insert."*
+
+Describes the exact accumulation model t1920 deleted, sitting directly above the branch that now REPLACES —
+a comment asserting a behaviour the code no longer has, on the single highest-traffic, highest-stakes branch
+this whole arc is about. Corrected to state current behavior and point at where it's tracked:
+
+> *"t1916/t1918/t1920 — REPLACES the program (a Studio canvas is always exactly one op; loadOpAsProgram's own
+> doc comment names the deleted accumulation machinery this used to need). This branch is reached only for a
+> FRESH insert (not editing an existing op — see the `this.editingOpId` branch above), so it is the one gesture
+> t1930's own plan names as the primary unguarded destructive-load door. Ops with no block builder yet
+> (probe/ATC families) fall back to a plain text insert."*
+
+Shifted `wizardManager.js` by +1 line; the only downstream citation past that point,
+`ARCHITECTURE.md`'s own DOM-tree annotation `wizardManager.js:539-543` (prose only, not machine-checked —
+confirmed no `architecture-map-1698.test.mjs` entry cites this file past line 322), corrected to 540-544 with a
+`t1932 — shifted` note. `TRAP5` (line 322, machine-checked) is before the edit point, unaffected — confirmed by
+re-running the test.
+
+### Gate
+`npm run test:node`: 118/118, including `architecture-map-1698.test.mjs`'s own citation checks, clean after the
+one comment fix + its one citation update. Only `WORK-LOG.md`, `ARCHITECTURE.md`, and the one permitted comment
+in `wizardManager.js` changed — every other source file untouched, confirmed by `git status`.
+
+🔨 turn 1932

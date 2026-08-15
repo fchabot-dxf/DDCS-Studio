@@ -475,9 +475,11 @@ export class WizardManager {
         const view = this.activeView();
         const code = view ? el(view.codeElId)?.textContent : '';
 
-        // Accumulate this op INTO the one program (its high-level blocks slot before Program End) so multiple
-        // inserts coexist and all show in Blocks — not two framed programs concatenated (M30 mid-file). Ops with
-        // no block builder yet (probe/ATC families) fall back to a plain text insert.
+        // t1916/t1918/t1920 — REPLACES the program (a Studio canvas is always exactly one op; loadOpAsProgram's
+        // own doc comment names the deleted accumulation machinery this used to need). This branch is reached
+        // only for a FRESH insert (not editing an existing op — see the `this.editingOpId` branch above), so it
+        // is the one gesture t1930's own plan names as the primary unguarded destructive-load door. Ops with no
+        // block builder yet (probe/ATC families) fall back to a plain text insert.
         let committed = false;
         try {
             const ops = await import('./blocks/opSession.js');
