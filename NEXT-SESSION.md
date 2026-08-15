@@ -2765,3 +2765,42 @@ at 1.58.2, `node_modules` intact, process table clean). **`npm run test:e2e -- -
 
 ⚠ Do NOT build the Add gesture, the doors, or `collectOps` this turn — they are queued behind the release.
 ⚠ Do NOT start slice 2 of the rename. Fixing STALE ASSERTIONS left by slice 1 is finishing slice 1, not slice 2.
+
+# ═══ t1938 — CLOSE THE THREE SILENT DOORS (step 3, minus Insert) ═══
+
+**RELEASED V2026.08.15.11** (`1167455b`, pushed). t1936 accepted: one genuinely stale assertion, no siblings —
+and the sweep was done by CHECKING ~20 candidates against live app source, not by trusting a grep count. Two
+findings correctly kept OUT of the fix and recorded here instead:
+- **NEAR-MISS:** `lathe-honest-3d-1301.spec.js:169` still passes by substring luck (`'Drill op'` is a prefix of
+  `'Drill operation'`). Not broken; it is a test that would not fail if the thing it guards broke. **Queued.**
+- **SLICE 1 MISSED A WHOLE REGION:** `web/ui/macrosApp.js` (~15 strings — dialog text, button titles, the
+  "N of M" hint) plus `stackToSlot.js` / `subStackToSlot.js` / `createPreviewPanel.js` were never surveyed.
+  Nothing red today. **This is slice 1's real remainder — its own task, not folded into anything.**
+
+## THE TASK — route the THREE SILENT doors through the seam that already exists.
+`confirmDestructiveLoad` (`saveStates.js:66`) already snapshots to Undo and already stays silent when there is
+nothing to lose (empty program, or an identical load). **Route, do not reinvent.** These three destroy the
+user's work with NO warning today:
+
+| door | site | what the user was doing |
+|---|---|---|
+| import a `.nc` file | `commandDeck.js:148` | opening a file on top of live work |
+| open a saved project | `programFile.js` `loadProject` (**3 UI callers**) | opening a `.mjson` |
+| the editor Clear button | `editorManager.js:165` | one click, no confirm |
+
+1. **THE MESSAGE BECOMES A PARAMETER OF THE SEAM.** Today it is hard-coded to the Blocks-tab context —
+   *"Opening X in Blocks replaces the program in the editor"* — which is wrong at all three of these doors.
+   **One seam, a parameterised message. NOT three messages at three doors, and NOT a second seam.**
+2. **ALL THREE `loadProject` CALLERS**, not the convenient one. If the guard belongs inside `loadProject`
+   rather than at its callers, say so and do that — one guard beats three.
+3. **PROVE THE REFUSAL IS REAL, per door:** Cancel leaves the program **byte-identical** (assert the G-code, not
+   a flag), and the surface the user was on is untouched. This is the assertion you named in t1930 — write it now.
+4. **PROVE THE PROCEED IS RECOVERABLE:** the snapshot lands and Undo restores the prior program.
+5. ⚠ **DO NOT TOUCH THE WIZARD-BAR INSERT DOOR** (`wizardManager.js:512`). It is the 4th door and it gets a
+   **THREE-button** dialog (Add / Replace / Cancel) under the human's Add-to-program ruling — building it
+   two-button now means building it twice. It lands next turn, together with Add.
+
+**Gate: the specs you touch, by name, plus the node tier. NOT the full suite** — that is my release gate.
+⚠ Use `npm run test:e2e -- --grep "<name>"`; bare `npx playwright test <file>` is broken here.
+⚠ No new affordances beyond the notice: no "save first" button, no undo UI, nothing unasked.
+⚠ DO NOT start slice 2 of the rename.
