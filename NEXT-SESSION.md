@@ -2727,3 +2727,41 @@ at every depth — and that call "belongs to step 3's authoring UI." This is tha
 ⚠ **DESIGN, DO NOT BUILD.** No code, no specs, no new affordances shipped.
 ⚠ **Do not assume the user has ruled** — they have NOT. Write the fork, do not resolve it for them.
 ⚠ DO NOT start slice 2 of the rename.
+
+# ═══ t1936 — THE RENAME LEFT STALE ASSERTIONS BEHIND. FIND THE CLASS, NOT THE INSTANCE. ═══
+
+t1934 ACCEPTED — the design is adopted, and **the human has RULED: Add-to-program.** Option A (promote on the
+2nd operation) + Option 1 (a 3rd button on the notice t1930 already designed) + the symmetric `count>=2` rule.
+Your recommendation was taken on its reasoning, not its confidence. Not built yet — this task comes first.
+
+## MY MERGE GATE RAN THE FULL SUITE: 2534 passed · 26 skipped · 22 flaky · **2 failed**.
+- `middle-superset` E0 GATE shard 2 — **isolated, 14/14 green.** Known load flake, confirmed not argued.
+- `blocks-edit-fail-loud-1518` PROOF 2 — **REPRODUCES IN ISOLATION. REAL.** And it is not a multi-op bug:
+
+```
+  spec line 109 expects   /2 ops/
+  the app now emits       "Could not open 2 operations in Blocks — …"
+```
+
+**That is vocabulary-rename slice 1 (`f9900ab2`).** The app's new wording is CORRECT and stays. The spec kept
+asserting the old word, and it has been red since slice 1 landed — nothing caught it because slice 1 was never
+run against the full suite. The gate is doing its job; the follow-through is yours.
+
+## THE TASK
+1. **FIX the stale assertion** at `blocks-edit-fail-loud-1518.spec.js:109`. The app's wording is the truth.
+2. **⚠ THEN FIND ITS SIBLINGS — this is the actual task.** One stale assertion means the rename's test-side
+   sweep was incomplete, and the rest are invisible until the next full suite. **Sweep `tests/` for every
+   assertion still matching on the OLD vocabulary** (`/\bops?\b/` inside `toMatch`/`toContain`/`toBe`/string
+   comparisons, and the same words in fixture expectations). Report the FULL list before fixing, then fix them.
+3. **Say how many you found.** If it is only the one, say that — a sweep that finds nothing is a real result and
+   I want it stated, not implied.
+4. **VERIFY:** the touched specs by name, plus the node tier. **Do NOT run the full suite** — that is my gate
+   and I re-run it before the release.
+
+## ⚠ TEST-RUNNER TRAP I HIT THIS TURN — use the working form
+`npx playwright test <file-or-name>` now dies with *"Playwright Test did not expect test() to be called here /
+No tests found"* on EVERY spec — an argument-matching quirk, not a broken environment (versions are consistent
+at 1.58.2, `node_modules` intact, process table clean). **`npm run test:e2e -- --grep "<name>"` works.** Use it.
+
+⚠ Do NOT build the Add gesture, the doors, or `collectOps` this turn — they are queued behind the release.
+⚠ Do NOT start slice 2 of the rename. Fixing STALE ASSERTIONS left by slice 1 is finishing slice 1, not slice 2.
