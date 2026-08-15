@@ -2486,3 +2486,35 @@ playback continue; this entry is why they should not.
 with a two-op program sees playback stop after op 1 with no explanation and reasonably concludes it broke.
 Saying *"stopped — program end (M30)"* is honesty about behaviour the user has now ratified, the same shape as
 t1834's frame note and t1894's ATC refusal. Cheap, and it does not reopen multi-op playback.
+
+## ONE OP PER PROGRAM — the shape, ruled  [USER RULINGS 2026-08-15, t1914 analysis]
+
+**Three rulings that lock together:**
+1. **Multi-op continuous playback: NOT WANTED.** *"they can program the multiop within one op."*
+2. **Wizard insert REPLACES the canvas ops**, with a notice first (*"obvi there should be a notice about the
+   ops gonna be cleared"*). Today `opSession.js:5` does the opposite — inserts ACCUMULATE.
+3. **Re-importing a multi-op `.nc` → ONE op carrying N steps.** Nothing lost, the invariant holds, the file
+   round-trips. Ruled over refuse-and-explain and keep-first-drop-rest.
+
+**⚠ DO NOT COLLAPSE THE FRAME TYPES.** The advisor's first instinct (progstart/progend and user_root describe
+one boundary) was WRONG — t1914 found **four** distinct responsibilities, not two: `progstart/progend` (the
+machine bracket, real G-code) · `user_root` (wizard-authoring / form identity, transparent) · `op`/makeOp
+(program-composition identity, transparent) · `endprogram` (decode-only degenerate leaf), plus
+`xform`/`entry`/`flip` as program-level siblings. Merging them folds four jobs onto one block.
+
+**✅ THE RIGHT MOVE INSTEAD: delete the ACCUMULATION machinery.** Under one-op-per-program these go dead —
+`appendIntoProgram`'s `cur.length` branch, `normalizeEnds`, and `_framed`'s `user_root`-unwrap complexity
+(which took THREE attempts across t1828/t1830). **That kills the whole bug class without conflating anything.**
+
+**The bug class is real and has already bitten TWICE, independently:** t1828's premature `M30` (shipped, fixed
+today) and a confirmed sibling in CAM slot composition — `slotPack.js:92-99` names it in its own comment as
+*"the shipped multi-op + sub-stack bug"*, with parallel `composeParts`/`offsetBodyLabels`/`stripTerminalEnd`
+machinery mirroring `opSession`'s `normalizeEnds`/`offsetLabels`. Same disease, two organs, found by two people
+who never connected them.
+
+⚠ **CAM slots sit on the identical problem one level down** and are NOT fixed by this — named in their own
+source, still open.
+
+⚠ **Sequence matters:** the import answer and the accumulation deletion shape replace-on-insert, so they come
+first. And the notice must be REFUSABLE and land BEFORE the destruction — losing an authored op to a silent
+wipe is unrecoverable, unlike a wrong picture.
