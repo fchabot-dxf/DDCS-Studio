@@ -34470,3 +34470,113 @@ rather than papered over with a longer guess. Gate: node 118/118, 103-file gate 
 first-pass failures isolated, root-caused, and fixed — not dismissed as flake on the say-so.
 
 🔨 turn 1888
+
+---
+
+## t1890 — THE ATC/toolTable SEMANTIC CHECK: atc encodes ignorance (STOP), toolTable is confirmed absence (WIRED)
+
+Dispatch: check the atc and toolTable capability gates (both orphaned per t1884's census — their only DOM
+targets, wiz_atc_change/test and wiz_atc_length/check/warmup/table, are permanently display:none), but
+establish the semantic first, exactly as for probePort (t1880) — does caps.atc:false on V4.1/DM500 mean a
+genuine, confirmed hardware absence, or does it encode OUR ignorance (unmapped registers)? If ignorance, STOP AND
+SAY SO rather than grey a real capability on the most common profiles.
+
+THE ATC FINDING — IGNORANCE, NOT ABSENCE. STOPPED, NOT WIRED. Read fresh (not from memory) three independent,
+primary-source layers, oldest to newest:
+1. ddcs-v41.js:16: atc: null — comment: "atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the
+   dump shows them as generic 'system parameter area')". ddcs-v3-dm500.js:20: atc: null — comment: "no confirmed
+   tool-changer firmware model on the DM500". Both hedge — "unmapped" / "no confirmed" is a statement about
+   Studio's own evidence, not a statement that the firmware lacks the concept.
+2. postGating.js's own CAP_WHY.atc (authored t640, Jul 10) is confident, not hedged: "no pneumatic
+   tool-changer model on this controller — the drawbar/pusher/pocket dance is DDCS-Expert only." This text
+   PREDATES the more careful analysis below and, read against it, overclaims.
+3. portingArc.js's own V41_NAMED_ABSENCES.atcTables (t1534, Aug 2 — the LATEST, most careful pass) is
+   unambiguous evidence-gap language: whyAbsent: "no ATC-specific structure visible at those addresses on THIS
+   firmware image" (a statement about the dump, not the machine); liftNeeds: "observing what registers a real
+   V4.1 tool-change macro touches" (presupposes one may exist); blocked: "evidence-blocked — the bench unit is
+   motorless and toolless by design and cannot demonstrate this. Needs either a V4.1 unit WITH an actual ATC
+   attached, or a community-referenced macro from an owner who has one." The doc explicitly entertains that such
+   a machine/macro could exist — the opposite of a confirmed absence.
+   The SAME file's own t1535 ruling (ratifying atc:false in DEFAULT_CAPS) states the general principle this
+   turn is a live instance of, in its own words: "safe-floor-by-default for a RARE/UNCERTAIN capability — an
+   undeclared key means nobody has said, and nobody-has-said is not yes-it-has-it," and warns explicitly:
+   "postGating cannot distinguish 'declared unsupported' from 'never considered' — which is a declaration gap, and
+   it bites the NEXT post, not this one." This turn IS that next post.
+
+Per the dispatch's own explicit instruction, this is a STOP: data-cap="atc" (wiz_atc_change/wiz_atc_test, still
+orphaned) is left untouched — not wired, not deleted — pending the advisor's own design call on what message
+(if any) belongs where "not-supported" and "not-mapped-yet" are different, and both are live candidates.
+
+BONUS, UNPLANNED FINDING while tracing vars.atc through its consumers — a genuine, pre-existing correctness
+bug, NOT fixed this turn: atcLengthWizard.js:18 and atcToolCheckWizard.js:29 both compute curToolVar as
+'#' + ((d && d.vars && d.vars.atc && d.vars.atc.currentTool) || 1300). Since vars.atc is null on V4.1/DM500,
+this silently falls back to Expert's own #1300 "current tool" register — with ZERO evidence that address holds
+a current-tool number on V4.1/DM500 (the SAME V41_NAMED_ABSENCES.atcTables entry says #1300 reads as a generic
+"system parameter area" there). Both wizards then branch on that value (IF #103<1 GOTO<no-tool-set-error>) and,
+if it passes, WRITE the measured tool length to the tool-table slot it names (TO('#103','#102')) — a wrong
+#103 could silently write a length to the wrong slot, or misfire the error path, on real V4.1/DM500 hardware.
+This directly CONTRADICTS portingArc.js:245's own claim — "vars.atc: null, caps.atc: false — every ATC
+wizard degrades honestly on V4.1" — that claim is stale for these 2 wizards specifically (they don't degrade to
+[] like readActiveWcs does; they guess). Not fixed here: it is entangled with the same atc-semantic question
+just stopped on (should it fold to [] honestly, error visibly, or something else?), and is a design call, not a
+mechanical patch. Flagged for a future act.
+
+THE toolTable FINDING — CONFIRMED ABSENCE. WIRED. caps.toolTable is true for every DDCS variant (Expert
+#1430, V4.1 #1560, DM500 #1430 — all CONFIRMED, mapped base registers, unlike atc) plus rs274ngc (#5401)
+and centroid; false ONLY for grbl.js, which declares vars: false, flow: 'none' — a categorically
+variable-less firmware, a genuine structural absence with nothing hedged about it. grbl is reached today via the
+ACTIVE-POST override (setActivePostId, wizards/dialects/index.js — a live, user-reachable codegen target
+independent of the 4 selectable machine profiles, per io-step-edge-dialect.spec.js's own established precedent),
+so this is a real, currently-completely-unsignaled gap: userOpView.js had NO broad caps.vars-level UI gate
+before this turn (confirmed by reading its full gate-consumer list: only _oword/_rigidOk/_probePortOk
+existed) — a grbl-post user opening any of these forms today sees every field fully live, with nothing telling
+them the resulting program folds to comments.
+
+Of the 4 legacy data-cap="toolTable" targets, only 3 ops genuinely have a toolTable dependency:
+- atcLengthData.js (writes the table — atcLengthWizard.js's own TO('#103','#102')) — all 7 scalar
+  bindings now carry gate: {param:'_toolTableOk', is:false, tip:'...'}.
+- atcCheckData.js (reads the table back for comparison) — all 8 scalar bindings, same gate.
+- atcTableData.js — ONLY its includeLengths toggle (writes #[table base + T-1] directly) is gated.
+  Its SIBLING includePockets toggle writes #1330/#1350/#1370 — the ATC pocket/model registers, governed by
+  the SEPARATE atc cap just stopped on above — left deliberately UNGATED this turn; wiring it now would have
+  silently taken the very design position (grey a V4.1/DM500 field because caps.atc says so) this turn defers
+  to the advisor. Its own help text already names the "needs a mapped ATC model" caveat in prose.
+- atcWarmupData.js — checked and found to have ZERO toolTable dependency at all: a plain spindle
+  M3/dwell/M3/dwell/M5 sequence, no #-variable, no tooloffset block anywhere in atcWarmupWizard.js. Its own
+  data-cap="toolTable" was MIS-SCOPED from the start (lumped under "ATC" loosely, not by actual register
+  dependency), not merely orphaned. Removed with no replacement gate — there is nothing to gate.
+
+_toolTableOk computed in userOpView.js (mirroring activePostProbePort), fresh on every twin-form render.
+postGating.js's own dead CAP_WHY.toolTable entry deleted; the 4 legacy panels' data-cap="toolTable" HTML
+attributes removed (index.html). data-cap="atc" (2 panels) and CAP_WHY.atc/CAP_FIELDS.wcsSync (still
+orphaned but out of THIS turn's scope) are untouched.
+
+IDENTICAL-CAPS ECONOMY, cited: ddcs-v41.js:17 and ddcs-v3-dm500.js:21 both declare toolTable: true in the
+same caps-object shape (verified by direct read, not assumed) — tested live on V4.1, DM500 not re-tested (a
+divergence would be a regression in one of those two files, not something a DM500-specific copy could catch
+differently).
+
+New: tests/tooltable-gate-1890.spec.js (5 tests — primary evidence both directions, the identical-caps note,
+every toolTable-dependent field/op across all 3 ops, a vacuity-trap on the ungated includePockets sibling, and a
+no-dependency sanity check on atcWarmup). NON-VACUOUS, proven by full revert to the pre-change tree (git checkout
+HEAD --, all 6 changed files, confirmed byte-identical diff before/after): 4/5 fail against the pre-change tree
+(exactly the gate-dependent ones — 3 timeout on "field never settled a gate state," matching the predicted
+signature since the gate attribute never gets set pre-fix); the 5th (atcWarmup no-dependency) correctly passes
+either way, since it asserts nothing the fix touches. Restored from scratch backup, git diff --stat matched the
+intended fix scope exactly, re-ran green.
+
+ARCHITECTURE-MAP DRIFT, caught and fixed: userOpView.js gained 7 lines above TRAP9's own citation site
+(renderLayout2D's two call sites, paired with their own setFormHost calls). tests/node/architecture-map-1698
+.test.mjs's own TRAP9 entry (userOpView.js:682 → 689) and ARCHITECTURE.md's own citation (userOpView.js:
+665,682 → 672,689) both updated, each with a "t1890 — shifted from X by 7" comment matching the established
+convention. Caught by the node-tier gate exactly as designed (1 failure on the first pass, 0 after the fix).
+
+Gate: node tier 118/118 (0 failed — includes the architecture-map fix). Playwright: every ATC/toolTable/postGating
+-touching spec built via grep -rl on actual symbol references (atcLengthData/atcCheckData/atcTableData/
+atcWarmupData/atcLengthWizard/atcToolCheckWizard/_toolTableOk/the 4 op-type strings/postGating/CAP_WHY/CAP_FIELDS)
+— 23 files, 83 tests, 0 failed, 2 pre-existing skips (gateway-state-contract-1327, unrelated). atc-cap-gate.spec.js
+(t640's own pneumatic-M-code emit gate) still green, confirming this turn's changes didn't disturb it.
+
+process health: clean, 0 lingering ephemeral processes (proc_health.py watch).
+
+🔨 turn 1890

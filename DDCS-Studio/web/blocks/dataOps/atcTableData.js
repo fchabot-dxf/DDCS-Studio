@@ -27,8 +27,14 @@ export const ATC_TABLE_DEFAULTS = { includeLengths: true, includePockets: true }
 
 /** The op params (the run-form): the two include toggles + the 'Edit table…' action button (opens Settings → ATC = the ONE
  *  table editor; contributes no param). The rows come from the live table, never the form. */
+// t1890 — includeLengths writes #[toolTable+n-1] (the confirmed-mapped length-table register on every DDCS variant +
+// rs274ngc/centroid; absent only on grbl) → gated on `_toolTableOk`, same as atcLengthData/atcCheckData.
+// includePockets writes #1330/#1350/#1370 — the ATC pocket/model registers, governed by the SEPARATE `atc` cap, which
+// t1890 found encodes an EVIDENCE GAP on V4.1/DM500 (not a confirmed absence — see WORK-LOG t1890) — left UNGATED
+// this turn, pending the advisor's ruling on atc; its own help text already names the "mapped ATC model" caveat.
 export const ATC_TABLE_STRUCT_BINDINGS = [
-    { param: 'includeLengths', type: 'bool', default: ATC_TABLE_DEFAULTS.includeLengths, label: 'Write tool lengths', help: 'Emit the library tool-length writes (#[table base + T−1]).', section: 'TABLE' },
+    { param: 'includeLengths', type: 'bool', default: ATC_TABLE_DEFAULTS.includeLengths, label: 'Write tool lengths', help: 'Emit the library tool-length writes (#[table base + T−1]).', section: 'TABLE',
+        gate: { param: '_toolTableOk', is: false, tip: 'This controller has no in-program tool-length table to write to.' } },
     { param: 'includePockets', type: 'bool', default: ATC_TABLE_DEFAULTS.includePockets, label: 'Write pocket positions', help: 'Emit the magazine pocket XYZ writes (needs a controller with a mapped ATC model).', section: 'TABLE' },
     { param: '_setup', type: 'bool', widget: 'action', action: 'atcTableEdit', default: false, label: 'Edit table…', help: 'Open Settings → ATC: the tool library (lengths) + the magazine (pocket XYZ) — the ONE source this macro writes.', section: 'TABLE' },
 ];

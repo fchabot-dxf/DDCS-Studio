@@ -21,14 +21,18 @@ export const ATC_LENGTH_DEFAULTS = { blockHeight: 50, safeZ: 10, maxDist: 100, r
 
 /** The bindable scalars → the `assign` macro var each writes. DECLARED by identity (var). #5 (port) + #6 (blockHeight) are
  *  ALSO source-chip vars: the binding injects the literal, applyProbeSources rewrites it to a register on Expert. level baked. */
+// t1890 — every field here feeds the SAME macro, whose whole purpose is a tool-table WRITE (atcLengthWizard.js's
+// `TO('#103','#102')`); gated uniformly on `_toolTableOk` (true for every DDCS variant + rs274ngc/centroid, false
+// only for grbl — a confirmed structural absence, see userOpView.js's own activePostToolTable comment).
+const TT_GATE = { param: '_toolTableOk', is: false, tip: 'This controller has no in-program tool-length table to write to.' };
 export const ATC_LENGTH_BINDING_SPECS = [
-    { param: 'maxDist',     type: 'number', default: ATC_LENGTH_DEFAULTS.maxDist,     label: 'Max Plunge',  help: 'How far the tool searches down toward the setter before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
-    { param: 'retract',     type: 'number', default: ATC_LENGTH_DEFAULTS.retract,     label: 'Retract',     help: 'How far the tool backs off after the first touch, before the slow, accurate re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
-    { param: 'f_fast',      type: 'number', default: ATC_LENGTH_DEFAULTS.f_fast,      label: 'Fast Feed',   help: 'Feed rate (mm/min) for the initial fast approach to the setter.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
-    { param: 'f_slow',      type: 'number', default: ATC_LENGTH_DEFAULTS.f_slow,      label: 'Slow Feed',   help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
-    { param: 'port',        type: 'number', default: ATC_LENGTH_DEFAULTS.port,        label: 'Setter Port', help: 'The controller input port the tool-setter signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
-    { param: 'blockHeight', type: 'number', default: ATC_LENGTH_DEFAULTS.blockHeight, label: 'Setter Block Height', help: 'The height of the fixed tool-setter block — subtracted from the machine Z at touch to give the true tool length.', section: 'GEOMETRY', match: { type: 'assign', var: '#6' },  key: 'value' },
-    { param: 'safeZ',       type: 'number', default: ATC_LENGTH_DEFAULTS.safeZ,       label: 'Safe Z',      help: 'The machine Z to retract to after the touch.', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value' },
+    { param: 'maxDist',     type: 'number', default: ATC_LENGTH_DEFAULTS.maxDist,     label: 'Max Plunge',  help: 'How far the tool searches down toward the setter before it gives up.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value', gate: TT_GATE },
+    { param: 'retract',     type: 'number', default: ATC_LENGTH_DEFAULTS.retract,     label: 'Retract',     help: 'How far the tool backs off after the first touch, before the slow, accurate re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value', gate: TT_GATE },
+    { param: 'f_fast',      type: 'number', default: ATC_LENGTH_DEFAULTS.f_fast,      label: 'Fast Feed',   help: 'Feed rate (mm/min) for the initial fast approach to the setter.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value', gate: TT_GATE },
+    { param: 'f_slow',      type: 'number', default: ATC_LENGTH_DEFAULTS.f_slow,      label: 'Slow Feed',   help: 'Feed rate (mm/min) for the precise second touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value', gate: TT_GATE },
+    { param: 'port',        type: 'number', default: ATC_LENGTH_DEFAULTS.port,        label: 'Setter Port', help: 'The controller input port the tool-setter signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value', gate: TT_GATE },
+    { param: 'blockHeight', type: 'number', default: ATC_LENGTH_DEFAULTS.blockHeight, label: 'Setter Block Height', help: 'The height of the fixed tool-setter block — subtracted from the machine Z at touch to give the true tool length.', section: 'GEOMETRY', match: { type: 'assign', var: '#6' },  key: 'value', gate: TT_GATE },
+    { param: 'safeZ',       type: 'number', default: ATC_LENGTH_DEFAULTS.safeZ,       label: 'Safe Z',      help: 'The machine Z to retract to after the touch.', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value', gate: TT_GATE },
 ];
 
 export const ATC_LENGTH_DATA_OPTYPE = 'user_atc_length_data';

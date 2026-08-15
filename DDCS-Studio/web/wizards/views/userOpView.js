@@ -49,6 +49,12 @@ const activePostId = () => { try { return resolveActivePost(getActiveProfile().i
 // all (move-until-input). So probePort:false means "the port field is dead weight, never read by this
 // dialect's own emit" — NOT "cannot probe" (V4.1/DM500 both probe, via their own fixed/different forms).
 const activePostProbePort = () => { try { return !!getCaps(resolveActivePost(getActiveProfile().id).id).probePort; } catch (_) { return true; } };
+// t1890 — toolTable: does the active post have an in-program tool-length-offset table at all? Confirmed true for
+// every DDCS variant + rs274ngc/centroid (each declares its own base register — #1430/#1560/#5401 etc.); false
+// ONLY for grbl, whose own caps declare `vars:false, flow:'none'` — a categorically variable-less firmware, a
+// confirmed structural absence, not an unmapped/unconfirmed one (unlike `atc`, left untouched this turn — see
+// WORK-LOG t1890).
+const activePostToolTable = () => { try { return !!getCaps(resolveActivePost(getActiveProfile().id).id).toolTable; } catch (_) { return true; } };
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
 import { latheProbeTool, latheBarOf } from '../../viz/latheScene.js';   // t1301 — a lathe probe's stylus is the form's declared radius, scaled to the bar
 
@@ -472,8 +478,9 @@ export function createUserOpView(ns, opts) {
             // t538 — the live params + a dialect gate flag (`_oword`); t778 — `_rigidOk` for the tapping rigid gate: a DECLARED
             // encoder/servo spindle (settings.spindle.tapCapable) AND the Expert post (the only dump-evidenced firmware).
             // t1880 — `_probePortOk`: does the active post's own probeMove even read a port number (Expert: yes; V4.1/DM500: no).
+            // t1890 — `_toolTableOk`: does the active post have an in-program tool-length table at all (all DDCS/rs274ngc/centroid: yes; grbl: no).
             const _spin = (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {};
-            const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert'), _probePortOk: activePostProbePort() };
+            const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert'), _probePortOk: activePostProbePort(), _toolTableOk: activePostToolTable() };
             if (fhost) fhost.querySelectorAll('[data-when], [data-when-all]').forEach((row) => {
                 let ok;
                 if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions

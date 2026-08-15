@@ -17,12 +17,19 @@ import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 // mechanism that actually runs on every twin-form render, not just load + settings-change. Leaving the dead
 // entry here would have this file keep CLAIMING to gate probe ports while doing nothing — see WORK-LOG t1878/
 // t1880 for the full trace.
+// t1890 — toolTable REMOVED the same way: its only DOM targets were wiz_atc_length/check/warmup/table's own
+// `data-cap="toolTable"` — all 4 permanently display:none (t1884's census, re-confirmed t1890). The live twin
+// forms (atcLengthData/atcCheckData/atcTableData's own `includeLengths`) now gate with a declared `_toolTableOk`
+// (userOpView.js), same pattern as probePort. `atc` is INTENTIONALLY left here — t1890 found its own caps.atc:false
+// on V4.1/DM500 encodes an EVIDENCE GAP (unmapped registers), not a confirmed capability absence, so it is NOT
+// wired to the twin forms this turn; the CAP_WHY text below is now known to overclaim ("no ... model" states a
+// confirmed absence the project's own portingArc.js V41_NAMED_ABSENCES.atcTables does not support) — left as-is,
+// unresolved, pending the advisor's own design ruling (see WORK-LOG t1890).
 const CAP_FIELDS = {
     // t475 — the WCS dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on other posts.
     wcsSync: ['w_sync', 'w_slave'],
 };
 const CAP_WHY = {
-    toolTable: 'no in-program tool table / ATC on this controller (e.g. grbl)',
     atc: 'no pneumatic tool-changer model on this controller — the drawbar/pusher/pocket dance is DDCS-Expert only',
     hmi: 'no in-program operator prompts on this controller',
     vars: 'no #variables on this controller',
