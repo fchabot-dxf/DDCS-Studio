@@ -599,7 +599,7 @@ exactly as described above; it stays a known, accepted rough edge rather than a 
 closing, the mechanism to reuse is exactly this: `wizardManager.js`'s `open()`, right after the `wizElem` lookup.
 
 ### 6 · `setup_datawiz` is an undeclared group. **Read from source.**
-`blocks/dataOps/commData.js:154` and `blocks/dataOps/homingData.js:167` pass `'setup_datawiz'`, but `GROUPS`
+`blocks/dataOps/commData.js:154` and `blocks/dataOps/homingData.js:129` (t1898 — shifted from 167 by -38) pass `'setup_datawiz'`, but `GROUPS`
 (`wizardLibrary.js:28-41`) declares only `probe_datawiz` / `atc_datawiz` / `mill_datawiz`. Harmless today because
 both are `opensAs` targets that `userEntries()` drops — but a **fork** copies `def.group` verbatim, so forking
 Comm or Homing puts a bar dropdown on screen whose label falls through to the raw id (`wizardLibrary.js:206`).

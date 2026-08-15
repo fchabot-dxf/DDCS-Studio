@@ -82,12 +82,20 @@ test('E1: the twin emit TRACKS live settings — change the Z travel / flip a Ho
 });
 
 /**
- * E2 M2 RULING (t550) — the emit operates on the OP'S OWN STORED STACK: a Blocks edit (an added/edited child atom) SURVIVES
- * the settings recompose, AND the settings-dependent values still track a settings change. The recompose UNROLLS/VALUE-SWAPS
- * in place — it never regenerates arms in a way that discards the edit. (This is the north-star gate the rebuild shape was
- * approved against.)
+ * E2 — SUPERSEDED (t1898, was t550). The old ruling was: the emit operates on the OP'S OWN STORED STACK, so a
+ * Blocks edit (an added/edited child atom) SURVIVES the settings recompose. t1896's census found the mechanism
+ * that made that possible — a per-arm "does the fresh shape match the stored shape" check — was ALSO the exact
+ * mechanism silently defeating `homingWizard.js`'s own explicit V4.1/DM500 safety refusal: the check was
+ * VACUOUSLY TRUE whenever the live dialect's fresh build had no per-axis arms at all (the refusal path returns a
+ * bare array, no `op` wrapper), so a template frozen under Expert kept re-emitting its OWN stored Expert arms
+ * under V4.1 — confirmed live, WORK-LOG t1896/t1892's own #1300 finding is the same class. FIXED (t1898) by a
+ * FULL RECOMPOSE, mirroring the atc_length/atc_check fix (t1894): `postInstantiate` rebuilds `root.children`
+ * from `homingStack(...)` fresh every time, unconditionally. The trade-off, ACCEPTED and named, not accidental:
+ * a Blocks-tab edit to an individual homing arm no longer survives a settings/dialect recompose — there IS no
+ * "stored arm" to preserve an edit inside anymore. What survives unchanged from the old ruling: the seek values
+ * still track live settings on every render (recompose reads them fresh each time either way).
  */
-test('E2 ruling: a Blocks edit SURVIVES the settings recompose (in-place on the stored stack) + the seek still tracks settings', async ({ page }) => {
+test('E2 SUPERSEDED: a Blocks edit does NOT survive the full recompose (t1898 — the trade-off for making the V4.1/DM500 refusal actually fire); the seek still tracks live settings', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
@@ -112,7 +120,7 @@ test('E2 ruling: a Blocks edit SURVIVES the settings recompose (in-place on the 
         op.children.splice(zi + 1, 0, { type: 'comment', params: { text: 'USER BEEP - do not lose me' } });
         const emitBefore = emitMapped(stack).text;
 
-        // settings change: Z travel -120 → 600 → the recompose (on the STORED, EDITED stack) must UPDATE the seek AND KEEP the edit
+        // settings change: Z travel -120 → 600 → the full recompose rebuilds from scratch, dropping the edit
         window.__s = { machine: { z: 600, x: 300, y: 300 }, limits: { zMaxHome: true }, homing: { axes: cfg } };
         const recomposed = def.postInstantiate(stack, { axes: ['z'], softLimits: true });
         const emitAfter = emitMapped(recomposed).text;
@@ -121,7 +129,7 @@ test('E2 ruling: a Blocks edit SURVIVES the settings recompose (in-place on the 
         return { before: emitBefore, after: emitAfter, seekBefore: seek(emitBefore), seekAfter: seek(emitAfter) };
     });
     expect(r.before, 'the edit is present in the initial emit').toContain('USER BEEP - do not lose me');
-    expect(r.after, 'the Blocks edit SURVIVES the settings recompose (the emit is on the stored stack, not a rebuild)').toContain('USER BEEP - do not lose me');
+    expect(r.after, 'the Blocks edit does NOT survive the full recompose — the named trade-off (t1898)').not.toContain('USER BEEP - do not lose me');
     expect(Number(r.seekBefore), 'initial: Z=-120 → seek 140').toBe(140);
-    expect(Number(r.seekAfter), 'after the edit: the seek STILL tracks the settings change (Z=600 → 620)').toBe(620);
+    expect(Number(r.seekAfter), 'the seek still tracks the settings change (Z=600 → 620) — unaffected by the trade-off').toBe(620);
 });

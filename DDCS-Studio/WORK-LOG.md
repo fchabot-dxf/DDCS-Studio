@@ -34861,3 +34861,70 @@ Gate: node tier 118/118 (no code changed this turn — the ONE live verification
 files, deleted after; `git status --short` confirmed clean before this WORK-LOG-only commit).
 
 🔨 turn 1896
+
+---
+
+## t1898 — HOMING FIXED: THE REFUSAL NOW REACHES THE TWIN. Full recompose, mirroring t1894. Flip direction settled.
+
+Dispatch: fix `homing_data` (t1896's one BROKEN, confirmed-live row) the same way t1894 fixed atc_length/
+atc_check — full postInstantiate recompose, no third shape. Assert the EMITTED TEXT, not a flag. Prove Expert
+byte-identical. Settle the flip direction. Gate: node tier + new spec + every homing spec + the cross-dialect
+emit invariant suite.
+
+THE FIX: `applyHomingRecompose` (`homingData.js`) REPLACED entirely. The OLD version (t550) operated on the
+FROZEN template's own stored `{type:'op', opType:'homing'}` container, partitioning it into header/per-axis-arms/
+tail and value-swapping each arm in place so a Blocks-tab edit would survive a settings recompose. Its own
+`shapeStable` check — `fRoles.every((r) => sRoleSet.has(r))` — is VACUOUSLY TRUE on an EMPTY `fRoles`, which is
+exactly what happens when the LIVE dialect's fresh build has no per-axis arms at all: `homingWizard.js`'s own
+non-Expert refusal path (`:168-173`) returns a BARE array (2 comments + `endprogram`, no `op` wrapper — never
+reaching the wrap at `:200`), so `freshOp` was `undefined` and `partitionArms((freshOp && freshOp.children) ||
+[])` fed an EMPTY array into the whole matching machinery. Net effect, confirmed live at t1896: a template frozen
+under Expert (the app's own boot-default profile — registration runs before any in-page `setActiveProfile` call
+takes effect, confirmed this turn) kept walking its OWN stored Expert arms through UNCHANGED under V4.1/DM500,
+dropping the header/tail too (both computed from the same empty `fp`). NEW: `root.children = homingStack({axes,
+config, machine, limits, softLimits}, {})` — rebuilt fresh from the ONE source, on every instantiation,
+unconditionally. Removed as dead code alongside it: `partitionArms`, `blockRole`, `ARM_HEAD`, `AX_FROM_LABEL`, the
+`flattenBlocks` import (its only caller was the old recompose).
+
+THE NAMED TRADE-OFF (stated up front, not discovered after): this SUPERSEDES the t550 ruling — a Blocks-tab edit
+to an individual homing arm (an inserted comment, etc.) no longer survives a settings/dialect recompose, because
+there is no "stored arm" left to preserve an edit inside. This is not collateral damage; it is the SAME mechanism
+that let the safety refusal go unheeded, retired on purpose. `homing-data-emit.spec.js`'s own E2 test (previously
+"a Blocks edit SURVIVES the settings recompose") is REWRITTEN, not deleted, to assert the new behavior explicitly
+and cite why — its sibling assertion (the seek still tracks live settings on every render) is UNCHANGED and still
+passes, since a full recompose reads current settings fresh regardless.
+
+EXPERT BYTE-IDENTICAL, proven two ways: (1) `homing-data-emit.spec.js`'s own pre-existing E1 sweep (twin ==
+`homingStack` byte-diff ZERO across 66 combos: 11 axis-selections/permutations × 2 Z-signs × 3 declared-home
+variants) — unmodified, still green. (2) the new spec's own dedicated Expert test — real seek content, no
+refusal text.
+
+THE FLIP DIRECTION, SETTLED (not left uncertain this time): driven live — register the twin under V4.1 (refusing),
+switch the active profile to Expert mid-session, re-render — the preview correctly shows Expert's real seek
+sequence, NOT stuck on the V4.1 refusal. The full recompose makes this STRUCTURALLY moot: every render replaces
+`root.children` wholesale from the LIVE dialect, so there is no "frozen direction" left in either direction — the
+question t1896 could not resolve for the OLD mechanism doesn't apply to the new one by construction.
+
+New: `tests/homing-refusal-reaches-twin-1898.spec.js` (4 tests — V4.1 refusal text + no Expert register anywhere,
+DM500 same + identical-caps note, Expert byte-identical, the flip direction settled). Asserts the EMITTED TEXT
+throughout (`#wiz_user_code`'s own textContent, read via `setActiveProfile`+`openWiz`, the same real-gesture
+pattern as t1892/t1894/t1896) — never a flag, per the dispatch's own explicit instruction, since this whole bug
+WAS a correctly-set flag silently ignored on the way to the machine. NON-VACUOUS: full revert of `homingData.js`
+alone (`git checkout HEAD --`, confirmed empty diff before re-editing) — 2/4 fail against the pre-fix source
+(the V4.1 and DM500 refusal-text assertions — reproducing the live bug: DM500's own preview showed the raw Expert
+seek sequence, byte-for-byte the WORK-LOG t1896 finding); the other 2 (Expert unchanged, flip-direction) pass
+either way by construction, not a gap — noted plainly rather than treated as a weaker proof, since the 2 failing
+ones are independently sufficient. Restored from scratch backup, diff matched exactly, re-ran green.
+
+ARCHITECTURE-MAP DRIFT, caught and fixed: removing the old ~50-line recompose machinery shifted `homingData.js`
+by −38 lines. `tests/node/architecture-map-1698.test.mjs`'s own TRAP6 citation (`homingData.js:167` → `129`) and
+`ARCHITECTURE.md`'s matching citation both updated, each with a "t1898 — shifted from 167 by −38" comment. Caught
+by the node-tier gate exactly as designed.
+
+Gate: node tier 118/118 (0 failed, post-fix). 27-file homing sweep (every `tests/homing-*.spec.js` +
+`rotary-homing.spec.js`) + `gcode-dialect-emit-invariants-1870.spec.js` — 1 first-pass timeout
+(`homing-limit-trip.spec.js`'s own `window.ddcsStudio` wait, under heavy parallel load), re-run single-worker
+5/5 clean — a load-contention flake, isolated and confirmed, not dismissed on the say-so. Everything else green
+on the first pass.
+
+🔨 turn 1898
