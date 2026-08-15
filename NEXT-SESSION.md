@@ -2687,3 +2687,43 @@ message becomes a parameter of the seam; it does not become four messages at fou
 
 ⚠ Report REACHABLE/NOT with evidence, not a theory. "Unlocated" is an acceptable answer; a guess is not.
 ⚠ DO NOT start slice 2 of the rename. DO NOT build step 3.
+
+# ═══ t1934 — DESIGN "ADD OPERATION": the gesture that grows a program (PLAN ONLY) ═══
+
+t1932 ACCEPTED. Three things it got right: it stated its CONFIDENCE LEVEL on the reachability finding
+("static trace, not an observed drag") instead of asserting it · it *checked* the segment-frame flag rather
+than repeating it, and ruled out a candidate mechanism by grep · and it refused to conflate a DIFFERENT live
+gap (`opAtLine`'s nested-child descent, now reachable via import) with the flag it was asked about.
+Findings recorded: `collectOps` over-deep twin = REACHABLE (static) · `slotPack.js` = genuinely separate
+domain, two declarations correctly stay two · `segment-frame-derivation-1838` flag CONFIRMED.
+
+## CONTEXT — the human is ruling on this; your job is to make the ruling concrete, NOT to pre-empt it.
+The word "op" means two things in this codebase: the CONTAINER (industry: a **program**, one per canvas) and
+its CONTENTS (industry: an **operation**, several per program, each with its own tool). The user's ruling
+"insert replaces the program" is correct for the container and destructive for the contents — as built, adding
+a drill operation destroys the facing operation. The multi-operation machinery already EXISTS and emits
+correctly (`blockEmitter.js:224-228` — an op container is transparent, verified): import can CREATE a
+multi-operation program, but no gesture can GROW one.
+
+**t1926 parked exactly this decision here:** `multi_step` is judged retirable *if* `operation` is the one word
+at every depth — and that call "belongs to step 3's authoring UI." This is that moment.
+
+## THE TASK — a written design. NO product code, NO specs, NO suite run (my gate is STILL running).
+1. **WHERE DOES AN ADDED OPERATION GO?** A canvas holding one operation has no wrapper today (`groupConsecutive
+   Ops` returns a run of 1 unwrapped). So does adding a second operation PROMOTE the single op into a wrapper,
+   or does every program carry a wrapper from the start? Name the cost of each. **This is the `multi_step`
+   retirement question in concrete form — answer it here.**
+2. **WHAT HAPPENS WHEN IT DROPS BACK TO ONE?** Does the wrapper collapse? A shape that appears and disappears
+   under the user is worse than one that is always there. State the rule and make it ONE rule.
+3. **THE GESTURE ITSELF** — how does the user say "add" vs "start over" at the wizard bar? Sketch it (ASCII is
+   fine). The user is a visual thinker; a picture beats a paragraph. **Present real options, not a menu of one
+   good idea and two you have already dismissed** — and if one is clearly right, say which and why.
+4. **WHAT DOES IT COST THE FOUR FEATURES JUST FIXED?** The setup sheet, time estimate, sim hints and flow
+   labels all read `flattenOps`. If a wrapper now appears where none was, say what changes for them — including
+   `collectOps`, whose over-deep twin you just proved REACHABLE.
+5. **ORDER OF OPERATIONS INSIDE A PROGRAM.** A real job is face → drill → contour and the tool changes between
+   them. Can the user reorder? If reordering is out of scope, say so — do not silently assume append-only.
+
+⚠ **DESIGN, DO NOT BUILD.** No code, no specs, no new affordances shipped.
+⚠ **Do not assume the user has ruled** — they have NOT. Write the fork, do not resolve it for them.
+⚠ DO NOT start slice 2 of the rename.
