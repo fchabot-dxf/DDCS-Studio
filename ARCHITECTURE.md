@@ -527,7 +527,7 @@ write, worse than the cold failure it looked like, because it looked like it wor
 another special case, with an INJECTED host (`setFormHost`, `panelTypes.js:85-87` — mirroring
 `setPreviewOnlyWriteHandler` just below it — dependency injection, not a new import cycle, since `panelTypes.js`
 is a lower layer than `userOpView.js`, which calls it before every `renderLayout2D` call with THIS instance's own
-`elNS('wiz_user_form')`, `userOpView.js:672,689` — t1890, shifted from 665,682 by 7 (the `_toolTableOk` gate wiring above it)). `_formHostExists` was removed rather than ported.
+`elNS('wiz_user_form')`, `userOpView.js:707,724` — t1906, shifted from 672,689 by 19 (the `_wcsSyncOk`/`_wcsPickerOk` gate wiring above it)). `_formHostExists` was removed rather than ported.
 **t1806 found the injection point itself was still a MODULE-LEVEL SINGLETON, read AGAIN at GESTURE time** by
 three DEFERRED readers (`setFields`'s drag write-back, `onEdgePick`, `onCornerPick`) — correct for `_writable`
 (evaluated synchronously during the render that built it) but not for a handler firing long after that render

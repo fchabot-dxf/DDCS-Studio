@@ -55,6 +55,23 @@ const activePostProbePort = () => { try { return !!getCaps(resolveActivePost(get
 // confirmed structural absence, not an unmapped/unconfirmed one (unlike `atc`, left untouched this turn — see
 // WORK-LOG t1890).
 const activePostToolTable = () => { try { return !!getCaps(resolveActivePost(getActiveProfile().id).id).toolTable; } catch (_) { return true; } };
+// t1906 — wcsSync/wcsPicker: does the active post support dual-gantry slave sync, or a WCS-number picker at all?
+// CONFIRMED, not encoded ignorance (unlike `atc`): #883/#884 dual-gantry sync is an Expert-specific register write
+// (postGating.js's own now-dead CAP_WHY, an already-settled architecture fact cited elsewhere in this project's
+// history as a "gated-absence", not an unmapped one); V4.1/DM500 both declare `wcsAuto:false, wcsFixed:false,
+// wcsSync:false` grounded in the SAME confirmed structural fact as `readActiveWcs`'s own named-absence entry —
+// V4.1/DM500 have NO per-WCS-index register at all (work ACTIVE-ONLY), so neither "auto" (needs an active-WCS
+// var) nor "fixed" (needs a targetable register) has anything to target. `_wcsPickerOk` is a SIMPLIFICATION of
+// the old dead code's own per-OPTION granularity (Auto needs wcsAuto, G54-59 need wcsFixed separately — RS274NGC
+// genuinely has fixed-only: `rs274ngc.js`'s own caps declare `wcsAuto:false, wcsFixed:true` — read directly, not
+// via wcs-gating.spec.js, which t1906 retired: its own gesture, a bare `openWiz('wcs')`, bypasses the wizard
+// bar's own opensAs redirection entirely — `commandDeck.js:90` bakes the REDIRECTED type into the bar's own
+// generated onclick, so no real user gesture ever reaches the legacy `wiz_wcs` panel that test targeted)
+// — collapsed to "does EITHER sub-capability exist" because
+// V4.1/DM500 (the profiles in question) have both false together; the finer distinction would need extending
+// [data-option-gate] to more than one option per binding, named here as a deliberate trade-off, not silent.
+const activePostWcsSync = () => { try { return !!getCaps(resolveActivePost(getActiveProfile().id).id).wcsSync; } catch (_) { return true; } };
+const activePostWcsPicker = () => { try { const c = getCaps(resolveActivePost(getActiveProfile().id).id); return !!(c.wcsAuto || c.wcsFixed); } catch (_) { return true; } };
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
 import { latheProbeTool, latheBarOf } from '../../viz/latheScene.js';   // t1301 — a lathe probe's stylus is the form's declared radius, scaled to the bar
 
@@ -479,8 +496,10 @@ export function createUserOpView(ns, opts) {
             // encoder/servo spindle (settings.spindle.tapCapable) AND the Expert post (the only dump-evidenced firmware).
             // t1880 — `_probePortOk`: does the active post's own probeMove even read a port number (Expert: yes; V4.1/DM500: no).
             // t1890 — `_toolTableOk`: does the active post have an in-program tool-length table at all (all DDCS/rs274ngc/centroid: yes; grbl: no).
+            // t1906 — `_wcsSyncOk`/`_wcsPickerOk`: dual-gantry sync (Expert-only, #883/#884) and the WCS-number picker
+            // (needs wcsAuto or wcsFixed — V4.1/DM500 have neither, no per-WCS-index register at all).
             const _spin = (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {};
-            const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert'), _probePortOk: activePostProbePort(), _toolTableOk: activePostToolTable() };
+            const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert'), _probePortOk: activePostProbePort(), _toolTableOk: activePostToolTable(), _wcsSyncOk: activePostWcsSync(), _wcsPickerOk: activePostWcsPicker() };
             if (fhost) fhost.querySelectorAll('[data-when], [data-when-all]').forEach((row) => {
                 let ok;
                 if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions

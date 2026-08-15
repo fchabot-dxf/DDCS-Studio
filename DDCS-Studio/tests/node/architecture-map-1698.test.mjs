@@ -158,7 +158,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
     { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 706, find: /container\.__layout/ },
     { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
-    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 689, find: /renderLayout2D|el\('userVizContainer'\)/ },   // t1890 — shifted from 682 by 7 (the _toolTableOk gate wiring above it, mirroring t1880's own _probePortOk shift)
+    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 708, find: /renderLayout2D|el\('userVizContainer'\)/ },   // t1906 — shifted from 689 by 19 (the _wcsSyncOk/_wcsPickerOk gate wiring above it)
 ];
 
 test('architecture map ASSERTED: every TRAP citation still holds', () => {

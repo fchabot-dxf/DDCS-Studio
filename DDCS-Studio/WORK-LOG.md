@@ -35123,3 +35123,112 @@ under the identical load batch — 1 failed pre-fix, 1 STILL failed after the fi
 failed across 3 separate runs after the corrected fix. `npm run test:node`: 118/118 (test-file-only change).
 
 🔨 turn 1904
+
+---
+
+## t1906 — CLOSING THE CENSUS BACKLOG: wcsSync/w_sys wired, numericInputGuards deleted, 2 UNCLEAR rows settled — with two real mistakes caught and corrected before they shipped
+
+Dispatch: close the remaining t1884-orphaned rows — wcsSync + the w_sys option-gate, `numericInputGuards.js`
+(flagged as a possible second casualty, never traced), and the 2 UNCLEAR rows with what would settle each.
+Default suspicion carried forward: check whether each mechanism still FUNCTIONS before writing a test. Take each
+in one act only if genuinely small; stop and report if any turns into its own investigation.
+
+### 1 — wcsSync + w_sys: CLOSED, wired to the twin form (confirmed absence, not encoded ignorance)
+
+Semantic established fresh, same rigor as probePort/toolTable: V4.1/DM500 both declare `wcsAuto:false,
+wcsFixed:false, wcsSync:false` (`ddcs-v41.js:19`, `ddcs-v3-dm500.js:23`), grounded in the SAME confirmed
+architectural fact `portingArc.js`'s own `V41_NAMED_ABSENCES.readActiveWcs` entry already documents in detail —
+no per-WCS-index register exists on those firmwares at all (work ACTIVE-ONLY). Unlike `atc`, nothing here hedges
+("unmapped"/"unconfirmed") — this is a settled fact, already cited elsewhere in this project's own history as a
+"gated-absence" pattern (`#883`/`#884` dual-gantry sync), not a new claim.
+
+`wcsData.js`'s own `sync`/`slave` bindings now gate on a new `_wcsSyncOk`; `sys` gates WHOLE-FIELD on a new
+`_wcsPickerOk` (`caps.wcsAuto || caps.wcsFixed`) — a NAMED SIMPLIFICATION of the old dead code's own per-OPTION
+granularity (Auto needs wcsAuto, G54-59 need wcsFixed separately; RS274NGC genuinely has fixed-only,
+`rs274ngc.js:27`). The simplification is correct for V4.1/DM500 (both false together, so whole-field and
+per-option grey the SAME thing for them); RS274NGC's own finer case would need extending `[data-option-gate]`
+beyond one option per binding — named as a deliberate trade-off, not attempted (out of "genuinely small" scope).
+`postGating.js`'s own dead `CAP_FIELDS.wcsSync`/`CAP_WHY.wcsSync` and its separate `w_sys` option-gating loop
+(both targeting the legacy `wiz_wcs` panel) are deleted entirely.
+
+New: `tests/wcs-sync-gate-1906.spec.js` (4 tests). NON-VACUOUS: reverted all 3 changed source files to HEAD,
+confirmed 4/4 fail with the predicted "field never settled a gate state" signature, restored, re-ran green.
+
+**A REAL CORRECTION TO THE CENSUS'S OWN FOUNDATIONAL FACT, caught mid-verification, not assumed away.** Running
+the pre-existing `wcs-gating.spec.js` against my change failed — not on a "panel not found" error, but on a
+VALUE mismatch, meaning `#wiz_wcs`/`#w_sys` genuinely EXIST and are reachable via that test's own gesture
+(`window.openWiz('wcs')`, the SHORT built-in id). Verified live: `openWiz('wcs')` really does render `#wiz_wcs`
+as `display:block`, contradicting the t1884 census's own "every wizard is twin-routed, no exceptions" claim on
+its face. Traced to the actual mechanism before concluding either way: `commandDeck.js:90` — the wizard BAR's
+own generated `onclick` for an entry WITH `opensAs` bakes in the REDIRECTED type
+(`openWiz('user_wcs_data')`), not the short id. The redirection is a BAR-RENDER-TIME behavior, not something
+`wizardManager.open()`/`window.openWiz()` do internally — so a REAL user, clicking the actual WCS bar button,
+100% reaches the twin; only a RAW, direct `openWiz('wcs')` call (a test-only gesture, matching nothing a real
+user gesture ever produces) reaches the legacy panel. This REFINES the census's own foundational fact rather
+than overturning it: true for every real bar-click gesture, not true for a bare short-id call — a nuance worth
+keeping since it's easy to accidentally write a "real gesture" test that isn't one. `wcs-gating.spec.js` itself
+is RETIRED (deleted, not merely fixed) — its own coverage is superseded by `wcs-sync-gate-1906.spec.js`, which
+targets the mechanism a real user actually reaches.
+
+### 2 — numericInputGuards.js: CLOSED, DELETED (reviving it would have been actively harmful, not neutral)
+
+Confirmed dead the same way probePort/toolTable were: `NUMERIC_INPUT_POLICY.integer`/`.decimal` is built entirely
+from the same pre-wizards-as-data static ids (`c_dist`, `c_port`, `m_dist`, etc.) as postGating's own deleted
+`CAP_FIELDS.probePort` — zero DOM presence today, `setupNumericInputGuards()`'s own `el(id)` lookup returns null
+every time, called once at boot as a total no-op.
+
+Unlike the gates closed so far, reviving this one would NOT have been neutral — checked before concluding
+anything, per the dispatch's own "check whether it still functions" standard: the twin form's own number widget
+(`formWidgets.js:114-125`) already renders a native `type="number"` input for every field WITHOUT a declared
+token policy (the vast majority) — the BROWSER ITSELF already rejects non-numeric keystrokes at the DOM level,
+making the old guard fully redundant there. For the MINORITY of fields WITH `tokenEligible`/`tokenRefusal`
+declared, the widget deliberately renders `type="text"` so a `#500`-style controller token CAN be typed —
+reviving the old guard's own strict digit-only character allowlist onto THOSE fields would have STRIPPED the `#`
+and broken the live token-entry feature. Deleted the module, its import, its call site, and its boot-time
+invocation in `app.js`; no test referenced it.
+
+### 3 — UNCLEAR #1 (`headerPost.js`'s `caps.vars`/`caps.flowStreamable` banner): SETTLED, exhaustively — correctly scoped, not broken
+
+t1884 only spot-checked. Read all 7 registered dialects' own `caps.vars`/`caps.flowStreamable` declarations
+directly: `caps.vars:false` exists on EXACTLY ONE dialect (`grbl.js`) of the 7; every DDCS dialect (Expert/V4.1/
+DM500) plus RS274NGC/Centroid/grblHAL all declare (or inherit) `vars:true`. `caps.flowStreamable:false` is
+declared by EXACTLY ONE dialect (`grblhal.js`, an explicit override); every other dialect inherits the default
+`true`. Both of the banner's own trigger conditions are therefore architecturally IMPOSSIBLE to satisfy for any
+of the 3 DDCS dialects — this is not an orphaned gate, it's a correctly-scoped mechanism for an audience (grbl/
+grblHAL) outside this project's own DDCS-centric primary use case. No code change; nothing to fix.
+
+### 4 — UNCLEAR #2 (`app.js`'s `saveDefaults()`): STOPPED, NOT superseded — a real, reachable, currently-broken feature; its own investigation
+
+**A second real mistake, caught and corrected before it shipped.** First pass: confirmed `saveDefaults()`'s own
+field-id list is the same 100%-dead legacy ids, concluded (WRONGLY, and briefly implemented) that it was both
+unreachable and superseded by the twin's own `wizard-value-persistence-1437.spec.js` persistence — deleted it.
+My OWN "confirm no remaining references" sweep (a habit, not a special check for this case) turned up
+`ui/downloadMenu.js:28`: the header's own DOWNLOAD button → a popup menu → "🌐 App as HTML — portable, your
+defaults" (`#dl-html`), a REAL, currently-shipped, dynamically-created button (invisible to a static grep of
+`index.html`, which is why the FIRST reachability check missed it) that calls `window.saveDefaults?.()`.
+Reverted the deletion immediately, restored both files exactly.
+
+Re-examined on the correct premise: `saveDefaults()` is genuinely REACHABLE, and serves a DIFFERENT purpose than
+t1437's own persistence — t1437 is same-machine, localStorage-backed "remember my last Insert"; `saveDefaults()`
+is "bake my current settings into a downloadable, portable HTML file to carry to another machine" — NOT the same
+use case, NOT superseded. Its own field-id list IS confirmed 100% stale, so the shipped "your defaults" promise
+is silently unfulfilled today for every real user who clicks that button — a REAL, ADVERTISED, CURRENTLY-BROKEN
+feature, the exact same severity class as `probeInputSelect.js`'s own finding (t1884), not dead code to delete.
+
+STOPPED, not fixed: updating the captured id list to the modern twin-form field set is its own investigation —
+the twin system covers far more op types than the original ~6-wizard hardcoded list ever did, and deciding the
+right SCOPE/DESIGN for "capture defaults across every possible custom op" (every registered `user_*` type? Only
+the ones with visible forms? How does a per-op-type field list even get declared going forward without becoming
+its own maintenance burden?) is a real design question, not a mechanical field-id swap. Reported, per the
+dispatch's own explicit allowance, rather than guessed at or rushed.
+
+### Gate
+
+Full sweep on every spec touching `wcsData`/`postGating`/`CAP_WHY`/`wizardManager` opensAs routing (14 files, 68
+tests, 0 failed, 2 pre-existing skips) + `npm run test:node`: 118/118 (architecture-map drift from the
+`userOpView.js` line-count shift caught and fixed — TRAP9 + the matching `ARCHITECTURE.md` citation, both
+shifted +19, same discipline as every prior turn). `git status --short`: exactly the 8 files this entry names,
+confirmed clean before staging (the corrected `saveDefaults()`/`globalFunctions.js` pair shows ZERO net diff
+against HEAD, confirming the revert was byte-exact).
+
+🔨 turn 1906

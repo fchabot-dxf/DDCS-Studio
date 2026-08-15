@@ -12,7 +12,6 @@ import { DockManager } from './ui/dockManager.js';
 import { WizardManager } from './wizardManager.js';
 import { el } from './ui/uiUtils.js';
 import { setupGlobalFunctions } from './ui/globalFunctions.js';
-import { setupNumericInputGuards as setupNumericInputGuardsImpl } from './ui/numericInputGuards.js';
 import { playClick } from './ui/sound.js';  // click feedback sound
 import { loadUserOps, listUserOps, createUserOp, updateUserOp, deleteUserOp, getUserDef } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops; t1107 — per-wizard Restore-to-factory reseed
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
@@ -178,9 +177,6 @@ class DDCSStudio {
         this.setupGlobalFunctions();
         console.debug('DDCSStudio.init() - setupGlobalFunctions complete');
 
-        // Enforce numeric-only input on generator numeric fields
-        this.setupNumericInputGuards();
-
         // Setup file upload handler
         this.setupFileUpload();
 
@@ -288,9 +284,16 @@ class DDCSStudio {
         });
     }
 
-    setupNumericInputGuards() {
-        setupNumericInputGuardsImpl();
-    }
+    // setupNumericInputGuards() retired (t1906) — ui/numericInputGuards.js was a hand-rolled keystroke filter
+    // keyed entirely off the same pre-wizards-as-data static field ids as postGating.js's own now-deleted
+    // CAP_FIELDS.probePort (c_dist/c_port/m_dist/etc.) — zero DOM presence today, a total no-op. NOT revived: the
+    // twin form's own number widget already renders a native `type="number"` input for every field WITHOUT a
+    // declared token policy (the vast majority) — the browser itself already rejects non-numeric keystrokes at
+    // the DOM level, making the old guard redundant there. For the MINORITY of fields WITH `tokenEligible`/
+    // `tokenRefusal` declared, the widget deliberately renders `type="text"` so a `#500`-style controller token
+    // CAN be typed (formWidgets.js:114-125) — reviving the old guard's own strict digit-only character allowlist
+    // would have STRIPPED that `#` and broken the live token-entry feature, not restored anything. Deleted, not
+    // revived — the disposal this project has already used twice for a dead mechanism whose gate encodes nothing.
 
     // openCorner() retired ④ — the built-in Corner is replaced by the "Corner (data)" twin (user_corner_data).
     // setupVisualizationListeners()/openMiddle()/openEdge() retired t1730 (gameplan step 2, Tier B) — the
@@ -298,6 +301,16 @@ class DDCSStudio {
     // had zero callers already (globalFunctions.js's window.openMiddleWiz/openEdgeWiz call
     // wizardManager.openMiddle()/openEdge() — a DIFFERENT class's methods — not these).
 
+    // t1906 — CORRECTION to an initial premature deletion this same turn: saveDefaults() is REACHABLE (the
+    // header Download button → "🌐 App as HTML — portable, your defaults", ui/downloadMenu.js's own #dl-html
+    // click handler) and serves a DIFFERENT purpose than the twin's own t1437 persistence (that's same-machine,
+    // localStorage-backed "remember my last Insert"; this is "bake my current settings into a downloadable,
+    // portable HTML file to carry to another machine") — NOT superseded. Its own field-id list IS confirmed
+    // 100% stale (the same dead pre-wizards-as-data ids as postGating.js's own deleted CAP_FIELDS.probePort), so
+    // the shipped "your defaults" promise is silently unfulfilled today — a real, advertised, currently-broken
+    // feature (probeInputSelect.js's own class), not dead code. Restored, not fixed — updating the captured
+    // id list to the modern twin-form fields is its own investigation, out of this turn's own "genuinely small"
+    // scope; reported to the advisor instead of guessed at.
     saveDefaults() {
         // All wizard input IDs to snapshot
         const inputIds = [

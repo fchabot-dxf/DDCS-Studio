@@ -21,13 +21,19 @@ const WRAP = 4;
 // function that copies every param straight into the single wcszero atom's params object — zero JS arithmetic,
 // zero branching, at the wizard layer. All 6 are `tokenEligible`. (None render as a typed field today — every one
 // is a dropdown/checkbox — so none currently OFFER a token-entry gesture regardless; see the scope note above.)
+// t1906 — `sys` gated whole-field on `_wcsPickerOk` (needs wcsAuto OR wcsFixed; V4.1/DM500 have neither — no
+// per-WCS-index register at all, same confirmed fact as readActiveWcs's own named-absence). `sync`/`slave` gated
+// on `_wcsSyncOk` (dual-gantry slave sync is an Expert-specific #883/#884 register write, confirmed absence on
+// every other post, not encoded ignorance — see userOpView.js's own activePostWcsSync comment).
+const WCS_PICKER_GATE = { param: '_wcsPickerOk', is: false, tip: 'This controller has no per-WCS-index register — it zeroes whichever WCS frame is currently active, and can\'t target a specific one.' };
+const WCS_SYNC_GATE = { param: '_wcsSyncOk', is: false, tip: 'Dual-gantry slave sync is a DDCS-Expert-specific register write — no equivalent on this controller.' };
 const WCS_EXEC_BINDINGS = [
-    { param: 'sys', tokenEligible: true, blockIndex: 0, key: 'sys', type: 'enum', default: WCS_DEFAULTS.sys, widget: 'dropdown', widgetConfig: { options: SYS_OPTIONS }, label: 'WCS System', help: 'Active WCS (Auto) zeroes whichever WCS is loaded; G54-G59 target a specific register (posts that can\'t are gated).', section: 'GEOMETRY' },
+    { param: 'sys', tokenEligible: true, blockIndex: 0, key: 'sys', type: 'enum', default: WCS_DEFAULTS.sys, widget: 'dropdown', widgetConfig: { options: SYS_OPTIONS }, label: 'WCS System', help: 'Active WCS (Auto) zeroes whichever WCS is loaded; G54-G59 target a specific register (posts that can\'t are gated).', section: 'GEOMETRY', gate: WCS_PICKER_GATE },
     { param: 'axisX', tokenEligible: true, blockIndex: 0, key: 'axisX', type: 'bool', default: WCS_DEFAULTS.axisX, label: 'Zero X', section: 'GEOMETRY' },
     { param: 'axisY', tokenEligible: true, blockIndex: 0, key: 'axisY', type: 'bool', default: WCS_DEFAULTS.axisY, label: 'Zero Y', section: 'GEOMETRY' },
     { param: 'axisZ', tokenEligible: true, blockIndex: 0, key: 'axisZ', type: 'bool', default: WCS_DEFAULTS.axisZ, label: 'Zero Z', section: 'GEOMETRY' },
-    { param: 'sync', tokenEligible: true, blockIndex: 0, key: 'sync', type: 'bool', default: WCS_DEFAULTS.sync, label: 'Sync A Axis (Dual Gantry)', section: 'OPTIONS' },
-    { param: 'slave', tokenEligible: true, blockIndex: 0, key: 'slave', type: 'enum', default: WCS_DEFAULTS.slave, widget: 'dropdown', widgetConfig: { options: SLAVE_OPTIONS }, label: 'Slave', section: 'OPTIONS' },
+    { param: 'sync', tokenEligible: true, blockIndex: 0, key: 'sync', type: 'bool', default: WCS_DEFAULTS.sync, label: 'Sync A Axis (Dual Gantry)', section: 'OPTIONS', gate: WCS_SYNC_GATE },
+    { param: 'slave', tokenEligible: true, blockIndex: 0, key: 'slave', type: 'enum', default: WCS_DEFAULTS.slave, widget: 'dropdown', widgetConfig: { options: SLAVE_OPTIONS }, label: 'Slave', section: 'OPTIONS', gate: WCS_SYNC_GATE },
 ];
 export const WCS_BINDINGS = WCS_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP }));
 
