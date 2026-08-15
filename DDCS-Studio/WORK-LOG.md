@@ -35723,3 +35723,72 @@ not a regression. `proc_health.py watch`: clean. `git status` on `verification/`
 touched this turn.
 
 🔨 turn 1916
+
+## t1918 — COARSEN THE LATHE ICONS (user-visual, queue-jump)
+
+### Dispatch
+
+Direct user feedback jumping the one-op queue: "the lathe icons are too small, make them a bit more coarse." The
+family concept (shared bar + centreline, differentiated by what the cut does) stays — the DETAIL BUDGET at actual
+render size was wrong. Fewer, heavier marks; drop what can't survive 14px rather than shrinking it further; match
+Mill's own weight (compare side by side FIRST, at the same size, before concluding lathe is the odd one out); show
+the picture, before and after, same size. Gate: node tier + any spec touching wizIcons/commandDeck; not the full
+suite (the advisor's own gate runs before release).
+
+### Measured the actual gap before touching anything
+
+At 14px / 24-unit viewBox: my own bar was 4 units tall (~2.3px rendered), the centreline a 1.1-stroke with a
+"2 1.6" dash (near-invisible), the probe ball r=1.8 (~1px), the hex facets a 1.6 stroke (gone) — exactly the
+symptom the user named. Compared directly against `wizIcons.js`'s own `rotary_center` (the CLOSEST precedent —
+same "this rotates" concept, same house style, already proven at this exact render size): its rect is height=8
+(mine was HALF), its dashed centreline inherits stroke-width 2 with dash "3 2" (mine was 1.1/"2 1.6" — roughly
+half the weight in both dimensions). `drill`/`bore` (the mill set) use stroke-width 2.5 and span nearly the whole
+24-unit box. My own family was under-sized relative to BOTH direct references, not merely "thin" in the abstract —
+measured, not guessed.
+
+### Recoarsened to match, not merely "bolder"
+
+Bar height 4→8 (matches `rotary_center`'s own rect exactly), bar stroke 2→2.5 (matches `drill`/`bore`), centreline
+stroke 1.1→2 with dash "2 1.6"→"3 2" (matches `rotary_center` exactly, not just "wider"). Every cut-mark and probe
+ball enlarged in proportion: Facing's own dark bite, Part/Groove's own slit, Centre Drill's own point, all roughly
+doubled; Polygon Turn's hexagon enlarged with its own stroke bumped to 2.5 rather than trying to preserve the old
+facet count at a bigger size (a bigger hexagon at the old 1.6 stroke would still have thin facets — the fix is
+weight, not just scale); probe balls r 1.8→2.6. The group icon (`commandDeck.js`'s `HEADER_ICONS.lathe`) recoarsened
+to the identical bar/centreline weight so it stays visibly kin to its own item family below it, plus a bigger,
+bolder tool wedge.
+
+### Verified weight parity BEFORE wiring in — a zoomed direct comparison, not assumed
+
+Built an isolated mockup rendering the new "Facing" icon beside `rotary_center` and `drill` at high zoom (32px,
+6x DPI) — the three read at comparable stroke weight side by side, confirming the target was hit rather than
+merely "bolder than before." Only then wired the calibrated weights into `wizIcons.js` (7 item icons) and
+`commandDeck.js` (`HEADER_ICONS.lathe`).
+
+### Shown, not described — real before/after at the same true size
+
+Backed up the new files, temporarily restored the exact t1911-committed versions (`git show d12b6b5c:...`),
+screenshotted the live Lathe dropdown at 4x DPI (matching t1911's own method), restored the new files, re-screenshotted
+the same crop at the same DPI — a genuine apples-to-apples live-app before/after, not two differently-scaled mockups.
+Composed side by side and sent to the user, plus the group-icon-vs-Mill/Custom/Probe/ATC comparison (old and new
+weight together in one row) — both delivered as files per the dispatch's own "show me the picture" instruction,
+not just described in text.
+
+### A second finding, unrelated to this act's own scope but caught by its own gate: t1916's line-shift arithmetic was wrong
+
+`npm run test:node` failed BEFORE I'd touched anything of my own — `INV3`'s citation (`programModel.js`,
+subscriber-isolation `console.error`) was stale at 347; the real line is 357. t1916's own comment claimed "shifted
+from 269 by +78" — 269+78 is 347, but the actual shift was +88; a plain arithmetic slip, not a moving target (git
+log confirms `d5330659`, my own t1916 commit, is still `programModel.js`'s tip — the file hasn't changed since).
+Fixed both citations (the test + `ARCHITECTURE.md`'s own copy) since this act's own gate is what surfaced it and
+it blocks node tier for anyone. Also re-fixed `TRAP7` (`commandDeck.js`, the `opensAs` stamp) for the ordinary
+reason — my own `HEADER_ICONS.lathe` edit this turn added 2 lines above it, 107→109.
+
+### Gate
+
+`npm run test:node`: 118/118 (after both citation fixes). 6 specs referencing `commandDeck`/`wizIcons`
+(`header-never-clips-748`, `middle-feature-draw`, `op-params-complete`, `wiz-bar-canvas-route`, `wizard-bar`,
+`wizbar-icon-picker`): 14 passed, 1 pre-existing unrelated skip. `proc_health.py watch`: clean. `git status` on
+`verification/`: no tracked baseline PNGs touched. Scratch `http-server` instances (ports 3214, the earlier
+temporary revert-for-screenshot swap) killed before finishing.
+
+🔨 turn 1918

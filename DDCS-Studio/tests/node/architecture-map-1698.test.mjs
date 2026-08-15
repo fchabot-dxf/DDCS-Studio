@@ -152,7 +152,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP6 commData.js passes setup_datawiz', file: 'web/blocks/dataOps/commData.js', line: 154, find: /setup_datawiz/ },
     { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 129, find: /setup_datawiz/ },   // t1898 — shifted from 167 by -38 (the full-recompose fix removed the old per-arm partitionArms/blockRole machinery)
     { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', line: 28, lineEnd: 41, find: /_datawiz/ },
-    { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 107, find: /opensAs/ },   // t1911 — shifted from 105 by +2 (HEADER_ICONS.lathe restyled to the bar+axis family motif, 3-line comment)
+    { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 109, find: /opensAs/ },   // t1918 — shifted from 107 by +2 (HEADER_ICONS.lathe recoarsened, comment grew by one line)
     { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1147, lineEnd: 1148, find: /z-index/ },   // t1874 — shifted from 1127-1128 by the Slice 3 live-visibility wiring above it (Option B Slice 3)
     { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2835, find: /attach/ },   // t1874 — shifted from 2819 by the setPlayFrameHidden edits above it (Option B Slice 3)
     { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
@@ -184,7 +184,7 @@ const INVARIANT_CLAIMS = [
     { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', line: 78, find: /mouth/ },
     { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', line: 40, find: /./ },
     { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', line: 265, find: /./ },
-    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 347, find: /console\.error/ },   // t1916 — shifted from 269 by +78 (importMarkedNc's own multi-step grouping + terminator-collapse + the fixed-skip rewrite, all above it)
+    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 357, find: /console\.error/ },   // t1918 — corrected: t1916's own "+78" arithmetic was off by 10 (269->357, not 347); caught by this turn's own node-tier gate
     { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
     { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
     { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 893, lineEnd: 900, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1880 — shifted from 884-891 by the gate round-trip fix above (bindingsToBlocks/bindingsFromStack)

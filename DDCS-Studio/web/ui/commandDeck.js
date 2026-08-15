@@ -42,8 +42,10 @@ const HEADER_ICONS = {
     custom: _svg('<path d="M12 2.5c.6 4.3 2.7 6.4 7 7-4.3.6-6.4 2.7-7 7-.6-4.3-2.7-6.4-7-7 4.3-.6 6.4-2.7 7-7z" fill="#fbbf24" stroke="#f59e0b"/>', '#f59e0b'),
     // Lathe = the stock bar on its spinning axis (red dashed centreline, the SAME convention wizIcons.js's own
     // rotary_center already uses for "this rotates") + an amber tool touching it. t1910 replaced the fallback
-    // sparkle; t1911 restyled to this bar+axis motif so the group icon reads as kin to its own item icons below.
-    lathe:  _svg('<rect x="2" y="10" width="20" height="4" rx="2" stroke="#94a3b8"/><line x1="0.5" y1="12" x2="23.5" y2="12" stroke="#e11d48" stroke-width="1.4" stroke-dasharray="2.4 1.8"/><path d="M14 16.5l3-2.7 1.6.5-1 3.2z" fill="#f59e0b" stroke="#f59e0b" stroke-width="1"/>', '#64748b'),
+    // sparkle; t1911 restyled to this bar+axis motif so the group icon reads as kin to its own item icons below;
+    // t1918 recoarsened to rotary_center's own proven weight (bar height 8/stroke 2.5, axis stroke 2 dash "3 2")
+    // after the user found the first pass too thin at its actual render size — matches the item family's own fix.
+    lathe:  _svg('<rect x="2" y="8" width="20" height="8" rx="3" stroke="#94a3b8" stroke-width="2.5"/><line x1="0.5" y1="12" x2="23.5" y2="12" stroke="#e11d48" stroke-width="2" stroke-dasharray="3 2"/><path d="M13 17.5l4-3.5 2 .7-1.3 4.3z" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/>', '#64748b'),
 };
 
 // ── Data-driven wizard bar (stage 4) ─────────────────────────────────────────────────────────────────────────

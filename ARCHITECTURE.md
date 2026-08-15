@@ -409,7 +409,7 @@ relative plunge silently becomes absolute. Note the resolution shape: `_group` i
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 
 **3 · A fail-loud guard is worthless if the path carrying its throw swallows it.**
-Guard: `blocks/programModel.js:347` (t1916 — was stale at 236, already shifted to 269 by t1846 and never updated here) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
+Guard: `blocks/programModel.js:357` (t1918 — corrected: t1916's own "+78" arithmetic was off by 10, having previously been stale at 236 then 269) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
 the guards above fired into a silent catch for their entire early life, on the only path an operator's
 paste-then-open-Blocks gesture takes.
 
@@ -608,7 +608,7 @@ rg -n "setup_datawiz" DDCS-Studio/web
 ```
 
 ### 7 · The bar's `data-optype` stamp is the BUILT-IN type, not the twin.
-`commandDeck.js:107` — `e.type || e.opensAs || e.id` (t1911 — shifted from 105 by +2, `HEADER_ICONS.lathe` restyled). So `ui/axisGating.js` gates the Pocket button on `'pocket'`
+`commandDeck.js:109` — `e.type || e.opensAs || e.id` (t1918 — shifted from 107 by +2, `HEADER_ICONS.lathe` recoarsened). So `ui/axisGating.js` gates the Pocket button on `'pocket'`
 while the click opens `'user_pocket_data'`. For `io_step` / `pause_confirm` / `tap` the stamped value is a type no
 builder registry knows.
 
