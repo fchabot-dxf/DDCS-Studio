@@ -38318,3 +38318,87 @@ Read-only design, per the dispatch — no code, no specs, no suite run. `git sta
 entry changed.
 
 🔨 turn 1960
+
+# ═══ t1962 — DESIGN (read-only): the guarded-fallback idiom, all sites, one rule ═══
+
+**Correction to my own t1960 pass-back first:** I told you "9 sites." The real count is **6**, across 4 files —
+the Explore agent's tally conflated "already uses the canonical primitive" with "has a guarded ternary fallback."
+`opGlow.js`'s 4 lookups are NOT this idiom at all: my own t1958 fix replaced its private `_findOpById` with a
+DIRECT import (`import { findOpById as _findOpById } from './programModel.js'`) — no ternary, no fallback, ever.
+Grepped fresh for the literal `window.ddcsFindOpById`/`window.ddcsFlattenOps`/`window.ddcsReplaceOpById` pattern
+to get the real list, not trusted from memory:
+
+| # | Site | Fallback branch |
+|---|---|---|
+| 1 | `opSession.js:552` (`replaceOp`, the op lookup) | `cur.find(b => b.type==='op' && b.id===opId)` |
+| 2 | `opSession.js:560` (`replaceOp`, the splice) | IIFE: `findIndex` + manual slice-splice, same top-level-only shape |
+| 3 | `engine/envelopeCheck.js:184` (pre-flight pass-start derivation) | `prog.filter(b => b.type==='op')` |
+| 4 | `wizardManager.js:410` (`openForEdit`) | `prog.find(b => b.type==='op' && b.id===opId)` |
+| 5 | `wizardManager.js:495` (group-edit `tgt` detection) | same shape as #4 |
+| 6 | `wizardManager.js:525` (insert-path duplicate-count message) | `cur.filter(b => b.type==='op')` |
+
+## (1) CLASSIFY ALL 6 — every fallback is (a) KNOWN-WRONG, none are (b) benign or (c) equivalent
+
+All six fallback branches are the EXACT shallow, top-level-only shape this whole session has been fixing —
+`#1`/`#4`/`#5` are literally the pre-t1958 `openForEdit`/`replaceOp` bug, byte-for-byte; `#3`/`#6` are the
+pre-t1928 `flattenOps` bug. None degrade gracefully to an empty/no-op result (which would be category b) and
+none are a genuine alternate-but-equivalent implementation (category c) — every one of them silently mishandles
+or drops a `multi_step`-nested op, for exactly the reasons already fixed elsewhere in this codebase. `#6`'s
+consequence is the mildest (an under-counted op-name in a confirmation dialog's message, not a data loss), but
+it's still the same wrong computation.
+
+## (2) CAN THE GUARD EVER FIRE? No — traced the boot order, not assumed
+
+`app.js`'s `DDCSStudio` constructor calls `new WizardManager(...)` (line 148) and THEN `this.init()` (line 152),
+which calls `initProgramModel()` (line 161) SYNCHRONOUSLY, still inside the same constructor call, before the
+app is interactive or renders anything a user could click. All 6 sites are METHODS/functions invoked only in
+response to a later user gesture (Edit click, Insert click, opening the pre-flight sheet) or a later programmatic
+call — never from the `WizardManager` constructor itself, never before `init()` returns. So by the time any of
+these 6 can actually run, `window.ddcsFindOpById`/`ddcsFlattenOps`/`ddcsReplaceOpById` are already assigned.
+
+Checked the other way `window` could be missing: a Node-only test context. Grepped `tests/node/*.mjs` for
+`opSession.js`/`wizardManager.js`/`envelopeCheck.js` — only `architecture-map-1698.test.mjs` references any of
+them, and only via `fs.readFileSync` text-matching (citation checking), never `import()`/execution. **No
+reachable path exists today where the guard's condition is false.** Every one of these 6 is dead code asserting
+a danger that does not exist — your own hypothesis, confirmed, not just plausible.
+
+## (3) IS THERE A LOAD-ORDER REASON THE `window.` BRIDGE EXISTS AT ALL? Yes for the DECLARATION, no for these 6 call sites — a real distinction, not a contradiction
+
+Two different questions get answered differently:
+- **Should `window.ddcsFindOpById` etc. exist as globals at all?** YES, genuinely — `tests/collapse-on-delete-
+  1948.spec.js` calls `window.ddcsFlattenOps(prog)` directly from `page.evaluate()` (browser-context test code,
+  which can only reach app internals through `window.*`, never a static import across the test/app boundary —
+  the same reason `window.ddcsGetBlockProgram`/`ddcsLoadBlockStack` exist). Checked `index.html` for any inline
+  `onclick=""` referencing these three names too (the OTHER standing reason a `window.*` bridge is load-bearing
+  in this codebase, e.g. `window.insertWiz`) — none found, but the test dependency alone justifies keeping the
+  declaration.
+- **Do `wizardManager.js`/`opSession.js`/`envelopeCheck.js` need to REACH `findOpById` THROUGH that bridge, or
+  could they import it directly?** No real reason found. Traced the full import graph (not assumed): `opBuilders.
+  js`'s own header comment states the intended layering explicitly — "this is the LEAF of the op modules; it
+  imports the 20 wizards; opSession / opGlow / programModel import FROM [opBuilders]" — confirmed by grep: none
+  of opSession.js's 13 imports, envelopeCheck.js's 6 imports, or programModel.js's 8 imports (nor anything
+  transitively reachable from them — checked opBuilders.js, userOps.js, blockEmitter.js, gcodeToStack.js,
+  opSchema.js, programFraming.js, dialects/index.js, controllerProfiles.js by name) references any of the other
+  three files. `opSession.js`, `opGlow.js`, and `programModel.js` are PEERS sharing one leaf, not a chain — no
+  cycle possible between any pair of them. **`opGlow.js`'s own t1958 fix is the live proof**: it switched from a
+  private duplicate to a direct `import { findOpById } from './programModel.js'` and the full gate (including
+  `guard-roundtrip-1595`, `fork-parity-1593`) passed clean — the same import, in the same peer relationship,
+  already works with zero fallout.
+
+## (4) ONE RULE FOR THE WHOLE IDIOM
+
+**Direct import everywhere, delete all 6 guarded ternaries.** Every premise that would justify keeping a guard
+— the guard can fire, there's a real cycle, the fallback is a safe degrade — is false for all 6 sites, checked
+individually and by shared cause (all 4 files are `opBuilders.js` peers with no reachable pre-init call path).
+`opGlow.js` already proved the direct-import shape works. The `window.ddcsFindOpById`/`ddcsFlattenOps`/
+`ddcsReplaceOpById` DECLARATIONS in `initProgramModel()` stay exactly as they are — that's a separate, genuinely
+load-bearing bridge (tests, and any future inline-HTML/legacy consumer), untouched by this rule. This is not
+"guard-but-fail-loud" (a `window.ddcsFindOpById || (() => { throw … })()` at each site) — that would still leave
+6 places re-asserting a danger that provably doesn't exist, just louder instead of silent; a direct import is
+the honest version of "this can't happen here," enforced at parse time instead of asserted at runtime.
+
+## Gate
+Read-only design, per the dispatch — no code, no specs, no suite run. `git status` confirms only this WORK-LOG
+entry changed.
+
+🔨 turn 1962
