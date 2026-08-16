@@ -39053,3 +39053,82 @@ method, applied to the gap this turn's bounded question surfaced) → the remain
 architecture-citation Option B, including the unenforced prose half.
 
 🔨 turn 1978
+
+# ═══ t1980 — setupSheet.js collectOps: reachability checked, live, before touching a line ═══
+
+## THE SHAPE — confirmed, not the shallow-scan family
+
+`collectOps` (`setupSheet.js:106-113`) already recurses correctly — the OPPOSITE defect from the last three
+turns. For each block it both `out.push(b)` (when `b.type === 'op'`) AND unconditionally recurses into
+`b.children` when present. A `multi_step` wrapper IS `type:'op'`, so it gets pushed, AND its own children (the
+real nested ops) also get pushed — a phantom wrapper row alongside the real ones, never a missing row. This is
+why `op-lookup-scan-1968`'s own detector explicitly names `collectOps` as an example of a "genuine recursive
+walker" it correctly stays silent on (`op-lookup-scan-1968.test.mjs:52,163`) — it was never in `INVENTORY`, not
+an oversight; the checker's whole domain is the shallow-miss family, and this is structurally the opposite shape.
+**Per requirement 4: `collectOps` is deliberately not tracked there. Inventory count stays at 7, unchanged.**
+
+## REACHABILITY — reproduced live, and it does NOT hold up
+
+t1932 traced this as reachable "via manual Blocks-tab dragging" but never observed it live (per the dispatch).
+Checked, in order:
+
+1. **No live UI creates a `setup` block at all.** Grepped every `web/ui/*.js` + `web/*.js` for a setup-group
+   creation gesture (button, menu item, wizard-bar entry) — `setupSheet.js` is the ONLY file that references the
+   concept anywhere in the app shell. `setupBlock`'s own def (`wizards/ops/transform.js:40-45`) exists as a
+   declared atom, but nothing in the UI ever instantiates one.
+2. **The Blocks tab cannot render a `setup` block that HAS children, of any kind — reproduced live, not
+   inferred.** Built a `setup` block by hand (matching `two-sided-879.spec.js`'s own established construction)
+   with a `multi_step`-wrapped 2-op program as its `.children`, loaded via `ddcsLoadBlockStack`, then drove the
+   real `showApp('blocks')` gesture. Live console error, verbatim: `blocks init failed Error: recToJson: block
+   "setup" (kind "setup") carries 1 children but its def declares no \`mouth\` — they would be silently discarded
+   on this round-trip.` (`stackBridge.js:350`, thrown from `recToJson` → `chainToJson` → `stackToWorkspace` →
+   `blocksApp.js`'s own `renderFromModel`/`buildWorkspace`.) The Blocks tab's workspace never initializes
+   (`window.__blkws` stayed `undefined`) — this is not specific to a `multi_step` child; `setupBlock`'s own atom
+   declaration (`wizards/ops/transform.js:40-45`) carries no `mouth` field at all, so ANY child under a `setup`
+   throws on the very first visit to the Blocks tab, per `stackBridge.js`'s own t1638 FAIL-LOUD guard. A user
+   could not reach the drag t1932 described — the surface it would happen on refuses to render first.
+3. **The `.nc` marker export/import path cannot reconstruct a `setup` group either.** `serializeWithMarkers`
+   (`programModel.js:224`) walks lines via `opAtLine` and marks per-OP boundaries only — a `setup` block is not
+   `type:'op'`, so it emits no marker of its own and a round-trip through `.nc` never restores the grouping.
+
+**Conclusion, stated plainly: `setup` groups have no live creation path, cannot survive a Blocks-tab visit once
+they exist, and cannot round-trip through `.nc` export/import. The ONLY way to produce the exact shape this bug
+needs — a `setup` holding a `multi_step` — is to hand-author a `.mjson` file's raw JSON directly (bypassing every
+UI affordance) and load it via File→Load, or construct it in a test/dev-console exactly as I did above.** This is
+a stronger finding than t1932's own "unobserved" — it is not merely undemonstrated, the specific mechanism t1932
+proposed (Blocks-tab dragging) is actively blocked by an unrelated, pre-existing gap (`setupBlock` declares no
+`mouth`) that would need its own fix before dragging into a setup group could ever work AT ALL, for any child.
+
+## NOT FIXED — per the dispatch's own conditional, deferred to the advisor
+
+"If it turns out NOT to be reachable, SAY SO and I will decide whether it is worth fixing at all, rather than you
+fixing a ghost." It does not hold up. No code touched this turn — `collectOps` is unchanged, `INVENTORY` is
+unchanged (7 entries), no test added (there is no live gesture to assert against). The scratch reachability
+check (`tests/check1980-reach.spec.js`) was deleted after use, not committed — it was a diagnostic, not evidence
+worth keeping in the suite. `git status` confirms zero file changes for this turn.
+
+## WHAT WOULD BE NEEDED, named not built
+
+If the advisor decides `collectOps`'s phantom-row rule is worth fixing regardless of current unreachability
+(cheap insurance against the day setup groups DO get a creation UI + a Blockly mouth): substitute via
+`flattenOps`, per the dispatch's own instruction — `collectOps`'s outer walk still needs to handle arriving at a
+`setup`'s own children (a shape `flattenOps` doesn't itself walk into, since `flattenOps`'s domain is a top-level
+program array, not an arbitrary container's children), but the WRAPPER-SUBSTITUTION rule itself should delegate
+rather than re-spell: something in the shape of `collectOps(blocks) = flattenOps(blocks)` if a setup's own
+children are always a flat-or-multi_step-wrapped op list (the same shape `flattenOps` already reads), or a
+thinner recursive shell around `flattenOps` if a setup could ever nest a DIFFERENT container type. Separately —
+and out of THIS turn's scope, named only because it blocks reachability entirely — `setupBlock` declaring no
+`mouth` (`wizards/ops/transform.js:40-45`) means a `setup` group cannot be Blocks-tab-edited at all today, which
+is arguably the more load-bearing gap if two-sided setups are meant to be a real, live feature.
+
+## GATE
+
+No code changed — the full gate specified for a fix was not run, since there is no fix to verify. Confirmed the
+tree is otherwise clean: `git status` shows zero modified files under `DDCS-Studio/` for this turn.
+
+## Queued CODE work, the advisor's own order — awaiting a ruling on collectOps
+Batch closes here per the dispatch, pending the advisor's decision on `collectOps`. Then: bridge
+`option-b-slice2-positioning-1872` to a WRAPPED program (t1974's own method) → the remaining 7-entry inventory →
+architecture-citation Option B, including the unenforced prose half.
+
+🔨 turn 1980
