@@ -40121,3 +40121,83 @@ committed alongside, not stray.
 `opEditMap` instead) — flagged again, not chased. Two-sided setup — awaits the human.
 
 🔨 turn 2000
+
+# ═══ t2002 — setGroupChildParams' REAL UI door, finally driven: the parked t1992 pass, built ═══
+
+## THE DOOR
+
+`window.ddcsEditOp(groupId)` (the editor hover-chip / right-click "✎ Edit" handler) → `wizardManager.openForEdit`
+→ `_openGroupForEdit` → `devMode.deriveGroupDef` derives a generic widget form from the group's STORED children
+→ a real `[data-param]` field is edited → `window.insertWiz()` (the real Insert button) →
+`wizardManager.insert()` detects the editing op is a group → `userOpView.applyGroupEdits` →
+`opSession.setGroupChildParams` writes the edit back into the group's own children. New file
+`tests/group-edit-real-ui-2002.spec.js` drives this whole chain, twice, per the dispatch's two named routes.
+
+## WHAT MADE THE SCAFFOLDING TRACTABLE (t1992 parked it as "more scaffolding than that turn honestly allowed")
+
+`deriveGroupDef`'s `FRAMING_KNOBS` table auto-exposes a `progstart`'s own `clearance`/`rpm` and a `progend`'s own
+`retractZ` as real widget-bound fields UNCONDITIONALLY — no `_expose` knob-marking (t391) needed at all, since
+framing records carry no `_expose` (`isAtom` skips them) and are exposed by a fixed, always-on rule instead.
+Separately, `groupLooseAtoms` already absorbs ADJACENT `progstart`/`progend` into a hand-built group's own
+children (parity with a built-in op's stack — the docstring names this explicitly). Combining the two: a plain
+`[progstart, move, progend]` triple, once grouped via the real `groupLooseAtoms` call, genuinely renders an
+editable `clearance` field in the generic form — no custom-op `_expose` seeding, no synthetic widget-binding
+setup. Read `devMode.js`'s `deriveGroupDef` and `programFraming.js`'s `makeStart`/`makeEnd` (confirming `clearance`
+defaults to `5`, `retractZ` to `0`, both real numbers so the framing-exposure rule fires) before building anything,
+to confirm the door was actually reachable this way rather than assuming it.
+
+## (1) TOP-LEVEL → PROMOTED
+
+Build loose `[progstart, move, progend]` → `groupLooseAtoms` → ONE top-level group op. Then the REAL "+ Add as a
+2nd operation" gesture (reused verbatim from `edit-nested-op-1958.spec.js`'s own `addSecondOp` helper — the
+established, already-proven driver of `groupConsecutiveOps`) adds a `drill` op alongside it, promoting the canvas
+into ONE `multi_step` wrapper — asserted directly (`topTypes` = `['multi_step']`, the group no longer top-level).
+Then the real door: open the group's form, edit `clearance` to a seeded, checked-against-baseline value, the
+real Insert, then confirm via `findOpById` that the value landed on the group's own (still-nested) `progstart`
+child.
+
+## (2) GROUP-IN-GROUP (t1986's own route)
+
+Two independently-framed groups (`Group A`: `progstart(clearance:5)/move/progend`; `Group B`:
+`progstart(clearance:9)/move/progend`), built top-level, side by side. Nested via the SAME Blockly connection
+mechanic `edit-nested-op-1958.spec.js`'s own function-level test already used (connect Group B's block after
+Group A's last child, real Blockly connection object, not hand-built JSON), then `workspaceToStack` reads the
+nested shape back. Confirmed B is genuinely nested (not top-level) before touching anything. Opened B's form via
+the real door, asserted the DERIVED FORM ITSELF seeded from B's OWN stored clearance (9), not A's (5) — a
+cross-contamination check that would have caught a wrong groupId reaching the wrong record — edited to a new
+seeded value, real Insert, then asserted B's own child reconciled AND A's own field is untouched (captured before
+the edit, compared after).
+
+## NON-VACUITY
+
+Every seeded value checked against ITS OWN field's pre-edit baseline (route 1: `5`→`37.25`, asserted the baseline
+was not already `37.25`; route 2: `9`→`61.5`, additionally asserted the DERIVED baseline really was B's own `9`
+and not A's `5` before editing) — the standard t2000 established, now applied here too. Proved the tests genuinely
+fail on the bug they claim to catch, not just theorized: saved a scratch copy of the current (fixed)
+`opSession.js`, temporarily reverted ONLY `setGroupChildParams` to the exact pre-t1992 shallow `findIndex`/
+top-level-only code (pulled straight from that commit's own diff, not reconstructed from memory), re-ran — BOTH
+tests failed exactly as predicted (`received 5`/`received 9` — the seeded edit never reached the nested record,
+the old top-level scan silently missing it), then restored from the scratch copy (never `git checkout HEAD --`,
+since the fix predates this turn but the file was mid-edit) and re-verified `node --check` + a clean re-run.
+
+## Gate
+
+`npm run test:node`: 125/125. Playwright: `group-edit.spec.js` (1/1, the existing increment-2 chip-form-writeback
+spec, untouched), `group-edit-real-ui-2002.spec.js` (2/2, new), `word-glow.spec.js` (2/2, 2 pre-existing unrelated
+skips — t1732, already named), `edit-nested-op-1958.spec.js` (6/6), `atc-roundtrip.spec.js` (9/9),
+`fork-parity-1593.spec.js` (2/2), `guard-roundtrip-1595.spec.js` (2/2) — clean. One transient timeout hit on
+`word-glow.spec.js`'s own `bootAdd` (`waitForFunction`) during the combined run — the same known concurrent/long-
+run flake shape as t2000's own gate; re-ran that file alone and it passed clean, attributed correctly rather than
+chased. `proc_health.py watch`: clean throughout. No product code changed this turn — `opSession.js` was touched
+only transiently, for the non-vacuity proof, and is back to its t2000 state (confirmed via the restored scratch
+copy, not re-derived).
+
+## Files
+`tests/group-edit-real-ui-2002.spec.js` (new). No other files.
+
+## Queued, still untouched
+The `opGlow.js` stale doc-comment claim (t1998): `replayReconcile`'s own header claims it backs the three diff
+surfaces (glow/chip/Merge-Replace notice); `opGlow.js`'s real code reads `opEditMap` instead. Two-sided setup —
+awaits the human.
+
+🔨 turn 2002
