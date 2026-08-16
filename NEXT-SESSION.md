@@ -3600,3 +3600,44 @@ batch: I run ONE full gate and cut a release.
 ⚠ Queued after the release: **bridge `option-b-slice2-positioning-1872` to a wrapped program** the way t1974
 did for slice3 — a PRIMARY EVIDENCE test that never runs the case it names is the defect we keep deleting ·
 then the rest of the inventory · then architecture-citation Option B (incl. the unenforced prose half).
+
+# ═══ t1980 — collectOps: the OVER-deep twin (closes the batch) ═══
+
+t1978 accepted, verified by me: inventory **8 → 7**, ratchet green a third time.
+
+**My screenshot flag was a false alarm and you settled it in one check, correctly.** The `#1505` line is a
+static refuse-guard branch (jumped over by `GOTO94`, reached only if the condition trips — same shape as
+drill's own zero-bite guard) and the amber badge is the generic no-WCS test-boot state. Both present on a
+fresh untouched default insert. **You checked and stopped**, which is exactly the scope I asked for.
+
+**And you did NOT bolt the test onto the file I suggested.** I proposed bridging to
+`export-import-fidelity-1964`; you checked and found it only covers the G-code BODY round-trip, never
+`buildProgram()`/`.name` — a genuinely different mechanism — so you bridged to `export-title-975` instead, the
+title mechanism's own origin file. Taking a suggestion that does not fit is how evidence ends up in the wrong
+place, and refusing it is the harder call.
+
+**The bug was bigger than "a title":** every multi-operation export **and** every `bridgeTransfer` TRANSFER has
+been filed as `multi_step.nc` since t975 — including files sent to the controller.
+
+## THE TASK — `setupSheet.js collectOps`. LAST of the batch, and the ODD ONE OUT.
+⚠ **This is NOT the shallow bug.** `collectOps` already recurses correctly; its defect is the **opposite** — it
+pushes a `multi_step` wrapper AND then its children, so the printed setup sheet shows a **phantom operation
+row** alongside the real ones. **Substitute, do not add:** a wrapper must be REPLACED by its children, never
+counted beside them — the same rule `flattenOps` already encodes.
+
+1. **Reuse the declared enumeration** rather than hand-writing the substitute rule a second time. If
+   `collectOps` genuinely needs its own traversal (it also has to handle `setup` containers), then make it
+   *delegate* the wrapper rule rather than re-spell it — and say why it could not simply call the canonical one.
+2. **ASSERT WHAT PRINTS:** a setup sheet for a multi-operation program inside a `setup` container lists exactly
+   the real operations with their own tools — no phantom row, no missing row. `setup-sheet-850` is the evidence
+   file; extend it rather than starting a parallel claim.
+3. **⚠ REACHABILITY, honestly:** t1932 traced this as REACHABLE by dragging a wrapper into a `setup` container
+   but never observed it live. **Reproduce it for real this time** — if it turns out NOT to be reachable, say so
+   and I will decide whether it is worth fixing at all rather than you fixing a ghost.
+4. **INVENTORY 7 → 6** if it is tracked there; if `collectOps` is deliberately NOT in the inventory (different
+   shape), say so and leave the count.
+5. **PROVE NON-VACUITY. Gate:** node tier (incl. checker) + `setup-sheet-850` + the 4 t1928 features + the
+   round-trip/parity set.
+
+⚠ **THIS CLOSES THE BATCH.** After it: I run ONE full gate and cut the release. Then `option-b-slice2` bridged
+to a wrapped program → the rest of the inventory → architecture-citation Option B.
