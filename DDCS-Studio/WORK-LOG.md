@@ -37572,3 +37572,123 @@ No code changed. `git status` confirms zero source-file changes — only this WO
 not run (no code touched, matches the dispatch). `proc_health.py watch`: clean, nothing spawned this turn.
 
 🔨 turn 1946
+
+
+## 🔨 turn 1948 — ONE SHAPE FOR ONE PROGRAM: addOperation fixed, collapse-on-delete wired, grow/shrink share one rule
+
+### Dispatch
+Fix the nested-wrapper bug t1946 found (adding a 3rd operation onto an existing 2-op `multi_step` produced a
+NESTED wrapper instead of one flat one), extend the equivalence bridge test to arities that actually exercise
+regrouping, wire collapse-on-delete at the confirmed choke point (`workspaceToStack`, `stackBridge.js:173`)
+using the SAME flatten-then-regroup pipeline, and assert the shape converges both directions (add 3 delete 1 ==
+add 2, shape AND emit). Stop condition: if the fix changes emitted G-code at any arity, stop and report — this
+is a shape fix, not an output fix, since `multi_step` carries no G-code of its own.
+
+### The fix — one shared pipeline, `regroupOps` (programModel.js)
+
+Root cause, confirmed in t1946: `groupConsecutiveOps` only ever GROUPS a flat run of top-level ops — it has no
+notion of "there's already a wrapper here." `addOperation` spliced the incoming op in and called
+`groupConsecutiveOps` directly, which saw the EXISTING `multi_step` wrapper as just one more opaque `type:'op'`
+entry and wrapped it AGAIN around whatever sat beside it. The doc comment claimed flat-append; the CODE was the
+thing that was wrong, so this fixes the code to make the comment true (the advisor's own framing: "one of the
+two is lying, and it is not allowed to stay that way").
+
+New declared function, `regroupOps(items)`:
+```js
+export function regroupOps(items) {
+    const flat = (items || []).flatMap((b) =>
+        (b && b.type === 'op' && b.opType === 'multi_step') ? flattenOps(b.children) : [b]);
+    return collapseImportTerminators(groupConsecutiveOps(flat));
+}
+```
+Unwraps any existing wrapper(s) first — via `flattenOps`, which is already recursive, so it's immune to a
+NESTED wrapper too, not just a single stale one (re-confirmed here, not just inherited from t1946's read) —
+then re-groups the flat result. `addOperation` now calls this instead of `groupConsecutiveOps` directly.
+Exported as `window.ddcsRegroupOps` alongside the existing hooks.
+
+**Wired at both ends, per the dispatch's own "grow and shrink share one rule" ask:**
+- **Grow**: `addOperation` (programModel.js) — unchanged call shape, now correct at every arity.
+- **Shrink**: `workspaceToStack` (`stackBridge.js:173`, the single choke point t1946 confirmed every structural
+  Blockly edit — including a native block-delete — passes through) now wraps its own return in `regroupOps`.
+  Imported `regroupOps` from `../programModel.js` into `stackBridge.js` — checked for a circular import first
+  (`programModel.js`'s own dependency chain: `blockEmitter.js`, `gcodeToStack.js`, `opSchema.js`, `opBuilders.js`,
+  `programFraming.js`, `userOps.js`, `dialects/index.js`, `controllerProfiles.js` — none reach into `blockly/`,
+  confirmed by grepping each for a `blockly` import; none found).
+
+A `multi_step` wrapper carries no G-code of its own — `blockEmitter.js`'s `type==='op'` branch recurses into
+`children` with zero special-casing regardless of nesting or count — so `regroupOps` can only change WHICH ops
+share a wrapper, never what any op emits. Confirmed, not assumed: the byte-identical assertions below hold at
+every arity tested (2, 3, 4, and the add-3-then-delete-1 convergence case). **Stop condition never triggered.**
+
+### The tests — extended bridge (3/4 arities) + new collapse-on-delete spec
+
+**`add-operation-1940.spec.js`** — new test folding `addOperation` left-to-right through 3 and 4 operations
+(drill, surfacing, pocket, contour — exactly the live Insert → Add → Add → Add gesture), asserting BOTH
+byte-identical G-code against the import-path reference (extending the existing 2-op bridge's own method) AND
+the shape check that would have caught the regression: exactly one top-level `multi_step`, and none of its own
+direct children is itself a `multi_step`.
+
+**New file, `collapse-on-delete-1948.spec.js`** — three tests, using Blockly's own `checkAndDelete()` (the same
+call the UI's Delete-key / right-click-Delete path uses — confirmed present in the vendored v13 bundle via
+grep, chosen over a raw `dispose()` for fidelity to a real user gesture) against a workspace loaded via the real
+Insert/Add gesture, not a data-level splice:
+1. Deleting the middle step of a 3-op wrapper collapses to a flat 2-op wrapper (not nested, not stale) — both
+   surviving bodies still emit, the deleted one's body is genuinely gone.
+2. Deleting one of TWO steps collapses the wrapper away entirely — a lone operation is never left wrapped
+   (mirrors `addOperation`'s own "a run of 1 stays unwrapped" rule, now proven in the shrink direction too).
+3. **CONVERGENCE**: add 3 operations, delete the 3rd via a real Blocks-tab delete → shape-identical AND
+   emit-identical to having added only 2 directly. This is the symmetric-rule promise from t1934, finally
+   testable now that both directions exist.
+
+### Non-vacuity — proven, not assumed
+
+Backed up the fix (`programModel.js`, `stackBridge.js`) to the session scratchpad, reverted both files to HEAD
+(t1946's own commit — source-untouched, so HEAD is genuinely the pre-fix state), and ran all 4 new/extended
+tests against it: **all 4 failed**, each for exactly the predicted reason (the 3/4-arity bridge test failed on
+`anyNestedChild` being `true`; the 3-op delete test failed the same way; the 2-op delete test failed because
+collapse-on-delete simply wasn't wired at all pre-fix, the wrapper stayed even at 1 child; the convergence test
+failed with a literal `nChildren: 1` vs `nChildren: 2` shape mismatch). Restored the fix from the scratch backup,
+re-ran — all green. A genuine, unrelated flaw surfaced in the FIRST green run: `collapse-on-delete-1948.spec.js`'s
+own "pocket body still emits" check asserted `gcode.includes('POCKET')`, copied from the pre-existing
+`hasDrillBody`/`hasSurfacingBody` pattern without checking pocket's own actual output first — pocket's wizard
+comments never literally say "POCKET" (verified live via a throwaway inspection spec, deleted after use). Fixed
+by asserting `'AREA CLEARING'` instead, a marker confirmed present in pocket's real emitted body. Not a defect in
+the fix itself — a bad assertion in my own new test, found and corrected before reporting green.
+
+### collectOps's phantom-row story — unchanged, checked not assumed
+
+The advisor asked whether this fix changes it. It does not: `collectOps`'s bug (t1932, still queued) is that it
+never looks INSIDE a `multi_step` wrapper at all — it treats the wrapper as one opaque row regardless of how
+many children it holds or whether they're flat or nested. `regroupOps` changes WHICH ops share a wrapper and
+guarantees the wrapper is never nested, but a wrapper is still a wrapper either way — `collectOps`'s own
+blindness to its children is orthogonal to nesting depth and unaffected by this turn's fix.
+
+### Architecture map — 3 stale citations found and fixed while editing, per the worker's own repair duty
+
+Both edited files carry hand-maintained `file:line` citations elsewhere (`ARCHITECTURE.md`,
+`tests/node/architecture-map-1698.test.mjs`) that my own line-count changes shifted. Found and corrected, cited
+at the line I verified them at, not assumed from the diff size:
+- `stackBridge.js` INV1 (mouth guard throws by name): 318 → 326 (+8, the `regroupOps` import + the
+  `workspaceToStack` doc comment/wiring).
+- `stackBridge.js` INV2 (leaf record fields declared-or-throw): 265 → 273 (+8, same cause).
+- `programModel.js` INV3 (subscriber isolation logs, never swallows): 438 → 456 (+18, the `regroupOps`
+  declared-pipeline insert). Extended the "previously stale at…" trail in `ARCHITECTURE.md` with `then 407` —
+  this citation has now drifted seven times; still a comment-maintenance cost, not a design defect, so left
+  as-is rather than restructuring the citation to be self-locating (out of this turn's scope).
+Verified via `npm run test:node`'s own architecture-map suite (below), not just by eye.
+
+### Gate
+Per the advisor's own scope: new specs + `add-operation-1940` + `insert-add-replace-1942` + the 4 t1928 features
++ node tier. `npx playwright test add-operation-1940.spec.js collapse-on-delete-1948.spec.js
+insert-add-replace-1942.spec.js --retries=0`: 12/12. `npx playwright test flow-labels-unique-1408.spec.js
+setup-sheet-850.spec.js time-estimate-844.spec.js editor-sim-real-insert.spec.js --retries=0`: 19/19.
+`npm run test:node`: 118/118 (includes the corrected architecture-map citations). A stale `node.exe` from a
+prior turn was found squatting on port 3211 (not in my own process tree — `proc_health.py mark --turn 1948` +
+`watch` confirmed clean, nothing spawned by me survived) and killed before the first run so Playwright's own
+`webServer` could start a fresh one serving the edited files, not stale cached modules. `git status`: exactly
+the 5 files this turn touched (`ARCHITECTURE.md`, `programModel.js`, `stackBridge.js`,
+`architecture-map-1698.test.mjs`, `add-operation-1940.spec.js`) plus the one new file
+(`collapse-on-delete-1948.spec.js`) — everything else in the tree is pre-existing, unrelated clutter, unchanged.
+Advisor runs the full suite after this lands, per their own note.
+
+🔨 turn 1948

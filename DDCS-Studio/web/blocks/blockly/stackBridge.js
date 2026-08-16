@@ -8,6 +8,7 @@
 import { BLOCKS } from '../../wizards/ops/index.js';
 import { FN, fieldKind, fieldsOf, mouthOf, getBlockly, OP_BLOCKS } from './bridge.js';
 import { GUARD_FIELDS, guardFieldsFromWhen, guardWhenFromFields } from '../../wizards/ops/guard.js';   // t1595 — the guard predicate's DECLARED serialization (its `when` is an object; the data path excludes objects by design)
+import { regroupOps } from '../programModel.js';   // t1948 — collapse-on-delete: the SAME flatten-then-regroup pipeline addOperation grows a program with
 
 const HAS_CUSTOM_OP = {};
 OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
@@ -169,10 +170,17 @@ function chain(block) {
     return out;
 }
 
-/** Workspace → the program stack (top-level statement blocks, in order; floating reporters ignored). */
+/** Workspace → the program stack (top-level statement blocks, in order; floating reporters ignored).
+ *  t1948 — COLLAPSE-ON-DELETE lives here: every structural Blockly edit (blocksApp.js's own change listener,
+ *  including a native block-delete) re-reads the workspace through this one function, so it's the single choke
+ *  point where a `multi_step` wrapper left holding one child (or a run that grew back to 2+ after a drag) needs
+ *  to reconcile. `regroupOps` unwraps any existing wrapper(s) then re-groups the flat result — the SAME pipeline
+ *  `addOperation` grows a program with (programModel.js) — so grow and shrink share one rule, not two hand-
+ *  matched ones. A `multi_step` wrapper carries no G-code of its own, so this can only change which ops share a
+ *  wrapper, never what emits. */
 export function workspaceToStack(ws) {
     const tops = ws.getTopBlocks(true).filter((b) => { const d = BLOCKS[b.type]; return !d || d.kind !== 'reporter'; });
-    return tops.flatMap((t) => chain(t));
+    return regroupOps(tops.flatMap((t) => chain(t)));
 }
 
 // ── stack → workspace ────────────────────────────────────────────────────────

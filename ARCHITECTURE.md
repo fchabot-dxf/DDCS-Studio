@@ -397,19 +397,19 @@ pane they would have backed) — see WORK-LOG t1734.
 ## INVARIANTS — the rule, its guard, and what breaking it looks like
 
 **1 · A record that carries children declares a `mouth`.**
-Guard: `blocks/blockly/stackBridge.js:318` throws by name. Reader: `blocks/blockly/bridge.js:78`.
+Guard: `blocks/blockly/stackBridge.js:326` (t1948 — shifted from 318 by +8; the regroupOps import + workspaceToStack collapse-on-delete wiring) throws by name. Reader: `blocks/blockly/bridge.js:78`.
 Break it → the children are **silently discarded** on a Blockly round-trip. This replaced four hand-maintained
 kind lists after the *fifth* silent loss (t1069/t1093/t1595/t1627/t1636). A **fifth, still-live** kind list at
 `blocks/blockEmitter.js:40` was surveyed, measured non-lossy, and deliberately left — unifying it is re-litigating
 a decided call.
 
 **2 · A leaf record's top-level fields are declared or the write throws.**
-Guard: `stackBridge.js:265`. Break it → `G1 G91 Z-5` comes back through the Blocks canvas having lost its G91: a
+Guard: `stackBridge.js:273` (t1948 — shifted from 265 by +8, same cause). Break it → `G1 G91 Z-5` comes back through the Blocks canvas having lost its G91: a
 relative plunge silently becomes absolute. Note the resolution shape: `_group` is **tolerated, not persisted** —
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 
 **3 · A fail-loud guard is worthless if the path carrying its throw swallows it.**
-Guard: `blocks/programModel.js:438` (t1940 — shifted from 407 by +31; previously stale at 236, then 269, then 347, then 357, then 364, then 388) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
+Guard: `blocks/programModel.js:456` (t1948 — shifted from 438 by +18, the regroupOps declared-pipeline insert; previously stale at 236, then 269, then 347, then 357, then 364, then 388, then 407) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
 the guards above fired into a silent catch for their entire early life, on the only path an operator's
 paste-then-open-Blocks gesture takes.
 

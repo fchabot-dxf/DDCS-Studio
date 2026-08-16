@@ -82,9 +82,79 @@ test('addOperation(A,B) bridges to the import path — byte-identical G-code, no
     expect(r.addedOpTypes, 'both operations present, in order, flattened').toEqual(['drill', 'surfacing']);
 });
 
-// t1942 — this proves the GROW direction only. The SHRINK direction (deleting a step back down to one collapses
-// the wrapper, via this SAME groupConsecutiveOps, not a hand-rolled mirror rule) is t1934's own stated design —
-// it is NOT built or called anywhere yet. Do not read this test as covering that path; it doesn't exist to cover.
+// t1948 — THE ASSERTION THAT WOULD HAVE CAUGHT THE REGRESSION. The 2-op bridge test above proves addOperation
+// correct at arity 2 only — t1946 found live that arity 3+ (adding onto a program that ALREADY holds a 2-op
+// wrapper) produced a NESTED multi_step(multi_step(A,B),C) instead of one flat multi_step(A,B,C): the doc
+// comment on addOperation claimed "a program that already holds a wrapper appends into it," but
+// groupConsecutiveOps treats an EXISTING wrapper as just another opaque top-level 'op' entry and wraps it AGAIN,
+// and this test's own predecessor never exercised that arity. Fixed via `regroupOps` (programModel.js) —
+// unwraps any existing wrapper before regrouping — shared with the collapse-on-delete choke point
+// (stackBridge.js's workspaceToStack, see collapse-on-delete-1948.spec.js). Folds addOperation left-to-right,
+// exactly the live Insert -> Add -> Add -> Add gesture, at the two arities that actually exercise regrouping.
+test('addOperation folded to 3 and 4 ops bridges to the import path — byte-identical G-code, ONE flat wrapper never nested (t1948 regression)', async ({ page }) => {
+    await boot(page);
+    const programA = await insertAndCapture(page, 'drill');
+    const programB = await insertAndCapture(page, 'surfacing');
+    const programC = await insertAndCapture(page, 'pocket');
+    const programD = await insertAndCapture(page, 'contour');
+
+    const r = await page.evaluate(async ({ programA, programB, programC, programD }) => {
+        const progMod = await import('/blocks/programModel.js');
+        const emitMod = await import('/blocks/blockEmitter.js');
+        const dialectsMod = await import('/wizards/dialects/index.js');
+        const profileMod = await import('/shared/js/profiles/controllerProfiles.js');
+        const dopts = { dialect: dialectsMod.resolveActivePost(profileMod.getActiveProfile().id) };
+
+        const bareA = programA.find((b) => b && b.type === 'op');
+        const bareB = programB.find((b) => b && b.type === 'op');
+        const bareC = programC.find((b) => b && b.type === 'op');
+        const bareD = programD.find((b) => b && b.type === 'op');
+
+        // Fold left-to-right: exactly what a live Insert (A), then Add (B), then Add (C), then Add (D) produces.
+        const after2 = progMod.addOperation(programA, bareB);
+        const after3 = progMod.addOperation(after2, bareC);
+        const after4 = progMod.addOperation(after3, bareD);
+
+        // The import-path reference, same framed footing as programA (see the 2-op test's own comment for why).
+        const progstartA = programA.find((b) => b && b.type === 'progstart');
+        const progendA = programA.find((b) => b && b.type === 'progend');
+        const buildImportRef = (bares) => {
+            window.ddcsLoadBlockStack([progstartA, ...bares, progendA].filter(Boolean));
+            const exported = window.ddcsSerializeWithMarkers();
+            const imported = progMod.importMarkedNc(exported);
+            return emitMod.emitMapped(imported, dopts).text;
+        };
+
+        // The shape assertion that WOULD have caught the bug: exactly one top-level multi_step, and none of its
+        // own direct children is itself a multi_step (the nested shape t1946 found).
+        const shapeOf = (prog) => {
+            const wrappers = prog.filter((b) => b && b.type === 'op' && b.opType === 'multi_step');
+            const anyNestedChild = wrappers.some((w) => (w.children || []).some((c) => c && c.opType === 'multi_step'));
+            return { wrapperCount: wrappers.length, anyNestedChild, opTypes: progMod.flattenOps(prog).map((b) => b.opType) };
+        };
+
+        return {
+            text3: emitMod.emitMapped(after3, dopts).text, importText3: buildImportRef([bareA, bareB, bareC]),
+            text4: emitMod.emitMapped(after4, dopts).text, importText4: buildImportRef([bareA, bareB, bareC, bareD]),
+            shape3: shapeOf(after3), shape4: shapeOf(after4),
+        };
+    }, { programA, programB, programC, programD });
+
+    expect(codeOnly(r.text3), '3 ops folded via addOperation: byte-identical to the import path').toBe(codeOnly(r.importText3));
+    expect(codeOnly(r.text4), '4 ops folded via addOperation: byte-identical to the import path').toBe(codeOnly(r.importText4));
+
+    expect(r.shape3.wrapperCount, '3 ops: exactly ONE multi_step wrapper').toBe(1);
+    expect(r.shape3.anyNestedChild, '3 ops: NOT nested — the t1946 regression shape (a multi_step holding a multi_step)').toBe(false);
+    expect(r.shape3.opTypes, '3 ops present, in order, one level flat').toEqual(['drill', 'surfacing', 'pocket']);
+
+    expect(r.shape4.wrapperCount, '4 ops: exactly ONE multi_step wrapper').toBe(1);
+    expect(r.shape4.anyNestedChild, '4 ops: NOT nested').toBe(false);
+    expect(r.shape4.opTypes, '4 ops present, in order, one level flat').toEqual(['drill', 'surfacing', 'pocket', 'contour']);
+});
+
+// t1948 — the SHRINK direction (deleting a step back down collapses the wrapper, via this SAME regroupOps, not
+// a hand-rolled mirror rule) is now BUILT — see collapse-on-delete-1948.spec.js (wired at stackBridge.js's
+// workspaceToStack). This file stays scoped to the GROW direction / data-level addOperation itself.
 test('the symmetric rule: a run of ONE stays unwrapped — the same function that wraps a run of 2 also refuses to wrap 1', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {

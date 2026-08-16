@@ -269,15 +269,33 @@ export function groupConsecutiveOps(items) {
     return out;
 }
 
+// t1948 — THE SHARED GROW/SHRINK PIPELINE. `groupConsecutiveOps` only ever GROUPS a flat run of top-level ops —
+// it has no notion of "there's already a wrapper here," so handing it a list that still contains an existing
+// `multi_step` treats that wrapper as just one more opaque `type:'op'` entry and wraps it AGAIN around whatever
+// sits beside it, nesting rather than flattening (found live, t1946: adding a 3rd operation onto an existing
+// 2-op wrapper produced `multi_step(multi_step(A,B), C)` instead of one flat `multi_step(A,B,C)` — the doc
+// comment on `addOperation` below claimed the flat behavior; the CODE was the thing that was wrong, not the
+// promise, so this fixes the code to make the comment true). `regroupOps` is the one place that ALWAYS unwraps
+// any existing wrapper(s) first (via `flattenOps`, recursive — immune to a nested wrapper too, not just a
+// single stale one) before re-grouping, so growing a program (`addOperation`, below) and shrinking one (a
+// future/live delete, `stackBridge.js`'s `workspaceToStack`) share this ONE rule instead of two hand-matched
+// ones. A `multi_step` wrapper carries no G-code of its own (blockEmitter's `op` container recurses into it
+// with zero special-casing) — flatten-then-regroup can only change WHICH ops share a wrapper, never what any
+// op emits, so this is a shape fix, not an output fix.
+export function regroupOps(items) {
+    const flat = (items || []).flatMap((b) =>
+        (b && b.type === 'op' && b.opType === 'multi_step') ? flattenOps(b.children) : [b]);
+    return collapseImportTerminators(groupConsecutiveOps(flat));
+}
+
 /** t1940 — DATA-LEVEL ONLY: grow a program by one more operation (the mechanism under the human's own
- *  Add-to-program ruling; no UI this turn — the wizard-bar Insert door stays untouched and wires onto this next).
- *  Promote-on-2nd (Option A, t1934's own recommendation): a program holding one bare op becomes a `multi_step`
- *  wrapper holding both; a program that already holds a wrapper appends into it. Reuses `groupConsecutiveOps` +
- *  `collapseImportTerminators` VERBATIM — the SAME pipeline `importMarkedNc` already trusts for exactly this
- *  "several operations, one shared program frame" composition (t1916/t1920), not a second one built to match it.
- *  This is also the symmetric-rule promise from t1934: the SAME `groupConsecutiveOps` decides wrapping in both
- *  directions (a run of 1 stays unwrapped, a run of 2+ wraps) — a future delete-down-to-one path re-runs this
- *  same function over what remains rather than hand-rolling its own mirror-image collapse rule.
+ *  Add-to-program ruling). Promote-on-2nd (Option A, t1934's own recommendation): a program holding one bare op
+ *  becomes a `multi_step` wrapper holding both; a program that already holds a wrapper appends into it — FLAT,
+ *  never nested (t1948 — see `regroupOps` above for why this needed its own shared pipeline rather than calling
+ *  `groupConsecutiveOps` directly). This is also the symmetric-rule promise from t1934: the SAME pipeline
+ *  decides wrapping in both directions (a run of 1 stays unwrapped, a run of 2+ wraps, any existing wrapper is
+ *  unwrapped before regrouping) — a delete-down-to-one path re-runs this same function over what remains
+ *  rather than hand-rolling its own mirror-image collapse rule.
  *
  *  `program` is the CURRENT full program array (`[progstart, …, progend]`); `incomingBare` is the new operation's
  *  own BARE record — no progstart/progend of its own (matching `commitActiveOp`'s own `bare` local: `framed`
@@ -297,7 +315,7 @@ export function addOperation(program, incomingBare) {
     let idx = -1;
     for (let i = prog.length - 1; i >= 0; i--) { if (isEnd(prog[i])) { idx = i; break; } }
     const items = idx >= 0 ? [...prog.slice(0, idx), incomingBare, ...prog.slice(idx)] : [...prog, incomingBare];
-    return collapseImportTerminators(groupConsecutiveOps(items));
+    return regroupOps(items);
 }
 
 /** Import a .nc → program stack, using DDCS op markers where present. A marker DECLARES an op → it's
@@ -472,6 +490,7 @@ export function initProgramModel() {
     window.ddcsLinesForOp = linesForOp;
     window.ddcsFlattenOps = flattenOps;   // t1928 — every real operation, one level through a multi_step import wrapper
     window.ddcsAddOperation = addOperation;   // t1940 — DATA-LEVEL ONLY: grow a program by one operation; no UI calls this yet
+    window.ddcsRegroupOps = regroupOps;   // t1948 — the shared flatten-then-regroup pipeline addOperation and workspaceToStack both use
     window.ddcsLinesForRun = linesForRun;   // AUTO chip highlight (a loose run's lines)
     window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
     window.ddcsSerializeWithMarkers = serializeWithMarkers;   // .nc text + self-describing op markers (export only; editor stays clean)
