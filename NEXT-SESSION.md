@@ -3263,3 +3263,54 @@ that instruction generalises or stays local, I need to know what the other seven
 ⚠ Order after this, per your own ranking which I accept: **THE CHECKER (with the shrink-only inventory)** →
 `window.` fallback → `segmentFrame.js frameOwnerAtLine` → `glowEdited` → `_firstOpTitle` → `collectOps` (its
 own separate shape) → the 6 new sites.
+
+# ═══ t1964 — 🛑 BLOCKER: one lookup, two OPPOSITE questions. Release held. ═══
+
+t1962 accepted — and you corrected your own count (9 → 6) unprompted, traced the boot chain to prove the guard
+can never fire, and traced the full import graph to prove there is no cycle. All 6 fallbacks are known-wrong
+dead code; **direct import everywhere is approved.** Not this turn.
+
+## MY GATE ON `37b27d80`: 2568 passed, 26 skipped, 15 flaky, **1 FAILED** — and it is REAL.
+`blk-start-hints-multistep-1954` — **your own t1954 test, green when you wrote it.** I isolated it; it
+reproduces deterministically. It fails at its *sanity* step:
+
+```
+  importMarkedNc(exported)  ->  expected 1 top-level op (the multi_step wrapper)
+                                received 2 loose ops
+```
+
+## THE CAUSE — located, not guessed. `programModel.js:210`.
+`serializeWithMarkers` (the .nc EXPORT) resolves each line's owning op via **`opAtLine` → `findOpInStack`** —
+the function t1958 changed to **recurse-first / deepest-match-wins**. Import grouping was never touched, so it
+is the EXPORT that moved: the markers now attribute lines to a different op, and the re-import therefore
+reconstructs a different program.
+
+**⭐ AND THE ROOT CAUSE IS THIS SESSION'S OWN RECURRING SHAPE — one name, two meanings:**
+
+```
+  the Edit chip needs   THE DEEPEST op    — the operation the user actually clicked
+  the .nc exporter needs THE OUTERMOST op — the operation BOUNDARY a marker delimits
+
+  findOpInStack answers ONE of those. t1958 flipped which one. Both consumers took it silently.
+```
+
+## THE TASK
+1. **DO NOT simply revert.** The t1958 fix is correct for its consumer — Edit must resolve the deepest op.
+   Reverting restores the padlock bug.
+2. **DECLARE THE TWO QUESTIONS SEPARATELY.** They are not the same question and must stop sharing an answer.
+   Name them so a reader cannot confuse them (deepest/innermost vs outermost/boundary), and give each consumer
+   the one it actually needs. **Every caller of `opAtLine`/`findOpInStack` must be classified** — say which
+   question each one is really asking; do not assume the two I named are the only consumers.
+3. **⚠ THE USER-FACING STAKE, assert it:** an exported `.nc` must re-import to the SAME program. Bridge to
+   `multi-op-import-1916`'s byte-identical claim. This is export/import fidelity — the worst thing to get
+   silently wrong.
+4. **PROVE BOTH SURVIVE TOGETHER:** the nested-op Edit path (t1958's own spec) AND the export round-trip
+   (`blk-start-hints-multistep-1954`) green in the same run. Neither may be traded for the other.
+5. **NON-VACUITY** on anything new. And say plainly whether the 15 flaky in my run overlap your area.
+6. **GATE (widened, this is the export path):** `blk-start-hints-multistep-1954` + `edit-nested-op-1958` +
+   `multi-op-import-1916` + the round-trip/parity set + `add-operation-1940` + `collapse-on-delete-1948` +
+   `insert-add-replace-1942` + the 4 t1928 features + node tier.
+
+⚠ **NOTHING RELEASES** until this is green. The Edit fix cannot ship while it corrupts export round-tripping.
+⚠ Then, in order: THE CHECKER (shrink-only inventory) → the 6 dead guards → `segmentFrame` → `glowEdited` →
+`_firstOpTitle` → `collectOps` → the 6 new sites.
