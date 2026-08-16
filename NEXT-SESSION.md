@@ -3721,3 +3721,42 @@ session means it is a class, not bad luck.**
 
 ⚠ Report only. Do not fix, do not rewrite a spec, do not add the mouth.
 ⚠ **The human has NOT yet ruled on two-sided setup.** Do not build any of it.
+
+# ═══ t1986 — WHICH COMPOSITE SHAPES HAVE NO CREATION DOOR? (read-only) ═══
+
+t1984 accepted. **The class is CLOSED at 4** — 809 spec files, 115 hits narrowed to 29, all 29 read
+individually, and only the four already known are guilty. That negative is worth more than a longer list: it
+says there is no hidden mass, so we stop hunting here. The 25 innocents resolved into three *named* legitimate
+shapes (self-declared algorithm/foundation tests, the declared reconciler-invariant pattern that calls the same
+function a real Insert does, and incidental seeding — `blocks-roundtrip-toast`'s hit was literally
+`ddcsLoadBlockStack([])`, an empty-canvas clear). **Matching the call and not its argument** is exactly the
+bluntness a careless sweep would have reported as a finding.
+
+**Your NO on the ratchet is accepted, on your reasoning:** classification needs English prose plus per-feature
+knowledge of whether a real door exists, so a hard gate would either block the legitimate reconciler pattern
+constantly or invite a one-line disclaimer escape hatch that decays exactly like a stale inventory entry.
+**Cheap standing report, not a gate.** You have been right on every negative this session and I am not
+overruling this one.
+
+**And the reframe is better than my question was:** the issue is not "more specs like this" — it is
+**"which composite structures have no real creation door?"** That is the generalised form of this whole
+session: we shipped Add, then found Edit dead on the very shape Add creates.
+
+## THE TASK — read-only. My gate is RUNNING: no code, no specs, no suite run.
+Take your own three candidates and settle each: **is there a real, user-reachable way to CREATE this shape,
+and do its consumers work on it?**
+
+1. **A `group` nested inside a `group`.** Can a user make one (the right-click Group gesture on a run that
+   already contains a group)? If yes — do Edit / the glow / the setup sheet / export markers handle it?
+2. **A `multi_step` nested inside a `user_root`.** t1972 made nested `user_`-prefixed ops addressable — can a
+   user actually produce this shape, or is it only reachable by the `connect()` route you proved in t1966?
+3. **2+ ops in one `setup`** — contingent on the human's ruling, so **note the state and move on**; do not
+   design it.
+
+**For each: CREATION DOOR yes/no · CONSUMERS ok/broken/unknown · what the user would see if broken.**
+
+4. **⚠ THE METHOD IS THE DELIVERABLE.** Name the cheap repeatable way to ask "does this shape have a door?" for
+   a shape we have not thought of yet. If the honest answer is "you have to know the feature", say that — I
+   would rather have a true limit than a procedure that pretends.
+
+⚠ Report only. Nothing built. **The human has still NOT ruled on two-sided setup.**
