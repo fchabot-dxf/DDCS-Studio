@@ -3485,3 +3485,46 @@ homing's fragment is the only nested `type:'op'` across all 32 registered ops �
 me. Today's shipped programs must be unaffected.
 ⚠ Then: `segmentFrame` → `glowEdited` → `_firstOpTitle` → `collectOps` → the rest of the 10-entry inventory →
 architecture-citation Option B (now including the unenforced prose half).
+
+# ═══ t1974 — segmentFrame.frameOwnerAtLine: the comment lies, the sim flip never fires ═══
+
+t1972 accepted, verified by me: node tier **125/125 (fail 0)**, and I ran both halves myself — 3 passed. One
+spec flaked in exactly the changed territory (`user_root wrapper is transparent at emit time`), so I isolated
+it rather than accept the retry: **green on its own.** Not masking anything.
+
+**The turn's best moment was a bug you did NOT ship.** You ran the naive `validateUserOp` rule against the real
+tree first — standing discipline in this session — and it **threw on homing's own registration at every boot.**
+A validator that bricks startup is about the worst thing to add to a save path, and it would have looked
+completely reasonable in review. Testing the rule before trusting it is what caught it.
+
+**And the fix for it was principled rather than hand-named:** `opToolbox.js`'s palette only ever offers
+`user_`-prefixed `USER_DEFS`, never a bare `BUILDERS` key, so a legacy builder opType can only reach a template
+as a twin's own internal self-wrap — excluding `BUILDERS` membership is safe *by construction*, and `BUILDERS`
+is a closed existing registry rather than a new list that could quietly grow. That is an exclusion that cannot
+rot, which is the only kind worth having.
+
+**Also right:** non-vacuity proven on each half **independently** (two separate reverts, 3/3 red each, rather
+than one combined claim standing in for both), and the STOP condition discharged against `fork-parity-1593`'s
+byte-for-byte sweep across all 32 ops — no shipped export byte moved.
+
+## THE TASK — the next LIVE bug in the inventory. `segmentFrame.js frameOwnerAtLine`.
+The sim's machine-frame flip (hide-workpiece / DRO switch) **never fires for an operation nested in a
+multi-operation program** — while **its own header comment claims it handles exactly that case**, naming the
+same Homing-then-Corner example. Live since t1874. The code lies about itself, which is the family we have been
+deleting all session.
+
+1. **FIX IT THROUGH THE DECLARED LOOKUP.** It is inventory entry — resolve it via the canonical enumeration
+   rather than a local walk. If the canonical one genuinely does not fit, **stop and tell me** rather than
+   growing a variant.
+2. **⚠ MAKE THE COMMENT TRUE, or delete it.** A comment asserting a behaviour the code does not have is worse
+   than no comment: it stops the next reader checking. Do not leave a corrected code path under a stale claim.
+3. **ASSERT WHAT THE USER SEES:** on a real multi-operation Homing-then-Corner program, the workpiece hides
+   through Homing's own lines and reappears at Corner's first line, and the DRO reads machine-frame for the
+   right span. `option-b-slice3-live-visibility-1874` is the existing evidence — bridge to it.
+4. **THE CHECKER'S INVENTORY MUST SHRINK BY ONE** — and its count updated. That is the ratchet doing its job
+   for the first time; confirm it actually fails if you fix the site without updating the inventory.
+5. **PROVE NON-VACUITY.** Gate: node tier (incl. checker) + `option-b-slice2/3` + `marker-rebuild-1848` +
+   `user-root-boundary-1972` + `export-import-fidelity-1964` + the round-trip/parity set + the 4 t1928 features.
+
+⚠ Then: `glowEdited` → `_firstOpTitle` → `collectOps` (different shape) → the rest of the inventory →
+architecture-citation Option B (including the unenforced prose half).
