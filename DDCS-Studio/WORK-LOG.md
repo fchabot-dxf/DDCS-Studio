@@ -37967,3 +37967,115 @@ No code changed — design/read-only, per the dispatch. `git status` confirms on
 `npm run test:node` not run (no code touched). `proc_health.py watch`: clean.
 
 🔨 turn 1952
+
+# ═══ t1954/t1955 — 🔴 THE SIXTH SITE CLOSED, and the re-run hunt found FIVE MORE (not seven — the class is NOT closed) ═══
+
+**Seat restart note (turn 1955 re-dispatch):** `.handoff/worker.last` already read 1954 from a prior seat that
+died before starting any work — nothing was lost, confirmed by amendment (epoch 5 adopted). This entry covers
+the actual work, done under turn 1955.
+
+## THE FIX — `blkStartHints` now runs `flattenOps`
+
+`web/blocks/blocksApp.js`'s `blkStartHints` (~line 158) walked the raw top-level stack (`getStack()`) instead of
+the declared enumeration. `opSimStarts` has no `'multi_step'` entry, so a `multi_step` import wrapper contributed
+**zero** registry hints and its wrapped children's hints never appeared at all — on a multi-op program the
+Blocks-tab sim collapsed to ONE fallback start (index 0's own `st`/default), not one per real operation.
+
+Fix: `for (const b of (getStack() || []))` → `for (const b of flattenOps(getStack()))` — one line, the same
+declared source the other five t1928 sites already use (`flattenOps` was already imported in this file for the
+`applyProgramIntent` call two lines below, unused for this second consumer until now).
+
+## VERIFY — real symptom, comparison-based, non-vacuous
+
+New spec: `tests/blk-start-hints-multistep-1954.spec.js`. Rather than hand-deriving expected numeric pass-start
+positions (opSimStarts' per-op math is non-trivial — corner alone chains 2-3 rows off a frac anchor + reposition
+offsets), the test COMPARES a real Homing+Corner program loaded two ways: (a) unwrapped, two top-level ops — the
+same shape `marker-rebuild-1848` already proves correct — and (b) the exact SAME program round-tripped through
+`window.ddcsSerializeWithMarkers()` → `importMarkedNc` (the real `multi-op-import-1916` shape), producing ONE
+`multi_step` wrapper. Asserts the Blocks-tab whole-program 3D preview (`panel.getPassStarts()`) reports the
+IDENTICAL count and positions in both cases — the user-visible claim: wrapping a program in an import step-holder
+must not change what the sim shows.
+
+**Non-vacuity, the real way** (temporarily reverted the one-line fix, re-ran, restored — not argued):
+- With the fix: 2/2 green.
+- Fix reverted (`git diff` confirmed byte-for-byte the pre-change line): **3/3 red**, `Expected: 3, Received: 1`
+  — the wrapped case collapsing to exactly the single fallback start the bug description predicted. Restored,
+  re-ran, green again (diff confirmed identical to the intended fix afterward).
+
+## GATE (per the advisor's named list, not the full suite)
+
+`blk-start-hints-multistep-1954` + `marker-rebuild-1848` + `option-b-slice2-positioning-1872` +
+`option-b-slice3-live-visibility-1874` + `guard-roundtrip-1595` + `fork-parity-1593` + the 4 t1928 features
+(`setup-sheet-850`, `time-estimate-844`, `editor-sim-real-insert`, `whole-program-intent-756`) + node tier.
+
+First pass (6 workers): 28 passed clean, 2 flaked (`fork-parity-1593`'s real-gesture fork-every-twin test and
+`guard-roundtrip-1595`'s structural sweep — both timed out on `window.__blkws` inside a 60s boot wait, then
+passed on Playwright's own retry). Re-ran both in isolation (`--workers=1`): **4/4 clean**, confirming load
+contention under the 6-worker batch, not a regression — matches the project's own documented flake shape
+(`guard-roundtrip-1595` is already named in this file's own history as full-suite-noise-only). Node tier:
+**118/118**. `proc_health.py watch` at end of turn: clean, nothing lingering.
+
+## THE RE-RUN ENUMERATION HUNT (the dispatch's own explicit ask — "is six genuinely all?")
+
+**No — it is not.** Dispatched a fresh Explore sweep of the whole `web/` tree for every "what operations does
+this program hold" consumer that scans the top-level stack for `type:'op'` blocks without going through
+`flattenOps`, with the explicit instruction to check every candidate against LIVE SOURCE, not trust the grep (the
+t1936/t1944 standard the dispatch named). 39 grep hits surveyed; I independently re-verified the two highest-
+consequence findings myself against source before trusting the rest (below). **Five genuinely new sites**, none
+overlapping the six already fixed:
+
+1. **`web/ui/setupSheet.js:106` `collectOps`** — unlike `flattenOps`, pushes the `multi_step` wrapper block
+   ITSELF (as a phantom `opType:'multi_step'` row with no real params) **and** recurses into its children — a
+   double-count. Feeds the two-sided-setup time split and tool list (`setupTimeSplit`/`buildSheetHTML`'s
+   per-setup path). Verified myself against live source: line 109 pushes on `b.type === 'op'` with no `opType`
+   guard, line 110 recurses unconditionally on `b.children` — confirmed, this is a second, unfixed function in
+   the SAME file whose other branch (`buildSheetHTML`'s non-setup path, line 185) already correctly calls
+   `flattenOps`.
+2. **`web/ui/editorManager.js:187` `_firstOpTitle`** — top-level-only `.find`; for a `multi_step` program it
+   resolves the wrapper itself, and `opLabelOf('multi_step')` has no registered label, so an exported/downloaded
+   `.nc`'s title/filename would literally read "multi_step" instead of the real first op's name.
+3. **`web/ui/editorOpHover.js:125` `glowEdited`** (`window.ddcsRefreshBlockGlow`) — top-level-only loop; the
+   per-child edit-glow (`ddcsOpBlockEdited(op.id)`) is never checked with the right (nested) id, so a hand-edited
+   op inside a multi-op import never gets its editor highlight, even though the underlying glow machinery
+   (`opGlow.js`) itself recurses fine.
+4. **`web/wizardManager.js:405` `openForEdit`** (`window.ddcsEditOp`) — **verified myself against live source,
+   both ends.** `openForEdit`'s own lookup (line 407) is a top-level-only `.find`. But the callers that FEED it an
+   id — the editor hover chip (`editorOpHover.js:151`, via `window.ddcsOpAtLine(line)`) and the right-click
+   context menu — both resolve through `ddcsOpAtLine`, which DOES recurse (the file's own header comment: "sees
+   inside `multi_step`, proven t1922"). So the "✎ Edit" affordance is shown and clickable for an op nested inside
+   a multi-op import, and clicking it silently does nothing — no error, no form. The sharpest of the five: a
+   visible, enabled control that does nothing on click, the exact defect shape this whole project spent weeks on
+   before t1928.
+5. **`web/viz/segmentFrame.js:35` `frameOwnerAtLine`** (feeds `createPreviewPanel.js`'s t1874 Slice 3
+   hide-workpiece-during-machine-frame-move toggle + the DRO mach/work label) — reads only the top-level ancestry
+   slot, so on a `multi_step` program every line resolves to the wrapper, and `opSimContext('multi_step')` isn't
+   in `MACHINE_FRAME_TOOL`, so the workpiece never hides and the DRO never flips to machine-frame during a nested
+   Homing/ATC pass that should trigger it — even though this exact function's own comment at
+   `createPreviewPanel.js:707-711` claims to handle "a multi-op program."
+
+**34 other candidates checked and ruled out** (registry/def lookups on the definitions list, not the program;
+single-op-fixture-by-construction canvases; already-flattened Blockly block lists; per-block/per-record
+converters; a `type:'xform'` sibling declaration that by design never lives inside `multi_step`; `opSession.js`'s
+edit-mutation pipeline, which documents "top-level op" as an explicit, consistent scope throughout rather than an
+oversight). Full per-site verdicts are in the sweep transcript, not reproduced here for length — available on
+request.
+
+**Method, so the count is trustworthy this time:** grep for op-type checks + program/stack consumers across
+`web/` (excluding tests), then every candidate read against its live source, not inferred from the grep alone —
+the same discipline t1936/t1944 used. None of the five were found by the grep alone; each required reading the
+call site AND (for #3, #4) tracing who feeds it an id/line to confirm nested ids actually reach the shallow
+lookup in practice, not just in theory.
+
+**Verdict on "is the class closed": NO.** Fixing all five is explicitly NOT done this turn (the dispatch asked
+for the hunt, not a fix-everything-found sweep) — queued below, ranked by user-visible consequence: #4 first
+(silent broken control, no workaround), then #1 (wrong numbers on a printed sheet), then #2/#3/#5 (cosmetic —
+wrong title text, missing glow highlight, missing 3D hide/DRO-flip cue on the one nested-multi-op+machine-frame
+combination).
+
+## Queued after this (advisor's own list, unchanged) + the 5 new sites above
+`collectOps`'s phantom row (now the SAME item as new-site #1 above — folds together) · the raw-text import door ·
+architecture-citation Option B (with the uniqueness assertion) · `lathe-honest-3d-1301` near-miss · slice 1's
+unswept `macrosApp.js` · rename slices 2–4 · the marker key · **NEW:** `_firstOpTitle`, `glowEdited`,
+`openForEdit`, `frameOwnerAtLine` (4 more `flattenOps`-bypass sites, ranked above).
+
+🔨 turn 1955

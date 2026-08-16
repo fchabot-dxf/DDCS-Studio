@@ -158,7 +158,10 @@ async function buildWorkspace() {
   const blkStartHints = () => {
     const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const hints = [];
-    for (const b of (getStack() || [])) {
+    // t1954 — the SIXTH t1928 site: this used to walk the raw top-level stack, so a multi_step import wrapper
+    // (opSimStarts has no 'multi_step' entry) contributed zero hints and its wrapped children's hints never
+    // appeared at all. flattenOps is the one declared enumeration the other five sites already use.
+    for (const b of flattenOps(getStack())) {
       if (!b || b.type !== 'op' || !b.opType) continue;
       const h = opSimStarts(b.opType, b.params || {}, stock);
       // t1872 (Option B Slice 2) — tag each hint with ITS OWN contributing op's declared toolMachineFrame, the
