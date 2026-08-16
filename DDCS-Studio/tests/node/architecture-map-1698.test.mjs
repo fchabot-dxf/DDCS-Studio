@@ -96,6 +96,55 @@ import { fileURLToPath } from 'node:url';
  * checker reported 0 matches, by name); (3) duplicated a cited line so it appeared twice (the checker reported
  * 2 matches, by name, as a DIFFERENT failure reason than 0). All three against a scratch copy, restored after.
  * Proven once for the mechanism, not once per citation — see WORK-LOG t1996 for the exact commands run.
+ *
+ * ── t2006 — THE MAP RESTATES ITS OWN CHECKED FACTS. THAT IS A SECOND SOURCE, NOT A COVERAGE GAP ──────────────────
+ * t2004 found INV6's own PROSE (`userOps.js:893-900`) still stale a full turn after its machine-checked twin (INV6,
+ * above) was correctly re-anchored to `:917`. The checker got fixed; the prose a few sections away never caught
+ * up — because it is a SEPARATE, independent restatement of the same fact, not a reference to the checked one.
+ * Measured (proximity-correlated every one of the 62 already-checked claims — TRAP/INVARIANT/Q3/REGISTRY —
+ * against all 149 raw citations in ARCHITECTURE.md, then hand-confirmed the close matches, since same-file
+ * proximity alone over-counts in dense files like `userOps.js`/`panelTypes.js`/`featureCanvas.js` where several
+ * DISTINCT facts sit within a few dozen lines): at least 4 facts among the 62 are independently restated in 2-3
+ * SEPARATE named sections of the document (9+ total citation sites for those 4 alone) — `BUILTINS`/`opensAs`
+ * (Q1's own diagram AND its own prose line AND the REGISTRIES row — ironically inside a box literally labelled
+ * "THE ONE DECLARATION"), `def.mouth`'s reader (REGISTRIES row + INVARIANT #1's own guard description), `_BASE_
+ * DEF_SHAPE`/`hookKeysOf` (REGISTRIES row + INVARIANT #6, the t2004 finding), and the WebGL canvas's in-flow
+ * append (Q3's own diagram + TRAP8). Likely more beyond these 4 — the proximity tool flagged ~126 candidate close
+ * citations across the 62 claims before hand-filtering; only these 4 were individually confirmed as genuinely the
+ * SAME fact rather than a nearby-but-different one, so this is a measured FLOOR, not an exhaustive count.
+ *
+ * A related, adjacent finding: even PART 1's own GENERATED test hardcodes `wizLib.slice(41, 81)` for BUILTINS —
+ * a FIFTH copy of the same "42-81" fact, this time as functional test logic rather than prose (if the array ever
+ * moves, this slice would silently read the wrong byte range rather than erroring). Named here, not fixed this
+ * turn — regex-based extraction (matching `SEED_BUILDERS`'s own approach two lines below it) would remove the
+ * dependency but is a separate, scoped change.
+ *
+ * THE DESIGN CALL: prose should REFERENCE a claim already machine-checked elsewhere (by section/id, e.g. "see
+ * § THE REGISTRIES") rather than RESTATE its file:line and count independently — one canonical prose home per
+ * fact, backed by the checker, instead of N independent copies that can only individually go stale or be
+ * individually fixed. Argued, not asserted: a bare restated line number is EXACTLY the shape of "two sources
+ * that both fail loudly instead of one that can't" (t2006's own dispatch) — fixing one copy after a drift, as
+ * t1996/t2004 both did, does nothing for its siblings, which is how INV6's prose survived stale through an entire
+ * turn that fixed the identical fact three sections away.
+ *
+ * THE COST, ARGUED HONESTLY RATHER THAN ASSUMED AWAY: a reader who has ARCHITECTURE.md open WITHOUT this test
+ * file loses the immediate "jump to this exact line" convenience at the REFERENCING site — they must follow the
+ * pointer to the fact's ONE canonical home (a named section, not a bare id — an id alone means nothing without
+ * this file open) to get the real file:line. This is a real, not hypothetical, cost for a document whose own
+ * header promises "a `file:line` you can check in one jump." The trade only pays for itself where a fact is
+ * ALREADY independently checked elsewhere AND restated at least once more — for a fact cited exactly ONCE,
+ * referencing would just relocate the citation for no gain, so this is NOT a blanket rule for all 149 citations,
+ * only for the CONFIRMED restatements.
+ *
+ * WORKED EXAMPLE LANDED (one section, per the dispatch — not a migration): Q1's own "THE ONE DECLARATION" diagram
+ * box and its neighbouring "BUILTINS = 25 entries; ALL 25 declare opensAs" prose line no longer restate
+ * `wizardLibrary.js:42-81` / the 25/25 counts — both now point to "§ THE REGISTRIES" by name, where the
+ * `REG BUILTINS bar+opensAs registry` claim above (and PART 1's own GENERATED count test) already own the fact.
+ * ARCHITECTURE.md's own text still names WHERE to look (a section header, not a bare test id) — the cost above,
+ * paid deliberately for the one fact this turn confirmed genuinely restated three times. The other 3 confirmed
+ * duplicates (`def.mouth`, `_BASE_DEF_SHAPE`/`hookKeysOf`, the WebGL-canvas line) and the wider Q1/Q2 sweep this
+ * would need are NOT converted this turn — named, sized, and left for whoever picks up the recommendation next
+ * (see WORK-LOG t2006 for the full per-section breakdown and reasoning).
  */
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');   // …/tests/node/<this file> → DDCS-Studio → repo root

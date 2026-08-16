@@ -20,7 +20,8 @@ time. Test pass/fail states are **not** re-measured — they are WORK-LOG-report
                      ┌───────────────────────────────────────────────────────────┐
                      │  THE ONE DECLARATION                                      │
                      │  `opensAs` on a BUILTINS entry                            │
-                     │  DDCS-Studio/web/blocks/wizardLibrary.js:42-81            │
+                     │  — see § THE REGISTRIES, "what the bar shows and what     │
+                     │    it opens" (file:line lives there, machine-checked)     │
                      └───────────────┬───────────────────────────────────────────┘
                                      │ drives THREE consequences, so they cannot drift
           ┌──────────────────────────┼──────────────────────────┐
@@ -32,7 +33,11 @@ time. Test pass/fail states are **not** re-measured — they are WORK-LOG-report
    + inverse bridge for CAM: builtinTypeForTwin  wizardLibrary.js:151 → data/opCamMap.js
 
 
- THE WIZARD BAR IS 100% DATA-TWIN.  BUILTINS = 25 entries; ALL 25 declare opensAs.
+ THE WIZARD BAR IS 100% DATA-TWIN — BUILTINS' opensAs coverage is machine-checked (§ THE REGISTRIES, GENERATED
+ count test); not restated here so there is exactly ONE prose copy of the count to keep in sync (t2006 — this line
+ used to also say "25 entries; ALL 25 declare opensAs", the SAME fact the REGISTRIES row and the GENERATED test
+ both already state; three copies of one fact is the exact "second source" shape this session keeps finding and
+ deleting — see architecture-map-1698.test.mjs's own t2006 comment for the fuller account).
  WIZ_SPECIAL_OPENER = {}   (commandDeck.js:61 — every 3D-animated opener is gone)
 
  ROUTE                        CODE                              LANDS ON

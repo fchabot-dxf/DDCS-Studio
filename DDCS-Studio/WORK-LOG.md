@@ -40299,3 +40299,104 @@ addressed (one complete, one section landed + the rest sized and parked by name,
 either/or).
 
 🔨 turn 2004
+
+# ═══ t2006 — DESIGN TURN: the map restates its own checked facts; that's a second source, not a gap ═══
+
+Node tier only. No bulk rewrite — report, recommendation, and exactly one worked example, per the dispatch.
+
+## (1) COUNT THE DUPLICATES — method and result
+
+Built a correlation: parsed all 62 already-checked claims (TRAP 24 + INVARIANT 21 + Q3 7 + REGISTRY 10) out of
+`architecture-map-1698.test.mjs`, resolved each one's CURRENT true line via the same substring lookup the checker
+itself uses, then cross-referenced against all 149 raw `file:line` citations in ARCHITECTURE.md. Naive same-FILE
+grouping massively over-counts (userOps.js/panelTypes.js/featureCanvas.js each carry a dozen-plus DISTINCT facts
+within a few hundred lines of each other, so "same file" alone isn't "same fact"); tightened to a proximity
+window, then hand-confirmed every close match by reading the actual surrounding prose in both locations rather
+than trusting the number alone.
+
+**Confirmed floor: at least 4 facts among the 62 are independently restated in 2-3 SEPARATE named sections** (9+
+total citation sites for those 4 alone):
+- `BUILTINS`/`opensAs` (`wizardLibrary.js:42-81`, 25/25 count) — stated in Q1's own ASCII diagram, Q1's own prose
+  line right below it, AND the REGISTRIES row — **three restatements of a fact the diagram itself labels "THE ONE
+  DECLARATION."**
+- `def.mouth`'s reader (`bridge.js:78`) — REGISTRIES row + INVARIANT #1's own guard description.
+- `_BASE_DEF_SHAPE`/`hookKeysOf` (`userOps.js:917/924`) — REGISTRIES row + INVARIANT #6 (the exact t2004 finding
+  that started this design turn).
+- The WebGL canvas's in-flow append (`gcodeViz3d.js:68`) — Q3's own diagram + TRAP8.
+
+**Likely more, not exhaustively counted:** the proximity tool flagged ~126 candidate close citations across the
+62 claims before hand-filtering; only these 4 facts were individually confirmed. Stated as a measured FLOOR, not
+a claimed total — the honest boundary of what got individually verified this turn.
+
+**A related, adjacent finding, named not fixed:** even PART 1's own GENERATED test hardcodes `wizLib.slice(41,
+81)` for BUILTINS — a FIFTH copy of the same "42-81" fact, this time as functional TEST LOGIC rather than prose.
+If the array ever moves, this silently reads the wrong byte range instead of erroring (unlike `SEED_BUILDERS`'s
+own regex-based extraction two lines below it in the same test, which is line-independent). Flagged, out of
+scope this turn — a separate, small, mechanical fix.
+
+## (2) THE DESIGN CALL — prose should REFERENCE a checked claim, not RESTATE it
+
+**Recommendation: for a fact already machine-checked elsewhere, prose should point to that check BY SECTION/NAME
+("see § THE REGISTRIES") rather than independently restate the file:line and count.** One canonical prose home
+per fact, backed by the checker, instead of N independent copies that can only individually go stale or be
+individually fixed — which is exactly how INV6's prose survived stale through an entire turn (t1996) that fixed
+the identical fact three sections away (t2004 found it a turn later).
+
+**Argued, not asserted, why this reframes "enforce the other 97" itself:** two independently machine-checked
+copies of one fact still diverge from each other the moment either one drifts — they just both fail loudly
+instead of one failing silently. Checking every restatement separately treats the SYMPTOM (an unenforced copy)
+without treating the CAUSE (a copy that should not exist as an independent fact at all). This is the same
+declare-once-vs-hand-roll shape the project's own north star already applies to source code, aimed back at the
+document that states the rule.
+
+**The cost, argued honestly rather than assumed away:** a reader with ARCHITECTURE.md open but NOT the test file
+loses the immediate "jump to this exact line" convenience at the referencing site — real friction against the
+document's own stated promise ("a `file:line` you can check in one jump"). This is why the recommendation is
+scoped: reference-by-name only pays for a fact that is CONFIRMED restated at least twice already; for the ~145
+citations that appear exactly once, restating would just relocate the citation for no gain — NOT a blanket rule
+for the whole document.
+
+## (3) COST vs "anchor all 97 instead"
+
+Anchoring every remaining prose citation (the Q1/Q2/KNOWN-DIVERGENCE/GATES/UNVERIFIED sections t2004 parked)
+would leave the SAME structural risk in place for every fact that happens to also be checked elsewhere already —
+each of the 4+ confirmed duplicates would become TWO checked copies that could each independently pass while
+disagreeing with each other, which is strictly worse than one copy referencing the other: two sources that both
+fail loudly is still two sources. The reference-by-name approach is cheaper too — no new `find` string to anchor
+and verify per restatement, just a section pointer. For a genuinely SINGLY-cited fact, anchoring remains the
+right move (nothing to reference), so the two approaches are complementary, not competing: reference where a
+check already exists, anchor where it does not.
+
+## (4) WORKED EXAMPLE — one section, not a migration
+
+Converted Q1's own "THE ONE DECLARATION" diagram box and its neighbouring "BUILTINS = 25 entries; ALL 25 declare
+opensAs" prose line: both no longer restate `wizardLibrary.js:42-81` or the 25/25 counts, both now point to
+"§ THE REGISTRIES" by name (a section header, not a bare test id — kept human-readable for a reader without the
+test file open). The REGISTRIES row (already machine-checked via `REG BUILTINS bar+opensAs registry`, landed
+t2004) and PART 1's own GENERATED count test remain the fact's one enforced home. Full reasoning + the design
+call documented as a new comment block in `architecture-map-1698.test.mjs`'s own header (t2006 section), so the
+next reader finds the argument beside the mechanism, not just in WORK-LOG.
+
+**Not converted this turn** (named, not silently skipped): the other 3 confirmed duplicates (`def.mouth`,
+`_BASE_DEF_SHAPE`/`hookKeysOf`'s INVARIANT-#6-vs-REGISTRIES pair, the WebGL-canvas line), and the wider sweep
+needed to find more beyond the 4 confirmed. This was a design turn with ONE sample, per the dispatch, not a
+migration.
+
+## Gate
+
+Node tier only. `npm run test:node`: 126/126, unchanged count (this turn edited prose + a doc comment; no new
+test, no code change — verified the Q1 edits break nothing since PART 1's GENERATED test re-derives its counts
+independently of what Q1's own text says, and REGISTRY_CLAIMS targets source files, never ARCHITECTURE.md's own
+prose). `proc_health.py watch`: clean.
+
+## Files
+`ARCHITECTURE.md` (the Q1 worked-example edit), `DDCS-Studio/tests/node/architecture-map-1698.test.mjs` (the
+t2006 design-rationale comment block only — no array/test changes).
+
+## Queue
+Per the dispatch: KNOWN DIVERGENCE's "is this even the same kind of claim" design question (accepted debt vs.
+stated fact — whether "enforced" means the same thing there), Q1/Q2 anchoring ONLY if still wanted after this
+design turn's own recommendation (which argues for reference-by-name at the confirmed-duplicate sites rather than
+anchoring everything), and two-sided setup — still awaits the human.
+
+🔨 turn 2006
