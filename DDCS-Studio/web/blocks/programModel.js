@@ -47,25 +47,33 @@ export const getProjection = () => proj;
 function findOpInStack(blocks, anc) {
     for (const b of (blocks || [])) {
         if (!b) continue;
-        // t1842 — a type:'op' block with NO id is a builder defect (an internal wrapper that should have been
-        // stripped, or given a real id, before landing in a stored program's own tree — homing's own
-        // `homingDataStack` does exactly this, LOAD-BEARING and left alone, see its own comment). Never match
-        // it: `anc.includes(b.id)` would otherwise match it BY ACCIDENT for any OTHER line whose own ancestry
-        // pads out with genuine `undefined` at this depth, silently resolving to the wrong op (confirmed
-        // reachable, WORK-LOG t1838/t1840). `b.id != null` guards that; see `opAtLine` for the loud signal —
-        // logging HERE, on every encounter, was tried and reverted (t1844): it fired on every homing line
-        // whether or not the search actually failed, an over-broad proxy for the real hazard.
         // t1958 — DEEPEST match wins: try the children FIRST. A line inside a multi_step-nested op carries BOTH
         // the wrapper's id and the nested op's own id in its ancestry (blockEmitter's `own = [...anc, block.id]`
         // grows on every level of recursion) — checking `b` itself first, as this used to, matched the WRAPPER
         // (the first `type:'op'` id encountered at the top level) and returned before ever looking inside it, so
         // every line of every op in a multi-op program resolved to the wrapper, not its own op. The editor hover
         // chip then showed 🔒 (multi_step has no declared form) instead of the real op's own ✎ affordance — one
-        // layer upstream of `openForEdit`'s own by-id bug, and the reason its symptom read as "chip enabled, click
-        // dead" rather than "chip never resolves the right op at all." A childless op (drill, corner, …) is
-        // unaffected: none of its children are themselves `type:'op'`, so the recursion finds nothing and this
-        // still falls through to match `b` itself, byte-identical to before.
-        if (b.children) { const f = findOpInStack(b.children, anc); if (f) return f; }
+        // layer upstream of `openForEdit`'s own by-id bug. A childless op (drill, corner, …) is unaffected: none
+        // of its children are themselves `type:'op'`, so the recursion finds nothing and this still falls through
+        // to match `b` itself, byte-identical to before.
+        //
+        // t1964 — BUT `user_root` is a BOUNDARY, not a container to search through, for this question. A `user_*`
+        // twin's own template body lives inside a `user_root` (every twin has one — corner's own `user_root`
+        // holds plain `section`s; homing's holds an EXTRA nested `{type:'op', opType:'homing'}` fragment, the
+        // legacy stack-builder's own internal wrapper, t1842/t1838's own finding, "LOAD-BEARING and left alone").
+        // That fragment is deliberately never given an id BY THIS MODULE — but a Blockly workspace round-trip
+        // assigns a real id to every block it renders, including this one, so "deepest match, guarded by
+        // `id != null`" (t1958's own rule) started matching it once a program had been through the Blocks tab:
+        // the export marker for a Homing-then-Corner program read `{"op":"homing"}` with no params instead of
+        // the real `user_homing_data` record (t1958-regression, caught by the advisor's own release gate on
+        // `blk-start-hints-multistep-1954`). The id-null guard was the RIGHT idea (t1842) but depends on an
+        // invariant (this fragment stays id-less) that a Blockly round-trip can silently break; treating
+        // `user_root` as opaque doesn't depend on ids at all — NOTHING inside one op's own authoring body can
+        // ever be a DIFFERENT, independently-addressable op, so there is nothing to find by descending into it.
+        // A multi_step-nested op's own line still resolves correctly: its ancestry reaches the nested op's own
+        // `type:'op'` container (e.g. corner's own record) BEFORE ever reaching corner's own `user_root`, so the
+        // deepest-match search stops there, one level short of where this boundary would even apply.
+        if (b.children && b.type !== 'user_root') { const f = findOpInStack(b.children, anc); if (f) return f; }
         if (b.type === 'op' && b.id != null && anc.includes(b.id)) return b;
     }
     return null;

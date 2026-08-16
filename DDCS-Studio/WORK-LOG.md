@@ -38402,3 +38402,96 @@ Read-only design, per the dispatch — no code, no specs, no suite run. `git sta
 entry changed.
 
 🔨 turn 1962
+
+# ═══ t1964 — 🔴 RELEASE BLOCKER FIXED: t1958's reorder broke .nc export for any program holding Homing ═══
+
+The advisor's own full gate on `37b27d80` caught what my own gate missed: `blk-start-hints-multistep-1954` — a
+test that was GREEN when I wrote it — failed deterministically at its sanity step. Reproduced first, not assumed:
+3/3 red, `importMarkedNc(exported)` returned 2 loose top-level ops where it expected 1 `multi_step` wrapper.
+
+## THE ADVISOR'S OWN DIAGNOSIS DID NOT SURVIVE TESTING — narrower, correct root cause found instead
+
+The dispatch's hypothesis was "two different questions sharing one answer: Edit needs the DEEPEST op, export
+needs the OUTERMOST." I tested that premise directly before building anything on top of it, the same way t1958
+itself got built on a premise ("chip enabled, click dead") that testing later disproved. It didn't hold:
+
+- Exporting an **already-wrapped** `multi_step` stack (built directly, no Blockly involved) with the CURRENT
+  deepest-match code produces two correct, separate per-op markers — export wants the DEEPEST op here too, same
+  as Edit. Confirmed live before touching anything.
+- The regression only appears for a program containing `user_homing_data`, and only AFTER a Blocks-tab visit.
+  Traced with a scratch diagnostic (not guessed): `homingWizard.js`'s own builder nests an internal
+  `{type:'op', opType:'homing'}` fragment inside its `user_root` authoring body — deliberately never given an id
+  (t1842/t1838's own finding: "LOAD-BEARING and left alone", specifically so it could never be independently
+  matched). `corner`'s own `user_root` has no such fragment — this shape is homing-specific. A Blockly workspace
+  round-trip assigns a REAL id to every block it renders, including this one — so t1958's own "deepest match,
+  guarded by `id != null`" rule started matching the fragment (`opType:"homing"`, no params) instead of the real
+  `user_homing_data` record, the instant a program went through the Blocks tab. `blk-start-hints-multistep-1954`
+  was green when written because it never visited the Blocks tab before exporting.
+- `viz/segmentFrame.js`'s own header comment (t1838, read fresh, not from memory) documents this EXACT collision
+  by name, with the exact same Homing-then-Corner example, from before the `id != null` guard existed — this is
+  the guard's OWN failure mode reopening through a different door (a Blockly-assigned id instead of a genuinely
+  malformed ancestry), not a new "two questions" problem.
+
+**So there is one question, one answer (deepest match), with one boundary the old guard didn't know how to
+express**: nothing inside one op's own authoring body (`user_root`) can ever be a DIFFERENT, independently-
+addressable op. Classified every caller of `opAtLine`/`findOpInStack` to make sure no third consumer wants
+something else: `editorOpHover.js` (the hover chip, wants deepest — unaffected by the boundary, since the twin
+that owns the boundary is always the one it should match anyway), `wizardManager.js`'s `openForEdit` (t1958, same
+want), and `segmentFrame.js` (already bypasses `opAtLine` entirely for its own unrelated, still-queued reason).
+No consumer wants the fragment or the wrapper by preference — the boundary is correct for all of them.
+
+## THE FIX — `user_root` is an opacity boundary, not a container to search through
+
+`programModel.js`'s `findOpInStack`: `if (b.children && b.type !== 'user_root') { recurse }` — one added
+condition. More robust than the original `b.id != null` guard (t1842), which depended on an invariant (this
+fragment stays id-less) that a Blockly round-trip can silently break; this doesn't depend on ids at all. A
+multi_step-nested op's own line still resolves to the nested op correctly — its ancestry reaches that op's own
+`type:'op'` record BEFORE ever reaching ITS `user_root`, so the deepest-match search stops one level short of
+where the boundary would even apply. Verified this holds by hand-tracing both shapes before running anything,
+then confirmed both empirically.
+
+## VERIFY — both survive TOGETHER, non-vacuous on the fix specifically
+
+Re-ran `blk-start-hints-multistep-1954` (green) and `edit-nested-op-1958` (green) in the same run — neither
+traded for the other, per the dispatch's own requirement. Added a NEW dedicated test,
+`tests/export-import-fidelity-1964.spec.js`, bridging to `multi-op-import-1916`'s own byte-identical standard:
+builds Homing-then-Corner through the REAL "Add" wizard-bar gesture (not hand-spliced ops — homing is
+self-terminating, and only `addOperation`'s own `collapseImportTerminators` step folds its internal M30 away
+correctly when a second op follows; a hand-spliced fixture would carry a stray mid-program M30 never expected to
+round-trip, a separate, pre-existing, already-documented gap, not this regression), visits the Blocks tab (the
+realistic trigger), exports, imports, and asserts: exactly 2 markers naming the REAL ops · structural shape ·
+BOTH ops' params round-trip byte-for-byte against what was actually inserted (not a hardcoded literal that could
+itself drift) · the re-emitted G-code is byte-identical to the original.
+
+**Non-vacuity, on the ACTUAL fix, isolated from the rest of t1958's own reorder**: temporarily removed just the
+`&& b.type !== 'user_root'` clause (kept the deepest-match reorder itself, since t1958's own fix is correct and
+must stay), re-ran both `export-import-fidelity-1964` and `blk-start-hints-multistep-1954`: **3/3 red on both**,
+failing exactly at the predicted spot (`{"op":"homing"}` instead of `user_homing_data`). Restored from a saved
+copy (not `git checkout HEAD`, which would have restored the ALREADY-BROKEN t1958 state, not this fix), re-ran:
+green.
+
+## GATE — widened per the dispatch, since this is the export path
+
+`blk-start-hints-multistep-1954` + `edit-nested-op-1958` + `export-import-fidelity-1964` + `multi-op-import-1916`
++ `guard-roundtrip-1595` + `fork-parity-1593` + `add-operation-1940` + `collapse-on-delete-1948` +
+`insert-add-replace-1942` + the 4 t1928 features + node tier. First pass (default 6 workers, 13 spec files at
+once — heavier than any gate run so far this session): 8 outright failed + 3 flaked, but EVERY ONE died at the
+initial page-boot `waitForFunction` (`window.ddcsStudio && …` never appearing within 5s), none at an assertion —
+pure load contention from the batch size, not a logic failure. Re-ran the identical set at `--workers=2`: **40/41
+clean**, 1 flake (`guard-roundtrip-1595`'s own heavy structural sweep, already documented in this file's own
+history as load-sensitive — timed out once, passed on its own retry). Node tier: 118/118.
+
+## ARCHITECTURE.md — 1 citation repaired (my own edit's own line shift, both encodings)
+
+INV3 (`programModel.js`'s subscriber-isolation `console.error` guard): 518 → 526 (+8, this fix's own explanatory
+comment). Fixed in the test file's own `INVARIANT_CLAIMS` array (the checker's real source, not the prose) —
+`ARCHITECTURE.md`'s own prose line was already generic enough (`file:line`, no restated content) not to need a
+separate edit this time.
+
+## CORRECTION TO MY OWN t1962 PASS-BACK, filed here since it's load-bearing for the queued CODE work
+
+The window-fallback residue (queued first, per the advisor's own order) is UNCHANGED by this turn — still 6
+sites, still dead code, still safe to direct-import. This turn only touched `findOpInStack`; it did not touch
+`openForEdit`/`replaceOp`/the guarded ternaries at all.
+
+🔨 turn 1964
