@@ -3996,3 +3996,40 @@ it still checks for is **test-only dead code today**.
 
 ⚠ Then: `setGroupChildParams`'s real-UI test (needs a browser — after my gate) · two-sided setup awaits the
 human · and I release as soon as the gate lands.
+
+# ═══ t2000 — FIX RECONCILERS.surfacing (live, silent, invisible) ═══
+
+**RELEASED V2026.08.16.3** (`72a12b57`, pushed). Gate: **2581 passed, 26 skipped, ZERO failures**, node
+125/125, at `--workers=3`.
+
+t1998 accepted — **and keeping the three severities apart is exactly what made it actionable.** You separated
+`reconcileActiveOp → pullFromBlocks` (LIVE, wired to the Studio tab switch, silently drops a real hand edit)
+from `replayReconcile` (zero live callers, therefore inert) instead of reporting "the reconciler is stale."
+Those need different responses and a merged report would have got the wrong one. You also re-grepped
+`replayReconcile`'s callers **fresh** rather than citing t1992's finding, and proved nothing props up the dead
+shape — including spotting that `edit-nested-op-1958` deliberately **routes around** this very function. And
+you named a *separate* stale doc-comment claim in `opGlow.js` as out of scope rather than folding it in.
+
+## THE TASK — build the fix you recommended.
+`RECONCILERS.surfacing` opens `find(prog, 'stepdown')`, but surfacing's current builder (t1359) emits
+`surfaceraster` only — stepdown/surfacefill were retired **for surfacing specifically** and are still live for
+pocket/slot/contour. So it returns null on every current surfacing op, unconditionally.
+
+**The user-visible symptom:** edit a surfacing operation's blocks in the Blocks tab, switch back to Studio, and
+the form fields never update. **No error.** Their edit is simply gone from the form.
+
+1. **FOLLOW THE PROVEN PATTERN** — you named `RECONCILERS.slot` (t1500) as the same repair already done. Reuse
+   its shape rather than inventing a third.
+2. **⚠ ASSERT THE REAL GESTURE, not the reconciler:** edit a surfacing op's block field → switch to Studio →
+   **the form field shows the new value.** A unit test on the reconciler would pass while the tab switch stayed
+   broken — that is precisely how `openForEdit` hid for months.
+3. **⚠ DO NOT BREAK pocket / slot / contour** — stepdown/surfacefill are still live for those. Assert at least
+   one of them still reconciles.
+4. **PROVE NON-VACUITY** — and given your last three turns, apply the same suspicion to your own assertion: a
+   form field that shows the right value *for the wrong reason* (a default, a re-derive, a fallback) is the
+   trap you caught twice this week. **Seed a distinctive non-default value.**
+5. **Gate:** node tier + your new spec + `word-glow` + `edit-nested-op-1958` + the round-trip/parity set + the
+   4 t1928 features. **The machine is yours — my gate is not running.**
+
+⚠ Then: `setGroupChildParams`'s real-UI test · the `opGlow.js` stale doc-comment claim you named · two-sided
+setup, still awaiting the human.
