@@ -3064,3 +3064,41 @@ choke point every edit passes through, the gate includes the ROUND-TRIP and PARI
 
 ⚠ Gate for THIS turn: all 12 failing tests by name + your own specs + node tier. The machine is yours; I run
 the full suite again after this lands. Nothing releases until it is clean.
+
+# ═══ t1952 — DESIGN: stop the architecture-map citations rotting (read-only) ═══
+
+t1950 accepted, blocker cleared. **The turn's real value was refusing to stop at the first fix.** Fix 1 made
+`guard-roundtrip-1595` and `fork-parity-1593` green — and you noticed the other four named files were STILL
+red, and treated that as evidence of a second distinct bug rather than as flakiness or a fixture problem. Two
+bugs, found because the first fix's success did not satisfy you. Fix 2 is right for the same reason Fix 1 is:
+**a workspace read-back must REFLECT what is there, not normalise it.** Wrapping two never-wrapped ops is a
+mutation on read, the same class as eating a terminator. And you isolated `probe-input-select-revival-1888`
+(5/5, the known chronic flake) instead of folding it into the story.
+
+## ⚠ TWO THINGS FROM YOUR OWN REPORT, NOW QUEUED — do NOT do them this turn.
+1. **🔴 `blkStartHints` NEVER RUNS `flattenOps` — it is a SIXTH site of the t1928 bug.** You surfaced it while
+   chasing something else. It is the same defect as the four the setup sheet/time estimate/sim hints had:
+   a multi-operation program's hints resolve wrong. **This is the next CODE task after the release.**
+2. `hasWrapper` checks TOP-LEVEL items only. A `multi_step` dragged inside a `setup` container (t1932 proved
+   that reachable) would not trigger collapse. Narrow, same territory as `collectOps`. Noted, not urgent.
+
+## THE TASK — read-only design. My full gate is RUNNING; no code, no specs.
+**The architecture-map citations have now drifted TEN times**, and three of those were this session alone —
+every turn that edits a cited file pays a fix. You flagged it as "a maintenance cost, not restructuring." I
+disagree: ten repetitions is not a cost, it is a design defect asking to be fixed. A map with a checker is a
+guarantee; a map whose checker fails for a reason nobody cares about trains everyone to fix it mechanically —
+and a check people fix without reading is a check that has stopped working.
+
+1. **WHY do they drift?** If the citations are `file:line`, any edit above the line breaks them while the claim
+   stays true. Name the actual mechanism, with examples from this session's three.
+2. **WHAT WOULD NOT DRIFT?** Options to cost, not one recommendation: anchor to a SYMBOL (function/export
+   name) and let the checker find its line · anchor to a distinctive source SUBSTRING · GENERATE the cited
+   sections from the declarations themselves and mark them do-not-hand-edit · or narrow what earns a citation.
+3. **WHICH CLAIMS ARE DERIVABLE vs GENUINELY HAND-WRITTEN?** Generated content cannot rot. Say roughly how much
+   of the map falls in each bucket — that ratio decides whether this is worth doing at all.
+4. **⚠ SAY SO IF IT IS NOT WORTH IT.** If the honest answer is "ten cheap fixes beat one migration", say that
+   and I will drop it. A negative from you has been worth acting on every time.
+
+⚠ Design only. No code, no specs, no suite run.
+⚠ Queue behind the release: `blkStartHints` (🔴 first) · `collectOps` phantom row · raw-text import door ·
+`lathe-honest-3d-1301` near-miss · slice 1's unswept region (`macrosApp.js`) · rename slices 2–4 · marker key.
