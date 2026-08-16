@@ -40400,3 +40400,69 @@ design turn's own recommendation (which argues for reference-by-name at the conf
 anchoring everything), and two-sided setup — still awaits the human.
 
 🔨 turn 2006
+
+# ═══ t2008 — APPLIED t2006: the dangerous copy fixed first, all 4 confirmed duplicates converted ═══
+
+Node tier only.
+
+## (1) THE MOST DANGEROUS COPY, FIXED FIRST
+
+`architecture-map-1698.test.mjs`'s own PART 1 (GENERATED) hardcoded `wizLib.slice(41, 81)` for `BUILTINS` — a
+sixth copy of the "42-81" fact, as TEST LOGIC rather than prose, and the dangerous kind: a shifted array doesn't
+fail loudly, it silently reads the WRONG byte range. Fixed with regex extraction, matching `SEED_BUILDERS`' own
+sibling two lines below (already line-independent). **Found and fixed the identical pattern a second place while
+here, not named in the dispatch**: `viewsIndex.slice(34, 48)` for `WIZARD_VIEWS`, same risk, same fix, same
+sibling-regex convention.
+
+**Proved it, not assumed:** shifted a SCRATCH COPY of each source file (inserted padding lines before the array;
+content unchanged, only its position moved) and compared OLD (hardcoded slice) vs NEW (regex) output.
+- `BUILTINS`, unshifted: OLD 25/25, NEW 25/25 (agree). Shifted 10 lines: OLD read **18/18** — silently wrong, no
+  exception, just the wrong 40-line window. NEW still read **25/25** — found the array wherever it moved.
+- `WIZARD_VIEWS`, unshifted: OLD 14, NEW 14. Shifted 7 lines: OLD read **7** — silently wrong. NEW still read
+  **14**.
+Neither real source file was touched — pure scratch-copy string manipulation in a throwaway script, nothing to
+restore because nothing on disk changed.
+
+## (2) THE 4 CONFIRMED RESTATEMENTS — all converted, one canonical home each
+
+`BUILTINS`/`opensAs` was already 2/3 converted at t2006 (Q1's diagram + Q1's prose line reference § THE
+REGISTRIES; the REGISTRIES row itself stays as the canonical anchor). The remaining 3:
+
+- **`def.mouth`'s reader** — the REGISTRIES row now says "see INVARIANT #1" instead of restating `bridge.js:78`.
+  INVARIANT #1 (already machine-checked as `INV1 mouth reader`) is the canonical home.
+- **`_BASE_DEF_SHAPE`/`hookKeysOf`** — INVARIANT #6's own guard line now says "see § THE REGISTRIES" instead of
+  restating `userOps.js:917-924`. This is the EXACT fact whose stale copy started this whole design turn (t2004
+  found INVARIANT #6's prose stale a full turn after REGISTRIES' copy was fixed) — the fix here is to REMOVE the
+  second copy, not keep re-syncing two copies by hand, which is the whole point t2006 argued.
+- **The WebGL canvas's in-flow append** — Q3's own ASCII diagram now says "see § TRAPS #8" instead of restating
+  `gcodeViz3d.js:68`. TRAP8 (already machine-checked) is the canonical home.
+
+Every conversion carries a NAMED section/number PLUS what it asserts (never a bare cross-reference) — t2006's own
+condition for keeping "one jump" real for a reader without the test file open: "see INVARIANT #1 (the one-line
+reader's file:line lives there, machine-checked)", "see § THE REGISTRIES, 'what counts as a hook on a def'
+(`_BASE_DEF_SHAPE` + `hookKeysOf`, both machine-checked there)", "see § TRAPS #8 (file:line + the z-index history,
+machine-checked)". None of the 4 conversions needed to fall back to restating a coordinate to stay findable — the
+"if impossible, say so and stop" condition from the dispatch didn't trigger.
+
+Did NOT extend beyond the 4 confirmed, per the dispatch: the ~145 singly-cited facts keep their own anchors
+(nothing to reference — anchoring remains correct there, per t2006's own recommendation).
+
+## Gate
+
+Node tier only. `npm run test:node`: 126/126, unchanged count (prose + test-logic edits, no new test, no source
+code touched). `proc_health.py watch`: clean.
+
+## Files
+`ARCHITECTURE.md` (4 conversions across Q1/Q3/REGISTRIES/INVARIANTS), `DDCS-Studio/tests/node/architecture-map-
+1698.test.mjs` (the two slice→regex fixes + a new t2008 header comment documenting both).
+
+## Queue — EMPTY beyond what's already named as the human's or optional
+
+Nothing else named by the advisor is outstanding on my side. Per the dispatch's own list: KNOWN DIVERGENCE's "is
+this the same kind of claim" design question is still open (a question for the advisor/human to decide, not a
+build task); Q1/Q2 anchoring is explicitly OPTIONAL now, per t2006's own recommendation (reference where a check
+exists, which none of Q1/Q2's own facts currently do — anchoring them would need the same per-citation treatment
+t1996/t2004 already did twice); two-sided setup awaits the human. **The queue is empty on my side — nothing built
+this turn is left half-done, and I have no further task to self-assign.**
+
+🔨 turn 2008

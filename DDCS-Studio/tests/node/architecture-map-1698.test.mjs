@@ -136,15 +136,40 @@ import { fileURLToPath } from 'node:url';
  * referencing would just relocate the citation for no gain, so this is NOT a blanket rule for all 149 citations,
  * only for the CONFIRMED restatements.
  *
- * WORKED EXAMPLE LANDED (one section, per the dispatch — not a migration): Q1's own "THE ONE DECLARATION" diagram
+ * WORKED EXAMPLE LANDED (t2006, one section — not a migration): Q1's own "THE ONE DECLARATION" diagram
  * box and its neighbouring "BUILTINS = 25 entries; ALL 25 declare opensAs" prose line no longer restate
  * `wizardLibrary.js:42-81` / the 25/25 counts — both now point to "§ THE REGISTRIES" by name, where the
  * `REG BUILTINS bar+opensAs registry` claim above (and PART 1's own GENERATED count test) already own the fact.
  * ARCHITECTURE.md's own text still names WHERE to look (a section header, not a bare test id) — the cost above,
- * paid deliberately for the one fact this turn confirmed genuinely restated three times. The other 3 confirmed
- * duplicates (`def.mouth`, `_BASE_DEF_SHAPE`/`hookKeysOf`, the WebGL-canvas line) and the wider Q1/Q2 sweep this
- * would need are NOT converted this turn — named, sized, and left for whoever picks up the recommendation next
- * (see WORK-LOG t2006 for the full per-section breakdown and reasoning).
+ * paid deliberately for the one fact t2006 confirmed genuinely restated three times.
+ *
+ * ── t2008 — THE OTHER 3 CONFIRMED DUPLICATES CONVERTED, AND THE MOST DANGEROUS COPY FIXED ─────────────────────────
+ * All three remaining t2006-confirmed restatements now reference instead of restate, each carrying a NAMED section
+ * PLUS what it asserts (not a bare cross-reference — t2006's own condition for keeping "one jump" real):
+ *   - `def.mouth`'s reader: the REGISTRIES row now says "see INVARIANT #1" instead of restating `bridge.js:78` —
+ *     INVARIANT #1 (already machine-checked as `INV1 mouth reader`) is the canonical home.
+ *   - `_BASE_DEF_SHAPE`/`hookKeysOf`: INVARIANT #6's own guard line now says "see § THE REGISTRIES" instead of
+ *     restating `userOps.js:917-924` — REGISTRIES (already machine-checked as `REG hookKeysOf export`, plus INV6
+ *     itself for `_BASE_DEF_SHAPE`) is the canonical home. This is the exact fact whose stale copy started this
+ *     whole design turn (t2004) — it is the one where "keep both in sync by hand" was tried once already and
+ *     failed, so removing the second copy (not re-syncing it) is the point.
+ *   - The WebGL canvas's in-flow append: Q3's own diagram now says "see § TRAPS #8" instead of restating
+ *     `gcodeViz3d.js:68` — TRAP8 (already machine-checked) is the canonical home.
+ * All 4 confirmed duplicates from t2006 are now single-sourced. The wider Q1/Q2 sweep for MORE duplicates beyond
+ * these 4 is still not attempted — named, sized, and left for whoever picks up the recommendation next (see
+ * WORK-LOG t2006 for the full per-section breakdown and reasoning, WORK-LOG t2008 for this turn's).
+ *
+ * THE FIFTH COPY, FIXED FIRST BECAUSE IT WAS THE MOST DANGEROUS: PART 1's own GENERATED test (below) used to
+ * hardcode `wizLib.slice(41, 81)` for BUILTINS and `viewsIndex.slice(34, 48)` for WIZARD_VIEWS — copies of the
+ * SAME two facts, but as TEST LOGIC rather than prose, and the more dangerous kind: a shifted array does not fail
+ * loudly, it silently reads the WRONG byte range. Both replaced with regex extraction (matching `SEED_BUILDERS`'
+ * own sibling two lines below, already line-independent). PROVEN, not assumed: shifted a scratch copy of each
+ * source file by inserting lines before the array (content unchanged, only its position moved) and compared both
+ * forms' output — `BUILTINS` unshifted: OLD 25/25, NEW 25/25 (agree); shifted by 10 lines: OLD read **18/18**
+ * (silently wrong — the hardcoded slice grabbed the wrong 40 lines), NEW still read **25/25** (correct, found the
+ * array wherever it moved). `WIZARD_VIEWS` unshifted: OLD 14, NEW 14; shifted by 7 lines: OLD read **7** (silently
+ * wrong), NEW still read **14**. Neither real source file was touched for this proof — pure scratch-copy string
+ * manipulation, restored nowhere because nothing on disk was ever changed.
  */
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');   // …/tests/node/<this file> → DDCS-Studio → repo root
@@ -196,9 +221,16 @@ test('architecture map: ARCHITECTURE.md exists at the repo root', () => {
 // PART 1 — GENERATED: re-derive what the map states as a count, from the SAME declaration it names
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 test('architecture map GENERATED: Q1/registries — every stated count still matches its own declaration', () => {
-    // BUILTINS: 25 entries, 25 with opensAs (wizardLibrary.js:42-81)
-    const wizLib = linesOf(path.join(WEB, 'blocks/wizardLibrary.js'));
-    const builtinsBlock = wizLib.slice(41, 81).join('\n');   // lines 42-81, 1-based → 0-based slice
+    // BUILTINS: 25 entries, 25 with opensAs (§ THE REGISTRIES / REG BUILTINS bar+opensAs registry, above)
+    // t2008 — this used to hardcode `wizLib.slice(41, 81)`, a SIXTH copy of the "42-81" fact (t2006's own count),
+    // and the most dangerous one: a shifted array would silently slice the WRONG byte range instead of failing
+    // loudly, exactly the risk t2006 named and did not fix. Extracted by regex now, matching SEED_BUILDERS' own
+    // sibling extraction 12 lines below — line-independent, so a moved array is still found, wherever it lands.
+    const wizLibText = fs.readFileSync(path.join(WEB, 'blocks/wizardLibrary.js'), 'utf8');
+    const builtinsMatch = wizLibText.match(/const BUILTINS = \[([\s\S]*?)\n\];/);
+    must('wizardLibrary.js no longer declares `const BUILTINS = [...]` at all — the registry ARCHITECTURE.md cites moved',
+        () => expect(!!builtinsMatch).toBe(true));
+    const builtinsBlock = builtinsMatch[1];
     const builtinIds = (builtinsBlock.match(/\bid:\s*'[a-z_0-9]+'/g) || []).length;
     const builtinOpensAs = (builtinsBlock.match(/\bopensAs:\s*'[a-zA-Z_0-9]+'/g) || []).length;
     must(`BUILTINS entry count drifted from 25 (ARCHITECTURE.md Q1 + REGISTRIES) — got ${builtinIds}. Update the map's own stated count, or this citation range (wizardLibrary.js:42-81) no longer bounds the array.`,
@@ -224,11 +256,14 @@ test('architecture map GENERATED: Q1/registries — every stated count still mat
     must(`the two independent twin-count derivations disagree — SEED_BUILDERS says ${seedCount}, the _OPTYPE grep says ${optypeCount}. ARCHITECTURE.md cites both as agreeing at 32.`,
         () => expect(optypeCount).toBe(seedCount));
 
-    // WIZARD_VIEWS: 14 entries (wizards/views/index.js:35-48, t1730 — middle/rotary_center/rotary_clock/edge/
-    // alignment/homing retired, 20→14), the map's own regex given verbatim
-    const viewsIndex = linesOf(path.join(WEB, 'wizards/views/index.js'));
-    const viewsBlock = viewsIndex.slice(34, 48);   // lines 35-48
-    const viewCount = viewsBlock.filter((l) => /^\s{4}\w+View,$/.test(l)).length;
+    // WIZARD_VIEWS: 14 entries (t1730 — middle/rotary_center/rotary_clock/edge/alignment/homing retired, 20→14)
+    // t2008 — same fix as BUILTINS above: was `viewsIndex.slice(34, 48)`, a hardcoded line range that would
+    // silently slice the wrong block if the array ever moved. Regex-extracted now, line-independent.
+    const viewsText = fs.readFileSync(path.join(WEB, 'wizards/views/index.js'), 'utf8');
+    const viewsMatch = viewsText.match(/export const WIZARD_VIEWS = \[([\s\S]*?)\n\];/);
+    must('wizards/views/index.js no longer declares `export const WIZARD_VIEWS = [...]` at all — the registry ARCHITECTURE.md cites moved',
+        () => expect(!!viewsMatch).toBe(true));
+    const viewCount = (viewsMatch[1].match(/^\s{4}\w+View,$/gm) || []).length;
     must(`WIZARD_VIEWS entry count drifted from 14 (ARCHITECTURE.md Q1 + REGISTRIES) — got ${viewCount}`, () => expect(viewCount).toBe(14));
 
     // the two deletions Q1/TRAP1 claims are load-bearing negatives

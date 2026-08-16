@@ -222,7 +222,7 @@ WIZARD BODY (twin, panel = form3d+2d)      index.html:353-355
 ├─ #userViz3dBox / #userViz3dContainer ── the 3D box ─────────────────────────
 │   └─ .wiz-viz3d           wizardManager.js:569-573  (position:relative; t1942 — shifted from 540-544 by +29)
 │        └─ createPreviewPanel        ONE trace, ONE engine, TWO renderers
-│             ├─ WebGL canvas   viz/gcodeViz3d.js:68  — appended IN FLOW
+│             ├─ WebGL canvas   appended IN FLOW — see § TRAPS #8 (file:line + the z-index history, machine-checked)
 │             │      display:none when mode==='2d'    createPreviewPanel.js:1106
 │             ├─ canvas.pp-2d  createPreviewPanel.js:96  absolute, z-index:1
 │             │      display:none when mode==='3d'    createPreviewPanel.js:1102
@@ -384,7 +384,7 @@ pane they would have backed) — see WORK-LOG t1734.
 | what the bar shows and what it opens | `BUILTINS` + `opensAs`, `blocks/wizardLibrary.js:42-81` (**25** entries, **25** with `opensAs`) | `rg -n "opensAs" DDCS-Studio/web/blocks/wizardLibrary.js` |
 | the data twins | `SEED_BUILDERS`, `web/app.js:100-107` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:98-99`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
 | the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:34-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
-| which block kinds hold children | **`def.mouth`** on each def; the reader is one line — `blocks/blockly/bridge.js:78` | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
+| which block kinds hold children | **`def.mouth`** on each def — see INVARIANT #1 (the one-line reader's file:line lives there, machine-checked) | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
 | which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:36`) | — |
 | what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:917` (t1996 shifted this from 893 — see INV6); exported as `hookKeysOf` `:924` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |
@@ -429,9 +429,11 @@ accident**.
 fixing its gap erases the record of what changed.
 
 **6 · Derive membership from shape; never hand-maintain a name list that must track a growing set.**
-Guard: `userOps.js:917-924` (t2004 — this prose still said `893-900`; the machine-checked citation for this same
-guard was already re-anchored at t1996, this line just never caught up). Break it → `OP_CODE_HOOKS`, an 8-name
-hand list, had gone stale by **7 live hooks**;
+Guard: **derived, not listed** — see § THE REGISTRIES, "what counts as a hook on a def" (`_BASE_DEF_SHAPE` +
+`hookKeysOf`, both machine-checked there). (t2004 found THIS line's own copy of the fact stale at `893-900` a full
+turn after the REGISTRIES copy was fixed to `917`/`924` — t2008 removed the second copy instead of keeping both in
+sync by hand, since two synced copies is still two copies that CAN diverge again.) Break it → `OP_CODE_HOOKS`, an
+8-name hand list, had gone stale by **7 live hooks**;
 forking any of 11+ ops silently dropped one — byte-correct emit, clean console, a piece of the UI just missing.
 **The obvious replacement is also wrong:** "any function on `def`" misses 5 of the 7, because `zRuler` /
 `entryPoint` / `simStartParams` / `latheTool` / `latheProbeAxis` are plain JSON-safe **data**, not functions.
