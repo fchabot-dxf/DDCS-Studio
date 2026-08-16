@@ -215,8 +215,11 @@ const INVENTORY = [
     { file: 'web/blocks/opSession.js', name: 'setGroupChildParams', why: 'editing a hand-built group\'s own form fields silently fails once that group is promoted into a multi_step (any 2+ top-level ops wrap, group included)' },
     { file: 'web/blocks/opSession.js', name: 'replayReconcile', why: 'the edit-glow diff for a nested op reads "no edits" instead of erroring, so a real block-level edit never highlights' },
     { file: 'web/blocks/opSession.js', name: 'mergeOpBlocks', why: 'the block-edit-aware 3-way AST merge silently no-ops for a nested op, discarding the user\'s hand edits with no error' },
-    { file: 'web/ui/editorManager.js', name: '_firstOpTitle', why: 'an exported/downloaded .nc for a multi-op program is titled/filed as "multi_step" instead of the real first op\'s name (cosmetic)' },
     { file: 'web/ui/opContextMenu.js', name: 'showOpMenu', why: 'the right-click menu on a nested op falls back to a thinner, stale record (missing params/children) for its CAM-authoring actions' },
+    // t1978 — web/ui/editorManager.js's _firstOpTitle FIXED: now reads `flattenOps(ddcsGetBlockProgram())[0]`
+    // (t1928's own declared enumeration) instead of a shallow top-level `.find`, which resolved the multi_step
+    // WRAPPER itself and fell through opLabelOf to the bare string 'multi_step'. See WORK-LOG t1978 and
+    // export-title-975.spec.js's new multi-op test for the non-vacuity proof.
     // t1976 — web/ui/editorOpHover.js's glowEdited FIXED: iterates `flattenOps(ddcsGetBlockProgram())` (t1928's
     // own declared enumeration) instead of a shallow top-level loop; the edit-detection itself (isOpBlockEdited /
     // editedRangesForOp, opGlow.js) was already correct BY ID (t1958), the gap was purely what this loop visited.

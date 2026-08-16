@@ -38977,3 +38977,79 @@ for an intermediate gate, per the advisor's own stated plan.
 inventory → architecture-citation Option B, including the unenforced prose half.
 
 🔨 turn 1976
+
+# ═══ t1978 — editorManager.js _firstOpTitle: every multi-op export/download named "multi_step.nc" ═══
+
+## THE SCREENSHOT CHECK, asked first, one check only
+
+The advisor spotted `#1505=1 ;ERROR: stepover / stepdown must be greater than zero` and a "can't verify" badge in
+t1976's own screenshot and asked whether my edit caused it. One check: built a completely fresh default `surfacing`
+insert with NO field edit at all and read the same two signals. **Both were already present from the defaults,
+not caused by my edit.** The `#1505` line is a STATIC unconditional refuse-guard baked into `surfacing`'s own
+emit template (the same defensive shape as drill's own zero-bite guard, seen in this session's own node-tier
+output) — it only fires at runtime if the computed value is actually ≤0, not evidence the current defaults are
+invalid. The "can't verify" amber reads "placement not declared — no WCS table pulled/entered," the generic
+state of any fresh test-boot page with no machine profile configured — unrelated to stepover/stepdown entirely.
+Neither is a new bug; both are pre-existing, benign, default-state facts of this test harness. Not investigated
+further, as asked.
+
+## THE BUG
+
+`_firstOpTitle`'s own lookup — `prog.find((b) => b && b.type === 'op' && b.opType)` — was shallow, top-level only.
+For a `multi_step`-wrapped multi-op program (the real Add gesture, t1940/t1942), this resolved the WRAPPER
+itself; `opLabelOf('multi_step')` has no `OP_LABELS`/`USER_LABELS` entry for that internal type, so it fell
+through to the bare string `'multi_step'` verbatim. Every multi-operation export/download — both `downloadFile`
+and `bridgeTransfer.js`'s TRANSFER, which share this one function per its own header comment — has been titled
+and filed as `multi_step.nc` since this mechanism shipped (t975), on every multi-op program, no exceptions.
+
+## THE FIX
+
+`flattenOps(prog)[0]` — `programModel.js`'s own declared "what operations does this program hold" enumeration
+(t1928), same canonical-lookup shape as t1974 (`segmentFrame.js`) and t1976 (`editorOpHover.js`). Added the
+import. The surrounding doc comment ("the first op's friendly label") was already the correct INTENT, not a lie —
+nothing to correct there, only the implementation.
+
+## ASSERT THE EXPORTED FILENAME — bridged to export-title-975, not a parallel file
+
+Checked first: `export-import-fidelity-1964` (suggested as a possible bridge) touches only the G-code BODY round-
+trip via `ddcsSerializeWithMarkers`/`importMarkedNc` — it never calls `buildProgram()` or reads `.name` at all, a
+genuinely different mechanism from the title/filename path. `export-title-975.spec.js` is `_firstOpTitle`'s own
+origin-turn test file (t975) and already uses exactly the right surface (`window.ddcsStudio.editorManager.
+buildProgram()`) — extended it instead of inventing a new one. New test: drill then surfacing via the real "Add
+as a 2nd operation" gesture (t1958's own proven helpers), sanity-confirms a genuine `multi_step` wrapper exists,
+then asserts `buildProgram().name` contains `"drill"` and does NOT contain `"multi_step"`, plus the title comment
+line (`code.split('\n')[0]`) also names the real op.
+
+## NON-VACUITY
+
+Saved a scratch copy of the fixed `editorManager.js`, reverted `_firstOpTitle` to its exact pre-fix shallow
+`.find`, ran the new test at `--workers=1`: failed **3/3**, `r.name` reading literally `"multi_step.nc"` — the
+exact reported symptom, reproduced verbatim. Restored from the saved copy (not `git checkout HEAD`, uncommitted
+work). Re-ran the full 4-test file: green.
+
+## THE RATCHET, direction 2, third time
+
+Fixed the code first, left the `editorManager.js :: _firstOpTitle` entry in `INVENTORY`, ran the checker: failed,
+`staleEntries` naming exactly that site. Removed the entry (8-entry inventory is now 7; a t1978-dated comment
+replaces it, matching the convention from the two prior turns). Full checker re-run: 7/7, both ratchet-direction
+meta-tests pass.
+
+## ARCHITECTURE.md — checked, no drift
+
+Zero citations to `editorManager.js` in `ARCHITECTURE.md` (grepped).
+
+## GATE
+
+Node tier (125/125, including the updated 7-entry `op-lookup-scan-1968` at 7/7) + `export-import-fidelity-1964`
+(1/1) + `guard-roundtrip-1595` (2/2) + `fork-parity-1593` (2/2) + the 4 t1928 features (`setup-sheet-850`,
+`time-estimate-844`, `editor-sim-real-insert`, `whole-program-intent-756`, 15/15) + `export-title-975` (4/4,
+including the new multi-op test) — **33/33 clean** (`--workers=2`, 1 known load-contention flake on an unrelated
+`time-estimate-844` boot, retried green).
+
+## Queued CODE work, the advisor's own order, unchanged
+`setupSheet.js` `collectOps` (different shape — over-eager recursion/double-counting, not a shallow miss) closes
+the batch. Then, per the advisor: bridge `option-b-slice2-positioning-1872` to a WRAPPED program (t1974's own
+method, applied to the gap this turn's bounded question surfaced) → the remaining 7-entry inventory →
+architecture-citation Option B, including the unenforced prose half.
+
+🔨 turn 1978

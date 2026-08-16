@@ -7,6 +7,7 @@ import { el, UIUtils } from './uiUtils.js';
 import { SNIPPETS } from '../data/snippets.js';
 import { opLabelOf } from '../blocks/opBuilders.js';   // t975 — derive a clean export title from the op model (fixes g90_absolute.nc)
 import { confirmDestructiveLoad } from '../blocks/saveStates.js';   // t1938 — the ONE destructive-load seam Clear routes through
+import { flattenOps } from '../blocks/programModel.js';   // t1978 — the one declared op enumeration
 
 export class EditorManager {
     constructor() {
@@ -184,7 +185,14 @@ export class EditorManager {
             const proj = window.ddcsGetProjection && window.ddcsGetProjection();
             if (!proj || proj.text !== code) return '';
             const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-            const op = prog.find((b) => b && b.type === 'op' && b.opType);
+            // t1978 — was a shallow top-level `.find`: for a multi_step-wrapped multi-op program (the real Add
+            // gesture, t1940/t1942) this found the WRAPPER itself, and `opLabelOf('multi_step')` has no
+            // OP_LABELS/USER_LABELS entry for that internal type, so it fell through to the bare string
+            // 'multi_step' verbatim — every multi-op export/download was titled and filed as "multi_step.nc"
+            // instead of naming the real first operation. `flattenOps` (programModel.js, t1928) is the one
+            // declared answer to "what operations does this program hold," recursing into multi_step's own
+            // children — its own [0] is the real first op, same one a single-op program already returns.
+            const op = flattenOps(prog)[0];
             if (!op) return '';
             let name = String(opLabelOf(op.opType) || '').replace(/\s*\([^)]*\)/g, '').trim();   // "Surfacing (data)" → "Surfacing"
             if (!name) return '';
