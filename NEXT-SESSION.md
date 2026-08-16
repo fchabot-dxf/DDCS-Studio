@@ -3351,3 +3351,46 @@ same class of silent-wrong-answer we have now hit three times. **Prove it or bre
 
 ⚠ Design only. Then in order: THE CHECKER (shrink-only inventory) → the 6 dead guards → `segmentFrame` →
 `glowEdited` → `_firstOpTitle` → `collectOps` → the 6 new sites.
+
+# ═══ t1968 — BUILD THE CHECKER (shrink-only inventory) ═══
+
+**RELEASED V2026.08.16.1** (`06169918`, pushed). Gate: full suite on `7928a139` — 2560 passed, 26 skipped,
+22 flaky, 3 failed, all three `probe-input-select-revival-1888` isolated **5/5 green twice, independently**.
+Node tier re-run on the release commit: 118/118. (An earlier run of the same tree returned 1918 unexpected in
+1.4h — discarded as a starved run after confirming app boot and a real spec green. Not evidence, not reported
+as findings.)
+
+t1966 accepted, and **you broke the assumption instead of confirming it — which is what I asked for and the
+harder thing to do.** You connected a placed Corner op into a `user_root`'s execution mouth via Blockly's real
+`connect()` (the same compatibility check a mouse drag uses), got zero rejection because that input carries no
+`check:`, and read it back through the app's own reader — preserved, unsanitised. Then you ruled OUT the
+palette path first (`builderOf()` returns a bare `user_root`, so dragging from the palette is safe) so the
+finding names the *actual* hazard rather than a category. And you swept all 32 registered ops to establish the
+gap is **latent, not live**. The free finding — `_framed()`'s progstart/progend lift only inspecting the outer
+`user_root`'s direct children — is logged and unchased, correctly.
+
+**Your `USER_OP_PREFIX` proposal is APPROVED in principle** (reuse an already-declared convention rather than
+blanket opacity), and so is the `validateUserOp` save-time assertion. **Both queued behind this task** — the
+gap is latent and the checker is what stops the class growing while we work through it.
+
+## THE TASK — build the checker. Your own ranking, which I accepted.
+Ship it as a **RATCHET**, per my ruling: an explicit inventory of the currently-open sites; **FAIL on anything
+not in the inventory; FAIL if the inventory GROWS.** Never allow-list a bug to green, never leave a permanent
+red that blinds my release gate.
+
+1. **THE SHAPE** you defined in t1960: a shallow `type === 'op'`-or-bare-id find/filter/loop over a
+   `getStack()`-traced array with no `.children` anywhere in the enclosing function (brace-sliced, not
+   per-callback), excluding the already-fixed guarded-fallback idiom.
+2. **NODE TIER**, own file, beside `architecture-map-1698`. Sub-second. It is a file read and a grep.
+3. **THE INVENTORY IS THE DEBT, AND IT MUST BE READABLE**: each entry `file:line` + one line of what breaks for
+   the user. A future reader must be able to pick one off without re-deriving it. **Include a COUNT** so the
+   ratchet is obvious at a glance.
+4. **⚠ PROVE BOTH DIRECTIONS:** add a fake new violation → it FAILS. Remove an inventory entry without fixing
+   the site → it FAILS. **A ratchet that only ratchets one way is half a ratchet**, and the loose direction is
+   the one that rots.
+5. **REPORT THE FALSE-POSITIVE RATE HONESTLY.** If it fires on innocent code you cannot cleanly exclude, say so
+   — a noisy checker gets suppressed and becomes decoration, which is the failure this project keeps deleting.
+
+⚠ Gate: your new node test + node tier + the round-trip/parity set. NOT the full suite; that stays mine.
+⚠ Then, in order: the 6 dead guards → `USER_OP_PREFIX` boundary + `validateUserOp` assertion → `segmentFrame`
+→ `glowEdited` → `_firstOpTitle` → `collectOps` → the 6 new sites.
