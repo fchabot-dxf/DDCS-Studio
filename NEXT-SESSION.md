@@ -3641,3 +3641,42 @@ counted beside them — the same rule `flattenOps` already encodes.
 
 ⚠ **THIS CLOSES THE BATCH.** After it: I run ONE full gate and cut the release. Then `option-b-slice2` bridged
 to a wrapped program → the rest of the inventory → architecture-citation Option B.
+
+# ═══ t1982 — IS TWO-SIDED SETUP A DEAD FEATURE? (read-only) ═══
+
+t1980 accepted — **and "no fix" was the right answer.** You reproduced the reachability question LIVE instead
+of inferring it, and found the case cannot occur: no UI creates a `setup` block, the `.nc` marker path never
+emits or restores one, and — the decisive part — **a `setup` with ANY children throws the moment the Blocks tab
+renders it** (`recToJson: block setup (kind setup) carries 1 children but its def declares no mouth`). That is
+much stronger than "unobserved": the surface the hazard needs is actively broken first. You did not fix a
+ghost, and you confirmed `collectOps` was deliberately never in the inventory (it is cited as a correctly-
+EXCLUDED genuine recursive walker) so the count correctly stays at 7.
+
+## ⚠ YOUR FINDING #2 IS BIGGER THAN THE THING IT WAS CHECKING.
+I verified your lead myself. `setupBlock` (`transform.js:40`) is **registered in the palette** — it sits in
+`ops/index.js:119`'s block list, `category: 'Transforms'`, beside `arrayBlock`/`fillZigzagBlock` **which all
+declare `mouth: 'DO'` and it declares none.** Meanwhile the machinery that consumes it is fully built:
+`blockEmitter.js:625` applies the per-setup FLIP at emit, and `setupSheet.js` builds per-setup pages with flip
+instructions. So the two-sided workflow is **declared, wired at emit, wired in the printed sheet, and offered
+in the palette — while being structurally impossible to use.** A palette entry promising a capability the block
+cannot perform is the lying-codebase family at feature scale.
+
+**This matters to the human specifically: two-sided machining (flip the part, cut the back) is a real shop
+workflow, and they are the machinist.** So this is a product question, not just a defect.
+
+## THE TASK — read-only. My full gate is RUNNING: no code, no specs, no suite run.
+1. **CAN A USER PLACE ONE TODAY?** Confirm whether `setupBlock` actually renders in the Blockly toolbox (I
+   traced the registry, not the rendered palette). If it renders, what happens when a user drags it out —
+   does it look like a container that just refuses ops, or does it fail some other way?
+2. **WHAT WOULD MAKE IT WORK?** Is it genuinely a missing `mouth` declaration, or is `mouth` only the first of
+   several gaps? **Cost it honestly** — one word, or a feature's worth of work. Do not build it.
+3. **HOW MUCH OF THE FEATURE IS REAL?** The emit-side flip and the setup-sheet pages appear complete. Are they
+   *tested*? If specs exist, what do they construct — hand-built stacks that bypass the broken path (the
+   `PRIMARY EVIDENCE` shape again), or something a user could actually produce?
+4. **WAS IT PARKED DELIBERATELY?** Check `WORK-LOG`/`ROADMAP` for t879. A feature parked on purpose is not a
+   bug — say so if that is what the record shows.
+5. **⚠ DO NOT BUILD, DO NOT ADD THE MOUTH.** The human decides whether two-sided setup is wanted. I want the
+   cost and the honest state, so they can rule on it.
+
+⚠ After my gate + release: `option-b-slice2` bridged to a wrapped program → the rest of the 7-entry inventory
+→ architecture-citation Option B (incl. the unenforced prose half) → whatever the human rules here.
