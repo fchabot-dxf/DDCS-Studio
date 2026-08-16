@@ -10,9 +10,14 @@
  * DECLARED params off the structured block model (declaration, NOT the banned motion-inference).
  *
  * Imports the BUILDERS leaf (opBuilders) + the region helpers; talks to the program via window hooks
- * (ddcsGetBlockProgram / ddcsLoadBlockStack). Nothing imports back into the builders, so there's no cycle.
+ * (ddcsGetBlockProgram / ddcsLoadBlockStack) — plus a direct import of programModel.js's own findOpById/
+ * replaceOpById (t1970): opBuilders.js is the declared LEAF every op module imports FROM (opSession/opGlow/
+ * programModel are peers, never importing each other), so this is not a cycle risk, just a direct call to the
+ * declared primitive instead of a window-guarded fallback that could never fire (t1962's own boot-chain trace).
+ * Nothing imports back into the builders, so there's no cycle.
  */
 import { getLastOp, recordOp } from './opRecord.js';
+import { findOpById, replaceOpById } from './programModel.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks (commitDecodedCode)
 import { resolveActivePost } from '../wizards/dialects/index.js';
@@ -549,7 +554,9 @@ export function replaceOp(opId, params) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
     // t1958 — findOpById/replaceOpById reach an op wherever it lives (top-level or nested in a multi_step's
     // children); a plain findIndex here would silently fail to commit an edit the wizard just opened correctly.
-    const op = (typeof window !== 'undefined' && window.ddcsFindOpById) ? window.ddcsFindOpById(cur, opId) : cur.find((b) => b && b.type === 'op' && b.id === opId);
+    // t1970 — direct import, not a window-guarded fallback: the guard could never fire (t1962's own boot-chain
+    // trace), so the "fallback" was 6 places re-asserting a danger that provably doesn't exist.
+    const op = findOpById(cur, opId);
     if (!op) return false;
     const opType = op.opType;
     if (!builderOf(opType)) return false;
@@ -557,10 +564,7 @@ export function replaceOp(opId, params) {
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const opC = makeOp(opType, params, bare);
     opC.id = opId;                                                     // keep the same id so views/selection stay stable
-    const next = (typeof window !== 'undefined' && window.ddcsReplaceOpById) ? window.ddcsReplaceOpById(cur, opId, opC) : (() => {
-        const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
-        return idx < 0 ? null : [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
-    })();
+    const next = replaceOpById(cur, opId, opC);
     if (!next) return false;
     recordOp(opType, params);                                          // update the lastOp snapshot so preview syncs
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);

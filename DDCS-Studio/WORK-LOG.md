@@ -38653,3 +38653,67 @@ shape) → the 6 new sites (now 7, counting `openCamAuthoring`) — every one of
 entry from `op-lookup-scan-1968` when fixed (the ratchet's own shrink direction), not a separate bookkeeping step.
 
 🔨 turn 1968
+
+# ═══ t1970 — THE 6 DEAD GUARDS DELETED — direct import at every call site t1962 already proved safe ═══
+
+Every premise for this was already established in t1962: all 6 fallback branches are KNOWN-WRONG (the exact
+pre-fix shape of `openForEdit`/`replaceOp`/`flattenOps`), the guard CAN NEVER FIRE (`initProgramModel()` runs
+synchronously in the `DDCSStudio` constructor before the app is interactive, and no node-tier test executes these
+files), and there is NO import cycle (`opBuilders.js` is the declared LEAF; `opSession.js`/`opGlow.js`/
+`programModel.js` are peers, never importing each other) — `opGlow.js`'s own t1958 direct-import fix already
+proved the shape works clean. This turn just executes on that trace.
+
+## THE 6 SITES, all direct imports now
+
+- `opSession.js`'s `replaceOp` (×2): `findOpById(cur, opId)` and `replaceOpById(cur, opId, opC)`, replacing both
+  `window.ddcsFindOpById ? … : cur.find(shallow)` and the manual `findIndex`+splice IIFE fallback.
+- `envelopeCheck.js`'s pre-flight pass-start derivation (×1): `flattenOps(prog)`.
+- `wizardManager.js`'s `openForEdit`, the group-edit `tgt` lookup, and the insert-path duplicate-count message
+  (×3): `findOpById(prog, opId)` / `findOpById(prog, this.editingOpId)` / `flattenOps(cur)`.
+
+Each file's own header comment updated to say WHY the import is safe (leaf/peer relationship, no cycle) rather
+than leaving the reader to re-derive t1962's own trace from nothing.
+
+## THE STOP CONDITION DIDN'T TRIGGER — and static imports make the whole question moot going forward
+
+Nothing broke; the guard never fires in the real gate either. Worth naming precisely why this class of risk is
+now structurally gone, not just empirically unobserved: a static `import` is resolved by the module system
+BEFORE any application code runs, so there is no "was `findOpById` defined yet" question left to ask — unlike
+the window-runtime check it replaced, which depended on timing. The STOP CONDITION was really only ever a risk
+for the OLD shape; removing it removes the question, not just today's answer to it.
+
+## THE CHECKER'S GUARDED-FALLBACK EXCLUSION — deleted, per the advisor's own explicit rule (#4)
+
+Grepped fresh after the edits: `window.ddcsFindOpById`/`ddcsFlattenOps`/`ddcsReplaceOpById` now appear ONLY in
+their own `initProgramModel()` declarations — zero call sites reference them anywhere in `web/`. The exclusion
+clause `op-lookup-scan-1968.test.mjs` carried for this idiom is now genuinely unreachable against the real tree,
+so it's deleted (constant, its use in `isViolation`, its own synthetic proof-test, and the header comment's
+description of it) — replaced with a short section explaining WHY it was removed rather than just vanishing
+without a trace. The checker still passes 7/7, and Part 2's real-tree inventory match is UNCHANGED (10 entries,
+none of the 6 sites I fixed this turn were ever IN that inventory — they were already-fixed guarded-fallback
+sites, not shallow-scan violations, a different shape the checker was never tracking as debt).
+
+## VERIFY
+
+Two more `ARCHITECTURE.md` citations shifted by this turn's own edits (the import lines added): INV/TRAP4
+`opSession.js` dialectOpts (18→25) and TRAP5 `wizardManager.js` `canEdit` (322→323) — fixed in both the checker's
+own test array AND the prose table. Four OTHER prose mentions of `wizardManager.js` (two citing `:401`, one
+`:406`, one `:569-573`) were checked against current content and found to have been stale BEFORE this turn ever
+started (`this.open()` sat at line 413 even on the pre-t1970 tree, 7 lines from what the map already claimed) —
+left untouched rather than compounding a guess on an already-wrong baseline; named here so the next person
+doesn't have to re-discover it. These four are not test-enforced (outside `architecture-map-1698`'s own checked
+`ASSERTED` array), so nothing in the gate depends on them.
+
+## GATE
+`op-lookup-scan-1968` (7/7, down from 8 — one dead synthetic test removed with its own dead exclusion) + node
+tier (125/125) + `edit-nested-op-1958` + `export-import-fidelity-1964` + `blk-start-hints-multistep-1954` +
+`guard-roundtrip-1595` + `fork-parity-1593` + the 4 t1928 features (`setup-sheet-850`, `time-estimate-844`,
+`editor-sim-real-insert`, `whole-program-intent-756`) — **23/23 clean, zero flakes** (at `--workers=2`, matching
+the load-contention discipline established earlier this session).
+
+## Queued CODE work, the advisor's own order, unchanged
+`USER_OP_PREFIX` boundary + `validateUserOp` assertion → `segmentFrame.js` `frameOwnerAtLine` → `editorOpHover.js`
+`glowEdited` → `editorManager.js` `_firstOpTitle` → `setupSheet.js` `collectOps` (different shape) → the remaining
+inventory sites (still 10 — none of today's 6 were ever inventory entries).
+
+🔨 turn 1970

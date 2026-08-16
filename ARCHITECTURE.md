@@ -568,7 +568,7 @@ modules**. Three modules keep their own byte-identical `dialectOpts()` copy that
 ```
 blocks/programModel.js:36   () => ({ dialect })
 blocks/opGlow.js:18         () => ({ dialect })
-blocks/opSession.js:18      () => ({ dialect })
+blocks/opSession.js:25      () => ({ dialect })
 ```
 `applyIndentStyle` no-ops unless `settings.indentStyle === 'flush'` (`data/indentStyle.js:51`). So setting indent
 style to `flush` appears to change the **wizard preview panel** but not the committed program projection
@@ -579,7 +579,7 @@ rg -n "indentStyle" DDCS-Studio/web --glob '!data/indentStyle.js'
 Only `ui/settingsPanel.js` (writes) and `wizards/previewEmit.js` (reads) appear. **I did not run this.**
 
 ### 5 · A legacy `corner` op has a live ✎ Edit that opens onto nothing — CONFIRMED live at runtime, deliberately NOT fixed.
-`canEdit('corner')` (`wizardManager.js:322`) returns true because `paramFields('corner')` is non-empty —
+`canEdit('corner')` (`wizardManager.js:323`) returns true because `paramFields('corner')` is non-empty —
 `FIELD_BIND.corner` (`blocks/opSchema.js:158`) is folded onto `SCHEMA.corner` at `:177-180`. But those 15 field
 ids point at DOM deleted with the panel:
 ```bash

@@ -145,9 +145,9 @@ const TRAP_CLAIMS = [
     { id: 'TRAP4 activeDialectOpts declares {dialect, indentStyle}', file: 'web/wizards/previewEmit.js', line: 21, lineEnd: 24, find: /indentStyle/ },
     { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', line: 36, find: /dialect/ },
     { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', line: 19, find: /dialect/ },   // t1958 — shifted from 18 by +1 (the shared findOpById import replacing the private duplicate)
-    { id: 'TRAP4 opSession.js keeps its own {dialect}-only copy', file: 'web/blocks/opSession.js', line: 18, find: /dialect/ },
+    { id: 'TRAP4 opSession.js keeps its own {dialect}-only copy', file: 'web/blocks/opSession.js', line: 25, find: /dialect/ },   // t1970 — shifted from 18 by +7 (the findOpById/replaceOpById direct import + its own header comment)
     { id: 'TRAP4 applyIndentStyle no-ops unless flush', file: 'web/data/indentStyle.js', line: 51, find: /flush/ },
-    { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', line: 322, find: /canEdit/ },
+    { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', line: 323, find: /canEdit/ },   // t1970 — shifted from 322 by +1 (the findOpById/flattenOps direct import line)
     { id: 'TRAP5 FIELD_BIND.corner folded at opSchema.js', file: 'web/blocks/opSchema.js', line: 158, find: /corner/ },
     { id: 'TRAP6 commData.js passes setup_datawiz', file: 'web/blocks/dataOps/commData.js', line: 154, find: /setup_datawiz/ },
     { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 129, find: /setup_datawiz/ },   // t1898 — shifted from 167 by -38 (the full-recompose fix removed the old per-arm partitionArms/blockRole machinery)

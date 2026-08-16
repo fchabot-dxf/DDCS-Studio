@@ -20,6 +20,7 @@ import { openTemplatesPopover, closeTemplatesPopover, mountPresetRow } from './u
 import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
 import { makePanesCollapsible } from './ui/paneAccordion.js';   // t752 — individually collapsible preview/code panes (per-theme motion)
 import { needsPrereqPrompt } from './ui/wizardPrereq.js';   // just-in-time "add a probe / ATC" prompt for hardware-gated wizards
+import { findOpById, flattenOps } from './blocks/programModel.js';   // t1970 — direct import, not a window-guarded fallback (the guard could never fire, t1962's own boot-chain trace); opBuilders.js is the declared leaf, no cycle
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -407,7 +408,8 @@ export class WizardManager {
         // t1958 — the SAME recursive by-id lookup ddcsOpAtLine already uses to resolve the editor hover chip's
         // own opId (so the chip and the click can no longer disagree — a top-level-only `.find` here left an op
         // nested in a multi_step import wrapper with a rendered, clickable chip that silently no-opped on click).
-        const op = window.ddcsFindOpById ? window.ddcsFindOpById(prog, opId) : prog.find((b) => b && b.type === 'op' && b.id === opId);
+        // t1970 — direct import, not a window-guarded fallback (the guard could never fire).
+        const op = findOpById(prog, opId);
         if (!op || !op.opType) return;
         if (op.opType === 'group') { this._openGroupForEdit(op); return; }   // group: derive the form from its stored children
         this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
@@ -492,7 +494,7 @@ export class WizardManager {
                 // GROUP edit: a hand-built group has no builder, so apply the form values to its STORED children
                 // (surgical writeback) instead of a replaceOp rebuild. Detect by the op's type in the live program.
                 const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-                const tgt = window.ddcsFindOpById ? window.ddcsFindOpById(prog, this.editingOpId) : prog.find((b) => b && b.type === 'op' && b.id === this.editingOpId);   // t1958 — the same reach as openForEdit
+                const tgt = findOpById(prog, this.editingOpId);   // t1958 — the same reach as openForEdit; t1970 — direct import, not a window-guarded fallback
                 if (tgt && tgt.opType === 'group') {
                     committed = await userOpView.applyGroupEdits(this.editingOpId);
                     if (committed) { this.close(false, false); playClick(); return; }
@@ -522,7 +524,7 @@ export class WizardManager {
                     const framed = (start && end) ? [start, opC, end] : [opC];
                     const { confirmDestructiveLoad } = await import('./blocks/saveStates.js');
                     const cur = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-                    const existing = (window.ddcsFlattenOps ? window.ddcsFlattenOps(cur) : cur.filter((b) => b && b.type === 'op'))
+                    const existing = flattenOps(cur)   // t1970 — direct import, not a window-guarded fallback
                         .map((b) => b.label || b.opType || 'operation');
                     const already = existing.length === 1 ? existing[0]
                         : existing.length > 1 ? `${existing.length} operations` : '';

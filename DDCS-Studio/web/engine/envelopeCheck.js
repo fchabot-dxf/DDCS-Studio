@@ -21,6 +21,7 @@ import { wcsOffsetAt } from '../viz/sceneFrame.js';
 import { datumXY, stockWorkAABB } from './workpiece.js';   // t937 — datum-derived probe start + the work-frame stock AABB (the through-stock class)
 import { rayBox } from './probeGeometry.js';               // t937 — the shared segment-vs-box test (a true MID-SEGMENT plow, not the endpoint test)
 import { opSimStarts } from '../viz/opSimStarts.js';       // t957 — the DECLARED per-pass operator start (the sim's own derivation) → the pre-flight trace stops probes at the real walls, not the naive datum
+import { flattenOps } from '../blocks/programModel.js';    // t1970 — direct import, not a window-guarded fallback (the guard could never fire, t1962's own boot-chain trace)
 
 const EPS = 0.01;   // mm — below this an "overshoot" is trace/float noise, not a real breach worth warning about
 
@@ -181,7 +182,7 @@ export function checkEnvelope(program, settings) {
         let passStarts = null;
         try {
             const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-            const ops = (typeof window !== 'undefined' && window.ddcsFlattenOps) ? window.ddcsFlattenOps(prog) : prog.filter((b) => b && b.type === 'op');   // t1928 — sees inside a multi_step import wrapper
+            const ops = flattenOps(prog);   // t1928 — sees inside a multi_step import wrapper; t1970 — direct import, not a window-guarded fallback
             const hints = [];
             for (const b of ops) { if (b && b.opType) { const h = opSimStarts(b.opType, b.params || {}, stk); if (Array.isArray(h) && h.length) hints.push(...h); } }
             passStarts = hints.length ? hints : null;

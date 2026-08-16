@@ -48,10 +48,7 @@ import { fileURLToPath } from 'node:url';
  *      construct varies between `.find`/`.filter`/`.findIndex` and a plain loop, the bug doesn't), or a bare
  *      `.id === …` not immediately paired with `.opType ===` (a registry-lookup false positive, see below) —
  *   3. AND it does not call `flattenOps(`/`findOpById(`/`findOpInStack(` (the canonical answer) —
- *   4. AND it does not reference the declared guarded-fallback idiom (`window.ddcsFindOpById`/
- *      `window.ddcsFlattenOps`/`window.ddcsReplaceOpById`) — the ALREADY-FIXED shape (t1958/t1964's own sites);
- *      flagging these would make every fix a permanent false alarm —
- *   5. AND it does not delegate to a LOCALLY-DEFINED helper that is itself self-recursive into `.children`
+ *   4. AND it does not delegate to a LOCALLY-DEFINED helper that is itself self-recursive into `.children`
  *      (`opSession.js`'s own `find`/`flat`, `setupSheet.js`'s `collectOps`) — detected structurally (does a
  *      function call itself with a `.children`-shaped argument?), not by a hand-kept list of "known-safe" names.
  * Comments are blanked before matching (a doc comment that says "…scope find() to…" for PROSE reasons is not a
@@ -61,15 +58,24 @@ import { fileURLToPath } from 'node:url';
  * Tuned against known ground truth, not assumed: started from a literal "does `.children` appear anywhere in the
  * function" rule, which MISSED 2 of the 9 previously-known sites (`setGroupChildParams`/`mergeOpBlocks`, whose
  * own unrelated post-search `.children` reference wrongly read as recursion machinery) and separately produced
- * 4 false positives along the way while tuning (`checkEnvelope`/`openForEdit`/`insert`'s own already-fixed
- * guarded fallback, caught by a `\b` word-boundary gap on `window.ddcsFlattenOps` vs bare `flattenOps(`; a
- * `setupGlobalFunctions` mega-function where an UNRELATED `.find()` on a wholly different array, 38KB away from
- * its own single `getStack()` reference, collided at whole-function granularity — fixed by the proximity check;
- * `replayReconcile` excluded by its own doc comment's prose "…scope find() to…" — fixed by comment-blanking).
+ * false positives along the way while tuning (a `setupGlobalFunctions` mega-function where an UNRELATED
+ * `.find()` on a wholly different array, 38KB away from its own single `getStack()` reference, collided at
+ * whole-function granularity — fixed by the proximity check; `replayReconcile` excluded by its own doc
+ * comment's prose "…scope find() to…" — fixed by comment-blanking).
  * **Known remaining blind spot, not fixed, named rather than hidden**: a program-stack array passed in as a
  * PARAMETER (not a direct `getStack()`/`ddcsGetBlockProgram()` call in the same function) would not be detected
  * — every currently-known site calls one of those two directly, so this has zero false-negative cost TODAY, but
  * a future site shaped that way would not be caught by this file alone. Re-tune if one is ever found by hand.
+ *
+ * ── THE GUARDED-FALLBACK EXCLUSION WAS REMOVED HERE (t1970), not kept as belt-and-suspenders ────────────────────
+ * This detector originally also excluded the idiom `window.ddcsFindOpById ? window.ddcsFindOpById(...) :
+ * <shallow fallback>` — t1958/t1964's own already-fixed sites, still carrying a guard that could never fire
+ * (t1962's own boot-chain trace). t1970 deleted all 6 of those guards in favor of a direct import, so the
+ * pattern this exclusion protected against no longer has a single live instance anywhere in `web/`. An
+ * exclusion clause nothing in the real tree exercises is a claim the checker can't back up — kept, it would be
+ * the checker asserting protection against a shape it can no longer prove it still recognizes. Deleted along
+ * with its own synthetic proof-test, per the same reasoning as everything else this file protects: an
+ * assertion that can't fail isn't evidence.
  */
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');
@@ -149,7 +155,6 @@ function allIndices(s, re) {
 }
 
 const CANONICAL = ['flattenOps', 'findOpById', 'findOpInStack'];
-const GUARDED_FALLBACK = /window\.ddcsFindOpById|window\.ddcsFlattenOps|window\.ddcsReplaceOpById/;
 const PROXIMITY = 500;   // chars — every known-genuine site's own getStack()<->shallow-check distance is well
                           // under 200; the one false positive this excluded during tuning (setupGlobalFunctions,
                           // an unrelated .find() 38KB from its own single getStack() reference) sat far outside it.
@@ -164,7 +169,6 @@ function isSelfRecursiveIntoChildren(fn) {
 export function isViolation(fn, safeHelperNames) {
     const s = fn.scan;
     if (CANONICAL.some((n) => new RegExp('\\b' + n + '\\(').test(s))) return false;
-    if (GUARDED_FALLBACK.test(s)) return false;
     const stackIdx = allIndices(s, /getStack\(|ddcsGetBlockProgram\(/);
     if (!stackIdx.length) return false;
     const checkIdx = [
@@ -259,16 +263,6 @@ function fakeFindOpInStack(blocks, id) {
 export function fakeLookup(id) {
     const prog = window.ddcsGetBlockProgram() || [];
     return fakeFindOpInStack(prog, id);
-}`;
-    expect(scanFileText(src)).toEqual([]);
-});
-
-test('detector: silent on the already-fixed guarded-fallback idiom', () => {
-    const src = `
-export function fakeReplaceOp(opId) {
-    const cur = window.ddcsGetBlockProgram() || [];
-    const op = window.ddcsFindOpById ? window.ddcsFindOpById(cur, opId) : cur.find((b) => b && b.type === 'op' && b.id === opId);
-    return op;
 }`;
     expect(scanFileText(src)).toEqual([]);
 });
