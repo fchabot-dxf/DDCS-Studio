@@ -4073,3 +4073,44 @@ real one.**
 
 ⚠ **The machine is yours.** Then: the `opGlow.js` stale doc-comment claim you named in t1998 (its three diff
 surfaces read `opEditMap` today, not `replayReconcile`) · two-sided setup still awaits the human.
+
+# ═══ t2004 — THE LAST SELF-DESCRIPTION LIES (opGlow doc-comment, then the 97 prose citations) ═══
+
+t2002 accepted, verified by me: both tests green in isolation. **You built it instead of parking it twice, and
+the reason it became tractable is the reason to keep working this way** — you READ `deriveGroupDef` and
+`programFraming.js`'s defaults before building, and found `FRAMING_KNOBS` auto-exposes a progstart's
+`clearance` and a progend's `retractZ` **unconditionally**, so a plain `[progstart, move, progend]` triple
+genuinely renders an editable field. t1992 called the scaffolding too big because it hadn't found that yet.
+
+**The cross-contamination check is the detail that makes test (2) worth having:** you asserted the inner
+group's form seeds from the INNER group's own stored value (9) and not the outer's (5), then confirmed the
+outer's field stayed untouched after the edit. "It reconciled" would have passed while writing to the wrong
+group. And you proved non-vacuity by pulling **the exact pre-t1992 shallow code out of that commit's own
+diff** rather than approximating it — both tests failed as predicted.
+
+## THE TASK — two items, smallest first. **The machine is yours.**
+Both are the same family: **the codebase describing itself falsely.**
+
+1. **THE `opGlow.js` DOC-COMMENT (small, do it first).** You found in t1998 that its three diff surfaces —
+   `isOpBlockEdited` / `editedLinesForOp` / `editedRangesForOp` — all read `opEditMap` (declared-edit records)
+   today, while the comment still claims `replayReconcile` backs them. **Make the comment true, or delete the
+   claim.** A comment vouching for a mechanism that no longer runs is what stopped anyone noticing
+   `replayReconcile` had no callers at all.
+
+2. **THE 97 UNENFORCED PROSE CITATIONS (the main task).** t1996 brought 52 asserted citations under a
+   unique-substring checker; **~97 `file:line` references in `ARCHITECTURE.md` remain prose, checked by
+   nothing** — and t1970 already caught four of them stale before anyone touched the file. The map is
+   **enforced in one half and decorative in the other**, which is the exact state this session keeps deleting.
+   - **Bring them under the same checker** you just built, with the same **mandatory uniqueness assertion**.
+   - **⚠ EXPECT TO FIND MORE THAN DRIFT.** t1996's re-anchor turned up a citation pointing at the *wrong
+     function* behind a match-anything placeholder. **Report what you find, per citation** — stale line, wrong
+     target, or claim no longer true. The third kind is a real finding, not a citation fix.
+   - **If a claim turns out to be FALSE rather than merely mis-cited, DO NOT quietly re-point it at whatever
+     is there now.** Flag it — a wrong claim in the map is worth more to me than a tidy diff.
+   - **You sized this as "comparable to that whole turn again." If it runs long, land a COMPLETE section and
+     park the rest by name** — sections finished beat 97 half-anchored.
+3. **Gate: node tier only** for the citation work (it is a file read and a grep) + whatever the doc-comment
+   fix touches.
+
+⚠ Then the queue is empty but for **two-sided setup, which still awaits the human.** Say so in your pass-back
+if you finish and nothing else is named — I would rather close the cycle cleanly than invent work.
