@@ -4114,3 +4114,47 @@ Both are the same family: **the codebase describing itself falsely.**
 
 ⚠ Then the queue is empty but for **two-sided setup, which still awaits the human.** Say so in your pass-back
 if you finish and nothing else is named — I would rather close the cycle cleanly than invent work.
+
+# ═══ t2006 — THE MAP STATES THE SAME FACT TWICE. That is the real defect. ═══
+
+t2004 accepted, verified by me: node tier green, both new assertions live (`REGISTRIES-table citation still
+holds, uniquely`).
+
+**You fixed the comment rather than relocating it:** `opEditSummary` claimed it worked "against `collectEdits`"
+— and **`collectEdits` does not exist anywhere in the repo.** Not stale, *fictional*. You grepped rather than
+assumed, then found the **same** false claim in `opSession.js`'s `replayReconcile` header and fixed both
+together instead of leaving the sibling falsehood standing where it would re-seed the next reader.
+
+**And you sized it exactly as instructed** — one COMPLETE section (REGISTRIES 10/10), the rest parked BY NAME
+(Q1 20, Q2 25, KNOWN DIVERGENCE 6). The observation that KNOWN DIVERGENCE may be a *different kind of claim* —
+accepted debt rather than stated fact, where "enforcement" may not even mean the same thing — is a design
+question I would not have thought to ask, and it is queued as one.
+
+## ⭐ BUT YOUR THIRD FINDING IS THE ONE THAT MATTERS, AND IT REFRAMES THIS WHOLE EFFORT.
+INVARIANT #6's **prose** (line 427) was still stale — while its machine-checked twin **INV6 was correctly
+re-anchored back at t1996.** The checker got fixed; the prose a few sections away never caught up.
+
+```
+   the same fact, stated twice:   one copy CHECKED, one copy PROSE
+   fix the checked copy           -> the prose copy silently rots
+   => "enforced in one half, decorative in the other" is not a coverage gap.
+      It is a SECOND SOURCE — the defect this session has deleted six times.
+```
+
+**So the answer is probably NOT "check the other 97 too."** Two checked copies of one fact still diverge; they
+just both fail loudly. **The declare-once answer is that prose should REFERENCE the checked claim, not restate
+it.** You said the other 51 checked claims likely have orphaned duplicate prose nearby, unswept. **That is the
+task.**
+
+1. **COUNT THE DUPLICATES.** For each of the 52 already-checked claims, does the prose ALSO state the same
+   `file:line` somewhere? How many are already divergent *today*? Method as well as count.
+2. **⚠ DECIDE THE SHAPE, and argue it:** should prose cite a claim by NAME (`see INV6`) and let the checker own
+   the location — one source, prose can't rot? Or is there a real reason prose needs its own coordinates? **If
+   referencing loses something a reader needs, say what.**
+3. **COST IT** against the alternative (anchor all 97 and accept two sources that both fail loudly).
+4. **⚠ DO NOT BULK-REWRITE THE MAP.** Report, recommend, and land at most ONE section converted as a worked
+   example so the shape is concrete. **This is a design turn with a sample, not a migration.**
+5. **Gate: node tier only.**
+
+⚠ Then: KNOWN DIVERGENCE's "is this even the same kind of claim" question · Q1/Q2 anchoring (only if we still
+want it after this) · **two-sided setup, still awaiting the human.**
