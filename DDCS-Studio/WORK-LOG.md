@@ -39650,3 +39650,111 @@ The remaining 7-entry `op-lookup-scan-1968` inventory → architecture-citation 
 uniqueness assertion, including the unenforced prose half → whatever the human rules on two-sided setup.
 
 🔨 turn 1990
+
+# ═══ t1992 — THE FIVE opSession.js SITES: one file, one repeated shape, ONE declared fix ═══
+
+## THE DECLARATION — two new primitives beside findOpById/replaceOpById, not five hand-rolled resolves
+
+All five sites (`deleteOp`, `duplicateOp`, `setGroupChildParams`, `replayReconcile`, `mergeOpBlocks`) carried the
+same shallow top-level `.find`/`.findIndex`, dead on any op nested inside a `multi_step` wrapper (the real Add
+gesture, t1940/t1942, live since before Add only import could produce that shape). Rather than writing the same
+resolve five times, extended `programModel.js`'s own by-id toolkit (`findOpById`/`replaceOpById`, t1958) with the
+two remaining write shapes a by-id mutation can take: `removeOpById` (drop) and `insertOpAfterId` (insert a
+sibling), both immutable, both mirroring `replaceOpById`'s own exact style. Every one of the five sites now
+resolves through this ONE shared toolkit — a pure read uses `findOpById` alone (`replayReconcile`); a replace-in-
+place uses `findOpById` + `replaceOpById` (`setGroupChildParams`, `mergeOpBlocks`); delete uses `removeOpById`;
+duplicate uses `findOpById` + `insertOpAfterId`.
+
+## SEVERITY ORDER, landed exactly as dispatched
+
+**`mergeOpBlocks` first and most carefully — the worst bug in the inventory.** It is the "keep the user's hand
+edits" path specifically; failing silently here didn't just do nothing, it let the wizard's own automatic
+Replace-fallback (`wizardManager.js`'s `if (!committed) { committed = ops.replaceOp(...) }`) run in its place —
+so the user saw the Merge dialog, clicked "Keep both," watched it close normally, and their hand-typed Blocks
+edit was gone with NO error anywhere. Then `deleteOp`/`duplicateOp` (same right-click-does-nothing shape as the
+already-shipped Edit bug). Then `setGroupChildParams`/`replayReconcile`.
+
+## A REAL NON-VACUITY CATCH, worth naming: my own first test for mergeOpBlocks was too weak
+
+First draft asserted the hand-edited numeric value survived by checking whether the emitted G-code TEXT
+contained it as a substring — and it PASSED even against the reverted, broken code. Traced why: on failure,
+`mergeOpBlocks` returns false, the wizard's own fallback (`replaceOp`, already fixed, unrelated to this bug)
+silently rebuilds the op from form params instead — which still sets the FORM's own new value correctly, and the
+hand-edited NUMBER can coincidentally still appear somewhere else in a 100+ line emitted program. Rewrote the
+assertion to track the specific Blockly-edited ATOM's own id (found via `getSurroundParent()`, since a
+`math_number` shadow has no record identity of its own — `mergeArrays`' own `if (edited[a.eIdx].id) tBlock.id =
+edited[a.eIdx].id` is what makes the owning atom's id the right thing to track) and check THAT one atom's own
+params, scoped — a coincidental match elsewhere can no longer fool it. Re-ran non-vacuity with the corrected
+assertion: 3/3 red against the broken code this time. Caught before shipping, not after.
+
+## ASSERT WHAT THE USER DOES — real gestures per site, one honest exception each way
+
+- **`mergeOpBlocks`**: the full real chain — real Add-built 2-op program (drill+surfacing), a real Blockly field
+  edit on the nested op, ✎ chip → change a DIFFERENT form field → Insert → the real `showBlockEditNotice` modal
+  → click "Keep both." Both changes survive; the first op is untouched. Screenshot not needed (the earlier
+  turns' own precedent used one for a rendered PIXEL claim; this is a data-survival claim, asserted precisely).
+- **`deleteOp`/`duplicateOp`**: a real `contextmenu` DOM event dispatched at the nested op's own editor line
+  (the same technique `group-gesture.spec.js` already established), a real click on the rendered `.op-ctx-menu`
+  item. Delete removes only the nested op; Duplicate inserts a real sibling copy with its own fresh id, right
+  after the original, at the SAME depth (not hoisted to the top level).
+- **`replayReconcile`**: grepped the whole app — ZERO live UI callers anywhere, only direct test calls
+  (`pocket-rides-raster-1406.spec.js`, `slot-twin-repoint-1500.spec.js`, this turn's own new one). Its own doc
+  comment describes an intended integration ("the single rebuild the three diff surfaces share") that isn't
+  actually wired into anything shipped — whether that was never finished or was refactored away is unverified,
+  named not guessed. No live gesture exists to drive, so the test calls it directly on a nested op's own id,
+  matching the established convention. **Found, along the way, a SEPARATE, unrelated, pre-existing bug**: the
+  first op-type tried (`surfacing`) made the test fail even fixed — traced to `RECONCILERS.surfacing` still
+  reading the OLD `stepdown`/`surfacefill` shape, while `surfacingWizard.js`'s own t1359 guard confirms surfacing
+  ships `surfaceraster` exclusively today (the old shape is TEST-ONLY dead code, enforced by a grep-guard). This
+  makes `RECONCILERS.surfacing` stale for EVERY surfacing op, nested or not — out of this turn's scope (a
+  different bug, in the reconciler's own shape-matching, not the by-id lookup), named for the advisor rather
+  than fixed. Switched the test to `drill` (whose reconciler matches its current shape) to isolate the ONE thing
+  this turn is actually about.
+- **`setGroupChildParams`**: its own real UI door (`userOpView.applyGroupEdits`) needs a derived group DEF and a
+  rendered generic widget form — meaningfully more scaffolding than this turn's remaining budget afforded
+  honestly. Verified function-level instead, against a REALISTIC nested shape (t1986's own live-confirmed drag:
+  a group inside another group, built via the real `groupLooseAtoms` mechanism + Blockly's real connection
+  object, not hand-built JSON) — narrower than a full widget-driven gesture, but a genuine exercise of the exact
+  code path the fix touched. **Named as parked for a fuller UI-level pass**, not silently substituted.
+
+## INVENTORY 7 → 2, count updated; the ratchet checked in both directions
+
+Removed all five entries in one edit (grouped comment naming the shared fix, pointing at this WORK-LOG entry).
+Ran the checker with the code fixed but the OLD 5-entry inventory still in place first: **failed**, both ratchet
+ELSE meta-tests reporting the mismatch — confirmed, not assumed, before updating. Updated INVENTORY, re-ran: 7/7
+clean, 2 open sites remaining (`opContextMenu.js` `showOpMenu`, `macrosApp.js` `openCamAuthoring`).
+
+## STOP CONDITION — checked, did not trigger
+
+Single-operation behaviour is unchanged: `guard-roundtrip-1595`'s own structural-param sweep (byte-identical
+across all 32 registered ops) and `fork-parity-1593`'s own "fork EVERY shipped twin" both passed clean;
+`group-edit.spec.js`'s own PRE-EXISTING top-level group-edit test, `edit-nested-op-1958`'s own original t1958
+test, `insert-add-replace-1942`'s Insert/Replace/Cancel flows, and `add-operation-1940`'s own single-op-stays-
+unwrapped rule all passed unchanged. Every new/changed function is behaviour-preserving for an id found at the
+top level (`removeOpById`/`insertOpAfterId` mirror `replaceOpById`'s own array-shape exactly at that depth) —
+confirmed by the gate, not just reasoned through.
+
+## ARCHITECTURE.md — one real drift, fixed
+
+My own `removeOpById`/`insertOpAfterId` insertion (39 new lines in `programModel.js`, right after
+`replaceOpById`) shifted INV3's own cited `console.error` line from 538 to 586. Fixed in both the checker's own
+`INVARIANT_CLAIMS` array and the prose table, noting the shift and its cause (matching this turn's own
+convention, not the previous turns' drift chain being silently extended).
+
+## GATE
+
+Node tier (125/125, including the updated 2-entry `op-lookup-scan-1968` at 7/7) + `edit-nested-op-1958` (6/6,
+all five new site tests plus the original) + `word-glow` (2/2 real, 2 pre-existing fixme skips) + `group-edit`
+(1/1; 1 known load-contention flake retried clean) + `insert-add-replace-1942` (4/4) + `add-operation-1940` (5/5)
++ `collapse-on-delete-1948` (6/6; 1 known flake retried clean) + `guard-roundtrip-1595` (2/2) + `fork-parity-
+1593` (2/2) — **26/26 clean** (`--workers=2`, 2 flakes total, both the established load-contention pattern, both
+retried green).
+
+## Queued CODE work — awaiting the human's ruling on two-sided setup
+`opContextMenu.js` `showOpMenu` + `macrosApp.js` `openCamAuthoring` (the remaining 2-entry inventory) →
+architecture-citation Option B, with the mandatory uniqueness assertion, including the unenforced prose half →
+whatever the human rules on two-sided setup. Also flagged, not queued: `RECONCILERS.surfacing`'s own staleness
+against the current `surfaceraster` emit shape — a different bug, found by accident this turn, the advisor's own
+call on priority.
+
+🔨 turn 1992

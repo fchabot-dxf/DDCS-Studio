@@ -210,12 +210,13 @@ function scanTree() {
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const INVENTORY = [
-    { file: 'web/blocks/opSession.js', name: 'deleteOp', why: 'right-click Delete on an op nested inside a multi_step import silently no-ops' },
-    { file: 'web/blocks/opSession.js', name: 'duplicateOp', why: 'right-click Duplicate on a nested op silently no-ops' },
-    { file: 'web/blocks/opSession.js', name: 'setGroupChildParams', why: 'editing a hand-built group\'s own form fields silently fails once that group is promoted into a multi_step (any 2+ top-level ops wrap, group included) — t1986: a SECOND reachable path to the same shallow lookup, a group dragged inside another group (ordinary Blocks-tab drag, live-confirmed, not just multi_step promotion)' },
-    { file: 'web/blocks/opSession.js', name: 'replayReconcile', why: 'the edit-glow diff for a nested op reads "no edits" instead of erroring, so a real block-level edit never highlights' },
-    { file: 'web/blocks/opSession.js', name: 'mergeOpBlocks', why: 'the block-edit-aware 3-way AST merge silently no-ops for a nested op, discarding the user\'s hand edits with no error' },
     { file: 'web/ui/opContextMenu.js', name: 'showOpMenu', why: 'the right-click menu on a nested op falls back to a thinner, stale record (missing params/children) for its CAM-authoring actions' },
+    // t1992 — web/blocks/opSession.js's deleteOp, duplicateOp, setGroupChildParams, replayReconcile, and
+    // mergeOpBlocks all FIXED, as ONE thing: each now resolves via findOpById (a pure read: replayReconcile) or
+    // findOpById + one of replaceOpById/removeOpById/insertOpAfterId (the three write shapes a by-id mutation can
+    // take — replace in place, drop, or insert a sibling — declared together in programModel.js, t1958/t1992)
+    // instead of five separately hand-rolled top-level-only `.find`/`findIndex` calls. See WORK-LOG t1992 for the
+    // per-site non-vacuity proofs and the real-gesture tests (edit-nested-op-1958's own sibling file family).
     // t1978 — web/ui/editorManager.js's _firstOpTitle FIXED: now reads `flattenOps(ddcsGetBlockProgram())[0]`
     // (t1928's own declared enumeration) instead of a shallow top-level `.find`, which resolved the multi_step
     // WRAPPER itself and fell through opLabelOf to the bare string 'multi_step'. See WORK-LOG t1978 and

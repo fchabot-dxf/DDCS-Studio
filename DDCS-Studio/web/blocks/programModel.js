@@ -182,6 +182,54 @@ export function replaceOpById(program, id, newOp) {
     return found ? next : null;
 }
 
+// t1992 — DELETE and DUPLICATE needed the SAME reach as replaceOpById (right-click Delete/Duplicate on a nested
+// op silently no-op'd, `opSession.js`'s own `deleteOp`/`duplicateOp` each carrying a top-level-only `findIndex` —
+// the same shape `replaceOp` had before t1958). Declared here beside `findOpById`/`replaceOpById` rather than
+// re-spelled per call site: `removeOpById` DROPS the op wherever it lives; `insertOpAfterId` adds a new SIBLING
+// immediately after it, wherever it lives — the two remaining shapes a by-id mutation can take beyond replace.
+
+/** Remove the op at `id`, wherever it lives (top-level or nested inside a multi_step's children). Immutable
+ *  (returns a new tree; the input program is untouched); returns null if `id` isn't found anywhere. */
+export function removeOpById(program, id) {
+    let found = false;
+    const walk = (blocks) => {
+        const out = [];
+        for (const b of (blocks || [])) {
+            if (!b) { out.push(b); continue; }
+            if (!found && b.type === 'op' && b.id === id) { found = true; continue; }   // drop it
+            if (!found && b.children) {
+                const children = walk(b.children);
+                if (found) { out.push({ ...b, children }); continue; }
+            }
+            out.push(b);
+        }
+        return out;
+    };
+    const next = walk(program);
+    return found ? next : null;
+}
+
+/** Insert `newOp` as a sibling immediately AFTER the op at `id`, wherever it lives (top-level or nested inside a
+ *  multi_step's children) — Duplicate's own reach. Immutable; returns null if `id` isn't found anywhere. */
+export function insertOpAfterId(program, id, newOp) {
+    let found = false;
+    const walk = (blocks) => {
+        const out = [];
+        for (const b of (blocks || [])) {
+            if (!b) { out.push(b); continue; }
+            if (!found && b.type === 'op' && b.id === id) { out.push(b, newOp); found = true; continue; }
+            if (!found && b.children) {
+                const children = walk(b.children);
+                if (found) { out.push({ ...b, children }); continue; }
+            }
+            out.push(b);
+        }
+        return out;
+    };
+    const next = walk(program);
+    return found ? next : null;
+}
+
 // ── loose-run resolution (the in-context "Group" gesture) ───────────────────────────────────────────────────
 // A hand-built atom has no op wrapper, so opAtLine returns null. For the right-click "Group" gesture we instead
 // resolve the CONTIGUOUS run of loose top-level atoms the clicked line belongs to (bounded by a real op / framing),

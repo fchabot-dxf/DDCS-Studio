@@ -17,7 +17,7 @@
  * Nothing imports back into the builders, so there's no cycle.
  */
 import { getLastOp, recordOp } from './opRecord.js';
-import { findOpById, replaceOpById } from './programModel.js';
+import { findOpById, replaceOpById, removeOpById, insertOpAfterId } from './programModel.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks (commitDecodedCode)
 import { resolveActivePost } from '../wizards/dialects/index.js';
@@ -571,27 +571,33 @@ export function replaceOp(opId, params) {
     return true;
 }
 
-/** Remove a top-level op from the program (right-click → Delete). */
+/** Remove an op from the program, wherever it lives (right-click → Delete). */
 export function deleteOp(opId) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
-    if (idx < 0) return false;
-    const next = [...cur.slice(0, idx), ...cur.slice(idx + 1)];
+    // t1992 — was a top-level-only `findIndex`: right-click Delete on an op nested inside a multi_step wrapper
+    // (the real Add gesture, t1940/t1942) silently no-op'd — the menu item did nothing, no error. `removeOpById`
+    // (t1992, beside `findOpById`/`replaceOpById`) reaches it wherever it lives.
+    const next = removeOpById(cur, opId);
+    if (!next) return false;
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return true;
 }
 
-/** Duplicate a top-level op (right-click → Duplicate) — fresh blocks/id from the same params, inserted after it. */
+/** Duplicate an op, wherever it lives (right-click → Duplicate) — fresh blocks/id from the same params, inserted
+ *  as a sibling right after it. */
 export function duplicateOp(opId) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
-    if (idx < 0) return false;
-    const src = cur[idx];
+    // t1992 — was a top-level-only `findIndex` + splice: right-click Duplicate on a nested op silently no-op'd,
+    // same shape as deleteOp's own bug. `findOpById` resolves the source wherever it lives; `insertOpAfterId`
+    // (t1992) inserts the copy as its own sibling at that same depth, not hoisted to the top level.
+    const src = findOpById(cur, opId);
+    if (!src) return false;
     if (!builderOf(src.opType)) return false;
     const framed = _framed(src.opType, src.params);
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const copy = makeOp(src.opType, src.params, bare);                 // fresh id
-    const next = [...cur.slice(0, idx + 1), copy, ...cur.slice(idx + 1)];
+    const next = insertOpAfterId(cur, opId, copy);
+    if (!next) return false;
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return true;
 }
@@ -646,15 +652,20 @@ export function groupLooseAtoms(label, ids) {
  */
 export function setGroupChildParams(groupId, edits) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const idx = cur.findIndex((b) => b && b.type === 'op' && b.opType === 'group' && b.id === groupId);
-    if (idx < 0) return false;
-    const grp = JSON.parse(JSON.stringify(cur[idx]));                  // copy so we never mutate the live model in place
+    // t1992 — was a top-level-only `findIndex`: editing a hand-built group's own form fields silently failed
+    // once that group was promoted into a multi_step (any 2+ top-level ops wrap, group included, t1940/t1942) —
+    // OR (t1986, live-confirmed) once dragged inside ANOTHER group's own body, a second reachable path to the
+    // same shallow lookup. `findOpById`/`replaceOpById` (t1958) reach it wherever it lives.
+    const found = findOpById(cur, groupId);
+    if (!found || found.opType !== 'group') return false;
+    const grp = JSON.parse(JSON.stringify(found));                     // copy so we never mutate the live model in place
     const flat = flattenBlocks(grp.children);
     for (const e of (edits || [])) {
         const rec = flat[e && e.blockIndex];
         if (rec && rec.params && e.key != null) rec.params[e.key] = e.value;
     }
-    const next = [...cur.slice(0, idx), grp, ...cur.slice(idx + 1)];
+    const next = replaceOpById(cur, groupId, grp);
+    if (!next) return false;
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return true;
 }
@@ -699,7 +710,9 @@ export function reconcileActiveOp() {
 const _replayCache = new WeakMap();
 export function replayReconcile(opId) {
     const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
+    // t1992 — was a top-level-only `.find`: the edit-glow diff for a nested op read "no edits" instead of
+    // erroring, so a real block-level edit never highlighted — `findOpById` (t1958) reaches it wherever it lives.
+    const op = findOpById(prog, opId);
     if (!op || !op.opType || !RECONCILERS[op.opType] || !builderOf(op.opType)) return null;
     if (_replayCache.has(op)) return _replayCache.get(op);
     let fields;
@@ -843,9 +856,11 @@ function mergeArrays(base, edited, target) {
 
 export function mergeOpBlocks(opId, newParams) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
-    if (idx < 0) return false;
-    const op = cur[idx];
+    // t1992 — was a top-level-only `findIndex`: for an op nested inside a multi_step wrapper (the real Add
+    // gesture, t1940/t1942), this silently no-op'd — the WORST shape of this bug family, since a Merge is the
+    // "keep the user's hand edits" path specifically; failing silently here DISCARDS hand-typed work with no
+    // error, on the exact op the user just edited. `findOpById`/`replaceOpById` (t1958) reach it wherever it lives.
+    const op = findOpById(cur, opId);
     if (!op || !op.opType || !builderOf(op.opType)) return false;
 
     // The user's manually edited blocks
@@ -856,14 +871,15 @@ export function mergeOpBlocks(opId, newParams) {
     // mis-aligns every homing atom as an injection).
     const oldPristine = _builderAtoms(op.opType, op.params);
     const targetBlocks = _builderAtoms(op.opType, newParams);
-    
+
     // Perform the 3-way merge
     const mergedBlocks = mergeArrays(oldPristine, editedBlocks, targetBlocks);
-    
+
     // Apply the merged AST back to the program model
     const opC = makeOp(op.opType, newParams, mergedBlocks);
     opC.id = opId;
-    const next = [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
+    const next = replaceOpById(cur, opId, opC);
+    if (!next) return false;
     recordOp(op.opType, newParams);
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return true;
