@@ -20,26 +20,80 @@ import { fileURLToPath } from 'node:url';
  *     file runs the PURE-JS equivalent of every one of them (no `rg`/`grep` subprocess: confirmed absent from this
  *     environment's PowerShell PATH, and `fs.readFileSync` + a regex is exactly what "a file read plus a grep"
  *     means for this tier's cost budget) and asserts the map's stated number still matches.
- *   ASSERTED — a hand-written claim that names a `file:line` and describes what MUST be there. These cannot be
- *     regenerated (they are prose about a fact, not the fact's own declaration), so each is a `{file, line(s),
- *     find}` entry checked against the file's CURRENT content at that exact citation. `find` is a substring or
- *     regex chosen to be the smallest thing that would break if the citation rotted OR if the claim stopped being
- *     true — not a paraphrase of the whole sentence.
+ *   ASSERTED — a hand-written claim that names a fact and describes what MUST be there. These cannot be
+ *     regenerated (they are prose about a fact, not the fact's own declaration), so each is a `{file, find}` entry
+ *     checked against the file's CURRENT content — `find` is a literal substring (occasionally a narrow regex)
+ *     drawn from the cited line's own real text, chosen to be the smallest UNIQUE thing that would break if the
+ *     citation rotted OR if the claim stopped being true — not a paraphrase of the whole sentence.
+ *
+ * ── OPTION B (t1996) — SUBSTRING ANCHORS, NOT LINE NUMBERS, WITH A MANDATORY UNIQUENESS CHECK ────────────────────
+ * Every citation below used to carry a `line` (occasionally `line`+`lineEnd`); the checker searched only that
+ * range. DROPPED, in favour of `find` alone, checked against the WHOLE FILE, required to match EXACTLY ONCE.
+ *
+ * WHY: this session's own two real citation drifts (INV3's `console.error`, `programModel.js`, moved 538→586;
+ * INV6's `hookKeysOf`, `userOps.js`, moved 893→917) both happened because an edit landed A LINE ABOVE the cited
+ * one, inside the SAME enclosing function the citation was already scoped to — a symbol-level anchor ("does
+ * function X still exist somewhere in this file") would not have caught either one, since the function's own name
+ * never moved or changed; only the LINE the citation actually meant did. A substring drawn from the cited line's
+ * own content, searched whole-file, catches exactly this: the line itself is what must still exist, wherever it
+ * now sits — this is a STRICTLY STRONGER claim than "line N contains X," not a weaker one that merely drops the
+ * number, because it also fails the moment the same text starts appearing TWICE (a genuine ambiguity a line-
+ * numbered citation could paper over by accident).
+ *
+ * THE UNIQUENESS CHECK IS THE WHOLE POINT, NOT AN OPTIONAL EXTRA. A `find` that matches ZERO times means the
+ * citation rotted or the claim it names was fixed (update the map, or the claim, whichever is true). A `find`
+ * that matches TWO OR MORE times means the anchor is not distinctive enough to mean any one specific thing —
+ * dropping the line number without ALSO requiring uniqueness would make the checker WEAKER while looking like an
+ * improvement (a non-unique `find` could match on an unrelated line and report false confidence). Measured before
+ * building: 8 of the first 10 sampled patterns (`/dialect/`, `/getTransform/`, `/placement/`, `/_writable/`, …)
+ * matched 2+ times whole-file under their OLD short regex — real tightening work, not a mechanical line-drop. All
+ * 52 citations below are the FULL TRIMMED SOURCE LINE (or a hand-shortened unique fragment of it where the full
+ * line was unwieldy) — verified, not assumed, against the tree at the point this turn landed.
+ *
+ * ONE CITATION WAS FOUND GENUINELY WRONG WHILE RE-ANCHORING, NOT JUST STALE: `INV8 validateUserOp fork-arm
+ * check` cited `userOps.js:746`, inside `find:/./ ` — a trivial always-true placeholder that had NEVER actually
+ * verified anything (any non-empty line satisfies it). Line 746 sits inside a DIFFERENT function entirely (the
+ * `instantiate` binding loop), not `validateUserOp`. The real claim — "the fork-arm check is asserted silent
+ * rather than deleted" — lives at `userOps.js:861`, the `⚠ THIS CHECK STAYS, AND IS EXPECTED TO BE SILENT`
+ * comment. Re-anchored there. This is exactly the class of decorative-not-enforced claim Option B exists to end.
  *
  * ── SCOPE, PER THE DISPATCH (start with what would mislead into a wrong fix) ────────────────────────────────────
- * Every TRAP (9) and every INVARIANT (17) is checked — these are exactly the claims a reader ACTS on. The Q1/Q2/Q3
- * diagrams' own prose citations are covered by the GENERATED counts above (Q1's registry sizes) plus a handful of
- * the highest-value ASSERTED ones (the frame-algebra file:lines in Q3, since a coordinate bug there is the single
- * most expensive class of defect this session's WORK-LOG records). NOT covered, named rather than silently
- * skipped: the REGISTRIES table's non-generated rows (guard predicate shape, per-atom scratch vars — informational,
- * not trap-shaped), "KNOWN DIVERGENCE" (explicitly already-accepted debt, not a claim someone would act on as
- * fact), and "WHERE THE GATES ARE" (a table of NO's — nothing to assert false of a negative). If any of those
- * later earns its own TRAP or INVARIANT entry, it earns a citation here too.
+ * Every TRAP (24 sub-claims across 9 named traps) and every INVARIANT (21 sub-claims across 17 named invariants)
+ * is checked — these are exactly the claims a reader ACTS on. The Q1/Q2/Q3 diagrams' own prose citations are
+ * covered by the GENERATED counts above (Q1's registry sizes) plus the highest-value ASSERTED ones (Q3's 7 frame-
+ * algebra file:lines, since a coordinate bug there is the single most expensive class of defect this session's
+ * WORK-LOG records). NOT covered by TRAP/INVARIANT/Q3, and the REST OF THE MAP'S OWN PROSE remains genuinely
+ * UNENFORCED — see "THE PROSE HALF" below for exactly what that means and why it stays that way this turn,
+ * rather than being silently true or silently fixed. Also not covered, named rather than silently skipped: the
+ * REGISTRIES table's non-generated rows (guard predicate shape, per-atom scratch vars — informational, not trap-
+ * shaped), "KNOWN DIVERGENCE" (explicitly already-accepted debt, not a claim someone would act on as fact), and
+ * "WHERE THE GATES ARE" (a table of NO's — nothing to assert false of a negative). If any of those later earns
+ * its own TRAP or INVARIANT entry, it earns a citation here too.
  *
- * ── NON-VACUITY (done once, by hand, not as a permanent test — see WORK-LOG t1698) ──────────────────────────────
- * A citation moved in a scratch copy of a real source file, pointed the checker at the scratch copy, confirmed it
- * failed NAMING the exact claim, restored. The mechanism the checker embodies (line N of file F must contain X) is
- * generic — proven once is proven for all ~50 citations below, not one at a time.
+ * ── THE PROSE HALF — STATED PLAINLY, PER THE DISPATCH'S OWN EITHER/OR ────────────────────────────────────────────
+ * t1970 found four `wizardManager.js` prose mentions already stale BEFORE that turn's own edits (`this.open()`
+ * cited at `:401`, actually at `:413` even on the PRE-t1970 tree — 12 lines of pre-existing drift, left alone
+ * rather than guessed at). None of the four were ever promoted into TRAP_CLAIMS/INVARIANT_CLAIMS/Q3_CLAIMS, so
+ * none of them are checked by anything in this file, then or now. Measured this turn (`grep -oE
+ * "[A-Za-z0-9_/.-]+\.(js|mjs|md):[0-9]+"`): `ARCHITECTURE.md` carries 149 `file:line`-shaped citations total —
+ * a raw pattern count, so it includes the same fact cited more than once across different sections, not 149
+ * distinct claims. The 52 below account for the claims judged, per the ORIGINAL t1698 scope note above, to be
+ * what a reader actually ACTS on (every TRAP, every INVARIANT, Q3's frame-algebra). The remaining ~97 raw
+ * mentions are Q1/Q2 diagram annotations, REGISTRIES table rows, and narrative asides — bringing ALL of
+ * them under this same per-citation mechanism is not a mechanical extension of this turn's own work (each one
+ * needs the same individual "read the current line, pick a genuinely unique anchor" treatment the 52 here just
+ * got) — it is comparable in size to this turn over again, not a remaining slice of it. **Stated plainly: those
+ * ~97 remain unenforced prose.** A future citation earns enforcement here the moment it graduates into a named
+ * TRAP or INVARIANT (the existing scope rule, unchanged) — that is the honest boundary, not "eventually, someday."
+ *
+ * ── NON-VACUITY (done by hand against a scratch copy, not as a permanent test — see WORK-LOG t1698 + t1996) ─────
+ * t1698's own original proof: a citation moved in a scratch copy of a real source file, pointed the checker at
+ * the scratch copy, confirmed it failed NAMING the exact claim, restored. t1996 re-proved the SAME mechanism
+ * under the new substring+uniqueness design, twice: (1) moved a cited line within its own file (the citation
+ * still found it, wherever it landed — proving line-independence); (2) deleted the cited content entirely (the
+ * checker reported 0 matches, by name); (3) duplicated a cited line so it appeared twice (the checker reported
+ * 2 matches, by name, as a DIFFERENT failure reason than 0). All three against a scratch copy, restored after.
+ * Proven once for the mechanism, not once per citation — see WORK-LOG t1996 for the exact commands run.
  */
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');   // …/tests/node/<this file> → DDCS-Studio → repo root
@@ -58,17 +112,22 @@ function linesOf(absPath) {
     }
     return _cache.get(absPath);
 }
-/** True if `find` (string or RegExp) appears on ANY line in [from, to] (inclusive, 1-based). A single `line` is from===to.
- *  `to` may exceed the file length (whole-file search, for a claim with no `line` — see citation-format note below). */
-function citationHolds(absPath, from, to, find) {
+// t1996 (Option B) — THE ASSERTED-citation check, whole-file, uniqueness-required. `find` (a literal substring,
+// or occasionally a narrow RegExp for a hand-written claim that genuinely needs one — see INV12/INV15) is tested
+// against EVERY line of the file independently (never across a line break — a citation names one real line of
+// source, not a multi-line span glued together). Returns the 1-based line numbers of every match, so a caller
+// can report "0 matches" (rotted/deleted) and "2+ matches" (not a unique anchor) as the two DIFFERENT failure
+// reasons the mandatory uniqueness requirement exists to distinguish — collapsing them into one boolean is
+// exactly the weaker check dropping the line number without this requirement would have produced.
+function citationMatchLines(absPath, find) {
     const ls = linesOf(absPath);
     const re = find instanceof RegExp ? find : new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const upper = Math.min(to, ls.length);
-    for (let n = from; n <= upper; n++) {
-        const line = ls[n - 1];   // 1-based → 0-based
-        if (line != null && re.test(line)) return true;
+    const out = [];
+    for (let n = 1; n <= ls.length; n++) {
+        const line = ls[n - 1];
+        if (line != null && re.test(line)) out.push(n);
     }
-    return false;
+    return out;
 }
 function must(message, fn) {
     try { fn(); } catch (err) { err.message = `\n  MAP CLAIM: ${message}\n\n${err.message}`; throw err; }
@@ -134,94 +193,99 @@ test('architecture map GENERATED: Q1/registries — every stated count still mat
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PART 2 — ASSERTED: every TRAP citation still holds
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// t1996 (Option B) — every `find` below is the FULL TRIMMED SOURCE LINE of the cited claim (a hand-shortened
+// unique fragment where the full line was unwieldy), verified whole-file-unique against the tree at the point
+// this turn landed. No `line`/`lineEnd` — the substring IS the citation now; see the header comment for why.
 const TRAP_CLAIMS = [
-    { id: 'TRAP1 Corner view import gone', file: 'web/wizards/views/index.js', line: 20, find: /retired 2026-07-02/ },
-    { id: 'TRAP1 Corner opensAs the twin', file: 'web/blocks/wizardLibrary.js', line: 56, find: /opensAs:\s*'user_corner_data'/ },
-    { id: 'TRAP1 cornerWizard.js import (cornerData.js:44)', file: 'web/blocks/dataOps/cornerData.js', line: 44, find: /cornerWizard\.js'/ },
-    { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', line: 262, find: /cornerStack\(/ },   // t1880 — shifted from 261 by the probePort gate: property added to the port binding above it
-    { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
-    { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', line: 233, find: /latheLayoutSpec/ },
-    { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 311, find: /_writable/ },
-    { id: 'TRAP4 activeDialectOpts declares {dialect, indentStyle}', file: 'web/wizards/previewEmit.js', line: 21, lineEnd: 24, find: /indentStyle/ },
-    { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', line: 36, find: /dialect/ },
-    { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', line: 19, find: /dialect/ },   // t1958 — shifted from 18 by +1 (the shared findOpById import replacing the private duplicate)
-    { id: 'TRAP4 opSession.js keeps its own {dialect}-only copy', file: 'web/blocks/opSession.js', line: 25, find: /dialect/ },   // t1970 — shifted from 18 by +7 (the findOpById/replaceOpById direct import + its own header comment)
-    { id: 'TRAP4 applyIndentStyle no-ops unless flush', file: 'web/data/indentStyle.js', line: 51, find: /flush/ },
-    { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', line: 323, find: /canEdit/ },   // t1970 — shifted from 322 by +1 (the findOpById/flattenOps direct import line)
-    { id: 'TRAP5 FIELD_BIND.corner folded at opSchema.js', file: 'web/blocks/opSchema.js', line: 158, find: /corner/ },
-    { id: 'TRAP6 commData.js passes setup_datawiz', file: 'web/blocks/dataOps/commData.js', line: 154, find: /setup_datawiz/ },
-    { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', line: 129, find: /setup_datawiz/ },   // t1898 — shifted from 167 by -38 (the full-recompose fix removed the old per-arm partitionArms/blockRole machinery)
-    { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', line: 28, lineEnd: 41, find: /_datawiz/ },
-    { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', line: 109, find: /opensAs/ },   // t1918 — shifted from 107 by +2 (HEADER_ICONS.lathe recoarsened, comment grew by one line)
-    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', line: 1147, lineEnd: 1148, find: /z-index/ },   // t1874 — shifted from 1127-1128 by the Slice 3 live-visibility wiring above it (Option B Slice 3)
-    { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', line: 2835, find: /attach/ },   // t1874 — shifted from 2819 by the setPlayFrameHidden edits above it (Option B Slice 3)
-    { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', line: 68, find: /appendChild|canvas/ },
-    { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', line: 706, find: /container\.__layout/ },
-    { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', line: 92, lineEnd: 95, find: /innerHTML/ },
-    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', line: 708, find: /renderLayout2D|el\('userVizContainer'\)/ },   // t1906 — shifted from 689 by 19 (the _wcsSyncOk/_wcsPickerOk gate wiring above it)
+    { id: 'TRAP1 Corner view import gone', file: 'web/wizards/views/index.js', find: '// Corner wizard retired 2026-07-02 (④) — REPLACED by the "Corner (data)" twin (user_corner_data, the generic user-op view).' },
+    { id: 'TRAP1 Corner opensAs the twin', file: 'web/blocks/wizardLibrary.js', find: "{ id: 'corner', type: 'corner', label: 'Corner', icon: '📐', group: 'probe', opensAs: 'user_corner_data' }," },
+    { id: 'TRAP1 cornerWizard.js import (cornerData.js:44)', file: 'web/blocks/dataOps/cornerData.js', find: "import { cornerStack, cornerReposOffsets, dirsOf, cornerHeaderComments } from '../../wizards/stacks/cornerWizard.js';" },
+    { id: 'TRAP1 cornerStack() usage (cornerData.js:261)', file: 'web/blocks/dataOps/cornerData.js', find: 'const exec = cornerStack(params, { superset: true });' },
+    { id: 'TRAP2 the overlay never folds placement before t1686 fix (getTransform)', file: 'web/viz/featureCanvas.js', find: 'getTransform() {' },
+    { id: 'TRAP2 the crosshair went through _S not _disp (spec.origin)', file: 'web/wizards/ops/panelTypes.js', find: 'const _lathe = latheLayoutSpec(def, params, (m) => { for (const k in m) _writeParam(k, m[k]); });' },
+    { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', find: 'const _writable = (name) => _declaredParams.has(name) && !_unwritable.has(name) && (!_host || !!_field(name));' },
+    { id: 'TRAP4 activeDialectOpts declares {dialect, indentStyle}', file: 'web/wizards/previewEmit.js', find: 'let indentStyle;' },
+    { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', find: 'function dialectOpts() { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } }' },
+    { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', find: 'const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };' },
+    { id: 'TRAP4 opSession.js keeps its own {dialect}-only copy', file: 'web/blocks/opSession.js', find: 'const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };' },
+    { id: 'TRAP4 applyIndentStyle no-ops unless flush', file: 'web/data/indentStyle.js', find: "if (indentStyleOf(settings) !== 'flush') return;   // 'indented' is what the emitters already wrote — no pass at all" },
+    { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', find: 'canEdit(opType) {' },
+    { id: 'TRAP5 FIELD_BIND.corner folded at opSchema.js', file: 'web/blocks/opSchema.js', find: "corner: { corner: 'c_corner', probeZ: 'c_probe_z_first', syncA: 'c_sync_a', slave: 'c_slave'" },
+    { id: 'TRAP6 commData.js passes setup_datawiz', file: 'web/blocks/dataOps/commData.js', find: "const def = userOpFromStack('comm_data', 'Communication (data)', commDataStack(), bindings, 'commscreen', {}, 'setup_datawiz');" },
+    { id: 'TRAP6 homingData.js passes setup_datawiz', file: 'web/blocks/dataOps/homingData.js', find: "const def = userOpFromStack('homing_data', 'Homing (data)', homingDataStack(HOMING_DEFAULTS), [...HOMING_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'setup_datawiz');" },
+    { id: 'TRAP6 GROUPS declares only probe/atc/mill _datawiz', file: 'web/blocks/wizardLibrary.js', find: "{ id: 'probe_datawiz', label: 'Probe Data Wiz', section: 'right' }," },
+    { id: 'TRAP7 commandDeck stamps type||opensAs||id', file: 'web/ui/commandDeck.js', find: 'return `${sub}<button data-optype="${_escHtml(e.type || e.opensAs || e.id || \'\')}" onclick="${wizItemOnclick(e)}">${wizItemIcon(e)}${_escHtml(e.label)}</button>`;' },
+    { id: 'TRAP8 the stale z-index comment', file: 'web/viz/createPreviewPanel.js', find: '// The 3D renderer canvas is z-index 2 (above the 2D canvas), so 2D must HIDE it, not just show the 2D' },
+    { id: 'TRAP8 .attach( only caller is the retired bak file', file: 'web/viz/gcodeViz3d.js', find: 'attach(container) {' },
+    { id: 'TRAP8 the WebGL canvas is appended in flow', file: 'web/viz/gcodeViz3d.js', find: 'container.appendChild(renderer.domElement);' },
+    { id: 'TRAP9 (fixed t1816) renderLayout2D caches FeatureCanvas per container', file: 'web/wizards/ops/panelTypes.js', find: 'const layout = container.__layout || (container.__layout = new FeatureCanvas());' },
+    { id: 'TRAP9 _mount wipes container.innerHTML', file: 'web/viz/featureCanvas.js', find: "container.innerHTML = '';" },
+    { id: 'TRAP9 renderDeclaredLayout has zero live callers (userOpView.js:661)', file: 'web/wizards/views/userOpView.js', find: 'const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)' },
 ];
 
-test('architecture map ASSERTED: every TRAP citation still holds', () => {
+test('architecture map ASSERTED: every TRAP citation still holds, uniquely', () => {
     const wrong = [];
     for (const c of TRAP_CLAIMS) {
         const abs = path.join(DDCS, c.file);
-        const to = c.lineEnd || c.line;
         try {
-            if (!citationHolds(abs, c.line, to, c.find)) {
-                wrong.push(`${c.id} — ${c.file}:${c.line}${c.lineEnd ? '-' + c.lineEnd : ''} no longer contains ${c.find}`);
-            }
+            const lines = citationMatchLines(abs, c.find);
+            if (lines.length === 0) wrong.push(`${c.id} — ${c.file}: NOT FOUND anywhere (rotted, or the trap was fixed and the map should say so) — ${c.find}`);
+            else if (lines.length > 1) wrong.push(`${c.id} — ${c.file}: matches ${lines.length}× (lines ${lines.join(', ')}) — not a unique anchor, tighten the pattern — ${c.find}`);
         } catch (e) { wrong.push(`${c.id} — ${e.message}`); }
     }
-    must('a TRAP citation rotted — the file:line ARCHITECTURE.md points at no longer contains what the trap describes. Either the citation needs updating (the code moved) or the TRAP ITSELF is stale (the underlying gotcha was fixed and the map should say so, not still warn about it) — read the diff at that location before deciding which.',
+    must('a TRAP citation rotted or stopped being unique — the substring ARCHITECTURE.md points at either no longer exists (the citation needs updating, or the TRAP ITSELF is stale and the map should say so) or now matches more than once (tighten the pattern). Read the diff at that location before deciding which.',
         () => expect(wrong).toEqual([]));
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PART 3 — ASSERTED: every INVARIANT citation still holds
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// t1996 (Option B) — same convention as TRAP_CLAIMS above: `find` is the full trimmed source line (or a hand-
+// shortened unique fragment), no `line`/`lineEnd`, checked whole-file, required to match exactly once.
+// `INV8 validateUserOp fork-arm check` was RE-ANCHORED, not merely re-verified: its old citation (userOps.js:746,
+// find:/./ — a trivial always-true placeholder) pointed at a DIFFERENT function entirely and had never actually
+// checked anything. The real claim — "the fork-arm check is asserted silent rather than deleted" — lives at
+// userOps.js:861 today; see the header comment for the full account.
 const INVARIANT_CLAIMS = [
-    { id: 'INV1 mouth guard throws by name', file: 'web/blocks/blockly/stackBridge.js', line: 350, find: /mouth/ },   // t1950 — shifted from 326 by +24 (the workspaceToStack terminator/wrapper-gate correction's own doc comment)
-    { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', line: 78, find: /mouth/ },
-    { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', line: 40, find: /./ },
-    { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', line: 297, find: /./ },   // t1950 — shifted from 273 by +24, same cause
-    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 586, find: /console\.error/ },   // t1992 — shifted from 538 by +48 (removeOpById + insertOpAfterId declarations added beside findOpById/replaceOpById)
-    { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
-    { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
-    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 917, lineEnd: 924, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1972 — shifted from 893-900 by +24 (validateUserOp's own nested-op check, added above)
-    { id: 'INV7 getTransform folds placement', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
-    { id: 'INV7 onTransform relays the same composed value', file: 'web/viz/featureCanvas.js', line: 383, find: /getTransform|onTransform/ },
-    { id: 'INV8 fork-parity byte-identity gate exists', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', line: 1, find: /./ },
-    { id: 'INV8 validateUserOp fork-arm check', file: 'web/blocks/userOps.js', line: 746, find: /./ },
-    { id: 'INV10 fork-parity typed sweep', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', line: 1, find: /./ },
-    { id: 'INV11 UPDATE_PREVIEW_SNAPSHOT rewrites and throws', file: 'DDCS-Studio/tests/node/preview-spec-gate-1688.test.mjs', line: 324, find: /UPDATE_PREVIEW_SNAPSHOT/ },
-    { id: 'INV12 tri-state fill: emits !== false', file: 'web/viz/startGlyph.js', line: 20, lineEnd: 24, find: /emits\s*!==\s*false/ },
-    { id: 'INV12 pass 0 is manual regardless of source', file: 'web/viz/startGlyph.js', line: 13, find: /pass 0|manual/i },
-    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1169, find: /return null/ },   // t1972 — shifted from 1145 by +24 (validateUserOp's own nested-op check, added above)
-    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 989, find: /postInstantiate/ },   // t1972 — shifted from 965 by +24 (validateUserOp's own nested-op check, added above)
-    // no `line`: NEXT-SESSION.md is rewritten wholesale each cycle (advisor-owned, uncommitted mid-edit as this
-    // very claim was first checked — a live case, not a hypothetical) — anchored by content, not a position.
-    { id: 'INV15 corner is the gated pilot, standing ruling', file: 'NEXT-SESSION.md', find: /Corner is the gated pilot/i },
-    { id: 'INV17 AGENTS.md one commit one concern', file: 'AGENTS.md', line: 35, find: /./ },
-    { id: 'INV17 AGENTS.md trace consumers before cleanup', file: 'AGENTS.md', line: 41, find: /./ },
+    { id: 'INV1 mouth guard throws by name', file: 'web/blocks/blockly/stackBridge.js', find: 'carries ${rec.children.length} children but its def declares no' },
+    { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthOf = (def) => def.mouth;' },
+    { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', find: "if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'skim', 'guard'].includes(def.kind)) b.children = [];" },
+    { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', find: 'carries an undeclared top-level field "${k}"' },
+    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', find: "subs.forEach((fn) => { try { fn({ stack, proj, origin }); } catch (e) { console.error('[programModel] a subscriber threw:', e); } });" },
+    { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', find: 'const CLEAN_SHAPES = [' },
+    { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', find: '// ── PART 2 — KNOWN GAPS. The t1678 census found three live, evidence-backed findings and reported them for their' },
+    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', find: "const _BASE_DEF_SHAPE = new Set(Object.keys(userOpFromStack('__probe__', 'probe', [], [], 'form3d', { probe: true }, 'probe')));" },
+    { id: 'INV7 getTransform folds placement', file: 'web/viz/featureCanvas.js', find: 'getTransform() {' },
+    { id: 'INV7 onTransform relays the same composed value', file: 'web/viz/featureCanvas.js', find: 'if (this._onTransform && this._tf) this._onTransform(this.getTransform(), VW, VH);   // t309 — re-pin the animation overlay to the current transform (this is the ONE place all pan/zoom/fit/resize/render land)' },
+    { id: 'INV8 fork-parity byte-identity gate exists', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', find: "import { test, expect } from '@playwright/test';" },
+    { id: 'INV8 validateUserOp fork-arm check', file: 'web/blocks/userOps.js', find: '// ⚠ THIS CHECK STAYS, AND IS EXPECTED TO BE SILENT. It is what noticed the loss in the first place, and it is' },
+    { id: 'INV10 fork-parity typed sweep', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', find: "import { test, expect } from '@playwright/test';" },
+    { id: 'INV11 UPDATE_PREVIEW_SNAPSHOT rewrites and throws', file: 'DDCS-Studio/tests/node/preview-spec-gate-1688.test.mjs', find: 'if (process.env.UPDATE_PREVIEW_SNAPSHOT) {' },
+    { id: 'INV12 tri-state fill: emits !== false', file: 'web/viz/startGlyph.js', find: 'fill: emits !== false,' },
+    { id: 'INV12 pass 0 is manual regardless of source', file: 'web/viz/startGlyph.js', find: "return pass === 0 || source === 'manual';" },
+    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', find: 'if (!blk || !blk.params || !(c.key in blk.params)) return null;   // FAIL CLOSED (see above)' },
+    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', find: "return (typeof def.postInstantiate === 'function') ? def.postInstantiate(stack, resolved) : stack;" },
+    // NEXT-SESSION.md is rewritten wholesale each cycle (advisor-owned) — anchored by content, not a position;
+    // whole-file uniqueness is exactly what a line number could never have expressed for a file like this one.
+    { id: 'INV15 corner is the gated pilot, standing ruling', file: 'NEXT-SESSION.md', find: '- **Corner is the gated pilot** — no wizard ports until corner is right.' },
+    { id: 'INV17 AGENTS.md one commit one concern', file: 'AGENTS.md', find: '### 4. One commit, one concern' },
+    { id: 'INV17 AGENTS.md trace consumers before cleanup', file: 'AGENTS.md', find: '### 5. Do not "clean up" code you have not traced' },
 ];
 
-test('architecture map ASSERTED: every INVARIANT citation still holds', () => {
+test('architecture map ASSERTED: every INVARIANT citation still holds, uniquely', () => {
     const wrong = [];
     for (const c of INVARIANT_CLAIMS) {
         const abs = path.isAbsolute(c.file) ? c.file
             : c.file.startsWith('DDCS-Studio/') ? path.join(REPO_ROOT, c.file)
             : !c.file.includes('/') ? path.join(REPO_ROOT, c.file)   // bare filename (AGENTS.md, NEXT-SESSION.md, …) = repo-root doc
             : path.join(DDCS, c.file);
-        const from = c.line || 1;
-        const to = c.lineEnd || c.line || Infinity;   // no `line` at all → whole-file content search
         try {
-            if (!citationHolds(abs, from, to, c.find)) {
-                const where = c.line ? `:${c.line}${c.lineEnd ? '-' + c.lineEnd : ''}` : ' (whole file)';
-                wrong.push(`${c.id} — ${c.file}${where} no longer contains ${c.find}`);
-            }
+            const lines = citationMatchLines(abs, c.find);
+            if (lines.length === 0) wrong.push(`${c.id} — ${c.file}: NOT FOUND anywhere (rotted, or the guard was fixed/moved and the map should say so) — ${c.find}`);
+            else if (lines.length > 1) wrong.push(`${c.id} — ${c.file}: matches ${lines.length}× (lines ${lines.join(', ')}) — not a unique anchor, tighten the pattern — ${c.find}`);
         } catch (e) { wrong.push(`${c.id} — ${e.message}`); }
     }
-    must('an INVARIANT citation rotted — the guard ARCHITECTURE.md names no longer lives where it says. An invariant whose guard has moved or disappeared is worse than a stale trap: someone will trust the rule is still enforced.',
+    must('an INVARIANT citation rotted or stopped being unique — the guard ARCHITECTURE.md names either no longer lives where it says, or the substring now matches more than one place. An invariant whose guard has moved or disappeared is worse than a stale trap: someone will trust the rule is still enforced.',
         () => expect(wrong).toEqual([]));
 });
 
@@ -230,25 +294,27 @@ test('architecture map ASSERTED: every INVARIANT citation still holds', () => {
 // records — t1672/t1686's ~275px split — so its exact citations are checked even though the rest of Q3's prose
 // is diagram, not claim-per-line)
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// t1996 (Option B) — same convention: full trimmed source line, no `line`/`lineEnd`, whole-file, exactly once.
 const Q3_CLAIMS = [
-    { id: 'Q3 _disp folds placement', file: 'web/viz/featureCanvas.js', line: 330, find: /_disp/ },
-    { id: 'Q3 placement assigned at _draw', file: 'web/viz/featureCanvas.js', line: 379, find: /placement/ },
-    { id: 'Q3 overlay tx() reads view.ox', file: 'web/viz/toolpath2d.js', line: 83, find: /view\.ox|ox\s*\+/ },
-    { id: 'Q3 partZeroShift is the ONE declared transform', file: 'web/viz/sceneFrame.js', line: 43, find: /partZeroShift/ },
-    { id: 'Q3 stockPinOffset — a DIFFERENT number', file: 'web/viz/sceneFrame.js', line: 88, find: /stockPinOffset/ },
-    { id: 'Q3 placeShiftFromParams / PlaceOnStock attach shift', file: 'web/wizards/ops/placement.js', line: 133, find: /placeShift/ },
-    { id: 'Q3 lathe spec carries no placement key (early-return)', file: 'web/wizards/ops/panelTypes.js', line: 233, lineEnd: 234, find: /latheLayoutSpec/ },
+    { id: 'Q3 _disp folds placement', file: 'web/viz/featureCanvas.js', find: '_disp(x, y) { const p = this._placement || { x: 0, y: 0 }; return this._S(x + (p.x || 0), y + (p.y || 0)); }' },
+    { id: 'Q3 placement assigned at _draw', file: 'web/viz/featureCanvas.js', find: 'this._placement = spec.placement || { x: 0, y: 0 };   // pattern items/handles ride this; stock is datum-fixed' },
+    { id: 'Q3 overlay tx() reads view.ox', file: 'web/viz/toolpath2d.js', find: 'const tx = (x) => view.ox + x * view.scale;' },
+    { id: 'Q3 partZeroShift is the ONE declared transform', file: 'web/viz/sceneFrame.js', find: 'export function partZeroShift(machine, stock, stockFloorZ) {' },
+    { id: 'Q3 stockPinOffset — a DIFFERENT number', file: 'web/viz/sceneFrame.js', find: 'export function stockPinOffset(machine, stock) {' },
+    { id: 'Q3 placeShiftFromParams / PlaceOnStock attach shift', file: 'web/wizards/ops/placement.js', find: 'export function placeShiftFromParams(p = {}, liveBbox = null) {' },
+    { id: 'Q3 lathe spec carries no placement key (early-return)', file: 'web/wizards/ops/panelTypes.js', find: 'const _lathe = latheLayoutSpec(def, params, (m) => { for (const k in m) _writeParam(k, m[k]); });' },
 ];
 
-test('architecture map ASSERTED: Q3 frame-algebra citations still hold (the highest-cost defect class)', () => {
+test('architecture map ASSERTED: Q3 frame-algebra citations still hold (the highest-cost defect class), uniquely', () => {
     const wrong = [];
     for (const c of Q3_CLAIMS) {
         const abs = path.join(DDCS, c.file);
-        const to = c.lineEnd || c.line;
         try {
-            if (!citationHolds(abs, c.line, to, c.find)) wrong.push(`${c.id} — ${c.file}:${c.line}${c.lineEnd ? '-' + c.lineEnd : ''} no longer contains ${c.find}`);
+            const lines = citationMatchLines(abs, c.find);
+            if (lines.length === 0) wrong.push(`${c.id} — ${c.file}: NOT FOUND anywhere — ${c.find}`);
+            else if (lines.length > 1) wrong.push(`${c.id} — ${c.file}: matches ${lines.length}× (lines ${lines.join(', ')}) — not a unique anchor — ${c.find}`);
         } catch (e) { wrong.push(`${c.id} — ${e.message}`); }
     }
-    must('a Q3 frame-algebra citation rotted — this is the exact class of coordinate bug (t1672/t1686) the map exists to prevent a THIRD occurrence of',
+    must('a Q3 frame-algebra citation rotted or stopped being unique — this is the exact class of coordinate bug (t1672/t1686) the map exists to prevent a THIRD occurrence of',
         () => expect(wrong).toEqual([]));
 });

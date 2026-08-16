@@ -435,7 +435,11 @@ Break it → the ~275 px overlay/SVG split (§ TRAPS).
 
 **8 · BYTE-IDENTICAL EMIT is the proof obligation for any preview-only change.**
 Guard: `tests/fork-parity-1593.spec.js` — FORM identity, EMIT byte-identity at N off-default values, hook carry.
-Backed by `validateUserOp` (`userOps.js:746`), whose fork-arm check is asserted **silent** rather than deleted.
+Backed by `validateUserOp` (`userOps.js:861`), whose fork-arm check is asserted **silent** rather than deleted.
+(t1996 — this cited `:746` for who knows how long; that line sits inside a DIFFERENT function, `instantiate`'s own
+binding loop, not `validateUserOp` at all. The checker's own citation for this claim never caught it either, since
+it carried a trivial always-true placeholder pattern instead of checking real content — see architecture-map-
+1698.test.mjs's own header comment for the full account. Both are fixed now.)
 Every WORK-LOG entry this week carries an explicit `### Emit byte-identical` section.
 
 **9 · A new test must be proven RED against the pre-change tree.**

@@ -39859,3 +39859,87 @@ architecture-citation Option B, with symbol/substring anchors and the mandatory 
 the unenforced prose half → whatever the human rules on two-sided setup.
 
 🔨 turn 1994
+
+# ═══ t1996 — ARCHITECTURE-CITATION OPTION B: substring anchors, mandatory uniqueness, node tier only ═══
+
+Node-tier only per the dispatch — no browser, no Playwright touched this turn.
+
+## THE MECHANISM — dropped line numbers, required uniqueness whole-file
+
+Every one of the 52 ASSERTED citations (24 TRAP sub-claims, 21 INVARIANT sub-claims, 7 Q3 frame-algebra) used to
+carry `{file, line, find}`, checked only within that line range. Rewritten to `{file, find}` — `find` checked
+against the WHOLE FILE, required to match EXACTLY ONCE. `citationHolds` (line-range boolean) replaced with
+`citationMatchLines` (whole-file, returns every matching line number so 0-matches and 2+-matches report as the
+two DIFFERENT failure reasons the mandatory uniqueness check exists to distinguish).
+
+**Why substring, not symbol:** this session's own two real citation drifts (INV3's `console.error` in
+`programModel.js`, 538→586; INV6's `hookKeysOf` in `userOps.js`, 893→917) both happened because an edit landed
+ABOVE the cited line, inside the SAME enclosing function the citation was already scoped to. A symbol-level
+anchor ("does function X still exist somewhere in this file") would not have caught either — the function's own
+name never moved; only the specific LINE the citation meant did. A substring drawn from the cited line's own
+content, searched whole-file, catches exactly this.
+
+## RE-ANCHORING — 52 of 52, one found genuinely wrong
+
+Wrote a scratch analysis script (not committed) that, for each of the 52 citations, read the file at its CURRENT
+cited line, took the full trimmed line as a candidate substring, and counted its own whole-file matches. **51 of
+52 resolved cleanly on the first pass** — the full source line, verbatim, was already unique whole-file even
+though the OLD short regex (`/dialect/`, `/getTransform/`, `/placement/`, `/_writable/`, …) was not. Measured
+before building, as instructed: 8 of the first 10 sampled patterns matched 2+ times under their old short form —
+real tightening work, confirmed rather than assumed. Three of the 52 got a hand-shortened fragment instead of
+the full line, for readability (TRAP5 FIELD_BIND.corner, INV1 mouth-guard-throws, INV2 leaf-record-fields — all
+re-verified unique after shortening).
+
+**One citation was found GENUINELY WRONG, not just line-drifted.** `INV8 validateUserOp fork-arm check` cited
+`userOps.js:746` under `find: /./ ` — a trivial always-true placeholder that had never verified anything (any
+non-empty line satisfies it). Line 746 sits inside `instantiate`'s own binding loop, an entirely different
+function from `validateUserOp`. Traced the real claim — "the fork-arm check is asserted silent rather than
+deleted" — to `userOps.js:861`, the `⚠ THIS CHECK STAYS, AND IS EXPECTED TO BE SILENT` comment, confirmed unique.
+Re-anchored there, and fixed the SAME wrong line number in `ARCHITECTURE.md`'s own prose (`:746` → `:861`), named
+in-place rather than silently corrected, since a decorative citation misleading a human reader is exactly the
+failure class this whole file exists to end. **Report: 52 of 52 re-anchored; 0 citations could not be made
+unique.**
+
+## THE UNIQUENESS CHECK — verified as the load-bearing half, not decoration
+
+Every JS-syntax-valid, all-52-parse check ran against a scratch validation script before touching the real test
+file (`node --check`, then a final pass re-confirming all 52 `find` values match their real files EXACTLY ONCE,
+independent of the generation script that produced them). Both TEST bodies (TRAP/INVARIANT/Q3) now report 0-match
+and 2+-match as separate, named failure reasons rather than one collapsed boolean — dropping the line number
+WITHOUT this would have made the checker weaker while reading as an improvement, per the dispatch's own warning.
+
+## THE PROSE HALF — measured, stated, not silently either way
+
+Grepped `ARCHITECTURE.md` for every `file:line`-shaped citation: **149 raw mentions** (a pattern count, so it
+includes the same fact cited more than once across sections, not 149 distinct claims). The 52 now enforced are
+every TRAP, every INVARIANT, and Q3's frame-algebra — the ORIGINAL t1698 scope boundary, unchanged. **The
+remaining ~97 mentions — Q1/Q2 diagram annotations, REGISTRIES table rows, narrative asides — stay genuinely
+UNENFORCED prose**, stated plainly in the header comment rather than left ambiguous. Bringing all ~97 under this
+same mechanism would need the identical per-citation treatment (read current content, hand-pick a unique anchor,
+verify) the 52 here just got — comparable in size to this turn over again, not a remaining slice of it, so it was
+not attempted this turn. The boundary for future enforcement is unchanged and already explicit: a citation earns
+a check here the moment it graduates into a named TRAP or INVARIANT.
+
+## PROVED IT CATCHES DRIFT — three scenarios, against a scratch copy, not asserted
+
+Copied `wizardManager.js` to scratch, ran three in-memory transformations against `TRAP5 canEdit reads
+paramFields`'s own real citation (`'canEdit(opType) {'`, genuinely found at line 323 today):
+1. **MOVED** the cited line 200 lines later in the same file → still found (1 match, new line number) — proving
+   the mechanism is genuinely line-independent, the entire point of dropping the number.
+2. **DELETED** the cited line entirely → 0 matches, reported by name as rotted/deleted.
+3. **DUPLICATED** the cited line elsewhere in the file → 2 matches (lines 323 and 373), reported by name as not
+   unique — the SECOND failure mode the mandatory uniqueness check exists to catch, distinct from deletion.
+No file on disk was mutated — all three ran as in-memory string transforms against a scratch-directory copy,
+deleted after. This proves the MECHANISM once; it is generic across all 52 citations, not re-proven per entry
+(matching t1698's own original non-vacuity discipline, extended to the new design).
+
+## GATE
+
+Node tier only, per the dispatch: **125/125 clean**, including the redesigned `architecture-map-1698` (5/5).
+
+## Queued — both flagged prior turns, neither built this turn
+`setGroupChildParams`'s own real-UI test (the fuller widget-form pass named at t1992) → `RECONCILERS.surfacing`
+staleness against its own current `surfaceraster` emit shape (found t1992, unrelated, flagged not fixed) →
+whatever the human rules on two-sided setup.
+
+🔨 turn 1996
