@@ -3183,3 +3183,45 @@ it handles exactly that case, so the code is lying) → `editorOpHover.js glowEd
 _firstOpTitle` (exported .nc titled `multi_step`) → `setupSheet.js collectOps` (the over-deep twin — **different
 fix shape**, substitute-not-both). **Then: a CHECKER so a twelfth site cannot land silently** — eleven found
 across three sweeps says the class needs a test, not a fourth sweep.
+
+# ═══ t1960 — DESIGN THE CHECKER: make a twelfth site impossible to land silently (read-only) ═══
+
+t1958 accepted (`37b27d80`) — **and you corrected MY diagnosis with live evidence, which is the best thing in
+the turn.** I said "chip renders enabled, click no-ops." Your own test showed the chip rendered **disabled**,
+because `findOpInStack` matched the WRAPPER (it checked its own level before recursing) and `canEdit('multi_step')`
+is false. One layer upstream of where I pointed. You found it by testing the prediction instead of implementing it.
+Three duplicate by-id lookups collapsed to one, `opGlow.js`'s private copy deleted, and you fixed
+`opSession.js`'s `replaceOp` too — the commit path that would have failed one step *after* the open succeeded.
+
+## ⚠ ONE RESIDUE, first thing next code turn (NOT now — my gate is running).
+`wizardManager.js` (both sites) reads:
+```js
+window.ddcsFindOpById ? window.ddcsFindOpById(prog, opId) : prog.find((b) => b && b.type === 'op' && b.id === opId)
+```
+**The fallback branch IS the bug you just fixed**, kept alive behind a truthiness check. Either it can never
+fire (dead code asserting a danger that doesn't exist) or it can (the bug is still reachable). I checked:
+`programModel.js` does NOT import `wizardManager.js`, and `wizardManager.js` already imports from `./blocks/`
+— **so import `findOpById` directly and delete the fallback.** If a real load-order/cycle reason forces
+`window.`, keep it but make the absence LOUD (return null) — never silently fall back to a known-wrong lookup.
+
+## THE TASK — read-only design. My full gate is RUNNING: no code, no specs, no suite run.
+**Eleven sites, three sweeps, and a twelfth is a matter of time.** Three hand sweeps found them; a fourth is
+not the answer. Design the test that fails when a new one lands.
+
+1. **WHAT IS THE DETECTABLE SHAPE?** Every one of the eleven asks "which operations does this program hold" or
+   "find the op with this id" and answers it by walking only the top level (or, for `collectOps`, by walking too
+   deep). Is that mechanically detectable — a filter on `type === 'op'` / a `.find` on an id, in a file that
+   does NOT go through `flattenOps`/`findOpById`? **Name the false positives**, because a checker that cries
+   wolf gets suppressed and becomes decoration.
+2. **WHERE DOES IT LIVE?** It is a file read and a grep — it belongs in the FASTEST tier (node), beside the
+   architecture-map checker, not in a 32-minute suite.
+3. **ALLOW-LIST vs DERIVE.** A hand-maintained list of blessed sites is the thing this project keeps deleting.
+   Can the legitimate cases be *derived* instead (e.g. the walker itself, structural code that must see
+   wrappers)? If an allow-list is genuinely unavoidable, say why and how it stays honest.
+4. **⚠ SAY IF IT IS NOT WORTH IT.** If the honest answer is "the shape is too varied to detect without noise,
+   fix the remaining four and move on", say that. Your negatives have been right every time.
+5. **COST IT** against the alternative: fixing four more sites by hand and accepting a fifth sweep later.
+
+⚠ Queued code work, in order: the `window.` fallback above · `segmentFrame.js frameOwnerAtLine` (its comment
+claims it handles the nested case — the code lies) · `editorOpHover.js glowEdited` · `editorManager.js
+_firstOpTitle` · `setupSheet.js collectOps` (over-deep, different shape) · then whatever this design concludes.
