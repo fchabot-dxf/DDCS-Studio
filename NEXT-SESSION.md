@@ -3680,3 +3680,44 @@ workflow, and they are the machinist.** So this is a product question, not just 
 
 ⚠ After my gate + release: `option-b-slice2` bridged to a wrapped program → the rest of the 7-entry inventory
 → architecture-citation Option B (incl. the unenforced prose half) → whatever the human rules here.
+
+# ═══ t1984 — WHICH FEATURE SPECS NEVER DRIVE THE REAL PATH? (read-only, bounded) ═══
+
+t1982 accepted. **Sharper than my own framing:** `setupBlock` does not "render as a container that refuses
+ops" — it renders as a **flat 209×40 pill**, no C-notch at all, indistinguishable from `xform`/`entry`. And you
+found a **second gap behind the first**: `mouth:'DO'` alone fixes drop-and-read-back (the generic machinery
+already handles any mouth-declaring kind), but `workspaceToStack` only inspects top-level blocks and
+`regroupOps` only ever runs on that array — so two ops dropped into one setup would read back as loose
+children, never auto-wrapping. **Cheap line for basic drop-in; a real design ruling on top.** Costing the
+*second* gap is what stops "it's one word" becoming a half-shipped feature.
+
+## ⭐ THE PATTERN YOU HAVE NOW CONFIRMED THREE TIMES IS THE REAL FINDING.
+`two-sided-879` (5/5), `two-sided-881` (4/4) — both build every setup group from hand-written JSON through
+`ddcsLoadBlockStack`, **zero `showApp`/`__blkws`**. Same as `option-b-slice2` and `option-b-slice3`. So:
+
+```
+  a feature's BACK half is real, tested, green
+  its FRONT half (the user-reachable path) is broken or absent
+  the tests construct the state programmatically -> they never touch the broken half
+  -> the suite reports a working feature that no user can reach
+```
+
+That is how a whole workflow stayed dead in the palette with green tests over it. **Three instances in one
+session means it is a class, not bad luck.**
+
+## THE TASK — read-only, BOUNDED. My gate is RUNNING: no code, no specs, no suite run.
+1. **COUNT THE CLASS.** Which `tests/*.spec.js` files assert a FEATURE's behaviour while constructing their
+   program **only** via `ddcsLoadBlockStack` / hand-built records — never `openWiz`/`insertWiz`/`showApp`/
+   `__blkws` / a real gesture? Method as well as count, as always.
+2. **⚠ SEPARATE THE INNOCENT.** A unit-ish spec testing an emitter or a pure function SHOULD construct
+   programmatically — that is correct, not a defect. The defect is only where the spec's own claim is about a
+   **user-reachable feature**. Say how you drew the line; a count that lumps both is useless.
+3. **RANK BY EXPOSURE:** which of them guard a feature whose user-reachable path might ALSO be broken right now
+   — i.e. where else could a dead front half be hiding behind a green back half? **Name suspects; verify
+   nothing.** That is the next hunt, not this one.
+4. **IS IT CHECKABLE?** Could this be a ratchet like `op-lookup-scan-1968` — feature specs must touch a real
+   gesture — or is the innocent/guilty line too blurry to mechanise? **Say if it is not worth it**; your
+   negatives have been right every time.
+
+⚠ Report only. Do not fix, do not rewrite a spec, do not add the mouth.
+⚠ **The human has NOT yet ruled on two-sided setup.** Do not build any of it.
