@@ -3873,3 +3873,45 @@ ordinary use**: before Add, only an import produced a wrapper.
 
 ⚠ **STOP CONDITION:** if fixing any of these changes single-operation behaviour, stop and tell me.
 ⚠ The machine is yours. Then: `opContextMenu.showOpMenu` · `macrosApp.openCamAuthoring` · citation Option B.
+
+# ═══ t1994 — THE LAST TWO INVENTORY SITES ═══
+
+t1992 accepted, verified by me: **inventory 7 → 2**, node tier `fail 0`, ratchet green both directions, and the
+toolkit is one declared set of four (`findOpById` / `replaceOpById` / `removeOpById` / `insertOpAfterId`) with
+all five sites routed through it rather than five hand-rolled resolves.
+
+**⭐ THE BEST THING YOU DID WAS CATCH YOUR OWN WEAK TEST BEFORE SHIPPING IT.** Your first `mergeOpBlocks`
+non-vacuity check used a G-code substring search — and it **passed against the broken code**, because the
+wizard's own automatic Replace-fallback still applied the form's new value when the merge silently failed. A
+test that goes green whether or not the fix works, on the *data-loss* bug, would have been the worst possible
+thing to ship: a confident guarantee over the exact defect. You traced why, rewrote it to track the edited
+atom's own id via `getSurroundParent()` (a `math_number` shadow has no record identity; the owning atom does),
+and re-ran: 3/3 red. **That is the discipline working on itself.**
+
+**Also right:** `replayReconcile` has ZERO live UI callers, so you verified it function-level and said so —
+rather than inventing a gesture that does not exist. And `setGroupChildParams`'s real UI door needs a derived
+group def + generic widget form, which you judged beyond the turn's honest budget: **verified function-level
+against a REALISTIC nested shape and NAMED AS PARKED, not silently substituted.** Parking loudly is what makes
+your "done" believable.
+
+## THE TASK — close the inventory.
+1. **`opContextMenu.js showOpMenu`** — the right-click menu on a nested op falls back to a thinner, stale
+   record (missing params/children) for its CAM-authoring actions. Route through the declared toolkit.
+2. **`macrosApp.js openCamAuthoring`** — "auto-import all CAM-able program ops" **silently skips every op
+   nested inside a wrapper**, so a multi-operation program's later operations never reach CAM authoring at all.
+   This is the one you found while BUILDING the checker; it earns its place as the last entry.
+3. **ASSERT WHAT THE USER GETS:** auto-import on a real Add-built multi-operation program brings in **every**
+   operation, not just the first; the right-click menu on a nested op carries its real params.
+4. **INVENTORY 2 → 0.** ⚠ **When it hits zero, say what the checker should DO with an empty inventory** — does
+   it still guard (fail on any new violation, which is the whole point) or does an empty list read as
+   "nothing to check"? **An empty ratchet that silently stops ratcheting is the decoration we keep deleting.**
+5. **PROVE NON-VACUITY per site.** **Gate:** node tier (incl. checker) + `cam-build-mode` + `cam-multiop-edit-
+   blocks-s45` + `edit-nested-op-1958` + the round-trip/parity set + the 4 t1928 features.
+
+## Queued behind it — three things YOU surfaced, none lost:
+- **`setGroupChildParams`'s real-UI test** (parked above) — the fuller pass you named.
+- **`RECONCILERS.surfacing` is stale** against its own current `surfaceraster` emit shape (`surfacingWizard.js`'s
+  t1359 guard confirms the old stepdown shape it checks for is test-only dead code today). Found while looking
+  at something else; flagged, untouched.
+- architecture-citation **Option B** (symbol/substring anchors + the **mandatory uniqueness assertion**, incl.
+  the unenforced prose half).
