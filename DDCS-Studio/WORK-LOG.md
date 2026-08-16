@@ -39132,3 +39132,142 @@ Batch closes here per the dispatch, pending the advisor's decision on `collectOp
 architecture-citation Option B, including the unenforced prose half.
 
 🔨 turn 1980
+
+# ═══ t1982 — TWO-SIDED SETUP: the honest state of a feature offered in the palette and unusable end to end ═══
+
+READ-ONLY per the dispatch. No product code touched, no spec files added, no suite run. One screenshot kept as
+evidence (`verification/t1982-setup-block-shape.png`), one scratch diagnostic test written, run, and deleted.
+
+## (1) CAN A USER PLACE ONE TODAY? — Yes to placing it, no to using it as a container
+
+Confirmed live, not just from the registry. `setupBlock` (`wizards/ops/transform.js:40-45`) is not `hidden`, its
+category `'Transforms'` is a listed toolbox category, so `buildToolbox` (`blockly/bridge.js:494-519`) includes it
+— it DOES render in the Blocks-tab palette, draggable, exactly where the advisor traced it.
+
+Built a real instance the same way Blockly's own drag machinery would (`ws.newBlock('setup')` + `initSvg` +
+`render`, then read the rendered block back) and screenshotted it. The result: a small flat purple pill —
+`"Setup title [Setup] index [1]"` — 209×40px, `previousStatement`/`nextStatement` both present (it chains into a
+sequence like any ordinary atom) but **zero statement inputs** (`hasStatementInput: false`). Blockly's own C-shape
+notch is drawn ONLY when a block's JSON declares a `message`/`args` row with `type:'input_statement'`
+(`blockly/bridge.js:263-268`, `addMouth`, gated on `mouthOf(def)`); `setupBlock`'s own def has no `mouth` field,
+so that code path is never reached and no notch is ever drawn.
+
+**So the answer is sharper than "renders as a container that refuses ops": it does not render as a container at
+all.** Visually and structurally it is indistinguishable from a flat leaf atom like `xformBlock`/`entryBlock` — a
+user has no slot to even ATTEMPT dropping an op into, no failed-drop feedback, nothing that reads as broken. It
+just looks like a small settings pill that happens to say "Setup."
+
+## (2) WHAT WOULD MAKE IT WORK? — mouth is real, but it is not the only gap
+
+**The missing `mouth: 'DO'` is genuinely the FIRST and most direct gap**, and I traced both sides of the
+machinery it would plug into — both already fully generic, no new code needed there:
+- Write (data → canvas): `recToJson`'s generic mouth branch (`stackBridge.js:344-345`) already writes ANY
+  `mouthOf(def)`-declaring kind's `.children` into that named input via `chainToJson` — no `setup`-specific
+  branch would be needed.
+- Read (canvas → data): `toRecord`'s mirror-image generic branch (`stackBridge.js:151-152`) already reads ANY
+  declared mouth back into `.children` the same way.
+Both are proven working today for every OTHER mouth-declaring kind (`t1638`'s own "every child-holding kind" — a
+declared, shared mechanism, not per-kind duplication). Adding `mouth: 'DO'` to `setupBlock`'s def is therefore, by
+itself, enough to make a `setup` block visually render a notch and correctly carry whatever a user drops into it,
+both directions.
+
+**But a SECOND, separate gap sits right behind it, and it changes what "reachable" would even mean once the
+first is fixed.** `workspaceToStack` (`stackBridge.js:203-208`) — the read-back every structural Blocks-tab edit
+runs through — only inspects `ws.getTopBlocks(true)`, and `regroupOps`/`groupConsecutiveOps` (the ONLY code that
+ever creates a `multi_step` wrapper) is applied to that TOP-LEVEL array alone. It never descends into a `setup`
+block's own children to look for or create a wrapper there. **Concretely: even with a mouth added, dropping two
+real op blocks into a setup would NOT auto-wrap them in `multi_step` — they would read back as
+`setup.children = [op1, op2]`, two plain siblings, no wrapper at all.** This means `collectOps`'s specific
+phantom-row hazard (t1932's own worry: a `multi_step` nested inside a `setup`) would STILL not be reachable
+through ordinary dragging even after the mouth fix — the only way to nest a `multi_step` specifically inside a
+`setup` would remain hand-authored `.mjson` JSON, exactly as it is today. (Two ops loose inside a setup, without
+a wrapper, is exactly what `collectOps` already handles correctly today — no phantom row in that shape.)
+
+**Cost, honestly:** the mouth declaration is a one-line, low-risk change with generic machinery already proven on
+both sides. But calling the FEATURE "done" after that one line would be wrong — reaching the exact shape t1932
+worried about would need EITHER extending `regroupOps`'s own reach into container children (a real design
+decision: should 2+ ops dropped in one setup section auto-wrap the same way top-level ones do? no prior ruling
+says so), OR accepting that shape stays unreachable and `collectOps`'s bug stays dormant regardless. Beyond that,
+unverified this turn (out of scope for a "one word or a feature's worth" cost, named not chased): whether
+`collapse-on-delete`'s own top-level-only `hasWrapper` gate would need the same extension for symmetry, and
+whether anything constrains a program to exactly 2 setup indices or unique indices (nothing found that does —
+any number of `setup` blocks, any `index` values, would presumably all render their own sheet pages).
+
+## (3) HOW MUCH OF THE FEATURE IS REAL? — the machinery is real and tested; the door to reach it is not
+
+Grepped both feature test files for every trace of Blocks-tab or Blockly involvement (`showApp`, `__blkws`) —
+zero matches in either. **`two-sided-879.spec.js` (5/5) and `two-sided-881.spec.js` (4/4) construct every one of
+their `setup` groups via a hand-built plain JS record — `{type:'setup', id, params:{title,index}, children}` —
+loaded straight through `ddcsLoadBlockStack`, never through a wizard, never through a drag, never through the
+Blocks tab at all.** This is the exact "PRIMARY EVIDENCE shape" the advisor named — evidence for the DATA layer's
+own correctness, not evidence a user can produce that data. `setup-sheet-850.spec.js`'s own 4 tests don't
+construct a `setup` group at all (confirmed by the same grep) — its coverage is the single-page (no-setup) path
+only.
+
+What IS real, per t879/881's own WORK-LOG entries (turns 879 and 881, read in full): byte-identical transparent
+emit (`blockEmitter.js:237` includes `setup` in its transparent-container list), the per-setup mirror at emit
+(`applySetupFlips`, scoped per setup so setup 1 stays put — verified byte-identical when no flip declared), the
+prog-marker round-trip for the FLIP sibling specifically (not the setup container itself — see below), per-setup
+preflight bucketing (`violationsBySetup`), per-setup time-split, the setup sheet's own two-page rendering with
+flip instructions, and — per t881 — the sim's own stock-flip + carve-carry-over across the boundary (with an
+honestly-documented 2.5D limit: a blind pocket can't carry through a physical flip, only a through-hole can).
+This is a substantial, genuinely-built, genuinely-tested back half of a feature.
+
+**One more concrete hole in the front half, found while tracing t879's own round-trip note:** t879's WORK-LOG
+entry states the `setup` CONTAINER itself was deliberately kept OFF the `.nc` marker round-trip ("a transparent
+setup container cannot round-trip through the .nc builder-marker system... I kept the setup containers on the
+`.mjson`/Blocks round-trip") — only the FLIP sibling rides the program-level marker slot. Confirmed independently
+this turn (t1980): `serializeWithMarkers` walks `opAtLine` per-op-line only, `setup` isn't `type:'op'`, so it
+emits no marker. **This means even a setup group built by some future authoring UI could not survive a `.nc`
+export → reimport cycle today** — a THIRD gap, named at t879 itself as a conscious tradeoff for that turn's own
+scope, not rediscovered here as new.
+
+## (4) WAS IT PARKED DELIBERATELY? — no deliberate park; the authoring door was never in scope in the first place
+
+Read t879 and t881 (WORK-LOG.md, turns 879/881) in full, plus NEXT-SESSION.md's own t1932/t1934 record.
+
+**t879's own header is explicit about what WAS deliberately queued:** "Phase 2 (preflight-per-setup) + phase 3
+(sim stock-flip + carve-carry) are QUEUED, not built" — and t881's own header confirms both shipped one turn
+later ("Phase 2 preflight-per-setup + phase 3 sim stock-flip + carve-carry; the honest t879 note comes DOWN").
+**Neither turn's own scope, plan, or "queued" list ever once mentions an authoring UI, a drag gesture, or any way
+for a user to CREATE a setup group.** The entire five-piece t879 plan ("emit + byte-identity + prog-marker
+round-trip + setup sheet + estimate split") and t881's two phases are about what happens to a setup group ONCE
+IT EXISTS — never about how one comes to exist. This reads as a scope boundary that was simply never drawn, not
+a decision that was drawn and then deferred.
+
+**t1932 is the one place reachability was ever asked about, and it was honest about its own limits at the time**
+— its own finding, quoted in NEXT-SESSION.md's t1934 entry: `collectOps` over-deep twin = "REACHABLE (static)",
+explicitly caveated by the advisor's own review as "a static trace, not an observed drag" (NEXT-SESSION.md
+line ~2693-2696, praised specifically for stating that confidence level rather than asserting it as settled).
+Nobody — across t879, t881, or t1932 — ever traced whether `setupBlock` actually had a `mouth`. t1932's own
+"REACHABLE" verdict rested on `setup` being declared as a general children-holding container (true in the DATA
+model) without checking whether the CANVAS could ever populate that container for a real program — the exact gap
+this turn closes.
+
+**So: not parked. A feature whose back half (emit/sim/sheet) was fully built and tested, whose front door
+(authoring) was never designed or built, and whose one prior reachability check took the back half's own
+completeness as evidence the front door existed too.**
+
+## (5) NOT BUILT, PER INSTRUCTION
+
+No mouth added, no UI built, no code touched. `git status` confirms zero product/test file changes for this
+turn — only this WORK-LOG entry and one evidence screenshot.
+
+## FOR THE HUMAN'S RULING — the shape of the decision, not a recommendation
+
+Two-sided machining (flip the part, cut the back) is named by the advisor as a real shop workflow, and the
+machinist is the human here — so this is squarely theirs to call, not mine to nudge. The honest menu, as I found
+it: (a) the back half already works and is tested — nothing there is broken or needs touching; (b) the front
+door is a real gap, not a bug — cost is "cheap to make it accept drops" (the mouth line) plus "an open design
+question" (whether multi-op-per-setup should auto-wrap, and whether the setup container should gain `.nc`
+round-trip support) rather than a single clean estimate; (c) doing nothing leaves a palette entry that promises a
+capability the block cannot perform, which is its own kind of dishonesty in the UI regardless of whether anyone
+has hit it yet.
+
+## Queued CODE work — awaiting the human's ruling on two-sided setup, batch otherwise closed
+`collectOps` stays unfixed (t1980's own finding: unreachable, no code changed). Two-sided setup's own front door
+(mouth + design question) awaits a human ruling, not built. After: `option-b-slice2-positioning-1872` bridged to
+a wrapped program (t1974's own method) → the remaining 7-entry inventory → architecture-citation Option B,
+including the unenforced prose half.
+
+🔨 turn 1982
