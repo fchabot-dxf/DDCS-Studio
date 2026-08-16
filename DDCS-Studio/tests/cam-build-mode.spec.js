@@ -176,3 +176,80 @@ test('S-C empty-state: a program with NO CAM-able ops shows the empty-state, not
   expect(r.text, 'lists supported ops').toContain('Pocket');
   expect(r.text, 'the present contour shows its unsupported reason').toMatch(/Contour.*NO CAM generator/);
 });
+
+// `distinctiveW` lets a caller set surfacing's own Area-X width to a value that could not be mistaken for a
+// declared DEFAULT (millToSlot.js's own 'w' field default is 100) — needed to prove the CAM seed reads the
+// NESTED op's own real params, not a thin-stub fallback that would still show a plausible-looking DEFAULT row.
+async function addNested(page, distinctiveW) {
+  await page.waitForFunction(() => window.openWiz && window.updateWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack);
+  await page.evaluate(() => window.ddcsLoadBlockStack([]));
+  await page.evaluate(async () => { window.openWiz('drill', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz(); });
+  await page.waitForFunction(() => (window.ddcsGetBlockProgram() || []).some((b) => b && b.opType === 'drill'), { timeout: 8000 });
+  await page.evaluate(() => { window.openWiz('surfacing', undefined, true); window.updateWiz(); });
+  if (distinctiveW != null) {
+    await page.evaluate((w) => {
+      const el = document.getElementById('sf_w');
+      if (el) { el.value = String(w); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+    }, distinctiveW);
+    await page.evaluate(() => window.updateWiz());
+  }
+  await page.evaluate(() => { window.insertWiz(); });
+  await page.waitForSelector('.app-dialog', { timeout: 8000 });
+  await page.click('.app-dialog button:has-text("Add as a 2nd operation")');
+  await page.waitForFunction(() => !document.querySelector('.app-dialog'));
+  return page.evaluate(async () => {
+    const progMod = await import('/blocks/programModel.js');
+    const flat = progMod.flattenOps(window.ddcsGetBlockProgram() || []);
+    const raw = window.ddcsGetBlockProgram() || [];
+    const topOp = raw.find((b) => b && b.type === 'op');
+    return { wrapped: !!topOp && topOp.opType === 'multi_step', firstId: flat[0] && flat[0].id, secondId: flat[1] && flat[1].id, secondW: flat[1] && flat[1].params && flat[1].params.w };
+  });
+}
+
+// t1992 — showOpMenu's own `full` re-hydration was a top-level-only `.find`, dead for a nested op — this file's
+// OWN convention already calls showOpMenu directly with a THIN `{id, opType, label}` stub (POCKET/CORNER above,
+// matching the function's own declared contract: "Show the op menu for `op` ({ id, opType, label })"), so this
+// drives that exact same declared shape against a nested op's own id, the one caller pattern the fix protects.
+test('t1992 — showOpMenu (thin-stub caller, this file\'s own convention) seeds the CAM modal from the NESTED op\'s REAL params', async ({ page }) => {
+  await openCam(page);
+  // 137 is not millToSlot.js's own declared DEFAULT for 'w' (100) — a fallback seeding from an empty/thin params
+  // object would still plausibly show "100", so only the DISTINCTIVE value proves the real record was read.
+  const { secondId, secondW } = await addNested(page, 137);
+  expect(Number(secondW), 'sanity: the nested op\'s own w really is the distinctive value, not the default').toBe(137);
+
+  const r = await page.evaluate(async (opId) => {
+    const { showOpMenu } = await import('/ui/opContextMenu.js');
+    showOpMenu({ id: opId, opType: 'surfacing', label: 'Surfacing' }, 50, 50);
+    const btn = [...document.querySelectorAll('.op-ctx-menu .op-ctx-item')].find((b) => /Build CAM slot/.test(b.textContent));
+    return { found: !!btn, disabled: btn && btn.disabled };
+  }, secondId);
+  expect(r.found, 'the CAM action is offered for the nested op').toBe(true);
+  expect(r.disabled, 'the nested op\'s REAL params make it CAM-able (not "unsupported" from a thin/empty fallback)').toBe(false);
+
+  await page.evaluate(() => { document.querySelector('.op-ctx-menu .op-ctx-item').parentElement.querySelectorAll('.op-ctx-item')[2].click(); });
+  await page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 8000 });
+  const wValue = await page.evaluate(() => {
+    const el = document.querySelector('#cbm_table tr[data-fkey="w"] .cbm-val');
+    return el ? el.value : null;
+  });
+  expect(wValue, 'the Area X (w) field must be seeded from the nested op\'s own DISTINCTIVE value (137), not the declared default (100) or an empty/thin fallback').toBe('137');
+});
+
+// t1992 — openCamAuthoring's own auto-import loop filtered `ddcsGetBlockProgram()` at the top level only — for a
+// multi_step-wrapped program (the real Add gesture) it visited ONLY the wrapper (never CAM-able), so every real
+// operation past the first silently never reached CAM authoring, and the wrapper appeared once as "unsupported"
+// under its own internal opType instead of naming any real op.
+test('t1992 — auto-import (no seedOp) on a real Add-built 2-op program brings in BOTH operations, not just the wrapper', async ({ page }) => {
+  await openCam(page);
+  const { wrapped } = await addNested(page);
+  expect(wrapped, 'sanity: the real Add gesture genuinely produced a multi_step wrapper').toBe(true);
+
+  await page.evaluate(() => window.ddcsOpenCamAuthoring());
+  await page.waitForSelector('.cam-auth-overlay', { timeout: 8000 });
+  const r = await page.evaluate(() => ({
+    groups: document.querySelectorAll('.cbm-op-group').length,
+    text: (document.getElementById('cbm_table') || {}).textContent || '',
+  }));
+  expect(r.groups, `both real ops (drill + surfacing) must reach CAM authoring, not just the first — got ${r.groups} groups, text: ${r.text.slice(0, 300)}`).toBe(2);
+  expect(r.text, 'the wrapper itself never appears as an unsupported op').not.toMatch(/multi_step/);
+});

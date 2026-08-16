@@ -39758,3 +39758,104 @@ against the current `surfaceraster` emit shape — a different bug, found by acc
 call on priority.
 
 🔨 turn 1992
+
+# ═══ t1994 — CLOSING THE INVENTORY: the last two sites, and what zero means ═══
+
+## THE TWO SITES
+
+- **`opContextMenu.js` `showOpMenu`**: `full` — the re-hydrated record the CAM actions build from — was a
+  top-level-only `.find`, falling back to the raw `op` PARAMETER for a nested id. Fixed via `findOpById`.
+- **`macrosApp.js` `openCamAuthoring`**: the auto-import loop (no `seedOp` — the toolbar/CAM-tab doors) filtered
+  `ddcsGetBlockProgram()` at the top level only, so for a `multi_step`-wrapped program it visited ONLY the
+  wrapper (never CAM-able) — every real operation past the first silently never reached CAM authoring. Fixed via
+  `flattenOps` (t1928) — the exact domain this loop needs (a group counted once is NOT this question; a
+  `multi_step`'s own steps ARE the real operations here, same as `openCamAuthoring`'s own header comment already
+  says: "auto-import all CAM-able program ops").
+
+## `showOpMenu` — checked for a live symptom first, found none, said so
+
+Same discipline as `replayReconcile` (t1992): before writing a test, checked whether the bug is REACHABLE
+through the function's one real caller. `editorOpHover.js`'s own contextmenu handler is the ONLY live caller,
+and it already resolves `op` via `ddcsOpAtLine` — which returns the FULL, live block object by reference, not a
+summary — so the `|| op` fallback, even when the shallow lookup fails for a nested id, happens to already carry
+complete data for THIS caller. **Verified this empirically, not assumed**: built a real nested op, drove the
+actual right-click, clicked "Build CAM slot" against the UNFIXED code — the menu enabled correctly and the modal
+opened with a full-looking field table. No live symptom through the real gesture. But the function's own
+declared contract ("op: { id, opType, label }") explicitly documents a THIN caller shape, and this file's OWN
+sibling test (`cam-build-mode.spec.js`, POCKET/CORNER fixtures, already in the codebase) already calls
+`showOpMenu` that exact way — so the fix is not defending against a hypothetical; it's defending the function's
+own declared interface, exercised by an already-established test convention. Verified against that shape.
+
+## A SECOND weak-test catch, same shape as mergeOpBlocks's
+
+First draft of the `showOpMenu` test only checked that the CAM modal's field table was non-empty and contained a
+recognisable label ("Area X"/"Depth"/"Tool") — and it PASSED against the reverted code too. Traced why:
+`seedFromOp`/`makeAuthOp` build a COMPLETE-LOOKING field table even from a thin/undefined-params fallback,
+because each field's declared DEFAULT (`millToSlot.js`'s own `{ key: 'w', label: 'Area X', ..., def: 100 }`)
+fills in when the real value is missing — a thin stub doesn't read as broken, it reads as a program that happens
+to have default values. Rewrote to seed the nested op with a DISTINCTIVE, non-default width (137, not the
+declared default 100) via the real form before inserting, and check the modal's own `w` input value specifically.
+Re-ran non-vacuity: 3/3 red, showing "100" (the default) instead of "137" — the exact latent-defect shape the
+weak check would have missed a second time in one turn.
+
+## `openCamAuthoring` — a real, reproduced-live symptom
+
+Non-vacuity reproduced the dispatch's own predicted shape exactly: pre-fix, auto-import on a real Add-built 2-op
+program showed "No CAM-able ops yet" with `multi_step — no registered def for "multi_step"` as the SOLE entry —
+both real operations (drill and surfacing) silently absent, the wrapper itself standing in as a fake "unsupported
+op." Fixed: 2 groups, both real ops present, `multi_step` never appears anywhere in the modal's own text.
+
+## INVENTORY 2 → 0 — genuinely empty, not renamed
+
+Ran the checker with the code fixed but the old 2-entry inventory still in place first: **failed**, both sites
+reported as stale — confirmed before updating, same discipline every prior turn this session used. `INVENTORY`
+is now `[]`; every closed site's own history stays as a dated comment above it (the full trail: t1974/t1976/
+t1978/t1992/t1994), matching the convention every prior turn already established rather than deleting the record.
+
+## WHAT AN EMPTY INVENTORY MEANS FOR THE CHECKER — verified, not just argued
+
+**It still guards, at full strength, by construction — not a special case that needed adding.** `diffInventory`
+is a plain, symmetric set difference in both directions; neither is conditioned on the inventory's own length.
+At `INVENTORY = []`, `inventoryKeys` is the empty set, so `newViolations = scanned.filter(s => !∅.has(...))`
+degenerates to "every scanned violation is new" — the check gets STRICTER at zero, not weaker, and the scan
+still runs the FULL tree every single time regardless of how many entries are being tracked. There is no
+"nothing to check" reading available anywhere in the mechanism. Verified empirically: ran the whole suite at
+this genuinely-empty state — **7/7 clean**, "the inventory (0 open sites) matches the real tree exactly," proving
+the scan finds ZERO shallow-lookup violations across the entire codebase today.
+
+**One real fragility DID surface, and is fixed, not just noted.** "Ratchet direction 2" used to build its own
+"dishonestly shrunk" fixture via `INVENTORY.slice(1)` — which silently depended on `INVENTORY` having at least
+one real entry to drop; at length zero, `INVENTORY[0]` is `undefined` and the test would have THROWN, not just
+failed uninformatively. Rewrote it to use a fully synthetic scanned+inventory pair, independent of the real
+`INVENTORY`'s own current size — which also surfaced an honest structural fact worth naming: `diffInventory`
+itself cannot distinguish "a genuinely new violation" from "an old violation whose tracking entry got dishonestly
+dropped" — both are just a scanned key absent from the current inventory, the identical code path. The REAL-tree
+Part 2 test is what actually catches a dishonest removal in practice, proven live by this session itself: every
+site closed this session was verified by leaving its stale entry in place first and watching Part 2 fail, over
+five separate turns, not merely asserted once as a meta-test.
+
+## STOP CONDITION — checked, did not trigger
+
+All 7 pre-existing `cam-build-mode.spec.js` tests, both `cam-multiop-edit-blocks-s45` tests, and every prior
+`edit-nested-op-1958` test passed unchanged. `guard-roundtrip-1595`/`fork-parity-1593` (byte-identical across all
+32 registered ops) both clean.
+
+## ARCHITECTURE.md — checked, no drift
+
+Node tier (which includes `architecture-map-1698`) ran 125/125 clean — no citation shifted.
+
+## GATE
+
+Node tier (125/125, including the now-empty, 7/7-clean `op-lookup-scan-1968`) + `cam-build-mode` (9/9, including
+both new t1992/t1994 tests) + `cam-multiop-edit-blocks-s45` (2/2) + `edit-nested-op-1958` (6/6) +
+`guard-roundtrip-1595` (2/2) + `fork-parity-1593` (2/2) + the 4 t1928 features (`setup-sheet-850`,
+`time-estimate-844`, `editor-sim-real-insert`, `whole-program-intent-756`, 15/15) — **37/37 clean**, zero flakes
+this run.
+
+## Queued CODE work — nothing left in the inventory; awaiting the human's ruling on two-sided setup
+`setGroupChildParams`'s own real-UI test (the fuller pass named at t1992, not built) → `RECONCILERS.surfacing`
+staleness against its own current `surfaceraster` emit shape (found t1992, unrelated, flagged not fixed) →
+architecture-citation Option B, with symbol/substring anchors and the mandatory uniqueness assertion, including
+the unenforced prose half → whatever the human rules on two-sided setup.
+
+🔨 turn 1994

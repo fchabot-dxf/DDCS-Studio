@@ -209,8 +209,24 @@ function scanTree() {
 // entry states the user-visible symptom so a future reader can pick one off without re-deriving it.
 // ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
+// t1994 — CLOSED. The last two entries (opContextMenu.js showOpMenu, macrosApp.js openCamAuthoring) are fixed
+// below, alongside every prior site this session found — INVENTORY is now genuinely empty, not a smaller list.
+// See "AN EMPTY INVENTORY STILL GUARDS" below (right before the ratchet tests) for what that means for the check.
 const INVENTORY = [
-    { file: 'web/ui/opContextMenu.js', name: 'showOpMenu', why: 'the right-click menu on a nested op falls back to a thinner, stale record (missing params/children) for its CAM-authoring actions' },
+    // t1994 — web/ui/opContextMenu.js's showOpMenu FIXED: `full` (the re-hydrated record for the CAM actions)
+    // now resolves via `findOpById` instead of a shallow top-level `.find`. NO LIVE SYMPTOM through the one real
+    // caller today (editorOpHover.js's own contextmenu handler already hands `showOpMenu` a FULL record via
+    // `ddcsOpAtLine`, so the `|| op` fallback happened to already carry complete data) — but the function's own
+    // declared contract ("op: { id, opType, label }") explicitly supports a THIN caller, and this file's OWN
+    // sibling tests (cam-build-mode.spec.js's POCKET/CORNER fixtures) already call it that way. Verified against
+    // that exact shape: a thin `{id,opType,label}` stub for a NESTED op. See WORK-LOG t1994 for the non-vacuity
+    // proof (pre-fix: seeds the declared DEFAULT value, not the op's own real one — a real, if latent, defect).
+    // t1994 — web/ui/macrosApp.js's openCamAuthoring FIXED: the auto-import loop now reads `flattenOps(stack)`
+    // (t1928) instead of a shallow top-level `.filter`, which only ever visited a multi_step WRAPPER itself
+    // (never CAM-able) — every operation past the first in a real Add-built multi-op program silently never
+    // reached CAM authoring, and the wrapper showed up once as "unsupported" under its own internal opType. Live
+    // symptom, reproduced: pre-fix, auto-import on a real 2-op program showed "0 CAM-able ops" with "multi_step —
+    // no registered def" as the sole entry. See WORK-LOG t1994 for the non-vacuity proof.
     // t1992 — web/blocks/opSession.js's deleteOp, duplicateOp, setGroupChildParams, replayReconcile, and
     // mergeOpBlocks all FIXED, as ONE thing: each now resolves via findOpById (a pure read: replayReconcile) or
     // findOpById + one of replaceOpById/removeOpById/insertOpAfterId (the three write shapes a by-id mutation can
@@ -229,11 +245,21 @@ const INVENTORY = [
     // `opAtLine` (a genuine recursive walker, correctly excluded by the detector) instead of a local shallow
     // top-level find(). See WORK-LOG t1974 and option-b-slice3-live-visibility-1874.spec.js's new WRAPPED
     // PROGRAM test for the non-vacuity proof and the user-visible assertion.
-    { file: 'web/ui/macrosApp.js', name: 'openCamAuthoring', why: '"auto-import all CAM-able program ops" silently skips every op nested inside a multi_step wrapper — a multi-op program\'s later ops never reach CAM authoring' },
 ];
 
 const keyOf = (x) => `${x.file}::${x.name}`;
 
+// t1994 — AN EMPTY INVENTORY STILL GUARDS, BY CONSTRUCTION, NOT BY A SPECIAL CASE. `diffInventory` below is a
+// plain set difference in both directions; neither direction is gated on the inventory being non-empty. With
+// `INVENTORY = []`, `inventoryKeys` is the empty set, so `newViolations = scanned.filter(s => !∅.has(...))`
+// degenerates to "every scanned violation is new" — the check gets STRICTER at zero (any single shallow-lookup
+// site anywhere in the tree now fails the suite), never weaker, and never silently stops running. There is no
+// "nothing to check" reading available: the SCAN still runs the full tree every time regardless of INVENTORY's
+// own length, and the comparison is symmetric — it was never conditioned on "is there anything in the list,"
+// only on "does the scan's own output match the list's own output." Verified empirically, not just read: ran the
+// suite with INVENTORY at this genuinely-empty state — 7/7 clean, including both ratchet-direction meta-tests
+// below, which themselves plant a synthetic violation/removal against THIS now-empty array and confirm the
+// checker still reacts correctly at zero, not just at N>0.
 /** The core ratchet comparison, exported so both the real-tree test and the two meta-tests below share ONE
  *  implementation — a bug in the comparison itself would otherwise need fixing (and re-verifying) twice. */
 export function diffInventory(scanned, inventory) {
@@ -340,13 +366,21 @@ test('ratchet direction 1: a new violation not in the inventory FAILS', () => {
 });
 
 test('ratchet direction 2: removing an inventory entry WITHOUT fixing the site FAILS (the real tree still has it)', () => {
-    const scanned = scanTree();   // the REAL, current tree — not a mock
-    const dishonestlyShrunk = INVENTORY.slice(1);   // "someone" deletes the first entry, the code is untouched
-    const { clean, staleEntries } = diffInventory(scanned, dishonestlyShrunk);
-    // staleEntries stays empty here (we removed FROM the inventory, not added to it) — the real signal is that
-    // the scan itself still contains the dropped entry's own key, unaccounted for, which the FULL-inventory test
-    // above would catch. Assert that directly: the scan's own findings still include the deleted entry's site.
-    expect(scanned.some((v) => v.file === INVENTORY[0].file && v.name === INVENTORY[0].name),
-        'the site named by the removed entry must still be found by the scan — proving the removal was dishonest, not a real fix').toBe(true);
-    expect(staleEntries.length, 'sanity: shrinking the inventory itself produces no stale entries (that direction is checked by Part 2 against the FULL inventory, not this deliberately-shrunk one)').toBe(0);
+    // t1994 — SYNTHETIC, not INVENTORY.slice(1): this used to drop INVENTORY's own first entry, which depended
+    // on INVENTORY having at least one real entry to drop — true for every prior turn, false now that the real
+    // count reached zero (INVENTORY[0] would be undefined, throwing before the assertion even ran). The RATCHET
+    // MECHANISM's own correctness must hold at any inventory size, including empty — this is the exact fragility
+    // an empty inventory was named to expose, so it is fixed here rather than left to break silently later. A
+    // fabricated scanned+inventory pair proves the same shape `diffInventory` itself cannot distinguish from
+    // "a genuinely new violation" (both are just a scanned key absent from the current inventory) — which is
+    // itself the honest finding: direction 1 and direction 2 exercise the SAME code path in `diffInventory`; the
+    // REAL-tree Part 2 test above is what actually catches a dishonest removal in practice (proven live, not
+    // just here, every time this session removed a genuinely-fixed entry from the real INVENTORY array).
+    const fakeScanned = [{ file: 'web/fake/still-broken.js', name: 'stillBrokenSite', line: 1 }];
+    const fakeInventoryWithEntry = [{ file: 'web/fake/still-broken.js', name: 'stillBrokenSite', why: 'synthetic — direction-2 fixture' }];
+    const dishonestlyShrunk = fakeInventoryWithEntry.slice(1);   // "someone" deletes the tracked entry, the code is untouched
+    const { clean, newViolations, staleEntries } = diffInventory(fakeScanned, dishonestlyShrunk);
+    expect(clean, 'a scan finding whose inventory entry was dishonestly dropped must still fail the ratchet').toBe(false);
+    expect(newViolations.some((v) => v.name === 'stillBrokenSite'), 'the dropped site surfaces as an unaccounted-for scan finding').toBe(true);
+    expect(staleEntries.length, 'sanity: shrinking the inventory itself produces no stale entries (that direction is Part 2, against the real inventory)').toBe(0);
 });

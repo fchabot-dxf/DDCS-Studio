@@ -30,6 +30,7 @@ import { universalBands } from '../data/universalScratch.js';   // t1085 slice C
 // should be impossible on EITHER arm — so the guard firing now means a regression on whichever arm reported it.
 const camBandsOf = (t) => ((t === 'universal') ? universalBands() : bandsFor(t));
 import { getUserDef, defVOf, defVStale, flattenBlocks } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest; t1099 (S4a) — walk the template for cam_field block records
+import { flattenOps } from '../blocks/programModel.js';   // t1928 — the one declared enumeration: every real op, one level through a multi_step import wrapper
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { homingStack, homingRunParams } from '../wizards/homingWizard.js';   // homingRunParams = the ONE contract shape (t626) so sysstart generate matches the wizard emit (was passing the raw object → empty stub)
@@ -1555,7 +1556,13 @@ function isV41Post() {
                 _authoring.ops = [a]; _authoring.name = a.label;
             } else {        // global doors — auto-import all CAM-able program ops (program order)
                 const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-                for (const op of stack.filter((b) => b && b.type === 'op')) {
+                // t1992 — was a shallow top-level `.filter`: for a multi_step-wrapped multi-operation program
+                // (the real Add gesture, t1940/t1942), this visited ONLY the wrapper itself — never CAM-able, so
+                // every later operation silently never reached CAM authoring at all, and the wrapper showed up
+                // once in the unsupported list under its own internal opType instead of naming any real op.
+                // `flattenOps` (t1928) is the one declared answer to "what operations does this program hold" —
+                // recurses into a multi_step's own children, the exact domain this loop needs.
+                for (const op of flattenOps(stack)) {
                     const a = makeAuthOp(op);
                     if (a) _authoring.ops.push(a);
                     else { const r = seedFromOp(op); _cbmUnsupported.push({ label: op.label || op.opType, reason: (r && r.unsupported) || 'not CAM-able' }); }

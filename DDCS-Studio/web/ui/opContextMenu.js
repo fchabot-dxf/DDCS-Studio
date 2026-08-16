@@ -16,6 +16,7 @@
  */
 import { seedFromOp, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1). U2 — seedFromOp is the FINAL verdict (generator | universal | unsupported), so the universal fallback greys/enables correctly. t1073 — isCamGeneratorTwin gates the Customize action to the 8 CAM-generator twins
 import { getUserDef } from '../blocks/userOps.js';   // t1073 — the Customize action needs a registered def (else editWizardDef alerts "no longer in your library")
+import { findOpById } from '../blocks/programModel.js';   // t1992 — the declared by-id toolkit (t1958/t1992)
 
 let menu = null;
 function ensure() {
@@ -126,8 +127,12 @@ export function showOpMenu(op, x, y) {
     const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
     item(m, `✎ Edit ${op.label || op.opType || 'operation'}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
     item(m, '⧉ Duplicate', async () => { try { (await import('../blocks/opSession.js')).duplicateOp(op.id); } catch (_) { /* */ } });
-    // the full placed record (params = the truth) for the CAM actions below — re-hydrated from the program by id
-    const full = (window.ddcsGetBlockProgram && (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === op.id)) || op;
+    // the full placed record (params = the truth) for the CAM actions below — re-hydrated from the program by id.
+    // t1992 — was a top-level-only `.find`: for an op nested inside a multi_step wrapper (the real Add gesture,
+    // t1940/t1942), this silently fell through to the THINNER `op` parameter itself (whatever ancestry-matched
+    // block `ddcsOpAtLine` handed the caller), so the CAM actions below built from `full.opType`/`full.params`
+    // could read a stale or incomplete record. `findOpById` (t1958) reaches it wherever it lives.
+    const full = findOpById((window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [], op.id) || op;
     // t1045 S1c — the per-op CAM action (door 1): only for CAM-able op TYPES; greyed with the reason when this op's
     // variant has no generator (e.g. a single-axis middle). Opens the SAME authoring modal, pre-seeded from THIS op.
     if (isCamableType(op.opType)) {
