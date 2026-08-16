@@ -3102,3 +3102,39 @@ and a check people fix without reading is a check that has stopped working.
 ⚠ Design only. No code, no specs, no suite run.
 ⚠ Queue behind the release: `blkStartHints` (🔴 first) · `collectOps` phantom row · raw-text import door ·
 `lathe-honest-3d-1301` near-miss · slice 1's unswept region (`macrosApp.js`) · rename slices 2–4 · marker key.
+
+# ═══ t1954 — 🔴 THE SIXTH SITE: blkStartHints never runs flattenOps ═══
+
+**RELEASED V2026.08.15.12** (`f1d4aaac`, pushed). Gate: full suite on `3f018f1b` — 2549 passed, 26 skipped,
+33 flaky, **unexpected 0**, both tiers exit 0. The prior run on this arc had 12 failures; all 12 traced to the
+two shape bugs and are green. Node tier re-run on the release commit: 118/118.
+
+t1952 accepted, and **I was right to overrule you — but you were right about the option.** The measurement is
+what makes it actionable: 52 asserted citations counted from the arrays (not estimated), 10 sampled find
+patterns tested against their real files with 8 of 10 NON-unique, and the generate-from-declaration option
+**checked and eliminated** (0 of 52 are undiscovered candidates). Best single finding: symbol-anchoring would
+**not** have caught either of this session's own drifts, because both moved from INSIDE their own anchor
+function's doc comment. Recommending the option that covers the ACTUAL drift shape over the one that sounds
+more principled is the right instinct. And the caveat is the part I'd have missed: **dropping the line number
+without asserting uniqueness WEAKENS the checker while feeling like an improvement.** Option B is approved with
+that assertion mandatory — but it is not this turn.
+
+## THE TASK — close the t1928 bug's SIXTH site. You found it; it is yours to close.
+`blkStartHints` never runs `flattenOps`, exactly like the four sites t1928 fixed. On a multi-operation program
+the Blocks-tab sim start markers resolve against a wrapper instead of the real operations.
+
+1. **FIX IT THROUGH THE DECLARED ENUMERATION** — `flattenOps`, the same one the other five use. If it needs
+   something `flattenOps` does not give, **stop and tell me** rather than growing a variant.
+2. **ASSERT WHAT THE USER SEES:** on a multi-operation program the Blocks tab shows a start marker for EVERY
+   operation, at the right position — not one, and not one per wrapper. `marker-rebuild-1848` is the closest
+   existing evidence; bridge to it rather than inventing a parallel claim.
+3. **⚠ THEN ASK WHETHER THERE IS A SEVENTH.** Five sites were found by one sweep, a sixth surfaced by accident
+   two turns later. That is a sweep that missed one. **Re-run the enumeration hunt properly** — every site that
+   asks "what operations does this program hold" — and report the count with the method, so the answer is
+   trustworthy this time. If six is genuinely all, say so and I will treat the class as closed.
+4. **GATE — the new rule, because this lands near a shared path:** your specs + `marker-rebuild-1848` +
+   `option-b-slice2/3` + the round-trip/parity set (`guard-roundtrip-1595`, `fork-parity-1593`) + the 4 t1928
+   features + node tier. NOT the full suite; that stays mine.
+
+⚠ Queued after: `collectOps` phantom row · the raw-text import door · architecture-citation Option B (with the
+uniqueness assertion) · `lathe-honest-3d-1301` near-miss · slice 1's unswept `macrosApp.js` · rename slices 2–4.
