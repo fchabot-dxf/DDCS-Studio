@@ -3915,3 +3915,46 @@ your "done" believable.
   at something else; flagged, untouched.
 - architecture-citation **Option B** (symbol/substring anchors + the **mandatory uniqueness assertion**, incl.
   the unenforced prose half).
+
+# ═══ t1996 — ARCHITECTURE-CITATION OPTION B (node-tier only; safe beside my gate) ═══
+
+**THE INVENTORY IS EMPTY.** t1994 accepted, verified by me: `the inventory (0 open sites) matches the real tree
+exactly`, ratchet green both directions, node tier `fail 0`. The class opened at t1954 — code that asked "which
+operations does this program hold" and answered only for the top level — is **closed**, 11 sites plus 6 found
+by the checker itself.
+
+**⭐ YOU CAUGHT A SECOND WEAK TEST IN THE SAME TURN.** Your `showOpMenu` non-vacuity check only asserted the
+modal's field table was non-empty — and it **passed against the broken code**, because each field's DECLARED
+DEFAULT fills in when real params are missing (`seedFromOp` cannot tell a real value from a fallback). You
+seeded a distinctive non-default (137 against a declared 100) and got 3/3 red. **Two self-caught vacuous tests
+in two consecutive turns** — both of which would have shipped as guarantees over the exact defect they missed.
+
+**And you answered the empty-inventory question by VERIFYING, not reasoning:** `diffInventory` is a plain
+symmetric set difference never conditioned on length, so at `[]` it gets **stricter**, not weaker — then you
+*ran it at the genuinely empty state* to prove it. **Then you found the real fragility that question was
+pointing at:** `ratchet direction 2` sliced `INVENTORY[0]`, which **throws at length zero** — the mechanism's
+own test would have broken at the exact moment the debt was paid off. Rewritten to a synthetic pair,
+independent of the real array's size. That is the second-order catch; the ratchet now survives its own success.
+
+## THE TASK — Option B, approved back at t1952. **Node tier only: NO browser, NO Playwright.**
+**My release gate IS RUNNING** — this task is safe beside it *because* it never launches a browser. **If any
+part of it turns out to need one, park that part and say so; do not run it.**
+
+1. **Re-anchor all 52 asserted citations** from `{file,line}` to `{file, distinctive substring}` — your own
+   measured recommendation, chosen because symbol-anchoring would NOT have caught either of this session's real
+   drifts (both moved *inside* their own anchor function's doc comment).
+2. **⚠ THE UNIQUENESS ASSERTION IS MANDATORY** — your own caveat, and the reason the option is approved: the
+   checker must **fail loud on 0 matches AND on 2+ matches.** Dropping the line number without it makes the
+   checker WEAKER while feeling like an improvement. You measured 8 of 10 sampled patterns as non-unique, so
+   expect real find-tightening work, not a mechanical swap.
+3. **⚠ THE PROSE HALF IS UNENFORCED — that is the other half of this task.** t1970 found four
+   `wizardManager.js` prose citations already stale *before* that turn's edits (`this.open()` at 413 vs the
+   map's claim). Nothing in the gate checks prose. **Either bring prose citations under the same checker, or
+   state plainly that prose stays unenforced and why** — a map enforced in one half and decorative in the other
+   is the state this session keeps deleting.
+4. **PROVE IT CATCHES DRIFT:** move a cited function within its file → the checker still finds it. Delete the
+   cited content → it FAILS. Make the pattern match twice → it FAILS.
+5. **Gate: node tier only.** Report the count re-anchored and any citation you could not make unique.
+
+⚠ Also queued, both yours: `setGroupChildParams`'s real-UI test · `RECONCILERS.surfacing` stale against its own
+current `surfaceraster` emit shape.
