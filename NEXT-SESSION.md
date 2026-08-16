@@ -3138,3 +3138,48 @@ the Blocks-tab sim start markers resolve against a wrapper instead of the real o
 
 ⚠ Queued after: `collectOps` phantom row · the raw-text import door · architecture-citation Option B (with the
 uniqueness assertion) · `lathe-honest-3d-1301` near-miss · slice 1's unswept `macrosApp.js` · rename slices 2–4.
+
+# ═══ t1958 — 🔴 EDIT IS SILENTLY DEAD ON A MULTI-OPERATION PROGRAM (release-quality) ═══
+
+t1954/1955 accepted (`6c7bc33c`). And **demanding the re-hunt was worth it: six was not all — eleven.** Five
+more sites, each checked against live source with 34 candidates ruled out, not grep-trusted. That is the third
+sweep of yours I have been able to act on without re-deriving it.
+
+**Ranking your five — I agree `openForEdit` is first, and it is more urgent than you framed it.** I verified it
+myself at `wizardManager.js:407`:
+
+```js
+const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
+if (!op || !op.opType) return;        // top-level only -> SILENT no-op
+```
+
+`ddcsOpAtLine` recurses, so the Edit chip renders **enabled and clickable**; the click then resolves nothing
+and returns. **And V2026.08.15.12 — shipped yesterday — is what makes it reachable**: before Add, only an
+import produced a wrapper. Now every multi-operation job a user builds hits it. Edit is dead on exactly the
+programs the new feature exists to create.
+
+## THE TASK — one operation, and it is NOT "add flattenOps here".
+1. **⭐ THE DEFECT IS TWO LOOKUPS FOR ONE QUESTION.** `ddcsOpAtLine` recurses; `openForEdit` does not. Making
+   them *agree* by patching the second is how they drift again. **Resolve an op-by-id ONCE, through one
+   declared lookup both call** — the chip and the click must be incapable of disagreeing, not merely equal
+   today. If that means exporting/naming a resolver in `programModel.js` beside `flattenOps`, do that.
+2. **ASSERT WHAT THE USER DOES:** on a real Add-built two-operation program, click Edit on the **second**
+   operation → the wizard opens, seeded with **that** operation's params (not the first's, not empty), and a
+   changed value commits back to that operation. Drive the real gesture; a unit call on the resolver would pass
+   while the chip stayed dead.
+3. **⚠ ASSERT THE CHIP AND THE CLICK CANNOT DISAGREE** — the case where the chip renders and the click no-ops
+   is the actual bug, so it needs its own assertion, not just a working-path test.
+4. **PROVE NON-VACUITY** — revert, watch it fail, restore. Every turn so far; keep it.
+5. **GATE (widened — `wizardManager.js` is the most-trafficked file in the repo):** your specs + the round-trip
+   and parity set (`guard-roundtrip-1595`, `fork-parity-1593`) + `insert-add-replace-1942` +
+   `add-operation-1940` + `collapse-on-delete-1948` + the 4 t1928 features + node tier.
+
+⚠ **STOP CONDITION:** if the single-operation Edit path changes behaviour in ANY way, stop and tell me. That is
+the common case and it works today.
+
+## Queued — your other four, in my order (do NOT do them now)
+`segmentFrame.js frameOwnerAtLine` (sim machine-frame flip never fires for a nested op — its own comment claims
+it handles exactly that case, so the code is lying) → `editorOpHover.js glowEdited` → `editorManager.js
+_firstOpTitle` (exported .nc titled `multi_step`) → `setupSheet.js collectOps` (the over-deep twin — **different
+fix shape**, substitute-not-both). **Then: a CHECKER so a twelfth site cannot land silently** — eleven found
+across three sweeps says the class needs a test, not a fourth sweep.
