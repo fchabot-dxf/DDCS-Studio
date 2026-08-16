@@ -55,9 +55,17 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 const bare = (opType, n) => ({ type: 'op', opType, id: `op_${opType}_${n}`, children: [] });
 const HOMING = 'user_homing_data', CORNER = 'user_corner_data';
 
-async function loadBlocksStack(page, stack) {
+async function loadBlocksStack(page, stack, { wrapped = false } = {}) {
     await page.evaluate(() => window.showApp('studio'));
-    await page.evaluate((s) => window.ddcsLoadBlockStack(s), stack);
+    // t1990 — `ddcsLoadBlockStack` (-> `setStack`) never groups; a plain array of 2+ bare top-level ops stays
+    // UNWRAPPED (t1974's own finding for slice3 applies here verbatim: this file's own PRIMARY EVIDENCE test
+    // never actually exercised the multi_step-wrapped shape it's named for). `wrapped: true` reproduces that
+    // shape through the SAME declared grouping function a real Add gesture uses (`groupConsecutiveOps`,
+    // `programModel.js`), not a hand-built `multi_step` record.
+    const toLoad = wrapped
+        ? await page.evaluate(async (s) => (await import('/blocks/programModel.js')).groupConsecutiveOps(s), stack)
+        : stack;
+    await page.evaluate((s) => window.ddcsLoadBlockStack(s), toLoad);
     await page.evaluate(() => window.showApp('blocks'));
     await page.waitForFunction(() => document.getElementById('blk-preview-panel') && document.getElementById('blk-preview-panel').__panel, null, { timeout: 8000 });
     await page.evaluate(() => document.getElementById('blk-preview-panel').__panel.setView('3d'));
@@ -92,6 +100,42 @@ test('PRIMARY EVIDENCE: a Homing-then-Corner Blocks program tags EACH pass with 
     const explicitlyTrue = r.starts.filter((s) => s.toolMachineFrame === true);
     expect(explicitlyTrue.length, `at least one pass (Homing's) is explicitly tagged true — got ${JSON.stringify(r.starts)}`).toBeGreaterThan(0);
     expect(explicitlyFalse.length, `at least one pass (Corner's) is explicitly tagged false, diverging from the true union — got ${JSON.stringify(r.starts)}`).toBeGreaterThan(0);
+});
+
+test('t1990 — WRAPPED PROGRAM: the same per-pass divergence holds when Homing+Corner sit inside a multi_step wrapper', async ({ page }) => {
+    // t1974 bridged option-b-slice3's own PRIMARY EVIDENCE test the same way; this is slice2's own turn. The
+    // ABOVE PRIMARY EVIDENCE test loads the same two ops UNWRAPPED and never exercised the multi_step-nested
+    // shape it's named for — see loadBlocksStack's own t1990 comment. This does not replace that test — both
+    // shapes (a real Add-built 2-op wrapper, and whatever unwrapped construction produced the original) are
+    // legitimate programs a user can have, and both are asserted.
+    test.setTimeout(60_000);
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
+
+    const stack = [bare(HOMING, 1), bare(CORNER, 2)];
+    await loadBlocksStack(page, stack, { wrapped: true });
+
+    const wrappedShape = await page.evaluate(() => {
+        const prog = window.ddcsGetBlockProgram();
+        const top = prog.filter((b) => b && b.type === 'op');
+        return { count: top.length, opType: top[0] && top[0].opType };
+    });
+    expect(wrappedShape, 'sanity: the program actually loaded as ONE multi_step wrapper, not two top-level ops').toEqual({ count: 1, opType: 'multi_step' });
+
+    const r = await page.evaluate(() => {
+        const v = document.getElementById('blk-preview-panel').__panel.viz;
+        return {
+            unionToolMachineFrame: !!v._toolMachineFrame,
+            starts: (v.starts || []).map((s) => ({ toolMachineFrame: s.toolMachineFrame })),
+        };
+    });
+
+    expect(r.unionToolMachineFrame, 'the whole-program union is untouched even nested in multi_step: Homing still forces it true panel-wide').toBe(true);
+    expect(r.starts.length, 'sanity: both nested ops contributed at least one pass each').toBeGreaterThanOrEqual(2);
+    const explicitlyFalse = r.starts.filter((s) => s.toolMachineFrame === false);
+    const explicitlyTrue = r.starts.filter((s) => s.toolMachineFrame === true);
+    expect(explicitlyTrue.length, `at least one pass (Homing's, nested) is explicitly tagged true — got ${JSON.stringify(r.starts)}`).toBeGreaterThan(0);
+    expect(explicitlyFalse.length, `at least one pass (Corner's, nested) is explicitly tagged false, diverging from the true union — got ${JSON.stringify(r.starts)}`).toBeGreaterThan(0);
 });
 
 test('a single-op program tags its one pass to MATCH the (also true) union — no divergence to prove here, unlike multi-op', async ({ page }) => {

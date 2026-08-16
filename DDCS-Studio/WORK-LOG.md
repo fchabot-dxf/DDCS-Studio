@@ -39600,3 +39600,53 @@ inventory → architecture-citation Option B, including the unenforced prose hal
 two-sided setup.
 
 🔨 turn 1988
+
+# ═══ t1990 — option-b-slice2's own PRIMARY EVIDENCE, bridged to a wrapped program — a real result, not a fix ═══
+
+## THE BRIDGE, following t1974's own precedent exactly
+
+`option-b-slice2-positioning-1872.spec.js`'s own PRIMARY EVIDENCE test loads Homing+Corner via a plain array
+straight into `ddcsLoadBlockStack` — unwrapped, same shape t1974 already found and fixed for slice3. Added a
+`wrapped` option to the file's own `loadBlocksStack` helper (mirroring t1974's own `loadAndBoot` change): when
+set, the built ops route through `programModel.js`'s own `groupConsecutiveOps` — the SAME declared grouping
+function a real Add gesture uses — before loading, rather than a hand-built `multi_step` record. Added ONE new
+test, `t1990 — WRAPPED PROGRAM`, reusing the file's own `bare`/`loadBlocksStack` helpers verbatim, asserting the
+identical claim the existing PRIMARY EVIDENCE test makes (union stays true panel-wide; at least one pass tagged
+explicitly true, at least one explicitly false) against the wrapped shape, plus a sanity check confirming the
+load genuinely produced one `multi_step` wrapper. **The existing PRIMARY EVIDENCE test is untouched — both
+shapes are legitimate programs a user can have, and per the dispatch's own instruction this is an addition, not
+a replacement.**
+
+## A REAL RESULT, reported plainly rather than recorded as a fix
+
+**The wrapped test passed on the FIRST run, and stayed green on 3 repeats in isolation (`--repeat-each=3`).**
+No product code was touched this turn — nothing needed fixing. This confirms t1984's own flagged possibility:
+`blk-start-hints-multistep-1954`'s own earlier fix (`blkStartHints` routing through `flattenOps` instead of a
+raw top-level walk) already made slice2's own mechanism (`blkStartHints` tagging each hint with its own op's
+`opSimContext(opType).toolMachineFrame`) correctly multi_step-aware, since it's BUILT ON `blkStartHints`'s own
+already-fixed enumeration. **The claim in slice2's own PRIMARY EVIDENCE test name was already true; the evidence
+for the specific wrapped shape was simply never built until now.** This is a genuinely different outcome than
+t1974's own segmentFrame.js turn (a live bug, 3/3 red before the fix) or t1988's own glowEdited turn (also a live
+bug) — no non-vacuity revert-and-confirm-red step applies here, because there is no fix whose absence to prove:
+the "non-vacuous" check that DOES apply is confirming the new test can distinguish a real signal from a rubber
+stamp, which the 3x isolated repeat plus the sanity-shape assertion (real `multi_step` wrapper, not silently
+unwrapped) already establishes.
+
+## ARCHITECTURE.md — checked, no drift
+
+No citations to `option-b-slice2-positioning-1872.spec.js` exist in `ARCHITECTURE.md` (it's a test file, not
+cited product code); nothing else in this turn's edits touched a cited file/line.
+
+## GATE
+
+Node tier (125/125) + `option-b-slice2-positioning-1872` (4/4, including the new wrapped test, 3x-repeated green
+in isolation) + `option-b-slice3-live-visibility-1874` (5/5; 1 known load-contention flake retried clean) +
+`marker-rebuild-1848` (2/2) + `blk-start-hints-multistep-1954` (1/1) + `guard-roundtrip-1595` (2/2; 1 known flake
+retried clean) + `fork-parity-1593` (2/2) — **16/16 clean** (`--workers=2`, 2 flakes total, both the established
+load-contention pattern, both retried green).
+
+## Queued CODE work — awaiting the human's ruling on two-sided setup
+The remaining 7-entry `op-lookup-scan-1968` inventory → architecture-citation Option B, with the mandatory
+uniqueness assertion, including the unenforced prose half → whatever the human rules on two-sided setup.
+
+🔨 turn 1990
