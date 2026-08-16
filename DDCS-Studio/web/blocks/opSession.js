@@ -699,18 +699,24 @@ export function reconcileActiveOp() {
 }
 
 /**
- * Replay the DECLARED Replace path for ONE op, wizard-CLOSED — the single rebuild the three diff surfaces
- * (glow / chip / Merge-Replace notice, via opGlow) share. Reconciles the op's (possibly block-edited) stack back to
- * params — the reconciler reads the edited blocks — then rebuilds with BUILDERS. The reconciled fields override
- * their params; everything untouched (rpm, head, …) stays from stored state. Returns the rebuilt bare atoms =
- * what a form Replace would regenerate, or null if the op has no reconciler / its shape doesn't match (caller
- * falls back, fail-safe). So "edited" can mean exactly "Replace would lose something" — a surfaced edit
+ * Replay the DECLARED Replace path for ONE op, wizard-CLOSED. Reconciles the op's (possibly block-edited) stack
+ * back to params — the reconciler reads the edited blocks — then rebuilds with BUILDERS. The reconciled fields
+ * override their params; everything untouched (rpm, head, …) stays from stored state. Returns the rebuilt bare
+ * atoms = what a form Replace would regenerate, or null if the op has no reconciler / its shape doesn't match
+ * (caller falls back, fail-safe). So "edited" can mean exactly "Replace would lose something" — a surfaced edit
  * reconciles + reproduces; an injection / unrepresentable residue does not. Declaration via the reconcilers,
  * never motion-inference.
+ *
+ * t2004 — this used to claim it was "the single rebuild the three diff surfaces (glow / chip / Merge-Replace
+ * notice, via opGlow) share." Not true today: `opGlow.js`'s own three exports (isOpBlockEdited/editedLinesForOp/
+ * editedRangesForOp) all read `opEditMap` (declared edit records) directly, never this function — confirmed by
+ * reading `opGlow.js`, not assumed. `replayReconcile` has ZERO live UI callers anywhere in the app (t1992,
+ * independently re-grepped t1998, t2002) — its only callers today are direct test calls (pocket-rides-raster-
+ * 1406, slot-twin-repoint-1500, edit-nested-op-1958). Whether this was the true integration once and got
+ * refactored away, or was aspirational from the start, is unverified — named rather than guessed either way.
  */
 // Memo by the op OBJECT (its identity is the stack signature: ddcsLoadBlockStack replaces the program with fresh
-// objects on every edit, so a changed stack ⇒ a new key ⇒ a miss; an unchanged op ⇒ a hit). Dedupes the three
-// surface calls (isOpBlockEdited + editedLines + editedRanges) for the same op in one render pass. Caches null too.
+// objects on every edit, so a changed stack ⇒ a new key ⇒ a miss; an unchanged op ⇒ a hit).
 const _replayCache = new WeakMap();
 export function replayReconcile(opId) {
     const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];

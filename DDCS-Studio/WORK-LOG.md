@@ -40201,3 +40201,101 @@ surfaces (glow/chip/Merge-Replace notice); `opGlow.js`'s real code reads `opEdit
 awaits the human.
 
 🔨 turn 2002
+
+# ═══ t2004 — the codebase describing itself falsely, part 2: the opGlow doc-comment, then the REGISTRIES table ═══
+
+Node tier only — a file read and a grep, plus the two doc-comment fixes it named.
+
+## (1) THE opGlow.js DOC-COMMENT — made true, not deleted
+
+`opEditSummary`'s own doc comment (opGlow.js) claimed "the SAME MID #1 diff as the chip/glow: collectEdits
+against the declared Replace rebuild (replayReconcile)." Grepped the whole repo for `collectEdits`: it does not
+exist anywhere, in any file — not a renamed function, not dead code, nothing. The function's REAL body reads
+`opEditMap(opId)` directly, the identical declared-edit source its three siblings (`isOpBlockEdited`,
+`editedLinesForOp`, `editedRangesForOp`) already use. Rewrote the comment to say that, and named the finding
+in-place (whether this described an earlier, since-refactored mechanism or was never true is unverified — stated
+as such, not guessed).
+
+Found the SAME false claim living a second place: `opSession.js`'s `replayReconcile` header still said "the
+single rebuild the three diff surfaces (glow / chip / Merge-Replace notice, via opGlow) share" — untrue for the
+identical reason (opGlow's own three exports never call it). Fixed both in one pass rather than relocating the
+falsehood: `replayReconcile`'s doc now states plainly that it has zero live UI callers (t1992, re-confirmed
+t1998/t2002), naming its three actual callers today (all direct test calls). Also dropped a trailing comment
+("Dedupes the three surface calls... for the same op in one render pass") that only made sense under the false
+premise.
+
+Comment-only changes to both files — `node --check` on each, then node tier (below) as the correctness proof.
+
+## (2) THE REGISTRIES TABLE — the first complete section of the ~97, with two real findings
+
+Sized this as the dispatch named ("comparable to that whole turn again") and landed ONE COMPLETE, self-contained
+section rather than 97 half-anchored citations. Picked **the REGISTRIES table** (`## THE REGISTRIES — name these,
+never copy them`, ARCHITECTURE.md:375-397): the highest-value target of the remaining unenforced prose, since its
+own stated purpose — "name the declaration of record, never copy the fact" — is exactly what a stale citation
+defeats.
+
+Read every cited line's CURRENT content against its claim, not assumed from the prose. Of the 10 rows, 8 name a
+real `file:line` fact (the other 2 — "per-atom scratch vars", "the posts" — cite a FILE with no specific line/fact
+to anchor; left as informational, matching the header's own existing exclusion for "guard predicate shape" in
+spirit, though GUARD_FIELDS turned out cheap enough to include since it verified clean). New `REGISTRY_CLAIMS`
+array (10 entries — one row, `def.mouth`, needed just one; another, `hookKeysOf`, needed a distinct entry from its
+sibling `_BASE_DEF_SHAPE` which INV6 already machine-checks) + a new test in `architecture-map-1698.test.mjs`,
+same Option B convention (whole-file substring, mandatory uniqueness) as t1996's three arrays. All 10 verified
+unique via the same node-script discipline t1996 used, before writing anything into the test file.
+
+**Two real findings, reported per citation, neither silently re-pointed:**
+- **STALE LINES (claim still true, number drifted):** `web/app.js:101-108` → the SEED_BUILDERS array is actually
+  100-107; `app.js:99-100` (its own export-reason comment) → actually 98-99; `wizards/views/index.js:35-48` → the
+  array actually starts at 34; `stackBridge.js:23`/`:35` → actually `:24`/`:36`; `userOps.js:900` (`hookKeysOf`) →
+  actually `:924`. All fixed in ARCHITECTURE.md's own prose.
+- **ONE WRONG TARGET, not mere drift:** `panelTypes.js:267` was cited as the reader of `MULTI_WIDGETS`. Line 267
+  is CORNER-MARKER-INDEPENDENCE code — nothing to do with `MULTI_WIDGETS` at all. The real reader (the `.has()`
+  check `renderUnit`'s own comment names) is at `:292`. Re-anchored the checker there and fixed ARCHITECTURE.md's
+  prose with an explanatory note, matching the INV8 precedent (t1996) rather than silently moving the number.
+- **A THIRD, related finding:** INVARIANT #6's own PROSE (ARCHITECTURE.md:427, "Guard: `userOps.js:893-900`") was
+  ALSO still stale — even though its machine-checked counterpart (INV6 in `architecture-map-1698.test.mjs`) was
+  already correctly re-anchored to `:917` back at t1996. The checker got fixed; the prose describing the SAME fact
+  a few sections away never caught up. Fixed to `917-924`, named as exactly the "enforced in one half, decorative
+  in the other" shape this whole effort exists to close.
+
+Every row's count checked too, not just the line: SEED_BUILDERS' 32, WIZARD_VIEWS' 14, BUILTINS' 25-entries/25-
+`opensAs` all confirmed accurate against current source (counted, not trusted from the prose).
+
+## NON-VACUITY
+
+Deleted the `hookKeysOf` export line from a real (soon-restored) copy of `userOps.js`, re-ran the checker — the
+new REGISTRIES test failed by name, exactly as required. Restored via `git checkout -- web/blocks/userOps.js`
+(safe here: the file was untouched by any of this turn's OWN edits, confirmed via `git diff --stat` before and
+after — this was purely the non-vacuity experiment, not a HEAD-vs-uncommitted-work risk).
+
+## Gate
+
+Node tier only, per the dispatch: `npm run test:node` — **126/126** (125 + the one new REGISTRIES test).
+`architecture-map-1698.test.mjs` alone: 6/6. `proc_health.py watch`: clean.
+
+## SIZING CALL — what's landed vs what's named and parked
+
+**Landed, complete:** the opGlow.js doc-comment (+ its opSession.js sibling), and the REGISTRIES table (10/10
+citations enforced, 3 real findings fixed).
+
+**Parked by name, not attempted this turn** (measured, not guessed — raw citation counts per section from the
+earlier per-line sweep): **Q1** (20 raw citations, diagram annotations), **Q2** (25, "how a wizard becomes
+G-code" prose), **KNOWN DIVERGENCE** (6, explicitly-accepted debt — a different KIND of claim, "we know this is
+imprecise and choose not to fix it," worth a design decision on whether "enforced" even means the same thing
+there before building), **WHERE THE GATES ARE** (4, a table of NO's — same open question, asserting a negative),
+**UNVERIFIED** (5, explicitly named gaps — likely the least valuable to machine-check, since the section's whole
+point is "not verified yet"). Together ~60 of the remaining ~87. The residual TRAP/INVARIANT-section prose
+citations beyond their own promoted array entries (the ones this turn found duplicated stale, like INV6's) are
+the other likely-highest-value slice — the REGISTRIES sweep just proved that pattern is real and not isolated to
+one table.
+
+## Files
+`ARCHITECTURE.md`, `DDCS-Studio/tests/node/architecture-map-1698.test.mjs`, `DDCS-Studio/web/blocks/opGlow.js`,
+`DDCS-Studio/web/blocks/opSession.js` (both comment-only).
+
+## Queue
+Two-sided setup — awaits the human. Nothing else named by the advisor beyond this turn's own two items, both
+addressed (one complete, one section landed + the rest sized and parked by name, per the dispatch's own
+either/or).
+
+🔨 turn 2004

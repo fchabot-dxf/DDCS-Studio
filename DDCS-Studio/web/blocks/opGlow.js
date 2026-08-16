@@ -89,10 +89,17 @@ export function editedRangesForOp(opId) {
 
 /**
  * A human-readable summary of an op's BLOCK-only edits — the residue a form Replace would DISCARD (and "Keep both"
- * preserves) — for the informed Merge/Replace modal. The SAME MID #1 diff as the chip/glow: collectEdits against the
- * declared Replace rebuild (replayReconcile), then render via the emitter (no second engine). Returns
+ * preserves) — for the informed Merge/Replace modal. Reads the SAME declared edit source as the chip/glow
+ * (`opEditMap`, above), then renders each edit via the emitter (no second engine). Returns
  *   { injected: [gcodeLine…], overrides: [{ from, to }…] }   (each side as emitted G-code)
  * or null when there's no block-only residue (a clean op, or every edit is form-surfaced).
+ *
+ * t2004 — this used to claim a `collectEdits` step diffing against "the declared Replace rebuild (replayReconcile)".
+ * Neither is true today: there is no `collectEdits` function anywhere in the codebase (grepped), and `replayReconcile`
+ * (opSession.js) has zero live callers (t1992, independently reconfirmed t1998) — this function, like its three
+ * siblings above, reads `opEditMap` directly. Named, not silently re-pointed: whether the comment described an
+ * earlier, since-refactored mechanism or was simply never true is unverified — a stale claim that vouched for a
+ * mechanism nobody was running is exactly what let `replayReconcile`'s own dead-caller state go unnoticed this long.
  */
 export function opEditSummary(opId) {
     if (typeof window === 'undefined' || !window.ddcsGetBlockProgram) return null;

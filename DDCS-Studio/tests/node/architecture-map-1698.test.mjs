@@ -58,33 +58,35 @@ import { fileURLToPath } from 'node:url';
  * comment. Re-anchored there. This is exactly the class of decorative-not-enforced claim Option B exists to end.
  *
  * ── SCOPE, PER THE DISPATCH (start with what would mislead into a wrong fix) ────────────────────────────────────
- * Every TRAP (24 sub-claims across 9 named traps) and every INVARIANT (21 sub-claims across 17 named invariants)
- * is checked — these are exactly the claims a reader ACTS on. The Q1/Q2/Q3 diagrams' own prose citations are
- * covered by the GENERATED counts above (Q1's registry sizes) plus the highest-value ASSERTED ones (Q3's 7 frame-
- * algebra file:lines, since a coordinate bug there is the single most expensive class of defect this session's
- * WORK-LOG records). NOT covered by TRAP/INVARIANT/Q3, and the REST OF THE MAP'S OWN PROSE remains genuinely
- * UNENFORCED — see "THE PROSE HALF" below for exactly what that means and why it stays that way this turn,
- * rather than being silently true or silently fixed. Also not covered, named rather than silently skipped: the
- * REGISTRIES table's non-generated rows (guard predicate shape, per-atom scratch vars — informational, not trap-
- * shaped), "KNOWN DIVERGENCE" (explicitly already-accepted debt, not a claim someone would act on as fact), and
- * "WHERE THE GATES ARE" (a table of NO's — nothing to assert false of a negative). If any of those later earns
- * its own TRAP or INVARIANT entry, it earns a citation here too.
+ * Every TRAP (24 sub-claims across 9 named traps), every INVARIANT (21 sub-claims across 17 named invariants), and
+ * (t2004) every REGISTRIES-table row naming a real `file:line` fact (10 sub-claims) is checked — these are exactly
+ * the claims a reader ACTS on. The Q1/Q2/Q3 diagrams' own prose citations are covered by the GENERATED counts above
+ * (Q1's registry sizes) plus the highest-value ASSERTED ones (Q3's 7 frame-algebra file:lines, since a coordinate
+ * bug there is the single most expensive class of defect this session's WORK-LOG records). NOT YET covered, and
+ * REMAINING genuinely UNENFORCED — see "THE PROSE HALF" below for exactly what that means and why: Q1/Q2's own
+ * diagram-annotation citations, "KNOWN DIVERGENCE" (explicitly already-accepted debt, not a claim someone would act
+ * on as fact), and "WHERE THE GATES ARE" / "UNVERIFIED" (tables of NO's / named gaps — the negative-assertion
+ * question is different in kind, considered but not built this turn; see t2004's own WORK-LOG entry for the sizing
+ * call). If any of those later earns its own TRAP or INVARIANT entry, it earns a citation here too regardless.
  *
  * ── THE PROSE HALF — STATED PLAINLY, PER THE DISPATCH'S OWN EITHER/OR ────────────────────────────────────────────
  * t1970 found four `wizardManager.js` prose mentions already stale BEFORE that turn's own edits (`this.open()`
  * cited at `:401`, actually at `:413` even on the PRE-t1970 tree — 12 lines of pre-existing drift, left alone
  * rather than guessed at). None of the four were ever promoted into TRAP_CLAIMS/INVARIANT_CLAIMS/Q3_CLAIMS, so
- * none of them are checked by anything in this file, then or now. Measured this turn (`grep -oE
+ * none of them were checked by anything in this file at t1996. Measured at t1996 (`grep -oE
  * "[A-Za-z0-9_/.-]+\.(js|mjs|md):[0-9]+"`): `ARCHITECTURE.md` carries 149 `file:line`-shaped citations total —
  * a raw pattern count, so it includes the same fact cited more than once across different sections, not 149
- * distinct claims. The 52 below account for the claims judged, per the ORIGINAL t1698 scope note above, to be
- * what a reader actually ACTS on (every TRAP, every INVARIANT, Q3's frame-algebra). The remaining ~97 raw
- * mentions are Q1/Q2 diagram annotations, REGISTRIES table rows, and narrative asides — bringing ALL of
- * them under this same per-citation mechanism is not a mechanical extension of this turn's own work (each one
- * needs the same individual "read the current line, pick a genuinely unique anchor" treatment the 52 here just
- * got) — it is comparable in size to this turn over again, not a remaining slice of it. **Stated plainly: those
- * ~97 remain unenforced prose.** A future citation earns enforcement here the moment it graduates into a named
- * TRAP or INVARIANT (the existing scope rule, unchanged) — that is the honest boundary, not "eventually, someday."
+ * distinct claims. t1996 landed 52 (every TRAP/INVARIANT/Q3); t2004 landed the REGISTRIES table (10 more, 62
+ * total) — verifying each one against CURRENT source turned up two real, reported findings (see the REGISTRY_CLAIMS
+ * comment above): several stale line numbers (claim true, number drifted) and one WRONG TARGET (`panelTypes.js:267`
+ * pointed at unrelated code, re-anchored to `:292`), fixed in ARCHITECTURE.md's own prose rather than silently
+ * re-pointed. The remaining ~87 are Q1/Q2 diagram annotations, "KNOWN DIVERGENCE", "WHERE THE GATES ARE", and
+ * "UNVERIFIED" — bringing them under this mechanism needs the same individual "read the current line, pick a
+ * genuinely unique anchor" treatment each prior batch got; sized and named as remaining work, not attempted this
+ * turn (t2004's own WORK-LOG entry lists exactly which sections and why the boundary landed here). **Stated
+ * plainly: those ~87 remain unenforced prose.** A future citation earns enforcement here the moment it graduates
+ * into a named TRAP or INVARIANT (the existing scope rule, unchanged) — that is the honest boundary, not
+ * "eventually, someday."
  *
  * ── NON-VACUITY (done by hand against a scratch copy, not as a permanent test — see WORK-LOG t1698 + t1996) ─────
  * t1698's own original proof: a citation moved in a scratch copy of a real source file, pointed the checker at
@@ -316,5 +318,53 @@ test('architecture map ASSERTED: Q3 frame-algebra citations still hold (the high
         } catch (e) { wrong.push(`${c.id} — ${e.message}`); }
     }
     must('a Q3 frame-algebra citation rotted or stopped being unique — this is the exact class of coordinate bug (t1672/t1686) the map exists to prevent a THIRD occurrence of',
+        () => expect(wrong).toEqual([]));
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// t2004 — THE REGISTRIES TABLE, the first slice of the ~97 "remaining unenforced prose" citations named at t1996.
+// Same Option B convention (full trimmed source line, whole-file, exactly once). Every row of the REGISTRIES table
+// that names an actual `file:line` fact is here EXCEPT "guard predicate shape" (informational: GUARD_FIELDS is
+// verified accurate but the row states no trap a reader acts on beyond what INV1's own guard already backs) and
+// "per-atom scratch vars" / "the posts" (cite a FILE, not a specific line/fact — nothing to substring-anchor).
+// `_BASE_DEF_SHAPE` (userOps.js:917) is already enforced by INV6 above — not duplicated here, only its PROSE line
+// number in this table's own row was stale and got fixed in ARCHITECTURE.md alongside `hookKeysOf`'s.
+//
+// VERIFIED, NOT ASSUMED: read every cited line's CURRENT content against the claim before writing a `find` string.
+// Two real findings, both reported and fixed in ARCHITECTURE.md's own prose (not silently re-pointed):
+//   - STALE LINES (drift, the claim itself still true): `web/app.js:101-108` → actually 100-107 (SEED_BUILDERS);
+//     `app.js:99-100` → actually 98-99 (its own export-reason comment); `wizards/views/index.js:35-48` → actually
+//     34-48 (WIZARD_VIEWS starts one line earlier); `stackBridge.js:23`/`:35` → actually `:24`/`:36`
+//     (DURABLE_DATA_FIELDS/KNOWN_LEAF_RECORD_FIELDS); `userOps.js:900` → actually `:924` (`hookKeysOf`, the SAME
+//     +24-ish shift t1996 already found on this file's neighbouring `_BASE_DEF_SHAPE` citation).
+//   - ONE WRONG TARGET, not mere drift: `panelTypes.js:267` (claimed as MULTI_WIDGETS' reader) is CORNER-MARKER-
+//     INDEPENDENCE code — nothing to do with `MULTI_WIDGETS`. The real reader (the `.has()` check `renderUnit`'s
+//     own comment at `:283-284` describes) is at `:292`. Re-anchored there; ARCHITECTURE.md's own prose corrected
+//     with a note, matching the INV8 precedent (t1996) rather than silently moved.
+const REGISTRY_CLAIMS = [
+    { id: 'REG BUILTINS bar+opensAs registry', file: 'web/blocks/wizardLibrary.js', find: 'const BUILTINS = [' },
+    { id: 'REG SEED_BUILDERS data-twin registry', file: 'web/app.js', find: 'export const SEED_BUILDERS = [' },
+    { id: 'REG SEED_BUILDERS export reason (sweep the registry, not a hand list)', file: 'web/app.js', find: 'rather than a hand-typed parallel list that a new twin could silently fall out of.' },
+    { id: 'REG WIZARD_VIEWS coded-view registry', file: 'web/wizards/views/index.js', find: 'export const WIZARD_VIEWS = [' },
+    { id: 'REG def.mouth reader (which kinds hold children)', file: 'web/blocks/blockly/bridge.js', find: 'export const mouthOf = (def) => def.mouth;' },
+    { id: 'REG DURABLE_DATA_FIELDS (Blockly round-trip survivors)', file: 'web/blocks/blockly/stackBridge.js', find: "const DURABLE_DATA_FIELDS = ['modalPre', '_expose'];" },
+    { id: 'REG KNOWN_LEAF_RECORD_FIELDS', file: 'web/blocks/blockly/stackBridge.js', find: "const KNOWN_LEAF_RECORD_FIELDS = new Set(['id', 'type', 'params', 'children', 'uiChildren', 'collapsed', '_group', ...DURABLE_DATA_FIELDS]);" },
+    { id: 'REG hookKeysOf export (what counts as a hook)', file: 'web/blocks/userOps.js', find: 'export const hookKeysOf = (def) => Object.keys(def || {}).filter(isHookKey);' },
+    { id: 'REG GUARD_FIELDS (guard predicate shape)', file: 'web/wizards/ops/guard.js', find: "export const GUARD_FIELDS = ['whenparam', 'whenis', 'whentype'];" },
+    { id: 'REG MULTI_WIDGETS reader in panelTypes (re-anchored, was wrong target)', file: 'web/wizards/ops/panelTypes.js', find: 'if (unit.length > 1 && MULTI_WIDGETS.has(unit[0] && unit[0].widget)) for (const b of unit) _unwritable.add(b.param);' },
+    { id: 'REG kindFirst — lathe group leads the bar', file: 'web/blocks/wizardLibrary.js', find: 'const kindFirst = (ids) => {' },
+];
+
+test('architecture map ASSERTED: every REGISTRIES-table citation still holds, uniquely', () => {
+    const wrong = [];
+    for (const c of REGISTRY_CLAIMS) {
+        const abs = path.join(DDCS, c.file);
+        try {
+            const lines = citationMatchLines(abs, c.find);
+            if (lines.length === 0) wrong.push(`${c.id} — ${c.file}: NOT FOUND anywhere (rotted, or the registry was renamed/removed and the map should say so) — ${c.find}`);
+            else if (lines.length > 1) wrong.push(`${c.id} — ${c.file}: matches ${lines.length}× (lines ${lines.join(', ')}) — not a unique anchor, tighten the pattern — ${c.find}`);
+        } catch (e) { wrong.push(`${c.id} — ${e.message}`); }
+    }
+    must('a REGISTRIES-table citation rotted or stopped being unique — this table exists specifically so a reader NAMES the declaration instead of copying it; a stale name is worse than no name',
         () => expect(wrong).toEqual([]));
 });

@@ -377,14 +377,14 @@ pane they would have backed) — see WORK-LOG t1734.
 | fact | the declaration of record | regenerate with |
 |---|---|---|
 | what the bar shows and what it opens | `BUILTINS` + `opensAs`, `blocks/wizardLibrary.js:42-81` (**25** entries, **25** with `opensAs`) | `rg -n "opensAs" DDCS-Studio/web/blocks/wizardLibrary.js` |
-| the data twins | `SEED_BUILDERS`, `web/app.js:101-108` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:99-100`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
-| the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:35-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
+| the data twins | `SEED_BUILDERS`, `web/app.js:100-107` (**32**) — exported deliberately so tests sweep the registry, not a parallel hand list (`app.js:98-99`) | `rg -n "_OPTYPE = 'user_" DDCS-Studio/web/blocks/dataOps/*.js` |
+| the surviving coded views | `WIZARD_VIEWS`, `wizards/views/index.js:34-48` (**14**) | `rg -o 'id="wiz_[a-z_0-9]*"' DDCS-Studio/web/index.html \| sort -u` |
 | which block kinds hold children | **`def.mouth`** on each def; the reader is one line — `blocks/blockly/bridge.js:78` | `rg -n "mouth:" DDCS-Studio/web/wizards/ops/` |
-| which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:23`) + `KNOWN_LEAF_RECORD_FIELDS` (`:35`) | — |
-| what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:893-895`; exported as `hookKeysOf` `:900` | — |
+| which record fields survive a Blockly round-trip | `DURABLE_DATA_FIELDS` (`stackBridge.js:24`) + `KNOWN_LEAF_RECORD_FIELDS` (`:36`) | — |
+| what counts as a "hook" on a def | **derived**, not listed: `_BASE_DEF_SHAPE` from one real constructor call, `userOps.js:917` (t1996 shifted this from 893 — see INV6); exported as `hookKeysOf` `:924` | — |
 | guard predicate shape | `GUARD_FIELDS`, `wizards/ops/guard.js:36` | — |
 | per-atom scratch vars | `def.scratch` on each atom; aggregated by `data/universalScratch.js` | — |
-| which widgets own several params | `MULTI_WIDGETS`, `ui/formWidgets.js` — read by BOTH `renderOpForm`'s `renderUnit` AND `panelTypes.js:267` | — |
+| which widgets own several params | `MULTI_WIDGETS`, `ui/formWidgets.js` — read by BOTH `renderOpForm`'s `renderUnit` AND `panelTypes.js:292` (t2004 — this cited `:267` for who knows how long; that line is unrelated CORNER-MARKER-INDEPENDENCE code, not a `MULTI_WIDGETS` reader at all — see architecture-map-1698.test.mjs's own `REGISTRY_CLAIMS` comment for the full account) | — |
 | the posts | `wizards/dialects/index.js` registry (7 posts) + `DEFAULT_CAPS` | — |
 
 **32 twins vs 25 `opensAs` targets.** The 7-op remainder is the lathe family
@@ -424,7 +424,9 @@ accident**.
 fixing its gap erases the record of what changed.
 
 **6 · Derive membership from shape; never hand-maintain a name list that must track a growing set.**
-Guard: `userOps.js:893-900`. Break it → `OP_CODE_HOOKS`, an 8-name hand list, had gone stale by **7 live hooks**;
+Guard: `userOps.js:917-924` (t2004 — this prose still said `893-900`; the machine-checked citation for this same
+guard was already re-anchored at t1996, this line just never caught up). Break it → `OP_CODE_HOOKS`, an 8-name
+hand list, had gone stale by **7 live hooks**;
 forking any of 11+ ops silently dropped one — byte-correct emit, clean console, a piece of the UI just missing.
 **The obvious replacement is also wrong:** "any function on `def`" misses 5 of the 7, because `zRuler` /
 `entryPoint` / `simStartParams` / `latheTool` / `latheProbeAxis` are plain JSON-safe **data**, not functions.
