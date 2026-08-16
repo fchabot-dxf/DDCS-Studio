@@ -2974,3 +2974,45 @@ designed, and one of them is a promise already made in code.
 ⚠ Design only. No code, no specs, no suite run — my gate owns the machine this turn.
 ⚠ Still queued: `collectOps`'s phantom row · the raw-text import door · `lathe-honest-3d-1301` · slice 1's
 unswept region · slice 2 of the rename.
+
+# ═══ t1948 — ONE SHAPE FOR ONE PROGRAM: fix addOperation's nesting + wire collapse-on-delete ═══
+
+t1946 accepted, and **the unplanned finding is the most valuable thing in it.** You went looking for the delete
+design and found a live defect in code we shipped two turns ago:
+
+> **`addOperation` NESTS instead of flattening when a 3rd operation is added to an existing 2-op wrapper** —
+> contradicting its own doc comment, and never covered because the bridge test I specified only went to TWO.
+
+That is a **second source** — the exact defect class this whole session has been deleting:
+
+```
+   import a 3-operation .nc   ->  multi_step( A, B, C )              flat
+   add A, add B, add C        ->  multi_step( multi_step(A,B), C )   nested
+                                  ^ two shapes, one program
+```
+
+They agree TODAY only because `flattenOps` and the emitter both recurse. The first thing that walks one level —
+and `collectOps` already does — sees two different programs. **My test spec was the hole:** an equivalence
+bridge that stops at 2 proves nothing about 3. That is my miss, not yours.
+
+## THE TASK — one fix shape, two call sites. You already named it: flatten-then-regroup.
+1. **FIX `addOperation`** so adding onto an existing wrapper produces ONE flat wrapper, never a nest. Make the
+   doc comment true — or, if the comment is the thing that is wrong, say so and correct THAT instead. **One of
+   the two is lying and it is not allowed to stay that way.**
+2. **EXTEND THE BRIDGE TEST TO 3 AND 4 OPERATIONS.** Same claim as before — byte-identical G-code against the
+   import path — but at the arities that actually exercise regrouping. **This is the assertion that would have
+   caught it**, so it is the one that must exist now.
+3. **WIRE COLLAPSE-ON-DELETE** at the single choke point you confirmed — `workspaceToStack`
+   (`stackBridge.js:173`), the only path that can produce a malformed `multi_step`. Same flatten-then-regroup
+   pipeline, so grow and shrink genuinely share one rule rather than two that match by hand.
+4. **ASSERT THE SHAPE CONVERGES, both directions:** add 3 → delete 1 → the result is shape-identical AND
+   emit-identical to having added 2. That is the symmetric-rule promise, finally testable.
+5. **PROVE NON-VACUITY** on every new test — break it, watch it fail, restore. You have done this four turns
+   running; keep it.
+
+⚠ **STOP CONDITION:** if fixing the shape changes the emitted G-code for ANY arity, stop and tell me. The
+G-code is currently CORRECT at every arity (both paths recurse) — this is a shape fix, not an output fix, and
+byte-identical output is the proof it stayed that way.
+⚠ **MY GATE IS KILLED, the machine is yours.** Run what you need. Gate: your new specs + `add-operation-1940` +
+`insert-add-replace-1942` + the 4 t1928 features + node tier. I run the full suite after this lands.
+⚠ Do NOT fix `collectOps` this turn (still queued) — but note whether this fix changes its phantom-row story.
