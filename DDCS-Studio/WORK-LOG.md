@@ -37420,3 +37420,155 @@ entirely test-side, per the dispatch's own framing (the systemic risk was ALREAD
 product change, not a new one this turn introduces).
 
 🔨 turn 1944
+
+
+## 🔨 turn 1946 — DELETE, THE FAILURE MODE, AND REORDER: design only, read-only
+
+### Dispatch
+No code, no specs, no suite run — the advisor's release gate was running on `e61e6b72` for the duration. Four
+deliverables: (1) where deletion actually happens today and whether there's a single choke point for a future
+collapse-on-delete; (2) check (don't assume) what breaks downstream if a `multi_step` wrapper is left holding a
+malformed shape; (3) trace via source whether a `multi_step`'s children render as draggable sibling Blockly
+blocks; (4) name what I would explicitly not do.
+
+### (1) Collapse-on-delete — every delete path, traced
+
+**Three real delete mechanisms exist; only one can reach a `multi_step`'s own children.**
+
+- **Blockly-tab native block-delete — REACHABLE, and it IS the single choke point.** Every structural
+  (non-field) Blockly change — including a native block-delete — fires `blocksApp.js`'s own
+  `ws.addChangeListener` (line 906), falls through the `!e.isUiEvent && !muteChanges` branch (~966-968) into
+  `reproject()` (783-799), whose own body calls `setStack(workspaceToStack(ws), 'blockly')` (line 795).
+  `workspaceToStack` (`stackBridge.js:173-176`) walks `ws.getTopBlocks(true)` and rebuilds each chain via
+  `chain()` -> `toRecord()` (166-170, 44-163) — a plain, generic re-read of whatever blocks remain connected,
+  with no count-checking or normalization anywhere in that path. **A future collapse-on-delete is a one-line
+  addition right there**: flatten any existing wrapper (a `flattenOps`-style unwrap) then re-run
+  `groupConsecutiveOps` over the result, the same pipeline `addOperation` already composes (`programModel.js`).
+
+- **Studio-tab right-click Delete — NOT reachable for an individual step, confirmed by reading the code, not
+  assumed.** `opSession.js`'s `deleteOp(opId)` (565-572) does `cur.findIndex(b => b.type==='op' && b.id===opId)`
+  against the TOP-LEVEL array only. A `multi_step` wrapper is itself a top-level `type:'op'` entry, so
+  `deleteOp` CAN delete the whole wrapper as one unit (idx matches the wrapper's own id) — but a nested child's
+  id (one of the wrapper's own `children`) is never found by a top-level-only `findIndex`, so `idx<0` and the
+  call is a no-op. In practice this is narrower still: since the Studio tab's own context-menu resolves a
+  clicked line to an op via `opAtLine`, and `opAtLine` is already known (prior turns) to resolve ANY line
+  inside a `multi_step` to the WRAPPER's own id (never a nested child's), right-clicking anywhere inside a
+  multi_step and choosing Delete today can only ever delete the ENTIRE wrapper, never one step out of it. So
+  this gesture cannot produce a stale/malformed wrapper — it's inert for that shape, not by design intent, but
+  as a side effect of an already-known, separately-tracked gap.
+
+- **Editor text-delete — NOT reachable at all whenever the canvas holds any wizard op, multi_step included,
+  confirmed by reading the code.** `gcodeToStack.js`'s `isAllLeaf`/`isLeafRecord` (231-235) looks up
+  `BLOCKS[r.type]` — and every wizard-authored op record (drill, corner, `multi_step`, anything from `makeOp`)
+  carries the literal `type:'op'` (the record-kind marker; the specific kind lives in `opType`), which has no
+  entry in `BLOCKS` (keyed by leaf-atom definition types, e.g. 'raw', 'linear_move' — a `def.type`, a genuinely
+  different namespace from the runtime `record.type` marker, the same "one name, two meanings" shape flagged in
+  prior turns). So `isLeafRecord` is false for any op record, `isAllLeaf` is false for the whole stack, and
+  `reconcileGcodeToStack` (245-248) returns `null`. `programModel.js`'s own `reconcileFromEditor` (450-457)
+  checks that: `if (!ns) return;` — the edited text is silently discarded, the doc comment says "leave blocks;
+  blur will revert." This blocks the editor path for ANY wizard op on the canvas, not something specific to
+  `multi_step` — but it does mean the editor can never be the mechanism that produces a malformed wrapper.
+
+- **Project load / Undo — carriers, not mechanisms.** Both just replay a previously-captured stack verbatim
+  (`ddcsLoadBlockStack(obj.stack)` for load; a cloned snapshot for undo/redo) — neither ACTIVELY removes an
+  operation. If a saved file or an undo snapshot happens to already hold a stale wrapper (produced upstream by
+  one of the two paths above), loading or undoing just faithfully reproduces that state. Not a new choke point
+  to instrument — a stale wrapper reaching either would already have been stale before it got there.
+
+**Bottom line for (1): yes, a single choke point exists** (`workspaceToStack`, `stackBridge.js:173`) and it is
+the ONLY path that can actually produce the malformed shape in the first place, since the other two candidate
+delete gestures are each independently unable to touch an individual step within a wrapper.
+
+### (2) The failure mode — what breaks downstream, checked not assumed
+
+Built two scratch verification scripts (session scratchpad, not the repo) importing the real
+`programModel.js` directly (Node ESM, `file:///C:/...` URL — a bare Windows path throws
+`ERR_UNSUPPORTED_ESM_URL_SCHEME`, and a relative import resolves against the script's own location, not the
+shell CWD — both hit and fixed en route).
+
+- **`flattenOps` (and everything that reads through it) is CONFIRMED IMMUNE**, to both:
+  - a 1-child stale wrapper (`multi_step{children:[drill]}`) -> flattens to `["drill"]`, correct.
+  - a NESTED wrapper (`multi_step{children:[multi_step{children:[drill,surfacing]}, pocket]}` — see the
+    `addOperation` finding below for how this shape arises) -> flattens to `["drill","surfacing","pocket"]`,
+    correct — `flattenOps`'s own recursive call (`programModel.js:113`, `if (b.opType==='multi_step') {
+    out.push(...flattenOps(b.children)); continue; }`) walks arbitrary depth with no count assumption anywhere.
+  - This covers every consumer wired to it: setup sheet single-page, time estimate, sim hints, program-intent,
+    envelope-check (all t1928's own wiring sites).
+- **`blockEmitter.js`'s own emit is immune by the same reasoning, verified by direct code reading** (not a
+  fresh script — the same recursive `emit()` behavior was already confirmed transparent for a normal multi_step
+  in earlier turns; re-checked here specifically for nesting/count-sensitivity): its `type==='op'` branch is a
+  plain `(block.children||[]).forEach(c => out.push(...emit(c, ...)))` — no conditional anywhere reads
+  `opType`, `children.length`, or nesting depth, so a 1-child or nested wrapper emits exactly its real content,
+  same as `flattenOps`.
+- **The one real, already-known consequence: `collectOps`'s own phantom-row bug** (flagged t1932, still queued,
+  unchanged by this turn's findings) — scoped narrowly to the two-sided-setup path, not touched here.
+- **The `opAtLine`/hover-chip raw-label leak is pre-existing for ANY `multi_step`, not specific to a stale
+  wrapper.** `multi_step` has no entry in `OP_LABELS` (confirmed via grep, none found in `opBuilders.js`), so
+  `makeOp`'s label fallback leaves an unflattened wrapper's own `.label` as the literal string `"multi_step"`
+  wherever something displays it without going through `flattenOps` first. A malformed wrapper doesn't
+  introduce this — it's already reachable today for any correctly-formed 2+-child wrapper too.
+
+**A significant, unplanned finding surfaced while building the nested-wrapper fixture for the check above:
+`addOperation` (`programModel.js`, added t1940) is itself currently buggy for the case its own doc comment
+explicitly claims to handle.** The comment says a program that already holds a wrapper "appends into it." A
+scratch script (`verify-addop-3rd.mjs`) built a program already holding a 2-op `multi_step` (drill+surfacing)
+and called `addOperation(program, pocketOp)`. Expected: one flat 3-child wrapper. Actual: a NESTED wrapper —
+`multi_step{children:[multi_step{children:[drill,surfacing]}, pocket]}`. Root cause: `addOperation` splices
+the incoming op in, then runs `groupConsecutiveOps(items)` directly — but `groupConsecutiveOps` treats the
+EXISTING wrapper as itself just another top-level `type:'op'` entry (which, structurally, it is) and groups it
+together with the new op into a NEW outer wrapper, rather than recognizing it as something to unwrap first.
+**Never exercised by `add-operation-1940.spec.js`**, which only ever tests "1 op + add 1 = 2 ops" — the "2 ops
+already present + add a 3rd" case was never covered. This is directly relevant to the SAME fix the
+collapse-on-delete design needs (flatten-then-regroup) — a future fix at either the delete choke point or
+inside `addOperation` itself would use the identical pipeline. Confirmed empirically (not just reasoned about),
+via a real import of the shipped module, run outside the repo per this turn's read-only constraint. **Not
+fixed this turn — reporting only, per the dispatch's framing.**
+
+### (3) The reorder question — REACHABLE, traced via source
+
+`multi_step` has no custom Blockly block type — confirmed via `HAS_CUSTOM_OP['multi_step_op']` absent (grepped,
+none found), so `recToJson` (`stackBridge.js:186-255`) renders it through the plain generic `'op'` type (line
+187: `HAS_CUSTOM_OP[rec.opType + '_op'] ? (...) : 'op'`), loading its own children into the SAME `'GCODE'`
+`input_statement` mouth (line 250: `inputs.GCODE = { block: chainToJson(rec.children) }`) that every ordinary
+op already uses for its own body atoms — no `multi_step`-specific branch exists anywhere in `recToJson`,
+`toRecord`, or `chain`. The generic op block's own definition carries no `movable`/`draggable` override (both
+default `true` in Blockly unless explicitly set false — none is), and its `previousStatement`/`nextStatement`
+are unrestricted (`null`/`null`, same as every other op). Read-side, `toRecord` (44-163) reads a container's
+children back via `mouthOf(def)` -> `chain(first)` (150-152, 166-170) — a plain `getNextBlock()` walk with zero
+count or order assumptions, so whatever sequence the user leaves the blocks in after a drag is exactly what
+`workspaceToStack` reads back on the next `reproject()`.
+
+This means a `multi_step`'s own children are, today, ordinary sibling blocks inside a standard statement chain
+— reordering them by drag uses the SAME generic Blockly connection mechanic already relied on (implicitly) for
+every op's own body atoms. **State: REACHABLE.** This is a static trace, not an observed browser reproduction
+(no browser available this turn, no suite run authorized) — but the mechanism in question is Blockly's own
+generic block-chain drag/reorder, not a per-block-type customization, so I'm not flagging it NEEDS-A-BROWSER;
+there's no code path anywhere that could behave differently for a `multi_step` child than for any other op's
+body atom.
+
+### (4) What I would NOT do
+
+- **Not build a Studio-tab reorder control.** Given (3)'s finding — reorder is already reachable via the Blocks
+  tab, through a mechanism the product already ships and relies on elsewhere — a separate Studio-tab up/down
+  control would be a second, parallel mechanism for something already possible, not a new capability. That's
+  the same "declare once, don't hand-roll a second path" shape this whole session has repeatedly avoided. No
+  one has asked for a Studio-tab reorder gesture specifically (only the advisor's own framing of "the very next
+  thing they will do"), so building it now would be an unasked affordance. My read: ship reorder as "use the
+  Blocks tab" first, and only add Studio-tab chrome if that's confirmed insufficient for the actual workflow —
+  a UX call for the human, not mine to preempt.
+- **Not build the collapse-on-delete fix itself, or fix `addOperation`'s nested-wrapper bug**, this turn — both
+  are design/report only, per the dispatch's explicit constraint. Both point at the same fix shape
+  (flatten-then-regroup), so whichever lands first should probably be built as one shared helper both the
+  delete choke point and `addOperation` call, rather than two independent patches — a design note for whoever
+  picks this up, not something to build now.
+- **Not touch `opAtLine`'s pre-existing wrapper-resolution gap** — confirmed (again) pre-existing and general
+  to any `multi_step`, not new or specific to this turn's findings; already known from prior turns, still
+  separately queued.
+- **Not run the full suite or touch any source file** — matches the turn's own "no code, no specs, no suite
+  run" framing; confirmed via `git status` that nothing beyond this WORK-LOG entry changed.
+
+### Gate
+No code changed. `git status` confirms zero source-file changes — only this WORK-LOG entry. `npm run test:node`
+not run (no code touched, matches the dispatch). `proc_health.py watch`: clean, nothing spawned this turn.
+
+🔨 turn 1946
