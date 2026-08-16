@@ -216,8 +216,11 @@ const INVENTORY = [
     { file: 'web/blocks/opSession.js', name: 'replayReconcile', why: 'the edit-glow diff for a nested op reads "no edits" instead of erroring, so a real block-level edit never highlights' },
     { file: 'web/blocks/opSession.js', name: 'mergeOpBlocks', why: 'the block-edit-aware 3-way AST merge silently no-ops for a nested op, discarding the user\'s hand edits with no error' },
     { file: 'web/ui/editorManager.js', name: '_firstOpTitle', why: 'an exported/downloaded .nc for a multi-op program is titled/filed as "multi_step" instead of the real first op\'s name (cosmetic)' },
-    { file: 'web/ui/editorOpHover.js', name: 'glowEdited', why: 'the editor never highlights a hand-edited block belonging to a nested op — the edit-glow chip simply never appears for it' },
     { file: 'web/ui/opContextMenu.js', name: 'showOpMenu', why: 'the right-click menu on a nested op falls back to a thinner, stale record (missing params/children) for its CAM-authoring actions' },
+    // t1976 — web/ui/editorOpHover.js's glowEdited FIXED: iterates `flattenOps(ddcsGetBlockProgram())` (t1928's
+    // own declared enumeration) instead of a shallow top-level loop; the edit-detection itself (isOpBlockEdited /
+    // editedRangesForOp, opGlow.js) was already correct BY ID (t1958), the gap was purely what this loop visited.
+    // See WORK-LOG t1976 and word-glow.spec.js's new nested-op test for the non-vacuity proof + screenshot.
     // t1974 — web/viz/segmentFrame.js's frameOwnerAtLine FIXED: now resolves via programModel.js's own canonical
     // `opAtLine` (a genuine recursive walker, correctly excluded by the detector) instead of a local shallow
     // top-level find(). See WORK-LOG t1974 and option-b-slice3-live-visibility-1874.spec.js's new WRAPPED

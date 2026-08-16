@@ -9,7 +9,7 @@
  */
 import { showOpMenu, showGroupMenu, hideOpMenu, openMenu, attachLongPress } from './opContextMenu.js';
 import { indentMenuItems, installEditorIndent } from './editorTextOps.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
-import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
+import { onChange, flattenOps } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change; t1976 — the one declared op enumeration
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
 
@@ -122,8 +122,16 @@ export function initEditorOpHover() {
             overlay.querySelectorAll('.g-line.op-block-edited').forEach((s) => s.classList.remove('op-block-edited'));
             overlay.querySelectorAll('span.word-edited').forEach((s) => s.replaceWith(...s.childNodes));   // unwrap stale
             overlay.normalize();                                                                          // merge split text nodes → clean offsets
-            for (const op of (window.ddcsGetBlockProgram() || [])) {
-                if (!op || op.type !== 'op' || !window.ddcsOpBlockEdited(op.id)) continue;
+            // t1976 — was a shallow top-level loop over `ddcsGetBlockProgram()`: for a multi_step-wrapped
+            // multi-op program (the real Add gesture), a nested op's own record never appears at the top level,
+            // so `ddcsOpBlockEdited(op.id)` was never even CALLED for it — the glow silently never rendered for
+            // any hand-edited nested op, even though `isOpBlockEdited`/`editedRangesForOp` (opGlow.js) already
+            // resolve BY ID correctly at any depth (t1958's own `findOpById`). The gap was purely in what this
+            // loop iterated, not in the edit-detection itself. `flattenOps` is the one declared answer to "what
+            // operations does this program hold" (t1928) — recurses into a multi_step's own children, same
+            // domain this loop needs.
+            for (const op of flattenOps(window.ddcsGetBlockProgram() || [])) {
+                if (!op || !window.ddcsOpBlockEdited(op.id)) continue;
                 const entries = window.ddcsEditedRangesForOp ? window.ddcsEditedRangesForOp(op.id)
                     : ((window.ddcsEditedLinesForOp ? window.ddcsEditedLinesForOp(op.id) : (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || []).map((line) => ({ line, range: null })));
                 for (const { line, range } of entries) {

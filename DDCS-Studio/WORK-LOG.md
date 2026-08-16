@@ -38885,3 +38885,95 @@ established load-contention shape on unrelated tests, both retried green).
 shape) → the remaining 9-entry inventory → architecture-citation Option B, including the unenforced prose half.
 
 🔨 turn 1974
+
+# ═══ t1976 — editorOpHover.js glowEdited: the loop never visited a nested op at all ═══
+
+## THE BUG
+
+`glowEdited`'s own loop — `for (const op of (window.ddcsGetBlockProgram() || []))` — was shallow, top-level only.
+For a `multi_step`-wrapped multi-op program (the real Add gesture, t1940/t1942), a nested op's own record never
+appears at that top level, so `window.ddcsOpBlockEdited(op.id)` was never even CALLED for it — a real, hand-edited
+Blockly field on a nested op never glowed, silently. The edit-DETECTION itself was already correct by id
+(`isOpBlockEdited`/`editedRangesForOp` in `opGlow.js`, both via `findOpById`, fixed t1958) — the gap was purely
+in what `glowEdited`'s own loop iterated, never in the lookup those functions themselves perform once called.
+
+## THE FIX — through the declared lookup
+
+Replaced the shallow loop with `flattenOps(window.ddcsGetBlockProgram() || [])` — `programModel.js`'s own "ONE
+DECLARED ENUMERATION" (t1928) for exactly this question, "what operations does this program hold," recursing into
+a `multi_step`'s own children. Added `flattenOps` to the file's existing `programModel.js` import. No new declared
+data needed — `flattenOps` already existed, already used at 3+ other sites this session (`envelopeCheck.js`,
+`wizardManager.js`) for the identical shape of gap. Left a comment on the loop naming the exact defect and citing
+where the by-id functions were already correct, so a future reader doesn't have to re-derive which half was broken.
+
+## ASSERT THE VISIBLE RESULT — pixels, per the dispatch
+
+Extended `word-glow.spec.js` (the sibling file already proving the glow MECHANISM correct for a single op, via
+`op-declared-edits.spec.js`'s own `ws.getBlockById(...).setFieldValue()` technique — its own two existing tests
+are `test.fixme` for an unrelated, pre-existing twin-id gap named in its own header, not something this turn
+touches). New test builds `drill` then `surfacing` via the REAL "Add as a 2nd operation" gesture (t1958's own
+proven helpers, reused) — confirmed by sanity assertion to genuinely wrap both into ONE `multi_step`. Switches to
+the Blocks tab, makes a REAL field edit on `surfacing` (the SECOND/nested op) via `ws.getBlockById(secondOpId)`,
+then reads `#editor-highlight`'s actual DOM: every `.op-block-edited`/`.word-edited`-bearing line is asserted to
+fall inside the SECOND op's own line span (`ddcsLinesForOp`), NEVER the first op's, and the glowing set is
+non-empty (not nowhere). A screenshot (`verification/t1976-nested-op-glow.png`, scrolled to the first glowing
+line) shows the actual rendered result: the edited numeric token highlighted in its own box, inside `surfacing`'s
+own emitted lines.
+
+## NON-VACUITY
+
+Saved a scratch copy of the fixed `editorOpHover.js`, reverted `glowEdited`'s loop to its exact pre-fix shallow
+body, ran the new test at `--workers=1`: failed **3/3** (`glowingLines: []` — the edit glowed nowhere, exactly
+the reported symptom). Restored from the saved copy (not `git checkout HEAD`, uncommitted work). Re-ran: green.
+
+## THE RATCHET, direction 2 again
+
+Fixed the code first, left the `editorOpHover.js :: glowEdited` entry in `INVENTORY`, ran the checker: **failed**,
+`staleEntries` naming exactly that site — confirmed, not assumed, a second time. Removed the entry (10-entry
+inventory is now 8; a t1976-dated comment replaces it, matching the convention `frameOwnerAtLine`'s own removal
+set at t1974). Full checker re-run: 7/7, both ratchet-direction meta-tests pass.
+
+## THE BOUNDED QUESTION — report only, nothing fixed
+
+Asked: do the OTHER `option-b-*` PRIMARY EVIDENCE tests build a WRAPPED program, or is the whole naming family
+vouching for multi-operation behaviour it never actually runs, the same way slice3's own PRIMARY EVIDENCE test
+turned out to (t1974)? There are exactly two files under that name: `option-b-slice2-positioning-1872.spec.js`
+and `option-b-slice3-live-visibility-1874.spec.js` (no slice1 file carries the label — `segment-frame-derivation-
+1838.spec.js` is Slice 1's own guard test, unlabeled, outside the literal `option-b-*` naming scope this question
+was scoped to). **Slice2's own PRIMARY EVIDENCE test (line 68) is UNWRAPPED too** — `const stack = [bare(HOMING,
+1), bare(CORNER, 2)]` loaded straight through `ddcsLoadBlockStack`, the identical shape `mkOp`+`loadAndBoot`
+built in slice3 before this session's own fix, no `groupConsecutiveOps`/real-Add call anywhere in its own
+construction (`grep`-confirmed: `loadBlocksStack` at line 58 is a bare `ddcsLoadBlockStack(s)` pass-through, no
+grouping). So yes — **the whole family, as it stood before t1974, was vouching for a claim neither test actually
+ran.** Whether this MATTERS for slice2 specifically is a separate, unasked question I did not investigate (its
+own fix targets PASS-indexed hint tagging, a different mechanism than slice3's LINE-indexed one, and
+`blk-start-hints-multistep-1954.spec.js` already exists as a DEDICATED wrapped-vs-unwrapped test for the same
+`blkStartHints`/`flattenOps` family slice2 depends on — whether that coverage already closes the gap for slice2
+specifically is unverified, named here rather than guessed at). Two greps, as asked, then stopped.
+
+## ARCHITECTURE.md — checked, no drift
+
+Zero citations to `editorOpHover.js` in `ARCHITECTURE.md` (grepped). `architecture-map-1698` unaffected by this
+turn's edits (untouched files).
+
+## GATE
+
+Node tier (125/125, including the updated 8-entry `op-lookup-scan-1968` at 7/7) + `option-b-slice2-positioning-
+1872` (3/3; 1 known load-contention flake retried clean) + `option-b-slice3-live-visibility-1874` (5/5; 1 known
+flake retried clean) + `marker-rebuild-1848` (2/2) + `guard-roundtrip-1595` (2/2) + `fork-parity-1593` (2/2) +
+the 4 t1928 features (`setup-sheet-850`, `time-estimate-844`, `editor-sim-real-insert`, `whole-program-intent-
+756`, 15/15) + `word-glow.spec.js` (1/1 real test, 2 pre-existing unrelated fixme skips) — **158/158 clean**
+(`--workers=2`, 2 flakes total, both the established pattern, both retried green).
+
+## RELEASE PLAN — sizing, as asked
+
+`glowEdited` was a one-turn fix, same size and shape as `frameOwnerAtLine` (t1974): one canonical-lookup swap,
+one comment fix, one new test with non-vacuity + a screenshot, one inventory entry. Nothing here looked bigger
+than that. Continuing to the next two per the batch order (`_firstOpTitle`, then `collectOps`) without pausing
+for an intermediate gate, per the advisor's own stated plan.
+
+## Queued CODE work, the advisor's own order, unchanged
+`editorManager.js` `_firstOpTitle` → `setupSheet.js` `collectOps` (different shape) → the remaining 8-entry
+inventory → architecture-citation Option B, including the unenforced prose half.
+
+🔨 turn 1976
