@@ -39943,3 +39943,93 @@ staleness against its own current `surfaceraster` emit shape (found t1992, unrel
 whatever the human rules on two-sided setup.
 
 🔨 turn 1996
+
+# ═══ t1998 — RECONCILERS.surfacing staleness: investigation only, recommendation FIX, not built ═══
+
+Node-tier only per the dispatch (release gate still running) — this turn is pure source-reading, no browser
+needed, nothing to park.
+
+## (1) IS IT ACTUALLY STALE — confirmed against the CURRENT emit, not the comment
+
+`RECONCILERS.surfacing` (`web/blocks/opSession.js:78-90`) opens `const down = find(prog, 'stepdown')` and reads
+`down.children[0].params.region` for geometry. `surfacingStack()` (`web/wizards/stacks/surfacingWizard.js:37-75`,
+its own t1359 doc comment) confirms the CURRENT builder emits `[progstart · wcs · placeonstock{ surfaceraster }
+· progend]` (or the `skim` variant) — ONE `surfaceraster` atom, no `stepdown` anywhere. Its own words: "`stepdown`
+and `surfacefill` are NOT retired: pocket, slot and contour still emit through them. What retired is surfacing's
+use of them." So on every program a real, current surfacing op ever produces, `find(prog, 'stepdown')` returns
+`null` and `RECONCILERS.surfacing` returns `null` unconditionally. Confirmed by reading both sides — the
+reconciler's own search target and the builder's own current output — not inferred from either's comment alone.
+
+## (2) WHAT BREAKS FOR THE USER — two consumers, two different severities, not conflated
+
+`RECONCILERS.surfacing` has exactly two callers, and they differ in liveness:
+
+- **`reconcileActiveOp()` → `wizardManager.pullFromBlocks()` — LIVE.** `pullFromBlocks`'s own doc comment: "Wired
+  to the tab switch back to Studio (gatewayStatus.showApp)" — a real, current UI gesture. `reconcileActiveOp()`
+  returning `null` makes `pullFromBlocks` return at its very first guard (`if (!r || …) return;`,
+  `wizardManager.js:205`) — silently, no error, no console line. **Concrete user-facing effect: open a Surfacing
+  wizard, hand-edit its op in the Blocks tab (stepover, feed, depth, strategy — anything), switch back to
+  Studio — the form fields do NOT update to reflect the edit.** This is the middle severity named in the
+  dispatch: it **silently fails to reconcile a real hand-edit**, not reconciles wrongly (no bad value is ever
+  written) and not unreachable (the path fires on every surfacing tab-switch).
+- **`replayReconcile(opId)` — NOT LIVE, independently reconfirmed.** t1992 already grepped this and found zero
+  live UI call sites (`NEXT-SESSION.md:3891`, `tests/edit-nested-op-1958.spec.js:364-371`); a fresh repo-wide
+  grep this turn found the same three non-test-adjacent hits (the definition itself) plus exactly the same three
+  `.spec.js` direct test calls — no new caller has appeared since. `replayReconcile`'s own doc comment claims it
+  backs "the three diff surfaces (glow / chip / Merge-Replace notice, via opGlow)," but reading `opGlow.js`
+  directly shows those three (`isOpBlockEdited`, `editedLinesForOp`, `editedRangesForOp`) all read `opEditMap`
+  (a DECLARED-edit record) today, not `replayReconcile` — so that doc comment is itself stale on a SEPARATE,
+  larger claim (whether the whole reconcile-diff mechanism was ever wired or was refactored away), which is
+  outside this turn's scope and is named, not chased. **For `replayReconcile`, the surfacing staleness is
+  currently inert** — no user action reaches it, only test code does.
+
+So: one real (if narrow) silent-failure bug on a live path, one dormant staleness on a path nothing calls today.
+
+## (3) IS THE TEST-ONLY DEAD CODE LOAD-BEARING FOR A TEST?
+
+No. Searched every test referencing `surfacingLiteralStack` (the old `stepdown`/`surfacefill` emitter, kept
+alive per its own doc comment purely as "the named test-only reference" for G-code equivalence bridges) — all of
+them (`surfacing-parametric-1329`, `surfacing-both-paths-1361`, `surfacing-rotation-absorbed-1375`,
+`feed-modal-1377`, `ring-descent-1404`) compare its EMITTED TEXT against `surfacingStack`'s emitted text; none of
+them touch `RECONCILERS.surfacing`, `reconcileActiveOp`, or `replayReconcile` at all — a completely disjoint use
+of the same old builder function. Separately, `edit-nested-op-1958.spec.js`'s own `replayReconcile` test
+explicitly ROUTES AROUND `RECONCILERS.surfacing`: it orders its op stack drill-nested-inside-surfacing rather
+than the reverse specifically "NOT drill-then-surfacing: surfacing's own RECONCILERS entry is stale against its
+CURRENT parametric emit shape … a pre-existing, unrelated gap outside this turn's scope" (its own t1992 comment,
+lines 375-379) — using `drill`'s reconciler instead, which does match its current shape. No spec passes because
+it happens to feed the OLD `stepdown` shape into this reconciler; nothing is asserting a shape the app no longer
+produces here. (This finding matches, and independently reconfirms via fresh reading rather than trusting the
+prior comment, what t1992 already flagged.)
+
+## (4) RECOMMENDATION — FIX, not delete or leave
+
+**FIX.** Reasoning:
+- Not LEAVE: the live path (`pullFromBlocks`) is a real, silent, if narrow UX gap that has existed since
+  surfacing's builder collapsed to `surfaceraster`-only (t1359) — nobody would ever see an error, so it stays
+  invisible until someone notices a Blocks-tab surfacing edit not showing up back in Studio.
+- Not DELETE: `RECONCILERS` is a declared registry keyed by opType, one entry per parametric op (`slot`,
+  `pocket`, `drill`, `surfacing`, …); deleting the `surfacing` key doesn't remove any capability that isn't
+  ALREADY silently failing today — it just converts "silently always null" into "permanently absent by policy,"
+  which is a bigger, more permanent regression for no gain, when the data needed to reconcile correctly already
+  exists on the live atom.
+- The fix itself is small and exactly matches a pattern already proven twice in this same file: `RECONCILERS.slot`
+  (t1500) and `RECONCILERS.pocket` (t1406) each hit this identical shape-drift and were fixed by reading
+  `find(prog, 'surfaceraster')` FIRST as the new primary shape. Surfacing's case is simpler than either — it has
+  no re-pointed-arm branch to preserve, since `surfaceraster` is the ONLY shape the live builder ever emits now;
+  the fix is a straight swap of the `stepdown`/`over`/`region` lookup for `rg = find(prog, 'surfaceraster')`,
+  reading `rg.params` in place of `over.params`/`down.params`. Checked field-for-field against `opSchema.js:153`'s
+  own `sf_*` mapping and `surfaceraster`'s param shape (`web/wizards/ops/surfaceraster.js`): `w/h/depth/stepdown/
+  toolDia/stepoverPct/feed/plunge/clearance/strategy` all carry straight across; `sf_originX/originY/offZ` already
+  come from the (unaffected) `placeFields()` call at the end, same as today.
+- No test depends on the current (broken) behavior per (3), so a fix carries no known regression risk.
+
+**Not built this turn — investigation and recommendation only, per the dispatch.**
+
+Gate: node tier only, nothing touched, nothing to re-run (read-only turn).
+
+## Queued, still untouched
+`setGroupChildParams`'s own real-UI test (t1992) — awaits a browser turn once the advisor's gate lands.
+`RECONCILERS.surfacing`'s own fix — now fully scoped above, awaits the human/advisor's go to build it.
+Two-sided setup — awaits the human.
+
+🔨 turn 1998
