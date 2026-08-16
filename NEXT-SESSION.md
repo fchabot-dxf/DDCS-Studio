@@ -4158,3 +4158,43 @@ task.**
 
 ⚠ Then: KNOWN DIVERGENCE's "is this even the same kind of claim" question · Q1/Q2 anchoring (only if we still
 want it after this) · **two-sided setup, still awaiting the human.**
+
+# ═══ t2008 — APPLY IT: the hardcoded slice, then the 4 confirmed restatements ═══
+
+t2006 accepted, verified by me: node tier green.
+
+**You measured instead of estimating, and then said what the number WAS.** ~126 proximity candidates flagged,
+every close one **hand-confirmed by reading both prose sites**, and the answer reported as a **measured FLOOR
+of 4 facts across 9+ sites — not a total.** Naive same-file matching over-counts badly in dense files; you knew
+that and said so rather than shipping 126 as a finding.
+
+**⭐ AND THE BONUS FINDING IS THE MOST DANGEROUS COPY OF ALL.** Part 1's own **GENERATED** test — the half
+that is supposed to be immune to rot — hardcodes `wizLib.slice(41, 81)` for BUILTINS. **A fifth copy of the
+same fact, as TEST LOGIC**, two lines above a sibling that extracts its range by regex. And it fails the wrong
+way: a shifted file gives a **silently wrong slice**, not a loud failure. Rot inside the anti-rot machinery.
+
+**And you argued the shape honestly, including what it costs:** referencing by section name loses the reader's
+immediate jump-to-line at the referencing site — a real loss against the doc's own "one jump" promise — so you
+scoped the recommendation to **confirmed restatements only**, leaving anchoring correct for the ~145 singly-
+cited facts where there is nothing to reference. A recommendation that names its own downside is one I can act
+on without re-deriving it.
+
+## THE TASK — apply what you designed. Smallest and most dangerous first.
+1. **FIX `wizLib.slice(41, 81)` FIRST** (`architecture-map-1698.test.mjs:201`). Derive the range the way its
+   own sibling does two lines below (regex extraction), so a shifted file **fails loudly or self-corrects**
+   instead of silently reading the wrong lines. **⚠ Prove it: shift the source and confirm the old form read
+   wrong while the new one does not.**
+2. **CONVERT THE 4 CONFIRMED RESTATEMENTS** to reference-by-section-name: BUILTINS/opensAs (3 copies — one of
+   which is a diagram literally labelled *THE ONE DECLARATION*, restated twice) · `def.mouth`'s reader ·
+   `_BASE_DEF_SHAPE`/`hookKeysOf` · the WebGL in-flow append. **One source each; prose points at the checked
+   claim.**
+3. **⚠ KEEP ONE JUMP AVAILABLE.** You named the reader's loss — so make the reference carry enough to find the
+   thing (section name + what it asserts), not a bare cross-reference. If that proves impossible without
+   restating the coordinate, **say so and stop at the ones where it works.**
+4. **DO NOT extend beyond the 4 confirmed.** The ~145 singly-cited facts keep their own anchors, per your own
+   recommendation.
+5. **Gate: node tier only.**
+
+⚠ **After this the queue is: KNOWN DIVERGENCE's "is this the same kind of claim" question · Q1/Q2 anchoring
+(optional) · two-sided setup (human).** If you land this and nothing else is named, **say the queue is empty**
+— I intend to close the cycle rather than invent work.
