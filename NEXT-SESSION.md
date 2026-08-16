@@ -3314,3 +3314,40 @@ reconstructs a different program.
 ⚠ **NOTHING RELEASES** until this is green. The Edit fix cannot ship while it corrupts export round-tripping.
 ⚠ Then, in order: THE CHECKER (shrink-only inventory) → the 6 dead guards → `segmentFrame` → `glowEdited` →
 `_firstOpTitle` → `collectOps` → the 6 new sites.
+
+# ═══ t1966 — PROVE THE ONE ASSUMPTION THE BLOCKER FIX RESTS ON (read-only) ═══
+
+t1964 accepted pending my gate (running now). **You falsified my diagnosis before building on it — third time
+this session, and right every time.** I said "Edit wants deepest, export wants outermost, two questions." You
+TESTED it: exporting an already-wrapped stack with the deepest-match code produces correct per-op markers, so
+**export wants deepest too**. One answer for all three callers, not two. My framing would have had you build a
+split that nothing needed.
+
+The real cause is narrower and far more interesting: homing's builder nests an internal `{type:'op',
+opType:'homing'}` fragment inside its `user_root`, deliberately **id-less** — and a Blockly round-trip assigns
+a real id to every block it renders, so t1958's `deepest + id != null` rule started matching that fragment the
+moment a program passed through the Blocks tab. **The id-null guard was right in intent but depended on an
+invariant Blockly can silently break.** Treating `user_root` as opaque doesn't depend on ids at all. That is a
+declared boundary replacing a fragile guard, which is the better fix and not the one I asked for.
+
+## THE TASK — read-only. My gate is RUNNING: no code, no specs, no suite run.
+The fix rests on ONE semantic claim, stated in its own comment:
+
+> *"NOTHING inside one op's own authoring body can ever be a DIFFERENT, independently-addressable op."*
+
+If that is false anywhere, the boundary hides a real op and `opAtLine` silently returns the wrong owner — the
+same class of silent-wrong-answer we have now hit three times. **Prove it or break it.**
+
+1. **CAN A `user_root` BODY CONTAIN A GENUINELY ADDRESSABLE OP?** Not "does it today" — **can the authoring
+   path produce one?** Check what the wizard-maker / custom-op authoring surface allows a user to drop into a
+   twin's body. A user composing an op out of an existing op is the case that would break it.
+2. **ENUMERATE what actually sits inside `user_root` bodies today** across the shipped twins — is homing's
+   nested fragment the only `type:'op'` in any of them? Method as well as count, as you have been doing.
+3. **IF IT CAN BREAK:** say what the user would see (a wrong marker? a wrong Edit target? a wrong export?) and
+   what the boundary should be instead — do not build it.
+4. **IF IT CANNOT:** say so plainly and name what enforces it. **If nothing enforces it, that is the finding** —
+   an invariant with no enforcement is exactly the one that just cost us a release (the id-null guard).
+   A cheap assertion that makes it enforced is worth proposing.
+
+⚠ Design only. Then in order: THE CHECKER (shrink-only inventory) → the 6 dead guards → `segmentFrame` →
+`glowEdited` → `_firstOpTitle` → `collectOps` → the 6 new sites.
