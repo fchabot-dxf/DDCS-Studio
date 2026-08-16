@@ -38495,3 +38495,87 @@ sites, still dead code, still safe to direct-import. This turn only touched `fin
 `openForEdit`/`replaceOp`/the guarded ternaries at all.
 
 🔨 turn 1964
+
+# ═══ t1966 — DESIGN (read-only): stress-testing t1964's own `user_root` boundary — IT BREAKS ═══
+
+**Read-only, per the dispatch — no code, no specs, no suite run.** The task: prove or break t1964's own semantic
+claim — "NOTHING inside one op's own authoring body can ever be a DIFFERENT, independently-addressable op."
+
+## (1) CAN A `user_root` BODY CONTAIN A GENUINELY ADDRESSABLE OP? YES — proven empirically, not argued
+
+Traced the authoring surface first: `opToolbox.js`'s own comment states the palette offers `builderOf(opType)
+(defaultParams(def))` directly — I read `builderOf('user_corner_data')()`'s actual return and confirmed it is a
+BARE `[{type:'user_root', …}]`, with **no `type:'op'` wrapper** (the wrapper only gets added later, by `makeOp()`,
+which the palette-drag path never calls). So dragging a whole wizard FROM THE PALETTE into another wizard's body
+nests a bare, id-less `user_root` — safe by construction, not the hazard.
+
+**But a DIFFERENT, real gesture is not safe.** `blocksApp.js`'s own `deriveLiveWizard` comment already documents
+that a "Define Custom Wizard" block and an ordinary PLACED twin op (a real, id-bearing `type:'op', opType:
+'user_corner_data'` record) can coexist as top-level siblings on the SAME canvas — it names this exact
+coexistence as the cause of a PAST bug (inserting Corner into an unrelated program wrongly triggered the wizard
+face). Given that coexistence, I connected an ALREADY-PLACED Corner op block into a fresh `user_root`'s own
+EXECUTION mouth via Blockly's real connection API (`execInput.connection.connect(cornerBlock.previousConnection)`
+— the SAME compatibility check a real mouse drag-and-drop uses to decide whether a drop snaps) — it connected
+with **zero rejection, zero error**; `bridge.js`'s own `user_root` block definition puts NO `check:` on its
+EXECUTION `input_statement`, so Blockly enforces no type restriction there at all. Then read the result back
+through `workspaceToStack` — the app's own real reader, the one every Blocks-tab sync calls — and it **faithfully
+preserved the nested structure**: `user_root → op(user_corner_data, id="op1", full params/children) → user_root
+→ …`, no sanitization, no rejection, no warning.
+
+**So yes: a user composing a custom wizard by dragging an already-placed op into it produces a genuinely
+addressable op nested inside another op's authoring body** — exactly the case the dispatch asked me to check,
+and it is reachable through ordinary UI mechanics (drag-and-drop), not just a programmatic API poke.
+
+## (2) ENUMERATED: is homing's fragment the only one? YES, today — swept all 32, method + count, not assumed
+
+Walked every REGISTERED op's own builder output (`listUserOps()` × `builderOf(opType)()`, recursing into every
+`.children`/`.uiChildren` at every depth) checking for a `type:'op'` node anywhere below the top level. **32 ops
+checked, 1 with a nested op** (`user_homing_data`, its own known `opType:'homing'` fragment, depth 1) — the other
+**31 are clean**. So today's shipped state matches what my t1964 fix assumed; the gap is latent, not live —
+nothing SHIPPED breaks it yet, but the authoring path can produce it, and nothing stops that from becoming a
+shipped custom wizard.
+
+## (3) WHAT THE USER WOULD SEE, if this were ever composed and saved
+
+- **Editor hover chip**: no chip at all over the nested op's own lines (`opAtLine` returns null — my boundary
+  finds nothing at the top level to fall back to, since the OUTER `user_root` itself isn't `type:'op'`). Lost
+  affordance, not a wrong one — a real degrade, but not silent-wrong the way t1958/t1964 were.
+- **Export** (`serializeWithMarkers`): the nested op's own lines get NO marker (same null result) — so on
+  re-import, that body leaf-parses as anonymous G-code instead of reconstructing as its own op. Silent structural
+  data loss on round-trip, the exact class this whole session has been closing, reopened one level deeper.
+- **A SEPARATE, worse problem, found for free while tracing this**: `_framed()`'s own `progstart`/`progend` lift
+  (t1828/t1830) only searches the OUTER `user_root`'s DIRECT children — a self-terminating nested op's own M30,
+  buried two levels down, is invisible to it. Composing a custom wizard this way would very likely reproduce the
+  mid-program-M30 class of bug this session already fixed once (t1940/t1946's own `collapseImportTerminators`),
+  through a different door. Not investigated further — named, not chased, per the dispatch's own scope.
+
+**What the boundary should be instead (design, not built):** not "opaque at `user_root`, full stop" — narrower.
+The REAL distinguishing fact between homing's own fragment and a legitimately nested op is already DECLARED
+elsewhere in this codebase: `userOps.js`'s own `USER_OP_PREFIX = 'user_'`, which `validateUserOp` already
+enforces as "every registered custom op's `opType` starts with `user_`." Homing's fragment is `opType:'homing'`
+— NOT `user_`-prefixed (checked: `builderOf('homing')` DOES resolve — it's the retired coded wizard's own legacy
+builder, so "is it registered" is not the right test either). The boundary that survives both cases: don't
+recurse into a `user_root`'s own plain atoms (comments, moves, assigns, sections — never independently
+addressable) *unless* a `type:'op'` block appears among them, in which case check its `opType` against the
+ALREADY-DECLARED `USER_OP_PREFIX` convention — a `user_`-prefixed nested op is a real, addressable match; anything
+else (homing's `'homing'`, or any future legacy artifact shaped the same way) is not. This reuses a declared
+boundary instead of inventing a new one, and does not depend on ids at all (this turn's whole point).
+
+## (4) WHAT ENFORCES IT TODAY? Nothing — read `validateUserOp` line by line to confirm, not assumed
+
+`validateUserOp` (the ONE gate a def passes through before registration) checks: `opType` format, non-empty
+template, binding param/type validity, the `bindingSpecs`+`build` footgun, and fork-arm-count preservation. **It
+never inspects `def.template` for a nested `type:'op'` block at all.** This is exactly the shape the dispatch
+named: an invariant nobody enforces, discovered only because I went looking for a way to break it. **Proposed
+cheap assertion (design only): `validateUserOp` walks `def.template` and flags any `type:'op'` block found below
+the top level whose `opType` is not itself a `user_`-prefixed, currently-registered op** — catching this at
+SAVE/REGISTER time, before a broken custom wizard can ship, rather than at whatever later moment a chip fails to
+appear or an export silently drops a body. Sized at a few lines (the same tree-walk this turn's own sweep already
+proves works); not built this turn, per the dispatch.
+
+## Gate
+Read-only design, per the dispatch — no code, no specs, no suite run (three scratch diagnostic spec files were
+created, run, and deleted during investigation; `git status` confirms none survive). Only this WORK-LOG entry
+changed.
+
+🔨 turn 1966
