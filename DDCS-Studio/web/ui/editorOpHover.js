@@ -9,7 +9,7 @@
  */
 import { showOpMenu, showGroupMenu, hideOpMenu, openMenu, attachLongPress } from './opContextMenu.js';
 import { indentMenuItems, installEditorIndent } from './editorTextOps.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
-import { onChange, flattenOps } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change; t1976 — the one declared op enumeration
+import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
 
@@ -122,15 +122,29 @@ export function initEditorOpHover() {
             overlay.querySelectorAll('.g-line.op-block-edited').forEach((s) => s.classList.remove('op-block-edited'));
             overlay.querySelectorAll('span.word-edited').forEach((s) => s.replaceWith(...s.childNodes));   // unwrap stale
             overlay.normalize();                                                                          // merge split text nodes → clean offsets
-            // t1976 — was a shallow top-level loop over `ddcsGetBlockProgram()`: for a multi_step-wrapped
-            // multi-op program (the real Add gesture), a nested op's own record never appears at the top level,
-            // so `ddcsOpBlockEdited(op.id)` was never even CALLED for it — the glow silently never rendered for
-            // any hand-edited nested op, even though `isOpBlockEdited`/`editedRangesForOp` (opGlow.js) already
-            // resolve BY ID correctly at any depth (t1958's own `findOpById`). The gap was purely in what this
-            // loop iterated, not in the edit-detection itself. `flattenOps` is the one declared answer to "what
-            // operations does this program hold" (t1928) — recurses into a multi_step's own children, same
-            // domain this loop needs.
-            for (const op of flattenOps(window.ddcsGetBlockProgram() || [])) {
+            // t1988 — TWO DIFFERENT QUESTIONS, not one widened to cover both. `flattenOps` (t1928) answers "what
+            // OPERATIONS does this program hold" — it treats a `multi_step` wrapper as transparent (its own steps
+            // are the real operations) and every OTHER op as OPAQUE, correctly: a `group` op's own `.children` are
+            // its G-code body, not a second operation sitting beside it — that is the same reason `flattenOps`
+            // must NOT recurse into it, and why the setup sheet / time-estimate split are right to count it once.
+            // This loop asks a DIFFERENT question — "which OP-RECORD, at ANY depth, owns this recorded edit" — and
+            // a `group` op's own body can genuinely CONTAIN another independently-addressable op (t1986, live-
+            // confirmed: ordinary Blocks-tab drag nests one `group` inside another; `opEdits.recordEdit` records
+            // the change under the INNERMOST op's own id, per `blocksApp.js`'s own nearest-'op'-ancestor walk).
+            // t1976's `flattenOps` loop never visited that inner id at all — not a gap in `flattenOps`'s own job,
+            // a genuinely different enumeration this one needs. Rather than re-deriving the recursion (and its
+            // `user_root`/`USER_OP_PREFIX` boundary, t1972 — an op nested in another's authoring body must stay
+            // unaddressable here too, the same as it is for Edit), this sweeps every RENDERED line through the ONE
+            // already-canonical per-line answer (`ddcsOpAtLine`, t1842→t1972) and collects the distinct owners —
+            // the exact pattern `segmentFrame.js`'s own `frameSegments` already established for "ask every line,
+            // don't re-derive the boundary a second time."
+            const editableOps = new Map();
+            overlay.querySelectorAll('.g-line[data-line-index]').forEach((s) => {
+                const idx = Number(s.dataset.lineIndex);
+                const op = Number.isFinite(idx) ? window.ddcsOpAtLine(idx) : null;
+                if (op && op.id != null && !editableOps.has(op.id)) editableOps.set(op.id, op);
+            });
+            for (const op of editableOps.values()) {
                 if (!op || !window.ddcsOpBlockEdited(op.id)) continue;
                 const entries = window.ddcsEditedRangesForOp ? window.ddcsEditedRangesForOp(op.id)
                     : ((window.ddcsEditedLinesForOp ? window.ddcsEditedLinesForOp(op.id) : (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || []).map((line) => ({ line, range: null })));

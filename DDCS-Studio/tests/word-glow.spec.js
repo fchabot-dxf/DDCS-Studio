@@ -235,3 +235,104 @@ test('t1976 — a REAL field edit on the nested (2nd) op of a multi_step program
   await page.waitForTimeout(100);
   await page.screenshot({ path: 'verification/t1976-nested-op-glow.png' });
 });
+
+// t1988 — a group nested inside another group (t1986: ordinary Blocks-tab drag, live-confirmed reachable — the
+// "Group" right-click gesture itself cannot create this shape, but a real drag can, and nothing stops it). The
+// edit-detection itself (isOpBlockEdited/editedRangesForOp, opGlow.js) already records the change under the
+// INNERMOST group's own id correctly (blocksApp.js's own nearest-'op'-ancestor walk) — the gap was that
+// glowEdited's own enumeration (flattenOps, t1976's fix) never visits that inner id: flattenOps deliberately
+// treats every non-multi_step op as opaque (correct for "what operations does this program hold" — a group IS
+// one operation, and the setup sheet / time-estimate split are right to count it once), which is a DIFFERENT
+// question than "which op-record, at any depth, owns this edit." Fixed by sweeping every rendered line through
+// the already-canonical per-line answer (ddcsOpAtLine) instead of widening flattenOps.
+test('t1988 — a REAL field edit on an atom inside a group nested in another group glows THAT group\'s own lines', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack && window.showApp && window.ddcsLinesForOp && window.ddcsRefreshBlockGlow, null, { timeout: 15000 });
+
+  // BUILD: two loose runs, each wrapped into its own group via the real groupLooseAtoms function (the "Group"
+  // gesture's own mechanism), then nest group B inside group A via ordinary Blockly drag (t1986's own technique:
+  // Blockly's real connection object — the identical primitive a live mouse-drag invokes on release, since no
+  // mouth in this codebase declares a `check` constraint).
+  const setup = await page.evaluate(async () => {
+    const ops = await import('/blocks/opSession.js');
+    window.ddcsLoadBlockStack([
+      { type: 'move', id: 'm1', params: { mode: 'rapid', x: 10, y: 10, z: 5 } },
+      { type: 'move', id: 'm2', params: { mode: 'cut', x: 20, y: 20, z: -2, feed: 200 } },
+    ]);
+    const gidA = ops.groupLooseAtoms('Group A', ['m1', 'm2']);
+    window.ddcsLoadBlockStack([
+      ...window.ddcsGetBlockProgram(),
+      { type: 'move', id: 'm3', params: { mode: 'rapid', x: 30, y: 30, z: 5 } },
+    ]);
+    const gidB = ops.groupLooseAtoms('Group B', ['m3']);
+    return { gidA, gidB };
+  });
+
+  await page.evaluate(() => window.showApp('blocks'));
+  await page.waitForFunction(({ gidA, gidB }) => window.__blkws && window.__blkws.getBlockById(gidA) && window.__blkws.getBlockById(gidB), setup, { timeout: 8000 });
+
+  const dragResult = await page.evaluate(({ gidA, gidB }) => {
+    const ws = window.__blkws;
+    const blkA = ws.getBlockById(gidA), blkB = ws.getBlockById(gidB);
+    const gcodeInput = blkA.getInput('GCODE');
+    let cur = gcodeInput.connection.targetBlock();
+    while (cur && cur.nextConnection && cur.nextConnection.targetBlock()) cur = cur.nextConnection.targetBlock();
+    const destConn = cur ? cur.nextConnection : gcodeInput.connection;
+    destConn.connect(blkB.previousConnection);
+    return true;
+  }, setup);
+  expect(dragResult, 'sanity: group B connected inside group A\'s own GCODE mouth').toBe(true);
+
+  const structure = await page.evaluate(async (gidA) => {
+    const { workspaceToStack } = await import('/blocks/blockly/stackBridge.js');
+    const stack = workspaceToStack(window.__blkws);
+    window.ddcsLoadBlockStack(stack);
+    await new Promise((r) => setTimeout(r, 300));
+    const a = (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === gidA);
+    return { nested: !!(a && a.children && a.children.some((c) => c && c.opType === 'group')) };
+  }, setup.gidA);
+  expect(structure.nested, 'sanity: group B is genuinely nested inside group A after the read-back').toBe(true);
+
+  // EDIT: a real Blockly field edit on m3's own numeric value — m3 lives inside the NESTED group (B), not A.
+  const did = await page.evaluate((id) => {
+    const ws = window.__blkws;
+    const num = ws.getBlockById(id).getDescendants(false).find((b) => b.type === 'math_number');
+    if (!num) return false;
+    num.setFieldValue(String(Number(num.getFieldValue('NUM')) + 9), 'NUM');
+    return true;
+  }, 'm3');
+  expect(did, 'found a numeric field on the nested group\'s own atom to edit').toBe(true);
+  await page.waitForTimeout(200);
+  await page.evaluate(() => window.ddcsRefreshBlockGlow());
+
+  await page.evaluate(() => window.showApp('studio'));
+  await page.waitForTimeout(150);
+
+  const r = await page.evaluate(({ gidA, gidB }) => {
+    const outerLines = new Set(window.ddcsLinesForOp(gidA) || []);
+    const innerLines = new Set(window.ddcsLinesForOp(gidB) || []);
+    const glowingLines = Array.from(document.querySelectorAll('#editor-highlight .g-line'))
+      .filter((el) => el.classList.contains('op-block-edited') || el.querySelector('.word-edited'))
+      .map((el) => Number(el.dataset.lineIndex));
+    return {
+      glowingLines,
+      glowOnInnerOnly: glowingLines.every((l) => innerLines.has(l)),
+      spanTexts: Array.from(document.querySelectorAll('#editor-highlight .word-edited')).map((s) => s.textContent),
+    };
+  }, setup);
+
+  expect(r.glowingLines.length, `the edit must glow SOMETHING, not nowhere — got ${JSON.stringify(r)}`).toBeGreaterThan(0);
+  expect(r.glowOnInnerOnly, 'every glowing line belongs to the NESTED group\'s own span, not the outer group\'s').toBe(true);
+  expect(r.spanTexts.length, 'the changed token itself glows as a word-level span').toBeGreaterThan(0);
+
+  const firstGlow = Math.min(...r.glowingLines);
+  await page.evaluate((line) => {
+    const ed = document.getElementById('editor');
+    const lh = parseFloat(getComputedStyle(ed).lineHeight) || 22;
+    ed.scrollTop = Math.max(0, line * lh - 60);
+    ed.dispatchEvent(new Event('scroll'));
+  }, firstGlow);
+  await page.waitForTimeout(100);
+  await page.screenshot({ path: 'verification/t1988-nested-group-glow.png' });
+});

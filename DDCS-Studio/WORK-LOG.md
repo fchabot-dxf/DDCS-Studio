@@ -39523,3 +39523,80 @@ new glow-on-nested-group gap into it, as separate entries — not decided here) 
 including the unenforced prose half → whatever the human rules on two-sided setup.
 
 🔨 turn 1986
+
+# ═══ t1988 — glowEdited, again: two different questions, named apart instead of one widened ═══
+
+## THE TENSION, held rather than collapsed
+
+`flattenOps` (t1928) answers "what OPERATIONS does this program hold" — transparent through `multi_step`
+specifically, opaque to every other op, correctly: a `group`'s own `.children` are its G-code body, not a second
+operation sitting beside it, and the setup sheet / time-estimate split are RIGHT to count a group once each.
+`glowEdited` was asking a DIFFERENT question — "which op-record, at ANY depth, owns this recorded edit" — and a
+`group`'s own body can genuinely CONTAIN another independently-addressable `group` (t1986, live-confirmed:
+ordinary Blocks-tab drag, not the named "Group" gesture, which structurally cannot create it). `opEdits.
+recordEdit` already records the change under the INNERMOST group's own id (`blocksApp.js`'s own nearest-'op'-
+ancestor walk, unrelated to this bug); t1976's `flattenOps` loop never visited that inner id, because
+`flattenOps` was never supposed to.
+
+**Checked before touching anything: does widening `flattenOps` break a consumer that legitimately wants a group
+counted once?** Yes — `setupSheet.js`'s own `setupGroups`/single-page path and `timeEstimate.js`'s per-op split
+both call `flattenOps` expecting exactly "operations," and a widened `flattenOps` would double-list a nested
+group on the sheet and split its time twice. Not touched. `flattenOps` is unchanged, byte-for-byte.
+
+## THE FIX — a sweep over the already-canonical per-line answer, not a new boundary
+
+`glowEdited` now walks every RENDERED `.g-line[data-line-index]`, calls `window.ddcsOpAtLine(idx)` for each
+(the same canonical per-line lookup fixed across t1842→t1958→t1964→t1972, already correctly excluding a non-
+`user_`-prefixed op nested in a `user_root`), and collects the distinct op-record owners into a `Map` keyed by
+id. This is the SAME pattern `segmentFrame.js`'s own `frameSegments` already established — ask the canonical
+per-line answer for every line, don't re-derive its boundary a second time — applied here instead of re-writing
+the `insideUserRoot`/`USER_OP_PREFIX` recursion a third time. Dropped the now-unused `flattenOps` import.
+
+This is a STRICT SUPERSET of t1976's own fix, not a parallel one: it still correctly finds a nested op inside a
+`multi_step` (every line resolves to the deepest addressable owner regardless of wrapper type), and now also
+finds one nested inside a `group`, or any future nesting shape `opAtLine` itself already handles — the loop no
+longer needs updating every time a new container kind is invented.
+
+## ASSERT WHAT PRINTS — pixels, per t1976's own precedent
+
+New test in `word-glow.spec.js`, reusing `groupLooseAtoms` (the real "Group" mechanism) to build two groups, then
+t1986's own connection technique to nest one inside the other's GCODE mouth (Blockly's real `.connect()`, no
+`check` constraint blocks it — the identical primitive a live drag invokes). A real Blockly field edit on the
+NESTED group's own atom, then asserts every glowing line belongs to the inner group's own span, never the
+outer's, never nowhere. Screenshot (`verification/t1988-nested-group-glow.png`) shows exactly line 3 (the nested
+group's own emitted line) with the changed digit highlighted — lines 1-2 (the outer group's own lines) untouched.
+
+## NON-VACUITY
+
+Saved a scratch copy of the fixed file, reverted `glowEdited` to t1976's own `flattenOps` loop, ran the WHOLE
+`word-glow.spec.js` file: the new t1988 test failed **3/3** (`glowingLines: []` — nowhere, exactly the reported
+symptom), while t1976's own pre-existing test (the multi_step case) stayed GREEN — proof this test exercises a
+genuinely different path, not a re-assertion of what t1976 already covered. Restored from the saved copy. Re-ran
+the whole file: both real tests green.
+
+## THE INVENTORY — widened, not resized
+
+`glowEdited` was already removed from `op-lookup-scan-1968`'s `INVENTORY` at t1976 (this fix replaces its
+already-fixed implementation, doesn't reopen a closed site) — count stays at 7, confirmed clean 7/7. Per
+requirement 3, widened `setGroupChildParams`'s own "why" text (still an open, tracked entry) to name the SECOND
+reachable path this turn found: nesting a group inside another group is now a confirmed-live way to reach that
+same shallow `cur.findIndex` lookup, not only "promoted into a multi_step."
+
+## ARCHITECTURE.md — checked, no drift
+
+Zero citations to `editorOpHover.js` in `ARCHITECTURE.md` (grepped).
+
+## GATE
+
+Node tier (125/125, including the unchanged-count `op-lookup-scan-1968` at 7/7) + `word-glow.spec.js` (2/2 real
+tests, 2 pre-existing unrelated fixme skips) + `setup-sheet-850` (4/4) + `time-estimate-844` (7/7; 1 known load-
+contention flake retried clean) + `guard-roundtrip-1595` (2/2) + `fork-parity-1593` (2/2) + `editor-sim-real-
+insert` (2/2) + `whole-program-intent-756` (3/3) — **149/149 clean** (`--workers=2`, 1 flake total, the
+established pattern, retried green).
+
+## Queued CODE work — awaiting the human's ruling on two-sided setup
+`option-b-slice2-positioning-1872` bridged to a wrapped program (t1974's own method) → the remaining 7-entry
+inventory → architecture-citation Option B, including the unenforced prose half → whatever the human rules on
+two-sided setup.
+
+🔨 turn 1988
