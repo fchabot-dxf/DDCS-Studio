@@ -3563,3 +3563,40 @@ Two or three greps, then stop — I do not want this turning into a suite-wide a
 + the 4 t1928 features.
 ⚠ **RELEASE PLAN:** I am batching — `glowEdited` → `_firstOpTitle` → `collectOps`, then ONE full gate and one
 release, rather than a 30-minute gate per one-line fix. Say so if any of the three looks bigger than that.
+
+# ═══ t1978 — editorManager._firstOpTitle (3rd of the batch) ═══
+
+t1976 accepted, verified by me: inventory **9 → 8**, node tier 125/125, ratchet green both directions again,
+and **I looked at your screenshot** — the glow lands on the nested surfacing op's own lines (the highlighted
+`7` tokens at 52/55/63/66), not the wrapper's. That is the assertion made visible, which numbers alone could
+not have shown me.
+
+**Your bounded answer was exactly the right size:** `option-b-slice2-positioning-1872`'s PRIMARY EVIDENCE test
+is unwrapped too — grep-confirmed, same bare-array shape slice3 had before t1974. So **the whole family was
+vouching for multi-operation behaviour neither test ran**, and you said plainly that whether it *matters* for
+slice2 is unverified rather than guessing. Two greps, a real answer, and you stopped.
+
+## ⚠ ONE THING I SPOTTED IN THE SCREENSHOT — check it, do not chase it.
+That program is in an **error state**: line 75 emits `#1505=1 ;ERROR: stepover / stepdown must be greater than
+zero`, and the header badge reads **"can't verify"**. The glow claim still holds (it is about which lines
+glow). But a fixture whose program cannot verify is weaker evidence than one that can — and if the *default*
+Add-gesture surfacing op emits that error, that is a separate real bug. **Say which it is:** your edit made it
+invalid, or it was invalid from the defaults. One check, then move on.
+
+## THE TASK — `editorManager.js _firstOpTitle`, next in the inventory.
+An exported `.nc` is titled `multi_step` instead of naming the real operation. User-visible on every
+multi-operation export.
+
+1. **Fix via the canonical enumeration**, same shape as the last two.
+2. **ASSERT THE EXPORTED FILENAME/TITLE** a user actually gets for a multi-operation program — a real name, not
+   the wrapper's type. Bridge to `export-import-fidelity-1964` if the title rides the same path.
+3. **INVENTORY 8 → 7**, count updated.
+4. **PROVE NON-VACUITY.**
+5. **Gate:** node tier (incl. checker) + `export-import-fidelity-1964` + the round-trip/parity set + the 4
+   t1928 features.
+
+⚠ Then `collectOps` (the over-deep twin — **different fix shape**, substitute-not-both), and that closes the
+batch: I run ONE full gate and cut a release.
+⚠ Queued after the release: **bridge `option-b-slice2-positioning-1872` to a wrapped program** the way t1974
+did for slice3 — a PRIMARY EVIDENCE test that never runs the case it names is the defect we keep deleting ·
+then the rest of the inventory · then architecture-citation Option B (incl. the unenforced prose half).
