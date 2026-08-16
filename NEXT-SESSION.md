@@ -2934,3 +2934,43 @@ populated canvas without clearing first will HANG on it** — you hit exactly on
 ⚠ Still queued, not now: `collectOps`'s phantom row · the marker-free raw-text import door · the
 `lathe-honest-3d-1301` near-miss · slice 1's unswept region (`macrosApp.js` et al) · slice 2 of the rename ·
 collapse-on-delete (the symmetric rule's other half, still not built).
+
+# ═══ t1946 — DESIGN: the other half of the symmetric rule (collapse-on-delete) + the reorder question ═══
+
+t1944 accepted — a genuinely good sweep. **The best part was catching a flaw in your own method:** noticing
+that the first full run was misleadingly clean because files load fresh mid-run and your in-flight edits landed
+before some specs' turn came up, then re-running with everything already in place for a trustworthy count, and
+cross-checking the JSON reporter because the terminal buffers unreliably here. Most sweeps would have reported
+the first number. 7 files, root causes named per file, one shared `clickInsertChoice` helper instead of 4
+inline copies. And `anchor-contamination-1786` was the right call for the right reason — its own title says *on
+a REAL CONCATENATED PROGRAM*, so Add restores what it always tested; Replace would have left it unable to test
+its own claim. That is preserving intent, which is what I asked for, not reaching for the new toy.
+
+**MY RELEASE GATE IS RUNNING** on `e61e6b72` for the duration of this turn. **Read-only: no code, no specs.**
+
+## THE TASK — design, do not build.
+The user can now ADD operations. The very next thing they will do is REMOVE one and REORDER them. Neither is
+designed, and one of them is a promise already made in code.
+
+1. **COLLAPSE-ON-DELETE — the promise `addOperation`'s own doc comment makes.** It says a future delete path
+   "re-runs this same function over what remains rather than hand-rolling its own mirror-image collapse rule."
+   **Nothing calls it yet.** Answer concretely: **where does a delete actually happen today?** (Blockly's own
+   block-delete in the Blocks tab is the obvious one — are there others: an editor edit that removes an
+   operation's lines, a project load, an undo?) For each, name `file:line` and say whether the program passes
+   through a single choke point on its way back into the model. **If one choke point exists, the collapse is one
+   line there. If it does not, say so — that is the finding, and it changes the design.**
+2. **⚠ THE FAILURE MODE TO DESIGN AGAINST:** a wrapper left holding ONE operation. The shape then disagrees with
+   what `addOperation` would have produced for the same content — **two ways to represent one program**, which
+   is the second-source defect this whole session has been deleting. Say what goes wrong downstream if it
+   happens (setup sheet? `flattenOps`? emit?) — check, do not assume; `flattenOps` may well be immune.
+3. **THE REORDER QUESTION — you named it UNVERIFIED, so settle what CAN be settled from source.** A real job is
+   face → drill → contour and that order is the tool-change sequence. Trace whether a `multi_step`'s children
+   render as draggable sibling blocks in the Blocks tab (`stackBridge.js` / `bridge.js` — the same mechanics you
+   traced for `setup` in t1932). **State it as REACHABLE / NOT / NEEDS-A-BROWSER.** If it needs a browser, say
+   so plainly and I will queue the check — do not guess, and do not build a reorder control.
+4. **NAME WHAT YOU WOULD NOT DO.** If reorder-in-Blocks is enough and a Studio-tab reorder control would be
+   unasked chrome, say that. The human decides, but I want your read.
+
+⚠ Design only. No code, no specs, no suite run — my gate owns the machine this turn.
+⚠ Still queued: `collectOps`'s phantom row · the raw-text import door · `lathe-honest-3d-1301` · slice 1's
+unswept region · slice 2 of the rename.
