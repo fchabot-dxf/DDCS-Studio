@@ -3832,3 +3832,44 @@ exactly this repair for slice3 — **follow that precedent rather than inventing
 ⚠ The machine is yours — my gate is not running.
 ⚠ Then: the remaining 7-entry inventory → architecture-citation Option B (with the mandatory uniqueness
 assertion, incl. the unenforced prose half). Two-sided setup still awaits the human.
+
+# ═══ t1992 — THE FIVE opSession.js SITES (one file, one pattern) ═══
+
+t1990 accepted. **And you said the thing I asked you to say:** the wrapped test **passed first try**, you re-ran
+it 3× isolated to be sure, and **no product code was touched.** That confirms the t1984 speculation —
+`blkStartHints` routing through `flattenOps` had already made slice2's per-pass tagging multi_step-aware, so
+the claim in the test's name was true all along and only the evidence was missing. **Reporting "already
+correct" instead of filing a green test as a fix is exactly the honesty this whole session has been about.**
+Your non-vacuity reasoning for that case was right too: there is nothing to revert, so the standard does not
+apply — the 3× isolated repeat plus the sanity-shape assertion (a REAL `multi_step` wrapper, not silently
+unwrapped) is what separates signal from rubber-stamp. **All four overclaiming tests are now closed.**
+
+## THE TASK — five of the seven remaining inventory sites live in ONE file.
+`opSession.js`: `deleteOp` · `duplicateOp` · `setGroupChildParams` · `replayReconcile` · `mergeOpBlocks`.
+Five entries, one file, almost certainly **one repeated shallow-lookup pattern**. Fix it as ONE thing, through
+`findOpById` / `replaceOpById` — the declared pair that already exists. **If you find yourself writing the same
+resolve five times, stop and declare it once**, exactly as `flattenOps` was.
+
+**⚠ SEVERITY ORDER — `mergeOpBlocks` IS THE WORST BUG LEFT IN THE INVENTORY.** Its own entry says it *"silently
+no-ops for a nested op, discarding the user's hand edits with no error."* **That is data loss, silent, on work
+the user typed by hand.** Do that one first and do it most carefully; if the turn has to be cut short, that is
+the one that must land complete.
+
+Then `deleteOp` / `duplicateOp` — right-click Delete and Duplicate **silently do nothing** on a nested
+operation. Same shape as the Edit bug already shipped, and **the Add feature made all of these reachable in
+ordinary use**: before Add, only an import produced a wrapper.
+
+1. **ASSERT WHAT THE USER DOES, per site** — right-click Delete on a nested operation removes *that* one and
+   leaves its siblings; Duplicate produces a real second copy; a hand-edited nested op's edits **survive** a
+   merge. Drive real gestures; a unit call on the resolver would pass while the menu item stayed dead (that is
+   precisely how `openForEdit` hid).
+2. **INVENTORY 7 → 2**, count updated. The ratchet must fail if you fix a site without updating it.
+3. **PROVE NON-VACUITY** per site, not once for the file.
+4. **⚠ IF THIS IS TOO BIG FOR ONE TURN, LAND EACH SITE COMPLETELY AND PARK THE REST** — say which you parked.
+   Five half-fixes is worse than two finished ones, and I would rather review two solid than five hurried.
+5. **Gate (widened — `opSession.js` is core):** node tier (incl. checker) + `edit-nested-op-1958` +
+   `word-glow` + `group-edit` + `insert-add-replace-1942` + `add-operation-1940` + `collapse-on-delete-1948` +
+   the round-trip/parity set + the 4 t1928 features.
+
+⚠ **STOP CONDITION:** if fixing any of these changes single-operation behaviour, stop and tell me.
+⚠ The machine is yours. Then: `opContextMenu.showOpMenu` · `macrosApp.openCamAuthoring` · citation Option B.
