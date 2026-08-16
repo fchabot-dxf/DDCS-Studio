@@ -39271,3 +39271,123 @@ a wrapped program (t1974's own method) → the remaining 7-entry inventory → a
 including the unenforced prose half.
 
 🔨 turn 1982
+
+# ═══ t1984 — COUNTING THE CLASS: PRIMARY EVIDENCE that never runs its own claim, across the suite ═══
+
+READ-ONLY, bounded, per the dispatch. No product code touched, no spec rewritten, no mouth added, no suite run.
+
+## METHOD
+
+`ddcsLoadBlockStack` (`programModel.js`'s own `setStack` alias) is the ONE declared entry point for "put a
+program into the live app model" — anything a spec puts on the canvas without a real gesture must go through it
+(or a bare function call that never touches live state at all, which can't credibly claim UI-reachability in the
+first place, so it's outside this hunt's scope by construction). Started from every `tests/*.spec.js` file
+calling it (**115 of 809**), then subtracted every file that ALSO contains a genuine program-CONSTRUCTION
+gesture marker: `openWiz(`, `insertWiz(`, `wizardManager.open(`, `wizardManager.insert(`, `__blkws`,
+`getBlockById(`, `.connect(`, or the literal `"Add as a 2nd operation"` dialog text (deliberately narrower than
+"any `.click(`" — a spec can hand-build its program yet still click an UNRELATED button, e.g. Print or Export,
+which proves nothing about how the program itself got built). **29 files survive both filters** — they load a
+program into the live app with zero trace of a real construction gesture anywhere in the file.
+
+Read all 29: header comment + every `test(...)` title first (cheap, usually enough to place a file), then the
+exact `ddcsLoadBlockStack(...)` call site for anything still ambiguous (what did it actually receive — a hand-
+literal object tree, or the return of a REAL production function like `buildActiveOpStack()`/`middleStack()`/
+`importMarkedNc()`, and did a real form/wizard/right-click precede it in the same test).
+
+## (2) THE LINE — feature-reachability claim vs. everything else
+
+**Guilty** = the test's own title/claim is about something a USER DOES ("a program built this way behaves like
+X"), the construction is a literal hand-built record tree (or an app-state array assembled by hand), and no real
+gesture anywhere in the file demonstrates that shape is reachable. **Innocent** = one of three legitimate,
+recognizable shapes found repeatedly, none of them a bypass:
+  - **Self-declared algorithm/derivation/foundation tests** — the file says so itself (`opatline-identity-1842`:
+    "ALGORITHM layer only"; `segment-frame-derivation-1838`: "DERIVATION ONLY... no positioning, no visibility,
+    no render change"; `user-ops.spec.js`: "Pure foundation: no UI"). A claim about a function is not a claim
+    about reachability — nothing to bridge.
+  - **The declared reconciler-invariant pattern** — `recordOp → buildActiveOpStack/buildActiveOpRecord →
+    reconcileActiveOp`, the SAME production function a real Insert click calls internally, used to assert
+    "declare → build → reverse-sync agrees" as its own explicit, named, repeated convention across many op
+    families (`atc-roundtrip.spec.js`'s own header names it outright: "Drives the reconciler exactly the way
+    `wizardManager.pullFromBlocks` does"). This is a DIFFERENT claim than "a user can produce this program" — it
+    is "the round-trip machinery agrees with itself" — and the wizard doors these ops open through are not in
+    question (pocket/middle/corner/ATC wizards are unambiguously real, reachable, exercised elsewhere).
+  - **The claim is about something else entirely** — a file browser, a camera, a badge reading a typo, a preview
+    computation compared against another preview computation — where `ddcsLoadBlockStack` only seeds an
+    incidental program so the ACTUAL feature under test has something to act on. `blocks-roundtrip-toast.spec.js`
+    is the sharpest example: its one `ddcsLoadBlockStack` call is `([])` — an empty-canvas CLEAR, not a
+    construction, and my own filter's bluntness (matching the call, not its argument) is why it surfaced at all.
+
+## THE COUNT
+
+**4 of 29 are guilty** by this line — all four ALREADY found this session, not new: `option-b-slice2-
+positioning-1872` (t1980), `option-b-slice3-live-visibility-1874`'s own PRIMARY EVIDENCE test (t1974 — my own
+added WRAPPED test in the same file is fine, built through the real declared grouping function), `two-sided-879`,
+`two-sided-881` (both t1982). **25 of 29 resolve to innocent or explicitly-disclosed on inspection** — read every
+one individually, not sampled, not assumed clean.
+
+Two worth naming as CLOSE CALLS, not misclassified but genuinely closer to the line than the rest of the 25:
+- `multi-op-import-1916.spec.js` — the underlying claim (`importMarkedNc`, the parser function, correctly
+  reconstructs a wrapper from marker-tagged text) is legitimately function-level and its hand-built SOURCE
+  program is irrelevant to that claim. But its own test TITLES ("a real multi-op .nc imports as ONE op carrying N
+  steps") read as though a user drove File→Load, when the mechanism is a bare `importMarkedNc(exported)` call —
+  the same "claim outruns construction" shape as PRIMARY EVIDENCE, just in the test's NAME rather than its
+  premise. A wording fix, not a functional bug — flagged, not touched (out of scope: report only).
+- `shape-types.spec.js` / `middle-crossover.spec.js`'s round-trip halves — reconciler-pattern tests (Tier B,
+  innocent), but skip even the literal Insert CLICK a real gesture would need, relying on
+  `rec.recordOp()`+`buildActiveOpStack()` alone. Lower risk than the guilty four specifically because the WIZARD
+  DOORS they open through (Pocket, Middle) are unambiguously real and independently exercised — unlike
+  `option-b`/`two-sided`, nobody doubts these forms exist and open. Named for completeness, not as a lead.
+
+## (3) SUSPECTS FOR THE NEXT HUNT — named, not verified
+
+The pattern this session found three times (`option-b-slice2/3`, `two-sided-879/881`) shares one shape: a
+COMPOSITE program structure (an op nested inside a wrapper, inside a container) whose CREATION was never wired
+into a real UI door, while its DOWNSTREAM consumption (emit/sim/sheet/preview) was built and tested against a
+hand-assembled instance of that structure. The honest next question is not "which spec files look like this" (I
+just answered that — none beyond the four) but **"which OTHER composite structures exist in the data model that
+nobody has checked have a real creation door at all"** — the same category of question `setup` turned out to
+fail, asked about siblings I have NOT driven live this turn:
+  - **Nested groups** — a hand-built `group` op containing ANOTHER `group` op (the wizard-maker's own "wrap loose
+    atoms" mechanism, `group-chip.spec.js`/`group-gesture.spec.js`'s own domain) — does the real right-click
+    "Group" gesture ever produce a group-inside-a-group, or only ever a flat one level?
+  - **A `multi_step` wrapper nested inside a `user_root`** — this session (t1966/t1972) already found and fixed
+    the LOOKUP side of a `user_`-prefixed op nested in another's `user_root`; whether a `multi_step` wrapper
+    specifically could ever end up there, and whether anything downstream double-counts it the way `collectOps`
+    would, is unchecked.
+  - **Two `setup` blocks each holding 2+ ops** (once/if the mouth gap from t1982 is ever closed) — per t1982's own
+    finding, `workspaceToStack`'s regrouping is top-level-only, so this wouldn't auto-wrap today — but if the
+    human rules FOR building the mouth, this is the FIRST thing to re-check, not an afterthought.
+None of these are verified — named as the next hunt's own starting list, per the instruction.
+
+## (4) IS IT CHECKABLE?
+
+**Half of it, cheaply. Not the half that matters most, and not as a hard ratchet.**
+
+The NARROWING half — "which spec files load a program via `ddcsLoadBlockStack` with no construction-gesture
+marker anywhere in the file" — is exactly as mechanical as `op-lookup-scan-1968`'s own structural scan: a grep,
+re-runnable, cheap, and it already did 90% of this turn's own work (809 → 29 in one command). **This is worth
+having as a standing, periodically-reviewed candidate list** — not a pass/fail gate, a report: re-run the same
+two greps, diff the file list against a reviewed baseline, and anything NEW goes to a human/advisor for the same
+judgment call I just made by hand.
+
+The CLASSIFICATION half — innocent vs. guilty — is NOT mechanically decidable the way `op-lookup-scan`'s shallow-
+vs-recursive code SHAPE was. That checker works because the defect is a syntactic pattern in PRODUCT code with a
+small, closed, enumerable "correct" answer. This one requires reading English prose — a test's own title and
+header comment — and knowing, per FEATURE, whether its real UI door is independently known to exist. Two
+concrete failure modes if I mechanized the accept/reject line anyway: (a) a high false-positive rate against the
+declared reconciler-invariant pattern, which is a LEGITIMATE, repeated, self-documented convention this codebase
+relies on across many op families — a hard gate would either break constantly or need a per-file allowlist that
+decays exactly like every over-broad exclusion this session already spent turns correcting; (b) an easily-gamed
+escape hatch — nothing stops a genuinely-guilty spec from adding a one-line "// ALGORITHM ONLY" disclaimer to
+exit the check, the same shape as a stale inventory entry, except SELF-INFLICTED rather than discovered.
+
+**Verdict: not worth a hard ratchet. Worth the cheap standing candidate report, reviewed by a person each time it
+grows.** This is a genuinely weaker mechanism than `op-lookup-scan-1968` — narrower guarantee, real ongoing
+review cost — named honestly rather than oversold.
+
+## Queued CODE work — batch closed, awaiting the human's ruling on two-sided setup
+`option-b-slice2-positioning-1872` bridged to a wrapped program (t1974's own method, now itself named as one of
+the four confirmed guilty files) → the remaining 7-entry `op-lookup-scan-1968` inventory → architecture-citation
+Option B, including the unenforced prose half → whatever the human rules on two-sided setup.
+
+🔨 turn 1984
