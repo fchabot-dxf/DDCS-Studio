@@ -37820,3 +37820,150 @@ since their origin is unaccounted for (possibly the advisor's own gate process, 
 or a concurrent agent); guessing at intent for a file I didn't touch is worse than leaving it for whoever did.**
 
 🔨 turn 1950
+
+
+## 🔨 turn 1952 — WHY THE MAP DRIFTS, AND WHETHER TO FIX IT: design only, read-only
+
+### Dispatch
+The advisor overruled my own t1948/t1950 "flag, don't restructure" call: ten drifts (three this session alone)
+is a design defect, not a maintenance cost. Four questions, options not a recommendation for (2), design only —
+advisor's own full gate running concurrently, no code/specs/suite run this turn.
+
+### (1) WHY citations drift — the mechanism, with this session's own three
+
+Every ASSERTED citation in `architecture-map-1698.test.mjs` (`TRAP_CLAIMS`, `INVARIANT_CLAIMS`, `Q3_CLAIMS`) is
+`{file, line, lineEnd?, find}` — `citationHolds` searches ONLY `[line, lineEnd||line]` for `find`. The line
+number is an ABSOLUTE COORDINATE, not a semantic anchor: it means "however many lines happened to exist above
+this point when the citation was last fixed," which is unrelated to whether the CLAIM (a fact about behavior)
+is still true. Any edit anywhere ABOVE the cited line, in the SAME file, regardless of what the edit is about,
+shifts every citation below it by the same delta. The claim survives; the coordinate doesn't.
+
+Three from this session, all different edit shapes, same one mechanism:
+- **INV1** (`stackBridge.js`, mouth guard): 318 (t1946) → 326 (t1948, a doc-comment insert above it) → 350
+  (t1950, a SECOND doc-comment insert above it, two turns running). Content ADDED above, twice.
+- **INV3** (`programModel.js`, subscriber isolation): 438 → 456 (t1948) → 472 (t1950) this session alone — and
+  the map's own accumulated trail names EIGHT prior drifts before that (236, 269, 347, 357, 364, 388, 407, 438),
+  ten total across this ONE citation's whole history. Same cause every time: `regroupOps` and its own doc
+  comments growing above the cited `console.error` line.
+- **TRAP6** (`homingData.js`): 167 → 129, a DELETION (t1898's own full-recompose fix removed the old per-arm
+  machinery above it) — proof the mechanism isn't "comments only grow" or "one direction only"; ANY line-count
+  change above the citation, insertion or deletion, moves it.
+
+A subtlety worth naming, not just the three examples: **fixing a citation is itself new content.** The "shifted
+from X by +N" annotation I add each time I repair one is text landing ABOVE whatever citation comes after it in
+the same file — INV1 and INV3 both drifted a SECOND time in the very next turn (t1948→t1950), partly because
+of my own t1948 repair's own explanatory text. A line-number scheme can make FIXING it feed the very drift it's
+fixing. Nothing in the current design breaks this loop; it's structural to "coordinate = count of lines above."
+
+### (2) WHAT WOULD NOT DRIFT — options, at their cost, not a single pick
+
+**A — Anchor to a SYMBOL (function/export name); the checker finds its own line at run time.**
+`{file, symbol: 'recToJson', find: /mouth/}` — locate `function recToJson`/`export function recToJson`, bound
+the search to that function's own extent (next same-or-lower-indent `function`/`export` as the stop), search
+`find` inside that window only. Cost: a real, if small, piece of new machinery (a "find the enclosing function
+body" scanner) — every citation currently reads a line NUMBER, none reads a symbol name, so every one of the 52
+needs its `line` replaced with a `symbol`, and the scanner has to handle every shape this codebase's functions
+come in (`function X(`, `export function X(`, an arrow assigned to `const X =`). Benefit: immune to drift from
+edits ANYWHERE ELSE in the file, only vulnerable to edits inside the SAME function above the target line — a
+real reduction (this session's own three examples were all "content added above, inside or outside the cited
+function" — INV1/INV3 specifically were INSIDE the growing function's own doc comment, so symbol-anchoring alone
+would NOT have saved either of this session's two actual drifts; it only helps the OTHER-function case, which
+TRAP6's is). Doesn't apply cleanly to citations with no obvious enclosing symbol (`INV15`, whole-file text
+search already; a few TRAP claims sit inside a large init block with no distinguishing nearby name).
+
+**B — Anchor to a distinctive source SUBSTRING; drop `line` entirely, search the whole file, assert uniqueness.**
+Change `citationHolds` to search the WHOLE FILE for `find` when no `line` is given (the mechanism `INV15`
+already uses for `NEXT-SESSION.md`), but ADD a hard uniqueness check: 0 matches → citation broke, 2+ matches →
+citation is now AMBIGUOUS and must be flagged (not silently accepted) — dropping the uniqueness check would
+WEAKEN the tool while feeling like an improvement, since a `find` that matches everywhere never proves anything
+moved. Cost: small in the checker (`citationHolds`'s own no-line branch, ~10 lines) but real, PER-CLAIM cost in
+tightening whichever `find` patterns aren't already unique — measured, not guessed (below). Benefit: TRUE
+zero-maintenance for whatever fraction already has a distinctive `find` — the citation can never drift again
+because there's no coordinate to go stale; a one-time authoring cost, not a recurring one, once tightened. This
+is the ONLY option that would have caught BOTH of this session's own drifts (INV1/INV3), since neither is
+helped by symbol-anchoring alone (both drifted from inside their own anchor function).
+
+**C — GENERATE the cited sections from the declarations themselves; mark do-not-hand-edit.**
+This is what Part 1 (`GENERATED`) already does for BUILTINS/SEED_BUILDERS/WIZARD_VIEWS counts and the 3
+deletion-negatives — re-derive the fact from source at test-run time, no coordinate stored anywhere, truly
+cannot drift. Checked the 52 ASSERTED claims for any that are secretly this shape (a re-countable list or a
+plain existence check masquerading as a line citation) — found none. Every ASSERTED claim is NARRATIVE: "a fact
+I once observed about behavior/history is backed by this code" (TRAP2's "the overlay never folds placement
+before t1686" is a story about a bug and its fix, not a re-derivable count). That's the actual reason they're in
+the ASSERTED bucket and not the GENERATED one — the split already happened, correctly, when the map was built.
+This option isn't a live lever here; there's no unclaimed pool waiting to be migrated.
+
+**D — Narrow what earns a citation at all.**
+Every TRAP traces to a named past incident (TRAP1 = corner's deleted panel, TRAP8 = the z-index/attach() dead
+code, INV1-3 = literally this session's own three drifts). The file's own header already states the bar:
+"these are exactly the claims a reader ACTS on." 52 citations across ~20K+ lines of source isn't padding for a
+codebase this size and history — cutting further means deleting real, currently-load-bearing guards, not
+trimming fat. Not recommending this one.
+
+### (3) DERIVABLE vs GENUINELY HAND-WRITTEN — the ratio, measured not guessed
+
+52 ASSERTED citations total: 24 `TRAP_CLAIMS` + 21 `INVARIANT_CLAIMS` + 7 `Q3_CLAIMS` (counted directly from the
+array literals, not estimated). **0 of the 52 are GENERATE-candidates** — see (2)C above, the count-like claims
+were already migrated to Part 1 when the map was built; what remains is narrative by construction.
+
+For Option B's own real cost — is `find` already file-unique, or does it need tightening — sampled 10 of the
+more generic-looking patterns directly against their own cited files rather than guessing:
+
+| citation | pattern | occurrences in file | already safe? |
+|---|---|---|---|
+| INV3 | `console.error` | programModel.js: 4 | needs tightening |
+| INV1 | `mouth` | stackBridge.js: 9 | needs tightening |
+| TRAP4 (×3) | `dialect` | programModel.js 6 / opGlow.js 6 / opSession.js 4 | needs tightening (all 3) |
+| Q3 | `placement` | featureCanvas.js: 14 | needs tightening |
+| INV13 | `return null` | userOps.js: 6 | needs tightening |
+| TRAP7 | `opensAs` | commandDeck.js: 8 | needs tightening |
+| TRAP9 | `innerHTML` | featureCanvas.js: 1 | **already safe** |
+| TRAP8 | `attach` | gcodeViz3d.js: 1 | **already safe** |
+
+2 of 10 sampled generic-looking patterns are already file-unique despite looking generic; 8 need a one-time
+tightening (e.g. INV3's `console.error` → the specific `'[programModel] a subscriber threw:'` string; INV1's
+`mouth` → the exact throw-message fragment). The patterns that were ALREADY written narrowly (`/UPDATE_PREVIEW_SNAPSHOT/`,
+`/opensAs:\s*'user_corner_data'/`, `/partZeroShift/`, `/stockPinOffset/`, `/postInstantiate/`, `/cornerStack\(/`,
+and more) need no work at all. Extrapolating from the sample: roughly 35-45% of the 52 are free today; the rest
+need a targeted, ONE-TIME rewrite of their own `find` value — reading the cited line and picking a tighter
+fragment, not redesigning anything about the claim itself.
+
+### (4) IS IT WORTH IT
+
+Yes — but scoped precisely to what actually pays off, not to a bigger migration than the problem needs. Reasons:
+- The failure class is REAL and RECURRING (three drifts this session, ten across one citation's whole history),
+  not hypothetical — this isn't padding a report with an option nobody would pick.
+- Option B (substring-anchor + uniqueness assertion) is the ONE option that would have prevented BOTH of this
+  session's own two drifts (INV1, INV3) — Option A (symbol-anchor) would only have prevented TRAP6's kind (an
+  edit outside the anchor function), not the more common kind THIS session actually hit (an edit inside the
+  function's own doc comment, which is exactly where a "shifted from X by +N" repair note itself lives).
+- The size is bounded and matches turns already run this session (t1944's 7-file sweep, t1928's 5-site wiring):
+  one change to `citationHolds` (~10-15 lines, add the no-line/whole-file/uniqueness-assert branch — `INV15`
+  already proves the no-line path works) + up to 52 small per-citation edits (drop `line` where `find` is
+  already unique; tighten `find` where it isn't) + the matching prose in `ARCHITECTURE.md` itself, where a
+  literal `file:line` should become `file`, name of the enclosing function — better for a HUMAN reader too,
+  since a stale number actively misleads while a function name never goes stale as prose (nobody counts lines
+  by eye; they search their editor for the name).
+- The fix is self-terminating: once a citation drops `line`, it structurally CANNOT drift again (there's no
+  coordinate left to go stale) — this is a one-time cost that ends the recurring one, not a new recurring cost
+  of its own.
+
+The one caveat, not a reason against it: dropping `line` without the uniqueness assertion would make the
+checker WEAKER, not stronger (a `find` that matches everywhere proves nothing moved) — any implementation of
+Option B must fail loud on 0 matches AND on 2+ matches, never silently accept "found it somewhere."
+
+Recommend: Option B, applied to all 52, in one bounded turn — not Option A (more machinery, doesn't cover this
+session's own actual drift shape), not C (nothing to migrate), not D (nothing to cut). Design only this turn,
+per the dispatch; not built.
+
+### Queued, explicitly not this turn
+Per the advisor's own list, in order: `blkStartHints` (the 6th flattenOps site, NEXT after the release) →
+`collectOps`'s phantom row → the raw-text import door → `lathe-honest-3d-1301` → rename slice 1's unswept
+region (`macrosApp.js`) → rename slices 2-4 → the marker key. This citation-drift design (if accepted) would
+land after those, per the advisor's own ordering; not assumed to jump the queue.
+
+### Gate
+No code changed — design/read-only, per the dispatch. `git status` confirms only this WORK-LOG entry changed.
+`npm run test:node` not run (no code touched). `proc_health.py watch`: clean.
+
+🔨 turn 1952
