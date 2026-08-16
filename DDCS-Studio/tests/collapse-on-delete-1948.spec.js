@@ -124,6 +124,78 @@ test('deleting the 2nd of TWO steps collapses the wrapper away entirely — a lo
     expect(r.opTypes).toEqual(['drill']);
 });
 
+// t1950 — LOSSLESSNESS, the assertion the advisor's own gate found missing. `regroupOps` (programModel.js) was
+// corrected TWICE this turn: (1) it used to also dedupe endprogram/progend terminators via
+// `collapseImportTerminators` — right for splicing (`addOperation`) but wrong here, since a plain workspace
+// read-back must return every block the user placed VERBATIM, including an op's own internal terminator (corner
+// carries one by original design) — the combined version tore it out and hoisted it, caught live by
+// guard-roundtrip-1595. (2) `workspaceToStack` used to auto-wrap ANY 2+ bare top-level ops even when no
+// `multi_step` was there to begin with, changing the top-level op COUNT for programs this feature was never
+// asked to touch — caught live by marker-rebuild-1848/option-b-slice2/3/cam-multiop-edit-blocks-s45 (their own
+// `.filter(op).length === N` fixture waits started timing out). Both are asserted directly here, not only
+// inferred from those other files staying green.
+// Split into three independent tests (each its own fresh page, the suite's own established idiom) rather than
+// three cases sharing one page across multiple tab switches — avoids compounding modal/UI state across cases;
+// the claim under test is the MODEL's own shape, not a UI sequencing story, so a fresh page per case is cleaner
+// and more reliable than threading one page through mixed wizard-UI and direct-build steps.
+const CORNER_PARAMS = { corner: 'FL', probeSeq: 'YX', travelDist: 50, safeZ: 10, scanDepth: 5, clearMode: 'hop', hopDist: 15, planeZ: 10, probeZFirst: false, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active', syncA: false, dist: 741, retract: 5, f_fast: 200, f_slow: 50, port: 3, radius: 2 };
+
+test('LOSSLESS ROUND-TRIP, case 1: a SELF-TERMINATING op survives a workspace read-back verbatim — the terminator is not stripped or hoisted', async ({ page }) => {
+    await boot(page);
+    // Built directly via opBuilders.js (marker-rebuild-1848.spec.js's own established pattern), not the
+    // wizard-UI insert gesture — corner's own wizard has a pre-existing prereq gate (unrelated to this turn,
+    // confirmed via a throwaway debug run: openWiz('corner')+insertWiz() with only default params yields an
+    // empty program) that this test has no reason to route around.
+    await page.evaluate(async (params) => {
+        const OB = await import('/blocks/opBuilders.js');
+        window.ddcsLoadBlockStack([OB.makeOp('user_corner_data', params, OB._builderAtoms('user_corner_data', params))]);
+    }, CORNER_PARAMS);
+    await openBlocksTab(page);
+    const r = await page.evaluate(() => {
+        const prog = window.ddcsGetBlockProgram();
+        return { gcode: window.ddcsGetBlockGcode(), opTypes: window.ddcsFlattenOps(prog).map((b) => b.opType) };
+    });
+    expect(r.opTypes, 'corner is still the one operation').toEqual(['user_corner_data']);
+    expect((r.gcode.match(/M30/g) || []).length, "corner's own internal M30 survives the round-trip, not stripped").toBeGreaterThanOrEqual(1);
+});
+
+test('LOSSLESS ROUND-TRIP, case 2: two bare top-level ops with no prior wrapper are NOT auto-wrapped by a read-back with no edit', async ({ page }) => {
+    await boot(page);
+    // The exact shape marker-rebuild-1848/option-b-*/cam-multiop build via a direct ddcsLoadBlockStack, not
+    // through addOperation.
+    await page.evaluate(async () => {
+        const OB = await import('/blocks/opBuilders.js');
+        const drill = OB.makeOp('drill', {}, OB._builderAtoms('drill', {}));
+        const surfacing = OB.makeOp('surfacing', {}, OB._builderAtoms('surfacing', {}));
+        window.ddcsLoadBlockStack([drill, surfacing]);
+    });
+    await openBlocksTab(page);
+    const r = await page.evaluate(() => window.ddcsGetBlockProgram().filter((b) => b && b.type === 'op').map((b) => b.opType));
+    expect(r, 'two independently-loaded ops with no prior wrapper stay as two bare top-level ops after a read-back with no edit').toEqual(['drill', 'surfacing']);
+});
+
+test('LOSSLESS ROUND-TRIP, case 3: a program that ALREADY holds a wrapper round-trips to the identical shape when nothing is deleted', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(async () => {
+        const progMod = await import('/blocks/programModel.js');
+        const OB = await import('/blocks/opBuilders.js');
+        const drill = OB.makeOp('drill', {}, OB._builderAtoms('drill', {}));
+        const surfacing = OB.makeOp('surfacing', {}, OB._builderAtoms('surfacing', {}));
+        const pocket = OB.makeOp('pocket', {}, OB._builderAtoms('pocket', {}));
+        let acc = progMod.addOperation([drill], surfacing);
+        acc = progMod.addOperation(acc, pocket);
+        window.ddcsLoadBlockStack(acc);
+    });
+    await openBlocksTab(page);
+    const before = await page.evaluate(() => window.ddcsGetBlockProgram().map((b) => b.type === 'op' ? { opType: b.opType, n: (b.children || []).length } : b.type));
+    // force a second read-back (Studio then back to Blocks) with no delete in between
+    await page.locator('[data-app="studio"]').click();
+    await page.waitForTimeout(200);
+    await openBlocksTab(page);
+    const after = await page.evaluate(() => window.ddcsGetBlockProgram().map((b) => b.type === 'op' ? { opType: b.opType, n: (b.children || []).length } : b.type));
+    expect(after, 'an existing wrapper round-trips to the identical shape when nothing was deleted').toEqual(before);
+});
+
 test('CONVERGENCE: add 3 then delete 1 is shape- and emit-identical to having added only 2 (the symmetric-rule promise, t1934/t1946)', async ({ page }) => {
     await boot(page);
     const A = await insertAndCapture(page, 'drill');

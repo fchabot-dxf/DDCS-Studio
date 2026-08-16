@@ -37692,3 +37692,131 @@ the 5 files this turn touched (`ARCHITECTURE.md`, `programModel.js`, `stackBridg
 Advisor runs the full suite after this lands, per their own note.
 
 🔨 turn 1948
+
+
+## 🔨 turn 1950 — BLOCKER: the terminator claim was false, AND a second, deeper miss the gate also caught
+
+### Dispatch
+The advisor's full gate on `57f0f854` found 12 failures (2 valid before). Isolated two, confirmed they
+reproduce (not load contention). Root cause named: `regroupOps` composed `collapseImportTerminators`, which
+strips every `endprogram` anywhere in the tree and re-appends only the last at top level — correct for
+splicing (`addOperation`) but wrong wired into `workspaceToStack` (every Blockly edit), where a self-terminating
+op (corner, by original design) needs its own terminator to survive verbatim. My own doc comment claimed "never
+what emits" without qualification — false, and the gate proved it. Fix: separate the shape rule (stays shared)
+from the terminator rule (only where a conflict can arise — `addOperation`, not a plain read-back). Correct the
+claim as part of the fix. Assert losslessness directly in my own specs. Check `probe-input-select-revival-1888`
+in isolation before attributing it to this (it's on the known-chronic-flake list). Gate: all 12 failing tests by
+name + my own specs + node tier. Nothing releases until clean.
+
+### Fix 1 — separate the shape rule from the terminator rule (as instructed)
+
+`regroupOps` (programModel.js) is now SHAPE ONLY:
+```js
+export function regroupOps(items) {
+    const flat = (items || []).flatMap((b) =>
+        (b && b.type === 'op' && b.opType === 'multi_step') ? flattenOps(b.children) : [b]);
+    return groupConsecutiveOps(flat);
+}
+```
+`collapseImportTerminators` is no longer inside it. `addOperation` now composes it explicitly:
+`collapseImportTerminators(regroupOps(items))` — same behavior as before for the grow path (a terminator
+conflict CAN arise there, splicing a new op next to an existing one). `workspaceToStack` calls `regroupOps`
+alone — a plain read-back returns every block verbatim, terminator included. Corrected BOTH doc comments that
+asserted the false "never what emits" claim, per the advisor's own instruction that a comment promising a safety
+the code doesn't provide is the defect, not a footnote to it.
+
+Verified against the 6 genuinely-failing spec files named in the dispatch (`guard-roundtrip-1595`,
+`fork-parity-1593`, `marker-rebuild-1848`, `option-b-slice2-positioning-1872`,
+`option-b-slice3-live-visibility-1874`, `cam-multiop-edit-blocks-s45`): `guard-roundtrip-1595` and
+`fork-parity-1593` went green immediately. **The other four did NOT** — proof this was a second, distinct
+problem, not the same one restated.
+
+### Fix 2 — a second discovery investigating why 4 files were still red
+
+Traced `marker-rebuild-1848`'s own failure directly (`passStarts.length` was 1, expected 3) rather than assuming
+the terminator fix would cover it. Its own fixture (`loadStack`, matching the other 3 files' own pattern) builds
+a program as TWO BARE top-level ops via a direct `ddcsLoadBlockStack` — never wrapped, since no live gesture
+before this turn ever produced that shape via `addOperation`/`importMarkedNc`. A throwaway inspection spec
+confirmed live: opening the Blocks tab after loading `[homingOp, cornerOp]` auto-wrapped them into ONE
+`multi_step` — `workspaceToStack`'s own id-sync microtask (`blocksApp.js:821`) ran `regroupOps` unconditionally,
+and `groupConsecutiveOps` doesn't just COLLAPSE an existing wrapper, it also WRAPS any 2+ consecutive bare ops
+it finds, wrapper-history-blind — structurally, `[homingOp, cornerOp]` and `flattenOps(multi_step(homingOp,
+cornerOp))` are the identical shape, so there is no way to tell them apart after the fact. This is inherent to
+the shape rule itself, not a bug — but it's a BEHAVIOR CHANGE beyond what collapse-on-delete was asked to do:
+retroactively enforcing "2+ ops always share a wrapper" on programs that predate this feature, breaking
+`blkStartHints`' own hint count (a latent, pre-existing gap — it never ran `flattenOps` the way the 4 sites
+t1928 fixed do, now newly exposed) and 4 fixtures' own `.filter(op).length === N` waits.
+
+Fix: gate the call — `regroupOps` only runs when the read-back ALREADY contains a `multi_step` somewhere in it;
+otherwise the tops pass through untouched, exactly pre-t1948 behavior:
+```js
+export function workspaceToStack(ws) {
+    const tops = ws.getTopBlocks(true).filter(...);
+    const items = tops.flatMap((t) => chain(t));
+    const hasWrapper = items.some((b) => b && b.type === 'op' && b.opType === 'multi_step');
+    return hasWrapper ? regroupOps(items) : items;
+}
+```
+Collapse (shrink an existing wrapper, or unwrap it to bare-1) still fires correctly — the wrapper is present in
+the INCOMING read for every case that matters. New wrapping for previously-separate ops stays `addOperation`'s
+and `importMarkedNc`'s own job, on the paths where it's the asked-for behavior. Still ONE function decides
+wrapping (`groupConsecutiveOps`, inside `regroupOps`) — this gate decides only whether to invoke it, not a
+second wrapping rule, consistent with the advisor's own explicit constraint. All 6 files, 15/15, went green
+after this second correction.
+
+### Losslessness — asserted directly, not only inferred
+
+New tests in `collapse-on-delete-1948.spec.js`, three cases (split into independent tests, each its own fresh
+page — a shared page across mixed wizard-UI and direct-build steps proved fragile mid-turn, see Non-vacuity):
+1. A self-terminating op (corner) with no wrapper: its own M30 survives a workspace read-back verbatim.
+2. Two bare top-level ops with no prior wrapper: a read-back with no edit does NOT introduce one.
+3. A program that already holds a wrapper: a second read-back with no delete is a pure shape identity.
+
+### probe-input-select-revival-1888 — checked, not folded in
+
+Ran in isolation: 5/5 clean. Confirmed the known-chronic-flake, unrelated to this fix — not attributed to it,
+not silently dismissed either.
+
+### Non-vacuity and dead ends, named
+
+- Corner's own wizard-UI insert (`openWiz('corner')` + defaults + `insertWiz()`) produces an EMPTY program — a
+  pre-existing prereq gate unrelated to this turn, confirmed via a throwaway debug spec (deleted after use).
+  Rebuilt the terminator-survival case via `opBuilders.js` directly (`marker-rebuild-1848`'s own established
+  pattern) instead of routing around a gate this turn has no reason to touch.
+- The first version of the lossless test threaded ONE page through all 3 cases with mixed wizard-UI and
+  direct-build steps across tab switches; hit two real sequencing bugs of my own (a `[data-app="studio"]` click
+  attempted while a modal from an earlier case was still up; `insertAndCapture` called while the Blocks tab, not
+  Studio, was active) before being split into 3 independent tests, each on its own fresh page — the model's own
+  shape is what's under test, not a UI sequencing story, so this is a legitimate simplification, not a workaround.
+- One test (`CONVERGENCE`) and one lossless case flagged "flaky" during the full batched gate run (both
+  `boot()`'s own default 5s `waitForFunction` under a 13-file, multi-worker batch) — both confirmed passing
+  clean in isolation, the same load-contention signature this session has repeatedly identified, not a
+  regression; recovered on Playwright's own retry in the batched run too.
+
+### Architecture map — drifted again, corrected again
+
+Both this turn's own edits (the terminator/wrapper-gate doc comments) shifted the SAME three citations t1948
+already fixed once. Re-verified current line numbers directly (not estimated) and corrected `ARCHITECTURE.md` +
+`architecture-map-1698.test.mjs` again: `stackBridge.js` INV1 326→350, INV2 273→297; `programModel.js` INV3
+456→472. This citation has now drifted ten times across its own history — noted again as a standing
+comment-maintenance cost, restructuring it to be self-locating remains out of scope for a fix-turn.
+
+### Gate — everything named, plus the extras this turn's own fix needed
+
+All 6 originally-failing files: `guard-roundtrip-1595`, `fork-parity-1593`, `marker-rebuild-1848`,
+`option-b-slice2-positioning-1872`, `option-b-slice3-live-visibility-1874`, `cam-multiop-edit-blocks-s45` — 15/15.
+`probe-input-select-revival-1888` in isolation — 5/5 (confirmed unrelated flake). Own specs
+(`add-operation-1940`, `collapse-on-delete-1948` incl. the 3 new lossless cases, `insert-add-replace-1942`) + the
+4 t1928 features — all green, run together with the 6-file cluster in one 50-test batch (1 known-flake retry,
+recovered). `npm run test:node`: 118/118, including the re-corrected architecture-map citations. `git status`:
+exactly the 5 files this turn touched (`ARCHITECTURE.md`, `programModel.js`, `stackBridge.js`,
+`architecture-map-1698.test.mjs`, `collapse-on-delete-1948.spec.js`). **6 unrelated verification PNGs
+(`t1512-cam-pack`, `t1514-live-frame-rotation`, `t1526-origin-hoist`, `t1617-drive-shelf/manager-roundtrip/
+readonly-builtins`) show as modified in the working tree — none belong to any spec file I ran this turn
+(checked: their own owning specs are `raster-origin-hoist-shots-1526`, `slot-cam-pack-shots-1512`,
+`slot-live-frame-shots-1514`, `wizard-manager-1617`, none of which appear anywhere in my command history this
+turn), and they were unmodified as of t1948's own `git status`. Left untouched — not staged, not reverted —
+since their origin is unaccounted for (possibly the advisor's own gate process, killed mid-run per their note,
+or a concurrent agent); guessing at intent for a file I didn't touch is worse than leaving it for whoever did.**
+
+🔨 turn 1950

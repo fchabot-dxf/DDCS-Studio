@@ -174,13 +174,37 @@ function chain(block) {
  *  t1948 — COLLAPSE-ON-DELETE lives here: every structural Blockly edit (blocksApp.js's own change listener,
  *  including a native block-delete) re-reads the workspace through this one function, so it's the single choke
  *  point where a `multi_step` wrapper left holding one child (or a run that grew back to 2+ after a drag) needs
- *  to reconcile. `regroupOps` unwraps any existing wrapper(s) then re-groups the flat result — the SAME pipeline
- *  `addOperation` grows a program with (programModel.js) — so grow and shrink share one rule, not two hand-
- *  matched ones. A `multi_step` wrapper carries no G-code of its own, so this can only change which ops share a
- *  wrapper, never what emits. */
+ *  to reconcile. `regroupOps` unwraps any existing wrapper(s) then re-groups the flat result — the SAME shape
+ *  pipeline `addOperation` grows a program with (programModel.js) — so grow and shrink share one rule, not two
+ *  hand-matched ones.
+ *  t1950 — CORRECTED TWICE. First: `regroupOps` is SHAPE ONLY (no terminator handling — see its own doc
+ *  comment). It used to also dedupe `endprogram`/`progend` terminators, which is right for SPLICING a new op in
+ *  (`addOperation`) but wrong here: a plain workspace read-back must return every block the user placed,
+ *  verbatim, including an op's own internal terminator (corner carries one by original design). The combined
+ *  version tore corner's own M30 out on every edit and hoisted it to the top — 2 blocks eaten per round-trip,
+ *  caught live by `guard-roundtrip-1595`.
+ *  Second, found investigating the SAME gate: unconditionally calling `regroupOps` here doesn't just COLLAPSE an
+ *  existing wrapper — `groupConsecutiveOps` (inside it) also WRAPS any 2+ consecutive bare top-level ops it
+ *  finds, even ones that never shared a wrapper before. A workspace holding two independently-loaded ops (no
+ *  `multi_step` anywhere) got auto-wrapped the moment the Blocks tab's own id-sync microtask ran
+ *  `workspaceToStack` once — changing the top-level op COUNT for a program this feature was never asked to
+ *  touch, breaking `blkStartHints`' own hint count (a latent, pre-existing gap this newly exposed — it never
+ *  ran `flattenOps` the way the 4 sites t1928 fixed do) and several fixtures' own `.filter(op).length === N`
+ *  waits (`marker-rebuild-1848`, `option-b-slice2/3`, `cam-multiop-edit-blocks-s45`). Collapse-on-delete only
+ *  needs to react when a wrapper is ALREADY there to reconcile — it was never asked to retroactively enforce
+ *  "2+ ops always share a wrapper" on states that predate this feature. Gated: `regroupOps` runs only when the
+ *  read-back already contains a `multi_step` somewhere in it; otherwise the tops pass through untouched, exactly
+ *  pre-t1948 behavior. Collapse (shrink an existing wrapper, or unwrap it to bare-1) still fires correctly,
+ *  since the wrapper is present in the INCOMING read for every case that matters — new wrapping for previously-
+ *  separate ops does not (that remains `addOperation`'s and `importMarkedNc`'s own job, on the grow/import
+ *  paths, where it's the intended, asked-for behavior). Still ONE function decides wrapping
+ *  (`groupConsecutiveOps`, inside `regroupOps`) — this gate decides only whether to invoke it, not a second
+ *  wrapping rule. */
 export function workspaceToStack(ws) {
     const tops = ws.getTopBlocks(true).filter((b) => { const d = BLOCKS[b.type]; return !d || d.kind !== 'reporter'; });
-    return regroupOps(tops.flatMap((t) => chain(t)));
+    const items = tops.flatMap((t) => chain(t));
+    const hasWrapper = items.some((b) => b && b.type === 'op' && b.opType === 'multi_step');
+    return hasWrapper ? regroupOps(items) : items;
 }
 
 // ── stack → workspace ────────────────────────────────────────────────────────
