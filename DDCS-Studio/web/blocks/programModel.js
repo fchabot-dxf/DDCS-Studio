@@ -55,8 +55,18 @@ function findOpInStack(blocks, anc) {
         // reachable, WORK-LOG t1838/t1840). `b.id != null` guards that; see `opAtLine` for the loud signal —
         // logging HERE, on every encounter, was tried and reverted (t1844): it fired on every homing line
         // whether or not the search actually failed, an over-broad proxy for the real hazard.
-        if (b.type === 'op' && b.id != null && anc.includes(b.id)) return b;
+        // t1958 — DEEPEST match wins: try the children FIRST. A line inside a multi_step-nested op carries BOTH
+        // the wrapper's id and the nested op's own id in its ancestry (blockEmitter's `own = [...anc, block.id]`
+        // grows on every level of recursion) — checking `b` itself first, as this used to, matched the WRAPPER
+        // (the first `type:'op'` id encountered at the top level) and returned before ever looking inside it, so
+        // every line of every op in a multi-op program resolved to the wrapper, not its own op. The editor hover
+        // chip then showed 🔒 (multi_step has no declared form) instead of the real op's own ✎ affordance — one
+        // layer upstream of `openForEdit`'s own by-id bug, and the reason its symptom read as "chip enabled, click
+        // dead" rather than "chip never resolves the right op at all." A childless op (drill, corner, …) is
+        // unaffected: none of its children are themselves `type:'op'`, so the recursion finds nothing and this
+        // still falls through to match `b` itself, byte-identical to before.
         if (b.children) { const f = findOpInStack(b.children, anc); if (f) return f; }
+        if (b.type === 'op' && b.id != null && anc.includes(b.id)) return b;
     }
     return null;
 }
@@ -114,6 +124,42 @@ export function flattenOps(program) {
         out.push(b);
     }
     return out;
+}
+
+// t1958 — THE ONE DECLARED BY-ID LOOKUP (findOpById's own version of flattenOps' problem). `ddcsOpAtLine`
+// (findOpInStack, above) already resolves an op at any depth via its LINE — but "find the op with THIS id" had
+// no shared equivalent, so `wizardManager.js`'s `openForEdit` grew its own shallow, top-level-only `.find` (dead
+// on a multi_step-nested op: the editor hover chip resolves the id via opAtLine, which recurses, so the chip
+// renders enabled — then the click's own lookup fails silently) while `opGlow.js` independently grew a SECOND,
+// private, correctly-recursive copy of the same question. Declared once here so a by-id lookup can't drift from
+// a by-line one again, and so there's only one recursive implementation to get right.
+export function findOpById(program, id) {
+    for (const b of (program || [])) {
+        if (!b) continue;
+        if (b.type === 'op' && b.id === id) return b;
+        if (b.children) { const f = findOpById(b.children, id); if (f) return f; }
+    }
+    return null;
+}
+
+// t1958 — the WRITE side of findOpById: swap the op at `id` for `newOp`, wherever it lives (top-level or nested
+// inside a multi_step's children), preserving its exact position. `opSession.js`'s `replaceOp` (the Edit form's
+// own commit) used a top-level-only splice — findOpById now lets the wizard OPEN for a nested op, but committing
+// the edit needs the SAME reach or the click would still silently fail one step later. Immutable (returns a new
+// tree; the input program is untouched); returns null if `id` isn't found anywhere, so a caller can tell
+// "nothing to replace" apart from "replaced with an identical-looking op". For an id found at the TOP level this
+// returns the exact array shape the old splice produced — behaviour-preserving for every existing (single-op)
+// caller.
+export function replaceOpById(program, id, newOp) {
+    let found = false;
+    const walk = (blocks) => (blocks || []).map((b) => {
+        if (found || !b) return b;
+        if (b.type === 'op' && b.id === id) { found = true; return newOp; }
+        if (b.children) { const children = walk(b.children); if (found) return { ...b, children }; }
+        return b;
+    });
+    const next = walk(program);
+    return found ? next : null;
 }
 
 // ── loose-run resolution (the in-context "Group" gesture) ───────────────────────────────────────────────────
@@ -505,6 +551,8 @@ export function initProgramModel() {
     window.ddcsAutoGroupRunAtLine = (i) => (editorMatchesProjection() ? autoGroupRunAtLine(i) : null);   // AUTO: pure stack auto-shows the chip
     window.ddcsLinesForOp = linesForOp;
     window.ddcsFlattenOps = flattenOps;   // t1928 — every real operation, one level through a multi_step import wrapper
+    window.ddcsFindOpById = findOpById;   // t1958 — the ONE recursive by-id lookup, same convention as ddcsFlattenOps
+    window.ddcsReplaceOpById = replaceOpById;   // t1958 — its write-side counterpart, for opSession.js's replaceOp
     window.ddcsAddOperation = addOperation;   // t1940 — DATA-LEVEL ONLY: grow a program by one operation; no UI calls this yet
     window.ddcsRegroupOps = regroupOps;   // t1948 — the shared flatten-then-regroup pipeline addOperation and workspaceToStack both use
     window.ddcsLinesForRun = linesForRun;   // AUTO chip highlight (a loose run's lines)

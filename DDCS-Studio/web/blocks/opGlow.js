@@ -13,18 +13,10 @@
  */
 import { emitMapped } from './blockEmitter.js';                               // emit a stack → { lines, map } (for word-level glow diff)
 import { opEditMap } from './opEdits.js';                                     // the user's DECLARED edits per op (replaces inferring "edited" by re-derivation)
+import { findOpById as _findOpById } from './programModel.js';                // t1958 — the ONE recursive by-id lookup (was a private duplicate here, drifted from wizardManager's own broken shallow one)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
-
-function _findOpById(prog, id) {
-    for (const b of (prog || [])) {
-        if (!b) continue;
-        if (b.type === 'op' && b.id === id) return b;
-        if (b.children) { const f = _findOpById(b.children, id); if (f) return f; }
-    }
-    return null;
-}
 
 // Smallest changed [start, end) slice between two strings — trim the common prefix + suffix. start >= end ⇒ identical.
 function diffRange(b, a) {

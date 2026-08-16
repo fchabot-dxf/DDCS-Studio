@@ -144,7 +144,7 @@ const TRAP_CLAIMS = [
     { id: 'TRAP3 the declared _writable replacement', file: 'web/wizards/ops/panelTypes.js', line: 311, find: /_writable/ },
     { id: 'TRAP4 activeDialectOpts declares {dialect, indentStyle}', file: 'web/wizards/previewEmit.js', line: 21, lineEnd: 24, find: /indentStyle/ },
     { id: 'TRAP4 programModel.js keeps its own {dialect}-only copy', file: 'web/blocks/programModel.js', line: 36, find: /dialect/ },
-    { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', line: 18, find: /dialect/ },
+    { id: 'TRAP4 opGlow.js keeps its own {dialect}-only copy', file: 'web/blocks/opGlow.js', line: 19, find: /dialect/ },   // t1958 — shifted from 18 by +1 (the shared findOpById import replacing the private duplicate)
     { id: 'TRAP4 opSession.js keeps its own {dialect}-only copy', file: 'web/blocks/opSession.js', line: 18, find: /dialect/ },
     { id: 'TRAP4 applyIndentStyle no-ops unless flush', file: 'web/data/indentStyle.js', line: 51, find: /flush/ },
     { id: 'TRAP5 canEdit reads paramFields', file: 'web/wizardManager.js', line: 322, find: /canEdit/ },
@@ -184,7 +184,7 @@ const INVARIANT_CLAIMS = [
     { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', line: 78, find: /mouth/ },
     { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', line: 40, find: /./ },
     { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', line: 297, find: /./ },   // t1950 — shifted from 273 by +24, same cause
-    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 472, find: /console\.error/ },   // t1950 — shifted from 456 by +16 (regroupOps split into a shape-only function + its own corrected doc comment)
+    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 518, find: /console\.error/ },   // t1958 — shifted from 472 by +46 (findOpById + replaceOpById declared beside flattenOps, then findOpInStack's deepest-match-first reorder)
     { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
     { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
     { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 893, lineEnd: 900, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1880 — shifted from 884-891 by the gate round-trip fix above (bindingsToBlocks/bindingsFromStack)

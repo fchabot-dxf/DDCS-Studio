@@ -547,15 +547,21 @@ export function addActiveOp() {
  */
 export function replaceOp(opId, params) {
     const cur = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
-    const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
-    if (idx < 0) return false;
-    const opType = cur[idx].opType;
+    // t1958 — findOpById/replaceOpById reach an op wherever it lives (top-level or nested in a multi_step's
+    // children); a plain findIndex here would silently fail to commit an edit the wizard just opened correctly.
+    const op = (typeof window !== 'undefined' && window.ddcsFindOpById) ? window.ddcsFindOpById(cur, opId) : cur.find((b) => b && b.type === 'op' && b.id === opId);
+    if (!op) return false;
+    const opType = op.opType;
     if (!builderOf(opType)) return false;
     const framed = _framed(opType, params);
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
     const opC = makeOp(opType, params, bare);
     opC.id = opId;                                                     // keep the same id so views/selection stay stable
-    const next = [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
+    const next = (typeof window !== 'undefined' && window.ddcsReplaceOpById) ? window.ddcsReplaceOpById(cur, opId, opC) : (() => {
+        const idx = cur.findIndex((b) => b && b.type === 'op' && b.id === opId);
+        return idx < 0 ? null : [...cur.slice(0, idx), opC, ...cur.slice(idx + 1)];
+    })();
+    if (!next) return false;
     recordOp(opType, params);                                          // update the lastOp snapshot so preview syncs
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(next);
     return true;

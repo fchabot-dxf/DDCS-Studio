@@ -38079,3 +38079,111 @@ unswept `macrosApp.js` · rename slices 2–4 · the marker key · **NEW:** `_fi
 `openForEdit`, `frameOwnerAtLine` (4 more `flattenOps`-bypass sites, ranked above).
 
 🔨 turn 1955
+
+# ═══ t1958 — EDIT WAS SILENTLY DEAD ON A MULTI-OPERATION PROGRAM (the sharpest of the 5 new sites, fixed) ═══
+
+The advisor's own re-verification of my t1955 report (`wizardManager.js:407`) confirmed `openForEdit`'s
+top-level-only `.find` and ranked it first — worse than I'd framed it, because V2026.08.15.12's Add-to-program
+means every multi-op job a user BUILDS (not just imports) now hits it.
+
+## THE ACTUAL DEFECT HAD ONE MORE LAYER THAN THE DIAGNOSIS
+
+The dispatch's premise — "`ddcsOpAtLine` recurses, so the chip renders enabled; `openForEdit` doesn't, so the
+click no-ops" — turned out to be half right. Read `findOpInStack` (`programModel.js`, the function
+`ddcsOpAtLine` is built on) line by line: for a line inside a `multi_step`-nested op, its ancestry (`proj.map[i]`)
+carries BOTH the wrapper's id and the nested op's own id (`blockEmitter`'s `own = [...anc, block.id]` grows one
+level per recursion). The OLD `findOpInStack` checked `b` (the current level) BEFORE recursing into `b.children`
+— so at the top level it matched the WRAPPER (the first, and only, top-level `type:'op'` id in the ancestry) and
+returned immediately, **never even looking inside it**. My own new test proved this directly: the ✎ chip DID
+render (not hidden — the wrapper is a real op with a real id), but it rendered **🔒 disabled**, because
+`canEdit('multi_step')` is false — not the "enabled, click-dead" shape the dispatch predicted. Same defect
+family, one layer upstream: `ddcsOpAtLine` doesn't resolve to the right op for a nested line AT ALL, not "resolves
+right but the click can't use it."
+
+**Fixed by reordering, not by adding a new function**: `findOpInStack` now recurses into `b.children` FIRST, and
+only matches `b` itself if nothing deeper matched — deepest-match-wins. A childless/non-nested op (drill, corner,
+…) is unaffected: none of its children are themselves `type:'op'`, so the recursion finds nothing and it falls
+through to match `b`, byte-identical to before. The `b.id != null` guard (t1842's own protection against an
+id-less internal wrapper like `homingDataStack`'s) is untouched by the reorder.
+
+## THE BY-ID LOOKUP FIX (the dispatch's own named task)
+
+Declared ONE recursive by-id resolver, `findOpById(program, id)`, exported from `programModel.js` beside
+`flattenOps` — and its write-side counterpart `replaceOpById(program, id, newOp)`, since opening the form
+correctly is only half the gesture; committing an edited value back to a nested op needed the SAME reach in
+`opSession.js`'s `replaceOp` (which had its OWN top-level-only `findIndex`/splice — the form would have opened
+correctly and then silently failed to commit one step later). Both exposed on `window` (`ddcsFindOpById`,
+`ddcsReplaceOpById`) matching the established `ddcsFlattenOps` convention `wizardManager.js` already uses for
+this module (it reaches every `programModel.js` export through the window surface, never a static import — kept
+consistent rather than introducing a new pattern).
+
+Three call sites now share the one lookup instead of three independent shapes:
+1. `wizardManager.js:407` `openForEdit`'s own resolve (was the broken shallow `.find`).
+2. `wizardManager.js:495` the group-edit-detection `tgt` lookup (same shallow `.find`, same fix — a hand-built
+   `group` op CAN end up multi_step-nested too, since `groupConsecutiveOps` wraps ANY run of 2+ `type:'op'`
+   blocks, group included).
+3. `opGlow.js`'s own private `_findOpById` — DELETED, replaced with an import (`findOpById as _findOpById`) so
+   its 4 existing call sites (`isOpBlockEdited`, `editedLinesForOp`, `editedRangesForOp`, `opEditSummary`) needed
+   no further edits. This was itself a THIRD independent copy of the same question (correctly recursive, but
+   still a duplicate implementation) — collapsing it is the literal "resolve an op-by-id ONCE" the dispatch asked
+   for, not just patching the one broken copy.
+
+`opSession.js`'s `replaceOp` now resolves via `ddcsFindOpById` and splices via `ddcsReplaceOpById`, with the
+same fallback-to-old-behavior pattern as every other window-hook call in this file — for a TOP-LEVEL op (every
+existing caller today) `replaceOpById` produces the exact same array shape the old manual splice did.
+
+## VERIFY — the real gesture, both halves of "chip and click cannot disagree," non-vacuous
+
+New spec: `tests/edit-nested-op-1958.spec.js`. Drives the REAL Add gesture (wizard bar, not a hand-built stack) to
+build drill+surfacing, confirms live that a real Add DOES produce a `multi_step` wrapper (not two top-level ops —
+the premise the whole dispatch rests on), then:
+- **The chip's promise**: hovers the SECOND (surfacing) op's own editor line, asserts the ✎ chip renders
+  ENABLED and bound to surfacing's own id (not the wrapper's) — its own dedicated assertion, separate from —
+- **The click's effect**: clicks the chip, asserts the wizard overlay opens AND `editingOpId` equals surfacing's
+  own id (not null/dead, not drill's, not the wrapper's) — the exact pairing the dispatch asked for, so a future
+  regression back to "chip renders, click no-ops" fails HERE, not several assertions later.
+- The form is seeded with surfacing's own `w` (100), not drill's fields, not empty.
+- Changes `w` to 150, clicks the real INSERT button, asserts: still exactly 2 ops (no duplicate/drop), surfacing
+  kept its OWN id (a param update, not a replace-with-new), `w` is now 150, drill's own id AND params untouched.
+
+**Non-vacuity, the real way**: saved the 4 fixed files to scratch, `git checkout HEAD --` all 4 (safe — all
+pre-existing tracked files, confirmed via `git status` before reverting), re-ran: **3/3 red**, failing exactly at
+"the chip is the EDITABLE affordance, not a lock" (`disabled: Received true`) — matching the deeper root cause
+found above, not the shallower one the dispatch predicted. Restored from the scratch copies (never from HEAD,
+which would have re-destroyed the fix), re-ran: green. `git diff` confirmed the restored files are byte-identical
+to the intended fix.
+
+## ARCHITECTURE.md — 2 citations repaired in the same act (both genuinely caused by this turn's edits)
+
+- INV3 (`programModel.js`'s subscriber-isolation `console.error` guard): 472 → 518 (+46: `findOpById` +
+  `replaceOpById` declared beside `flattenOps`, then `findOpInStack`'s reorder added its own explanatory comment).
+- TRAP4 (`opGlow.js`'s own `{dialect}`-only copy): 18 → 19 (+1: the new `findOpById` import line landed above it).
+  Fixed in BOTH places a citation lives — the prose (`ARCHITECTURE.md` itself) AND the test file's own duplicate
+  encoding (`tests/node/architecture-map-1698.test.mjs`'s `TRAP_CLAIMS`/`INVARIANT_CLAIMS` arrays) — the checker
+  reads the array, not the prose, so fixing only the `.md` would have left the gate red. This is itself a live
+  instance of the t1952 citation-drift design question still queued (two hand-synced copies of the same fact).
+- Noted, not touched (pre-existing, not caused by this turn): `ARCHITECTURE.md:71-72`'s
+  `wizardManager.js:421-423` tombstone-comment citation was ALREADY three lines short of the real text even on
+  the pre-t1958 commit (`git show HEAD` confirms) — the checker doesn't assert this one (no TRAP/INVARIANT entry
+  for it), so it's silently stale independent of anything this turn touched. Flagging for whoever picks up the
+  Option B citation work, not fixing it here (out of this turn's scope).
+
+## GATE
+
+`edit-nested-op-1958` + `guard-roundtrip-1595` + `fork-parity-1593` + `insert-add-replace-1942` +
+`add-operation-1940` + `collapse-on-delete-1948` + the 4 t1928 features + node tier, PLUS the STOP-CONDITION
+regression set for the single-op Edit path (`group-edit`, `custom-op-panel`, `wizard-value-persistence-1437`,
+`zmode-modal-1609`) since this turn touches `openForEdit`/`replaceOp`/`findOpInStack` directly. First pass (6
+workers): 48 clean, 2 flaked on a page-boot `waitForFunction` timeout (`collapse-on-delete-1948`'s convergence
+test, `whole-program-intent-756`'s Blocks/editor parity test) — re-ran in isolation (`--workers=1`):
+`whole-program-intent-756` clean; `collapse-on-delete-1948`'s convergence test flaked ONCE even solo, passed on
+its own retry — a pre-existing boot-latency flake (nothing in its failure — page not ready within 5s — touches
+anything this turn changed). Node tier: 118/118. **STOP CONDITION not triggered**: all 4 single-op regression
+specs passed clean in the full run — the single-operation Edit path is unchanged.
+
+## Queued, unchanged from t1955 (not this turn, per the advisor's own order)
+`segmentFrame.js` `frameOwnerAtLine` (the sim machine-frame flip never fires for a nested op) → `editorOpHover.js`
+`glowEdited` → `editorManager.js` `_firstOpTitle` → `setupSheet.js` `collectOps` (different fix shape,
+substitute-not-both) → THEN the checker so a twelfth site can't land silently.
+
+🔨 turn 1958

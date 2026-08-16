@@ -409,7 +409,7 @@ relative plunge silently becomes absolute. Note the resolution shape: `_group` i
 in `KNOWN_LEAF_RECORD_FIELDS`, deliberately NOT in `DURABLE_DATA_FIELDS`, because a stashed copy goes stale.
 
 **3 · A fail-loud guard is worthless if the path carrying its throw swallows it.**
-Guard: `blocks/programModel.js:472` (t1950 — shifted from 456 by +16, the regroupOps shape/terminator-separation doc comment; previously stale at 236, then 269, then 347, then 357, then 364, then 388, then 407, then 438) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
+Guard: `blocks/programModel.js:508` (t1958 — shifted from 472 by +36, the findOpById + replaceOpById declarations added beside flattenOps; previously stale at 236, then 269, then 347, then 357, then 364, then 388, then 407, then 438, then 456) — subscriber isolation logs `console.error`, never a bare `catch {}`. Both of
 the guards above fired into a silent catch for their entire early life, on the only path an operator's
 paste-then-open-Blocks gesture takes.
 

@@ -404,7 +404,10 @@ export class WizardManager {
 
     openForEdit(opId) {
         const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-        const op = prog.find((b) => b && b.type === 'op' && b.id === opId);
+        // t1958 — the SAME recursive by-id lookup ddcsOpAtLine already uses to resolve the editor hover chip's
+        // own opId (so the chip and the click can no longer disagree — a top-level-only `.find` here left an op
+        // nested in a multi_step import wrapper with a rendered, clickable chip that silently no-opped on click).
+        const op = window.ddcsFindOpById ? window.ddcsFindOpById(prog, opId) : prog.find((b) => b && b.type === 'op' && b.id === opId);
         if (!op || !op.opType) return;
         if (op.opType === 'group') { this._openGroupForEdit(op); return; }   // group: derive the form from its stored children
         this.open(op.opType);                          // normal open (clears editing + glow, seeds defaults)
@@ -489,7 +492,7 @@ export class WizardManager {
                 // GROUP edit: a hand-built group has no builder, so apply the form values to its STORED children
                 // (surgical writeback) instead of a replaceOp rebuild. Detect by the op's type in the live program.
                 const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-                const tgt = prog.find((b) => b && b.type === 'op' && b.id === this.editingOpId);
+                const tgt = window.ddcsFindOpById ? window.ddcsFindOpById(prog, this.editingOpId) : prog.find((b) => b && b.type === 'op' && b.id === this.editingOpId);   // t1958 — the same reach as openForEdit
                 if (tgt && tgt.opType === 'group') {
                     committed = await userOpView.applyGroupEdits(this.editingOpId);
                     if (committed) { this.close(false, false); playClick(); return; }
