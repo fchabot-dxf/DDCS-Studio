@@ -40033,3 +40033,91 @@ Gate: node tier only, nothing touched, nothing to re-run (read-only turn).
 Two-sided setup — awaits the human.
 
 🔨 turn 1998
+
+# ═══ t2000 — RECONCILERS.surfacing FIXED: surfaceraster read directly, the real tab-switch gesture asserted ═══
+
+## THE FIX
+
+`RECONCILERS.surfacing` (`web/blocks/opSession.js`) opened `find(prog, 'stepdown')`, a shape surfacing's builder
+retired at t1359. Swapped it for `find(prog, 'surfaceraster')` — the ONLY shape this op emits now — reading `w/h/
+depth/stepdown/toolDia/stepoverPct/feed/plunge/clearance/strategy` straight off the atom's own params, exactly
+the pattern already proven twice in this file (`RECONCILERS.pocket` t1406, `RECONCILERS.slot` t1500). Two real
+improvements fall out of reading the atom directly rather than un-deriving through the old `stepdown{ region }`
+digging: `stepoverPct` no longer needs a toolØ un-derive (the atom already stores the percentage — the same knob
+`surfacingStack` derives it from via `stepoverPctOf`), and `toolDia` itself now reconciles too — the old reader
+only ever read `sf_toolDia` off the DOM to compute the percent, and never returned it as a field, so a Blocks-tab
+toolDia edit could never have reflected back even by accident.
+
+## AN ORPHAN, REMOVED
+
+The old reconciler was `formNum`'s ONLY call site in the whole file (confirmed against `HEAD`, not assumed) — a
+helper that read a STUDIO form field as a number, falling back to `_replayParams` (stored params) when
+`replayReconcile` runs wizard-closed. With that one call site gone, `formNum` and `_replayParams` (and the
+`r3` import, `formNum`'s only other user) had zero remaining readers anywhere — removed, per this project's own
+orphan rule, along with the doc comments describing them (the `replayReconcile` header's "toolØ … come from the
+op's STORED params" clause, since toolØ was exactly this call site). `replayReconcile`'s `try/finally` scoping
+block collapsed to a plain call — nothing left to set/clear. Confirmed no other reconciler ever used `formNum`
+(grepped `HEAD`, one hit, the line just replaced).
+
+## (2) — ASSERTED THE REAL GESTURE, NOT THE RECONCILER
+
+New file `tests/surfacing-reconciler-2000.spec.js`. The first test drives the actual production wiring end to
+end: open the Surfacing wizard (`wizardManager.open('surfacing')`) → switch to Blocks (`showApp('blocks')`) →
+hand-edit the live `surfaceraster` block's params directly (the same convention `atc-roundtrip.spec.js`'s raw-
+edit test already uses for a block-field edit) → switch BACK to Studio (`showApp('studio')`, never calling
+`reconcileActiveOp()` or `pullFromBlocks()` directly) → read the real DOM `#sf_depth`/`#sf_feed`/`#sf_toolDia`/
+`#sf_stepoverPct` fields. `showApp('studio')` is exactly what `gatewayStatus.js`'s own STUDIO-tab click handler
+calls, and it is what fires `pullFromBlocks()` internally (`gatewayStatus.js:86`) — a unit test on
+`reconcileActiveOp()` alone would have passed with that wiring itself broken, which is the exact gap the dispatch
+named (openForEdit's own history). A second test confirms `RECONCILERS.pocket` (raster arm, explicit big-rect
+params matching `pocket-rides-raster-1406.spec.js`'s own verified config) still reconciles untouched.
+
+## (4) NON-VACUITY — seeded distinctive, and proved the test fails pre-fix
+
+Every seeded value sits far from its own default and from every other field's value (depth 0.5→**7.777**, feed
+2000→**1888**, toolDia (form default 12)→**9.333**, stepoverPct→**37**) — a field reading right by coincidence
+(a stale default, a cross-field mix-up, a re-derive that ignores the edit — the exact trap caught twice already
+this week, on op-lookup-scan and on INV8's placeholder) would read wrong against all four simultaneously.
+Additionally asserted the PRE-switch baseline is NOT the seeded value, closing the "already was 7.777" loophole.
+
+Proved the spec actually fails against the pre-fix code, not just theorized: saved a scratch copy of the fixed
+`opSession.js`, temporarily reverted ONLY the `surfacing` reconciler back to the exact old `stepdown`-searching
+code, re-ran the new spec — the real-gesture test failed (timeout: `#sf_depth` never reaches `7.777`, exactly
+reproducing the reported symptom), the pocket sanity test still passed (confirms the two tests are genuinely
+independent, not both trivially green/red together). Restored the fix from the saved scratch copy (never
+`git checkout HEAD --`, since the fix was uncommitted) and confirmed `node --check` + a clean re-run.
+
+## (3) POCKET / SLOT / CONTOUR — not broken
+
+`pocket-rides-raster-1406.spec.js` (56/56), `slot-twin-repoint-1500.spec.js` (13/13), `contour-wizard.spec.js`
+(3/3) all still pass — none of the three ever used `formNum`/`_replayParams`, so the orphan removal cannot have
+touched them; confirmed by running the files, not inferred from the grep alone.
+
+## Gate
+
+`npm run test:node`: 125/125 (both before and after the `opSession.js` edit). Playwright, the dispatch's own
+named set, run to a clean SERIAL pass after one transient concurrent-worker flake (11 timeouts under
+`--workers=3`, all `boot()`-stage `waitForFunction` timeouts — the known "two concurrent suites manufacture mass
+timeout reds" shape; re-ran serially and it vanished, so attributed correctly rather than chased as a regression):
+`surfacing-reconciler-2000.spec.js` (2/2, new), `word-glow.spec.js` (4/4, 2 pre-existing unrelated skips — t1732,
+already named, not touched this turn), `edit-nested-op-1958.spec.js` (6/6), `atc-roundtrip.spec.js` (9/9),
+`fork-parity-1593.spec.js` (1/1), `guard-roundtrip-1595.spec.js` (2/2), `pocket-rides-raster-1406.spec.js`
+(56/56), `slot-twin-repoint-1500.spec.js` (13/13), `contour-wizard.spec.js` (3/3), `flow-labels-unique-1408.spec.js`
+(5/5), `setup-sheet-850.spec.js` (4/4), `time-estimate-844.spec.js` (7/7), `editor-sim-real-insert.spec.js` (1/1)
+— **84 passed, 2 pre-existing skipped, 0 failed**, one full serial run. `proc_health.py watch`: clean both
+before and after.
+
+Two verification screenshots (`t1976-nested-op-glow.png`, `t1988-nested-group-glow.png`) refreshed as a direct
+side effect of running `word-glow.spec.js` itself this turn (its own two `t1976`/`t1988` tests write them) —
+committed alongside, not stray.
+
+## Files
+`web/blocks/opSession.js` (the fix + the orphan cleanup), `tests/surfacing-reconciler-2000.spec.js` (new),
+`DDCS-Studio/verification/t1976-nested-op-glow.png` + `t1988-nested-group-glow.png` (regenerated by the gate run).
+
+## Queued, still untouched
+`setGroupChildParams`'s own real-UI test (t1992). The `opGlow.js` stale doc-comment claim named at t1998
+(`replayReconcile`'s own header claims it backs the three diff surfaces; `opGlow.js`'s real code reads
+`opEditMap` instead) — flagged again, not chased. Two-sided setup — awaits the human.
+
+🔨 turn 2000

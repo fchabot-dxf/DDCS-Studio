@@ -18,7 +18,7 @@
  */
 import { getLastOp, recordOp } from './opRecord.js';
 import { findOpById, replaceOpById, removeOpById, insertOpAfterId } from './programModel.js';
-import { num, r3 } from '../wizards/ops/util.js';
+import { num } from '../wizards/ops/util.js';
 import { parseGcodeToStack } from './gcodeToStack.js';                       // decode a non-builder op's G-code → blocks (commitDecodedCode)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -46,17 +46,6 @@ const find = (prog, type) => {
 // Read the (possibly edited) block objects and return { formFieldId: value }. The inverse of each builder,
 // co-located with it. Numeric/geometry params reconcile cleanly here; derived (stepover) and inset (pocket)
 // params are intentionally left out for now. Only ops listed here reverse-sync.
-// Read a STUDIO form field as a number (for un-deriving block values like stepover ← stepover% × toolØ).
-// During replayReconcile (wizard CLOSED — the chip/Blocks surfaces have no form open) the form-only values must
-// come from the op's STORED params, not the live DOM (which would read defaults and over-report). `_replayParams`
-// holds those stored params; the field id strips its op prefix (sf_toolDia → toolDia) to look them up.
-let _replayParams = null;
-const formNum = (id, d) => {
-    if (_replayParams) { const v = _replayParams[id.replace(/^[a-z]+_/, '')]; return v == null ? d : num(v, d); }
-    if (typeof document === 'undefined') return d;
-    const e = document.getElementById(id);
-    return e ? num(e.value, d) : d;
-};
 
 // The PlaceOnStock wrapper carries the placement intent; its params are the exact inverse of makePlace
 // (offX ← originX, etc.), so reading them back is correct whatever coordinates the wrapped geometry is built in.
@@ -75,17 +64,32 @@ function placeFields(prog, prefix, offX, offY) {
 }
 
 const RECONCILERS = {
+    /**
+     * ── t2000 — READS `surfaceraster` DIRECTLY, and it is the ONLY shape this op ever emits now ──────
+     *
+     * This reader used to open `find(prog, 'stepdown')` and dig into its first child's `region` params — the
+     * shape surfacing's builder emitted before t1359 collapsed `stepdown{ surfacefill }` into one `surfaceraster`
+     * atom that carries the whole depth+row walk. `stepdown` was never re-pointed to for surfacing (unlike
+     * pocket/slot's t1406/t1500 raster arm, which is one of two live shapes) — it is retired for this op
+     * specifically, so the old reader always returned null: a real hand-edit in the Blocks tab would silently
+     * never reflect back into the Studio form (`wizardManager.pullFromBlocks`, wired to the tab switch).
+     *
+     * `stepoverPct` no longer needs un-deriving from an absolute StepOver value — the atom already stores the
+     * percentage directly (the same knob `surfacingStack` derives it from via `stepoverPctOf`), so no toolØ
+     * form-read is needed here at all; `toolDia` itself now reconciles too, reading straight off the atom same as
+     * `RECONCILERS.pocket`'s and `RECONCILERS.slot`'s own raster-arm readers.
+     */
     surfacing(prog) {
-        const down = find(prog, 'stepdown'), over = down && down.children && down.children[0], rg = over && over.params && over.params.region;
-        if (!down || !over || !rg || !rg.params) return null;
-        const tool = formNum('sf_toolDia', 12), wb = find(prog, 'wcs');   // un-derive stepover% from the absolute StepOver value
+        const rg = find(prog, 'surfaceraster');
+        if (!rg || !rg.params) return null;
+        const s = rg.params, wb = find(prog, 'wcs');
         return Object.assign({
             sf_wcs: (wb && wb.params && wb.params.wcs) || 'active',
-            sf_originX: rg.params.x, sf_originY: rg.params.y, sf_w: rg.params.w, sf_h: rg.params.h,
-            sf_depth: down.params.to, sf_stepdown: down.params.by,
-            sf_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
-            sf_stepoverPct: tool > 0 ? r3((num(over.params.stepover, 0) / tool) * 100) : undefined,
-            sf_feed: over.params.feed, sf_plunge: over.params.plunge, sf_clearance: over.params.clearance,
+            sf_originX: s.x, sf_originY: s.y, sf_w: s.w, sf_h: s.h,
+            sf_depth: s.depth, sf_stepdown: s.stepdown,
+            sf_strategy: s.strategy === 'parallel' ? 'raster' : 'spiral',
+            sf_toolDia: s.toolDia, sf_stepoverPct: s.stepoverPct,
+            sf_feed: s.feed, sf_plunge: s.plunge, sf_clearance: s.clearance,
         }, placeFields(prog, 'sf_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the region
     },
     slot(prog) {
@@ -697,12 +701,12 @@ export function reconcileActiveOp() {
 /**
  * Replay the DECLARED Replace path for ONE op, wizard-CLOSED — the single rebuild the three diff surfaces
  * (glow / chip / Merge-Replace notice, via opGlow) share. Reconciles the op's (possibly block-edited) stack back to
- * params — the reconciler reads the edited blocks, and its form-only values (toolØ, wallOffset) come from the op's
- * STORED params, not the DOM — then rebuilds with BUILDERS. The reconciled fields override their params; everything
- * untouched (toolØ, rpm, head, …) stays from stored state. Returns the rebuilt bare atoms = what a form Replace
- * would regenerate, or null if the op has no reconciler / its shape doesn't match (caller falls back, fail-safe).
- * So "edited" can mean exactly "Replace would lose something" — a surfaced edit reconciles + reproduces; an
- * injection / unrepresentable residue does not. Declaration via the reconcilers, never motion-inference.
+ * params — the reconciler reads the edited blocks — then rebuilds with BUILDERS. The reconciled fields override
+ * their params; everything untouched (rpm, head, …) stays from stored state. Returns the rebuilt bare atoms =
+ * what a form Replace would regenerate, or null if the op has no reconciler / its shape doesn't match (caller
+ * falls back, fail-safe). So "edited" can mean exactly "Replace would lose something" — a surfaced edit
+ * reconciles + reproduces; an injection / unrepresentable residue does not. Declaration via the reconcilers,
+ * never motion-inference.
  */
 // Memo by the op OBJECT (its identity is the stack signature: ddcsLoadBlockStack replaces the program with fresh
 // objects on every edit, so a changed stack ⇒ a new key ⇒ a miss; an unchanged op ⇒ a hit). Dedupes the three
@@ -715,9 +719,7 @@ export function replayReconcile(opId) {
     const op = findOpById(prog, opId);
     if (!op || !op.opType || !RECONCILERS[op.opType] || !builderOf(op.opType)) return null;
     if (_replayCache.has(op)) return _replayCache.get(op);
-    let fields;
-    _replayParams = op.params || {};                                  // stored-state sourcing (wizard closed)
-    try { fields = RECONCILERS[op.opType]([op]); } finally { _replayParams = null; }   // scope find() to THIS op's subtree
+    const fields = RECONCILERS[op.opType]([op]);   // prog = [op] scopes find() to THIS op's own subtree
     let rebuilt = null;
     if (fields) {
         const overrides = {};
