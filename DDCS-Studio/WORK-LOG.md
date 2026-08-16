@@ -38579,3 +38579,77 @@ created, run, and deleted during investigation; `git status` confirms none survi
 changed.
 
 🔨 turn 1966
+
+# ═══ t1968 — THE CHECKER, built: `tests/node/op-lookup-scan-1968.test.mjs`, a shrink-only ratchet ═══
+
+New file, `web/` untouched — this turn is the checker only, per the advisor's own ranking. Node tier, beside
+`architecture-map-1698.test.mjs`, ~1.4s for all 8 of its own tests.
+
+## CALIBRATED AGAINST GROUND TRUTH, NOT ASSUMED — the false-positive rate the dispatch asked for, honestly
+
+Built the scanner in a scratch file first and ran it against the real tree BEFORE writing a single inventory
+entry, so the inventory reflects what the tuned detector actually finds, not what I expected it to find. Four
+real defects surfaced and fixed during tuning, each one a genuine miss or false alarm, not hypothetical:
+
+1. **A naive "does `.children` appear anywhere in the function" rule MISSED 2 of the 9 previously-known sites.**
+   `setGroupChildParams`/`mergeOpBlocks` both reference `.children` — but only AFTER their own shallow
+   `.findIndex` concludes, reading the ALREADY-FOUND record's own children for an unrelated reason, never as
+   recursion machinery. Fixed by detecting SELF-RECURSION structurally instead (does a function call ITS OWN
+   NAME with a `.children`-shaped argument?) rather than asking "does `.children` appear anywhere."
+2. **The already-fixed guarded-fallback idiom (t1958/t1964's own shape) false-positived** on `checkEnvelope`/
+   `openForEdit`/`insert` — `\bflattenOps\(` doesn't match `window.ddcsFlattenOps(` (no word boundary between
+   "ddcs" and "F" in camelCase). Fixed by matching the literal `window.ddcsFindOpById`/`ddcsFlattenOps`/
+   `ddcsReplaceOpById` bridge names directly.
+3. **A 38KB "kitchen sink" function (`globalFunctions.js`'s own `setupGlobalFunctions`) false-positived**: it
+   references `getStack()` once, for a legitimate unrelated reason, and separately does `.find((a) => a.id ===
+   …)` on `EDITOR_FILE_ACTIONS` — a completely different array (file-menu actions, not the program) — tens of
+   thousands of characters away. "Anywhere in the same function" isn't precise enough at this function size.
+   Fixed with a PROXIMITY check (500 chars) between the program-stack reference and the shallow test — every
+   known-genuine site sits well under 200 chars apart; this collision sat far outside any reasonable window.
+4. **`replayReconcile` was wrongly excluded** by its own doc comment: `// scope find() to THIS op's subtree` —
+   the literal text "find()" in PROSE matched my self-recursive-helper exclusion regex. Fixed by blanking
+   comments (not string literals — `.type === 'op'` needs its own `'op'` to survive) before any pattern match.
+
+**The shape had to widen too**: the dispatch's own t1960 definition named `.find`/`.filter`/`.findIndex`
+specifically, but `glowEdited`'s real shape is a plain `for…of` loop with an early `continue` — no `.find` call
+at all. Dropped the find/filter/findIndex requirement; the `.children`/canonical/guarded-fallback exclusions
+already do the real work of ruling out a genuine recursive walk, so the JS CONSTRUCT stopped mattering.
+
+**One NEW site found, not previously catalogued by any of the three prior manual sweeps**: `web/ui/macrosApp.js`
+`openCamAuthoring`'s own "global doors" branch (`stack.filter((b) => b && b.type === 'op')`, auto-importing every
+CAM-able op from the program) silently skips every op nested inside a `multi_step` wrapper — a multi-op program's
+later ops never reach CAM authoring. This is the checker earning its keep in the same turn it was built.
+
+**Known remaining blind spot, named rather than hidden**: a program-stack array reaching a function as a
+PARAMETER (not a direct `getStack()`/`ddcsGetBlockProgram()` call inside that same function) would not be
+detected. Zero cost today — every one of the 10 current sites calls one of those two directly — but a future
+site shaped that way needs re-tuning, not blind trust.
+
+## THE RATCHET, both directions, proven — not asserted
+
+Keyed by `{file, function name}`, deliberately NOT by line — `ARCHITECTURE.md`'s own citations drift on every
+edit above their cited line (t1952 measured 10 repetitions of exactly this). A name survives an edit a line
+number doesn't; the failure message computes today's real line from the scan itself when it needs to report one.
+
+- **Part 1** (5 tests): the detector fires on a synthetic fake violation and stays silent on a synthetic genuine
+  recursive walker, the guarded-fallback idiom, a prose-only comment mention, and correctly still fires on the
+  `setGroupChildParams` shape (children read after the find, not recursion) — proven on hand-written snippets,
+  independent of the real tree or the ratchet mechanics.
+- **Part 2**: the 10-entry inventory matches the real tree EXACTLY, right now — passes clean.
+- **Part 3, direction 1**: inject a fake extra scanned violation not in the inventory → the comparison reports
+  it and fails. **Direction 2**: drop a REAL inventory entry (not a mock) and re-check the REAL scan results —
+  the dropped site's own key is still present in the actual, current scan, proving a dishonest removal (deleting
+  the debt-list entry without touching the code) is caught, not just a hypothetical one.
+
+## GATE
+`op-lookup-scan-1968` (8/8) + node tier (126/126, up from 118 — the 8 new tests) + `guard-roundtrip-1595` +
+`fork-parity-1593` — all clean; one flake on `guard-roundtrip-1595`'s own heavy structural sweep, the same
+already-documented load-sensitive test named repeatedly in this file's own history, passed on its own retry.
+
+## Queued CODE work, the advisor's own order, unchanged
+The 6 dead guards → `USER_OP_PREFIX` boundary + `validateUserOp` assertion → `segmentFrame.js` `frameOwnerAtLine`
+→ `editorOpHover.js` `glowEdited` → `editorManager.js` `_firstOpTitle` → `setupSheet.js` `collectOps` (different
+shape) → the 6 new sites (now 7, counting `openCamAuthoring`) — every one of these now REMOVES its own inventory
+entry from `op-lookup-scan-1968` when fixed (the ratchet's own shrink direction), not a separate bookkeeping step.
+
+🔨 turn 1968
