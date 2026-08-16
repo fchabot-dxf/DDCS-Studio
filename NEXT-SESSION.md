@@ -3958,3 +3958,41 @@ part of it turns out to need one, park that part and say so; do not run it.**
 
 ⚠ Also queued, both yours: `setGroupChildParams`'s real-UI test · `RECONCILERS.surfacing` stale against its own
 current `surfaceraster` emit shape.
+
+# ═══ t1998 — RECONCILERS.surfacing: is it stale, and does it matter? (node-tier only) ═══
+
+t1996 accepted. 52/52 citations re-anchored to verified-unique substrings, **0 that could not be made unique**,
+and the drift proof done properly — move a cited line 200 lines away → still found; delete it → 0 matches;
+duplicate it → 2 matches — all against a **scratch copy**, never the real file.
+
+**⭐ AND YOU FOUND A LIE INSIDE THE CHECKER ITSELF.** INV8 cited `userOps.js:746` — **the wrong function
+entirely** — and was "protected" by a `find:/./` placeholder that matches anything and therefore **checked
+nothing**. A citation that could never fail, sitting inside the mechanism whose whole job is to make citations
+fail when they rot. You fixed the anchor *and* the same wrong line in the prose. That is the third
+never-could-fail check you have caught in three turns, and this one was in the guard rather than the guarded.
+
+**And the prose half you stated rather than fudged:** 149 citations total, 52 now enforced, **~97 unenforced** —
+sized comparably to that whole turn again, so not attempted, with the boundary named (a citation earns a check
+by graduating into a named TRAP/INVARIANT). A true limit beats a partial sweep presented as complete.
+
+**Good hygiene, noted:** you spotted two `verification/*.png` modified by MY concurrent gate and left them
+unstaged rather than absorbing someone else's side effects into your commit.
+
+## THE TASK — node tier only. **My release gate is STILL RUNNING: no browser, no Playwright.**
+You found this while looking at something else in t1992: **`RECONCILERS.surfacing` is stale against its own
+current `surfaceraster` emit shape** — `surfacingWizard.js`'s own t1359 guard confirms the old stepdown shape
+it still checks for is **test-only dead code today**.
+
+1. **IS IT ACTUALLY STALE?** Confirm against the current emit rather than the comment. Name the shape it
+   expects and the shape that is emitted now.
+2. **⚠ WHAT BREAKS FOR THE USER — or does nothing?** A reconciler that no longer matches may (a) silently
+   fail to reconcile a real hand-edit, (b) reconcile it wrongly, or (c) be entirely unreachable dead code. **The
+   three have very different severities and I do not want them conflated.** If it is unreachable, say so — that
+   is the "delete it" answer, not the "fix it" answer.
+3. **IS THE TEST-ONLY DEAD CODE LOAD-BEARING FOR A TEST?** If a spec only passes because it feeds the old
+   shape, that spec is asserting a shape the app no longer produces — the `PRIMARY EVIDENCE` family again.
+4. **RECOMMEND: fix, delete, or leave — with the reason.** Do not build it.
+5. **If answering honestly needs a browser, PARK IT and say so.** Node tier only this turn.
+
+⚠ Then: `setGroupChildParams`'s real-UI test (needs a browser — after my gate) · two-sided setup awaits the
+human · and I release as soon as the gate lands.
