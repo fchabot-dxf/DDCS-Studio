@@ -38798,3 +38798,90 @@ zero flakes** (`--workers=2`).
 Option B, now including the unenforced prose half (t1970's own finding, folded in per the advisor).
 
 🔨 turn 1972
+
+# ═══ t1974 — segmentFrame.js: the comment lied about itself, and it lied since t1874 ═══
+
+## THE BUG, exactly as the advisor named it
+
+`frameOwnerAtLine`'s own header comment claimed to answer "which op owns this line," but its body read
+`proj.map[i][0]` (`anc[0]`, the TOP-LEVEL ancestry slot) and did a shallow `getStack().find(b => b.id === topId)`.
+For a `multi_step`-wrapped multi-operation program (the real "Add" gesture, t1940/t1946), every nested op's
+ancestry starts with the WRAPPER's own id, never its own — so this always resolved the `multi_step` record.
+`opSimContext('multi_step')` is in none of that module's declared frame-intent sets, so `toolMachineFrame` read
+`false` for EVERY line of EVERY nested op, live since t1874 Slice 3: the sim's hide-workpiece toggle and the DRO
+machine-frame chip never fired for a nested op during playback, silently, on every multi-op program ever played.
+
+## THE FIX — through the declared lookup, nothing grown
+
+Replaced the local walk with a direct call to `programModel.js`'s own `opAtLine` — the canonical, now-safe answer
+(fixed across t1842/t1958/t1964/t1972 this session). `frameOwnerAtLine` is now four lines: `opAtLine(i)`, then the
+same `opSimContext(op.opType)` join as before. Dropped the now-dead `getStack`/`getProjection` imports. This
+module needed zero new declared data — `opAtLine` already exists, `opSimContext`'s tables already exist; the
+module's own job was always just the JOIN, which it already did correctly for the resolved-op case.
+
+**The comment was made true, not deleted** — the header (module doc) and the function's own preceding comment now
+trace the actual history (why the shallow walk existed, what bug it dodged, what bug it introduced, why `opAtLine`
+is safe now) instead of asserting a correctness the code didn't have. A future reader hitting this file mid-
+multi-op-bug will find the real chain of reasoning, not a stale claim that stops them checking.
+
+## ASSERT WHAT THE USER SEES — bridged to option-b-slice3-live-visibility-1874, not a parallel claim
+
+Read the existing evidence file in full first. Its "PRIMARY EVIDENCE" test loads Homing+Corner via `mkOp` +
+`ddcsLoadBlockStack` on a plain 2-item array — traced `ddcsLoadBlockStack` → `setStack`: it never groups.
+Grouping only happens in `addOperation` (the real Add gesture) and `workspaceToStack` (a Blockly structural edit),
+both via `regroupOps`/`groupConsecutiveOps`. So the existing test's own construction is UNWRAPPED — two top-level
+ops, each already its own `anc[0]` — and never actually exercised this bug at all (the shallow walk in the old
+code would have resolved it correctly too, for the wrong reason: no wrapper was ever in the way).
+
+Extended the SAME file rather than inventing a separate one: `loadAndBoot` grew a `{wrapped:true}` option that
+runs the built ops through `programModel.js`'s own `groupConsecutiveOps` (the real declared grouping function,
+not a hand-built `multi_step` record) before loading — the wrapper carries no G-code of its own (t1916), so line
+numbers stay identical to the unwrapped case. Added one new test, `t1974 — WRAPPED PROGRAM`, reusing the file's
+own `mkOp`/`stripIntermediateM30`/`stepOnce` helpers verbatim, asserting the same span (`hidden=true` through
+Homing's 31 lines, `hidden=false` from Corner's first line) plus a sanity check that the loaded program is
+genuinely one `multi_step` op, not two top-level ones — so a future regression in the load helper itself fails
+loud rather than silently degrading back to the unwrapped (bug-blind) shape.
+
+## NON-VACUITY
+
+Saved a scratch copy of the fixed `segmentFrame.js`, reverted `frameOwnerAtLine` to its exact pre-fix shallow-walk
+body, ran the whole spec file at `--workers=2`: the new WRAPPED PROGRAM test failed **3/3** (`hidden` stayed
+`false` through every Homing line — the union flip never fired, exactly the reported symptom), while all 4
+pre-existing tests (including the unwrapped PRIMARY EVIDENCE and the DRO chip test) stayed green — proof the new
+test exercises a genuinely different path than what was already covered, not a duplicate assertion. Restored from
+the saved copy (not `git checkout HEAD` — this work was uncommitted). Re-ran clean: 6/6 (one unrelated flake on
+the DRO chip test under `--workers=2` — the load-contention pattern this session already knows; isolated re-run
+passed 1/1, not a regression).
+
+## THE RATCHET, proven in anger for the first time (requirement 4)
+
+Fixed the code FIRST, left the `frameOwnerAtLine` entry in the checker's `INVENTORY` unchanged, ran
+`op-lookup-scan-1968`: **failed**, `staleEntries` reporting exactly `web/viz/segmentFrame.js :: frameOwnerAtLine`
+— "1 inventory entry the scan no longer finds." This is the ratchet's OTHER direction from Part 3's own built-in
+meta-test (which proves dropping an entry without fixing the code fails) — this is fixing the code without
+dropping the entry, and it fails too, confirmed rather than assumed. Removed the entry (replaced with a t1974
+dated comment naming the fix and pointing at the new test, matching this file's own convention for closed sites
+rather than a silent deletion). Inventory is now 9 entries; the test title (`INVENTORY.length` is already live in
+the string, no hardcoded count anywhere else in the file) reads "9 open sites" automatically. Full checker re-run:
+7/7, both ratchet-direction meta-tests pass.
+
+## ARCHITECTURE.md — checked, no drift
+
+`segmentFrame.js` has zero citations in `ARCHITECTURE.md` (grepped). The citation checker (`architecture-map-1698`)
+ran clean, 5/5 — nothing in this turn's edits touched a cited file/line.
+
+## GATE
+
+Node tier (125/125, including the updated 9-entry `op-lookup-scan-1968` at 7/7) + `option-b-slice3-live-
+visibility-1874` (5/5, the new WRAPPED PROGRAM test included; 1 unrelated flake retried clean) +
+`option-b-slice2-positioning-1872` (3/3; 1 unrelated boot-timeout flake retried clean) + `marker-rebuild-1848`
+(2/2) + `user-root-boundary-1972` (2/2) + `export-import-fidelity-1964` (1/1) + `guard-roundtrip-1595` (2/2) +
+`fork-parity-1593` (2/2) + the 4 t1928 features (`setup-sheet-850`, `time-estimate-844`, `editor-sim-real-
+insert`, `whole-program-intent-756`, 15/15) — **158/158 clean** (`--workers=2`, 2 flakes total, both the
+established load-contention shape on unrelated tests, both retried green).
+
+## Queued CODE work, the advisor's own order, unchanged
+`editorOpHover.js` `glowEdited` → `editorManager.js` `_firstOpTitle` → `setupSheet.js` `collectOps` (different
+shape) → the remaining 9-entry inventory → architecture-citation Option B, including the unenforced prose half.
+
+🔨 turn 1974

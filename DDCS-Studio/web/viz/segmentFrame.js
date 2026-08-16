@@ -3,10 +3,10 @@
  *
  * For a projected program, which LINE RANGES belong to which op, and what FRAME does that op declare — nothing
  * more. This is the join the t1836 design named as already fully declared, with nothing new to declare: line→op
- * ownership already lives in `programModel.js`'s own `proj.map` (read here directly — see `frameOwnerAtLine`'s
- * own comment below for why NOT via `opAtLine`, never a second copy of the mapping itself); per-type frame
- * intent already lives in `opSimContext.js`'s own declared tables. This module is the SEAM that joins the two —
- * it introduces zero new declared data, only a name for the join.
+ * ownership is the ONE declared answer `programModel.js`'s own `opAtLine` already gives (t1974 — see
+ * `frameOwnerAtLine`'s own comment below for why this module now calls it directly, after avoiding it for three
+ * turns); per-type frame intent already lives in `opSimContext.js`'s own declared tables. This module is the
+ * SEAM that joins the two — it introduces zero new declared data, only a name for the join.
  *
  * SLICE 1 SCOPE, DELIBERATELY NARROW: this module is not imported by any render/positioning/visibility code this
  * turn. Nothing here changes what is drawn, positioned, or shown/hidden — see the guard test
@@ -14,30 +14,25 @@
  * specifically to prove that. Slices 2 (positioning) and 3 (live visibility) are future acts that will import
  * this module's output — not built here.
  */
-import { getStack, getProjection } from '../blocks/programModel.js';
+import { opAtLine } from '../blocks/programModel.js';
 import { opSimContext } from './opSimContext.js';
 
-// t1838 — reads `proj.map[i][0]` directly (the TOP-LEVEL ancestry slot — `programModel.js:44`'s own declared
-// meaning: "an op-container id in that ancestry means the line belongs to that op") + a plain top-level lookup
-// in `getStack()`, rather than `programModel.js`'s own `opAtLine` (which recursively descends into EVERY block's
-// `.children`, including nested atoms far below any top-level op). This turn's own guard test caught `opAtLine`
-// returning a WRONG, unrelated match for a real Corner-after-Homing program: Homing's own builder self-wraps
-// with an internal `{type:'op', opType:'homing'}` fragment that is never assigned an `id` (only the top-level
-// `makeOp()` call assigns one) — and `findOpInStack`'s `anc.includes(b.id)` matches that id-less fragment
-// whenever `anc` happens to carry `undefined` padding at the depth it sits at (proven: Corner's own ancestry
-// for a plain top-level line is `['op2', undefined, undefined, undefined]`, and `[...].includes(undefined)` is
-// `true`, so the recursive descent falls through into Homing's own tree and returns its stray fragment instead
-// of `null`). This module only ever needs TOP-LEVEL attribution (which op owns this line), so it does not need
-// `opAtLine`'s general nested-atom search at all, and reading `anc[0]` directly sidesteps the bug rather than
-// depending on it. The bug itself is real, pre-existing, and NOT fixed here — flagged separately (WORK-LOG t1838)
-// as its own item, since `opAtLine` has other, unrelated live consumers (the editor's hover-to-edit) this module
-// must not risk perturbing.
+// t1838 — this module used to read `proj.map[i][0]` directly (the TOP-LEVEL ancestry slot) + a shallow
+// top-level `getStack().find(...)`, instead of `programModel.js`'s own `opAtLine`, because `opAtLine` had a
+// real bug at the time: homing's own internal, id-less `{type:'op', opType:'homing'}` self-wrap fragment could
+// get matched by accident (`findOpInStack`'s `anc.includes(b.id)` false-matching `undefined` ancestry padding).
+// The shallow top-level read was a correct WORKAROUND for that bug, not a preference — and it bought a NEW bug
+// of its own the same shape as the one it dodged: for a MULTI-OPERATION program, `anc[0]` is always the
+// `multi_step` WRAPPER's own id (every nested op's ancestry starts with it), so the shallow top-level lookup
+// always resolved to the wrapper, never the real op — `opSimContext('multi_step')` is not in any of that
+// module's declared sets, so `toolMachineFrame` read `false` for EVERY line of EVERY nested op, live since
+// t1874 Slice 3 (the sim's hide-workpiece/DRO machine-frame flip simply never fired for one). The bug
+// `opAtLine` had is now FIXED (t1842's id-null guard → t1958's deepest-match-wins → t1964's `user_root`
+// boundary → t1972's `USER_OP_PREFIX` refinement) — it is the canonical, declared, now-correct answer to
+// "which op owns this line," so this module calls it directly instead of carrying its own second copy of the
+// same lookup that itself went stale the moment the reason for avoiding `opAtLine` stopped being true.
 export function frameOwnerAtLine(i) {
-    const proj = getProjection();
-    const anc = proj.map && proj.map[i];
-    const topId = anc && anc[0];
-    if (!topId) return null;
-    const op = getStack().find((b) => b && b.type === 'op' && b.id === topId);
+    const op = opAtLine(i);
     if (!op || !op.opType) return null;
     return { opId: op.id, opType: op.opType, toolMachineFrame: !!opSimContext(op.opType).toolMachineFrame };
 }

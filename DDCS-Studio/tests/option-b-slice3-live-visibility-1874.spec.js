@@ -70,13 +70,24 @@ async function mkOp(page, opType, n) {
     }, { opType, n });
 }
 
-async function loadAndBoot(page, opTypes) {
+async function loadAndBoot(page, opTypes, { wrapped = false } = {}) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
     await page.evaluate(() => window.showApp('studio'));
     const blocks = [];
     for (let i = 0; i < opTypes.length; i++) blocks.push(await mkOp(page, opTypes[i], i + 1));
-    await page.evaluate((s) => window.ddcsLoadBlockStack(s), blocks);
+    // t1974 — `mkOp` + a plain array is what this file always loaded, and it is UNWRAPPED: `ddcsLoadBlockStack`
+    // (-> `setStack`) never groups; only `addOperation` (the real Add gesture) and `workspaceToStack` (a Blockly
+    // edit) call `regroupOps`/`groupConsecutiveOps`. So every existing test below this point loads two TOP-LEVEL
+    // ops, each already its own `anc[0]` — which never exercised the `multi_step`-wrapper bug `frameOwnerAtLine`
+    // had (t1874-live, fixed t1974): the bug only shows when a nested op's ancestry starts with a WRAPPER's id,
+    // not its own. `wrapped: true` reproduces that shape through the SAME declared grouping function real growth
+    // uses (`groupConsecutiveOps`, `programModel.js`) rather than hand-building a `multi_step` record — the
+    // wrapper carries no G-code of its own (t1916), so the projected line numbers stay identical either way.
+    const toLoad = wrapped
+        ? await page.evaluate(async (bs) => (await import('/blocks/programModel.js')).groupConsecutiveOps(bs), blocks)
+        : blocks;
+    await page.evaluate((s) => window.ddcsLoadBlockStack(s), toLoad);
     await page.evaluate(() => window.showApp('blocks'));
     await page.waitForFunction(() => document.getElementById('blk-preview-panel') && document.getElementById('blk-preview-panel').__panel, null, { timeout: 8000 });
     await page.evaluate(() => document.getElementById('blk-preview-panel').__panel.setView('3d'));
@@ -124,6 +135,38 @@ test('PRIMARY EVIDENCE: the workpiece hides through every Homing line and reappe
     expect(homingSpan.every(Boolean), `every line of Homing's own emit must hide the stock — got ${JSON.stringify(hiddenFlags)}`).toBe(true);
     expect(cornerSpan.length, 'sanity: stepped far enough into Corner to observe its own span').toBeGreaterThan(0);
     expect(cornerSpan.every((h) => h === false), `every line reached inside Corner's own emit must show the stock — got ${JSON.stringify(hiddenFlags)}`).toBe(true);
+});
+
+test('t1974 — WRAPPED PROGRAM: the same hide/reappear holds when Homing+Corner sit inside a multi_step wrapper', async ({ page }) => {
+    // This is the actual shape a real "Add" gesture or Blockly regroup produces for 2+ top-level ops (t1940/
+    // t1946), and the one `frameOwnerAtLine`'s pre-t1974 shallow top-level lookup got wrong: every nested op's
+    // ancestry starts with the WRAPPER's own id, so the old code always resolved `multi_step` (not in any
+    // `opSimContext` set → toolMachineFrame always false) instead of the real op underneath. The PRIMARY EVIDENCE
+    // test above loads the same two ops UNWRAPPED and never exercised that path — see loadAndBoot's own t1974
+    // comment. Non-vacuity: reverting frameOwnerAtLine to its pre-t1974 shallow walk fails this test (workpiece
+    // never hides through Homing at all) while leaving the unwrapped PRIMARY EVIDENCE test above green — proof
+    // this test is exercising a genuinely different path, not just re-asserting the same thing twice.
+    test.setTimeout(90_000);
+    await loadAndBoot(page, ['user_homing_data', 'user_corner_data'], { wrapped: true });
+    const wrappedShape = await page.evaluate(() => {
+        const prog = window.ddcsGetBlockProgram();
+        const top = prog.filter((b) => b && b.type === 'op');
+        return { count: top.length, opType: top[0] && top[0].opType };
+    });
+    expect(wrappedShape, 'sanity: the program actually loaded as ONE multi_step wrapper, not two top-level ops').toEqual({ count: 1, opType: 'multi_step' });
+
+    const stripped = await stripIntermediateM30(page);
+    expect(stripped, 'sanity: the test-only M30 strip must find the boundary to work around').toBe(true);
+
+    const trail = [];
+    for (let i = 0; i < 40; i++) trail.push(await stepOnce(page));
+
+    const hiddenFlags = trail.map((t) => t.hidden);
+    const homingSpan = hiddenFlags.slice(0, 31);
+    const cornerSpan = hiddenFlags.slice(32);
+    expect(homingSpan.every(Boolean), `every line of Homing's own emit must hide the stock even nested in multi_step — got ${JSON.stringify(hiddenFlags)}`).toBe(true);
+    expect(cornerSpan.length, 'sanity: stepped far enough into Corner to observe its own span').toBeGreaterThan(0);
+    expect(cornerSpan.every((h) => h === false), `every line reached inside Corner's own emit must show the stock even nested in multi_step — got ${JSON.stringify(hiddenFlags)}`).toBe(true);
 });
 
 test('the DRO chip reads the per-line override, not just the whole-trace union: work → mach at Homing\'s own first real motion', async ({ page }) => {

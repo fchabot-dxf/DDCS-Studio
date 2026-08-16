@@ -218,7 +218,10 @@ const INVENTORY = [
     { file: 'web/ui/editorManager.js', name: '_firstOpTitle', why: 'an exported/downloaded .nc for a multi-op program is titled/filed as "multi_step" instead of the real first op\'s name (cosmetic)' },
     { file: 'web/ui/editorOpHover.js', name: 'glowEdited', why: 'the editor never highlights a hand-edited block belonging to a nested op — the edit-glow chip simply never appears for it' },
     { file: 'web/ui/opContextMenu.js', name: 'showOpMenu', why: 'the right-click menu on a nested op falls back to a thinner, stale record (missing params/children) for its CAM-authoring actions' },
-    { file: 'web/viz/segmentFrame.js', name: 'frameOwnerAtLine', why: 'the sim\'s hide-workpiece/DRO machine-frame flip never fires for a nested op during playback, though its own comment claims to handle exactly that case' },
+    // t1974 — web/viz/segmentFrame.js's frameOwnerAtLine FIXED: now resolves via programModel.js's own canonical
+    // `opAtLine` (a genuine recursive walker, correctly excluded by the detector) instead of a local shallow
+    // top-level find(). See WORK-LOG t1974 and option-b-slice3-live-visibility-1874.spec.js's new WRAPPED
+    // PROGRAM test for the non-vacuity proof and the user-visible assertion.
     { file: 'web/ui/macrosApp.js', name: 'openCamAuthoring', why: '"auto-import all CAM-able program ops" silently skips every op nested inside a multi_step wrapper — a multi-op program\'s later ops never reach CAM authoring' },
 ];
 
