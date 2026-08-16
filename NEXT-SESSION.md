@@ -3528,3 +3528,38 @@ deleting all session.
 
 ⚠ Then: `glowEdited` → `_firstOpTitle` → `collectOps` (different shape) → the rest of the inventory →
 architecture-citation Option B (including the unenforced prose half).
+
+# ═══ t1976 — editorOpHover.glowEdited, + one bounded question about overclaiming tests ═══
+
+t1974 accepted, verified by me: **inventory 10 → 9**, node tier 125/125 fail 0, both ratchet directions green.
+**The ratchet worked in anger exactly as specified** — you fixed the code, left the entry in place, watched the
+checker fail with `staleEntries`, then removed it and got clean. That is the direction that rots, proven on a
+real fix rather than a synthetic one.
+
+**⭐ AND YOU FOUND THE BEST THING BY REFUSING TO TRUST A TEST'S NAME.** `option-b-slice3-live-visibility-1874`
+calls itself **PRIMARY EVIDENCE** — and it loads UNWRAPPED ops, so it never exercised the wrapper bug at all.
+It has been vouching for a behaviour it does not test. That is the same defect family as the lying comment you
+fixed in the same turn, wearing a test's clothes: **a confident name stops the next reader checking.** You
+bridged it by extending that same file with a genuinely wrapped program built through the real declared
+grouping function, rather than writing a parallel claim elsewhere.
+
+## THE TASK — `editorOpHover.js glowEdited`, next in the inventory.
+The nested edit-glow never renders for an operation inside a multi-operation program.
+
+1. **Fix via the canonical lookup**, same as `segmentFrame`. If it does not fit, stop and tell me.
+2. **ASSERT THE VISIBLE RESULT:** edit a value on a nested operation and the glow appears on that operation's
+   own lines — not the wrapper's, not nowhere. This one is *pixels*; if the honest assertion needs a screenshot,
+   take one.
+3. **INVENTORY 9 → 8**, count updated.
+4. **PROVE NON-VACUITY.**
+
+## ⚠ PLUS ONE BOUNDED QUESTION — you are already in that file family, so answer it there and stop.
+You proved one `PRIMARY EVIDENCE` test didn't exercise its own claim. **Do its siblings?** Check the other
+`option-b-*` PRIMARY EVIDENCE tests: do any of them build a WRAPPED program, or are they all unwrapped —
+i.e. is the whole family vouching for multi-operation behaviour it never runs? **Report only; fix nothing.**
+Two or three greps, then stop — I do not want this turning into a suite-wide audit.
+
+⚠ **Gate:** node tier (incl. checker) + `option-b-slice2/3` + `marker-rebuild-1848` + the round-trip/parity set
++ the 4 t1928 features.
+⚠ **RELEASE PLAN:** I am batching — `glowEdited` → `_firstOpTitle` → `collectOps`, then ONE full gate and one
+release, rather than a 30-minute gate per one-line fix. Say so if any of the three looks bigger than that.
