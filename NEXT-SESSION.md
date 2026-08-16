@@ -3798,3 +3798,37 @@ own atom **records correctly** (`isOpBlockEdited(innerId) === true`) but **never
 ⚠ **MY GATE IS NOT RUNNING — the machine is yours. Browser work is fine this turn.**
 ⚠ Still awaiting the human on two-sided setup. Then: `option-b-slice2` bridged to a wrapped program → the rest
 of the 7-entry inventory → architecture-citation Option B.
+
+# ═══ t1990 — BRIDGE option-b-slice2 TO A WRAPPED PROGRAM (close the last overclaiming test) ═══
+
+t1988 accepted, verified by me: node tier green, inventory holds at 7, and **I looked at your screenshot** —
+line 3's edited `9` glows, lines 1–2 clean. Exactly the claim.
+
+**⭐ You held the design tension instead of taking the easy fix, and that is the whole point of that dispatch.**
+You checked `setupSheet.js` and `timeEstimate.js` FIRST and confirmed both genuinely want a group counted once
+— a widened `flattenOps` would have double-listed a nested group on the printed sheet and split its time twice.
+Neither file touched, byte-for-byte unchanged. **And the fix you chose is a strict SUPERSET, not a second
+case:** sweeping rendered lines through the canonical `ddcsOpAtLine` and collecting distinct owners means the
+glow now handles `multi_step`, group-in-group, *and any future nesting `opAtLine` already resolves* — so that
+loop stops needing an edit every time a new container shape is invented. That is the difference between fixing
+a bug and closing a class.
+
+## THE TASK — the last of the four overclaiming tests.
+`option-b-slice2-positioning-1872`'s PRIMARY EVIDENCE test builds an UNWRAPPED program (bare array →
+`ddcsLoadBlockStack`), so it has never exercised the multi-operation case it is named for. t1974 already did
+exactly this repair for slice3 — **follow that precedent rather than inventing a second approach.**
+
+1. **Bridge it to a genuinely WRAPPED program** built through the real declared path (the same
+   `groupConsecutiveOps` / real-Add construction t1974 used), reusing the file's own helpers.
+2. **⚠ KEEP THE EXISTING UNWRAPPED TEST.** Both shapes are legitimate programs and both should be asserted —
+   this is an ADDITION, not a replacement. Do not trade one coverage gap for another.
+3. **REPORT WHETHER IT WAS ALREADY PASSING.** You flagged in t1984 that `blk-start-hints-multistep-1954` may
+   already cover slice2's dependency. **If the wrapped case passes first time, say so plainly** — that is a
+   real result (the claim was true, the evidence was just absent) and I would rather hear it than have a green
+   test quietly recorded as a fix.
+4. **PROVE NON-VACUITY** if it does fail. **Gate:** node tier + `option-b-slice2/3` + `marker-rebuild-1848` +
+   `blk-start-hints-multistep-1954` + the round-trip/parity set.
+
+⚠ The machine is yours — my gate is not running.
+⚠ Then: the remaining 7-entry inventory → architecture-citation Option B (with the mandatory uniqueness
+assertion, incl. the unenforced prose half). Two-sided setup still awaits the human.
