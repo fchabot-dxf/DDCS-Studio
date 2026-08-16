@@ -12,11 +12,20 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 // t1730 — 'middle' opens the twin now (its coded view is retired); '#wiz_user' is the shared twin panel.
-async function insertOp(page, name) {
+// t1944 — `choice` (optional): a NON-empty canvas now confirms (t1942); pass the button text to click
+// ("Replace it") when the canvas already holds a prior op — the empty-canvas first insert needs none.
+async function insertOp(page, name, choice) {
   await page.evaluate((n) => window.ddcsStudio.wizardManager.open(n), name);
   await page.waitForSelector('#wiz_user', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
-  await page.evaluate(() => window.ddcsStudio.wizardManager.insert());
+  if (choice) {
+    await page.evaluate(() => { window.ddcsStudio.wizardManager.insert(); });   // fire without awaiting — hangs on the confirm
+    await page.waitForSelector('.app-dialog', { timeout: 8000 });
+    await page.click(`.app-dialog button:has-text("${choice}")`);
+    await page.waitForFunction(() => !document.querySelector('.app-dialog'));
+  } else {
+    await page.evaluate(() => window.ddcsStudio.wizardManager.insert());
+  }
   await page.waitForTimeout(150);
 }
 
@@ -30,7 +39,9 @@ test('a second op REPLACES the program — the M30/label-collision bug class thi
 
   // A SECOND, DIFFERENT op — if this merely appended (the old contract), the program would now hold both; if it
   // replaced (the new one), only the second survives. Two distinct opTypes make which one happened unambiguous.
-  await insertOp(page, 'user_corner_data');
+  // t1944 — Replace is the explicit choice now (t1942's own 3-way dialog); it is the SAME behaviour this test
+  // has always proven, just no longer the ONLY thing Insert can do.
+  await insertOp(page, 'user_corner_data', 'Replace it');
   const afterSecond = await page.evaluate(() => window.ddcsGetBlockProgram().filter((b) => b.type === 'op').map((b) => b.opType));
   expect(afterSecond, 'the second insert REPLACES the first — exactly one op, and it is the NEW one, not both').toEqual(['user_corner_data']);
 

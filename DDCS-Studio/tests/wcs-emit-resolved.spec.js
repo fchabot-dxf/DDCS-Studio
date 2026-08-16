@@ -10,7 +10,12 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 
 async function driveInsertAndLint(page, opType, overrides) {
     const res = await page.evaluate(async ({ op, ov }) => {
-        window.clearCode && window.clearCode();
+        // t1944 — window.clearCode() (the user-facing Clear button) now confirms on a non-empty canvas (t1938) and
+        // was called here fire-and-forget (never awaited); across this sweep's 13 iterations, the 2nd one onward
+        // now leaves an unanswered dialog behind. This test's own intent is "start each combo from an empty
+        // canvas," not "exercise the Clear confirmation" — ddcsLoadBlockStack([]) is the SAME programmatic clear
+        // every other fixture in this suite already uses for that.
+        window.ddcsLoadBlockStack([]);
         await window.openWiz(op);
         await new Promise((r) => setTimeout(r, 250));
         // set overrides on the form

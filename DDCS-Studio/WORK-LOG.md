@@ -37300,3 +37300,123 @@ in one combined run. `architecture-map-1698.test.mjs` clean. `proc_health.py wat
 advisor's own release gate. No slice 2 of the rename.
 
 🔨 turn 1942
+
+
+## 🔨 turn 1944 — THE SUITE MADE DIALOG-AWARE: the full sweep, reported then fixed
+
+### Dispatch
+The systemic risk t1942 named, made the whole turn: sweep `tests/` for every spec that reaches an insert
+gesture while the canvas is already non-empty — not just the "two `insertWiz()` calls, no clear between" grep
+pattern, since a canvas can also be populated by an import, a project load, or a previous test's leftovers.
+Report the full list with a count FIRST, then fix minimally, preserving each test's own intent. Authorized to
+run broadly this turn — no full-suite gate running concurrently.
+
+### The method — static sweep + two full empirical runs, not either alone
+
+Static analysis alone would have missed at least one real case (below); a single empirical run turned out to
+be insufficiently conclusive on its own too (see the timing note). Used both, cross-checked:
+
+1. **Static**: grepped `tests/` for `insertWiz()`/`.insert()` (43 files, 64 occurrences) and separately for
+   `loadProject`/`openMacroText`/`importMarkedNc`/`loadGcodeFile` (18 files), cross-referenced the two lists,
+   and read every file with >1 occurrence or appearing in both lists, checking for an intervening
+   `ddcsLoadBlockStack([])` between calls. Also grepped the whole suite for `test.describe.serial`/shared-page
+   patterns (none found — every test genuinely gets its own fresh page, confirming the "fresh `page.goto` =
+   empty canvas" assumption this whole suite already leans on).
+2. **Empirical**: ran the FULL suite (`npx playwright test --retries=0`, all 2575 tests) twice — once before any
+   fixes (to catch the timing-ambiguous case honestly, see below) and once after, cross-checked against the
+   project's own JSON reporter (`test-results/summary.json`) rather than trusting terminal tail output, which
+   this environment buffers unreliably under a background redirect (confirmed empty for long stretches even
+   while the run was genuinely active — multiple live `node.exe` processes confirmed via `tasklist`).
+
+**A timing note, named rather than glossed over**: the FIRST full run (started before any fixes were written)
+reported 0 failures — misleading, not reassuring. Node's ESM loader reads each spec file fresh when that
+file's own tests actually execute, not all at once at the run's start; by the time
+`blocks-roundtrip-toast.spec.js` reached its turn in a ~30-minute, 6-worker run, my own static-analysis fix to
+it had already landed on disk. Re-ran the SAME broken file in isolation immediately afterward and confirmed it
+genuinely hangs on the pre-fix content (60s timeout) — so the first run's "0 failures" was not proof of safety,
+just an artifact of when each file happened to execute relative to when I was editing it. The SECOND full run,
+with every fix already in place before it started, is the one whose count is trustworthy.
+
+### The full list, with a count — 7 files, not more
+
+**Confirmed genuine (dialog now hangs or blocks a click), fixed — 7:**
+
+| File | Failure mode | Root cause |
+|---|---|---|
+| `blocks-roundtrip-toast.spec.js` | timeout | Second `wm.insert()` (proving "toast shows once") never clears between the two |
+| `custom-op-chip.spec.js` | timeout | A forked wizard's own insert lands on a canvas still holding the earlier built-in op |
+| `blocks-accumulate.spec.js` | timeout | Its own 2nd `insertOp()` — the test literally named "a second op REPLACES" |
+| `wcs-emit-resolved.spec.js` | timeout | `window.clearCode()` called fire-and-forget inside a 13-combo sweep loop — now confirms from iteration 2 on, never awaited or answered |
+| `multi-op-progend-1828.spec.js` | timeout (`waitForFunction`) | Its own 2nd `clickInsert()` — again literally titled "REPLACES it" |
+| `anchor-contamination-1786.spec.js` | click blocked by `.app-dialog` | A raw-block prefix + a real corner insert — the dialog physically intercepts the next click |
+
+That's 6 rows / 7 files (one fix — the `clickInsertChoice` helper — serves the 2 title-says-REPLACES files, but
+each needed its own edit). **A sweep run against the WHOLE suite (2575 tests) found exactly these 7 — no
+others** — every other insertWiz-touching file either clears between calls already (this session's own
+established idiom, confirmed safe by direct reading: `flow-labels-unique-1408`, `time-estimate-844`,
+`editor-sim-real-insert`, `setup-sheet-850`, `word-glow` (`test.fixme`, doesn't run), `wizard-value-
+persistence-1437` — each insert follows its own fresh `boot()` reload, confirmed this is a genuine reload not
+an auto-restore), or calls it exactly once per test on a fresh page (`placement-rollout`,
+`gesture-programmatic-equivalence-1778`, `pane-visual-host-programmatic-1762`, and 26 further single-occurrence
+files, none of which load a non-empty stack by hand or via import first — checked directly, not assumed).
+
+**A genuinely ambiguous case, resolved by reading the assertions, not guessed**: `anchor-contamination-1786`'s
+own docblock and title both say "concatenated program," and its assertion (`hasCorner`) only checks corner's
+own presence — reading further showed the test's WHOLE point (proving an earlier op's absolute-move state
+doesn't wrongly contaminate a later op's rendering) is only reachable if BOTH the raw prefix and corner's body
+coexist in the SAME emitted program. Between t1920 (accumulation deleted) and t1942 (Add introduced), no live
+gesture could ever produce that shape — this test's own scenario was unreachable through the UI the whole
+time, not merely broken by this turn. **Add**, not Replace, is the fix that actually restores what it always
+claimed to test — confirmed by tracing `addOperation`'s own behavior on a non-`op` sibling (a `type:'raw'`
+block): it's left exactly where it is, corner lands beside it as a plain sibling (no `multi_step` wrapper
+needed for one real op), which is precisely "concatenated."
+
+**26 further failures from the FIRST full run, all confirmed load-contention, not dialog-related** — re-ran in
+a smaller 18-file batch (40 tests): 14 passed clean, 4 recovered on retry, only the 2 genuine cases above (plus
+one already accounted for) remained. Spot-checked the 4 retry-recovered ones individually with `--retries=0`:
+3 passed clean standalone; the 4th (`formfield-loud-mismatch-1636.spec.js`'s "parameterless stack" test) also
+passed clean alone and doesn't touch any insert/clear/load gesture at all — confirmed unrelated. `middle-
+superset.spec.js`'s own two shard timeouts touch none of these patterns either (grepped, zero matches) — the
+SAME pre-existing "14336-combo structural sweep" load flake the advisor's own t1938 dispatch already named and
+isolated; not re-investigated, same identity.
+
+### The fixes — minimal, each preserving its own test's stated intent
+
+- **Toast-once / fork-and-insert** (`blocks-roundtrip-toast`, `custom-op-chip`): added `ddcsLoadBlockStack([])`
+  immediately before the 2nd insert — the programmatic, undialogued clear this whole suite already uses
+  elsewhere, not the user-facing Clear button. Neither test is ABOUT canvas-replace semantics; both stay
+  proving what they always proved.
+- **The two "REPLACES it" tests** (`blocks-accumulate`, `multi-op-progend-1828`): a new shared helper,
+  `clickInsertChoice(page, label)` in `tests/support/barGesture.js` (a declared sibling of the existing
+  `clickInsert`, not a bespoke inline handler duplicated at each call site) — clicks Insert, waits for
+  `.app-dialog`, clicks the named choice, waits for it to close. Both now explicitly choose "Replace it" —
+  exactly the behavior their own titles and docblocks already claimed to prove.
+- **The sweep loop** (`wcs-emit-resolved`): replaced the fire-and-forget `window.clearCode()` with
+  `window.ddcsLoadBlockStack([])` — the test's own intent was "start each of 13 combos from empty," never "test
+  the Clear button's own confirmation," so the lower-level programmatic clear is the more faithful fix, not a
+  workaround.
+- **The concatenation test** (`anchor-contamination-1786`): `clickInsertChoice(page, 'Add as a 2nd operation')`
+  — the one case where Add, not Replace, is what the test's own claim requires; reasoned from the assertions,
+  not defaulted to.
+
+None of the 7 fixes touch what any test ASSERTS — only how the canvas gets built before the assertions run.
+
+### Non-vacuity
+
+Every one of the 7 fixes was verified against its own pre-fix failure first, not assumed: `blocks-roundtrip-
+toast` reverted and re-run, confirmed the 60s timeout reproduces exactly as diagnosed, then restored. The other
+6 were confirmed failing via the two full-suite runs' own JSON-reported status (`timedOut` for 4, `failed`
+with the literal `.app-dialog intercepts pointer events` Playwright error for the 5th) before their fixes
+landed — not theorized from reading alone.
+
+### Gate
+
+`npm run test:node`: 118/118. All 7 fixed files re-run together with `destructive-load-doors-1938`,
+`insert-add-replace-1942`, `add-operation-1940`, and the 4 t1928 features: 48/48 (2 recovered on a single retry
+— the same known load-contention signature this batch-of-many-files pattern always produces, not a new
+finding). `proc_health.py watch` clean. Files: 6 spec files fixed + 1 shared test helper
+(`tests/support/barGesture.js`) extended. No product code touched this turn — the sweep and its fixes are
+entirely test-side, per the dispatch's own framing (the systemic risk was ALREADY a consequence of t1942's own
+product change, not a new one this turn introduces).
+
+🔨 turn 1944

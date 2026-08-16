@@ -37,6 +37,19 @@ export async function clickInsert(page) {
     await insertBtn.click();
 }
 
+/** t1944 — click INSERT on a canvas that's already non-empty: t1942's own 3-way confirm (Add/Replace/Cancel)
+ *  now appears, and nothing dismisses it on its own. `choiceLabel` names the button to click (e.g.
+ *  "Replace it", "Add as a 2nd operation", "Cancel"); waits for the dialog to appear, clicks it, waits for it
+ *  to close. Use this instead of a bare `clickInsert` whenever the canvas already holds a prior operation. */
+export async function clickInsertChoice(page, choiceLabel) {
+    const insertBtn = page.locator('.wiz-foot button.primary', { hasText: 'INSERT' });
+    await insertBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await insertBtn.click();
+    await page.waitForSelector('.app-dialog', { timeout: 8000 });
+    await page.click(`.app-dialog button:has-text("${choiceLabel}")`);
+    await page.waitForFunction(() => !document.querySelector('.app-dialog'));
+}
+
 /** Click the real BLOCKS tab (index.html:136's `[data-app="blocks"]`). */
 export async function clickBlocksTab(page) {
     await page.locator('[data-app="blocks"]').click();

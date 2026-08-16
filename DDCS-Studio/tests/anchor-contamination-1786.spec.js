@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickInsertChoice } from './support/barGesture.js';
 
 /**
  * t1786 — ADDITION 6 (the last of the six): THE ABSOLUTE BRANCH, ON A REAL CONCATENATED PROGRAM.
@@ -58,10 +59,15 @@ async function buildRawAbsoluteThenCorner(page) {
     await page.waitForTimeout(300);
 
     // CORNER — the op under test — via the full real gesture chain (Addition 1's own pattern).
+    // t1944 — the canvas already holds the raw prefix; t1942's own 3-way confirm now appears. ADD, not Replace:
+    // this test's own claim is "a real CONCATENATED program" (asserted at `hasCorner` below) — the raw G90
+    // prefix must survive alongside corner's own body for the contamination this test guards against to be
+    // possible to reproduce at all. Between t1920 (accumulation deleted) and t1942 (Add introduced), no live
+    // gesture could produce that shape — this test's own scenario was unreachable through the UI the whole
+    // time, not merely broken by this turn's own change. Add restores exactly the shape it always claimed.
     await page.locator('.dock-header .toolbar-dropdown > button.wizard-btn', { hasText: 'Probe' }).click();
     await page.locator('.dock-header .toolbar-dropdown-content button[data-optype="corner"]').click();
-    await page.locator('.wiz-foot button.primary', { hasText: 'INSERT' }).waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('.wiz-foot button.primary', { hasText: 'INSERT' }).click();
+    await clickInsertChoice(page, 'Add as a 2nd operation');
     await page.waitForTimeout(300);
 
     await page.locator('[data-app="blocks"]').click();

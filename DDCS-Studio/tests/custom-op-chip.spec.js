@@ -88,7 +88,10 @@ test('fork a built-in ("Tool Length") via Save-as-wizard → insert the fork →
   expect(reg.forkedType, 'the fork registered as a user op').toBeTruthy();
   expect(reg.builder, 'the fork has a builder (forking captures the stack → createUserOp registers one)').toBe(true);
 
-  // open the fork, insert it, hover → chip.
+  // open the fork, insert it, hover → chip. t1944 — a fresh insert: the canvas still has the ORIGINAL atc_length
+  // op from line 70 (t1942: Insert on a non-empty canvas now confirms; this test is about the fork's own chip,
+  // not that dialog).
+  await page.evaluate(() => window.ddcsLoadBlockStack([]));
   await page.evaluate(() => window.showApp('editor'));
   await page.waitForTimeout(100);
   await page.evaluate((t) => window.openWiz(t), reg.forkedType);

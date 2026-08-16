@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openWizardViaBar, clickInsert } from './support/barGesture.js';
+import { openWizardViaBar, clickInsert, clickInsertChoice } from './support/barGesture.js';
 
 /**
  * t1828 — BUG 1 of the three t1786 trace bugs (WORK-LOG t1826 confirmed all three by real gesture; this one
@@ -78,7 +78,9 @@ test('Corner inserted AFTER Drill REPLACES it — no second op survives to colli
 
     await openWizardViaBar(page, { group: 'Probe', optype: 'corner' });
     await expect(page.locator('#wiz_user_form [data-param="dist"]')).toBeVisible({ timeout: 5000 });
-    await clickInsert(page);
+    // t1944 — the canvas already holds Drill; t1942's own 3-way confirm now appears. Replace is the EXACT
+    // behaviour this test is named for and has always proven — Add would prove a different (also real) claim.
+    await clickInsertChoice(page, 'Replace it');
     // THE STRUCTURAL PROOF: not "still >=1 op somewhere" — exactly one, and it is corner, not drill.
     await page.waitForFunction(() => {
         const ops = window.ddcsGetBlockProgram().filter((b) => b.type === 'op');

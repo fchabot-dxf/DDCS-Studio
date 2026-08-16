@@ -23,6 +23,7 @@ test('round-trip toast: shows ONCE on the first wizard-op insert, never again', 
   // SECOND insert (flag now set) → NO toast (never nags).
   const second = await page.evaluate(async () => {
     document.querySelectorAll('.toast').forEach((t) => t.remove());   // clear the first toast's DOM
+    window.ddcsLoadBlockStack([]);   // t1944 — a fresh insert again (t1942: Insert on a non-empty canvas now confirms; this test is about the toast, not that dialog)
     const wm = window.ddcsStudio.wizardManager;
     wm.open('drill'); wm.update();
     await wm.insert();
