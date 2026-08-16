@@ -15,7 +15,7 @@
  *
  * Persisted in localStorage (`ddcs_user_ops`); `loadUserOps()` re-registers all at app start. v1 = number params.
  */
-import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLabel } from './opBuilders.js';
+import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLabel, builderOf, BUILDERS } from './opBuilders.js';   // t1972 — builderOf/BUILDERS back validateUserOp's nested-op check
 import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
 import { setUserSimStarts, makeProvider, setUserSimStock } from '../viz/opSimStarts.js';
@@ -807,6 +807,30 @@ export function validateUserOp(def) {
     // corner reverted exactly this def.build attempt one commit before the M2 rewrite). Cheap to guard while it's fresh.
     if (def && def.bindingSpecs && typeof def.build === 'function') errs.push('a def cannot set BOTH `bindingSpecs` and a function `build` — def.build bypasses the bindingSpecs re-derivation + validation (both would be silently skipped)');
     const flat = flattenBlocks(def.template || []), seen = new Set();
+    // t1972 — a NESTED `type:'op'` block whose `opType` is neither a registered `user_`-prefixed op NOR a
+    // BUILT-IN legacy builder key is t1966's own proven hazard, made real: `findOpInStack` (programModel.js)
+    // treats a `user_root` as opaque to anything that isn't `USER_OP_PREFIX`-prefixed, so such a block gets no
+    // Edit chip and its export marker is silently dropped on a round-trip through the Blocks tab. Catch it AT
+    // SAVE TIME, where the author can still act on it.
+    // The BUILT-IN-key exception (not just a `user_`-prefix check) is what lets this run against every ALREADY-
+    // SHIPPED def without breaking homing's own registration: homing's own legacy `homingDataStack` self-wraps
+    // with an internal `{type:'op', opType:'homing'}` fragment (t1842/t1838's own finding, "LOAD-BEARING and
+    // left alone") — `'homing'` is a `BUILDERS` key (opBuilders.js), not a `user_`-prefixed one, so a plain
+    // prefix check would flag SHIPPED, working code as an error on every boot. The exception is sound, not
+    // lenient: `opToolbox.js`'s own palette only ever offers `listUserOps()` — the `user_`-prefixed USER_DEFS
+    // registry — never a bare `BUILDERS` key, so a legacy builder opType can ONLY reach a template as a twin's
+    // OWN internal self-wrap (exactly homing's shape), never as something a user composed by hand. A genuinely
+    // nested `user_`-prefixed op (t1966's own proven case — an author drags an already-placed twin into
+    // another's authoring body) still gets flagged unless it is ALSO a real, registered op.
+    for (const b of flat) {
+        if (!b || b.type !== 'op') continue;
+        const opType = b.opType;
+        const isRegisteredUserOp = typeof opType === 'string' && opType.startsWith(USER_OP_PREFIX) && !!builderOf(opType);
+        const isLegacyInternalSelfWrap = typeof opType === 'string' && opType in BUILDERS;
+        if (!isRegisteredUserOp && !isLegacyInternalSelfWrap) {
+            errs.push(`a nested op block (opType "${opType}") is not a registered "${USER_OP_PREFIX}"-prefixed op — it will get no Edit chip and its export marker will be silently dropped on a Blocks-tab round-trip (t1966/t1972)`);
+        }
+    }
     for (const b of (def.bindings || [])) {
         if (!b || !b.param) { errs.push('a binding has no param name'); continue; }
         if (seen.has(b.param)) errs.push(`duplicate param "${b.param}"`);

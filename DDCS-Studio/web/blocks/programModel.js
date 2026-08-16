@@ -14,7 +14,7 @@ import { reconcileGcodeToStack, parseGcodeToStack } from './gcodeToStack.js';
 import { markerLine, isMarker, parseMarker } from './opSchema.js';
 import { builderOf, makeOp, _builderAtoms, opLabelOf } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
 import { makeXform, makeEntry, makeFlip } from './programFraming.js';   // t812 — reconstruct the program-level declarations from the prog marker; t879 — the two-sided flip
-import { defVOf, defVStale } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup); t1079 — defVStale is the ONE staleness rule, shared with the CAM sub-stack boundary
+import { defVOf, defVStale, USER_OP_PREFIX } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup); t1079 — defVStale is the ONE staleness rule, shared with the CAM sub-stack boundary; t1972 — the ONE declared "is this a real user op" prefix, already enforced by validateUserOp
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -44,7 +44,7 @@ export const getProjection = () => proj;
 // Each projected line carries its block ancestry (proj.map[i]); an op-container id in that ancestry means the
 // line belongs to that op. params are the op's single source of truth (no snapshot) — the editor reads them to
 // re-open the wizard, and replaceOp rebuilds the op from the edited params.
-function findOpInStack(blocks, anc) {
+function findOpInStack(blocks, anc, insideUserRoot = false) {
     for (const b of (blocks || [])) {
         if (!b) continue;
         // t1958 — DEEPEST match wins: try the children FIRST. A line inside a multi_step-nested op carries BOTH
@@ -57,24 +57,36 @@ function findOpInStack(blocks, anc) {
         // of its children are themselves `type:'op'`, so the recursion finds nothing and this still falls through
         // to match `b` itself, byte-identical to before.
         //
-        // t1964 — BUT `user_root` is a BOUNDARY, not a container to search through, for this question. A `user_*`
-        // twin's own template body lives inside a `user_root` (every twin has one — corner's own `user_root`
-        // holds plain `section`s; homing's holds an EXTRA nested `{type:'op', opType:'homing'}` fragment, the
-        // legacy stack-builder's own internal wrapper, t1842/t1838's own finding, "LOAD-BEARING and left alone").
-        // That fragment is deliberately never given an id BY THIS MODULE — but a Blockly workspace round-trip
-        // assigns a real id to every block it renders, including this one, so "deepest match, guarded by
-        // `id != null`" (t1958's own rule) started matching it once a program had been through the Blocks tab:
-        // the export marker for a Homing-then-Corner program read `{"op":"homing"}` with no params instead of
-        // the real `user_homing_data` record (t1958-regression, caught by the advisor's own release gate on
-        // `blk-start-hints-multistep-1954`). The id-null guard was the RIGHT idea (t1842) but depends on an
-        // invariant (this fragment stays id-less) that a Blockly round-trip can silently break; treating
-        // `user_root` as opaque doesn't depend on ids at all — NOTHING inside one op's own authoring body can
-        // ever be a DIFFERENT, independently-addressable op, so there is nothing to find by descending into it.
-        // A multi_step-nested op's own line still resolves correctly: its ancestry reaches the nested op's own
-        // `type:'op'` container (e.g. corner's own record) BEFORE ever reaching corner's own `user_root`, so the
-        // deepest-match search stops there, one level short of where this boundary would even apply.
-        if (b.children && b.type !== 'user_root') { const f = findOpInStack(b.children, anc); if (f) return f; }
-        if (b.type === 'op' && b.id != null && anc.includes(b.id)) return b;
+        // t1964/t1972 — A `user_*` twin's own template body lives inside a `user_root` (every twin has one —
+        // corner's own `user_root` holds plain `section`s; homing's holds an EXTRA nested `{type:'op',
+        // opType:'homing'}` fragment, the legacy stack-builder's own internal wrapper, t1842/t1838's own finding,
+        // "LOAD-BEARING and left alone"). That fragment is deliberately never given an id BY THIS MODULE — but a
+        // Blockly workspace round-trip assigns a real id to every block it renders, including this one, so
+        // "deepest match, guarded by `id != null`" alone (t1958's own rule) started matching it once a program
+        // had been through the Blocks tab (t1964's own regression). t1966 then proved the OPPOSITE failure mode
+        // of a blanket `user_root` boundary: Blockly's own `connect()` lets a user drag an ALREADY-PLACED,
+        // genuinely addressable op (e.g. Corner) into another op's own `user_root` EXECUTION mouth (no `check:`
+        // restricts that input), and nothing sanitises it on read-back — a blanket boundary would silently hide
+        // that real op's own Edit chip and export marker too, the SAME symptom class from the other direction.
+        // The declared line between "an internal artifact never independently addressable" and "a real op that
+        // happens to sit inside another op's authoring body" is `USER_OP_PREFIX` — already declared (userOps.js)
+        // and already enforced by `validateUserOp` for every TOP-LEVEL op's own opType (t1972 extends that same
+        // enforcement to a NESTED one, at save time — see validateUserOp). So: recursing INTO a `user_root` is
+        // fine — necessary, even, to reach a legitimately nested `user_` op — but a `type:'op'` match found
+        // anywhere BELOW a `user_root` only counts if its own `opType` carries that prefix; homing's own
+        // `'homing'` fragment does not, and stays excluded regardless of whether Blockly gave it a real id. A
+        // multi_step-nested op's own line still resolves correctly and WITHOUT this extra check: its ancestry
+        // reaches the nested op's own `type:'op'` container (e.g. corner's own record) before ever reaching
+        // corner's own `user_root`, so `insideUserRoot` is still `false` at the point that op itself is matched
+        // — the prefix restriction only ever applies to matches found ONE level past a `user_root`, never to a
+        // program's own top-level or multi_step-nested ops (which includes non-`user_`-prefixed ones like a
+        // hand-built `group`).
+        const enteringUserRoot = insideUserRoot || b.type === 'user_root';
+        if (b.children) { const f = findOpInStack(b.children, anc, enteringUserRoot); if (f) return f; }
+        if (b.type === 'op' && b.id != null && anc.includes(b.id)) {
+            if (insideUserRoot && !(typeof b.opType === 'string' && b.opType.startsWith(USER_OP_PREFIX))) continue;
+            return b;
+        }
     }
     return null;
 }

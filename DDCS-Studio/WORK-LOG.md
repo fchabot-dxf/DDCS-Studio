@@ -38717,3 +38717,84 @@ the load-contention discipline established earlier this session).
 inventory sites (still 10 — none of today's 6 were ever inventory entries).
 
 🔨 turn 1970
+
+# ═══ t1972 — THE `user_root` INVARIANT MADE REAL — a nested `user_` op resolves, homing's fragment still doesn't ═══
+
+## THE BOUNDARY, my own t1966 design, built exactly as proposed
+
+`findOpInStack` (`programModel.js`) now threads an `insideUserRoot` flag through its own recursion: entering a
+`user_root`'s children sets it; a `type:'op'` match found while that flag is set only counts if its own `opType`
+carries `USER_OP_PREFIX` (`userOps.js`'s own already-declared constant, already enforced by `validateUserOp` for
+every TOP-LEVEL op — this turn extends the SAME enforcement one level in, reusing the constant rather than
+re-spelling the prefix). Homing's own `'homing'` fragment fails that test (not `user_`-prefixed) and stays
+excluded regardless of whether Blockly gave it a real id — the t1964 regression cannot return through this door.
+A genuinely nested `user_`-prefixed op (t1966's own proven hazard) now passes it and resolves correctly. A
+multi_step-nested op's own resolution is UNTOUCHED: its ancestry reaches its own `type:'op'` record before ever
+reaching ITS OWN `user_root`, so `insideUserRoot` is still `false` at the point that op is matched — the prefix
+restriction never reaches a program's own top-level or multi_step-nested ops, which is why a hand-built `group`
+(not `user_`-prefixed) still resolves fine there.
+
+## THE ENFORCEMENT — validateUserOp, at SAVE time — and the boot-breaking bug it revealed before I shipped it
+
+Added a walk of `flattenBlocks(def.template)` flagging any `type:'op'` block that is neither a registered
+`user_`-prefixed op nor a BUILT-IN legacy builder key (`opBuilders.js`'s own `BUILDERS` map). Ran it — and it
+THREW ON HOMING'S OWN BOOT REGISTRATION, at every app start, in the node tier's own preview-gate boot: homing's
+`'homing'` fragment is neither `user_`-prefixed nor absent, so a naive "must be `user_`-prefixed" check flags
+SHIPPED, WORKING code as an error, every time.
+
+**Caught this by running the suite, not by reasoning it through in advance** — verifying the premise before
+trusting a plausible-looking check is exactly this session's own standing discipline, applied to my own code this
+time. The fix is principled, not a hand-named exception for `'homing'` specifically: `opToolbox.js`'s own palette
+only ever offers `listUserOps()` (the `user_`-prefixed `USER_DEFS` registry) — never a bare `BUILDERS` key — so a
+legacy builder opType can ONLY reach a template as a twin's OWN internal self-wrap (exactly homing's shape),
+never as something a user composed by hand through the palette. Excluding `opType in BUILDERS` from the
+validator's error is therefore SAFE by construction, not lenient: it can't hide t1966's own hazard (a genuinely
+`user_`-prefixed nested op still gets flagged unless it's ALSO a real, registered one), and it can't silently
+grow into a hiding place the way a hand-maintained allow-list would, since membership in `BUILDERS` is itself a
+declared, closed, already-existing registry — not a new list invented for this check.
+
+## VERIFY — both halves, together, and non-vacuous on EACH independently
+
+New file `tests/user-root-boundary-1972.spec.js`, two tests:
+- **HALF 1**: reproduces t1966's own hazard directly — an already-placed Corner op connected into a fresh
+  `user_root`'s EXECUTION mouth via Blockly's real `connect()` API (the same one t1966 used), read back through
+  `workspaceToStack` and loaded into the live program model. Asserts `ddcsOpAtLine` resolves the NESTED op by id
+  and opType (not null), and the export marker names the real op, not silently dropped.
+- **HALF 2**: homing, through the Blocks tab (the trigger that gives its fragment a real id), still exports as
+  `user_homing_data`, never `'homing'` — the exact t1964 regression, asserted as a standing guard.
+
+**Non-vacuity on each half INDEPENDENTLY, not just on the combined fix**: reverted to t1964's own blanket-opaque
+rule (`b.type !== 'user_root'`, no prefix distinction) — HALF 1 failed 3/3 (`opAtLine` returned null, exactly the
+t1966 hazard), HALF 2 stayed green (blanket opacity also excludes homing, just too broadly). Reverted FURTHER, to
+the pre-t1964/t1958-only state (no `user_root` boundary at all) — HALF 2 failed 3/3 (`{"op":"homing"}`, the exact
+t1964 regression reproduced), HALF 1 stayed green (no boundary at all also lets the legitimate nested op through
+by accident). Restored from a saved copy (not `git checkout HEAD`) between each revert; both halves green together
+against the actual fix. Two independent failure reproductions, not one combined non-vacuity claim standing in for
+both.
+
+## STOP CONDITION — did not trigger
+
+`fork-parity-1593`'s own "fork EVERY shipped twin: form + emit BYTE FOR BYTE" and `guard-roundtrip-1595`'s own
+structural-param sweep both assert byte-identical emit across all 32 registered ops — both passed clean. Since
+homing is the only registered op with anything nested at all (t1966's own 32-op sweep), and its own fragment
+stays excluded exactly as before, no shipped program's export bytes could have moved — confirmed, not assumed.
+
+## ARCHITECTURE.md — 4 more citations shifted, all fixed (uniform +12 in programModel.js, +24 in userOps.js)
+
+INV3 (`programModel.js` `console.error`, 526→538), INV6 (`userOps.js` `hookKeysOf`/`_BASE_DEF_SHAPE`, 893-900→
+917-924), INV13 (`userOps.js` FAIL CLOSED `return null`, 1145→1169), INV14 (`userOps.js` `postInstantiate`,
+965→989) — each shift verified against the file's own current content, not computed by arithmetic alone.
+
+## GATE
+
+`op-lookup-scan-1968` (unaffected — my edits touch `programModel.js`/`userOps.js`, both outside its scan scope) +
+node tier (125/125) + `export-import-fidelity-1964` + `blk-start-hints-multistep-1954` + `edit-nested-op-1958` +
+`user-root-boundary-1972` + `guard-roundtrip-1595` + `fork-parity-1593` + the 4 t1928 features — **25/25 clean,
+zero flakes** (`--workers=2`).
+
+## Queued CODE work, the advisor's own order, unchanged
+`segmentFrame.js` `frameOwnerAtLine` → `editorOpHover.js` `glowEdited` → `editorManager.js` `_firstOpTitle` →
+`setupSheet.js` `collectOps` (different shape) → the remaining 10-entry inventory → architecture-citation
+Option B, now including the unenforced prose half (t1970's own finding, folded in per the advisor).
+
+🔨 turn 1972

@@ -184,10 +184,10 @@ const INVARIANT_CLAIMS = [
     { id: 'INV1 mouth reader', file: 'web/blocks/blockly/bridge.js', line: 78, find: /mouth/ },
     { id: 'INV1 the fifth, deliberately-left kind list', file: 'web/blocks/blockEmitter.js', line: 40, find: /./ },
     { id: 'INV2 leaf record fields declared-or-throw', file: 'web/blocks/blockly/stackBridge.js', line: 297, find: /./ },   // t1950 — shifted from 273 by +24, same cause
-    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 526, find: /console\.error/ },   // t1964 — shifted from 518 by +8 (findOpInStack's user_root-boundary fix, its own explanatory comment)
+    { id: 'INV3 subscriber isolation logs, never swallows', file: 'web/blocks/programModel.js', line: 538, find: /console\.error/ },   // t1972 — shifted from 526 by +12 (USER_OP_PREFIX import + findOpInStack's own extended explanatory comment)
     { id: 'INV4 CLEAN_SHAPES', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 43, find: /CLEAN_SHAPES/ },
     { id: 'INV5 KNOWN GAP part 2 is empty by design', file: 'DDCS-Studio/tests/node/declared-key-coverage-1678.test.mjs', line: 80, lineEnd: 87, find: /PART 2|KNOWN GAP/ },
-    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 893, lineEnd: 900, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1880 — shifted from 884-891 by the gate round-trip fix above (bindingsToBlocks/bindingsFromStack)
+    { id: 'INV6 hookKeysOf derives from one real constructor call', file: 'web/blocks/userOps.js', line: 917, lineEnd: 924, find: /_BASE_DEF_SHAPE|hookKeysOf/ },   // t1972 — shifted from 893-900 by +24 (validateUserOp's own nested-op check, added above)
     { id: 'INV7 getTransform folds placement', file: 'web/viz/featureCanvas.js', line: 83, find: /getTransform/ },
     { id: 'INV7 onTransform relays the same composed value', file: 'web/viz/featureCanvas.js', line: 383, find: /getTransform|onTransform/ },
     { id: 'INV8 fork-parity byte-identity gate exists', file: 'DDCS-Studio/tests/fork-parity-1593.spec.js', line: 1, find: /./ },
@@ -196,8 +196,8 @@ const INVARIANT_CLAIMS = [
     { id: 'INV11 UPDATE_PREVIEW_SNAPSHOT rewrites and throws', file: 'DDCS-Studio/tests/node/preview-spec-gate-1688.test.mjs', line: 324, find: /UPDATE_PREVIEW_SNAPSHOT/ },
     { id: 'INV12 tri-state fill: emits !== false', file: 'web/viz/startGlyph.js', line: 20, lineEnd: 24, find: /emits\s*!==\s*false/ },
     { id: 'INV12 pass 0 is manual regardless of source', file: 'web/viz/startGlyph.js', line: 13, find: /pass 0|manual/i },
-    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1145, find: /return null/ },   // t1880 — shifted from 1136 by the gate round-trip fix above
-    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 965, find: /postInstantiate/ },   // t1880 — shifted from 956 by the gate round-trip fix above
+    { id: 'INV13 FAIL CLOSED return null', file: 'web/blocks/userOps.js', line: 1169, find: /return null/ },   // t1972 — shifted from 1145 by +24 (validateUserOp's own nested-op check, added above)
+    { id: 'INV14 postInstantiate ordering', file: 'web/blocks/userOps.js', line: 989, find: /postInstantiate/ },   // t1972 — shifted from 965 by +24 (validateUserOp's own nested-op check, added above)
     // no `line`: NEXT-SESSION.md is rewritten wholesale each cycle (advisor-owned, uncommitted mid-edit as this
     // very claim was first checked — a live case, not a hypothetical) — anchored by content, not a position.
     { id: 'INV15 corner is the gated pilot, standing ruling', file: 'NEXT-SESSION.md', find: /Corner is the gated pilot/i },
