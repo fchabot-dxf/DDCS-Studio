@@ -3440,3 +3440,48 @@ the graph; `opBuilders.js` is the declared leaf). `opGlow.js` already proves the
 
 ⚠ Then: `USER_OP_PREFIX` boundary + `validateUserOp` assertion → `segmentFrame` → `glowEdited` →
 `_firstOpTitle` → `collectOps` → the remaining new sites (now 11 in the inventory).
+
+# ═══ t1972 — ENFORCE THE user_root INVARIANT (USER_OP_PREFIX boundary + validateUserOp) ═══
+
+t1970 accepted, verified by me: node tier **125/125**, and I confirmed by grep that the three `window.ddcs*`
+bridges now have **zero call sites** — declarations only, exactly as instructed.
+
+**Two things worth naming:**
+- **You upgraded the STOP condition's answer instead of just satisfying it.** I asked "did the guard ever
+  fire?"; you answered that a static import resolves before any application code runs, so **the timing question
+  no longer exists** rather than merely evaluating false today. A structural answer beats an empirical one.
+- **You deleted the checker's guarded-fallback exclusion** — constant, use, and its synthetic proof-test — once
+  it became unreachable, per rule #4. Removing a test is the right move when what it guards is gone; keeping it
+  would have made the checker claim protection it no longer provides.
+
+**And you refused a tempting cleanup for the right reason:** four other `wizardManager.js` prose citations were
+already stale *before* your edits (`this.open()` sits at 413 even on the pre-t1970 tree, 7 off from the map's
+claim), so you named them rather than compound a guess on a wrong baseline. **That is itself a finding:** those
+citations are PROSE-ONLY — nothing in the gate enforces them. The map is enforced in one half and decorative in
+the other, which is the state this session keeps deleting. Folded into the approved Option B work, not lost.
+
+## THE TASK — make the invariant real. It is currently a habit, not a rule.
+t1966 proved a placed op can be dragged into a `user_root`'s execution mouth (Blockly's own `connect()`
+accepts it, no `check:`), and that nothing sanitises it on read-back. `findOpInStack` treats `user_root` as
+blanket-opaque, so such an op gets **no Edit chip and its export marker is silently dropped**. Latent today —
+homing's fragment is the only nested `type:'op'` across all 32 registered ops — but unenforced.
+
+1. **THE BOUNDARY, your own design:** don't descend into a `user_root`'s plain atoms, **but a nested
+   `type:'op'` IS a real match when its `opType` is `user_`-prefixed** (`USER_OP_PREFIX`, already declared in
+   `userOps.js` and already enforced by `validateUserOp` for top-level opType). Homing's fragment is not
+   `user_`-prefixed, so it stays excluded — the t1964 regression cannot return. **Reuse the declared constant;
+   do not re-spell the prefix.**
+2. **THE ENFORCEMENT, your own proposal:** `validateUserOp` walks `def.template` and flags any `type:'op'`
+   below the top level whose `opType` is not `user_`-prefixed-and-registered. **Catch it at save time**, where
+   the user can still act on it.
+3. **⚠ ASSERT THE USER-VISIBLE CONSEQUENCE, both halves:** a `user_`-prefixed op nested in a body DOES get its
+   Edit chip and DOES keep its export marker through a round-trip (bridge to `export-import-fidelity-1964`);
+   and homing's own fragment still does NOT resolve (the t1964 regression guard must stay green).
+4. **PROVE NON-VACUITY** on both — you have done this every turn.
+5. **Gate:** node tier (incl. the checker) + `export-import-fidelity-1964` + `blk-start-hints-multistep-1954` +
+   `edit-nested-op-1958` + the round-trip/parity set + the 4 t1928 features.
+
+⚠ **STOP CONDITION:** if making nested `user_` ops addressable changes ANY existing export byte, stop and tell
+me. Today's shipped programs must be unaffected.
+⚠ Then: `segmentFrame` → `glowEdited` → `_firstOpTitle` → `collectOps` → the rest of the 10-entry inventory →
+architecture-citation Option B (now including the unenforced prose half).
