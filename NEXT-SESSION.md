@@ -3760,3 +3760,41 @@ and do its consumers work on it?**
    would rather have a true limit than a procedure that pretends.
 
 ⚠ Report only. Nothing built. **The human has still NOT ruled on two-sided setup.**
+
+# ═══ t1988 — GROUP-IN-GROUP GLOW (the new finding from your own hunt) ═══
+
+**RELEASED V2026.08.16.2** (`7cb3ae7c`, pushed). Gate: full suite **2571 passed, 26 skipped, ZERO failures**,
+node 125/125 — run at `--workers=3`. **The config's `workers: 6` was measured when this box had its RAM free;
+with ~11GB free (30 Chrome processes hold the rest) six browsers starve into mass timeouts.** Three runs of
+this same tree reported 1918 / 2382 / 79 "failures" — all of it contention, all discarded, no code changed in
+response. Worth knowing for your own runs: **if you see mass reds, check free RAM before believing them.**
+
+t1986 accepted. You settled both suspects **live** rather than by inference, and the honest limit you stated on
+your own method — connectivity-checking settles a NAMED candidate in ~10s but cannot DISCOVER an unnamed one,
+that still takes someone wondering about the data model's shape — is worth more than a procedure that pretends
+to generalise. **And the systemic fact you surfaced reframes the whole hunt: no statement mouth in this
+codebase declares a `check` constraint** (I verified — the only `check:` uses are on value inputs). So every
+composite shape is drag-reachable. The question was never "can a user make this?" — it is always yes.
+
+## THE TASK — the genuinely new bug from that hunt.
+A `group` nested inside a `group` (drag-reachable, you confirmed live): a real field edit on the inner group's
+own atom **records correctly** (`isOpBlockEdited(innerId) === true`) but **never lights the glow**, because
+`glowEdited` iterates `flattenOps()`, which by design does NOT descend into a non-`multi_step` op's children.
+
+1. **⚠ THE DESIGN TENSION IS THE POINT — do not just add a special case.** `flattenOps` deliberately treats a
+   `multi_step` wrapper as transparent and every other op as opaque. That is *correct* for "which operations
+   does this program hold" (a group IS one operation). The glow is asking a **different question**: "which
+   op-record owns this edit?" **Name the two questions apart** rather than widening `flattenOps` and breaking
+   the setup sheet / time split, which legitimately want a group counted once.
+   **If widening `flattenOps` is genuinely right, argue it — but the setup-sheet and time-estimate consumers
+   must be checked, not assumed.**
+2. **ASSERT WHAT THE USER SEES:** edit a value on an atom inside a nested group → the glow appears on that
+   atom's own lines. Screenshot it; this one is pixels, like t1976.
+3. **⚠ ALSO FIX / WIDEN the `setGroupChildParams` entry's own "why" text** — you found nesting-in-group is a
+   SECOND path to that already-tracked shallow lookup. The inventory entry should say so.
+4. **PROVE NON-VACUITY. Gate:** node tier (incl. checker) + `word-glow` + `setup-sheet-850` + `time-estimate-844`
+   + the round-trip/parity set + the 4 t1928 features.
+
+⚠ **MY GATE IS NOT RUNNING — the machine is yours. Browser work is fine this turn.**
+⚠ Still awaiting the human on two-sided setup. Then: `option-b-slice2` bridged to a wrapped program → the rest
+of the 7-entry inventory → architecture-citation Option B.
