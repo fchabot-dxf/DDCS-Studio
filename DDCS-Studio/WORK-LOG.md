@@ -39391,3 +39391,135 @@ the four confirmed guilty files) → the remaining 7-entry `op-lookup-scan-1968`
 Option B, including the unenforced prose half → whatever the human rules on two-sided setup.
 
 🔨 turn 1984
+
+# ═══ t1986 — DOES THE SHAPE HAVE A DOOR: two composite structures settled live ═══
+
+READ-ONLY per the dispatch. No product code touched, no spec files added or rewritten. Three scratch diagnostic
+tests written, run, and deleted (`check1986-groupnest`, `check1986-groupexport`, `check1986-multistepuserroot`).
+
+## (1) A GROUP NESTED INSIDE A GROUP
+
+**Via the right-click "Group" gesture specifically: NO, structurally.** `groupLooseAtoms`'s own filter
+(`opSession.js:599`) is `_isLooseTop = (b) => b.type !== 'op'` — an existing `group` IS `type:'op'`, so it can
+never be a member of a run the gesture would wrap again. And the gesture never even OFFERS on an existing op:
+right-clicking one resolves via `ddcsOpAtLine` first and always shows the ✎ Edit/Duplicate/Delete menu
+(`editorOpHover.js:230-236`) — the "Group" menu only appears over a LOOSE run where `ddcsOpAtLine` returns null.
+Both the filter and the UI trigger independently exclude it.
+
+**Via ordinary Blocks-tab drag-and-drop: YES — confirmed live, not inferred.** A `group` op renders through the
+SAME generic `OP_BLOCKS` shape as any real op (`bridge.js:299-300`, `makeOpDef('op','op')`), which carries an
+ordinary GCODE statement mouth with no `check` constraint. Built two real groups via `groupLooseAtoms`, opened
+Blocks, and connected group B's block into group A's own GCODE mouth via Blockly's real connection object
+(the identical `.connect()` primitive t1966 used and, under the hood, the identical one a live mouse-drag
+invokes on release — nothing in this codebase's block defs restricts it). It connected without error, and
+`workspaceToStack`'s own read-back correctly preserved the nesting: `op1(group).children = [m1, m2, op2(group)]`.
+
+**Consumers, checked against the confirmed-reachable shape:**
+- **Edit (open)**: WORKS. `findOpById`/`findOpInStack` recurse into ANY block's `.children` unconditionally
+  (`programModel.js:156-163`, `t1958`'s own general fix) — no gate on opType, so the nested group resolves
+  correctly by id or by line.
+- **Edit (commit, the group-specific form)**: BROKEN — but this is the SAME already-tracked, already-open
+  inventory entry (`opSession.js`'s `setGroupChildParams`, top-level-only `cur.findIndex`), not a new bug. Its
+  own recorded "why" names only the multi_step path; nesting-inside-another-group is a SECOND, previously
+  unnamed way to reach the identical shallow lookup. Worth folding into that entry's own description, not
+  spawning a new one.
+- **Glow**: BROKEN — a genuinely NEW finding, confirmed live. A real field edit on an atom living inside the
+  NESTED group correctly records under the inner group's own id (`blocksApp.js:897`'s `opBlk` walk stops at the
+  NEAREST 'op'-type ancestor, which is the inner group, not the outer one) — but `glowEdited`'s own loop
+  (`editorOpHover.js`, fixed t1976) iterates `flattenOps()`, and `flattenOps` deliberately does NOT recurse into
+  a non-`multi_step` op's own children (by design — an op's `.children` are normally just its own G-code body,
+  not another addressable op). So `flattenOps` returns only the OUTER group; `isOpBlockEdited` is checked against
+  its id, reads `false`; the inner group's own real, recorded edit (`isOpBlockEdited(innerId) === true`,
+  confirmed live) never lights the glow. t1976's own fix does not cover this shape because `flattenOps`'s domain
+  was never meant to — a nested group breaks an assumption `flattenOps` never had to defend before.
+- **Setup sheet**: not independently checked — `collectOps` only runs at all when the program has `setup`
+  containers (t1982: currently unreachable), so this consumer is moot for the shape as it stands today. If setup
+  ever gets its own creation door, `collectOps`'s already-known over-deep bug would ALSO apply here (a nested
+  group is `type:'op'`, so its own push-and-recurse would double-list it the same way it double-lists multi_step)
+  — but a nested group is NOT a pure transparent wrapper like multi_step; whether double-listing it is even wrong
+  (vs. two legitimately separate operations) is a genuine open question, not asserted either way.
+- **Export markers**: WORKS for the G-code content, LOSES the group's own identity — confirmed live. The marker
+  line for a `group` (`( @DDCS:1 {"op":"group"} )`) IS emitted (serialization doesn't check for a builder before
+  writing it), but `opFromMarker` (`programModel.js:272-275`) returns `null` when `builderOf(opType)` is null —
+  and a group deliberately has no builder ("its children ARE the program"). On reimport the marker itself
+  contributes nothing, and the group's own former children fall through to the plain-text parse as ordinary
+  loose top-level atoms. Re-emitted G-code is BYTE-IDENTICAL to the original (verified: before/after match
+  exactly) — no machine instruction is lost — but the group WRAPPER (its label, its one-click editability) does
+  not survive a save/export/reimport cycle. This holds for a top-level group already, independent of nesting;
+  nesting doesn't make it worse, it just means BOTH levels degrade to loose atoms together.
+
+## (2) A `multi_step` WRAPPER NESTED INSIDE A `user_root`
+
+**Reachable by a real drag, not only by the `connect()` route t1966 scripted — confirmed live.** Built a real
+Corner op (a genuine wizard insert) and a real 2-op `drill`+`surfacing` `multi_step` wrapper (via the declared
+`groupConsecutiveOps`), then connected the wrapper into Corner's own `user_root` EXECUTION mouth using the same
+connection-object technique as (1). It connected without error — `user_root`'s own EXECUTION mouth
+(`bridge.js:267`) carries no `check` constraint either, same as every other mouth checked this session.
+`connect()` is not a bypass: it is the same primitive Blockly's own drag-and-drop implementation calls on
+release, and nothing in the app's own block defs restricts it — so if the API call succeeds, a live mouse-drag
+to the same target would too.
+
+**Consumer, checked against the confirmed-reachable shape: the t1972 boundary held, and held correctly, not by
+luck.** Searched the resulting projection for the line whose ancestry includes the nested `drill` op's own id —
+`ddcsOpAtLine` resolved it to **the Corner op itself**, never to the nested `multi_step` or its own `drill`/
+`surfacing` children. This is `findOpInStack`'s `insideUserRoot` rule (t1972) working exactly as designed: a
+`type:'op'` match found inside a `user_root` only counts if its own `opType` is `USER_OP_PREFIX`-prefixed;
+`multi_step` isn't, so it — and everything nested inside it — is excluded from independent address, the same way
+homing's own internal fragment always was. **This is not a crash, a false-match, or silent data loss — it is the
+deliberately-designed fallback, now proven to fire on a shape a real drag can actually produce, not just a
+synthetic one.** The practical consequence, worth naming plainly: a user who drags a real 2-op program into
+another op's `user_root` would find that content permanently welded into the outer op's own identity — no Edit
+chip, no independent glow, no independent setup-sheet row, no independent export marker for the drill/surfacing
+content specifically — it becomes indistinguishable from Corner's own internal implementation. The G-code itself
+almost certainly still emits (`blockEmitter.js`'s own op-in-op transparency, `WORK-LOG` line ~36890, verified
+directly by the advisor this session — not re-verified live this turn, named as an assumption resting on
+already-established fact rather than fresh evidence) — so nothing is silently LOST, but the user's own two
+operations silently STOP BEING operations from the app's point of view. Not chased further (out of scope: this
+turn asked whether the boundary holds, not whether the UX around reaching it is good).
+
+## (3) 2+ OPS IN ONE SETUP — STATE NOTED, NOT DESIGNED
+
+Unchanged from t1982: no creation door exists for a `setup` block with ANY children (`setupBlock` declares no
+`mouth`, confirmed live t1982 — the Blocks tab throws on render). Contingent on the human's ruling on two-sided
+setup. If ever built, t1982 already found `workspaceToStack`'s own regrouping is top-level-only, so 2 ops dropped
+into one setup would NOT auto-wrap into `multi_step` on their own — a further design question, not assumed
+either way here.
+
+## (4) THE METHOD — what generalises, and what honestly does not
+
+**The CONNECTIVITY half is cheap, repeatable, and already answered in the general case.** Every block def
+checked this session that declares a `mouth` — `setupBlock` (nominally; it declares none, which is why it fails),
+every `OP_BLOCKS` entry's GCODE mouth, `user_root`'s PRESENTATION/EXECUTION mouths — carries NO `check`
+constraint restricting what can connect there. Blockly enforces connection compatibility ONLY through declared
+`check` arrays; none exist anywhere in this codebase's mouths. **The practical consequence: almost any block CAN
+be dragged into almost any mouth, structurally — connectivity is close to the default, not the exception.** A
+NAMED candidate pairing is settled in ~10 seconds, ~15 lines: build both sides via real production functions
+(not raw JSON where a real function exists), get them into the SAME live workspace, grab the target mouth's own
+connection object (walking to the end of any existing chain), call `.connect()` on it, and read the result back
+through `workspaceToStack`. If it throws, there's a `check` gate — genuinely rare, so a refusal is itself
+informative. If it succeeds, the shape is reachable by a real drag, full stop — no need to also automate an
+actual mouse-drag interaction, since Blockly's own drag implementation resolves to the identical connection call.
+
+**What this does NOT do, and I would rather say so than oversell it: it verifies a NAMED candidate, it does not
+discover unnamed ones.** Nothing about this method tells you to WONDER whether a group could hold a group, or a
+multi_step could hide inside a user_root, in the first place — that step is still "you have to know the feature"
+(or, more precisely, know the DATA MODEL's own recursive shape: which block kinds are containers, and which
+container types could plausibly hold which other kinds). That is a judgment call about the schema, not something
+a grep or a connectivity sweep proposes on its own — this session's own three real findings (`setup`, group-in-
+group, multi_step-in-user_root) all started from a human or advisor NAMING the pairing, not from a scan surfacing
+it. And even a CONFIRMED-reachable pairing still needs its CONSUMERS checked one at a time, by reading each
+one's own recursion assumption (`flattenOps` vs `collectOps` vs `opFromMarker` vs `isOpBlockEdited` each answer
+"what counts as a nested thing" differently, on purpose, for different reasons) — that part was never going to
+mechanise, and doesn't here either.
+
+**Verdict:** connectivity-checking is a cheap, real, reusable TOOL for the "settle a named suspect" step (exactly
+what this turn used it for, twice, in well under an hour combined). It is not, and I don't think can be made
+into, a generator of the suspect list itself.
+
+## Queued CODE work — batch closed, awaiting the human's ruling on two-sided setup
+`option-b-slice2-positioning-1872` bridged to a wrapped program (t1974's own method) → the remaining 7-entry
+`op-lookup-scan-1968` inventory (consider folding this turn's `setGroupChildParams` nesting-path finding and the
+new glow-on-nested-group gap into it, as separate entries — not decided here) → architecture-citation Option B,
+including the unenforced prose half → whatever the human rules on two-sided setup.
+
+🔨 turn 1986
