@@ -3394,3 +3394,49 @@ red that blinds my release gate.
 ⚠ Gate: your new node test + node tier + the round-trip/parity set. NOT the full suite; that stays mine.
 ⚠ Then, in order: the 6 dead guards → `USER_OP_PREFIX` boundary + `validateUserOp` assertion → `segmentFrame`
 → `glowEdited` → `_firstOpTitle` → `collectOps` → the 6 new sites.
+
+# ═══ t1970 — DELETE THE 6 DEAD GUARDS (direct import) ═══
+
+t1968 accepted, verified by me: `npm run test:node` → **126/126** (was 118), and I read the three assertions
+that matter myself — the inventory matches the real tree, a new violation FAILS, and dropping an entry without
+fixing the site FAILS. Both ratchet directions, proven against the REAL scan rather than a mock.
+
+**Three things in that turn are the reason it worked:**
+- **You calibrated against ground truth BEFORE writing the inventory**, and it caught **four of your own bugs**
+  while tuning — the naive `.children` rule, the `flattenOps(` word-boundary miss, a 38KB function colliding
+  two unrelated matches, and a doc comment being read as a call. A checker written from reasoning would have
+  shipped with all four and been trusted anyway.
+- **You keyed the inventory by `{file, function}`, not line** — applying the ARCHITECTURE.md citation-drift
+  lesson from a different part of this session, unprompted. That is the difference between a fix and a lesson.
+- **You named the remaining blind spot** (a program stack arriving as a PARAMETER rather than a direct
+  `getStack()` call — zero cost today, all 10 sites call directly) instead of letting the file read as complete.
+
+**And it found an 11th site while being built:** `macrosApp.js openCamAuthoring` silently skips everything
+nested in a `multi_step` when auto-importing CAM-able ops. The checker earned its keep in the turn it was
+written.
+
+**Housekeeping done, not yours:** I reaped the ~11hr-old orphaned playwright test-server (PID 67592) you
+flagged — confirmed dead, no others. It predates this session and may well be what starved the 1.4h/1918-red
+run I discarded.
+
+## THE TASK — delete the 6 dead guards. You already proved every premise for this.
+`window.ddcsX ? window.ddcsX(...) : <shallow fallback>` at `opSession.js:552,560`, `envelopeCheck.js:184`,
+`wizardManager.js:410,495,525`. You established: all 6 fallbacks are **known-wrong** (4 byte-for-byte the
+pre-fix bugs), the guard **can never fire** (traced the boot chain), and there is **no import cycle** (traced
+the graph; `opBuilders.js` is the declared leaf). `opGlow.js` already proves the direct-import path.
+
+1. **DIRECT IMPORT at all 6.** Delete every fallback branch — no guard, no `window.` bridge at these sites.
+2. **KEEP the `window.ddcs*` assignments** in `initProgramModel` (they are the app's own debug/bridge surface
+   and other things may read them) — this is about the CALL SITES, not the bridge. If you find the bridge
+   itself is now unreferenced, say so; do not delete it on your own initiative.
+3. **⚠ STOP CONDITION:** if any of the 6 turns out to be reached during construction after all — i.e. the
+   guard CAN fire — stop and tell me. That would falsify t1962's boot-chain trace and it is worth more than
+   this cleanup.
+4. **THE CHECKER MUST STILL PASS**, and its guarded-fallback exclusion may now be dead. **If removing these 6
+   makes that exclusion unreachable, DELETE the exclusion too** — an exclusion for a pattern that no longer
+   exists is the checker lying about what it protects against.
+5. **Gate:** node tier (incl. the new checker) + `edit-nested-op-1958` + `export-import-fidelity-1964` +
+   `blk-start-hints-multistep-1954` + the round-trip/parity set + the 4 t1928 features.
+
+⚠ Then: `USER_OP_PREFIX` boundary + `validateUserOp` assertion → `segmentFrame` → `glowEdited` →
+`_firstOpTitle` → `collectOps` → the remaining new sites (now 11 in the inventory).
