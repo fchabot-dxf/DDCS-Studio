@@ -4033,3 +4033,43 @@ the form fields never update. **No error.** Their edit is simply gone from the f
 
 ⚠ Then: `setGroupChildParams`'s real-UI test · the `opGlow.js` stale doc-comment claim you named · two-sided
 setup, still awaiting the human.
+
+# ═══ t2002 — setGroupChildParams' REAL-UI TEST (the one you parked loudly) ═══
+
+t2000 accepted, verified by me: node tier green, inventory still 0, and the surfacing family runs **60 passed**
+(2 known load flakes, retried).
+
+**Three things beyond the fix:**
+- **You asserted the gesture, not the function** — `showApp('studio')`, which is literally the tab-click
+  handler that fires `pullFromBlocks` internally, never calling the reconciler directly. A reconciler-only unit
+  test would have passed with that wiring broken, which is exactly how `openForEdit` hid.
+- **You closed the trap I warned about, and then went one better:** four distinctive non-default values across
+  independent fields **plus** asserting the pre-switch baseline is not already the seeded value. Seeding alone
+  proves the field changed; the baseline check proves it changed *because of the switch*.
+- **You cleaned up your own orphans:** the old reconciler was `formNum`'s only call site, so `formNum`,
+  `_replayParams` and the now-unused `r3` import went with it, along with the doc-comment clause describing
+  them. Removing what your change orphaned — and nothing else — is the discipline.
+
+Two real improvements fell out that nobody asked for and both are right: `toolDia` now reconciles at all (the
+old reader only ever read it off the DOM to un-derive a percent), and `stepoverPct` no longer needs that
+un-derive since the atom stores the percentage directly.
+
+## THE TASK — finish the one you parked.
+In t1992 you fixed `setGroupChildParams` but could only verify it **function-level**, because its real UI door
+(`userOpView.applyGroupEdits`) needs a derived group def + generic widget form — more scaffolding than that
+turn honestly allowed. **You named it as parked rather than substituting a weaker test silently. Now build the
+real one.**
+
+1. **DRIVE THE REAL DOOR:** a hand-built group, promoted into a wrapper (any 2+ top-level ops wrap), its form
+   opened through the actual UI path, a field edited, committed — **and the change lands on that group's own
+   children.** Same standard as t2000: the gesture, not the function.
+2. **⚠ AND THE SECOND PATH:** t1986 proved a group dragged inside another group reaches the same lookup. Assert
+   **both** routes, or say plainly which one you could not drive and why.
+3. **NON-VACUITY with a distinctive non-default**, and check the baseline is not already the seeded value —
+   your own t2000 improvement, now the standard.
+4. **IF THE SCAFFOLDING IS STILL TOO BIG,** say so again and say what specifically blocks it. **A second
+   honest park beats a thin test** — but tell me what it would take, so I can decide whether to fund it.
+5. **Gate:** node tier + `group-edit` + `word-glow` + `edit-nested-op-1958` + the round-trip/parity set.
+
+⚠ **The machine is yours.** Then: the `opGlow.js` stale doc-comment claim you named in t1998 (its three diff
+surfaces read `opEditMap` today, not `replayReconcile`) · two-sided setup still awaits the human.
