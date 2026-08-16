@@ -3225,3 +3225,41 @@ not the answer. Design the test that fails when a new one lands.
 ⚠ Queued code work, in order: the `window.` fallback above · `segmentFrame.js frameOwnerAtLine` (its comment
 claims it handles the nested case — the code lies) · `editorOpHover.js glowEdited` · `editorManager.js
 _firstOpTitle` · `setupSheet.js collectOps` (over-deep, different shape) · then whatever this design concludes.
+
+# ═══ t1962 — IS THE `window.X ? X : fallback` IDIOM SAFE ANYWHERE? (read-only) ═══
+
+t1960 accepted, and **it overturned my ordering — correctly.** Rather than hand-sweep a fourth time you framed
+the sweep MECHANICALLY (the shape, not "what else asks this question") and it found **6 brand-new sites the
+three hand sweeps never named**. That is the evidence for the checker, produced by the design itself: "three
+sweeps converged" was falsified for the cost of one dispatch. Two corrections of mine accepted: `collectOps`
+is **not** this bug (it recurses correctly; its defect is the opposite, double-counting) and needs its own fix;
+and `opContextMenu.js showOpMenu` finds by **bare id with no type test**, so a checker keyed on `type === 'op'`
+alone would miss it.
+
+## ⚠ MY RULING ON "SHIP IT RED" — a RATCHET, not an allow-list and not a permanent red.
+You are right that allow-listing real bugs to green hides them. But a permanently-red checker breaks my
+release gate: I could no longer tell a regression from the known debt. So:
+**the checker carries an explicit INVENTORY of the currently-open sites, and FAILS on anything not in it.**
+The inventory may only ever SHRINK — a checker that fails when it GROWS. The debt is visible, counted, and
+cannot hide a new site. Build it that way, ranked above the individual fixes exactly as you recommended.
+
+## THE TASK — read-only. My full gate is STILL RUNNING: no code, no specs, no suite run.
+You found the guarded-fallback idiom `window.ddcsX ? window.ddcsX(...) : <inline fallback>` at **9 sites**.
+I told you to delete it in `wizardManager.js` because its fallback is the exact bug we had just fixed. Before
+that instruction generalises or stays local, I need to know what the other seven do.
+
+1. **CLASSIFY ALL 9.** For each: what does the fallback branch actually do if `window.ddcsX` is missing —
+   (a) a KNOWN-WRONG implementation (like `wizardManager`'s), (b) a benign no-op/empty result, or (c) a genuine
+   equivalent? `file:line` each.
+2. **CAN THE GUARD EVER FIRE?** Is `window.ddcsX` ever actually absent at those call sites, or is
+   `initProgramModel()` always run first? **If it can never fire, every one of these is dead code asserting a
+   danger that does not exist** — and the honest fix is a direct import, not a guard.
+3. **IS THERE A LOAD-ORDER REASON** the `window.` bridge exists at all (a cycle, a boot sequence)? If yes, name
+   it — that is the legitimate case and it changes the answer for all 9.
+4. **RECOMMEND ONE RULE FOR THE WHOLE IDIOM**, not nine judgements: direct import everywhere · or guard-but-
+   fail-loud · or leave it alone and only fix the known-wrong fallbacks. Say which and why.
+
+⚠ Design only. No code, no specs.
+⚠ Order after this, per your own ranking which I accept: **THE CHECKER (with the shrink-only inventory)** →
+`window.` fallback → `segmentFrame.js frameOwnerAtLine` → `glowEdited` → `_firstOpTitle` → `collectOps` (its
+own separate shape) → the 6 new sites.
