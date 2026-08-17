@@ -39,6 +39,7 @@
  */
 import { drillStack } from '../../wizards/stacks/drillWizard.js';
 import { patternPoints } from '../../wizards/drillWizard.js';   // patternPoints itself is a pass-through re-export (defined in ops/index.js), not a moved builder — stays at the old path
+import { skipSet } from '../../wizards/ops/holecycle.js';   // t2042 — the SAME declared skip parse the real emit's IF/GOTO gates on
 import { pointsBBox } from '../../wizards/ops/placement.js';   // t718 — the hole-CENTRES bbox for the placement-parity shift
 import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
@@ -183,7 +184,13 @@ export function drillPatternGeometry(p, boreDia) {
     const ox = _dn(p.originX, 0), oy = _dn(p.originY, 0);
     const holeR = boreDia ? Math.max(0.5, _dn(p.holeDia, 12) / 2) : 3;   // bore = the real bore Ø; drill = a small display dot
     const pts = patternPoints({ ...p, cx: ox, cy: oy, x0: ox, y0: oy }) || [];   // patternPoints reads cx/cy or x0/y0 per pattern
-    const paths = pts.map((pt) => _holeRing(pt.x, pt.y, holeR));
+    // t2042 — a skipped hole (the SAME declared skipSet the real emit's IF/GOTO gates on, 1-based like the emit's
+    // own hole index) is OMITTED here, not drawn: the machine never cuts it, so a ring at that point was a phantom
+    // — a hole the picture promised and the program refused. Not the drillView-style strikethrough (that convention
+    // is item/kind:'hole'-shaped, this preview draws hole-rings as paths — a different, pre-existing primitive;
+    // adopting the DECLARED skip rule doesn't require also adopting that rendering shape).
+    const skip = skipSet(p);
+    const paths = pts.map((pt, i) => (skip.has(i + 1) ? null : _holeRing(pt.x, pt.y, holeR))).filter(Boolean);
     
     // Calculate effective width/height for handleScale based on pattern
     let w = 0, h = 0;

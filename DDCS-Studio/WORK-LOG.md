@@ -42192,3 +42192,73 @@ Whatever the advisor's own answer to the survey question implies; abort-vs-lost-
 SETUP; preview Fork 3 — all the human's, both still open, neither blocking.
 
 🔨 turn 2040
+
+# ═══ t2042 — TIER 3 #21 SETTLED AS LIVE, and FIXED: the twin's preview drew a hole the machine never cuts ═══
+
+The inverse of everything else this arc found — here the CLASSIC view (`drillView.js`) was already correct
+and the TWIN's own shared preview (`drillPatternGeometry`, drill_data AND bore_data) was wrong.
+
+## Settled from evidence, not from the dispatch's own stated expectation
+
+**Drove the REAL registered builder end to end** (same technique as t2034's odturn settle): a `drill_data` op
+with `skip:'2'` on a 3-hole grid, read the ACTUAL emitted G-code — `IF #89 == 1 GOTO93   ( hole 2 skipped )`, a
+genuine controller-side jump around the peck motion for hole index 1 (0-based). The machine will NOT drill
+that hole — the real emit was always correct. **Separately called `drillPatternGeometry` directly with the
+SAME params** — it drew all 3 hole rings, no skip-awareness anywhere in the function body (confirmed by
+reading it in full at t2040, re-confirmed by calling it here). **Reaches the PICTURE only, not the G-code** —
+confirmed, not assumed, matching the dispatch's own explicit instruction to verify rather than trust its
+stated expectation.
+
+## The fix — collapsed onto the declared source, per the dispatch's own instruction
+
+**No shared function existed to collapse onto — said so before writing one, then wrote the minimum:**
+`holecycle.js`'s own `skipSet(p)` (the exact parse the real emit's IF/GOTO gates on) was module-private.
+Exported it — a declaration change, not new logic. `drillPatternGeometry` now filters `pts` by `skip.has(i+1)`
+before building each hole's ring, OMITTING a skipped hole's path entirely (not the `drillView.js`-style
+strikethrough — that convention is `item`/`kind:'hole'`-shaped, drawn by `featureCanvas.js`'s own dedicated
+branch; this preview draws hole-rings as `paths`, a different, pre-existing primitive. Adopting the DECLARED
+skip rule doesn't require also adopting that rendering shape — named as a deliberate, minimal scope choice,
+not an oversight).
+
+**Found and collapsed a second, smaller duplicate on the way, since it was directly on-topic and now free**:
+`drillView.js` had its OWN `parseSkip` — a byte-identical, independently hand-typed local copy of the exact
+same parse `holecycle.js` already owned. Once `skipSet` was exported, `drillView.js` importing it instead
+costs one line changed and removes a genuine (if trivial) pre-existing duplicate at the same time.
+
+## Non-vacuity
+
+New `drill-bore-skip-preview-2042.test.mjs`, 3 tests: the first drives the REAL registered builder + reads the
+ACTUAL G-code (proving the emit-side claim), then checks the preview agrees; the second sweeps skip
+combinations for BOTH `drill_data` and `bore_data` (the same shared function); the third checks `skipSet`'s own
+parse. Reverting all three files throws `SyntaxError` immediately (`skipSet` isn't exported pre-fix) — the
+same clean, immediate proof shape used throughout this arc for brand-new exports.
+
+## Gate
+
+**PARKED, per the dispatch's own note — the advisor's release gate is running this turn, no Playwright/no
+browser**: the `drill-*`/`bore-*` Playwright spec set and the round-trip/parity set were NOT run. Node tier
+run in full instead: `npm run test:node` — 161/161 (158+3), zero snapshot movement (the golden fixture's own
+drill/bore cases never set `skip`, so the fixed behaviour never touches it — confirmed directly, not assumed,
+by checking `preview-spec-1688.txt`'s own diff came back empty). Direct end-to-end verification (the real
+builder + real G-code + real preview call) substitutes for the parked Playwright layer this turn; worth a
+`drill-*.spec.js`/`bore-*.spec.js` run once the release gate clears, named for the advisor to decide on.
+`proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/web/wizards/ops/holecycle.js` — `skipSet` exported.
+- `DDCS-Studio/web/blocks/dataOps/drillData.js` — `drillPatternGeometry` omits a skipped hole's ring.
+- `DDCS-Studio/web/wizards/views/drillView.js` — `parseSkip` collapsed onto the shared `skipSet`.
+- `DDCS-Studio/tests/node/drill-bore-skip-preview-2042.test.mjs` — new, 3 tests.
+
+## Tier 3, updated
+
+#20 resolved (t2040, 0 of 8). #21 now fixed (this turn). #22 (`tap`/`text` missing `def.zRuler`), #23
+(`setLatheTool` dead), #24 (2D pane never draws the ATC magazine) remain, unchanged, not started.
+
+## Queue
+
+Tier 3's remaining 3, Tier 2's 6 (none confirmed live), abort-vs-lost-link, two-sided SETUP, preview Fork 3 —
+the human's/advisor's, none started, none blocking. A live-browser confirmation of this turn's fix, once the
+release gate is clear.
+
+🔨 turn 2042

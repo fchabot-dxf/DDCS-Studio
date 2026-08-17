@@ -7,13 +7,13 @@ import { toolOptionsHTML, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams, pointsBBox, handleScale } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
+import { skipSet } from '../ops/holecycle.js';   // t2042 — REUSED, not reimplemented: the SAME declared skip parse the real emit's IF/GOTO gates on (was its own byte-identical local copy, parseSkip)
 
 const wizard = new DrillWizard();
 const layout = new FeatureCanvas();
 const v = (id) => { const e = el(id); return e ? e.value : undefined; };
 const num = (val, d) => (val === '' || val == null || isNaN(Number(val))) ? d : Number(val);
 const r3 = (n) => Math.round(n * 1000) / 1000;
-const parseSkip = (s) => new Set(String(s || '').split(/[ ,]+/).map((t) => parseInt(t, 10)).filter((n) => n > 0));
 
 /** Write one or more wizard fields, then fire a single 'input' so the normal update() loop redraws. */
 function setFields(map) {
@@ -90,7 +90,7 @@ function buildDrillSpec(params, stock) {
         decls[0] = { type: 'point', id: 'origin', fx: 'd_originX', fy: 'd_originY', x: ox, y: oy, label: 'pos', ...hsS.pos };
     }
 
-    const skip = parseSkip(params.skip);
+    const skip = skipSet(params);
     patternPoints(params).forEach((p, i) => items.push({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: holeR, skipped: skip.has(i + 1) }));
 
     const { handles, onDrag, onEdit } = buildCanvasWidgets(decls, setFields);

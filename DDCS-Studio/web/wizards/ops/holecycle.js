@@ -157,8 +157,12 @@ export function holePatternPoints(p = {}) {
     return patternPoints({ ...p, cx: num(p.x0, 0), cy: num(p.y0, 0) });
 }
 
-/** The 1-based hole indices the operator asked to skip — the emitter container's own parse, reproduced exactly. */
-const skipSet = (p) => new Set(String(p.skip || '').split(/[ ,]+/).map((s) => parseInt(s, 10)).filter((n) => n > 0));
+/** The 1-based hole indices the operator asked to skip — the emitter container's own parse, reproduced exactly.
+ *  t2042 — EXPORTED: this is the ONE declared parse the real emit's IF/GOTO skip actually gates on; drillData.js's
+ *  preview (drillPatternGeometry, shared by drill_data AND bore_data) drew every hole regardless of skip — a
+ *  phantom hole the machine will never cut — and drillView.js's own classic view had an independent, byte-identical
+ *  re-derivation (parseSkip) instead of importing this. Both now call this one function. */
+export const skipSet = (p) => new Set(String(p.skip || '').split(/[ ,]+/).map((s) => parseInt(s, 10)).filter((n) => n > 0));
 
 /**
  * ── THE PATTERN'S POINT ARITHMETIC, PER PATTERN ───────────────────────────────────────────────────────────────────
