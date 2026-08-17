@@ -27,8 +27,7 @@ import { withPassesField } from './passesField.js';   // t1613 — the derived `
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b — the declared mill entry point (entryX/entryY bind via POCKET_BINDING_SPECS)
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a — the declared tool-selection marker (toolNum binds via POCKET_BINDING_SPECS)
 import { pruneGuards } from '../whenGuard.js';
-import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
-import { pocketInsetRegion, stepoverMm, pocketInsetMm } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit); t1406 — the inset NUMBER for the re-pointed arm's derived socket
+import { pocketInsetRegion, stepoverMm, pocketInsetMm, trueRegionFromFlat } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit); t1406 — the inset NUMBER for the re-pointed arm's derived socket; t2016 — trueRegionFromFlat, the SAME boundary function the real emit calls
 import { concentricRings } from '../../wizards/ops/contour.js';   // t802 — the inward offset rings the concentric emit cuts (draw them in the 2D preview)
 import { restValid, restRegion, restGreyReason } from '../../wizards/ops/restmachining.js';   // t871 — REST MACHINING: the _rest guard + the corner-sliver preview + the grey-out reason
 import { handleScale } from '../../wizards/ops/placement.js';   // t1567 — e6e681e8 wired this into pocketPreviewGeometry's handle placement but never added the import
@@ -307,29 +306,40 @@ const MATERIAL_BINDING = { param: 'material', type: 'enum', default: '', widget:
 export const POCKET_DATA_OPTYPE = 'user_pocket_data';
 
 const _pn = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
-const _circlePath = (cx, cy, r) => { const pts = []; for (let i = 0; i <= 48; i++) { const a = 2 * Math.PI * i / 48; pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); } return { pts, cls: 'fc-guide' }; };
 // t718 — bbox over a set of {pts} paths (the origin-inclusive boundary extent, for the layout placement-parity shift).
 const _pbb = (ps) => { let b = null; for (const p of (ps || [])) for (const q of (p.pts || [])) { if (!b) b = { minX: q.x, maxX: q.x, minY: q.y, maxY: q.y }; else { if (q.x < b.minX) b.minX = q.x; if (q.x > b.maxX) b.maxX = q.x; if (q.y < b.minY) b.minY = q.y; if (q.y > b.maxY) b.maxY = q.y; } } return b; };
 /** t716 — DECLARED preview geometry (twin-level): the pocket boundary (the finished-wall outline) PER SHAPE KIND — the
  *  multishape solved by declaration (the twin knows p.shape) — + a pos handle (originX/originY) + a size handle per kind
  *  (circle/polygon → radial Ø; rect/ellipse → rect W×H). Mirrors the built-in pocketView.buildPocketSpec. Preview-side → emit unaffected. */
+// t2016 — the boundary RING now comes from `trueRegionFromFlat`, the SAME function pocketfill.js's real emit
+// calls to get the tool-centre boundary (this WAS the strongest triplication PREVIEW-AS-DATA.md found: this
+// dispatch, pocketfill.js's own copy, and pocketWizard.js's structural-guard copy each hand-typed the same
+// shape→region mapping independently). Collapses to ONE call, not a new declaration — pocketWizard.js's own
+// copy feeds a genuinely different consumer (derive-guards) and is left untouched, out of scope for a preview fix.
+// Byte-identical for rect/polygon/ellipse (same field names, same regionDesc() call underneath); circle's drawn
+// ring gets MORE segments (96 vs the old hand-rolled 48) since it now reads the same higher-fidelity contour the
+// real clearing math already uses — a deliberate fidelity change, not a silent one, named here.
+function _boundaryRing(p) {
+    const ring = (trueRegionFromFlat(p).contour || [])[0] || [];
+    return ring.length > 1 ? [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })) : [];
+}
 export function pocketPreviewGeometry(p) {
     const ox = _pn(p.originX, 0), oy = _pn(p.originY, 0), shape = p.shape || 'rect';
     const hs = handleScale(p, '', ox, oy, _pn(p.w, 80), _pn(p.h, 60));
     const paths = [], handles = [{ type: 'point', id: 'pk_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
+    const boundary = _boundaryRing(p);
     if (shape === 'circle') {
         const R = _pn(p.dia, 50) / 2;
-        paths.push(_circlePath(ox, oy, R));
+        if (boundary.length) paths.push({ pts: boundary, cls: 'fc-guide' });
         handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: R, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
     } else if (shape === 'polygon') {
-        try { const ring = (regionDesc({ shape: 'polygon', x: ox, y: oy, w: _pn(p.dia, 50), sides: _pn(p.sides, 6) }).contour || [])[0] || []; if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); } catch (_) { /* degenerate */ }
+        if (boundary.length) paths.push({ pts: boundary, cls: 'fc-guide' });
         handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: _pn(p.dia, 50) / 2, a: hs.size.a, rScale: 2, minR: 1, label: 'Ø' });
     } else if (shape === 'ellipse') {
-        try { const ring = (regionDesc({ shape: 'ellipse', x: ox, y: oy, w: _pn(p.w, 80), h: _pn(p.h, 60) }).contour || [])[0] || []; if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); } catch (_) { /* degenerate */ }
+        if (boundary.length) paths.push({ pts: boundary, cls: 'fc-guide' });
         handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size, ax: ox + hs.pos.ax, ay: oy + hs.pos.ay, ex: hs.size.ex / 2, ey: hs.size.ey / 2 });
     } else {
-        const w = _pn(p.w, 80), h = _pn(p.h, 60);
-        paths.push({ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' });
+        if (boundary.length) paths.push({ pts: boundary, cls: 'fc-path' });
         handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', minw: 1, minh: 1, label: 'W×H', ...hs.size });
     }
     // t718 — the origin-inclusive boundary bbox: the twin's pocket geometry emits 0-relative (origin rides the placement

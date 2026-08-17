@@ -40836,3 +40836,119 @@ None — read-only, per the dispatch. `proc_health.py watch`: clean. No file in 
 None changed.
 
 🔨 turn 2014
+
+# ═══ t2016 — the 3 stale claims fixed; the Tier-1 collapse STARTED: pocket_data's boundary, done ═══
+
+## (1) THREE STALE CLAIMS — fixed, made true, no new checker built
+
+- **`NEXT-SESSION.md` open-task #3**: "6 legacy renderer views still LIVE... only corner's was actually deleted"
+  → marked ✅ DONE, all six retired at t1730, confirmed directly against `wizards/views/index.js`. Left the
+  item's separate "~20 dead built-in screens" figure explicitly UNVERIFIED (not folded into the "done" verdict —
+  a different, unmeasured count).
+- **`NEXT-SESSION.md` open-task #4's edge_data count**: ×4 → **×2**, with the t2014 measurement and the reason
+  (t1730's legacy-view deletion incidentally carried 2 copies away as a side effect) named inline.
+- **`ROADMAP.md`'s value-fidelity line**: "the pinned 11 round-trip diffs shrink" → ✅ CLOSED at t1520, citing the
+  tightened assert (`<= 11` → `=== []`) and the still-live, unreopened spec.
+
+No new checker built for any of the three, per the dispatch — these are hand-verified, one-time corrections
+matching t2012/t2014's own established practice for a document lying about itself.
+
+**⚠ ENVIRONMENTAL FINDING, not this turn's own content: a concurrent agent shares this working directory.**
+Mid-turn, `git log` showed three commits ahead of my own (`c9df311f`/`6e4c22dd`/`c800432f`, authored "Claude Opus
+5 (1M context)" — a different session, working an unrelated "job progress" track). All three touched only
+`NEXT-SESSION.md`, and the FIRST of the three (`c9df311f`) turned out to contain my own two uncommitted
+open-task edits (#3 and #4 above), swept in alongside its own unrelated additions — almost certainly a broad
+`git add` run against this SHARED working tree while my Edit-tool changes were sitting uncommitted on disk.
+Verified via `git show c9df311f -- NEXT-SESSION.md`: both my exact edits are present, byte-for-byte, inside
+that commit. No data was lost and no collision touched any file this turn's own work depends on (checked: all
+three concurrent commits touch `NEXT-SESSION.md` alone) — but the two open-task fixes above are NOT under my
+own commit as a result; they already landed via someone else's. Reported here rather than silently re-applying
+or re-committing something already on HEAD. This is the same class of hazard named in project memory
+("Concurrent analytics agent + git") — worth flagging plainly since it's the first time it was CAUGHT live,
+mid-edit, rather than inferred after the fact.
+
+## (2) THE TIER-1 COLLAPSE — started with `pocket_data`'s boundary, landed completely
+
+**Picked `pocket_data`'s shape→region-params boundary** — PREVIEW-AS-DATA.md's own "strongest triplication" — over
+the other 4 after checking each candidate's actual field-name alignment first (not assumed):
+- `lathe_parting`'s kerf formula has a genuine field-rename between the twin's form vocabulary (`floorDiameter`)
+  and the wizard's own internal vocabulary (`targetDiameter`/`spigotDiameter`, kind-gated) — real, would need an
+  adapter, more moving parts for a first collapse.
+- `pocket_data`'s three copies (`pocketWizard.js`'s `trueRegionParams`, `pocketfill.js`'s `trueRegionFromFlat`,
+  `pocketData.js`'s own inline dispatch) use the SAME field names throughout (`originX/originY/shape/dia/sides/
+  w/h`) — confirmed by reading all three, not assumed from the survey's own citation.
+
+**The fix.** `pocketPreviewGeometry` (`pocketData.js`) no longer hand-dispatches its OWN boundary geometry per
+shape — it now calls `trueRegionFromFlat(p)`, the SAME function `pocketfill.js`'s real emit calls, and draws
+whatever contour it returns. `pocketWizard.js`'s own `trueRegionParams` — a genuinely different consumer
+(structural guards, not preview) — is untouched, out of scope for a preview fix; the survey's "3 copies" becomes
+2 (a real, different-purpose one; a real, single-sourced preview) rather than 1, and that is the correct scope,
+not an incomplete collapse.
+
+**Verified, not assumed, exactly what would change:** read `regionDesc`'s own rect/polygon/ellipse/circle contour
+builders against the OLD hand-typed geometry line by line. Rect: identical 4 corners, same order — byte-identical.
+Polygon/ellipse: the OLD code ALREADY called `regionDesc` inline with the same params — byte-identical. Circle:
+the OLD code used a locally-defined 48-segment approximation; `regionDesc`'s own circle uses 96 — the ONE
+deliberate, named, higher-fidelity change, not a silent one. Confirmed live against `npm run test:node`: exactly
+one line changed in `preview-spec-1688.txt` (the snapshot fixture), and it was `user_pocket_data`'s own circular-
+pocket case — nothing else moved. Regenerated via the test's own documented `UPDATE_PREVIEW_SNAPSHOT=1` mechanism
+(which itself fails loud on a bare regen, per INVARIANT #11's own guard — confirmed it did), then re-ran clean.
+
+**Orphans removed** (my own change's, not pre-existing): the old `_circlePath` helper and the `regionDesc` import
+in `pocketData.js` had zero remaining callers after the collapse — removed both.
+
+**New permanent regression guard**: `tests/node/preview-collapse-pocket-2016.test.mjs` — asserts, for rect/
+circle/polygon/ellipse at both defaults and off-defaults, that `pocketPreviewGeometry`'s drawn boundary EQUALS
+`trueRegionFromFlat`'s own contour exactly (not just numerically close), plus a locked byte-identical check for
+rect specifically. If anyone re-introduces an independent hand-typed copy in the future, this catches it.
+
+**Non-vacuity, proven not assumed**: saved a scratch copy of the fix, temporarily reverted `pocketPreviewGeometry`
+to its pre-collapse hand-typed dispatch, re-ran the new test — failed exactly as required (circle/polygon/ellipse
+all reported as mismatched against `trueRegionFromFlat`'s own contour; rect still passed, since its own hand-typed
+path already matched byte-for-byte, confirming the test correctly distinguishes "collapsed" from "not," not just
+"broken from working"). Restored from the scratch copy (not `git checkout HEAD --`, since the fix was uncommitted).
+
+**No new field, no new vocabulary** — a straight import + call, the same shape `drill_data`/`bore_data`'s
+`patternPoints` reuse and `lathe_polygon`'s `polygonPath` reuse already prove works. Fork 1 stayed void.
+
+## THE SHAPE, for judging whether the other four follow the same way
+
+Every Tier-1 item shares the SAME two-step check before touching code: (1) does the "duplicate" function
+genuinely serve the SAME consumer need, or does one of the "copies" feed a different purpose (like
+`pocketWizard.js`'s guards) that should stay separate? (2) do the field names actually line up, or is there a
+real rename to bridge (like parting's `floorDiameter`)? Pocket answered both cleanly (same consumer for 2 of 3,
+identical field names) — that is WHY it went first and landed in one pass. `contour_data` is very likely the
+same shape (same pattern, same family) and probably follows directly. `comm_data`'s 3 copies need the SAME
+consumer check (is the class-method copy REALLY only feeding preview, or something else too) before assuming a
+clean collapse. `lathe_parting` needs the field-rename resolved first (a `floorDiameter` → `targetDiameter`/
+`spigotDiameter` adapter, or tracing why the twin's own stored params use a different name than the wizard's
+internal vocabulary at all — that second question might be worth answering before touching the code, since a
+genuine rename usually means someone chose it on purpose). ATC's `sim` self-heal is a DIFFERENT SHAPE of fix
+entirely (a missing write-back, not a duplicated formula) — traced its own value fully: `def.sim` is written
+once at construction from the raw positional arg and never reconciled, but nothing renders FROM `def.sim`
+directly (`opSimContext`'s real reader is the separate `setUserSimIntent` registry) — so the fix is genuinely
+zero rendering risk, but also zero live bug, purely a closed-off, confusing dead field for a future author to
+trip on. Real, worth doing, but a lower-urgency shape than the other four.
+
+## Gate
+
+`npm run test:node`: 128/128 (126 + 2 new, both proven non-vacuous). Playwright: the full pocket-family spec set
+(`pocket-canvas`, `pocket-cavity-2d`, `pocket-asblocks`, `pocket-data-emit`, `pocket-rides-raster-1406`,
+`boss-pocket-reconcile`, `pocket-offset`, `pocket-depth`, `pocket-e0-superset`, `pocket-in-place`,
+`pocket-delegation-1429`, `pocket-wall-parametric-1433`, `pocket-tenant-extraction-1391`, `atc-pocket-swap`) +
+`fork-parity-1593` + `guard-roundtrip-1595` — 89/90 clean in the combined run, one transient boot-timeout on
+`guard-roundtrip-1595` (Blocks-workspace init, unrelated to this change), re-ran alone: 2/2 clean, including its
+own `user_pocket_data flips=2` structural sweep. `proc_health.py watch`: clean.
+
+## Files
+`ROADMAP.md` (the value-fidelity fix, this turn's own commit); `NEXT-SESSION.md` (the other 2 stale-claim
+fixes — content verified present and correct, landed via a CONCURRENT agent's commit `c9df311f`, not this
+turn's own, per the environmental finding above); `DDCS-Studio/web/blocks/dataOps/pocketData.js` (the
+collapse); `DDCS-Studio/tests/node/preview-collapse-pocket-2016.test.mjs` (new); `DDCS-Studio/tests/node/
+__snapshots__/preview-spec-1688.txt` (the one deliberate circle-fidelity line, regenerated not hand-edited).
+
+## Queue
+The other 4 Tier-1 items (`contour_data`, `comm_data`, `lathe_parting`, ATC `sim`) — scoped above, not started.
+Fork 3 (the additive-layer shape) goes to the human, per the dispatch. Two-sided setup awaits the human.
+
+🔨 turn 2016

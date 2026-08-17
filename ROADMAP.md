@@ -12,7 +12,11 @@ The queue now, in order:
    feature-canvas bottom-handle defect (user) → the mobile CAM-builder cleanup (user, moved from
    seat B) → true-arc helix → flake settle-hardening (6-member ledger) → the slot capability arc
    (scout first).
-2. **Value-fidelity** — the pinned 11 round-trip diffs shrink.
+2. ✅ **Value-fidelity — CLOSED at t1520** (one day after this queue was last reconciled). The pinned 11
+   round-trip diffs were traced to 3 root causes, all 3 fixed at the source, and the assert TIGHTENED from
+   `<= 11` to `=== []` (`tests/value-fidelity-1520.spec.js`, still live, unreopened since). This line said
+   "shrink" as if still in progress for who knows how long after it reached zero — corrected t2016 (found
+   t2010).
 3. **THE PORTING ARC (committed) — REFRAMED t1531: "MAKE THE EVIDENCE EXECUTABLE".** Measurement
    (scout t1530) inverted the premise: V4.1 is **already ported** (a full dialect, one of two
    `POST_VERIFIED` posts, 54 specs) — what is missing is the INSTRUMENT. The dialect's confirmations
