@@ -4509,3 +4509,43 @@ asking for it actually owns, while every test stays green.
    that silently degrades on V4.1. A named limit the human can plan around beats a surprise at the machine.
 4. **DM500/V3 is NOT in scope** — it is `corpus-attested (thin)`, not `POST_VERIFIED` (t2010). Two targets,
    both real: V4.1 and Expert.
+
+# ═══ t2020 — JOB HISTORY: content-hash identity, and stop lying to V4.1 ═══
+
+t2018 Act 1 accepted. **The plan was stale in the OPPOSITE direction for once — it UNDERCLAIMED.** The beacon
+tracker is fully wired end to end (percent · op · line · a **time-weighted ETA**, not a bare line number), and
+**a durable run-log already exists**: `poller.py`'s `_record_history`, one record per terminal outcome, **for
+ANY job, beacons or not.** You found that while investigating 1a rather than assuming the dispatch was right.
+
+**⚠ AND YOU FOUND THE ESCALATION MY SCOPE RULING WAS WRITTEN FOR.** The beacon path is **Expert/M350-ONLY**:
+V4.1's firmware has **no Modbus RTU at all** — `bridge/controllers/README.md` says so explicitly,
+*"[CONFIRMED] not in firmware, checked 2 builds"*. So on the human's **own machine** beacons are not degraded,
+they are **structurally impossible** — and the only thing stopping an operator turning them on for a V4.1 job
+is a **warning label, not code**. Do it and the job silently becomes **"stalled"** after a timeout: a
+controller incapability, mislabelled as a fault. Invisible, because the suite boots Expert.
+
+## THE TASK — two parts, and part 1 is small.
+1. **STOP THE FALSE "STALLED" ON V4.1.** A controller that cannot do beacons must not produce a state that
+   reads as a machine fault. **Refuse the toggle, or name the real reason** — the operator should see
+   *"this controller has no Modbus link"*, never *"stalled"*. **Do not invent a new job state if an honest
+   existing one fits.** ⚠ **Expert behaviour must not move** — prove it.
+2. **CONTENT-HASH IDENTITY — this is the human's actual ask.** Today's identity is
+   **timestamp + operator-typed name**, so **two sends of the same program never link** — which defeats
+   *"this job took 47 min last time"* outright — while two different programs sharing a typed name look
+   identical in History.
+   - **⚠ NORMALIZE BEFORE HASHING, AND REUSE WHAT EXISTS.** You found `PORTING.md`'s V4.1 oracle work already
+     built exactly this (strip-CRLF · drop blank/comment · collapse whitespace). **Use it. Do not write a
+     second normalizer** — that is the defect class this session spent itself deleting.
+   - **SAY WHAT THE HASH GETS WRONG** in the UI's own terms: same geometry at a different feed is a
+     *different* job and will not link; a re-export with a changed header *will* link, which is what we want.
+   - **ASSERT THE USER-VISIBLE RESULT:** send the same program twice → History links them and can answer
+     *"last time: N min"*. Non-vacuity at your bar (distinctive value, baseline checked).
+3. **DIALECT COVERAGE per the standing ruling:** V4.1 **and** Expert, both tested. DM500 not in scope.
+
+## Queued, both yours, do NOT do now:
+- **STORAGE LANDMINE:** history lives in a folder beside the bridge exe — survives an in-place self-update but
+  **a full reinstall to a new folder loses it.** Not a stable OS location. Against the user-owned-file
+  principle; needs its own act.
+- **ABORT vs LOST-LINK collapse into one "stalled".** No operator-abort concept exists anywhere in the gateway
+  (zero `abort|cancel` hits). Not a wrong-duration risk — it never fabricates a finish — but short of the
+  "record unknown, distinctly" bar.
