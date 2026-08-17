@@ -4580,3 +4580,47 @@ invalidate that turn's gate for no gain. **It is the very next act.**
    open beats a hidden one.
 4. **What survives a full reinstall — prove it**, do not reason about it. Simulate the reinstall (fresh folder,
    existing data) and show the history still reads.
+
+# ═══ t2022 — JOB-HISTORY STORAGE: stable location + the workspace copy ═══
+
+t2020 accepted, verified by me: **bridge suite 26/26** (I ran it). Web gate running.
+
+**⭐ THE NON-VACUITY DESIGN IS THE BEST OF THE SESSION.** Six tests against the pre-fix `poller.py`:
+**4 fail** (the new-behaviour claims) and **2 pass on BOTH revisions ON PURPOSE** — the Expert-unmoved and
+deliver-only-unmoved **invariance witnesses**. Most people would read "passes on both" as a failed
+non-vacuity check; you named why it is the *correct* result for a witness whose whole job is to prove nothing
+moved. Distinguishing "this must newly pass" from "this must never change" is a sharper instrument than the
+blanket rule I gave you.
+
+**Also right:** you reused `normaliseGcode` from `portingArc.js` rather than writing a second normalizer ·
+hashed the **original pre-instrumentation** text so tracked and deliver-only sends of the same program still
+link · left `job_id` untouched and added `content_hash` as a **separate joinable field** (non-destructive) ·
+reused the existing deliver-only terminal instead of inventing a job state · and **rejected**
+`detect_controller()` fingerprinting as beyond scope — refuse and name the reason, do not auto-correct the
+user's config.
+
+## THE TASK — the human's own design, in two layers. Their words: *"can it be in the workspace"*.
+I checked the mechanism: `backup.js` is the declared registry of what rides in the `.ddcs`, and **every entry
+today reads a localStorage key** — while history is written by `poller.py`, server-side, **possibly with no
+browser open**. So the workspace cannot be the live store. It is the right *copy*:
+
+```
+  BRIDGE STORE     writes instantly, authoritative, works with Studio closed
+                   → must move to a STABLE per-user OS location (not beside the exe)
+  .ddcs WORKSPACE  the copy that TRAVELS and survives a reinstall
+                   → a backup.js entry, captured on save
+```
+
+1. **STABLE LOCATION FIRST** (the bridge half). Per-user app-data / Documents convention, not the install
+   folder. **⚠ MIGRATE THE EXISTING RECORDS, ONCE, IDEMPOTENTLY** — real history exists; losing it while
+   fixing where it lives would be the joke version of this fix.
+2. **⚠ PROVE THE REINSTALL SURVIVES IT.** Simulate it — fresh install folder, existing data — and show the
+   history still reads. **Do not reason about it.**
+3. **CAN THE USER FIND AND BACK IT UP?** The principle is *user-owned*, not merely durable. A path they can
+   open beats a hidden one.
+4. **THEN THE WORKSPACE COPY** — a `backup.js` entry. **⚠ THIS EXTENDS THE REGISTRY'S SHAPE**: it would be the
+   first entry sourced from the BRIDGE rather than localStorage. **If that turns out to be more than an entry —
+   if the registry needs a new capture kind — STOP and tell me**; that is a design change, not a line of config,
+   and I would rather fund it deliberately than have it smuggled in.
+5. **Gate:** the bridge suite + node tier + whatever gateway specs exist. **Dialect coverage: this is storage,
+   controller-agnostic — say so if you agree, do not pad the gate for its own sake.**
