@@ -4708,3 +4708,42 @@ tested, the surface a person actually clicks is not.
 
 ⚠ Then queued: abort-vs-lost-link (no operator-abort concept exists in the gateway at all) · the remaining
 **4 Tier-1 preview collapses** · two-sided SETUP (human) · preview Fork 3 (human).
+
+# ═══ t2028 — THE REMAINING 4 TIER-1 PREVIEW COLLAPSES (back to the named arc) ═══
+
+t2026 accepted, verified by me — I ran the spec: **3 passed**, including *"the Export CSV button is WIRED —
+clicking it actually triggers a file download, not just a click."*
+
+**You proved the download rather than asserting the button.** `page.waitForEvent('download')` around the click,
+and the assertion is on the **actual downloaded bytes** (`download.createReadStream()`) — not the unit test's
+return value. The repeat is visible **in the file**, not just in the DOM. And the honest-fallback path I asked
+for is written into the spec's own comment but **was never needed, because you ran it rather than assuming it
+would not work.**
+
+**The determinism call was the right one and I would not have thought of it:** you deliberately did NOT depend
+on a real bridge at :8765, because the existing connected tests `test.skip` when nothing is reachable — so this
+spec would have been silently non-deterministic on any machine without a bridge running. **A spec that skips
+itself is the same family as a test that cannot fail.** Mocking the exact three endpoints `onPoll` calls gets a
+genuinely connected, data-bearing state every run, anywhere.
+
+## THE TASK — back to the arc the human named: **finishing preview-as-data.**
+t2016 collapsed `pocket_data`'s boundary onto `trueRegionFromFlat` (the same function the emit calls). **Four
+Tier-1 facts remain**, each still expressed 3× and verified as still holding at t2014:
+**contour ×3 · parting ×3 · comm ×3 · ATC-sim-stale.**
+
+1. **DO THEM IN YOUR OWN ORDER, EASIEST-TO-PROVE FIRST** — you already measured that **parting's kerf has a
+   genuine field rename** (`floorDiameter` vs `targetDiameter`/`spigotDiameter`) needing an adapter, so it is
+   NOT the cheap one. Use the measurement you already have rather than re-deriving it.
+2. **⚠ COLLAPSE, DO NOT DECLARE.** Standing ruling, and Fork 1 was built and reverted for violating it: preview
+   work is *removing duplicate expressions*, not adding a preview vocabulary. **If a collapse seems to need a
+   new field, STOP — that is Fork 1 returning in disguise.**
+3. **LAND EACH COMPLETELY BEFORE STARTING THE NEXT.** Two finished beat four half-done, and I would rather
+   review two solid collapses than four hurried ones. **Park the rest by name.**
+4. **ASSERT THE PICTURE, not the function** — the same standard as `pocket_data`: the preview and the emit
+   agree because they *are* one source, proven by reference not by a snapshot that could pass on two copies
+   that currently agree.
+5. **NON-VACUITY** with your t2020 distinction stated per collapse.
+6. **Gate:** node tier + the specs covering whichever family you collapse + the round-trip/parity set.
+
+⚠ Still queued behind: abort-vs-lost-link in the gateway (no operator-abort concept exists at all) ·
+**two-sided SETUP** and **preview Fork 3** — both the human's to rule, neither blocking this.
