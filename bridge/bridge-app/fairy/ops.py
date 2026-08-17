@@ -52,8 +52,17 @@ class Ops:
     _FW_KEYS = ("DDCSV4", "DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus")
 
     # --- jobs ---------------------------------------------------------------
-    def submit_job(self, name, nc, mapping=None):
-        """Queue a job. nc = G-code (str or bytes). mapping present => tracked; absent => deliver-only."""
+    def submit_job(self, name, nc, mapping=None, content_hash=None):
+        """Queue a job. nc = G-code (str or bytes). mapping present => tracked; absent => deliver-only.
+
+        t2020 — content_hash (a SHA-256 of the client's NORMALISED G-code — see send.js's own contentHashOf,
+        reusing portingArc.js's normaliseGcode rather than a second normaliser) rides in the SAME mapping dict
+        so it survives for a deliver-only job too (mapping would otherwise be None/absent): it is what lets
+        two sends of the identical program LINK in the History view, independent of tracked vs deliver-only
+        and independent of jobId, which stays a fresh timestamp per send on purpose (never collapses two
+        sends into one record)."""
+        if content_hash:
+            mapping = {**(mapping or {}), "content_hash": content_hash}
         job_id = make_job_id(name)
         self.backend.put_job(job_id, nc, mapping)
         tracked = bool(mapping and mapping.get("total_beacons"))

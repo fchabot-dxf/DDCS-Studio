@@ -17,7 +17,7 @@ API (all JSON):
   GET  /api/status?id=<jobId>          -> one status object (404 if none)
   GET  /api/files                      -> CNCDISK listing (cncdisk/index shape)
   GET  /api/file?name=<file>           -> { ok, name, content }  (read a CNCDISK file)
-  POST /api/jobs        {name, nc, map?}-> { jobId, name, tracked }   (queue a job)
+  POST /api/jobs   {name, nc, map?, contentHash?}-> { jobId, name, tracked }   (queue a job)
   POST /api/files/delete{name}         -> { ok, ... }                 (safe delete on CNCDISK)
 """
 import json
@@ -259,7 +259,7 @@ class _Handler(BaseHTTPRequestHandler):
             b = self._read_body()
             if not b.get("name") or "nc" not in b:
                 return self._send_json({"error": "name and nc required"}, 400)
-            return self._send_json(self.ops.submit_job(b["name"], b["nc"], b.get("map")))
+            return self._send_json(self.ops.submit_job(b["name"], b["nc"], b.get("map"), b.get("contentHash")))
         if self.path == "/api/files/delete":
             b = self._read_body()
             return self._send_json(self.ops.delete_file(b.get("name", "")))

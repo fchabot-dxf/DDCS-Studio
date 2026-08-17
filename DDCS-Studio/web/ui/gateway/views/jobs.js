@@ -56,14 +56,23 @@ export default {
     c.replaceChildren(el('div', { class: 'section-label' }, 'History'));
     if (!rows || !rows.length) { c.append(el('div', { class: 'muted' }, 'no finished jobs yet')); return; }
     const tbl = el('table', {}, el('tr', {},
-      el('th', {}, 'job'), el('th', {}, 'result'), el('th', {}, 'duration'), el('th', {}, 'finished')));
-    for (const r of rows) {
+      el('th', {}, 'job'), el('th', {}, 'result'), el('th', {}, 'duration'), el('th', {}, 'last time'), el('th', {}, 'finished')));
+    // t2020 — "last time": rows arrive newest-first (list_history sorts recorded_at DESC), so the most recent
+    // EARLIER run of the SAME program (matched by content_hash — a re-export links, a different feed does not,
+    // per send.js's own contentHashOf) is the next match LATER in this array, with a real recorded duration.
+    rows.forEach((r, i) => {
+      let lastTime = '—';
+      if (r.content_hash) {
+        const prior = rows.slice(i + 1).find((p) => p.content_hash === r.content_hash && p.duration_s != null);
+        if (prior) lastTime = fmtEta(prior.duration_s);
+      }
       tbl.append(el('tr', {},
         el('td', { class: 'mono' }, r.name || r.jobId),
         el('td', {}, el('span', { class: 'pill ' + (r.final_state || '') }, r.final_state || '—')),
         el('td', { class: 'mono' }, r.duration_s == null ? '—' : fmtEta(r.duration_s)),
+        el('td', { class: 'mono' }, lastTime),
         el('td', { class: 'mono' }, fmtWhen(r.ended_at))));
-    }
+    });
     c.append(tbl);
   },
 };

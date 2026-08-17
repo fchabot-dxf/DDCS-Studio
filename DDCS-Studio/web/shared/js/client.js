@@ -58,7 +58,7 @@ export function makeClient(opts = {}) {
     listFiles: () => call("/api/files"),
     readFile: (name) => call("/api/file?name=" + encodeURIComponent(name), { headers: { "X-DDCS-Local": "1" } }),   // CSRF-guarded (leaks CNCDISK file content); same-origin Studio sends it
     deleteFile: (name) => postJSON("/api/files/delete", { name }),
-    submitJob: (name, nc, map) => postJSON("/api/jobs", { name, nc, map }),
+    submitJob: (name, nc, map, contentHash) => postJSON("/api/jobs", { name, nc, map, contentHash }),   // t2020 — contentHash links repeat sends of the same program in History
     getConfig: () => call("/api/config"),
     setConfig: (updates) => postJSON("/api/config", updates),
     readSysfile: (name) => call("/api/sysfile?name=" + encodeURIComponent(name), { headers: { "X-DDCS-Local": "1" } }),   // SYSDISK macro file (key-N.nc / slib-m.nc); CSRF-guarded, same-origin sends it

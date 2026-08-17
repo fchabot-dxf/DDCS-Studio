@@ -92,6 +92,21 @@ class Poller:
             self._record_history(job_id, name, m, "delivered", 0, now, None)
             self.log(f"[poller] delivered (deliver-only) {name} ({job_id})")
             return
+        if not self.cfg.enable_slave:
+            # t2020 — beacons were requested (the map has total_beacons), but this bridge has no Modbus link
+            # running (the admin "Beacons" toggle is off — the correct, labelled default for a V4.1 controller,
+            # which has no Modbus RTU in firmware at all; see bridge/controllers/README.md). Left alone this
+            # job would enter the watch loop below, never receive a beacon, and time out into "stalled" — a
+            # controller INCAPABILITY mislabelled as a machine fault. The program is still valid, cuttable
+            # G-code, so it still delivers; it just cannot be TRACKED, which is exactly the "delivered"
+            # terminal state deliver-only jobs already use — no new job state invented.
+            reason = "no Modbus link is active on this bridge (enable it in Setup, or leave it off for a V4.1 controller)"
+            self.backend.put_status(
+                job_id, tracker.build_status(job_id, name, m, "delivered", 0,
+                                             events + [f"delivered ({reason}) -> {dest}"]))
+            self._record_history(job_id, name, m, "delivered", 0, now, None)
+            self.log(f"[poller] delivered ({reason}) {name} ({job_id})")
+            return
         self.active = {
             "job_id": job_id, "name": name, "map": m,
             "total": m.get("total_beacons"),
@@ -164,7 +179,13 @@ class Poller:
 
     def _record_history(self, job_id, name, m, final_state, last_beacon, delivered_at, started_at):
         """Append a durable finished-job record (name, final state, run duration). History seam —
-        consumed by the console History view and any later metrics."""
+        consumed by the console History view and any later metrics.
+
+        t2020 — `content_hash` (a SHA-256 of the NORMALISED G-code, computed client-side by `send.js` and
+        carried through in the map since it applies to a deliver-only job too, not just a tracked one) rides
+        through here so the History view can link two runs of the SAME program — job identity (jobId) stays
+        timestamp+name, unique per SEND on purpose; content_hash is a SEPARATE, joinable field for "have I
+        run this exact program before," not a replacement for jobId's own uniqueness."""
         ended = time.time()
         rec = {
             "jobId": job_id, "name": name, "final_state": final_state,
@@ -172,6 +193,7 @@ class Poller:
             "delivered_at": _iso(delivered_at), "started_at": _iso(started_at), "ended_at": _iso(ended),
             "duration_s": round(ended - started_at) if started_at else None,
             "recorded_at": _iso(ended),
+            "content_hash": m.get("content_hash"),
         }
         try:
             self.backend.append_history(rec)

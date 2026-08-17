@@ -9,10 +9,24 @@ import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — 
 import { GcodeExecutionEngine } from '../../../engine/GcodeExecutionEngine.js';   // t1585 — the send gate reads the FILE, with the same parser the sim runs
 import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
 import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
+import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 const clampInt = (v, lo, hi, d) => Math.min(hi, Math.max(lo, int(v, d)));
+
+// t2020 — JOB IDENTITY: a SHA-256 of the NORMALISED (pre-instrumentation) G-code, so History can link two
+// sends of the identical program regardless of whether Beacons was ticked or how many beacon points were
+// configured (both would change the WIRE bytes without changing the logical job). Deliberately hashes the
+// ORIGINAL text the operator is sending, not the instrumented `nc` that later gets written to the controller.
+// What this gets right: a re-export with a changed comment/header/line-ending links (the normaliser strips
+// exactly that noise). What this gets wrong, on purpose: the same geometry at a different feed does NOT link
+// — a real cut-time difference is a genuinely different job, and normalisation was never meant to erase that.
+async function contentHashOf(text) {
+  const bytes = new TextEncoder().encode(normaliseGcode(text));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 export default {
   id: 'send',
@@ -198,7 +212,10 @@ export default {
           });
           nc = res.nc; map = res.map;
         }
-        const r = await ctx.client.submitJob(name, nc, map);
+        // t2020 — hashed from file.text (the ORIGINAL, pre-instrumentation program), so tracked and
+        // deliver-only sends of the same logical job hash the same regardless of the beacon settings above.
+        const contentHash = await contentHashOf(file.text);
+        const r = await ctx.client.submitJob(name, nc, map, contentHash);
         toast('Queued ' + r.jobId);
         info.textContent = `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
       } catch (e) {

@@ -41060,3 +41060,131 @@ None — read-only, no code/doc changed. `proc_health.py watch`: clean.
 None changed.
 
 🔨 turn 2018
+
+# ═══ t2020 — JOB HISTORY ACT 2: content-hash identity, and stop lying to V4.1 ═══
+
+Two parts, per the dispatch. Part 1 is small; part 2 (content-hash identity) is the human's actual ask.
+
+## Part 1 — STOP THE FALSE "STALLED" ON V4.1
+
+**The fix: one new branch in `Poller._claim()` (bridge/bridge-app/fairy/poller.py), gated on the SAME
+`config.enable_slave` flag the admin UI's own "Beacons (Modbus progress — Expert only; leave off for V4.1)"
+checkbox already writes.** If a job asks to be tracked (its map has `total_beacons`) but `enable_slave` is
+False, it now resolves immediately to `"delivered"` — the SAME terminal state a deliver-only job already uses
+— with an event naming the real reason ("no Modbus link is active on this bridge..."). It never enters
+`self.active` (the watch loop), so it can never time out into a fabricated `"stalled"`. **No new job state
+invented**, per the dispatch's own instruction — `"delivered"` already meant "the program is on the controller,
+nothing further is being tracked," which is exactly true here too.
+
+**Signal chosen, and one rejected:** considered `Ops.detect_controller()` (a live V4.1-vs-Expert firmware
+fingerprint) as a belt-and-suspenders check that would catch an operator who left `enable_slave=True` on a V4.1
+bridge anyway — REJECTED as beyond this turn's scope. The dispatch asked to "refuse the toggle, or name the
+real reason," not "auto-detect and auto-correct the config." `enable_slave` alone is the minimal, already-wired,
+already-correctly-labeled signal; the gap was purely that `poller.py` never enforced what the config value
+already meant.
+
+**Expert behaviour must not move — proven by construction, not just asserted:** the new branch and the
+pre-existing `self.active = {...}` tracked-path assignment are mutually exclusive on one boolean. A new test
+(`test_expert_behaviour_unchanged_enable_slave_true_still_enters_the_watch_loop`) drives the EXACT same tracked
+job through `enable_slave=True` and asserts `poller.active` is populated exactly as before — passes, and (see
+non-vacuity below) ALSO passes against the pre-fix tree, which is the correct, intentional result for an
+invariance witness: it is there to prove Expert's path is untouched, not to prove the new code exists.
+
+## Part 2 — CONTENT-HASH IDENTITY (the human's actual ask)
+
+**Normaliser: REUSED, not reimplemented.** `send.js` imports `normaliseGcode` from `web/data/portingArc.js`
+(the exact function the V4.1 porting-arc oracle work already built: strip-CRLF, drop-blank/comment lines,
+collapse whitespace) rather than writing a second one — the dispatch named this explicitly as "the defect class
+this entire session spent itself deleting."
+
+**Full chain, one new field threaded through every layer, zero pre-existing signatures broken except one
+mock:** `send.js` (`contentHashOf()` — SHA-256 via `crypto.subtle.digest` of `normaliseGcode(file.text)`, the
+ORIGINAL pre-instrumentation program, not the beacon-instrumented `nc`) → `client.js` (`submitJob` gains a 4th
+`contentHash` param) → `server.py` (`/api/jobs` reads `b.get("contentHash")`) → `ops.py` (`submit_job` folds
+`content_hash` into `mapping` even for a deliver-only job, which has no map otherwise) → `poller.py`
+(`_record_history` already receives the full `mapping` dict as `m` at every call site — zero signature changes
+needed there) → `jobs.js` (`renderHistory` adds a "last time" column: since `list_history()` returns rows
+newest-first, the prior run of the SAME program for row `i` is the first later row sharing `content_hash` with
+a real `duration_s`).
+
+**Hashed from the ORIGINAL text, deliberately, not the instrumented one:** so a tracked send (Beacons on) and a
+deliver-only send (Beacons off) of the identical program still hash identically — instrumentation changes the
+WIRE bytes without changing the logical job.
+
+**What this gets right and wrong, stated in the UI's own terms, per the dispatch's explicit demand:**
+- Same geometry at a DIFFERENT feed → DIFFERENT hash, does NOT link. Correct: that is a genuinely different
+  job, and normalisation was never meant to erase a real cut-time difference.
+- A re-export with a changed comment/timestamp header/line-ending → SAME hash, LINKS. Correct: that is exactly
+  the noise `normaliseGcode` already strips, and it is what makes "last time this ran: N min" actually usable
+  across a Fusion re-export.
+
+**job_id stays untouched, on purpose:** `make_job_id` (timestamp + typed-name slug) still gives every SEND a
+fresh, distinct id — content_hash is a separate, joinable field for "have I run this exact program before,"
+never a replacement for per-send uniqueness.
+
+## Non-vacuity — the new tests genuinely distinguish old from new
+
+New file: `bridge/bridge-app/tests/test_poller_track_gate.py`, 6 tests, all passing against the current tree.
+Proved non-vacuous by swapping `poller.py` for the pre-fix version (`git show HEAD:...` — the prior committed
+revision, since this turn's edits were still uncommitted; restored from a SCRATCH COPY afterward, not `git
+checkout HEAD --`, per the standing rule) and re-running:
+
+- `test_no_modbus_link_delivers_untracked_instead_of_entering_the_watch_loop` — FAILS pre-fix ("must NOT enter
+  the watch loop"). Correct: this is exactly the bug being fixed.
+- `test_two_sends_of_the_same_content_hash_link_in_history_different_jobids`,
+  `test_a_different_program_gets_a_different_hash_and_does_not_link`,
+  `test_content_hash_survives_on_a_deliver_only_job_not_only_a_tracked_one` — all three FAIL pre-fix
+  (`KeyError: 'content_hash'`, since `_record_history` never read it). Correct: content_hash didn't exist yet.
+- `test_expert_behaviour_unchanged_enable_slave_true_still_enters_the_watch_loop` and
+  `test_deliver_only_job_is_unaffected_by_enable_slave_either_way` — PASS pre-fix too, intentionally. These are
+  invariance witnesses (Expert's tracked path, and the pre-existing deliver-only path), not new-behaviour
+  proofs; them passing on BOTH revisions is the correct result, not a vacuity failure.
+
+4/6 fail pre-fix and pass post-fix (the new-behaviour claims); 2/6 pass on both revisions (the nothing-moved
+claims) — the split itself is the proof the harness can tell the two states apart, not just agree with
+whichever tree it's pointed at.
+
+## Dialect coverage, per the standing scope ruling — "name what differs before building"
+
+The `enable_slave` fix is dialect-AGNOSTIC BY CONSTRUCTION: it inspects one config flag, never asks "which
+dialect is this." That IS the correct answer to "what differs" here — nothing needs to differ, because one
+code path gated on one existing, already-correctly-labeled config value covers both. Tested explicitly as both
+configurations in the SAME test run (`enable_slave=False` and `enable_slave=True`), not "Expert plus a smoke
+check." Content-hash identity is likewise dialect-agnostic (a hash of normalised G-code text, computed
+client-side, has no controller-specific branch anywhere in the chain) — proven by the deliver-only tests, which
+exercise the path a V4.1 send actually takes (no map, no beacons) end-to-end. DM500/V3 — correctly out of
+scope, untouched.
+
+## Gate
+
+- New: `python bridge/bridge-app/tests/test_poller_track_gate.py` — 6/6 pass (non-vacuity above).
+- Regression: `test_csrf_guard.py` (9/9, still pass — its `_MockOps.submit_job` mock needed updating for the
+  new 4th param, caught by reading the test before running it, not by a failure) + `test_pull_geometry.py`
+  (11/11, untouched code, still pass).
+- JS: `node --check` on all three touched files (send.js, jobs.js, client.js) — OK.
+- `npm run test:node` (DDCS-Studio) — 128/128 pass, no regression.
+- Playwright `gateway-mismatch-gate-1229.spec.js` (imports `send.js` directly in a real browser, stubs
+  `submitJob`) — 6/6 pass: confirms `contentHashOf()`'s `crypto.subtle.digest` call works in-browser on
+  localhost and the stub tolerates the new 4th argument.
+- `proc_health.py watch` — clean, 0 flagged.
+
+## QUEUED, NOT STARTED THIS TURN (named again, per the dispatch's own explicit instruction)
+
+- **Storage landmine**: `_bridge_data/history/*.json` lives beside the bridge-app exe — survives an in-place
+  self-update, lost on a full reinstall to a new folder. Not a stable OS location; against the user-owned-file
+  principle. Needs its own act.
+- **Abort-vs-lost-link collapse**: both still produce the same `"stalled"` state; no operator-abort concept
+  exists anywhere in the gateway code. Neither fabricates a false duration, so neither was urgent, but both are
+  real gaps.
+
+## Files
+- `bridge/bridge-app/fairy/poller.py` — Task 1 branch + `content_hash` threaded into `_record_history`.
+- `bridge/bridge-app/fairy/ops.py` — `submit_job` accepts `content_hash`, folds into `mapping`.
+- `bridge/bridge-app/fairy/server.py` — `/api/jobs` reads `contentHash` from the POST body.
+- `bridge/bridge-app/tests/test_csrf_guard.py` — mock signature updated for `submit_job`'s new param.
+- `bridge/bridge-app/tests/test_poller_track_gate.py` — new, 6 tests, non-vacuity proved above.
+- `DDCS-Studio/web/shared/js/client.js` — `submitJob` takes/sends `contentHash`.
+- `DDCS-Studio/web/ui/gateway/views/send.js` — `contentHashOf()` helper, wired into the send handler.
+- `DDCS-Studio/web/ui/gateway/views/jobs.js` — `renderHistory` adds the "last time" linked-duration column.
+
+🔨 turn 2020

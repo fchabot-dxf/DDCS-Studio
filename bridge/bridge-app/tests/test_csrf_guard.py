@@ -25,7 +25,7 @@ class _MockOps:
         self.cfg = types.SimpleNamespace(google_client_id="cid", google_client_secret="secret")
 
     def set_config(self, body):        return {"ok": True, "reached": "set_config"}
-    def submit_job(self, n, nc, m):    return {"ok": True, "reached": "submit_job"}
+    def submit_job(self, n, nc, m, h=None):    return {"ok": True, "reached": "submit_job"}
     def delete_file(self, name):       return {"ok": True, "reached": "delete_file"}
     def write_sysfile(self, *a):       return {"ok": True, "reached": "write_sysfile"}
     def delete_sysfile(self, name):    return {"ok": True, "reached": "delete_sysfile"}
