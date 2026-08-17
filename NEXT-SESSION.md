@@ -5251,3 +5251,53 @@ tracking needed at all.**
 6. **NAME WHAT THE USER SEES:** "operation 3 of 7 · ~23 min left" — in their words, on which screen.
 
 ⚠ **Design only this turn. No emit change, no post change.** Gate: none needed.
+
+# ═══ t2054 — BUILD `chooseByOp`: per-operation beacon pacing (the missing piece) ═══
+
+**RELEASED V2026.08.17.5** (`1fafed43`, pushed) — the lathe DRO work-shift fix. Full suite 2596, node 175/175.
+
+t2053 accepted, and **the survey correction is the whole story: this is not a green-field build.**
+
+```
+  ALREADY BUILT AND SHIPPED, end to end, for Expert:
+    instrument.js        a browser JS port of checkpoint_insert.py — already
+                         imports estimateProgram, already paces beacons by
+                         TIME or LINE, up to 255, each landed on the next
+                         safe Z-up retract
+    the "Beacons" toggle send-time, opt-in, OFF by default
+    poller.py / slave.py the beacon watch
+    tracker.js           the Gateway's Tracking tab ALREADY RENDERS
+                         percent · op · line · eta_s   (grepped, confirmed)
+
+  MISSING: one pacing strategy — chooseByOp.
+```
+
+**So "what the user sees" already exists on screen, waiting on a status object real beacons would populate.**
+
+**And per-op pacing REDUCES the density risk rather than raising it** — a program's operation count is far
+below the existing 255 ceiling. That is the opposite of what I assumed when I warned about send-rate.
+
+**Option 1 (P279 slave polling — the human's stated preference) is BLOCKED on a firmware flash** with no
+evidence it has happened, and would additionally need "operation N of M" *derived* from a polled cursor
+position rather than read. **Your ranking is right: build Option 2 now, keep Option 1 for when the firmware
+happens — do not block on it.**
+
+## THE TASK — build `chooseByOp`, and nothing beyond it.
+1. **ONE PACING STRATEGY, beside the existing two.** `chooseByOp` places one beacon per operation boundary,
+   using the already-declared `flattenOps` / `linesForOp`. **Reuse the existing safe-Z-up landing rule — do not
+   write a second one.**
+2. **⚠ BYTE-IDENTICAL WHEN THE TOGGLE IS OFF — prove it, do not assert it.** You noted instrumentation is a
+   separate pass that never touches the base emit; **diff the un-instrumented output before/after this change
+   and show zero bytes move.**
+3. **DECLARE THE COUNT:** `flattenOps(program).length` is knowable at send time — surface it, so the operator
+   and the bench test both know how many beacons a job will send.
+4. **⚠ DO NOT ENABLE, DO NOT SHIP IT ON.** Density is still bench-untested. **Name the bench test in the
+   pass-back** — your own proposal (a real ~15–20-operation program first, stepping up, confirming every
+   beacon arrives in order, none dropped or duplicated, no wedge) — and state plainly that it must pass on the
+   human's Expert before this is switched on.
+5. **`MGETDATA` stays structurally impossible** — you established the generator has only one call shape and the
+   string does not exist. **Keep it that way; say if anything you add could change that.**
+6. **Gate:** node tier + bridge suite + the gateway/tracking specs + whatever covers `instrument.js`.
+
+⚠ Then: the bench test (the human's) · Option 1 if/when the firmware lands · **two-sided SETUP** and
+**preview Fork 3**, still the human's.
