@@ -4421,3 +4421,30 @@ do not build against a stale scoping note.
 6. **Gate:** node tier + `time-estimate-844` + whatever Gateway specs exist + the round-trip/parity set.
 
 ⚠ **Do not start slice 2 (live position).** ⚠ Fork 3 of preview-as-data still goes to the human separately.
+
+### ⚠ t2018 AMENDMENT (user ruling, just given) — LINE-PERCENT IS THE FLOOR, NOT A WRONG ANSWER
+
+The human's words: *"if my program is somewhat constant, line number out of total is a measure of time, but if
+we can do better then why not."* **Adopt that as the shape.** I had framed line-percent as useless; it is not —
+it is the **degraded mode that always works**, and for a uniform program (one long raster pass) it is close to
+right. The per-line model is simply *better when we have it*.
+
+```
+  BEST     Studio wrote this program  ->  sum perLine[cursor..end]  ->  "~23 min left"
+  FLOOR    Studio does NOT have the plan (foreign .nc, edited at the
+           controller, no match)      ->  line 4200 / 9000          ->  "~47% through"
+```
+
+**Both, with the basis NAMED** — that IS the "show the basis, no false precision" constraint, satisfied by a
+declared ladder rather than by hedging a single number. **Do not build the floor as a separate feature:** one
+progress readout, two bases, and it says which one it is using.
+
+⚠ **The variance is knowable, and that decides whether the floor is honest.** Studio holds `perLine`, so it can
+see whether a program's per-line cost is uniform or wildly mixed (drill + toolchange + a 40-min surfacing pass).
+**Do NOT build a variance display** — but if the floor is being used on a program Studio DOES have, that is a
+bug, not a fallback. The floor is for programs Studio genuinely cannot see.
+
+**And this reopens the V4.1 question in a good way, for a LATER slice — do not chase it now:** if the anchor
+only needs *"which line are you on"* rather than position telemetry, the bar is far lower than
+`M350-MODBUS-REFERENCE.md` implies, and the beacon tracker reportedly already carries a line. **Measure that
+before anyone designs slice 2.** Slice 1 (predict-only, no anchor) is unchanged and still comes first.
