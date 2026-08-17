@@ -4488,3 +4488,24 @@ improve on. The plan's own CORRECT / RE-PREDICT stages need exactly this data an
 executes it, so a **Fusion 360 `.nc` is in scope by construction** — the "Studio must have authored it" limit
 I assumed is false. Coverage of Fusion's own constructs (canned cycles, comp) is UNMEASURED. The human may
 supply a real long Fusion file with a known true cut time — that would calibrate prediction directly.
+
+### ⚠ t2018 SCOPE RULING (human) — BOTH CONTROLLERS: V4.1 **and** Expert/M350
+
+*"make the 2 version though 4.1 and expert."* **Job tracking is NOT Expert-only. Build and TEST both.**
+
+⚠ **This lands directly on a documented trap in this project:** the suite boots **Expert** by default, while
+**V4.1 + V3 outnumber Expert in the wild — and V4.1 is the human's OWN machine.** A V4.1-only defect here is
+an **escalation, not an edge case**: it would mean the feature does not work on the one controller the person
+asking for it actually owns, while every test stays green.
+
+**So:**
+1. **Every assertion in this arc runs on BOTH dialects** — not one, not "Expert plus a smoke check". If a
+   shared assertion cannot be parameterised over both, say so rather than quietly covering one.
+2. **NAME WHAT ACTUALLY DIFFERS before building.** Candidates, unverified: line/position reporting, the
+   per-dialect `varMap` (registers are NOT interchangeable — Expert's reserved set is its own), and whatever
+   the gateway path assumes about the target. **If the difference turns out to be nothing, that is a fine
+   answer — but establish it, do not assume it.**
+3. **⚠ IF ONE CONTROLLER CANNOT SUPPORT A PIECE, SAY SO EXPLICITLY AND EARLY** rather than shipping a feature
+   that silently degrades on V4.1. A named limit the human can plan around beats a surprise at the machine.
+4. **DM500/V3 is NOT in scope** — it is `corpus-attested (thin)`, not `POST_VERIFIED` (t2010). Two targets,
+   both real: V4.1 and Expert.
