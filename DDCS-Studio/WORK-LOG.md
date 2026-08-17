@@ -40685,3 +40685,154 @@ ruling should be revisited with new reasoning, that's a design call for the advi
 building first and asking after.
 
 🔨 turn 2012
+
+# ═══ t2014 — RECONCILE PREVIEW-AS-DATA.md: three of the four forks are already ruled ═══
+
+Read-only, no code, no specs, no doc rewrites, per the dispatch — nothing in this survey's own document
+touched. Applied the standing rule from t2012 throughout: **a "flagged for later" note is not a live item —
+follow the thread forward.** Delegated the four verification sweeps to parallel research agents; the fork
+research (below) I did directly, since it kept leading one commit further than the last.
+
+## (1) TIER 0 — ALL FOUR ARE FIXED. The survey's own "Broken/missing previews" section is stale.
+
+One commit, `ae491bfd` ("the four Tier-0 preview divergences the survey found — all declared or unified, none
+patched," t1722, cycle 857 ACT 2, the very next act after the survey), fixed all four, verified against the real
+symptom live, not just green tests, with non-vacuity evidence for the two where a proxy could have hidden a
+no-op fix:
+
+1. **`middle_data`'s round-stock preview — FIXED.** `middleData.js` now declares `def.simStock` (mirrors
+   `rotaryCenterData.js`'s own pattern). A DEEPER bug was found and fixed live in the same act:
+   `createPreviewPanel.js` only re-applied a panel's stock on an unrelated "route anchor" change, so a live
+   param edit (ticking Circular on an already-open wizard) never refreshed the shape — a signature check on the
+   derived stock itself was added.
+2. **`rotary_center_data`'s legacy-view mutation — FIXED, and the whole legacy view is GONE.** The mutation was
+   replaced with a pure derivation at t1722; the legacy view file itself (`rotaryCenterView.js`) was then
+   deleted entirely at t1730 (see Fork 4, below) — closing the "reachable via an old save file" landmine too,
+   not just the mutation.
+3. **The lathe tool-identity bug ("the single most consequential finding in the whole survey") — FIXED, and I
+   CONFIRM the advisor's own spot-check.** `userOpView.js:477` now reads `_tbl.kind || _tbl.type || 'endmill'`
+   — `kind` (the lathe field) tried first. The spelling landmine noted alongside it was ALSO real and fixed: the
+   tool table's canonical id is British `centredrill`; `gcodeViz3d.js`'s two tool-mesh branches were unified to
+   match (6 sites total). Verified live per WORK-LOG: seeded a real `kind:'centredrill'` tool, picked it,
+   confirmed the resolved type is `'centredrill'` not the buggy `'endmill'` default. **One small NEW gap found
+   while confirming, outside the original claim's scope, flagged not fixed:** `LATHE_TOOL_KINDS` also declares a
+   `drill` kind distinct from `centredrill`; `gcodeViz3d.js`'s tool-mesh branches test `'turning'`/`'centredrill'`/
+   `'probe'` only — no `'drill'` branch — so a plain drill-kind tool still falls through to the generic mill
+   shape. Smaller, not part of item 3's original verdict, named for whoever picks it up.
+4. **The ATC magazine pocket-list disagreement — FIXED.** A new `magazineOccupiedPockets()` is now the ONE
+   function both the single-op wizard preview and the whole-program preview call — they already shared the base
+   geometry (`magazinePockets()`), only the occupancy filter differed. Verified live: seeded one occupied + one
+   empty pocket, confirmed both hosts now return the same filtered list.
+
+**Ranked separately as user-visible preview bugs, per the dispatch's own instruction (5): there are ZERO
+currently.** All four were real, all four are closed, four days after the survey found them.
+
+## (2) TIER 1 — the count, with method, FLOOR not total
+
+Verified all six named Tier-1 items directly against current source (not the survey's cached line numbers),
+cross-checked WORK-LOG/git log for the two turns since the survey that touched these files (t1728 "extract the
+stack builders," logged as pure relocation with no behavior change; t1730, the legacy-screen deletion below):
+
+1. `pocket_data` shape-dispatch table — **3 copies, CONFIRMED** (relocated by t1728, not collapsed).
+2. `contour_data` shape-dispatch table — **3 copies, CONFIRMED**.
+3. `edge_data` "pos ⇒ near/0 face" rule — **COLLAPSED 4 → 2**, but incidentally: `edgeView.js` and legacy
+   `EdgeWizard` were deleted wholesale at t1730 as part of retiring the 6 legacy views (Fork 4), which happened
+   to carry away 2 of the 4 copies as a side effect — not a deliberate dedup of this specific fact. The remaining
+   2 (`opSimStarts.js:227-228`, `panelTypes.js:583`) are untouched.
+4. `lathe_parting` kerf-offset formula — **3 copies, CONFIRMED** (declared helper, the macro's own re-derivation,
+   the 2D canvas's independent re-derivation — none calls another).
+5. `comm_data` message-formatting regex — **3 copies, CONFIRMED** (relocated by t1728; line numbers shifted, the
+   duplicate logic did not).
+6. ATC `sim` positional-argument staleness — **CONFIRMED unchanged.** `userOps.js`'s `resolveSimMeta` still never
+   writes the resolved value back into `def.sim`, unlike `panel`, which genuinely self-heals. Zero WORK-LOG hits
+   for `resolveSimMeta` since the survey — never revisited.
+
+**Net: 5 of 6 hold at their original count; 1 dropped by half, incidentally.** The "collapse duplicates" mandate
+the 2026-08-11 ruling calls for (below) has not been started — Tier 1 is still exactly the live risk the survey
+mapped, and it is ALREADY a tracked open task (`NEXT-SESSION.md` § "4. THE 24 DUPLICATED FACTS" — my counts
+confirm its own numbers still hold, except edge's, which that doc's own text still states as ×4 and should read
+×2).
+
+## (3) THE 2026-08-11 RULINGS — present, but not under the names the survey guessed
+
+**`previewSources` — WITHDRAWN as the vehicle, ONE commit after it was proposed, by the user.** Zero grep hits
+for the literal name is not the finding — the correct finding is that it was tried and explicitly retracted:
+commit `0d0be079` ("previewSources withdrawn as the vehicle... user-caught," same turn, t1723) states the
+PRINCIPLE stands (a preview must provably reuse the emit's own function) but it should "ride on the blocks that
+already exist... rather than a new `def.*` field." The principle IS present informally today, confirmed in the
+three cases the survey itself called "the model": `drillData.js` imports `patternPoints` from the same module the
+emit uses; `pocketData.js`'s spiral strategy imports `concentricRings`/`restRegion` from the atom the emit calls;
+`latheProfileCanvas.js` imports `polygonPath`, "the same function the emit unrolls" in its own comment. No
+checkable declared field exists — the discipline is enforced only by import hygiene + comments.
+
+**"Authoring never chooses a preview" — formally declared, and REFINED past what the survey's Fork 3 anticipated.**
+A HARD CONSTRAINT (`NEXT-SESSION.md`, user, 2026-08-11) rules the preview-family/vocabulary idea DEAD outright:
+"does an author ever pick, name, or configure a preview thing? If yes, the act is wrong." A same-day REFINEMENT
+splits this into two layers: **① DERIVED** (has G-code behind it — cut boundary, toolpath) — not authorable,
+changes only by changing the stack, the picture follows for free; **② ADDITIVE** (no G-code behind it — a
+reference marker, a datum dot, a stylus) — authorable, optional, never a required step. **Still explicitly
+unsized per the ruling's own words: "whether the additive layer is blocks, and what the minimum shape is... not
+yet planned."** No later commit builds a preview picker (none exists to search for — nothing was ever built
+against it) and no later commit progresses the additive layer's own shape.
+
+## MY OWN FINDING, beyond what was dispatched: THREE OF THE FOUR FORKS ARE ALREADY RULED, NOT OPEN
+
+The dispatch asked me to state each fork in one sentence for the advisor to take to the human directly. Before
+doing that, I followed the thread forward on each — and three of four are not actually waiting on anyone:
+
+- **Fork 1 (declare per-op/per-atom/per-fact) is VOID, not open.** The chain: `previewSources` ruled as Fork 1's
+  answer (`b0047d3f`) → withdrawn as vehicle, same turn (`0d0be079`) → the whole 4-family "ceiling" follow-up
+  rescoped to corner-only (`9e202288`) → corner's preview vocabulary actually BUILT at t1725 (cycle 858 ACT 1) →
+  **STOOD DOWN mid-act at t1726, all 8 touched files reverted, nothing committed**: "a preview vocabulary
+  declared BESIDE the stack is a second, driftable source" — violates north star principle 1 (one stack, many
+  renderings) and sieve gate G3 (one-source), fired with no judgement call. This is the SAME ruling the HARD
+  CONSTRAINT above states formally. **There is no live "how granular should the new declaration be" question —
+  there is no new declaration, for the derived layer, at all.** The standing mandate is "collapse duplicates by
+  making every copy call the one real function" (exactly Tier 1, above), not design a new shape.
+- **Fork 2 (3D trace-only vs. declared) HOLDS — reaffirmed by the later, more authoritative ruling, not
+  contradicted.** "3D stays trace-only" requires no new declaration at all (it's leaving the status quo alone);
+  "preview-only visuals keep their explicit channel" is exactly the ADDITIVE layer, already declared on the op
+  (`def.sim`/`simStartsProvider`/`simStock`) as it already works today. Consistent, not overtaken.
+- **Fork 3 (universal namespace vs. per-family idioms) is MOOT for the derived layer, genuinely STILL OPEN for
+  the additive layer specifically.** Nothing to namespace when there's no new derived-layer declaration. The
+  additive layer's own shape is the one piece of this whole arc the ruling itself calls "still unsized... not yet
+  planned" — genuinely the human's open question, narrower than the survey's original framing.
+- **Fork 4 (retire the 6 legacy views) is DONE, not open.** Confirmed directly against `wizards/views/index.js`:
+  it imports only `commView`/`wcsView`/the ATC views/the mill cutting-op views — `middleView`, `edgeView`,
+  `alignmentView`, `rotaryCenterView`, `rotaryClockView`, `homingView` are ALL gone, deleted at t1730 ("DELETE
+  THE OLD SCREENS AND LEGACY RENDERERS," Tier B — every one of the 6, not just corner's). This also retroactively
+  closes Tier 3 finding #20 ("6 of 8 probe ops carry a full second renderer") — stale, the renderers no longer
+  exist to be reached by an old file.
+
+**A related stale-plan finding, found while tracing this, worth flagging alongside:** `NEXT-SESSION.md`'s own
+OPEN TASKS § "3. RETIRE THE OLD SCREENS AND RENDERERS" still reads "**6 legacy renderer views still LIVE and
+reachable**... Only corner's was actually deleted" — this is the SAME false-pending claim as `PORTING.md`'s S5
+row last turn, now found a third place: the survey said it, the open-tasks list still says it, and the actual
+commit that closed it (t1730) post-dates both. Not fixed — flagged, per the dispatch's own read-only scope.
+
+## THE FOUR FORKS, in one plain sentence each — for the advisor to take to the human, per the dispatch's own DO
+## NOT RECOMMEND instruction, WITH each fork's current status attached so "still open" isn't presented where it
+## no longer is:
+
+1. **Should a preview declare, per op/atom/or per named fact, exactly which function it must call?**
+   — *Already answered: no. Ruled VOID at t1726 (a declared preview vocabulary is a second source); the standing
+   answer is "collapse duplicates onto the one function that already exists," no new declaration.*
+2. **Should the 3D pane read declared geometry, or stay a pure trace of the emitted G-code?**
+   — *Already answered: stays trace-only for anything with G-code behind it; preview-only visuals (no G-code)
+   keep their own already-existing per-op channel.*
+3. **Should every op-family share one preview vocabulary, or keep its own idiom?**
+   — *Moot for cut/toolpath geometry (nothing to share a vocabulary for). Genuinely open for the ADDITIVE layer
+   only — markers/datums/styli with no G-code behind them — explicitly unsized by the user's own ruling.*
+4. **Should the 6 still-registered legacy renderer views (reachable only by an old save file) be deleted or kept
+   as accepted, tracked debt?**
+   — *Already answered: deleted, all 6, at t1730.*
+
+## Gate
+
+None — read-only, per the dispatch. `proc_health.py watch`: clean. No file in `PREVIEW-AS-DATA.md`,
+`NEXT-SESSION.md`, `ARCHITECTURE.md`, or any source file was touched this turn.
+
+## Files
+None changed.
+
+🔨 turn 2014
