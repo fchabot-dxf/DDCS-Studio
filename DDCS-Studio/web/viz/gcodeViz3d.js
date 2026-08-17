@@ -793,9 +793,6 @@ export class GcodeViz3D {
         this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);
     }
 
-    /** DECLARE which tool this op shows: 'turn' (holder + insert from +X), 'drill' (on centre), or null (the mill's). */
-    setLatheTool(kind) { if (kind === this._latheTool) return; this._latheTool = kind || null; this._buildAnimTool(); this.render(); }
-
     /**
      * t1285 — THE SPIN IS WITHDRAWN, deliberately, and this note is why.
      *

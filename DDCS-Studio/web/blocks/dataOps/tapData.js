@@ -98,6 +98,7 @@ export function tapDataDef() {
     const def = userOpFromStack('tap_data', 'Tap (data)', stack, [...toolBindingsFor(stack), ...TAP_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = tapPreviewGeometry;
     def.entryPoint = ENTRY_POINT;
+    def.zRuler = { depthParam: 'depth', depthOnly: true };   // t2044 — the depth-only ruler (tap has no stepdown — a single threading pass): axis + total-depth grip, no pass ticks
     // The DERIVED pitch-locked feed shown read-only + the reversible/rigid honesty (live per params + the declared spindle).
     def.statusHint = (p) => {
         const rpm = _n(p.rpm, 400), pitch = _n(p.pitch, 1);

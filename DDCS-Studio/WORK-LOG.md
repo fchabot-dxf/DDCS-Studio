@@ -42262,3 +42262,78 @@ the human's/advisor's, none started, none blocking. A live-browser confirmation 
 release gate is clear.
 
 🔨 turn 2042
+
+# ═══ t2044 — TIER 3's LAST THREE: setLatheTool deleted, tap/text zRuler declared, ATC-2D checked "correctly out of scope" — THE ARC IS DONE ═══
+
+## #23 — `setLatheTool` deleted (dead API, zero callers)
+
+Confirmed zero callers AND zero readers of `_latheTool` before touching anything: `grep setLatheTool` across the
+whole repo returned only its own declaration; `grep _latheTool\b` likewise — the field it sets is never read by
+anything (the REAL tool-kind mechanism is `setSimTool`/`_buildAnimTool`, an unrelated live path). Deleted the
+method and its one-line JSDoc, same treatment as `odPassExtent` (t2036). Left `setLatheSpin` alone — a
+DIFFERENT method, deliberately kept unused per its own t1285 note ("the method stays, unused and honest about
+it"); not in scope, not touched.
+
+## #22 — `tap_data`/`text_data` now declare `def.zRuler` — CONFIRMED LIVE, then fixed
+
+**Settled before building**: both ops declare `panel: 'form3d+2d'` in their own stack (confirmed by reading
+`tapData.js`/`textData.js` directly) — the same panel mode pocket/drill/bore/slot/contour/surfacing use, which
+routes through `userOpView.js`'s `renderZRulerBeside(c, _def, params)` on every render. Neither declared
+`def.zRuler`, so the strip's own `spec` came back null and stayed hidden — a genuine, silent gap, not a
+theoretical one.
+
+**Fixed** by declaring `def.zRuler`, matching the two shapes already in use exactly — no new shape invented:
+tap (single threading pass, no stepdown) gets drill/bore's `depthOnly` form; text (depth + stepdown) gets
+pocket's full stepped form.
+
+**Non-vacuity, two layers**: (1) node — `tap-text-zruler-2044.test.mjs` reproduces `renderZRulerBeside`'s own
+spec-building logic against the real declared defaults and proves a real spec with real pass ticks comes out;
+reverting both source files makes it fail (`toBeTruthy` on `undefined`). (2) BROWSER — a throwaway spec (not
+committed) opened the real registered ops (`user_tap_data`/`user_text_data`, the actual `opensAs` types, not
+the bare def name) via `window.openWiz` and queried `.viz-zruler-row`/`.zruler-z`: **1 row / 2 ticks each,
+post-fix; 0 rows, pre-fix** — the same real-DOM proof shape as t2042's drill fix, run then discarded (a
+throwaway confirmation, not a permanent spec — the node test already pins the logic going forward).
+
+## #24 — 2D toolpath pane never draws the ATC magazine — CHECKED, and CLOSED as "correctly out of scope"
+
+Read `toolpath2d.js` in full: its own header claims to mirror "everything the 3D scene has, flat" — which on
+its own would read as a gap (the 3D pane's `setMagazine` is real, live, drawn). But grepped for every OTHER
+piece of FIXED 3D-only machine furniture the 3D pane draws — `station`/`pusher`/`fork`/`rotaryRig`/`carousel`
+— and `toolpath2d.js` has ZERO of any of them, not just the magazine. That consistency is the tell: the 2D
+pane's actual, exercised scope is grid + envelope + stock + toolpath + axes (what a top-down TOOLPATH trace
+needs); ALL fixed machine-side devices — magazine included — are 3D-exclusive, uniformly, not a magazine-
+specific miss. The magazine's own dedicated 2D editor already exists separately and correctly
+(`atcSetupCanvas.js`, the read-only table + Edit-modal from the ATC arc) — the toolpath pane was never meant
+to duplicate it. Closed as a verified non-gap; the header comment's "everything" is the aspirational
+one-liner, not a literal enumeration — no code changed for this item.
+
+## Gate
+
+No concurrent release-gate constraint this turn (the advisor's V2026.08.17.2 had already landed/pushed before
+dispatch). Node tier: 163/163 (161+2), zero snapshot movement. Playwright: the touched-op + round-trip/parity
+sets — `hook-carry-1682`, `tap-twin-778`, `tapping-776`, `text-as-data`, `text-atom-708`, `text-glow-cap`,
+`blocks-roundtrip`, `gui-blocks-roundtrip`, `preview-dialect-parity`, `preview-parity-config` — 33/33 pass.
+Plus the throwaway browser zRuler DOM check described above (run, confirmed both ways, discarded — not part
+of the diff). `proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/web/viz/gcodeViz3d.js` — `setLatheTool` + its comment deleted.
+- `DDCS-Studio/web/blocks/dataOps/tapData.js` — `def.zRuler` declared (depthOnly).
+- `DDCS-Studio/web/blocks/dataOps/textData.js` — `def.zRuler` declared (depth+stepdown).
+- `DDCS-Studio/tests/node/tap-text-zruler-2044.test.mjs` — new, 2 tests.
+
+## THE ARC IS DONE
+
+Tier 3's #20-24 are now ALL closed: #20 resolved (t2040), #21 fixed (t2042), #22 fixed (this turn), #23
+deleted (this turn), #24 checked and correctly out of scope (this turn). PREVIEW-AS-DATA.md's Tier 3 has
+**no remaining open items** except the two the human owns (two-sided SETUP, preview Fork 3 — never in this
+arc's scope). No Tier 4 invented, per the dispatch's own instruction — if a fresh duplicate sweep is ever
+wanted, it uses this session's OWN method (grep current code, same-need + same-field bar, check the
+classic-view path via `opensAs`), not a resumed document.
+
+## Queue
+
+Unchanged, none started, none blocking: abort-vs-lost-link (no operator-abort concept in the gateway), Tier
+2's six (none confirmed live, last swept at t2040), two-sided SETUP + preview Fork 3 (the human's alone).
+
+🔨 turn 2044

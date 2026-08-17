@@ -149,5 +149,6 @@ export function textDataDef() {
         return td > sw ? ` · ⚠ engraved width ${td}mm (Ø${td} tool wider than the ${sw}mm stroke)` : '';
     };
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
+    def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t2044 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)
     return def;
 }
