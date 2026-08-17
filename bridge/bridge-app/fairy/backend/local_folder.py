@@ -3,8 +3,40 @@ inbox/  status/. Lets the whole bridge run on one PC, no cloud account.
 """
 import json
 import os
+import shutil
 
 from . import Backend
+
+_SUBDIRS = ("inbox", "status", "cncdisk", "commands", "history")
+
+
+def migrate_legacy_root(new_root, legacy_root="./_bridge_data", log=print):
+    """t2022 — port forward records from the OLD cwd-relative default (a landmine: relative to wherever the
+    process happened to launch from, so it sat beside the install folder) into the new stable per-user
+    NEW_ROOT (Config.default_local_root()). Merges file-by-file and never overwrites an existing destination
+    file, so re-running this on every startup is a no-op once the one-time copy has happened — safe to call
+    unconditionally. Returns the number of files moved (0 = nothing to do, including "already migrated")."""
+    legacy = os.path.abspath(legacy_root)
+    new_abs = os.path.abspath(new_root)
+    if legacy == new_abs or not os.path.isdir(legacy):
+        return 0
+    moved = 0
+    for sub in _SUBDIRS:
+        src_dir = os.path.join(legacy, sub)
+        if not os.path.isdir(src_dir):
+            continue
+        dst_dir = os.path.join(new_root, sub)
+        os.makedirs(dst_dir, exist_ok=True)
+        for fn in os.listdir(src_dir):
+            src = os.path.join(src_dir, fn)
+            dst = os.path.join(dst_dir, fn)
+            if not os.path.isfile(src) or os.path.exists(dst):
+                continue   # a directory entry, or already migrated -- never overwrite what's already there
+            shutil.copy2(src, dst)
+            moved += 1
+    if moved:
+        log(f"[migrate] moved {moved} record(s) from the old {legacy} into {new_root} (one-time)")
+    return moved
 
 
 class LocalFolderBackend(Backend):

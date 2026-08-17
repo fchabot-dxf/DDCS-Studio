@@ -29,8 +29,9 @@ python -m fairy.bridge --demo        # full pipeline on a temp folder with simul
 ```
 Live, against the real rig (needs `pip install -r fairy/requirements.txt`):
 ```bash
-# local-folder backend, real Modbus slave + real SMB delivery:
-python -m fairy.bridge run --backend local --root ./_bridge_data --dest \\192.168.0.99\CNCDISK --port COM6
+# local-folder backend, real Modbus slave + real SMB delivery (queue/history land in the stable per-user
+# ~/.ddcs-bridge/data by default; pass --root to point somewhere else, e.g. for a throwaway dev run):
+python -m fairy.bridge run --backend local --dest \\192.168.0.99\CNCDISK --port COM6
 # R2 backend (set R2_ENDPOINT/R2_BUCKET/R2_ACCESS_KEY/R2_SECRET_KEY first):
 python -m fairy.bridge run --backend r2 --dest \\192.168.0.99\CNCDISK --port COM6
 ```

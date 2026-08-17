@@ -41188,3 +41188,123 @@ scope, untouched.
 - `DDCS-Studio/web/ui/gateway/views/jobs.js` — `renderHistory` adds the "last time" linked-duration column.
 
 🔨 turn 2020
+
+# ═══ t2022 — JOB-HISTORY STORAGE: a stable location, and WHY the workspace copy is not built this turn ═══
+
+Per the dispatch: bridge suite + node tier only this turn (the advisor's WEB gate was running — no Playwright,
+no browser). Parts 1-3 (stable location, migration, reinstall-survival proof, discoverability) are DONE. Part
+4 (a backup.js entry) was investigated and DELIBERATELY NOT BUILT — it is a new capture kind, not a row, per
+the dispatch's own "if this turns out to be more than an entry, STOP AND TELL ME."
+
+## Parts 1-3 — the bridge half
+
+**Confirmed the landmine precisely before fixing it.** `Config.local_root` defaults to `"./_bridge_data"` —
+cwd-relative. Two real launch paths both hit it: `START_GATEWAY.bat` explicitly passed `--root _bridge_data`
+(relative to `cd /d "%~dp0"`, the batch file's own folder); the SHIPPED exe (`desktop/fairy_gateway.py`,
+`build_fairy.ps1 -> fairy.exe`) passes NO `--root` at all, so it silently inherits the same cwd-relative
+default — landing beside wherever the exe happens to be launched from. Neither is AppData/Documents; both are
+the install folder. `fairy/webview_storage.py`'s own docstring names the exact failure mode for a PyInstaller
+onefile build: "a path relative to the executable would be discarded on exit... an install-location path would
+make an app UPDATE read as a fresh, amnesiac install" — it already solved this once, for the WEBVIEW's browser
+storage (`%LOCALAPPDATA%\DDCS-Studio\webview`). Job history needed the SAME category of fix, not the same path
+(see below).
+
+**Fix: `Config.default_local_root()` — `~/.ddcs-bridge/data`, matching an ALREADY-SHIPPED convention, not a
+new one.** `~/.ddcs-bridge/` already holds `config.json`, `fairy.log`, `install_id` (all per
+`fairy_gateway.py`) — a stable, per-user, home-anchored directory with real precedent in this exact codebase.
+Considered `webview_storage.py`'s `%LOCALAPPDATA%\DDCS-Studio\` convention instead (also real, also stable) and
+REJECTED it for this data specifically: AppData is a semi-hidden system folder in Windows Explorer by default,
+which cuts against the dispatch's own point 3 ("a path they can open beats a hidden one") — `~/.ddcs-bridge`
+sits directly under the user's own home folder, one hop away, exactly like the files already living there.
+`from_env()` now sets `c.local_root = cls.default_local_root()` immediately after construction; the existing
+override loop (CLI `--root`, or a caller constructing `Config(...)` directly, as every test in this repo does)
+still wins over it unchanged — nothing about explicit overrides moved.
+
+**`START_GATEWAY.bat` and the dev README both had to change too, or the fix would do nothing.** An explicit
+CLI arg always beats a computed default, so leaving `--root _bridge_data` in the batch file (or in the README's
+copy-paste dev example) would have kept the landmine alive for anyone still launching that way. Both now omit
+`--root` and fall through to the new stable default; the README explicitly notes `--root` still works for a
+throwaway dev run.
+
+**MIGRATION, once and idempotently, per the dispatch's own instruction — real history existed and the fix
+must not lose it.** New `local_folder.migrate_legacy_root(new_root, legacy_root="./_bridge_data")`: for each of
+the 5 subdirs (`inbox/status/cncdisk/commands/history`), copies any file from the OLD cwd-relative location
+into the new stable one, but ONLY if the destination file does not already exist — never overwrites. Called
+automatically from `from_env()`, gated on `local_root == default_local_root()` (i.e. only when the process is
+genuinely resolving the new stable default, never when a test or a custom `--root` deployment chose something
+else — so it can never reach into an unrelated caller's directory). Idempotent by construction: running it on
+every startup is cheap and correct, since a second run finds every file already copied and does nothing.
+
+**"Migrated" claims verified with an ACTUAL reinstall simulation, not reasoned about, per the dispatch's
+explicit instruction.** `test_reinstall_to_a_new_folder_actually_survives_it`: writes a real history record
+while "installed" at a temp folder A, DELETES A entirely (`shutil.rmtree`, not just abandons it — the real
+shape of a reinstall-to-new-folder), "reinstalls" at a fresh temp folder B, and reads the record back — it is
+there, because storage was never tied to A in the first place. `test_stable_location_is_home_based_not_cwd_
+relative` proves the resolved `local_root` is IDENTICAL from two different simulated install folders (only
+`os.path.expanduser` is patched to a throwaway temp home — the real developer's `~/.ddcs-bridge` is never
+touched by any of these tests).
+
+## Dialect coverage — storage and controller-agnostic, stated plainly per the dispatch's own ask
+
+Agreed, not padded: nothing here touches G-code, a controller connection, or a dialect branch — it is a pure
+filesystem-location decision, the same for Expert, V4.1, or any future target. No dialect-split test added.
+
+## Non-vacuity
+
+New `test_storage_migration_t2022.py`, 5 tests, all pass against the current tree. Proved non-vacuous the same
+way as t2020: swapped `config.py` + `local_folder.py` for the last-committed (pre-t2022) revision (`git show
+HEAD:...`, restored from a SCRATCH COPY afterward) and re-ran — `ImportError: cannot import name
+'migrate_legacy_root'`, since neither the function nor the home-anchored default existed yet. Correct failure:
+this is genuinely new capability, not a re-statement of something already true.
+
+## Part 4 — investigated, and NOT built: a backup.js row is the wrong shape for job history
+
+**The registry's own declared invariant, stated in its own header comment: "every store already persists
+itself as JSON under its own localStorage key (or as verbatim IDB entries). A backup therefore MOVES each
+store's OWN persisted bytes."** Every one of the 11 existing rows honors this — `ls`/`lsMulti`/`lsPrefix`
+(synchronous localStorage) or the one declared `async: true` exception, `projects` (IndexedDB, still fully
+browser-local). Job history has NO existing browser-side persisted form to move: it lives entirely server-side,
+in the bridge's own files, fetched over HTTP (`client.listHistory()` -> `GET /api/history`) — sometimes with no
+browser open at all (poller.py writes it from a background thread). A row for it would not be moving existing
+bytes; it would be inventing a NEW persistence layer (a browser-side cache) just to have something to move,
+which is the "second, divergeable definition" the registry's own design note explicitly guards against
+elsewhere (`workspaceSignature`'s comment on the delta baseline).
+
+**`write()`/`clear()` have no honest answer either.** Every other row's `write()` mutates something the CURRENT
+browser owns; `clear()` means "reset to this workspace's default." For job history, both would have to act on a
+LIVE BRIDGE'S DISK RECORD of a physical machine's run log — restoring a `.ddcs` on a different PC/bridge would
+either silently inject someone else's job records into this bridge's history (no such write endpoint exists
+today — `server.py`/`ops.py` have no `POST /api/history`), or `clear()` would wipe a real device's operational
+record as a side effect of opening an unrelated file. Neither matches "restoring a workspace adopts its
+design/settings state," which is what `machine`'s row already legitimately does (retargeting the live
+controller identity is a DECLARED, deliberate exception — job history isn't identity, it's a log).
+
+**Conclusion, stated as the dispatch asked: this needs a new capture KIND (or it needs to not be a backup.js
+row at all — e.g., a plain export/import button ON the History view itself, not folded into the whole-file
+open/restore contract), not a declared row over an existing store.** Flagging per instruction rather than
+building it. If the human still wants job history portable in some form, the real design question is narrower
+than "add an entry": what does "restore" even mean for a device-side log, and is a backup.js row the right
+place to ask that question at all, versus a dedicated export next to the History table.
+
+## Gate
+
+- New: `test_storage_migration_t2022.py` — 5/5 pass (non-vacuity above).
+- Regression: full bridge suite — `test_poller_track_gate.py` 6/6, `test_csrf_guard.py` 9/9,
+  `test_pull_geometry.py` 11/11. 26/26 total, no regressions.
+- `npm run test:node` (DDCS-Studio) — 128/128 pass. No Playwright/browser run this turn, per the dispatch.
+- `proc_health.py watch` — clean, 0 flagged.
+
+## Files
+- `bridge/bridge-app/fairy/config.py` — `default_local_root()`, wired into `from_env()` + migration trigger.
+- `bridge/bridge-app/fairy/backend/local_folder.py` — new `migrate_legacy_root()`.
+- `bridge/bridge-app/START_GATEWAY.bat` — dropped the explicit `--root _bridge_data`.
+- `bridge/bridge-app/fairy/README.md` — dev example updated to match (stable default; `--root` still available).
+- `bridge/bridge-app/tests/test_storage_migration_t2022.py` — new, 5 tests, non-vacuity proved above.
+
+## NOT BUILT, and why (see Part 4 above)
+
+The backup.js workspace-copy row — a design finding, not a deferred task: it is the wrong shape for this data
+under the registry's own stated invariant. Needs a decision from the advisor/human on what "portable job
+history" should actually mean before anything gets built.
+
+🔨 turn 2022

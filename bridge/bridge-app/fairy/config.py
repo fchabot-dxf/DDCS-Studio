@@ -79,12 +79,25 @@ class Config:
     def default_config_path():
         return os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "config.json")
 
+    @staticmethod
+    def default_local_root():
+        """Stable per-user location for the local-folder backend's queue/status/history data (t2022) —
+        NOT beside the executable. The install folder is unsafe for durable data twice over: a frozen
+        PyInstaller build unpacks to a temp dir each run (an exe-relative path is discarded on exit), and
+        even the unpacked desktop exe reads it as cwd-relative (see START_GATEWAY.bat / fairy_gateway.py),
+        so a full reinstall to a new folder silently starts a fresh, empty store while the old one sits
+        orphaned. Sibling to config.json/fairy.log/install_id — the SAME already-shipped stable-per-user
+        convention (fairy_gateway.py) — directly under the user's home folder rather than buried in
+        AppData, so it is a path the user can actually find and back up, not just a durable one."""
+        return os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "data")
+
     @classmethod
     def from_env(cls, **overrides):
         """Build a Config: defaults < env (secrets) < persisted Setup config.json < explicit CLI overrides.
         Loading the persisted file is what makes Setup survive a relaunch (the gateway reads back what the
         Setup UI saved); explicit CLI args still win over it."""
         c = cls()
+        c.local_root = cls.default_local_root()   # stable by default; an explicit --root below still wins
         c.r2_endpoint = os.environ.get("R2_ENDPOINT", c.r2_endpoint)
         c.r2_bucket = os.environ.get("R2_BUCKET", c.r2_bucket)
         c.r2_access_key = os.environ.get("R2_ACCESS_KEY", c.r2_access_key)
@@ -134,4 +147,12 @@ class Config:
         for k, v in overrides.items():
             if v is not None:
                 setattr(c, k, v)
+
+        # t2022 — one-time, idempotent: port forward any job/history data an OLDER build left in the cwd-relative
+        # "./_bridge_data" landmine (still the same folder this process just launched from) into the new stable
+        # root, but only when local_root is genuinely the stable default — never when a caller (a test, --root,
+        # a custom deployment) explicitly chose a different location.
+        if c.backend == "local" and c.local_root == cls.default_local_root():
+            from .backend.local_folder import migrate_legacy_root
+            migrate_legacy_root(c.local_root)
         return c
