@@ -5046,3 +5046,40 @@ classic view is RIGHT and the twin's shared preview is WRONG** — the inverse o
 ⚠ Remaining after this: Tier 3's other 3 (tap/text zRuler · `setLatheTool` dead, zero callers · the 2D pane
 not drawing the ATC magazine) · Tier 2's 6, none confirmed live · abort-vs-lost-link · **two-sided SETUP** and
 **preview Fork 3**, both the human's.
+
+# ═══ t2044 — TIER 3's REMAINING THREE (smallest real gaps) ═══
+
+**RELEASED V2026.08.17.2** (`4004b06c`, pushed). Gate: full suite **2598 passed / ZERO failures** on the
+pre-drill-fix tree, that delta covered separately (drill/bore/holecycle **120 passed**), node **161/161**.
+
+t2042 accepted. **You settled it from evidence and against my stated expectation** — drove the real builder
+with `skip:'2'` on a 3-hole grid, read the **actual emitted G-code** (a genuine controller-side
+`IF … GOTO ( hole 2 skipped )`), then called `drillPatternGeometry` directly with the same params and watched
+it draw all three. **Picture-only, confirmed not assumed.** I had *said* I expected picture-only; you checked
+anyway, which is the only reason that statement is now worth anything.
+
+**And you collapsed toward the RIGHT source** — exporting `holecycle.js`'s `skipSet`, the one parse the real
+emit's IF/GOTO actually gates on — rather than copying the classic view's correct implementation into a third
+place. Copying the *right* answer would still have made a second source.
+
+## THE TASK — Tier 3's remaining three. Small, and the last of this arc's known list.
+1. **`setLatheTool` is DEAD — zero callers.** Same treatment as `odPassExtent`: **delete it, and take any
+   comment block that only describes it.** Confirm zero callers yourself first (it has been true for two
+   turns, but confirm).
+2. **tap/text `zRuler` missing** — settle **what the user does not see**, then fix if it is live. Same order as
+   the drill gap: evidence before building.
+3. **The 2D toolpath pane does not draw the ATC magazine** — **⚠ this one may be intentional.** A 2D toolpath
+   view arguably has no business drawing a tool carousel. **Check whether it was a decision before treating it
+   as a gap** — "correctly out of scope" closes it as well as a fix.
+4. **⚠ LAND EACH COMPLETELY; park the rest by name.** Three small items is exactly where a rushed batch goes
+   wrong.
+5. **Gate:** node tier + the spec sets you touch + the round-trip/parity set.
+
+## ⚠ AND THEN THE ARC IS DONE — say so plainly.
+After these three, the preview-as-data work has **no known open items** except the two the human owns. **Do not
+invent a Tier 4.** If a fresh duplicate sweep is ever wanted it uses your t2040 method (grep the code, the
+same-need + same-field bar, check the classic-view path) — **not a resumed document.** Say in your pass-back
+whether the arc is closed.
+
+⚠ Remaining, unchanged: abort-vs-lost-link (no operator-abort concept in the gateway) · Tier 2's 6, none
+confirmed live · **two-sided SETUP** · **preview Fork 3**. The last two are the human's alone.
