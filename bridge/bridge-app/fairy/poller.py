@@ -73,6 +73,15 @@ class Poller:
             self.backend.delete_job(job_id)
             return
 
+        # t2066 — DECLARE the one genuinely-unsafe window so a take-over can SEE it. The write to the controller is
+        # the synchronous deliver() just below; until it returns there was no queue state meaning "a file is being
+        # written right now" — delivered/running/stalled are ALL post-write. Mark "delivering" here so /api/queue
+        # reports it for the duration of the copy (the HTTP thread reads it while this thread blocks in deliver);
+        # delivered/failed overwrite it immediately after. This is the ONLY state a take-over should stop for
+        # (fairy_gateway._transfer_in_flight) — the false "a job is in flight" alarm was gating on the post-write
+        # states, which persist durably and made a forgotten job look like a live transfer forever.
+        self.backend.put_status(
+            job_id, tracker.build_status(job_id, name, m, "delivering", 0, events + ["writing to controller"]))
         try:
             dest = self.transfer.deliver(nc, name)
         except OSError as e:

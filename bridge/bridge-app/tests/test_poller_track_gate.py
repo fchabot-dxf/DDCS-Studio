@@ -127,6 +127,36 @@ def test_deliver_only_job_is_unaffected_by_enable_slave_either_way():
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ── (1b) the "delivering" window is OBSERVABLE during the write (t2066) ──────────────────────────────────────
+
+def test_delivering_state_is_visible_during_the_write_then_becomes_delivered():
+    """The take-over prompt must be able to tell an ACTIVE write from a stale finished job. Until t2066 no queue
+    state meant "writing right now" — delivered/running/stalled are all POST-write and persist durably, so a
+    forgotten job read as "in flight" forever. The poller now marks 'delivering' right before the synchronous
+    deliver() and overwrites it after. Prove a reader sees 'delivering' MID-WRITE, then 'delivered' once done."""
+    tmp = tempfile.mkdtemp()
+    try:
+        poller, backend, cfg = _make_poller(tmp, enable_slave=True)
+        job = _submit(backend, cfg, "part.nc", "G0 X0\nM30\n", {"total_beacons": 5, "marker": 111})
+
+        seen = {}   # a transfer that snapshots the state a concurrent reader (the launcher) would see MID-WRITE
+
+        class _SnoopTransfer:
+            def deliver(self, nc, name):
+                st = backend.get_status(job["jobId"])       # what /api/queue would report during the copy
+                seen["mid"] = st["state"] if st else None
+                return r"\\stub\cncdisk\%s" % name
+
+        poller.transfer = _SnoopTransfer()
+
+        poller.tick()   # claim -> mark 'delivering' -> deliver() (snapshots here) -> 'delivered'
+
+        assert seen.get("mid") == "delivering", f"a reader mid-write must see 'delivering', saw {seen!r}"
+        assert backend.get_status(job["jobId"])["state"] == "delivered", backend.get_status(job["jobId"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ── (2) content-hash linking ────────────────────────────────────────────────────────────────────────────────
 
 def test_two_sends_of_the_same_content_hash_link_in_history_different_jobids():

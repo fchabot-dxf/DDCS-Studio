@@ -18,7 +18,7 @@ export default {
     let items = [];
     try { items = await ctx.client.listQueue(); } catch { return; }
     const active = items
-      .filter((i) => ["running", "delivered", "stalled"].includes(i.state))
+      .filter((i) => ["delivering", "running", "delivered", "stalled"].includes(i.state))
       .sort((a, b) => (a.jobId < b.jobId ? 1 : -1))[0];
     this.renderTracker(active);
     this.renderQueue(items);

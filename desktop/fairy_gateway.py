@@ -242,13 +242,32 @@ def _pick_port():
     return order[0], False   # none free — binding will fail and report below
 
 
-def _tracking_active():
-    """True if a job is being tracked right now (queue has running/delivered/stalled items)."""
+def _transfer_in_flight():
+    """True ONLY while a file is being WRITTEN to the controller right now — the 'delivering' window in the running
+    instance's poller, the one moment a take-over could leave a partial .nc on the machine. Every POST-write state is
+    safe to take over: 'delivered' means the file is already on the controller, 'running'/'stalled' mean the machine
+    is executing it and the bridge is push-only so it keeps running regardless. Those states also persist DURABLY in
+    the queue, which is why gating on them raised the false "a job is in flight" alarm on a forgotten past job (t2066).
+    Best-effort; any error = treat as not in flight."""
     try:
         import json
         with urllib.request.urlopen(f"http://{HOST}:{PORT}/api/queue", timeout=2) as r:
             items = json.load(r)
-        return any(i.get("state") in ("running", "delivered", "stalled") for i in items)
+        return any(i.get("state") == "delivering" for i in items)
+    except Exception:
+        return False
+
+
+def _tracking_active():
+    """True if a job is being ACTIVELY TRACKED right now (state 'running' — beacons arriving). Terminal states
+    (delivered/stalled/done/failed) are NOT active: they persist durably in the queue, so counting them would make a
+    long-finished job look live forever (t2066). Used for the window-close confirm, never the take-over prompt — a
+    take-over is unsafe only during an active write (see _transfer_in_flight)."""
+    try:
+        import json
+        with urllib.request.urlopen(f"http://{HOST}:{PORT}/api/queue", timeout=2) as r:
+            items = json.load(r)
+        return any(i.get("state") == "running" for i in items)
     except Exception:
         return False
 
@@ -291,10 +310,12 @@ def main():
         # Default = TAKE OVER the port (close the other instance, start here). A stale/forgotten/orphaned
         # gateway is replaced seamlessly: job state is durable on disk and Studio state persists, so the new
         # window comes back to the same place. The ONLY thing unsafe to interrupt is a file TRANSFER to the
-        # controller (mid-write could deliver a partial .nc) — so we ASK FIRST only when a job is in flight.
-        if _tracking_active():
-            if not _msgbox(f"DDCS Studio is already running on port {PORT} and a job is in flight.\n\n"
-                           "Taking over now could interrupt a file transfer to the controller. "
+        # controller (mid-write could deliver a partial .nc) — so we ASK FIRST only during that write, not for any
+        # tracked job (t2066: the old _tracking_active gate fired on durable post-write states and cried "in flight"
+        # over a job that finished sessions ago).
+        if _transfer_in_flight():
+            if not _msgbox(f"DDCS Studio is already running on port {PORT} and is sending a file to the controller.\n\n"
+                           "Taking over now could interrupt the transfer and leave a partial program on the machine. "
                            "Close it and take over anyway?", yesno=True):
                 print(f"[fairy] another instance on :{PORT} is busy — left running, exiting.")
                 return
@@ -316,9 +337,14 @@ def main():
         window = webview.create_window(TITLE, url, width=1180, height=820, min_size=(900, 600))
 
         def on_closing():
-            # Window close = full shutdown (chosen lifecycle, COMBINED-APP-PLAN). The machine keeps
-            # running its job regardless (the bridge is push-only) — but tracking, the queue and LAN
-            # serving stop with this window, so confirm when a job is live.
+            # Window close = full shutdown (chosen lifecycle, COMBINED-APP-PLAN). Two distinct confirms:
+            # a write in flight is UNSAFE (closing mid-copy could leave a partial .nc); an actively-tracked run
+            # is merely LOST TRACKING (the machine keeps running, the bridge is push-only, but tracking + LAN
+            # serving stop with this window). Terminal states (delivered/stalled/done) prompt for neither (t2066).
+            if _transfer_in_flight():
+                return _msgbox("A file is being sent to the controller right now.\n\n"
+                               "Closing could interrupt the transfer and leave a partial program on the "
+                               "machine.\n\nClose anyway?", yesno=True)
             if _tracking_active():
                 return _msgbox("A job is still being tracked.\n\n"
                                "The machine keeps running either way, but tracking and LAN serving "
