@@ -41699,3 +41699,137 @@ Abort-vs-lost-link in the gateway (no operator-abort concept exists at all); two
 (the additive-layer shape) — all the human's, per the standing ruling, none started.
 
 🔨 turn 2030
+
+# ═══ t2032 — edge_data SETTLED (collapsed, honestly not "already resolved"), then TIER 2 RECONCILED ═══
+
+## (1) `edge_data` — the dispatch's own reading was half right: settled, then collapsed
+
+The dispatch's own re-read was accurate as far as it went: `edgeData.js:65`'s `EDGE_SIM_STARTS` DOES genuinely
+single-source the sim-start MARKER position — a declared row, read by `opSimStarts.js`'s shared row-interpreter
+(`edgeSideIsNear`, formerly an inline `minSide` local). But that is only HALF of what the survey's original
+"pos ⇒ near/0 face" rule covers. `panelTypes.js:583` (`const ePos = (params.dir||'pos')!=='neg'`) independently
+re-typed the IDENTICAL boolean decision a second time, for a DIFFERENT drawn output — the 2D WALL-GLYPH line
+(which stock edge is highlighted as "the wall"), not the marker's offset. Same fact, two authors, genuinely
+still 2 live copies — "it fell out of the 3-plus band" and "it is resolved" were different claims, and only
+the second one closes Tier 1; the honest answer was the first.
+
+**COLLAPSED, per the dispatch's own instruction ("if it is still 2 copies, collapse it").** Extracted the local
+`minSide` computation out of `opSimStarts.js`'s `rowToStart` into an exported `edgeSideIsNear(side)`; `panelTypes.js`
+now calls it instead of re-deriving the equivalent boolean. Value-preserving (`edgeSideIsNear('pos'/'neg')` is
+logically identical to the old inline expression for edge's own 2-value vocabulary) — `npm run test:node`:
+zero snapshot movement.
+
+**Non-vacuity — immediate and clean**, unlike contour's: the new test IMPORTS `edgeSideIsNear` directly, so
+reverting either file produces a `SyntaxError` (the export doesn't exist pre-collapse) before any assertion
+even runs — the same shape of proof t2020/t2028 used for brand-new exports. A second test drives the REAL
+`layoutSpecFromOp` (not a re-implementation) with `edgeDataDef()` and confirms the ACTUAL drawn wall line
+flips with `dir` exactly as `edgeSideIsNear` predicts.
+
+**Gate:** new test 2/2 pass; `npm run test:node` 149/149 (147+2), zero snapshot movement; full `edge-*` spec
+set (7 files) — 8/8 pass, including `edge-view.spec.js`'s own direct assertion of the wall-line position.
+`proc_health.py watch`: clean.
+
+## (2) TIER 2 RECONCILED — read-only, per the dispatch's own instruction (no collapsing)
+
+**First, the count itself: the dispatch's "14" is Tier 2 + Tier 3 combined, not Tier 2 alone.** Re-read
+`PREVIEW-AS-DATA.md` directly: Tier 2 (2-copy duplicates) = **9 items** (#11–19); Tier 3 (capability gaps — a
+genuinely different risk class, "a feature exists on one renderer path and not the other," not a computed-fact
+duplicate) = **5 items** (#20–24). `NEXT-SESSION.md §4` already states this split correctly ("Tier 2: 9
+two-copy items. Tier 3: 5 capability gaps") — 9+5=14, which is almost certainly where the dispatch's number
+came from, not a miscount in either document. Reconciled Tier 2 only, per this turn's own instruction; Tier 3
+untouched, as separately named in the dispatch's own queue.
+
+**Verified all 9 directly against HEAD, not the survey's cached citations — floor, not total:**
+
+1. **`slot_data`'s perpendicular-offset formula — SURVIVES, unchanged.** `slot.js:58` / `slotData.js:157`, still
+   byte-identical (`nx=-dy/len, ny=dx/len`), still 2 files, genuine rename bridged already
+   (`x0/y0/x1/y1/tool` ↔ `ax/ay/bx/by/toolDia`). Simplest remaining candidate — 2 lines, zero branches.
+2. **`homing_data`'s mid-envelope start formula — RESOLVED, not surviving.** The survey's own SECOND cited copy
+   (`homingView.js:88-89`) no longer exists — deleted at Fork 4 with the other 5 legacy views. `homingData.js`'s
+   own `homingMidStart()` is the sole live copy; checked the whole app for any other independent re-derivation
+   of `(m.x||0)/2` and found none — `gcodeViz3d.js:1356`'s similar-looking `gCx=m.x/2` is a DIFFERENT consumer
+   (the scene's always-on grid/table footprint, not this op's marker), correctly not counted, matching the
+   `contourWizard.js`-bbox precedent from t2028.
+3. **`corner_data`'s `cornerDatumXY` vs `dirsOf` — SURVIVES at 2 (down from 2 live + 1 orphaned dead).** Both
+   still independently hardcode their own 4-entry corner map (`cornerDatumXY`: positions; `dirsOf`: probe-approach
+   signs) — related facts, structurally different outputs, not literally the same formula, so not a false
+   positive to dismiss (unlike contourWizard's bbox) but also not confirmed diverged. The THIRD copy — the
+   orphaned `CornerWizard.inferStart` (a resurrection trap the survey explicitly flagged) — is CONFIRMED GONE
+   (grepped the whole app; zero hits), cleaned up in some intervening commit.
+4. **`lathe_odturn`'s finished-shape formula — SURVIVES, and this is the RANKED #1 candidate: it may already be
+   hiding the SAME shape of bug the parting collapse just fixed.** `odPasses`/`odPassExtent` (the wizard's own
+   declared functions, `odTurn.js`) apply NO guard against `endDiameter<=0` on a taper. The 2D canvas's OWN
+   `odProfileSpec` (`latheProfileCanvas.js:201`) explicitly guards it — its own comment: "AN UNSET FAR END
+   FOLLOWS THE TARGET, exactly as the emit does... reading it as 0 would draw a cone to a point the moment you
+   picked Taper." The twin's OWN `rebuildOdTurn` (`odturnData.js:133`) applies the identical guard BEFORE
+   calling into the wizard's build — so the TWIN never actually feeds a bare 0 through. But `odPasses`/
+   `odPassExtent` are ALSO the functions the WIZARD's OWN direct form-authored path calls, with no equivalent
+   guard found anywhere upstream of them on that path. Unconfirmed (did not check for a client-side min-clamp
+   on the "End Ø" field, which would be the same read that settled edge_data — a next-turn question, not
+   answered here): IF a user can type an explicit 0 while Taper is selected via the FORM WIZARD specifically
+   (not the twin), the real cut would taper to an actual point while the preview — guarding against exactly
+   that — draws a straight, untapered turn. Same shape as the spigot bug: a real cut the preview would not show.
+5. **The lathe probe-stylus SIZE — SURVIVES, unchanged, LOW risk.** `latheScene.js:130` (a 3D mesh diameter,
+   `max(0.2,tip)*2`) vs `latheProfileCanvas.js:421` (a 2D schematic radius, `max(0.4,tip)`) — different minimum,
+   different scale, genuinely not numerically comparable (survey's own framing), cosmetic-only — no emit/cut
+   impact possible.
+6. **"Is this stock a lathe bar" — SURVIVES at 4 non-identical predicates, unchanged.** `gcodeViz3d.js:1895` +
+   `latheScene.js:177` (identical 3-field check, 2 separate hand-typings) / `latheScene.js:37` (same 3 fields,
+   negated) / `latheDro.js:46` (checks `datum` instead of `origin`) / `latheProfileCanvas.js:102` (checks
+   `shape` ALONE, weakest). Co-extensive only by accident today (every real lathe bar happens to satisfy all
+   four) — no confirmed live divergence, but the widest surface area of any survivor (3D carve, DRO diameter
+   readout, and the profile canvas all gate on their own version of "is this a bar").
+7. **ATC's "`-3000` = persistent" magic number — SURVIVES at 3, unchanged.** `stacks/communicationWizard.js:77`
+   (emit comment) / `communicationWizard.js:106` (preview) / `commData.js:143` (twin recompose) — 3 independent
+   equality tests against a literal. Low divergence risk: a magic number either matches or it doesn't, no
+   rounding/branch subtlety to silently drift on.
+8. **ATC's beep pulse-count formula — SURVIVES at 2, unchanged.** `stacks/communicationWizard.js:95` /
+   `commData.js:144`, byte-identical `Math.round(dur/(cyc*2))`, both feeding a COMMENT STRING only (no G-code
+   motion/timing impact) — the preview's own 3rd, differently-worded version (`Pulsed: Nms on/off`) still
+   doesn't textually match either, unchanged. Lowest functional risk on this list — cosmetic text, not cut
+   geometry.
+9. **`text_data`'s centreline-vs-cut mismatch — SURVIVES, unchanged, and the ONE item on this list that already
+   tells the operator.** `fillText.js:73`'s `previewGeometry` still draws `layoutText(p).strokes` (bare
+   centrelines) instead of `textContours(p)` (the true, inflated cut boundary `scanlineFill` actually uses) —
+   confirmed the mitigating `def.statusHint` (`textData.js:146`) is still wired, so unlike every other item
+   here this ONE already surfaces its own limitation to the operator rather than staying silent about it.
+
+## RANKED for dispatch — by what a user could see, not copy count, per the dispatch's own instruction
+
+1. **`lathe_odturn`'s finished-shape formula** — possible live bug, same shape as the just-fixed spigot,
+   unconfirmed pending one more read (does the form allow typing 0?).
+2. **`corner_data`'s `cornerDatumXY`/`dirsOf`** — two structurally-fragile 4-entry maps, no confirmed
+   divergence, corner is the most heavily tested op in the app.
+3. **"Is this stock a lathe bar"** — widest surface area (3D + DRO + canvas), co-extensive only by accident.
+4. **`slot_data`'s perpendicular offset** — cheapest remaining collapse, lowest divergence risk (2 lines, no
+   branches).
+5. **ATC's `-3000` magic number** — low risk, no branch subtlety.
+6. **Lathe probe-stylus size** — cosmetic only, no emit impact.
+7. **ATC beep pulse-count** — comment-string only.
+8. **`text_data`'s centreline mismatch** — already mitigated with its own operator-facing warning.
+
+`homing_data` — resolved, not ranked (no longer a live duplicate).
+
+## Gate
+
+New: `preview-collapse-edge-2032.test.mjs` (2 tests, non-vacuity proved above). `npm run test:node`: 149/149,
+zero snapshot movement from the edge collapse. Full `edge-*` spec set (7 files): 8/8 pass. Part 2 (Tier 2
+reconciliation) was read-only, per the dispatch's own instruction — no gate beyond the reading itself.
+`proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/web/viz/opSimStarts.js` — `edgeSideIsNear` extracted + exported.
+- `DDCS-Studio/web/wizards/ops/panelTypes.js` — the wall-glyph collapses onto it.
+- `DDCS-Studio/tests/node/preview-collapse-edge-2032.test.mjs` — new, 2 tests.
+
+## Flagged for the advisor, not fixed (per the read-only scope)
+
+`NEXT-SESSION.md §4`'s own "edge near-face rule ×2" line is now stale by this turn's own work (collapsed to
+×1) — NOT edited, per the standing t2018 protocol rule (NEXT-SESSION.md/ROADMAP.md are advisor-only to touch).
+
+## Queue
+
+Tier 3's 5 capability gaps, abort-vs-lost-link in the gateway, two-sided SETUP, preview Fork 3 — named per the
+dispatch's own list, none started, none blocking.
+
+🔨 turn 2032

@@ -8,7 +8,7 @@
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { middleAxes } from '../middleWizard.js';   // t1211 — the ONE middle axis-order resolver (the handle decls must agree with the emit)
-import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
+import { opSimStarts, resolveRelToIndex, edgeSideIsNear } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass; edgeSideIsNear — t2032, the SAME "pos/dir ⇒ near face" rule the sim-start marker uses, reused for the 2D wall glyph
 import { markerWorldOf } from '../../viz/markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the 3D preview ALSO reads, so the Layout handle + the 3D ruby can't diverge
 import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
 import { datumXY, getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // t359 — the datum crosshair; t385 — DRAW the workpiece INSIDE cavities (the pocket) from the DECLARED feature (stock-modal size)
@@ -580,7 +580,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const edgeDirBind = (def.bindings || []).find((b) => b && b.param === 'dir' && b.type === 'enum');
     if (edgeAxisBind && edgeDirBind) {
         const eAxis = params.axis === 'Y' ? 'Y' : 'X';
-        const ePos = (params.dir || 'pos') !== 'neg';   // pos → the near/0 face; neg → the far face
+        const ePos = edgeSideIsNear(params.dir || 'pos');   // t2032 — COLLAPSED onto the sim-start marker's own rule (opSimStarts.js), not a 2nd hand-typed copy; pos → the near/0 face, neg → the far face
         const sp = simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y) ? simStart.pos : null;
         if (eAxis === 'X') {
             const wx = ePos ? 0 : stock.w;

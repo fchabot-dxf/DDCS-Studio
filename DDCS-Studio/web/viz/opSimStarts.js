@@ -218,6 +218,12 @@ const planeZ = (p, ctx) => {
     return 0;
 };
 
+// t2032 — the ONE declared "pos/dir ⇒ near/0 face" rule (PREVIEW-AS-DATA.md Tier 1 #7's surviving copy, after
+// Fork 4's legacy-view deletion incidentally carried 2 of the original 4 away). EXPORTED so panelTypes.js's
+// own 2D wall-glyph — which decides the SAME near-vs-far fact for a DIFFERENT drawn output (which stock edge
+// is the "wall", not this marker's offset) — calls this instead of re-typing the equivalent boolean a 2nd time.
+export const edgeSideIsNear = (side) => side === 'pos' || side === 'min';     // matches the built-in outside(): pos ⇒ -out
+
 const rowToStart = (row, ctx) => {
     const z = planeZ(row.plane, ctx);
     const { sx, sy, cx, cy, pcx, pcy } = ctx;
@@ -225,7 +231,7 @@ const rowToStart = (row, ctx) => {
         case 'edge': {
             const axis = row.axis === 'Y' ? 'Y' : 'X';
             const side = TOK(row.side, ctx);                      // 'pos'/'min' → the -out side; 'neg'/'max' → the +out side
-            const minSide = side === 'pos' || side === 'min';     // matches the built-in outside(): pos ⇒ -out
+            const minSide = edgeSideIsNear(side);
             const out = n(TOK(row.out, ctx), 0);
             const coord = minSide ? -out : (axis === 'X' ? sx : sy) + out;
             return axis === 'X' ? { x: coord, y: cy, z } : { x: cx, y: coord, z };
