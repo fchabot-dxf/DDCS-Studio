@@ -4668,3 +4668,43 @@ endpoint exists). **That is the STOP I asked for, used exactly as intended.**
 
 ⚠ Still queued: abort-vs-lost-link collapse into one "stalled" (no operator-abort concept exists anywhere in
 the gateway) · the remaining 4 Tier-1 preview collapses · two-sided SETUP (human) · Fork 3 (human).
+
+# ═══ t2026 — COVER THE GATEWAY HISTORY VIEW (the gap my own gate exposed) ═══
+
+**RELEASED V2026.08.16.5** (`43741a58`, pushed). t2024 accepted, verified by me: node 134/134, bridge 26/26,
+gateway+console specs 34 passed on the current tree.
+
+**The negative test is the one that makes the feature trustworthy** — two runs sharing the same TYPED NAME but
+different content correctly do NOT link. Without it, "last time: N min" could have been quietly matching on the
+label, which is precisely the flaw the content hash exists to remove. Nobody asked for that test; you wrote it
+because it is the way the claim could be wrong.
+
+**Also right:** you reused `UIUtils.downloadFile` (the same primitive `backup.js` and `varListPanel.js` already
+use) and **extracted `lastTimeDuration` out of `renderHistory`** so the table and the CSV share one lookup —
+rather than a second copy that agrees today. And CSV was justified from an existing convention
+(`varListPanel.js` already exports operator data that way), not picked by taste.
+
+## ⚠ THE GAP MY OWN RELEASE GATE EXPOSED — and it is squarely in the feature we just shipped.
+Checking whether my full-suite run still covered the tree, I found: **no Playwright spec asserts the gateway
+History view at all.** `jobs.js` changed by +65 lines across two turns and the only thing standing between a
+load-time error and your users was `check-console`. The new export and the "last time" column are covered by
+**node tests only** — they never render.
+
+**This is the `green-tests-over-a-dead-ui-path` shape**, in the feature added this evening: the logic is
+tested, the surface a person actually clicks is not.
+
+## THE TASK
+1. **A REAL-GESTURE SPEC FOR THE HISTORY VIEW:** open the Gateway, reach History, and assert what a human sees
+   — rows render, the **"last time" column shows a linked repeat**, and the **Export CSV button exists and is
+   clickable**. Bridge to the existing gateway specs' own established fake/offline harness
+   (`gateway-state-contract-1327`, `gateway-quiet-offline-1307`) rather than inventing a second way to stand a
+   gateway up.
+2. **⚠ ASSERT THE DOWNLOAD IS WIRED, not merely that a button exists.** A button that renders and does nothing
+   is the exact defect this session opened with (`openForEdit`'s chip). If the download cannot be intercepted
+   in this harness, **say so and assert the nearest honest thing** — do not fake it.
+3. **NON-VACUITY** at your bar, with the t2020 distinction stated.
+4. **⚠ DO NOT widen this into a gateway-wide coverage audit.** One view, the one we just changed.
+5. **Gate:** your new spec + the gateway/console set + node tier.
+
+⚠ Then queued: abort-vs-lost-link (no operator-abort concept exists in the gateway at all) · the remaining
+**4 Tier-1 preview collapses** · two-sided SETUP (human) · preview Fork 3 (human).
