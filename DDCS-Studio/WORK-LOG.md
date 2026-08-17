@@ -43268,3 +43268,136 @@ the shape it claims to.
 - `bridge/bridge-app/tests/test_position_poller_2063.py` — new, 10 tests.
 
 🔨 turn 2063
+
+# t2065 — Job History, driven for real (not the tests): the server-side chain works; the browser-side chain had a real, live gap; the USB-stick workflow records nothing
+
+## The task, restated
+
+The dispatch named the exact failure shape this arc has already proven twice (beacons never worked;
+"last time" reported an aborted run's own stopwatch): a green suite that never once drove the real gesture.
+`job-history-csv-export-2024`, `gateway-jobs-history-view-2026` and the bridge suite all pass, and every one
+of them mocks `/api/descriptor`/`/api/queue`/`/api/history` with hand-typed JSON — none of it produced by a
+real send. This turn assumes nothing from that green and drives the actual path: a real spawned
+`fairy.bridge` process, a real HTTP POST from a real click on the real Send button, a real background tick
+loop, real beacon injection (`SimBeaconSource` standing in for hardware — the one necessarily-fake piece),
+and the real rendered History/Tracking DOM. No `page.route` anywhere in either new test file.
+
+## Server-side half: PROVEN working, no fix needed
+
+`bridge/bridge-app/tests/test_history_real_path_2065.py` (3 new tests, all passing) spins up the real bridge
+HTTP server + a real background tick loop in a thread, and drives it purely over real `urllib` HTTP requests
+— no direct Python calls into `ops.py`/`poller.py` bypassing the wire. Proven, with real evidence:
+1. A tracked job fed all its beacons in order produces `final_state: "done"` with a real positive
+   `duration_s`, over real HTTP, via the real tick loop's own claim/watch/deliver cycle.
+2. A tracked job fed one beacon and then genuinely starved (no more beacons, past the real stall window)
+   is recorded honestly as `"stalled"` — not silently dropped from history.
+3. Sending the same program twice — once to completion, once left to stall — and reading real `/api/history`
+   rows back: `lastTimeDuration`'s own skip-the-non-"done"-row logic (t2049's fix) correctly finds the FIRST
+   one's real duration and ignores the second one's stall, using only genuinely-produced rows, not hand-typed
+   ones. This is the exact scenario the dispatch named ("send the same program again, does 'last time' show
+   the RIGHT run") and it holds against real data.
+
+This is a positive finding worth stating plainly: the chain from `/api/jobs` through the tick loop through
+`/api/history` is not just wired, it is *correct*, end to end, over the real wire — not merely covered by a
+test that agrees with itself.
+
+## Browser-side half: one real, live edge case found and fixed in the test's own realism, not the product
+
+`DDCS-Studio/tests/send-history-real-path-2065.spec.js` (2 new tests, both passing) spawns the real
+`fairy.bridge` process as a subprocess, points Studio's real Send flow at it (via `localStorage`, the same
+mechanism a real user's typed daemon URL uses — `gateway-local-reach-1325`'s own "typed URL" precedent, not
+a shortcut), and drives the real Send button, the real Beacons checkbox, and the real Jobs/Tracking tabs.
+
+**Five real things were found and fixed along the way, none of them defects in the shipped product:**
+1. **CORS/CSRF (working as designed, not a bug).** `server.py`'s `TRUSTED_ORIGINS` only grants the
+   `X-DDCS-Local` CORS preflight header to the real hosted Studio origin by default — Studio's own local dev
+   server (this test's origin) was correctly, deliberately refused. Fixed via the code's own sanctioned
+   extension point, `DDCS_TRUSTED_ORIGINS`, not a bypass.
+2. **Windows process teardown.** Plain `.kill()` does not reliably tear down a `python -m` child process
+   tree on Windows — confirmed live (a stale bridge from an earlier manual debug session was still LISTENING
+   on 8765, silently answering a later run with stale config). Fixed with `taskkill /F /T /PID` in
+   `test.afterAll`.
+3. **Idle poll cadence.** The bridge's default tick interval is 5s; a real send otherwise sits in the inbox
+   for up to that long before the loop even looks at it. Fixed by passing `--poll 0.3` to the spawned test
+   bridge — a test-timing fix, not a product change (a real user isn't testing against a stopwatch).
+4. **A real persisted config on THIS dev machine.** `~/.ddcs-bridge/config.json` — the human's own actual
+   prior bridge usage — carries `enable_slave: false`, and `Config.from_env()`'s layering
+   (defaults < persisted config < CLI) meant this file was silently overriding the test bridge's config, with
+   no CLI flag able to force it back on. Fixed by isolating `HOME`/`USERPROFILE` for the spawned subprocess
+   so `default_config_path()` resolves nowhere real. **Named here because it is a genuine trap for anyone
+   else writing a bridge-subprocess test on a machine that has ever run the bridge for real** — not something
+   `pytest`'s own isolated venvs would ever surface.
+5. **A real, live occurrence of a previously-only-theoretical edge case (t2055's own item #4).**
+   `instrument.js` only places beacons on a Z-up retract move or ahead of an `M30` (`instrument.js:55,59`
+   — `zups`/`findM30`). This test's own first staged program was two flat rapids at the same Z with no
+   `M30`, and hit exactly that: `total_beacons: 0`, so the real `/api/jobs` response came back `tracked:
+   false` even with the Beacons checkbox genuinely checked. **This is real and reachable, not a test
+   artifact** — but every real wizard-built program in Studio always closes with a `progend` block, whose
+   `end` param defaults to `'M30'` (`programFraming.js:104`, `makeEnd()`), so normal Studio authoring can
+   never produce this. It IS reachable through a hand-typed/pasted raw G-code program loaded straight into
+   the editor with neither a retract nor an `M30` — a send would silently degrade to untracked with **no
+   warning surfaced anywhere** (the `warning` field in `submit_job`'s response only fires for the
+   Modbus-off/dead-receiver cases, t2057, not for the zero-beacon case). Not fixed this turn (the dispatch's
+   own scope is "make the real path work," and the real path — wizard-authored programs — already works;
+   this is a narrower, named gap for a different, non-default authoring style). Fixed IN THE TEST by adding
+   the real retract move the staged program was missing, restoring the realistic case this spec means to
+   drive; the finding itself is recorded here rather than silently absorbed.
+
+With that one test-realism fix applied, both browser-side tests pass: a real deliver-only send renders a real
+`delivered` row in History; a real tracked send that is never fed a beacon genuinely reaches `STALLED` in the
+real Tracking tab and a real `stalled` row in History — not a stuck 0% that never explains itself.
+
+## Every link named that a test alone would have exercised (dispatch item 2)
+
+Before this turn, **every** existing spec touching this feature (`job-history-csv-export-2024`,
+`gateway-jobs-history-view-2026`, and the bridge suite's own history-adjacent tests) constructed the state a
+real send would have produced, by hand — mocked HTTP bodies or direct backend calls, never a real `/api/jobs`
+POST through a real tick loop through a real UI click. That is now closed by this turn's two new files; no
+other link in the history chain remains test-only after this turn.
+
+## The USB-stick workflow — established, and said plainly (dispatch item 3)
+
+**History records ONLY jobs that go out through `/api/jobs` on the bridge — nothing else writes to it.**
+Traced directly: `Ops.submit_job()` (`ops.py:58`) is the one call that reaches `self.backend.put_job()`;
+`poller.py`'s tick loop is what later calls `record_history` for a tracked or deliver-only job that passed
+through that path; nothing else in the codebase calls either.
+
+Studio has a **second, completely separate way to get a program onto the machine that never touches this at
+all**: the editor's own "Export…" action (`window.downloadFile()`, `editorManager.js:259`) writes the
+program via a local file-system picker or a plain browser download (`deployFolder.js`) — a program a human
+can then carry to the controller on a USB stick and load directly at the DDCS panel. This path shares zero
+code with `submit_job`/`/api/jobs`; a job delivered this way is invisible to History, Tracking, and "last
+time," by construction, not by a bug.
+
+**Said plainly, as the dispatch asked: this is a finding about who the feature serves, not a defect.** History
+and live tracking serve exactly the operators who send through the Gateway. An operator who normally exports
+to a USB stick and walks it to the machine gets none of this — no record, no duration, no "last time," no
+live progress — and nothing in the current UI tells them so at the moment they choose Export over Send. Not
+fixed this turn (no product change was requested or implied by this finding); logged here as the answer to
+the question the dispatch said the human has not yet settled, so this decision is made with the fact, not the
+assumption, in front of them.
+
+## Non-vacuity
+
+Both new files were run standalone and are demonstrably not decoration. The Python file was watched fail
+during its own construction, twice, for real reasons diagnosed and fixed (an `enable_slave=False` misconfig
+that skipped the watch loop entirely per t2020's own existing, correct behaviour; `duration_s` rounding
+sub-second gaps to 0). The Playwright stalled-send test failed for a real reason (`tracked: false`) before
+the retract-move fix, and passes cleanly after it — the failure and the fix are causally connected, not
+coincidental. All 5 real-path tests (3 Python + 2 Playwright) were run individually and together; the full
+spec file runs clean in one pass with no cross-test process-teardown flakiness.
+
+## Gate
+
+Bridge suite: 59/59 (`pytest tests/` — 56 prior + 3 new). Node tier: 183/183 (unchanged — no node-tier
+source files touched). Specified Playwright gate — `gateway-jobs-history-view-2026`,
+`gateway-local-reach-1325`, `gateway-mismatch-gate-1229`, `gateway-quiet-offline-1307`,
+`gateway-state-contract-1327`, `send-gate-refuses-unreadable-1585`, `send-gate-wiring-1585`,
+`send-beacon-warning-2057`, `send-history-real-path-2065`: 32 passed, 2 pre-existing skips (unrelated to
+this turn), 0 failed.
+
+## Files
+- `bridge/bridge-app/tests/test_history_real_path_2065.py` — new, 3 tests, real HTTP + real tick loop.
+- `DDCS-Studio/tests/send-history-real-path-2065.spec.js` — new, 2 tests, real spawned bridge + real UI.
+
+🔨 turn 2065
