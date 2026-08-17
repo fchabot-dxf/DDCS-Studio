@@ -1,6 +1,7 @@
 /** views/slotView.js — Slot milling wizard view (Mill group). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { SlotWizard, slotArrayBBox, slotPatterned, slotPatternPoints } from '../slotWizard.js';
+import { slotPerp } from '../ops/slot.js';   // t2036 — the SAME perpendicular-offset function slotPath's own real emit uses, not a 3rd hand-typed copy
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
@@ -28,15 +29,16 @@ function applyTool() {
     if (Object.keys(m).length) setFields(m);
 }
 
-/** 2D layout: the slot centreline + its two edges, with draggable A, B and a width handle. */
-function buildSlotSpec(params, stock) {
+/** 2D layout: the slot centreline + its two edges, with draggable A, B and a width handle. Exported (t2036) so a
+ *  test can prove it shares slotPerp with slotData.js's own preview, not a re-typed copy that merely agrees. */
+export function buildSlotSpec(params, stock) {
     const ax = num(params.ax, 0), ay = num(params.ay, 0), bx = num(params.bx, 60), by = num(params.by, 0);
     // t1444 — the 2D draws the width you TYPED. The clamp made a too-narrow slot draw itself at tool width, so the
     // canvas agreed with a cut the emit now refuses to make — the same silent repair, on the surface the operator
     // is actually looking at. It is a no-op for every slot that still cuts (width ≥ tool).
     const W = num(params.width, num(params.toolDia, 6));
     const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len;          // perpendicular unit
+    const { nx, ny } = slotPerp(dx, dy, len);
     const mx = (ax + bx) / 2, my = (ay + by) / 2;  // midpoint
     const hw = W / 2;
 

@@ -137,31 +137,6 @@ export function odPasses(p = {}) {
 }
 
 /**
- * t1291 — HOW FAR ALONG THE BAR A ROUGHING PASS MAY CUT, which on a taper is not the whole length.
- *
- * A cone's radius changes with Z, so a pass at radius x may only cut where the finished surface is THINNER than x.
- * Cutting the full length at every radius — which is what this op did — removes the cone itself: for a fat far end
- * (Ø8 at the face, Ø16 deep) roughing to the face floor took the whole cone away and the finish pass then cut air.
- * On a real machine that is a gouged part, not a cosmetic sim error.
- *
- * The crossing is a pure ratio, so the controller can compute it with no trig:  z = −depth·(x − rFace)/(rFar − rFace).
- * Which SIDE of it to cut depends on which end is fat: a fat FAR end leaves the thin material near the face (cut from
- * the face to the crossing); a fat FACE leaves it deep (cut from the crossing to the end).
- *
- * @returns {{from:number, to:number}} the Z span this pass cuts, already clamped into the turned length
- */
-export function odPassExtent(x, p = {}) {
-    const v = { ...OD_DEFAULTS, ...p };
-    const targetR = radiusOf(Math.max(0, Number(v.targetDiameter) || 0));
-    const endR = odKind(v.kind) === 'taper' ? radiusOf(Math.max(0, Number(v.endDiameter) || 0)) : targetR;
-    const depth = Math.max(0, Number(v.depth) || 0);
-    const zEnd = -depth;
-    if (Math.abs(endR - targetR) < 1e-9) return { from: 0, to: zEnd };          // straight: the whole length, as before
-    const cross = Math.max(zEnd, Math.min(0, round3(-depth * (x - targetR) / (endR - targetR))));
-    return endR > targetR ? { from: 0, to: cross } : { from: cross, to: zEnd };
-}
-
-/**
  * The OD-turning macro as a block stack: a #var config header, a controller-side pass loop, one finishing pass.
  * @param {object} p  OD_DEFAULTS shape
  */

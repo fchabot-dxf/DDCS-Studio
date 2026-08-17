@@ -40,7 +40,7 @@
  * every gate by tests/slot-as-data.spec.js + tests/slot-twin-repoint-1500.spec.js.
  */
 import { slotStack, slotStackRidesRaster, slotStackArmGap, slotLeafParams } from '../../wizards/stacks/slotWizard.js';
-import { slotRasterParams } from '../../wizards/ops/slot.js';   // t1500 — the atom's slot-side params are ALL derived; postInstantiate writes them from this one source
+import { slotRasterParams, slotPerp } from '../../wizards/ops/slot.js';   // t1500 — the atom's slot-side params are ALL derived; postInstantiate writes them from this one source. t2036 — slotPerp: the SAME perpendicular-offset function slotPath's own real emit uses
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
@@ -154,7 +154,8 @@ export function slotPreviewGeometry(p) {
     const ax = _n(p.ax, 0), ay = _n(p.ay, 0), bx = _n(p.bx, 60), by = _n(p.by, 0);
     const tool = _n(p.toolDia, 6), W = Math.max(tool, _n(p.width, tool));
     const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len, mx = (ax + bx) / 2, my = (ay + by) / 2, hw = W / 2;
+    const { nx, ny } = slotPerp(dx, dy, len);
+    const mx = (ax + bx) / 2, my = (ay + by) / 2, hw = W / 2;
     const line = (x1, y1, x2, y2, cls) => ({ pts: [{ x: x1, y: y1 }, { x: x2, y: y2 }], cls: cls || 'fc-guide' });
     const paths = [
         line(ax, ay, bx, by, 'fc-path'),                                              // centreline (the tool path)

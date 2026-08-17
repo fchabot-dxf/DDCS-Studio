@@ -41913,3 +41913,81 @@ Tier 3's 5 capability gaps, abort-vs-lost-link, two-sided SETUP, preview Fork 3 
 list, none started, none blocking.
 
 🔨 turn 2034
+
+# ═══ t2036 — odPassExtent DELETED (dead), slot_data COLLAPSED (and undercounted at 2 — it was really 3) ═══
+
+Two clean, bounded items, per the dispatch.
+
+## (1) `odPassExtent` — DELETED, not just flagged
+
+Zero callers anywhere in the app, confirmed a second time before touching anything (t2034 confirmed it once;
+re-grepped fresh this turn). Removed the function AND its own dedicated comment block (`t1291`'s 14-line
+doc, which described nothing else) — a comment describing a function that no longer exists is a worse
+landmine than the dead function alone. `round3` (the one helper `odPassExtent` also used) stays — confirmed 8
+other live call sites in the same file. `npm run test:node`: 152/152, zero movement (a pure deletion of
+already-unreachable code cannot change any output).
+
+## (2) `slot_data`'s perpendicular-offset formula — COLLAPSED, and the real count was 3, not 2
+
+**Consumer check first found the survey (and my own t2032 report) had UNDERCOUNTED, not overcounted.**
+t2032 checked only `slot.js` (the real emit, cited by the survey) against `slotData.js` (the twin) and called
+it "2 files, survives unchanged." That missed `slotView.js` — the CLASSIC WIZARD's own 2D view, STILL
+registered in `wizards/views/index.js` and reachable via `SlotWizard`. Mill cutting ops were never touched by
+the Fork-4 legacy-view deletion (that was probe-family-only); slot's classic dual-path (a `SlotWizard` class
+alongside the twin) is fully alive today, unlike edge/middle/corner's now-retired equivalents. `slotView.js:39`
+carries a THIRD independent hand-typing of the identical `nx=-dy/len, ny=dx/len` formula — confirmed it draws
+the SAME thing (the slot's two edges) for the SAME field vocabulary (`ax/ay/bx/by`, matching the twin, per
+`slotStack`'s own documented `ax→x0` etc. bridge) — a genuine triplicate, not a different-consumer false
+positive. Point (3)'s "stop and say so if it's a different consumer" did NOT fire here — unlike contour's bbox
+helper (t2028) or homing's grid-centre calc (t2032), all three slot copies serve the identical need.
+
+**The fix.** Extracted the 2-line formula into `export const slotPerp = (dx, dy, len) => ({ nx: -dy/len, ny:
+dx/len })` in `slot.js` (the real emit's own file — the natural home, matching every other Tier-1/2 collapse
+this session). `slotPath` (the emit), `slotData.js`'s `slotPreviewGeometry` (the twin's preview), and
+`slotView.js`'s `buildSlotSpec` (the classic wizard's own view, now `export`ed for testability, matching the
+`fmtCtrl`/`fmtLine` re-export precedent from t2030) all call it. Each caller keeps its OWN `dx/dy/len` — and
+deliberately its own zero-length handling, which genuinely differs by design: the emit short-circuits into a
+single-plunge comment before ever reaching the formula; a preview defaults `len` to 1 so a degenerate A==B
+still draws something. Only the shared vector math collapsed — not the surrounding zero-length policy, which
+is a real, intentional divergence between "what the machine does" and "what the picture must always show."
+
+**Non-vacuity — reference identity, used where the shape allowed it, per the dispatch's own instruction.**
+`slotPerp` is imported directly (no rename-adapter needed for THIS specific function, unlike contour's
+`regionFromFlat`), so a test asserts the SAME binding is used everywhere; a second test drives the REAL
+`slotPreviewGeometry` and the REAL (now-exported) `buildSlotSpec` with identical A/B/width and confirms both
+draw the exact same edge line. Reverting all three files throws `SyntaxError` immediately (the export doesn't
+exist pre-collapse) — the same clean, immediate proof shape as t2020/t2028/t2032's brand-new exports, no
+mutation technique needed here (that technique is for when a revert stays green, which this isn't).
+
+**Value-preserving — zero snapshot movement**, matching contour/comm/edge's own collapses (unlike parting's,
+which had two real, deliberate behaviour changes). `npm run test:node`: 155/155 (152+3), no lines moved in
+`preview-spec-1688.txt`.
+
+## Gate
+
+New: `preview-collapse-slot-2036.test.mjs` (3 tests, non-vacuity proved above). `npm run test:node`: 155/155
+(152+3), zero snapshot movement from either change. Playwright: full `slot-*` spec set (14 files) +
+`lathe-odturn-1273` (odPassExtent's own file) + `fork-parity-1593` + `guard-roundtrip-1595` — 90 passed clean,
+1 flaky-then-passed-on-retry (the SAME documented Blocks-boot-timeout flake seen at t2028/t2030, unrelated to
+either change here). `proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/web/wizards/lathe/odTurn.js` — `odPassExtent` + its own comment block, deleted.
+- `DDCS-Studio/web/wizards/ops/slot.js` — `slotPerp` extracted + exported; `slotPath` calls it.
+- `DDCS-Studio/web/blocks/dataOps/slotData.js` — `slotPreviewGeometry` calls the shared `slotPerp`.
+- `DDCS-Studio/web/wizards/views/slotView.js` — `buildSlotSpec` exported + calls the shared `slotPerp`.
+- `DDCS-Studio/tests/node/preview-collapse-slot-2036.test.mjs` — new, 3 tests.
+
+## Tier-2 state, honestly
+
+2 resolved/collapsed this session (`homing_data`, `slot_data`), 7 survive (`corner_data`'s two maps, the 4
+lathe-bar predicates, the ATC `-3000` magic number, lathe probe-stylus size, ATC beep pulse-count, `text_data`'s
+centreline mismatch), none confirmed live-divergent. Structural hygiene territory now, as the advisor named —
+not expecting further spigot-class wins in what's left, and saying so rather than implying otherwise.
+
+## Queue
+
+Tier 3's 5 capability gaps, abort-vs-lost-link, two-sided SETUP, preview Fork 3 — named per the dispatch's own
+list, none started, none blocking.
+
+🔨 turn 2036

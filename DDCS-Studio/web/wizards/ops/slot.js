@@ -25,6 +25,13 @@ export const slotTooSmall = (p = {}) => toolTooLarge(slotMaxToolDia(p), num(p.to
 /** The operator sentence for a slot the tool cannot fit, or '' — one wording for emit, preview, twin and CAM pack. */
 export const slotToolRefusal = (p = {}) => toolFitRefusal(slotMaxToolDia(p), num(p.tool, num(p.toolDia, 6)), 'slot');
 
+// t2036 — the ONE declared perpendicular-offset fact (PREVIEW-AS-DATA.md Tier-2 #11), now reused by both preview
+// consumers (slotData.js's twin, slotView.js's classic wizard) instead of each hand-typing this 2-line formula a
+// second and third time. Each caller keeps its OWN dx/dy/len (and its own zero-length handling — the emit below
+// short-circuits into a single-plunge comment before ever reaching this; a preview instead defaults len to 1 so
+// it still has something to draw for a degenerate A==B) — only the shared vector math collapses onto one place.
+export const slotPerp = (dx, dy, len) => ({ nx: -dy / len, ny: dx / len });   // perpendicular (left of A→B)
+
 /** Slot toolpath: clearance preamble + zig-zag offset passes stepping down (+ zero-length single-plunge guard). */
 export function slotPath(p) {
     const x0 = num(p.x0, 0), y0 = num(p.y0, 0), x1 = num(p.x1, 60), y1 = num(p.y1, 0);
@@ -55,7 +62,7 @@ export function slotPath(p) {
         return L;
     }
 
-    const nx = -dy / len, ny = dx / len;        // perpendicular (left of A→B)
+    const { nx, ny } = slotPerp(dx, dy, len);
     const band = Math.max(0, width - tool);     // width the tool centre must sweep
     const offs = [];
     if (band < 1e-6) offs.push(0);
