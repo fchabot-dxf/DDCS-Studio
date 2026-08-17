@@ -5170,3 +5170,42 @@ neither is a real 10-minute job.** One wrong duration poisons every later estima
 
 ⚠ Then: Tier 2's 6 (structural, none confirmed live) · **two-sided SETUP** · **preview Fork 3** · and the two
 bench experiments above, which are the human's.
+
+# ═══ t2050 — TIER 2's SIX (structural hygiene; nothing else is unblocked) ═══
+
+**RELEASED V2026.08.17.4** (`7d818e97`, pushed): full suite **2597 passed / ZERO failures**, node 165/165,
+bridge 31/31.
+
+t2049 accepted. **You found a live defect in what we shipped 24 hours earlier, and you reproduced it BEFORE
+touching code** — three same-hash rows (delivered / stalled-at-45s / the true 600s completion) returning **45**.
+A machinist re-sending an interrupted program would have planned against it.
+
+**The fix is the right shape, not just the right value:** gating on `final_state === 'done'` is an **explicit
+"this row is a genuine completion"**, replacing an inference from a field that merely *correlates* — which is
+the same class of error as reading `duration_s` as "it finished". And **"—" for unknown** rather than a
+fabricated number meets the bar I set at t2018 and you held me to.
+
+**And (1)/(2) came back as a LIMIT, correctly:** an operator abort cannot be told from a lost link or a genuine
+hang; distinguishing them needs a channel that does not exist. **You named what it would take and did not
+attempt it.** *"Cannot distinguish these two, here is why"* is the answer I wanted.
+
+## ⚠ WHERE THE ARC STANDS — everything else needs the human or the bench.
+Live progress is blocked on two bench experiments (V4.1's `.pos` mid-run poll · Expert's checkpoint density),
+and **two-sided SETUP** and **preview Fork 3** are the human's rulings. **Do not design ahead of any of them.**
+
+## THE TASK — the only substantial work left that needs nobody: Tier 2's six.
+None is confirmed to be causing anything — this is **drift prevention, not bug-fixing**, and I want that said
+plainly rather than dressed up.
+`corner_data`'s two 4-entry maps · the 4 lathe-bar predicates (widest surface: 3D + DRO + canvas) · the
+`-3000` magic number · lathe stylus size (cosmetic) · the beep pulse-count (comment-only) · `text_data`
+(already self-disclosed via its own `statusHint`).
+
+1. **START WITH THE 4 LATHE-BAR PREDICATES** — your own ranking called them the **widest surface area**, and
+   *"co-extensive only by accident"* is precisely the phrase that precedes a divergence.
+2. **USE YOUR OWN t2040 METHOD** — grep current code, *same-need + same-field-vocabulary*, **and check the
+   classic-view path**. Do not resume the survey's list; it is retired.
+3. **⚠ EXPECT SOME TO BE NOT-WORTH-DOING AND SAY SO.** A comment-only duplicate and a cosmetic stylus size may
+   genuinely not earn a change. **"Leave it, here is why" closes an item** — I would rather carry an honest
+   six-item list than six changes nobody needed.
+4. **LAND EACH COMPLETELY; park the rest by name.**
+5. **Gate:** node tier + the spec sets you touch + the round-trip/parity set.
