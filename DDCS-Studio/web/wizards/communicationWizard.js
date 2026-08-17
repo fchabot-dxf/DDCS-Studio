@@ -9,7 +9,7 @@ import { recordOp } from '../blocks/opRecord.js';
 // kept importable+re-exported here unchanged for every other existing caller — pure move, no signature change).
 // CommunicationWizard (the class below) is NOT a legacy screen only — its generateScreenPreview() is also the
 // LIVE renderer for the twin's own 'commscreen' panel (userOpView.js), so it stays in place, untouched, either way.
-import { commStack } from './stacks/communicationWizard.js';
+import { commStack, fmtLine } from './stacks/communicationWizard.js';   // t2030 — fmtLine REUSED for the preview's own single-line formatting, not a second hand-typed copy
 export { commStack };
 
 // CommunicationWizard: Generates UI G-code (popup/status/input/etc.)
@@ -145,19 +145,12 @@ export class CommunicationWizard {
         };
     }
 
-    formatMessageForController(msg) {
-        const text = String(msg || '');
-        return text
-            .replace(/\r\n|\r|\n/g, ' / ')
-            .replace(/\s*\/\s*/g, ' / ')
-            .trim();
-    }
-
+    // t2030 — formatMessageForController (a byte-identical, unused 3rd copy of fmtCtrl — zero callers, confirmed by
+    // grep across the whole app) removed as an orphan, not collapsed: nothing rendered from it, so there was no call
+    // site to redirect. formatMessageSingleLine now calls the imported fmtLine (stacks/communicationWizard.js — the
+    // SAME function commStack's own real emit uses) instead of re-deriving the identical regex by hand.
     formatMessageSingleLine(msg) {
-        return String(msg || '')
-            .replace(/\r\n|\r|\n/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+        return fmtLine(msg);
     }
 
     escapeMessageForPreview(msg) {

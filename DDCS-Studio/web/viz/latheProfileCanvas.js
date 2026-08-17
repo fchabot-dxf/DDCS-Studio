@@ -20,6 +20,7 @@
  */
 import { halfProfile, normalizeBar, radiusOf, diameterOf } from '../data/lathe.js';
 import { polygonPath, polyRadiusAt, polySides } from '../wizards/lathe/polygon.js';   // t1277 — the end view draws the op's OWN r(angle), never its own idea of a hexagon
+import { partBladeZ, partFloorRadius } from '../wizards/lathe/parting.js';   // t2030 — the SAME kerf helpers the real emit calls, "derived HERE so the emit and the tests cannot disagree" (parting.js's own words) — this canvas used to disagree with that on purpose, one level down
 
 /** Lathe Z → canvas x. The bar runs left (chuck, −Z) to right (raw face, +Z), which is how a turner faces one. */
 export const zToCanvas = (z) => z;
@@ -274,8 +275,16 @@ export function partProfileSpec(bar, part, onChange) {
     const groove = o.kind !== 'part';
     const width = Math.max(0, Number(o.width) || 0);
     const zFace = Number(o.zFace) || 0;
-    const zBlade = zFace - width;                 // the far side of the kerf — where the blade body sits
-    const floorR = groove ? radiusOf(Math.max(0, Number(o.floorDiameter) || 0)) : 0;
+    // t2030 — COLLAPSED onto partBladeZ/partFloorRadius (wizards/lathe/parting.js), the SAME functions the real emit
+    // calls, instead of re-deriving "zFace - width" and the floor radius by hand a 3rd time. zFace/width need no
+    // rename (the twin already uses these names); the twin's single `floorDiameter` field is adapted into the
+    // wizard's own two-name vocabulary (targetDiameter/spigotDiameter) — partFloorRadius picks the right one by
+    // `kind` internally, so passing the same value under both names is exact, not a guess.
+    const zBlade = partBladeZ(o);                 // the far side of the kerf — where the blade body sits
+    const floorR = partFloorRadius({ kind: o.kind, targetDiameter: o.floorDiameter, spigotDiameter: o.floorDiameter });
+    // t2030 — DELIBERATE BEHAVIOUR CHANGE, not silent: the OLD code hardcoded floorR=0 for every part-off, so a
+    // declared spigot (floorDiameter > 0 while parting) never appeared in the drawing at all — partFloorRadius
+    // handles both kinds correctly, so a part-off spigot now draws where the operator actually typed it.
 
     return {
         stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },

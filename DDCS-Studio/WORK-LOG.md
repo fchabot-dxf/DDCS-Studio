@@ -41583,3 +41583,119 @@ blast radius than assumed going in. Restored from the scratch copy; all 3 pass a
   dispatch's own list, none started.
 
 🔨 turn 2028
+
+# ═══ t2030 — TIER-1 CLOSED: comm_data's message regex + lathe_parting's kerf formula, both collapsed ═══
+
+The two parked-by-name items from t2028. **All 6 Tier-1 items from PREVIEW-AS-DATA.md's original ranked list
+are now resolved** — 4 collapsed (`pocket_data` t2016, `contour_data`/ATC-sim t2028, `comm_data`/`lathe_parting`
+this turn) and 1 collapsed incidentally to 2 copies as a side effect of the Fork-4 legacy-view deletion
+(`edge_data`, t2016's own measurement, untouched further since — genuinely lower priority, not re-opened this
+turn per the dispatch's own scope). Own order: `comm_data` first (the simpler of the two, as parked), then
+`lathe_parting`.
+
+## (1) `comm_data`'s message-formatting regex — COLLAPSED (3 copies → 1, plus a dead 4th removed)
+
+**Consumer check first found the count was stale in a NEW way — a live copy had moved, not just shifted
+lines.** t1728's relocation moved `communicationWizard.js`'s OWN module-scope `fmtCtrl`/`fmtLine` (the ones
+the REAL EMIT calls) into `stacks/communicationWizard.js` — the survey's cited file no longer holds them at
+all. `commData.js`'s own copy — genuinely the SAME real-emit need (its `postInstantiate` recompose must stay
+"BYTE-IDENTICAL to commStack," the file's own doc comment) via a DIFFERENT construction mechanism
+(sentinel-swap over an already-built superset, not a direct build) — is a true duplicate, unlike
+`contourWizard.js`'s bbox helper at t2028: same field (`msg`), same purpose, two mechanisms. Collapsed onto
+`stacks/communicationWizard.js`'s own exports.
+
+**`communicationWizard.js`'s own class methods, checked individually, not swept as one block.**
+`formatMessageSingleLine` is LIVE — feeds `generateScreenPreview` (the DDCS-screen mock, a genuinely different
+FINAL consumer than G-code) but computes the exact same FACT (single-line message) the emit's `fmtLine`
+already owns — collapsed the same way pocket_data's preview boundary was: not a different fact, a different
+downstream use of the identical one. `formatMessageForController` — CONFIRMED DEAD (zero callers anywhere in
+the app or tests, grepped before touching anything) — removed as an orphan, not collapsed: nothing rendered
+from it, so there was no call site to redirect onto the shared function, matching t2016's "orphans removed"
+step. `escapeMessageForPreview`/`formatMessageForPreview` (HTML-escaping + `<br/>` line breaks) compute a
+genuinely DIFFERENT fact with no emit equivalent — correctly left untouched.
+
+**Non-vacuity — the STRONGEST form available, per PREVIEW-AS-DATA.md's own stated bar, used where it was
+achievable.** Re-exported `fmtCtrl`/`fmtLine` from `commData.js` (a 1-line addition) specifically so a test
+could assert REFERENCE IDENTITY (`toBe`, not `toEqual`) between the twin's imported binding and the real
+emit's own export — the direct proof "only the reference identity of the function called can tell them apart"
+names, stronger than a value-equality check. `npm run test:node`: zero snapshot movement (value-preserving,
+same shape as contour_data's own collapse).
+
+## (2) `lathe_parting`'s kerf-offset formula — COLLAPSED, and NOT byte-identical, reported plainly
+
+**The rename resolved, not newly adapted — the twin's own field already IS the bridge.** `zFace`/`width` need
+no adapter (twin and wizard already share those names). The twin's single #var-bound `floorDiameter` field
+covers what the wizard keeps as two mutually-exclusive named fields (`targetDiameter` for groove,
+`spigotDiameter` for part) because ONE macro variable (`#142`) serves both roles — a deliberate design choice
+(one socket, one field), not a careless divergence, confirming t2016's own suspicion. Bridged by passing
+`floorDiameter` under BOTH wizard names at once (`partFloorRadius`'s own `kind` dispatch picks the right one)
+— no NEW adapter needed, and said so before writing anything, per the dispatch's own instruction.
+
+**`latheProfileCanvas.js`'s partProfileSpec now calls `partBladeZ`/`partFloorRadius` (`wizards/lathe/parting.js`)
+directly** — the same two functions that file's own doc comment says are "derived HERE so the emit and the
+tests cannot disagree." Worth noting: `latheProfileCanvas.js`'s OWN header comment already states the exact
+principle this collapse restores ("IT DRAWS THE MODEL'S DATA, IT DOES NOT COMPUTE GEOMETRY... there is no
+second opinion to reconcile") — the kerf math was the one place in this file that quietly violated its own
+stated design.
+
+**NOT byte-identical — TWO real, deliberate value changes, both found by comparing the OLD and NEW formulas
+directly rather than assuming the collapse was free, and BOTH reported rather than smoothed over:**
+1. **A genuine bug fix.** The old hand-typed `floorR` was HARDCODED to 0 for every part-off, regardless of a
+   declared spigot diameter (`floorDiameter > 0` while `kind:'part'` — a real, supported combination per the
+   twin's own binding help text: "Parting: leave 0 to run right through, or a diameter to leave a spigot you
+   snap off"). `partFloorRadius` handles both kinds correctly by construction, so a declared spigot now draws
+   where the operator actually typed it — previously invisible in the 2D preview no matter what was typed.
+2. **A tiny (≤0.001mm) rounding change.** `partBladeZ`/`partFloorRadius` apply `round3` (3dp) — the SAME
+   rounding the real emit's macro vars already carry; the old inline canvas code applied none, so the preview
+   was a sub-micron away from what actually got cut. Confirmed via a direct case (`radiusOf(8.567)` = 4.2835
+   exactly; the real emit already rounds to 4.284).
+
+**Snapshot moved, exactly where expected, regenerated per the test's own documented procedure.** `npm run
+test:node` failed on ONE line: `user_lathe_parting @offdefaults`'s kerf rect moved from `y:0,h:10` to
+`y:9.5,h:0.5` — the fixture's own `@offdefaults` case happens to combine `kind:'part'` with a nonzero
+`floorDiameter`, so the bug fix fired on the golden snapshot itself. Regenerated with
+`UPDATE_PREVIEW_SNAPSHOT=1` (which correctly refuses a bare regen without review, per INVARIANT #11's own
+guard — confirmed it did), reviewed the diff (exactly the one predicted line, nothing else moved), re-ran clean.
+
+**Non-vacuity — a genuine revert-and-fail proof, no mutation needed this time**, since (unlike contour) this
+collapse has real behavioural content: reverted `latheProfileCanvas.js` to the pre-collapse hand-typed
+version, all 3 new tests FAILED correctly (the reference-check-equivalent value comparison, the bug-fix
+assertion, and the rounding assertion — all three catch the reversion cleanly). Restored, re-confirmed green.
+
+## Gate
+
+- New: `preview-collapse-comm-2030.test.mjs` (4 tests) + `preview-collapse-parting-2030.test.mjs` (3 tests) —
+  7/7 pass, non-vacuity proved above per-fix (reference-identity for comm, genuine revert-and-fail for parting
+  — the two fixes have different vacuity shapes, stated explicitly rather than one blanket claim for both).
+- `npm run test:node`: 147/147 (140 + 7 new). ONE deliberate snapshot line moved (the parting spigot fix,
+  reviewed and regenerated); comm_data's own collapse moved zero lines.
+- Playwright: full `comm-*` spec set (6 files, 7/7) + full `lathe-*` spec set (25 files) + `parting-cross-
+  dialect-1900` + `layout-partzero-shift-1672` + `fork-parity-1593` + `guard-roundtrip-1595` — **143/143 clean,
+  zero flakes this run** (unlike t2028's two known Blocks-boot timeouts, which were re-confirmed unrelated to
+  either change).
+- `proc_health.py watch`: clean.
+
+## TIER-1 STATUS: CLOSED, stated plainly per the dispatch's own ask
+
+All 6 of PREVIEW-AS-DATA.md's original Tier-1 findings are now resolved: `pocket_data` (t2016), `contour_data`
++ ATC `def.sim` (t2028), `comm_data` + `lathe_parting` (this turn) — 5 genuine collapses onto the emit's own
+function, 1 self-heal write-back. `edge_data` sits at its t2016-measured ×2 (down from ×4, an incidental side
+effect of the Fork-4 legacy-view deletion, not a deliberate collapse) — correctly out of THIS turn's scope
+(not named in the dispatch's own list), but worth naming as the one Tier-1-adjacent item that was never
+directly touched.
+
+## Files
+- `DDCS-Studio/web/wizards/stacks/communicationWizard.js` — `fmtCtrl`/`fmtLine` exported.
+- `DDCS-Studio/web/blocks/dataOps/commData.js` — imports + re-exports instead of redefining.
+- `DDCS-Studio/web/wizards/communicationWizard.js` — `formatMessageSingleLine` delegates; `formatMessageForController` removed (dead).
+- `DDCS-Studio/web/viz/latheProfileCanvas.js` — the kerf collapse + the spigot bug fix.
+- `DDCS-Studio/tests/node/preview-collapse-comm-2030.test.mjs` — new, 4 tests.
+- `DDCS-Studio/tests/node/preview-collapse-parting-2030.test.mjs` — new, 3 tests.
+- `DDCS-Studio/tests/node/__snapshots__/preview-spec-1688.txt` — the one deliberate line, regenerated not hand-edited.
+
+## Queue
+
+Abort-vs-lost-link in the gateway (no operator-abort concept exists at all); two-sided SETUP; preview Fork 3
+(the additive-layer shape) — all the human's, per the standing ruling, none started.
+
+🔨 turn 2030

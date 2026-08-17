@@ -12,12 +12,11 @@
  * It rides a SENTINEL: the superset bakes SENTINEL_MSG (etc.); the recompose global-replaces the sentinel with the resolved,
  * dialect-formatted text — so a single swap covers all ~6 embeddings, and the twin is byte-identical to the concrete bake.
  */
-import { commStack } from '../../wizards/stacks/communicationWizard.js';
+import { commStack, fmtCtrl, fmtLine } from '../../wizards/stacks/communicationWizard.js';   // t2030 — REUSED, not reimplemented: the SAME message-format functions commStack's own real emit calls
+export { fmtCtrl, fmtLine };   // re-exported so a reference-identity check (not just a value-equality one) can prove this stayed the SAME function, not a re-typed copy
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 // t632 — the twin no longer reads the active post (the _hmi guard is gone; the atoms fold per-post at emit time = the un-freeze).
-const fmtCtrl = (m) => String(m || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
-const fmtLine = (m) => String(m || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
 
 // ── SENTINELS — the superset bakes these; applyCommRecompose swaps them for the resolved values (clean tokens: no chars
 //    fmtCtrl/fmtLine transform, so they survive the format verbatim; a distinctive id/dest so the computed useId + var swap). ──

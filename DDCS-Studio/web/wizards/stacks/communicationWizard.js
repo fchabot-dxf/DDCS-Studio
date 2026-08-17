@@ -6,8 +6,13 @@ import { newBlock } from '../../blocks/blockEmitter.js';
 
 // t632 — commStack is now DIALECT-AGNOSTIC (the HMI idioms are dialect-aware atoms that fold at emit time); it no longer
 // resolves the active post at build time (that build-time bake was the twin freeze).
-const fmtCtrl = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
-const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
+// t2030 — EXPORTED: the one declared source for "format an operator message for G-code embedding." commData.js's own
+// postInstantiate recompose (a DIFFERENT construction mechanism — sentinel-swap over an already-built superset, not a
+// direct build) needs the SAME formatted string for the SAME params.msg field, and used to hand-type its own byte-
+// identical copy; the preview-only mock screen (communicationWizard.js's generateScreenPreview) needs the single-line
+// half of the same fact too. Collapsed onto this ONE function rather than three that happened to agree.
+export const fmtCtrl = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
+export const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
 
 /**
  * Communication (HMI) params → its block SNIPPET (Comment / Set# / If Goto / Goto / Label / Raw). A snippet —
