@@ -5126,3 +5126,47 @@ running job's position?"**
    maybe wastes a bench session. Their machine is the one that matters here.
 
 ⚠ **Read-only. No code.** Gate: none needed.
+
+# ═══ t2048 — ABORT vs LOST-LINK (independent of the bench; the live-progress arc now needs the human) ═══
+
+t2046 accepted. **Two results, and both matter:**
+
+**V4.1 — my combined idea REFUTED without a bench trip**, from evidence already on the bench. But you found a
+real candidate anyway: `\10.0.0.50\sysdisk\.<name>.nc.pos`, and designed a **15-second experiment** with an
+unambiguous read — a 3-move dwell-separated file, poll the `.pos` bytes mid-run, YES if they track 10→50→100
+*before* `M30`, NO if frozen until it fires. **That is a question the human can settle in one bench visit.**
+
+**Expert — no "current line" variable exists at all** (`FINDINGS.md`: none in the mapped register space; the
+on-screen `syntax error:Ln` renders straight to `/dev/fb0`, never persisted). **So there is no line to read —
+and the human's "edit the post" idea turns out to be the answer.** `CHECKPOINT_TEST.nc` already PROVED the
+outbound channel: `#250=1/2/3` + `MSETDATA` at each step, all three frames received near-instant, no wedge.
+Studio's post already emits macro lines per op, so a checkpoint write at each op boundary is a live signal over
+an **already-confirmed** channel. Only the DENSITY is untested. *(And `MGETDATA` — the inbound direction —
+wedges this firmware and forces a reboot: irrelevant here since checkpoint push is purely outbound, but worth
+never forgetting.)*
+
+**⚠ BOTH remaining questions need the bench, i.e. the human.** The loop cannot advance live progress further
+without them. **Do not build a checkpoint design on an untested density** — that is the same shape as raising
+`caps.flow` on an unread ruling.
+
+## THE TASK — the one job-tracking item that needs no hardware at all.
+Today an operator abort, a dropped link and a genuine hang **all report `"stalled"`** — and there is **no
+operator-abort concept anywhere in the gateway** (you grepped: zero `abort|cancel` hits).
+
+**Why it matters more than it looks:** job history is now the ground truth for *"how long did this take"*.
+**A run aborted at 10 minutes and a run that lost its link at 10 minutes are not the same evidence — and
+neither is a real 10-minute job.** One wrong duration poisons every later estimate built on it.
+
+1. **DISTINGUISH WHAT IS DISTINGUISHABLE, and record the rest as UNKNOWN — distinctly.** You already set this
+   bar yourself at t2018 and it was not met. **Do NOT fabricate a duration for a run whose end we cannot
+   establish.**
+2. **⚠ AN OPERATOR ABORT MAY NOT BE OBSERVABLE AT ALL** — if nothing tells the bridge the operator hit stop,
+   say so and record it honestly rather than inventing a signal. **"Cannot distinguish these two, here is why"
+   is a valid, useful outcome** and better than a plausible-looking wrong label.
+3. **DOES THE CSV / "last time" LOGIC ALREADY EXCLUDE non-`done` runs?** If an aborted run is feeding the
+   *"last time: N min"* answer, **that is a live defect in what we shipped** — check before designing.
+4. **DIALECT COVERAGE:** gateway-level, controller-agnostic — say so if you agree rather than padding.
+5. **Gate:** bridge suite + node tier + the gateway/History specs.
+
+⚠ Then: Tier 2's 6 (structural, none confirmed live) · **two-sided SETUP** · **preview Fork 3** · and the two
+bench experiments above, which are the human's.
