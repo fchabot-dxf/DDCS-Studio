@@ -5001,3 +5001,48 @@ else too.** Re-count with the classic-view lens.
 
 ⚠ Then: whatever your answer to (4) implies · abort-vs-lost-link · **two-sided SETUP** and **preview Fork 3**,
 both the human's and both still open.
+
+# ═══ t2042 — DRILL/BORE's SKIP PARAM: the twin's preview ignores it (read-only first) ═══
+
+t2040 accepted. **Tier 3 #20 was stale in the OPPOSITE direction — 0 of 8, not 6 of 8** — and you settled it by
+listing the view FILES on disk rather than the registry: the probe views are **deleted outright**, not merely
+unregistered. Only `wcsView.js` survives, and you read it in full: a bare DOM shell, zero geometry, matching
+the survey's own original `wcs_data` finding verbatim.
+
+**⭐ AND YOU FOUND A THIRD FAILURE MODE IN THE SURVEY — a METHODOLOGY GAP, not staleness.** Its mill-family
+text explicitly called the wiring *"clean"*, because **it never checked the classic-view path for mill ops at
+all.** That is why `slot`/`pocket`/`contour` were each undercounted: not a document going out of date, a
+question never asked. Distinguishing that from staleness is what makes the conclusion trustworthy.
+
+**And a correction to a correction:** the `-3000` magic number and the beep-pulse formula were **mislabelled
+"ATC" by the original survey from the start** — they are `comm_data` findings. Not drift; a label wrong on day
+one.
+
+**YOUR ANSWER TO MY QUESTION, ADOPTED IN FULL:**
+> **Stop treating `PREVIEW-AS-DATA.md`'s Tier 1/2/3 lists as an actionable checklist.** Everything remaining is
+> now independently re-verified against current code, so there is nothing left to re-derive *from* the
+> document. A fresh sweep for NEW duplicates uses **this turn's method** — grep current code, the
+> *same-need + same-field-vocabulary* bar, and check the classic-view path via `opensAs`/`viewByType` — not the
+> old lists. **The survey's PROSE (declare-vs-infer framing, tier severity logic) still reads true and stays.**
+
+**The lists are spent; the reasoning is kept.** That is the right distinction and I would not have drawn it as
+cleanly.
+
+## THE TASK — the one genuinely open user-visible gap you found.
+`drill`/`bore`'s **skip param is missing from `drillPatternGeometry`'s preview** (you read the whole function —
+zero `p.skip` reference), while **`drillView.js`, the classic view, handles it correctly.** So here **the
+classic view is RIGHT and the twin's shared preview is WRONG** — the inverse of everything else this arc found.
+
+1. **⚠ SETTLE WHAT THE USER SEES FIRST, read-only, as you did for the taper guard.** Set a skip on a real
+   drill/bore pattern: does the twin's preview draw holes that the emit will NOT cut? **Does it reach the
+   G-code, or only the picture?** (Here I expect picture-only — the emit is a different path — **but say so
+   from evidence, not from my expectation.**)
+2. **⚠ MY GATE IS RUNNING — if settling this needs a browser, PARK IT and say so.** Node-level reading is fine.
+3. **IF IT IS LIVE: collapse toward the RIGHT source.** The classic view is correct here, so the fix is the
+   twin's preview adopting the same declared skip rule — **not** copying `drillView`'s implementation into a
+   third place. **If there is no shared function to collapse onto, say so before writing one.**
+4. **NON-VACUITY** at your bar. **Gate:** node tier + the drill spec set + the round-trip/parity set.
+
+⚠ Remaining after this: Tier 3's other 3 (tap/text zRuler · `setLatheTool` dead, zero callers · the 2D pane
+not drawing the ATC magazine) · Tier 2's 6, none confirmed live · abort-vs-lost-link · **two-sided SETUP** and
+**preview Fork 3**, both the human's.
