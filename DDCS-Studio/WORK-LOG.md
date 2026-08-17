@@ -42955,3 +42955,100 @@ still `20260731T181343Z`) — whether P279 is now present, unblocking Option 1, 
 Expert reaching this network.
 
 🔨 turn 2057
+
+# ═══ t2059 — OPTION 1 PREP: the master-side Modbus client, proven against a local synthetic slave ═══
+
+Built, not designed, per the dispatch. Nothing wired into the live poller/job flow; no emitted G-code
+touched; Option 2 (checkpoint push, t2057) stays the shipped, honest fallback.
+
+## Survey confirmed again: bridge/ had zero master-side Modbus code
+
+Grepped the whole `fairy/` package before writing anything — only `slave.py` matched, a passive RTU slave
+(receives, never polls; confirmed again by reading it). `fairy/master.py` is genuinely new plumbing, not an
+extension of anything that already existed.
+
+## The client — `fairy/master.py`, `ModbusMaster` + `REGISTERS`
+
+`REGISTERS` declares the three EVIDENCE-tier blocks from `M350-MODBUS-REFERENCE.md` §1 (`work_position`
+7080/10, `machine_position` 7260/10, `state` 10002/2) as DATA, not scattered addresses — a correction is a
+one-line diff. `ModbusMaster.read(key)` is the only transaction shape the class can produce (read-only, FC03)
+and fails LOUDLY AND INSTANTLY on every way a read can go wrong: not connected, an unknown register key, a
+transport exception, a Modbus protocol-level error response, or a reply with the wrong register count — all
+raise the SAME `ModbusMasterError`, immediately, from the call that hit them. **This is the deliberate
+mirror-image of the defect fixed at t2057**: that fix stopped a dead receiver from looking healthy forever;
+this design stops a WRONG READING from looking like a real one. A wrong register (the map is "evidence, not
+attested" — never bench-confirmed on this user's own controller) must announce itself, not return silently
+plausible garbage.
+
+## Why this cannot wedge the firmware the way MGETDATA does
+
+Answered in the module's own docstring, not just here, so it stays attached to the code: `MGETDATA` is a
+G-CODE MACRO the Expert's own interpreter executes WHILE RUNNING A PROGRAM, blocking that macro on an
+external slave's reply — the hazard lives entirely inside the controller's macro-execution path (the
+documented ~16s timeout, the analyzer-channel wedge). Polling is the reverse relationship: with P279=Slave,
+the Expert's firmware Modbus STACK — not a macro, not the interpreter — answers a standard read the way any
+compliant slave device does. No G-code runs to service it; the controller's own analyzer is never in this
+path. `ModbusMaster` also cannot emit `MGETDATA` structurally, not just by omission — it speaks raw Modbus
+frames directly (no G-code emission of any kind exists in this file), and `read()` is its one transaction
+shape.
+
+## THE DERIVATION QUESTION, named honestly, not hand-waved
+
+Polling gives POSITION and STATE, not an operation number. Studio holds the whole plan (`linesForOp`,
+`estimateProgram`) — `JOB-PROGRESS-PLAN.md` (2026-08-13, still unbuilt) already named the mechanism AND its
+own failure mode as a numbered design constraint: **"Anchor by ADVANCING A CURSOR, not by matching
+position... a program crosses the same point many times, so 'where is the tool' ≠ 'which move is it on'.
+Walk the plan forward as positions arrive."** Concretely: never search the WHOLE path for the globally
+nearest point (exactly where a revisit goes ambiguous — multiple candidates, no way to prefer one); instead
+advance a monotonic cursor through the sim's own time-ordered playback, using the cursor's CURRENT expected
+position (given elapsed wall-clock time, corrected by measured-vs-predicted drift) to narrow the search to a
+small window near "now," not the whole program. In practice this collapses the ambiguity almost always: even
+when geometry repeats, TIMING doesn't — two visits to the same XY happen at meaningfully different points in
+the time-ordered sequence, and the cursor already knows roughly which one is current.
+
+**Named honestly, not claimed solved**: this narrowing depends on the correction factor being reasonably
+calibrated. Early in a job (before any real elapsed-vs-predicted data exists) the expected-position window is
+wider, so a revisit close in TIME as well as space is genuinely harder to disambiguate — a job dominated by
+tight, repeated back-and-forth motion over a small area (dense drilling, repeated pocket passes) is the
+concrete case where this could still go wrong, not a hypothetical one. This is a real, load-bearing property
+the cursor-advance design depends on, not a solved problem — worth stating plainly rather than smoothing over,
+matching the dispatch's own ask. Not built this turn; JOB-PROGRESS-PLAN.md's own note that "prediction alone
+works with no link at all" and is "the sensible first slice" still stands — this turn only prepares the READ
+side, not the derivation logic that would consume it.
+
+## Proof — the local synthetic slave, two tiers
+
+Logic needing no pymodbus wire I/O (REGISTERS shape, unknown-key refusal, not-connected refusal, close()
+idempotence) runs in the standard suite under whatever pymodbus is installed here (3.13). The REAL wire
+round-trip needs the client and server halves to agree with each other — `master.py`'s own `read()` is
+written for the PINNED `pymodbus==3.6.9` (confirmed by direct inspection: 3.13 renamed the `slave` kwarg to
+`device_id` and made it keyword-only — the same cross-version trap t2057 hit on the server side). Detected
+structurally (inspecting the actual call signature, not a version string) and skipped cleanly with a printed
+reason when the installed pymodbus doesn't match, rather than crashing the gate on an environment fact
+unrelated to the code.
+
+**The real proof**: ran the same test file through the scratch venv (the same one built at t2057, pinned
+correctly) — a genuine in-process synthetic Modbus TCP slave, pre-loaded with known register values at the
+SAME addresses `REGISTERS` declares, polled by the real `ModbusMaster`/pymodbus client over a real socket.
+Confirmed both directions: a correct read returns exactly the seeded values (`[111, 222, 0, 0, 0, 0, 0, 0, 0,
+0]`), and a deliberately wrong register range provokes a genuine Modbus exception response
+(`IllegalAddress`) which `read()` correctly refuses rather than silently accepting.
+
+## Gate
+
+Bridge suite: 46/46 (`pytest tests/`; 40 prior + 6 new, 2 of the 6 print an environment-skip reason under
+this machine's pymodbus and pass trivially rather than failing the gate — the scratch-venv run above is what
+actually proves the wire round-trip; noted honestly since `pytest -q` doesn't surface the printed reason by
+default). Node tier: 175/175 (unchanged — no node-tier files touched).
+
+## Files
+- `bridge/bridge-app/fairy/master.py` — new. Not imported anywhere else; genuinely unwired.
+- `bridge/bridge-app/tests/test_master_2059.py` — new, 6 tests.
+
+## Queue
+
+Unchanged: the opLabel bug (t2055, parked, small and localized). Two-sided SETUP + preview Fork 3 (the
+human's alone). Whether P279 is confirmed live on the human's own controller — awaits the two glances the
+advisor asked for (About build number, P279's own on-screen label); do not build past that confirmation.
+
+🔨 turn 2059
