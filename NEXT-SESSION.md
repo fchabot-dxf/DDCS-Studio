@@ -4788,3 +4788,43 @@ mirroring `def.panel`'s own already-working write-back one line above — not a 
 
 ⚠ **This closes Tier-1.** After it: abort-vs-lost-link · **two-sided SETUP** and **preview Fork 3**, both the
 human's. Say plainly in your pass-back if Tier-1 is done.
+
+# ═══ t2032 — CONFIRM edge_data, then open TIER 2 ═══
+
+**RELEASED V2026.08.17.1** (`e79e5530`, pushed). Gate: **2596 passed / 26 skipped / ZERO failures**, node
+147/147. t2030 accepted — **Tier 1 closed.**
+
+**The last collapse paid for the whole exercise:** the part-off canvas hardcoded the floor radius to 0, so a
+declared spigot **never drew, whatever the operator typed.** Found by collapsing a duplicate, not by hunting
+bugs — and you reported it as **NOT byte-identical**, deliberately, rather than burying a behaviour change
+under "refactor".
+
+**And you closed the testing gap you yourself identified one turn earlier.** You had said a value-equality test
+*structurally cannot* tell "one shared function" from "two copies that agree today" — which is the entire
+defect. So for `comm_data` you asserted **reference identity** (`toBe` on the function object), the strongest
+form `PREVIEW-AS-DATA.md` itself names, **re-exporting `fmtCtrl`/`fmtLine` specifically so the test could prove
+it.** Naming a limit one turn and engineering past it the next is the difference between a caveat and a fix.
+
+**Also right:** you found the survey's counts stale in a NEW way (t1728 relocated the real-emit functions, so
+the cited file no longer held them) · you removed `formatMessageForController` outright after confirming
+**zero callers anywhere**, rather than collapsing a corpse · and `lathe_parting` needed **no new adapter** —
+you established that before writing one, as asked.
+
+## THE TASK
+1. **⚠ CONFIRM `edge_data` HONESTLY — I could not settle it and I will not repeat it unchecked.** Your t2014
+   report said it dropped **4 → 2 as a SIDE EFFECT** of the legacy-view deletion, "not a deliberate dedup."
+   Your t2030 note counts it among the six resolved. Reading the code, `edgeData.js:65` now DECLARES
+   `EDGE_SIM_STARTS` (anchor/side/`@outset`) with `opSimStarts.js:77-80` as the resolver, and the cited
+   `panelTypes.js` **no longer exists at that path** — which looks like genuine single-sourcing. **Settle it:
+   one source, or two that agree?** *"It fell out of the 3+ band"* and *"it is resolved"* are different claims
+   and only one of them closes it. **If it is still 2 copies, collapse it — that is the honest end of Tier 1.**
+2. **THEN OPEN TIER 2** — the survey lists **14** two-copy duplicates. **Do not start collapsing them.**
+   **RECONCILE FIRST**, exactly as t2014 did for Tier 0/1: how many still hold at HEAD? The survey has now been
+   wrong in *both* directions — items already fixed (Tier 0, all four) and counts stale from relocation
+   (comm_data). **Report SURVIVING / FIXED / MOVED with evidence, and a floor not a total.**
+3. **⚠ RANK BY WHAT THE USER WOULD SEE.** Tier 1 taught us a duplicate can be *hiding a live bug* (the spigot).
+   **Say which of the survivors could be doing that** — that is the ranking I will dispatch from, not copy count.
+4. **Gate:** node tier. Read-only for part 2; part 1 may need a collapse.
+
+⚠ Then: Tier 3 (5 capability gaps) · abort-vs-lost-link · **two-sided SETUP** and **preview Fork 3**, both the
+human's and neither blocking.
