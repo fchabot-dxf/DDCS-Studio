@@ -5600,6 +5600,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     cursor:pointer; text-decoration:none; font:inherit; font-weight:600;
 }
 .ddcs-update-bar .upd-what { background:transparent; color:var(--text); border-color:var(--border); }
+/* t2066 — when the in-place same-name update is available, Download is a manual fallback, not an equal peer: demote it to
+   secondary styling so the one-click in-place path is visibly primary and users stop grabbing the dated Downloads copy. */
+.ddcs-update-bar .upd-dl-fallback { background:transparent; color:var(--text-dim); border-color:var(--border); font-weight:500; }
 .ddcs-update-bar .upd-x { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:15px; padding:0 4px; }
 .ddcs-update-bar .upd-notes { flex-basis:100%; max-height:180px; overflow:auto; margin-top:4px; color:var(--text-dim); font-size:12px; line-height:1.5; }
 

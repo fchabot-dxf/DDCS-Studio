@@ -64,6 +64,42 @@ test('update banner: silent on web, version compare correct, shows in (simulated
   expect(await page.evaluate(() => !!document.querySelector('.ddcs-update-bar')), 'dismissed version does not re-nag').toBeFalsy();
 });
 
+// t2066 — when the gateway reports the in-place same-name self-update is available, it becomes the PRIMARY action and
+// the dated manual Download is demoted to a labelled fallback. Users kept grabbing the version-named `DDCS-Studio-vX.exe`
+// from Downloads (a dated name that can't replace the running exe) instead of the one-click in-place update.
+test('in-place update available → self-update primary, dated Download demoted to a labelled fallback', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};   // simulate the exe
+    const real = window.fetch;
+    window.fetch = async (url, opts) => {
+      const s = String(url);
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/commits')) return { ok: true, json: async () => ([]) };
+      if (s.includes('/api/update/status')) return { ok: true, json: async () => ({ supported: true, writable: true, has_asset: true, has_checksum: true, tag: 'v9999.0' }) };
+      return real(url, opts);
+    };
+  });
+  await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
+  await page.waitForSelector('.ddcs-update-bar .upd-self');   // the in-place button appears only when status says it can
+
+  const r = await page.evaluate(() => {
+    const self = document.querySelector('.ddcs-update-bar .upd-self');
+    const dl = document.querySelector('.ddcs-update-bar .upd-dl');
+    return {
+      selfText: self && self.textContent,
+      selfBeforeDl: !!(self && dl && (self.compareDocumentPosition(dl) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      dlText: dl && dl.textContent,
+      dlDemoted: !!(dl && dl.classList.contains('upd-dl-fallback')),
+    };
+  });
+  expect(r.selfText, 'the in-place update names the version').toContain('v9999.0');
+  expect(r.selfBeforeDl, 'the in-place update sits before the manual Download').toBe(true);
+  expect(r.dlText, 'Download is relabelled as a manual fallback').toBe('Download manually');
+  expect(r.dlDemoted, 'Download carries the demoted fallback class').toBe(true);
+});
+
 // t1185 — the Download button used to fire TWICE (the anchor's target=_blank navigation AND a window.open in the click
 // listener). The fix: preventDefault + a SINGLE window.open (location.href only if the popup is blocked). Exactly one download.
 test('Download button triggers exactly ONE download: window.open once + anchor default prevented', async ({ page }) => {

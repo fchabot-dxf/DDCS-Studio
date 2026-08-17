@@ -77,6 +77,18 @@ async function addSelfUpdate(bar, tag) {
 You can download it yourself from the release page.`);
   });
   bar.insertBefore(btn, bar.querySelector('.upd-dl'));
+
+  // t2066 — PREFER THE IN-PLACE PATH, DEMOTE THE DATED DOWNLOAD. The in-place update downloads once and keeps THIS
+  // exe's own name and location (selfupdate.swap_in moves the new build onto the running file's exact path). The
+  // plain Download instead hands you a version-named `DDCS-Studio-vX.Y.exe` in your Downloads folder — a dated name
+  // that can't replace the running app without a manual rename+move, which is exactly the footgun the user hit. So
+  // once we KNOW the in-place button is live, relabel Download as an explicit manual fallback rather than an equal peer.
+  const dl = bar.querySelector('.upd-dl');
+  if (dl) {
+    dl.textContent = 'Download manually';
+    dl.classList.add('upd-dl-fallback');
+    dl.title = 'Saves a version-named copy to your Downloads folder. Use “Update … and restart” above to replace this app in place, keeping its name.';
+  }
 }
 
 function showBanner(tag, dl, body, commits) {
@@ -94,8 +106,13 @@ function showBanner(tag, dl, body, commits) {
   // ONE download path (t1185 — the anchor's target=_blank AND window.open BOTH firing = the double-download bug): preventDefault
   // the anchor, then a SINGLE window.open (routes to the system browser under pywebview, which may ignore target=_blank). Only
   // if the popup is blocked (window.open → null) fall back to location.href. Net = exactly one download in a browser AND the exe.
+  // t2066 — RE-ENTRANCY GUARD on top of the t1185 single-path fix: a double-click (or an event double-dispatch under
+  // pywebview) must not fire two downloads. Latch for ~1.5s so one gesture = at most one download, belt-and-braces.
+  let _dlBusy = false;
   bar.querySelector('.upd-dl').addEventListener('click', (e) => {
     e.preventDefault();
+    if (_dlBusy) return;
+    _dlBusy = true; setTimeout(() => { _dlBusy = false; }, 1500);
     let w = null; try { w = window.open(dl, '_blank', 'noopener'); } catch (_) { w = null; }
     if (!w && typeof window.pywebview === 'undefined') location.href = dl;
   });
