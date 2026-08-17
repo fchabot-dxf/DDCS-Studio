@@ -5209,3 +5209,45 @@ plainly rather than dressed up.
    six-item list than six changes nobody needed.
 4. **LAND EACH COMPLETELY; park the rest by name.**
 5. **Gate:** node tier + the spec sets you touch + the round-trip/parity set.
+
+# ═══ t2052 — LIVE JOB PROGRESS ON EXPERT (human-directed). Survey + design; STOP before touching emit ═══
+
+## BENCH RESULTS, run with the human at the V4.1 tonight — V4.1 IS SETTLED, NEGATIVE.
+Two routes tested live over SMB, both closed, and the controls were done properly:
+- **POSITION:** the on-screen DRO moved X 10→50→100 (**the human confirmed by eye**) while
+  `.POSTEST.nc.pos` **never changed content** — same hash start to finish, touched only at `M30`. **The
+  controller knows the position and does not write it anywhere readable.** The DRO check is what made this a
+  definite negative rather than a motorless artefact.
+- **VARIABLES:** `VARPROBE.nc` set `#230` eight times over ~160s. `#230` in `SYSDISK\uservar` = **0**. The
+  writes never arrived. *(I briefly misread `1111`/`2222` at other slots as ours — they were pre-existing
+  values at different variable numbers. The human corrected the indexing. Not a positive.)*
+
+**So: V4.1 gets predicted duration + history only. No live progress, ever, over this path.** Both already
+shipped.
+
+## THE HUMAN'S DIRECTION: *"ok make it work on expert then."*
+The channel is **already proven**: `CHECKPOINT_TEST.nc` set `#250=1/2/3` and called `MSETDATA` at each step —
+all three frames received by the PC's Modbus slave, **near-instant, no wedge** (`expert-m350/FINDINGS.md`).
+This is exactly the human's own *"edit the post"* idea, on hardware-confirmed plumbing.
+
+**⭐ AND STUDIO ALREADY HOLDS THE OTHER HALF:** per-operation time estimates (`estimateProgram` / `perLine` /
+`secondsForLines` — the setup sheet and time split already use them). **A checkpoint per OPERATION plus
+Studio's own per-operation durations gives a real "operation 3 of 7, about 23 minutes left" — no line-level
+tracking needed at all.**
+
+## THE TASK — survey and DESIGN. **⚠ STOP before changing a single emitted byte.**
+1. **SURVEY what exists:** the Modbus slave in `bridge/`, `enable_slave`, `CHECKPOINT_TEST.nc`'s exact working
+   frame shape (reg/func/slave-id/byte order — `FINDINGS.md` records `115200 8N1`, slave id 1, `X5=16` →
+   write-HOLDING, little-endian `reg=#(n+1)<<8|#n`), and where Studio's post could emit a per-op checkpoint.
+2. **⚠ THIS CHANGES EMITTED G-CODE — the project's iron rule.** Design it **OPT-IN and BYTE-IDENTICAL when
+   off.** State how you would prove the off-path is unchanged.
+3. **⚠ DENSITY IS UNTESTED — do NOT design past it.** The proven test was **3** writes. A 50-operation program
+   is 50. **Make the density a declared value, name the bench test that would confirm it, and say plainly that
+   it must not ship until that test passes.** Building on an untested send-rate is the `caps.flow` mistake.
+4. **⚠ `MGETDATA` MUST NEVER BE EMITTED** — it wedges this firmware and forces a reboot. Checkpoint push is
+   outbound only. Say how the design makes the inbound direction impossible, not merely unused.
+5. **V4.1 SAFETY:** enabling this on a V4.1 must be a no-op or refused — never a wedge, never a fake fault.
+   You already fixed the sibling case at t2020; reuse that shape.
+6. **NAME WHAT THE USER SEES:** "operation 3 of 7 · ~23 min left" — in their words, on which screen.
+
+⚠ **Design only this turn. No emit change, no post change.** Gate: none needed.
