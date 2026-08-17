@@ -270,6 +270,18 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path == "/api/update/apply":
             from . import selfupdate as su
             return self._send_json(su.perform_update())
+        # t2066 — OPEN AN EXTERNAL LINK in the user's real browser, HOST-SIDE. The embedded webview's own window.open
+        # on a download URL can fire twice (the webview downloads it AND the system browser does); the host opening it
+        # via webbrowser is the one deterministic path. http(s) ONLY — never hand a page the power to launch file:// or
+        # a custom protocol handler. The CSRF guard above already gates every POST here, so a drive-by page cannot reach it.
+        if self.path == "/api/open-external":
+            b = self._read_body()
+            url = (b or {}).get("url", "")
+            from urllib.parse import urlparse
+            if urlparse(url).scheme not in ("http", "https"):
+                return self._send_json({"ok": False, "error": "only http(s) links can be opened"}, 400)
+            import webbrowser
+            return self._send_json({"ok": bool(webbrowser.open(url))})
         if self.path == "/api/sysfile":
             b = self._read_body()
             return self._send_json(self.ops.write_sysfile(b.get("name", ""), b.get("content", ""), b.get("mode", "write")))

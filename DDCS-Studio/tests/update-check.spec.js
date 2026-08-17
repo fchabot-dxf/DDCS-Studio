@@ -33,24 +33,23 @@ test('update banner: silent on web, version compare correct, shows in (simulated
       const s = String(url);
       if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'release-notes.txt', browser_download_url: 'https://example/notes.txt' }, { name: 'benchgateway.exe', browser_download_url: 'https://example/other.exe' }, { name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
       if (s.includes('/commits')) return { ok: true, json: async () => ([{ commit: { message: 'feat: shiny new thing\n\nbody' } }, { commit: { message: 'fix: a bug' } }]) };
+      if (s.includes('/api/open-external')) { window.__openExt.push(JSON.parse(opts.body).url); return { ok: true, json: async () => ({ ok: true }) }; }
       return real(url, opts);
     };
   });
   await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
   await page.waitForSelector('.ddcs-update-bar');
 
-  // t1185's fix (see the OTHER test below) replaced the anchor+href Download control with a <button class="upd-dl">
-  // whose click listener calls window.open(dl, ...) directly — there is no href attribute to read anymore, so this
-  // asserts the SAME way test 2 does: mock window.open, click, check the URL it opened.
-  const bar = await page.evaluate(() => {
-    const opens = [];
-    window.open = (...a) => { opens.push(a); return { focus() {} }; };
-    document.querySelector('.ddcs-update-bar .upd-dl').click();
-    const b = document.querySelector('.ddcs-update-bar');
-    return { text: b.textContent, openedUrl: opens[0] && opens[0][0] };
-  });
-  expect(bar.text).toContain('v9999.0');
-  expect(bar.openedUrl).toBe('https://example/DDCS-Studio.exe');
+  // t2066 — in the exe the Download opens through the gateway (POST /api/open-external → the host's real browser, once),
+  // NOT window.open (whose embedded-webview double-fire was the bug). Assert the gateway was asked to open the .exe url,
+  // and window.open was never touched.
+  await page.evaluate(() => { window.__openExt = []; window.open = () => { window.__openExt.push('WINDOW_OPEN'); return { focus() {} }; }; });
+  const barText = await page.textContent('.ddcs-update-bar');
+  await page.click('.ddcs-update-bar .upd-dl');
+  await page.waitForFunction(() => (window.__openExt || []).length > 0);
+  const opened = await page.evaluate(() => window.__openExt);
+  expect(barText).toContain('v9999.0');
+  expect(opened, 'desktop download goes through the gateway once, never window.open').toEqual(['https://example/DDCS-Studio.exe']);
 
   await page.click('.ddcs-update-bar .upd-what');
   const notes = await page.textContent('.ddcs-update-bar .upd-notes');
@@ -100,35 +99,45 @@ test('in-place update available → self-update primary, dated Download demoted 
   expect(r.dlDemoted, 'Download carries the demoted fallback class').toBe(true);
 });
 
-// t1185 — the Download button used to fire TWICE (the anchor's target=_blank navigation AND a window.open in the click
-// listener). The fix: preventDefault + a SINGLE window.open (location.href only if the popup is blocked). Exactly one download.
-test('Download button triggers exactly ONE download: window.open once + anchor default prevented', async ({ page }) => {
+// t2066 (root fix of t1185) — the Download used to double-fire inside the embedded webview (the webview downloaded the
+// .exe AND the system browser did). It now opens through the gateway HOST-SIDE (POST /api/open-external → webbrowser.open,
+// exactly once), so in the exe window.open is never touched at all. Assert: exactly ONE gateway open, window.open unused,
+// default prevented, no page navigation. A re-entrancy latch also means two clicks are still just one open.
+test('Download opens exactly ONCE through the gateway; window.open is never used in the exe', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.__ddcsUpd);
   await page.evaluate(() => {
     window.pywebview = {};   // simulate the exe
+    window.__openExt = [];
+    window.__winOpen = 0;
+    window.open = () => { window.__winOpen++; return { focus() {} }; };
     const real = window.fetch;
     window.fetch = async (url, opts) => {
       const s = String(url);
       if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'release-notes.txt', browser_download_url: 'https://example/notes.txt' }, { name: 'benchgateway.exe', browser_download_url: 'https://example/other.exe' }, { name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
       if (s.includes('/commits')) return { ok: true, json: async () => ([]) };
+      if (s.includes('/api/open-external')) { window.__openExt.push(JSON.parse(opts.body).url); return { ok: true, json: async () => ({ ok: true }) }; }
       return real(url, opts);
     };
   });
   await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
   await page.waitForSelector('.ddcs-update-bar .upd-dl');
 
-  const r = await page.evaluate(() => {
-    const opens = [];
-    window.open = (...a) => { opens.push(a); return { focus() {} }; };   // truthy → the location.href fallback stays untaken
-    const before = location.href;
+  // click TWICE in quick succession — the re-entrancy latch must collapse it to a single open
+  const before = await page.evaluate(() => location.href);
+  const prevented = await page.evaluate(() => {
     const a = document.querySelector('.ddcs-update-bar .upd-dl');
     const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
     a.dispatchEvent(ev);
-    return { opens, defaultPrevented: ev.defaultPrevented, navigated: location.href !== before };
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    return ev.defaultPrevented;
   });
-  expect(r.opens.length, 'window.open fires exactly ONCE (not twice)').toBe(1);
-  expect(r.opens[0], 'opens the download URL in a new tab, noopener').toEqual(['https://example/DDCS-Studio.exe', '_blank', 'noopener']);
-  expect(r.defaultPrevented, 'the anchor navigation default is prevented → no second download').toBe(true);
-  expect(r.navigated, 'no page navigation on click').toBe(false);
+  await page.waitForFunction(() => (window.__openExt || []).length > 0);
+  const r = await page.evaluate(() => ({ openExt: window.__openExt, winOpen: window.__winOpen }));
+  const navigated = (await page.evaluate(() => location.href)) !== before;
+
+  expect(r.openExt, 'exactly ONE gateway open, of the .exe url — even after a double-click').toEqual(['https://example/DDCS-Studio.exe']);
+  expect(r.winOpen, 'window.open is never used on the desktop path').toBe(0);
+  expect(prevented, 'the click default is prevented').toBe(true);
+  expect(navigated, 'no page navigation on click').toBe(false);
 });

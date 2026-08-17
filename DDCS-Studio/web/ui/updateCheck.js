@@ -7,18 +7,9 @@
  * Download link + the recent commit messages ("what's new"). Public GitHub API, no token, one check per launch.
  */
 import { toast } from './gateway/util.js';   // the shared transient toast (web version-nudge reuses it)
+import { isDesktopApp, openExternal } from './openExternal.js';   // canonical "are we the exe?" + the one external-open primitive
 
 const REPO = 'fchabot-dxf/DDCS-Studio';
-const GW_PORTS = ['8765', '8766', '8767', '8768', '8769'];
-
-/** True only in the desktop exe: pywebview, or the page served from the gateway's loopback port. */
-function isDesktopApp() {
-  try {
-    if (typeof window.pywebview !== 'undefined') return true;
-    const loopback = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-    return loopback && GW_PORTS.includes(location.port);
-  } catch (_) { return false; }
-}
 
 /** Baked app version from the header chip ("V10.20" → "10.20"); null if absent. */
 function bakedVersion() {
@@ -103,18 +94,16 @@ function showBanner(tag, dl, body, commits) {
   const notes = bar.querySelector('.upd-notes');
   const list = (commits && commits.length) ? commits : (body || '').split('\n').filter(Boolean);
   notes.innerHTML = list.slice(0, 10).map((l) => `<div>• ${escapeHtml(l)}</div>`).join('') || '<div>See the release notes.</div>';
-  // ONE download path (t1185 — the anchor's target=_blank AND window.open BOTH firing = the double-download bug): preventDefault
-  // the anchor, then a SINGLE window.open (routes to the system browser under pywebview, which may ignore target=_blank). Only
-  // if the popup is blocked (window.open → null) fall back to location.href. Net = exactly one download in a browser AND the exe.
-  // t2066 — RE-ENTRANCY GUARD on top of the t1185 single-path fix: a double-click (or an event double-dispatch under
-  // pywebview) must not fire two downloads. Latch for ~1.5s so one gesture = at most one download, belt-and-braces.
+  // t2066 — THE download opens through openExternal(): in the exe the gateway opens the user's real browser server-side
+  // (webbrowser.open), which fires exactly once. The old window.open path double-fired inside the embedded webview (the
+  // webview downloaded the .exe AND the system browser did). A re-entrancy latch still guards a double-CLICK, since two
+  // gestures are two opens. (t1185 was the earlier, partial fix — the anchor+window.open double; this removes the root.)
   let _dlBusy = false;
   bar.querySelector('.upd-dl').addEventListener('click', (e) => {
     e.preventDefault();
     if (_dlBusy) return;
     _dlBusy = true; setTimeout(() => { _dlBusy = false; }, 1500);
-    let w = null; try { w = window.open(dl, '_blank', 'noopener'); } catch (_) { w = null; }
-    if (!w && typeof window.pywebview === 'undefined') location.href = dl;
+    openExternal(dl);
   });
   bar.querySelector('.upd-what').addEventListener('click', () => { notes.hidden = !notes.hidden; });
   bar.querySelector('.upd-x').addEventListener('click', () => { try { localStorage.setItem('ddcs_update_dismissed', tag); } catch (_) { /* */ } bar.remove(); });

@@ -183,6 +183,34 @@ def test_evil_origin_preflight_does_not_grant_the_local_header():
         httpd.shutdown()
 
 
+def test_open_external_is_guarded_and_scheme_limited():
+    """POST /api/open-external opens a link in the user's REAL browser host-side (the fix for the embedded-webview
+    double-download, t2066). It is a state-changing POST, so the CSRF guard applies (403 without the header); WITH the
+    header it opens only http(s) and REFUSES any other scheme (no file:// or custom-protocol launch from a page).
+    webbrowser.open is stubbed, so the test proves the GUARD + the scheme gate and never launches a browser."""
+    import webbrowser
+    _orig = webbrowser.open
+    opened = []
+    webbrowser.open = lambda u, *a, **k: (opened.append(u) or True)
+    httpd, port = _start()
+    try:
+        # forged cross-origin POST, no header → 403, and nothing is opened
+        st, _, data = _req(port, "POST", "/api/open-external", _HDR_JSON, '{"url":"https://example.com"}')
+        assert st == 403, "open-external without header must be 403, got %d (%s)" % (st, data)
+        assert opened == [], "must not open anything when unguarded: %r" % opened
+        # same-origin POST with the header + an http(s) url → 200 ok, opened exactly once
+        st, _, data = _req(port, "POST", "/api/open-external", _HDR_LOCAL, '{"url":"https://example.com/x.exe"}')
+        assert st == 200 and '"ok": true' in data, "http(s) open must be 200 ok, got %d (%s)" % (st, data)
+        assert opened == ["https://example.com/x.exe"], "the http(s) url must be opened once: %r" % opened
+        # a dangerous scheme is refused BEFORE any open (no file:// / protocol-handler launch from a page)
+        st, _, data = _req(port, "POST", "/api/open-external", _HDR_LOCAL, '{"url":"file:///C:/Windows/System32/calc.exe"}')
+        assert st == 400, "a non-http(s) scheme must be refused 400, got %d (%s)" % (st, data)
+        assert opened == ["https://example.com/x.exe"], "the file:// url must NOT be opened: %r" % opened
+    finally:
+        webbrowser.open = _orig
+        httpd.shutdown()
+
+
 if __name__ == "__main__":
     test_forged_post_without_header_is_403()
     test_post_with_header_reaches_ops()
@@ -193,6 +221,7 @@ if __name__ == "__main__":
     test_file_reads_are_guarded()
     test_trusted_origin_preflight_grants_the_local_header()
     test_evil_origin_preflight_does_not_grant_the_local_header()
+    test_open_external_is_guarded_and_scheme_limited()
     print("PASS — gateway CSRF guard: forged POST 403 (5 routes, never reaches Ops), header POST reaches Ops, "
           "preflight withholds X-DDCS-Local from untrusted/no-origin, innocuous GET open, guard is header-only (LAN == "
           "loopback); the sensitive GETs (Drive token + status) are 403 without the header (token NOT leaked) / return "

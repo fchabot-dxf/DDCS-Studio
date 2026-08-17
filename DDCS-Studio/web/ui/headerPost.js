@@ -19,6 +19,7 @@ import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare 
 import { getMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the identity line names THIS WORKSPACE'S MACHINE; t1231 — with its signed envelope
 import { THEMES } from './themes.js';
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
+import { openExternal } from './openExternal.js';   // t2066 — open external links once, host-side in the exe
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
 import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
 
@@ -54,7 +55,8 @@ function runQuickAction(act) {
         case 'standalone':
             // The "standalone" IS the desktop EXE (bundles the gateway, runs fully offline) — open the SAME
             // release link the Gateway page uses (gatewayStatus.EXE_DOWNLOAD_URL → the latest GitHub release).
-            window.open(EXE_DOWNLOAD_URL, '_blank', 'noopener');
+            // t2066 — via openExternal so a desktop-app viewer's embedded webview doesn't double-download the .exe.
+            openExternal(EXE_DOWNLOAD_URL);
             break;
         case 'settings': window.openSettings?.(); break;
         case 'checklist': window.openSetupChecklist?.(); break;

@@ -10,6 +10,7 @@
  */
 
 import { submitRating } from './analytics.js';   // t698 — POST stars+comment to the Worker /rate (D1 + AE)
+import { openExternal } from './openExternal.js';   // t2066 — open the repo link once, host-side in the exe
 
 // The ONE declared trigger config — thresholds + cooldowns, readable + tweakable in one place.
 export const RATE_TRIGGER = { minSessions: 2, minInserts: 5, cooldownLaterDays: 14, oncePerVersion: true };
@@ -70,7 +71,7 @@ function removeToast() { const t = document.querySelector('.ddcs-rate-toast'); i
 
 /** Open the GitHub repo (star / feedback) + record done — shared by the toast Rate button AND the header-menu entry. */
 export function openRate(source) {
-    try { window.open(REPO_URL, '_blank', 'noopener'); } catch (_) { /* popup blocked — the anchor href is the fallback */ }
+    openExternal(REPO_URL);   // t2066 — one open, host-side in the exe (no embedded-webview double)
     const s = loadState(); s.state = 'done'; saveState(s);
     track('rate_clicked');
     removeToast();
