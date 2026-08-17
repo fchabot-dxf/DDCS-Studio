@@ -41389,3 +41389,76 @@ Abort-vs-lost-link collapse into one "stalled"; the remaining 4 Tier-1 preview c
 preview Fork 3 — all the human's/advisor's, per the dispatch's own list.
 
 🔨 turn 2024
+
+# ═══ t2026 — COVER THE GATEWAY HISTORY VIEW: the gap the advisor's own release gate exposed ═══
+
+The advisor's full-suite release gate found what this session's own node-tier coverage could not: `jobs.js`
+grew +65 lines across t2020/t2024 (the "last time" column, the Export CSV button) with NO Playwright spec
+ever RENDERING it — the green-tests-over-a-dead-ui-path shape, in the feature just shipped. ONE view, exactly
+as scoped — no wider audit.
+
+## What was built
+
+**`DDCS-Studio/tests/gateway-jobs-history-view-2026.spec.js`, 3 tests, bridging to the gateway suite's OWN
+established techniques rather than a third way to stand a gateway up.** Combined `gateway-quiet-offline-1307`'s
+`page.route` response mocking with `gateway-state-contract-1327`'s navigate/click-the-tab pattern
+(`window.showApp('gateway')` + click the `Jobs` tab button). Deliberately did NOT depend on a real bridge
+process answering on this machine — `gateway-state-contract-1327`'s own "connected" tests already `test.skip`
+when nothing real is reachable, which would have made THIS spec non-deterministic/skippable on a machine with
+no bridge running. Mocking the exact three endpoints `jobs.js`'s own `onPoll` calls (`/api/descriptor`,
+`/api/queue`, `/api/history`) gets a genuinely connected, data-bearing state deterministically, every run, on
+any machine — the same technique `gateway-quiet-offline-1307` already uses for `/api/descriptor` alone,
+extended to the endpoints this ONE view actually needs.
+
+**Test 1 — the real gesture, asserting what a HUMAN SEES:** two staged history rows (same `content_hash`,
+newest-first, matching real `list_history()` ordering) render as table rows; the newer row's "last time"
+column shows the OLDER run's real duration (the repeat, visible on screen — the actual point of t2020's
+content-hash work); the Export CSV button exists and is not disabled.
+
+**Test 2 — the empty state:** no finished jobs renders the "no finished jobs yet" message, no table, and no
+Export button to click on nothing — an added case beyond what was asked, but a one-line natural counterpart to
+test 1 that costs nothing extra to assert.
+
+**Test 3 — THE DOWNLOAD IS WIRED, not merely that the button exists, per the dispatch's explicit demand.**
+`page.waitForEvent('download')` around the click: Chromium's download manager DOES fire for `UIUtils.
+downloadFile`'s `<a download>`-click-on-a-`blob:`-URL mechanism, and Playwright intercepts it — confirmed
+empirically by running it, not assumed. The honest-fallback path the dispatch asked for (assert the nearest
+observable thing if the download genuinely cannot be intercepted) is written into the test's own comment but
+was NOT needed — the real download interception worked outright, so the assertion is on the ACTUAL bytes that
+left the browser (read via `download.createReadStream()`), not the pure-function unit test's return value: the
+exact CSV text, byte for byte, including the linked "last time" column.
+
+## Non-vacuity, the t2020 new-behaviour-vs-invariance distinction stated explicitly
+
+All 3 tests are NEW-BEHAVIOUR claims about a view that had never been rendered by any spec before — proved
+against two real prior revisions (scratch-swapped via `git show <rev>:...`, restored after), not a hypothetical:
+- Swapped `jobs.js` to `001167c9` (t2020 — "last time" column present, Export CSV absent): tests 1 and 3
+  FAIL (export-presence and download assertions); test 1's own "last time" assertions, already true at that
+  revision, correctly did NOT fail on their own — Playwright just stops at the first failing `expect` in the
+  same test, so the failure surfaces at the export-presence line.
+- Swapped `jobs.js` to `60a6d999` (pre-t2020 — neither feature exists): test 1 fails at the EARLIER "last
+  time" assertion instead, and test 3 fails the same way. Confirms the spec is sensitive to BOTH turns' work,
+  not just the latest.
+- Test 2 (the empty state) passed on all three revisions — the one genuine INVARIANCE witness in this file
+  (the empty-state message predates both features and was never expected to change), correctly not required to
+  fail anywhere.
+
+## Gate
+
+- New spec: `gateway-jobs-history-view-2026.spec.js` — 3/3 pass.
+- Full gateway + console set (`gateway-jobs-history-view-2026`, `gateway-local-reach-1325`,
+  `gateway-mismatch-gate-1229`, `gateway-quiet-offline-1307`, `gateway-state-contract-1327`,
+  `check-console`) — 25 passed, 2 skipped (pre-existing: `gateway-state-contract-1327`'s own two
+  "connected" tests, gated on a REAL bridge answering on :8765, absent on this run — not something this
+  turn touched or broke).
+- `npm run test:node` — 134/134, unaffected (this turn added no new node-tier file).
+
+## Files
+- `DDCS-Studio/tests/gateway-jobs-history-view-2026.spec.js` — new, 3 tests, non-vacuity proved above.
+
+## Still queued, not started (named again per the dispatch's own list)
+
+Abort-vs-lost-link collapse into one "stalled" (no operator-abort concept exists in the gateway at all); the
+remaining 4 Tier-1 preview collapses; two-sided SETUP; preview Fork 3 — all the advisor's/human's.
+
+🔨 turn 2026
