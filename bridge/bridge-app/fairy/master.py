@@ -34,6 +34,9 @@ sites. `count` is REGISTERS per block (each float32 axis value spans 2 registers
 truncating.
 """
 
+import threading
+import time
+
 REGISTERS = {
     "work_position": {"addr": 7080, "count": 10, "note": "WORK coords X,Y,Z,A,B — 5 x float32 (2 regs each)"},
     "machine_position": {"addr": 7260, "count": 10, "note": "MACHINE coords X,Y,Z,A,B — 5 x float32"},
@@ -61,11 +64,16 @@ class ModbusMaster:
     3.13's `read_holding_registers` renamed the `slave` kwarg to `device_id` and made it keyword-only,
     confirmed by direct inspection of both installs while building this)."""
 
-    def __init__(self, port, baud, device_id, timeout=1.0):
+    def __init__(self, port, baud, device_id, timeout=1.0, registers=None):
         self.port = port
         self.baud = baud
         self.device_id = device_id
         self.timeout = timeout
+        # t2063 — CONFIGURABLE, not baked in: the register map is evidence, never bench-confirmed on this
+        # user's own controller, so a correction (a wrong address, a wrong count) must cost a config value,
+        # not a code change. Snapshotted from the module default at construction time; pass an override dict
+        # (any subset of keys) to replace individual blocks without touching this file.
+        self.registers = dict(registers) if registers else dict(REGISTERS)
         self._client = None
 
     def connect(self):
@@ -79,14 +87,14 @@ class ModbusMaster:
             raise ModbusMasterError(f"could not open {self.port}@{self.baud}: connect() returned False")
 
     def read(self, key):
-        """Read a DECLARED register block by name (a key in REGISTERS — never a bare address, so a typo'd
-        register is a KeyError-shaped refusal at the call site, not a silent wrong read). Returns the raw
-        register list on a clean reply; raises ModbusMasterError on anything else."""
+        """Read a DECLARED register block by name (a key in this instance's registers — never a bare
+        address, so a typo'd register is a KeyError-shaped refusal at the call site, not a silent wrong
+        read). Returns the raw register list on a clean reply; raises ModbusMasterError on anything else."""
         if self._client is None:
             raise ModbusMasterError("not connected — call connect() first")
-        spec = REGISTERS.get(key)
+        spec = self.registers.get(key)
         if spec is None:
-            raise ModbusMasterError(f"unknown register key {key!r} — not in the declared REGISTERS map")
+            raise ModbusMasterError(f"unknown register key {key!r} — not in the declared registers map")
         try:
             rr = self._client.read_holding_registers(spec["addr"], spec["count"], self.device_id)
         except Exception as e:
@@ -108,3 +116,90 @@ class ModbusMaster:
         if self._client is not None:
             self._client.close()
             self._client = None
+
+
+class PositionPoller:
+    """t2063 — Option 1's READ-side progress source: continuously polls the controller's own Modbus
+    Slave-mode registers (P279=Slave) for live position/state, in a background daemon thread — the SAME
+    threading shape as `slave.py`'s `ModbusBeaconSource`, and the SAME honest `status()` contract from
+    t2057: a dead poller REPORTS dead, it never looks healthy by omission. `status()` reflects the LAST
+    poll CYCLE's real outcome, not merely "is the thread alive" — a thread that keeps looping while every
+    single read fails must still report unhealthy; that was exactly the gap t2057 closed on the receive
+    side, and this is the same discipline applied to the read side.
+
+    DELIBERATELY NOT A BeaconSource, and NOT wired into `Poller`/job-tracking this turn. Position/state is
+    not a beacon ordinal — there is no cursor yet to translate "where the tool physically is" into "which
+    operation, how much time left" (`JOB-PROGRESS-PLAN.md`'s own cursor-advance design, named as load-bearing
+    and explicitly NOT built at t2059/t2061). This class only proves the one thing this turn asks for: that
+    the PC can read live position/state from the controller, standing alone, observable, honestly reported.
+
+    MUTUALLY EXCLUSIVE with `ModbusBeaconSource` on the SAME physical serial link — not just a software
+    conflict (both would try to exclusively open the same COM port), a CONTROLLER-side one: the OEM's own
+    firmware release notes document `P279` as a three-way mode select (`NO` / `Poll` / `Slave`), with `Poll`
+    explicitly labelled "the renamed master mode" — the one MSETDATA/MGETDATA need. The controller can only
+    be in ONE of these at a time, so a controller set to `P279=Slave` (what this class needs) will NOT be
+    pushing MSETDATA checkpoint frames at the same time, regardless of what the bridge's own config says.
+    `bridge.py`'s wiring keeps these as alternatives, never both active at once, for exactly this reason.
+    """
+
+    def __init__(self, port, baud, device_id, interval_s=2.0, registers=None, timeout=1.0):
+        self.port = port
+        self.baud = baud
+        self.device_id = device_id
+        self.interval_s = interval_s
+        self.registers = dict(registers) if registers else dict(REGISTERS)
+        self.timeout = timeout
+        self._thread = None
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self._latest = None    # {..key: [regs].., "ts": float} from the most recent CLEAN cycle
+        self._error = None     # the most recent cycle's failure reason, or None while healthy
+
+    def start(self):
+        self._stop.clear()
+        self._error = None
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self.interval_s + 2)
+        self._thread = None
+
+    def status(self):
+        """{"ok": bool, "error": str|None} — t2057's exact contract, reused rather than re-invented."""
+        if self._thread is None or not self._thread.is_alive():
+            return {"ok": False, "error": self._error or "not started"}
+        if self._error:
+            return {"ok": False, "error": self._error}
+        if self._latest is None:
+            return {"ok": False, "error": "no successful read yet"}
+        return {"ok": True, "error": None}
+
+    def latest(self):
+        """The most recent SUCCESSFUL reading, or None if none has landed yet — never a stale value handed
+        out silently: check status() alongside this to know whether it's still current."""
+        with self._lock:
+            return dict(self._latest) if self._latest is not None else None
+
+    def _run(self):
+        master = ModbusMaster(self.port, self.baud, self.device_id, timeout=self.timeout, registers=self.registers)
+        try:
+            master.connect()
+        except ModbusMasterError as e:
+            self._error = str(e)
+            return   # connect failed -- the thread ends HERE; status() reports it, nothing hides behind an internal retry loop (the exact pymodbus-server trap t2057 fixed on the receive side)
+        try:
+            while not self._stop.is_set():
+                try:
+                    cycle = {key: master.read(key) for key in self.registers}
+                    cycle["ts"] = time.time()
+                    with self._lock:
+                        self._latest = cycle
+                    self._error = None
+                except ModbusMasterError as e:
+                    self._error = str(e)   # THIS cycle failed; the OLD _latest (still the last genuinely good reading) stays, but status() now reports the failure honestly rather than silently continuing to look fine
+                self._stop.wait(self.interval_s)
+        finally:
+            master.close()

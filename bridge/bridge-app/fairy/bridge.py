@@ -5,6 +5,10 @@
   python -m fairy.bridge run                    # real: ModbusBeaconSource + SMB, loop forever
       [--backend local|r2] [--root DIR] [--dest PATH] [--port COM6] [--baud 115200]
       [--slave 1] [--stall 120] [--poll 5]
+      [--position-poll [--position-poll-interval 2]]   # t2063 — Option 1: read live position/state instead
+                                                        # of receiving checkpoints; needs P279=Slave on the
+                                                        # controller and is MUTUALLY EXCLUSIVE with the
+                                                        # Modbus slave above (same wire, one mode at a time)
 
 Run from the bridge-app/ directory so `fairy` is importable as a package.
 """
@@ -19,6 +23,7 @@ from .cncdisk import CncDiskService
 from .config import Config
 from .ops import Ops
 from .poller import Poller
+from .master import PositionPoller
 from .slave import ModbusBeaconSource, SimBeaconSource
 from .telemetry import TelemetryServer, make_checkpoint_payload
 from .transfer import Transfer
@@ -55,22 +60,38 @@ def _log_profile_validation(ops):
             print(f"[bridge]   • {w}")
 
 
-def build(config, beacons=None):
+def build(config, beacons=None, position_poller=None):
     backend = make_backend(config)
     transfer = Transfer(config)
     if beacons is None:
-        # SimBeaconSource needs no pymodbus/serial — lets the gateway run for UI/SMB-only (--no-slave).
-        beacons = (ModbusBeaconSource(config.com_port, config.baud, config.slave_id)
-                   if config.enable_slave else SimBeaconSource())
+        # t2063 — position-poll mode WINS: it needs the SAME serial port as the Modbus slave (com_port/
+        # baud/slave_id, the same wire) as a MASTER, not a slave, and the controller's own P279 can only be
+        # in one mode at a time (Poll, which MSETDATA needs, or Slave, which polling needs) — never both.
+        # A tracked send correctly resolves to "delivered" via the existing enable_slave=False path (t2020)
+        # rather than trying to share a port that's already spoken for.
+        if config.enable_position_poll:
+            beacons = SimBeaconSource()
+        elif config.enable_slave:
+            # SimBeaconSource needs no pymodbus/serial — lets the gateway run for UI/SMB-only (--no-slave).
+            beacons = ModbusBeaconSource(config.com_port, config.baud, config.slave_id)
+        else:
+            beacons = SimBeaconSource()
+    if position_poller is None and config.enable_position_poll:
+        position_poller = PositionPoller(
+            config.com_port, config.baud, config.slave_id,
+            interval_s=config.position_poll_interval_s, registers=config.position_registers,
+        )
     poller = Poller(backend, transfer, beacons, config)
-    return backend, transfer, beacons, poller
+    return backend, transfer, beacons, poller, position_poller
 
 
 def run_loop(config):
-    backend, _, beacons, poller = build(config)
+    backend, _, beacons, poller, position_poller = build(config)
     explorer = CncDiskService(backend, config, config.cncdisk_refresh_s)
     ops = Ops(backend, config, beacons)   # t2057 — so submit_job can cross-check a tracked send against the receiver's REAL state
     beacons.start()
+    if position_poller is not None:
+        position_poller.start()
     explorer.publish()                          # publish an initial CNCDISK listing at startup
     _publish_heartbeat(backend, ops, poller)    # announce liveness immediately
 
@@ -108,9 +129,17 @@ def run_loop(config):
         st = beacons.status()
         slave = f"{config.com_port}@{config.baud}" if st.get("ok") else f"FAILED — {st.get('error') or 'unknown reason'}"
     print(f"[bridge] up — backend={config.backend}  machine={machine}  dest={config.expert_dest}  slave={slave}")
+    if position_poller is not None:
+        # t2063 — SAME discipline: report the poller's REAL post-start status, not the fact that --position-poll
+        # was passed. A moment after start() the thread has usually either failed the port probe already or is
+        # still mid-first-cycle ("no successful read yet") — either way this line names what IS, honestly.
+        pst = position_poller.status()
+        pstate = "connecting…" if pst.get("error") == "no successful read yet" else (pst.get("error") or "ok")
+        print(f"[bridge] position-poll {config.com_port}@{config.baud} slave-id={config.slave_id} — {pstate}")
     _log_profile_validation(ops)
     print("[bridge] polling… (Ctrl+C to stop)")
     last_hb = time.time()
+    last_pp_print = time.time()
     try:
         while True:
             poller.tick()
@@ -119,10 +148,22 @@ def run_loop(config):
             if now - last_hb >= config.heartbeat_s:
                 _publish_heartbeat(backend, ops, poller)
                 last_hb = now
+            # t2063 — the CHEAPEST possible bench test: watch the console. Printed at the poller's OWN
+            # read cadence (position_poll_interval_s, default 2s) — NOT the 20s heartbeat, which would make
+            # a bench operator wait far longer than the poller itself actually takes to know anything.
+            if position_poller is not None and now - last_pp_print >= config.position_poll_interval_s:
+                last_pp_print = now
+                pst = position_poller.status()
+                if pst.get("ok"):
+                    print(f"[bridge] position-poll OK — {position_poller.latest()}")
+                else:
+                    print(f"[bridge] position-poll UNHEALTHY — {pst.get('error')}")
             time.sleep(config.run_poll_interval_s if poller.active else config.poll_interval_s)
     except KeyboardInterrupt:
         print("\n[bridge] stopped")
     finally:
+        if position_poller is not None:
+            position_poller.stop()
         if server is not None:
             server.shutdown()
         if telemetry_server is not None:
@@ -164,7 +205,7 @@ def demo():
     cfg = Config(backend="local", local_root=root, expert_dest=dest,
                  poll_interval_s=0.1, run_poll_interval_s=0.1, stall_seconds=5.0)
     beacons = SimBeaconSource()
-    backend, transfer, _, poller = build(cfg, beacons=beacons)
+    backend, transfer, _, poller, _ = build(cfg, beacons=beacons)
 
     print(f"[demo] root = {root}")
     _seed_demo_job(backend, "20260607T120000-demo_bracket")
@@ -208,7 +249,7 @@ def self_test():
         dest = os.path.join(root, "cncdisk")
         cfg = Config(backend="local", local_root=root, expert_dest=dest, stall_seconds=stall)
         beacons = SimBeaconSource()
-        backend, _, _, poller = build(cfg, beacons=beacons)
+        backend, _, _, poller, _ = build(cfg, beacons=beacons)
         return root, backend, beacons, poller
 
     def seed(backend, job_id="20260607T000000-job"):
@@ -502,6 +543,10 @@ def main(argv):
     ap.add_argument("--baud", type=int)
     ap.add_argument("--slave", dest="slave_id", type=int)
     ap.add_argument("--no-slave", action="store_true", help="don't start the Modbus slave (UI/SMB-only; no serial hardware or pymodbus)")
+    ap.add_argument("--position-poll", dest="enable_position_poll", action="store_true",
+                    help="poll the controller's OWN Modbus Slave-mode registers for live position/state (Option 1; needs controller param P279=Slave). MUTUALLY EXCLUSIVE with the Modbus slave/checkpoint receiver above -- same serial port, and the controller can only be in one Modbus mode at a time")
+    ap.add_argument("--position-poll-interval", dest="position_poll_interval_s", type=float,
+                    help="seconds between position-poll read cycles (default 2.0)")
     ap.add_argument("--open", dest="open_browser", action="store_true", help="open the console in the default browser on start")
     ap.add_argument("--stall", dest="stall_seconds", type=float)
     ap.add_argument("--poll", dest="poll_interval_s", type=float)
@@ -527,6 +572,8 @@ def main(argv):
         studio_dir=args.studio_dir, shared_dir=args.shared_dir,
         machine_id=args.machine_id, machine_name=args.machine_name,
         enable_slave=(False if args.no_slave else None),
+        enable_position_poll=(True if args.enable_position_poll else None),
+        position_poll_interval_s=args.position_poll_interval_s,
         open_browser=(True if args.open_browser else None),
         enable_ws=(True if args.enable_ws else None),
         ws_port=getattr(args, 'ws_port', None),

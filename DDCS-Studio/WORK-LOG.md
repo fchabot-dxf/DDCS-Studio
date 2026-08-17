@@ -43115,3 +43115,156 @@ controller glances (About build number, P279's own on-screen label) for Option 1
 Fork 3. Nothing queued that this seat can act on without them.
 
 🔨 turn 2061
+
+# ═══ t2063 — OPTION 1 WIRED: the position poller is a genuine part of the bridge now, plus a finding the human needs before the next bench session ═══
+
+The read side only, per the dispatch. No derivation. Governed by the human's own standing ruling this whole
+session: make what exists work, stop adding.
+
+## A finding that changes what the human can do RIGHT NOW, surfaced before anything else
+
+Re-read `bridge/controllers/expert-m350/assets/community/modbus-slave-2025-12-11/README.md` closely before
+building: the OEM's own release notes describe `#279` as a **three-way mode select** — `NO` / `Poll` /
+`Slave` — and state plainly that `"Poll" = the renamed master mode`, i.e. the one `MSETDATA`/`MGETDATA`
+need. **The controller can only be in one of these at a time.** The human's own controller is confirmed
+`P279 = Slave` right now. **This means Option 2 (checkpoint push, t2057, already shipped) is NOT currently
+receiving anything on their machine** — switching to Slave for polling is not an addition alongside
+checkpoint-push, it is a swap away from it. Not something to fix; something the human needs to know before
+their next bench session, since nothing about the UI says so and a job sent with "Beacons" ticked right now
+would silently degrade to the same "delivered, never advances" shape t2057 already made honest — for a
+different, new reason (the controller's own mode, not a dead PC-side receiver).
+
+## What got built
+
+**`fairy/master.py` — `PositionPoller`.** Wraps t2059's `ModbusMaster` in a background daemon thread (the
+same shape `slave.py`'s `ModbusBeaconSource` already uses) that reads the declared registers on a
+configurable interval and exposes `status()`/`latest()`. `status()` is t2057's EXACT contract
+(`{"ok": bool, "error": str|None}`) reused, not reinvented — and it reflects the LAST POLL CYCLE's real
+outcome, not merely "is the thread alive": a thread that keeps looping while every single read fails still
+reports unhealthy. Proven directly (not asserted): ran a poller against a synthetic slave whose datastore
+was deliberately too small for the declared range and watched it report `{"ok": False, ...}` on THREE
+consecutive cycles while the background thread stayed demonstrably alive throughout, printing a fresh
+`IllegalAddress` exception response each time — the central claim, shown, not just described.
+
+**Registers are configurable, not baked in.** `ModbusMaster.__init__` now takes an optional `registers=`
+override (snapshotted per instance, defaulting to the module's declared map); `PositionPoller` and
+`config.py`'s new `position_registers` field thread the same override straight through. A bench correction
+to a wrong address costs a config value, never a code edit.
+
+**`bridge.py`/`config.py` wiring.** New `enable_position_poll` (opt-in, OFF by default — unproven on real
+hardware beyond the local synthetic slave) and `--position-poll`/`--position-poll-interval` CLI flags
+(`--poll` was already taken by the existing job-idle-interval flag — confirmed by reading the arg parser
+before picking a name). `build()` enforces the SAME mutual exclusivity the controller's own P279 imposes:
+when position-poll is requested, `beacons` is forced to `SimBeaconSource` regardless of `enable_slave`'s own
+value — never two Modbus roles fighting over the same COM port. The startup log and a periodic in-loop print
+(at the poller's own read interval, not the 20s heartbeat — a bench operator shouldn't wait longer than the
+poller itself takes to know anything) report the poller's REAL status, matching t2057's own "report what IS"
+discipline exactly.
+
+## CORRECTED after amendment 2 — this is a TWO-MACHINE test, not one
+
+This session's own PC (the one every earlier bench command in this arc ran from) is **RENDERANCHY**, wired
+to the **V4.1** — it has only `COM1`, a motherboard port, no SABRENT adapter. The **Expert and its SABRENT
+cable are on the OTHER shop PC**. `bridge/controllers/expert-m350/FINDINGS.md`'s own open TODO already named
+this exact gap ("capture exact COM port + which laptop") and it was never closed. The procedure below
+assumes nothing about which machine has what.
+
+## What the human connects and sets — one short list (on the PC wired to the Expert)
+
+1. The SABRENT adapter (already confirmed set up per the human's own note — no new hardware step) into the
+   controller's **DB9 port 2** — the Modbus-data channel (port 1 is the M3K keyboard).
+2. Controller `P267 = 115200` — already matches what the bridge expects.
+3. Controller `P279 = Slave` — already confirmed set by the human's own glance.
+
+## Test procedure — steps to run, naming WHICH machine each one is on
+
+1. **On the PC wired to the Expert** (not this session's own PC): find the adapter's actual COM port —
+   `python -m serial.tools.list_ports -v` lists every port Windows currently sees with a description; the
+   SABRENT/FTDI one is the target. Do not guess a port number; this is the one command that tells you.
+2. **Get the updated bridge code onto that machine.** If it has its own git checkout of this repo: `git pull`
+   this branch. If it runs the packaged exe instead: this feature needs a fresh build/release before it's
+   there — check which is actually true for that machine before assuming either.
+3. **On that machine**, stop any already-running bridge instance, then run:
+   `python -m fairy.bridge run --position-poll --port COMx --baud 115200 --slave 1` (COMx = the port found
+   in step 1; `--position-poll` alone already forces the Modbus slave off via `build()`'s own mutual-
+   exclusion logic — no separate `--no-slave` needed).
+4. Watch the console, on that machine.
+   - **Success**: `[bridge] position-poll COMx@115200 slave-id=1 — connecting…` at startup, then a line
+     every few seconds like `[bridge] position-poll OK — {'work_position': [...], 'state': [...], 'ts': ...}`
+     with real numbers — jog the machine or change state and confirm the numbers actually move.
+   - **Failure**: `[bridge] position-poll UNHEALTHY — <reason>` every cycle, naming exactly what's wrong —
+     a bad/unopenable COM port SAYS SO by name (the t2057 lesson applied doubly here, since the human runs
+     this without anyone watching), and if the register map itself is wrong for this controller, a Modbus
+     `IllegalAddress`/error response — the exact failure mode this design exists to surface loudly, not hide.
+5. Ctrl+C to stop.
+
+**What this session could not do**: the Expert is unreachable from here — everything above is proven only
+against the local synthetic slave (this turn's own tests, same discipline as t2059); the human's own run on
+the real machine is the one confirming test nobody else can run for them.
+
+## Amendment 1 — WHO this is for, corrected, and said plainly for the human to decide with
+
+The human's own ruling: their machines aren't the audience — V4.1 and V3 matter because OTHER USERS run
+them, which is the actual point of supporting them at all. This corrects a scoping line this WORK-LOG has
+written more than once ("DM500/V3 not in scope") — that was a priority mistake, not a fact.
+
+**(a) The seam is already NOT Expert-shaped, checked directly, not assumed.** `ModbusMaster`/`PositionPoller`
+carry nothing Expert-specific in their own logic — `REGISTERS` is a plain overridable default (the
+`registers=` constructor argument this turn's own "configurable, not baked in" requirement already forced
+into existence), not a hardcoded assumption. A V3/DM500 controller with a genuinely different register map
+would use the exact same two classes with a different override — no rewrite. The class design already
+satisfies this; nothing needed changing to confirm it.
+
+**(b) Said plainly, since burying it would be the human's call to make, not mine:**
+- **V4.1: NO, confirmed, multiple independent lines of evidence** — zero Modbus RTU in firmware (checked 2
+  builds), and t2046/t2055's own bench findings found nothing else observable over SMB either. Not a gap in
+  asking; a closed question.
+- **V3/DM500: UNKNOWN — genuinely never asked.** Grepped `bridge/controllers/` before writing this: no
+  `FINDINGS.md` exists for `dm500/` at all (only a firmware/setting dump, no Modbus investigation of any
+  kind). If live progress turns out to be Expert-only forever, that means the feature the human just
+  prioritised reaches the FEWEST users of the three controllers this project tracks — a real possibility,
+  not settled, and worth knowing before investing further here. What it would take to settle it: the same
+  kind of investigation Expert already got — check that firmware's own parameter table for a P279-equivalent
+  mode-select, and whether an MSETDATA/MGETDATA-equivalent macro exists at all. Not started this turn.
+
+**Second ruling, queued not now, and a real tension named rather than smoothed over:** the human's own words,
+"aborted can just say aborted no other info needed" — but t2049's own limit still applies: operator-abort,
+lost-link, and a genuine hang are structurally indistinguishable given the current beacon-only channel, all
+three collapsing into the same "stalled" state. Showing "aborted" for a run that was actually a lost link
+would be a new, different dishonesty from the one t2049 already fixed — the human's own stated condition
+("if the three cannot be told apart... the honest word is whatever covers all three") already anticipates
+this and asks it be raised rather than papered over. Raised here, not implemented: the wording change is
+real and wanted, but "aborted" specifically isn't earned by what the channel can currently tell apart. Queued
+for a future turn to decide the right word (or the right new signal) with this tension in view.
+
+## Not built this turn, named plainly
+
+The position-to-operation cursor (`JOB-PROGRESS-PLAN.md`'s own design, its ambiguity already named as
+load-bearing at t2059/t2061) — worthless until a real read succeeds, per the dispatch's own instruction.
+Nothing else in this arc is queued for this seat; everything remaining needs the human, as it did at t2061.
+
+## Gate
+
+Bridge suite: 56/56 (`pytest tests/`; 46 prior + 10 new — 7 `PositionPoller` tests, 3 `build()` wiring
+tests; 2 of the 10 environment-skip cleanly under this machine's pymodbus and pass trivially, same as t2059
+— the scratch-venv run is what actually proves the wire round-trip). Node tier: 183/183 (unchanged — no
+node-tier files touched). Also ran the bridge's own `--demo` and `--self-test` CLI modes directly: `--demo`
+passes clean end-to-end (submit → deliver → beacons → done); `--self-test` hits a pre-existing `HTTP 403`
+crash — confirmed, before assuming otherwise, that this reproduces IDENTICALLY on unmodified `HEAD` (reverted
+`bridge.py`, re-ran, same traceback) — pre-existing, unrelated to this turn, not investigated further as
+out of scope.
+
+## Non-vacuity
+
+Reverting `bridge.py` fails the new wiring tests immediately (`build()` returns a 4-tuple, `ValueError:
+not enough values to unpack (expected 5, got 4)`) — restored, re-confirmed all 10 pass. `PositionPoller`'s
+own tests fail similarly on revert (no `status()`/`latest()` to call). Every failure genuinely reproduces
+the shape it claims to.
+
+## Files
+- `bridge/bridge-app/fairy/master.py` — `ModbusMaster.registers` configurable; new `PositionPoller`.
+- `bridge/bridge-app/fairy/config.py` — `enable_position_poll`, `position_poll_interval_s`, `position_registers`.
+- `bridge/bridge-app/fairy/bridge.py` — `build()`/`run_loop()` wiring, `--position-poll` CLI flag.
+- `bridge/bridge-app/tests/test_position_poller_2063.py` — new, 10 tests.
+
+🔨 turn 2063

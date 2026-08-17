@@ -32,6 +32,16 @@ class Config:
     slave_id: int = 1
     enable_slave: bool = True               # False (--no-slave): skip the Modbus slave (UI/SMB-only; no serial/pymodbus)
 
+    # --- Modbus MASTER position poll (master.py, Option 1) — t2063 --------
+    # Opt-in, OFF by default: unproven on real hardware beyond a local synthetic slave (t2059/t2063).
+    # MUTUALLY EXCLUSIVE with enable_slave/the Modbus slave above — same serial port (com_port/baud/
+    # slave_id, reused as-is: it's the SAME wire), and the controller's own P279 parameter is a one-at-a-
+    # time mode select (NO/Poll/Slave) — Poll is what MSETDATA needs, Slave is what this needs. See
+    # master.py's own PositionPoller docstring.
+    enable_position_poll: bool = False      # --position-poll
+    position_poll_interval_s: float = 2.0   # seconds between read cycles
+    position_registers: dict = None         # override any/all of master.py's default REGISTERS block(s); None = use the defaults as-is
+
     # --- loop / timing ----------------------------------------------------
     poll_interval_s: float = 5.0            # while idle (no active job)
     run_poll_interval_s: float = 1.0        # while a job is active (faster progress)
