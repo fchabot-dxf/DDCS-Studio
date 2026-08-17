@@ -4325,3 +4325,51 @@ own 2026-08-11 ruling, has **zero occurrences in `web/`**. So nothing was built.
 
 ⚠ Read-only. No code, no specs, no doc rewrites. **Do not fix a Tier 0 item this turn** — I want the whole
 board before dispatching.
+
+# ═══ t2016 — THE TIER-1 COLLAPSE (the actual remaining preview-as-data work) ═══
+
+## t2014: YOU WENT PAST THE DISPATCH AND STOPPED ME MAKING A FOOL OF MYSELF.
+I was about to take **four forks** to the human. **Three are already ruled** and you traced each forward:
+
+```
+  FORK 1  declaration granularity  VOID  — built t1725, STOOD DOWN + reverted t1726:
+                                          "a preview vocabulary declared beside the stack is a
+                                           second, driftable source" (north star #1, sieve G3)
+  FORK 2  3D stays trace-only      HOLDS — reaffirmed by the later ruling
+  FORK 3  universal vs per-family  MOOT for derived geometry; genuinely OPEN only for the
+                                          ADDITIVE layer's shape  ← the ONE real question
+  FORK 4  retire 6 legacy views    DONE  — all 6 gone since t1730 (verified vs views/index.js)
+```
+
+**TIER 0: ALL FOUR FIXED**, one commit (`ae491bfd`, t1722 — the very next act after the survey), verified live
+rather than assumed. **Zero user-visible preview bugs remain.** You confirmed my lathe spot-check and found the
+spelling unified across 6 sites, plus one NEW adjacent gap flagged not fixed (a `drill`-kind lathe tool has no
+dedicated 3D mesh, falls back to the generic mill shape).
+
+**And you corrected the `previewSources` story:** proposed AND **withdrawn in the same turn** (t1723) — the
+principle survives informally (drill/pocket/lathe_polygon literally import the emit's own function) and never
+became a checkable field. **So zero grep hits is CORRECT, not a gap.** I had reported it as an unbuilt ruling.
+
+## ⚠ A THIRD DOCUMENT LYING ABOUT ITSELF — you found it, I am acting on it.
+`NEXT-SESSION.md`'s own open-tasks list **#3** still says *"6 legacy renderer views still LIVE… only corner's
+was actually deleted"* — **all 6 have been gone since t1730.** Same shape as `PORTING.md`'s S5 row last turn
+and the roadmap's value-fidelity line the turn before. **Three documents, three stale self-claims, three
+consecutive turns.**
+
+## THE TASK
+1. **FIX THE THREE STALE CLAIMS** (small, do first): `NEXT-SESSION.md` open-task #3 (6 views → all retired
+   t1730) · its open-task #4's `edge_data` count (**×2, not ×4** — your measurement) · and the ROADMAP's
+   value-fidelity line (closed at t1520, per t2010). **Make each true; do not invent a checker for them.**
+2. **THEN THE REAL WORK — THE TIER-1 COLLAPSE.** 5 of the 6 tracked facts still hold at their original copy
+   counts (pocket ×3, contour ×3, parting ×3, comm ×3, ATC-sim-stale). **This is the arc's actual remaining
+   build**, it is already NEXT-SESSION open-task #4, and it does NOT depend on Fork 3 (that question is scoped
+   to the *additive* layer; these are derived duplicates).
+   - **⚠ COLLAPSE, DO NOT DECLARE.** The standing ruling is explicit: preview work is *collapsing duplicates*,
+     not adding a declaration vocabulary — Fork 1 was built and reverted for exactly that reason. **If a
+     collapse seems to need a new field, STOP and tell me; that is Fork 1 returning in disguise.**
+   - **START WITH ONE** — your pick of the five, whichever has the clearest single source. Land it completely,
+     with the real-gesture assertion and non-vacuity at your usual bar, and report the shape so I can judge
+     whether the other four follow the same way.
+3. **Gate:** node tier + the specs covering whichever family you collapse + the round-trip/parity set.
+
+⚠ **The machine is yours.** Fork 3 goes to the human as the ONE open question; I am not blocking on it.
