@@ -5490,3 +5490,49 @@ loudly with `IllegalAddress`). **Now wire it into the bridge as a genuine progre
 
 ⚠ Queued, in order: **remove the dead `Setup` palette block** (the human does two-sided work in Fusion) ·
 **verify job history end-to-end** (their *"make sure it actually works"*) · preview Fork 3 if they ever want it.
+
+# ═══ t2064 — DOES JOB HISTORY ACTUALLY WORK, END TO END, ON THE REAL PATH? ═══
+
+t2063 accepted, verified by me: **bridge suite 56/56.** The master-side poller is wired in as a real progress
+source with the honest `status()` contract, configurable registers, and a procedure that names which PC each
+step happens on.
+
+**Three things you did right without being told:**
+- **You raised the V3 question yourself** — that live tracking may reach the FEWEST of the three controllers,
+  and named exactly what would settle it (check that firmware's parameter table for a P279-equivalent, and
+  whether an MSETDATA-equivalent exists at all). That is the human's own stated priority, surfaced rather than
+  assumed away.
+- **You RAISED the "aborted" wording instead of implementing it.** The human said *"aborted can just say
+  aborted"* — but operator-abort, lost-link and a genuine hang remain structurally indistinguishable, so
+  printing "aborted" would be **a new dishonesty replacing the one t2049 fixed.** You quoted their own
+  condition back and queued it. Exactly right.
+- **You confirmed the `--self-test` HTTP 403 reproduces on unmodified HEAD** before treating it as yours.
+  Pre-existing, out of scope, and proven so rather than assumed.
+
+## ⚠ THE HUMAN'S GOAL FOR THE REST OF THIS LOOP, verbatim:
+> *"history and live tracking would be cool to see at the end of this loop"*
+
+Live tracking is built and now needs **CNC-FAIRY at the studio** — a different building from this session.
+**History is fully verifiable here. That is this turn.**
+
+## THE TASK — drive the REAL user path, not the tests.
+⚠ **This arc has already proved twice that a wired chain is not a working one** (beacons never worked; "last
+time" reported an aborted run's stopwatch). `job-history-csv-export-2024`, `gateway-jobs-history-view-2026` and
+the bridge suite all pass — **and that is exactly the `green-tests-over-a-dead-ui-path` shape.** Assume nothing
+from them.
+
+1. **WALK IT AS A USER WOULD, end to end, locally:** send a job through the real Send path → does it appear in
+   History with a real duration? → send the **same program** again → does *"last time"* show the **right** run?
+   → does a stalled run stay out of it? **Drive the actual UI, not the functions.**
+2. **⚠ NAME EVERY LINK THAT IS ONLY EVER EXERCISED BY A TEST.** Where a spec constructs state the real path
+   would have produced, say so — that gap is where the beacon bug lived for months.
+3. **⚠ THE WORKFLOW QUESTION I RAISED AND THE HUMAN HAS NOT ANSWERED:** history only records jobs that go out
+   **through the gateway**. If they normally copy files to a **USB stick**, none of this records anything.
+   **Establish what the code requires** — and if a USB-stick workflow genuinely records nothing, **say so
+   plainly**; that is a finding about who the feature serves, not a bug.
+4. **FIX WHAT IS BROKEN, in the smallest way that makes the real path work.** No new features — the standing
+   instruction is *"make sure it actually works"*.
+5. **Gate:** bridge suite + node tier + the gateway/history/send specs.
+
+⚠ Queued: the "aborted" wording tension you raised · the V3 capability question · removing the dead `Setup`
+palette block (the human does two-sided work in Fusion) · the studio bench run for live tracking.
