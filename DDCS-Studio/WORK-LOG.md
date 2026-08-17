@@ -42602,3 +42602,149 @@ preview Fork 3 (the human's alone). The V4.1 `.pos` bench experiment and Expert 
 (t2046, need the bench).
 
 🔨 turn 2051
+
+# ═══ t2053 — LIVE JOB PROGRESS ON EXPERT: survey + design, ranked per the human's own preference order ═══
+
+SURVEY AND DESIGN ONLY, per dispatch. No emit change, no post change, no code. Redirected mid-turn by a
+human amendment: check the no-post-change path (P279 Slave, PC-as-master polling) BEFORE designing the
+checkpoint-push path further. Both fully investigated; both ranked below with real costs, not hopeful ones.
+
+## Amendment Q1 — is P279 Slave mode real and reachable? Real, NOT yet reachable — blocked on an unflashed update
+
+**Real**, and better-sourced than "read off a hobbyist project": `M350-MODBUS-REFERENCE.md` cites the M3X
+project's source, but `bridge/controllers/expert-m350/assets/community/modbus-slave-2025-12-11/README.md`
+traces it to the **OEM's own GitHub release** (foinnc/M350, the actual manufacturer) — release `2025-12-11-00`'s
+changelog explicitly adds "Modbus RTU Slave mode (P279) + M3X compatibility," confirmed by the release's own
+`eng` parameter table: `#279 … -i0"NO" -i1"Poll" -i2"Slave"`.
+
+**NOT yet reachable on this user's controller.** That same file states the decisive fact plainly: "**CNC-FAIRY's
+own SYSDISK capture (`20260610T163337Z/SYSDISK/eng` line 916) still shows `#279 … NO/YES`** → its firmware
+predates this release; no Slave option until this zip is flashed." A follow-up note (2026-07-31) names
+`V1_M350_20260410.zip` as the current flash target. **Nothing in `FINDINGS.md`, `WORK-LOG.md`, or anywhere else
+records that flash having happened** (grepped both, zero hits for "P279"/"flash" anywhere past that note). So
+Option 1's prerequisite is a **real-world firmware update on the operator's live production machine** — its
+own risk category, unrelated to and prior to any Studio/bridge work, genuinely unverified either way.
+
+**And nothing in `bridge/` speaks master-side Modbus today.** Grepped the whole `fairy/` package for
+`ModbusSerialClient`/read-holding-register/master-side calls — only `slave.py` matched, which (read in full at
+t2049) is a **passive RTU slave** (`StartSerialServer`, receives, never polls). A PC-as-master poller would be
+genuinely new code, not a flip of an existing switch.
+
+## Amendment Q2 — is there a line-number register at all? Not in the map we have; that is not proof it's absent
+
+`M350-MODBUS-REFERENCE.md` §1's read table is exactly 3 blocks: `7080`/`7260` (work/machine XYZ+AB, float32)
+and `10002` (IDLE/BUSY/RESET). No line counter anywhere. **But the file says outright why this can't be read
+as "confirmed absent"**: "the M3X source only proves the three read blocks... do not design against [anything
+else] until their addresses are confirmed. Establishing that map is its own scouting job" — the M3X pendant
+never needed a line number for its own phone-jog use case, so its author had no reason to document one even
+if the firmware's Modbus handler answers one at a different address. t2046's own "no single current-line
+variable" finding was about the **G-code `#var` register space** (a different question — checked by grepping
+the mapped `#var` table); this is about the **Modbus holding-register space**, sourced from a different,
+narrower document. Neither map claims to be exhaustive.
+
+**What would settle it**, in order of cost: (a) static analysis of the Expert firmware's own Modbus-handling
+binary (Ghidra, the same technique already used for other findings in this file's own "Firmware internals"
+section) to enumerate every register the slave-mode handler actually answers — cheap, no machine time, no
+risk; (b) a bounded, incremental live register sweep on the bench, ONLY once P279 is flashed and verified
+non-wedging on known-good registers first. **Caution, not a footnote**: `#1630`-class reads are proven to wedge
+the analyzer channel hard enough to force a reboot (t2046/FINDINGS.md) — a blind sweep of unknown holding
+registers carries the same class of risk on the Modbus side until proven otherwise. Any live probing must be
+incremental, off-hours, with a recovery plan — the same discipline already paid for once on this project.
+
+## Amendment Q3 — is position-matched-to-plan sound, and how is the revisit ambiguity handled?
+
+**Sound, and already designed** — `JOB-PROGRESS-PLAN.md` (2026-08-13, scoping-only, nothing built) names this
+exact mechanism and its exact failure mode up front, as a numbered design constraint, not an afterthought:
+**"Anchor by ADVANCING A CURSOR, not by matching position. A program crosses the same point many times, so
+'where is the tool' ≠ 'which move is it on'. Walk the plan forward as positions arrive. The sim already does
+exactly this walk — it knows the expected time-to-reach at every point, because it plays the program."**
+Concretely: never do a global nearest-point search over the whole path (exactly where a revisit goes
+ambiguous); instead advance a monotonic cursor through the SIM's own time-ordered playback, checking only
+whether the live position is near where the cursor's *current* prediction already expects it to be. A revisit
+never gets consulted as a candidate match at all, because the cursor is never searching backward. This
+directly closes the ambiguity concern, not just describes it.
+
+## Amendment Q4 — ranked, with real costs
+
+**Both are Expert-only.** V4.1 has zero Modbus in firmware (confirmed, 2 builds checked, `controllers/README.md`'s
+own matrix) — not a slave stack, not a master stack, nothing. Whichever design ships, the SAME guard applies to
+both: gate behind the SAME `enable_slave`-shaped capability check t2020 already built for the sibling case (a
+tracked job on a controller with no Modbus link resolves straight to a terminal non-tracking state, never enters
+a watch loop, never times out into a fabricated failure) — reused, not reinvented, for whichever design wins.
+
+**Option 1 — DRO poll + ANCHOR cursor (the human's stated preference, if it clears its blocker)**
+- Needs, all unbuilt today: the firmware flash (real-world, unrelated to code, genuinely unverified); a new
+  Modbus RTU **master** client in `bridge/` (pymodbus's serial client, ~zero prior art in this repo to build
+  from); the ANCHOR/CORRECT/RE-PREDICT cursor logic in Studio's own engine (informed by `timeEstimate.js`'s
+  existing per-line time model, but the live-position-to-cursor-advance code itself doesn't exist yet).
+- Benefit: **genuinely zero G-code change, unconditionally** — the exact thing the human asked for. The DRO
+  readout itself has an already-ruled home (the visualiser/preview panel, per the user's own 2026-08-13 call
+  in `M350-MODBUS-REFERENCE.md` §3) but is not built. "Operation N of M" would need to be DERIVED from the
+  cursor's plan position (Studio already knows which op owns which line/time-span via `linesForOp`), not
+  read directly — an extra translation step Option 2 doesn't need.
+- **Cannot ship until the firmware flash happens and P279 is confirmed live on the real machine** — this is
+  the hard blocker, not a nice-to-have to verify later.
+
+**Option 2 — per-operation checkpoint push (the proven channel) — MORE ALREADY BUILT THAN ASSUMED**
+- The channel itself is proven live, wedge-free (`CHECKPOINT_TEST.nc`, 3/3 frames, near-instant).
+- **Survey correction: this is not a green-field build.** `web/shared/js/instrument/instrument.js` — a
+  browser-runnable JS port of `checkpoint_insert.py` — ALREADY exists, already imports `estimateProgram` (the
+  SAME per-line time model the setup sheet/time chip already use), and already paces beacons by time
+  (`chooseByTime`) or by line (`chooseByLine`), up to 255, landing each on the next safe Z-up retract. The
+  "Beacons" send-time toggle, `poller.py`/`slave.py`'s beacon watch, and the status object's `percent`/`op`/
+  `line`/`eta_s` fields are ALL already wired end-to-end for Expert (t2018's own finding, re-confirmed here).
+  `tracker.js` (the Gateway's live Tracking tab) **already renders `percent`/`eta_s`/`op`/`line`** — grepped
+  and confirmed directly, not assumed. **"What the user sees" already exists on screen today**, waiting only
+  on a status object populated by real beacons.
+- What's actually missing: a **per-operation pacing strategy** (a `chooseByOp`, using the already-declared
+  `flattenOps`/`linesForOp` to place one beacon per op boundary) instead of the existing time-sliced pacing —
+  a bounded, scoped addition to a file that already does the adjacent thing, not new plumbing. Per-op pacing
+  is also the natural fix for the density risk: a typical program's operation count is far below 255, so
+  moving from "up to 255, time-sliced" to "one per operation" REDUCES density rather than needing new headroom.
+- **Density is still the one thing that must be bench-tested before shipping** — the proven test was 3 writes;
+  a real multi-op program is more. **Declare the count** (= the program's own operation count, from
+  `flattenOps(program).length` — already knowable at send time, no guessing) and **name the bench test**: send
+  an instrumented job whose op count matches a realistic ceiling (the dispatch's own "a 50-operation program is
+  fifty" framing — pick a program with ~15-20 real ops as a first checkpoint, not 50 outright, and step up),
+  confirm every beacon arrives in order with no dropped/duplicate frames and no wedge. **Must not ship until
+  that test passes** — stated plainly, per the dispatch's own caps.flow warning.
+- Cost: **does change emitted G-code** — but only when "Beacons" is explicitly ticked (already opt-in, already
+  shipped, already off by default); byte-identical when off is a property the CURRENT shipped mechanism
+  ALREADY has (instrumentation is a separate post-processing pass over an already-complete emit, never touches
+  the base emit path) — provable the same way any of this arc's own non-vacuity proofs work: diff the
+  un-instrumented output before/after the per-op pacing change lands, confirm zero bytes move when the toggle
+  is off.
+
+**Ranking: Option 1 first if its blocker clears (matches the human's stated preference exactly, costs nothing
+in emitted bytes) — but it is BLOCKED TODAY on a real firmware update with no evidence it has happened. Option
+2 is buildable NOW, on proven hardware, on a pipeline that is substantially already shipped — the honest
+recommendation is to pursue Option 2 as the near-term path while Option 1's firmware prerequisite is handled
+separately, on the human's own timeline, not blocked on it.**
+
+## Amendment Q5 / dispatch #4 — MGETDATA must never be emitted, made impossible not just unused
+
+**Option 2** never emits `MGETDATA` because the instrumenter (`instrument.js`/`checkpoint_insert.py`) only ever
+generates ONE call shape (`msetdataCall()`, hardcoded to the proven `MSETDATA[...]` string) — there is no
+branch, flag, or parameter anywhere in that function that could produce an `MGETDATA` call; the string literally
+does not exist in the generator. **Option 1** never emits `MGETDATA` either, for a structural reason: it emits
+NOTHING into the G-code at all — the master-side poll happens entirely on the PC/bridge side, over the wire, with
+zero G-code participation. Whichever design ships, the constraint should still be named as an explicit test (grep
+the instrumenter's own output for `MGETDATA`, assert zero matches) rather than left as "true because nobody wrote
+it yet."
+
+## dispatch #6 — what the user sees, in their words, on which screen
+
+**Option 2 (buildable now):** the Gateway's existing **Tracking tab** — already shows "ETA," "Operation," "Line"
+stat rows plus a percent bar (confirmed by reading `tracker.js` directly); once per-op beacons are wired, an
+operator ticking "Beacons" sees "Operation 3 of 7 · ~23 min left" there, live, during the cut, on the exact
+screen this session has already built out this arc (Jobs/History/Tracking).
+
+**Option 1 (blocked):** live position joins the visualiser/preview panel's existing DRO readout (the user's
+own 2026-08-13 ruling, `M350-MODBUS-REFERENCE.md` §3) — "is the machine where the sim says it should be," one
+frame; the derived "operation N of M" would most naturally still surface in the same Tracking tab, computed
+from the cursor's current plan position rather than read directly off a beacon.
+
+## Files
+None changed. Gate: none needed, per dispatch.
+
+🔨 turn 2053
