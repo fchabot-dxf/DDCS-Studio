@@ -4920,3 +4920,42 @@ tier.
 lathe-bar predicates · ATC magic number · stylus size (cosmetic) · ATC beep text (comment-only) · text_data
 (self-disclosed). Then Tier 3 (5 capability gaps) · abort-vs-lost-link · **two-sided SETUP** and **preview
 Fork 3** — both the human's, both still open.
+
+# ═══ t2038 — ⚠ RE-CHECK THE CLOSED TIER-1 ITEMS AGAINST THE STILL-LIVE CLASSIC VIEWS ═══
+
+t2036 accepted, verified by me: node **155/155**.
+
+**⭐ YOU CORRECTED YOUR OWN COUNT AND IT IS THE MOST IMPORTANT FINDING SINCE THE SPIGOT.** `slot_data` was
+**3 copies, not 2** — your own t2032 report undercounted because it checked only the survey's cited pair
+(`slot.js` vs `slotData.js`) and missed **`slotView.js`**, the classic SlotWizard's own 2D view, **still
+registered and reachable today**.
+
+**The reason is structural and it generalises:** the Fork-4 legacy-view deletion swept the **probe family
+only**. I listed `wizards/views/index.js` myself — **fifteen classic views are still registered**:
+`contourView · drillView · pocketView · slotView · surfacingView · textView · commView · wcsView` + the seven
+ATC views. So **every mill and ATC duplicate count in the survey may be short by one**, for exactly the reason
+`slot_data` was.
+
+**⚠ AND THAT REACHES WORK WE ALREADY CALLED DONE.** `pocket_data` (t2016), `contour_data` (t2028) and
+`comm_data` (t2030) were all collapsed against the survey's cited copies — **while `pocketView`, `contourView`
+and `commView` are all still live.** "Tier 1 closed" may be true of the citations and false of the code.
+
+## THE TASK — read first, then fix only what is real.
+1. **RE-CHECK THE FIVE CLOSED TIER-1 MILL/ATC ITEMS against their still-live classic view:**
+   `pocket_data` → `pocketView.js` · `contour_data` → `contourView.js` · `comm_data` → `commView.js` ·
+   `lathe_parting` (does a classic lathe view survive?) · the ATC `def.sim` item → the seven ATC views.
+   **For each: does the classic view hand-type the same fact a further time?**
+2. **⚠ APPLY YOUR OWN t2036 TEST — "same need, same field vocabulary" — NOT "looks similar".** You correctly
+   did NOT fire on contour's bbox or homing's grid-centre calc because they were different consumers. **A
+   different consumer is not a miss; it is a correct exclusion.** Say which each one is.
+3. **REPORT BEFORE FIXING.** If any closed item is genuinely still duplicated, **say so plainly — "Tier 1 was
+   not closed" is a real result and I would rather hear it than have it quietly patched.** Then collapse them,
+   cheapest first, same standard.
+4. **⚠ AND SAY WHETHER THE TIER-2 SURVIVORS NEED THE SAME RE-COUNT.** If the 8 remaining were counted the same
+   way, their numbers are suspect too — I need to know before ranking them again.
+5. **Gate:** node tier + the spec sets for whatever you touch + the round-trip/parity set.
+
+**Also right this turn:** you deleted `odPassExtent`'s **14-line comment block with it** (*"a comment
+describing a function that no longer exists is a worse landmine than the dead function alone"*), kept `round3`
+after confirming 8 live call sites, and **left each slot caller's own zero-length handling alone** because they
+genuinely differ by design — collapsing the shared formula without flattening a real behavioural difference.
