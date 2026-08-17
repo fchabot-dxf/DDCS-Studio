@@ -4959,3 +4959,45 @@ and `commView` are all still live.** "Tier 1 closed" may be true of the citation
 describing a function that no longer exists is a worse landmine than the dead function alone"*), kept `round3`
 after confirming 8 live call sites, and **left each slot caller's own zero-length handling alone** because they
 genuinely differ by design — collapsing the shared formula without flattening a real behavioural difference.
+
+# ═══ t2040 — RE-COUNT TIER 2 AND TIER 3 WITH THE CLASSIC-VIEW LENS (read-only) ═══
+
+t2038 accepted. **2 of 5 were NOT closed, and you said so plainly — which is the whole point of asking.**
+`pocket_data` (`pocketView.js` re-typed `trueRegionFromFlat`'s dispatch for polygon/ellipse) and `contour_data`
+(`contourView.js` held its OWN third `regionParams()`, distinct from *both* the copy t2028 correctly excluded
+and the one it collapsed onto). Both now collapsed, byte-identical.
+
+**And three were genuinely CLEAN, each excluded for a stated reason** — `comm_data` (pure DOM glue over the
+methods t2030 already fixed) · `lathe_parting` (no classic lathe view exists at all) · ATC `def.sim` (all six
+views read the already-shared `opSimContext` registry). **A correct exclusion is a result**, and you did not
+pad the count with lookalikes — `pocketView`'s rect/circle branches were rightly not flagged either, being
+native SVG primitives that never call `regionDesc`.
+
+**You also corrected MY count: 14 classic views, not 15** — `atcViews.js` exports exactly 6, not 7.
+
+**⭐ AND YOU TRACED THE MECHANISM ONCE INSTEAD OF FIVE TIMES**, which is what makes the result reusable:
+`wizardLibrary.js`'s `opensAs` means the deck always passes the TWIN's opType, so `wizardManager.open()` reaches
+a classic view **only when a RAW built-in type is passed — an old save file, or a raw Blocks-authored block.
+Never today's menu.** That single fact explains all five verdicts and predicts the next ones.
+
+## THE TASK — read-only. My release gate is RUNNING: no Playwright, no browser.
+**The counting method that undercounted `slot_data`, `pocket_data` and `contour_data` was used for everything
+else too.** Re-count with the classic-view lens.
+
+1. **THE 8 TIER-2 SURVIVORS** — `corner_data`'s two 4-entry maps · the 4 lathe-bar predicates · ATC magic
+   number · stylus size · ATC beep text · `text_data` · and any others in your t2032 list. **Does a still-live
+   classic view hold a further copy?** `text_data` has `textView.js`; `corner_data` — is there a classic corner
+   view still registered, or did Fork-4 take it?
+2. **⚠ TIER 3 #20's "6 of 8 probe ops carry a full second renderer" — YOU FLAGGED IT AS SUSPECT. Settle it.**
+   The probe family WAS swept by Fork-4, so that figure may now be stale in the *opposite* direction.
+3. **APPLY YOUR OWN BAR:** *same need + same field vocabulary*, not *looks similar*. **Report exclusions with
+   their reason** — those are results.
+4. **⚠ THEN TELL ME WHETHER THE SURVEY IS STILL WORTH FOLLOWING.** It has now been wrong in three distinct
+   ways: items already fixed, counts stale from relocation, and counts short because it cited pairs while a
+   third copy lived in a still-registered view. **If the honest answer is "re-derive the duplicate list from
+   the code and stop reading the survey", say that** — I will act on it. Your negatives have been right every
+   time.
+5. **Gate: node tier only.**
+
+⚠ Then: whatever your answer to (4) implies · abort-vs-lost-link · **two-sided SETUP** and **preview Fork 3**,
+both the human's and both still open.
