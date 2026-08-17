@@ -12,8 +12,8 @@
  * It rides a SENTINEL: the superset bakes SENTINEL_MSG (etc.); the recompose global-replaces the sentinel with the resolved,
  * dialect-formatted text — so a single swap covers all ~6 embeddings, and the twin is byte-identical to the concrete bake.
  */
-import { commStack, fmtCtrl, fmtLine } from '../../wizards/stacks/communicationWizard.js';   // t2030 — REUSED, not reimplemented: the SAME message-format functions commStack's own real emit calls
-export { fmtCtrl, fmtLine };   // re-exported so a reference-identity check (not just a value-equality one) can prove this stayed the SAME function, not a re-typed copy
+import { commStack, fmtCtrl, fmtLine, STATUS_PERSISTENT, beepPulseCount } from '../../wizards/stacks/communicationWizard.js';   // t2030 — REUSED, not reimplemented: the SAME message-format functions commStack's own real emit calls; t2051 — same for the persistent-status constant + beep pulse-count formula
+export { fmtCtrl, fmtLine, STATUS_PERSISTENT, beepPulseCount };   // re-exported so a reference-identity check (not just a value-equality one) can prove this stayed the SAME function, not a re-typed copy
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 // t632 — the twin no longer reads the active post (the _hmi guard is gone; the atoms fold per-post at emit time = the un-freeze).
@@ -140,8 +140,8 @@ function applyCommRecompose(stack, resolved) {
     // the persistent/update status comment + the pulsed-beep comment are computed → rebuild from resolved (the superset baked defaults)
     for (const b of flat) {
         if (!b || b.type !== 'comment' || !b.params) continue;
-        if (b.params.text === 'Persistent Status Bar' || b.params.text === 'Status Bar Update') b.params.text = (sm === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
-        if (/^System Beep - .* pulses of .*ms$/.test(b.params.text)) { const cyc = Number(p.cycle); const dur = (p.val != null && p.val !== '') ? p.val : 500; b.params.text = `System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`; }
+        if (b.params.text === 'Persistent Status Bar' || b.params.text === 'Status Bar Update') b.params.text = (sm === STATUS_PERSISTENT ? 'Persistent Status Bar' : 'Status Bar Update');
+        if (/^System Beep - .* pulses of .*ms$/.test(b.params.text)) { const cyc = Number(p.cycle); const dur = (p.val != null && p.val !== '') ? p.val : 500; b.params.text = `System Beep - ${beepPulseCount(dur, cyc)} pulses of ${cyc}ms`; }
     }
     return stack;
 }

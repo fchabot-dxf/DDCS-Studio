@@ -22,6 +22,7 @@
  */
 import { barToStock, normalizeBar, radiusOf, DEFAULT_BAR } from '../data/lathe.js';
 import { isLathe } from '../data/workspaceMachine.js';
+import { isLatheBar } from '../data/stockShape.js';   // t2051 — the ONE declared "is this stock a lathe bar" predicate, shared with gcodeViz3d.js/latheDro.js/latheProfileCanvas.js
 
 /** The bar every lathe op shows, from whatever the op knows about it. Defaults are the op's, not this file's. */
 export function latheBarFrom(params, fallback) {
@@ -34,7 +35,7 @@ export function latheBarFrom(params, fallback) {
     const ws = (Number(p.barDiameter) > 0) ? null : (() => {
         try {
             const st = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().stock : null;
-            if (!st || st.shape !== 'cylinder' || st.axis !== 'z' || st.origin !== 'finished-face') return null;
+            if (!isLatheBar(st)) return null;   // t2051 — collapsed onto data/stockShape.js's isLatheBar (was its own inline check)
             const face = Number(st.faceZ) || 0;
             return { diameter: Number(st.diameter) || 0, stickOut: (Number(st.z) || 0) - face };
         } catch (_) { return null; }
@@ -174,7 +175,7 @@ export function applyLatheWorkspaceStock() {
     try { s = window.ddcsGetSettings(); } catch (_) { return false; }
     if (!s || !isLathe()) return false;
     const cur = s.stock || {};
-    if (cur.shape === 'cylinder' && cur.axis === 'z' && cur.origin === 'finished-face') return false;   // already a bar
+    if (isLatheBar(cur)) return false;   // already a bar — t2051 collapsed onto data/stockShape.js's isLatheBar
     // THE DECLARED DEFAULT BAR — not the mill box's width read as a diameter. A 100mm block is not a 100mm bar; the
     // box says nothing about the stock a turner has in the chuck, and inferring one from the other invents a fact.
     //

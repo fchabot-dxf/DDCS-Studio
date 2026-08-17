@@ -27,6 +27,7 @@ import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE p
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
 import { displayOf } from './displayPrefs.js';   // t738 — the ONE declared preview-visibility registry ({visible,alpha} per element)
 import { isManualStart, resolveStartGlyph } from './startGlyph.js';   // t1688 — the ONE shape/fill/colour rule for a start/reposition marker, shared with featureCanvas.js + toolpath2d.js
+import { isLatheBar } from '../data/stockShape.js';   // t2051 — the ONE declared "is this stock a lathe bar" predicate (shape/axis/origin), shared with latheScene.js/latheDro.js/latheProfileCanvas.js
 
 /**
  * t1297 — WHICH AXIS LABELS A SCENE HAS, by the kind of machine it draws. A mill has an XY table; a lathe has a bed
@@ -1623,7 +1624,7 @@ export class GcodeViz3D {
             // resets its mesh to the origin, dropping a −C the group was still applying. The result was the bar, its
             // carve and its chuck all sitting at (10,10) — the "ghost bars" floating beside the origin were the real
             // ones, in the wrong place. A bar's group sits at zero and its children speak absolute coordinates.
-            const latheBar = stock.axis === 'z' && stock.origin === 'finished-face';
+            const latheBar = isLatheBar(stock);   // t2051 — collapsed onto data/stockShape.js's isLatheBar (was its own inline check, ×3 in this function)
             if (latheBar) {
                 pg.position.set(0, 0, 0);
                 this._stockFloorZ = -(stock.diameter || stock.x) / 2;   // the grid sits under the bar, not under a box
@@ -1640,12 +1641,12 @@ export class GcodeViz3D {
             // t1321 — THE CHUCK LEAVES WITH THE BAR. It was only ever disposed INSIDE the bar branch, so a workspace
             // switched back to a mill kept a chuck floating in its scene: the furniture outlived the fact it belonged
             // to. Disposed here, before the branch, so any stock that is not a bar has none.
-            if (!(stock.axis === 'z' && stock.origin === 'finished-face') && this._latheChuck) {
+            if (!latheBar && this._latheChuck) {
                 pg.remove(this._latheChuck);
                 this._latheChuck.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
                 this._latheChuck = null; this._latheChuckSpan = null;
             }
-            if (stock.axis === 'z' && stock.origin === 'finished-face') {
+            if (latheBar) {
                 const face = Number(stock.faceZ) || 0, halfL = stock.z / 2;
                 // t1285 — THE LATHE CHUCK IS ITS OWN RIG. Built through the same render (one chuck concept) but kept
                 // in its OWN field: `setRotaryFixture(false)` — which every one of these ops sets, because none of
@@ -1886,11 +1887,9 @@ export class GcodeViz3D {
     }
 
     /** Instant settled END-STATE: reseed + carve ALL segments once + build the CRISP vertical-wall mesh. segs = parsed.segments; tip = flat|ball. */
-    /** t1283 — is the stock a LATHE BAR? The stock says so itself (axis + face datum), so this is a read, not a guess. */
-    _isLatheStock() {
-        const st = this._stock;
-        return !!(st && st.shape === 'cylinder' && st.axis === 'z' && st.origin === 'finished-face');
-    }
+    /** t1283 — is the stock a LATHE BAR? The stock says so itself (axis + face datum), so this is a read, not a guess.
+     *  t2051 — collapsed onto data/stockShape.js's isLatheBar, the ONE declared predicate (was its own copy). */
+    _isLatheStock() { return isLatheBar(this._stock); }
 
     /**
      * t1283 — THE PROFILE CARVE: turned material removal, revolved.

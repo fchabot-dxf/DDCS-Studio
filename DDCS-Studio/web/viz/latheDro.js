@@ -9,6 +9,7 @@
  * WHY IT IS MARKED AND NOT JUST DOUBLED: an unmarked doubled number is indistinguishable from a bug. The row says Ø.
  */
 import { isLathe } from '../data/workspaceMachine.js';
+import { isLatheBar } from '../data/stockShape.js';   // t2051 — the ONE declared "is this stock a lathe bar" predicate, shared with gcodeViz3d.js/latheScene.js/latheProfileCanvas.js
 
 /** The label a DRO row carries. Only X changes, and only on a lathe — Z was never a radius. */
 export function droAxisLabel(axis, lathe = isLathe()) {
@@ -39,11 +40,14 @@ export const droRow = (axis, work, mach, lathe = isLathe()) => ({
  * stock number unchanged told a turner their stylus was a whole radius further out than it was.
  *
  * This is the SHIFT to take off before displaying, and nothing else reads it: geometry and emit are untouched.
+ * t2051 — "is this a bar" now reads data/stockShape.js's isLatheBar (shape/axis/origin, the fields that DEFINE a
+ * bar) instead of independently re-deriving it off `datum` (a FIELD THAT FOLLOWS FROM being a bar, not one that
+ * defines it) — the two were co-extensive only because every stock constructor happens to set both together today.
  * @returns {{x:number, y:number}} zero for anything that is not a lathe bar
  */
 export function droWorkShift(stock, lathe = isLathe()) {
     const s = stock || {};
-    const isBar = lathe && s.shape === 'cylinder' && s.axis === 'z' && String(s.datum || '').slice(0, 2) === 'cc';
+    const isBar = lathe && isLatheBar(s);
     if (!isBar) return { x: 0, y: 0 };
     return { x: (Number(s.x) || 0) / 2, y: (Number(s.y) || 0) / 2 };
 }

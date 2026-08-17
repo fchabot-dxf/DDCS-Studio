@@ -14,6 +14,17 @@ import { newBlock } from '../../blocks/blockEmitter.js';
 export const fmtCtrl = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
 export const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
 
+// t2051 — EXPORTED, same reasoning as fmtCtrl/fmtLine above: the ONE declared "which statusMode value means
+// persistent" fact. commData.js's postInstantiate recompose and the preview-only mock screen
+// (communicationWizard.js's generateScreenPreview) each independently tested their own literal `-3000` for the
+// same meaning instead of reading it from here.
+export const STATUS_PERSISTENT = -3000;
+
+// t2051 — EXPORTED: the ONE declared beep pulse-count formula (feeds the "System Beep - N pulses of Xms"
+// comment only — BEEP()'s own arguments are dur/cyc directly, untouched). commData.js's recompose hand-typed
+// the same expression a second time to keep that comment string in sync.
+export const beepPulseCount = (dur, cyc) => Math.round(dur / (cyc * 2));
+
 /**
  * Communication (HMI) params → its block SNIPPET (Comment / Set# / If Goto / Goto / Label / Raw). A snippet —
  * no Program Start/End — because it's inserted mid-program. The one source of truth for both displays.
@@ -74,7 +85,7 @@ export function commStack(params = {}, opts = {}) {
     const line = fmtLine(params.msg);
     const statusMode = (params.statusMode != null && params.statusMode !== '') ? Number(params.statusMode) : 1;
     const statusArm = () => {
-        C(statusMode === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
+        C(statusMode === STATUS_PERSISTENT ? 'Persistent Status Bar' : 'Status Bar Update');
         STATUS(statusMode, line, params.statusColor, params.statusDwell);
     };
 
@@ -92,7 +103,7 @@ export function commStack(params = {}, opts = {}) {
     // ── BEEP arm (cyc fork — the pulsed vs plain COMMENT differs; the hmibeep atom owns the #2042/#2043 register fork) ──
     const beepArm = () => {
         const dur = (params.val != null && params.val !== '') ? params.val : 500;
-        const beepCyc = () => { const cyc = Number(params.cycle); C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); BEEP(dur, cyc); };
+        const beepCyc = () => { const cyc = Number(params.cycle); C(`System Beep - ${beepPulseCount(dur, cyc)} pulses of ${cyc}ms`); BEEP(dur, cyc); };
         const beepPlain = () => { C('System Beep'); BEEP(dur, 0); };
         if (superset) S.push(GUARD({ param: '_hasCyc', is: true }, cap(beepCyc)), GUARD({ param: '_hasCyc', is: false }, cap(beepPlain)));
         else { const cyc = (params.cycle != null && params.cycle !== '') ? Number(params.cycle) : 0; if (cyc > 0) beepCyc(); else beepPlain(); }

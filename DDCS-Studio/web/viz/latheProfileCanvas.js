@@ -19,6 +19,7 @@
  * That mapping is stated once, here, in zToCanvas/canvasToZ — the two are inverses and are tested as such.
  */
 import { halfProfile, normalizeBar, radiusOf, diameterOf } from '../data/lathe.js';
+import { isLatheBar } from '../data/stockShape.js';   // t2051 — the ONE declared "is this stock a lathe bar" predicate, shared with gcodeViz3d.js/latheScene.js/latheDro.js
 import { polygonPath, polyRadiusAt, polySides } from '../wizards/lathe/polygon.js';   // t1277 — the end view draws the op's OWN r(angle), never its own idea of a hexagon
 import { partBladeZ, partFloorRadius } from '../wizards/lathe/parting.js';   // t2030 — the SAME kerf helpers the real emit calls, "derived HERE so the emit and the tests cannot disagree" (parting.js's own words) — this canvas used to disagree with that on purpose, one level down
 
@@ -95,11 +96,17 @@ export const LATHE_LAYOUT_KIND = 'lathe_profile';
  * WHICH BAR THE PICTURE SHOWS. A lathe workspace's stock is a cylinder; when one is configured we draw THAT, so the
  * canvas is about the operator's actual bar. With none configured we fall back to the op's own default rather than
  * drawing nothing — an empty pane teaches nobody what the numbers mean.
+ *
+ * t2051 — was `s.shape === 'cylinder'` alone, the weakest of 4 independent "is this a bar" checks in the app: a
+ * ROUND BLANK (a disc standing on the table, also `shape:'cylinder'` but not on the lathe centreline — see
+ * data/stockShape.js) would have had its diameter/z read as bar dimensions here while gcodeViz3d.js/latheScene.js
+ * correctly fell back to a default bar for the same stock. Now reads data/stockShape.js's isLatheBar, the ONE
+ * declared predicate (shape/axis/origin) every other lathe-bar check in the app now shares.
  */
 export function barFromSettings(fallback) {
     let s = null;
     try { s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings().stock || null) : null; } catch (_) { s = null; }
-    const dia = s && (s.shape === 'cylinder') && Number(s.diameter) > 0 ? Number(s.diameter) : null;
+    const dia = isLatheBar(s) && Number(s.diameter) > 0 ? Number(s.diameter) : null;
     return normalizeBar({
         diameter: dia || (fallback && fallback.diameter) || 20,
         stickOut: (dia && Number(s.z) > 0) ? Number(s.z) : ((fallback && fallback.stickOut) || 60),

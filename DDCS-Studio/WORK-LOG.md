@@ -42507,3 +42507,98 @@ Unchanged, none started, none blocking: Tier 2's six (none confirmed live, last 
 Expert MSETDATA-checkpoint density (t2046, needs the bench too).
 
 🔨 turn 2049
+
+# ═══ t2051 — TIER 2's SIX: dispatched, not just visited — 3 collapsed (1 with a real bug found), 3 correctly left alone ═══
+
+Drift prevention, per the dispatch's own framing, not bug-fixing — except one of the six turned out to be both.
+
+## #1 — the 4 lathe-bar predicates: COLLAPSED, and it wasn't just hygiene
+
+Confirmed the citations first, current line numbers: `gcodeViz3d.js`'s `_isLatheStock()` (shape/axis/origin),
+`latheScene.js` ×2 (same 3 fields), `latheDro.js`'s `droWorkShift` (shape/axis/**datum** — a genuinely different
+third field), `latheProfileCanvas.js`'s `barFromSettings` (**shape alone**, the weakest). **Found the canonical
+declared source ALREADY EXISTS and nobody used it**: `data/stockShape.js`'s `isLatheBar` (t1313) — matches
+`gcodeViz3d.js`/`latheScene.js`'s exact 3-field check, sitting unused. Collapsed all 4 files (plus 3 more
+intra-function repeats of the same check inside `gcodeViz3d.js`, found while already there, zero added risk
+since they share one enclosing `shape==='cylinder'` branch) onto the one import.
+
+**This was NOT just deduplication.** `droWorkShift` and `barFromSettings` don't test the DEFINING fields
+(shape/axis/origin) — they test a field that merely FOLLOWS from being a bar (`datum`, or `shape` alone).
+Constructed the exact divergence: `roundBlankStock(40, 30, 'z')` — a real, reachable stock (a round blank
+oriented along Z, e.g. a workspace switched to "lathe" without its stock re-configured through the bar editor)
+— has `shape:'cylinder'`, `axis:'z'`, `datum:'ccp'` (round blanks ALSO default to a centre datum — same value
+as a bar's), but `origin:undefined` (NOT `'finished-face'`). **Both old predicates accepted it as a bar; the
+canonical one correctly refuses it.** Reproduced live: `droWorkShift` returned a real half-diameter DRO shift
+for a non-bar workpiece (should be `{x:0,y:0}`); `barFromSettings` read the round blank's 40mm diameter as the
+bar's own (should have fallen back to the op default). Both fixed by the same import.
+
+## #2/#5 — the ATC/comm `-3000` magic number + beep pulse-count formula: COLLAPSED
+
+Both mislabelled "ATC" by the original survey from day one — corrected at t2040, confirmed again here (they
+live in `comm_data`/`communicationWizard.js`, no ATC-prefixed file involved). `-3000` ("persistent status") was
+tested as a bare literal independently in 3 places (the real emit, the twin's postInstantiate recompose, the
+preview-only mock screen); the pulse-count formula (`Math.round(dur/(cyc*2))`, feeding a comment string only —
+`BEEP()`'s own dur/cyc arguments are untouched) was hand-typed twice (emit + recompose). Same pattern t2030
+already used for this exact file's `fmtCtrl`/`fmtLine`: exported `STATUS_PERSISTENT`/`beepPulseCount` from
+`stacks/communicationWizard.js` (the real emit), made the other 2 consumers import them.
+
+## #3 — corner_data's two 4-entry maps: verified consistent, NOT collapsed — named why
+
+`cornerDatumXY` (`panelTypes.js`, positions) and `dirsOf` (`stacks/cornerWizard.js`, direction signs) encode
+the same corner identity in two vocabularies; checked by hand and they agree today (FL=(0,0)→(+,+), FR=(w,0)→
+(-,+), BL=(0,h)→(+,-), BR=(w,h)→(-,-) — consistent). A real unification is possible (the survey's own sketch),
+but it means changing `dirsOf`'s IMPLEMENTATION in the real emit path for corner_data — the project's explicitly
+gated pilot wizard ("no other wizard ports until CORNER is PERFECT"). A 4-entry literal encoding physical
+constants that never change is low change-frequency, low drift-risk; the collapse's blast radius (probe
+direction signs, a real machine-safety surface) outweighs the benefit for a fact that isn't drifting. Left
+alone, named clearly, not silently skipped. **The survey's OTHER claim for this item — a 3rd orphaned dead copy
+in `cornerWizard.js:424-450` — is CONFIRMED FULLY GONE**: that file is now 24 lines, a pure re-export shim
+(the t1728 reorg gutted it). Resolved, not just stale.
+
+## #4 — lathe probe-stylus size: confirmed genuinely different needs, NOT collapsed
+
+`latheProbeTool`'s 3D ball (`max(0.2,tipRadius)*2`, further scaled against the bar radius R for the shank) is a
+physically-proportioned mesh; `touchMarker`'s 2D circle (`max(0.4,tipRadius)`, canvas units, no bar-radius
+relation at all) is a fixed-visibility schematic marker. These aren't two copies of one fact — they're two
+different rendering needs (accurate mesh scale vs. a marker that must stay visible regardless of bar size).
+Forcing one formula would make the 2D marker invisible on a large bar or oversized on a small one. Correctly
+cosmetic, correctly left alone.
+
+## #6 — text_data: confirmed unchanged, no action
+
+`def.statusHint` already surfaces the centreline/stroke-width mismatch directly in the form's own status text
+("engraved width Xmm... tool wider than the Ymm stroke") — genuinely self-disclosing, not a silent duplicate.
+Matches t2038's own earlier finding. No code touched.
+
+## Non-vacuity
+
+`lathe-bar-predicate-collapse-2051.test.mjs` (6 tests) and `preview-collapse-comm-2051.test.mjs` (4 tests).
+Reverting the 4 lathe files reproduces both bugs exactly (droWorkShift returns `{x:20,y:20}` instead of
+`{x:0,y:0}`; `barFromSettings` reads 40 instead of the 20 fallback). Reverting the 3 comm files throws
+`SyntaxError` immediately (new exports). All restored and re-confirmed passing.
+
+## Gate
+
+Node tier: 175/175 (165+10). Playwright: full `lathe-*` set (17 files) + `comm-*` set (6 files) +
+`fork-parity-1593` + `guard-roundtrip-1595` + `preview-dialect-parity` + `preview-parity-config` — all green,
+zero flakes.
+
+## Files
+- `DDCS-Studio/web/viz/gcodeViz3d.js`, `latheScene.js`, `latheDro.js`, `latheProfileCanvas.js` — collapsed onto `data/stockShape.js`'s `isLatheBar`.
+- `DDCS-Studio/web/wizards/stacks/communicationWizard.js` — `STATUS_PERSISTENT`/`beepPulseCount` exported.
+- `DDCS-Studio/web/blocks/dataOps/commData.js`, `web/wizards/communicationWizard.js` — import the above instead of re-deriving.
+- `DDCS-Studio/tests/node/lathe-bar-predicate-collapse-2051.test.mjs`, `preview-collapse-comm-2051.test.mjs` — new.
+
+## Tier 2 — CLOSED
+
+All six dispositioned: 3 collapsed (2 of them into ONE shared fix, since -3000/beep share the same 3 files), 2
+confirmed correctly out of scope (corner's maps, stylus size), 1 confirmed already self-disclosing (text_data).
+No item silently skipped.
+
+## Queue
+
+Unchanged: abort-vs-lost-link — answered at t2049 (structural limit, not fixable in software). Two-sided SETUP +
+preview Fork 3 (the human's alone). The V4.1 `.pos` bench experiment and Expert MSETDATA-checkpoint density
+(t2046, need the bench).
+
+🔨 turn 2051

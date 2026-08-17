@@ -9,7 +9,7 @@ import { recordOp } from '../blocks/opRecord.js';
 // kept importable+re-exported here unchanged for every other existing caller — pure move, no signature change).
 // CommunicationWizard (the class below) is NOT a legacy screen only — its generateScreenPreview() is also the
 // LIVE renderer for the twin's own 'commscreen' panel (userOpView.js), so it stays in place, untouched, either way.
-import { commStack, fmtLine } from './stacks/communicationWizard.js';   // t2030 — fmtLine REUSED for the preview's own single-line formatting, not a second hand-typed copy
+import { commStack, fmtLine, STATUS_PERSISTENT } from './stacks/communicationWizard.js';   // t2030 — fmtLine REUSED for the preview's own single-line formatting, not a second hand-typed copy; t2051 — same for the persistent-status constant
 export { commStack };
 
 // CommunicationWizard: Generates UI G-code (popup/status/input/etc.)
@@ -103,7 +103,7 @@ export class CommunicationWizard {
                     barBg = `rgb(${r},${g},${b})`;
                 }
                 const modeNum = Number(statusMode);
-                const persistent = modeNum === -3000;
+                const persistent = modeNum === STATUS_PERSISTENT;
                 return `<div class="comm-status-bar" style="background:${barBg}">${safeMsg}${persistent ? ' <span style="opacity:0.6;font-size:0.85em">[persistent]</span>' : ''}&nbsp;</div>`;
             }
             case 'beep': {
