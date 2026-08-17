@@ -4828,3 +4828,47 @@ you established that before writing one, as asked.
 
 ⚠ Then: Tier 3 (5 capability gaps) · abort-vs-lost-link · **two-sided SETUP** and **preview Fork 3**, both the
 human's and neither blocking.
+
+# ═══ t2034 — lathe_odturn: is the missing taper guard LIVE? (Tier-2 #1) ═══
+
+t2032 accepted. **Two corrections of mine, both yours:**
+- **`edge_data` was NOT resolved** — my re-read was *half* right. The sim-start marker genuinely is
+  single-sourced, but `panelTypes.js:583`'s **2D wall-glyph** re-typed the identical near-face boolean a second
+  time for a **different drawn output**. (My "the cited file no longer exists" was **a wrong path on my part**,
+  not a deleted file.) You collapsed it: `edgeSideIsNear(side)` exported once, both callers on it, zero snapshot
+  movement — **and the non-vacuity was clean this time** because a revert throws on the missing import before
+  any assertion runs.
+- **My "14" conflated Tier 2 (9) with Tier 3 (5)** — and you noted `NEXT-SESSION.md`'s own §4 already had the
+  split right, so neither document was wrong, my ask was. Saying that plainly beats absorbing my error.
+
+**And you ranked by consequence, not copy count, exactly as asked** — which is what found the spigot.
+
+## THE TASK — settle #1, then fix it if it is live.
+`odPasses` / `odPassExtent` (the wizard's own declared functions) have **no guard against `endDiameter <= 0`
+on a taper.** Two of three callers guard it independently — the 2D canvas (*"reading it as 0 would draw a cone
+to a point"*) and the twin's `rebuildOdTurn`, **before** calling in. **The wizard's own form-authored path
+calls them with no equivalent guard.**
+
+```
+   the DUPLICATE here is the GUARD itself —
+   copied into two callers, missing from the third
+   → the gap is exactly where nobody copied it
+```
+
+1. **⚠ SETTLE LIVENESS FIRST, as you did for `edge_data`:** does the form actually let a user type `0` (or
+   negative) into `endDiameter` on a taper — is there a min-clamp upstream? **You named this as the one
+   remaining read. Do it before building.** If the form clamps it, say so — **"not reachable" closes this item
+   as validly as a fix**, and I would rather have that than a guard against an impossible input.
+2. **IF IT IS LIVE: put the guard IN the declared function**, not a third copy in the wizard. `odPasses` /
+   `odPassExtent` are the declared source; a caller-side guard is the thing that already failed here. **Then
+   the two existing caller guards become redundant — say whether they should go, and do not remove them if
+   they guard something else.**
+3. **⚠ SAY WHAT THE USER WOULD SEE** if it is live — a cone drawn to a point? a bad emit? **The severity
+   depends entirely on whether this reaches the G-code or only the picture**, and those are very different.
+4. **NON-VACUITY** at your bar; state the t2020 distinction.
+5. **Gate:** node tier + the lathe spec set + the round-trip/parity set.
+
+⚠ Tier-2 remainder, your ranking, do not start: corner_data's two 4-entry maps · the 4 lathe-bar predicates
+(widest surface: 3D + DRO + canvas) · slot_data (cheapest) · ATC magic number · stylus size (cosmetic) · ATC
+beep text (comment-only) · text_data (already self-disclosed via its own `statusHint`). **`homing_data` is
+RESOLVED** — its second copy went with the Fork-4 deletion.
