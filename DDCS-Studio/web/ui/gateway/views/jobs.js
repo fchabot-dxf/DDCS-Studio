@@ -11,10 +11,17 @@ const fmtWhen = (iso) => (iso ? iso.replace('T', ' ').replace('Z', '') : '—');
 // arrive newest-first (list_history sorts recorded_at DESC), so the most recent EARLIER run of the SAME
 // program (content_hash — a re-export links, a different feed does not; see send.js's contentHashOf) is the
 // next match LATER in this array, with a real recorded duration.
+//
+// t2049 — gated on final_state === 'done', not just a non-null duration_s: a `stalled` row (operator abort,
+// a genuinely lost link, or a real hang — the poller can't tell these apart, see WORK-LOG) still gets a
+// duration_s whenever at least one beacon arrived before the stall, but that number measures "time until the
+// watchdog gave up," never a real finish — poisoning "last time" with a truncated run's duration for every
+// later send of the same program. `find` walks back through any interleaved stalled/failed rows to the most
+// recent GENUINE completion; none found -> null ("—" on screen), not a fabricated number.
 export function lastTimeDuration(rows, i) {
   const r = rows[i];
   if (!r.content_hash) return null;
-  const prior = rows.slice(i + 1).find((p) => p.content_hash === r.content_hash && p.duration_s != null);
+  const prior = rows.slice(i + 1).find((p) => p.content_hash === r.content_hash && p.final_state === 'done');
   return prior ? prior.duration_s : null;
 }
 

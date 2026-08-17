@@ -42433,3 +42433,77 @@ point of this turn.
 None — read-only, no code changed, per dispatch.
 
 🔨 turn 2046
+
+# ═══ t2049 — JOB TRACKING: ABORT vs LOST-LINK vs HANG — genuinely indistinguishable, but a real poisoning bug WAS fixable, and is fixed ═══
+
+Answers the bar t2018 set and didn't meet: "record it as unknown, distinctly." Two separate questions, two
+separate answers — one architectural (cannot build), one a real bug (built and fixed).
+
+## (1)+(2) — Can the bridge tell operator-abort from lost-link from a real hang? NO, and here's exactly why
+
+Read `poller.py`/`slave.py` in full. The ONLY channel is a Modbus RTU **slave** (`ModbusBeaconSource`) that
+passively receives whatever the running Expert macro pushes via `MSETDATA` — the bridge never polls the
+controller, never issues `MGETDATA` (confirmed hard-wedges the firmware, see `expert-m350/FINDINGS.md`), and
+there is no lower-level serial link-health check independent of beacon arrival (`StartSerialServer` just opens
+the port; nothing watches DCD/DSR or any other line-state signal). `_watch()`'s only failure path is
+`now - a["last_progress_at"] > stall_seconds` → `"stalled"`.
+
+**All three scenarios silence the exact same signal, identically:** an operator hitting Stop/Reset halts the
+macro, which stops emitting `MSETDATA` frames. A dropped cable/adapter stops frames arriving even if the
+machine keeps cutting. A genuine hang (bad wait/loop) stops the macro from ever reaching the next checkpoint.
+None of these is separately observable — there is no second signal to cross-reference against beacon silence.
+**This is a "cannot distinguish these two, here is why" answer, not a shortfall in this turn's effort**: building
+a real distinction needs a NEW channel (a periodic controller-side liveness push independent of job progress,
+or hardware link-state monitoring) — genuinely out of scope for a software-only turn, and not attempted.
+
+## (3) — Does the CSV/"last time" logic already exclude non-done runs? NO — CONFIRMED LIVE DEFECT, fixed
+
+`jobs.js`'s `lastTimeDuration(rows, i)` filtered candidates on `p.duration_s != null` — but `duration_s` is
+computed by `_record_history` for **any** terminal state with a non-null `started_at`, and `started_at` is set
+on the FIRST beacon, before any stall check ever runs. So a `"stalled"` run (operator abort / lost link / real
+hang — indistinguishable per above) that received at least one beacon before dying still carries a real
+`duration_s` — measuring "time until the watchdog gave up," never a genuine finish. That number was feeding
+straight into the next send's "last time" estimate, both on-screen and in the CSV export, with the "stalled"
+pill's own context lost the moment it became someone else's "last time" column.
+
+**Confirmed as a LIVE bug via a concrete repro before touching code**: three same-`content_hash` rows —
+a fresh `delivered` send, a `stalled` run 45s in, and the true prior `done` completion at 600s — `lastTimeDuration`
+returned **45**, not 600. A machinist re-sending a program interrupted early would see a wildly wrong duration
+estimate for planning.
+
+**Fix**: gate on `p.final_state === 'done'` instead of the duration proxy — an explicit whitelist of "this row
+is a genuine completion," not an inference from a field that happens to correlate most of the time. `find`
+still walks back through any interleaved stalled/failed rows to the most recent real completion; none found
+→ `null` → "—" on screen, which is honestly "unknown," not a fabricated number. Matches both halves of the
+dispatch's bar: no fabricated duration for a run whose end can't be established, and the excluded case reports
+as distinctly unknown rather than silently wrong.
+
+**Non-vacuity, two layers**: node (`job-history-csv-export-2024.test.mjs`, 2 new tests) and browser
+(`gateway-jobs-history-view-2026.spec.js`, 1 new test using the same 3-row shape rendered through the real
+DOM). Both fail against the reverted source (45s/"45s" instead of 600/"10m00s"), confirmed by reverting and
+re-running before restoring.
+
+## (4) — Dialect coverage
+
+Agreed, no padding needed. `jobs.js`/`poller.py` operate purely on job-history records (name, final_state,
+duration_s, content_hash) — zero G-code, zero `dialect`/`varMap` branches anywhere in either file (confirmed
+by reading both in full). Gateway-level and controller-agnostic, exactly as the dispatch expected.
+
+## Gate
+
+Bridge suite (`pytest tests/`): 31/31. Node tier: 165/165 (163+2). Gateway spec set (`gateway-jobs-history-view-2026`,
+`gateway-local-reach-1325`, `gateway-mismatch-gate-1229`, `gateway-quiet-offline-1307`, `gateway-state-contract-1327`):
+25/25 passed, 2 skipped (pre-existing, `test.skip` when no real gateway is reachable — unrelated to this change).
+
+## Files
+- `DDCS-Studio/web/ui/gateway/views/jobs.js` — `lastTimeDuration` gated on `final_state === 'done'`.
+- `DDCS-Studio/tests/node/job-history-csv-export-2024.test.mjs` — 2 new tests.
+- `DDCS-Studio/tests/gateway-jobs-history-view-2026.spec.js` — 1 new test.
+
+## Queue
+
+Unchanged, none started, none blocking: Tier 2's six (none confirmed live, last swept t2040), two-sided SETUP
++ preview Fork 3 (the human's alone), the V4.1 `.pos` bench experiment (t2046, needs the human at the bench),
+Expert MSETDATA-checkpoint density (t2046, needs the bench too).
+
+🔨 turn 2049

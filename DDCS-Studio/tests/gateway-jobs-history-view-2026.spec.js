@@ -70,6 +70,28 @@ test('a human reaching History sees the finished jobs, the linked repeat, and a 
     expect(r.exportDisabled, 'and it is clickable, not greyed out').toBeFalsy();
 });
 
+test('t2049: a stalled run does not poison "last time" on the REAL rendered view — the estimate skips it', async ({ page }) => {
+    // Same shape as the CSV/last-time node test (job-history-csv-export-2024.test.mjs), rendered through the
+    // actual view: J2 stalled 45s into the same program after J1's genuine 600s completion; J3 is the newest
+    // send, no result yet. Before the fix, J3's (and J2's own) "last time" column showed "45s" — the stalled
+    // run's own truncated duration — instead of the real 600s completion.
+    const STALL_ROWS = [
+        { jobId: 'J3', name: 'bracket.nc', final_state: 'delivered', duration_s: 0, ended_at: '2026-08-17T12:00:00', content_hash: 'HASH-A' },
+        { jobId: 'J2', name: 'bracket.nc', final_state: 'stalled', duration_s: 45, ended_at: '2026-08-17T11:00:00', content_hash: 'HASH-A' },
+        { jobId: 'J1', name: 'bracket.nc', final_state: 'done', duration_s: 600, ended_at: '2026-08-17T10:00:00', content_hash: 'HASH-A' },
+    ];
+    await boot(page, { historyRows: STALL_ROWS });
+    const r = await page.evaluate(() => {
+        const root = document.querySelector('#gateway-app .gw-view');
+        const rows = [...root.querySelectorAll('table tr')].slice(1);
+        return rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
+    });
+    expect(r[0][1], 'the newest row is the un-finished delivery').toBe('delivered');
+    expect(r[0][3], 'skips the stalled row, links to the real 10-minute completion').toBe('10m00s');
+    expect(r[1][1], 'the middle row is the stall itself').toBe('stalled');
+    expect(r[1][3], 'the stalled row also looks past itself to the real completion, not its own truncated 45s').toBe('10m00s');
+});
+
 test('with NO finished jobs, History says so plainly and offers no Export control to click', async ({ page }) => {
     await boot(page, { historyRows: [] });
     const r = await page.evaluate(() => {
