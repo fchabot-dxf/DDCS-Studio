@@ -42748,3 +42748,127 @@ from the cursor's current plan position rather than read directly off a beacon.
 None changed. Gate: none needed, per dispatch.
 
 🔨 turn 2053
+
+# ═══ t2055 — FOUR AMENDMENTS IN SEQUENCE: chooseByOp built then reverted; turned into a COLD FAULT HUNT — "beacon never worked" ═══
+
+## What happened to the build
+
+Started building `chooseByOp` per the dispatch. A human amendment first re-ranked Option 1 above Option 2;
+a second (superseding) amendment said "beacon is already built," reframing this into a trace of the existing
+pipeline; a third said the human ALREADY TRIED IT ON REAL HARDWARE AND IT FAILED — reframing again, from "does
+it work" to "hunt for the break, rank suspects by which fails SILENTLY"; a fourth confirmed no remembered
+symptom exists ("beacon never worked," flat) and added: mark each link LOCALLY-TESTABLE vs NEEDS-THE-MACHINE,
+since that split is what the next turn dispatches from. Reverted the uncommitted `instrument.js` edit with
+`git checkout --` before any of this (confirmed clean). Nothing built or committed this turn.
+
+## SUSPECTS, RANKED — favouring links that fail QUIETLY, since the human got no error, just nothing
+
+### 1 — TOP SUSPECT: the Modbus serial thread can fail to start with NOTHING anywhere noticing
+
+`bridge.py`'s `run_loop()` calls `beacons.start()` once at startup and never checks its result. `slave.py`'s
+`ModbusBeaconSource.start()` spawns a **daemon thread** and returns immediately — the actual
+`StartSerialServer(port=self.port, ...)` call (opening the real COM port) happens INSIDE that thread. An
+uncaught exception in a background thread (wrong/unavailable COM port, no adapter plugged in, a permission
+error, pymodbus failing to import) does not crash the process, does not raise anywhere the main loop or the
+HTTP server would see, and does not touch `run_loop`'s own startup log line — which prints
+`slave={config.com_port}@{config.baud}` straight from the **CONFIG VALUE**, not the thread's actual runtime
+state. **The bridge would look completely healthy** (serving, delivering jobs over SMB, answering the API)
+while the Modbus receiver is silently dead. This matches "beacon never worked," not "broke once," extremely
+well: if the COM port was ever wrong or the adapter was ever not the one the config names, EVERY attempt fails
+this same silent way, from the first one. **LOCALLY-TESTABLE — no Expert needed**: run the bridge locally with
+a wrong/absent COM port and confirm nothing surfaces the failure anywhere a user would look; the machine only
+matters for confirming which port THEIR adapter actually needs, a wiring fact, not a code fact.
+
+### 2 — STRONG SUSPECT: two DIFFERENTLY-SCOPED checkboxes, both loosely called "Beacons," cross-check nothing
+
+Grepped every `enable_slave` site. There are genuinely **two independent toggles**: `send.js`'s **per-job**
+"Beacons (track progress)" checkbox (client-side, defaults CHECKED, controls whether THIS send gets
+instrumented) and `admin.js`'s **per-bridge** "Beacons" checkbox (server-side `enable_slave`, gates whether the
+Modbus receiver even starts at all). Nothing anywhere compares them. A user can correctly tick "Beacons" on
+every send while the bridge's own capability is off (or was toggled off once and never revisited) — t2020's
+own fix DOES degrade this gracefully server-side (the job resolves straight to `"delivered"`, never a
+fabricated `"stalled"`), but **what the operator SEES is a job sitting at 0%, "DELIVERED," no ETA, no
+op-label, that simply never advances** — visually indistinguishable from "about to start" until the operator
+gives up watching. A correct, intentional server-side degrade can still read as total silence at the screen.
+**LOCALLY-TESTABLE — no Expert needed**: toggle `enable_slave` off, run a real Send-with-Beacons through the
+actual UI, watch the Tracker; fully reproducible on this PC.
+
+### 3 — RULED OUT for THIS complaint, but real and confirmed live: the op-LABEL bug
+
+Emitted a real drill op (`drillDataDef` → `builderOf` → `emitMapped`) and read its own header comment:
+`( ---- DRILL, parametric: 2 holes (grid) x peck · @work 52 ---- )` — nested parens, a completely ordinary
+Studio comment. Ran `gcode-parse.js`'s `opLabel()` on it directly: **returns `"grid"`**, not the op name — its
+regex (`/\(([^()]*)\)/`, non-nesting-aware) matches the first paren pair it CAN complete, which for this string
+is the inner `(grid)`, while `stripComment`'s correct depth-tracking blanks the whole line and satisfies
+`opLabel`'s own "nothing but a comment" gate, so it returns the wrong capture instead of refusing. **Confirmed
+by execution**, not reasoning. Checked pocket as a control — no nested parens, `opLabel` returns it correctly
+— so this is **op-dependent** (drill hits it; pocket doesn't), not universal. **Ranked below suspects 1/2
+because it degrades the OPERATION label only — percent/ETA would still advance normally** (Link 4 below), so
+it does not by itself explain "never worked," only "Operation: grid" on a working progress bar. Named because
+it is real and confirmed, not because it is the likely root cause here. **LOCALLY-TESTABLE — fully confirmed
+already, zero hardware involved.**
+
+### 4 — LOWER PROBABILITY: a program with no safe Z-up retract degrades silently to deliver-only
+
+`chooseByTime`/`chooseByLine` both return `[]` when `zups` (Z-up retract candidates) is empty. If `M30` is
+ALSO not found, `instrument()`'s `n` stays 0 → `map.total_beacons = 0` → `poller.py`'s `tracked =
+bool(m.get('total_beacons'))` is **`bool(0) == False` in Python** → the job silently resolves to
+`"delivered"`, same visible shape as suspect 2. Low probability for a realistic multi-op program (M30 alone
+guarantees one forced "complete" beacon, and M30 is essentially universal in Studio's own emit), but the
+FALLBACK expression itself (`m30 ? m30 - 1 : null`) has a latent off-by-a-falsy-value bug too: `m30 === 0`
+(M30 on the very first line) would wrongly evaluate as "not found." Unrealistic for a real job, named for the
+record. **LOCALLY-TESTABLE — no hardware needed**: feed a real emitted program through `instrument()` directly
+and check `map.total_beacons > 0`.
+
+### 5 — Frame-format/settings mismatch specific to THIS bridge's config
+
+`CHECKPOINT_TEST.nc` proved the FRAME SHAPE works when a slave correctly listens at 115200 8N1, slave id 1 —
+it does not prove THIS bridge's own `config.com_port`/`baud`/`slave_id` values are set to match the human's
+actual serial adapter and wiring today. **PARTIALLY LOCALLY-TESTABLE**: the pymodbus slave side plus a
+synthetic frame injector (per amendment 4's own suggestion — impersonate the controller pushing a frame at the
+proven settings) can confirm the software is internally consistent, entirely on this PC; confirming the REAL
+Expert's port/adapter/cabling actually agrees with the bridge's configured values is a wiring fact and
+**NEEDS THE MACHINE**.
+
+### 6 — Lower probability for this user specifically: no dialect gate on the per-job checkbox
+
+`send.js`'s Beacons checkbox carries no check against the active profile/dialect at all — nothing stops
+instrumenting a send bound for a non-Modbus controller. The human's own controller is Expert, so this is not
+the live cause here, but it is a real, separate design gap (unlike the Admin toggle, which already carries an
+"Expert only" warning per t2018/t2020). **LOCALLY-TESTABLE**: set an active profile to V4.1, tick Beacons,
+check whether anything warns or blocks.
+
+### 7 — Named, structurally tied to suspects 1/2, not independent: job-id-less frame attribution
+
+`PROTOCOL.md` §1 states plainly: "the frame carries NO job id — only the beacon number." `poller.py`'s
+single-active-job model means a beacon is only ever read while `self.active` is set; if the job never became
+`self.active` in the first place (suspects 1/2/4 above), any frame that DID somehow arrive is simply never
+read by anything — not misattributed, just structurally invisible. Doesn't need separate investigation; it's
+a consequence of the suspects above, not a sixth independent cause.
+
+## RULED OUT — checked directly, not the problem
+
+**Link 3 — status object → `tracker.js` render.** Read `tracker.js` in full: `render(j)` consumes `j.percent`,
+`j.eta_s`, `j.op`, `j.line` **verbatim**, no re-parsing. Cannot silently corrupt anything; also cannot be the
+break, since it has nothing to transform wrong.
+
+**Link 4 — is percent/eta_s time-weighted or a line ratio?** The amendment's own named worry, checked directly:
+`instrument.js` computes `percent: r1(100 * cumT / scanTotal)` and `cum_time_s` calibrated against
+`estimateProgram` — the SAME per-line time model the setup sheet/time chip use. **CONFIRMED time-weighted, not
+line-ratio.** Not the defect; ruled out by reading the code, not assumed.
+
+## Testability summary (for the next turn's dispatch)
+
+**LOCALLY-TESTABLE, no Expert needed:** suspects 1, 2, 3 (confirmed), 4, 6, and the software half of 5 (a
+synthetic Modbus client impersonating the proven frame). **NEEDS THE MACHINE:** only confirming the real
+adapter/COM-port/wiring facts inside suspect 5 — everything else that could explain "never worked" is
+reproducible entirely on this PC, at no cost to the human and no re-test trip after a fix.
+
+## Files
+None changed (the `chooseByOp` build was fully reverted mid-turn; `git status` confirms a clean tree).
+
+## Gate
+
+None — read-only, per the superseding amendments.
+
+🔨 turn 2055
