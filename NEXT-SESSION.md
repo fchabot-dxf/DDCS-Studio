@@ -4236,3 +4236,43 @@ not evidence.** Verify each item against current HEAD before I dispatch anything
    deleting. Report it; do not rewrite the roadmap.
 
 ⚠ Read-only. No code, no specs. **Gate: none needed.** The machine is free either way.
+
+# ═══ t2012 — DM500 STAGE 2 (caps.flow) + the PORTING.md contradiction ═══
+
+t2010 accepted. **The reconciliation was worth doing and it inverted my picture of the queue.** Four of the six
+"improvement remainder" items are SHIPPED with commit+spec evidence — **including BOTH user-reported defects**
+(feature-canvas bottom-handle t1468; mobile CAM-builder t1470, its spec still live). Value-fidelity is CLOSED
+and **the roadmap's line for it is stale** — fixed at t1520, one day after the 07-31 stamp, with the assert
+tightened to `=== []`. The PORTING arc has moved furthest of all: **V4.1 is fully closed including S5**, run on
+real hardware at t1542 — SQRT confirmed *computed* not parsed, ATAN comma-form confirmed, spacing / IF-GOTO /
+increment confirmed, and WHILE parses but never opens (which also kills the DM500 under-declaration theory).
+
+**And you found the same defect we spent t1996–t2008 deleting, in a different file:** `PORTING.md`'s own
+summary table still marks S5 **"⏳ human-gated"** while a section further down **the same file** describes it
+as DONE with results — and `portingArc.js`'s `landed` field agrees it is done. **One fact, three copies, one of
+them stale.** Flagged not fixed, exactly as instructed.
+
+## THE TASK — your own #1, the only ranked item that needs no machine.
+1. **FIX THE `PORTING.md` CONTRADICTION FIRST** (small). S5's summary-table row disagrees with its own section
+   body and with `portingArc.js`. **Make it one source** — the same treatment we just applied to
+   `ARCHITECTURE.md`: the table should reference the section or derive from `portingArc.js`, not restate a
+   status it cannot keep in sync. If deriving is impractical, say why and just make it true.
+2. **DM500 STAGE 2 — raise `caps.flow` from `'goto'`.** You reported the evidence is already in hand
+   (`slib.nc`), no machine needed, ready now.
+   - **⚠ THE EVIDENCE IS THE POINT, not the flag.** This arc's own reframe is *"make the evidence
+     executable"* — so a capability raised on a corpus file must be **read by a spec**, not asserted in a
+     comment. `0 of 91 factory macros are read by any spec` was the whole finding that reframed the arc. **Do
+     not add the 92nd unread file.**
+   - **⚠ STOP CONDITION — this changes emitted G-code for a dialect.** Every OTHER dialect must stay
+     **byte-identical**; prove it against `fork-parity-1593` / the round-trip set. If DM500's own output
+     changes, that is expected — but say exactly what changed and why the corpus supports it.
+   - **DM500 is `corpus-attested (thin)`, NOT `POST_VERIFIED`** — you established that. **Do not let this raise
+     imply otherwise**; if the status line needs a qualifier, add it.
+3. **PROVE NON-VACUITY** to your now-standard bar: distinctive values, baseline checked.
+4. **Gate:** node tier + `fork-parity-1593` + `guard-roundtrip-1595` + whatever dialect specs cover DM500 +
+   the 4 t1928 features. **The machine is yours.**
+
+⚠ **AT-THE-MACHINE, for the human — cannot be done by either of us:** true-arc helix verification
+(`V16_helical_arc.nc`, exists, never reported run) and SQRT confirmation for Expert/M350 (`V13c_sqrt.nc` —
+`V13_trig.nc` aborted before reaching the SQRT probe). The second unblocks three named boundaries.
+Also still theirs: the two-sided SETUP ruling.
