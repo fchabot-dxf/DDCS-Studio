@@ -41833,3 +41833,83 @@ Tier 3's 5 capability gaps, abort-vs-lost-link in the gateway, two-sided SETUP, 
 dispatch's own list, none started, none blocking.
 
 🔨 turn 2032
+
+# ═══ t2034 — Tier-2 #1 SETTLED: NOT LIVE. odPasses/odPassExtent's missing guard is unreachable, proven end to end ═══
+
+**Verdict, stated plainly per the dispatch's own instruction: NOT LIVE — "not reachable" closes this item, the
+same way a fix would.** My own t2032 ranking assumed a "wizard's own form-authored path" separate from the
+twin, mirroring contour/comm/parting — that assumption was wrong for THIS op specifically, and settling it
+before touching anything (as asked) is what caught it.
+
+## What's actually true, traced fully rather than assumed
+
+`odPasses`/`odPassExtent` (`wizards/lathe/odTurn.js`) genuinely have NO internal guard against
+`endDiameter <= 0` on a taper — confirmed directly: `odPasses({kind:'taper', targetDiameter:20,
+endDiameter:0}).finish.end === 0`. But unlike contour/comm/parting, **OD-turn has no separate classic-wizard
+authoring path at all** — grepped the whole app for every caller of `odTurnStack`/`odPasses`/`odPassExtent`:
+`odTurnStack` is called ONLY from `odTurnData.js` (the twin), `odPasses` is called ONLY from `odTurnStack`,
+and `odPassExtent` is called from NOWHERE (a separate, unrelated dead-code finding — see below). The twin is
+the ONLY way this op is ever built.
+
+**The twin's own `postInstantiate` (`rebuildOdTurn`) is unconditional, not "one of several paths."** Confirmed
+`def.build` is unset (`typeof def.build === 'undefined'`), so `registerUserOp`'s own builder ALWAYS runs
+`postInstantiate` before returning a stack — there is no way to reach `odTurnStack` without going through
+`rebuildOdTurn`'s own `(Number(p.endDiameter) > 0) ? … : targetDiameter` guard first, for every build, every
+time, unconditionally.
+
+**Confirmed end to end, not from reading — drove the REAL registered builder (`builderOf(def.opType)`) with
+every degenerate shape of `endDiameter` (0, -5, '', null, undefined) and read the ACTUAL emitted G-code**: all
+five produce `#133=20` (the target diameter), never a bare 0. The 2D preview (`odProfileSpec`), independently
+checked the same way, agrees: the finished-surface line sits at radius 10 (Ø20) on both ends — a straight cut,
+not a cone to a point. Preview and emit AGREE for the exact input t2032 worried about; they do not diverge.
+
+## Non-vacuity — proving the new guard has real teeth, not proving a fix
+
+There is no bug to fix, so no revert-and-fail on the SOURCE is possible — instead, simulated the regression
+this guard exists to prevent: temporarily mutated `rebuildOdTurn`'s guard to stop redirecting (`endDiameter:
+Number(p.endDiameter) || 0` instead of the real `>0` check), re-ran the new test — the real-emit test correctly
+FAILED (`#133=0`, the exact degenerate output this whole item was worried about), while the preview test
+correctly kept passing (its own guard is untouched by this specific mutation) — proving the test distinguishes
+"the caller-side guard exists" from "it doesn't," not just "something is broken." Restored from a scratch copy,
+re-confirmed all 3 pass.
+
+## Severity, if it WERE live (per the dispatch's own question, answered for completeness)
+
+Would have reached the G-CODE, not just the picture: `odTurnStack`'s own header-var assignment
+(`dEnd = kind==='taper' ? String(Math.max(0, endDiameter)) : …`) has no guard of its own either — it trusts
+its caller. A bare 0 baked into `#133` would flow into the controller-side IF/GOTO (`t1305`'s own runtime
+floor-selection logic) as "the far end is the thinner one," setting the roughing floor to roughly the finish
+allowance across the WHOLE declared depth — not a cosmetic taper-to-a-point but a full-depth over-cut, the
+same severity class as the parting spigot bug (a real, wrong cut), just a different failure shape. Named for
+the record since the dispatch asked; does not change the verdict — it was never reachable.
+
+## A separate, unrelated finding, flagged not touched (per this turn's own scope: settle the guard, not sweep dead code)
+
+`odPassExtent` has ZERO callers anywhere in the app. `odTurnStack`'s own `t1305` comment explains why: the
+taper roughing-extent clamp it was built for (t1291, "a fat far end... roughing to the face floor took the
+whole cone away") moved to a controller-side IF/GOTO — the JS function it replaced was never removed. Not this
+turn's job; named so it isn't rediscovered as a live gap by someone who doesn't read the t1305 comment.
+
+## Gate
+
+New: `lathe-odturn-endzero-guard-2034.test.mjs` (3 tests), non-vacuity proved above (simulated-regression
+technique, since there's no historical bug to revert-and-fail against). `npm run test:node`: 152/152 (149+3),
+no source change so no snapshot risk. Full `lathe-*` spec set (25 files) + `fork-parity-1593` +
+`guard-roundtrip-1595`: 138/138 clean, zero flakes this run. `proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/tests/node/lathe-odturn-endzero-guard-2034.test.mjs` — new, 3 tests, permanent regression guard
+  (protects the SHAPE of the parting-spigot bug from reopening here, even though it isn't open today).
+
+## Tier-2 remainder — untouched, per the dispatch's own explicit "do NOT start" list
+
+`corner_data`'s two 4-entry maps; the 4 lathe-bar predicates (widest surface — 3D, DRO, canvas); `slot_data`
+(cheapest); the ATC `-3000` magic number; the lathe probe-stylus size (cosmetic); ATC's beep pulse-count
+(comment-only); `text_data` (already self-discloses via its own `statusHint`). `homing_data` stays RESOLVED.
+
+## Queue
+
+Tier 3's 5 capability gaps, abort-vs-lost-link, two-sided SETUP, preview Fork 3 — named per the dispatch's own
+list, none started, none blocking.
+
+🔨 turn 2034
