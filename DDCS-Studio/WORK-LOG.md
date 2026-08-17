@@ -40952,3 +40952,111 @@ The other 4 Tier-1 items (`contour_data`, `comm_data`, `lathe_parting`, ATC `sim
 Fork 3 (the additive-layer shape) goes to the human, per the dispatch. Two-sided setup awaits the human.
 
 🔨 turn 2016
+
+# ═══ t2018 — JOB TRACKING ACT 1: it exists and works, ONLY on the human's non-Expert dialect it does not ═══
+
+Read-only, no code, no build — per the dispatch's own explicit list ("DO NOT build prediction, correction, live
+position, a progress bar, or any Fusion-post change"). Verified `JOB-PROGRESS-PLAN.md`'s own claims against
+current source first, per the standing "follow the thread forward, don't trust the plan doc" rule — it turned
+out stale in the OPPOSITE direction from the usual pattern this session: not overclaiming, UNDERCLAIMING.
+
+## ACT 1a — DOES JOB TRACKING EXIST, AND IS IT RELIABLE?
+
+**`JOB-PROGRESS-PLAN.md` said the beacon tracker reports "a line number," nothing about time.** Measured: it
+reports percent, operation name, source line, AND a time-weighted ETA, computed from a pre-built per-job map —
+considerably more built than the plan credited.
+
+**The chain, confirmed live in current source, not assumed:** the instrumenter (`checkpoint_insert.py` /
+`instrument.js`, ported 1:1) walks a program, plants ≤255 Z-up-retract beacon points, and emits a `.map.json`
+with per-beacon `orig_line`/`op`/`cum_time_s`/`percent` (TIME-weighted, not line-ratio) + `total_est_time_s`.
+Sending a job with "Beacons" ticked pushes `#250=n`/`#251=111` via Modbus `MSETDATA` (`PROTOCOL.md`). The
+gateway's own `poller.py` watches the Modbus slave, updates state on each new beacon, and on the terminal beacon
+marks `done`. **This is fully wired end to end, not a stub — for one dialect.**
+
+**⚠ THE REAL FINDING: it is Expert/M350-ONLY, and the boundary is a LABEL, not code.** V4.1's firmware has NO
+Modbus RTU at all (`bridge/controllers/README.md`'s own comparison matrix: V4.1 "❌ confirmed not in firmware,
+checked 2 builds" vs Expert "✅✅ LIVE-CONFIRMED") — beacons are structurally impossible on V4.1, full stop. The
+instrumenter itself is dialect-blind (zero `dialect`/`varMap` branches anywhere in `web/shared/js/instrument/`,
+confirmed by grep) — it always emits the same Modbus frame regardless of which controller is connected. The ONLY
+thing stopping an operator from ticking "Beacons" for a V4.1 job is a warning LABEL on the admin toggle ("Expert
+only; leave off for V4.1") and a batch-file comment — `send.js`'s own mismatch guard only blocks sending to a
+DIFFERENT configured machine, never a different DIALECT. **This is precisely the escalation the dispatch's own
+scope ruling warned about**: V4.1 is the human's OWN machine, and this feature does not work on it at all today
+— not degraded, ABSENT — while every existing test stays green because the suite boots Expert by default.
+
+**What happens if an operator ticks Beacons for a V4.1 job anyway (measured, not guessed):** it becomes a
+"tracked" job that will never receive a beacon, and after the stall timeout (120s default) the poller records it
+as `"stalled"` — a MISLEADING label for what is actually a controller-incapability being asked to do something it
+cannot do, not a real stall. A silent, wrong record, exactly the "one wrong duration poisons every later estimate"
+risk the dispatch named.
+
+**Does anything survive reload? Yes, and it is NOT localStorage** (checked, per the standing rule) — connection
+settings + a small watchlist are the only localStorage use; the actual job record of record (queue → status →
+history) lives server-side, in real files on disk beside the bridge-app exe (below), and the web UI re-polls the
+server on reload rather than reconstructing from browser storage.
+
+**ACT 1a VERDICT: partially reliable, not "somewhat reliable" in the way the human likely meant when asking to
+make it so.** For Expert/M350 with Beacons on: durable, time-weighted, considerably more capable than assumed.
+For V4.1 — the human's own machine — it does not exist, and the gap is invisible until someone hits it, because
+the UI accepts the same gesture (tick Beacons, send) on either dialect and only fails quietly, later, mislabeled.
+
+## ACT 1b — THE RUN LOG: mostly already exists too, and the identity question has a real, measured answer
+
+**Found while investigating 1a, not assumed going in: a durable per-job history record ALREADY EXISTS** —
+`poller.py`'s `_record_history` writes `{name, final_state, delivered_at, started_at, ended_at, duration_s}` to
+`history/<jobId>.json` on every terminal outcome (`done`/`stalled`/`failed`/`delivered`), for EVERY job sent
+through the gateway, beacons or not. **This substantially closes what the dispatch asked me to design** — the
+real remaining question is whether its EXISTING identity/storage/outcome shape is actually sound, which is
+exactly what the dispatch asked me to answer.
+
+**Job identity, measured: timestamp + operator-typed name, NOT a content hash.** `make_job_id` builds
+`<YYYYMMDDTHHMMSS_microseconds>-<slug-of-typed-name>` — every SEND gets a fresh, distinct id regardless of
+whether the program is byte-identical to a prior send. **What this gets right:** two sends of the same geometry
+at a different feed (the dispatch's own example) are correctly treated as different jobs, automatically, with no
+special-casing needed. **What this gets wrong, and it is the gap that matters for the human's own stated want**
+("this job took 47 min last time"): nothing LINKS two sends of the IDENTICAL program together. The current
+scheme can tell you "here are all my past runs" but not "here are the past runs of THIS job" — that comparison
+depends entirely on the operator having typed the exact same name both times, unenforced, uniqueness-unchecked
+(the History table displays `name`, and two UNRELATED programs sharing a typed name are visually
+indistinguishable even though their underlying records are genuinely separate files).
+
+**A content-hash identity (the dispatch's own candidate) would fix the linking case automatically** — the same
+program re-sent hashes the same, giving "last time this exact job ran" for free — **but gets its own thing
+wrong, named as the dispatch asked**: hashing the RAW file would treat a trivially different export (a changed
+comment, a re-exported timestamp header from Fusion, whitespace) as a genuinely different job even when the cut
+is identical, unless the hash is computed over normalized/stripped content — the SAME normalization problem
+`PORTING.md`'s own V4.1 oracle work already solved once for a different purpose (strip-CRLF, drop-blank-comment,
+collapse-whitespace), reusable rather than re-invented if this is ever built.
+
+**Storage: real, durable, NOT localStorage, but not in a stable OS location either.** `_bridge_data/history/*.json`
+sits beside the bridge-app exe, survives an in-place self-update (confirmed: the updater only replaces the exe
+itself, touches nothing else), but is NOT in AppData/Documents — a full reinstall to a new folder, or deleting
+the app folder, loses it. Real, but a landmine for the "user-owned file" principle if the app is ever moved.
+
+**Honest end detection — the CURRENT mechanism does NOT distinguish "aborted" from "lost the link."** Both
+collapse into the same `"stalled"` state after the timeout; there is no operator-abort concept anywhere in the
+gateway code at all (grepped `abort|cancel` across the whole fairy service — zero hits). This is not a wrong
+duration being recorded (the mechanism is honest in the sense of not fabricating a false finish) — but it is
+short of the "record it as unknown, distinctly" bar the dispatch asked for: today "stalled" means at least three
+different real situations (link genuinely lost, operator aborted at the controller, or — per the V4.1 case above
+— a controller that structurally cannot ever beacon) without telling them apart.
+
+## SCOPE RULING — both dialects, tested
+
+Every claim above was checked against BOTH V4.1 and Expert/M350, not just the suite's default (Expert) — the
+central finding (V4.1 has no beacon path at all) only exists because the ruling's own instruction to check both,
+not assume parity, was followed. DM500/V3 — correctly out of scope, untouched.
+
+## NOT BUILT, per the dispatch's own explicit list
+
+No prediction, no correction, no live position, no progress bar, no Fusion-post change, no code touched at all.
+This turn is pure measurement + a design answer to the identity question, exactly as scoped.
+
+## Gate
+
+None — read-only, no code/doc changed. `proc_health.py watch`: clean.
+
+## Files
+None changed.
+
+🔨 turn 2018
