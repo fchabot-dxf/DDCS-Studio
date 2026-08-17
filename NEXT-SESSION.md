@@ -4448,3 +4448,43 @@ bug, not a fallback. The floor is for programs Studio genuinely cannot see.
 only needs *"which line are you on"* rather than position telemetry, the bar is far lower than
 `M350-MODBUS-REFERENCE.md` implies, and the beacon tracker reportedly already carries a line. **Measure that
 before anyone designs slice 2.** Slice 1 (predict-only, no anchor) is unchanged and still comes first.
+
+### ⚠⚠ t2018 SUPERSEDED BY A USER RULING — RECORD FIRST, PREDICT LATER
+
+The human's words: *"we can just first make tracking somewhat reliable, record job runs and see there how long
+they take."* **This reorders the arc and it is the better order.** My predict-only slice assumed the model is
+the hard part. It is not — **the missing thing is GROUND TRUTH.**
+
+```
+  MY ORDER (wrong):   model the time  ->  hope it matches reality
+  THEIRS  (right):    RECORD what really happened  ->  now the model has
+                      something to be checked against, and to be corrected BY
+```
+
+**And a recorded run is useful on its own, before any modelling exists:** a shop runs the same part again and
+again, so *"this job took 47 min last time"* beats any prediction — and it is the one number no model can
+improve on. The plan's own CORRECT / RE-PREDICT stages need exactly this data and currently have none.
+
+## THE REVISED ACT 1 — two parts, in order. Do NOT build prediction UI this turn.
+1. **⚠ ESTABLISH WHAT JOB TRACKING EXISTS TODAY AND WHETHER IT IS RELIABLE.** The human said *"first make
+   tracking somewhat reliable"*, which implies it exists and is not. **Measure it, do not assume it:** what
+   does the gateway/beacon path actually record when a job is sent? Does it know a job STARTED, FINISHED,
+   ABORTED? Does anything survive a page reload? **Report the honest state — including "it does not work at
+   all" if that is the answer.** That is act 1a and it may consume the whole turn; if so, STOP there and say so.
+2. **THEN THE RUN LOG (1b):** each run records **which program**, **when it started**, **when it ended**, and
+   therefore **how long it took**. Nothing else.
+   - **⚠ WHAT IDENTIFIES A JOB IS THE REAL DESIGN QUESTION** — a name collides, a file path lies, an edited
+     program is a different job. Propose an identity (a content hash is the obvious candidate) **and say what
+     it gets wrong**, e.g. two runs of the same geometry at a different feed are genuinely different jobs.
+   - **⚠ STORAGE FOLLOWS THE STANDING PRINCIPLE: a user-owned file, not localStorage.** localStorage is a
+     buffer, never "saved" — that ruling is already established in this project. If run history lives only in
+     a browser, it is lost the first time they clear a cache.
+   - **HONEST END DETECTION:** if we cannot tell "finished" from "aborted" or "lost the link", **record that
+     as unknown** rather than logging a wrong duration. One wrong 47-minute row poisons every later estimate
+     that trusts it.
+3. **DO NOT build prediction, correction, live position, a progress bar, or a Fusion-post change.** All later.
+
+⚠ **RECORDED FROM THIS CONVERSATION, do not act on yet:** Studio's `traceToolpath` takes RAW G-CODE TEXT and
+executes it, so a **Fusion 360 `.nc` is in scope by construction** — the "Studio must have authored it" limit
+I assumed is false. Coverage of Fusion's own constructs (canned cycles, comp) is UNMEASURED. The human may
+supply a real long Fusion file with a known true cut time — that would calibrate prediction directly.
