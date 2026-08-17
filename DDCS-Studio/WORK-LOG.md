@@ -41308,3 +41308,84 @@ under the registry's own stated invariant. Needs a decision from the advisor/hum
 history" should actually mean before anything gets built.
 
 🔨 turn 2022
+
+# ═══ t2024 — EXPORT JOB HISTORY FROM THE HISTORY VIEW: a plain button, standing alone ═══
+
+The advisor adopted my own t2022 alternative to the refused backup.js row: a deliberate-click export ON the
+History view itself, no restore, no coupling to workspace open/save. Bridge suite + node tier only — the
+advisor's WEB gate may still be running (no Playwright this turn); one half of this turn's testing is
+explicitly PARKED rather than faked, see Gate below.
+
+## What shipped
+
+**`web/ui/gateway/views/jobs.js`: an "Export CSV" button beside the History section label.** Click ->
+`exportHistoryCSV()` -> `UIUtils.downloadFile('ddcs-job-history-<timestamp>.csv', historyToCSV(rows))`. REUSED
+`UIUtils.downloadFile` (`web/ui/uiUtils.js`) — the SAME primitive `backup.js`'s workspace export and
+`varListPanel.js`'s variable-table CSV export already use; no new download mechanism invented. `rows` comes
+from the same `client.listHistory()` poll `renderHistory` already runs on, cached on `this._historyRows` so
+the export doesn't need a second fetch.
+
+**CSV, no reason to deviate, exactly as the dispatch invited me to just say.** This data's whole value is "how
+long did this take" — a spreadsheet is where that question gets answered (sorted, summed, compared); a
+machinist opens Excel/Sheets for that, not a JSON viewer. `varListPanel.js` already established CSV export as
+this codebase's own convention for exactly this kind of tabular operator data.
+
+**Columns mirror the on-screen table exactly (Job, Result, Duration, Last time, Finished) — export what's
+already shown, per the dispatch's own words ("a plain export button ON the History view"), nothing more.**
+Standard CSV quoting (every field double-quoted, embedded `"` doubled) and CRLF line endings — the convention
+spreadsheet apps expect from a `.csv` file, not just the app's own JSON habit.
+
+**`lastTimeDuration` extracted out of `renderHistory` into its own function, REUSED by both the on-screen
+table and the CSV builder, rather than a second copy of the content_hash lookup.** Same discipline as t2020's
+`normaliseGcode` reuse — one declared definition of "last time this ran," not two that could drift. Both
+`lastTimeDuration` and `historyToCSV` are now named exports of `jobs.js` (previously module-private) so they
+are directly node-testable as pure functions — no DOM, no client, no bridge.
+
+**NO IMPORT, per the dispatch's explicit instruction — export only, this turn.** The button does not read a
+file or write anything back; History stays exactly as durable/append-only as it already was. Re-import would
+raise the same merge/overwrite questions that made the backup.js row wrong in the first place (WORK-LOG t2022)
+— a separate act, if the human wants it.
+
+## Requirement 4, checked directly: repeats are visible AS repeats
+
+Built a synthetic 2-row history (same `content_hash`, newest-first, matching real `list_history()` ordering)
+and confirmed the exported CSV's newer row's "Last time" column carries the OLDER run's actual duration — the
+repeat is visible in the file itself, not just inferable from a repeated name. A negative case is tested too:
+two rows sharing the same operator-typed `name` but a DIFFERENT `content_hash` do NOT link — proving the
+column tracks the program's real identity (t2020's content-hash work), not the typed label.
+
+## Non-vacuity
+
+New `job-history-csv-export-2024.test.mjs` (Node tier, no DOM needed — `historyToCSV`/`lastTimeDuration` are
+pure), 6 tests, all pass against the current tree. Swapped `jobs.js` for the last-committed (pre-t2024)
+revision (`git show HEAD:...`, restored from a SCRATCH COPY after) and re-ran: `SyntaxError: the requested
+module does not provide an export named 'historyToCSV'` — correct failure, since neither export existed
+before this turn. All 6 are new-behaviour claims (nothing in this small a change is an invariance witness
+worth a separate test) — 6/6 fail pre-fix, 6/6 pass post-fix.
+
+## Gate
+
+- New: `job-history-csv-export-2024.test.mjs` — 6/6 pass (non-vacuity above).
+- `npm run test:node` (DDCS-Studio) — 134/134 pass (128 prior + 6 new), no regressions.
+- Bridge suite (unaffected by this turn's pure-JS change, run anyway per instruction) — 26/26 pass, all 4
+  files.
+- **PARKED, not run, per the dispatch's own instruction:** a live-browser proof that clicking "Export CSV"
+  actually triggers a file save (the DOM wiring: `onclick` -> `UIUtils.downloadFile` -> `Blob`/anchor/click).
+  No existing Playwright spec touches `jobs.js`/History at all (checked — grepped `tests/` for
+  `gateway/views/jobs|renderHistory|exportHistoryCSV`, zero hits), so nothing is being skipped that was
+  already covered; this is a genuinely new gap, named rather than silently left uncovered. `UIUtils.
+  downloadFile` itself already has real callers exercised elsewhere (backup.js, varListPanel.js) — only the
+  NEW `jobs.js` wiring into it is unproven in a real browser. Worth a Playwright spec once the WEB gate is
+  clear.
+
+## Files
+- `DDCS-Studio/web/ui/gateway/views/jobs.js` — Export CSV button, `historyToCSV`/`lastTimeDuration` (exported,
+  extracted from `renderHistory`).
+- `DDCS-Studio/tests/node/job-history-csv-export-2024.test.mjs` — new, 6 tests, non-vacuity proved above.
+
+## Still queued (named again, not started)
+
+Abort-vs-lost-link collapse into one "stalled"; the remaining 4 Tier-1 preview collapses; two-sided SETUP;
+preview Fork 3 — all the human's/advisor's, per the dispatch's own list.
+
+🔨 turn 2024
