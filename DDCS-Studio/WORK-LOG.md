@@ -42872,3 +42872,86 @@ None changed (the `chooseByOp` build was fully reverted mid-turn; `git status` c
 None — read-only, per the superseding amendments.
 
 🔨 turn 2055
+
+# ═══ t2057 — BOTH SILENT BEACON FAILURES FIXED: the receiver's real state is now visible, and a tracked send that can't be tracked says so ═══
+
+Reproduced both locally first (per dispatch), then fixed, then re-ran the same reproduction to show honest
+reporting. Neither needed the Expert.
+
+## Reproduction #1 — the daemon thread lies about its own state
+
+`bridge.py`'s `beacons.start()` was fire-and-forget; the real port-open happens inside a daemon thread whose
+exceptions never propagate anywhere. Reproducing this needed the PROJECT'S OWN PINNED `pymodbus==3.6.9` (this
+machine has 3.13, which the project's own `requirements.txt` already documents as broken) — installed into an
+isolated scratch venv rather than touching the system Python. Against that pinned version, read pymodbus's own
+`ModbusSerialServer` source directly rather than guessing: its transport sets `reconnect_delay=2` and **retries
+a failed serial open FOREVER inside its own asyncio loop** — a bad/missing/busy port never raises out of the
+thread and never stops it; `is_alive()` reports `True` indefinitely either way, confirmed by running it against
+a nonexistent port (`COM999`) and watching the thread stay alive 1.5s later with `latest()` still `None` and
+nothing anywhere indicating failure. **A try/except around `StartSerialServer` itself would have caught
+nothing — proven, not assumed, before writing the fix.**
+
+**Fix**: probe the port SYNCHRONOUSLY with `pyserial` directly (a plain open+close) BEFORE handing off to
+pymodbus at all. A missing/busy/wrong port raises cleanly and immediately from that probe alone — confirmed:
+`SerialException: could not open port 'COM999': FileNotFoundError(...)`, no pymodbus needed to reach this path
+(the probe runs first; a failure returns before the pymodbus import). `ModbusBeaconSource` now carries
+`status()` — `{"ok": bool, "error": str|None}` — the receiver's REAL current state. Verified the success path
+too, against a genuinely available port on this machine (`COM1`, a legacy stub Windows always exposes):
+`status()` reports `ok: True`, thread alive, exactly as before. `bridge.py`'s own startup log now prints the
+REAL post-`start()` status instead of the config value blindly.
+
+## Reproduction #2 — two "Beacons" toggles, nothing comparing them
+
+Grepped every `enable_slave` site: `send.js`'s per-job checkbox (client, defaults checked) and `admin.js`'s
+per-bridge `enable_slave` (server, gates whether the receiver starts at all) are genuinely independent.
+`poller.py`'s own t2020 fix already degrades this correctly server-side to `"delivered"` — but nothing told
+the OPERATOR at the moment that matters. Reproduced by running the two-toggle mismatch through `Ops.submit_job`
+directly with a stub `enable_slave=False` config: the existing code returned `{jobId, name, tracked: true}` —
+nothing distinguishing "tracked and will work" from "tracked and never will."
+
+**Fix**: `Ops` now optionally takes the live `beacons` object (`bridge.py`'s real construction threads it
+through; test/self-test call sites keep working unchanged with the default `None`, matching every existing
+call site). `submit_job` cross-checks BOTH facts — `cfg.enable_slave` and, when a real beacon source is known,
+its live `status()` — and returns an explicit `warning` string in the submit response itself when a tracked
+request can't actually be tracked. `send.js` surfaces it immediately: a toast (matching the existing pattern)
+PLUS appended to the persistent `info` line, so it survives even if the operator glances away right after
+clicking Send. Never silently un-ticks tracking for them — names the reason and lets them decide.
+
+## Non-vacuity
+
+`test_beacon_health_2057.py` (9 tests, bridge suite): reverting `slave.py`/`ops.py` throws/fails immediately
+(the reverted `ModbusBeaconSource` has no `status()` at all — an `ImportError` from this machine's mismatched
+pymodbus surfaces exactly because the probe-first guard isn't there to short-circuit before it). Restored,
+re-confirmed all 9 pass. `send-beacon-warning-2057.spec.js` (Playwright, real Send click, mocked
+`/api/descriptor`+`/api/jobs`): reverting `send.js` — the warning text never reaches the screen (confirmed by
+running it, not assumed); restored, re-confirmed passing.
+
+## #3, the opLabel bug — parked, not touched
+
+Per dispatch: named again for the record (`gcode-parse.js`'s nested-paren regex, confirmed live at t2055), not
+fixed this turn — label-only, doesn't explain "never worked," lower priority than the two structural fixes
+above.
+
+## Gate
+
+Bridge suite: 40/40 (31+9). Node tier: 175/175 (unchanged — no node-tier files touched). Gateway/tracking/send
+spec set (`gateway-jobs-history-view-2026`, `gateway-local-reach-1325`, `gateway-mismatch-gate-1229`,
+`gateway-quiet-offline-1307`, `gateway-state-contract-1327`, `send-gate-refuses-unreadable-1585`,
+`send-gate-wiring-1585`, `send-beacon-warning-2057`): 30/30 passed, 2 pre-existing skips, unrelated.
+
+## Files
+- `bridge/bridge-app/fairy/slave.py` — `status()` on `BeaconSource`/`ModbusBeaconSource`; probe-before-start.
+- `bridge/bridge-app/fairy/bridge.py` — threads `beacons` into `Ops`; honest startup log.
+- `bridge/bridge-app/fairy/ops.py` — `submit_job` cross-checks and returns `warning`.
+- `DDCS-Studio/web/ui/gateway/views/send.js` — surfaces `r.warning` at send time.
+- `bridge/bridge-app/tests/test_beacon_health_2057.py` — new, 9 tests.
+- `DDCS-Studio/tests/send-beacon-warning-2057.spec.js` — new, 1 test.
+
+## Queue
+
+Unchanged: the opLabel bug (t2055, parked by name, small and localized). Two-sided SETUP + preview Fork 3 (the
+human's alone). The human has flashed new Expert firmware; no dump exists in this repo yet (newest capture is
+still `20260731T181343Z`) — whether P279 is now present, unblocking Option 1, awaits either the dump or the
+Expert reaching this network.
+
+🔨 turn 2057

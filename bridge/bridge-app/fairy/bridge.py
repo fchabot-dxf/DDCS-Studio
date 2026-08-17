@@ -69,7 +69,7 @@ def build(config, beacons=None):
 def run_loop(config):
     backend, _, beacons, poller = build(config)
     explorer = CncDiskService(backend, config, config.cncdisk_refresh_s)
-    ops = Ops(backend, config)
+    ops = Ops(backend, config, beacons)   # t2057 — so submit_job can cross-check a tracked send against the receiver's REAL state
     beacons.start()
     explorer.publish()                          # publish an initial CNCDISK listing at startup
     _publish_heartbeat(backend, ops, poller)    # announce liveness immediately
@@ -99,7 +99,14 @@ def run_loop(config):
                 pass
 
     machine = config.machine_name or config.machine_id or "(unconfigured)"
-    slave = f"{config.com_port}@{config.baud}" if config.enable_slave else "off (--no-slave)"
+    # t2057 — REPORT WHAT IS, not what was configured: beacons.start() already ran (above), so status()
+    # now reflects the receiver's REAL outcome — a probed-and-failed port reports its own reason here
+    # instead of the startup log claiming a healthy "slave=COMx@baud" from the config value alone.
+    if not config.enable_slave:
+        slave = "off (--no-slave)"
+    else:
+        st = beacons.status()
+        slave = f"{config.com_port}@{config.baud}" if st.get("ok") else f"FAILED — {st.get('error') or 'unknown reason'}"
     print(f"[bridge] up — backend={config.backend}  machine={machine}  dest={config.expert_dest}  slave={slave}")
     _log_profile_validation(ops)
     print("[bridge] polling… (Ctrl+C to stop)")

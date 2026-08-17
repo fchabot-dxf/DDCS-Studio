@@ -61,6 +61,10 @@ class BeaconSource(ABC):
     def latest(self): ...
     def stop(self):
         pass
+    def status(self):
+        """The receiver's REAL, current state — {"ok": bool, "error": str|None}. t2057 — default
+        healthy-always (no real hardware to be unhealthy); ModbusBeaconSource overrides with the truth."""
+        return {"ok": True, "error": None}
 
 
 class ModbusBeaconSource(BeaconSource):
@@ -73,8 +77,33 @@ class ModbusBeaconSource(BeaconSource):
         self.slave_id = slave_id
         self._beacon = _LatestBeacon(marker)
         self._thread = None
+        self._error = None    # None = healthy; a string = why the receiver is NOT actually listening. t2057
+
+    def status(self):
+        """t2057 — THE RECEIVER'S REAL STATE, not what `enable_slave` was configured to. Report what IS."""
+        if self._error:
+            return {"ok": False, "error": self._error}
+        if self._thread and self._thread.is_alive():
+            return {"ok": True, "error": None}
+        return {"ok": False, "error": "not started"}
 
     def start(self):
+        # t2057 — PROBE THE PORT FIRST, synchronously, before handing off to pymodbus. Confirmed on the
+        # bench (a scratch venv pinned to the required pymodbus==3.6.9): StartSerialServer's own transport
+        # layer sets `reconnect_delay=2` and RETRIES A FAILED OPEN FOREVER inside its asyncio loop — a
+        # missing/busy/wrong port never raises out of this thread, never stops the thread, and the daemon
+        # thread stays `is_alive() == True` indefinitely either way. A try/except around StartSerialServer
+        # itself catches NOTHING (proven, not assumed) — the only way to know honestly is to test the port
+        # BEFORE handing it to that retry loop. A quick pyserial open+close raises synchronously and clearly
+        # for a missing device, a wrong port name, or one already claimed by another process.
+        try:
+            import serial
+            probe = serial.Serial(port=self.port, baudrate=self.baud, timeout=0.2)
+            probe.close()
+        except Exception as e:
+            self._error = f"could not open {self.port}: {e}"
+            return   # do NOT start the thread — nothing to run; status() now reports the real reason
+
         from pymodbus.datastore import (
             ModbusSequentialDataBlock,
             ModbusServerContext,

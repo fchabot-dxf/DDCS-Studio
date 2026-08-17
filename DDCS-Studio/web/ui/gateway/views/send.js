@@ -218,6 +218,15 @@ export default {
         const r = await ctx.client.submitJob(name, nc, map, contentHash);
         toast('Queued ' + r.jobId);
         info.textContent = `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
+        // t2057 — SAY SO AT THE MOMENT OF SENDING: the bridge can request tracking (this checkbox) while its
+        // own Modbus receiver is off or dead — two independent toggles nothing else compares. The toast fades
+        // in 3.2s like any other, so ALSO append to the durable `info` line the operator already reads —
+        // that one survives even if they glance away right after clicking Send, rather than silently
+        // un-ticking tracking for them.
+        if (r.warning) {
+          toast(r.warning, true);
+          info.textContent += ` — ⚠ ${r.warning}`;
+        }
       } catch (e) {
         toast('Send failed: ' + e.message, true);
       } finally {

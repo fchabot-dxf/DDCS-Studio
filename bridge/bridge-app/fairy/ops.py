@@ -33,9 +33,12 @@ def make_job_id(name, now=None):
 
 
 class Ops:
-    def __init__(self, backend, config):
+    def __init__(self, backend, config, beacons=None):
         self.backend = backend
         self.cfg = config
+        self.beacons = beacons     # t2057 — optional: the live BeaconSource, so submit_job can cross-check
+                                    # a tracked request against the receiver's REAL state, not just enable_slave's
+                                    # configured intent. None in tests/self-test that don't exercise this.
         self._detect_cache = None  # (dest, result): the fingerprint is stable per connected controller
 
     # Per-controller baseline profiles (the shared shape Studio consumes). detect_controller() picks
@@ -66,7 +69,24 @@ class Ops:
         job_id = make_job_id(name)
         self.backend.put_job(job_id, nc, mapping)
         tracked = bool(mapping and mapping.get("total_beacons"))
-        return {"jobId": job_id, "name": name, "tracked": tracked}
+
+        # t2057 — SAY SO AT THE MOMENT OF SENDING, not twenty minutes into watching a bar that will never
+        # move: a job can ask to be tracked (its map has total_beacons) while the bridge's own Modbus
+        # receiver is off or dead — two independently-set toggles (this send's own request vs. the bridge's
+        # `enable_slave`/hardware state) that nothing else compares. `poller.py`'s claim-time check still
+        # degrades this correctly to "delivered" server-side (t2020) — this is a SEPARATE, EARLIER honesty
+        # signal, surfaced in the submit response itself so the operator can act before the job even runs,
+        # not silently un-ticked for them.
+        warning = None
+        if tracked:
+            if not self.cfg.enable_slave:
+                warning = "Beacons were requested but this bridge has Modbus disabled (Setup -> Beacons is off) — this job will deliver but will NOT show live progress."
+            elif self.beacons is not None:
+                st = self.beacons.status()
+                if not st.get("ok"):
+                    warning = f"Beacons were requested but the bridge's Modbus receiver is not running ({st.get('error') or 'unknown reason'}) — this job will deliver but will NOT show live progress."
+
+        return {"jobId": job_id, "name": name, "tracked": tracked, "warning": warning}
 
     def list_queue(self):
         """The queue/tracker view: every status object, plus inbox jobs not yet given a status."""
