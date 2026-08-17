@@ -40608,3 +40608,80 @@ None — read-only reconciliation, no code/spec/doc changed, per the dispatch. `
 None changed.
 
 🔨 turn 2010
+
+# ═══ t2012 — (1) PORTING.md contradiction FIXED. (2) DM500 stage 2 NOT built — a standing ruling already closes it ═══
+
+## (1) THE PORTING.md CONTRADICTION — fixed, one source
+
+`PORTING.md`'s own summary table said S5 was "⏳ human-gated" while its own "S5 — THE LIVE ROUND-TRIP" section
+(and `portingArc.js`'s own `landed` field) described it as done, with results, dated t1538/t1542. Fixed the table
+row to state the true status and point to the section + `portingArc.js` as the sources, rather than duplicate the
+fact a third time: **no automated checker exists for `PORTING.md`** (unlike `ARCHITECTURE.md`'s own test suite,
+built specifically for this) — building one this turn would be a much bigger act than the fix itself, so the
+table now says what's true and names where the fuller/machine-tracked version of the same fact lives, matching
+the "reference, don't restate" shape from t2006-t2008, without inventing new checker infrastructure for a single
+markdown table. Also fixed the section header just above the table ("V4.1 OFFLINE ARC CLOSED (S1–S4)... only S5
+remains") to read S1–S5, since that phrase was the SAME stale fact stated a fourth way.
+
+## (2) DM500 STAGE 2 — NOT BUILT. A standing advisor ruling already closes the premise this dispatch was built on
+
+Before touching `caps.flow`, re-read `PORTING.md`'s OWN "What it settles" section (the S5 write-up, chronologically
+AFTER the "flagged for a future act" note the dispatch — and my own t2010 report — pointed at) and searched
+WORK-LOG for the actual ruling. Found, in order of increasing specificity:
+
+1. **`PORTING.md` itself, "What it settles" (line ~202):** *"`caps.flow: 'goto'` is CORRECT for what Studio
+   emits. The DM500 'we may be under-declaring' theory (t1537) is closed — and closed with an error message
+   behind it, not a freeze."*
+2. **WORK-LOG's own S5 entry:** *"This closes the DM500 under-declaration theory the t1538 WORK-LOG entry
+   raised — if WHILE can't open at top level on V4.1's DDCS-family firmware either, DM500's own
+   `caps.flow:'goto'` is very likely correctly-declared, not under-declaring."*
+3. **WORK-LOG, explicitly, in so many words:** *"Rulings already made by the advisor, not remade here:
+   `caps.flow:'goto'` STAYS, confirmed correct for what Studio emits. `POST_VERIFIED` unchanged. No cap value
+   touched anywhere in this act."*
+
+**The reasoning, for completeness:** V4.1's own hardware (S5) showed `WHILE` is *recognised* by the parser but
+never actually opens a loop at the top level of a standard-mode program — it only functions inside Macro Mode
+(`#122` param or a `macro_` filename prefix), which Studio does not currently emit into for ANY target. So the
+factory's `slib.nc` using `WHILE`/`DO`/`END` does NOT mean Studio is safely leaving a usable capability
+undeclared — using it today, as Studio actually emits, would not work. `caps.flow:'goto'` was never wrong; the
+"under-declaration" WORRY (not the capability enum itself) is what closed.
+
+**This directly contradicts my own turn's dispatch, which was built on t2010's own report** — t2010 correctly
+found and quoted the "flagged for a future act, NOT taken here" note but did not cross-check WORK-LOG for whether
+that flag was later ruled on. It was. **My own prior reconciliation was incomplete**, and it fed a stale premise
+forward into this turn's task. Named plainly rather than quietly built around: I did not raise `caps.flow`, did
+not add a spec reading `slib.nc`, did not touch any dialect file. Building the raise as dispatched would have
+directly reversed a ruling already on record, on a premise (this exact WHILE/slib.nc finding) the advisor's own
+prior turn had already weighed and closed the other way.
+
+**What a genuine future raise would actually require, if ever re-opened:** not a caps-value flip. `caps.flow`'s
+enum (`'goto' | 'oword' | 'none'`, per `dialects/index.js`'s own comment) has no value for "goto normally, WHILE
+available only under Macro-Mode gating" — that's a new semantic, not a documented one. A real raise would need
+Studio to actually START emitting into Macro Mode (auto-detecting when a program needs WHILE, prefixing the
+filename or setting `#122`), which is its own emit-class feature with its own design questions across BOTH V4.1
+and DM500 — exactly the "own bridge, its own act, a heavier seat" `PORTING.md`'s original flag already named.
+Not scoped, not started.
+
+## Non-vacuity
+
+N/A for item 2 — nothing built, nothing to prove non-vacuous. Item 1 is prose-only; verified true against
+`portingArc.js`'s own `landed` field and the S5 section's own results table, not merely reworded.
+
+## Gate
+
+`npm run test:node`: 126/126 (sanity check; `PORTING.md` is not read by any test). No dialect/DM500/fork-parity/
+guard-roundtrip/t1928 gate run — nothing in that list was touched, per "gate what you changed." `proc_health.py
+watch`: clean.
+
+## Files
+`PORTING.md` (the S5 status-table fix, item 1 only). No source/spec files touched.
+
+## For the advisor's ruling
+
+Does the standing "`caps.flow:'goto'` STAYS" ruling still hold? If yes, DM500 stage 2 as framed ("raise
+caps.flow") should come OFF the live-items list — it is CLOSED, not open, and t2010's own ranking of it as
+"ready now, no machine needed" should be corrected the same way `PORTING.md`'s own contradiction just was. If the
+ruling should be revisited with new reasoning, that's a design call for the advisor/human, not mine to make by
+building first and asking after.
+
+🔨 turn 2012

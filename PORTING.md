@@ -20,7 +20,7 @@ round-trip · verify) before any fleet port — the corner-gated-pilot rule.
 
 ---
 
-## Status: V4.1 OFFLINE ARC **CLOSED** (S1–S4) · DM500 stage 1 MEASURED · only S5 (human-gated) remains
+## Status: V4.1 ARC **CLOSED** (S1–S5) · DM500 stage 1 MEASURED (thin, not POST_VERIFIED) · S5 ran on real hardware
 
 The scout's own stage plan, declared as data in `DDCS-Studio/web/data/portingArc.js` (the
 `slotCapabilityArc` shape) and pinned by `tests/porting-arc-scout-1530.spec.js` (9 factual claims,
@@ -34,7 +34,7 @@ all green) so the design cannot rot before it is built.
 | S2 | Normalisation policy | ✅ **landed** t1534 | Factory G-code is **unspaced**, Studio emits **spaced**. ✅ **SETTLED t1531 — V4.1 accepts spaced** (user-attested). The oracle still compares normalised (the corpus is unspaced, so normalisation is what makes comparison possible), but the delta is an **answered** row, not an open question. S5 confirms it for free. |
 | S3 | Caps completeness | ✅ **landed** t1534 | 3 caps live outside `DEFAULT_CAPS`, confirmed **latent not live** (every consumer truthy-tests; zero `=== false` comparisons). |
 | S4 | Named unknowns | ✅ **landed** t1534 | `readActiveWcs` / `hmiPrompt` / ATC tables — all fold to `[]` honestly today. |
-| S5 | Live round-trip | ⏳ **human-gated** | Cannot be agent-scheduled — needs a human at the bench to press Start. The C3-is-last discipline. |
+| S5 | Live round-trip | ✅ **ran** t1538/t1542 — see § "S5 — THE LIVE ROUND-TRIP" below | RAN on a real V4.1 bench unit. This row used to say "⏳ human-gated" after the run actually happened — a stale copy of a fact this file's own S5 section (and `portingArc.js`'s own `PORTING_STAGES['live-roundtrip'].landed` field) already stated correctly; t2012 fixed the table rather than re-derive it mechanically (no checker exists for this file, unlike `ARCHITECTURE.md`'s own test suite — building one is a bigger act than this fix). The section below is the one place with the full measured results; `portingArc.js` is the one machine-readable source. |
 | — | DM500 stage 1 | ✅ **measured** t1536 · tier ruled t1537 | Same S1–S4 stages. **Guard:** rows carry their evidence tier on their face, and DM500 does **not** enter `POST_VERIFIED` on offline agreement alone. |
 | — | grbl-class | ⏳ | **UNROLL** — confirmed against caps: grbl has no `#vars` at all; grblHAL's O-word flow cannot stream. |
 
