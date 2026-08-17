@@ -5301,3 +5301,47 @@ happens — do not block on it.**
 
 ⚠ Then: the bench test (the human's) · Option 1 if/when the firmware lands · **two-sided SETUP** and
 **preview Fork 3**, still the human's.
+
+# ═══ t2056 — FIX THE TWO SILENT BEACON FAILURES (no hardware needed) ═══
+
+t2055 accepted. **Four amendments absorbed in order, `chooseByOp` reverted cleanly, nothing built** — and the
+fault hunt found two defects that BOTH fully explain *"beacon never worked"*, and both are this session's own
+recurring shapes.
+
+**⭐ #1 — THE BRIDGE LIES ABOUT ITS OWN STATE.** `beacons.start()` spawns a **daemon thread** and returns
+immediately; the real `StartSerialServer` (opening the COM port) happens *inside* it. An exception there —
+wrong port, no adapter, permission, a pymodbus import failure — **crashes nothing, raises nowhere, and is
+never checked.** Meanwhile the startup log prints `slave={config.com_port}@{config.baud}` **straight from the
+CONFIG VALUE, not the thread's actual state.** So the bridge reports a healthy Modbus receiver while it is
+silently dead — and it would fail this way on *every* attempt, from the first. That is exactly "never worked",
+not "broke once".
+
+**⭐ #2 — TWO TOGGLES, BOTH CALLED "BEACONS", NOTHING COMPARES THEM.** `send.js`'s **per-job** checkbox
+(client-side, defaults CHECKED) versus `admin.js`'s **per-bridge** `enable_slave` (gates whether the receiver
+starts at all). Tick the first with the second off and t2020's fix degrades correctly server-side — but **what
+the operator sees is a job at 0%, "DELIVERED", no ETA, never advancing**, indistinguishable from "about to
+start" until they give up. A correct degrade can still read as total silence.
+
+**And #3, confirmed by execution not reasoning:** `opLabel()` returns **`"grid"`** for a real drill op, because
+its regex is not nesting-aware and the emitted header is `( ---- DRILL, parametric: 2 holes (grid) x peck ... )`.
+Pocket (no nested parens) is fine — **op-dependent, and correctly ranked below 1/2** since it degrades only the
+label, not progress.
+
+## THE TASK — fix #1 and #2. Both are honesty defects; neither needs the Expert.
+1. **#1: MAKE THE RECEIVER'S REAL STATE VISIBLE.** Capture the thread's actual outcome and surface it —
+   **report what IS, not what was configured.** A log line printing a config value it never verified is the
+   same defect class as a comment asserting a safety the code lacks. **⚠ Do NOT paper over a genuinely absent
+   adapter — an honest "Modbus receiver failed to start: <reason>" is the goal**, not a retry loop that hides it.
+2. **#2: CROSS-CHECK THE TWO TOGGLES.** If a send requests beacons while the bridge's receiver is off or dead,
+   **say so at the moment of sending** — the operator can act then, not twenty minutes into watching a bar that
+   will never move. **Do not silently un-tick it for them; tell them.**
+3. **⚠ REPRODUCE BOTH FIRST, LOCALLY** — you marked both as testable here. Run the bridge with a bad COM port
+   and confirm nothing surfaces it; run a real Send with `enable_slave` off and watch the Tracker sit at 0%.
+   **Reproduce, then fix, then show the same run reporting honestly.**
+4. **#3 IS NOT THIS TURN** — real, confirmed, but label-only. Park it by name.
+5. **Gate:** bridge suite + node tier + the gateway/tracking specs.
+
+⚠ **Still open for the human:** they have **already flashed the firmware**, but **no new dump exists in this
+repo** (newest capture is `20260731T181343Z`; nothing uncommitted). If P279 is present on the flashed
+firmware, **Option 1 — polling, no emitted bytes — may be unblocked**, which is their stated preference. I have
+asked them to point me at the dump or put the Expert on the network.
