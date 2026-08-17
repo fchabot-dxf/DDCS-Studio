@@ -42337,3 +42337,99 @@ Unchanged, none started, none blocking: abort-vs-lost-link (no operator-abort co
 2's six (none confirmed live, last swept at t2040), two-sided SETUP + preview Fork 3 (the human's alone).
 
 🔨 turn 2044
+
+# ═══ t2046 — JOB TRACKING SLICE 2 (READ-ONLY): can V4.1 be OBSERVED mid-run over SMB? ═══
+
+No code, no gate — per dispatch. Read `bridge/controllers/README.md`, `v4.1/FINDINGS.md`,
+`v4.1/ETHERNET_TESTS.md`, `v4.1/dispatcher/README.md`, `expert-m350/FINDINGS.md`, `archive/EXPERIMENTS.md`.
+
+## (1) What does a running V4.1 expose on disk?
+
+- **`uservar`** (SYSDISK, 400×f64, #100–#499) — the ONLY variable-readback channel. Already CONFIRMED (not
+  a new finding, existing evidence): flushes RAM→file **only at run start and run end**, never mid-run. Not
+  an inference — the `M47` dispatcher's own heartbeat `#246` (incremented every RAM cycle by the loop macro)
+  **froze in the readback file while the loop kept running** (`FINDINGS.md` line 185-188). That is a live
+  program actively bumping a var whose file-image nonetheless never moved until the loop stopped.
+- **`.file`** (332B text) — last-loaded path only. No progress content.
+- **`.<name>.nc.env`** (888B modal/run state) — idx148/149 already REFUTED as a completion signal (reflect
+  program *structure*, not status). Other indices untested; nothing suggests a progress counter lives here.
+- **`.<name>.nc.pos`** (60B, axis positions) — the ONE genuinely open item. Confirmed only as a coarse
+  "did the program actually run" flag (`archive/EXPERIMENTS.md` A7: "`.pos` confirmed it ran"; parse-error
+  runs leave none, per the Expert side's parallel finding). **Its UPDATE CADENCE during a run has never been
+  tested on either controller** — not confirmed live, not confirmed lazy. Genuinely `[TO TEST]`, not a gap in
+  reading, a gap in the ledger itself.
+
+## (2) The combined idea (Studio writes a progress uservar, PC reads it over SMB) — ALREADY REFUTED, no bench trip needed
+
+This doesn't need a new experiment — the existing evidence answers it directly. The uservar RAM→file flush
+model is confirmed **start/end only**, and the `M47` heartbeat freeze is a *live program, mid-run, actively
+writing the exact var class Studio would use* — as close to this precise question as the bench has already
+come. **A progress variable written by Studio's post into #100–#499 will sit in RAM and never reach the
+SMB-readable file until the job ends.** Reading `uservar` over SMB during a run returns the value from **run
+start**, not "as of now." The human's "edit the post" idea and "read it over SMB" idea are each individually
+sound, but the file layer between them is proven non-live — the combination doesn't survive contact with
+what's already on the bench. V4.1 also has no Modbus (`[CONFIRMED]`, zero hits across 2 firmware builds) — no
+live serial fallback exists the way Expert has.
+
+## (3) The exact experiment for `.pos` — the one thing actually worth a bench trip
+
+**Setup** (reuses the existing SMB recipe, no new tooling): a short test file with 3 distinguishable,
+dwell-separated commanded moves on any real, unused axis — motorless is fine, `S6d` already proved a real
+`G0 X<word>` axis move gets INTERPRETED on this motorless bench (rejected only for a bad token, not for lack
+of a motor), so software position tracking should run regardless of whether a drive is attached:
+```
+G0 A10
+G4 P5000
+G0 A50
+G4 P5000
+G0 A100
+G4 P5000
+M30
+```
+**Steps**: (a) select + Start the file on the panel once (same one-time trigger the dispatcher already uses);
+(b) WHILE it runs (~15s), repeatedly read `\\10.0.0.50\sysdisk\.<name>.nc.pos` over SMB — every 1s is plenty
+— and note the raw bytes or eyeball the on-screen DRO alongside each poll as ground truth.
+
+**What YES looks like**: the polled bytes visibly track A=10, then A=50, then A=100 **before** the program
+reaches `M30` — i.e., a poll taken during the second dwell already shows 50, not 0 and not 100. That would
+mean V4.1 CAN expose live position over SMB — a genuine (if coarse, position-based rather than line-number-
+based) progress signal Studio could poll at any cadence.
+
+**What NO looks like**: the bytes stay frozen — either at 0/the previous run's ending value — through the
+whole run, and only reach A=100 once `M30` fires. That matches the uservar model exactly and closes the
+question: **nothing on V4.1 is observable mid-run**, full stop.
+
+## (4) Expert — does a running job's beacon carry a LINE NUMBER that advances?
+
+No — but the real answer is more useful than a flat no. `expert-m350/FINDINGS.md` explicitly states **no
+single "current line" system variable exists in the mapped register space**, and the on-screen
+`syntax error:Ln` text is rendered straight to `/dev/fb0`, never persisted to any file. So there is no
+existing beacon to read.
+
+**But there doesn't need to be one.** `CHECKPOINT_TEST.nc` already PROVED the outbound Modbus channel is
+genuinely live: the macro set `#250=1/2/3` and called `MSETDATA` at each step; the PC's Modbus slave received
+all three frames **near-instant, no wedge** (`FINDINGS.md` line 373-382, "the PC tracks how far a job got").
+This is the checkpoint mechanism, not raw line-tracking, but it's the SAME shape as the human's "edit the
+post" idea — Studio's post already emits macro lines per op; inserting a checkpoint-id write + `MSETDATA`
+call at each op boundary gives a truly live, sub-run signal over an ALREADY-CONFIRMED channel, not a
+hypothetical one. `MGETDATA` (the reverse, PC→controller direction) is separately confirmed to WEDGE this
+firmware and force a reboot — irrelevant here since checkpoint push is purely outbound. Expert live progress
+is not "already free," but it is close: the checkpoint plumbing is proven, only the density (how many
+`MSETDATA` calls per program, at what granularity) is untested and worth its own small bench pass before
+committing to a design.
+
+## (5) If V4.1 turns out unobservable — say so
+
+Based on everything already on the bench (independent of the `.pos` experiment above): **no currently proven
+V4.1 channel exposes progress during a run.** `uservar` is proven not live; there is no Modbus fallback. The
+`.pos` experiment is the one open question — if it comes back NO, the honest, complete statement becomes
+**V4.1 has no observable live-progress channel at all; only post-completion status (done/errored, via the
+already-proven uservar sentinel) is available**, a real and plannable limit, structurally different from
+Expert's near-term MSETDATA-checkpoint path. Naming that now, rather than after a bench session, is the
+point of this turn.
+
+## Gate
+
+None — read-only, no code changed, per dispatch.
+
+🔨 turn 2046
