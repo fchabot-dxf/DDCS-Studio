@@ -1037,19 +1037,23 @@ rotary mutating saved settings, ATC magazine). Extend the fork comparison to the
 decisions, and it would have caught all four before the user did.
 
 ## 3. RETIRE THE OLD SCREENS AND RENDERERS — turns "portable" into "as data"
-User has ruled they go ([[nothing-is-precious-delete-freely]], [[no-legacy-burden]]). ~20 dead built-in
-screens + **6 legacy renderer views still LIVE and reachable** (an op carrying its raw built-in type
-instead of `user_*_data` gets the OLD renderer; **2 of the 6 already behave differently from their twin**).
-Only corner's was actually deleted. ⚠ EXTRACT FIRST: 24 of 38 twins import from `wizards/*Wizard.js` —
-those imports are STACK BUILDERS (legitimate per principle 2, `BUILDERS(params)==children`), NOT leftovers.
-Cut the screens/renderers, keep the builders.
-**Why this is the highest-value item:** it serves BOTH ideas at once — the app's cleanliness (one source)
-AND the user's ownership (a fork can no longer silently get old behaviour). It is also the step that makes
-"wizards as data" TRUE rather than just "portable".
+✅ **THE 6 LEGACY RENDERER VIEWS ARE DONE — retired at t1730, ALL SIX, not just corner's** (confirmed t2014
+directly against `wizards/views/index.js`: it imports only `commView`/`wcsView`/the ATC views/the mill
+cutting-op views — `middleView`/`edgeView`/`alignmentView`/`rotaryCenterView`/`rotaryClockView`/`homingView`
+are gone). This entry said "6 legacy renderer views still LIVE and reachable... only corner's was actually
+deleted" for who knows how long after t1730 closed it — the same stale-self-claim shape this session found in
+`PORTING.md` and `ROADMAP.md` the same week, now fixed here too (t2016).
+⚠ **STILL UNVERIFIED, not part of the above:** the "~20 dead built-in screens" figure this item also names —
+not re-measured this turn, named as a separate, unconfirmed count rather than folded into the "done" verdict
+above. ⚠ EXTRACT FIRST (if this is picked up again): 24 of 38 twins import from `wizards/*Wizard.js` — those
+imports are STACK BUILDERS (legitimate per principle 2, `BUILDERS(params)==children`), NOT leftovers. Cut
+screens/renderers, keep the builders.
 
 ## 4. THE 24 DUPLICATED FACTS (`PREVIEW-AS-DATA.md`, tiered)
-Tier 1 (3-4 copies of one fact): pocket shape table ×3 · contour ×3 · edge near-face rule ×4 ·
-parting kerf ×3 · comm message format ×3 · ATC sim declared twice with one copy permanently stale.
+Tier 1 (3-4 copies of one fact): pocket shape table ×3 · contour ×3 · edge near-face rule **×2** (was ×4 at
+the survey; t1730's legacy-view deletion incidentally carried away 2 of the 4 copies as a side effect, not a
+deliberate dedup of this fact — measured t2014, corrected here t2016) · parting kerf ×3 · comm message
+format ×3 · ATC sim declared twice with one copy permanently stale.
 Tier 2: 9 two-copy items. Tier 3: 5 capability gaps.
 **Each is the same move — find the one real function, make everything call it, delete the copies.**
 NO new blocks, NO vocabulary, nothing new for an author to learn (see the HARD CONSTRAINT above).
@@ -4373,3 +4377,47 @@ consecutive turns.**
 3. **Gate:** node tier + the specs covering whichever family you collapse + the round-trip/parity set.
 
 ⚠ **The machine is yours.** Fork 3 goes to the human as the ONE open question; I am not blocking on it.
+
+# ═══ t2018 — JOB PROGRESS, SLICE 1: predict-only "how much longer" (user-requested arc) ═══
+
+**THE HUMAN HAS ASKED FOR THIS NEXT:** job tracking in the Gateway — *seeing how far a job is in.*
+`JOB-PROGRESS-PLAN.md` is its scoping note (prepared 2026-08-13 **at their request**), and it says
+**"Status: scoping note. Nothing built."** I grepped: no `jobProgress` / `timeRemaining` / `etaFromPlan`
+anywhere in `web/`. Confirmed unbuilt.
+
+**The problem in their own words:** *"long jobs have no way to tell if its halfway or 90%"* — and
+*"tracker is anytime"*, i.e. this is NOT a remote-only concern. In the shop or not, the question is the same:
+**how much longer.**
+
+**Why the existing mechanism does not answer it:** the beacon tracker reports a LINE NUMBER, and
+**lines ≠ time** — a dwell is one line; a 40-minute surfacing pass is also one line.
+
+## ⚠ FIRST — VERIFY THE PLAN IS STILL TRUE (it is 3 days and ~250 turns old).
+The last three plan documents I trusted were each stale in some respect. **Follow the thread forward before
+building anything.** Specifically: is the beacon tracker still shaped as the plan describes, and does anything
+in `bridge/` already compute time rather than lines? **If the plan's premise has moved, STOP and tell me** —
+do not build against a stale scoping note.
+
+## THE TASK — the plan's OWN first slice, which needs no machine at all.
+> *"Prediction alone works with NO link at all… **that is the sensible first slice:** predict-only, no live
+> anchor, no correction. It proves the estimate against real jobs before any machine plumbing exists."*
+
+**Build that, and nothing beyond it.**
+
+1. **REUSE `estimateProgram` / `secondsForLines`** (`engine/timeEstimate.js:22,42`). They already back the
+   editor chip, the per-operation split and the setup sheet, and they are well covered
+   (`time-estimate-844`). **Do NOT write a second estimator** — that is the second-source defect this session
+   has deleted a dozen times.
+2. **SURFACE IT WHERE THEY ASKED: the Gateway.** A job's predicted duration, before it runs, from Studio's own
+   program. **Their vocabulary, not ours** — "about 41 min", not "estimated move seconds".
+3. **⚠ SAY WHAT IT CANNOT KNOW.** The plan separates EXACT / MODELLED / MEASURED for good reason. A predicted
+   time that silently ignores tool changes, or the machine's real accel, is a number that will be wrong on the
+   shop floor and trusted anyway. **Show the basis, or show a range — do not show false precision.**
+4. **NO LIVE ANCHOR, NO CORRECTION, NO MODBUS.** Those are later slices and they need hardware this loop
+   cannot verify. **If you find yourself needing the machine, you have left slice 1.**
+5. **ASSERT WHAT THE USER SEES:** a real program → the Gateway shows a duration that matches
+   `estimateProgram`'s own number for that program. Real gesture, non-vacuity at your usual bar (distinctive
+   value, baseline checked).
+6. **Gate:** node tier + `time-estimate-844` + whatever Gateway specs exist + the round-trip/parity set.
+
+⚠ **Do not start slice 2 (live position).** ⚠ Fork 3 of preview-as-data still goes to the human separately.
