@@ -4549,3 +4549,34 @@ controller incapability, mislabelled as a fault. Invisible, because the suite bo
 - **ABORT vs LOST-LINK collapse into one "stalled".** No operator-abort concept exists anywhere in the gateway
   (zero `abort|cancel` hits). Not a wrong-duration risk — it never fabricates a finish — but short of the
   "record unknown, distinctly" bar.
+
+### ⚠ PROMOTED BY THE HUMAN — JOB HISTORY STORAGE MUST BE PERSISTENT (next act after t2020)
+
+*"the storage needs to be persistent then no?"* — **Yes, and it outranks the rest of the queued list.**
+
+**Why it is worse than it looks:** run history is the ONLY ground truth this feature has, it **accumulates one
+job at a time over months**, and it cannot be regenerated — you cannot re-run last March's job to recover how
+long it took. And the loss is **silent**: nobody discovers it at reinstall, they discover it the day they ask
+*"how long did this take last time?"* and get nothing back.
+
+```
+  today:   a folder beside the bridge-app exe
+           survives an in-place self-update            ✓
+           a full reinstall to a new folder            ✗ HISTORY GONE
+```
+
+That is squarely against the project's standing persistence principle (a **user-owned file**, in a place the
+user can find, back up and keep). Beside-the-exe is an install artifact, not user data.
+
+**NOT amended into t2020 mid-turn, deliberately:** identity (how a record is KEYED) and storage (WHERE the file
+lives) are independent — moving the file later does not invalidate the hashes — so injecting it now would
+invalidate that turn's gate for no gain. **It is the very next act.**
+
+**When dispatched, it must answer:**
+1. **A stable per-user OS location** (the platform's app-data / Documents convention), not the install folder.
+2. **⚠ MIGRATE THE EXISTING RECORDS** — there is real history there already. **Losing it while fixing where it
+   lives would be the joke version of this fix.** And migrate ONCE, idempotently.
+3. **Can the user FIND it, and back it up?** The principle is user-owned, not merely durable. A path they can
+   open beats a hidden one.
+4. **What survives a full reinstall — prove it**, do not reason about it. Simulate the reinstall (fresh folder,
+   existing data) and show the history still reads.
