@@ -7,6 +7,7 @@ import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams, handleScale } from '../ops/placement.js';
 import { regionDesc } from '../ops/region.js';
 import { contourRegion } from '../ops/contour.js';
+import { regionFromFlat } from '../ops/contourfill.js';   // t2038 — the SAME shape->region-dims mapping the real emit (and the twin's own collapsed preview, t2028) already reuses — this classic view's own local regionParams was a 3rd independent copy, still reachable via an old file's raw `contour` type (opensAs routes today's menu to the twin, per wizardManager.js's open())
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
@@ -30,18 +31,15 @@ function applyTool() {
     if (Object.keys(m).length) setFields(m);
 }
 
-/** The TRUE profile region params (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)). */
-function regionParams(params) {
-    const ox = num(params.originX, 0), oy = num(params.originY, 0);
-    if (params.shape === 'circle') return { shape: 'circle', x: ox, y: oy, w: num(params.dia, 50) };
-    if (params.shape === 'polygon') return { shape: 'polygon', x: ox, y: oy, w: num(params.dia, 50), sides: num(params.sides, 6) };
-    if (params.shape === 'ellipse') return { shape: 'ellipse', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
-    return { shape: 'rect', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
-}
+// t2038 — the local regionParams() that used to live here (rect = corner+size, circle/polygon = centre±R,
+// ellipse = centre±(rx,ry)) is GONE: regionFromFlat (contourfill.js) already reads this exact same shape
+// dispatch, keyed on the atom's x/y — bridged below with the same originX/originY -> x/y adapter contourData.js
+// already uses (t2028), not a new one.
 
 /** 2D layout: the profile boundary (what you type) + the OFFSET toolpath (where the tool centre runs) + a place
- *  handle + a size handle. The offset contour comes from contourRegion so it matches the emitted G-code exactly. */
-function buildContourSpec(params, stock) {
+ *  handle + a size handle. The offset contour comes from contourRegion so it matches the emitted G-code exactly.
+ *  Exported (t2038) so a test can prove it shares regionFromFlat with contourData.js's own preview. */
+export function buildContourSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const items = [], paths = [];
     // DECLARE the handles via reusable gestures (same shape vocabulary as pocket): pos = `point`; the size handle is a
@@ -55,7 +53,7 @@ function buildContourSpec(params, stock) {
         decls.push({ type: 'radial', id: 'size', field: 'ct_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a });
     } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
         // No SVG primitive for polygon/ellipse — draw the TRUE boundary ring from the region kernel's contour.
-        const brg = regionDesc(regionParams(params));
+        const brg = regionDesc(regionFromFlat({ ...params, x: params.originX, y: params.originY }));
         const ring = (brg.contour && brg.contour[0]) || [];
         if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
         if (params.shape === 'polygon') {
@@ -72,7 +70,7 @@ function buildContourSpec(params, stock) {
     }
 
     // The OFFSET toolpath (tool-centre contour) — drawn as a closed polyline guide so 2D matches what's cut.
-    const rg = contourRegion({ region: regionDesc(regionParams(params)), side: params.side || 'outside', tool: num(params.toolDia, 6) });
+    const rg = contourRegion({ region: regionDesc(regionFromFlat({ ...params, x: params.originX, y: params.originY })), side: params.side || 'outside', tool: num(params.toolDia, 6) });
     for (const ring of (rg.contour || [])) {
         if (!ring || ring.length < 2) continue;
         paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-path' });

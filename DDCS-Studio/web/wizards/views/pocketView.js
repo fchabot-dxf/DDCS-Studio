@@ -5,7 +5,7 @@ import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams, handleScale } from '../ops/placement.js';
-import { regionDesc } from '../ops/region.js';
+import { trueRegionFromFlat } from '../ops/pocketfill.js';   // t2038 — the SAME shape->region-dims mapping the real emit (and the twin's own collapsed preview, t2016) already reuses — this classic view's own polygon/ellipse branch was a 4th independent copy, still reachable via an old file's raw `pocket` type (opensAs routes today's menu to the twin, per wizardManager.js's open())
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
@@ -29,8 +29,9 @@ function applyTool() {
     if (Object.keys(m).length) setFields(m);
 }
 
-/** 2D layout: the pocket outline (what the finished walls will be) + a place handle + a size handle. */
-function buildPocketSpec(params, stock) {
+/** 2D layout: the pocket outline (what the finished walls will be) + a place handle + a size handle. Exported
+ *  (t2038) so a test can prove it shares trueRegionFromFlat with pocketData.js's own preview, not a re-typed copy. */
+export function buildPocketSpec(params, stock) {
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const items = [], paths = [];
     // DECLARE the handles via reusable gestures (not hand-rolled): pos = `point`; the size handle is a `rect` corner
@@ -45,9 +46,9 @@ function buildPocketSpec(params, stock) {
         decls.push({ type: 'radial', id: 'size', field: 'p_dia', cx: ox, cy: oy, r: R, rScale: 2, minR: 1, label: 'Ø', a: hs.size.a });
     } else if (params.shape === 'polygon' || params.shape === 'ellipse') {
         // No SVG primitive for polygon/ellipse — draw the boundary ring from the region kernel's contour.
-        const rg = regionDesc(params.shape === 'polygon'
-            ? { shape: 'polygon', x: ox, y: oy, w: num(params.dia, 50), sides: num(params.sides, 6) }
-            : { shape: 'ellipse', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) });
+        // t2038 — trueRegionFromFlat already reads these exact field names (originX/originY/shape/dia/sides/w/h)
+        // and dispatches polygon/ellipse to regionDesc the same way this branch used to hand-type inline.
+        const rg = trueRegionFromFlat(params);
         const ring = (rg.contour && rg.contour[0]) || [];
         if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((p) => ({ x: p.x, y: p.y })), cls: 'fc-guide' });
         if (params.shape === 'polygon') {

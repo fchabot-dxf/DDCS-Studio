@@ -41991,3 +41991,109 @@ Tier 3's 5 capability gaps, abort-vs-lost-link, two-sided SETUP, preview Fork 3 
 list, none started, none blocking.
 
 🔨 turn 2036
+
+# ═══ t2038 — RE-CHECKED THE 5 "CLOSED" TIER-1 ITEMS AGAINST STILL-LIVE CLASSIC VIEWS: 2 were not closed ═══
+
+t2036's own slot_data finding generalises, per the dispatch's own hypothesis — checked, not assumed.
+
+## The mechanism, traced once, applies to all 5
+
+`wizards/views/index.js` registers **14** classic views (not "fifteen" — counted directly: `commView, wcsView,
+drillView, pocketView, contourView, slotView, surfacingView, textView` + **6** ATC views —`atcViews.js` itself
+exports exactly 6, not 7; both counts corrected here, plainly, the same way t2032 corrected the "14" mix-up).
+Fork 4 (t1730) deleted the PROBE family's 6 legacy views only — mill/setup/ATC classic views were never
+touched and are all still present.
+
+**Confirmed why they're unreachable from today's menu but NOT dead code**: every mill/ATC/setup entry in
+`wizardLibrary.js` that has a twin also carries `opensAs: 'user_X_data'`; `commandDeck.js`'s own click handler
+(`if (e.opensAs) return openWiz(e.opensAs)`) always passes the TWIN's opType, never the classic view's raw
+`type`. `wizardManager.js`'s `open(type,...)` resolves `viewByType.get(type) || (isUserOp(type)?userOpView:
+null)` — so the classic view is reached ONLY when `type` is the raw built-in string, which happens for an old
+save file or a raw Blocks-authored block carrying the pre-twin type. This is EXACTLY Tier-3 finding #20's own
+shape ("6 of 8 probe ops carry a full second renderer... reachable via an old file"), now confirmed to extend
+well past the probe family — at minimum pocket, contour, slot, comm all share it. Not a full Tier-3 re-audit
+this turn (out of scope, named for later) — but the "6 of 8" figure itself is now suspect too.
+
+## The 5 re-checks, each verified directly, "same need + same field vocabulary" not "looks similar"
+
+1. **`pocket_data` — STILL DUPLICATED, not closed.** `pocketView.js`'s polygon/ellipse branch called
+   `regionDesc(...)` with its OWN inline shape→params mapping — line-for-line the same dispatch
+   `trueRegionFromFlat` (the function t2016 collapsed the twin's own preview onto) already declares, same
+   field names (`originX/originY/shape/dia/sides/w/h`), zero rename needed. The rect/circle branches were
+   correctly NOT flagged — they never called `regionDesc` at all (native SVG primitives), so there was nothing
+   there to duplicate.
+2. **`contour_data` — STILL DUPLICATED, not closed.** `contourView.js` had its OWN local `regionParams()` —
+   a THIRD independent definition, distinct from BOTH `contourWizard.js`'s `regionParams`/`contourBBox`
+   (correctly excluded at t2028 — a genuinely different consumer, the wizard's own placement/bbox build) and
+   `contourfill.js`'s `regionFromFlat` (the one t2028 collapsed the twin's preview onto). Same field names as
+   before the rename (`originX/originY`), bridged with the identical adapter t2028 already established.
+3. **`comm_data` — CLEAN, remains closed.** `commView.js` has NO independent formatting logic at all — it is
+   pure DOM glue that calls `wizard.generate(params)` and `wizard.generateScreenPreview(params)`, the SAME
+   `CommunicationWizard` methods t2030 already collapsed onto the shared `fmtCtrl`/`fmtLine`. A genuinely
+   different result from pocket/contour, not a hedge.
+4. **`lathe_parting` — CLEAN, remains closed.** No classic lathe-parting view exists at all — lathe ops never
+   used the `WIZARD_VIEWS`/`viewByType` registry (`latheLayoutSpec`'s regex dispatch is the only 2D path, and
+   t2030 already collapsed its kerf math). Grepped the whole app for the kerf formula's own shape — zero hits
+   outside the two files t2030 already touched.
+5. **ATC `def.sim` — CLEAN, remains closed.** All 6 ATC classic views call `applyPreviewIntent(mgr,
+   containerId, opType)`, which reads `opSimContext(opType)` — the SAME declared registry `registerUserOp`'s
+   `setUserSimIntent` feeds (confirmed at t2028: "nothing renders FROM def.sim directly"). The classic views
+   never touched the stale `def.sim` field either way — t2028's self-heal fixed the FIELD's own honesty for a
+   future reader, not a rendering path any of these six ever used.
+
+## Part (4) — do the 8 Tier-2 survivors need the same re-count? Checked the one at risk; answer is no, not broadly
+
+Of the 8 survivors, only ONE belongs to the mill-cutting-op family this pattern applies to: `text_data`.
+Checked `textView.js` directly — it calls `layoutText(params)` (the SAME function `fillText.js`'s own
+`previewGeometry` already calls), not an independent re-derivation. Both consumers share the ONE known
+limitation (bare centrelines, not the true `textContours` boundary) rather than disagreeing — the Tier-2 count
+stands unchanged. `corner_data` is a probe-family op (its legacy view was DELETED at Fork 4, nothing to
+recheck against). The 4 lathe-bar predicates and the lathe probe-stylus size are lathe items (no
+registry-based classic view exists for lathe at all, confirmed under item 4 above). The ATC `-3000`/beep-
+pulse items are — corrected here — actually `comm_data`/`communicationWizard.js` findings the ORIGINAL survey
+mislabelled "ATC" (verified: neither lives in any ATC-prefixed file); `commView.js`'s own clean result (found
+above) covers them too — no independent duplicate there either. **So: no, the 8 Tier-2 survivors do not need
+the same re-count — the risk was specific to the mill-cutting-op family sharing the `opensAs`+legacy-shim
+pattern, and the one member of that family among the 8 survivors came back clean.**
+
+## The fix — pocket first (cheapest), then contour, same standard as every prior collapse
+
+`pocketView.js`: imports `trueRegionFromFlat` (`pocketfill.js`), replaces the inline polygon/ellipse dispatch;
+`regionDesc`'s own import became fully orphaned (rect/circle never used it) — removed. `contourView.js`:
+imports `regionFromFlat` (`contourfill.js`), removes the local `regionParams()` entirely, both call sites
+(the guide ring and the offset toolpath) now call it with the same `x:originX,y:originY` adapter t2028
+established. Both `buildPocketSpec`/`buildContourSpec` exported (matching the `slotView.js`/`buildSlotSpec`
+precedent from t2036) so a test can prove the real function, not a re-implementation.
+
+**Verified byte-identical, not assumed**: direct comparison scripts for polygon/ellipse on both files —
+old-dispatch output === new-collapsed output, exact JSON match. `npm run test:node`: zero snapshot movement.
+
+**Non-vacuity — immediate and clean, the export-doesn't-exist-yet shape**: reverting either file throws
+`SyntaxError` before any assertion runs (`buildPocketSpec`/`buildContourSpec` weren't exported pre-collapse).
+
+## Gate
+
+New: `preview-collapse-classic-views-2038.test.mjs` (3 tests, non-vacuity proved above). `npm run test:node`:
+158/158 (155+3), zero snapshot movement. Playwright: full `pocket-*` (12 files) + `contour-*` (6 files) +
+`fork-parity-1593` + `guard-roundtrip-1595` — 100/100 effectively clean (one `pocket-cavity-2d.spec.js` boot
+timeout, re-ran alone, passed — a `toolpath2d.js`-only spec, doesn't even touch the files this turn changed).
+`proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/web/wizards/views/pocketView.js` — collapsed onto `trueRegionFromFlat`, `buildPocketSpec` exported.
+- `DDCS-Studio/web/wizards/views/contourView.js` — collapsed onto `regionFromFlat`, `buildContourSpec` exported.
+- `DDCS-Studio/tests/node/preview-collapse-classic-views-2038.test.mjs` — new, 3 tests.
+
+## Tier-1, restated honestly
+
+Not "closed" as a blanket claim — 2 of the original 6 items (`pocket_data`, `contour_data`) needed a second
+collapse pass against a consumer nobody had re-checked since the survey. All 6 are now genuinely closed
+against BOTH the twin's own preview AND any still-live classic view. `comm_data`/`lathe_parting`/ATC `def.sim`
+were re-verified clean, not re-collapsed.
+
+## Queue
+
+Tier 3's 5 capability gaps (now suspect on its own count, per the mechanism above — worth a fresh pass, not
+done this turn), abort-vs-lost-link, two-sided SETUP, preview Fork 3 — named, none started, none blocking.
+
+🔨 turn 2038
