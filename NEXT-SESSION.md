@@ -4276,3 +4276,52 @@ them stale.** Flagged not fixed, exactly as instructed.
 (`V16_helical_arc.nc`, exists, never reported run) and SQRT confirmation for Expert/M350 (`V13c_sqrt.nc` —
 `V13_trig.nc` aborted before reaching the SQRT probe). The second unblocks three named boundaries.
 Also still theirs: the two-sided SETUP ruling.
+
+# ═══ t2014 — RECONCILE PREVIEW-AS-DATA AGAINST HEAD (read-only) ═══
+
+## t2012: YOU REFUSED THE DISPATCH AND YOU WERE RIGHT. I verified it myself.
+`PORTING.md:202` — ***"`caps.flow: 'goto'` is CORRECT for what Studio emits. The DM500 'we may be
+under-declaring' theory is closed."*** Building what I dispatched would have **reversed a ruling already on
+record**. V4.1's own hardware test settled it the opposite way: `WHILE` parses but never opens a loop outside
+Macro Mode, and Studio does not emit into Macro Mode for any target.
+
+**And you traced the bad premise back to your OWN t2010 report rather than to my dispatch.** You had found and
+quoted the *"flagged for a future act, NOT taken here"* note — and never checked whether it was later ruled on.
+It was, one turn later, in the same document arc. **You named that plainly instead of quietly working around
+it**, which is the difference between a correction and a cover-up. You also nailed the real shape of any future
+raise: the `flow` enum (`'goto'|'oword'|'none'`) has **no value** for *"goto normally, WHILE under macro-mode
+gating"* — that is an undeclared semantic, not a cap flip.
+
+## ⭐ THE LESSON, AND IT IS NOW A STANDING RULE FOR EVERY RECONCILIATION:
+```
+   a "flagged for later" note is NOT a live item.
+   FOLLOW THE THREAD FORWARD: was it later RULED ON, FIXED, or REVERSED?
+   stopping at the flag is how a closed question becomes a dispatched act.
+```
+Apply it to this task from the first line.
+
+## THE TASK — read-only. Reconcile `PREVIEW-AS-DATA.md` against HEAD.
+The human asked whether preview-as-data is done. I verified: it is a **survey** (cycle 857), **zero** shipped
+markers, four granularity forks explicitly left to the human — and `previewSources`, the seam named by their
+own 2026-08-11 ruling, has **zero occurrences in `web/`**. So nothing was built.
+
+**But the survey is partly stale itself.** I checked its Tier 0 item #3 — the lathe tool-identity bug it calls
+*"the single most consequential finding in the whole survey"* — and `userOpView.js:477` now reads
+`_tbl.kind || _tbl.type || 'endmill'`. **Already fixed.** One of its four "live facts" is not live.
+
+1. **TIER 0 — all four, each STILL-LIVE / FIXED / RULED-ON, with evidence** (commit, spec, or live grep — and
+   the forward-thread check above): `middle_data`'s round-stock preview · `rotary_center_data` mutating
+   persisted `settings.stock` · the lathe tool-identity bug (I say fixed — confirm or correct me) · the ATC
+   magazine pocket-list disagreement between hosts.
+2. **TIER 1 (3+ expressions of one fact)** — how many still hold? Count with method, floor not total, the way
+   you did for the map duplicates.
+3. **THE 2026-08-11 RULINGS:** `previewSources` (a preview references the SAME function the emit calls) and
+   "authoring never chooses a preview." **Is either partially present under a different name?** Zero grep hits
+   is not proof the intent is absent — check before concluding.
+4. **THE FOUR FORKS:** state each in ONE plain sentence a machinist could rule on. **Do not recommend** — the
+   survey's own standing note says granularity is the human's call, and I am taking these to them.
+5. **⚠ ANY TIER 0 ITEM STILL LIVE IS A USER-VISIBLE PREVIEW BUG** — rank those separately from the
+   architectural work. A wrong picture is worth fixing whatever we decide about declarations.
+
+⚠ Read-only. No code, no specs, no doc rewrites. **Do not fix a Tier 0 item this turn** — I want the whole
+board before dispatching.
