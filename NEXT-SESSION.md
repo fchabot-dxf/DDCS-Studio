@@ -5083,3 +5083,46 @@ whether the arc is closed.
 
 ⚠ Remaining, unchanged: abort-vs-lost-link (no operator-abort concept in the gateway) · Tier 2's 6, none
 confirmed live · **two-sided SETUP** · **preview Fork 3**. The last two are the human's alone.
+
+# ═══ t2046 — JOB TRACKING SLICE 2: can we see a V4.1 job's progress over SMB? (read-only) ═══
+
+**RELEASED V2026.08.17.3** (`14a53beb`, pushed) — full suite 2595 passed, ZERO failures, node 163/163.
+t2044 accepted: **the preview-as-data arc is CLOSED**, #24 correctly closed as *out of scope* rather than
+built, and no Tier 4 invented. **The human has chosen job tracking as the next arc.**
+
+## ⚠ MY OWN FRAMING WAS WRONG AND I AM CORRECTING IT BEFORE IT COSTS A TURN.
+I have been telling the human that live progress is blocked on V4.1 because it has no Modbus. **"No Modbus" is
+not "no link."** `bridge/controllers/README.md` says plainly:
+
+```
+  V4.1 Modbus RTU          ❌ [CONFIRMED] not in firmware (checked 2 builds)
+  V4.1 SMB over Ethernet   ✅ [CONFIRMED] R/W to \10.0.0.50\cncdisk + \sysdisk
+  V4.1 live inbound        ✅ [CONFIRMED] the M47 self-loop re-reads the program
+                              file each cycle; the PC overwrites it
+                              (⚠ `uservar` vars do NOT work for this direction)
+```
+
+**The controller exposes its disk and the PC reads AND writes it.** That is a live path, and the whole
+"V4.1 can never have live progress" conclusion rests on a premise I did not check.
+
+## THE TASK — read-only. Establish what is KNOWN, name the experiment, do NOT build.
+The question is **outbound**: not "can the PC send to a running job" (confirmed) but **"can the PC OBSERVE a
+running job's position?"**
+
+1. **WHAT DOES A RUNNING V4.1 EXPOSE ON DISK?** `SYSDISK` = `/mnt/nand1-1/`, `CNCDISK` = `/local/`. **Does the
+   controller persist anything that moves while a program runs** — a uservar file, a state file, a log?
+   `bridge/controllers/v4.1/` and `ETHERNET_TESTS.md` are the ledgers; **read them rather than the summary.**
+2. **⚠ THE COMBINED IDEA, and it joins the human's own two suggestions:** Studio emits a progress write into
+   the G-code (their "edit the post" idea) → **the controller persists that variable → the PC reads it over SMB
+   at whatever cadence.** *Is there any evidence uservars are written to a readable file, and when?* The README
+   already says uservars do NOT work INBOUND — **that says nothing about outbound.** Do not assume either way.
+3. **NAME THE EXACT EXPERIMENT** the human could run at the bench (`10.0.0.50`), in steps they can follow —
+   this is their hardware and their time, so make it cheap and unambiguous. **Say what result would mean yes
+   and what would mean no.**
+4. **AND THE EXPERT SIDE:** does a running job's beacon actually carry a **line number that advances**? If yes,
+   Expert live progress may already be nearly free. Measure from the code/ledger; **park anything needing a
+   live machine.**
+5. **⚠ IF THE HONEST ANSWER IS "NOT OBSERVABLE ON V4.1", SAY SO.** A named limit lets the human plan; a hopeful
+   maybe wastes a bench session. Their machine is the one that matters here.
+
+⚠ **Read-only. No code.** Gate: none needed.
