@@ -4872,3 +4872,51 @@ calls them with no equivalent guard.**
 (widest surface: 3D + DRO + canvas) · slot_data (cheapest) · ATC magic number · stylus size (cosmetic) · ATC
 beep text (comment-only) · text_data (already self-disclosed via its own `statusHint`). **`homing_data` is
 RESOLVED** — its second copy went with the Fork-4 deletion.
+
+# ═══ t2036 — delete the dead `odPassExtent`, collapse `slot_data` (Tier-2 cheapest) ═══
+
+t2034 accepted, verified by me: node **152/152**, and `odPassExtent` confirmed defined once, called **nowhere**
+in `web/`.
+
+**⭐ THE VERDICT WAS "NOT LIVE" AND YOU REACHED IT BY DISPROVING YOUR OWN RANKING.** Your t2032 #1 assumed a
+separate wizard-authored path could reach `odPasses` unguarded, mirroring contour/comm/parting. **That
+assumption was wrong for this op** — OD-turn has no classic-wizard path at all, and the twin's
+`postInstantiate` is unconditional (`def.build` unset, so the builder always runs it). Settling liveness first
+is exactly what stopped a guard being built against an impossible input.
+
+**And you proved the negative end-to-end rather than by reading:** drove the REAL registered builder with
+`0 / -5 / '' / null / undefined` and read the **actual emitted G-code** — all five give `#133=20`, never a bare
+`0`; the 2D preview independently agrees. Proving a *negative* properly is harder than confirming a bug, and
+far easier to fake.
+
+**You answered the severity question anyway, though the verdict made it moot** — it would have reached the
+**G-code**, not the picture: a bare `0` in `#133` flows into the t1305 controller-side IF/GOTO as *"the far end
+is thinner"*, setting the roughing floor to about the finish allowance across the whole depth — **a full
+over-cut**, the spigot bug's severity class in a different shape. That is why the question was worth asking
+even for a dead end.
+
+**And the non-vacuity had no bug to revert, so you SIMULATED the regression:** dropped `rebuildOdTurn`'s guard,
+watched the real-emit test fail with `#133=0` while the preview test correctly kept passing (its own separate
+guard untouched) — proving the test distinguishes *"the guard exists"* from *"something broke"*.
+
+## ⚠ STATE OF TIER 2, HONESTLY: no confirmed live bug among the survivors.
+1 resolved (`homing_data`), 8 survive, **none confirmed divergent**. So this is now **structural hygiene** —
+preventing future drift — not bug-fixing. Worth saying plainly: the spigot-class wins may be behind us in this
+tier.
+
+## THE TASK — two clean, bounded items.
+1. **DELETE `odPassExtent`** (`wizards/lathe/odTurn.js:153`). Zero callers, confirmed twice. **This is a
+   dispatched deletion, not a side effect of another change** — and take its now-orphaned comment with it if it
+   only described this function.
+2. **COLLAPSE `slot_data`** — your own ranking's cheapest remaining, "survives, unchanged, low branch-risk".
+   Same standard as the Tier-1 work: **consumer check first** (a different consumer is not a duplicate) ·
+   collapse onto the function the **emit** calls · **reference identity** if the shape allows it, otherwise
+   mutate-the-duplicate · report snapshot movement either way.
+3. **⚠ IF `slot_data` TURNS OUT TO BE A DIFFERENT CONSUMER, STOP AND SAY SO** — that has now happened twice
+   (contour's wizard path, `homing_data`'s look-alike in `gcodeViz3d.js`) and it is a real result.
+4. **Gate:** node tier + the lathe/slot spec sets + the round-trip/parity set.
+
+⚠ Remaining Tier-2 after this, your ranking, none confirmed live: corner_data's two 4-entry maps · the 4
+lathe-bar predicates · ATC magic number · stylus size (cosmetic) · ATC beep text (comment-only) · text_data
+(self-disclosed). Then Tier 3 (5 capability gaps) · abort-vs-lost-link · **two-sided SETUP** and **preview
+Fork 3** — both the human's, both still open.
