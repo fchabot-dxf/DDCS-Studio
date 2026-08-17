@@ -4624,3 +4624,47 @@ browser open**. So the workspace cannot be the live store. It is the right *copy
    and I would rather fund it deliberately than have it smuggled in.
 5. **Gate:** the bridge suite + node tier + whatever gateway specs exist. **Dialect coverage: this is storage,
    controller-agnostic — say so if you agree, do not pad the gate for its own sake.**
+
+# ═══ t2024 — EXPORT JOB HISTORY FROM THE HISTORY VIEW (not a backup row) ═══
+
+t2022 accepted, verified by me: **bridge 26/26, node 128/128**, and I checked your central claim myself —
+`backup.js:4-5` states the invariant in its own header exactly as you quoted (*"a backup MOVES each store's
+OWN persisted bytes"*), and every store-kind factory really does expose `clear()`.
+
+**⭐ PART 4 REFUSED, AND THE REASONING IS BETTER THAN THE IDEA IT REFUSED.** A history row's `clear()` would
+**wipe a real device's operational log as a side effect of opening an unrelated workspace file.** That is not a
+shape mismatch, it is a destructive surprise — and you distinguished it correctly from the `machine` row's
+retargeting, which is a *declared identity exception*, not a precedent for a device LOG. You also noted
+`write()` has no honest implementation (it would have to POST records into a live bridge's disk; no such
+endpoint exists). **That is the STOP I asked for, used exactly as intended.**
+
+**And three things in parts 1–3 that made the fix real rather than nominal:**
+- **You dropped the explicit `--root` from `START_GATEWAY.bat` and the dev README** — without that, fixing the
+  default would have changed **nothing on either real launch path.** A "fix" that the launcher overrides is the
+  most convincing kind of non-fix.
+- **You reused the stable-per-user convention `config.json`/`fairy.log`/`install_id` already use**
+  (`~/.ddcs-bridge/`) instead of inventing one — and **rejected `%LOCALAPPDATA%` on the human's own stated
+  ground**: AppData is semi-hidden in Explorer, and the principle was *user-owned*, not merely durable.
+- **Reinstall survival PROVEN, not argued**: write a record under folder A, **`shutil.rmtree` A entirely** (the
+  real shape of a reinstall-to-a-new-folder), reinstall at B, read it back.
+
+## THE TASK — your own alternative, which I am adopting.
+> *"a plain export button ON the History view, not folded into whole-file open/restore"*
+
+1. **EXPORT the job history from the History view** — the user's own data, in a file they choose, on a
+   deliberate action. **No restore, no `clear()`, no coupling to workspace open.** That is precisely why this
+   shape is right and the backup row was not.
+2. **⚠ FORMAT: something a machinist can actually use.** This data's whole value is *"how long did this take"* —
+   so it should open in a spreadsheet, not only round-trip into Studio. **CSV unless you have a reason;
+   say the reason if not.**
+3. **NO IMPORT THIS TURN.** Export is non-destructive and stands alone; import raises the same merge/overwrite
+   questions that made the backup row wrong. **If the human wants it back in, that is its own act.**
+4. **ASSERT WHAT THE USER GETS:** a real history with ≥2 runs of the same program exports rows carrying the
+   program, the duration, and the outcome — openable, with the repeat runs visible as repeats.
+5. **NON-VACUITY at your bar** — and use your own t2020 distinction: new-behaviour claims must fail pre-fix;
+   any invariance witness may pass on both, and say which is which.
+6. **Gate:** bridge suite + node tier + whatever gateway specs exist. **My web gate may still be running — if
+   Playwright is needed, say so and park that half rather than running it.**
+
+⚠ Still queued: abort-vs-lost-link collapse into one "stalled" (no operator-abort concept exists anywhere in
+the gateway) · the remaining 4 Tier-1 preview collapses · two-sided SETUP (human) · Fork 3 (human).
