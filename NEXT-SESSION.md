@@ -5438,3 +5438,55 @@ is **op-dependent**.
 
 ⚠ After this: **nothing is left that does not need the human.** Say so plainly; do not invent work. Open for
 them: the two controller glances · **two-sided SETUP** · **preview Fork 3**.
+
+# ═══ t2062 — ⭐ OPTION 1 IS UNBLOCKED. Wire the poller into a real progress source ═══
+
+**RELEASED V2026.08.17.7** (`bf0f8726`, pushed): 2599 passed, ZERO failures, node 183/183.
+t2061 accepted — `opLabel` fixed, verified against a real emitted drill header with pocket as a byte-identical
+control, and the revert fails 3 of 8 tests for 3 DIFFERENT reasons (including an incidental find: `""` returned
+where `null` was correct).
+
+## ⭐ HUMAN ANSWERS — THE BLOCKER IS GONE, plus three rulings that CLOSE work.
+
+```
+  P279 reads "Slave"   ·   build is 2026-something   (>= 2025-12-11-00 ✓)
+     -> the polling route is AVAILABLE ON THEIR MACHINE, TODAY.
+```
+
+- **TWO-SIDED SETUP: NOT WANTED.** Verbatim: *"i dont understand the benefit of this, i do alot of 2 sided but
+  i make them in fusion."* **They do the work — in Fusion, not Studio.** So this is not a missing feature, it
+  is a feature Studio should not have. **Do not build it.** ⚠ But the palette still offers a `Setup` block that
+  **cannot hold an operation** — a promise the app cannot keep. **Removing it is now the honest move**; queued
+  below, not this turn.
+- **BLOCK REORDERING: "good for now."** Closed. No work.
+- **HISTORY IMPORT: "dont need export history at all."** Closed. No import, and no more history features.
+
+## ⚠ AND THE STANDING INSTRUCTION FOR THIS WHOLE ARC, verbatim:
+> *"for now lets just make sure it actually works, and live tracking make sure it works too"*
+
+**STOP ADDING. MAKE WHAT EXISTS WORK.** That governs every dispatch from here: no new surfaces, no new
+options, no adjacent improvements. If something already shipped does not actually function end to end, that is
+the work.
+
+## THE TASK — make live tracking real, on the polling path.
+The master-side client is built and locally proven (t2059: correct reads verified, a wrong register refused
+loudly with `IllegalAddress`). **Now wire it into the bridge as a genuine progress source.**
+
+1. **A POLLING BEACON SOURCE beside the existing slave one.** Same `BeaconSource` shape, same honest `status()`
+   contract you built at t2057 — **a dead poller must report dead, never look healthy.**
+2. **⚠ REGISTERS ARE EVIDENCE, NOT ATTESTED** — `7080/7260` DRO, `10002` state, read from the M3X source and
+   **never confirmed on this controller.** Design so a wrong register is **instantly obvious**, and make the
+   addresses configurable rather than baked in, so a bench correction costs no code change.
+3. **⚠ THE TRANSPORT IS SERIAL, NOT NETWORK** — Modbus RTU over the SABRENT adapter, `115200 8N1`, slave id 1,
+   per `FINDINGS.md`. **The human will need that adapter wired to port 2.** Name exactly what they must connect
+   and set, in one short list.
+4. **DERIVATION IS NOT THIS TURN.** Get *"the PC is reading live position and state from the controller"*
+   working first. **Do not build the position→operation cursor** — you named its ambiguity as load-bearing, and
+   it is worthless until a real read succeeds.
+5. **⚠ WHAT DOES THE HUMAN DO TO TEST IT?** Write the procedure as steps they can follow at the machine, with
+   what success and failure each look like. **They have already given this arc three bench sessions tonight —
+   make theirs the cheapest possible.**
+6. **Gate:** bridge suite + node tier. `MGETDATA` stays forbidden — polling is the PC talking.
+
+⚠ Queued, in order: **remove the dead `Setup` palette block** (the human does two-sided work in Fusion) ·
+**verify job history end-to-end** (their *"make sure it actually works"*) · preview Fork 3 if they ever want it.
