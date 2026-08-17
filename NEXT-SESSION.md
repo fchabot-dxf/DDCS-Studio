@@ -5345,3 +5345,50 @@ label, not progress.
 repo** (newest capture is `20260731T181343Z`; nothing uncommitted). If P279 is present on the flashed
 firmware, **Option 1 — polling, no emitted bytes — may be unblocked**, which is their stated preference. I have
 asked them to point me at the dump or put the Expert on the network.
+
+# ═══ t2058 — OPTION 1 PREP: build the master-side poller against the dump's own evidence ═══
+
+**RELEASED V2026.08.17.6** (`9998c7e5`, pushed): full suite 2596 / ZERO failures, node 175/175, bridge 40/40
+(I ran the bridge suite myself). Both silent beacon failures fixed, each reproduced locally first.
+
+## ⭐ NEW EVIDENCE — I READ THE COMMITTED DUMP AND `#279` HAS MOVED.
+The human said they had already flashed the firmware. There is no new capture in the repo, but the existing
+ones answer more than I expected:
+
+```
+  SYSDISK/setting  (8000 B = 1000 float64 slots)
+    2026-06-10   #279 = 1     FINDINGS.md:204 documents #279=1 as "Modbus on"
+    2026-07-31   #279 = 2     a DIFFERENT value — the human changed it
+
+  M350-MODBUS-REFERENCE.md:17 — the POLLING route requires:
+    firmware >= 2025-12-11-00  ·  P279 = Slave  ·  P267 = 115200
+```
+
+`#279` is confirmed on-machine as **the Modbus-RTU enable** (`FINDINGS.md:69`, resolved against a wrong manual
+claim). **So the human's own machine may already be configured for slave/polling mode.**
+
+⚠ **WHAT I HAVE NOT PROVEN, and must not be built on:** no document in this repo enumerates `#279`'s VALUES —
+`2 = Slave` is my **inference** from "2 ≠ 1" plus the reference naming Slave as a distinct mode. And the
+manifest carries **no firmware version string**, so "flashed" is the human's word, uncorroborated by the dump.
+**I have asked them for two glances at the controller: the About build number, and whether P279's own label
+reads "Slave".**
+
+## THE TASK — prepare Option 1 so it is ready the moment those two glances land. **Do NOT assume they did.**
+1. **WHAT WOULD THE PC ACTUALLY POLL?** `M350-MODBUS-REFERENCE.md` names the registers read from the M3X
+   source — **7080/7260 DRO, 10002 state** — marked EVIDENCE, not attested, and unverified on this controller.
+   **Establish what a master-side read would need**: does `bridge/` contain any master-side Modbus client at
+   all, or only the slave? `pymodbus==3.6.9` is already pinned.
+2. **⚠ BUILD NOTHING THAT ASSUMES THE REGISTER MAP IS RIGHT.** It is one project's source-read, never
+   bench-confirmed here. **Design so a wrong register fails LOUDLY and instantly** — the opposite of the
+   defect we just fixed. **No silent dead thread, ever again.**
+3. **⚠ `MGETDATA` REMAINS FORBIDDEN.** Master-side polling is the PC talking, not the controller — say
+   explicitly why this path cannot wedge the firmware the way the inbound direction does.
+4. **THE DERIVATION QUESTION:** polling gives POSITION and STATE, not an operation number. Studio holds the
+   whole plan (`linesForOp`, `estimateProgram`). **Can "operation 3 of 7 · ~23 min left" be derived from a
+   polled position against the plan — and what happens when a path revisits the same point?** Name the
+   ambiguity honestly; do not hand-wave it.
+5. **⚠ A SAFE FIRST STEP THAT NEEDS NO CONTROLLER:** a master-side read against a **local synthetic slave** you
+   stand up on this PC — proving the client works before it ever meets the machine. Do that, not a design doc.
+6. **Gate:** bridge suite + node tier.
+
+⚠ Do not touch emitted G-code. Option 2 stays the fallback, already shipped and now honest about its own state.
