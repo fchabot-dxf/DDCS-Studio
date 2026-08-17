@@ -5392,3 +5392,49 @@ reads "Slave".**
 6. **Gate:** bridge suite + node tier.
 
 ⚠ Do not touch emitted G-code. Option 2 stays the fallback, already shipped and now honest about its own state.
+
+# ═══ t2060 — FIX opLabel's nested parens (small, real, parked twice) ═══
+
+t2059 accepted, verified by me: **bridge suite 46/46.**
+
+**⭐ THE WRONG-REGISTER CASE IS PROVEN, WHICH IS THE HALF THAT MATTERS.** You stood up a real in-process
+synthetic Modbus slave, seeded known values, polled it with the real client over a real socket — a correct read
+returned exactly `[111, 222, 0…]`, **and a deliberately wrong register range provoked a genuine
+`IllegalAddress` exception that `read()` REFUSED rather than silently accepting.** That is the explicit
+requirement from the dispatch, met by demonstration: after fixing a silently-dead receiver, the replacement
+had to fail loudly, and you showed it doing so.
+
+**And you caught the same cross-version trap structurally, not by version string:** `pymodbus` 3.13 renamed
+`slave` to `device_id` and made it keyword-only. You detected it by **inspecting the actual call signature**,
+skipped with a printed reason rather than crashing the gate on an environment fact, and then ran the real proof
+in the correctly-pinned scratch venv. A skip with a stated reason is honest; a green that never ran is not.
+
+**And the derivation ambiguity is named as LOAD-BEARING, not solved:** the cursor narrows the match window and
+timing usually collapses repeats — **but that depends on the correction factor being calibrated, and early in a
+job the window is wider.** You named the concrete failure case (dense drilling, repeated pocket passes over a
+small area), not a hypothetical one. **That is the right way to hand me a dependency I will have to design
+around.**
+
+## ⚠ OPTION 1 IS NOW BLOCKED ON THE HUMAN, and correctly so.
+The read side is built and locally proven. What remains needs their controller: **the About build number**, and
+**whether P279's label reads "Slave"**. **Do not build the derivation logic on an unread position** — that is
+the caps.flow shape again, and prediction-only already ships today.
+
+## THE TASK — the last item that needs nobody. You parked it twice; collect it.
+`gcode-parse.js`'s `opLabel()` is not nesting-aware. A real drill op's own emitted header —
+`( ---- DRILL, parametric: 2 holes (grid) x peck · @work 52 ---- )` — makes it return **`"grid"`**, because
+its regex matches the first paren pair it can complete while `stripComment`'s correct depth-tracking satisfies
+its "nothing but a comment" gate. **Confirmed by execution at t2055.** Pocket is fine (no nested parens), so it
+is **op-dependent**.
+
+1. **Fix the nesting** — `stripComment` already tracks depth correctly in the same file. **Reuse that; do not
+   write a second depth-tracker.**
+2. **⚠ ASSERT THE REAL HEADER**, not a synthetic string: emit a drill op through `builderOf`/`emitMapped` and
+   run `opLabel` on its ACTUAL output, the way you found it. Keep pocket as the control.
+3. **⚠ SAY WHAT IT SHOULD RETURN.** `"DRILL, parametric: 2 holes (grid) x peck · @work 52"` is a header, not a
+   label. **If the right answer is a truncation or a different capture, decide it and say why** — this is what
+   the operator reads on the Tracking tab.
+4. **NON-VACUITY** at your bar. **Gate:** node tier + whatever covers `gcode-parse` + the gateway/tracking set.
+
+⚠ After this: **nothing is left that does not need the human.** Say so plainly; do not invent work. Open for
+them: the two controller glances · **two-sided SETUP** · **preview Fork 3**.
