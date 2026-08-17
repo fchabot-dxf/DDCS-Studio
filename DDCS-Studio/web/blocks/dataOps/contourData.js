@@ -23,6 +23,7 @@ import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t7
 import { withPassesField } from './passesField.js';   // t1613 — the derived `passes` field (declared once, every depth+stepdown twin)
 import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
+import { regionFromFlat } from '../../wizards/ops/contourfill.js';   // t2028 — the SAME shape→region-dims mapping the real emit reads (contourfill.js's own `emit` calls this), not a second hand-typed copy
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, ENTRY_OPTIONS_NO_HELIX } from './wizardOptions.js';   // t722 P2a rider — one-source; t842 depth entry (no helix — a profile trace)
 
 /** Author defaults — match contourStack's num() fallbacks + the built-in Contour form defaults. Geometry is local-0-based
@@ -100,24 +101,18 @@ export const CONTOUR_DATA_OPTYPE = 'user_contour_data';
 const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
 // t718 — bbox over a set of {pts} paths (the origin-inclusive toolpath extent, for the layout placement-parity shift).
 const _pbb = (ps) => { let b = null; for (const p of (ps || [])) for (const q of (p.pts || [])) { if (!b) b = { minX: q.x, maxX: q.x, minY: q.y, maxY: q.y }; else { if (q.x < b.minX) b.minX = q.x; if (q.x > b.maxX) b.maxX = q.x; if (q.y < b.minY) b.minY = q.y; if (q.y > b.maxY) b.maxY = q.y; } } return b; };
-/** The region params for the current shape (mirrors the built-in contourView.regionParams): rect/ellipse = corner/centre
- *  + size, circle/polygon = centre + Ø. Origin owned by the placement (originX/originY) — the pos handle writes those. */
-function _regionParams(p) {
-    const ox = _n(p.originX, 0), oy = _n(p.originY, 0);
-    if (p.shape === 'circle') return { shape: 'circle', x: ox, y: oy, w: _n(p.dia, 50) };
-    if (p.shape === 'polygon') return { shape: 'polygon', x: ox, y: oy, w: _n(p.dia, 50), sides: _n(p.sides, 6) };
-    if (p.shape === 'ellipse') return { shape: 'ellipse', x: ox, y: oy, w: _n(p.w, 80), h: _n(p.h, 60) };
-    return { shape: 'rect', x: ox, y: oy, w: _n(p.w, 80), h: _n(p.h, 60) };
-}
-/** t712 — DECLARED preview geometry (twin-level, own param names). The MULTISHAPE is solved by DECLARATION, not by
+/** t712/t2028 — DECLARED preview geometry (twin-level, own param names). The MULTISHAPE is solved by DECLARATION, not by
  *  layoutSpecFromOp guessing: the twin KNOWS p.shape, so it returns the right boundary + size-handle FOR THAT KIND. The
  *  boundary ring + the OFFSET toolpath (what's cut) come from the SAME kernels the emit uses → the 2D can't diverge from
- *  the G-code. Handles write the TWIN params (originX/originY pos; w/h or dia size). Preview-side → emit unaffected. */
+ *  the G-code. Handles write the TWIN params (originX/originY pos; w/h or dia size). Preview-side → emit unaffected.
+ *  t2028 — the shape→region-dims mapping is no longer a 3rd hand-typed copy: `regionFromFlat` (contourfill.js) is the
+ *  SAME function contourfill's own `emit` calls, reading its flat x/y — bridged here with the one real rename the twin
+ *  and the atom disagree on (originX/originY vs x/y), the exact adapter `contourStack` already uses to build the atom's
+ *  own params from these same twin fields. */
 import { handleScale } from '../../wizards/ops/placement.js';
 export function contourPreviewGeometry(p) {
     const ox = _n(p.originX, 0), oy = _n(p.originY, 0), shape = p.shape || 'rect';
-    const rp = _regionParams(p);
-    const brg = regionDesc(rp);
+    const brg = regionDesc(regionFromFlat({ ...p, x: p.originX, y: p.originY }));
     const hs = handleScale(p, '', ox, oy, _n(p.w, 80), _n(p.h, 60));
     const paths = [], handles = [{ type: 'point', id: 'ct_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos', ...hs.pos }];
     // the BOUNDARY you type (a closed guide ring, straight from the region kernel — correct for every shape)

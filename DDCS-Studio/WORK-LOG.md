@@ -41462,3 +41462,124 @@ Abort-vs-lost-link collapse into one "stalled" (no operator-abort concept exists
 remaining 4 Tier-1 preview collapses; two-sided SETUP; preview Fork 3 — all the advisor's/human's.
 
 🔨 turn 2026
+
+# ═══ t2028 — TWO MORE TIER-1 COLLAPSES: contour_data's boundary, and ATC's stale def.sim self-heal ═══
+
+Back to the preview-as-data arc (PREVIEW-AS-DATA.md), picking up where t2016 left off. Own order, easiest-
+to-prove first, per the dispatch: skipped `lathe_parting` (t2016 already measured its genuine field-rename,
+not the cheap one). Landed TWO completely rather than four half-done — `contour_data` (a geometry collapse,
+the same shape as t2016's pocket_data) and ATC's `def.sim` (a different shape entirely — a missing
+write-back, not a duplicated formula, but genuinely worth doing per t2016's own scoping). `comm_data` and
+`lathe_parting` are PARKED, by name, below — not started.
+
+## (1) `contour_data`'s shape→region-dims boundary — COLLAPSED
+
+**Consumer check FIRST, per t2016's own two-step rule.** `contourWizard.js`'s `regionParams`/`contourBBox`
+feeds the WIZARD's OWN stack build (`makePlace(params, contourBBox(params), down)` inside `contourStack`) —
+a DIFFERENT consumer from the twin's preview, exactly like `pocketWizard.js`'s `trueRegionParams` stayed
+untouched at t2016. Left alone. The real collapse target is TWO copies, not three: `contourData.js`'s own
+`_regionParams` (the twin's hand-typed preview dispatch) vs. `contourfill.js`'s `regionFromFlat` (the SAME
+function the real emit calls — `contourfill.js`'s own `emit` reads `regionDesc(regionFromFlat(p))`).
+
+**Field-name check SECOND.** The twin's form uses `originX`/`originY`; the atom's flat vocabulary uses `x`/
+`y` — a genuine rename, but a TRIVIAL one already bridged by `contourStack`'s own `contourFlatParams` (which
+builds the atom's real params from these same twin fields: `x: num(params.originX,0)`). Reused the identical
+adapter inline rather than a new helper.
+
+**The fix.** `contourPreviewGeometry` no longer calls its own `_regionParams(p)` — it calls `regionFromFlat({
+...p, x: p.originX, y: p.originY })`, the atom's own function, then `regionDesc`/`contourRegion` exactly as
+before (unchanged — those were already shared). `_regionParams` had zero other callers after the collapse —
+removed (orphan).
+
+**Verified BYTE-IDENTICAL across every shape, not assumed — and STRONGER than t2016's own pocket collapse
+(zero deliberate fidelity change, not one).** `_n` (contourData.js's own numeric coercion) and `num`
+(contourfill.js's) are byte-identical implementations — confirmed by reading both. A direct comparison script
+(rect/circle/polygon/ellipse, defaults, off-defaults, an empty-string coercion edge case) confirmed the OLD
+hand-typed `_regionParams` and the NEW `regionFromFlat`-based path produce identical `regionDesc` output in
+every case. `npm run test:node` confirms this independently: **zero snapshot lines changed** in
+`preview-spec-1688.txt` (t2016's pocket collapse moved exactly one line, circle's fidelity gain — this
+collapse moved none).
+
+**Non-vacuity, and the HONEST limit of a value-equality test, stated plainly rather than smoothed over.**
+Because the collapse is genuinely value-preserving, the new regression guard (`preview-collapse-contour-
+2028.test.mjs`) PASSES against the pre-collapse code too — a value-equality test cannot distinguish "calls
+the same function" from "a hand-typed duplicate that happens to still agree," which is PREVIEW-AS-DATA.md's
+own stated limit of a snapshot approach ("only the reference identity of the function called can tell them
+apart"). Rather than accept that as an ungrounded pass, PROVED the guard has real teeth a different way: on
+the reverted pre-collapse code, hand-mutated `_regionParams`'s x/y sourcing (a plausible silent-drift bug — a
+duplicate that starts disagreeing) and re-ran — 2 of 3 tests correctly FAILED (the third, a symmetric
+originX==originY rect case, correctly stayed blind to an x/y swap — the right result, not a gap). This is the
+t2020 new-behaviour-vs-invariance distinction turned one further degree: not "does this fail on the historical
+diff" (it doesn't — the diff moved zero values) but "does this fail on a REAL future divergence" (it does).
+Restored from the scratch copy after every experiment, never from `git checkout HEAD --` (the change was
+uncommitted throughout).
+
+## (2) ATC's stale positional `def.sim` — SELF-HEALED (a different shape of fix, not a geometry collapse)
+
+**The fix mirrors `def.panel`'s own already-working self-heal, one line above it in the same function.**
+`userOps.js`'s `registerUserOp` already does `def.panel = resolvePanelMeta(def)` — the resolved value written
+BACK onto the def. `resolveSimMeta` computed the equivalent `sim.intent` but never wrote it back; `def.sim`
+stayed frozen at whatever `userOpFromStack`'s raw 6th positional argument set (its own vocabulary —
+`forceMachine`/`showMagazine`/`toolMachineFrame`), permanently disconnected from what the stack's OWN
+embedded `sim` block (a DIFFERENT key vocabulary — `machine`/`magazine`/`toolMachine`) actually resolves to
+and what genuinely renders. Added `def.sim = sim.intent;` right after `resolveSimMeta` computes it — one
+line, no new vocabulary (`simIntentFromStack` already normalises the stack block into the SAME shape the
+positional arg uses, so this is a straight write-back, not a new shape — Fork 1 stays void).
+
+**Confirmed live, not assumed, and WORSE than the survey's own citation.** PREVIEW-AS-DATA.md's survey named
+this a risk without citing a concrete live value. Traced `atc_change_data`'s actual def: the positional arg
+claims `forceMachine:true`; the stack's own sim block never sets `machine` at all (its own t646 comment says
+this is intentional — "machine implied by toolMachine" elsewhere) — `simIntentFromStack` correctly resolves
+`forceMachine:false`. Pre-fix, `def.sim.forceMachine` read `true` forever; post-fix it reads `false`,
+matching what actually renders. **Swept all 6 ATC def-builders, not just the 2 the survey happened to
+cite**: the SAME mismatch (positional `forceMachine:true` vs. stack-resolved `false`) is confirmed live on
+`atc_table_data`/`atc_test_data` too (identical stack-block shape); `atc_warmup_data`/`atc_check_data`/
+`atc_length_data` have their own distinct positional/stack shapes but were previously equally stale (their
+`toolMachineFrame`/`showMagazine` keys were simply absent from the positional arg, defaulting silently rather
+than disagreeing outright) — now all 6 self-heal correctly.
+
+**Why this is safe, checked before touching a SHARED registration path (every twin, not just ATC, runs
+through `registerUserOp`):** `resolveSimMeta` reads `def.sim` ONLY as its OWN fallback, for a hypothetical
+legacy op with NO stack sim block at all — `panel`'s equivalent already has the exact same self-referential
+shape and is proven working, so `sim`'s is safe by the identical precedent. For all 9 real ATC ops (which
+always embed a stack sim block), the fallback path never fires — `sim.intent` is computed purely from the
+stack, so overwriting `def.sim` with it introduces no loop.
+
+**Non-vacuity — clean and unambiguous, unlike (1) above.** This fix has REAL behavioural impact (unlike the
+contour collapse, which was value-preserving). Reverted `userOps.js` to pre-fix: all 3 new tests FAILED
+correctly — `atc_change_data`/`atc_table_data`'s hand-picked assertions, AND the 6-op sweep, which additionally
+revealed the bug affects ALL 6 ATC ops (not the 2 the survey's own citation named) — a broader confirmed
+blast radius than assumed going in. Restored from the scratch copy; all 3 pass again.
+
+## Gate
+
+- New: `preview-collapse-contour-2028.test.mjs` (3 tests) + `preview-atc-sim-selfheal-2028.test.mjs` (3 tests)
+  — 6/6 pass, non-vacuity proved above (per-test, since the two fixes have genuinely different vacuity
+  shapes — stated explicitly rather than applying one blanket claim to both).
+- `npm run test:node`: 140/140 (134 + 6 new), zero snapshot diffs from either change.
+- Playwright: full `contour-*` spec set (6 files) + `atc-*` spec set (36 files) + `fork-parity-1593` +
+  `guard-roundtrip-1595` — 15/16 clean on the contour run (1 transient Blocks-boot timeout, re-ran alone:
+  clean) + 142/143 clean on the ATC run (the SAME known flaky Blocks-boot timeout on `fork-parity-1593`'s own
+  "THE REAL GESTURE" test, retried and passed) — both flakes match t2016's own documented, unrelated-to-this-
+  change pattern exactly, not something introduced this turn.
+- `proc_health.py watch`: clean.
+
+## Files
+- `DDCS-Studio/web/blocks/dataOps/contourData.js` — the collapse (import `regionFromFlat`, remove
+  `_regionParams`).
+- `DDCS-Studio/web/blocks/userOps.js` — the ATC `def.sim` self-heal (one line + comment, `registerUserOp`).
+- `DDCS-Studio/tests/node/preview-collapse-contour-2028.test.mjs` — new, 3 tests.
+- `DDCS-Studio/tests/node/preview-atc-sim-selfheal-2028.test.mjs` — new, 3 tests.
+
+## Queue — PARKED, by name, not started this turn
+
+- `comm_data`'s message-formatting regex (3 copies) — t2016's own note stands: needs the SAME consumer check
+  first (is the class-method copy in `communicationWizard.js` really preview-only, or does it feed something
+  else too) before assuming a clean collapse the way contour's did.
+- `lathe_parting`'s kerf-offset formula (3 copies) — the genuine field-rename (`floorDiameter` vs. `targetDiameter`/
+  `spigotDiameter`, kind-gated) t2016 already measured and set aside as not-the-cheap-one; still not attempted.
+- Fork 3 (the additive-layer shape) — the human's, per t2014's own reconciliation.
+- Two-sided SETUP, preview Fork 3, and the gateway's abort-vs-lost-link collapse — all named again per the
+  dispatch's own list, none started.
+
+🔨 turn 2028

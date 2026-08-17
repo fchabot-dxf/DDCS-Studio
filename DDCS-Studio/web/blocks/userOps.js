@@ -997,6 +997,13 @@ export function registerUserOp(def) {
     def.panel = resolvePanelMeta(def);
     def.layout = resolveLayoutMeta(def);
     const sim = resolveSimMeta(def);
+    // t2028 — SELF-HEAL, mirroring def.panel above: userOpFromStack sets def.sim from the raw POSITIONAL arg (its
+    // own vocabulary — forceMachine/showMagazine/toolMachineFrame), but the stack's OWN embedded `sim` block (a
+    // DIFFERENT key vocabulary — machine/magazine/toolMachine) always wins via resolveSimMeta/simIntentFromStack.
+    // Before this line def.sim stayed permanently stale at whatever was passed positionally — never reconciled,
+    // unlike panel, which self-corrects here already. simIntentFromStack already normalises BOTH vocabularies into
+    // the SAME shape def.sim's positional callers use, so this is a straight write-back, not a new shape.
+    def.sim = sim.intent;
     setUserSimIntent(def.opType, sim.intent);   // DECLARED preview intent only (never inferred from motion)
     // DECLARED per-pass sim-starts (template `simstart` rows first, legacy def.sim.starts fallback). The rows travel
     // ALONGSIDE the provider so resolveRelToIndex can map a binding's semantic relTo ({row:'wall1'}) → the surviving pass.
