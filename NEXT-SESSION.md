@@ -4198,3 +4198,41 @@ on without re-deriving it.
 ⚠ **After this the queue is: KNOWN DIVERGENCE's "is this the same kind of claim" question · Q1/Q2 anchoring
 (optional) · two-sided setup (human).** If you land this and nothing else is named, **say the queue is empty**
 — I intend to close the cycle rather than invent work.
+
+# ═══ t2010 — RECONCILE THE ROADMAP'S ACTIVE QUEUE AGAINST REALITY (read-only) ═══
+
+**RELEASED V2026.08.16.4** (`cffb4706`, pushed): 2594 passed, 26 skipped, 9 flaky, **ZERO failures**, node
+126/126. t2008 accepted — you fixed the hardcoded slice I named **and found a second identical one I missed**
+(`viewsIndex.slice(34,48)`), proved both dangerous on scratch copies (shifted 10 lines: old read 18 of 25
+silently, new read 25; shifted 7: old read 7 of 14, new read 14), and converted all 4 confirmed duplicates with
+a named section + what it asserts at every site — so "keep one jump" held everywhere and nothing had to fall
+back to restating a coordinate.
+
+## ⚠ MY MISS, CORRECTED BY THE HUMAN.
+I reported the queue as empty. It was only *NEXT-SESSION's* queue that was empty — **I never opened
+`ROADMAP.md`** (99KB) or the other plan docs (`PORTING.md`, `PREVIEW-AS-DATA.md`, `JOB-PROGRESS-PLAN.md`,
+`MACHINE-DAY.md`, `implementation_plan.md`, `wizards_as_data_transition_plan.md`). The human said "there has to
+be more roadmap items" and there are. **I was about to close a cycle on a queue I had not actually read.**
+
+## THE TASK — read-only. Reconcile, do not build.
+`ROADMAP.md`'s **ACTIVE LOOP QUEUE** is stamped *advisor-reconciled 2026-07-31* — **~500 turns ago.** Its own
+neighbouring section carries a `⚠ POSSIBLY-STALE` warning about a note that aged the same way. **Plan text is
+not evidence.** Verify each item against current HEAD before I dispatch anything from it.
+
+1. **QUEUE ITEM 1, "the improvement remainder" — six named items.** For each, SHIPPED / STILL OPEN / STALE,
+   with the evidence (a commit, a spec, a live grep — not the work log's say-so):
+   SQRT loud-failure diagnose + V13-prep · the feature-canvas bottom-handle defect **(user-reported)** ·
+   the mobile CAM-builder cleanup **(user-reported)** · true-arc helix · flake settle-hardening (6-member
+   ledger) · the slot capability arc.
+2. **⚠ THE TWO USER-REPORTED ONES RANK HIGHEST** if still open — they are defects a human actually hit. Say
+   plainly whether each still reproduces, or whether something since has fixed it incidentally.
+3. **ITEMS 2–4 (value-fidelity · the PORTING arc · wizards-as-data layout splitters):** state, in one line
+   each, whether the arc has MOVED since 2026-07-31 and what its true next act is. `PORTING.md` and
+   `web/data/portingArc.js` are the porting arc's own ledger — **read them rather than the roadmap's summary
+   of them.**
+4. **NAME THE TOP THREE LIVE ITEMS, ranked, with why.** That is what I will dispatch from.
+5. **⚠ FLAG ANYTHING THE ROADMAP CLAIMS THAT IS NO LONGER TRUE** — a roadmap asserting a shipped thing is
+   pending, or a pending thing is shipped, is the same self-description lie we have spent this session
+   deleting. Report it; do not rewrite the roadmap.
+
+⚠ Read-only. No code, no specs. **Gate: none needed.** The machine is free either way.
