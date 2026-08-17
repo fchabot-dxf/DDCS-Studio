@@ -43052,3 +43052,66 @@ human's alone). Whether P279 is confirmed live on the human's own controller —
 advisor asked for (About build number, P279's own on-screen label); do not build past that confirmation.
 
 🔨 turn 2059
+
+# ═══ t2061 — opLabel FIXED: the last item that needed nobody, collected ═══
+
+Twice parked (t2055 found it, t2057 named it not-this-turn), fixed now.
+
+## The fix — one shared depth-tracker, not a regex plus a separate loop
+
+`gcode-parse.js`'s `stripComment` already tracked DDCS comment nesting correctly (a `(...)` span, honoring
+inner parens, plus `;` to end-of-line); `opLabel` used an UNRELATED single-level regex
+(`/\(([^()]*)\)/`) that grabbed the first paren pair it could complete — for a comment containing its own
+parens, that's an inner fragment, not the label. Per the dispatch's own instruction, refactored both onto
+ONE shared walker (`walkLine`, module-private): it calls back with `(char, depth)` for every character up to
+any `;`. `stripComment` blanks every character at `depth > 0`; `opLabel` keeps every character at `depth > 0`
+EXCEPT the outermost delimiter pair (`depth === 1` at the paren itself) — so nested parens survive as literal
+text (`(grid)` stays `(grid)`) while the wrapping parens that mark the comment as a comment do not. One depth
+counter now backs both functions; they cannot drift from each other again the way the regex and the
+depth-loop already had.
+
+## What it returns — decided, not defaulted
+
+The dispatch's own question: the full header isn't really a "label," so should this truncate or clean it up?
+**No — returns the full trimmed text unmodified**, matching what every non-nested header already ships
+(pocket's own header is equally decorated with "----" dashes and an internal `@work NNN` reference, and was
+never touched by this bug). Truncating or prettifying drill's output here would make it INCONSISTENT with
+every other op's header rather than fix the actual defect — which was never about how ornate a header is,
+only about capturing the right one. If the Tracking tab's display ever wants a cleaner label, that's a
+separate, pre-existing cosmetic question that applies uniformly across every op, not something this fix
+should invent a one-off answer to.
+
+## Verified against the REAL emit, the way the bug was originally found
+
+Emitted a real drill op (`drillDataDef` → `builderOf` → `emitMapped`) and a real pocket op as the control,
+read `opLabel()` against their ACTUAL header lines — not a synthetic string standing in for one. Drill:
+`"---- DRILL, parametric: 2 holes (grid) x peck · @work 52 ----"` (was `"grid"`). Pocket: byte-identical to
+before the fix — confirms the control case, and every other non-nested header, are genuinely untouched.
+
+## Non-vacuity
+
+`gcode-parse-oplabel-2061.test.mjs`, 8 tests. Reverting the source fails 3 of them for 3 DIFFERENT real
+reasons: the drill-header regression (`"grid"` instead of the full text), a synthetic doubly-nested case
+(`"inner"` instead of the outer text), and an incidental find — the OLD code returned `""` for an empty
+`()` comment instead of `null` (`m[1].trim()` on an empty capture is `""`, returned literally; the new code's
+`label || null` closes this too, a small additional correctness gain beyond the nesting fix itself). Restored,
+re-confirmed all 8 pass.
+
+## Gate
+
+Node tier: 183/183 (175+8), zero snapshot movement. Gateway/tracking/send spec set (same set as t2057) plus
+`riders-848` (the spec that exercises `instrument()`'s own full pipeline, which calls `opLabel` internally via
+`scan()`'s `curOp` tracking): 35/35 passed, 2 pre-existing skips, unrelated.
+
+## Files
+- `DDCS-Studio/web/shared/js/instrument/gcode-parse.js` — `opLabel`/`stripComment` share one depth-tracker.
+- `DDCS-Studio/tests/node/gcode-parse-oplabel-2061.test.mjs` — new, 8 tests.
+
+## AFTER THIS — nothing left that doesn't need the human
+
+Said plainly, per the dispatch's own instruction, not invented: PREVIEW-AS-DATA's Tier 2 and Tier 3 are both
+fully closed (t2044, t2051). The job-tracking arc's own remaining items all wait on the human now — the two
+controller glances (About build number, P279's own on-screen label) for Option 1; two-sided SETUP; preview
+Fork 3. Nothing queued that this seat can act on without them.
+
+🔨 turn 2061

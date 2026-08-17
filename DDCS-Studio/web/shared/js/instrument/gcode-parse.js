@@ -3,24 +3,49 @@
 
 const WORD = /([A-Za-z])\s*([-+]?\d*\.?\d+)/g;
 
-// Blank out DDCS comments: '(...)' spans and ';' to end-of-line. Enough for word extraction.
-export function stripComment(line) {
-  const out = [];
+// Walk a line char-by-char, tracking DDCS comment status: nesting-aware '(...)' spans + ';' to end-of-line
+// (which ends the walk entirely — nothing after it is code OR comment, by DDCS convention). Calls
+// onChar(ch, depth) once per character reached. ONE depth-tracker — stripComment blanks every commented
+// character; opLabel needs the comment's OWN text (minus the outermost delimiter pair that marks it as a
+// comment in the first place), so it can't be derived by re-parsing stripComment's already-blanked output;
+// both are built on this one walk instead of each tracking depth its own way.
+function walkLine(line, onChar) {
   let depth = 0;
   for (const ch of line) {
     if (depth === 0 && ch === ";") break;
-    if (ch === "(") { depth++; out.push(" "); }
-    else if (ch === ")") { depth = Math.max(0, depth - 1); out.push(" "); }
-    else out.push(depth ? " " : ch);
+    if (ch === "(") { depth++; onChar(ch, depth); continue; }
+    if (ch === ")") { onChar(ch, depth); depth = Math.max(0, depth - 1); continue; }
+    onChar(ch, depth);
   }
+}
+
+// Blank out DDCS comments: '(...)' spans and ';' to end-of-line. Enough for word extraction.
+export function stripComment(line) {
+  const out = [];
+  walkLine(line, (ch, depth) => out.push(depth > 0 ? " " : ch));
   return out.join("");
 }
 
-// If a line is essentially just a '(...)' comment (a CAM op header), return its text.
+// If a line is essentially just a '(...)' comment (a CAM op header), return its full text — nesting-aware.
+// t2061 — was a single-level regex (`/\(([^()]*)\)/`) that matched the FIRST paren pair it could complete;
+// for a comment that contains its own parens (e.g. Studio's real drill header, "... 2 holes (grid) x
+// peck ..."), that is the INNER pair, not the label — confirmed live: returned "grid" instead of the
+// header. Now walks the SAME depth-tracker stripComment uses: every character at depth >= 1 is kept
+// (including nested parens, as literal text — "(grid)" survives unchanged), and only the OUTERMOST
+// delimiter pair (depth exactly 1 at the paren itself) is dropped, the same way it always was for a
+// non-nested header. Returns the FULL trimmed text, unmodified — matching what already ships for every
+// other op's header (pocket's own is equally decorated and was never touched by this bug); truncating or
+// cleaning it up here would make drill's label inconsistent with every other op instead of fixing the
+// actual defect, which was never about how ornate a header is, only about capturing the RIGHT one.
 export function opLabel(line) {
-  const m = line.match(/\(([^()]*)\)/);
-  if (m && !stripComment(line).trim()) return m[1].trim();
-  return null;
+  if (stripComment(line).trim()) return null;   // not purely a comment line
+  const chars = [];
+  walkLine(line, (ch, depth) => {
+    if (ch === "(" || ch === ")") { if (depth > 1) chars.push(ch); return; }
+    if (depth > 0) chars.push(ch);
+  });
+  const label = chars.join("").trim();
+  return label || null;
 }
 
 // One forward pass: track modal motion/pos/feed, per-move time, Z-up flag, current op label.
