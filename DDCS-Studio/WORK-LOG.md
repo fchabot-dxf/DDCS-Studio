@@ -40466,3 +40466,145 @@ t1996/t2004 already did twice); two-sided setup awaits the human. **The queue is
 this turn is left half-done, and I have no further task to self-assign.**
 
 🔨 turn 2008
+
+# ═══ t2010 — RECONCILE THE ROADMAP: reading ROADMAP.md itself, not just NEXT-SESSION's queue ═══
+
+Read-only, no code, no gate. PLAN TEXT IS NOT EVIDENCE — every verdict below cites a commit, a spec, or a
+current-source grep, not a WORK-LOG paragraph's own say-so. Delegated the six-item evidence sweep to three
+parallel research agents (each independently verified commits/specs/current source); read `PORTING.md` and
+`web/data/portingArc.js` directly myself, per the dispatch's own instruction.
+
+## (1) + (2) QUEUE ITEM 1 — "the improvement remainder," six named items
+
+**SQRT loud-failure diagnose plus V13-prep — SHIPPED as diagnosis, hardware question STILL OPEN (correctly).**
+The diagnose/prep work is shipped: `web/data/trigEvidence.js` (272 lines, backed by `tests/trig-lift-plan-1466.spec.js`)
+declares run order, expected values, and per-site consequences for COS/SIN/SQRT/ATAN; commits `65446679`
+("SQRT diagnosed V13-GATED... converts to V13-PREP") and `66a600dc` are both ancestors of HEAD. ATAN was
+subsequently resolved (comma-form works, t1634). SQRT itself is still genuinely open for **Expert/M350**
+specifically — `V13_trig.nc` (`bridge/controllers/expert-m350/verify/`) aborted on the machine at the ATAN
+slash-form line before ever reaching the SQRT probe. **Cross-check against PORTING.md (below): SQRT IS
+hardware-confirmed, but on V4.1, a DIFFERENT target** — PORTING.md's own words: "attested for V4.1 only... sibling
+evidence for the M350 and nothing stronger." So the roadmap line, as worded, reads like open diagnostic work; the
+diagnosis is done, only a machine visit with `V13c_sqrt.nc` remains.
+
+**The feature-canvas bottom-handle defect (USER-REPORTED) — SHIPPED, does NOT still reproduce.** t1468
+(WORK-LOG.md:12008+), three commits ancestors of HEAD: `2324d046` (pane collapse seam), `72448dfd` ("the bottom
+handle's height is CONSUMED on mobile — the grey band was a quantity with no reader"), `8e156187` (bottom-handle
+resize without squishing the top pane), hardened again in release `3be3ce39`.
+
+**The mobile CAM-builder cleanup (USER-REPORTED) — SHIPPED, does NOT still reproduce.** t1470 (WORK-LOG.md:12069),
+commit `5e569852` ("the phone layout is a column, not a badly-wrapped row — desktop pinned byte-for-byte"), and
+`DDCS-Studio/tests/cam-builder-mobile-1470.spec.js` exists in the current tree (stronger evidence than the commit
+alone — the spec is still there to catch a regression).
+
+**True-arc helix — STILL OPEN, correctly gated on missing hardware evidence, not stale.** Commit `ddb9586f`
+(t1472) declared `caps.helicalArc = false` for every DDCS dialect actually in use, after a corpus sweep found
+7361 planar-arc lines and ZERO helical ones. Current source (`holecycle.js`'s `boreHelixCycle`, `slot.js`) still
+emits helices as faceted polyline segments — `slot.js`'s own still-current doc says outright "a slot HELIX entry
+still wants the true-arc form the atom does not have." A verification macro (`V16_helical_arc.nc`) exists but was
+never reported as run. `wizards/ops/contour.js` already emits one unconfirmed helical-arc G3 site in production —
+flagged, not fixed.
+
+**Flake settle-hardening, the 6-member ledger — SHIPPED.** Merge `12e8f490` (2026-07-31) is the actual ledger:
+exactly six spec files (`blocks-edit-lag-788`, `blocks-live-form`, `form-widgets`, `preview-chip-tag-1395`,
+`sim-anim-refresh`, `workspace-cloud-tab-1233`) + `playwright.config.js` + `mem-server.cjs` (env-overridable
+port). All six spec files still exist. Follow-up t1517/t1518 fixed one more real root cause
+(`editWizardDef`'s capped wait) and correctly parked two non-reproducing suspects with measurements, not guesses.
+A LATER, separate flake-fixing batch (chronic gate flakes, ~Aug 15) is a different effort — doesn't affect this
+verdict.
+
+**Slot capability arc — SHIPPED, scout genuinely preceded the build.** Scout at t1478 (commit `6ac2f260`) →
+`web/data/slotCapabilityArc.js` (4 capabilities C1-C4 declared as data) → all four built and shipped (`b5f9c3e5`,
+`4825058c`, `eefdf58a`, `88bbc303`) → arc formally closed at release `5efde09b`. `tests/slot-capability-arc-1478.spec.js`
+exists. The atom's own current doc says "ALL FOUR CLAUSES ARE RETIRED NOW... the arc closed, the decision did
+not" — its remaining open items (a live/dialled bearing needing trig, the true-arc helix entry) are the SAME
+already-tracked gates named above, not unfinished arc work.
+
+**Net for queue item 1:** 4 of 6 sub-items SHIPPED outright. 1 (SQRT) is shipped-as-diagnosis with the hardware
+question correctly still open. 1 (true-arc helix) is genuinely still open, correctly gated, not stale. **The two
+USER-REPORTED items — the highest-priority ones per the dispatch — are BOTH fixed and do not reproduce.**
+
+## (3) ITEMS 2 THROUGH 4 — one line each, has the arc moved since 2026-07-31?
+
+**Value-fidelity (the pinned 11 round-trip diffs) — MOVED, and CLOSED.** Commit `95254bec` (2026-08-01, one day
+after the roadmap's own stamp), t1520: 11 diffs traced to 3 root causes, all 3 fixed at the source, the assert
+TIGHTENED from `<= 11` to `=== []`. `tests/value-fidelity-1520.spec.js` still lives, untouched since, no later
+WORK-LOG entry reopens the count. **True next act: none — this roadmap line is stale prose describing an already-
+closed problem.**
+
+**Wizards-as-Data Layout Splitters — MOVED substantially.** `split_horizontal`/`split_vertical`/`grid_container`/
+`tab_group`/`corner_grid_picker` are real, live, wired block types (`web/wizards/ops/layout.js`, `tabGroup.js`,
+`gridContainer.js`, `specializedPickers.js`, into `blocksApp.js`/`userOpView.js`). Commit `0bd8b38c` (Aug 5) landed
+41 wizard UI blocks + the `renderUiTree` layout engine + the Wizard View drawer; `9d06552d` (Aug 8) added
+palette-by-role; a real-gesture spec (`renderer-branch-parity-1780.spec.js`, 2/2) hardened both render branches.
+One correction along the way (t1613): Corner is NOT a separate split-tree pilot — all 16 sampled twins,
+Corner included, share ONE renderer, refuting an earlier plan assumption. **True next act: exactly what the
+roadmap's OWN caveat already (correctly, not stale) says — "porting built-in wizards over to block templates is
+deferred to a future session." The engine is live and tested; migrating existing built-ins onto it remains
+unscheduled, deliberately.**
+
+## PORTING ARC — read `PORTING.md` and `web/data/portingArc.js` directly, not the roadmap's summary
+
+**V4.1: fully closed, including the stage the roadmap still shows as pending.** S1-S4 landed (t1532/t1534,
+V2026.08.02.3/.4). **S5 (live round-trip, "human-gated," per the roadmap's own queue text still "⏳") is ALSO
+DONE** — t1538 the gate opened (user connected a real V4.1 bench unit over SMB), t1542 the full round-trip RAN:
+spacing bench-confirmed, **SQRT confirmed working on hardware** (`[SQRT[9]*100]` → 300, computed not parsed),
+ATAN confirmed (comma-form only), IF/GOTO confirmed, WHILE parses but never opens at top level (closing the
+DM500 under-declaration theory too), increment confirmed. `portingArc.js`'s own `PORTING_STAGES['live-
+roundtrip'].landed` field carries the full t1538/t1542 story.
+
+**DM500: stage 1 MEASURED (t1536/t1537), explicitly ruled `corpus-attested (thin)`, NOT `POST_VERIFIED`.** 8 of
+8 core idioms byte-exact after normalisation against the installer corpus (25% of which is empty files) — real
+evidence, deliberately not over-claimed as hardware-equivalent to V4.1's own tier.
+
+**Grbl-class: confirmed UNROLL** — no `#vars` at all, O-word flow cannot stream. No action needed, nothing open.
+
+**⚠ A SELF-DESCRIPTION LIE, INSIDE `PORTING.md` ITSELF — reported per the dispatch's own instruction (5), not
+fixed:** the file's own summary TABLE near the top (line ~37) still reads `| S5 | Live round-trip | ⏳
+**human-gated** | Cannot be agent-scheduled — needs a human at the bench to press Start. |` — while a WHOLE
+SECTION further down the SAME FILE ("## S5 — THE LIVE ROUND-TRIP, RUN ON HARDWARE (2026-08-02)") describes S5 as
+completed with full measured results, and `portingArc.js`'s own `landed` field agrees it happened at t1538/t1542.
+The document contradicts itself. This is the exact "enforced in one half, decorative in the other" / "second
+source" shape this session has spent turns t1996-t2008 finding and closing in `ARCHITECTURE.md` — it exists in
+`PORTING.md` too, unnoticed until this reconciliation. Not fixed here — dispatch said reconcile, not build; also
+not this session's declared architecture-map arc.
+
+## (5) EVERYTHING ELSE THE ROADMAP CLAIMS THAT IS NO LONGER TRUE
+
+Beyond `PORTING.md`'s own S5 table (above): the roadmap's OWN queue-item-1 wording ("SQRT loud-failure diagnose
+plus V13-prep") reads as open diagnostic work that is actually shipped — only the machine-visit confirmation
+remains, and that's specific to Expert/M350, not V4.1 (where it's already confirmed). Queue item 2's "the pinned
+11 round-trip diffs shrink" describes a problem that reached zero over two weeks ago. No claim of a SHIPPED thing
+being falsely called PENDING was found beyond these; no claim of a PENDING thing being falsely called SHIPPED was
+found anywhere in the six items or items 2-4.
+
+## (4) TOP THREE LIVE ITEMS, RANKED, WITH WHY
+
+**1. DM500 stage 2 — raise `caps.flow` from `'goto'` to reflect what `slib.nc` actually demonstrates.**
+Explicitly named in `PORTING.md` as "flagged for a future act, NOT taken here": the factory's own `slib.nc` uses
+`WHILE`/`DO`/`END`, but the DM500 dialect declares `caps.flow: 'goto'` — an under-declaration, the opposite of
+the over-claim this whole arc has guarded against. Evidence already in hand (`slib.nc` named), no machine visit
+needed — ready to dispatch NOW, unlike the other two.
+
+**2. True-arc helix — scout first: has `V16_helical_arc.nc` ever actually been run?** The verify macro exists
+(named in the t1472 commit's own follow-through) but was never reported as run in WORK-LOG or PORTING.md. Before
+committing to a machine visit, a cheap scout (does the macro exist, what would it test, is `contour.js`'s one
+unconfirmed helical G3 site actually reachable in a shipped path) is agent-doable now; the verification run
+itself is human-gated, the same shape V4.1's own S5 just closed.
+
+**3. SQRT hardware confirmation for Expert/M350 (`V13c_sqrt.nc`).** The exact same shape as V4.1's now-closed
+S5 — diagnosis and prep already shipped, only a machine visit remains. `PORTING.md` names SQRT as "the function
+three shipped boundaries were waiting on" (raster ramp distance-to-centre, rest-machining corner clip,
+pocketfill's rest half) — real, named value once run, human-gated exactly like DM500's own S5 was until t1538.
+
+Not ranked (correctly deferred, per the roadmap's own current, non-stale wording): porting built-in wizards onto
+the layout-splitter engine — the roadmap's own caveat already says this is deliberately deferred, not neglected.
+
+## Gate
+
+None — read-only reconciliation, no code/spec/doc changed, per the dispatch. `proc_health.py watch`: clean.
+
+## Files
+None changed.
+
+🔨 turn 2010
