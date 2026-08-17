@@ -42097,3 +42097,98 @@ Tier 3's 5 capability gaps (now suspect on its own count, per the mechanism abov
 done this turn), abort-vs-lost-link, two-sided SETUP, preview Fork 3 — named, none started, none blocking.
 
 🔨 turn 2038
+
+# ═══ t2040 — TIER 2 + TIER 3 RE-COUNTED with the classic-view lens. Read-only, node tier only ═══
+
+## Tier 3 #20 — SETTLED: stale in the OPPOSITE direction now, not the same one
+
+**Original claim: "6 of 8 probe/utility ops carry a full second renderer... Only corner's legacy view was
+actually deleted."** Listed every file in `web/wizards/views/` directly (not the registry — the FILES
+themselves): `alignmentView.js`, `edgeView.js`, `middleView.js`, `rotaryCenterView.js`, `rotaryClockView.js`,
+`homingView.js` — **none exist on disk**. Fork 4 (t1730) deleted all six outright, not just unregistered them.
+Of the 8 probe/utility ops, only `wcs_data` still has a surviving view (`wcsView.js`) — read it in full: it is
+a bare DOM-glue shell (`update()` calls `wizard.generate(params)`, sets the code element, sets a status label
+— no `buildXSpec`, no 2D canvas, no geometry of any kind), matching the survey's OWN original per-op finding
+for wcs_data verbatim ("Neither renderer draws anything, by design"). **Corrected count: 0 of 8, not 6 of 8.**
+The probe family WAS fully swept — the classic-view undercounting risk this turn exists specifically BECAUSE
+Fork 4 happened for probe ops and never happened for mill/setup ops, which is exactly the asymmetry t2038
+traced through `opensAs`/`wizardManager.open()`.
+
+## Tier 3 #21-24 — spot-checked, all four remain accurate, unchanged
+
+- **#21 (`drill_data`/`bore_data`'s `skip` param never reaches the preview)** — CONFIRMED STILL TRUE, read
+  `drillPatternGeometry`'s full body (`drillData.js`): draws every point in `patternPoints(...)` with zero
+  filtering, no reference to `p.skip` anywhere. Cross-checked the OTHER half of the claim too: `drillView.js`
+  (still registered, same reachability shape as pocket/contour/slot) DOES handle it correctly (`skipped:
+  skip.has(i+1)`) — the twin's shared preview is missing what the classic view already has right, a genuine,
+  still-open capability gap.
+- **#22 (`tap_data`/`text_data` missing `def.zRuler`)** — CONFIRMED, zero hits for `zRuler` in either file.
+- **#23 (`gcodeViz3d.js`'s `setLatheTool` is dead API)** — CONFIRMED, the method is still defined, still has
+  zero callers anywhere in the app.
+- **#24 (2D toolpath pane never draws the ATC magazine)** — CONFIRMED, zero magazine-related code in
+  `toolpath2d.js`.
+
+## Tier 2 — all 6 remaining items re-checked against the classic-view lens; NONE gained a new copy
+
+1. **`corner_data`'s two 4-entry maps** — no `cornerView.js` exists on disk (confirmed in the same listing
+   above — corner's legacy view was the FIRST one ever deleted, predating Fork 4). Nothing to re-check
+   against; stays at 2 live copies (`cornerDatumXY`/`dirsOf`), unchanged.
+2. **The 4 lathe-bar predicates** + **lathe probe-stylus size** — lathe ops use NO registry-based view at all
+   (`latheLayoutSpec`'s regex dispatch inside `latheProfileCanvas.js` is the only 2D path, confirmed at t2038)
+   — structurally not exposed to this risk. Unchanged.
+3. **The `-3000` "persistent status" magic number** and **the beep pulse-count formula** — CORRECTED HERE
+   (again): both live in `comm_data`/`communicationWizard.js` files, not any ATC-prefixed file — the ORIGINAL
+   SURVEY mislabelled them "ATC" from the start, not a staleness issue. `commView.js` (comm's own classic
+   view) was already read in full at t2038: pure delegation to `CommunicationWizard`'s methods, no `-3000`
+   check and no beep-pulse formula anywhere in it. Both items unchanged at their existing counts (3 and 2
+   respectively).
+4. **`text_data`'s centreline-vs-cut mismatch** — re-confirmed (already checked at t2038): `textView.js` calls
+   `layoutText(params)` directly, the same function the twin's own preview calls — not an independent copy,
+   shares the one known limitation rather than disagreeing. Unchanged.
+
+**Net: zero new duplicates found anywhere in Tier 2.** The undercounting risk was real and systemic (proven by
+slot/pocket/contour), but it is SPECIFIC to ops whose classic wizard view is (a) still registered in
+`views/index.js` AND (b) independently draws 2D geometry rather than delegating. None of the 6 remaining
+Tier-2 items meet both conditions.
+
+## Part (4) — is PREVIEW-AS-DATA.md still worth following? Direct answer, as asked for.
+
+**Stop treating its Tier 1/2/3 lists as an actionable checklist. Its citations should be read as UNVERIFIED
+until independently re-checked against current code — every single time this session has re-checked one, a
+correction was needed, in three genuinely different failure modes:**
+1. **Items already fixed** (Tier 0, all four, closed by t1722 — four days after the survey, per t2014).
+2. **Counts stale from code relocation** (`comm_data`'s real-emit `fmtCtrl`/`fmtLine` moved files at t1728;
+   the survey's own cited file no longer held them, per t2030).
+3. **Counts SHORT, not just stale** — the survey cited PAIRS (twin vs. real emit) for `pocket_data`,
+   `contour_data`, `slot_data` while a THIRD copy lived on in a still-registered classic view the survey's OWN
+   mill-family analysis explicitly called clean ("the renderer wiring for this family is clean... all 8 reach
+   a single declared channel"). This is not staleness — the survey's own methodology never checked the
+   classic-view path for the mill family at all, only for probe (where it correctly found 6 of 8, at the time).
+
+**Every remaining item (Tier 2's 6, Tier 3's 4) is now independently re-verified as of THIS turn, against
+current code, not against the document's own citations** — the practical effect of "should I keep reading the
+survey" is already moot for what's left: there is nothing left to re-derive that this turn (plus t2038, t2036)
+hasn't already re-confirmed directly. Going forward, if the human/advisor wants a FRESH sweep for NEW
+duplicates beyond this list, it should be done the way this turn was — grep the current codebase and check
+each candidate against the two-part bar (same need, same field vocabulary, INCLUDING the classic-view path
+via `opensAs`+`viewByType`) — not by resuming the old document. The survey's PROSE (the declare-vs-infer
+framing, the tier severity logic, the historical "what a duplicate costs" reasoning) still reads true and is
+worth keeping as reference — its SPECIFIC file:line citations and copy-counts are not, and should not be acted
+on without the same re-verification this turn just did by hand. Not edited myself — `PREVIEW-AS-DATA.md` isn't
+covered by the standing NEXT-SESSION.md/ROADMAP.md advisor-only rule, but a correction this large is the
+advisor's call to make, not mine to apply unilaterally mid-investigation.
+
+## Gate
+
+Read-only turn, no source touched. `npm run test:node`: 158/158 (unchanged from t2038's own commit — confirms
+nothing drifted). `proc_health.py watch`: clean.
+
+## Files
+None changed.
+
+## Queue
+
+Whatever the advisor's own answer to the survey question implies; abort-vs-lost-link in the gateway; two-sided
+SETUP; preview Fork 3 — all the human's, both still open, neither blocking.
+
+🔨 turn 2040
