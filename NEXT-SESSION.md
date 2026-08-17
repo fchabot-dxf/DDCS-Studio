@@ -4747,3 +4747,44 @@ Tier-1 facts remain**, each still expressed 3× and verified as still holding at
 
 ⚠ Still queued behind: abort-vs-lost-link in the gateway (no operator-abort concept exists at all) ·
 **two-sided SETUP** and **preview Fork 3** — both the human's to rule, neither blocking this.
+
+# ═══ t2030 — FINISH TIER-1: comm_data + lathe_parting (the last two) ═══
+
+t2028 accepted, verified by me: **node tier 140/140, fail 0**, and both new guards green.
+
+**⭐ THE NON-VACUITY REPORT IS THE MOST HONEST THING IN THIS WHOLE SESSION.** You stated that because the
+contour collapse is genuinely **value-preserving**, your regression guard **passes on the pre-collapse code
+too** — and that a value-equality test **structurally cannot** distinguish *"one shared function"* from
+*"a duplicate that still agrees today"*. That is `PREVIEW-AS-DATA.md`'s own named limit, and you did not smooth
+it over to claim a clean non-vacuity result. **Then you did the only thing that actually tests it:** hand-
+mutated the pre-collapse duplicate's `x/y` sourcing — a *plausible future drift* — and confirmed 2 of 3 guards
+catch it, **with the third correctly staying blind** because its case is symmetric. Reporting "2 of 3, and here
+is why the third can't" beats claiming 3.
+
+**Also right:** you checked the CONSUMER first and found `contourWizard.js`'s `regionParams` feeds the wizard's
+own stack build — a **different consumer** — and left it alone, exactly as you did for `pocketWizard.js`.
+Collapsing that too would have looked like more progress and been wrong. And the field rename was bridged with
+**the adapter `contourStack` already uses**, not a new one. **Zero snapshot lines moved** — stronger than the
+pocket collapse, which moved one.
+
+**The ATC finding was worse than the survey said, and you checked it live:** `atc_change_data`'s positional arg
+claims `forceMachine:true` while its stack's own sim block never sets `machine` at all. Self-healed by
+mirroring `def.panel`'s own already-working write-back one line above — not a new mechanism.
+
+## THE TASK — finish Tier-1. **`comm_data` and `lathe_parting`, the two you parked by name.**
+1. **`comm_data` first** (you parked it as the simpler of the two).
+2. **`lathe_parting` second** — you measured its genuine field rename at t2016 (`floorDiameter` vs
+   `targetDiameter`/`spigotDiameter`). **Bridge it with an existing adapter if one exists; if it genuinely
+   needs a new one, say so before writing it** — a new adapter is not a new vocabulary, but it is not free
+   either, and I want to see the reasoning.
+3. **SAME STANDARD AS CONTOUR:** consumer check first (a different consumer is NOT a duplicate) · collapse onto
+   the function the **emit** calls · byte-identical, with snapshot movement reported either way.
+4. **⚠ USE YOUR OWN NON-VACUITY METHOD** — the mutate-the-duplicate technique you invented this turn. It is now
+   the standard for value-preserving collapses, because a passing equality test proves nothing on its own.
+5. **IF EITHER TURNS OUT NOT TO BE A REAL DUPLICATE, SAY SO AND STOP.** t2014 verified these at their original
+   copy counts, but t2028 already showed one apparent duplicate was a legitimately different consumer. **A
+   correct "this is not a duplicate" closes Tier-1 just as well as a collapse.**
+6. **Gate:** node tier + the specs covering each family + the round-trip/parity set.
+
+⚠ **This closes Tier-1.** After it: abort-vs-lost-link · **two-sided SETUP** and **preview Fork 3**, both the
+human's. Say plainly in your pass-back if Tier-1 is done.
