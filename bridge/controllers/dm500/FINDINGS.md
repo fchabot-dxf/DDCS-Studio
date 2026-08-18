@@ -36,22 +36,34 @@ Note vs Expert: soft-limits are COORDINATE values here (#375–382) as on Expert
 DIRECTION is #64–67 (Expert #112–114). WCS G54–G59 offset TABLE + machine-zero storage NOT yet located
 (no `coord1`-style file in this capture — may live inside `setting` or a coord file not captured).
 
-## THE VALUE LAYOUT IS NOT CRACKED (the real "ungrounded" part)
-Reading `setting[engIndex]` as f64 (what works for Expert/V4.1) yields **astronomical garbage** (e.g. `#43
-Z-max-speed` = 8e169). Tested and REJECTED, scored by non-zero-values-in-declared-range:
-- f64 identity `slot=#idx` → 28/51 (garbage)
-- f64 offset `slot=#idx+k` (k swept −5…21249) → best frac 0.74 @ ~20 hits = noise, no clean base
-- f64 stride `#idx*2 / *3` → poor
-- **f32** (`170000/4 = 42500` slots), identity / `*2` / base-swept → poor (`*2` ≡ f64 identity)
+## THE VALUE LAYOUT IS CRACKED (2026-08-18) — a self-describing text-record format
+DM500 does **NOT** store a flat f64 array indexed by eng `#idx` like Expert/V4.1 — reading `setting[#idx]`
+as f64 gave astronomical garbage because those "f64s" are actually **ASCII bytes**. Ruled out first
+(f64 identity/offset-swept/stride, f32 variants — all noise). The real format, found by hexdump:
 
-So DM500 does NOT store params as a flat array indexed by eng `#idx` (unlike Expert/V4.1). Its firmware
-serializes settings by an internal structure; the eng `#idx` is a UI id, not the storage slot. Plausible
-non-zero values (|v|<1e5) number ~1569 and are scattered across ALL 21250 slots — no contiguous param block.
+**Each parameter is a record `[float32 value][name string\0][unit string\0][enum labels…]`.** The value is
+a **little-endian float32 in the 4 bytes IMMEDIATELY BEFORE its name string.** The names are the eng's
+`-s1` strings verbatim (`"minimum log radius of 4axis machining"`, `"Soft-limited postion value of X--"`).
 
-## TO GROUND THE VALUES — the unblock (needs the machine, cheap)
-Pick ONE well-known parameter, read its value off the DM500 screen, and I locate that exact number in the
-`setting` bytes to anchor the layout — e.g. **X pulse equivalency (#34)**, or **G0 speed (#80)**, or a
-**soft-limit (#375)**. One or two anchors + the eng ranges should reveal the slot function
-(base/stride/record layout). Alternatively: two dumps differing by ONE changed param → diff the bytes.
-Until then DM500 stays on the honest by-name path (names shown, values N/A) — do NOT emit values from the
-uncracked layout. See memory `var-read-address-systems` + `ddcs-firmware-downloads`.
+**Decode = for each eng `-s1` name, find that `name\0` in the bytes, read the float32 at `pos-4`.** Verified:
+**244/244 matched params fall in their eng-declared min/max** (vs garbage under any index scheme). Robust
+form must search by EXACT name (a regex that greedily eats printable value-bytes mis-aligns the start).
+
+### Grounded profile of THIS capture (a real, coherent ~400×400×20 machine)
+| role | # | X | Y | Z |
+|---|---|---|---|---|
+| pulse equivalency | 34-36 | 640 | 640 | 640 |
+| max speed (M_Ctrl) | 41-43 | 16000 | 16000 | 16000 |
+| home speed | 56-58 | 1600 | 1600 | 1600 |
+| home direction | 64-66 | 0 | 0 | 0 |
+| soft-limit −− | 375-77 | -400 | -400 | -20 |
+| soft-limit ++ | 379-81 | 400 | 400 | 20 |
+Active WCS (#16)=1 (G54) · enable soft-limit (#374)=0 · G0 speed (#80)=3000 · max spindle (#98)=24000.
+
+WCS G54-G59 offset TABLE + machine-zero still not located as named records (may be a separate coord file
+not in this capture, or non-`-s1` records) — the ENVELOPE/homing/feeds ARE grounded.
+
+## NEXT — wire it into the importer
+`dumpImport.js` DM500 branch should switch from "values N/A" to **parse-by-name** (float32 before each eng
+name), reusing the eng it already reads. Add a DM500 golden from this in-repo capture (envelope ±400/±20,
+pulse 640, active WCS G54) — cross-language pinned like Expert/V4.1. See memory `var-read-address-systems`.
