@@ -38,14 +38,25 @@ const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '
 // slot … (t2067)") are noise to an operator. Turn them into plain lines: keep only the user-facing types (feat/fix/
 // perf), strip the conventional-commit type(scope) prefix, drop the "— developer detail" tail and any task-id / issue
 // refs, and sentence-case the gist. Internal commits (docs/test/chore/refactor/build/release) never reach the user.
+const NOTES_MAX = 4;   // succinct — a few highlights, not a changelog
 export function userFacingNotes(subjects) {
-  const out = [];
+  const out = [], seen = new Set();
   for (const s of (subjects || [])) {
     const m = /^\s*(\w+)(\([^)]*\))?(!)?:\s*(.+)$/.exec(s);
     if (m && !['feat', 'fix', 'perf'].includes(m[1].toLowerCase())) continue;   // internal type → not shown to users
-    let text = (m ? m[4] : s).split(/\s+(?:--|—)\s+/)[0];                        // drop the "-- technical detail" tail
-    text = text.replace(/\s*\(?\bt\d+\b\)?/gi, '').replace(/\s*\(?#\d+\)?/g, '').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim();
-    if (text) out.push(text.charAt(0).toUpperCase() + text.slice(1));           // sentence-case
+    let text = (m ? m[4] : s)
+      .split(/\s+(?:--|—|->|→)\s+/)[0]           // keep only the lead; drop any "— detail" / "-> x" tail
+      .replace(/\s*\([^)]*\)/g, '')               // drop parenthetical clauses (task ids, asides)
+      .replace(/\s*\[[^\]]*\]/g, '')              // and bracketed ones
+      .replace(/\s*\bt\d+\b/gi, '').replace(/\s*#\d+/g, '')   // bare task / issue refs
+      .split(/;\s+/)[0]                            // one clause, not a semicolon-joined pair
+      .replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim();
+    if (!text) continue;
+    text = text.charAt(0).toUpperCase() + text.slice(1);   // sentence-case
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;                  // no near-duplicates
+    seen.add(key); out.push(text);
+    if (out.length >= NOTES_MAX) break;           // don't mention everything
   }
   return out;
 }

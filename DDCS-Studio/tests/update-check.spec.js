@@ -76,10 +76,23 @@ test('What\'s new: commit subjects become plain user-facing lines (internal comm
     'test(job-history): drive the real path end to end',
     'refactor(preview): delete dead odPassExtent',
   ]));
-  expect(out, 'only feat/fix survive, cleaned of prefixes/task-ids/detail tails and sentence-cased').toEqual([
+  expect(out, 'succinct: only feat/fix, lead clause only (tails/arrows/semicolons/parens dropped), deduped').toEqual([
     'Var-read used the wrong slot for setting params',
-    'Prefer the in-place same-name update; demote the dated manual Download',
+    'Prefer the in-place same-name update',
   ]);
+});
+
+// t2066 — the notes stay SHORT: deduped, and capped so a busy release doesn't dump a changelog on the user.
+test('What\'s new: deduped and capped at a few highlights', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  const out = await page.evaluate(() => window.__ddcsUpd.userFacingNotes([
+    'fix: the surfacing preview shows nothing', 'fix: the surfacing preview shows nothing -- flow-label collision',
+    'feat: pull reads the machine WCS live', 'fix: gateway job-in-flight false alarm',
+    'feat: cleaner update notes', 'fix: one more thing', 'fix: and another',
+  ]));
+  expect(out.length, 'capped at a few, not everything').toBeLessThanOrEqual(4);
+  expect(out.filter((x) => /surfacing preview shows nothing/i.test(x)).length, 'the two identical-gist lines collapse to one').toBe(1);
 });
 
 // t2066 — when the gateway reports the in-place same-name self-update is available, it becomes the PRIMARY action and
