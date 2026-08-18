@@ -526,10 +526,12 @@ export function emitMapped(blocks, settings = {}) {
     // and any of them could be perturbed by leading whitespace appearing or vanishing underneath it. Running last
     // means the whole pipeline sees exactly the bytes it always saw and only the final rendering differs — which is
     // what makes "whitespace-only" a property of the ORDER as well as of the transform.
+    applyInlineClampSkip(T, dialect);     // t2070 — DDCS rejects inline `IF x>y THEN x=y`; rewrite to an IF..GOTO-skip
     // t2070 — DDCS controllers reject a leading space before an N-label (bench-confirmed on the Expert 2026-08-17:
     // `  N50` throws a syntax error, `N50` parses; indented STATEMENTS are fine, labels are NOT). The `flush` style
     // was built as exactly this fallback. DDCS dialects declare `flushIndent` so the whole family emits column-0
     // regardless of the user's indent setting — indentation is cosmetic bytes, the machine's column rule is not.
+    // (Runs AFTER the clamp-skip so the inserted `N<L>` gets flushed too.)
     applyIndentStyle(T, (dialect && dialect.flushIndent) ? { ...settings, indentStyle: 'flush' } : settings);
     const lines = T.map((t) => t.line);
     // t1375 — the ABSORBED range map, exposed rather than kept private: it is the emitter's own declaration of which
@@ -540,6 +542,33 @@ export function emitMapped(blocks, settings = {}) {
     // here must give a program whose traced feeds are identical — which is exactly what feed-modal-1377 does.
     const feedFolds = []; T.forEach((t, i) => { if (t.foldedF != null) feedFolds.push({ line: i, f: t.foldedF }); });
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src), absorbed, feedFolds };
+}
+
+// t2070 — INLINE `IF <cond> THEN <var>=<val>` IS A HARD SYNTAX ERROR on the DDCS Expert (bench-confirmed 2026-08-17:
+// the Expert does `IF <cond> GOTO <label>` only, never a THEN-assignment). Looped ops (surfacing/pocket/holecycle/…)
+// emit these as depth/row CLAMPS (`IF #z > #depth THEN #z=#depth`, `IF #n < 1 THEN #n=1`), so every one errored on the
+// Expert. Rewrite each to the equivalent GOTO-skip: `IF <var> <INVERSE-op> <bound> GOTO<L>` / `<var>=<val>` / `N<L>`
+// (skip the assignment unless the clamp condition holds — provably the same result as the inline form). Runs after the
+// tool/flip passes (opRanges is spent) and before the flush; inserted lines inherit the clamp's own src so `map`/
+// `absorbed`/`feedFolds` stay aligned. Labels start ABOVE the program's own (base-91) labels so they never collide.
+const CLAMP_INV = { '>': '<=', '<': '>=', '>=': '<', '<=': '>', '==': '!=', '!=': '==' };
+const CLAMP_RE = /^(\s*)IF\s+(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+?)\s+THEN\s+(\S+?)\s*=\s*(.+?)(\s+\(.*\))?\s*$/;
+function applyInlineClampSkip(T, dialect) {
+    if (!dialect || !dialect.flushIndent) return;   // DDCS family only — other dialects accept the inline THEN form
+    let next = 90;                                   // the next free label: strictly above every N-label already present
+    for (const t of T) { const m = /(?:^|\s)N(\d+)\b/.exec(t.line || ''); if (m) next = Math.max(next, +m[1]); }
+    next += 1;
+    for (let i = 0; i < T.length; i++) {
+        const m = CLAMP_RE.exec(T[i].line || '');
+        if (!m) continue;
+        const [, indent, lhs, op, rhs, av, aval, comment] = m;
+        const inv = CLAMP_INV[op]; if (!inv) continue;
+        const L = next++;
+        T[i].line = `${indent}IF ${lhs} ${inv} ${rhs} GOTO${L}${comment || ''}`;   // guard: skip unless the clamp fires
+        const mk = (line) => ({ ...T[i], line });    // inherit src/anc so the line map stays 1:1
+        T.splice(i + 1, 0, mk(`${indent}${av}=${aval}`), mk(`${indent}N${L}`));
+        i += 2;
+    }
 }
 
 /** t726 P2b — find the DECLARED entry-point marker anywhere in the stack (a childless `entry` block). */

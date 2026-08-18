@@ -25,8 +25,11 @@ contour / holecycle / slot / drill / bore) emit them, so those ops errored on ha
 
 2. **INLINE `IF <cond> THEN <assignment>` IS REJECTED** — the Expert does `IF <cond> GOTO <label>` only, never
    `IF x > y THEN x=y`. **Answers the open V12 question: NO.** The surfacing/holecycle depth/row clamps
-   (`IF #z > #depth THEN #z=#depth`, `IF #n < 1 THEN #n=1`) emit this form → rejected. **FIX PENDING:** emit a
-   `GOTO`-skip (`IF #z <= #depth GOTO<L>` / `#z=#depth` / `N<L>`), dialect-aware, with the label flush-left per (1).
+   (`IF #z > #depth THEN #z=#depth`, `IF #n < 1 THEN #n=1`) emit this form → rejected. **FIXED (node-verified,
+   ⚠ HARDWARE RE-CHECK PENDING):** `blockEmitter.applyInlineClampSkip` rewrites each clamp to the equivalent
+   GOTO-skip (`IF #z <= #depth GOTO<L>` / `#z=#depth` / `N<L>`) for DDCS dialects (label above the base-91 pool,
+   flushed per (1)). Provably logic-equivalent; **load a generated surfacing on the Expert and confirm it parses
+   AND cuts before trusting a real job.**
 
 The sim models neither column position nor the inline-THEN rejection, so both slipped through until a bench load.
 
