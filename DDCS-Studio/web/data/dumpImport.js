@@ -13,6 +13,8 @@
  * (by-name), the review shows the resolved param + "value N/A (DM500 setting layout ungrounded)". Refine on a real dump.
  */
 
+import { macroToParam } from './paramAddressing.js';
+
 const SENTINEL = 9999.0;
 
 /** Decode a little-endian float64 array (index N = param #N, offset N*8). Accepts ArrayBuffer / TypedArray / Buffer. */
@@ -60,8 +62,13 @@ export function controllerFromParamCount(n) {
 const round4 = (x) => Math.round(x * 1e4) / 1e4;
 
 // ── Expert-M350 — the confirmed index map (ports _map_geometry_to_profile). Values grounded (index = offset). ──
+// t2073 — the WCS param bases are DERIVED from the Expert MACRO bases (#805/#578 = dialect.vars['ddcs-expert-m350']
+// .wcsBase/activeWcs, pinned equal by dialect-address-map-2073) via the ONE setting offset, not hardcoded — so #305/#78
+// can't drift from the #805/#578 the codegen + Python use. The rest stay direct param indices (no macro dual:
+// soft-limits/homing/machZero are read only here + by the Python mapper, pinned by dump-import-golden).
 const EXP = { softNeg: [161, 162, 163], softPos: [166, 167, 168], homingDir: [112, 113, 114],
-    homingSpeed: [107, 108, 109], precision: 118, machZero: [235, 236, 237], activeWcs: 78, wcsBase: 305, wcsStride: 5,
+    homingSpeed: [107, 108, 109], precision: 118, machZero: [235, 236, 237],
+    activeWcs: macroToParam(578), wcsBase: macroToParam(805), wcsStride: 5,
     rapid: 63 };   // t848 — #63 "G00 speed" (mm/min): seeds settings.machine.rapidRate for the time estimate + time-true sim
 
 function farReach(neg, pos) {
