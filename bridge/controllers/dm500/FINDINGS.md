@@ -1,5 +1,25 @@
 # DM500 (V3) — controller findings
 
+## LIVE TRACKING CAPABILITY — the queued V3 question (NEXT-SESSION.md t2062), ANSWERED
+The Expert-only live-tracking poller (t2059-2063) depends on the Expert's **param #279 "Modbus RTU"**
+(`-i0"NO" -i1"Poll" -i2"Slave"` — the P279 mode toggle that puts the PC in Modbus master/slave with the
+controller). Checked the DM500's own `install/eng` for an equivalent:
+- **`#279` on the DM500 is a DIFFERENT param entirely — "H12 tool offset"** (the H-code tool-length table,
+  #267-281 = H00-H14). Not a communication mode at all.
+- **grep the whole 311-param DM500 eng for `modbus|master|slave|serial.*mode|comm.*mode` → ZERO hits**
+  (the only near-miss is `#485 "SBK"` = single-block run mode, unrelated). No P279-equivalent toggle
+  exists anywhere in the DM500's declared parameter table.
+- The only "serial" reference found is `#430 "MPG interface type"` (0=serial-port MPG pendant / 1=standard
+  MPG) — an input-device wiring choice, not a host communication protocol.
+
+**Conclusion (evidence-based, not proven-impossible):** the DM500's parameter dictionary declares NO
+Modbus RTU master/slave mode and no discoverable host-communication toggle — unlike the Expert, which
+names it explicitly. This does not prove the DM500 has zero serial protocol (an undocumented one could
+exist), but there is no declared entry point to build the Expert-style poller against, and the eng
+dictionary is the same self-describing mechanism that correctly named every other capability across all
+three controllers. **Working assumption: live tracking is Expert-only; do not build a DM500 poller without
+first finding — on real hardware — a comm-mode parameter this eng dictionary doesn't declare.**
+
 ## The dump is IN THIS REPO (no external dump needed)
 `bridge/controllers/dm500/` already holds a real DM500 capture:
 - `setting` — 170000 bytes = **21250 float64 slots** (matches dumpImport's `n >= 20000 → dm500`).

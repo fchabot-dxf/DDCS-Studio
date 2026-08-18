@@ -5534,5 +5534,16 @@ from them.
    instruction is *"make sure it actually works"*.
 5. **Gate:** bridge suite + node tier + the gateway/history/send specs.
 
-⚠ Queued: the "aborted" wording tension you raised · the V3 capability question · removing the dead `Setup`
-palette block (the human does two-sided work in Fusion) · the studio bench run for live tracking.
+⚠ Queued: the "aborted" wording tension you raised · removing the dead `Setup` palette block (the human does
+two-sided work in Fusion) · the studio bench run for live tracking.
+
+# ═══ t2073 addendum — THE V3 CAPABILITY QUESTION, ANSWERED ═══
+
+Checked the DM500's own `install/eng` (311 params, decoded + grounded this arc — see
+`bridge/controllers/dm500/FINDINGS.md`) for an Expert-#279 "Modbus RTU" equivalent: **DM500's own #279 is
+a different param ("H12 tool offset"); a full grep for modbus/master/slave/comm-mode across all 311 params
+found NOTHING.** No declared host-communication mode toggle exists anywhere in its parameter dictionary,
+unlike the Expert which names it explicitly. Working conclusion: **live tracking is Expert-only** — do not
+build a DM500 poller without first finding a comm-mode parameter on real hardware that this dictionary
+doesn't declare. Not proof-of-impossibility (an undocumented protocol could exist), but there is no
+declared entry point to build against. Full evidence in the FINDINGS.md entry.
