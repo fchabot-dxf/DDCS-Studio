@@ -88,7 +88,7 @@ def build(config, beacons=None, position_poller=None):
 def run_loop(config):
     backend, _, beacons, poller, position_poller = build(config)
     explorer = CncDiskService(backend, config, config.cncdisk_refresh_s)
-    ops = Ops(backend, config, beacons)   # t2057 — so submit_job can cross-check a tracked send against the receiver's REAL state
+    ops = Ops(backend, config, beacons, position_poller)   # t2057 — cross-check a tracked send against the receiver's REAL state; t2073 — position_status()
     beacons.start()
     if position_poller is not None:
         position_poller.start()

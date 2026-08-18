@@ -69,6 +69,46 @@ def test_a_bad_port_reports_dead_immediately_never_looking_healthy():
     p.stop()
 
 
+# ── t2073 — Ops.position_status(): AN HONEST STUB, not a job-progress feature ───────────────────────────────
+# The poller is bench-proven to READ; nothing turns "the tool is at these numbers" into "the job is N% done"
+# (that cursor stays gated on a real bench session — JOB-PROGRESS-PLAN.md). So the API surfaces exactly what
+# the poller measures: RAW, UNDECODED registers. Assembling a work_position register pair into a float32
+# X/Y/Z would be a SECOND unverified guess (byte order) stacked on the register MAP's own already-unattested
+# addresses — not built here on purpose.
+
+def test_position_status_when_no_poller_is_configured_says_so_plainly():
+    from fairy.ops import Ops
+    ops = Ops(backend=None, config=None)   # position_poller defaults to None — no --position-poll
+    assert ops.position_status() == {"enabled": False}
+
+
+def test_position_status_surfaces_the_pollers_real_connected_state_and_raw_registers():
+    from fairy.ops import Ops
+    ops = Ops(backend=None, config=None, position_poller=PositionPoller("COM_UNUSED", 115200, 1))
+    st = ops.position_status()
+    assert st["enabled"] is True
+    assert st["connected"] is False, st          # never started -> status() says "not started"
+    assert st["error"] == "not started", st
+    assert st["raw"] == {}, st                   # latest() is None before any read -> empty raw, not fabricated zeros
+    assert st["read_at"] is None, st
+
+
+def test_position_status_never_leaks_the_internal_ts_key_into_raw():
+    """raw must be ONLY the register blocks (work_position/machine_position/state) — ts is surfaced
+    separately as read_at, so a UI reading `raw` never has to know to skip one special key."""
+    from fairy.ops import Ops
+
+    class _FakeReadyPoller:
+        def status(self): return {"ok": True, "error": None}
+        def latest(self): return {"work_position": [1, 2, 3], "state": [0, 0], "ts": 1734567890.0}
+
+    ops = Ops(backend=None, config=None, position_poller=_FakeReadyPoller())
+    st = ops.position_status()
+    assert st["connected"] is True
+    assert st["raw"] == {"work_position": [1, 2, 3], "state": [0, 0]}, st   # ts excluded
+    assert st["read_at"] == "2024-12-19T00:24:50Z", st
+
+
 # ── bridge.py wiring: mutual exclusivity with the Modbus slave, same serial port ───────────────────────────
 
 def _cfg(tmp, **overrides):

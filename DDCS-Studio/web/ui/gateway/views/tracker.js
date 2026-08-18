@@ -12,7 +12,8 @@ export default {
 
   mount(ctx) {
     this.wrap = el("section", { class: "block bigtrack" });
-    ctx.root.append(this.wrap);
+    this.posBlock = el("section", { class: "block bt-position", style: "display:none" });   // t2073 — hidden until enabled
+    ctx.root.append(this.wrap, this.posBlock);
     this.onPoll(ctx);
   },
 
@@ -27,6 +28,28 @@ export default {
       .filter((i) => ["delivering", "running", "delivered", "stalled"].includes(i.state))
       .sort((a, b) => (a.jobId < b.jobId ? 1 : -1))[0];
     this.render(active);
+    this.renderPosition(ctx);   // t2073 — independent of job state (Poll-mode position isn't wired to job tracking)
+  },
+
+  // t2073 — AN HONEST STUB, not a job-progress feature. Poll-mode reads (t2059/2063) are bench-proven to
+  // reach the controller, but nothing yet turns "the tool is at these numbers" into "this job is N% done"
+  // (that cursor stays gated on a real bench session — JOB-PROGRESS-PLAN.md). So this shows exactly what
+  // the bridge measures — RAW, UNDECODED registers — and nothing more; decoding a register pair into a
+  // float32 X/Y/Z would be a second unverified guess on top of an already-unattested register map (see
+  // Ops.position_status's own docstring). Silent (block stays hidden) for every gateway that hasn't
+  // enabled --position-poll — this must never appear as a broken/empty tracking feature for the majority
+  // who use beacons instead.
+  async renderPosition(ctx) {
+    let pos;
+    try { pos = await ctx.client.getPosition(); } catch { return; }   // gateway-unreachable is already shown by render() above; don't double-report
+    if (!pos || !pos.enabled) { this.posBlock.style.display = "none"; return; }
+    this.posBlock.style.display = "";
+    const rows = Object.entries(pos.raw || {}).map(([k, v]) => stat(k, Array.isArray(v) ? v.join(",") : String(v)));
+    this.posBlock.replaceChildren(
+      el("div", { class: "section-label" }, "Live position poll — raw registers, undecoded, not linked to job progress"),
+      pos.connected
+        ? el("div", { class: "bt-stats" }, rows.concat(stat("read at", pos.read_at || "—")))
+        : el("div", { class: "muted" }, pos.error || "not connected"));
   },
 
   renderUnreachable() {

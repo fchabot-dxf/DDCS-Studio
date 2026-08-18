@@ -15,6 +15,9 @@ API (all JSON):
   GET  /api/profile                    -> controller profile in the shared shape (Studio consumes this)
   GET  /api/queue                      -> [ status/queue items ]
   GET  /api/status?id=<jobId>          -> one status object (404 if none)
+  GET  /api/position                   -> {enabled, connected, error, raw, read_at} — t2073, an honest stub:
+                                           RAW undecoded registers from the Poll-mode position poller, no
+                                           job-progress claim (see Ops.position_status's own docstring)
   GET  /api/files                      -> CNCDISK listing (cncdisk/index shape)
   GET  /api/file?name=<file>           -> { ok, name, content }  (read a CNCDISK file)
   POST /api/jobs   {name, nc, map?, contentHash?}-> { jobId, name, tracked }   (queue a job)
@@ -178,6 +181,8 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             st = self.ops.get_status((q.get("id") or [""])[0])
             return self._send_json(st, 200) if st else self._send_json({"error": "no such job"}, 404)
+        if path == "/api/position":
+            return self._send_json(self.ops.position_status())
         if path == "/api/files":
             return self._send_json(self.ops.list_files())
         if path == "/api/file":

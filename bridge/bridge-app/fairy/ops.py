@@ -33,12 +33,14 @@ def make_job_id(name, now=None):
 
 
 class Ops:
-    def __init__(self, backend, config, beacons=None):
+    def __init__(self, backend, config, beacons=None, position_poller=None):
         self.backend = backend
         self.cfg = config
         self.beacons = beacons     # t2057 — optional: the live BeaconSource, so submit_job can cross-check
                                     # a tracked request against the receiver's REAL state, not just enable_slave's
                                     # configured intent. None in tests/self-test that don't exercise this.
+        self.position_poller = position_poller   # t2073 — optional: the live PositionPoller (t2059/2063),
+                                    # so position_status() can surface it. None when --position-poll is off.
         self._detect_cache = None  # (dest, result): the fingerprint is stable per connected controller
 
     # Per-controller baseline profiles (the shared shape Studio consumes). detect_controller() picks
@@ -104,6 +106,31 @@ class Ops:
     def list_history(self, limit=100):
         """Finished-job history: name, final state, duration (History view seam)."""
         return self.backend.list_history(limit)
+
+    def position_status(self):
+        """t2073 — AN HONEST STUB, not a job-progress feature. The Poll-mode position poller (t2059/2063) is
+        bench-proven to read the controller's own registers, but nothing turns "the tool is at these numbers"
+        into "this job is N% done" (that cursor is explicitly NOT built — JOB-PROGRESS-PLAN.md — and stays
+        gated on a real bench session). So this exposes exactly what the poller measures and nothing more:
+
+        RAW, UNDECODED register values. master.py's own REGISTERS map is "evidence, not attested" — a
+        register ADDRESS taken from a different OEM-derived project, never bench-confirmed on THIS
+        controller — and turning a work_position register pair into a float32 X/Y/Z assumes a byte order
+        that has never been verified either. Decoding here would be a SECOND unverified guess stacked on
+        the first. So: raw registers, a timestamp, and connection status — true regardless of whether the
+        register MAP or the decode is ever confirmed. Never raises; {"enabled": False} when no poller runs."""
+        if self.position_poller is None:
+            return {"enabled": False}
+        st = self.position_poller.status()
+        latest = self.position_poller.latest() or {}
+        ts = latest.get("ts")
+        return {
+            "enabled": True,
+            "connected": bool(st.get("ok")),
+            "error": st.get("error"),
+            "raw": {k: v for k, v in latest.items() if k != "ts"},
+            "read_at": datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None,
+        }
 
     # --- CNCDISK files ------------------------------------------------------
     def list_files(self):

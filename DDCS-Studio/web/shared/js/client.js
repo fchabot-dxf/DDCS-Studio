@@ -55,6 +55,7 @@ export function makeClient(opts = {}) {
     listQueue: () => call("/api/queue"),
     listHistory: (limit = 100) => call("/api/history?limit=" + limit),
     getStatus: (id) => call("/api/status?id=" + encodeURIComponent(id)),
+    getPosition: () => call("/api/position"),   // t2073 — {enabled, connected, error, raw, read_at}; an HONEST STUB (raw undecoded registers, no job-progress claim — see Ops.position_status)
     listFiles: () => call("/api/files"),
     readFile: (name) => call("/api/file?name=" + encodeURIComponent(name), { headers: { "X-DDCS-Local": "1" } }),   // CSRF-guarded (leaks CNCDISK file content); same-origin Studio sends it
     deleteFile: (name) => postJSON("/api/files/delete", { name }),
