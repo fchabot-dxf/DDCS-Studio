@@ -63,7 +63,28 @@ Active WCS (#16)=1 (G54) · enable soft-limit (#374)=0 · G0 speed (#80)=3000 ·
 WCS G54-G59 offset TABLE + machine-zero still not located as named records (may be a separate coord file
 not in this capture, or non-`-s1` records) — the ENVELOPE/homing/feeds ARE grounded.
 
-## NEXT — wire it into the importer
+## EMIT AUDIT (t2073) — the dialect's emitted variables, checked vs install/eng + defprobe.nc
+Read side (above) and EMIT side use DIFFERENT variable namespaces: the config/setting params (#16, #375…)
+are what we READ; the runtime macro vars (#864, G92…) are what wizards EMIT. Auditing every emitted form:
+
+| form | emits | verdict |
+|---|---|---|
+| probe move | `M101 / G91 G01 <ax><d> F / M102` | ✅ GROUNDED (probe.nc) |
+| probeRead / readMachine / DRO | `#864-866` (X/Y/Z) | ✅ GROUNDED (defprobe.nc) |
+| setWorkOffset / zero | `G90 G92 <ax>[#864+ax − v]` | ✅ GROUNDED (defprobe.nc G92) |
+| dwell | `G04 P<sec>` (seconds) | ✅ GROUNDED |
+| ifGoto / goto / label | WORD ops `EQ/LT/GT`, `GOTO/N` | ✅ GROUNDED (`!=`→NE flagged) |
+| spindle / coolant / end | `M3/M4/M5 · M8/M9 · M30` | ✅ standard |
+| machineMove | `G53 <ax><ref>` | ⚠ TO CONFIRM (dump parks via `M98 P101`, never G53) |
+| **readActiveWcs** | ~~`<v>=#455`~~ → `[]` | ❌→✅ FIXED: #455 = the "CONT" MENU BUTTON (eng #450-459), not an active-WCS selector. DM500 is G92 / no per-WCS index (like V4.1) → folds to `[]`. |
+| **vars.toolTable** | ~~#1430~~ → #268 | ❌→⚠ FIXED: #1430 is NOT a DM500 param (Expert copy). Tool offsets are H00-H14 at eng #267-281 → H01=#268. Runtime write UNVERIFIED. |
+| vars.wcsBase | #804 (DECLARED) | ⚠ never emitted (setWorkOffset uses G92; wcsFixed=false) — left unused, documented. |
+
+Net: the forms that actually reach emitted G-code were already grounded against the DM500's own factory
+macros; the two wrong entries (`activeWcs #455`, `toolTable #1430`) were declarations, now corrected. Still
+NOT hardware-tested (we own no DM500). Commit for the audit: see the ddcs-v3-dm500.js "t2073 EMIT AUDIT" block.
+
+## Read-side follow-up — wire it into the importer
 `dumpImport.js` DM500 branch should switch from "values N/A" to **parse-by-name** (float32 before each eng
 name), reusing the eng it already reads. Add a DM500 golden from this in-repo capture (envelope ±400/±20,
 pulse 640, active WCS G54) — cross-language pinned like Expert/V4.1. See memory `var-read-address-systems`.

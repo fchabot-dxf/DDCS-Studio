@@ -9,8 +9,10 @@ import { test, expect } from '@playwright/test';
  * THE SEMANTIC, established from primary source before wiring anything (t1890's own explicit instruction, echoing
  * t1880's "no gate is better than a wrong gate" — this time applied to BOTH `atc` and `toolTable`, which turned
  * out to have DIFFERENT evidence quality):
- *   - `caps.toolTable` is TRUE for every DDCS variant (Expert/V4.1/DM500 — each declares its own CONFIRMED base
- *     register: #1430/#1560/#1430) plus rs274ngc (#5401) and centroid; FALSE only for `grbl.js`, whose own caps
+ *   - `caps.toolTable` is TRUE for every DDCS variant (Expert #1430 CONFIRMED; V4.1 #1560; DM500 #268 = the eng H01
+ *     tool-offset param, grounded to install/eng #267-281 = H00-H14, runtime-write UNVERIFIED — t2073 audit corrected
+ *     the earlier #1430, which was an Expert copy and NOT a DM500 param) plus rs274ngc (#5401) and centroid; FALSE
+ *     only for `grbl.js`, whose own caps
  *     declare `vars: false, flow: 'none'` — a categorically variable-less firmware. This is a genuine, confirmed,
  *     structural absence (grbl has no #-variable engine to hold a table AT ALL), unlike `atc` (left untouched
  *     this turn — see WORK-LOG t1890 for the full evidence trail: `caps.atc: false` on V4.1/DM500 turned out to

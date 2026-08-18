@@ -18,7 +18,16 @@ export const dialect = {
     id: 'ddcs-v3-dm500', name: 'DDCS V3 / DM500',
     flushIndent: true,   // t2070 — same DDCS-family column-0 label rule (applied unverified; only the Expert is hardware-testable)
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
-    vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
+    vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: null, toolTable: 268, atc: null, ax: AX },
+    // t2073 EMIT AUDIT (against install/eng + defprobe.nc):
+    //   dro / probeTrig #864 — GROUNDED (defprobe.nc DRO #864-866).
+    //   toolTable #268 — the H01 tool-offset param (eng #267-281 = H00-H14 tool offset; H01=#268 → T1). The OLD #1430
+    //     was NOT a DM500 param at all (an Expert copy) — corrected. ⚠ runtime WRITE-to-#268 unverified (no DM500 hw).
+    //   activeWcs NULLED — the OLD #455 was WRONG: eng #455 = the "CONT" MENU BUTTON (eng #450-459 = GOTOZ/HOME/PROBE/
+    //     AUTO/SIMULATE/CONT/STEP/MPG/RESET/READY), NOT a coord-system selector. DM500 WCS is G92 with no per-WCS index
+    //     (like V4.1), so there is no active-WCS register to read → readActiveWcs folds to [] below.
+    //   wcsBase #804 — DECLARED but NEVER emitted (setWorkOffset uses G92; wcsFixed cap is false). Left as-is, unused.
+    //   atc null — no confirmed tool-changer firmware model.
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
         helicalArc: false,   // t1472 — no arc evidence of EITHER kind in the DM500 capture; the weakest corpus of the family
         wcsAuto: false, wcsFixed: false, wcsSync: false },   // t479 — WCS via G92 (grounded, defprobe.nc): active-frame-driven, WCS-agnostic → the number is GATED; auto M350-only; no slave-sync
@@ -66,7 +75,8 @@ export const dialect = {
         if (!axes.length) return ['( WCS zero: no axes selected )'];
         return ['( WCS zero at current - DM500 G92 datum - VERIFY on hardware )', `G90 G92 ${axes.map((a) => a + '0').join(' ')}`];
     },
-    readActiveWcs: (varName) => [`${varName}=#455`],        // #455/#516 select coord system
+    readActiveWcs: () => [],   // t2073 AUDIT — DM500 has NO per-WCS-index register (G92 WCS, wcsAuto false), same as V4.1.
+                               // The old `#455` was WRONG: eng #455 = the "CONT" menu button, not a coord-system selector.
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G04 P${sec}`],                        // P = SECONDS (probe.nc, slib.nc G82 P#9)
     endProgram: () => ['M30'],                              // m30.nc empty → controller default
