@@ -16,6 +16,7 @@ const OP = { '==': 'EQ', '!=': 'NE', '<': 'LT', '>': 'GT', '<=': 'LE', '>=': 'GE
 
 export const dialect = {
     id: 'ddcs-v3-dm500', name: 'DDCS V3 / DM500',
+    flushIndent: true,   // t2070 — same DDCS-family column-0 label rule (applied unverified; only the Expert is hardware-testable)
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
     vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,

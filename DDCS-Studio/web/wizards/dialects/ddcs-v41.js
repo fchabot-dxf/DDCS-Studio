@@ -11,6 +11,7 @@ const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 
 export const dialect = {
     id: 'ddcs-v41', name: 'DDCS V4.1',
+    flushIndent: true,   // t2070 — same DDCS-family column-0 label rule as the Expert (applied unverified; the Expert confirmed it)
     programModel: 'inline', probeModel: 'g31', dwellUnits: 'ms',
     // dro = machine pos #1500-1503; wcsWork = workpiece pos #1506-1509 (what zero*.nc writes); toolTable #1560/#764.
     vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, atc: null, ax: AX },   // atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the dump shows them as generic "system parameter area")

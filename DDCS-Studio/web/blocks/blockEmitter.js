@@ -526,7 +526,11 @@ export function emitMapped(blocks, settings = {}) {
     // and any of them could be perturbed by leading whitespace appearing or vanishing underneath it. Running last
     // means the whole pipeline sees exactly the bytes it always saw and only the final rendering differs — which is
     // what makes "whitespace-only" a property of the ORDER as well as of the transform.
-    applyIndentStyle(T, settings);
+    // t2070 — DDCS controllers reject a leading space before an N-label (bench-confirmed on the Expert 2026-08-17:
+    // `  N50` throws a syntax error, `N50` parses; indented STATEMENTS are fine, labels are NOT). The `flush` style
+    // was built as exactly this fallback. DDCS dialects declare `flushIndent` so the whole family emits column-0
+    // regardless of the user's indent setting — indentation is cosmetic bytes, the machine's column rule is not.
+    applyIndentStyle(T, (dialect && dialect.flushIndent) ? { ...settings, indentStyle: 'flush' } : settings);
     const lines = T.map((t) => t.line);
     // t1375 — the ABSORBED range map, exposed rather than kept private: it is the emitter's own declaration of which
     // lines already carry the program rotation, so a caller (and the coherence spec) can read it instead of guessing.

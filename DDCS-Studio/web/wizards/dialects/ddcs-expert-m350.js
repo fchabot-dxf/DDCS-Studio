@@ -9,6 +9,7 @@ const AX = { X: 0, Y: 1, Z: 2, A: 3 };
 
 export const dialect = {
     id: 'ddcs-expert-m350', name: 'DDCS Expert M350',
+    flushIndent: true,   // t2070 — a leading space before an N-label is a hard syntax error (bench-confirmed); emit column-0
     programModel: 'inline', probeModel: 'g31', dwellUnits: 'ms',
     vars: { dro: 880, probeStatus: 1920, probeTrig: 1925, wcsBase: 805, wcsStride: 5, activeWcs: 578, toolTable: 1430,
         // ATC tool-changer firmware tables. currentTool/capacity/pockets live in SYSDISK/camsetting (#1000-1499,

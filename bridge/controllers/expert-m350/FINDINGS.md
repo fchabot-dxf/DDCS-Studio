@@ -9,6 +9,29 @@ bench-proven. **Do not assume V4.1 findings carry over** — see [`../README.md`
 
 ---
 
+## ⛔ Macro-parser quirks — `[CONFIRMED on machine 2026-08-17]` (t2070, controlled A/B on CNC-FAIRY)
+
+Two forms the **sim accepts but the real Expert REJECTS** — both surfaced because looped ops (surfacing / pocket /
+contour / holecycle / slot / drill / bore) emit them, so those ops errored on hardware while passing in the sim.
+
+1. **`N`-LABELS MUST START AT COLUMN 0.** A leading space before a label is a hard `syntax error`, even though
+   indented *statements* are fine (this **refines V15**: indent tolerated for statements, NOT for labels). Proven by
+   A/B: `N50` flush-left inside a `WHILE…DO` loop parses; the identical line as `  N50` (2 spaces) throws
+   `syntax error L5`. This is why every looped op failed — the emit indents inside loops, so labels landed indented.
+   **FIXED:** the DDCS dialects now carry `flushIndent: true`, so `emitMapped` forces the existing
+   `applyIndentStyle('flush')` pass (column-0) for the whole family — Expert verified, V4.1/V3-DM500 applied
+   unverified (only the Expert is hardware-testable). The `flush` style was literally built as this fallback
+   (`data/indentStyle.js`: "if a controller turns out to balk at leading whitespace…").
+
+2. **INLINE `IF <cond> THEN <assignment>` IS REJECTED** — the Expert does `IF <cond> GOTO <label>` only, never
+   `IF x > y THEN x=y`. **Answers the open V12 question: NO.** The surfacing/holecycle depth/row clamps
+   (`IF #z > #depth THEN #z=#depth`, `IF #n < 1 THEN #n=1`) emit this form → rejected. **FIX PENDING:** emit a
+   `GOTO`-skip (`IF #z <= #depth GOTO<L>` / `#z=#depth` / `N<L>`), dialect-aware, with the label flush-left per (1).
+
+The sim models neither column position nor the inline-THEN rejection, so both slipped through until a bench load.
+
+---
+
 ## Serial = Modbus RTU ⭐ (the rich channel, Expert-only)
 - RS232 port is **MAX3232, ±6V true RS-232** (scope-confirmed +8V=0/−8V=1) → the **SABRENT FTDI
   cable is the correct adapter.** `[CONFIRMED via docs + scope]`

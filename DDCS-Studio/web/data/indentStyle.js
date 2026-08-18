@@ -24,13 +24,16 @@ export const INDENT = '  ';
 export const INDENT_WIDTH = INDENT.length;
 
 /**
- * The two output styles. `indented` is today's bytes, unchanged and default — so a user who never opens the setting
- * gets exactly the program they got before this existed, which is what makes the whitespace-only proof meaningful.
- * `flush` is the FALLBACK: the factory corpus contains ZERO indented lines, so if a controller turns out to balk at
- * leading whitespace the operator has a documented switch rather than a bug report (V15_indent.nc is the decider).
+ * The two output styles. `flush` is now the DEFAULT for every dialect (t2070): the DDCS Expert turned out to balk at
+ * leading whitespace exactly as the fallback anticipated — a leading space before an `N`-label is a hard syntax error
+ * (bench-confirmed 2026-08-17, controlled A/B on CNC-FAIRY). The factory corpus already contains ZERO indented lines,
+ * so column-0 is the corpus-true form; indentation was only ever cosmetic readability in the editor, which keeps its
+ * own indent/outdent regardless. `indented` remains a selectable style for a controller that tolerates (or wants) it,
+ * but no path defaults to it now. DDCS dialects additionally FORCE flush (dialect.flushIndent) so a user cannot pick
+ * `indented` into a syntax error.
  */
 export const INDENT_STYLES = ['indented', 'flush'];
-export const DEFAULT_INDENT_STYLE = 'indented';
+export const DEFAULT_INDENT_STYLE = 'flush';
 
 /** The style these settings ask for — unknown words resolve to the default rather than emitting something unasked. */
 export function indentStyleOf(settings = {}) {
