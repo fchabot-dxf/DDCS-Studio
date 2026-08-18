@@ -5594,3 +5594,82 @@ unlike the Expert which names it explicitly. Working conclusion: **live tracking
 build a DM500 poller without first finding a comm-mode parameter on real hardware that this dictionary
 doesn't declare. Not proof-of-impossibility (an undocumented protocol could exist), but there is no
 declared entry point to build against. Full evidence in the FINDINGS.md entry.
+
+---
+
+# ═══ t2075 — FIX THE UPDATE PROCESS END TO END ═══
+*(advisor, 2026-08-18, station: RENDERRANCHY. The human hit this live and asked for it end to end.)*
+
+## THE SYMPTOM, OBSERVED
+The exe sat forever on **"Updated — restarting…"** with a black window. `updateCheck.js:89` sets that text
+when `/api/update/apply` returns ok, then `return`s — there is no timeout and no failure branch, so it is a
+TERMINAL state.
+
+## ROOT CAUSE — PROVEN ON THE MACHINE, NOT INFERRED
+`selfupdate.py:231` — `subprocess.Popen([target], close_fds=True)` with **no `env=`**. The app is
+PyInstaller **6.20.0 onefile**. The child inherits the parent's `_PYI_*` bootloader variables, concludes it
+is already unpacked, and dies. `Popen` never raises, so `apply()` returns `ok:True, relaunched:True`.
+
+**The proof (do not re-derive):** killed both stuck PIDs, launched the SAME exe via `Start-Process`
+(clean env) → came up at 19:10:11, gateway answered on 8765, `FileVersion 2026.08.17.11`. Same file, same
+disk, same machine — **the only variable was the inherited environment.**
+
+**Steps 1–4 are GOOD and today proved it:** check, download, checksum-verify and swap all worked — a
+correct `.11` landed on disk and the old build was renamed to `DDCS-Studio.exe.old.exe`. **Everything
+broken is downstream of the swap. Do not touch 1–4.**
+
+## THE WORK, in dependency order — land each COMPLETELY, park the rest
+
+1. **The root cause.** Pass a cleaned `env=` to `Popen`, stripping `_PYI*` and `_MEIPASS2`. One line.
+2. ⭐ **THE HONEST VERIFY — the one that matters most.** After relaunching, poll `/api/descriptor` for a
+   few seconds. If nothing comes up, return `relaunched: False` with a NAMED reason, never `ok:True`.
+   With this alone, today would have been a clear message in 5 seconds instead of an infinite hang.
+   **A relaunch that was not observed to succeed must never be reported as success.**
+3. **The old process exits** — only once (2) has CONFIRMED the new instance is live. Today nothing knows
+   whether exiting is safe, so it never does.
+4. **The welcome notice** (the human asked for this directly). On boot, compare a stored last-version
+   against the running one; if it changed, show "Updated to vX" plus the SAME 3 highlights the banner
+   already builds (`updateCheck.js`, `NOTES_MAX = 3`). No version memory exists today — that is new.
+   ⚠ **DESIGN RULING, do not do the other thing:** key it on **stored-vs-current at boot**, NOT on a flag
+   passed from the updater. A flag only covers the in-place path — the exact path that just failed —
+   whereas stored-vs-current also fires after a manual download, a fresh install, or a hand-launch, which
+   is precisely the fallback route a user takes when in-place breaks. One stored fact, no coupling.
+5. **The UI's terminal state.** `'Updated — restarting…'` needs a timeout and a failure branch.
+6. **Cleanup.** Verify `sweep_old` actually removes `.old.exe` — there is one in Downloads dated Aug 2,
+   which suggests it does not.
+
+## ⚠ THE VERIFICATION PROBLEM — READ THIS BEFORE WRITING A TEST
+**This bug is invisible to every test that does not run the real frozen exe.** It lives in the difference
+between a normal process and a PyInstaller child. A unit test of `apply()` passes with the bug present —
+that is exactly the *green-tests-over-a-dead-path* shape this project has been burned by three times.
+
+So: **say plainly which parts you can prove and which you cannot.** A unit test can cover the env-scrub
+(assert `_PYI*` is absent from the env handed to `Popen`) and the verify-loop's failure branch. It CANNOT
+prove the relaunch works in a frozen build. **Do not claim end-to-end success from a unit test.** If the
+only honest answer is "needs a real exe build to confirm", write that — an accurate limit beats a green
+tick, and the human is running the real exe on this machine and can test it.
+
+**Non-vacuity:** every new test fails first, for a diagnosed reason, before it passes.
+
+## GATE
+The bridge Python suite plus whatever browser specs touch `updateCheck.js`. Note the two known
+environment-only failures (`test_csrf_guard.py`) — they are pre-existing, confirmed on clean HEAD.
+
+## DO NOT
+- Do not touch the check/download/checksum/swap path — proven working today.
+- Do not add a second update mechanism. Fix the one that exists.
+- Do not report a relaunch as successful without observing the new process answer.
+
+## ⚠⚠ SEVERITY — THIS IS NOT ONE USER'S MACHINE
+The failure is **deterministic and structural**: every Windows user runs the same PyInstaller onefile exe,
+every in-place update calls the same env-inheriting `Popen`, and every child inherits the same `_PYI_*`
+variables. There is no race and no machine-specific factor.
+
+⇒ **The in-place update button has almost certainly NEVER worked for any Windows user.** It fails the same
+way every time, and it fails SILENTLY — the UI claims success — so nobody would report it; they would just
+use the Download link and assume that is how it works. Treat this as a shipped-broken feature, not an edge
+case, and prioritise accordingly.
+
+⇒ **macOS is probably the same bug** (same PyInstaller onefile mechanism, same inheritance), but there is
+no Mac to test on — the CI builds it blind. **Fix the env-scrub platform-agnostically** rather than
+Windows-only, and mark the macOS half **UNVERIFIED** rather than claiming it.
