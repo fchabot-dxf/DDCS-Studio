@@ -1,0 +1,456 @@
+# dialect-emit golden 2072 — 2 verified posts × 3 ops
+# emit path: emitMapped(builderOf(op)(defaultParams+overrides), { dialect: getDialect(id) })
+# contracts pinned per line elsewhere in this file: FLUSH (no leading ws), NO-THEN (no inline clamp), CLAMP→GOTO
+#
+
+===== user_surfacing_data @ ddcs-expert-m350 =====
+G90   ( absolute )
+M3 S18000   ( spindle on )
+G04 P3000   ( spin-up dwell )
+G0 Z5   ( clearance )
+( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive. · @work 171 ---- )
+#40=100   ( area X — the tool-CENTRE sweep, so the tool overhangs the edge )
+#41=80   ( area Y )
+#42=0.5   ( total depth to face off )
+#43=0.5   ( bite per level )
+#44=[12 * 60 / 100]   ( stepover mm = tool Ø 12 x 60% — the CAM derives it the same way )
+IF #44 <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )
+IF #43 <= 0 GOTO91
+#45=[FIX[[#41 - #44 / 2] / #44] + 1]   ( rows that FIT: the last lands inside the area, not past it )
+IF #45 >= 1 GOTO99   ( a face narrower than one stepover is still one row )
+#45=1
+N99
+
+#46=0   ( the level being cut )
+G0 Z5   ( clear before the first plunge )
+WHILE [#46 < #42] DO1   ( depth: one pass per level, the last bite clamped to the total )
+#46=[#46 + #43]
+IF #46 <= #42 GOTO100
+#46=#42
+N100
+#48=0
+#49=1   ( the raster restarts at the near corner for each level )
+WHILE [#48 < #45] DO2   ( rows: counted above, so the area and the stepover decide how many )
+#47=[0 + #44 / 2 + #48 * #44]
+IF #48 > 0 GOTO93   ( already down: step over at depth rather than lifting between rows )
+IF #49 < 0 GOTO97
+G0 X0 Y#47
+GOTO98
+N97
+G0 X[0 + #40] Y#47
+N98
+G1 Z[0 - #46] F200   ( the ONE plunge of this level )
+GOTO94
+N93
+G1 Y#47 F2000   ( step over at depth — the tool does not lift between rows )
+N94
+IF #49 < 0 GOTO95
+G1 X[0 + #40] F2000
+GOTO96
+N95
+G1 X0 F2000
+N96
+#49=[0 - #49]
+#48=[#48 + 1]
+END2
+G0 Z5   ( clear of the work before the next level )
+END1
+GOTO92
+N91
+#1505=1   ;ERROR: stepover / stepdown must be greater than zero
+N92
+M5   ( spindle off )
+M9   ( coolant off )
+#101 = 0   ( safe Z - G53 needs a variable )
+G53 Z#101   ( retract )
+M30
+
+===== user_pocket_data @ ddcs-expert-m350 =====
+G90   ( absolute )
+M3 S18000   ( spindle on )
+G04 P3000   ( spin-up dwell )
+G0 Z5   ( clearance )
+( ---- AREA CLEARING, parametric. Every var below speaks; change one and the loops re-derive. · @work 479 ---- )
+#40=74   ( area X — the tool-CENTRE sweep, held 3mm inside the declared edge )
+#41=54   ( area Y )
+#42=4   ( total depth to clear )
+#43=1.5   ( bite per level )
+#44=[6 * 40 / 100]   ( stepover mm = tool Ø 6 x 40% — the CAM derives it the same way )
+IF #44 <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )
+IF #43 <= 0 GOTO91
+IF #40 <= 0 GOTO93   ( the 3mm inset leaves no width to clear )
+IF #41 <= 0 GOTO93
+#45=[FIX[[54 - 0.001] / [2 * #44]] + 1]   ( rings that FIT before the middle closes )
+IF #45 >= 1 GOTO97
+#45=1
+N97
+
+#46=0   ( the level being cut )
+G0 Z5   ( clear before the first plunge )
+WHILE [#46 < #42] DO1   ( depth: one pass per level, the last bite clamped to the total )
+#46=[#46 + #43]
+IF #46 <= #42 GOTO98
+#46=#42
+N98
+#47=0   ( how far in this ring sits )
+#48=0
+WHILE [#48 < #45] DO2   ( rings, inward )
+IF #48 > 0 GOTO95
+G0 X[3 + #47] Y[3 + #47]
+G1 Z[0 - #46] F150   ( the ONE plunge of this level )
+GOTO96
+N95
+G1 X[3 + #47] Y[3 + #47] F2000   ( diagonal step in to the next ring, still cutting )
+N96
+G1 X[3 + #40 - #47] Y[3 + #47] F2000
+G1 X[3 + #40 - #47] Y[3 + #41 - #47]
+G1 X[3 + #47] Y[3 + #41 - #47]
+G1 X[3 + #47] Y[3 + #47]
+#47=[#47 + #44]
+#48=[#48 + 1]
+END2
+G0 Z5   ( clear of the work before the next level )
+END1
+GOTO92
+N91
+#1505=1   ;ERROR: stepover / stepdown must be greater than zero
+N92
+GOTO94
+N93
+#1505=1   ;ERROR: the 3mm inset leaves no area to clear - the tool is too large for this feature
+N94
+M5   ( spindle off )
+M9   ( coolant off )
+#101 = 0   ( safe Z - G53 needs a variable )
+G53 Z#101   ( retract )
+M30
+
+===== user_corner_data @ ddcs-expert-m350 =====
+( Corner | FL OUTSIDE | X pos Y pos + Z Surface | Active WCS )
+( Probe dist: 500mm | Retract: 5mm )
+( Fast: 200 | Slow: 50 | SafeZ: 10mm | ScanDepth: 5mm )
+( === CONFIGURATION === )
+#1=500 ( Max probe distance )
+#2=5 ( Retract distance )
+#3=200 ( Fast feedrate )
+#4=50 ( Slow feedrate )
+#5=3 ( Probe port )
+#6=2 ( Probe stylus radius )
+( === CALCULATED MOTIONS === )
+#7=[0-#1] ( Negative max probe )
+#8=#1 ( Positive max probe )
+#9=[0-#2] ( Negative retract )
+#10=#2 ( Positive retract )
+#15=50 ( Positive travel = travelDist )
+#16=[0-#15] ( Negative travel )
+#19=10 ( Safe Z retract distance )
+#20=5 ( Scan depth )
+#17=[#19+#20] ( Plunge depth = safeZ + scanDepth )
+#18=[0-#17] ( Negative plunge )
+#21=0 ( Z to Wall 1 traverse X )
+#22=#16 ( Z to Wall 1 traverse Y )
+#23=#16 ( Wall 1 to Wall 2 traverse X )
+#24=#15 ( Wall 1 to Wall 2 traverse Y )
+( Read Active WCS )
+#71=#578 ( Active WCS index: 1=G54 2=G55 etc )
+#72=[#71-1] ( Zero-based index )
+#70=[805+[#72*5]] ( Base WCS address )
+( Confirm Start )
+#1505=1 ( Hover OVER the FL corner material. Press Enter )
+G91   ( incremental )
+G31 Z#7 F#3 P#5 L0 Q1
+IF #1922!=2 GOTO1
+G0 Z#10
+G31 Z#7 F#4 P#5 L0 Q1
+IF #1922!=2 GOTO1
+#73=[#70+2] ( WCS Z Address )
+#[#73]=[#1927-#6] ( Save Active WCS Z offset - machine coord − stylus radius )
+( REPOSITION: Traverse to first wall )
+G0 Z#19
+G0 X#21 Y#22
+( Step 2: Y Probe )
+G0 Z#18
+G31 Y#8 F#3 P#5 L0 Q1
+IF #1921!=2 GOTO1
+G0 Y#9
+G31 Y#8 F#4 P#5 L0 Q1
+IF #1921!=2 GOTO1
+#101=[#1926+#6] ( Trigger Pos + Radius )
+#73=[#70+1] ( WCS Y Address )
+#[#73]=#101 ( Save to Active WCS Y )
+G0 Y#9
+#95=#882 ( @saveProbeZ )
+( Clearance hop - capped at the machine margin )
+#43=[#95+15]
+#42=#520
+IF #42<0 GOTO91
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N91
+IF #43<#42 GOTO92
+#43=#42 ( cap the hop at the safe machine margin )
+N92
+G90   ( absolute )
+G53 Z#43
+G91   ( incremental )
+( Step 3: REPOSITION: Traverse past corner and set up for X )
+G0 X#23
+G0 Y#24
+G90   ( absolute )
+G53 Z#95 ( @returnProbeZ )
+G91   ( incremental )
+( Step 4: X Probe )
+G31 X#8 F#3 P#5 L0 Q1
+IF #1920!=2 GOTO1
+G0 X#9
+G31 X#8 F#4 P#5 L0 Q1
+IF #1920!=2 GOTO1
+#102=[#1925+#6] ( Trigger Pos + Radius )
+#[#70]=#102 ( Save to Active WCS X )
+G0 X#9
+#95=#882 ( @saveProbeZ )
+( Safe-Z retract - machine frame )
+#42=#520
+IF #42<0 GOTO93
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N93
+G90   ( absolute )
+G53 Z#42
+G91   ( incremental )
+G90   ( absolute )
+#1505=-5000 ( Corner FL found )
+GOTO2
+( === ERROR HANDLER === )
+N1
+( Safe-Z retract - machine frame )
+#42=#520
+IF #42<0 GOTO94
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N94
+G90   ( absolute )
+G53 Z#42
+#1505=1 ( ERROR: Probe failed to trigger )
+N2
+M30
+
+===== user_surfacing_data @ ddcs-v41 =====
+G90   ( absolute )
+M3 S18000   ( spindle on )
+G04 P3000   ( spin-up dwell )
+G0 Z5   ( clearance )
+( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive. · @work 171 ---- )
+#40=100   ( area X — the tool-CENTRE sweep, so the tool overhangs the edge )
+#41=80   ( area Y )
+#42=0.5   ( total depth to face off )
+#43=0.5   ( bite per level )
+#44=[12 * 60 / 100]   ( stepover mm = tool Ø 12 x 60% — the CAM derives it the same way )
+IF #44 <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )
+IF #43 <= 0 GOTO91
+#45=[FIX[[#41 - #44 / 2] / #44] + 1]   ( rows that FIT: the last lands inside the area, not past it )
+IF #45 >= 1 GOTO99   ( a face narrower than one stepover is still one row )
+#45=1
+N99
+
+#46=0   ( the level being cut )
+G0 Z5   ( clear before the first plunge )
+WHILE [#46 < #42] DO1   ( depth: one pass per level, the last bite clamped to the total )
+#46=[#46 + #43]
+IF #46 <= #42 GOTO100
+#46=#42
+N100
+#48=0
+#49=1   ( the raster restarts at the near corner for each level )
+WHILE [#48 < #45] DO2   ( rows: counted above, so the area and the stepover decide how many )
+#47=[0 + #44 / 2 + #48 * #44]
+IF #48 > 0 GOTO93   ( already down: step over at depth rather than lifting between rows )
+IF #49 < 0 GOTO97
+G0 X0 Y#47
+GOTO98
+N97
+G0 X[0 + #40] Y#47
+N98
+G1 Z[0 - #46] F200   ( the ONE plunge of this level )
+GOTO94
+N93
+G1 Y#47 F2000   ( step over at depth — the tool does not lift between rows )
+N94
+IF #49 < 0 GOTO95
+G1 X[0 + #40] F2000
+GOTO96
+N95
+G1 X0 F2000
+N96
+#49=[0 - #49]
+#48=[#48 + 1]
+END2
+G0 Z5   ( clear of the work before the next level )
+END1
+GOTO92
+N91
+#1505=1   ;ERROR: stepover / stepdown must be greater than zero
+N92
+M5   ( spindle off )
+M9   ( coolant off )
+#101 = 0   ( safe Z - G53 needs a variable )
+G0 G53 Z#101   ( retract )
+M30
+
+===== user_pocket_data @ ddcs-v41 =====
+G90   ( absolute )
+M3 S18000   ( spindle on )
+G04 P3000   ( spin-up dwell )
+G0 Z5   ( clearance )
+( ---- AREA CLEARING, parametric. Every var below speaks; change one and the loops re-derive. · @work 479 ---- )
+#40=74   ( area X — the tool-CENTRE sweep, held 3mm inside the declared edge )
+#41=54   ( area Y )
+#42=4   ( total depth to clear )
+#43=1.5   ( bite per level )
+#44=[6 * 40 / 100]   ( stepover mm = tool Ø 6 x 40% — the CAM derives it the same way )
+IF #44 <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )
+IF #43 <= 0 GOTO91
+IF #40 <= 0 GOTO93   ( the 3mm inset leaves no width to clear )
+IF #41 <= 0 GOTO93
+#45=[FIX[[54 - 0.001] / [2 * #44]] + 1]   ( rings that FIT before the middle closes )
+IF #45 >= 1 GOTO97
+#45=1
+N97
+
+#46=0   ( the level being cut )
+G0 Z5   ( clear before the first plunge )
+WHILE [#46 < #42] DO1   ( depth: one pass per level, the last bite clamped to the total )
+#46=[#46 + #43]
+IF #46 <= #42 GOTO98
+#46=#42
+N98
+#47=0   ( how far in this ring sits )
+#48=0
+WHILE [#48 < #45] DO2   ( rings, inward )
+IF #48 > 0 GOTO95
+G0 X[3 + #47] Y[3 + #47]
+G1 Z[0 - #46] F150   ( the ONE plunge of this level )
+GOTO96
+N95
+G1 X[3 + #47] Y[3 + #47] F2000   ( diagonal step in to the next ring, still cutting )
+N96
+G1 X[3 + #40 - #47] Y[3 + #47] F2000
+G1 X[3 + #40 - #47] Y[3 + #41 - #47]
+G1 X[3 + #47] Y[3 + #41 - #47]
+G1 X[3 + #47] Y[3 + #47]
+#47=[#47 + #44]
+#48=[#48 + 1]
+END2
+G0 Z5   ( clear of the work before the next level )
+END1
+GOTO92
+N91
+#1505=1   ;ERROR: stepover / stepdown must be greater than zero
+N92
+GOTO94
+N93
+#1505=1   ;ERROR: the 3mm inset leaves no area to clear - the tool is too large for this feature
+N94
+M5   ( spindle off )
+M9   ( coolant off )
+#101 = 0   ( safe Z - G53 needs a variable )
+G0 G53 Z#101   ( retract )
+M30
+
+===== user_corner_data @ ddcs-v41 =====
+( Corner | FL OUTSIDE | X pos Y pos + Z Surface | Active WCS )
+( Probe dist: 500mm | Retract: 5mm )
+( Fast: 200 | Slow: 50 | SafeZ: 10mm | ScanDepth: 5mm )
+( === CONFIGURATION === )
+#1=500 ( Max probe distance )
+#2=5 ( Retract distance )
+#3=200 ( Fast feedrate )
+#4=50 ( Slow feedrate )
+#5=3 ( Probe port )
+#6=2 ( Probe stylus radius )
+( === CALCULATED MOTIONS === )
+#7=[0-#1] ( Negative max probe )
+#8=#1 ( Positive max probe )
+#9=[0-#2] ( Negative retract )
+#10=#2 ( Positive retract )
+#15=50 ( Positive travel = travelDist )
+#16=[0-#15] ( Negative travel )
+#19=10 ( Safe Z retract distance )
+#20=5 ( Scan depth )
+#17=[#19+#20] ( Plunge depth = safeZ + scanDepth )
+#18=[0-#17] ( Negative plunge )
+#21=0 ( Z to Wall 1 traverse X )
+#22=#16 ( Z to Wall 1 traverse Y )
+#23=#16 ( Wall 1 to Wall 2 traverse X )
+#24=#15 ( Wall 1 to Wall 2 traverse Y )
+( Confirm Start )
+( Hover OVER the FL corner material. Press Enter )
+G91   ( incremental )
+#190=#1502
+G31 Z#7 L#682 Q1 K0 F#3
+IF #1502<=[#190+#7+0.05]GOTO1
+G0 Z#10
+#190=#1502
+G31 Z#7 L#682 Q1 K0 F#4
+IF #1502<=[#190+#7+0.05]GOTO1
+G90 G92 Z[#1502-[#1502-#6]]
+G91   ( incremental )
+( REPOSITION: Traverse to first wall )
+G0 Z#19
+G0 X#21 Y#22
+( Step 2: Y Probe )
+G0 Z#18
+#190=#1501
+G31 Y#8 L#682 Q1 K0 F#3
+IF #1501>=[#190+#8-0.05]GOTO1
+G0 Y#9
+#190=#1501
+G31 Y#8 L#682 Q1 K0 F#4
+IF #1501>=[#190+#8-0.05]GOTO1
+#101=[#1501+#6] ( Trigger Pos + Radius )
+G90 G92 Y[#1501-#101]
+G91   ( incremental )
+G0 Y#9
+#95=#1502 ( @saveProbeZ )
+( Clearance hop - capped at the machine margin )
+#190=-5 ( safe-Z margin - machine frame )
+#191=[#95+15]
+IF #191<#190GOTO92
+#191=#190 ( cap the hop at the safe machine margin )
+N92
+G90   ( absolute )
+G0 G53 Z#191
+G91   ( incremental )
+( Step 3: REPOSITION: Traverse past corner and set up for X )
+G0 X#23
+G0 Y#24
+G90   ( absolute )
+G0 G53 Z#95 ( @returnProbeZ )
+G91   ( incremental )
+( Step 4: X Probe )
+#190=#1500
+G31 X#8 L#682 Q1 K0 F#3
+IF #1500>=[#190+#8-0.05]GOTO1
+G0 X#9
+#190=#1500
+G31 X#8 L#682 Q1 K0 F#4
+IF #1500>=[#190+#8-0.05]GOTO1
+#102=[#1500+#6] ( Trigger Pos + Radius )
+G90 G92 X[#1500-#102]
+G91   ( incremental )
+G0 X#9
+#95=#1502 ( @saveProbeZ )
+( Safe-Z retract - machine frame )
+#190=-5 ( safe-Z margin - machine frame )
+G90   ( absolute )
+G0 G53 Z#190
+G91   ( incremental )
+G90   ( absolute )
+( Corner FL found )
+GOTO2
+( === ERROR HANDLER === )
+N1
+( Safe-Z retract - machine frame )
+#190=-5 ( safe-Z margin - machine frame )
+G90   ( absolute )
+G0 G53 Z#190
+( ERROR: Probe failed to trigger )
+N2
+M30
