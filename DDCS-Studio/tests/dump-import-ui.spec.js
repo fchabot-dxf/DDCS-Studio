@@ -65,7 +65,7 @@ test('drop a V4.1 dump → review modal derives the envelope + WCS by name; Appl
     expect(applied.spindle.tapCapable, 'the pull NEVER overwrites the user-owned tapCapable attestation').toBe(true);
 });
 
-test('drop a DM500 dump → honest "named from the eng, values N/A" (its setting layout is ungrounded)', async ({ page }) => {
+test('drop a DM500 dump → GROUNDED envelope from the cracked self-describing setting (t2073)', async ({ page }) => {
     await openControllerPanel(page, 'ddcs-v3-dm500');   // a DM500 workspace reading its own DM500 dump
     await dropDump(page, [
         { name: 'setting', b64: b64('dm500/setting') },
@@ -74,10 +74,14 @@ test('drop a DM500 dump → honest "named from the eng, values N/A" (its setting
     await page.waitForSelector('#import-modal.active', { timeout: 8000 });
     const body = await page.evaluate(() => document.getElementById('import-body').textContent);
     expect(body, 'DM500 recognized').toMatch(/DM500/i);
-    expect(body, 'honest N/A — values not applied').toMatch(/values N\/A|not yet grounded/i);
-    expect(body, 'the eng named the soft-limit params (#375/#379)').toContain('375');
-    // there is no travel candidate to apply (values N/A) → no envelope written
-    const noTravel = await page.evaluate(() => !/travel \+|travel \d/i.test(document.getElementById('import-body').textContent));
-    expect(noTravel, 'no derived travel value is offered for the DM500 (honest)').toBe(true);
+    // t2073 — the DM500 setting is CRACKED (self-describing [f32][name] records), so the envelope now GROUNDS:
+    // the review says "grounded" and no longer claims the old honest-N/A. (The grounded VALUES themselves —
+    // travel 400 / soft-limits ±400 — are gated at the data level in dump-import-golden.spec.js.)
+    expect(body, 'grounded from the self-describing setting').toMatch(/grounded/i);
+    expect(body, 'no longer the old "values N/A / not yet grounded"').not.toMatch(/values N\/A|not yet grounded/i);
+    // the GROUNDED envelope reaches the review: X/Y ±400, Z ±20, soft-limits disabled on this capture
+    expect(body, 'the grounded X/Y envelope (400) renders').toContain('400');
+    expect(body, 'the grounded Z envelope (20) renders').toMatch(/Z\b[^]{0,40}\b20\b/);
+    expect(body, 'the controller had soft limits off (#374=0)').toMatch(/soft.?limits DISABLED/i);
     await page.screenshot({ path: 'scratchpad/dump-import-dm500.png' });
 });

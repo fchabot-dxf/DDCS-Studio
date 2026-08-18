@@ -179,6 +179,32 @@ export function mapByNameGeometry(params, engText, grounded = true) {
     };
 }
 
+/**
+ * t2073 — DM500 setting is a SELF-DESCRIBING record format, NOT the flat f64 array Expert/V4.1 use. Each param is
+ * stored as `[float32 value][name string\0][unit\0]`, so a param's VALUE is the little-endian float32 in the 4 bytes
+ * IMMEDIATELY BEFORE its name string. (Reading it as `setting[#idx]` f64 gave astronomical garbage because those
+ * bytes ARE the ASCII names — see bridge/controllers/dm500/FINDINGS.md, verified 244/244 params land in their eng
+ * min/max.) Returns a SPARSE array `arr[engIndex] = value` so mapByNameGeometry consumes it EXACTLY like a flat
+ * setting array — every by-name index lookup then hits the real value. Read-only; never throws.
+ */
+export function parseDm500ByName(buf, engText) {
+    const ab = buf instanceof ArrayBuffer ? buf
+        : (buf && buf.buffer) ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+        : buf;
+    if (!ab) return [];
+    const dv = new DataView(ab);
+    const s = new TextDecoder('latin1').decode(new Uint8Array(ab));   // Latin1 → byte offset == char offset (names are ASCII)
+    const eng = parseEng(engText);
+    const out = [];
+    for (const k of Object.keys(eng)) {
+        const idx = +k, name = eng[idx] && eng[idx].name;
+        if (!name) continue;
+        const pos = s.indexOf(name + '\0');                          // the record's NUL-terminated name field
+        if (pos >= 4) out[idx] = round4(dv.getFloat32(pos - 4, true));   // little-endian f32 just before the name
+    }
+    return out;
+}
+
 // ── SPINDLE (t780 1b) — the DECLARED spindle interface + mapping axis, BY NAME from the eng, decoded through EACH eng's
 // OWN enums (V4.1 #188 Analog|PUL/DIR + #189 X/Y/Z/A · Expert #79 Analog|Plu/dir|Multi-speed + #80 X..5th — never
 // cross-applied). Seeds ONLY interface + mappingAxis (readable machine truth); tapCapable/reversible stay USER attestations.
@@ -243,11 +269,11 @@ export function classifyFile(name) {
  * which the import modal states as such and lets the user correct) | null (nothing identified it).
  */
 export function recognizeDump(files) {
-    let settingParams = null, engText = null, coordParams = null;
+    let settingParams = null, settingBuf = null, engText = null, coordParams = null;
     const recognized = [], unrecognized = [];
     for (const f of files || []) {
         const role = classifyFile(f.name);
-        if (role === 'setting' && f.buffer != null) { settingParams = readF64(f.buffer); recognized.push({ name: f.name, role }); }
+        if (role === 'setting' && f.buffer != null) { settingParams = readF64(f.buffer); settingBuf = f.buffer; recognized.push({ name: f.name, role }); }
         else if (role === 'eng' && f.text != null) { engText = f.text; recognized.push({ name: f.name, role }); }
         else if (role === 'coord' && f.buffer != null) { coordParams = readF64(f.buffer); recognized.push({ name: f.name, role }); }
         else unrecognized.push(f.name);
@@ -268,10 +294,21 @@ export function recognizeDump(files) {
         spindle = mapSpindle(settingParams, engText);   // t780 — V4.1 #188/#189 by name
         if (!engText) note = 'Drop the eng file too — V4.1 geometry is derived from it by name.';
     } else if (controllerId === 'ddcs-v3-dm500') {
-        // DM500 setting layout is ungrounded → NAMES resolve by-name, VALUES stay N/A (honest; refine on a real dump).
-        geometry = engText ? mapByNameGeometry(settingParams || [], engText, false) : null;
-        grounded = false;
-        note = 'DM500 geometry is named from the eng, but its setting layout is not yet grounded — values show N/A until a real dump confirms them.';
+        // t2073 — DM500 setting is CRACKED: a self-describing [f32 value][name] record format (not a flat f64 array).
+        // Parse each param's value BY NAME from the raw bytes → a sparse index→value array mapByNameGeometry consumes
+        // like a flat setting, so envelope/homing-dir/feeds ground the same way V4.1's by-name path does.
+        if (engText && settingBuf != null) {
+            const dm = parseDm500ByName(settingBuf, engText);
+            geometry = mapByNameGeometry(dm, engText, true);
+            spindle = mapSpindle(dm, engText);
+            grounded = true;
+            // The WCS G54–G59 offset TABLE is not stored as named records in this capture (may be a separate coord
+            // file / non -s1 records) — envelope IS grounded, the WCS table stays N/A until located.
+            note = 'DM500 geometry grounded from its self-describing setting (t2073). The WCS offset table is not yet located — WCS shows N/A.';
+        } else if (engText) {
+            geometry = mapByNameGeometry(settingParams || [], engText, false);
+            note = 'Drop the DM500 setting file too — its values are read from it by name (t2073).';
+        }
     }
     return { controllerId, idSource, recognized, unrecognized, geometry, wcs, spindle, grounded, note };
 }

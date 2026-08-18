@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { join } from 'path';
-import { readF64, parseEng, byNameIndices, controllerFromParamCount, mapExpertGeometry, mapExpertWcs, mapByNameGeometry, mapCoordWcs, mapSpindle } from '../web/data/dumpImport.js';
+import { readF64, parseEng, byNameIndices, controllerFromParamCount, mapExpertGeometry, mapExpertWcs, mapByNameGeometry, mapCoordWcs, mapSpindle, parseDm500ByName } from '../web/data/dumpImport.js';
 
 /**
  * CROSS-LANGUAGE GOLDEN (t666). The Studio JS dump mapper (data/dumpImport.js) must reproduce the EXACT values the
@@ -77,10 +77,11 @@ test('V4.1 WCS from coord1 == the Python golden (G54 = -300.29 / -116.06 / 1547.
     expect(mapCoordWcs(null, 0), 'no coord1 → WCS N/A').toBeNull();
 });
 
-test('DM500 — the eng NAMES the geometry (by-name), but the setting layout is ungrounded → values honest-N/A (first DM500 golden)', () => {
-    const p = readF64(bytes(DM500_SETTING));
+test('DM500 — the setting is CRACKED (t2073): self-describing [f32][name] records → GROUNDED envelope (±400 / Z ±20)', () => {
+    const buf = bytes(DM500_SETTING);
+    const p = readF64(buf);
     const engText = text(DM500_ENG);
-    expect(p.length, '21250 params').toBe(21250);
+    expect(p.length, '21250 f64 slots').toBe(21250);
     expect(controllerFromParamCount(p.length)).toBe('ddcs-v3-dm500');
     // the DM500 eng carries the SAME soft-limit / home-direction labels → the V4.1 by-name resolver finds them
     const gi = byNameIndices(parseEng(engText));
@@ -88,14 +89,23 @@ test('DM500 — the eng NAMES the geometry (by-name), but the setting layout is 
     expect(gi.softPos).toEqual({ x: 379, y: 380, z: 381 });
     expect(gi.enable).toBe(374);
     expect(gi.homeDir).toEqual({ x: 64, y: 65, z: 66 });
-    // but "Home speed" ≠ "Home search speed" → seek is honestly unresolved (N/A)
+    // "Home speed" ≠ "Home search speed" → the seek regex is honestly unresolved (a follow-up name), but the
+    // ENVELOPE grounds regardless.
     expect(gi.seek).toEqual({ x: null, y: null, z: null });
-    // VALUES stay N/A (grounded=false — we never reverse-engineer the DM500 setting layout)
-    const g = mapByNameGeometry(p, engText, false);
-    expect(g.travel).toEqual({ x: null, y: null, z: null });
-    expect(g.softLimits.xMin).toBeNull();
-    expect(g.homingFeeds).toBeNull();
-    expect(g._indices.softNeg).toEqual({ x: 375, y: 376, z: 377 });   // structure known, values not
+
+    // t2073 — the CRACK: values are the little-endian float32 stored right before each eng name in the setting
+    // bytes (NOT setting[#idx] f64, which is garbage). parseDm500ByName → sparse index→value array that
+    // mapByNameGeometry consumes exactly like a flat setting, so the SAME by-name path grounds it.
+    const dm = parseDm500ByName(buf, engText);
+    expect(dm[375], 'soft-limit X-- read from the [f32][name] record').toBe(-400);
+    expect(dm[379], 'soft-limit X++').toBe(400);
+    expect(dm[16], 'active coordinate system = G54').toBe(1);
+    const g = mapByNameGeometry(dm, engText, true);
+    expect(g.travel).toEqual({ x: 400, y: 400, z: 20 });
+    expect(g.softLimits).toEqual({ xMin: -400, xMax: 400, yMin: -400, yMax: 400, zMin: -20, zMax: 20 });
+    expect(g.softLimitEnabled, '#374 enable soft-limit = 0 in this capture').toBe(false);
+    expect(g.rapidRate, '#80 G0 speed').toBe(3000);
+    expect(g._grounded).toBe(true);
 });
 
 test('SPINDLE (t780) — interface + mapping axis BY NAME through EACH eng own enums (V4.1 #188/#189 · Expert #79/#80); DM500 N/A', () => {
