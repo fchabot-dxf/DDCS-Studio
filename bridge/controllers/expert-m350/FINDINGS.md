@@ -141,10 +141,16 @@ client + `EnableInsecureGuestLogons $true` + `BlockNTLM $false` (admin + reboot)
   ⇒ **Expert `uservar` range = #100–#549** (450 slots; bigger than V4.1's #100–#499). The PC reads controller
   state by decoding this file as little-endian f64 — `[CONFIRMED readback 2026-06-06]`. Slot 0 = byte 0 (no header).
 - **System params live in two more SYSDISK f64 files — the PC can read #0–#1499 over SMB, not just `uservar`:**
-  - **`SYSDISK/setting`** (8000 B = **1000×f64, index == param #**) → persisted system params #0–#999: WCS offsets
-    `#805+[WCS−1]*5`, serial/servo/feed params, etc. Mapping `[CONFIRMED]` by `tools/diff_setting.py` differential
-    toggles. **`SYSDISK/default_setting`** is the factory baseline of the same layout → diff `setting` vs
-    `default_setting` = **which params the operator actually changed** (160 differ on the studio rig).
+  - **`SYSDISK/setting`** (8000 B = **1000×f64, index == PARAM #**) → persisted system params. ⚠️ **THE SETTING FILE
+    IS NOT THE MACRO ADDRESS SPACE:** a G-code macro reads the param **500 below** it. So the G54 offset table `#805 +
+    [WCS−1]*5` (MACRO numbers, what you type) lives at **param #305+ = `setting[305]`**, and the active-WCS macro `#578`
+    is param **#78 = `setting[78]`**. **Bench-confirmed (t2067):** the `20260731` dump has G54 at `setting[305..307]`
+    = `50.13 / −665.70 / −47.28` while `setting[805]` = `0`. The param↔index mapping is `[CONFIRMED]` by
+    `tools/diff_setting.py` differential toggles; `ops.py _map_geometry_to_profile` uses the correct base (`_WCS_BASE
+    = 305`). ⚠️ **The trap that bit us:** `ops.py _var_value` used to read `setting[#var]` (= `setting[805]` = 0) →
+    the "G54 pulls 000 but the machine has one" bug; fixed to `setting[#var − 500]` (t2067, `test_var_value_2067.py`).
+    **`SYSDISK/default_setting`** is the factory baseline of the same layout → diff `setting` vs `default_setting` =
+    **which params the operator actually changed** (160 differ on the studio rig).
   - **`SYSDISK/camsetting`** (4000 B = **500×f64, slot = #var − 1000**) → the ATC/CAM tables #1000–#1499:
     current tool `#1300`, capacity `#1301`, pocket X/Y/Z `#1330/#1350/#1370`, tool-length table `#1430+`.
     Slot map `[CONFIRMED]` by the captured boundary sentinels (`#1000`=222.111 · `#1050`=222.222 · `#1099`=222.333 ·
