@@ -61,9 +61,40 @@ function Invoke-ExeSign([string]$Path) {
 Push-Location $root
 try {
     $sep = ";"   # Windows PyInstaller --add-data "SRC;DEST" separator
+
+    # VERSION RESOURCE (t2069) — an UNSIGNED exe with NO metadata (no CompanyName/ProductName/version) reads as
+    # generic malware to Defender's ML and earns SmartScreen reputation slowly. Stamp full version info from the
+    # app's .ver chip so the build looks like the real software it is. Cheap, no cert, reduces the false-positive rate.
+    $verHtml = Get-Content "DDCS-Studio/web/index.html" -Raw
+    $ver = if ($verHtml -match 'class="ver">V([0-9][0-9.]*)<') { $Matches[1] } else { "0.0.0.0" }
+    $parts = @(@($ver -split '\.') | ForEach-Object { [int]$_ })
+    while ($parts.Count -lt 4) { $parts += 0 }
+    $filevers = ($parts[0..3] -join ', ')
+    $verFile = Join-Path $root "version-info.txt"
+    @"
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=($filevers), prodvers=($filevers), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', 'DDCS Studio'),
+      StringStruct('FileDescription', 'DDCS Studio - CNC control and gateway for DDCS controllers'),
+      StringStruct('FileVersion', '$ver'),
+      StringStruct('InternalName', '$Name'),
+      StringStruct('OriginalFilename', '$Name.exe'),
+      StringStruct('ProductName', 'DDCS Studio'),
+      StringStruct('ProductVersion', '$ver'),
+      StringStruct('LegalCopyright', 'DDCS Studio')
+    ])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"@ | Out-File -Encoding ascii $verFile
+    Write-Host "[build] version resource -> $ver (filevers $filevers)" -ForegroundColor Cyan
     $pyArgs = @(
         "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noupx", "--name", $Name,
         "--icon", "desktop/ddcs.ico",
+        "--version-file", $verFile,
+
         "--paths", "bridge/bridge-app",
         "--add-data", "bridge/bridge-app/web/ui${sep}console",
         "--add-data", "DDCS-Studio/web${sep}studio",
@@ -102,5 +133,6 @@ finally {
     # PyInstaller writes a generated <name>.spec from our CLI args; we never build from it
     # (this script IS the source of truth), so drop it - and any stale ones - to keep root clean.
     Remove-Item "$root/*.spec" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$root/version-info.txt" -Force -ErrorAction SilentlyContinue   # the generated version resource
     Pop-Location
 }
