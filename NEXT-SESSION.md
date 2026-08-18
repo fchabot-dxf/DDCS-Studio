@@ -5673,3 +5673,29 @@ case, and prioritise accordingly.
 ⇒ **macOS is probably the same bug** (same PyInstaller onefile mechanism, same inheritance), but there is
 no Mac to test on — the CI builds it blind. **Fix the env-scrub platform-agnostically** rather than
 Windows-only, and mark the macOS half **UNVERIFIED** rather than claiming it.
+
+---
+
+# ═══ QUEUED (advisor, 2026-08-18) — THEME THE REST OF THE MODALS ═══
+*(human: "btw it should be so for all modal, health check setup and load screen". NOT dispatched — queued
+behind t2075 at their request: "sure next turn".)*
+
+**The rule already exists** (`web/styles.css:112`): *"A SKIN is one `[data-theme=…]` bundle that sets these
+tokens; components read them."* This is enforcement of a written contract, not a new design.
+
+**Named by the human:** the health check, Setup, and the load screen — plus the welcome modal from t2075,
+which is being built to the rule already and can serve as the reference implementation.
+
+**The same test applies:** switching `data-theme` must restyle each surface completely with NO edit to its
+own CSS. No hex, no `rgb()`, no px radii in a themed component. ⚠ `--radius` is `0` in the base skin —
+that is deliberate; a skin that wants rounding sets the token.
+
+**Tokens to read:** `--scrim` (declared verbatim as *"modal / overlay backdrop"*), `--panel`, `--text` /
+`--text-dim`, `--border` / `--outline`, `--radius`, `--font-ui`, `--success` / `--danger` / `--warn`.
+
+⚠ **SCOPE IS NOT MEASURED — my first attempt was wrong, do not reuse it.** Grepping
+`#[0-9a-fA-F]{3,8}` matched **DDCS macro variables** (`#805`, `#1512`, `#1430`), so `factoryMacros.js`,
+`default_vars.js` and the dialect files dominated a "hardcoded colour" count that was mostly G-code. Any
+real audit must exclude `data/`, `wizards/dialects/`, `vendor/`, and match colours in a way `#805` cannot
+satisfy (e.g. require exactly 3/6/8 hex digits AND a CSS-ish context, or scan CSS files and style strings
+only). **Measure honestly first, report the real number, then decide whether this is one turn or several.**
