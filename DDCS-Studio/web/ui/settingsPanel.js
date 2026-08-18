@@ -2400,7 +2400,7 @@ function wireSettingsOverlay(ov) {
                 <div class="im-head"><span>↧ Import controller parameters</span><button id="import-close" title="Close">✕</button></div>
                 <div class="im-transport">
                     <span class="im-tlbl">Read from:</span>
-                    <button class="toolbar-btn settings-io im-tbtn" id="import-src-live" title="The bridged controller, over the Gateway (LAN)">↧ Live via the Gateway</button>
+                    <button class="toolbar-btn settings-io im-tbtn" id="import-src-live" title="Read the controller live through the DDCS Studio desktop app. The app must be running on this computer — on the website, keep it open at the same time as this browser tab.">↧ Live via the Gateway</button>
                     <button class="toolbar-btn settings-io im-tbtn" id="import-src-file" title="The parameter file the controller saves to USB — or a copy of its whole disk (e.g. a DM500, which has no LAN)">📁 From a USB copy (.eng file or disk folder)</button>
                 </div>
                 <div class="im-body" id="import-body"></div>
@@ -2518,7 +2518,7 @@ function wireSettingsOverlay(ov) {
             //   no-controller = the bridge answered but the machine didn't; no-gateway (default) = the bridge itself is unreachable.
             const msg = scan.reason === 'no-controller'
                 ? 'The gateway is running, but the controller didn’t respond — check the machine is powered on and connected.'
-                : 'Gateway not reachable — is the bridge / desktop app running?';
+                : '<b>“Live via the Gateway” needs the DDCS Studio desktop app running on this computer.</b> On the website, keep the desktop app <b>open at the same time</b> as this browser tab — the browser reads the machine through it. Start the app, then try again.';
             // t666 — no LAN? The other transport is the answer. t1221: it is already in the row above, so this points
             // AT that row rather than rendering its own button. Screenshotting the modal is what caught it: an
             // identical "From a USB file (.eng)" button twice over is precisely the duplicate door being consolidated.
