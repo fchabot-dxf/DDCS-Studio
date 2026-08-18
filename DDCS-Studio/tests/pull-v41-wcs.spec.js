@@ -16,7 +16,7 @@ const V41_WCS = {   // the payload ops._map_wcs_to_profile_v41 produces from the
 
 test('the review renders the V4.1 WCS table from coord1 (G54 taught) when /api/vars declines #15xx', async ({ page }) => {
     await page.route('**/api/profile', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'ddcs-v41', name: 'DDCS V4.1', hardwareTabs: [], wcs: V41_WCS }) }));
-    await page.route('**/api/vars**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ connected: true, values: {} }) }));   // the vars endpoint declines #15xx → empty → the file-read fallback fires
+    await page.route('**/api/vars**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ connected: true, values: {} }) }));   // t2073 — the pull no longer requests WCS vars at all; the WCS comes solely from the profile (coord1). vars carries only tools/ATC now.
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsSetMachine);
     // t1229 — this workspace IS the V4.1 being pulled from (the ordinary case), so the new mismatch gate stays out of
@@ -44,7 +44,7 @@ test('the review renders the V4.1 WCS table from coord1 (G54 taught) when /api/v
     const g54 = rows.find((r) => /^G54/.test(r.label));
     expect(g54, 'a G54 detail row renders (from coord1, not readVars)').toBeTruthy();
     expect(g54.raw, 'G54 shows the coord1 offsets').toContain('-300.29');
-    expect(g54.derived, 'G54 flagged active, read from the controller file (coord1/setting), not the live var-read').toMatch(/active.*(file|coord1)/i);
+    expect(g54.derived, 'G54 flagged active (WCS is single-source from the profile now — t2073, no var-read source to distinguish)').toMatch(/active/i);
     // the empty systems render as zero rows (G55 present, all-zero) — the whole table pulled, not just the taught one
     expect(rows.find((r) => /^G55/.test(r.label)), 'G55 row present (all 6 systems shown)').toBeTruthy();
 

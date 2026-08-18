@@ -83,5 +83,5 @@ test('no gateway → the review still shows the visible error (detail feature do
     await openPull(page, { gateway: false });
     await page.waitForFunction(() => /gateway/i.test((document.querySelector('#import-body') || {}).innerText || ''), null, { timeout: 8000 });
     const txt = await page.evaluate(() => document.querySelector('#import-body').innerText);
-    expect(txt).toMatch(/gateway not reachable/i);
+    expect(txt).toMatch(/needs the DDCS Studio desktop app/i);   // the reworded no-gateway guidance (copy changed; test intent = a visible error still shows)
 });

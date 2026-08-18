@@ -2121,10 +2121,12 @@ function wireSettingsOverlay(ov) {
         const d = (hwProfile && hwProfile.id) ? getDialect(hwProfile.id) : activeDialect();
         const atc = d.vars && d.vars.atc;
         const tb = (d.vars && d.vars.toolTable) || 1430;
-        const wcsBase = (d.vars && d.vars.wcsBase) || 805, wcsStride = (d.vars && d.vars.wcsStride) || 5, activeWcsVar = (d.vars && d.vars.activeWcs) || 578;
         const MAX = 24;                                   // pockets/tools scanned (most magazines ≤ 24)
-        const need = new Set([activeWcsVar]);
-        for (let k = 0; k < 6 * wcsStride; k++) need.add(wcsBase + k);
+        // t2073 — the WCS is NOT requested via the var-read any more. It comes solely from the gateway profile
+        // (Expert setting-file base #305 / V4.1 coord1). The var-read read the SAME setting file at the SAME slot,
+        // so it was a redundant second address path — the exact surface t2067's off-by-500 drifted on. Only tool
+        // lengths + ATC pockets remain on the var-read (their only source).
+        const need = new Set();
         for (let i = 0; i < MAX; i++) { need.add(tb + i); if (atc) { need.add(atc.pocketX + i); need.add(atc.pocketY + i); need.add(atc.pocketZ + i); } }
         let values = {}, connected = false;
         try { const res = await makeClient().readVars([...need].map(String)); gatewayReached = true; connected = !!(res && res.connected); values = (res && res.values) || {}; } catch (e) { /* gateway not reachable */ }
@@ -2177,35 +2179,20 @@ function wireSettingsOverlay(ov) {
             if ((cur.active || 1) !== pActive) return true;
             return pTable.some((r, i) => { const c = ct[i] || {}; return r4(c.x) !== r4(r.x) || r4(c.y) !== r4(r.y) || r4(c.z) !== r4(r.z); });
         };
-        // t2067 — PREFER THE SETTING-FILE WCS. The gateway's profile read maps the WCS straight from the `setting`
-        // file param-space (ops.py _map_geometry_to_profile: base #305 = macro #805) — the AUTHORITATIVE store, the
-        // one G-code's `#805` actually addresses. The live readVars(#805) reads a DIFFERENT live-variable space that
-        // is NOT the WCS param table: on the Expert it comes back 0 / stale scratch (the reported "G54 shows 000 but
-        // I have one" bug — the file had X50.13 Y-665.70 Z-47.28 while the var-read said 0). So use hwProfile.wcs
-        // whenever it carries offsets; fall back to the var-read only if the profile brought none. (V4.1 always used
-        // the file path here — t654 — because its vars endpoint declines #15xx; the Expert now joins it.)
+        // t2073 — WCS reads from ONE source: the gateway profile. ops.py _map_geometry_to_profile maps the Expert
+        // `setting` file at param base #305 (= macro #805); V4.1 comes from the coord1 file. The old live-var
+        // fallback read the SAME setting file at the SAME slot, so it could never surface a value the profile
+        // lacked (both zero, or both the same non-zero) — a redundant second address path, and the exact surface
+        // t2067's off-by-500 drifted on. WCS is now single-source, so two address systems can't disagree about it.
         const wp = hwProfile && hwProfile.wcs && hwProfile.wcs.table ? hwProfile.wcs : null;
-        const fileTab = wp ? WCS_NAMES.map((_, i) => { const r = wp.table['g' + (54 + i)] || [0, 0, 0]; return { x: +r[0] || 0, y: +r[1] || 0, z: +r[2] || 0 }; }) : null;
-        const fileActive = wp && wp.active >= 1 && wp.active <= 6 ? Math.round(wp.active) : 1;
-        const fileAny = fileTab && fileTab.some((r) => r.x || r.y || r.z);
-        // the live var-read table (fallback only)
-        const varActive = (idxO => (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1)(obj(activeWcsVar));
-        const varTab = []; let varAny = false;
-        for (let g = 0; g < 6; g++) {
-            const b = wcsBase + g * wcsStride; const gx = obj(b), gy = obj(b + 1), gz = obj(b + 2);
-            if (gx || gy || gz) varAny = true;
-            varTab.push({ x: gx ? gx.value : 0, y: gy ? gy.value : 0, z: gz ? gz.value : 0 });
-        }
-        const useFile = !!fileAny;                                   // file wins whenever it has any taught offset
-        const src = useFile ? 'controller file' : 'live vars';       // profile read (Expert setting-file / V4.1 coord1) vs the live var-read fallback
-        const table = useFile ? fileTab : varTab;
-        const active = useFile ? fileActive : varActive;
-        const anyWcs = useFile || varAny;
+        const table = wp ? WCS_NAMES.map((_, i) => { const r = wp.table['g' + (54 + i)] || [0, 0, 0]; return { x: +r[0] || 0, y: +r[1] || 0, z: +r[2] || 0 }; }) : null;
+        const active = wp && wp.active >= 1 && wp.active <= 6 ? Math.round(wp.active) : 1;
+        const anyWcs = !!(table && table.some((r) => r.x || r.y || r.z));
         if (anyWcs) {
             const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
-            const detail = table.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === active - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === active - 1 ? `← active (${src})` : '' }));   // DETAIL: all 6 systems' raw offsets, active flagged + where it was read
+            const detail = table.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === active - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === active - 1 ? '← active' : '' }));   // DETAIL: all 6 systems' raw offsets, active flagged
             cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: wcsDiffers(table, active), kind: 'wcs', data: { table, active }, detail });
-        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: 'controller returned no non-zero WCS offsets (setting file + live vars both empty)', kind: 'note' });
+        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: 'no WCS offsets from the controller profile', kind: 'note' });
         // Machine envelope / home / feeds — from the controller's soft-limit + homing params (gateway /api/profile geometry).
         // t594 — signed travel per axis (magnitude × homeDir), the per-axis Home EDGE (→ settings.limits <edge>Home), and the
         // homing feeds. A SENTINEL axis (travel null: both soft-limit ends ±9999) shows 'not declared on the controller' + stays
