@@ -21,8 +21,12 @@ import shutil
 import sys
 import tempfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "bridge", "bridge-app"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+# t2075 — was `dirname(dirname(file))` + "bridge/bridge-app", which resolves to .../bridge/tools/bridge/bridge-app
+# for this file's actual location (bridge/tools/desktop-tests/) — never existed, so this test could never import
+# and has apparently never run since it landed here. Two levels up from desktop-tests IS bridge/; bridge-app sits
+# directly inside it.
+sys.path.insert(0, os.path.join(HERE, "..", "..", "bridge-app"))
 
 from fairy import selfupdate as su   # noqa: E402
 
@@ -260,6 +264,92 @@ def test_the_swap_keeps_the_users_filename_even_though_the_asset_is_versioned():
         assert os.path.isfile(renamed + su.OLD_SUFFIX), "their previous build is beside it"
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+# ── t2075 — RELAUNCH, PROVEN AND VERIFIED ─────────────────────────────────────────────────────────────────────────
+# The live bug: subprocess.Popen([target]) with no env= hands a PyInstaller onefile child the PARENT's own
+# _PYI_*/_MEIPASS2 bootloader vars; the child concludes it is already unpacked and dies near-instantly, and
+# Popen() never raises — so perform_update() reported relaunched:True with nothing actually alive. These tests
+# spawn REAL subprocesses (the current Python interpreter running a tiny inline script) to prove _relaunch's own
+# crash-detection and env-scrub are correct. HONESTLY SCOPED: this proves the MECHANISM works against a process
+# that behaves the way the diagnosed PyInstaller bug behaves (exits immediately vs. survives) — it does NOT and
+# CANNOT prove the actual frozen DDCS-Studio.exe relaunches cleanly; only a real built exe can confirm that.
+def test_relaunch_reports_success_once_the_child_survives_the_confirm_window():
+    d, target = _tmp()
+    try:
+        # a script that behaves like a HEALTHY app: it does not exit within the confirm window
+        script = os.path.join(d, "survives.py")
+        open(script, "w", encoding="utf-8").write("import time\ntime.sleep(5)\n")
+        r = su._relaunch([sys.executable, script], confirm_s=0.5)
+        assert r == {"relaunched": True}, r
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_relaunch_names_the_reason_when_the_child_dies_in_the_proven_crash_window():
+    d, target = _tmp()
+    try:
+        # a script that behaves EXACTLY like the diagnosed PyInstaller bootloader crash: exits near-instantly
+        script = os.path.join(d, "crashes.py")
+        open(script, "w", encoding="utf-8").write("import sys\nsys.exit(3)\n")
+        r = su._relaunch([sys.executable, script], confirm_s=2.0)
+        assert r["relaunched"] is False, r
+        assert "3" in r["error"], f"the exit code is named, not swallowed: {r['error']}"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_relaunch_names_the_reason_when_popen_itself_fails():
+    r = su._relaunch([os.path.join(tempfile.mkdtemp(prefix="ddcs-upd-test-"), "does-not-exist.exe")])
+    assert r["relaunched"] is False, r
+    assert r.get("error"), "a Popen failure (missing file, no permission, ...) must still be a NAMED reason"
+
+
+def test_clean_env_strips_the_pyinstaller_bootloader_vars_and_nothing_else():
+    """The proven poison: _MEIPASS2 (the parent's onefile extraction dir) and any _PYI* bootloader var. Everything
+    else in the environment must survive untouched — this must not become a general environment wipe."""
+    real_environ = dict(os.environ)
+    try:
+        os.environ["_MEIPASS2"] = r"C:\Users\x\AppData\Local\Temp\_MEI123456"
+        os.environ["_PYI_APPLICATION_HOME_DIR"] = r"C:\Users\x\AppData\Local\Temp\_MEI123456"
+        os.environ["DDCS_UNRELATED_VAR"] = "kept"
+        cleaned = su._clean_env()
+        assert "_MEIPASS2" not in cleaned, cleaned.get("_MEIPASS2")
+        assert "_PYI_APPLICATION_HOME_DIR" not in cleaned
+        assert cleaned.get("DDCS_UNRELATED_VAR") == "kept", "only the PyInstaller bootloader vars are stripped"
+        assert cleaned.get("PATH") == os.environ.get("PATH"), "an ordinary var must pass through unchanged"
+    finally:
+        os.environ.clear()
+        os.environ.update(real_environ)
+
+
+def test_relaunch_actually_launches_the_child_without_the_poisoned_vars():
+    """Not just that _clean_env() strips them in isolation — that the CHILD PROCESS Popen actually starts with
+    them gone. A child that can still see _MEIPASS2 would hit the exact bug this fix exists to close."""
+    d, target = _tmp()
+    real_environ = dict(os.environ)
+    try:
+        os.environ["_MEIPASS2"] = r"C:\poisoned"
+        marker = os.path.join(d, "meipass2_seen.txt")
+        script = os.path.join(d, "check_env.py")
+        open(script, "w", encoding="utf-8").write(
+            "import os\n"
+            f"open({marker!r}, 'w').write(os.environ.get('_MEIPASS2', 'ABSENT'))\n"
+        )
+        r = su._relaunch([sys.executable, script], confirm_s=0.5)
+        # the child exits almost instantly (it does nothing else) -- that alone is not a failure signal for
+        # this test, which only cares whether the child's OWN environment was clean; poll briefly for the marker
+        for _ in range(20):
+            if os.path.exists(marker):
+                break
+            time.sleep(0.1)
+        assert os.path.exists(marker), "the child never ran"
+        assert open(marker, encoding="utf-8").read() == "ABSENT", "the child must not see the parent's _MEIPASS2"
+    finally:
+        os.environ.clear()
+        os.environ.update(real_environ)
+        shutil.rmtree(d, ignore_errors=True)
+
 
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):

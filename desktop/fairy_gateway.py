@@ -366,8 +366,10 @@ def main():
             from fairy.selfupdate import sweep_old
             for name in sweep_old():
                 print(f"[fairy] removed the previous build: {name}")
-        except Exception:
-            pass   # never let housekeeping stop the app from starting
+        except Exception as e:
+            # t2075 — was a bare `pass`: a housekeeping failure here was as invisible as sweep_old's own former
+            # silent skip. Still never blocks boot — only the visibility changed.
+            print(f"[fairy] boot sweep of old builds failed ({e}) — continuing.")
 
         from fairy.webview_storage import start_persistent
         start_persistent(webview)             # blocks until the window closes

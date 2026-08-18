@@ -274,7 +274,16 @@ class _Handler(BaseHTTPRequestHandler):
         # repo itself, so a confused or hostile page cannot point the downloader at arbitrary bytes.
         if self.path == "/api/update/apply":
             from . import selfupdate as su
-            return self._send_json(su.perform_update())
+            result = su.perform_update()
+            self._send_json(result)
+            # t2075 — once selfupdate._relaunch has OBSERVED the new process survive its own proven crash window,
+            # step aside DELIBERATELY rather than lingering to be raced by the new process's own single-instance
+            # takeover (fairy_gateway._shutdown_other taskkills whatever answers this port — a forceful kill mid
+            # response would be a coin-flip on whether this reply ever reaches the browser). The short delay is
+            # only to let the write above actually leave the socket before the process disappears.
+            if result.get("ok") and result.get("relaunched"):
+                threading.Timer(0.75, lambda: os._exit(0)).start()
+            return
         # t2066 — OPEN AN EXTERNAL LINK in the user's real browser, HOST-SIDE. The embedded webview's own window.open
         # on a download URL can fire twice (the webview downloads it AND the system browser does); the host opening it
         # via webbrowser is the one deterministic path. http(s) ONLY — never hand a page the power to launch file:// or

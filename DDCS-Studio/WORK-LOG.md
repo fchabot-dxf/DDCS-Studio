@@ -43401,3 +43401,163 @@ this turn), 0 failed.
 - `DDCS-Studio/tests/send-history-real-path-2065.spec.js` — new, 2 tests, real spawned bridge + real UI.
 
 🔨 turn 2065
+
+# t2067 (dispatch: t2075) — Fix the update process end to end: the proven env-inheritance crash, an honest verify, and the post-update welcome modal
+
+Loop turn 2067; the advisor's own dispatch cites it as "t2075" — the first time this session the two numbering
+schemes have diverged (every earlier code comment citing a `tNNNN` matched its own loop turn). Naming both here
+so a future reader searching either number finds this entry.
+
+## The proven bug, and the fix (dispatch items 1–3)
+
+The human hit this live: the exe sat forever on "Updated — restarting…" with a black window. Advisor's own
+proof, not re-derived: `selfupdate.py`'s `subprocess.Popen([target], close_fds=True)` carried no `env=`, so
+the relaunched child inherited the PARENT's `_PYI_*`/`_MEIPASS2` PyInstaller onefile bootloader vars, concluded
+it was already unpacked, and died near-instantly — `Popen()` never raises for this, so `perform_update()` kept
+reporting `ok:True, relaunched:True` with nothing alive.
+
+**(1) env-scrub** — `_clean_env()` strips `_PYI*`/`_MEIPASS2` from the env handed to the relaunched child;
+everything else in the environment passes through unchanged (own test proves both halves: the poison is gone,
+an unrelated var and `PATH` survive).
+
+**(2) honest verify — THE ONE THAT MATTERS MOST.** Considered and rejected an HTTP poll of `/api/descriptor`
+after Popen: that poll would run INSIDE the OLD process (the one serving this very request), so it is
+structurally self-referential — if the relaunch silently failed (today's exact bug), the OLD process is still
+the one answering its own poll and would report false success; if the relaunch genuinely succeeds, the NEW
+process's own single-instance takeover (`fairy_gateway._shutdown_other`) forcefully taskkills whatever answers
+this port BEFORE the poll could ever observe the new PID, killing the very thread doing the polling mid-loop.
+Neither outcome is provable from inside the dying process. Used `Popen.wait(timeout=2.0)` instead — a direct,
+deterministic signal for exactly the diagnosed failure shape (a child that exits near-instantly), immune to
+both problems above since it needs no HTTP round trip at all. `_relaunch()` returns `{relaunched:False, error:
+"...exited immediately (code N)..."}` on a fast exit, `{relaunched:True}` once the child survives the window.
+A relaunch not OBSERVED to survive is never reported as success.
+
+**(3) the old process exits only once (2) confirms.** `server.py`'s `/api/update/apply` handler now sends its
+HTTP response FIRST, then — only when `relaunched:True` was actually confirmed — schedules its own deliberate
+`os._exit(0)` on a 0.75s `threading.Timer` (just long enough for the response bytes to leave the socket). This
+replaces relying on the new process's own forceful takeover/taskkill to eventually kill the old one, which was
+racy against this exact response (a kill mid-write is a coin-flip on whether the browser ever sees the reply).
+
+**Client side (dispatch item 5):** `addSelfUpdate`'s click handler now requires BOTH `r.ok` AND `r.relaunched`
+before showing "Updated — restarting…" — `ok:true, relaunched:false` shows the NAMED reason instead (the exact
+hang this turn fixes at the source, closed at the boundary too). Added `watchRestart()`: a client-side bounded
+poll (20s timeout, 900ms interval) of `/api/descriptor`, the browser being the one thing that survives the old
+process handing off to the new one (or failing to) — a defense-in-depth net for a LAN/regular-browser tab
+pointed at the gateway, which (unlike the pywebview window, which just closes when its process exits) does not
+go away on its own.
+
+**HONESTLY SCOPED, per the dispatch's own instruction:** the Python tests (`bridge/tools/desktop-tests/
+test_selfupdate.py`, 5 new) spawn REAL subprocesses (the current interpreter running tiny inline scripts) to
+prove the crash-detection and env-scrub mechanisms are correct against processes that behave the way the
+diagnosed bug behaves (exit near-instantly vs. survive). This proves the MECHANISM. It does NOT and CANNOT
+prove the actual frozen `DDCS-Studio.exe` relaunches cleanly — only a real built exe can confirm that, and the
+human is the one positioned to run it.
+
+**macOS:** the env-scrub is platform-agnostic (no Windows-specific logic in `_clean_env`/`_relaunch`), so the
+same fix applies there in principle — but per the dispatch's own instruction, this is UNVERIFIED, not claimed:
+no Mac exists to test the frozen build's actual relaunch behavior on.
+
+## Item 6 — sweep_old, verified wired, two silent-failure gaps found and closed
+
+Traced the call site: `desktop/fairy_gateway.py:363-370` DOES call `sweep_old()` on every boot (not unwired,
+not the gap). The advisor's own "Downloads dated Aug 2" finding is fully consistent with — very likely
+explained by — the SAME relaunch bug: since relaunch always silently failed, a stuck old process from any
+given update attempt kept running (never got the chance to be swept, and its own boot's sweep call never even
+ran a second time) until whoever eventually closed or replaced it manually. Cannot prove this is THE cause
+without a frozen exe and this dev machine's own update history, which is unavailable — said plainly rather
+than claimed.
+
+What WAS a genuine, real gap: BOTH the failure path inside `sweep_old()` (`except OSError: pass`) and its
+caller's outer swallow (`except Exception: pass`) were fully silent — nothing distinguished "nothing to sweep"
+from "a `.old.exe` exists and will not go away," which is exactly the shape a months-old leftover would take
+without ever being diagnosable. Fixed by printing one line per skip/failure (routes to `fairy.log` via
+`_setup_logging`'s existing stdout tee) — still never raises, still never blocks boot, only the visibility
+changed.
+
+## Item 4 — the welcome modal (three rounds of human amendment mid-turn; this WORK-LOG entry reflects the FINAL, ruled shape only)
+
+The dispatch's own item 4 (a stored-vs-current welcome banner reusing the derived commit titles) was
+substantially amended three times while this turn was in progress. Final, decided shape:
+
+- **A DECLARED per-release notes artifact, one source, two views with different budgets and different
+  fallback behaviour** (human's own words: "yes this needs to be composed" — this was decided, not offered as
+  a choice). **Where it lives:** `DDCS-Studio/web/data/releaseNotes.js`, a plain `export const RELEASE_NOTES`
+  object (matches this project's existing `web/data/*.js` declared-data convention). **Shape:**
+  `RELEASE_NOTES[version] = [{ short, full }, ...]`, keyed by the EXACT `.ver`-chip version string (no `v`
+  prefix) — `short` is the banner's terse pre-update teaser (still capped at 3, t2068), `full` is a real
+  sentence including the HOW, one modal panel per entry. **Who writes it:** a human, at release-cutting time —
+  this is a REAL new step added to every release; the human is recording that in their own release ritual, not
+  this codebase.
+- **What a release that forgets to compose notes actually does — and this is the one place the two surfaces
+  diverge on purpose:** the BANNER (pre-update, re-openable — filler is cheap there) keeps its old fallback to
+  derived commit-subject titles (`userFacingNotes()`), unchanged from before this turn. The WELCOME MODAL
+  (shown exactly once, gone forever after dismissal) does NOT fall back to derived titles at all — filler
+  there spends the one moment the user is paying attention. A version with no composed entry still gets the
+  modal (its core job — confirming the update landed — doesn't depend on notes existing) but as a single bare
+  "Updated to v<version>" panel: no body text, no "no release notes" line, no Skip (nothing to skip), one Done.
+  This is the human's own correction of an earlier, REJECTED design (no-notes ⇒ no modal at all) — the
+  reasoning that survives: the version confirmation is the PRIMARY payload (answering "did my update actually
+  work," the exact question the hang left unanswered), and the notes are the bonus.
+- **Exact wording, human-specified:** "Updated to v2026.08.17.11" — past tense, lowercase v, spelled out.
+  "Welcome to vX" was considered and rejected (welcome belongs to a first run; this user was already here).
+- **First run (no stored version at all) stays SILENT** — not a version-change, and a greeting on every fresh
+  install is an affordance nobody asked for. Only records the current version and returns.
+- **Central modal, one panel per composed entry, "Skip all" exits the WHOLE sequence in one click** (not
+  one-panel-at-a-time), gone forever once dismissed with no re-open anywhere (no Help entry, no version-chip
+  door, no history) — considered and rejected.
+- **Styling reads ONLY the declared theme-token contract** (`styles.css:112`) — `--scrim` for the backdrop
+  (the token that exists for exactly this), `--surface-1`/`--outline`/`--border-w`/`--radius` for the card,
+  `--text`/`--text-main`/`--text-dim` for type, `--font-ui`, `--accent` for the primary action. No token exists
+  for "text on a filled accent background" anywhere in this project's contract; rather than invent one, the
+  primary "Next"/"Done" button reads as accent via border+text colour, not a filled background, avoiding an
+  undeclared token entirely. Grepped the new CSS block for hex/rgb()/px-radius: zero matches outside comments.
+
+## Non-vacuity
+
+Python: reverted `selfupdate.py` to HEAD, re-ran `test_selfupdate.py` — all 5 new tests fail (one with
+`AttributeError: no attribute '_clean_env'`, confirming the fix doesn't exist on the pre-change tree), restored,
+all 20 pass again (15 pre-existing + 5 new — see below, the pre-existing 15 had never actually been run before
+this turn). JS: reverted `updateCheck.js` to HEAD, re-ran `update-check.spec.js` — all 7 new/changed tests fail
+(missing exports/selectors), restored, all 12 pass again.
+
+## A found-and-fixed adjacent bug, unrelated to the dispatch but blocking my own verification
+
+`bridge/tools/desktop-tests/test_selfupdate.py`'s `sys.path` setup computed `dirname(dirname(file)) +
+"bridge/bridge-app"`, which resolves to `bridge/tools/bridge/bridge-app` for this file's actual location
+(`bridge/tools/desktop-tests/`) — never existed. This file could not import `fairy` and had apparently never
+been run successfully since it landed at its current path (git blame: 2026-07-29). Fixed the path math (two
+levels up from `desktop-tests` is `bridge/`); all 15 pre-existing tests in the file passed cleanly once it
+could actually run, alongside my 5 new ones — nothing else in the file needed changing.
+
+## A pre-existing test flake, found while sweeping gateway specs after touching the shared server.py
+
+`send-history-real-path-2065.spec.js`'s stalled-job test failed on a broader post-change sweep. Confirmed NOT
+caused by this turn's server.py edit: reverted server.py to HEAD (my own `/api/update/apply` change scrubbed
+out entirely) and the SAME test failed identically against unmodified HEAD. Pre-existing, environment-only,
+out of scope for this dispatch (a different turn's own test) — not investigated further, restored my fix. This
+is now the SECOND pre-existing environment flake surfaced this session (alongside the advisor's own noted
+`test_csrf_guard.py` pair, which did NOT reproduce on this run — 10/10 passed cleanly here, worth saying
+plainly since a claim that didn't reproduce is itself information).
+
+## Gate
+
+Bridge Python suite: 71/71 (`pytest tests/` from `bridge/bridge-app`; unchanged in count from server.py's own
+addition — no new pytest-collected tests added there this turn, the new Python tests live in the standalone
+`desktop-tests` file per its own established convention). `test_csrf_guard.py` specifically: 10/10 (the
+advisor's noted pre-existing pair did not reproduce here — said plainly, not silently matched). Node tier:
+193/193. Browser specs touching `updateCheck.js` — `update-check.spec.js`: 12/12 (6 pre-existing + 6 new).
+Broader gateway sweep (my own choice, since `server.py` is shared): `gateway-jobs-history-view-2026`,
+`gateway-local-reach-1325`, `gateway-state-contract-1327`, `send-beacon-warning-2057` all green;
+`send-history-real-path-2065` 1/2 — the pre-existing flake above, confirmed unrelated.
+
+## Files
+- `bridge/bridge-app/fairy/selfupdate.py` — `_clean_env()`, `_relaunch()` (env-scrubbed Popen + crash-window confirm).
+- `bridge/bridge-app/fairy/server.py` — `/api/update/apply` sends its response first, then self-exits ONLY once relaunch is confirmed.
+- `desktop/fairy_gateway.py` — the boot sweep's two silent exception swallows now log a reason.
+- `bridge/tools/desktop-tests/test_selfupdate.py` — fixed the broken `sys.path` (pre-existing, unrelated), 5 new relaunch/env-scrub tests.
+- `DDCS-Studio/web/data/releaseNotes.js` — NEW, the declared per-release notes artifact (empty; a human composes entries at release time).
+- `DDCS-Studio/web/ui/updateCheck.js` — the welcome modal (`checkWelcomeNotice`/`showWelcomeSequence`), the banner's composed-notes preference, `addSelfUpdate`'s honest-relaunch gate + `watchRestart`.
+- `DDCS-Studio/web/styles.css` — `.ddcs-welcome-modal` and children, theme-tokens only.
+- `DDCS-Studio/tests/update-check.spec.js` — 6 new tests (2 self-update relaunch-honesty, 4 welcome modal).
+
+🔨 turn 2067

@@ -173,3 +173,185 @@ test('Download opens exactly ONCE through the gateway; window.open is never used
   expect(prevented, 'the click default is prevented').toBe(true);
   expect(navigated, 'no page navigation on click').toBe(false);
 });
+
+// ── t2075 — the standing bug this turn fixes: ok:true alone used to be treated as success and the button sat on
+// "Updated — restarting…" forever even when the relaunch had already silently died. The server now only sets
+// relaunched:true once it has OBSERVED the new process survive its own proven crash window; the client must
+// require BOTH ok and relaunched, and show the NAMED reason otherwise — never a silent/forever "restarting".
+test('self-update: ok:true but relaunched:false shows the NAMED reason, never a silent forever-restarting state', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};
+    const real = window.fetch;
+    window.fetch = async (url, opts) => {
+      const s = String(url);
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/commits')) return { ok: true, json: async () => ([]) };
+      if (s.includes('/api/update/status')) return { ok: true, json: async () => ({ supported: true, writable: true, has_asset: true, has_checksum: true, tag: 'v9999.0' }) };
+      if (s.includes('/api/update/apply')) return { ok: true, json: async () => ({ ok: true, relaunched: false, error: 'the new version exited immediately (code 3) — open it yourself.' }) };
+      return real(url, opts);
+    };
+  });
+  await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
+  await page.waitForSelector('.ddcs-update-bar .upd-self');
+  await page.click('.ddcs-update-bar .upd-self');
+  await page.waitForSelector('.app-dialog');
+  const dlgText = await page.textContent('.app-dialog');
+  expect(dlgText, 'the exact reason from the server reaches the user').toContain('exited immediately (code 3)');
+  const btn = await page.evaluate(() => document.querySelector('.ddcs-update-bar .upd-self').textContent);
+  expect(btn, 'the button never gets stuck on "restarting" for an unconfirmed relaunch').not.toMatch(/restarting/i);
+});
+
+test('self-update: a CONFIRMED relaunch shows "restarting…" then settles once the app reconnects', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};
+    let descriptorCalls = 0;
+    const real = window.fetch;
+    window.fetch = async (url, opts) => {
+      const s = String(url);
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/commits')) return { ok: true, json: async () => ([]) };
+      if (s.includes('/api/update/status')) return { ok: true, json: async () => ({ supported: true, writable: true, has_asset: true, has_checksum: true, tag: 'v9999.0' }) };
+      if (s.includes('/api/update/apply')) return { ok: true, json: async () => ({ ok: true, relaunched: true, tag: 'v9999.0' }) };
+      if (s.includes('/api/descriptor')) {
+        descriptorCalls++;
+        if (descriptorCalls < 2) throw new TypeError('Failed to fetch');   // the old process stepping aside
+        return { ok: true, json: async () => ({}) };                      // the new one answering
+      }
+      return real(url, opts);
+    };
+  });
+  await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
+  await page.waitForSelector('.ddcs-update-bar .upd-self');
+  await page.click('.ddcs-update-bar .upd-self');
+  await page.waitForFunction(() => (document.querySelector('.ddcs-update-bar .upd-self') || {}).textContent === 'Updated — restarting…');
+  await page.waitForFunction(() => (document.querySelector('.ddcs-update-bar .upd-self') || {}).textContent === 'Updated — restarted', { timeout: 10000 });
+});
+
+// ── t2075 (amended three times, human-ruled — this is the FINAL shape) — the post-update WELCOME modal: a
+// different, CENTRAL surface from the pre-update banner, keyed on stored-vs-current AT BOOT (never a flag from
+// the updater), gone forever once dismissed (no re-open anywhere), composed notes preferred, one panel per
+// entry, "Skip all" closes the WHOLE sequence in one click. The headline "Updated to v<version>" is the exact,
+// human-specified wording and is the PRIMARY payload — it answers "did my update actually work," the very
+// question the update hang left unanswered.
+test('welcome modal: fires on a real version change, exact headline, one panel per composed entry, Next/Back/Done navigate', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};
+    localStorage.setItem('ddcs_seen_version', '0.0.1');
+    window.__ddcsUpd.RELEASE_NOTES[window.__ddcsUpd.bakedVersion()] = [
+      { short: 'A', full: 'COMPOSED PANEL ONE, with the how.' },
+      { short: 'B', full: 'COMPOSED PANEL TWO.' },
+    ];
+  });
+  await page.evaluate(() => window.__ddcsUpd.checkWelcomeNotice());
+  await page.waitForSelector('.ddcs-welcome-modal');
+  const headline = await page.textContent('.wcm-head');
+  const version = await page.evaluate(() => window.__ddcsUpd.bakedVersion());
+  expect(headline, 'the exact, human-specified wording — past tense, lowercase v').toContain(`Updated to v${version}`);
+  expect(await page.textContent('.wcm-body')).toContain('COMPOSED PANEL ONE');
+  expect(await page.textContent('.wcm-dots')).toHaveLength(2);
+  expect(await page.textContent('.wcm-next')).toBe('Next');
+  await page.click('.wcm-next');
+  expect(await page.textContent('.wcm-body')).toContain('COMPOSED PANEL TWO');
+  expect(await page.textContent('.wcm-next'), 'the last panel says Done, not Next').toBe('Done');
+  await page.click('.wcm-back');
+  expect(await page.textContent('.wcm-body')).toContain('COMPOSED PANEL ONE');
+  await page.click('.wcm-next');
+  await page.click('.wcm-next');   // Done on the last panel
+  await page.waitForFunction(() => !document.querySelector('.ddcs-welcome-modal'));
+});
+
+test('welcome modal: "Skip all" closes the WHOLE sequence in one click, from any panel', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};
+    localStorage.setItem('ddcs_seen_version', '0.0.1');
+    window.__ddcsUpd.RELEASE_NOTES[window.__ddcsUpd.bakedVersion()] = [
+      { short: 'A', full: 'Panel one.' }, { short: 'B', full: 'Panel two.' }, { short: 'C', full: 'Panel three.' },
+    ];
+  });
+  await page.evaluate(() => window.__ddcsUpd.checkWelcomeNotice());
+  await page.waitForSelector('.ddcs-welcome-modal');
+  expect(await page.textContent('.wcm-skip')).toBe('Skip all');
+  await page.click('.wcm-next');   // now on panel 2 of 3
+  await page.click('.wcm-skip');
+  await page.waitForFunction(() => !document.querySelector('.ddcs-welcome-modal'));
+});
+
+test('welcome modal: never fires on first-ever launch (no stored version) or when the version has not changed', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  // first-ever launch: nothing stored yet — this is a POST-UPDATE notice, not onboarding
+  await page.evaluate(() => { window.pywebview = {}; localStorage.removeItem('ddcs_seen_version'); });
+  await page.evaluate(() => window.__ddcsUpd.checkWelcomeNotice());
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => !!document.querySelector('.ddcs-welcome-modal')), 'a first-ever launch stays silent — no "Welcome to vX" onboarding').toBeFalsy();
+  expect(await page.evaluate(() => localStorage.getItem('ddcs_seen_version')), 'the current version is now stamped as seen').toBe(await page.evaluate(() => window.__ddcsUpd.bakedVersion()));
+
+  // an ordinary relaunch of the SAME version: stored === current
+  await page.evaluate(() => window.__ddcsUpd.checkWelcomeNotice());
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => !!document.querySelector('.ddcs-welcome-modal')), 'no notice when the version has not changed').toBeFalsy();
+});
+
+// t2075 — human's CORRECTION, superseding an earlier ruling: a version with no composed notes still gets the
+// modal (its core job — confirming the update landed — does not depend on notes existing), just the bare
+// headline as a single panel: no body text, no "no release notes" filler, no Skip (nothing to skip), one Done.
+test('welcome modal: a version with NO composed notes still appears — bare headline only, no derived-title filler, single Done', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};
+    localStorage.setItem('ddcs_seen_version', '0.0.1');   // RELEASE_NOTES has no entry for the current baked version
+    const real = window.fetch;
+    window.fetch = async (url, opts) => {
+      const s = String(url);
+      // the modal must NEVER derive from commits (that fallback is banner-only) — prove it by making the call blow up
+      if (s.includes('/commits')) throw new Error('the welcome modal must not fetch commits when there are no composed notes');
+      return real(url, opts);
+    };
+  });
+  await page.evaluate(() => window.__ddcsUpd.checkWelcomeNotice());
+  await page.waitForSelector('.ddcs-welcome-modal');
+  const version = await page.evaluate(() => window.__ddcsUpd.bakedVersion());
+  expect(await page.textContent('.wcm-head')).toContain(`Updated to v${version}`);
+  expect(await page.evaluate(() => !!document.querySelector('.wcm-body')), 'no body element at all when there is nothing composed to say').toBeFalsy();
+  expect(await page.evaluate(() => !!document.querySelector('.wcm-skip')), 'no Skip on a single, already-terminal panel').toBeFalsy();
+  expect(await page.evaluate(() => !!document.querySelector('.wcm-dots')), 'no progress dots for a single panel').toBeFalsy();
+  expect(await page.textContent('.wcm-next'), 'a single Done, not Next').toBe('Done');
+  await page.click('.wcm-next');
+  await page.waitForFunction(() => !document.querySelector('.ddcs-welcome-modal'));
+});
+
+// ── t2075 — the banner PREFERS composed release notes (RELEASE_NOTES[version].short) over derived commit
+// titles when the human wrote them for this release; a release that forgot them keeps the old derived behaviour.
+test('What\'s new banner prefers composed release notes over derived commit titles when present for the release', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};
+    window.__ddcsUpd.RELEASE_NOTES['9999.0'] = [
+      { short: 'COMPOSED HEADLINE ONE', full: 'full one' },
+      { short: 'COMPOSED HEADLINE TWO', full: 'full two' },
+    ];
+    const real = window.fetch;
+    window.fetch = async (url, opts) => {
+      const s = String(url);
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/commits')) throw new Error('must not derive from commits when composed notes exist for this release');
+      return real(url, opts);
+    };
+  });
+  await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
+  await page.waitForSelector('.ddcs-update-bar');
+  await page.click('.ddcs-update-bar .upd-what');
+  const notes = await page.textContent('.ddcs-update-bar .upd-notes');
+  expect(notes).toContain('COMPOSED HEADLINE ONE');
+  expect(notes).toContain('COMPOSED HEADLINE TWO');
+});

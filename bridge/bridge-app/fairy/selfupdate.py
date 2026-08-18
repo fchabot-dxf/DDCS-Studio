@@ -55,7 +55,13 @@ def exe_path() -> str:
 
 
 def sweep_old(directory: str = None) -> list:
-    """Delete the previous build(s) left behind by an update. Called on boot; failures are ignored (still in use)."""
+    """Delete the previous build(s) left behind by an update. Called on boot; a locked file is retried the next
+    boot, not an error. @returns the names actually removed.
+
+    t2075 — a locked-file skip used to be a bare `pass`, fully silent: nothing distinguished "there was nothing
+    to sweep" from "there IS a .old.exe and it would not go away" (the exact shape a Downloads-folder leftover
+    from months back was found in). Prints ONE line per skip so it lands in fairy.log (fairy_gateway.py's own
+    _setup_logging tees stdout there before this is ever called) — still never raises, still never blocks boot."""
     directory = directory or os.path.dirname(exe_path())
     removed = []
     try:
@@ -64,10 +70,10 @@ def sweep_old(directory: str = None) -> list:
                 try:
                     os.remove(os.path.join(directory, name))
                     removed.append(name)
-                except OSError:
-                    pass   # still locked by a process that has not exited yet; the next boot gets it
-    except OSError:
-        pass
+                except OSError as e:
+                    print(f"[fairy] could not remove old build {name} ({e}) — still in use? will retry next boot.")
+    except OSError as e:
+        print(f"[fairy] could not list {directory} to sweep old builds ({e}).")
     return removed
 
 
@@ -227,12 +233,43 @@ def perform_update(fetch=None, relaunch=True) -> dict:
         _quiet_remove(new_file)
         return {"ok": False, "error": r.get("error"), "page": RELEASES_PAGE}
     if relaunch:
-        try:
-            subprocess.Popen([target], close_fds=True)
-        except Exception as e:
-            return {"ok": True, "tag": rel.get("tag"), "relaunched": False,
-                    "error": f"updated, but the new version could not be started automatically ({e}) — open it yourself."}
-    return {"ok": True, "tag": rel.get("tag"), "relaunched": bool(relaunch)}
+        return {"ok": True, "tag": rel.get("tag"), **_relaunch([target])}
+    return {"ok": True, "tag": rel.get("tag"), "relaunched": False}
+
+
+# ── relaunch (t2075) ────────────────────────────────────────────────────────────────────────────────────────────
+# PROVEN ROOT CAUSE (reproduced live): subprocess.Popen([target]) with no env= hands the child the PARENT's own
+# _PYI_*/_MEIPASS2 PyInstaller bootloader vars. A PyInstaller --onefile child that inherits those concludes it is
+# already unpacked (pointed at a temp dir that is the PARENT's, not its own) and dies near-instantly — Popen()
+# itself never raises, so the caller had no way to tell. A relaunch not OBSERVED to survive must never be reported
+# as success (the standing bug: the UI showed "Updated — restarting…" forever while the new process was already
+# dead). subprocess.Popen returns a Popen handle we can WAIT on — watching the child's own exit code is a direct,
+# deterministic signal for exactly this failure shape, and unlike polling the HTTP port it cannot be confused by
+# this SAME (old, still-running) process answering its own request: the old process is what's calling this, so an
+# HTTP self-check would trivially "pass" even when the new process never came up at all.
+_RELAUNCH_CONFIRM_S = 2.0   # the proven crash happens near-instantly; this window is generous, not a real wait
+
+
+def _clean_env():
+    """The parent's own env, minus the PyInstaller bootloader vars a onefile child must not inherit."""
+    return {k: v for k, v in os.environ.items() if not k.startswith("_PYI") and k != "_MEIPASS2"}
+
+
+def _relaunch(argv: list, confirm_s: float = _RELAUNCH_CONFIRM_S) -> dict:
+    """Start `argv` (normally just [target], the new build's own path) with a cleaned env, then wait `confirm_s`
+    and check it did not already exit.
+    @returns {relaunched, error?} — relaunched=False always carries a NAMED reason, never a silent guess."""
+    try:
+        proc = subprocess.Popen(argv, close_fds=True, env=_clean_env())
+    except Exception as e:
+        return {"relaunched": False,
+                "error": f"the new version could not be started automatically ({e}) — open it yourself."}
+    try:
+        code = proc.wait(timeout=confirm_s)
+        return {"relaunched": False,
+                "error": f"the new version exited immediately (code {code}) — open it yourself."}
+    except subprocess.TimeoutExpired:
+        return {"relaunched": True}   # still running past the window the proven crash happens inside of
 
 
 def _quiet_remove(path: str):
