@@ -38,7 +38,7 @@ const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '
 // slot … (t2067)") are noise to an operator. Turn them into plain lines: keep only the user-facing types (feat/fix/
 // perf), strip the conventional-commit type(scope) prefix, drop the "— developer detail" tail and any task-id / issue
 // refs, and sentence-case the gist. Internal commits (docs/test/chore/refactor/build/release) never reach the user.
-const NOTES_MAX = 4;   // succinct — a few highlights, not a changelog
+const NOTES_MAX = 3;   // succinct — a few highlights, not a changelog
 export function userFacingNotes(subjects) {
   const out = [], seen = new Set();
   for (const s of (subjects || [])) {

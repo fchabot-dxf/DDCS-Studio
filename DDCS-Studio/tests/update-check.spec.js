@@ -91,7 +91,7 @@ test('What\'s new: deduped and capped at a few highlights', async ({ page }) => 
     'feat: pull reads the machine WCS live', 'fix: gateway job-in-flight false alarm',
     'feat: cleaner update notes', 'fix: one more thing', 'fix: and another',
   ]));
-  expect(out.length, 'capped at a few, not everything').toBeLessThanOrEqual(4);
+  expect(out.length, 'capped at a few, not everything').toBeLessThanOrEqual(3);
   expect(out.filter((x) => /surfacing preview shows nothing/i.test(x)).length, 'the two identical-gist lines collapse to one').toBe(1);
 });
 
