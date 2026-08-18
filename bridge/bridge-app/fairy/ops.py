@@ -422,14 +422,21 @@ class Ops:
     #   active WCS  #78  (1..6 = G54..G59);  WCS offset table base #305 (= macro #805), stride 5 = [X,Y,Z,A,B]
     # A WCS register holds the MACHINE coordinate of that work origin (direct `#805 = #880` sets G54 X = current
     # machine X), so workOrigin (the active WCS's X/Y/Z) IS the sim's wcsOffset: part = machine - workOrigin.
+    # t2073 — THE ONE macro#↔param# translation, declared ONCE. A macro var reads the persisted file 500/1000/100
+    # below it (setting/camsetting/uservar); `_var_value` AND the WCS param base below both go through this map, so
+    # the `-500` that t2067 got wrong in one place but right in another can no longer drift. The macro bases are what
+    # G-code addresses; the JS dialect.vars mirrors them and is pinned equal by the cross-language test.
+    PARAM_FILE_OFFSET = {"uservar": 100, "setting": 500, "camsetting": 1000}
+    _WCS_MACRO_BASE = 805        # macro #805 (G54-X) -> setting param #305
+    _ACTIVE_WCS_MACRO = 578      # macro #578 (active WCS) -> setting param #78
     _SOFT_NEG = (161, 162, 163)
     _SOFT_POS = (166, 167, 168)
     _HOMING_DIR = (112, 113, 114)
     _HOMING_SPEED = (107, 108, 109)   # per-axis homing feed (X/Y/Z); #118 = homing precision (seed Studio's Homing Setup)
     _HOMING_PRECISION = 118
     _MACH_ZERO = (235, 236, 237)
-    _ACTIVE_WCS = 78
-    _WCS_BASE = 305
+    _ACTIVE_WCS = _ACTIVE_WCS_MACRO - PARAM_FILE_OFFSET["setting"]   # 78 -- DERIVED, not an independent hardcode
+    _WCS_BASE = _WCS_MACRO_BASE - PARAM_FILE_OFFSET["setting"]       # 305 -- DERIVED from the macro base via the ONE offset
     _WCS_STRIDE = 5
     _SENTINEL = 9999.0
 
@@ -954,21 +961,22 @@ class Ops:
             return {"available": False, "reason": "not a number"}
         if 0 <= n <= 99:
             return {"available": False, "source": "local", "reason": "local var - RAM-only, not on disk"}
+        off = self.PARAM_FILE_OFFSET   # t2073 — the ONE offset map; no inline -100/-500/-1000 literals below
         # uservar: live macro vars #100-549 (slot = #var-100). No factory baseline → userSet = non-zero.
-        if uservar is not None and 100 <= n and (n - 100) < len(uservar):
-            v = uservar[n - 100]
+        if uservar is not None and 100 <= n and (n - off["uservar"]) < len(uservar):
+            v = uservar[n - off["uservar"]]
             return {"available": True, "value": v, "source": "uservar", "userSet": v != 0}
         # camsetting: ATC/CAM tables #1000-1499 (slot = #var-1000). No default file → userSet = non-zero (untaught = 0).
-        if 1000 <= n <= 1499 and camsetting is not None and (n - 1000) < len(camsetting):
-            v = camsetting[n - 1000]
+        if 1000 <= n <= 1499 and camsetting is not None and (n - off["camsetting"]) < len(camsetting):
+            v = camsetting[n - off["camsetting"]]
             return {"available": True, "value": v, "source": "camsetting", "userSet": v != 0}
         # setting: persisted system PARAMS. THE SETTING FILE IS NOT THE MACRO ADDRESS SPACE — it is indexed by PARAM
         # number, and a macro var reads the param 500 BELOW it: macro #805 = param #305 = setting[305], macro #578
         # (active WCS) = setting[78]. The old code read setting[#var] (setting[805]), which is a DIFFERENT, empty slot,
         # so a taught G54 came back "000". Bench-confirmed on a live dump (t2067): setting[305]=50.13/-665.70/-47.28 was
-        # the real G54 while setting[805]=0. _map_geometry_to_profile already uses the correct base (#305 = macro #805);
-        # this brings the raw var-read into line with it. (camsetting #1000-1499 is handled above with its own slot map.)
-        idx = n - 500
+        # the real G54 while setting[805]=0. The offset now comes from the ONE PARAM_FILE_OFFSET map that also derives
+        # _WCS_BASE (#305 = macro #805 - 500), so the var-read and the geometry mapper cannot use different offsets.
+        idx = n - off["setting"]
         if setting is not None and 0 <= idx < len(setting):
             v = setting[idx]
             out = {"available": True, "value": v, "source": "setting"}
