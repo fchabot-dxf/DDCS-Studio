@@ -10,7 +10,7 @@ A gap that was named but never closed. **Both halves are proven separately, neve
 ```
   console → gateway → a DIRECTORY        ✅ proven in software (t2065)
                                             real spawned bridge, real Send click, real DOM
-  SMB write → the REAL controller        ✅ proven at the bench, June 2026 (FINDINGS.md:125)
+  SMB write → the REAL controller        ✅ proven at the bench, June 2026 (FINDINGS.md → find "SMB file access")
   ────────────────────────────────────────────────────────────────────────
   console → gateway → the REAL controller   ❌ never run end to end
 ```

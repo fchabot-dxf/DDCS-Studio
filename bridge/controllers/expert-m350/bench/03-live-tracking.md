@@ -13,7 +13,7 @@ whether the feature is real for the project at all.
 ## ⛔⛔ TWO RULES BEFORE YOU START
 
 **1. NEVER run `MGETDATA`** — REFUTED on this firmware, wedges the analyzer, forces a reboot
-(`FINDINGS.md:23`). If debugging seems to call for it, it doesn't. Stop and report instead.
+(`FINDINGS.md → find "MGETDATA` = REFUTED"`). If debugging seems to call for it, it doesn't. Stop and report instead.
 
 **2. The two tasks below CANNOT run at the same time.** Slave mode and position-poll mode use the **same
 serial port** and are mutually exclusive (`config.py:37`, `bridge.py:67-69`):

@@ -27,7 +27,7 @@ confirmed on your controller.
 ## ⛔ SAFETY — applies to every project
 
 1. ⛔⛔ **NEVER run `MGETDATA`.** REFUTED on this firmware — it wedges the controller's *analyzer* (not the
-   serial link) and forces a reboot. `FINDINGS.md:23`. No slave configuration fixes it. If a step seems to
+   serial link) and forces a reboot. `FINDINGS.md → find "MGETDATA` = REFUTED"`. No slave configuration fixes it. If a step seems to
    want it, the step is wrong — stop and say so.
 2. ⛔ **Nothing here starts the spindle.** The gateway's op allowlist is `{"delete"}` only — it never runs
    or starts G-code. Where a program must *run*, a human at the machine presses Start having checked the
@@ -52,13 +52,13 @@ arguments**, so write them down.
 
 - [ ] Controller panel: read and record the **firmware build string** (must be ≥ `2025-12-11-00` for
       P279=Slave; user reports a 2026 build).
-- [ ] Param page → **`#279` Modbus RTU = Slave** (not `NO`). `FINDINGS.md:69`
-- [ ] **`#267` Serial-2 baud = `B115200`**, framing **8N1**, on **DB9 port 2**. `FINDINGS.md:66,74`
+- [ ] Param page → **`#279` Modbus RTU = Slave** (not `NO`). `FINDINGS.md → find "IS the Modbus-RTU enable"`
+- [ ] **`#267` Serial-2 baud = `B115200`**, framing **8N1**, on **DB9 port 2**. `FINDINGS.md → find "Serial 2 baud rate" + "framing is confirmed"`
 - [ ] **`#284` Network boot mode = manu-IP** — Ethernet up, "Cable IP" not reading *Disconnect*. Record the
-      controller **IP**. `FINDINGS.md:70`
+      controller **IP**. `FINDINGS.md → find "Network boot mode"`
 - [ ] On CNC-FAIRY: confirm the SABRENT adapter's **COM port** in Device Manager (was COM6 — it can move).
 - [ ] SMB reachable: `net use S: \\<controller-ip>\CNCDISK`
-      (⚠ `Test-Path` is flaky under SMB1-guest — use `net use`). `FINDINGS.md:130`
+      (⚠ `Test-Path` is flaky under SMB1-guest — use `net use`). `FINDINGS.md → find "flaky under SMB1-guest"`
 
 **PASS =** all six confirmed and written down.
 
