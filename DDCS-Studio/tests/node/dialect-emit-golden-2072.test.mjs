@@ -32,6 +32,9 @@ import { fileURLToPath } from 'node:url';
  *     dialects (Expert writes the active-WCS table indirectly via `#578`/`#[#73]`; v4.1 uses `G90 G92`). It is here
  *     so the golden is a TRUE per-controller artifact — a fixture that would notice if the two posts silently
  *     collapsed to the same output — not two identical blobs. NON-VACUITY below asserts that difference is real.
+ *   · user_middle_data (probeZ) — the bore-CENTRE probe: a SECOND WCS-write op with its own distinct body (two-axis
+ *     span, probe-status IF…GOTO checks) that also diverges per dialect (Expert `#578`-indirect). Proves the
+ *     per-controller WCS-write coverage is not resting on corner's exact shape alone.
  *
  * ── THE TWO NAMED CONTRACTS (on top of the byte snapshot) ────────────────────────────────────────────────────────
  * A snapshot diff tells you a line moved; a named property tells you WHICH t2070 contract broke:
@@ -71,6 +74,7 @@ const OPS = [
     { opType: 'user_surfacing_data', overrides: {}, hasClamp: true },
     { opType: 'user_pocket_data', overrides: {}, hasClamp: true },
     { opType: 'user_corner_data', overrides: { probeZFirst: true }, hasClamp: false },
+    { opType: 'user_middle_data', overrides: { probeZ: true }, hasClamp: false },
 ];
 
 /** node:test drops playwright's `expect(value, message)` 2nd arg; prepend it so a red gate prints the contract. */

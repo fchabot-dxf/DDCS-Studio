@@ -1,4 +1,4 @@
-# dialect-emit golden 2072 — 2 verified posts × 3 ops
+# dialect-emit golden 2072 — 2 verified posts × 4 ops
 # emit path: emitMapped(builderOf(op)(defaultParams+overrides), { dialect: getDialect(id) })
 # contracts pinned per line elsewhere in this file: FLUSH (no leading ws), NO-THEN (no inline clamp), CLAMP→GOTO
 #
@@ -232,6 +232,118 @@ G53 Z#42
 N2
 M30
 
+===== user_middle_data @ ddcs-expert-m350 =====
+#1=200 ( Max probe distance )
+#2=2 ( Retract distance )
+#3=200 ( Fast feedrate )
+#4=50 ( Slow feedrate )
+#5=3 ( Probe port )
+#6=2 ( Probe stylus radius )
+#51=0 ( Wall 1 pos )
+#52=0 ( Wall 2 pos )
+#53=0 ( Center pos )
+#54=0 ( Wall 3 pos )
+#55=0 ( Wall 4 pos )
+#56=0 ( Center pos 2 )
+#7=[0-#1] ( Negative max probe )
+#8=#1 ( Positive max probe )
+#9=[0-#2] ( Negative retract )
+#10=#2 ( Positive retract )
+#17=10 ( DM500 work-frame safe clearance mm above work-0; DM500 has no G53 - other posts park at the machine margin )
+#19=80 ( X cross-over: in-axis traverse, wall 1 across to wall 2 user-set to span the feature, default 80 )
+#20=80 ( Y cross-over: in-axis traverse, wall 1 across to wall 2 user-set to span the feature, default 80 )
+#71=#578 ( Active WCS index: 1=G54 2=G55 etc )
+#72=[#71-1] ( Zero-based index )
+#70=[805+[#72*5]] ( Base WCS address )
+#1505=1 ( Hover OVER the stock top Z datum first. Press Enter - ESC=cancel )
+IF #1505==0 GOTO2
+G91   ( incremental )
+( Z Surface - set Z datum first )
+#1907=0 ( Stop mode: decelerate )
+#1917=1 ( Limit protect )
+G31 Z#7 F#3 P#5 L0 Q1
+IF #1922!=2 GOTO1
+G0 Z#10
+G31 Z#7 F#4 P#5 L0 Q1
+IF #1922!=2 GOTO1
+#57=[#1927-#6] ( surface = trigger +/- stylus radius )
+G0 Z#10
+#[#70+2]=#57 ( Save Active WCS Z offset )
+#95=#882 ( @saveProbeZ )
+( Safe-Z retract - machine frame )
+#42=#520
+IF #42<0 GOTO91
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N91
+G90   ( absolute )
+G53 Z#42
+G91   ( incremental )
+( REPOSITION: jog clear, to the first wall )
+#1505=1 ( Press Enter when repositioned )
+IF #1505==0 GOTO2
+G90   ( absolute )
+G53 Z#95 ( @returnProbeZ )
+G91   ( incremental )
+#1905=0 ( Stop mode: decelerate )
+#1915=2 ( Limit protect )
+G31 X#8 F#3 P#5 L0 Q1
+IF #1920!=2 GOTO1
+G0 X#9
+G31 X#8 F#4 P#5 L0 Q1
+IF #1920!=2 GOTO1
+#51=[#1925+#6] ( surface = trigger +/- stylus radius )
+G0 X#9
+#95=#882 ( @saveProbeZ )
+( Clearance hop - capped at the machine margin )
+#43=[#95+15]
+#42=#520
+IF #42<0 GOTO92
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N92
+IF #43<#42 GOTO93
+#43=#42 ( cap the hop at the safe machine margin )
+N93
+G90   ( absolute )
+G53 Z#43
+G91   ( incremental )
+G0 X#19
+G90   ( absolute )
+G53 Z#95 ( @returnProbeZ )
+G91   ( incremental )
+#1905=0 ( Stop mode: decelerate )
+#1915=1 ( Limit protect )
+G31 X#7 F#3 P#5 L0 Q1
+IF #1920!=2 GOTO1
+G0 X#10
+G31 X#7 F#4 P#5 L0 Q1
+IF #1920!=2 GOTO1
+#52=[#1925-#6] ( surface = trigger +/- stylus radius )
+G0 X#10
+#53=[#51+#52]/2
+( Safe-Z retract - machine frame )
+#42=#520
+IF #42<0 GOTO94
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N94
+G90   ( absolute )
+G53 Z#42
+G91   ( incremental )
+#[#70+0]=#53
+G90   ( absolute )
+#1505=-5000
+GOTO2
+N1
+( Safe-Z retract - machine frame )
+#42=#520
+IF #42<0 GOTO95
+#42=-5 ( safe-Z margin - baked fallback; controller #520 wins if set )
+N95
+G90   ( absolute )
+G53 Z#42
+#1505=1
+N2
+M30
+
 ===== user_surfacing_data @ ddcs-v41 =====
 G90   ( absolute )
 M3 S18000   ( spindle on )
@@ -452,5 +564,99 @@ N1
 G90   ( absolute )
 G0 G53 Z#190
 ( ERROR: Probe failed to trigger )
+N2
+M30
+
+===== user_middle_data @ ddcs-v41 =====
+#1=200 ( Max probe distance )
+#2=2 ( Retract distance )
+#3=200 ( Fast feedrate )
+#4=50 ( Slow feedrate )
+#5=3 ( Probe port )
+#6=2 ( Probe stylus radius )
+#51=0 ( Wall 1 pos )
+#52=0 ( Wall 2 pos )
+#53=0 ( Center pos )
+#54=0 ( Wall 3 pos )
+#55=0 ( Wall 4 pos )
+#56=0 ( Center pos 2 )
+#7=[0-#1] ( Negative max probe )
+#8=#1 ( Positive max probe )
+#9=[0-#2] ( Negative retract )
+#10=#2 ( Positive retract )
+#17=10 ( DM500 work-frame safe clearance mm above work-0; DM500 has no G53 - other posts park at the machine margin )
+#19=80 ( X cross-over: in-axis traverse, wall 1 across to wall 2 user-set to span the feature, default 80 )
+#20=80 ( Y cross-over: in-axis traverse, wall 1 across to wall 2 user-set to span the feature, default 80 )
+( Hover OVER the stock top Z datum first. Press Enter - ESC=cancel )
+G91   ( incremental )
+( Z Surface - set Z datum first )
+#190=#1502
+G31 Z#7 L#682 Q1 K0 F#3
+IF #1502<=[#190+#7+0.05]GOTO1
+G0 Z#10
+#190=#1502
+G31 Z#7 L#682 Q1 K0 F#4
+IF #1502<=[#190+#7+0.05]GOTO1
+#57=[#1502-#6] ( surface = trigger +/- stylus radius )
+G0 Z#10
+G90 G92 Z[#1502-#57]
+G91   ( incremental )
+#95=#1502 ( @saveProbeZ )
+( Safe-Z retract - machine frame )
+#190=-5 ( safe-Z margin - machine frame )
+G90   ( absolute )
+G0 G53 Z#190
+G91   ( incremental )
+( REPOSITION: jog clear, to the first wall )
+( Press Enter when repositioned )
+G90   ( absolute )
+G0 G53 Z#95 ( @returnProbeZ )
+G91   ( incremental )
+#190=#1500
+G31 X#8 L#682 Q1 K0 F#3
+IF #1500>=[#190+#8-0.05]GOTO1
+G0 X#9
+#190=#1500
+G31 X#8 L#682 Q1 K0 F#4
+IF #1500>=[#190+#8-0.05]GOTO1
+#51=[#1500+#6] ( surface = trigger +/- stylus radius )
+G0 X#9
+#95=#1502 ( @saveProbeZ )
+( Clearance hop - capped at the machine margin )
+#190=-5 ( safe-Z margin - machine frame )
+#191=[#95+15]
+IF #191<#190GOTO93
+#191=#190 ( cap the hop at the safe machine margin )
+N93
+G90   ( absolute )
+G0 G53 Z#191
+G91   ( incremental )
+G0 X#19
+G90   ( absolute )
+G0 G53 Z#95 ( @returnProbeZ )
+G91   ( incremental )
+#190=#1500
+G31 X#7 L#682 Q1 K0 F#3
+IF #1500<=[#190+#7+0.05]GOTO1
+G0 X#10
+#190=#1500
+G31 X#7 L#682 Q1 K0 F#4
+IF #1500<=[#190+#7+0.05]GOTO1
+#52=[#1500-#6] ( surface = trigger +/- stylus radius )
+G0 X#10
+#53=[#51+#52]/2
+( Safe-Z retract - machine frame )
+#190=-5 ( safe-Z margin - machine frame )
+G90   ( absolute )
+G0 G53 Z#190
+G91   ( incremental )
+G90 G92 X[#1500-#53]
+G90   ( absolute )
+GOTO2
+N1
+( Safe-Z retract - machine frame )
+#190=-5 ( safe-Z margin - machine frame )
+G90   ( absolute )
+G0 G53 Z#190
 N2
 M30
