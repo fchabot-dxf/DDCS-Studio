@@ -53,7 +53,7 @@ test('update banner: silent on web, version compare correct, shows in (simulated
 
   await page.click('.ddcs-update-bar .upd-what');
   const notes = await page.textContent('.ddcs-update-bar .upd-notes');
-  expect(notes).toContain('shiny new thing');
+  expect(notes.toLowerCase(), 'the feat commit shows as a plain, sentence-cased user line').toContain('shiny new thing');
 
   // dismiss persists for that version
   await page.click('.ddcs-update-bar .upd-x');
@@ -61,6 +61,25 @@ test('update banner: silent on web, version compare correct, shows in (simulated
   await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => !!document.querySelector('.ddcs-update-bar')), 'dismissed version does not re-nag').toBeFalsy();
+});
+
+// t2068 — the "What's new" list is for USERS, not developers: raw commit subjects are translated to plain lines —
+// internal commits (docs/test/chore/release) dropped, conventional-commit prefixes + task ids + "-- detail" tails removed.
+test('What\'s new: commit subjects become plain user-facing lines (internal commits dropped)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  const out = await page.evaluate(() => window.__ddcsUpd.userFacingNotes([
+    'fix(gateway): var-read used the wrong slot for setting params -- WCS pulled "000" (t2067)',
+    'feat(update): prefer the in-place same-name update; demote the dated manual Download (t2066)',
+    'docs(findings): the setting file is param-indexed, not macro (t2067)',
+    'release: V2026.08.17.9 -- WCS pull fix reaches the exe (t2067)',
+    'test(job-history): drive the real path end to end',
+    'refactor(preview): delete dead odPassExtent',
+  ]));
+  expect(out, 'only feat/fix survive, cleaned of prefixes/task-ids/detail tails and sentence-cased').toEqual([
+    'Var-read used the wrong slot for setting params',
+    'Prefer the in-place same-name update; demote the dated manual Download',
+  ]);
 });
 
 // t2066 — when the gateway reports the in-place same-name self-update is available, it becomes the PRIMARY action and

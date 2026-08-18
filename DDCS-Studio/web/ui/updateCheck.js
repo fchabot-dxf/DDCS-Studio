@@ -34,6 +34,22 @@ async function fetchJSON(url) {
 
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// t2068 — the "What's new" is for USERS, not developers. Raw commit subjects ("fix(gateway): var-read used the wrong
+// slot … (t2067)") are noise to an operator. Turn them into plain lines: keep only the user-facing types (feat/fix/
+// perf), strip the conventional-commit type(scope) prefix, drop the "— developer detail" tail and any task-id / issue
+// refs, and sentence-case the gist. Internal commits (docs/test/chore/refactor/build/release) never reach the user.
+export function userFacingNotes(subjects) {
+  const out = [];
+  for (const s of (subjects || [])) {
+    const m = /^\s*(\w+)(\([^)]*\))?(!)?:\s*(.+)$/.exec(s);
+    if (m && !['feat', 'fix', 'perf'].includes(m[1].toLowerCase())) continue;   // internal type → not shown to users
+    let text = (m ? m[4] : s).split(/\s+(?:--|—)\s+/)[0];                        // drop the "-- technical detail" tail
+    text = text.replace(/\s*\(?\bt\d+\b\)?/gi, '').replace(/\s*\(?#\d+\)?/g, '').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim();
+    if (text) out.push(text.charAt(0).toUpperCase() + text.slice(1));           // sentence-case
+  }
+  return out;
+}
+
 /**
  * t1261 — ONE-CLICK UPDATE (user-ruled). The exe can replace itself: the gateway downloads the new build, verifies it
  * against the release's published checksum, swaps it in and relaunches. This function only ASKS — it deliberately
@@ -189,14 +205,14 @@ export async function initUpdateCheck() {
   const exe = (rel.assets || []).find((a) => /^ddcs-studio.*\.exe$/i.test(a.name || ''));
   if (exe) dl = exe.browser_download_url;
 
-  let commits = [];                                     // "what's new" = recent commit subjects ("last commit comments")
+  let commits = [];                                     // "what's new" = recent USER-FACING changes (feat/fix, cleaned)
   try {
-    const c = await fetchJSON(`https://api.github.com/repos/${REPO}/commits?per_page=8`);
-    commits = (c || []).map((x) => ((x.commit && x.commit.message) || '').split('\n')[0]).filter(Boolean);
+    const c = await fetchJSON(`https://api.github.com/repos/${REPO}/commits?per_page=20`);   // 20 raw → enough after filtering out internal commits
+    commits = userFacingNotes((c || []).map((x) => ((x.commit && x.commit.message) || '').split('\n')[0]));
   } catch (_) { /* fall back to the release body */ }
 
   showBanner(tag, dl, rel.body, commits);
 }
 
 // Expose helpers for tests (and so the web-exclusion can be asserted).
-if (typeof window !== 'undefined') window.__ddcsUpd = { isNewer, isDesktopApp, isDevServer, bakedVersion, initUpdateCheck, checkWebVersion, initWebVersionNudge, checkStalePage, _resetNudgeThrottle: () => { _lastWebCheck = 0; } };
+if (typeof window !== 'undefined') window.__ddcsUpd = { isNewer, isDesktopApp, isDevServer, bakedVersion, userFacingNotes, initUpdateCheck, checkWebVersion, initWebVersionNudge, checkStalePage, _resetNudgeThrottle: () => { _lastWebCheck = 0; } };
