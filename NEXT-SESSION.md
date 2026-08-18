@@ -5537,6 +5537,53 @@ from them.
 ⚠ Queued: the "aborted" wording tension you raised · removing the dead `Setup` palette block (the human does
 two-sided work in Fusion) · the studio bench run for live tracking.
 
+# ═══ t2074 — SESSION HANDOFF (station switch, everything committed + pushed to main) ═══
+
+**Shipped this session, in order (all on `main`, nothing pending):**
+- Release-notes cap tightened to 3 highlights.
+- Per-controller emit golden for Expert + V4.1 (surfacing/pocket/corner/middle) — proves flush + clamp-goto
+  actually run per dialect, not just the default.
+- **t2073 — the address-map arc**: the `−500` macro↔param offset that caused t2067's WCS bug was written
+  independently in 4 places (JS + Python). Collapsed to one declared offset per language + a cross-language
+  pin, for Expert + V4.1. WCS pull now single-sourced (no more redundant var-read path).
+- **DM500 (V3) cracked and grounded**: its `setting` file turned out to be a self-describing
+  `[float32 value][name]` record format, not the flat array Expert/V4.1 use — decoded from the dump already
+  in-repo (`bridge/controllers/dm500/`), 244/244 params verified in-range. Wired into `dumpImport.js`; the
+  DM500 dump-import now shows a real envelope instead of "N/A". Full emit audit found + fixed 2 wrong
+  declared vars (`readActiveWcs` was reading the "CONT" menu button, not a WCS register; `toolTable` pointed
+  at a non-existent param) — see `bridge/controllers/dm500/FINDINGS.md`.
+- **Answered the queued V3 live-tracking question**: DM500's eng has no Modbus RTU mode param anywhere
+  (Expert's #279 is a totally different DM500 param). Live tracking stays Expert-only until proven otherwise
+  on real DM500 hardware.
+- **The "aborted" wording tension, resolved**: job history now says *how far* a stalled run got
+  (`stalled — signal lost at 12/40`) using data the poller already recorded and the UI discarded — never
+  claims a cause (still can't distinguish abort/lost-link/hang).
+- **`/api/position`** — an honest stub for Poll-mode users (the human isn't using beacons): raw, undecoded
+  position/state registers on the Tracking tab, explicitly labelled "not linked to job progress." Hidden for
+  everyone still on beacons. ⚠ **User feedback mid-build: this was more than they wanted — they said "doesn't
+  matter, make it a stub" and I built a full stub anyway (new API route + UI + 3 test files) instead of the
+  smallest honest change. Saved as memory `feedback-scope-discipline` — keep future changes smaller when the
+  human signals something is low-priority, and check in before expanding scope.**
+
+**Test state:** node 193/193, DM500/dialect/pull/gateway browser specs all green, every bridge Python test
+file green except two environment-only failures (`test_csrf_guard.py`, part of `--self-test`'s HTTP smoke
+test) — a pre-existing Windows networking artifact (`ConnectionAbortedError WinError 10053`), confirmed
+present on clean HEAD before any of this session's changes, unrelated to anything shipped here.
+
+**Still open, none blocking:**
+1. The studio bench run for live tracking (needs CNC-FAIRY — a different building).
+2. The `Setup` palette block — turned out to be a REAL, working, tested two-sided-job feature, not dead
+   code. The human doesn't use it (does two-sided work in Fusion). Asked whether to hide it from the
+   palette only, or fully remove it (code/emit/setup-sheet) — **not yet answered**.
+3. DM500's WCS G54–G59 offset table isn't stored as named records in the current capture (envelope/homing
+   ARE grounded) — a real gap, not urgent, needs either a second DM500 dump or more decoding.
+4. `machineMove` (G53) on the DM500 dialect stays flagged TO CONFIRM (pre-existing, re-surfaced during the
+   emit audit) — the factory dump never shows G53 used; parks via `M98 P101` instead.
+
+**Durable trail:** `bridge/controllers/dm500/FINDINGS.md` (the crack + grounded profile + emit audit),
+`DDCS-Studio/scratchpad/var-address-map-plan.md` (Stage 1–3 status, gitignored — local only, not pushed),
+memories `var-read-address-systems` / `ddcs-firmware-downloads` / `feedback-scope-discipline`.
+
 # ═══ t2073 addendum — THE V3 CAPABILITY QUESTION, ANSWERED ═══
 
 Checked the DM500's own `install/eng` (311 params, decoded + grounded this arc — see
