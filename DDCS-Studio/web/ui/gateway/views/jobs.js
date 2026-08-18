@@ -25,6 +25,21 @@ export function lastTimeDuration(rows, i) {
   return prior ? prior.duration_s : null;
 }
 
+// t2073 — the "aborted" wording tension, resolved: operator-abort / lost-link / a genuine hang are
+// STRUCTURALLY INDISTINGUISHABLE to the poller (t2049/t2064) — no channel exists to tell them apart, so a
+// cause-word ("aborted") would be a guess dressed as a fact. What the poller DOES know, and already records
+// on every stalled row (poller.py _record_history: last_beacon/total_beacons), is HOW FAR the run got before
+// signal stopped — real, measured, unused until now. That is the honest axis: not WHY it stopped, only HOW
+// FAR. "after delivery, no beacon at all" is itself informative (Start was likely never pressed / the link
+// never came up) without claiming which.
+export function resultLabel(r) {
+  const state = r.final_state || '';
+  if (state !== 'stalled') return state || '—';
+  const n = r.last_beacon, total = r.total_beacons;
+  if (!n) return 'stalled — no signal after delivery';
+  return total ? `stalled — signal lost at ${n}/${total}` : `stalled — signal lost at checkpoint ${n}`;
+}
+
 // t2024 — one row per finished job, the SAME columns and formatting the on-screen table already shows, so
 // what a machinist sees on screen is exactly what they get in the file. CSV, not JSON: this data's whole
 // value is "how long did this take", and that question gets answered in a spreadsheet (sorted, summed,
@@ -38,7 +53,7 @@ export function historyToCSV(rows) {
     const last = lastTimeDuration(rows, i);
     return [
       r.name || r.jobId,
-      r.final_state || '',
+      resultLabel(r),
       r.duration_s == null ? '' : fmtEta(r.duration_s),
       last == null ? '' : fmtEta(last),
       fmtWhen(r.ended_at),
@@ -109,7 +124,7 @@ export default {
       const last = lastTimeDuration(rows, i);
       tbl.append(el('tr', {},
         el('td', { class: 'mono' }, r.name || r.jobId),
-        el('td', {}, el('span', { class: 'pill ' + (r.final_state || '') }, r.final_state || '—')),
+        el('td', {}, el('span', { class: 'pill ' + (r.final_state || '') }, resultLabel(r))),
         el('td', { class: 'mono' }, r.duration_s == null ? '—' : fmtEta(r.duration_s)),
         el('td', { class: 'mono' }, last == null ? '—' : fmtEta(last)),
         el('td', { class: 'mono' }, fmtWhen(r.ended_at))));

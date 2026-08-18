@@ -77,7 +77,7 @@ test('t2049: a stalled run does not poison "last time" on the REAL rendered view
     // run's own truncated duration — instead of the real 600s completion.
     const STALL_ROWS = [
         { jobId: 'J3', name: 'bracket.nc', final_state: 'delivered', duration_s: 0, ended_at: '2026-08-17T12:00:00', content_hash: 'HASH-A' },
-        { jobId: 'J2', name: 'bracket.nc', final_state: 'stalled', duration_s: 45, ended_at: '2026-08-17T11:00:00', content_hash: 'HASH-A' },
+        { jobId: 'J2', name: 'bracket.nc', final_state: 'stalled', duration_s: 45, last_beacon: 6, total_beacons: 40, ended_at: '2026-08-17T11:00:00', content_hash: 'HASH-A' },
         { jobId: 'J1', name: 'bracket.nc', final_state: 'done', duration_s: 600, ended_at: '2026-08-17T10:00:00', content_hash: 'HASH-A' },
     ];
     await boot(page, { historyRows: STALL_ROWS });
@@ -88,7 +88,9 @@ test('t2049: a stalled run does not poison "last time" on the REAL rendered view
     });
     expect(r[0][1], 'the newest row is the un-finished delivery').toBe('delivered');
     expect(r[0][3], 'skips the stalled row, links to the real 10-minute completion').toBe('10m00s');
-    expect(r[1][1], 'the middle row is the stall itself').toBe('stalled');
+    // t2073 — no cause is claimed (operator-abort/lost-link/hang stay indistinguishable), but the label is now
+    // PRECISE about how far the run got, using data the poller already records and the view previously discarded.
+    expect(r[1][1], 'the middle row is the stall itself, honest about extent not cause').toBe('stalled — signal lost at 6/40');
     expect(r[1][3], 'the stalled row also looks past itself to the real completion, not its own truncated 45s').toBe('10m00s');
 });
 

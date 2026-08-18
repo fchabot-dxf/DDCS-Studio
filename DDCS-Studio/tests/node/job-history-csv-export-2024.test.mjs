@@ -1,5 +1,5 @@
 import { test, expect } from './support/harness.mjs';
-import { historyToCSV, lastTimeDuration } from '../../web/ui/gateway/views/jobs.js';
+import { historyToCSV, lastTimeDuration, resultLabel } from '../../web/ui/gateway/views/jobs.js';
 
 /**
  * job-history-csv-export-2024 — EXPORT JOB HISTORY (t2024): a plain "Export CSV" button on the Jobs view's
@@ -91,4 +91,34 @@ test('a program with ONLY stalled/failed runs on record has no real "last time" 
         { jobId: 'J1', name: 'bracket.nc', final_state: 'failed', duration_s: null, content_hash: 'HASH-A' },
     ];
     expect(lastTimeDuration(rows, 0), 'no genuine completion exists yet — null, not a fabricated duration').toBeNull();
+});
+
+/**
+ * t2073 — the "aborted" wording tension, resolved. Operator-abort / lost-link / a genuine hang are
+ * structurally indistinguishable to the poller (t2049/t2064) — no channel exists to tell them apart, so
+ * printing a cause word ("aborted") would be a guess dressed as fact. `resultLabel` stays honest (never
+ * names a cause) while getting MORE PRECISE than the bare word "stalled", using data the poller already
+ * records on every stalled row (last_beacon/total_beacons — poller.py _record_history) but the UI never
+ * showed: exactly how far the run got before signal stopped.
+ */
+test('resultLabel: a non-stalled row passes through unchanged', () => {
+    expect(resultLabel({ final_state: 'done' })).toBe('done');
+    expect(resultLabel({ final_state: 'delivered' })).toBe('delivered');
+    expect(resultLabel({})).toBe('—');
+});
+
+test('resultLabel: stalled with progress names exactly how far it got — no cause claimed', () => {
+    expect(resultLabel({ final_state: 'stalled', last_beacon: 12, total_beacons: 40 }))
+        .toBe('stalled — signal lost at 12/40');
+    // total unknown (older record / deliver-only edge) — still precise about the checkpoint, honest about the total
+    expect(resultLabel({ final_state: 'stalled', last_beacon: 7 }))
+        .toBe('stalled — signal lost at checkpoint 7');
+});
+
+test('resultLabel: stalled with ZERO beacons is a genuinely different, more informative case', () => {
+    // Delivered but no beacon ever arrived — likely Start was never pressed, or the link never came up at
+    // all. Distinct from "died partway" without guessing WHICH of those it was.
+    expect(resultLabel({ final_state: 'stalled', last_beacon: 0, total_beacons: 40 }))
+        .toBe('stalled — no signal after delivery');
+    expect(resultLabel({ final_state: 'stalled' }), 'last_beacon absent (older record) reads the same as 0').toBe('stalled — no signal after delivery');
 });
