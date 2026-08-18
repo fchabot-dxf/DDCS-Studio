@@ -27,7 +27,14 @@ test('the review renders the V4.1 WCS table from coord1 (G54 taught) when /api/v
     await page.click('[data-target="set_tab_profile"]');
     await page.click('#set_profile_pull');
     await page.waitForSelector('#import-modal.active #import-body', { timeout: 8000 });
-    // the WCS candidate is 'default' (changed:false, like the Expert's) → untick "Show only changed" to review the full table
+    // t2067 — the workspace has NO WCS (fresh machine) and the controller has a taught G54 → the pull now marks the WCS
+    // row 'changed', so it surfaces even with "Show only changed" ticked (the empty-vs-taught case the user hit).
+    const wcsTag = await page.evaluate(() => {
+        const row = [...document.querySelectorAll('#import-modal .im-row')].find((r) => /active/i.test(r.querySelector('.im-lbl')?.textContent || ''));
+        return row ? (row.querySelector('.im-tag')?.textContent || '') : null;
+    });
+    expect(wcsTag, 'the WCS row shows as "changed" (empty workspace vs a taught controller) — visible without unticking').toBe('changed');
+    // untick anyway to review the full 6-system detail table below
     await page.evaluate(() => { const o = document.querySelector('#import-only'); if (o && o.checked) { o.checked = false; o.dispatchEvent(new Event('change', { bubbles: true })); } });
     await page.waitForSelector('#import-modal.active #import-body .im-drow', { timeout: 8000 });
 
@@ -37,7 +44,7 @@ test('the review renders the V4.1 WCS table from coord1 (G54 taught) when /api/v
     const g54 = rows.find((r) => /^G54/.test(r.label));
     expect(g54, 'a G54 detail row renders (from coord1, not readVars)').toBeTruthy();
     expect(g54.raw, 'G54 shows the coord1 offsets').toContain('-300.29');
-    expect(g54.derived, 'G54 flagged active, from coord1').toMatch(/active.*coord1/i);
+    expect(g54.derived, 'G54 flagged active, read from the controller file (coord1/setting), not the live var-read').toMatch(/active.*(file|coord1)/i);
     // the empty systems render as zero rows (G55 present, all-zero) — the whole table pulled, not just the taught one
     expect(rows.find((r) => /^G55/.test(r.label)), 'G55 row present (all 6 systems shown)').toBeTruthy();
 

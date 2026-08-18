@@ -962,14 +962,19 @@ class Ops:
         if 1000 <= n <= 1499 and camsetting is not None and (n - 1000) < len(camsetting):
             v = camsetting[n - 1000]
             return {"available": True, "value": v, "source": "camsetting", "userSet": v != 0}
-        # setting: persisted system params #0-999 (index = #var) — WCS #805+, serial, servo, … userSet = differs
-        # from the factory `default_setting` baseline (so the import can flag what the operator actually changed).
-        if 100 <= n <= 999 and setting is not None and n < len(setting):
-            v = setting[n]
+        # setting: persisted system PARAMS. THE SETTING FILE IS NOT THE MACRO ADDRESS SPACE — it is indexed by PARAM
+        # number, and a macro var reads the param 500 BELOW it: macro #805 = param #305 = setting[305], macro #578
+        # (active WCS) = setting[78]. The old code read setting[#var] (setting[805]), which is a DIFFERENT, empty slot,
+        # so a taught G54 came back "000". Bench-confirmed on a live dump (t2067): setting[305]=50.13/-665.70/-47.28 was
+        # the real G54 while setting[805]=0. _map_geometry_to_profile already uses the correct base (#305 = macro #805);
+        # this brings the raw var-read into line with it. (camsetting #1000-1499 is handled above with its own slot map.)
+        idx = n - 500
+        if setting is not None and 0 <= idx < len(setting):
+            v = setting[idx]
             out = {"available": True, "value": v, "source": "setting"}
-            if default_setting is not None and n < len(default_setting):
-                out["default"] = default_setting[n]
-                out["userSet"] = abs(v - default_setting[n]) > 1e-9
+            if default_setting is not None and idx < len(default_setting):
+                out["default"] = default_setting[idx]
+                out["userSet"] = abs(v - default_setting[idx]) > 1e-9
             else:
                 out["userSet"] = v != 0
             return out

@@ -2165,28 +2165,47 @@ function wireSettingsOverlay(ov) {
         if (!lenReadable) notes.push({ group: 'Tool lengths', label: 'Not readable on this controller', value: '—', kind: 'note' });
         else if (!lenCount) notes.push({ group: 'Tool lengths', label: 'None set', value: 'all at default (0)', kind: 'note' });
         // WCS table — read all 6 systems (G54–G59) + the active index. Builds the full table for Settings → Machine.
-        const idxO = obj(activeWcsVar); const active = (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1;
-        const table = []; let anyWcs = false;
+        // t2067 — is the PULLED table actually different from what this workspace has? A workspace with NO WCS
+        // (table null/empty) vs a controller with real offsets IS a change worth surfacing; the old hardcoded
+        // changed:false buried it under "Show only changed" (the user hit exactly this — empty workspace, taught
+        // machine, WCS invisible). Round to 4dp so register-read float noise isn't a false diff.
+        const wcsDiffers = (pTable, pActive) => {
+            const r4 = (v) => Math.round((+v || 0) * 1e4) / 1e4;
+            const cur = (_ddcsSettings.machine && _ddcsSettings.machine.wcs) || {};
+            const ct = Array.isArray(cur.table) ? cur.table : null;
+            if (!ct) return pTable.some((r) => r4(r.x) || r4(r.y) || r4(r.z));   // no WCS in the workspace → any taught offset is new
+            if ((cur.active || 1) !== pActive) return true;
+            return pTable.some((r, i) => { const c = ct[i] || {}; return r4(c.x) !== r4(r.x) || r4(c.y) !== r4(r.y) || r4(c.z) !== r4(r.z); });
+        };
+        // t2067 — PREFER THE SETTING-FILE WCS. The gateway's profile read maps the WCS straight from the `setting`
+        // file param-space (ops.py _map_geometry_to_profile: base #305 = macro #805) — the AUTHORITATIVE store, the
+        // one G-code's `#805` actually addresses. The live readVars(#805) reads a DIFFERENT live-variable space that
+        // is NOT the WCS param table: on the Expert it comes back 0 / stale scratch (the reported "G54 shows 000 but
+        // I have one" bug — the file had X50.13 Y-665.70 Z-47.28 while the var-read said 0). So use hwProfile.wcs
+        // whenever it carries offsets; fall back to the var-read only if the profile brought none. (V4.1 always used
+        // the file path here — t654 — because its vars endpoint declines #15xx; the Expert now joins it.)
+        const wp = hwProfile && hwProfile.wcs && hwProfile.wcs.table ? hwProfile.wcs : null;
+        const fileTab = wp ? WCS_NAMES.map((_, i) => { const r = wp.table['g' + (54 + i)] || [0, 0, 0]; return { x: +r[0] || 0, y: +r[1] || 0, z: +r[2] || 0 }; }) : null;
+        const fileActive = wp && wp.active >= 1 && wp.active <= 6 ? Math.round(wp.active) : 1;
+        const fileAny = fileTab && fileTab.some((r) => r.x || r.y || r.z);
+        // the live var-read table (fallback only)
+        const varActive = (idxO => (idxO && idxO.value >= 1 && idxO.value <= 6) ? Math.round(idxO.value) : 1)(obj(activeWcsVar));
+        const varTab = []; let varAny = false;
         for (let g = 0; g < 6; g++) {
             const b = wcsBase + g * wcsStride; const gx = obj(b), gy = obj(b + 1), gz = obj(b + 2);
-            if (gx || gy || gz) anyWcs = true;
-            table.push({ x: gx ? gx.value : 0, y: gy ? gy.value : 0, z: gz ? gz.value : 0 });
+            if (gx || gy || gz) varAny = true;
+            varTab.push({ x: gx ? gx.value : 0, y: gy ? gy.value : 0, z: gz ? gz.value : 0 });
         }
+        const useFile = !!fileAny;                                   // file wins whenever it has any taught offset
+        const src = useFile ? 'controller file' : 'live vars';       // profile read (Expert setting-file / V4.1 coord1) vs the live var-read fallback
+        const table = useFile ? fileTab : varTab;
+        const active = useFile ? fileActive : varActive;
+        const anyWcs = useFile || varAny;
         if (anyWcs) {
             const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
-            const detail = table.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === active - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === active - 1 ? '← active' : '' }));   // DETAIL: all 6 systems' raw offsets, active flagged
-            cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active }, detail });
-        } else if (hwProfile && hwProfile.wcs && hwProfile.wcs.table) {
-            // t654 — the vars endpoint declines #15xx on V4.1, so the WCS came from the gateway's FILE read (coord1) as the
-            // hwProfile.wcs payload (same shape the Expert emits). Render the SAME rows + apply path (→ settings.machine.wcs).
-            const wp = hwProfile.wcs, wa = (wp.active >= 1 && wp.active <= 6) ? Math.round(wp.active) : 1;
-            const ftab = WCS_NAMES.map((_, i) => { const r = wp.table['g' + (54 + i)] || [0, 0, 0]; return { x: +r[0] || 0, y: +r[1] || 0, z: +r[2] || 0 }; });
-            if (ftab.some((r) => r.x || r.y || r.z)) {
-                const ar = ftab[wa - 1] || { x: 0, y: 0, z: 0 };
-                const detail = ftab.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === wa - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === wa - 1 ? '← active (from coord1)' : '' }));
-                cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[wa - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table: ftab, active: wa }, detail });
-            } else notes.push({ group: 'WCS table (G54–G59)', label: 'All zero', value: 'controller reports no taught WCS offsets (coord1)', kind: 'note' });
-        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: 'controller returned no non-zero WCS offsets', kind: 'note' });
+            const detail = table.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === active - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === active - 1 ? `← active (${src})` : '' }));   // DETAIL: all 6 systems' raw offsets, active flagged + where it was read
+            cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: wcsDiffers(table, active), kind: 'wcs', data: { table, active }, detail });
+        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: 'controller returned no non-zero WCS offsets (setting file + live vars both empty)', kind: 'note' });
         // Machine envelope / home / feeds — from the controller's soft-limit + homing params (gateway /api/profile geometry).
         // t594 — signed travel per axis (magnitude × homeDir), the per-axis Home EDGE (→ settings.limits <edge>Home), and the
         // homing feeds. A SENTINEL axis (travel null: both soft-limit ends ±9999) shows 'not declared on the controller' + stays
