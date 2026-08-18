@@ -5699,3 +5699,109 @@ that is deliberate; a skin that wants rounding sets the token.
 real audit must exclude `data/`, `wizards/dialects/`, `vendor/`, and match colours in a way `#805` cannot
 satisfy (e.g. require exactly 3/6/8 hex digits AND a CSS-ish context, or scan CSS files and style strings
 only). **Measure honestly first, report the real number, then decide whether this is one turn or several.**
+
+---
+
+# ═══ THE STYLESHEET ARC — agreed with the human 2026-08-18 ═══
+*(SUPERSEDES the "theme the rest of the modals" entry queued earlier today — that was written BEFORE the
+audit and is wrong about sequencing. Do not work from it.)*
+
+**Origin:** the human said the stylesheet had been neglected while the logic got attention, and asked for a
+general inconsistency audit BEFORE any theming work. Eight parallel read-only agents audited it. Every
+number below was measured, not estimated.
+
+## WHAT THE AUDIT FOUND (the load-bearing facts)
+
+- **The declared token contract is followed by 9 rules; the hand-rolled one by ~134.** `styles.css:112`
+  says a SKIN sets these tokens and components read them. 231 of 250 `[data-theme=]` rules instead patch
+  component selectors directly. **Those patches are not a wart — they are the compensation mechanism for a
+  token layer too thin to carry a skin.**
+- ⚠ **But "declare more tokens" is only ~40% of it.** Causes split: ~40% no token exists · **~35% a token
+  EXISTS and the component ignores it** (`--hdr-bg` is set by all 5 skins while `.app-header:193` reads
+  `--bg`) · ~25% the value lives in a skin-private ramp (`--sv-*`, `--bv-*`) no other skin can populate.
+- **112 tokens declared, 22 honoured by all five skins, 16 dead** (`--tab-color` set 10x, read 0x), **22
+  dangling** (`--tab-accent` read 3x, never declared — futuristic's tab glow silently never fires).
+- **~1,041 hardcoded colours in styles.css bypass the token layer** — 4.5 literals per token. 756 distinct
+  colours; **482 used exactly once**; 54% collapse into a visual neighbour. De-facto palette is ~38.
+  Provenance traced: **Tailwind 500s + GitHub-dark are the real base** — the drift is people eyeballing a
+  neighbour of a Tailwind swatch instead of reusing it. `#000000` carries **31 different alphas**.
+- **314 `!important`** (not 260 — grep counted lines). 77% sit in ordinary component rules, NOT skins —
+  **skins are the provocation, components did the shouting.** **27% exists solely to fight other
+  `!important` in the same file.** 31 comments in the file explicitly reason about specificity.
+- **Every integer 1-16 is in use as a spacing value.** 34 font-sizes. 96 box-shadow shapes for 151 uses.
+  46 z-index values across 9 magnitude bands, zero tokens. Zero `rem` anywhere.
+- **Two reference implementations already exist in-house:** the glass-keyboard section (4319-4476, reads
+  only `--kbd-*`) and `.ddcs-welcome-modal` (22 `var()` reads, 0 hex, the only `--scrim` consumer).
+  **Copy those. Do not invent a style.**
+
+## ⚠ TWO CONSTRAINTS THAT GOVERN EVERY PHASE
+
+1. **POSITION ENCODES MEANING.** The file's own final comment says a rule lives at the END deliberately,
+   because the per-theme editor rules carry equal specificity and the last one wins — written earlier it
+   "looked right and changed nothing". With 314 `!important` there are certainly more undocumented cases.
+   ⛔ **NO REORDERING AND NO FILE SPLIT UNTIL P4** has removed the reason they exist. A naive `themes.css`
+   extraction would silently change what renders — every theme is currently defined in five scattered
+   places.
+2. **CSS HAS NO TEST.** Nothing in the suite catches "still works, looks wrong". ⭐ **THE GATE FOR EVERY
+   PHASE IS BEFORE/AFTER SCREENSHOTS ACROSS ALL FIVE THEMES** (normal, studio, futuristic, organic,
+   steampunk). A green suite is necessary and nowhere near sufficient. State plainly which surfaces you
+   captured and which you did not.
+
+## THE PHASES, in order
+
+**P0 — BUGS, not debt.** Each independently verifiable, each user-visible:
+- `styles.css:3215` sets `outline:none` on `[data-theme="studio"] .wiz-body input, select` with **no
+  replacement** — every form input in the DEFAULT theme has no focus ring. The fix pattern already exists
+  in the file four times (`:focus-visible` with a 2px accent outline and -2px offset).
+- `styles.css:315` `.top-dock-header` uses `!important` at only (0,1,0) — **three skins' authored styling
+  for that element never renders** (studio 3085, futuristic 3379, organic 3539).
+- The 8 named z-index collisions — incl. `.setup-sheet-overlay` (4000) rendering UNDER the wizard (10000)
+  that opens it, and the drag ghost (9999) vanishing under any open wizard.
+- `styles.css:2898-2917` — a **broken nested comment** (an inner comment closes the outer one early)
+  silently discards a whole 50px header plate.
+- `ui/dockManager.js:18` — `querySelector('.secondary-toolbar')` returns **null every run**. Dead wire.
+
+**P1 — DELETE.** Pure subtraction; makes every later phase smaller:
+- the ~250-line `.secondary-toolbar` / `.var-list` / `.variable-chip` / `.search-box` / `.toolbar-*`
+  subsystem (styles.css 1108-1931), dead except that one orphan querySelector;
+- the ~90-line `.pal-*` block renderer — its source `blocks/blocks.html` **no longer exists**;
+- byte-identical dupes: `.row-2` (clone of `.grid-2`, zero uses), the twin spin keyframes
+  (`ddcs-busy-spin` and `ddcs-busy-rot`), `.g-comment` (4 definitions, 2 exact duplicate pairs);
+- the dead tokens.
+- ⛔ **DO NOT delete the Tier-3 dynamics** — `.cat-*`, `.s-queued/.s-running/...`, `.ss-verdict-*` are
+  built at runtime from template literals. The audit flagged them as unverifiable statically.
+
+**P2 — THE TWO ADDITIONS THAT CONFLICT WITH NOTHING.** Nothing currently defines either, so neither can
+break anything: a shared `input, select, textarea` base, and one `:focus-visible` ring on the base button
+rule. ⭐ Closes the largest gap and the largest accessibility hole at once. **There is NO
+`input, select, textarea` rule anywhere in 5,953 lines**, and `.wiz-body` fields — the app's primary form
+surface — render as **raw browser-default controls in four of five themes**.
+
+**P3 — WIDEN THE VOCABULARY.** The enabler. Declare the missing tokens (button material, modal shell,
+header band, screen surface, and the one the audit called the cleanest example: **`--subhdr-bg`**, absent,
+which is why organic patches five selectors with a single colour) — AND make components read the ones that
+already exist. ⭐ **This is a DESIGN act, not a cleanup: bring the naming to the human before building.**
+
+**P4 — CONVERT SKINS** from patches to token bundles: ~208 of 228 patch parts (~91%) become token
+assignments. Collapses most of the `!important` war as a side effect. 26 patches are genuinely structural
+(CRT scanlines, keyframe identity, grid geometry, organic's deliberate `nth-child` variation) — leave them.
+
+**P5 — CONSOLIDATE.** Shared modal base (copy `.ddcs-welcome-modal` verbatim — it already is the template;
+14 hand-rolled scrims in 5 opacities collapse to one). Merge the identical families. Snap colours to the
+Tailwind base that is already 39% of the UI. Pick a spacing/type scale. **A file split becomes safe here,
+not before.**
+
+## NOT A PERFORMANCE PROJECT — told to the human plainly
+Deleting ~350 lines of ~5,953 saves ~10KB and microseconds of parsing; selector matching at this scale is
+not a bottleneck. **The wins are correctness and maintainability, not speed.** Do not justify any of this
+work on performance grounds, and do not trade correctness for a micro-optimisation.
+
+## HELD, NOT DECIDED
+**Whether five themes is the right number.** Answer it AFTER P4, when a skin costs ~40 token assignments
+instead of ~100 patches — i.e. choose on merit, not on maintenance pain. (Weakest today: **steampunk** —
+30 tokens, 9 patches, and grouped with `:root` for tab shape so it *cannot* differ from the default.)
+
+## EXPLICITLY PROTECT — do not "fix" these
+The `.comm-dialog` family (148 lines of deliberate Win95 chrome replicating the DDCS controller's own
+dialogs — product identity) · the setup sheet's white `.setup-sheet-page` (deliberately unthemed paper) ·
+the three table implementations (three genuinely different contexts).
