@@ -31,6 +31,23 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.3": [
+    { short: "One sign-in, in the header, with your photo",
+      full: "Signing in used to be in two different places that disagreed with each other about whether you "
+        + "were connected. There is now ONE account button in the top-right of the header: a plain avatar you "
+        + "click to sign in, which becomes your Google profile picture once you have. Click it any time for "
+        + "your account details or to sign out. Signing in does not switch anything on by itself — saving "
+        + "projects and sending jobs through Drive stay their own settings." },
+    { short: "Undo and redo finally have keyboard shortcuts",
+      full: "Program undo/redo had no shortcut at all — the two header buttons were the only way to reach it. "
+        + "They now respond to Ctrl+Z, and Ctrl+Shift+Z or Ctrl+Y to redo, and the buttons themselves moved "
+        + "down beside the editor. Typing in a text box is untouched: Ctrl+Z there still undoes your typing, "
+        + "not your program." },
+    { short: "A tidier editor and header",
+      full: "The indent and outdent buttons are gone from the editor's corner — Tab and Shift+Tab already did "
+        + "the same thing. The old Transfer button, which had been hidden for a long time and was replaced by "
+        + "the Gateway tab's own Send, is removed too." },
+  ],
   "2026.08.19.2": [
     { short: "Send jobs through your own Google Drive",
       full: "You can now send a program to your machine from anywhere, over the internet, using YOUR "
