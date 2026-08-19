@@ -6131,3 +6131,59 @@ what else in that range breaks at 360px, but do not fix it in this turn.
 `.command-deck-handle` is dead CSS for a handle that no longer exists — a small deletion candidate, but
 **do not bundle it with this fix**; a dead-code removal tangled into a live responsive bug makes the
 before/after harder to read.
+
+---
+
+# ═══ QUEUED — MAKE STUDIO INSTALLABLE (PWA) ═══
+*(human, 2026-08-18: "i would like to add pwa after the css revamp" — SEQUENCED AFTER the stylesheet arc,
+do not start it earlier)*
+
+## WHAT IT IS
+Two small files added to the existing site. **Not a port, not a second client, not a rewrite** — the same
+Studio, which the phone then treats as an installed app.
+
+- `manifest.json` — name, icons, theme colour, and `display: standalone`
+- a service worker — caches the shell so it opens offline
+
+Result: home-screen icon · opens with **no URL bar and no tabs** · works with no internet · can send
+notifications later if wanted. **One codebase; it IS the website.**
+
+## WHY, IN ORDER OF ACTUAL VALUE
+1. ⭐ **Standalone display removes the URL bar** — which is the direct cause of the command-deck bug the
+   human hit on Android (`100vh` includes the area behind Chrome's address bar).
+2. Home-screen icon and instant launch — the shop-floor use case is a phone or tablet at the machine.
+3. Offline — a shop with bad wifi still opens the app.
+4. Notifications ("job finished / stalled") become possible without going native.
+
+⚠ **DO NOT LET (1) BECOME A REASON TO SKIP THE `dvh` FIX.** The queued mobile-dock entry stands on its own
+and must land FIRST. A PWA merely *hides* that bug for installed users; everyone still in a browser tab —
+i.e. every first-time visitor — keeps hitting it. Fix the cause, then add the PWA.
+
+## ⛔⛔ THE THING MOST LIKELY TO GO WRONG — SERVICE-WORKER CACHING vs THE UPDATE FLOW
+**A service worker is a cache that persists across reloads and survives a hard refresh.** This project has
+ALREADY been burned by stale assets: the standing rule is *"version.json refreshes but ES modules cache;
+fetch the served FILE and grep it before debugging a fix-did-not-work report."* **A service worker makes
+that failure mode stronger and longer-lived.**
+
+⇒ Requirements, not suggestions:
+- The SW must have an **explicit update/activate path** — new SW takes control promptly, old caches purged
+  by version. Never ship a cache-first strategy over the app's own JS without a version key.
+- It must **not** break the existing update banner and the post-update welcome modal built in t2075. Those
+  rely on `version.json` reflecting reality; a SW that serves a cached `version.json` would make the app
+  lie about its own version — the exact dishonesty that arc was fixing.
+- **Verify like a release:** fetch the served file and confirm bytes, do not trust the version chip. Test
+  the full sequence: install → new version deploys → does the installed PWA actually update?
+- ⚠ Consider whether the SW should be **scoped to the Cloudflare origin only**. The exe ALSO serves Studio
+  (from `127.0.0.1:8765`, its own origin). A service worker registered there would cache the exe's bundled
+  assets and could survive an exe update. Decide deliberately; do not let it happen by accident.
+
+## iOS
+Works, with one gap: **there is no install prompt on iPhone** — the user must tap Share → "Add to Home
+Screen", and on iOS *every* browser is WebKit underneath, so the install path is effectively Safari's.
+⇒ Ship a one-line hint for iPhone users. ⚠ **Verify current iOS behaviour on a real device** rather than
+trusting documentation or an assistant's recollection; Apple has changed these rules repeatedly (push
+arrived in 16.4, EU engine rules in 2024).
+
+## SIZE
+Small — roughly a manifest, a service worker, an icon set, and a line of iOS help text. The care is all in
+the caching contract above, not in the code volume.
