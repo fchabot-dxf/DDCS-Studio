@@ -5864,3 +5864,22 @@ A yes/no on the visibility question with the evidence that settled it, the exe-t
 interval, and an honest note on anything you could NOT determine without live Google credentials. **If you
 cannot test it without credentials the human must supply, say so plainly and say exactly what you need** —
 do not simulate the answer or reason it out from documentation and present that as a result.
+
+## CSS DECISIONS TAKEN BY THE ADVISOR (human 2026-08-18: "most css question i trust you,
+## especially subtle color, thats trivial") — recorded so P3/P5 inherit them, not re-litigate
+
+- **The accent blue is `#3b82f6`** (Tailwind blue-500). It beat `#2d7ff9` on usage (37 vs 25) and because
+  the audit traced the de-facto base palette to the **Tailwind 500 series + GitHub-dark**. Greys resolve to
+  the **Tailwind slate ramp** (`#94a3b8` muted, `#64748b` secondary). ⇒ Snap drift toward the palette that
+  is ALREADY 39% of the UI; do not invent a new one.
+- **Delete the hardcoded Win95 leftovers** — `.sidebar button` (2884), `.variable-chip` (1875),
+  `.viz-container` (2781). They sit OUTSIDE the theme system, so they render grey bevels in futuristic and
+  organic too. That is a bug wearing a style's clothes. ⛔ **`.comm-dialog` is NOT included** — it is the
+  deliberate DDCS controller replica and stays exactly as it is.
+- **"Compact" becomes the base values.** `.wiz-head`/`.wiz-foot`/`.section-label`/`.grid-N` each have a
+  later override that unconditionally clobbers the base, so the roomier original is already unreachable —
+  it is dead code with extra steps. Collapse to one value. If density ever becomes a real option it gets a
+  real modifier class, which this sheet currently has zero of.
+- **`prefers-color-scheme` is a SEED, never an override.** The five named themes are an explicit user
+  choice and the OS must not second-guess it. But on **first run with nothing chosen**, use the system
+  preference to pick a sensible default instead of always landing on the same skin.
