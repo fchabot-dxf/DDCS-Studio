@@ -6338,3 +6338,37 @@ at the machine is simply the PC whose `install_id` is declared).
 ⚠ **Verify the real symptom, not just a unit test:** run two instances, one declared and one not, against
 one rendezvous, and confirm the undeclared one publishes NOTHING while the declared one keeps reporting
 `controller_connected: true`. A test that only asserts a config flag would pass with the stomp still live.
+
+### ⭐ AMENDMENT — A LIST OF ALLOWED GATEWAYS, NOT ONE
+*(human, 2026-08-18: "i can unplug a pc and plug another one in and not needing to edit their role")*
+
+**Real scenario: swap which PC drives the machine — a laptop for a desktop, or a backup box — with NO
+edit to the workspace.** This does NOT break [[one-workspace-one-machine]]: it is still ONE machine, with
+more than one PC permitted to serve it.
+
+**The declaration becomes a LIST:**
+```
+  gateways: [ { install_id, hostname }, { install_id, hostname }, … ]
+```
+
+⭐ **A PC acts as the gateway only when BOTH conditions hold:**
+1. **its `install_id` is in the list** — the DECLARATION, i.e. permission, and
+2. **the controller is actually reachable** — the FACT, i.e. it is really plugged in.
+
+**Why both, and why neither alone is enough:**
+- **Permission alone** would let an unplugged-but-listed PC keep publishing heartbeats and a file index,
+  which is the stomp this whole design exists to kill.
+- **Reachability alone** would make ANY PC on the controller's LAN a gateway by accident — a copied config
+  or a stray destination, exactly the inference-vs-declaration failure that made me choose a declared role
+  over gating on `expert_dest` in the first place.
+
+⇒ Behaviour, with no editing ever required for a swap: laptop plugged in and desktop not → only the laptop
+publishes · swap them → works immediately · a PC not on the list → stays a client even though it can reach
+the controller.
+
+**The reachability check already exists** — `ops.py:221` does `os.path.isdir(expert_dest)`. Reuse it; do
+not invent a second probe.
+
+⚠ **Two listed PCs genuinely connected at once is out of scope** — the human states it cannot happen
+("its never simultaneously"). Do NOT build leader election or arbitration for it. If it ever does happen,
+the duplicate-delivery hazard is real, so it is worth a LOG LINE naming the collision — but nothing more.
