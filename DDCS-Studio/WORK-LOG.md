@@ -44234,3 +44234,169 @@ to the established set on the first run.
 - `DDCS-Studio/verification/t2077-{before,after}-*.png` — 50 screenshots.
 
 🔨 turn 2077
+
+# t2079 — P4c of the stylesheet arc: EDITOR SCREEN AND SYNTAX (the largest remaining block)
+
+A prep pass had already mapped six live bugs with evidence, plus a named trap-dodge technique. Per the
+dispatch's own instruction — "do not re-derive them, but DO verify each before fixing" — every one was
+re-confirmed against the actual file/DOM/highlighter before touching anything, and one (#3) turned out to be
+subtly wrong in its specifics. That correction is the most important finding of this turn.
+
+## Bug #1 — the caret: !important alone measured as NOT enough
+
+Confirmed exactly as briefed: `body #editor.editor-layer { caret-color: white !important; }` (a base rule) beat
+studio/futuristic/organic's own `caret-color` declarations, none of which carried `!important`. Added
+`!important` to all three — and then **measured the result with `getComputedStyle`, not assumed it worked**: the
+caret was STILL white in all three. Root cause: `body #editor.editor-layer` has specificity `(1,1,1)` (1 ID + 1
+class + the "body" element); a plain `[data-theme="X"] #editor` override is `(1,1,0)` — LOWER — so even with
+both sides `!important`, the base rule's higher specificity wins outright, and even if specificity were tied,
+the base rule sits LATER in the file (no reordering permitted) so a tie would still lose. Fixed by matching the
+base rule's own shape with the theme attribute folded in — `body[data-theme="X"] #editor.editor-layer` reaches
+`(1,2,1)`, which wins unconditionally. Re-verified: studio/futuristic/organic's caret now reads
+`rgb(21,224,0)`/`rgb(45,226,255)`/`rgb(217,122,92)` — their own phosphor/accent/coral, byte-matching each
+theme's own token — normal/steampunk correctly stay white (no override, by design).
+
+## Bug #2 — studio's comment colour, dead against the base `!important`
+
+Confirmed: base `.g-comment { color: var(--success) !important; }`; futuristic and organic had already
+anticipated it with their own `!important`; studio hadn't. Added `!important` to studio's own rule. Verified
+BEFORE vs AFTER with `getComputedStyle`: studio's comment colour moved from `rgb(34,197,94)` (the base
+`--success` default, what was silently rendering) to `rgb(0,180,0)` (`--phosphor-2`, studio's own declared
+intent) — futuristic/organic's comment colour is BYTE-IDENTICAL before and after (they were already correct;
+my only change there was retiring the now-redundant `--code-comment` token, a non-visual refactor, confirmed
+non-visual by this same diff).
+
+## Bug #3 — CORRECTED, not just fixed: the classes aren't wired for ANY theme, not "missing for two"
+
+Briefed as: normal/steampunk lack an unthemed `.g-num`/`.g-word`/`.g-ln` rule, so their numbers/G-words render
+plain white while studio/futuristic/organic's own declared colours "sit unused." Checked against the actual
+source of every `.g-line`'s markup — `ui/uiUtils.js:formatGCode`, the SOLE highlighter for both the main editor
+and the wizard code preview — rather than assumed. Its regex produces exactly four things: `.g-comment` (a real
+class), G31/M-code/axis-letters (inline `style="color:..."`, not classes at all), and everything else — G0/G1,
+plain numbers, keywords — **falls through completely unwrapped, no span, no class, for every theme**. So
+studio/futuristic/organic's own pre-existing `.g-num`/`.g-word`/`.g-ln` rules have ALSO never rendered anything,
+ever — this was never "2 skins missing colour on a live class," it's a CSS-only fix with **zero visible effect
+anywhere** until the highlighter itself is taught to emit those classes, which is a JS/behavioural change, not a
+styles.css one. **Declared the CSS side anyway** (trap-dodge shape: `.g-num { color: var(--code-num, #d9b3ff); }`
+etc., fallback = the value these tokens' own now-deleted root declaration held) so the moment a JS change wires
+the highlighter up, the correct per-theme colours are already sitting there ready — but this is flagged plainly
+here and in the pass-back as a correction to the brief, not silently absorbed or expanded into a JS change on my
+own authority. Verified with a real G-code sample loaded through the actual editor (`document.getElementById(
+'editor').value = ...; dispatchEvent('input')`) and inspecting the rendered `innerHTML` directly — confirmed
+`.g-num`/`.g-word`/`.g-ln` are absent from the DOM in every theme, both before and after this turn's CSS work.
+
+## Bug #4 — `--code-comment` retired outright (the standing trap, but the fix is deletion, not re-declaration)
+
+A root-only alias (`var(--success, #22c55e)`) whose only real value — comment = success green — already had a
+correctly-working consumer (the base `.g-comment` rule, which reads `--success` directly, never `--code-comment`
+at all). The token added an indirection nothing needed. Deleted at root; futuristic's own override (its only
+real consumer) is now a literal `#46d6a0` directly in its `.g-comment` rule instead of routing through a token
+with exactly one reader. `--code-text`/`--code-num`/`--code-word`/`--code-ln` got the TRAP-DODGE instead of
+deletion (per the dispatch's own named technique): their root declarations are gone, and each value now lives
+as the literal fallback inside the var() call at the actual consuming selector (`#editor-highlight { color:
+var(--code-text, #ffffff); }`, the new `.g-num`/`.g-word`/`.g-ln` rules) — resolved AT the element, which is
+inside body and sees a real skin override, instead of at `:root`, which never does. No per-skin re-declaration
+boilerplate needed for any of the four — futuristic's own already-correct per-skin values simply reach through
+directly now, for the first time.
+
+## Bug #5 — `--screen` finally wired to the base rules, deleting the `!important` arms race
+
+`.editor-container`/`#editor-highlight` (both of its two near-duplicate base declarations, not just one) /
+`#editor-gutter` all hardcoded `#000`/`#000000` directly; futuristic and organic had to fight that with their
+own `!important` overrides to make their own `--screen` (already correctly declared, per t2073) visible at all.
+Wired the base rules to `var(--screen, #000000)` (trap-dodge, byte-identical fallback for normal/steampunk/
+studio, whose own `--screen` is `#000000` too) and deleted the now-fully-redundant selector overrides —
+futuristic's `background-image` (a genuinely distinct HUD-grid texture) and organic/futuristic's own gutter
+number colours are the only things left as their own rules. Verified: `.editor-container`/`#editor-highlight`/
+`#editor-gutter` background byte-identical before/after in all 5 themes (`rgb(0,0,0)`/`rgb(0,0,0)`/`rgb(0,0,0)`/
+`rgb(8,15,28)`/`rgb(18,13,9)` — matches each skin's own `--screen` exactly, unchanged from HEAD).
+
+## Bug #6 — `--block-edited`: wired, not deleted
+
+6 hand-tuned per-skin values, genuinely distinct from each skin's own `--accent` (amber vs blue, hot-pink vs
+cyan, etc. — real design intent, not copy-paste), zero consumers — `.op-block-edited`/`.word-edited` read
+`var(--accent)` instead, despite the class name being exactly what the token was declared for. Wired both
+consumers to `var(--block-edited, #ffb454)`. Verified (a standalone test span, since the live highlighter
+re-renders `#editor-highlight` and wipes any class added to its existing children — confirmed via a debug probe
+before trusting the "real" one): the computed `background-color` at all 5 themes matches `color-mix(in srgb,
+<that skin's own --block-edited> 38%, transparent)` exactly — a real, reclaimed, now-visible per-skin choice.
+
+## Dead code — the dispatch's own find, plus two more caught in the same sweep
+
+Confirmed via `grep` across every HTML/JS file: zero elements anywhere carry the bare class `editor` (real
+elements are `#editor`/`#editor-highlight`/`.editor-container`/`.editor-layer`). Cleaned every `.editor`-only
+comma-list limb throughout studio's block. The dispatch named one fully-dead rule (`.editor ::selection`) — two
+more turned up in the same sweep, not named before: `.editor .sel-line` (zero consumers anywhere, CSS or JS —
+deleted) and a SECOND, base-level `.editor { ... }` rule (an apparent pre-dual-layer draft, single flex box,
+resizable — deleted, its neighbour comment already explained a related predecessor's fate).
+
+## Scope discipline
+
+Dock/bevel, menu, field, tab, and typography groups untouched (swept the diff to confirm). `#blocks-app`'s own
+separately-scoped `--screen`/`--screen-ink`/`--screen-dim` (a deliberately UNthemed mini-contract, "the screen
+is black in every theme," per its own comment) is a different, out-of-scope mechanism — confirmed by reading
+its declaring rule, not assumed from the shared name.
+
+## Non-vacuity
+
+Brace-depth balance re-verified after every edit, ending at depth 0 throughout. Every one of the six bugs was
+confirmed with a real measurement before AND after the fix — not just before: the caret fix specifically FAILED
+its first verification (plain `!important` measured as insufficient), which is exactly the discipline paying
+for itself a fourth time this arc.
+
+## Mid-task amendment (human, via the advisor) — CARET SHAPE
+
+Landed after the CSS work above and the first full gate run, while already inside bug #1's own caret code —
+added `--screen-caret-shape` (real `caret-shape` values only: `block`/`underscore`/`bar`, no fake caret — a
+hidden native caret + a JS-tracked blinking pseudo-element was explicitly ruled out by the human). Mapping:
+studio `block` (CRT terminal identity), futuristic `underscore` (HUD prompt), normal/steampunk/organic `bar`
+(the default — organic explicitly gets nothing shape-wise, since caret-shape has no curvy/biomorphic value to
+give it; its own terracotta caret COLOUR from bug #1 is still real and new either way).
+
+**Browser support, checked rather than trusted**: could not verify current support tables live (no web access
+from this environment), but `getComputedStyle(editor).caretShape` was measured directly in the Chromium engine
+this whole gate runs on, and it resolves correctly per theme (`bar`/`block`/`underscore`, matching each token
+exactly) — so the property is real and functional in at least this engine. Added regardless of wider support
+per the human's own reasoning: one inert declaration per skin, costs nothing until a browser reads it, and
+degrades harmlessly to the default bar caret with no fallback to write.
+
+**No specificity war needed, unlike caret-color**: nothing else in the file declares `caret-shape`, so the
+trap-dodge alone (`caret-shape: var(--screen-caret-shape, bar) !important;` on the SAME base rule bug #1 already
+elevated) was sufficient — studio/futuristic's own `--screen-caret-shape` (declared in their own blocks, no
+alias) reaches through directly, no `body[data-theme="X"] #editor.editor-layer` duplicate rule required for
+this property.
+
+**Gate for the amendment**: re-ran node tier (193/193, still green) and re-verified every previously-confirmed
+computed value (caret colour, screen background, comment colour) across all 5 themes — unchanged, confirming
+the addition is isolated. Did NOT re-run the full 46-minute Playwright suite a second time for this addition —
+per the worker protocol's own amendment-gating guidance, a single new, verified-working, non-interacting CSS
+property is the fast-tier case, not a full-suite one; the full suite already ran clean against this turn's
+substantive changes before the amendment arrived. Flagged here plainly in case the advisor wants a fresh full
+run before merge regardless.
+
+## Gate
+
+Node tier: 193/193 (both before and after the amendment). Full Playwright suite (2,649 tests): 2,605 passed, 11
+flaky (recovered on retry, none editor/syntax-related by name), 25 skipped, 8 failed — **all 8 match the
+established pre-existing set from every prior turn in this arc, zero new failures** (same clean result as
+t2077's own gate). This full run predates the caret-shape amendment; see the amendment's own section above for
+why it wasn't re-run in full.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the editor screen/syntax fixes (bugs #1-#6) + dead-`.editor` cleanup +
+  `--code-comment`/`--code-text`/`--code-num`/`--code-word`/`--code-ln` trap-dodge retirement.
+- `DDCS-Studio/verification/t2079_caret_probe.mjs` — new, caret-color per theme — the tool that caught the
+  caret fix's first attempt NOT working.
+- `DDCS-Studio/verification/t2079_syntax_probe.mjs` — new, loads REAL G-code and checks screen/caret/comment
+  computed styles per theme (per the gate's own instruction: an empty program hides syntax regressions).
+- `DDCS-Studio/verification/t2079_debug_highlight.mjs` — new, dumps the actual `#editor-highlight` innerHTML
+  for real G-code — the tool that found bug #3's correction (no `.g-num`/`.g-word`/`.g-ln` spans exist at all).
+- `DDCS-Studio/verification/t2079_block_edited_probe.mjs` — new, verifies `--block-edited`'s wiring via a
+  standalone test element (the live highlighter wipes classes added to its own rendered children).
+- `DDCS-Studio/verification/t2079_caret_shape_probe.mjs` — new, verifies `--screen-caret-shape` resolves
+  correctly per theme via `getComputedStyle(editor).caretShape` (the amendment's own browser-support check).
+- `DDCS-Studio/verification/t2079-editor-screens.mjs` — new, before/after screenshot capture with REAL G-code
+  loaded (not "System Ready") + Blocks tab + Gateway tab, all 5 themes.
+- `DDCS-Studio/verification/t2079-{before,after}-*.png` — 30 screenshots.
+
+🔨 turn 2079

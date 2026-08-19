@@ -207,13 +207,17 @@ svg [id*="Zfirst_travel"] {
     --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
     --font-code: var(--mono, ui-monospace, "Consolas", "Liberation Mono", monospace);
 
-    /* Editor / code "screen" (reserved contract slots — editor rules migrate here incrementally) */
-    --screen:       #000000;
-    --code-text:    #e6e6e6;
-    --code-comment: var(--success, #22c55e);
-    --code-num:     #d9b3ff;
-    --code-word:    #67d3ff;
-    --code-ln:      #ff6b6b;
+    /* Editor / code "screen". t2079 (P4c) — code-text/-num/-word/-ln used to sit here as root-only slots that
+       only futuristic ever actually read (the standing trap made them unreachable for anyone relying on the
+       root default) — deleted in favour of the TRAP-DODGE: each consuming selector below now carries its own
+       literal fallback directly in the var() call (e.g. `.g-num { color: var(--code-num, #d9b3ff); }`), which
+       resolves at the element (inside body, sees a skin's real override) rather than at :root — no alias, no
+       per-skin re-declaration boilerplate, and a skin with no override just gets the fallback, not html's dead
+       one. --code-comment is gone outright: its only real value (comment = --success green) already had a
+       correctly-working consumer (the base .g-comment rule, reading --success directly) — the token added an
+       indirection layer nothing needed; futuristic's own comment colour is now a literal in its own rule. */
+    --screen: #000000;
+    --screen-caret-shape: bar;   /* t2079 amendment — real caret-shape values only; bar is the default everywhere except studio/futuristic */
 }
 
 
@@ -790,20 +794,24 @@ html, body { overflow-x: clip; }
 }
 /* The CHARACTER glow REUSES the app's window/return glow — theme colour --edit-glow-rgb + pace --edit-glow-speed
    (same family as .settings-modal.return-glow / the wizard edit-glow). The STATIC highlight behind the words uses
-   the theme --accent; width: fit-content keeps it hugging the text (e.g. `#100=20`), never the whole row. */
+   --block-edited; width: fit-content keeps it hugging the text (e.g. `#100=20`), never the whole row.
+   t2079 (P4c, bug #6) — was var(--accent): --block-edited has 6 hand-tuned per-skin values (root + all 5
+   skins), each genuinely distinct from that skin's own accent, and this class name (.op-block-edited) is
+   exactly what the token was declared for — it just never got wired to it. Wiring it reclaims 5 real per-skin
+   choices that have sat dead since the token was added; documented + screenshotted as a real visible change. */
 #editor-highlight .g-line.op-block-edited {
     width: fit-content;
     max-width: 100%;
     border-radius: 3px;
-    background-color: color-mix(in srgb, var(--accent, #0ea5e9) 38%, transparent);
+    background-color: color-mix(in srgb, var(--block-edited, #ffb454) 38%, transparent);
     animation: blockEditedBreathe var(--edit-glow-speed, 1.5s) ease-in-out infinite;
 }
 /* WORD-LEVEL glow: when a Blocks edit changed just a VALUE token in an otherwise form-generated line, only that
-   token is wrapped (editorOpHover.wrapRange) — same accent fill + character breathe as the whole-line glow, but
-   hugging the inline span (e.g. only the `987654` in `#1=987654`), never the rest of the line. */
+   token is wrapped (editorOpHover.wrapRange) — same block-edited fill + character breathe as the whole-line
+   glow, but hugging the inline span (e.g. only the `987654` in `#1=987654`), never the rest of the line. */
 #editor-highlight .g-line .word-edited {
     border-radius: 3px;
-    background-color: color-mix(in srgb, var(--accent, #0ea5e9) 38%, transparent);
+    background-color: color-mix(in srgb, var(--block-edited, #ffb454) 38%, transparent);
     animation: blockEditedBreathe var(--edit-glow-speed, 1.5s) ease-in-out infinite;
 }
 
@@ -1753,23 +1761,12 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 }
 
 /* Old .editor-toolbar removed as part of a layout refactor; its own successor, .secondary-toolbar, was itself
-   confirmed dead and deleted at t2069 (no live JS/HTML reference — the controls it once held moved on again). */
-
-.editor {
-    flex: 1;
-    min-height: 200px;
-    background: #000000;
-    color: #ffffff;
-    border: 1px solid var(--border);
-    padding: 12px;
-    border-radius: var(--radius);
-    font-family: "Courier New", Consolas, monospace;
-    font-size: 14px;
-    line-height: 1.6;
-    white-space: pre;
-    resize: vertical;
-    outline: none;
-}
+   confirmed dead and deleted at t2069 (no live JS/HTML reference — the controls it once held moved on again).
+   t2079 (P4c) — its neighbour, the base `.editor` rule, is the SAME kind of leftover: no element anywhere in
+   the app carries the bare class "editor" (confirmed via grep across every HTML/JS file — the real elements
+   are #editor/#editor-highlight/.editor-container/.editor-layer). This looks like a pre-dual-layer draft
+   (single flex box, resizable, Courier New) superseded when the editor became the current #editor (invisible
+   textarea) + #editor-highlight (colored <pre>) pair. Deleted outright, not aliased — nothing reads it. */
 
 /* ============================================
    FORM FIELDS (base) — t2071, P2 of the stylesheet arc.
@@ -2668,6 +2665,14 @@ button.primary:hover {
     --radius: 6px;
     --block-edited: #e08a00;   /* warm amber on light bg */
 
+    /* t2079 (P4c) — normal has NO distinct editor "screen" identity: no --screen override (inherits root's
+       plain #000000, matching what the editor's own base rule has always rendered), no caret override (stays
+       white, the base rule's own colour). Syntax colours (.g-num/-word/-ln) are declared with the SAME
+       fallback default as every other unthemed skin — see the base .g-comment rule's own note: these classes
+       aren't actually emitted by the highlighter today, so this is CSS-readiness, not yet a visible change.
+       This is real information, not an oversight — normal is the "clean flat" skin and never had a distinct
+       editor look; nothing here is invented to give it one. */
+
     /* header — t2073: was #ffffff (== --panel exactly, the collision .app-header used to dodge by reading --bg
        instead); relocated the value .app-header actually rendered before this turn (--bg) into --hdr-bg itself,
        so the header stays the deeper tone it always was, now via the token that's supposed to carry it. */
@@ -2727,6 +2732,7 @@ button.primary:hover {
     --bg:            #c4bfb5;   /* silver chassis */
     --panel:         #cfcabf;   /* silver plate */
     --screen:        #000000;   /* readout / editor black */
+    --screen-caret-shape: block;   /* t2079 amendment (human) — a block caret reads as a real CRT terminal, matching this skin's whole identity */
     --accent:        #1668ff;   /* electric-blue selection */
     --text:          #101010;
     --text-main:     #101010;
@@ -2899,33 +2905,37 @@ button.primary:hover {
 [data-theme="studio"] .header-center button { min-width: 92px; font-weight: 700; }
 
 /* --- Editor → the phosphor screen (no frame) --- */
-[data-theme="studio"] .editor-container {
-    background: #000;
-    border: none;
-}
+/* t2079 (P4c) — .editor-container's own background/border (was here as its own rule) is deleted: the base
+   rule already sets border:none and now reads var(--screen), which studio's own #000000 matches exactly — the
+   selector became fully redundant. Also cleaning the dead ".editor" limb throughout this block: confirmed
+   zero elements anywhere in the app carry the bare class "editor" (grep across every HTML/JS file) — every
+   real element reaches through #editor-highlight/#editor instead. Removed from every comma-list below, and
+   deleted the two rules that depended on .editor ALONE with no live pairing: `.editor ::selection` (the
+   dispatch's own named find) and `.editor .sel-line` (a new find this turn — same dead ancestor, never named
+   before; .sel-line has zero other consumers anywhere in CSS or JS). */
 [data-theme="studio"] #editor-highlight,
-[data-theme="studio"] #editor,
-[data-theme="studio"] .editor {
+[data-theme="studio"] #editor {
     margin: 0; padding: 14px 16px 14px 52px;   /* left clears the line-number gutter */
     font-family: var(--mono); font-size: 15px; line-height: 1.6;
     background: #000; white-space: pre; tab-size: 4; border: 0;
 }
-[data-theme="studio"] #editor-highlight, [data-theme="studio"] .editor { color: var(--phosphor); }
+[data-theme="studio"] #editor-highlight { color: var(--phosphor); }
 [data-theme="studio"] #editor {
     position: absolute; inset: 0; color: transparent; background: transparent;
-    caret-color: var(--phosphor); resize: none; outline: none;
+    resize: none; outline: none;
 }
-[data-theme="studio"] #editor::selection,
-[data-theme="studio"] .editor ::selection { background: #15e000; color: #000; }
-[data-theme="studio"] .editor .g-comment,
-[data-theme="studio"] #editor-highlight .g-comment { color: var(--phosphor-2); }
-[data-theme="studio"] .editor .g-num,
+/* t2079 (P4c, bug #1) — !important alone isn't enough: `body #editor.editor-layer` (base rule, further down
+   this file) carries specificity (1,1,1) — 1 ID + 1 class + the "body" element — which beats a plain
+   `[data-theme="studio"] #editor` override's (1,1,0) even when BOTH sides are !important, and ties would go
+   to that base rule anyway since it sits LATER in the file (no reordering). Matching its own shape with the
+   theme attribute folded in reaches (1,2,1), which wins outright regardless of position. Verified via
+   getComputedStyle, not assumed — the plain !important add alone measurably did NOT work first. */
+body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !important; }
+[data-theme="studio"] #editor::selection { background: #15e000; color: #000; }
+[data-theme="studio"] #editor-highlight .g-comment { color: var(--phosphor-2) !important; }   /* t2079 — !important added (bug #2: was losing to the base .g-comment's own !important) */
 [data-theme="studio"] #editor-highlight .g-num { color: var(--dro-white); }
-[data-theme="studio"] .editor .g-word,
 [data-theme="studio"] #editor-highlight .g-word { color: var(--cyan); }
-[data-theme="studio"] .editor .g-ln,
 [data-theme="studio"] #editor-highlight .g-ln { color: var(--red); }
-[data-theme="studio"] .editor .sel-line { background: linear-gradient(180deg, var(--select-hi), var(--select)); color: #fff; display: block; }
 
 /* status strip → green readout band */
 
@@ -3092,6 +3102,10 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --radius: 4px;
     --block-edited: #e6a832;   /* burnished brass */
 
+    /* t2079 (P4c) — steampunk has NO distinct editor "screen" identity either (same as normal — see its own
+       block for the fuller note): inherits the base --screen/#000000, the base white caret, and the base
+       .g-num/-word/-ln syntax defaults. Real information, not an oversight. */
+
     /* header — t2073: was #3d2817 (== --panel exactly, THE originally-diagnosed collision — .app-header used
        to read --bg specifically to dodge this). Relocated the value .app-header actually rendered before this
        turn (--bg) into --hdr-bg itself, so the header stays the deeper tone it always was, now via the token
@@ -3174,10 +3188,11 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --scrim: rgba(3, 7, 16, .72);
     --elev-2: 0 10px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(45, 226, 255, .12);
 
-    /* contract: editor "screen" + syntax */
+    /* contract: editor "screen" + syntax. --code-comment retired (t2079, P4c) — inlined as a literal directly
+       into this theme's own .g-comment rule below, its only consumer; no other skin ever read it. */
     --screen: #080f1c;
+    --screen-caret-shape: underscore;   /* t2079 amendment (human) — HUD prompt */
     --code-text: #cdd9f5;
-    --code-comment: #46d6a0;
     --code-num: #ffce6a;
     --code-word: #36e3ff;
     --code-ln: #ff5d9e;
@@ -3255,22 +3270,31 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     border-bottom: 1px solid rgba(45,226,255,.18);
 }
 
-/* Editor = the HUD screen: deep navy, cyan caret/selection, data-coloured syntax */
-[data-theme="futuristic"] .editor-container { background: var(--screen); }
+/* Editor = the HUD screen: deep navy, cyan caret/selection, data-coloured syntax.
+   t2079 (P4c) — background-color/color deleted from #editor-highlight below: the base rule now reads
+   var(--screen)/var(--code-text) directly (trap-dodge) and reaches this theme's own values without a
+   selector override; .editor-container's own background: var(--screen) is deleted for the same reason.
+   Only the background-IMAGE (the HUD grid texture, a genuinely distinct decoration) and the gutter's own
+   number colour stay as their own overrides. */
 /* HUD grid screen — a faint cyan graticule so the glass keyboard ALWAYS has something to reveal
    (transparency reads even over an empty program) and the editor feels like an instrument screen */
 [data-theme="futuristic"] #editor-highlight {
-    background-color: var(--screen) !important; color: var(--code-text);
     background-image:
         repeating-linear-gradient(0deg, rgba(45,226,255,.05) 0 1px, transparent 1px 30px),
         repeating-linear-gradient(90deg, rgba(45,226,255,.05) 0 1px, transparent 1px 30px) !important;
 }
-[data-theme="futuristic"] #editor-gutter { background: var(--screen); color: #3c5a82; }
-[data-theme="futuristic"] #editor { caret-color: var(--accent); }
+[data-theme="futuristic"] #editor-gutter { color: #3c5a82; }
+/* t2079 (P4c, bug #1) — plain !important measured as NOT enough (getComputedStyle still showed white): the
+   base `body #editor.editor-layer` rule's specificity (1,1,1) beats a bare theme-attribute override (1,1,0)
+   even importance-tied, and it sits later in the file (no reordering) so a tie would lose anyway. Matching
+   its shape with the theme attribute folded in reaches (1,2,1) — wins outright. See studio's own block above
+   for the fuller note (same fix, same reasoning). */
+body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) !important; }
 [data-theme="futuristic"] #editor::selection,
 [data-theme="futuristic"] #editor-highlight ::selection { background: rgba(45,226,255,.30); color: #fff; }
+/* t2079 — --code-comment retired (was a root-only alias only this skin ever read); inlined as a literal. */
 [data-theme="futuristic"] #editor-highlight .g-comment,
-[data-theme="futuristic"] .g-comment { color: var(--code-comment) !important; font-weight: 600; }
+[data-theme="futuristic"] .g-comment { color: #46d6a0 !important; font-weight: 600; }
 [data-theme="futuristic"] #editor-highlight .g-num  { color: var(--code-num); }
 [data-theme="futuristic"] #editor-highlight .g-word { color: var(--code-word); }
 [data-theme="futuristic"] #editor-highlight .g-ln   { color: var(--code-ln); }
@@ -3400,15 +3424,24 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     /* contract */
     --scrim: rgba(12,8,5,.72);
     --screen: #120d09;        /* the body-cavity editor */
+    /* t2079 amendment (human) — organic gets no --screen-caret-shape override (stays the default bar):
+       caret-shape has no curvy/biomorphic value to give it, and faking one (a hidden native caret + a
+       JS-tracked pseudo-element) was explicitly ruled out. Its own terracotta caret COLOUR (bug #1) is real
+       and new either way — no theme has ever shown a coloured caret before this turn. */
 }
 
 [data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
 
-/* Editor = the body cavity; bone text, coral caret, arterial line-numbers */
-[data-theme="organic"] .editor-container { background: var(--screen); }
-[data-theme="organic"] #editor-highlight { background-color: var(--screen) !important; color: #e9dcc4; }
-[data-theme="organic"] #editor-gutter { background: var(--screen); color: #6e5b42; }
-[data-theme="organic"] #editor { caret-color: #d97a5c; }
+/* Editor = the body cavity; bone text, coral caret, arterial line-numbers.
+   t2079 (P4c) — background-color/background deleted from #editor-highlight/.editor-container/#editor-gutter
+   below: the base rules now read var(--screen) directly (trap-dodge) and reach this theme's own value without
+   a selector override. Only the genuinely distinct colours (bone text, gutter number tone) stay. */
+[data-theme="organic"] #editor-highlight { color: #e9dcc4; }
+[data-theme="organic"] #editor-gutter { color: #6e5b42; }
+/* t2079 (P4c, bug #1) — plain !important measured as NOT enough; see studio's own block above for the fuller
+   note (same fix, same reasoning: matching body[data-theme] #editor.editor-layer reaches specificity (1,2,1),
+   which beats the base rule's (1,1,1) outright regardless of file position). */
+body[data-theme="organic"] #editor.editor-layer { caret-color: #d97a5c !important; }
 [data-theme="organic"] #editor::selection,
 [data-theme="organic"] #editor-highlight ::selection { background: rgba(217,122,92,.32); color: #fff; }
 [data-theme="organic"] #editor-highlight .g-comment, [data-theme="organic"] .g-comment { color: #8aa15a !important; }
@@ -3579,17 +3612,34 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     padding: 8px 12px;
     font-size: 12px;
 }
+/* t2079 amendment (human) — CARET SHAPE alongside caret colour: --screen-caret-shape, real `caret-shape`
+   (CSS UI 4) values only (block/underscore/bar) — no fake caret (a hidden native caret + a JS-tracked blinking
+   pseudo-element was explicitly ruled out). Browser support is thin/uneven as of this writing and could not be
+   verified live from this environment (no web access) — added anyway per the human's own reasoning: it is one
+   inert declaration per skin, costs nothing until a browser reads it, and degrades harmlessly to the normal
+   bar caret with no fallback needed. UNLIKE caret-color, this needs NO specificity war: nothing else in the
+   file declares caret-shape, so the trap-dodge alone (var() with an inline fallback, resolved at this element)
+   is sufficient — studio/futuristic's own --screen-caret-shape (declared in their own blocks) reaches here
+   directly, no elevated-specificity override rule required. */
 body #editor.editor-layer {
     background: transparent !important;
     color: transparent !important;
     caret-color: white !important;
+    caret-shape: var(--screen-caret-shape, bar) !important;
     z-index: 2;
 }
 
 /* Ensure the bottom highlight layer is visible */
+/* t2079 (P4c) — TRAP-DODGE: the fallback (#000000/#ffffff, what every theme actually rendered before this
+   turn) sits INLINE in the var() call, resolved at THIS element (inside body, sees a skin's real --screen/
+   --code-text override) rather than as a :root alias (which would resolve against html's own bare fallback
+   instead — the standing trap). No per-skin re-declaration needed: a skin with no override just gets the
+   same fallback every theme already showed; futuristic/organic's own --screen/--code-text (already correctly
+   declared in their own blocks) now finally reach here directly, and their duplicate selector-based overrides
+   below are deleted as redundant. */
 #editor-highlight {
-    background-color: #000000 !important; /* The real background color */
-    color: #ffffff; /* Code color */
+    background-color: var(--screen, #000000) !important; /* The real background color */
+    color: var(--code-text, #ffffff); /* Code color */
     z-index: 1;
 }
 
@@ -3600,7 +3650,7 @@ body #editor.editor-layer {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: #000; /* Background is on the container now */
+    background: var(--screen, #000); /* Background is on the container now */
     overflow: hidden;
 }
 
@@ -3630,8 +3680,8 @@ body #editor.editor-layer {
 /* Bottom Layer: The Colors */
 #editor-highlight {
     z-index: 1;
-    color: #ffffff;
-    background-color: #000000;
+    color: var(--code-text, #ffffff);
+    background-color: var(--screen, #000000);
     pointer-events: none;
 }
 
@@ -3682,7 +3732,7 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
     line-height: 1.6;
     text-align: right;
     color: #5a5a5a;
-    background: #000;
+    background: var(--screen, #000);
     white-space: pre;
     overflow: hidden;
     pointer-events: none;
@@ -3699,6 +3749,22 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
 
 /* Comment Color */
 .g-comment { color: var(--success) !important; font-weight: bold; }
+/* t2079 (P4c, bug #3) — CORRECTION to the dispatch's own premise, found by verifying rather than re-deriving:
+   this was briefed as "normal/steampunk lack an unthemed .g-num/.g-word/.g-ln rule, so numbers render plain
+   white while their declared colours sit unused" — checked against the actual highlighter
+   (ui/uiUtils.js:formatGCode, the SOLE source of every .g-line's markup, main editor AND wizard code preview
+   both) rather than assumed, and its own regex only ever produces FOUR things: `.g-comment` (class), G31/
+   M-code/axis-letters (inline styles), and everything else — G0/G1, plain numbers, keywords — falls through
+   completely unwrapped, no class, no span, for EVERY theme. So studio/futuristic/organic's own existing
+   .g-num/.g-word/.g-ln rules have ALSO never rendered anything, ever — this isn't 2 skins missing colour on a
+   live class, it's a CSS-only fix with ZERO visible effect anywhere until the highlighter itself is taught to
+   emit these classes, which is a JS/behavioural change outside a styles.css-only turn's scope. Declared here
+   anyway (TRAP-DODGE shape, fallback = the value these tokens' own now-deleted root declaration held) so the
+   CSS side is READY and correct the moment a JS change wires it up — but flagged plainly to the advisor as
+   NOT the free, purely-CSS fix it was briefed as; see WORK-LOG. */
+.g-num  { color: var(--code-num, #d9b3ff); }
+.g-word { color: var(--code-word, #67d3ff); }
+.g-ln   { color: var(--code-ln, #ff6b6b); }
 
 /* Ensure wizards still constrained to viewport when large */
 .overlay {
