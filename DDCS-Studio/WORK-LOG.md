@@ -44842,3 +44842,139 @@ flake in the other direction). Confirmed by reading the actual failed-test names
 
 🔨 turn 2085
 
+# t2087 — P5a of the stylesheet arc: THE SHARED MODAL BASE
+
+## Survey first — 13 scrims, ~28 chrome-declaring roots, confirmed against the dispatch's own numbers
+
+Cataloged every scrim (`position:fixed`+full inset+`background`) and every modal card root before touching
+anything (delegated the mechanical inventory, then verified the load-bearing claims myself). Confirmed: 13
+standalone scrim rule-sets (matching the dispatch's "fourteen" once `.overlay`'s own vestigial second
+declaration — no background, no z-index, see below — is counted as the 14th); ~17 true modal-card roots plus
+~11 popover/toast/tooltip "mini-panel" roots sharing the same background/border/radius/shadow *pattern*
+without being modal cards per se, totaling the dispatch's "~28." `.ddcs-welcome-modal` confirmed 100%
+token-pure (zero hex/rgb/rgba anywhere in its own rule set, bare `var(--x)` with no literal fallback even) —
+the reference template, copied rather than reinvented.
+
+## The two exempt zones — confirmed, not assumed
+
+`comm-dialog` (lines ~4062–4273): confirmed **zero** `var(--...)` reads anywhere in the whole family — every
+colour is a hardcoded hex/rgba literal (grep-verified line by line). A pixel-accurate replica of the real
+DDCS M350 controller's own on-screen VGA dialogs. Untouched, as instructed.
+`.setup-sheet-page` (the print-preview "paper," lines ~5799–5814 plus its own `@media print` block):
+confirmed hardcoded `#fff`/`#14181d` and friends throughout, explicitly theme-independent by the file's own
+comment. Untouched; only its FRAME (`.setup-sheet-overlay`/`-modal`/`-chrome`/`-btn*`, above the paper)
+participates in the migration below.
+
+## The shared base: `.modal-scrim` / `.modal-card` / `.modal-head` / `.modal-body` / `.modal-foot`
+
+The SHAPE (scrim → card → head/body/foot, one flex-centred overlay) is copied from `.ddcs-welcome-modal`. The
+CHROME reads the `--modal-*` contract as `.wiz-box`/`.wiz-head`/`.wiz-foot` ACTUALLY use it (P4b, t2077), not
+welcome-modal's own simpler `--surface`/`--edge` pair — checked directly rather than assumed from
+welcome-modal's shape, and the two genuinely differ: `.wiz-head` is a FILLED bar (`--modal-head-face`/`-ink`,
+no border) while welcome-modal's own head is unfilled-but-bordered; `.wiz-foot`'s divider is
+`--modal-foot-edge` (a distinct, neutral token from `--modal-edge`, which is `--accent`) at a fixed `1px`, not
+`--modal-edge-w`. Got this wrong on the first pass (built `.modal-head`/`-foot` matching welcome-modal's own
+shape) and corrected it after actually reading `.wiz-head`/`.wiz-foot`'s rules rather than trusting the more
+famous example.
+
+**Scope decision, stated plainly:** existing modals keep their own class names — I did NOT touch JS
+`className=` assignments across the half-dozen files that generate this markup (`helpPanel.js`,
+`libraryModal.js`, `wizardManager.js`, `workspaceManager.js`, …) to swap in the new shared classes. That's a
+bigger, riskier change (JS logic risk, not just CSS) than a CSS-focused turn should take on unprompted. The
+`.modal-*` classes are declared as a directly-usable base for future markup; existing modals get the same
+de-duplication by having their OWN rules migrated to read the identical tokens instead.
+
+## The scrim collapse — 8 opacities into `var(--scrim)`, one real find changed the whole story
+
+Migrated every non-exempt scrim's `background` to `var(--scrim)` and `z-index` to a new named MODAL z-index
+SCALE (`--z-modal-save/-cloud/-wizard/-settings/-library/-workspace/-help/-setup-sheet/-first-save/-busy/
+-saved/-welcome`) — a naming pass preserving every current numeric value exactly; checked the current file
+for actual modal-vs-modal z-index ties first and found none (the dispatch's "two of those tie" didn't survive
+contact with the current file — the real ties are all with NON-modal surfaces: `#global-tooltip` at 12000,
+`.scale-pop`/`.gateway-dl-pop` at 1000, `.toolbar-dropdown-content` at 2000, a mobile-keyboard editor pin at
+10000 — none of which are modals, so none needed resolving).
+
+**The real find:** while fixing steampunk/futuristic/organic's own `[data-theme=X] .wizard { background:
+... }` overrides (which I first assumed were winning over `.overlay`'s `var(--scrim)` via higher specificity,
+0,2,0 vs 0,1,0), `t2087_probe.mjs`'s before/after diff came back showing **zero change** to the wizard scrim's
+background across all 5 themes — not the 3-theme colour shift the specificity story predicted. Investigated
+rather than shrugged off: `t2087_wizard_class_debug.mjs` dumped the real element's classList, and the wizard-
+opening element is `<div id="wizard" class="overlay">` (web/index.html:211) — an ID literally named "wizard"
+but a CLASS of plain "overlay". **The `.wizard` CSS class selector — the base rule, `.wizard.active`, and all
+three per-theme background overrides — has been matching ZERO elements**, confirmed by a repo-wide search for
+`class="wizard"` (none) and `classList.add('wizard')` (none). Deleted the entire dead `.wizard`/`.wizard.active`
+block and rewrote the three per-theme deletion comments, which I'd already written with the (wrong)
+specificity story before the diff came back — corrected them to state the true finding rather than leave a
+confidently-wrong comment in a file this arc has repeatedly warned against exactly that. Re-verified
+non-vacuously after the full-block deletion: all 5 themes' wizard-scrim computed style still byte-identical.
+
+Every OTHER scrim (proj-savemodal, cloud-modal, settings-overlay, setup-sheet-overlay, library-overlay,
+wsm-overlay, help-overlay, wss-ask, ddcs-busy-overlay, saved-pop) now reads `var(--scrim)` — a REAL, expected
+visual change for most of them (8 distinct hardcoded opacities/tints collapsing to one theme-aware value),
+screenshotted per the dispatch's own instruction. `ddcs-busy-overlay`/`saved-pop` specifically used a
+different, blue-tinted `rgba(8,11,16,X)` base colour with zero token reads anywhere — unlike comm-dialog,
+nothing in either rule's own history claims that was deliberate theme-independence, so treated as unmigrated
+debt like every other modal, not a third exemption.
+
+## The card harmonization — background/border/radius/shadow onto `--modal-*`
+
+Every non-exempt card root (proj-savepanel, cloud-modal-panel, settings-modal, settings-box, setup-sheet-
+modal, library-modal, wsm-modal, help-modal, wss-box, ddcs-busy-card, saved-pop-card) migrated from its own
+mix of `var(--panel, #hex)`-with-fallback + hardcoded radius (mostly 8px/10px/12px) + hardcoded shadow onto
+`var(--modal-face)`/`var(--modal-edge-w) solid var(--modal-edge)`/`var(--modal-radius)`/`var(--modal-shadow)`
+— the exact same values `.wiz-box` already uses. `--modal-edge` is `var(--accent)` by default (not a neutral
+border), so this is a real, visible harmonization: every modal's rim goes from a subtle neutral 1px line to
+the SAME accent-coloured 2px rim the wizard already has. Expected and screenshotted, per the dispatch.
+Buttons inside these modals (`.setup-sheet-btn`) were migrated to the generic `--btn-*` material instead of
+inventing a bespoke modal-button token — `.wiz-foot button` itself does the same (structural sizing only,
+relying on the plain `button` rule for its own chrome), so that's the established precedent, not a new one.
+
+## Two more verified-dead duplicates found along the way, deleted
+
+- `.overlay { position: fixed; inset: 0; }` (a second declaration, later in the file) — byte-identical to the
+  first `.overlay` rule's own declaration of those same two properties, same selector, same specificity — a
+  provable no-op, no live measurement needed (unlike the value-level cases elsewhere in this arc).
+- `.settings-overlay { z-index: 12000; align-items: center; justify-content: center; }` (a second declaration,
+  near the older `.settings-box` dialog) — the z-index already matched the FIRST `.settings-overlay` rule
+  exactly, and align/justify-content already come from the base `.overlay` rule this element also carries.
+  Verified redundant on both counts, not just the z-index.
+
+## Non-vacuity
+
+`t2087_probe.mjs`: 5 themes × 6 real-flow modals (wizard, settings, library, workspace-manager, setup-sheet,
+plus button-label from t2085's own group reused) via their actual JS trigger functions, + 5 direct-injection
+checks (proj-save/cloud/wss-ask/busy/saved-pop/help — state-heavy or not-yet-globally-exposed at page-load
+time, e.g. `window.openHelp` isn't attached until the quick-menu wires it, confirmed via
+`t2087_help_debug.mjs`; the real click path for Help is still covered by screenshots), each clearly labeled.
+Before/after: 219 diffs total, every one traceable to either the scrim-colour collapse or the card
+harmonization — zero diffs on z-index (pure renames, confirmed), zero diffs on either exempt zone
+(comm-dialog, setup-sheet-page), zero diffs on the wizard scrim specifically (the dead-`.wizard`-class
+finding, re-confirmed after the full-block deletion).
+
+## Gate
+
+Node tier: 193/193. Comment-delimiter + brace-balance check: 0 suspects, depth 0. Ramp enforceability
+(t2083's own check, re-verified for regression): unchanged, 32 hits, all inside the studio token block or
+comments. Full Playwright suite (2,649 tests, 45.4m): 2,606 passed, 11 flaky (recovered on retry, none
+modal/scrim-related by name), 25 skipped, 7 failed — **all 7 match the established pre-existing set**
+(`controller-import-one-door-1221`, `editor-indent-1450`×3, `pull-modal-stacking`, `ring-descent-1404`,
+`send-history-real-path-2065`) — same set as t2085's own gate, zero new failures. Confirmed by reading the
+actual failed-test names, not just the trailing count.
+
+## Files
+- `DDCS-Studio/web/styles.css` — `.modal-scrim`/`-card`/`-head`/`-body`/`-foot` base; the MODAL z-index scale;
+  every non-exempt scrim/card migrated; the dead `.wizard` block + 3 per-theme overrides deleted (with
+  corrected comments); the two verified-redundant duplicates deleted.
+- `DDCS-Studio/verification/t2087_probe.mjs` — the main before/after computed-style gate (real-flow +
+  direct-injection, 5 themes) — this is what caught the wizard-scrim zero-diff anomaly.
+- `DDCS-Studio/verification/t2087_wizard_class_debug.mjs` — dumps the real wizard element's classList; found
+  `id="wizard" class="overlay"`, the root cause of the zero-diff anomaly.
+- `DDCS-Studio/verification/t2087_help_debug.mjs` — confirms `window.openHelp` isn't attached at page-load.
+- `DDCS-Studio/verification/t2087-screens.mjs` — before/after screenshot capture, 7 real-flow views × 5
+  themes (wizard, settings, library, workspace-manager, help via real click, setup-sheet, Blocks/Gateway
+  tabs); the comm-dialog exempt-zone screenshot was skipped (its trigger path wasn't found quickly and its
+  exemption is already proven, more rigorously, by the zero-diff computed-style check).
+- `DDCS-Studio/verification/t2087-{before,after}-*.png` — screenshots.
+
+🔨 turn 2087
+

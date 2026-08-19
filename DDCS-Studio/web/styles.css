@@ -203,6 +203,18 @@ svg [id*="Zfirst_travel"] {
     --modal-close-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
     --modal-close-text-shadow: 0 1px 1px rgba(0,0,0,.35);
 
+    /* t2087 (P5a) — MODAL z-index SCALE: named tokens replacing scattered literals, scoped to true
+       scrim-backed modals only (not popovers/toasts/tooltips/dropdowns — those have their own separate
+       z-index concerns, out of this scale's scope, per the dispatch's own "keep it to MODALS" instruction).
+       A naming pass, not a re-ordering: every value here is IDENTICAL to what the file already used before
+       this turn — checked, not assumed. No two of these collided before this turn either (the dispatch's
+       "two of those tie" did not hold up against the current file: the only real ties found were with
+       NON-modal surfaces — #global-tooltip at 12000, .scale-pop/.gateway-dl-pop at 1000, .toolbar-dropdown-
+       content at 2000, a mobile-keyboard editor pin at 10000 — none of which are modals). */
+    --z-modal-save: 2000; --z-modal-cloud: 2100; --z-modal-wizard: 10000; --z-modal-settings: 12000;
+    --z-modal-library: 13100; --z-modal-workspace: 13200; --z-modal-help: 13300; --z-modal-setup-sheet: 13400;
+    --z-modal-first-save: 20000; --z-modal-busy: 100000; --z-modal-saved: 100001; --z-modal-welcome: 100002;
+
     /* Typography */
     --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
     --font-code: var(--mono, ui-monospace, "Consolas", "Liberation Mono", monospace);
@@ -1027,9 +1039,12 @@ html, body { overflow-x: clip; }
 .sl-primary:disabled { opacity: .4; cursor: default; }
 
 /* Project VFS — SAVE modal (centered) with the folder tree picker. */
-.proj-savemodal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; }
+/* t2087 (P5a) — background/z-index/card chrome migrated to the shared modal contract (--scrim, the
+   --z-modal-* scale, --modal-*): was rgba(0,0,0,.5) + a literal 2000 + var(--panel, #1d2530)/12px/hardcoded
+   shadow. Kept its own bespoke width/layout (min(440px,92vw), flex column) — that's structural, not chrome. */
+.proj-savemodal { position: fixed; inset: 0; z-index: var(--z-modal-save); background: var(--scrim); display: flex; align-items: center; justify-content: center; }
 .proj-savemodal[hidden] { display: none; }
-.proj-savepanel { width: min(440px, 92vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--panel, #1d2530); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,.5); overflow: hidden; }
+.proj-savepanel { width: min(440px, 92vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge); border-radius: var(--modal-radius); box-shadow: var(--modal-shadow); overflow: hidden; }
 .proj-savebody { padding: 14px 16px; overflow: auto; }
 .proj-savebody .label { display: block; margin: 0 0 4px; }
 /* t754 — the save TARGET toggle (Local | Cloud) + the quiet fallback note */
@@ -1058,11 +1073,13 @@ html, body { overflow-x: clip; }
 .cloud-connect svg { flex: none; }
 
 /* Connect modal (OAuth popup launcher). */
-.cloud-modal { position: fixed; inset: 0; z-index: 2100; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; }
-.cloud-modal-panel { width: min(420px, 92vw); background: var(--panel, #1d2530); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,.5); overflow: hidden; }
+/* t2087 (P5a) — same migration as .proj-savemodal/-savepanel just above: scrim/z-index/card chrome onto
+   the shared modal contract; own bespoke width/layout kept. */
+.cloud-modal { position: fixed; inset: 0; z-index: var(--z-modal-cloud); background: var(--scrim); display: flex; align-items: center; justify-content: center; }
+.cloud-modal-panel { width: min(420px, 92vw); background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge); border-radius: var(--modal-radius); box-shadow: var(--modal-shadow); overflow: hidden; }
 .cloud-modal-body { padding: 16px; }
 .cloud-modal-status { font-weight: 600; margin-bottom: 8px; }
-.cloud-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.cloud-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--modal-foot-edge); }
 .cloud-status { font-size: 13px; color: var(--text-main); }
 .cloud-status.muted { color: var(--text-dim); }
 
@@ -1960,13 +1977,54 @@ button.primary:hover {
 }
 
 /* ============================================
+   MODAL BASE (P5a) — .modal-scrim / .modal-card / .modal-head / .modal-body / .modal-foot.
+   The SHAPE (scrim → card → head/body/foot, one flex-centred overlay) is copied from .ddcs-welcome-modal
+   (t2075) — the only scrim consumer in the whole file that was ever 100% token-pure before this turn, so it
+   is the reference rather than a new invention. The CHROME reads the --modal-* contract as .wiz-box ACTUALLY
+   uses it (P4b, t2077) — not welcome-modal's own simpler --surface/--edge pair, per this turn's dispatch —
+   since .wiz-box is the far more common surface and the wider precedent: its head is a FILLED bar
+   (--modal-head-face/-ink, no border — welcome-modal's own head is unfilled-but-bordered, a genuinely
+   different look) and its foot divider is --modal-foot-edge (a distinct, neutral token from --modal-edge,
+   which is --accent) at a fixed 1px (not --modal-edge-w) — checked against .wiz-head/.wiz-foot's own rules
+   directly rather than assumed from welcome-modal's shape. Declared here as a documented, directly-usable
+   base for any FUTURE modal's markup; existing modals in THIS turn keep their own class names (touching JS
+   className= assignments across half a dozen files is a bigger, riskier change than a CSS-focused turn
+   should take on unprompted — see WORK-LOG) but have their own rules migrated below to read the identical
+   tokens, so the de-duplication is real even without a class swap. TWO surfaces are explicitly EXEMPT from
+   all of P5a and are untouched anywhere in this file: the comm-dialog family (a pixel-accurate replica of
+   the real DDCS controller's own on-screen dialogs — product identity, not debt) and .setup-sheet-page (the
+   deliberately unthemed print-preview "paper" — only its frame, above the paper, participates below). */
+.modal-scrim {
+    position: fixed; inset: 0; z-index: var(--z-modal-settings);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--scrim);
+}
+.modal-card {
+    background: var(--modal-face); color: var(--text);
+    border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius);
+    box-shadow: var(--modal-shadow);
+    overflow: hidden;
+}
+.modal-head {
+    display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
+    background: var(--modal-head-face); color: var(--modal-head-ink);
+    font-weight: 700; font-size: 14px;
+}
+.modal-body { padding: 20px 16px; color: var(--text-dim); }
+.modal-foot {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
+    border-top: 1px solid var(--modal-foot-edge);
+}
+
+/* ============================================
    WIZARDS (Structure)
    ============================================ */
 .wizard {
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 10000; /* CHANGED: Was 99 */
+    z-index: var(--z-modal-wizard); /* CHANGED: Was 99, then a literal 10000 */
     align-items: center;
     justify-content: center;
     background: rgba(0, 0, 0, 0.75);
@@ -2620,10 +2678,15 @@ button.primary:hover {
        (replacing its old .55 alpha) rather than the reverse, so the wizard — by far the more common surface —
        stays byte-identical for normal/studio/steampunk; futuristic/organic already had a distinct, deliberately
        tuned --scrim (colour-tinted to match their own dark palette, alpha .72) that this now finally reaches
-       for the first time. See WORK-LOG for the full reasoning. */
+       for the first time. See WORK-LOG for the full reasoning.
+       t2087 (P5a) — that "finally reaches" was still aspirational for THREE themes: steampunk/futuristic/
+       organic each carried their OWN higher-specificity `[data-theme=X] .wizard { background: ... }` override
+       (0,2,0, beating this rule's 0,1,0 regardless of source order), so var(--scrim) never actually painted
+       for them — verified by reading each override's literal value against that theme's own --scrim before
+       deleting them (see each theme's own block). Genuinely reaches all 5 themes now. */
     background: var(--scrim);
     /* Raised well above toolbars so wizards are always on top */
-    z-index: 10000;
+    z-index: var(--z-modal-wizard);
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(3px);
@@ -2638,16 +2701,19 @@ button.primary:hover {
 
 /* Settings MODAL — a wide/tall flex modal hosted in an .overlay (ui/settingsPanel.js renders its
    flex head/body/foot inside #settings-app). z above wizards so the ⚙ gear opens it ON TOP of a wizard. */
-.settings-overlay { z-index: 12000; }
+.settings-overlay { z-index: var(--z-modal-settings); }
 .settings-modal {
     width: min(1500px, 96vw);
     height: min(1000px, 94vh);
     height: min(1000px, 94dvh);   /* t782 — dvh so the centered modal never exceeds the VISIBLE height (mobile URL bar) */
     display: flex; flex-direction: column;
-    background: var(--bg, #111);
-    border: 1px solid var(--edge, var(--border, #444));
-    border-radius: var(--radius, 10px);
-    box-shadow: var(--elev-2, 0 12px 40px rgba(0,0,0,.55));
+    /* t2087 (P5a) — background/border/radius/shadow migrated onto the shared modal contract (was var(--bg,
+       #111)/var(--edge,var(--border,#444))/var(--radius,10px)/var(--elev-2,...) — a DIFFERENT token family
+       from --modal-face/-edge/-radius/-shadow, restating the same job with its own literal fallbacks). */
+    background: var(--modal-face);
+    border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius);
+    box-shadow: var(--modal-shadow);
     overflow: hidden;
 }
 @media (max-width: 600px) {
@@ -3296,9 +3362,10 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --modal-close-shadow: inset 0 1px 0 rgba(255,220,150,.25), 0 1px 2px rgba(0,0,0,.5);
 }
 
-[data-theme="steampunk"] .wizard {
-    background: rgba(40, 20, 0, 0.85);
-}
+/* t2087 (P5a) — DELETED: this used to override the wizard overlay to a brown-tinted rgba(40,20,0,.85),
+   higher specificity than .overlay's own `background: var(--scrim)`, so steampunk never actually reached
+   --scrim (which steampunk never overrides, so it resolves to the plain rgba(0,0,0,.85) root default — a
+   real, intentional colour shift, screenshotted). */
 
 /* ============================================
    THEME: FUTURISTIC (Neon Cyan)
@@ -3445,9 +3512,9 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
 [data-theme="futuristic"] #editor-highlight .g-word { color: var(--code-word); }
 [data-theme="futuristic"] #editor-highlight .g-ln   { color: var(--code-ln); }
 
-[data-theme="futuristic"] .wizard {
-    background: rgba(10, 14, 26, 0.9);
-}
+/* t2087 (P5a) — DELETED: same shape as steampunk's own deletion above — rgba(10,14,26,.9), higher
+   specificity than .overlay's `var(--scrim)`, blocked futuristic's OWN --scrim (rgba(3,7,16,.72), a
+   genuinely different alpha and a slightly different tint) from ever painting. */
 
 /* t2075 (P4a) — colour/background/border/shadow/text-shadow/transform now come from the button-material
    tokens (this theme's own block above, via the token-driven base button rule); only the transition timing
@@ -3585,7 +3652,8 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        and new either way — no theme has ever shown a coloured caret before this turn. */
 }
 
-[data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
+/* t2087 (P5a) — DELETED: same shape as steampunk/futuristic above — rgba(14,9,6,.82), blocked organic's
+   own --scrim (rgba(12,8,5,.72), a genuinely different alpha and near-identical tint) from ever painting. */
 
 /* Editor = the body cavity; bone text, coral caret, arterial line-numbers.
    t2079 (P4c) — background-color/background deleted from #editor-highlight/.editor-container/#editor-gutter
@@ -3919,11 +3987,11 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
 .g-word { color: var(--code-word, #67d3ff); }
 .g-ln   { color: var(--code-ln, #ff6b6b); }
 
-/* Ensure wizards still constrained to viewport when large */
-.overlay {
-    position: fixed;
-    inset: 0;
-}
+/* t2087 (P5a) — DELETED: "Ensure wizards still constrained to viewport when large" used to restate
+   `position: fixed; inset: 0;` a second time here — byte-identical to the FIRST .overlay rule's own
+   declaration of those same two properties (same selector, same specificity), so this was a no-op
+   duplicate, not a genuine override; provably so (identical property:value pairs need no live measurement
+   to prove redundant, unlike the value-level cases elsewhere in this arc). */
 
 /* Base styles for viz paths - hidden via stroke-dashoffset
    dasharray/dashoffset are set per-element by JS to match actual path length */
@@ -5071,17 +5139,24 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 }
 
 /* ===== Settings overlay ===== */
-.settings-overlay { z-index: 12000; align-items: center; justify-content: center; } /* above the wizard (10001) so the in-wizard ⚙ opens on top */
+/* t2087 (P5a) — DELETED: this used to restate ".settings-overlay { z-index:12000; align-items:center;
+   justify-content:center; }" a second time here — the z-index already matches the OTHER .settings-overlay
+   rule (above, near .settings-modal) exactly, and align/justify-content already come from the base .overlay
+   rule this element also carries — verified redundant on both counts, not just the z-index. */
 .settings-box {
     width: min(560px, 94vw);
     max-height: 88vh;
     display: flex;
     flex-direction: column;
-    background: var(--panel);
+    /* t2087 (P5a) — migrated to the shared modal contract (was var(--panel)/var(--border)/hardcoded 8px/
+       hardcoded shadow — this is a SECOND, older settings dialog, distinct from .settings-modal above but
+       sharing its .settings-head/-body/-foot class names; tokenized like every other non-exempt modal card
+       regardless, since nothing here suggested it's dead). */
+    background: var(--modal-face);
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius);
+    box-shadow: var(--modal-shadow);
     overflow: hidden;
 }
 .settings-head {
@@ -5707,7 +5782,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
    (human): every value here reads a DECLARED TOKEN (the contract at styles.css:112) — no hex, no rgb(), no px
    radius. A theme switch must restyle this completely with zero edits to these rules. */
 .ddcs-welcome-modal {
-    position:fixed; inset:0; z-index:100002; display:flex; align-items:center; justify-content:center;
+    /* t2087 (P5a) — z-index only, onto the shared modal z-index SCALE (--z-modal-welcome, same value,
+       100002); everything else in this family is the P5a reference template and stays exactly as written. */
+    position:fixed; inset:0; z-index:var(--z-modal-welcome); display:flex; align-items:center; justify-content:center;
     background:var(--scrim);
 }
 .ddcs-welcome-modal .wcm-card {
@@ -5789,11 +5866,17 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* t2069 — was z-index:4000, so this rendered UNDERNEATH the wizard (10000) it is opened from — invisible,
    not just behind. Slotted into the modal-overlay family (library 13100 / workspace-manager 13200 /
    help 13300) rather than inventing a new scale (that's P5 of the stylesheet arc, not this fix). */
-.setup-sheet-overlay { position:fixed; inset:0; z-index:13400; display:flex; align-items:flex-start; justify-content:center; padding:24px; overflow:auto; background:rgba(0,0,0,.55); }
-.setup-sheet-modal { width:100%; max-width:820px; max-height:calc(100vh - 48px); display:flex; flex-direction:column; background:var(--panel, #1a1f27); color:var(--text, #e7edf5); border:1px solid var(--border, #333a45); border-radius:8px; box-shadow:0 12px 40px rgba(0,0,0,.5); overflow:hidden; }
-.setup-sheet-chrome { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--border, #333a45); flex:0 0 auto; }
+/* t2087 (P5a) — the FRAME (this rule through .setup-sheet-btn-close) migrated to the shared modal contract.
+   .setup-sheet-page below (the print-preview "paper") is explicitly EXEMPT and untouched — see the MODAL
+   BASE section's own comment. */
+.setup-sheet-overlay { position:fixed; inset:0; z-index:var(--z-modal-setup-sheet); display:flex; align-items:flex-start; justify-content:center; padding:24px; overflow:auto; background:var(--scrim); }
+.setup-sheet-modal { width:100%; max-width:820px; max-height:calc(100vh - 48px); display:flex; flex-direction:column; background:var(--modal-face); color:var(--text); border:var(--modal-edge-w) solid var(--modal-edge); border-radius:var(--modal-radius); box-shadow:var(--modal-shadow); overflow:hidden; }
+.setup-sheet-chrome { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; background:var(--modal-head-face); color:var(--modal-head-ink); flex:0 0 auto; }
 .setup-sheet-chrome-title { font-weight:600; font-size:14px; letter-spacing:.02em; }
-.setup-sheet-btn { font:inherit; font-size:13px; padding:5px 12px; margin-left:8px; border-radius:5px; border:1px solid var(--border, #333a45); background:var(--bg, #11151c); color:var(--text, #e7edf5); cursor:pointer; }
+/* buttons are ordinary buttons — the generic --btn-* material (P4a), not a bespoke modal-button token;
+   .wiz-foot button (the wizard's own modal footer) does the same, relying on the plain button rule for its
+   own chrome and only adding structural sizing here. */
+.setup-sheet-btn { font:inherit; font-size:13px; padding:5px 12px; margin-left:8px; border-radius:var(--btn-radius); border:var(--btn-edge-w) solid var(--btn-edge); background:var(--btn-face); color:var(--btn-ink); cursor:pointer; }
 .setup-sheet-btn:hover { filter:brightness(1.2); }
 .setup-sheet-btn-close { padding:5px 9px; }
 /* the PAPER sheet — always white/black (a print preview), INDEPENDENT of theme so it reads the same in both */
@@ -5814,8 +5897,11 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .setup-sheet-page .ss-verdict-red { color:#b3261e; }
 
 /* ── The Library (t854): one tabbed modal — Profiles · Projects · Wizards. Themed; 13100 tier (below dialogs). ──── */
-.library-overlay { position:fixed; inset:0; z-index:13100; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
-.library-modal { width:min(640px,96vw); height:min(680px,90vh); display:flex; flex-direction:column; background:var(--panel,#161b22); color:var(--text-main,#e6ecf2); border:1px solid var(--border,#2a313b); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.6); overflow:hidden; }
+/* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract; .library-head/-body's own token
+   reads (already var(--border,...) etc., just a different token name) are left as-is — already correct, not
+   debt. */
+.library-overlay { position:fixed; inset:0; z-index:var(--z-modal-library); background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:16px; }
+.library-modal { width:min(640px,96vw); height:min(680px,90vh); display:flex; flex-direction:column; background:var(--modal-face); color:var(--text); border:var(--modal-edge-w) solid var(--modal-edge); border-radius:var(--modal-radius); box-shadow:var(--modal-shadow); overflow:hidden; }
 .library-head { display:flex; align-items:center; gap:8px; padding:8px 12px 0; border-bottom:1px solid var(--border,#2a313b); }
 .library-tabs { display:flex; gap:4px; flex:1; flex-wrap:wrap; }
 .library-tab { font:inherit; font-size:13px; padding:8px 18px; border-radius:7px 7px 0 0; border:1px solid transparent; border-bottom:0; background:transparent; color:var(--text-dim,#9fb0c4); cursor:pointer; }
@@ -5847,10 +5933,11 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* ── t1223 — THE WORKSPACE MANAGER (ui/workspaceManager.js). One modal, two halves: THIS workspace on top (name,
    state, what changed since the last save, Save/Save As/Duplicate) and the GRANTED FOLDER below as cards. The card
    leads with the ENVELOPE because that is what a machine is recognised by, not its filename. ─────────────────── */
-.wsm-overlay { position: fixed; inset: 0; z-index: 13200; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.55); }
+/* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract. */
+.wsm-overlay { position: fixed; inset: 0; z-index: var(--z-modal-workspace); display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--scrim); }
 .wsm-modal { width: 100%; max-width: 720px; max-height: calc(100vh - 48px); display: flex; flex-direction: column;
-    background: var(--panel, #1a1f27); color: var(--text-main, #e7edf5); border: 1px solid var(--border, #333a45);
-    border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.5); overflow: hidden; }
+    background: var(--modal-face); color: var(--text); border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius); box-shadow: var(--modal-shadow); overflow: hidden; }
 .wsm-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
 .wsm-head .wsm-x { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
 .wsm-body { overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
@@ -5974,10 +6061,13 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* ── t1245 — THE HELP PANEL (ui/helpPanel.js). FAQ + About left Settings: neither is a setting, and looking for an
    answer inside the configuration screen is a lesson nobody should have to learn. Same modal shape as the workspace
    manager so there is one modal language, not two. ─────────────────────────────────────────────────────────────── */
-.help-overlay { position: fixed; inset: 0; z-index: 13300; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.55); }
+/* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract; byte-identical to .wsm-modal's own
+   pre-turn literals — a genuine duplicate pair, both now point at the same tokens instead of restating the
+   same numbers twice. */
+.help-overlay { position: fixed; inset: 0; z-index: var(--z-modal-help); display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--scrim); }
 .help-modal { width: 100%; max-width: 720px; max-height: calc(100vh - 48px); display: flex; flex-direction: column;
-    background: var(--panel, #1a1f27); color: var(--text-main, #e7edf5); border: 1px solid var(--border, #333a45);
-    border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.5); overflow: hidden; }
+    background: var(--modal-face); color: var(--text); border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius); box-shadow: var(--modal-shadow); overflow: hidden; }
 .help-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
 .help-close { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; min-width: 44px; min-height: 44px; }
 .help-body { overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
@@ -5991,9 +6081,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 
 /* ── t1225 — THE FIRST-SAVE ASK (ui/workspaceSave.js): name + workspaces folder in ONE dialog, so the first Save is
    one step and the saved file lands where the manager lists it. ────────────────────────────────────────────────── */
-.wss-ask { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
-.wss-box { background: var(--panel, #161b22); color: var(--text-main, #e6edf5); border: 1px solid var(--border, #333a45);
-    border-radius: 8px; padding: 16px 18px; width: min(440px, 92vw); box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+/* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract. */
+.wss-ask { position: fixed; inset: 0; z-index: var(--z-modal-first-save); display: flex; align-items: center; justify-content: center; background: var(--scrim); }
+.wss-box { background: var(--modal-face); color: var(--text); border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius); padding: 16px 18px; width: min(440px, 92vw); box-shadow: var(--modal-shadow); }
 .wss-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
 .wss-lbl { display: block; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
 .wss-namerow { display: flex; align-items: center; gap: 6px; }
@@ -6015,10 +6106,15 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 
 /* t1283 (user ruling) — THE CENTRED OPEN OVERLAY. Only a workspace open earns it: that open ends in a reload, so the
    app really is going away and a centre-screen glyph is the honest signal, not a claim about one busy row. */
-.ddcs-busy-overlay { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center;
-    background: rgba(8, 11, 16, 0.55); backdrop-filter: blur(2px); }
-.ddcs-busy-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 30px; border-radius: 12px;
-    background: rgba(20, 26, 34, 0.94); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+/* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract (was a hardcoded blue-tinted
+   rgba(8,11,16,X)/rgba(20,26,34,X) look with zero token reads anywhere — unlike comm-dialog, nothing in this
+   rule's own history claims that was deliberate theme-independence, so treated as unmigrated debt like every
+   other modal here, not a third exemption). backdrop-filter's own blur stays as its own decorative choice —
+   the dispatch calls out opacity/colour consolidation, not blur radius. */
+.ddcs-busy-overlay { position: fixed; inset: 0; z-index: var(--z-modal-busy); display: flex; align-items: center; justify-content: center;
+    background: var(--scrim); backdrop-filter: blur(2px); }
+.ddcs-busy-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 30px; border-radius: var(--modal-radius);
+    background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge); box-shadow: var(--modal-shadow); }
 /* t2069 — was its own animation: ddcs-busy-rot, a byte-identical twin of ddcs-busy-spin below (both just
    `to { transform: rotate(360deg); }`) — consolidated onto the one keyframe both spinners now share. */
 .ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.18);
@@ -6029,12 +6125,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
    and the refinement names why that failed: on a narrow screen the chip is not rendered at all, so the feedback went
    to a place the user could not be looking. Centred, at every width, and it waits to be dismissed rather than timing
    out — a message naming what was written should not vanish before it is read. */
-.saved-pop { position: fixed; inset: 0; z-index: 100001; display: flex; align-items: center; justify-content: center;
-    background: rgba(8, 11, 16, 0.45); padding: 16px; }
+/* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract, same reasoning as .ddcs-busy-
+   overlay/-card just above. */
+.saved-pop { position: fixed; inset: 0; z-index: var(--z-modal-saved); display: flex; align-items: center; justify-content: center;
+    background: var(--scrim); padding: 16px; }
 .saved-pop-card { max-width: min(92vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 20px 24px; border-radius: 12px; text-align: center;
-    background: rgba(20, 26, 34, 0.97); border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 12px 44px rgba(0, 0, 0, 0.55); }
+    padding: 20px 24px; border-radius: var(--modal-radius); text-align: center;
+    background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge);
+    box-shadow: var(--modal-shadow); }
 .saved-pop-title { font-size: 15px; font-weight: 700; letter-spacing: .3px; color: #7ddc9a; }
 .saved-pop-name { font-size: 12.5px; color: #cfe0f2; word-break: break-word; }
 .saved-pop-what { font-size: 12px; color: #9fb2c6; line-height: 1.45; word-break: break-word; }
