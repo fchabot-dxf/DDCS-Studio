@@ -6528,3 +6528,9 @@ answer is that it already effectively is.
 ⚠ **Check the CAM surface for the same shape while you are there** — a comment notes the library folder
 holds ".wiz here, .cam on the CAM surface", so the same export-writes-X / import-accepts-Y mismatch may
 exist there too. Verify rather than assume.
+
+### AMENDMENT — no legacy burden here either *(human: "legacy is not important")*
+**Do not add `.wiz` alongside `.wizard` for compatibility. REPLACE it.** The filter becomes `.wiz,.json`
+and `.wizard` goes entirely — including from the prose comments that still mention it, so a future reader
+does not think both are live. Consistent with [[no-legacy-burden]]: pre-release, no install base, delete
+rather than maintain. Same for the CAM surface if it shows the same mismatch.
