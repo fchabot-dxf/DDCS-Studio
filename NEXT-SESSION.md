@@ -6280,3 +6280,61 @@ never starts the publishers, rather than being gated by a setting someone could 
 belong in a file that describes a *machine*? What happens when the gateway PC is replaced or renamed? How
 does a brand-new PC bootstrap before it has the workspace? Does this survive the headless-gateway future
 (a Pi or tablet at the machine, where every UI is remote)? None of these are answered.
+
+---
+
+# ═══ QUEUED — THE WORKSPACE NAMES ITS GATEWAY ═══
+*(human, 2026-08-18: "pc roles is small enough and straightforward to do now" → "w-y not in workspace" →
+"feels natural". SUPERSEDES the "workspace registers PC roles" shape parked earlier today — that entry was
+parked on questions this design answers.)*
+
+## THE DESIGN — one declaration, no second setting
+
+**The `.ddcs` workspace declares which PC is the gateway for that machine.** A PC compares its own identity
+against that declaration and knows what it is. **There is NO local role setting** — one source of truth.
+
+```
+  workspace says:  gateway = { install_id: <uuid>, hostname: "CNC-FAIRY" }
+
+  a PC opens it →  my install_id matches?  YES → I am the gateway
+                                           NO  → I am a client
+```
+
+⭐ **Store BOTH identifiers, and use them for different jobs:** match on **`install_id`** (already exists at
+`~/.ddcs-bridge/install_id`, stable forever, survives a rename), display the **hostname** (human-readable
+in the UI). A PC rename then changes only the label, not the matching. Do not match on hostname.
+
+**Why the workspace and not local config:** the `.ddcs` IS the machine
+([[one-workspace-one-machine]]), so *"who serves this machine"* is a machine fact and belongs in its file.
+Local config would leave the topology stated nowhere — three PCs, three separate setups, and no file
+anywhere saying who the gateway is. And storing it in BOTH places was explicitly rejected: two sources of
+truth is the shape this project has spent the day deleting.
+
+## WHAT IT FIXES — the reason it is worth doing now
+`bridge.py` runs `explorer.tick()` and `_publish_heartbeat()` **unconditionally**, while `poller.py:54` and
+`ops.py:221` already guard on `expert_dest`. So a second exe with no controller currently overwrites
+`cncdisk/index.json` with an empty list and `heartbeat.json` with `controller_connected: false` — **making
+the real shop gateway look dead**, with job claiming still safe but the console lying about liveness.
+
+⇒ **Gate both publishers on BEING the declared gateway.** ⚠ Note this is deliberately stronger than gating
+on `expert_dest`: a path is an INFERENCE (a copied config or a stray dest turns a desk PC into a stomping
+gateway by accident), whereas the role is a DECLARATION — the pattern this project runs on.
+
+## THE CASES, all with the same simple answer
+- **No gateway declared yet (fresh workspace):** nobody publishes. Safe by default. A UI action — *"this PC
+  is connected to the machine"* — claims it and writes the declaration.
+- **Wrong PC declared / gateway PC replaced / PC renamed:** **edit it.** The human ruled this explicitly
+  ("roles can be edited its not a big deal"), and it is the whole recovery story — do not build migration
+  machinery for it.
+- **A client opens the workspace:** reads the declaration, shows which PC serves this machine, publishes
+  nothing.
+
+## SCOPE — keep it small
+The declaration in the workspace, the identity comparison at startup, the two publishers gated, and a
+Setup affordance to claim/edit it. **Not** a multi-machine registry, **not** roles beyond gateway/client,
+**not** a headless-service mode (that future is noted elsewhere and this design survives it: a Pi or tablet
+at the machine is simply the PC whose `install_id` is declared).
+
+⚠ **Verify the real symptom, not just a unit test:** run two instances, one declared and one not, against
+one rendezvous, and confirm the undeclared one publishes NOTHING while the declared one keeps reporting
+`controller_connected: true`. A test that only asserts a config flag would pass with the stomp still live.
