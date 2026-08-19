@@ -6723,3 +6723,29 @@ visibility problem the spike measured away. One client + registered URIs keeps t
 ⇒ **This is a one-time account-side prerequisite, not a code bug.** Worth surfacing in the UI though: the
 Connect button currently reports Google's failure only as a browser page the user has to read. A future
 turn could pre-flight it, or at minimum name `redirect_uri_mismatch` in the Setup hint.
+
+# ═══ BACKLOG (human, 2026-08-19) — HIDE THE CONSOLE WINDOW WHEN LAUNCHING THE EXE ═══
+*(human: "backlog can we hide this window when launcing the exe". NOT dispatched — recorded.)*
+
+**What the user sees:** launching DDCS-Studio.exe opens a black console window alongside the app:
+```
+=== fairy gateway started 2026-08-19 19:23:24 (pid 18024) ===
+[fairy] serving on http://127.0.0.1:8765
+```
+It sits there for the whole session. For a shop-floor app that is noise, and closing it kills the gateway.
+
+**Cause:** `desktop/build_fairy.ps1` passes neither `--windowed`/`--noconsole` nor `--console` to
+PyInstaller, so it defaults to a CONSOLE build. The gateway's `print()` logging goes there.
+
+⚠ **DO NOT just add `--windowed` and call it done — the log is load-bearing.** Real diagnoses this project
+has depended on came off that window (the startup line naming the bound host/port, the beacon/slave status
+line that reports a FAILED serial probe, `[poller]` delivery + stall lines). With `--windowed`, stdout on a
+frozen Windows build goes nowhere and those become unobservable — trading a cosmetic annoyance for a
+debugging blackout, on the one platform where users cannot run it from a terminal to get them back.
+
+**Shape of a fix (so it is not re-derived):** keep the logs, lose the window — write them to a FILE the app
+can surface (`~/.ddcs-bridge/gateway.log`, rotated) BEFORE switching to `--windowed`, and give Setup a
+"show log" affordance. `--windowed` first, logging second, is the wrong order.
+
+⚠ Check `desktop/fairy_gateway.py` for anything reading stdin/writing stdout that assumes a console exists;
+under `--windowed` `sys.stdout` can be None on Windows and a bare `print()` then RAISES.
