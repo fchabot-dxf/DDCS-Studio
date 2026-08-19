@@ -5952,3 +5952,27 @@ true. It does **not** establish that a second PC can resolve the first — that 
 the network, which on this user's studio WiFi is exactly the unadministered, untested variable. So: lead
 with the hostname because it is the friendliest thing that usually works, **never present it as
 guaranteed**, and keep the IP reachable for when name resolution is unavailable.
+
+## ⭐ PRIORITY RULING (advisor, 2026-08-18) — THE OAUTH SPIKE OUTRANKS THE QR FEATURE
+
+The human flagged a drift I had caused: they said early on *"we shouldnt rely on local network"* and asked
+about sending over the internet via their own cloud — and I then spent several turns polishing LAN
+affordances (QR, hostname, IP ranking) while the cloud path remained an unbuilt spike. Wrong ratio.
+
+**The topology, settled** *(human: "cnc pc ofcourse is local to controller")*:
+
+```
+  USER ─── the VARIABLE leg ───▶ GATEWAY PC ─── cable ───▶ CONTROLLER
+       cloud (anywhere) | LAN (in the shop)    ALWAYS local — physics, not a choice
+```
+
+The gateway must run on the machine wired to the controller; that was never in question. *"Do not rely on
+local network"* applies **only to how the USER reaches the gateway.**
+
+⇒ **Run the Drive OAuth spike BEFORE the QR/hostname work.** The spike decides whether the "anywhere" leg
+is viable at all — if two OAuth clients cannot see each other's `drive.file` files, the cloud design
+changes shape before a line is written. The QR is convenience on a leg that **already works today**.
+
+⇒ Both paths survive, they are not competitors: **cloud = works from anywhere** (needs internet, ~15-30s
+poll latency, a Google account); **LAN = fast, offline, no third party** (only in the building). CONFIGS.md
+already models both.
