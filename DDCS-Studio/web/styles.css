@@ -273,13 +273,19 @@ html, body { overflow-x: clip; }
    through the header's bottom border so there's no separating line. */
 .app-header .tab.active { --tab-fill: var(--panel); color: var(--hdr-ink, var(--text-main)); background: var(--tab-fill); margin-bottom: -1px;
     box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
-/* Organic theme: the connecting tab AND the bar below the header are pink (theme accent), kept matching so the
-   active tab still merges into the bar. */
+/* Organic theme: the connecting tab AND the bar below the header are coral (theme accent), kept matching so
+   the active tab still merges into the bar. t2071 (human-ruled: "i remember coral was the original color, lets
+   try it") — this rule used to paint #studio-app .top-dock-header green too, at (1,2,0) + !important, which
+   permanently beat this file's OWN separate, more detailed coral gradient rule for that exact element
+   (`.top-dock-header`'s own linear-gradient(180deg,#bf6850,#8d4533), a few hundred lines down) — never once
+   rendering. #studio-app .top-dock-header is REMOVED from this list so that rule wins on its own merits — no
+   !important, no out-specificizing, the same technique the three P0 .top-dock-header collisions were fixed
+   with. The remaining four selectors are ONE band with the tab (the file's own comment already said so) — they
+   move to the SAME coral (#bf6850, the gradient's own top stop) rather than splitting off and staying green. */
 [data-theme="organic"] .app-header .tab.active,
-[data-theme="organic"] #studio-app .top-dock-header,
 [data-theme="organic"] #macros-app .settings-head,
 [data-theme="organic"] #gateway-app .settings-head,
-[data-theme="organic"] #blocks-app .blk-topbar { background: #6f9b4d !important; }
+[data-theme="organic"] #blocks-app .blk-topbar { background: #bf6850 !important; }
 /* Organic's bars are a saturated colour → inactive tab labels need lighter, higher-contrast text. */
 [data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255,255,255,0.82); }
 [data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255,255,255,0.7); }
@@ -304,8 +310,8 @@ html, body { overflow-x: clip; }
 [data-theme="futuristic"] .settings-tabs .settings-main-tab.active::before, [data-theme="futuristic"] .settings-tabs .settings-main-tab.active::after,
 [data-theme="normal"] .app-header .tab.active::before, [data-theme="normal"] .app-header .tab.active::after,
 [data-theme="normal"] .settings-tabs .settings-main-tab.active::before, [data-theme="normal"] .settings-tabs .settings-main-tab.active::after { content: none; }
-/* Organic header-tab feet flare into the green bar (match the tab fill). */
-[data-theme="organic"] .app-header .tab.active { --tab-fill: #6f9b4d; }
+/* Organic header-tab feet flare into the coral bar (match the tab fill). t2071 — was #6f9b4d, following the band's own colour above. */
+[data-theme="organic"] .app-header .tab.active { --tab-fill: #bf6850; }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. */
@@ -1692,6 +1698,29 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 }
 
 /* ============================================
+   FORM FIELDS (base) — t2071, P2 of the stylesheet arc.
+   No input/select/textarea rule existed anywhere in this file — .wiz-body's own input/select (P0, t2069) was
+   the one exception, and only in studio. Everywhere else, and every OTHER theme, a form field rendered as a
+   raw browser-default control. Bare-tag selectors (0,0,1), the lowest possible specificity, so this only fills
+   the gap — anything already styled via a class/id anywhere continues to win exactly as before.
+   ============================================ */
+input, select, textarea {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: inherit;
+    padding: 4px 6px;
+}
+/* the SAME :focus-visible pattern already used elsewhere in this file (.wiz-pane-bar, .form-sec-hdr, and
+   .wiz-body input/select from P0) — not a new one invented for this. */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* ============================================
    BUTTONS (Structure & Uniform Sizing)
    All buttons use same base padding
    Themes override ONLY visual styling (colors, borders, gradients)
@@ -1711,6 +1740,16 @@ button,
     transition: all 0.15s ease;
     min-height: 24px;
     line-height: 1.2;
+}
+/* t2071 P2 — no :focus-visible ring existed on the base button rule either; same pattern as the form fields
+   above. Bare-tag/class selectors at the SAME specificity the base rule already has — any component that
+   already overrides button styling (most do, via a more specific selector) is unaffected. */
+button:focus-visible,
+.btn:focus-visible,
+.op-btn:focus-visible,
+.toolbar-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
 button:hover,

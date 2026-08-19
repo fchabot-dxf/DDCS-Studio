@@ -43741,3 +43741,83 @@ regressions in the full suite.
 - `DDCS-Studio/tests/screenshot-baselines-1792.spec.js-snapshots/modal-corner-win32.png` — updated baseline, the real new focus ring from P0 item 1 (inspected before accepting, not blindly regenerated).
 
 🔨 turn 2069
+
+# t2071 — organic's coral ruling + P2 of the stylesheet arc (shared form-field base + button focus ring)
+
+## (1) Organic's coral band — a human ruling, executed the same way as the t2069 collisions
+
+The advisor showed the human both colours live: `#6f9b4d` flat green (the one actually rendering, via an
+ID-anchored, `!important`, five-selector rule) and an already-declared `linear-gradient(180deg,#bf6850,#8d4533)`
+terracotta on `.top-dock-header` specifically, which had never once rendered (same shadowing shape as the P0
+`.top-dock-header` bugs from t2069, just not caught then because nobody had reason to look at organic's OWN
+colour choice). Human's ruling, verbatim: *"i remember coral was the original color. lets try it."* — corroborated
+by the skin itself: the command deck at the bottom of every organic screenshot this arc has taken is already
+coral/brown; the green top band was the only green thing in the whole skin.
+
+**Explicit constraint, honored**: do not make coral win by `!important` or by out-specificizing — remove or
+re-point the green patch so the ALREADY-DECLARED coral rule wins on its own merits, the exact technique the
+three `.top-dock-header` collisions in t2069 were fixed with. Removed `#studio-app .top-dock-header` from the
+green rule's five-selector list — its own gradient rule (unedited) now renders there, on its own merits, no
+selector or specificity war needed. The remaining four selectors (`.app-header .tab.active`,
+`#macros-app`/`#gateway-app .settings-head`, `#blocks-app .blk-topbar`) are explicitly ONE band with the tab —
+the file's own comment already said so, and the advisor was explicit not to split them and leave the tab green
+— so their shared value moved from `#6f9b4d` to `#bf6850` (the gradient's own top stop), keeping the whole band
+coordinated. The companion `--tab-fill` custom property (the tab's "feet" flare colour) moved the same way.
+Screenshot-verified: the STUDIO tab and the toolbar bar now move together in coral, the toolbar shows its own
+genuine gradient (lighter top, darker bottom) rather than a flat colour, and nothing else in the skin changed.
+
+## (2) P2 — the two additions that conflict with nothing
+
+No `input, select, textarea` rule existed anywhere in 5,900+ lines — `.wiz-body`'s own studio-only override
+(P0, t2069) was the ONE exception, meaning every form field in the other four themes rendered as a raw
+browser-default white box against a themed panel. Added a bare-tag base rule (`background: var(--panel);
+border: 1px solid var(--border); border-radius: var(--radius);` + the same `:focus-visible` ring pattern
+already used 4x in this file) at the lowest possible specificity (0,0,1 per tag) — anything already styled via
+a class/id anywhere continues to win exactly as before; this only fills the gap. Same pattern added to the base
+button rule (`button`, `.btn`, `.op-btn`, `.toolbar-btn`), which had no focus state defined at all.
+
+Verified two ways, not just eyeballed: computed-style check confirms `background`/`border-color` on a real
+wizard input now resolve to each theme's own `--panel`/`--border` token in normal/steampunk/futuristic/organic,
+while studio's own more-specific rule stays untouched (transparent background, its own gradient border) —
+proving the new base rule fills the gap without displacing anything already styled. Screenshot comparison:
+steampunk's wizard fields go from stark white boxes clashing against the dark brown skin to properly
+panel-coloured, bordered fields in every field on the form — the most dramatic of the four themes, and the
+clearest evidence the fix does what it claims.
+
+**An amendment mid-turn repaired backtick-eaten text in the original dispatch note** (a known trap this session
+has hit before) — the repaired version matched what was already implemented before the amendment landed; no
+change was needed as a result of it.
+
+**Named plainly, what was NOT captured this turn**: the Blocks tab's own canvas/palette, the Gateway/Macros
+tabs, the settings panel, and any narrow-viewport/mobile layout — none of these were touched by either change,
+but none were screenshotted either. The wizard modal (all 5 themes) and the main app header/toolbar band (all 5
+themes) were the surfaces both changes could plausibly affect, and are what was captured.
+
+## Non-vacuity
+
+Brace-depth balance (comment-aware, whole-file) re-verified after every edit, ending at depth 0 both times.
+Computed-style assertions (not just screenshots) for both changes: organic's `.top-dock-header` background
+resolves to the gradient (verified via `backgroundImage`, not just eyeballed colour); the four other organic
+selectors resolve to `#bf6850` exactly; the P2 base rule's `background-color`/`border-color` resolve to each
+theme's own declared `--panel`/`--border` on a real wizard field, while studio's pre-existing override is
+provably untouched (still transparent/its own gradient).
+
+## Gate
+
+Node tier: 193/193. Full Playwright suite (2,656 tests): 2,609 passed, 8 flaky (recovered on retry), 25
+skipped, 7 failed. Every one of the 7 matches, byte-for-byte, the SAME set investigated and confirmed
+pre-existing/unrelated in t2069's own gate run: `controller-import-one-door-1221`, `editor-indent-1450` (×3),
+`pull-modal-stacking`, `ring-descent-1404` (all six independently confirmed against unmodified HEAD last turn —
+not re-verified against HEAD again this turn, since they are the identical assertions/messages already
+established as unrelated to this file), plus `send-history-real-path-2065`'s stalled-job test (the
+already-documented environment flake, unrelated to CSS). **Critically: `screenshot-baselines-1792` — the one
+test t2069's own P0 fix touched and required a baseline update for — is NOT in this turn's failure list**,
+confirming that fix held and this turn's own changes (organic's coral, the P2 base rules) introduced zero new
+visual regressions anywhere the suite's own baselines cover. Zero net-new failures this turn.
+
+## Files
+- `DDCS-Studio/web/styles.css` — organic's coral fix + the P2 base form-field/button-focus rules.
+- `DDCS-Studio/verification/t2071-organic-coral-and-p2-fields.mjs` — new, the before/after screenshot capture script for this turn.
+- `DDCS-Studio/verification/t2071-{before,after}-*.png` — 30 screenshots (main + wizard-open + field-focus per theme, before and after, all 5 themes).
+
+🔨 turn 2071
