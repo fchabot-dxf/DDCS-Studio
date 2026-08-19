@@ -44540,3 +44540,144 @@ fully settled).
 - `DDCS-Studio/verification/t2081-{before,after}-*.png` — 50 screenshots.
 
 🔨 turn 2081
+
+# t2083 — P4d of the stylesheet arc: THE DOCK AND THE PUBLIC BEVEL RAMP
+
+Studio's private "sv-*/bv-*" Win95-style 3D bevel ramp (9 tokens, 89 reads: 98 raw name occurrences in the
+pre-turn file minus the 9 tokens' own declarations) lived entirely inside `[data-theme="studio"]` — but 89
+reads is not "used privately," it's "used as if it were public," just without the contract. Renamed to
+self-ordering luminance tiers — `--plate-hi/-mid/-lo` (flat plate tones) and `--bevel-hi/-hi-dim/-mid-hi/
+-mid-lo/-lo` (the 3D edge tones, literally ordered light→dark by name) — via an ordered `sed` pass, longest
+name first so no rename clobbers a shorter one's prefix. One side effect: `\b`-anchored `--bv-dark\b` also
+matched `--bv-dark`'s own prefix inside `--bv-dark-2` (`-` counts as a non-word char, so the boundary still
+fires), silently renaming it to `--bevel-lo-2` instead of leaving it alone. Caught by `grep -n "bevel-lo-2\|
+bv-dark-2"` right after the sed pass; `--bv-dark-2` had zero reads anywhere in the file (grep-confirmed before
+the rename) and was slated for outright deletion per dispatch, so the fix was just deleting the accidentally-
+renamed declaration — the intended end state either way.
+
+## The core move: raw ramp → skin-authoring material only, composite tokens are the public contract
+
+The rename alone doesn't fix anything — the defect was 65-ish of those 89 reads sitting directly in SELECTOR
+RULES (four distinct gradient recipes repeated across dock chassis, dock handle, inset well panels, info
+chips, deck headings, dropdown tray — one recipe byte-identical across 5 separate selectors). Declared 9
+composite tokens, each a FULL multi-layer background/border recipe built from the ramp, matching the existing
+`--kbd-glass`/`--btn-face` precedent (both already stack multiple gradients behind one name): `--dock-well-edge`
+(the "sunken well" border-box gradient, the 5-copy recipe — `.wiz-body input/select`, `.viz-container`,
+`.preview-block pre` alias it same-block per the advisor's explicit scope call, since aliasing inside their OWN
+skin block carries no cross-block trap risk), `--dock-chip-face` / `--dock-chip-face-hover` / `--dock-chip-
+radius` (kept dock-local per the advisor's scope decision, not generalized), `--dock-chassis-face` / `--dock-
+chassis-edge`, `--dock-handle-face` / `--dock-handle-edge`, `--dock-heading-edge`, `--dock-plate-edge`, and
+`--dropdown-tray-face` — the dropdown tray isn't conceptually "dock," but it was reading the raw ramp directly
+(the 4th of the four repeated recipes), so it gets a composite token too: the enforceability grep doesn't care
+about conceptual category, only "does anything outside the token block read the raw names."
+
+Consumers migrated: dropdown trigger/item → `var(--btn-face)` (already existed, was needlessly reading raw
+ramp); dropdown tray → `var(--dropdown-tray-face)`; `.dock-header.top-dock-header` (chassis face+edge, verified
+LIVE — a real, different element from bare `.dock-header`, confirmed via DOM structure and a dedicated
+`t2083_topheader_probe.mjs` computed-style check matching the declared values exactly); `.viz3d-drawer` border-
+left + `.viz3d-handle` (handle face+edge); `.dock-body` border (color only — see below); deck section headings
+(`--dock-heading-edge`); `.var-item`/`:hover` (chip face+radius, `--dock-chip-radius` declared as a full
+shorthand since organic's own chip radius is asymmetric).
+
+## Four whole rules deleted, each verified before deletion — not trusted on the dispatch's claim
+
+The dispatch named 4 candidates as dead. Verified each individually via `getComputedStyle` on the real element
+(`t2083_dead_rule_probe.mjs`) AND by exact hex cross-reference against studio's own already-live `--kbd-*`
+tokens, rather than taking "dead" on faith:
+- `.raised, .controller-dock` bevel helper — `.raised` matches zero elements in HTML/JS (grep-confirmed).
+  `.controller-dock` matches a real element but never renders its own declared value: superseded by
+  `#controller-dock.controller-dock { background: var(--kbd-glass); border-top: 1px solid var(--kbd-edge); }`
+  (an ID selector, higher specificity) — and studio's `--kbd-edge` is itself `var(--bevel-lo)` (was `var(--bv-
+  dark)`), so the OLD dead rule's own value was already flowing through the kbd system by a different, already-
+  winning path.
+- bare `.dock-header` (background:transparent) — superseded by the UNIVERSAL `#controller-dock .dock-header
+  { background: transparent; }` (ID beats attribute selector regardless of class count); same value either
+  way, so deleting it changes nothing — it simply never won.
+- `.header-handle` — superseded by `--kbd-handle` (same two hex stops, e6e2d9/cfcabf, now with alpha).
+- `.chevron` (color:#101010) — superseded by `--kbd-grip` (rgba(16,16,16,.7), same hex, now translucent).
+
+Distinguished carefully from `.dock-header.top-dock-header`, which LOOKS like the same dispatch mention but is
+a genuinely different, live element (the top action bar) — confirmed via DOM structure, not assumed from the
+similar name, and given its own composite tokens (`--dock-chassis-face`/`-edge`) rather than deleted.
+
+`.dock-body`'s `background: var(--panel)` is ALSO dead by the same measurement (superseded by the same-
+specificity-beating universal `#controller-dock .dock-body { background: transparent; }`) — but per the
+dispatch, this one MUST STAY dead: the glass-keyboard showthrough effect depends on `.dock-body` staying
+transparent so `#controller-dock`'s own `--kbd-glass` material shows through underneath it. Left byte-for-byte
+untouched; only the rule's genuinely-live border-color properties (now `var(--dock-plate-edge)`) were tokenized
+in the same block, surgically, around the dead line.
+
+## THE BUG — a self-inflicted "*/" comment-truncation, same class as t2069
+
+Writing the new ramp-declaration comment, I wrote "sv-*/bv-*" as shorthand for "the sv- and bv- prefixed
+names" — which contains the literal substring `*/`, immediately closing the CSS comment early. This silently
+corrupted the very next declaration on the line. Symptom: `getComputedStyle(document.body).getPropertyValue
+('--plate-hi')` returned an EMPTY STRING while its siblings (`--plate-mid`, `--plate-lo`, declared on the same
+line) resolved fine — looked token-specific until reordering the line moved the breakage to whichever token was
+now FIRST after the comment, proving it was positional (first-declaration-after-a-truncated-comment), not
+token-specific. Cascaded: `--btn-face` (references `--plate-hi` in its first gradient stop) broke too, which
+broke `.toolbar-dropdown-content button`'s background — the ONE real diff `t2083_ramp_probe.mjs`'s before/after
+computed-style comparison actually caught (`studio.dropdownItem.background` went from a real gradient to fully
+transparent `rgba(0,0,0,0)`). That diff is what surfaced the bug at all — the brace-depth balance checker run
+after every edit this whole session does NOT and structurally CANNOT catch this class of bug, since a stray
+`*/` doesn't necessarily unbalance braces, it only breaks comment boundaries. This is the second time this
+exact bug class has bitten a turn in this arc (first documented t2069) — the fix here is the same as there:
+never write a literal `*/` inside a comment, and treat computed-style before/after diffing as non-negotiable
+even on "just a rename" turns, because prose comments are still code.
+
+Fixed by rewording to "the old sv- and bv- names" and restoring original declaration order. Swept the WHOLE
+file afterward for any other instance (`grep -noE '.{15}\*/.{15}' web/styles.css`, filtered for genuine mid-
+text `*/` adjacency) — found none, confirming this was the only occurrence. Re-verified via
+`t2083_dropdown_debug3.mjs` (dumps all 13 ramp/composite/button/modal tokens at once) that every value resolves
+correctly, then re-ran the full `t2083_ramp_probe.mjs` before/after diff: **zero diffs**, all 5 themes, all
+measured properties (controllerDock, headerHandle, chevron, topDockHeader, dockBody, deckHeading, viz3dDrawer,
+viz3dHandle, dropdownTrigger, dropdownTray, dropdownItem), confirmed again after the file was restored fresh
+into the mem-server for the final gate run.
+
+## Enforceability — the dispatch's own required check, re-run on the final file
+
+`grep -n -- "--plate-\|--bevel-" web/styles.css` → 27 hits. Every one is either (a) a declaration inside a
+`[data-theme="studio"]` token block (the two blocks at ~2756 and ~4405), (b) another composite token's value
+inside one of those same blocks, or (c) explanatory-comment text (confirmed by inspecting each: lines 391 and
+3021 are prose inside larger comment spans, not live declarations). Zero hits in a selector rule anywhere else
+in the file — the regression this turn exists to close does not exist in the final state.
+
+## Gate
+
+Node tier: 193/193. Full Playwright suite (2,649 tests, 45.2m): 2,606 passed, 10 flaky (recovered on retry,
+none dock/ramp/CSS-related by name), 25 skipped, 8 failed — **all 8 match the established pre-existing set from
+every prior turn in this arc, zero new failures** (`controller-import-one-door-1221`, `editor-indent-1450`×3,
+`pull-modal-stacking`, `ring-descent-1404`, `send-history-real-path-2065`, `update-check.spec.js`'s "NO composed
+notes" test). Confirmed by reading the actual failed-test names, not just the trailing count line.
+
+Screenshots: 5 themes × {main, deck-open, dropdown-open, wizard-open, blocks-tab, gateway-tab}, before AND
+after (60 total) — `t2083-ramp-screens.mjs`. The wizard-open step originally failed for all 5 themes (a script
+bug: clicking "Probe" a second time after an Escape-closed dropdown toggled it shut instead of open, not a CSS
+issue) — fixed by giving the wizard-open and tab-capture steps their own fresh page each, rather than chaining
+onto the same page session as the dropdown-open shot. Visually reviewed: studio's before/after pairs are
+pixel-identical everywhere except where expected (this was a pure token refactor, not a recolor — identical
+rendering IS the correct outcome), and all 4 other themes are pixel-identical before/after everywhere (the raw
+ramp only ever existed inside studio's own block, so no other theme should show any difference at all — none
+did).
+
+## Files
+- `DDCS-Studio/web/styles.css` — the ramp rename, 9 composite token declarations, consumer migrations, 4 dead-
+  rule deletions (+ documenting comment), the `.dock-body` must-stay-dead surgical edit.
+- `DDCS-Studio/verification/t2083_dead_rule_probe.mjs` — computed-style measurement proving the 4 dead-rule
+  candidates are genuinely superseded.
+- `DDCS-Studio/verification/t2083_topheader_probe.mjs` — confirms `.dock-header.top-dock-header` is LIVE
+  (distinct from the dead bare `.dock-header`).
+- `DDCS-Studio/verification/t2083_ramp_probe.mjs` — the main before/after computed-style gate (11 measured
+  points × 5 themes); this is what caught the "*/" bug.
+- `DDCS-Studio/verification/t2083_wizfield_probe.mjs` — isolated check for `.wiz-body input`/`.viz-container`/
+  `.var-item` in the wizard context.
+- `DDCS-Studio/verification/t2083_dropdown_debug.mjs`, `_debug2.mjs`, `_debug3.mjs` — sequential diagnostics
+  that isolated and confirmed the "*/" bug and its fix; `_debug3` dumps all 13 ramp/composite/button/modal
+  tokens at once.
+- `DDCS-Studio/verification/t2083_varitem_probe.mjs` — dedicated `.var-item` check (no live element in the
+  test mem-server's empty-variables state; not a bug).
+- `DDCS-Studio/verification/t2083-ramp-screens.mjs` — new, before/after screenshot capture, 6 views × 5 themes.
+- `DDCS-Studio/verification/t2083-{before,after}-*.png` — 60 screenshots.
+
+🔨 turn 2083
+

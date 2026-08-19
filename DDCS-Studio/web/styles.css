@@ -388,7 +388,7 @@ html, body { overflow-x: clip; }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. t2073 — the !important override that used to force this here is RETIRED:
-   studio's own --hdr-bg now IS var(--sv-3) (see its theme block), and .app-header reads --hdr-bg directly. */
+   studio's own --hdr-bg now IS var(--plate-lo) (see its theme block), and .app-header reads --hdr-bg directly. */
 /* Wizard bar (studio top action bar) = the unified below-header strip colour in EVERY theme (was the theme accent
    — grey/gold/cyan), so the active STUDIO tab connects to it. Flat: no border/shadow by default — a theme
    overrides via its own MORE-SPECIFIC [data-theme=X] .top-dock-header rule (organic overrides to pink; studio and
@@ -1275,10 +1275,9 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown > button.toolbar-btn:focus {
     border: 2px solid transparent !important;
     border-radius: 6px !important;
-    background:
-        linear-gradient(180deg, var(--sv-1, #e2dfd7), var(--sv-2, #cfcabf) 60%, var(--sv-3, #b6b1a5)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite, #ffffff), var(--bv-mid-lite, #b8b3a8) 35%,
-                                         var(--bv-mid-dark, #6f6a60) 65%, var(--bv-dark, #3a362f)) border-box !important;
+    /* t2083 (P4d) — was a hand-typed copy of --btn-face's own recipe (with moot inline fallbacks — this
+       token is always declared, so they never triggered); reads the real token now, one source instead of two. */
+    background: var(--btn-face) !important;
     color: var(--text) !important;
     opacity: 1 !important;
     filter: none !important;
@@ -1291,19 +1290,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     border-radius: 8px;
     padding: 4px;
     gap: 4px;
-    background:
-        linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
-                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    background: var(--dropdown-tray-face);
     box-shadow: 0 4px 10px rgba(0,0,0,0.35);
 }
 [data-theme="studio"] .toolbar-dropdown-content button {
     border: 2px solid transparent !important;
     border-radius: 5px !important;
-    background:
-        linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
-                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box !important;
+    /* t2083 (P4d) — was a hand-typed copy of --btn-face's own recipe; same value, one source now. */
+    background: var(--btn-face) !important;
 }
 [data-theme="studio"] .toolbar-dropdown-content button:hover { filter: brightness(1.05); }
 
@@ -2772,11 +2766,11 @@ button.primary:hover {
     --radius:        6px;
     --block-edited:  #ff9d00;   /* CRT amber, matches the phosphor family */
 
-    /* header — t2073: was #cfcabf (== --panel exactly). Relocated var(--sv-3) — the darkest silver bevel tone,
+    /* header — t2073: was #cfcabf (== --panel exactly). Relocated var(--plate-lo) — the darkest silver bevel tone,
        which body[data-theme="studio"] .app-header used to force via a separate !important override (retired,
        see .app-header) — into --hdr-bg itself, so the header renders the exact same tone via the token that's
        supposed to carry it, no override needed. */
-    --hdr-bg:        var(--sv-3);
+    --hdr-bg:        var(--plate-lo);
     --hdr-ink:       #101010;
     --hdr-dim:       #4b4843;
     --accent-studio: #1668ff;
@@ -2797,16 +2791,16 @@ button.primary:hover {
        precedent, `.op-btn:hover { filter: brightness(1.05); }`) — --btn-face/-edge/-ink-hover stay identical to
        resting, only --btn-filter-hover differs. */
     --btn-face:
-        linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
-                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+        linear-gradient(180deg, var(--plate-hi), var(--plate-mid) 60%, var(--plate-lo)) padding-box,
+        linear-gradient(to bottom right, var(--bevel-hi), var(--bevel-mid-hi) 35%,
+                                         var(--bevel-mid-lo) 65%, var(--bevel-lo)) border-box;
     --btn-edge: transparent; --btn-edge-w: 2px; --btn-ink: var(--text);
     --btn-face-hover: var(--btn-face); --btn-edge-hover: transparent; --btn-ink-hover: var(--text);
     --btn-filter-hover: brightness(1.05);
     --btn-face-active:
-        linear-gradient(180deg, var(--sv-3), var(--sv-2) 60%, var(--sv-1)) padding-box,
-        linear-gradient(to top left, var(--bv-lite-2), var(--bv-mid-lite) 35%,
-                                     var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+        linear-gradient(180deg, var(--plate-lo), var(--plate-mid) 60%, var(--plate-hi)) padding-box,
+        linear-gradient(to top left, var(--bevel-hi-dim), var(--bevel-mid-hi) 35%,
+                                     var(--bevel-mid-lo) 65%, var(--bevel-lo)) border-box;
     --btn-transform-active: translate(1px, 1px);
     --btn-radius: 6px; --btn-text-shadow: 0 1px 0 rgba(255,255,255,0.5);
     --btn-primary-face:
@@ -2830,13 +2824,13 @@ button.primary:hover {
        2-stop gradient (relocated from the selector-based rules this replaces, below). Title bar becomes a
        navy plate rather than the flat accent every other skin uses — needs its own light ink to read. */
     --modal-face:
-        linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
-                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+        linear-gradient(180deg, var(--plate-mid), var(--plate-lo)) padding-box,
+        linear-gradient(to bottom right, var(--bevel-hi), var(--bevel-mid-hi) 35%,
+                                         var(--bevel-mid-lo) 65%, var(--bevel-lo)) border-box;
     --modal-edge: transparent; --modal-edge-w: 3px; --modal-radius: 10px;
     --modal-shadow: 0 6px 18px rgba(0,0,0,0.45);
     --modal-head-face: linear-gradient(180deg, #2a4f82, #123a66); --modal-head-ink: #eef4fb;
-    --modal-foot-edge: var(--bv-mid-dark);
+    --modal-foot-edge: var(--bevel-mid-lo);
     --modal-close-edge: transparent; --modal-close-edge-w: 2px;
     --modal-close-face:
         linear-gradient(180deg, #ff6a5a, #d62311 60%, #a31205) padding-box,
@@ -2855,25 +2849,65 @@ button.primary:hover {
     --select:        #1668ff;
     --select-hi:     #4f93ff;
 
-    /* silver bevel ramp (Win95 3D) */
-    --sv-1: #e2dfd7; --sv-2: #cfcabf; --sv-3: #b6b1a5;
-    --bv-lite: #ffffff; --bv-lite-2: #f0eee8;
-    --bv-mid-lite: #b8b3a8; --bv-mid-dark: #6f6a60;
-    --bv-dark: #3a362f; --bv-dark-2: #16140f;
+    /* t2083 (P4d) — SKIN-AUTHORING MATERIAL ONLY: renamed from the old sv- and bv- names (Win95 3D bevel ramp)
+       to self-ordering luminance tiers. No component may read these directly — every consumer below reads a
+       COMPOSITE token (one token, a full multi-layer background/border recipe) built FROM this ramp inside
+       this same block, exactly as --kbd-glass already holds three stacked gradients and --btn-face holds two.
+       Verify with `grep -n -- "--plate-\|--bevel-" styles.css` — every hit must be either a declaration in
+       THIS block, another token's value in THIS block, or this comment; a hit inside a selector rule anywhere
+       else in the file is the regression this turn exists to close. The old bv-dark-2 (#16140f) is dropped
+       outright, not renamed — confirmed zero reads anywhere (grep for var(--bv-dark-2) before this rename). */
+    --plate-hi: #e2dfd7; --plate-mid: #cfcabf; --plate-lo: #b6b1a5;
+    --bevel-hi: #ffffff; --bevel-hi-dim: #f0eee8;
+    --bevel-mid-hi: #b8b3a8; --bevel-mid-lo: #6f6a60;
+    --bevel-lo: #3a362f;
+
+    /* t2083 (P4d) — COMPOSITE tokens built from the raw ramp above — these, not the ramp itself, are what
+       every selector rule below reads. --dock-well-edge is the border-box LAYER alone (the "sunken well" rim,
+       byte-identical across all 5 of its old copies): chip/field/preview each supply their OWN padding-box
+       fill and reuse this one shared fragment, per the explicit scope decision to keep it dock-local and let
+       the other groups alias it directly (safe — same [data-theme="studio"] block, never hits the trap). */
+    --dock-well-edge:
+        linear-gradient(to bottom right, var(--bevel-lo), var(--bevel-mid-lo) 35%,
+                                         var(--bevel-mid-hi) 65%, var(--bevel-hi-dim)) border-box;
+    --dock-chip-face: linear-gradient(#000, #000) padding-box, var(--dock-well-edge);
+    --dock-chip-face-hover: linear-gradient(#061206, #061206) padding-box, var(--dock-well-edge);
+    --dock-chip-radius: 6px;   /* a token, not a literal in the selector — ready for a future asymmetric skin */
+    /* dock chassis frame — the TOP action bar's own plate + rim (distinct from #controller-dock itself, which
+       already reads the generic --kbd-glass/--kbd-edge system correctly for every theme; this is specifically
+       .dock-header.top-dock-header, a real, live, separately-styled element). */
+    --dock-chassis-face: linear-gradient(180deg, var(--plate-mid), var(--plate-lo));
+    --dock-chassis-edge: var(--bevel-hi) transparent var(--bevel-lo) transparent;   /* top right bottom left — a real 4-value shorthand, not just documentation: only top/bottom carry a border-width */
+    /* the grab-handle plate (viz3d's OWN pull-tab, a distinct 2-stop hi->lo, not the mid-tier chassis) */
+    --dock-handle-face: linear-gradient(180deg, var(--plate-hi), var(--plate-lo));
+    --dock-handle-edge: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);   /* top right bottom left */
+    /* single-tone accent lines — deck section headings + the viz3d drawer's own divider, same tier, different consumers */
+    --dock-heading-edge: var(--bevel-mid-lo);
+    /* .dock-body's own rim (left/right/bottom, no top — the outer sunken frame around the deck panel) */
+    --dock-plate-edge: transparent var(--bevel-mid-lo) var(--bevel-lo) var(--bevel-mid-hi);   /* top right bottom left */
+    /* the dropdown tray's own silver key-tray surface (menu material, not dock — migrated here anyway since
+       the raw-ramp rule is unconditional: no selector rule anywhere may read the ramp directly, regardless of
+       which future P4 phase conceptually owns the consumer). */
+    --dropdown-tray-face:
+        linear-gradient(180deg, var(--plate-mid), var(--plate-lo)) padding-box,
+        linear-gradient(to bottom right, var(--bevel-hi), var(--bevel-mid-hi) 35%,
+                                         var(--bevel-mid-lo) 65%, var(--bevel-lo)) border-box;
 
     --mono: "DejaVu Sans Mono", "Consolas", "Liberation Mono", ui-monospace, monospace;
     --sans: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
     --pixel: var(--sans); /* (Silkscreen omitted — offline build) */
 }
 
-/* reusable bevel helper */
-[data-theme="studio"] .raised,
-[data-theme="studio"] .controller-dock {
-    border-top: 3px solid var(--bv-lite);
-    border-left: 3px solid var(--bv-mid-lite);
-    border-right: 3px solid var(--bv-mid-dark);
-    border-bottom: 3px solid var(--bv-dark);
-}
+/* t2083 (P4d) — DELETED: the "reusable bevel helper" that used to live here (`.raised, .controller-dock {
+   border-top/left/right/bottom: ...}`). Verified before deleting, not trusted: `.raised` matches ZERO
+   elements anywhere in HTML or JS (grep confirmed). `.controller-dock` DOES match a real element (it carries
+   both id="controller-dock" and class="controller-dock") — but its declared border never actually renders:
+   #controller-dock's real background/border come from the "Component (reads ONLY tokens)" rule further down
+   this file (`#controller-dock.controller-dock { background: var(--kbd-glass); border-top: 1px solid
+   var(--kbd-edge); }`), confirmed by direct getComputedStyle measurement AND by exact hex match — studio's
+   own --kbd-edge is declared as `var(--bevel-lo)` (was var(--bv-dark)), meaning this old rule's own value was
+   already flowing through the kbd system by a different, higher-specificity path. Dead weight, not a live
+   fallback. */
 
 /* App header: silver chassis plate via the shared --hdr-* tokens (base rule). */
 
@@ -2922,9 +2956,8 @@ button.primary:hover {
    it was winning here too, same shape as the .top-dock-header/.dock-header collision above. Compounding in
    .dock-header raises this to (0,3,0), beating both contenders without touching either of them. */
 [data-theme="studio"] .dock-header.top-dock-header {
-    background: linear-gradient(180deg, var(--sv-2), var(--sv-3));
-    border-bottom: 2px solid var(--bv-dark);
-    border-top: 2px solid var(--bv-lite);
+    background: var(--dock-chassis-face);
+    border-style: solid; border-width: 2px 0; border-color: var(--dock-chassis-edge);
 }
 [data-theme="studio"] .top-dock-header .header-controls {
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
@@ -2973,30 +3006,35 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 /* 3D toolpath drawer + handle */
 [data-theme="studio"] .viz3d-drawer {
     background: #000; color: var(--cyan);
-    border-left: 3px solid var(--bv-mid-dark); font-family: var(--mono); font-size: 12px;
+    border-left: 3px solid var(--dock-heading-edge); font-family: var(--mono); font-size: 12px;
 }
 [data-theme="studio"] .viz3d-handle {
-    background: linear-gradient(180deg, var(--sv-1), var(--sv-3));
-    color: #101010; border-top: 2px solid var(--bv-lite); border-left: 2px solid var(--bv-lite);
-    border-right: 2px solid var(--bv-dark); border-bottom: 2px solid var(--bv-dark);
+    background: var(--dock-handle-face);
+    color: #101010; border-style: solid; border-width: 2px; border-color: var(--dock-handle-edge);
 }
 
-/* --- Controller dock → silver command-deck plate --- */
-[data-theme="studio"] .controller-dock {
-    background: linear-gradient(180deg, var(--sv-2), var(--sv-3));
-    border-top: 3px solid var(--bv-lite);
-}
-[data-theme="studio"] .dock-header { background: transparent; }
-[data-theme="studio"] .header-handle {
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    background: repeating-linear-gradient(180deg, #e6e2d9 0 2px, #cfcabf 2px 4px);
-    border-top: 2px solid var(--bv-lite); border-bottom: 2px solid var(--bv-dark);
-}
-[data-theme="studio"] .chevron { color: #101010; font-weight: 700; font-size: 14px; }
+/* --- Controller dock → silver command-deck plate ---
+   t2083 (P4d) — DELETED four rules here, each verified individually before deletion (not trusted): the
+   values they declare NEVER render — every one is superseded by the "Component (reads ONLY tokens)" kbd-glass
+   rule for #controller-dock (further down this file), confirmed by exact hex match between each old value and
+   studio's own --kbd-* declarations. `.controller-dock` (background/border-top) → --kbd-glass (its own two
+   gradient stops ARE plate-mid/plate-lo, now translucent) + --kbd-edge (var(--bevel-lo), the same border
+   colour, now through a different token). `.dock-header` (background:transparent) → superseded by the
+   UNIVERSAL `#controller-dock .dock-header { background: transparent; }` (styles.css, base layer), which has
+   HIGHER specificity (an ID beats an attribute selector regardless of class count) — same VALUE, so removing
+   this one changes nothing, it simply never won. `.header-handle` (background/border) → --kbd-handle (the
+   SAME two hex values, e6e2d9/cfcabf, now with alpha) + --kbd-edge. `.chevron` (color:#101010) → --kbd-grip
+   (rgba(16,16,16,.7) — same hex, now translucent). Confirmed via direct getComputedStyle measurement on the
+   real elements, not just by reading the CSS — none of these four rules' own declared values matched what
+   actually renders, in every case because a DIFFERENT, already-correct rule was already winning. */
 [data-theme="studio"] .dock-body {
+    /* ⚠ background: var(--panel) here is ALSO dead (superseded by the same-specificity-beating universal
+       `#controller-dock .dock-body { background: transparent; }`, an ID selector) — but unlike the four rules
+       above, this one MUST STAY dead rather than be deleted or "fixed": the glass keyboard's whole effect
+       depends on .dock-body staying transparent so #controller-dock's own kbd-glass material shows through
+       underneath. Left completely untouched; only the genuinely-live border colours below are tokenised. */
     background: var(--panel);
-    border-left: 3px solid var(--bv-mid-lite); border-right: 3px solid var(--bv-mid-dark);
-    border-bottom: 3px solid var(--bv-dark);
+    border-style: solid; border-width: 0 3px 3px; border-color: var(--dock-plate-edge);
     padding: 10px 12px 14px;
 }
 [data-theme="studio"] .deck-panel { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
@@ -3006,26 +3044,24 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 [data-theme="studio"] .section-label {
     font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     text-transform: uppercase; color: var(--text-dim);
-    border-bottom: 1px solid var(--bv-mid-dark); padding-bottom: 3px;
+    border-bottom: 1px solid var(--dock-heading-edge); padding-bottom: 3px;
 }
 [data-theme="studio"] .editor-keys-row,
 [data-theme="studio"] .editor-keys .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 [data-theme="studio"] .editor-keys-row button,
 [data-theme="studio"] .editor-keys button { min-height: 48px; font-size: 16px; font-weight: 800; width: 100%; }
 
-/* --- Variable chips → black info chips --- */
+/* --- Variable chips → black info chips ---
+   t2083 (P4d) — background now reads --dock-chip-face/-hover (declared in this skin's own token block above,
+   built from --dock-well-edge — the SAME border-box layer this recipe shares, byte-identical, with 4 other
+   surfaces: the two below it here, plus the wizard field/preview groups further down this file, which alias
+   --dock-well-edge directly rather than each restating the gradient — a same-block alias, safe from the trap). */
 [data-theme="studio"] .var-item {
-    border: 2px solid transparent; border-radius: 6px;
-    background:
-        linear-gradient(#000, #000) padding-box,
-        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
-                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+    border: 2px solid transparent; border-radius: var(--dock-chip-radius);
+    background: var(--dock-chip-face);
 }
 [data-theme="studio"] .var-item:hover {
-    background:
-        linear-gradient(#061206, #061206) padding-box,
-        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
-                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+    background: var(--dock-chip-face-hover);
 }
 [data-theme="studio"] .var-item .var-id { font-family: var(--mono); font-weight: 800; color: var(--phosphor); }
 [data-theme="studio"] .var-item .var-desc { font-family: var(--sans); color: var(--cyan); }
@@ -3049,12 +3085,12 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 [data-theme="studio"] .wiz-body select {
     font-family: var(--mono); font-size: 13px; color: var(--text); width: 100%;
     padding: 6px 8px; outline: none;
-    /* sunken well: inverted rim (dark top-left → light bottom-right) */
+    /* sunken well: inverted rim (dark top-left → light bottom-right). t2083 (P4d) — the border-box layer
+       aliases --dock-well-edge directly (declared in this skin's own token block, above) rather than
+       restating the gradient — a same-block alias, safe from the standing trap; this field group keeps its
+       own white padding-box fill, the one thing genuinely distinct from the chip/preview surfaces. */
     border: 2px solid transparent; border-radius: 6px;
-    background:
-        linear-gradient(#fff, #fff) padding-box,
-        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
-                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+    background: linear-gradient(#fff, #fff) padding-box, var(--dock-well-edge);
 }
 /* t2069 — the sunken-well outline:none above had NO replacement: every form input in this (the DEFAULT)
    theme had no focus ring at all. Same :focus-visible pattern already used elsewhere in this file
@@ -3065,13 +3101,11 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 }
 [data-theme="studio"] .wiz-body input[type="checkbox"] { width: auto; }
 
-/* wizard visualization (black + green vector) */
+/* wizard visualization (black + green vector). t2083 (P4d) — same --dock-well-edge alias as the field group
+   above; both this and .preview-block pre below keep their own black padding-box fill. */
 [data-theme="studio"] .viz-container {
     border: 2px solid transparent; border-radius: 6px;
-    background:
-        linear-gradient(#000, #000) padding-box,
-        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
-                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+    background: linear-gradient(#000, #000) padding-box, var(--dock-well-edge);
 }
 [data-theme="studio"] .viz-status {
     font-family: var(--pixel); font-size: 12px; color: var(--phosphor);
@@ -3080,10 +3114,7 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 [data-theme="studio"] .preview-block pre {
     font-family: var(--mono); color: var(--dro-white);
     border: 2px solid transparent; border-radius: 6px;
-    background:
-        linear-gradient(#000, #000) padding-box,
-        linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
-                                         var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+    background: linear-gradient(#000, #000) padding-box, var(--dock-well-edge);
 }
 [data-theme="studio"] .preview-block pre .g-comment { color: var(--phosphor-2); }
 
@@ -4378,7 +4409,7 @@ svg [id$="_wcs"] { display: none; }
     --kbd-blur: 6px;
     --kbd-handle: repeating-linear-gradient(180deg, rgba(230,226,217,.94) 0 2px, rgba(207,202,191,.94) 2px 4px);
     --kbd-grip: rgba(16,16,16,.7);
-    --kbd-edge: var(--bv-dark);
+    --kbd-edge: var(--bevel-lo);
 }
 
 /* ORGANIC → BIOMORPH — a ribcage panel: dark sinew body with bone-coloured rib striations; the
