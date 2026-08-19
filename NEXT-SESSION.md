@@ -5976,3 +5976,27 @@ changes shape before a line is written. The QR is convenience on a leg that **al
 ⇒ Both paths survive, they are not competitors: **cloud = works from anywhere** (needs internet, ~15-30s
 poll latency, a Google account); **LAN = fast, offline, no third party** (only in the building). CONFIGS.md
 already models both.
+
+## ⭐⭐ RULING — ONE-BOX IS PERMANENT; LAN SERVING IS CONDEMNED PENDING PROOF
+*(human, 2026-08-18: "yes 1 stay forever", after "if cloud works id be ok to remove local for simplicity")*
+
+```
+  1  ONE BOX      Studio + gateway on the SAME pc (localhost)
+                  no network · no account · no internet · no addressing
+                  ⭐ PERMANENT. Never remove. Never gate behind a login.
+  2  LAN SERVING  another device over the local network — IPs, hostnames, QR,
+                  adapter ranking, mixed content
+                  ⚠ DELETE once cloud is PROVEN. This is the whole messy middle.
+  3  CLOUD        anywhere, via the user's own Drive; the gateway polls OUT
+```
+
+Someone standing at the machine must always be able to run Studio and send a file with **no prerequisites
+whatsoever** — that is why one-box survives; it is the SIMPLEST deployment, not the messy one.
+
+⚠ **THE GATE:** do not delete LAN until cloud is proven **end to end** — a real job through Drive onto a
+real controller, not merely the OAuth visibility question answered. `backend/r2.py` has been tagged
+`[TO TEST]` for months while reading like a working cloud path to anyone skimming it.
+
+⇒ **The queued "get my phone onto Studio" feature (QR + hostname + adapter ranking) is now ON HOLD and
+should die unbuilt** if cloud lands. Do not build it. It solves an addressing problem that only exists
+inside the layer being removed.
