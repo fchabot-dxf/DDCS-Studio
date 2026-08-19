@@ -11,7 +11,7 @@ from dataclasses import dataclass
 @dataclass
 class Config:
     # --- backend (the rendezvous store; PROTOCOL §3) -----------------------
-    backend: str = "local"                  # "local" (test) | "r2" (prod)
+    backend: str = "local"                  # "local" (test) | "r2" (dev's bucket) | "drive" (user's own Drive)
     local_root: str = "./_bridge_data"      # local-folder backend root (inbox/ status/)
 
     # --- R2 (only used when backend == "r2"); pulled from env --------------
@@ -19,6 +19,14 @@ class Config:
     r2_bucket: str = ""
     r2_access_key: str = ""
     r2_secret_key: str = ""
+
+    # --- Google Drive (backend == "drive"): BYO cloud, t2076 ---------------
+    # Auth is the loopback OAuth already shipped (google_client_id/secret below + oauth.py) — no extra
+    # credential to configure. The folder is created in the user's Drive root on first use.
+    drive_folder: str = "DDCS Bridge"
+    # ⚠ Drive's per-user API quota is far tighter than R2's; a 5s poll is antisocial and will meet it.
+    # 15s is the deliberate floor for SENDING. Live progress never rides this path — it is the serial cable.
+    drive_poll_s: float = 15.0
 
     # --- transfer to the controller (transfer.py — the only hardware path) -
     # The controller's CNCDISK network share, e.g. \\192.168.0.99\CNCDISK or \\10.0.0.50\cncdisk.

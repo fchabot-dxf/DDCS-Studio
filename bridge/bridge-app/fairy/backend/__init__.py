@@ -80,4 +80,10 @@ def make_backend(config):
     if config.backend == "r2":
         from .r2 import R2Backend
         return R2Backend(config)
-    raise ValueError(f"unknown backend: {config.backend!r} (expected 'local' or 'r2')")
+    if config.backend == "drive":
+        # t2076 — BYO cloud: the USER's own Google Drive. Stdlib-only on purpose (see drive.py's header):
+        # r2.py needs boto3, which build_fairy.ps1 EXCLUDES from the exe, so the R2 path can never run in
+        # the shipped app. This one can.
+        from .drive import DriveBackend
+        return DriveBackend(config)
+    raise ValueError(f"unknown backend: {config.backend!r} (expected 'local', 'r2' or 'drive')")
