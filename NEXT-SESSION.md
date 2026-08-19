@@ -6187,3 +6187,33 @@ arrived in 16.4, EU engine rules in 2024).
 ## SIZE
 Small — roughly a manifest, a service worker, an icon set, and a line of iOS help text. The care is all in
 the caching contract above, not in the code volume.
+
+## ⭐ DECIDED — THE PWA CACHING STRATEGY IS **NETWORK-FIRST** (human, 2026-08-18)
+The human asked: *"im ok with caching the app until a new release or a new commit lands, is that
+possible"* — yes, and this is the chosen shape. **Do not reach for a cache-first template.**
+
+**THE RULE:**
+- **App code (HTML / JS / CSS): NETWORK-FIRST.** Always fetch the newest when online; the cache exists
+  ONLY as the offline fallback. Unchanged files return `304 Not Modified`, so the cost is bytes, not
+  downloads.
+- ⛔ **`version.json`: NEVER cached. Always network, no exceptions.** A cached version file makes the app
+  report a version it is not running — the exact lie the t2075 update arc existed to remove, and it would
+  also poison the update banner and the post-update welcome modal.
+- **Static assets that never change (icons, fonts): cache-first** is fine and desirable.
+
+**WHY NETWORK-FIRST RATHER THAN A VERSIONED CACHE-FIRST**, which is the usual "correct" answer for a web
+app: **this app emits G-code that cuts metal.** One load behind is not a cosmetic staleness — a client
+cached before t2070 still writes **indented N-labels the Expert rejects**; one cached before t2067 reads
+the **wrong WCS slot**. Correctness beats a few hundred milliseconds, and the project's stated priority
+already puts friendliness and customisation ahead of optimisation.
+
+**IT ALSO MATCHES WHAT WAS ASKED WITH NO BOOKKEEPING.** Two alternatives were considered and rejected:
+keying the cache on `version.json` (breaks, because Cloudflare serves `DDCS-Studio/web` **RAW on push to
+main**, so commits deploy *without* a version bump — that is precisely why the chip read `.11` while newer
+commits were already live), and having CI stamp the commit SHA into a build file (works, but adds a
+workflow step and a second source of truth). Network-first needs neither: **cached until something new
+lands, and the moment something new lands you get it.**
+
+⚠ Still verify like a release when this ships: install the PWA, deploy a change, and confirm the INSTALLED
+app picks it up. Fetch the served file and check its bytes — do not trust the version chip, which is the
+standing rule here for exactly this reason.
