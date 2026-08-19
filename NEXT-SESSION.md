@@ -5805,3 +5805,62 @@ instead of ~100 patches — i.e. choose on merit, not on maintenance pain. (Weak
 The `.comm-dialog` family (148 lines of deliberate Win95 chrome replicating the DDCS controller's own
 dialogs — product identity) · the setup sheet's white `.setup-sheet-page` (deliberately unthemed paper) ·
 the three table implementations (three genuinely different contexts).
+
+---
+
+# ═══ QUEUED — THE DRIVE OAUTH SPIKE (human said "yes look at oauth", 2026-08-18) ═══
+
+**This is a SPIKE, not a build.** Answer one question and stop. Do NOT write `drive.py`, do NOT touch the
+`Backend` ABC, do NOT add a provider. If the answer is yes, the build becomes a separate, larger task.
+
+## WHY IT EXISTS
+The human asked whether G-code could be sent over the internet using **their own Google Drive** instead of
+our R2 bucket. Architecturally it works and most of it already exists:
+
+- `backend/__init__.py` declares a **`Backend` ABC with 13 abstract methods**; `local_folder.py` and
+  `r2.py` both implement it. A Drive backend is one more file against an existing interface.
+- The gateway loop is **already backend-agnostic** — `ops.py:95` calls `self.backend.list_inbox()`, and
+  `cncdisk.py` delivers with plain file ops over the SMB path. **The fetch-and-deliver half needs NO new
+  code**; only the source changes.
+- Both sides connect **outbound** to Google, so nothing has to reach into the shop: no port forwarding, no
+  router admin, no static IP. That is the entire point — it is the one path that works from anywhere.
+- Google OAuth already exists on both sides: `fairy/oauth.py` (desktop loopback) and
+  `web/ui/cloud/{googleDrive,googlePicker,providers}.js`, both requesting scope `drive.file`.
+
+## ⭐ THE ONE QUESTION TO ANSWER
+**Can two different OAuth clients, signed into the SAME Google account, see each other's `drive.file` files?**
+
+`drive.file` grants access only to files **the app created or the user picked**. Google forces the desktop
+side to be a "Desktop app" client (loopback redirect) and the web side to be a "Web application" client
+(JS origin) — **they cannot share one client ID.** So if `drive.file` visibility is scoped per CLIENT
+rather than per PROJECT, the console writes a job the gateway can never see.
+
+⚠ **The failure mode is SILENCE, not an error.** The gateway would poll forever and find nothing, with
+nothing logged and nothing raised — the exact shape that hid the beacon bug for months. That is why this
+is settled BEFORE any code is written.
+
+## THE TEST
+Sign in with client A, create a file. Sign in with client B (same Google account, same Cloud project,
+different client type), list and read. Visible → the design holds. Invisible → it does not, in that shape.
+
+## ⭐ THE ESCAPE HATCH — CHECK THIS FIRST, IT MAY MAKE THE WHOLE QUESTION MOOT
+If **both ends run the exe** (the desktop app on the user's desk and the gateway on the shop PC), they
+share **one desktop client ID**, so they are one app to Google and the files are mutually visible by
+construction. The risk only appears when one end is the **browser** console. The human already runs the
+exe. **Establish whether the exe-to-exe shape is sufficient for what they want before testing anything** —
+if it is, report that and stop; the spike is over.
+
+## ALSO WORTH REPORTING, briefly
+- **Polling quota.** Drive has per-user API limits; a gateway asking "any jobs?" every 5s will meet them.
+  Say roughly what interval is safe. This makes Drive fine for SENDING and too slow for LIVE tracking —
+  which is fine, since live tracking runs on the serial cable regardless.
+- **Drive is not an object store.** Files have IDs, not paths; "list the inbox" is a folder query. Say
+  whether the 13 `Backend` methods map cleanly or whether any of them fight that model.
+- ⚠ **`r2.py` is still tagged `[TO TEST]`** — never run against a real bucket. So Drive would not be
+  replacing something proven. Do not describe it as a fallback that works.
+
+## WHAT A GOOD PASS-BACK LOOKS LIKE
+A yes/no on the visibility question with the evidence that settled it, the exe-to-exe finding, a safe poll
+interval, and an honest note on anything you could NOT determine without live Google credentials. **If you
+cannot test it without credentials the human must supply, say so plainly and say exactly what you need** —
+do not simulate the answer or reason it out from documentation and present that as a result.
