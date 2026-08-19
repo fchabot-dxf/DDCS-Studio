@@ -113,27 +113,60 @@ svg [id*="Zfirst_travel"] {
    ONLY tokens, never raw colour. The defaults below ALIAS the base palette above,
    so any token a skin leaves unset is still sane and a skin can stay tiny.
 
-   To add a skin: copy the SKIN TEMPLATE comment near the theme bundles, give it a
-   new data-theme value, add it to THEMES in ui/themes.js, and fill the tokens you
-   want to change. Keyboard material tokens (--kbd-*) live in the GLASS KEYBOARD
-   section; everything else lives here.
+   To add a skin: copy an existing [data-theme="…"] bundle below, give it a new
+   data-theme value, add it to THEMES in ui/themes.js, and fill the tokens you want
+   to change. Keyboard material tokens (--kbd-*) live in the GLASS KEYBOARD section;
+   everything else lives here. t2073 (human-ruled: no user-authored skins) — the
+   separate SKIN TEMPLATE block that used to sit below this comment, documenting a
+   contract for an outside skin author, is deleted; there is no such person, and an
+   existing skin is now the only template that needs to stay accurate.
    ============================================================================ */
 :root {
-    /* Surfaces & elevation — what panels / popovers / wells are made of */
-    --surface-1: var(--panel);                                       /* cards, popovers, dock body   */
-    --surface-2: var(--bg);                                          /* inset wells, inputs, tracks  */
-    --surface-3: color-mix(in srgb, var(--panel) 86%, var(--text));  /* raised / hover               */
-    --outline:   var(--border);                                      /* hairline edges / separators  */
-    --scrim:     rgba(0, 0, 0, .55);                                 /* modal / overlay backdrop     */
+    /* t2073 — THE NAMING CONVENTION: group-part-state, lowercase-hyphenated. GROUP names a thing you can
+       point at (button, modal, band, screen, field, menu, tab, dock) — never an abstraction level. Three
+       words for colour roles, no synonyms: -face (fill), -edge (hairline), -ink (text). Self-ordering
+       words for tiers (-hi/-mid/-lo, -strong/-dim), never a numeric ladder — a number gives no clue which
+       direction is lighter. State suffix comes last: -hover/-active/-focus/-disabled. The two families
+       every skin already fills correctly (--kbd-*, --tab-*) both name a visible object plus a part; the
+       families that failed (--surface-1/2/3, --elev-1/2) named an abstraction whose referent needed a
+       lookup. This turn declares the FOUNDATION (ink/edge/surface + 3 named wins) with each skin's value
+       RELOCATED from what it already had scattered through its own theme rules — nothing invented.
+       Migrating the big consumer groups (button material, modal shell, screen, menu, field) off the OLD
+       names (text/text-main/text-dim/panel/border/outline) is P4 — they stay declared and read below,
+       aliasing the new names, until that migration happens. No deprecated aliases were left for anything
+       actually retired this turn: --outline/--border-w/--surface-1/2/3 had a combined 5 consumers, all in
+       this file's own newest code (the t2067 welcome modal) — migrated together with this same edit, so
+       those four old names are simply gone, not aliased. */
+
+    /* Ink — collapses text/text-main/text-dim (+ the dangling --fg) into one self-ordering family. */
+    --ink:        var(--text);
+    --ink-strong: var(--text-main);
+    --ink-dim:    var(--text-dim);
+
+    /* Edge — collapses border/outline/line(#blocks-app's own local alias)/border-color. -w is the SAME
+       token --border-w used to be, renamed as part of the same family (its only 4 consumers, all in the
+       welcome modal, are migrated in the same pass — not left as a dangling old name). */
+    --edge:   var(--border);
+    --edge-w: 1px;
+
+    /* Surfaces & elevation — collapses panel/surface-1/2/3/panel2. --surface-1/2/3 had one real consumer
+       total (also the welcome modal, migrated here) and are retired outright rather than aliased. --panel2
+       already IS a working "raised" alias (:root default var(--panel), organic overrides it) — --surface-
+       raised simply adopts that existing mechanism under the new name rather than inventing a second one. */
+    --surface:        var(--panel);
+    --surface-raised: var(--panel2, color-mix(in srgb, var(--panel) 86%, var(--text)));
+    --scrim: rgba(0, 0, 0, .55);                                 /* modal / overlay backdrop     */
     --elev-1: 0 2px 8px rgba(0, 0, 0, .18);
     --elev-2: 0 8px 22px rgba(0, 0, 0, .34);
+
+    /* Accent complements — new this turn, not a collapse of anything. */
+    --accent-ink: #fff;           /* the text colour that sits ON a filled --accent surface; every skin below overrides it to its own real contrast pairing. */
+    --tab-accent: var(--accent);  /* the active-tab glow colour; a skin overrides it only when the glow wants to differ from the flat accent (futuristic does). */
+    --band-bg:    var(--panel);   /* the strip directly under the header — .app-header's own --tab-fill (below) derives from this rather than restating it. */
 
     /* Typography */
     --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
     --font-code: var(--mono, ui-monospace, "Consolas", "Liberation Mono", monospace);
-
-    /* Shape */
-    --border-w: 1px;
 
     /* Editor / code "screen" (reserved contract slots — editor rules migrate here incrementally) */
     --screen:       #000000;
@@ -144,23 +177,6 @@ svg [id*="Zfirst_travel"] {
     --code-ln:      #ff6b6b;
 }
 
-/*  SKIN TEMPLATE — copy this block, rename the data-theme, add it to THEMES in
-    ui/themes.js, and change the values you want. Only `--bg/--panel/--accent/--text*
-    /--border` are essential; everything else inherits a sane default from the contract.
-
-    [data-theme="my-skin"] {
-        --bg: #101418;  --panel: #161b22;  --accent: #58a6ff;
-        --text: #c9d1d9;  --text-main: #fff;  --text-dim: #8b949e;  --border: #30363d;
-        --radius: 8px;
-
-        --surface-1: #161b22;  --surface-2: #0d1117;  --outline: #30363d;
-        --scrim: rgba(1,4,9,.7);
-
-        --kbd-glass: linear-gradient(180deg, rgba(22,27,34,.4), rgba(13,17,23,.78));
-        --kbd-blur: 5px;  --kbd-handle: linear-gradient(180deg,#21262d,#0d1117);
-        --kbd-grip: rgba(88,166,255,.6);  --kbd-edge: #30363d;
-    }
-*/
 
 /* ============================================
    RESET & BASE
@@ -190,8 +206,14 @@ html, body { overflow-x: clip; }
     padding: 0 15px 0 0;
     display: flex;
     align-items: stretch;
-    background: var(--bg);   /* header = the deepest tone in EVERY theme (some themes set --hdr-bg == --panel, which
-                                collided with the panel-toned active tab — steampunk). Consistent: header darker than the tab. */
+    background: var(--hdr-bg);   /* t2073 — was var(--bg), bypassing the --hdr-bg all 5 skins already declare (studio
+                                    needed a body-level !important override to compensate — retired below). The
+                                    ORIGINAL reason for bypassing it is still real and still handled: normal and
+                                    steampunk used to declare --hdr-bg identical to --panel (the exact "collided with
+                                    the panel-toned active tab" steampunk problem this comment used to warn about) —
+                                    fixed by RELOCATING their own already-correct --bg value into --hdr-bg itself
+                                    (see their theme blocks) rather than reading --bg here and leaving --hdr-bg
+                                    permanently wrong. Every theme renders byte-identical to before this change. */
     border-bottom: 1px solid var(--border);
     user-select: none;
 }
@@ -271,8 +293,11 @@ html, body { overflow-x: clip; }
    every app: studio wizard bar, macros/gateway/settings sub-tab head). So it reads as merged with the body, and
    that "body colour below the header" is identical for every tab in a given theme. margin-bottom:-1px punches it
    through the header's bottom border so there's no separating line. */
-.app-header .tab.active { --tab-fill: var(--panel); color: var(--hdr-ink, var(--text-main)); background: var(--tab-fill); margin-bottom: -1px;
+.app-header .tab.active { --tab-fill: var(--band-bg); color: var(--hdr-ink, var(--text-main)); background: var(--tab-fill); margin-bottom: -1px;
     box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
+/* t2073 — was --tab-fill: var(--panel) directly; now DERIVES from --band-bg (which defaults to var(--panel),
+   so this is byte-identical everywhere except organic, which now sets --band-bg once instead of restating
+   its own tab-fill AND its own five-selector patch separately — see organic's theme block + the patch below. */
 /* Organic theme: the connecting tab AND the bar below the header are coral (theme accent), kept matching so
    the active tab still merges into the bar. t2071 (human-ruled: "i remember coral was the original color, lets
    try it") — this rule used to paint #studio-app .top-dock-header green too, at (1,2,0) + !important, which
@@ -285,7 +310,10 @@ html, body { overflow-x: clip; }
 [data-theme="organic"] .app-header .tab.active,
 [data-theme="organic"] #macros-app .settings-head,
 [data-theme="organic"] #gateway-app .settings-head,
-[data-theme="organic"] #blocks-app .blk-topbar { background: #bf6850 !important; }
+[data-theme="organic"] #blocks-app .blk-topbar { background: var(--band-bg) !important; }
+/* t2073 — was the literal #bf6850 restated a second time; now derives from organic's own --band-bg (its
+   theme block), the exact gap point (c) of this turn's dispatch named as the reason this patch existed at
+   all. Same resolved colour. */
 /* Organic's bars are a saturated colour → inactive tab labels need lighter, higher-contrast text. */
 [data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255,255,255,0.82); }
 [data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255,255,255,0.7); }
@@ -310,12 +338,14 @@ html, body { overflow-x: clip; }
 [data-theme="futuristic"] .settings-tabs .settings-main-tab.active::before, [data-theme="futuristic"] .settings-tabs .settings-main-tab.active::after,
 [data-theme="normal"] .app-header .tab.active::before, [data-theme="normal"] .app-header .tab.active::after,
 [data-theme="normal"] .settings-tabs .settings-main-tab.active::before, [data-theme="normal"] .settings-tabs .settings-main-tab.active::after { content: none; }
-/* Organic header-tab feet flare into the coral bar (match the tab fill). t2071 — was #6f9b4d, following the band's own colour above. */
-[data-theme="organic"] .app-header .tab.active { --tab-fill: #bf6850; }
+/* Organic header-tab feet flare into the coral bar (match the tab fill). t2071 — was #6f9b4d, following the
+   band's own colour above. t2073 — now DERIVES from --band-bg (organic's own theme block) instead of
+   restating the hex a second time; same resolved colour. */
+[data-theme="organic"] .app-header .tab.active { --tab-fill: var(--band-bg); }
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
-   inactive tab = header colour. */
-body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !important; }
+   inactive tab = header colour. t2073 — the !important override that used to force this here is RETIRED:
+   studio's own --hdr-bg now IS var(--sv-3) (see its theme block), and .app-header reads --hdr-bg directly. */
 /* Wizard bar (studio top action bar) = the unified below-header strip colour in EVERY theme (was the theme accent
    — grey/gold/cyan), so the active STUDIO tab connects to it. Flat: no border/shadow by default — a theme
    overrides via its own MORE-SPECIFIC [data-theme=X] .top-dock-header rule (organic overrides to pink; studio and
@@ -334,7 +364,7 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
    order, while staying EQUAL to (and so still losing to, by source order) the per-theme `[data-theme=X]
    .top-dock-header` rules below — the fix each of those two other rules needs, at their own specificity, without
    reaching for !important again. normal/steampunk now correctly render this flat base with no accent bleed. */
-.dock-header.top-dock-header { background: var(--panel); border: none; box-shadow: none; }
+.dock-header.top-dock-header { background: var(--band-bg); border: none; box-shadow: none; }   /* t2073 — was var(--panel); --band-bg defaults to var(--panel), so byte-identical for every theme without its own override */
 
 /* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
    clicking offers the desktop exe download (see ui/gatewayStatus.js). */
@@ -355,20 +385,23 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     z-index: 1000;
     min-width: 220px;
     padding: 12px 14px;
-    background: var(--surface-1, var(--panel, #1e1e1e));
-    border: var(--border-w, 1px) solid var(--outline, var(--border, #444));
+    background: var(--surface, #1e1e1e);
+    border: var(--edge-w, 1px) solid var(--edge, #444);
     border-radius: var(--radius, 6px);
     box-shadow: var(--elev-2, 0 8px 22px rgba(0,0,0,.45));
 }
 
+/* t2073 — this rule's own background/border used to fall all the way through a chain of DANGLING names
+   (--panel-bg, --border-color — never declared anywhere) to a hardcoded literal, meaning it never once
+   actually read the theme, in any skin. Fixed to read the real declared tokens directly. */
 .gateway-dl-pop {
     position: fixed;
     z-index: 1000;
     max-width: 270px;
     padding: 12px 14px;
-    background: var(--surface-1, var(--panel-bg, #1e1e1e));
+    background: var(--surface, #1e1e1e);
     color: var(--text-main, #ddd);
-    border: var(--border-w, 1px) solid var(--outline, var(--border-color, #444));
+    border: var(--edge-w, 1px) solid var(--edge, #444);
     border-radius: var(--radius, 6px);
     box-shadow: var(--elev-2, 0 8px 22px rgba(0,0,0,.45));
     font-size: 12px;
@@ -779,7 +812,9 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .editor-container .preflight-amber  .preflight-badge-label { background: #f0b429; color: #1a1200; border-color: color-mix(in srgb, #f0b429 55%, #000); }
 /* t1323 — the INFO chip: a jog-start program that fits, stating the travel it needs. Deliberately NOT green and not
    amber — it is neither a pass badge nor a warning, so it reads as a neutral note in the editor's own chrome colours. */
-.editor-container .preflight-info   .preflight-badge-label { background: color-mix(in srgb, var(--panel, #23262b) 88%, #fff); color: var(--fg, #d7dae0); border-color: color-mix(in srgb, var(--fg, #d7dae0) 22%, transparent); font-weight: 500; }
+/* t2073 — was var(--fg, ...), a name never declared anywhere, so this ALWAYS rendered the same hardcoded
+   colour regardless of theme. Fixed to read --ink (the real, declared token). */
+.editor-container .preflight-info   .preflight-badge-label { background: color-mix(in srgb, var(--panel, #23262b) 88%, #fff); color: var(--ink, #d7dae0); border-color: color-mix(in srgb, var(--ink, #d7dae0) 22%, transparent); font-weight: 500; }
 .editor-container .preflight-red    .preflight-badge-label { background: #e5484d; color: #2a0407; border-color: color-mix(in srgb, #ff5964 55%, #000); box-shadow: 0 2px 10px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, #ff5964 30%, transparent); }
 .editor-container .preflight-pop {
     margin-top: 6px; min-width: 210px; max-width: 330px; max-height: 42vh; overflow: auto;
@@ -1104,7 +1139,7 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     padding: 2px 8px;
     z-index: 10;
     font-size: 11px;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-code, monospace);   /* t2073 — was var(--font-mono, ...), a name never declared anywhere (the real token is --font-code) */
 }
 .editor-statusbar.hidden {
     display: none;
@@ -1550,8 +1585,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     width: 280px;
     padding: 12px;
     overflow-y: auto;
-    background: var(--surface-1, var(--panel));
-    border-right: var(--border-w, 1px) solid var(--outline, var(--border));
+    background: var(--surface, var(--panel));
+    border-right: var(--edge-w, 1px) solid var(--edge, var(--border));
     z-index: 2;
 }
 
@@ -2467,7 +2502,7 @@ button.primary:hover {
     height: min(1000px, 94dvh);   /* t782 — dvh so the centered modal never exceeds the VISIBLE height (mobile URL bar) */
     display: flex; flex-direction: column;
     background: var(--bg, #111);
-    border: 1px solid var(--outline, var(--border, #444));
+    border: 1px solid var(--edge, var(--border, #444));
     border-radius: var(--radius, 10px);
     box-shadow: var(--elev-2, 0 12px 40px rgba(0,0,0,.55));
     overflow: hidden;
@@ -2577,12 +2612,24 @@ button.primary:hover {
     --radius: 6px;
     --block-edited: #e08a00;   /* warm amber on light bg */
 
-    /* header */
-    --hdr-bg: #ffffff;
+    /* header — t2073: was #ffffff (== --panel exactly, the collision .app-header used to dodge by reading --bg
+       instead); relocated the value .app-header actually rendered before this turn (--bg) into --hdr-bg itself,
+       so the header stays the deeper tone it always was, now via the token that's supposed to carry it. */
+    --hdr-bg: var(--bg);
     --hdr-ink: #000000;
     --hdr-dim: #666666;
     --accent-studio: #4a90e2;
     --accent-gateway: #22a55e;
+    --accent-ink: #fff;   /* t2073 — no existing "text on filled accent" rule to relocate for THIS skin specifically; #fff on #4a90e2 has real contrast, matching studio's own confirmed precedent for a similar mid-blue accent */
+
+    /* t2073 — re-asserted HERE, not just at :root: a :root-only "--ink: var(--text)" resolves var(--text)
+       using :root's (<html>'s) OWN --text, which is always the base fallback — [data-theme] lives on <body>,
+       so :root itself never sees a skin's override. Every skin needs its own copy of these five aliases for
+       them to actually track its own values; verified empirically (getComputedStyle on body), not assumed. */
+    --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
+    --edge: var(--border);
+    --surface: var(--panel); --surface-raised: var(--panel2, color-mix(in srgb, var(--panel) 86%, var(--text)));
+    --band-bg: var(--panel);
 }
 
 [data-theme="normal"] .toolbar-btn {
@@ -2622,12 +2669,22 @@ button.primary:hover {
     --radius:        6px;
     --block-edited:  #ff9d00;   /* CRT amber, matches the phosphor family */
 
-    /* header */
-    --hdr-bg:        #cfcabf;
+    /* header — t2073: was #cfcabf (== --panel exactly). Relocated var(--sv-3) — the darkest silver bevel tone,
+       which body[data-theme="studio"] .app-header used to force via a separate !important override (retired,
+       see .app-header) — into --hdr-bg itself, so the header renders the exact same tone via the token that's
+       supposed to carry it, no override needed. */
+    --hdr-bg:        var(--sv-3);
     --hdr-ink:       #101010;
     --hdr-dim:       #4b4843;
     --accent-studio: #1668ff;
     --accent-gateway:#0a9a06;
+    --accent-ink:    #fff;   /* t2073 — relocated from studio's own confirmed .toolbar-dropdown.active precedent (line ~1225) */
+
+    /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this). */
+    --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
+    --edge: var(--border);
+    --surface: var(--panel); --surface-raised: color-mix(in srgb, var(--panel) 86%, var(--text));
+    --band-bg: var(--panel);
 
     --phosphor:      #15e000;   /* primary CRT green */
     --phosphor-2:    #00b400;
@@ -2951,12 +3008,22 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --radius: 4px;
     --block-edited: #e6a832;   /* burnished brass */
 
-    /* header */
-    --hdr-bg: #3d2817;
+    /* header — t2073: was #3d2817 (== --panel exactly, THE originally-diagnosed collision — .app-header used
+       to read --bg specifically to dodge this). Relocated the value .app-header actually rendered before this
+       turn (--bg) into --hdr-bg itself, so the header stays the deeper tone it always was, now via the token
+       that's supposed to carry it. */
+    --hdr-bg: var(--bg);
     --hdr-ink: #f5d7a8;
     --hdr-dim: #8b7355;
     --accent-studio: #c89b2a;
     --accent-gateway: #7a9a4a;
+    --accent-ink: #d4a574;   /* t2073 — relocated from steampunk's own confirmed hover-filled precedent (.toolbar-btn:hover keeps its own --text, not white) */
+
+    /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this). */
+    --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
+    --edge: var(--border);
+    --surface: var(--panel); --surface-raised: color-mix(in srgb, var(--panel) 86%, var(--text));
+    --band-bg: var(--panel);
 }
 
 [data-theme="steampunk"] .wizard {
@@ -2997,11 +3064,14 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --radius: 8px;
     --block-edited: #ff5daa;   /* hot-pink neon */
 
-    /* contract: surfaces / material */
-    --surface-1: rgba(14, 22, 38, .92);
-    --surface-2: #070b14;
-    --surface-3: #16243c;
-    --outline: #244468;
+    /* contract: surfaces / material — t2073: --surface-1/2/3/--outline retired (their only consumer, the
+       welcome modal, is migrated to --surface/--edge/--surface-raised). Genuinely distinct values relocated,
+       not dropped: the old --surface-1's translucency (a real material choice, not a --panel duplicate) is
+       now --surface itself; the old --surface-3/--outline (both genuinely different from --panel/--border,
+       unlike organic's which were exact duplicates and simply removed) become --surface-raised/--edge. */
+    --surface: rgba(14, 22, 38, .92);
+    --surface-raised: #16243c;
+    --edge: #244468;
     --scrim: rgba(3, 7, 16, .72);
     --elev-2: 0 10px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(45, 226, 255, .12);
 
@@ -3019,6 +3089,14 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --hdr-dim: #6f86a8;
     --accent-studio: #2de2ff;
     --accent-gateway: #2bd47a;
+    --accent-ink: #0a0e1a;   /* t2073 — relocated from futuristic's own confirmed precedent + comment: "cyan accent needs dark ink" (line ~1244) */
+    --tab-accent: var(--accent);   /* declared explicitly — was only ever reached via the fallback in var(--tab-accent, var(--accent)); same resolved colour, now a real declaration */
+
+    /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this).
+       --surface/--surface-raised/--edge are already declared above (the relocated distinct values); only
+       the ink family and --band-bg were still missing here. */
+    --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
+    --band-bg: var(--panel);
 }
 
 /* HUD header: faint vertical grid, cyan hairline + glow, glowing brand & active tab */
@@ -3150,15 +3228,26 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --danger:  #c0473a;       /* arterial */
     --warn:    #d99a3a;
 
-    /* header */
-    --hdr-bg: #1d160f;
+    /* header — t2073: was #1d160f, a genuinely distinct value from both --bg and --panel — but since it was
+       NEVER read before this turn (nothing else had this problem: normal/steampunk's own --hdr-bg was a
+       literal --panel duplicate, an ACTUAL collision; this one just diverged from what .app-header actually
+       rendered, --bg, with no evidence either value is "more correct"). Matched to the zero-surprise standard
+       every other theme now holds to: relocated the value that was ACTUALLY rendering (--bg) rather than
+       keep an untested value nobody has ever seen on screen. */
+    --hdr-bg: var(--bg);
     --hdr-ink: #f3e8d0;
     --hdr-dim: #9d8a6b;
     --accent-studio: #d97a5c;
     --accent-gateway: #8aa15a;
+    --accent-ink: #2a1712;   /* t2073 — relocated from organic's own confirmed button:hover precedent (dark ink on a lighter coral fill, line ~3182) */
+    --band-bg: #bf6850;      /* t2073 — relocated from the t2071 coral fix (the .top-dock-header gradient's own top stop); tab-fill now derives from this instead of restating it (see .app-header .tab.active) */
+
+    /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this). */
+    --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
+    --edge: var(--border);
+    --surface: var(--panel); --surface-raised: var(--panel2);
 
     /* contract */
-    --surface-1: #241c15; --surface-2: #15110d; --outline: #5a4836;
     --scrim: rgba(12,8,5,.72);
     --screen: #120d09;        /* the body-cavity editor */
 }
@@ -5243,25 +5332,28 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     background:var(--scrim);
 }
 .ddcs-welcome-modal .wcm-card {
-    width:min(420px, calc(100vw - 32px)); border:var(--border-w) solid var(--outline); border-radius:var(--radius);
-    background:var(--surface-1); color:var(--text); box-shadow:var(--elev-2);
+    width:min(420px, calc(100vw - 32px)); border:var(--edge-w) solid var(--edge); border-radius:var(--radius);
+    background:var(--surface); color:var(--text); box-shadow:var(--elev-2);
     font:13px/1.5 var(--font-ui); overflow:hidden;
 }
 .ddcs-welcome-modal .wcm-head {
     display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
-    border-bottom:var(--border-w) solid var(--outline); font-weight:700; font-size:14px; color:var(--text-main);
+    border-bottom:var(--edge-w) solid var(--edge); font-weight:700; font-size:14px; color:var(--text-main);
 }
 .ddcs-welcome-modal .wcm-skip { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font:inherit; text-decoration:underline; }
 .ddcs-welcome-modal .wcm-body { padding:20px 16px; min-height:64px; color:var(--text-dim); }
-.ddcs-welcome-modal .wcm-foot { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:var(--border-w) solid var(--outline); }
+.ddcs-welcome-modal .wcm-foot { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:var(--edge-w) solid var(--edge); }
 .ddcs-welcome-modal .wcm-dots { color:var(--accent); letter-spacing:3px; font-size:10px; }
 .ddcs-welcome-modal .wcm-nav { display:flex; gap:8px; }
 .ddcs-welcome-modal .wcm-nav button {
-    padding:5px 14px; border-radius:var(--radius); border:var(--border-w) solid var(--outline); background:transparent; color:var(--text);
+    padding:5px 14px; border-radius:var(--radius); border:var(--edge-w) solid var(--edge); background:transparent; color:var(--text);
     cursor:pointer; font:inherit; font-weight:600;
 }
-/* primary action reads as accent via BORDER + TEXT rather than a filled background — no "text on filled accent"
-   token is declared anywhere in this project's contract, and inventing one is out of scope for this fix */
+/* t2073 — --outline/--border-w/--surface-1 (used above until this turn) are RETIRED, not aliased; this was
+   their only real consumer, migrated to --edge/--edge-w/--surface in the same pass. Primary action still
+   reads as accent via BORDER + TEXT rather than a filled background — a legitimate, already-shipped design
+   choice, kept as-is even though --accent-ink (the token this comment used to say didn't exist) is declared
+   now; changing this button's own look is not in this turn's scope. */
 .ddcs-welcome-modal .wcm-next { border-color:var(--accent); color:var(--accent); font-weight:700; }
 
 /* ── DEV stale-page banner (ui/updateCheck.js; localhost-only) — a loud RED bar pinned to the TOP when the loaded page is

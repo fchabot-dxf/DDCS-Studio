@@ -43821,3 +43821,138 @@ visual regressions anywhere the suite's own baselines cover. Zero net-new failur
 - `DDCS-Studio/verification/t2071-{before,after}-*.png` — 30 screenshots (main + wizard-open + field-focus per theme, before and after, all 5 themes).
 
 🔨 turn 2071
+
+# t2073 — P3 of the stylesheet arc: the token-naming foundation (ink/edge/surface + accent-ink/band-bg/hdr-bg)
+
+Human ruled: no user-authored skins, so token names are internal — no compatibility burden, rename freely.
+The advisor took the naming convention itself as a delegated decision and dispatched it. This turn declares
+the FOUNDATION with each skin's value relocated from what it already had; migrating the big consumer groups
+(button material, modal shell, screen, menu, field) off the old names stays P4, per the dispatch's own scope.
+
+## The convention, and what actually collapsed
+
+`group-part-state`, lowercase-hyphenated — GROUP names a thing you can point at, never an abstraction level.
+Three words for colour roles: `-face`/`-edge`/`-ink`. Self-ordering tiers (`-strong`/`-dim`), never a numeric
+ladder. Declared at `:root`: `--ink`/`--ink-strong`/`--ink-dim` (collapses text/text-main/text-dim/the
+dangling --fg), `--edge`/`--edge-w` (collapses border/outline/`#blocks-app`'s own local `--line` alias/the
+dangling --border-color), `--surface`/`--surface-raised` (collapses panel/surface-1/2/3/panel2).
+
+**`--outline`/`--border-w`/`--surface-1/2/3` were RETIRED outright, not aliased** — a full usage audit (every
+`var(--name)` AND every `var(--name, fallback)` form, since the first pass missed the fallback forms and had
+to be redone) found their combined real consumer count was FIVE, all in this file's own newest code (the
+t2067 welcome modal) — migrated to the new names in the same pass. Two skins had genuinely DISTINCT values
+for these (futuristic's `--surface-3`/`--outline` were real material choices, not `--panel`/`--border`
+duplicates) — relocated to `--surface-raised`/`--edge` rather than dropped; organic's were exact duplicates
+and simply removed.
+
+## A real bug found by verification, not by inspection — CSS custom properties don't cascade the way `Sass`
+## variables do
+
+Declaring `--surface: var(--panel);` ONLY at `:root` looked correct and reads correctly by eye — but `:root`
+IS `<html>`, and `[data-theme="X"]` lives on `<body>`. `<html>` never carries a theme, so `var(--panel)`
+inside a `:root`-only declaration resolves using `<html>`'s OWN base-fallback `--panel` (`#f0f0f0`) — not
+whatever `--panel` is overridden to on `<body>`. The COMPUTED (already-substituted) value is what inherits
+down, not a live re-evaluation at each descendant.
+
+**Caught by the gate's own computed-style check, not by reading the CSS**: `getComputedStyle(document.body)`
+showed `--surface`/`--ink`/`--edge`/`--band-bg` resolving to the SAME base value in every theme except the two
+skins (futuristic, organic) that happened to already have an explicit per-skin override for unrelated reasons.
+Screenshots alone would likely have shown "looks about right" for 4 of 5 themes purely by accident (several
+base-fallback values happen to be plausible-looking neutral tones) — the active-tab band in particular would
+have silently collapsed to the SAME grey in normal/studio/steampunk/futuristic, a real, visible regression
+that direct value comparison caught and a first-glance screenshot review plausibly would not have.
+
+**Fix**: every alias (`--ink`/`--ink-strong`/`--ink-dim`/`--edge`/`--surface`/`--surface-raised`/`--band-bg`)
+is re-declared inside EACH of the 5 `[data-theme="X"]` blocks too, re-asserting `var(--panel)` etc. at a scope
+where it actually resolves per-theme. Verified by direct `getComputedStyle(body).getPropertyValue()` diff
+across all 5 themes after the fix — every alias now exactly equals its source token, per theme, with zero
+exceptions. **This is worth flagging explicitly for P4**: any FUTURE token added the same way (declared once
+at `:root`, aliasing another token) will hit the identical bug unless it's ALSO re-declared per skin — this is
+not a one-off, it's a property of how this file's theme-switching mechanism (data-theme on body, not html)
+interacts with CSS custom-property inheritance.
+
+## The three named wins
+
+**(b) `--accent-ink`** — the text colour that sits ON a filled `--accent` surface. Two rounds of investigation
+found ONE explicit comment asking for it by name (the t2067 welcome modal, now updated since the token it
+said didn't exist now does) — did not find a second explicit comment, though hardcoded `color:#fff` on an
+accent fill appears in many places (P4 territory). Per-skin values RELOCATED from real, confirmed precedents,
+not guessed: normal/studio `#fff` (studio's own `.toolbar-dropdown.active` rule); steampunk `#d4a574` (its own
+`.toolbar-btn:hover` keeps its own `--text`, not white); futuristic `#0a0e1a` (an EXISTING comment says so
+verbatim: "cyan accent needs dark ink"); organic `#2a1712` (its own `button:hover` precedent, dark ink on a
+lighter coral fill).
+
+**(c) `--band-bg`** — the strip directly under the header. `--tab-fill` (both the base rule and organic's own
+override) now DERIVES from it instead of restating a value; organic's own 5-selector t2071 coral patch
+(`.app-header .tab.active`, both `.settings-head`s, `.blk-topbar`) now reads `var(--band-bg)` instead of the
+literal `#bf6850` it used until this turn — one declared source instead of three separate copies of the same
+hex. `.dock-header.top-dock-header`'s own base rule (t2069) now reads `var(--band-bg)` too (defaults to
+`var(--panel)`, byte-identical for every theme without its own override).
+
+**(d) `.app-header` now reads `--hdr-bg`**, not `--bg` — closing the exact gap the dispatch named (all 5 skins
+declared it, nothing read it, studio needed a body-level `!important` override to compensate — retired).
+**Not a mechanical one-line swap**: the ORIGINAL `.app-header` comment already documented WHY it read `--bg`
+instead — normal AND steampunk both declared `--hdr-bg` as an EXACT duplicate of `--panel`, which would have
+collapsed the header into the panel-toned active tab (the exact steampunk collision that comment named).
+Fixed by RELOCATING each theme's own already-rendering `--bg` value into `--hdr-bg` itself (normal, studio via
+`--sv-3`, steampunk) rather than blindly flipping the selector and reintroducing that exact regression.
+Organic's `--hdr-bg` was ALSO found to differ from what was actually rendering (a value nobody had ever seen
+on screen, since it was never read) — aligned to the same zero-surprise standard as the other four rather than
+kept as an untested guess. **Verified byte-identical to pre-turn rendering across all 5 themes** —
+`.app-header`/`.top-dock-header`/active-tab background AND colour, direct computed-style diff, zero mismatches.
+
+## Also fixed — the named dangling reads
+
+`--fg` (never declared, one real consumer — `.preflight-info .preflight-badge-label` — permanently ignored the
+theme regardless of which one was active; now reads `--ink`). `--font-mono` (never declared, the real token is
+`--font-code`; one consumer, the editor statusbar, permanently fell back to the generic browser monospace).
+`--panel-bg`/`--border-color` (both pre-token leftovers, found as SECOND-level fallbacks inside
+`.gateway-dl-pop`, which never once read the theme for its background or border in any skin — fixed to read
+`--surface`/`--edge` directly). `--tab-accent` (was only ever reached via its own `var(--tab-accent,
+var(--accent))` fallback — now genuinely declared, at `:root` and explicitly for futuristic, same resolved
+colour either way).
+
+## Deleted
+
+The SKIN TEMPLATE comment block (~17 lines) documenting a contract for an outside skin author — human ruled
+there is no such person. The "how to add a skin" note above the contract updated to point at an existing skin
+block instead.
+
+## Non-vacuity
+
+Comment-aware brace-depth balance (whole-file) re-verified after every edit pass, ending at depth 0 throughout
+— no repeat of the t2069 self-inflicted nested-comment bug. Direct `getComputedStyle` diffs (not just
+screenshots) proved BOTH the real bug (all-themes-collapse-to-base-fallback) and its fix (every alias exactly
+tracks its source token per theme) — a claim a screenshot alone could not make with the same certainty. Full
+before/after screenshot pairs (main + wizard-open, all 5 themes) confirm the visual record matches the
+computed-style proof.
+
+## Gate
+
+Node tier: 193/193. Full Playwright suite (2,656 tests): 2,606 passed, 10 flaky (recovered on retry), 25
+skipped, 8 failed. Investigated every failure, not just counted them.
+
+**7 of 8 match, byte-for-byte, the same pre-existing set confirmed unrelated on prior turns**:
+`controller-import-one-door-1221`, `editor-indent-1450` (×3), `pull-modal-stacking`, `ring-descent-1404`
+(all confirmed against unmodified HEAD in t2069's own gate, not re-verified again here since the assertions
+are identical), plus `send-history-real-path-2065`'s stalled-job test (the documented environment flake).
+
+**The 8th (`update-check.spec.js`, "welcome modal: a version with NO composed notes...") is new — investigated,
+not assumed unrelated.** Reverted `styles.css` to unmodified HEAD and re-ran it in isolation: FAILED
+IDENTICALLY, proving it is NOT caused by this turn's token work. Root cause traced instead: this test's own
+premise ("today's baked version has no composed release notes") depends on EXTERNAL state — a real release
+happened concurrently with this turn's own work (the baked chip now reads V2026.08.18.1, and
+`releaseNotes.js` was independently updated with genuine composed entries for exactly that version, visible as
+an external-edit notification partway through this turn). The test was never mine to fix this turn (t2067's
+own design, unrelated to P3's token scope) — flagged here plainly rather than silently absorbed: the test
+should key off a synthetic/mocked version rather than `bakedVersion()`'s real current value, so composing real
+release notes for a real release doesn't retroactively break a test written before any notes existed.
+
+Zero failures attributable to this turn's token changes.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the token foundation: new primitives, per-skin re-assertions, hdr-bg/band-bg/accent-ink, the 5 dangling-read fixes, the SKIN TEMPLATE deletion.
+- `DDCS-Studio/verification/t2073-tokens-screens.mjs` — new, the before/after screenshot capture script for this turn.
+- `DDCS-Studio/verification/t2073-{before,after}-*.png` — 20 screenshots (main + wizard-open, before and after, all 5 themes).
+
+🔨 turn 2073
