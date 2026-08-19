@@ -31,6 +31,20 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.1": [
+    { short: "The command deck now works on a phone",
+      full: "Opening the deck on a narrow screen used to hide its entire keypad — all 22 keys were "
+        + "clipped away with no way to scroll to them. The pane scrolls properly now, and the ENTER key "
+        + "and the Variables tab are no longer sliced off the right edge." },
+    { short: "Your typing cursor matches your theme",
+      full: "Studio, Futuristic and Organic each declared their own caret colour, and none of them had "
+        + "ever actually appeared — every theme showed a plain white cursor. They paint now, and "
+        + "Studio gets a block cursor while Futuristic gets an underscore." },
+    { short: "Form fields are themed everywhere",
+      full: "In four of the five themes the boxes inside a wizard were raw browser defaults — white "
+        + "rectangles on a dark panel. They now follow the theme, and keyboard focus finally shows a "
+        + "visible ring on inputs and buttons." },
+  ],
   "2026.08.18.1": [
     { short: "One-click update no longer hangs",
       full: "The in-place update used to stick on “Updated — restarting…” forever. "
