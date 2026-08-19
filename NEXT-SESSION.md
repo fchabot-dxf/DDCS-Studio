@@ -6562,3 +6562,35 @@ genuinely scrollable, footer buttons 151x55. It is the one surface that already 
 
 **P4d and P4e prep is already banked** (dock/bevel ramp and the small groups), so the arc loses nothing by
 waiting a turn — the sheets do not go stale.
+
+## QUEUED (real onboarding hole, human-found 2026-08-19) — THE WEB APP TELLS YOU TO GET THE DESKTOP APP AND GIVES YOU NO WAY TO GET IT
+
+**Human, at the machine:** *"on a connected browser gateway there is no way to download the app from the
+website."* Verified:
+
+- `ui/helpPanel.js` answers *"Do I need the desktop app?"* with **"To talk to a real controller, yes — the
+  desktop app is the gateway"** — and offers **no link**.
+- The only Download affordance lives inside `ui/updateCheck.js`'s update banner, which appears **only when
+  an update is DETECTED**. ⇒ **A first-time web visitor never sees it.**
+
+⇒ The app states a hard requirement and does not satisfy it. This is first-class, not cosmetic:
+[[one-box-stays-forever]] makes the exe **permanent and required** at the machine, so *getting* it is a
+primary path.
+
+⚠ **It also breaks a workaround already written down.** The bench checklist's Step Zero tells someone whose
+update hangs to *"download the exe directly from the release page"* — a page nothing in the product links
+to. Until this lands, that instruction assumes knowledge the user does not have.
+
+**The fix:** a persistent, always-available route to the desktop build from the web version — the natural
+home is the help panel's own "Do I need the desktop app?" answer, which already explains WHY and just needs
+the HOW. `fairy/selfupdate.py` already carries a `RELEASES_PAGE` constant; reuse it rather than minting a
+second URL.
+
+⚠ **Do NOT show it in the exe** — someone already running the desktop app does not need a download link,
+and the update banner is the right surface there. `/api/update/status` already distinguishes the exe from a
+browser, so the condition exists.
+
+**Also worth checking in the same pass:** `helpPanel.js` still tells phone users to open the LAN URL from
+*"Settings → Controller → Gateway"*. Verify that path still exists after the Setup/admin changes, and note
+that LAN serving is [[one-box-stays-forever]]-condemned pending the cloud proof — so that answer may need
+rewriting rather than just re-pointing.
