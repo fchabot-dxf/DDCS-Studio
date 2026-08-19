@@ -1,0 +1,25 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+await page.addInitScript(() => { try { localStorage.setItem('ddcs_theme', 'normal'); } catch (_) { } });
+await page.goto('http://localhost:3211', { waitUntil: 'networkidle' });
+await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings, undefined, { timeout: 20000 });
+await page.waitForTimeout(400);
+await page.locator('.dock-header .header-center .toolbar-dropdown > button.toolbar-btn', { hasText: 'Probe' }).click();
+const entry = page.locator('.dock-header .header-center .toolbar-dropdown-content button[data-optype="corner"]');
+await entry.waitFor({ state: 'visible', timeout: 5000 });
+await entry.click();
+await page.waitForSelector('.wiz-box', { timeout: 5000 });
+await page.waitForTimeout(400);
+const inputs = await page.evaluate(() => [...document.querySelectorAll('.wiz-body input')].map(el => ({ type: el.type, name: el.name || el.id })));
+console.log('inputs found:', JSON.stringify(inputs));
+const first = page.locator('.wiz-body input').first();
+console.log('count:', await first.count());
+await first.click();
+await page.waitForTimeout(150);
+const focusInfo = await page.evaluate(() => {
+    const el = document.activeElement;
+    return { tag: el.tagName, cls: el.className, matchesFocus: el.matches(':focus'), matchesFocusVisible: el.matches(':focus-visible') };
+});
+console.log(JSON.stringify(focusInfo));
+await browser.close();

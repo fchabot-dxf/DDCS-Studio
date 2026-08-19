@@ -44681,3 +44681,164 @@ did).
 
 🔨 turn 2083
 
+# t2085 — P4e of the stylesheet arc: MENU AND POPOVER, FORM FIELD, TAB STATE, MICRO-TYPOGRAPHY (the last conversion stage)
+
+## First, before any token work: the comment-delimiter checker
+
+The dispatch's opening instruction was to close the blind spot that let the "*/" comment-truncation bug bite
+twice (t2069, t2083): the project's ad-hoc comment-aware brace-depth scanner (re-run manually after every edit,
+never a saved file) tracks brace balance but structurally cannot see a comment closing in the wrong place,
+since a stray `*/` doesn't unbalance braces, it only breaks comment boundaries. Declared it properly instead of
+re-typing the same one-off scan again: `DDCS-Studio/verification/css-comment-brace-check.mjs`, a single script
+doing BOTH checks. The comment-delimiter heuristic: a DELIBERATE `*/` almost always has whitespace/newline (or
+another `*`) on both sides; an ACCIDENTAL one (typed as prose, e.g. "sv-*/bv-*") is glued to word characters on
+BOTH sides with no space — that shape is what actually bit both previous times. Proved it non-vacuous both ways
+before trusting it: reproduced the exact t2083 bug text in a scratch file (1 suspect found, exit 1) and ran it
+against a normal multi-line comment ending in "still fine. */" (0 suspects, exit 0 — no false positive). Run
+against the pre-t2085 file: **0 comment-delimiter suspects, brace depth 0** — no third undiscovered instance.
+Re-run after every edit pass this turn, same result throughout.
+
+## TAB STATE
+
+Added `--tab-ink`/`--tab-ink-dim` (active/inactive label colour, was an inline `var(--hdr-ink)`/`var(--hdr-dim)`
+fallback at each consumer) and `--tab-glow` (an extra box-shadow layer on the active tab; default an inert
+`0 0 0 transparent` since box-shadow has no bare "off" keyword usable inside a comma list) to the existing
+5-skin `--tab-radius/-flare/-edge` block — extending the file's own "good precedent" rather than restating it
+elsewhere. `--tab-radius/-flare/-edge/-fill` themselves are untouched, per the dispatch.
+
+**The dispatch's 3-way inconsistency claim didn't fully match the current file — verified each, didn't take it
+on faith:**
+- `--tab-color` ("set ten times, read zero"): **already fully resolved**, at t2069 — zero live declarations
+  anywhere; the only match is a t2069 comment DOCUMENTING that earlier cleanup. Nothing to fix.
+- `--tab-fill` ("set by only one skin"): the shared base `.tab.active` rule sets `--tab-fill: var(--band-bg)`
+  for EVERY theme (not skin-specific at all), and organic additionally restated the exact same expression —
+  a genuine no-op duplicate, not a missing override. Deleted the duplicate (documented in place).
+- `--tab-accent` ("read three times but never declared, so futuristic's glow has never fired"): it WAS
+  declared (twice, redundantly) — the real defect is more specific and more interesting: futuristic's static
+  glow rule targeted `.tab.active::after`, but futuristic sets `content: none` on that exact pseudo-element
+  (the "no feet" list, a few lines above — futuristic is square) — the rule was structurally dead, confirmed
+  via `getComputedStyle(tab, '::after').content === 'none'` (t2085_futuristic_tabglow_probe.mjs). The glow
+  APPEARED to work anyway because a SEPARATE, fully redundant hardcoded rule duplicated the base 3-inset ring
+  plus a literal glow layer directly on `.tab.active` itself. Consolidated both into `--tab-glow` (declared per
+  skin, `0 -2px 10px rgba(45,226,255,.3)` for futuristic) added as a 4th box-shadow layer on the shared base
+  rule; deleted both the dead `::after` rule and the now-redundant duplicate.
+
+**A related, more significant dead-code find surfaced investigating this: a "breathing" pulse animation**
+(`@keyframes op-pulse`, comment: "Active tab breathes; respects reduced-motion") ALSO targeted the same dead
+`.tab.active::after` — a full intended FEATURE, never once rendering a frame, with no duplicate anywhere else
+covering for it (unlike the static glow). Relocated the animation onto `.tab.active` itself, restating the
+insets each keyframe (animating `box-shadow` replaces the whole property, not one layer) so the ring never
+disappears mid-pulse. This is a genuine, intentional visual change for futuristic — the active tab now visibly
+pulses, which it structurally could not before — called out explicitly rather than folded in silently;
+screenshots capture it (the computed glow blur reads as an interpolated value mid-cycle, e.g. 14.49px, since
+it's now a live animation rather than a static number).
+
+## FORM FIELD
+
+Only studio had ever styled `.wiz-body input/select` (t2069, P0) — every other theme rendered the plain
+browser-default via the base `input, select, textarea` rule (t2071, P2). Declared `--field-face/-edge/-edge-w/
+-ink/-radius/-focus-edge/-placeholder-ink` **inline on the consuming selector** (the `--tab-fill` pattern, not
+a `:root` alias): custom properties set this way apply only to the matched elements and their descendants, so
+studio's own `.wiz-body input` override cannot leak onto OTHER inputs elsewhere in studio's DOM (settings,
+blocks search, …) the way a skin-wide `:root`-style alias would have — a real risk, since those currently fall
+through to the flat default and should keep doing so. `--field-placeholder-ink` is a genuine NEW addition: no
+`::placeholder` rule existed anywhere in the file before this turn; every theme showed the browser's raw
+placeholder colour. Studio's `.wiz-body input/select` rule now reads the same tokens with its own literal
+overrides (the sunken-well `--field-face` aliasing `--dock-well-edge`, same-block, safe per the t2083
+precedent).
+
+## MENU AND POPOVER
+
+Two genuinely separate surfaces, both covered:
+
+**The toolbar dropdown tray** (Probe/ATC/Mill/Lathe): `--menu-face/-edge/-radius/-shadow/-item-ink/-sep/
+-trigger-face/-trigger-ink` declared inline on `.toolbar-dropdown` — the common ANCESTOR of both the trigger
+button and the tray (siblings under it), which is what lets the open-TRIGGER state read the same
+`--menu-trigger-*` values by ordinary inheritance (declaring them on the tray alone would not have reached the
+trigger). Investigated "item hover" before adding anything for it: the tray's own comment claimed "dropdown
+items use the theme's normal button:hover," but the item rule sets background/color/border with `!important`,
+which a non-important generic `button:hover` cannot cross — only `filter` was ever actually reachable. Studio's
+own `--btn-filter-hover` is ALREADY `brightness(1.05)`, byte-identical to the explicit
+`[data-theme="studio"] .toolbar-dropdown-content button:hover { filter: brightness(1.05); }` rule sitting right
+there — meaning that explicit rule was fully redundant. Proved it non-vacuously: measured the hover filter with
+the rule present (brightness(1.05)), removed it, restarted the mem-server fresh, measured again — identical
+result — then deleted it for real. No new "item hover" token needed; the existing mechanism already covered it.
+
+**The header quick-menu popover** (`.hdr-quick-menu`, the chevron menu): was reading `--kbd-glass`/`--kbd-blur`/
+`--kbd-edge` DIRECTLY — a semantic lie (a popover is not a keyboard) the dispatch called out by name. Gave it
+`--menu-glass`/`--menu-blur`/`--menu-edge` via the TRAP-DODGE (the fallback chain lives in the `var()` call on
+THIS selector, not a `:root` alias — aliasing a skin-only token like `--kbd-glass` at `:root` would resolve
+against `<html>`'s un-themed default rather than `<body>`'s real one, the standing trap first documented at
+t2073). No skin declares `--menu-glass` etc. yet, so every theme falls all the way through to its existing
+`--kbd-*` value — byte-identical today, confirmed by the gate; a skin can diverge later without touching kbd.
+
+## MICRO-TYPOGRAPHY
+
+`.label`: consolidated a cascade-split pair (`font-size`/`margin-bottom` were restated a SECOND time, later in
+the file, under a "Labels - Tighter Spacing" comment, silently overriding the same rule's own first-declared
+values) into one rule, declaring `--label-size/-tracking/-transform/-weight/-ink` inline. `.hint`: same
+`--hint-size/-style/-ink` pattern, no pre-existing duplicate to consolidate. Studio only ever diverges on
+`--label-size` (10px vs 8px) and `--hint-size` (10px vs 9px) — confirmed by direct comparison, so studio's own
+rules only override that one token each; the rest correctly falls through from the base rule matching the same
+element (a more-specific selector only wins the properties it actually sets — this is NOT DOM inheritance,
+both rules target the identical element).
+
+**Button label transform/tracking — a bug caught by the gate, not by inspection.** First pass declared
+`--btn-label-transform: none; --btn-label-tracking: normal;` INLINE on the base `button,.btn,.op-btn,
+.toolbar-btn` rule, matching the `--tab-fill` pattern used everywhere else this turn. Wrong pattern for this
+case: a custom property declared DIRECTLY on an element (via a rule matching it) always wins over one
+INHERITED from an ancestor, regardless of specificity — so every button's own local `none`/`normal` silently
+SHADOWED futuristic's skin-level (body) override every time, making futuristic's own `--btn-label-transform:
+uppercase` a dead letter. `t2085_probe.mjs`'s before/after diff caught it immediately: futuristic read back
+"none"/"normal" where it should have read "uppercase"/".08em" (BEFORE showed uppercase/1.04px correctly — the
+pre-existing selector-based rule this turn was replacing). Fixed by moving the default to `:root` instead —
+the SAME pattern `--btn-face` already uses (declared only at `:root` and per-skin body blocks; the consuming
+button rule only ever READS it, never locally shadows it). Re-verified: futuristic now reads back
+"uppercase"/"1.04px", matching the pre-change baseline exactly. Relocated futuristic's own literal
+(`uppercase`/`.08em`) from a standalone `.toolbar-btn .btn-tx, .op-btn .op-label, .app-header .tab .app-tx`
+selector into its button-material token block; `.app-header .tab .app-tx` stays a literal (tab typography,
+a separate concern, out of this token's scope).
+
+## Verification
+
+Before/after computed-style diff (`t2085_probe.mjs`) across all 5 themes, 6 measurement groups (tabs, menu
+tray, popover, button label, settings-tab, wizard field + focus). **9 raw diffs, all accounted for**: 8 are the
+new inert `--tab-glow` 4th box-shadow layer (`rgba(0,0,0,0) 0px 0px 0px 0px`, zero visual effect) landing on
+every non-futuristic active-tab/settings-tab; 1 is futuristic's active-tab glow now reading as a live
+interpolated animation value instead of a static number — the intended pulse-animation fix, described above.
+Zero unexplained diffs. Screenshots: 5 themes × {main, dropdown-open, popover-open, wizard-open, gateway-tab,
+blocks-tab}, before AND after, visually reviewed — studio's dock/menu material and the futuristic glow ring
+render correctly; every other theme is pixel-identical before/after outside the documented tab-glow change.
+
+Enforceability re-check (t2083's own ramp constraint, unrelated to this turn's tokens but re-verified for
+regression): `grep -n -- "--plate-\|--bevel-" web/styles.css` — every hit still a declaration/comment inside
+the studio token block, zero selector-rule leaks; this turn never touches the ramp system.
+
+## Gate
+
+Node tier: 193/193. Comment-delimiter + brace-balance check: 0 suspects, depth 0, re-run after every edit pass.
+Full Playwright suite (2,649 tests, 44.4m): 2,607 passed, 10 flaky (recovered on retry, none CSS/token-related
+by name), 25 skipped, 7 failed — **all 7 match the established pre-existing set** (`controller-import-one-door-
+1221`, `editor-indent-1450`×3, `pull-modal-stacking`, `ring-descent-1404`, `send-history-real-path-2065`) — one
+fewer than t2083's own gate (`update-check.spec.js`'s "NO composed notes" test flipped to passing, an unrelated
+flake in the other direction). Confirmed by reading the actual failed-test names, not just the trailing count.
+
+## Files
+- `DDCS-Studio/web/styles.css` — TAB STATE tokens + the futuristic dead-rule cleanup + pulse-animation
+  relocation; FORM FIELD tokens + placeholder rule; MENU/POPOVER tokens (tray + trigger + quick-menu glass);
+  MICRO-TYPOGRAPHY tokens (label/hint consolidation + button-label transform/tracking, incl. the mid-turn fix).
+- `DDCS-Studio/verification/css-comment-brace-check.mjs` — NEW, durable: comment-delimiter + brace-balance
+  check in one script, replacing the ad-hoc manual scan this whole arc has re-typed since t2069.
+- `DDCS-Studio/verification/t2085_futuristic_tabglow_probe.mjs` — confirms the dead `::after` pseudo-element
+  (`content: none`) and the working duplicate box-shadow, before the consolidation.
+- `DDCS-Studio/verification/t2085_dropdown_hover_probe.mjs` — the non-vacuity check for the redundant
+  studio item-hover rule (measured identical with the rule present AND removed).
+- `DDCS-Studio/verification/t2085_focus_debug.mjs` — diagnostic that found `.wiz-body` holds every op's
+  fields at once (only one op's tab visible) — fixed the main probe's focus check to use `:visible`.
+- `DDCS-Studio/verification/t2085_probe.mjs` — the main before/after computed-style gate (6 measurement
+  groups × 5 themes) — this is what caught the button-label inheritance bug.
+- `DDCS-Studio/verification/t2085-screens.mjs` — before/after screenshot capture, 6 views × 5 themes.
+- `DDCS-Studio/verification/t2085-{before,after}-*.png` — 60 screenshots.
+
+🔨 turn 2085
+

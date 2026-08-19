@@ -302,12 +302,16 @@ html, body { overflow-x: clip; }
 /* Underline-style app-switcher tabs (the original look): flat, transparent, with a coloured accent
    bar under the active tab. Icons kept so they collapse to icon-only on narrow screens. */
 /* Per-theme tab shape: --tab-radius = TOP-corner rounding; --tab-flare = OUTWARD bottom-corner "feet" radius
-   (the classic browser-tab curve into the bar); --tab-edge = the outline colour that traces both. */
-:root, [data-theme="steampunk"] { --tab-radius: 8px;  --tab-flare: 7px;  --tab-edge: var(--border); }
-[data-theme="studio"]     { --tab-radius: 13px; --tab-flare: 9px;  --tab-edge: var(--border); }
-[data-theme="organic"]    { --tab-radius: 16px; --tab-flare: 11px; --tab-edge: var(--border); }
-[data-theme="futuristic"] { --tab-radius: 0;    --tab-flare: 0;    --tab-edge: rgba(45,226,255,.7); }  /* square */
-[data-theme="normal"]     { --tab-radius: 5px;  --tab-flare: 0;    --tab-edge: var(--border); }          /* flat, no feet */
+   (the classic browser-tab curve into the bar); --tab-edge = the outline colour that traces both.
+   t2085 (P4e) — ADDED --tab-ink/-ink-dim (active/inactive label colour, was a bare var(--hdr-ink)/var(--hdr-dim)
+   fallback inline at each consumer) and --tab-glow (an extra box-shadow LAYER on the active tab, default an
+   inert `0 0 0 transparent` — box-shadow has no bare "off" keyword usable inside a comma list, so every theme
+   needs a real, harmless layer rather than `none`). --tab-radius/-flare/-edge/-fill are UNCHANGED. */
+:root, [data-theme="steampunk"] { --tab-radius: 8px;  --tab-flare: 7px;  --tab-edge: var(--border); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 0 0 transparent; }
+[data-theme="studio"]     { --tab-radius: 13px; --tab-flare: 9px;  --tab-edge: var(--border); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 0 0 transparent; }
+[data-theme="organic"]    { --tab-radius: 16px; --tab-flare: 11px; --tab-edge: var(--border); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 0 0 transparent; }
+[data-theme="futuristic"] { --tab-radius: 0;    --tab-flare: 0;    --tab-edge: rgba(45,226,255,.7); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 -2px 10px rgba(45,226,255,.3); }  /* square; glow relocated from the dead ::after rule + the redundant box-shadow duplicate below (see t2085 comment there) */
+[data-theme="normal"]     { --tab-radius: 5px;  --tab-flare: 0;    --tab-edge: var(--border); --tab-ink: var(--hdr-ink, var(--text-main)); --tab-ink-dim: var(--hdr-dim, var(--text-dim)); --tab-glow: 0 0 0 transparent; }          /* flat, no feet */
 
 .app-header .tab,
 .app-header .tab:hover,
@@ -320,7 +324,7 @@ html, body { overflow-x: clip; }
     font-weight: 700;
     letter-spacing: 1.5px;
     font-family: inherit;
-    color: var(--hdr-dim, var(--text-dim));
+    color: var(--tab-ink-dim, var(--hdr-dim, var(--text-dim)));
     border: none;
     border-radius: var(--tab-radius, 8px) var(--tab-radius, 8px) 0 0;
     background: transparent;
@@ -331,13 +335,13 @@ html, body { overflow-x: clip; }
     cursor: pointer;
     position: relative;
 }
-.app-header .tab:hover { color: var(--hdr-ink, var(--text-main)); background: color-mix(in srgb, var(--bg) 45%, transparent); }
+.app-header .tab:hover { color: var(--tab-ink, var(--hdr-ink, var(--text-main))); background: color-mix(in srgb, var(--bg) 45%, transparent); }
 /* Active app tab fills with the colour of the strip DIRECTLY below the header (var(--panel) — now unified across
    every app: studio wizard bar, macros/gateway/settings sub-tab head). So it reads as merged with the body, and
    that "body colour below the header" is identical for every tab in a given theme. margin-bottom:-1px punches it
    through the header's bottom border so there's no separating line. */
-.app-header .tab.active { --tab-fill: var(--band-bg); color: var(--hdr-ink, var(--text-main)); background: var(--tab-fill); margin-bottom: -1px;
-    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
+.app-header .tab.active { --tab-fill: var(--band-bg); color: var(--tab-ink, var(--hdr-ink, var(--text-main))); background: var(--tab-fill); margin-bottom: -1px;
+    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge), var(--tab-glow, 0 0 0 transparent); }
 /* t2073 — was --tab-fill: var(--panel) directly; now DERIVES from --band-bg (which defaults to var(--panel),
    so this is byte-identical everywhere except organic, which now sets --band-bg once instead of restating
    its own tab-fill AND its own five-selector patch separately — see organic's theme block + the patch below. */
@@ -383,8 +387,9 @@ html, body { overflow-x: clip; }
 [data-theme="normal"] .settings-tabs .settings-main-tab.active::before, [data-theme="normal"] .settings-tabs .settings-main-tab.active::after { content: none; }
 /* Organic header-tab feet flare into the coral bar (match the tab fill). t2071 — was #6f9b4d, following the
    band's own colour above. t2073 — now DERIVES from --band-bg (organic's own theme block) instead of
-   restating the hex a second time; same resolved colour. */
-[data-theme="organic"] .app-header .tab.active { --tab-fill: var(--band-bg); }
+   restating the hex a second time; same resolved colour. t2085 (P4e) — DELETED: since t2073, the shared base
+   `.app-header .tab.active` rule (above) ALSO sets `--tab-fill: var(--band-bg)` directly — literally the same
+   expression, so this per-skin restatement had been a no-op duplicate all along, not an actual override. */
 /* Studio depth: the toolbar's bevel is RAISED (light top edge), so it sits ABOVE the header in the
    colour hierarchy — toolbar lightest (sv-1), header darker (sv-3). Active tab = toolbar colour,
    inactive tab = header colour. t2073 — the !important override that used to force this here is RETIRED:
@@ -663,18 +668,25 @@ html, body { overflow-x: clip; }
 .app-header button.hdr-quick-btn[aria-expanded="true"] { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); }
 .app-header button.hdr-quick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 
-/* Popover menu (reuses .scale-pop chrome) — themed like the keyboard: same translucent "glass" material
-   (--kbd-glass / --kbd-blur / --kbd-edge tokens). Items are buttons → override the per-theme skin via (0,2,0). */
+/* Popover menu (reuses .scale-pop chrome) — themed like the keyboard: same translucent "glass" material.
+   t2085 (P4e) — was reading --kbd-glass/--kbd-blur/--kbd-edge DIRECTLY: a semantic lie (a popover is not a
+   keyboard) that also meant any future divergence between the two would have to be faked back in. Now reads
+   its OWN --menu-glass/-blur/-edge first, falling through to the kbd values via the TRAP-DODGE (the fallback
+   lives in the var() call on THIS selector, not a :root alias — a :root alias to a skin-only token like
+   --kbd-glass would resolve against html's un-themed default, not body's real one, the standing trap). No
+   skin declares --menu-glass/-blur/-edge yet, so every theme falls all the way through to its existing
+   --kbd-* value — byte-identical today; a skin can override just --menu-* later without touching kbd at all.
+   Items are buttons → override the per-theme skin via (0,2,0). */
 .hdr-quick-menu {
     left: 0; right: auto;                 /* the chevron now sits LEFT (by the logo) → menu opens leftward-anchored */
     /* t1231 — a MAX width too: the identity line grew an envelope, and an unbounded shrink-to-fit popover simply got
        wider until its ☁ / ↧ targets were off the screen (the account-row spec caught it). Bounded, the line wraps. */
     min-width: min(300px, calc(100vw - 20px)); max-width: min(340px, calc(100vw - 20px)); max-height: min(72vh, 560px); overflow-y: auto;
     padding: 6px; display: flex; flex-direction: column; gap: 2px;
-    background: var(--kbd-glass, var(--panel, #1e1e1e));
-    -webkit-backdrop-filter: blur(var(--kbd-blur, 8px)) saturate(1.1);
-    backdrop-filter: blur(var(--kbd-blur, 8px)) saturate(1.1);
-    border: 1px solid var(--kbd-edge, var(--border, #444));
+    background: var(--menu-glass, var(--kbd-glass, var(--panel, #1e1e1e)));
+    -webkit-backdrop-filter: blur(var(--menu-blur, var(--kbd-blur, 8px))) saturate(1.1);
+    backdrop-filter: blur(var(--menu-blur, var(--kbd-blur, 8px))) saturate(1.1);
+    border: 1px solid var(--menu-edge, var(--kbd-edge, var(--border, #444)));
 }
 .hdr-quick-menu[hidden] { display: none; }
 .hdr-quick-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .55; padding: 4px 8px 2px; }
@@ -691,7 +703,7 @@ html, body { overflow-x: clip; }
 .hdr-quick-warn { color: #e0a020; }
 .hq-ico { flex: 0 0 15px; }
 .hq-swatch { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
-.hdr-quick-sep { height: 1px; margin: 5px 4px; background: var(--kbd-edge, var(--border, #444)); opacity: .6; }
+.hdr-quick-sep { height: 1px; margin: 5px 4px; background: var(--menu-edge, var(--kbd-edge, var(--border, #444))); opacity: .6; }
 
 /* Collapsible submenus (Post-processor, Theme): a header row + an indented, togglable list */
 .hdr-quick-sub { font-weight: 700; }
@@ -1218,9 +1230,16 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 
 /* Toolbar dropdowns used in the dock header */
+/* t2085 (P4e) — MENU AND POPOVER tokens declared INLINE here (the --tab-fill/--field-face pattern): this is
+   the common ANCESTOR of both the trigger button and the tray (`.toolbar-dropdown > button.toolbar-btn` and
+   `.toolbar-dropdown-content` are siblings under it), so declaring them here — rather than on the tray alone —
+   is what lets the open-TRIGGER state below read the same --menu-trigger-* values by ordinary inheritance. */
 .toolbar-dropdown {
     position: relative; /* anchor for absolute dropdown content */
     display: inline-block;
+    --menu-face: var(--panel); --menu-edge: var(--border); --menu-radius: var(--radius, 6px);
+    --menu-shadow: 0 4px 10px rgba(0,0,0,0.35); --menu-item-ink: var(--text); --menu-sep: rgba(0,0,0,0.06);
+    --menu-trigger-face: var(--accent); --menu-trigger-ink: #fff;
 }
 
 .toolbar-dropdown > button.toolbar-btn {
@@ -1237,12 +1256,12 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     left: -6px;
     min-width: calc(100% + 12px);
     /* opaque tray in every theme — rounded items no longer leak the editor through the gaps */
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius, 6px);
+    background: var(--menu-face);
+    border: 1px solid var(--menu-edge);
+    border-radius: var(--menu-radius);
     padding: 4px;
     gap: 4px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    box-shadow: var(--menu-shadow);
     z-index: 2000; /* higher to ensure visibility */
     white-space: nowrap;
     flex-direction: column;
@@ -1253,19 +1272,23 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     width: 100% !important;
     text-align: left;
     padding: 6px 10px;
-    background: var(--panel) !important;
-    color: var(--text) !important;
+    background: var(--menu-face) !important;
+    color: var(--menu-item-ink) !important;
     border: none !important;
-    border-top: 1px solid rgba(0,0,0,0.06) !important;
+    border-top: 1px solid var(--menu-sep) !important;
     cursor: pointer !important;
     font-size: 13px !important;
 }
 
 .toolbar-dropdown-content button:first-child { border-top: none; }
 
-/* No custom hover override here: dropdown items use the theme's normal (solid) button:hover.
-   The old `background: rgba(0,0,0,0.12)` replaced the opaque panel, making the hovered item go
-   see-through — it only looked "fine" before because a `..` selector typo disabled this rule. */
+/* No custom hover override here: dropdown items use the theme's normal (solid) button:hover — genuinely true
+   now, verified (t2085): `.toolbar-dropdown-content button` sets background/color/border with !important, so
+   only properties it does NOT touch (box-shadow, filter) can flow through from the generic `button:hover`
+   rule — but filter is exactly the mechanism studio's own hover effect needs (see its --btn-filter-hover
+   below), so it already arrives for free. The old `background: rgba(0,0,0,0.12)` replaced the opaque panel,
+   making the hovered item go see-through — it only looked "fine" before because a `..` selector typo disabled
+   this rule. */
 
 /* Studio theme only: force the dropdown trigger's silver panel look (fixes a studio transparency issue).
    Other themes (steampunk/futuristic/…) must fall through to their own button styling so the Probe/ATC
@@ -1286,12 +1309,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 /* Studio: the open menu is a silver key-tray — same plate-and-rim as the buttons,
    each item a mini key inside it (closes the see-through gaps between rounded items) */
 [data-theme="studio"] .toolbar-dropdown-content {
+    --menu-face: var(--dropdown-tray-face); --menu-radius: 8px;
     border: 2px solid transparent;
-    border-radius: 8px;
+    border-radius: var(--menu-radius);
     padding: 4px;
     gap: 4px;
-    background: var(--dropdown-tray-face);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    background: var(--menu-face);
+    /* box-shadow: DELETED (t2085) — was 0 4px 10px rgba(0,0,0,.35), byte-identical to the base rule's own
+       --menu-shadow default, which this element already inherits (this rule never overrode --menu-shadow). */
 }
 [data-theme="studio"] .toolbar-dropdown-content button {
     border: 2px solid transparent !important;
@@ -1299,17 +1324,28 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     /* t2083 (P4d) — was a hand-typed copy of --btn-face's own recipe; same value, one source now. */
     background: var(--btn-face) !important;
 }
-[data-theme="studio"] .toolbar-dropdown-content button:hover { filter: brightness(1.05); }
+/* t2085 (P4e) — DELETED the explicit hover filter that used to sit here: verified redundant with the generic
+   `button:hover { filter: var(--btn-filter-hover); }` mechanism (base rule, above) — studio's own
+   --btn-filter-hover is ALREADY brightness(1.05) (its theme block, for exactly this "silver key" hover
+   effect), and nothing on `.toolbar-dropdown-content button` blocks `filter` with !important the way
+   background/color/border are blocked, so it was already arriving for free. Confirmed via getComputedStyle
+   before AND after removing this rule: brightness(1.05), unchanged (t2085_dropdown_hover_probe.mjs). */
 
-/* studio: open trigger flips to the electric-blue key (beats the silver !important trigger rule above) */
+/* studio: open trigger flips to the electric-blue key (beats the silver !important trigger rule above).
+   t2085 (P4e) — --menu-trigger-face/-ink declared on [data-theme="studio"] .toolbar-dropdown (below, where
+   --menu-face/-edge/etc. get their base defaults) rather than here: this selector reads them, it doesn't
+   need to redeclare them. */
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn,
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn:hover,
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn:focus {
-    background:
-        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
-        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box !important;
-    color: #fff !important;
+    background: var(--menu-trigger-face) !important;
+    color: var(--menu-trigger-ink) !important;
     text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+}
+[data-theme="studio"] .toolbar-dropdown {
+    --menu-trigger-face:
+        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
 }
 
 .toolbar-dropdown.active .toolbar-dropdown-content {
@@ -1322,12 +1358,13 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 
 /* …and make the open trigger read as the tray's header, distinct from the items below it */
 .toolbar-dropdown.active > button {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
+    background: var(--menu-trigger-face);
+    border-color: var(--menu-trigger-face);
+    color: var(--menu-trigger-ink);
     font-weight: 800;
 }
-[data-theme="futuristic"] .toolbar-dropdown.active > button { color: #0a0e1a; } /* cyan accent needs dark ink */
+/* cyan accent needs dark ink — t2085: relocated from a selector override into the token itself */
+[data-theme="futuristic"] .toolbar-dropdown { --menu-trigger-ink: #0a0e1a; }
 
 /* Ensure dropdowns don't push layout when opened on small viewports */
 .dock-header .header-center .toolbar-dropdown {
@@ -1800,11 +1837,19 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
    raw browser-default control. Bare-tag selectors (0,0,1), the lowest possible specificity, so this only fills
    the gap — anything already styled via a class/id anywhere continues to win exactly as before.
    ============================================ */
+/* t2085 (P4e) — face/edge/edge-w/ink/radius/focus-edge/placeholder-ink declared INLINE on this same rule
+   (the --tab-fill pattern, not a :root alias): custom properties set this way apply only to the elements
+   this selector matches and their own descendants, so there is no risk of a per-skin override elsewhere in
+   the DOM (e.g. studio's .wiz-body inputs) bleeding onto OTHER inputs in that same theme outside .wiz-body —
+   a real risk a :root-level alias would have created, since --field-face would then inherit skin-wide. */
 input, select, textarea {
-    background: var(--panel);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    --field-face: var(--panel); --field-edge: var(--border); --field-edge-w: 1px;
+    --field-ink: var(--text); --field-radius: var(--radius); --field-focus-edge: var(--accent);
+    --field-placeholder-ink: var(--text-dim);
+    background: var(--field-face);
+    color: var(--field-ink);
+    border: var(--field-edge-w) solid var(--field-edge);
+    border-radius: var(--field-radius);
     font-family: inherit;
     font-size: inherit;
     padding: 4px 6px;
@@ -1812,8 +1857,15 @@ input, select, textarea {
 /* the SAME :focus-visible pattern already used elsewhere in this file (.wiz-pane-bar, .form-sec-hdr, and
    .wiz-body input/select from P0) — not a new one invented for this. */
 input:focus-visible, select:focus-visible, textarea:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--field-focus-edge, var(--accent));
     outline-offset: -2px;
+}
+/* t2085 (P4e) — NEW: no placeholder rule existed anywhere in the file before this: every theme showed the raw
+   browser-default placeholder colour. --field-placeholder-ink is set above (inherits onto this pseudo-element
+   the same way --field-ink does), so this needs no per-skin override on its own. */
+input::placeholder, textarea::placeholder {
+    color: var(--field-placeholder-ink, var(--text-dim));
+    opacity: 1;   /* Firefox lowers opacity on ::placeholder by default; the colour alone should carry the dimming */
 }
 
 /* ============================================
@@ -1825,6 +1877,7 @@ button,
 .btn,
 .op-btn,
 .toolbar-btn {
+    --btn-label-transform: none; --btn-label-tracking: normal;
     padding: 6px;
     font-size: 12px;
     cursor: pointer;
@@ -1838,6 +1891,13 @@ button,
     line-height: 1.2;
     box-shadow: var(--btn-shadow);
     text-shadow: var(--btn-text-shadow);
+}
+/* t2085 (P4e) — MICRO-TYPOGRAPHY: --btn-label-transform/-tracking, declared above (default a no-op: none /
+   normal). Only futuristic overrides them (its own block, "HUD chip labels"); every other theme renders
+   byte-identical since text-transform:none / letter-spacing:normal is the browser's own initial value. */
+.toolbar-btn .btn-tx, .op-btn .op-label {
+    text-transform: var(--btn-label-transform);
+    letter-spacing: var(--btn-label-tracking);
 }
 /* t2075 (P4a) — was background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
    color:var(--text); box-shadow/text-shadow unset — the button-material tokens all default to exactly these
@@ -2364,14 +2424,19 @@ button.primary:hover {
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 
 /* Labels */
-.label { 
-    font-size: 9px; 
-    color: var(--text-dim); 
-    margin-bottom: 4px; 
-    display: block; 
-    text-transform: uppercase; 
-    font-weight: bold; 
-    letter-spacing: 0.5px; 
+/* t2085 (P4e) — MICRO-TYPOGRAPHY tokens declared inline (the --tab-fill pattern). font-size/margin-bottom
+   here used to be overridden a second time, later in the file, by an identically-scoped "Labels - Tighter
+   Spacing" rule (same 8px/2px this rule now states directly) — consolidated into ONE rule instead of a
+   cascade-split pair; see that spot for the deletion note. */
+.label {
+    --label-size: 8px; --label-tracking: 0.5px; --label-transform: uppercase; --label-weight: 700; --label-ink: var(--text-dim);
+    font-size: var(--label-size);
+    color: var(--label-ink);
+    margin-bottom: 2px;
+    display: block;
+    text-transform: var(--label-transform);
+    font-weight: var(--label-weight);
+    letter-spacing: var(--label-tracking);
 }
 
 .section-label { 
@@ -3076,21 +3141,33 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 }
 /* footer actions = the big soft keys (C4) — chassis keys stay at 6px */
 [data-theme="studio"] .wiz-foot button { border-radius: 14px; padding: 8px 18px; }
+/* t2085 (P4e) — weight/tracking/transform/ink DELETED from here: identical to the base .label rule's own
+   700/0.5px/uppercase/var(--text-dim) (via --label-weight/-tracking/-transform/-ink), which still applies to
+   this same element (a more-specific rule only wins the properties it actually sets) — only --label-size
+   genuinely differs (10px vs the base's 8px), so only that gets overridden. */
 [data-theme="studio"] .label {
-    font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
-    text-transform: uppercase; color: var(--text-dim); display: block; margin-bottom: 3px;
+    --label-size: 10px;
+    font-family: var(--sans); font-size: var(--label-size); display: block; margin-bottom: 3px;
 }
-[data-theme="studio"] .hint { font-family: var(--sans); font-size: 10px; color: var(--text-dim); }
+/* t2085 (P4e) — same reasoning: --hint-style/-ink are unchanged from the base .hint rule (italic/text-dim),
+   only --hint-size differs (10px vs 9px). */
+[data-theme="studio"] .hint { --hint-size: 10px; font-family: var(--sans); font-size: var(--hint-size); color: var(--hint-ink, var(--text-dim)); }
 [data-theme="studio"] .wiz-body input,
 [data-theme="studio"] .wiz-body select {
-    font-family: var(--mono); font-size: 13px; color: var(--text); width: 100%;
+    font-family: var(--mono); font-size: 13px; color: var(--field-ink, var(--text)); width: 100%;
     padding: 6px 8px; outline: none;
     /* sunken well: inverted rim (dark top-left → light bottom-right). t2083 (P4d) — the border-box layer
        aliases --dock-well-edge directly (declared in this skin's own token block, above) rather than
        restating the gradient — a same-block alias, safe from the standing trap; this field group keeps its
-       own white padding-box fill, the one thing genuinely distinct from the chip/preview surfaces. */
-    border: 2px solid transparent; border-radius: 6px;
-    background: linear-gradient(#fff, #fff) padding-box, var(--dock-well-edge);
+       own white padding-box fill, the one thing genuinely distinct from the chip/preview surfaces.
+       t2085 (P4e) — --field-face/-edge/-edge-w/-radius declared INLINE here (same pattern as the base rule):
+       only .wiz-body input/select in studio ever sees these values; a real input elsewhere in studio's DOM
+       (settings, blocks search, …) still falls through to the base rule's own flat --field-face default,
+       exactly as it did before this token existed — nothing widened its reach. */
+    --field-face: linear-gradient(#fff, #fff) padding-box, var(--dock-well-edge);
+    --field-edge: transparent; --field-edge-w: 2px; --field-radius: 6px;
+    border: var(--field-edge-w) solid var(--field-edge); border-radius: var(--field-radius);
+    background: var(--field-face);
 }
 /* t2069 — the sunken-well outline:none above had NO replacement: every form input in this (the DEFAULT)
    theme had no focus ring at all. Same :focus-visible pattern already used elsewhere in this file
@@ -3131,7 +3208,7 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 }
 .settings-tabs .settings-main-tab:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 45%, transparent); }
 .settings-tabs .settings-main-tab.active { --tab-fill: var(--bg); color: var(--text-main); background: var(--tab-fill);
-    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge); }
+    box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge), var(--tab-glow, 0 0 0 transparent); }
 /* Sub-tab bar connects to the body: drop its bottom border (the colored line) + bottom padding so the active
    tab's var(--bg) fill meets the content with no seam. body-prefixed to beat the per-app .settings-head rules. */
 body #macros-app .settings-head, body #settings-app .settings-head, body .gateway-app .settings-head {
@@ -3288,6 +3365,9 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-shadow-hover: 0 0 14px rgba(45,226,255,.42), inset 0 0 8px rgba(45,226,255,.12);
     --btn-transform-active: translateY(1px);
     --btn-face-active: var(--btn-face-hover);
+    /* t2085 (P4e) — MICRO-TYPOGRAPHY: relocated from a standalone ".toolbar-btn .btn-tx, .op-btn .op-label"
+       selector rule ("HUD chip labels", below) into the button-material token group it belongs with. */
+    --btn-label-transform: uppercase; --btn-label-tracking: .08em;
     /* ⚠ standing trap correction (same as steampunk above): --btn-radius and the semantic variants below were
        missing here on the first pass — a :root-only alias resolves against <html>'s fallback (--radius:0,
        --accent:#666666), not futuristic's own <body> override (--radius:8px, --accent:#2de2ff), confirmed via
@@ -3318,13 +3398,17 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     box-shadow: 0 1px 14px rgba(45,226,255,.12);
 }
 [data-theme="futuristic"] .app-header .brand .logo { filter: drop-shadow(0 0 6px rgba(45,226,255,.55)); }
-[data-theme="futuristic"] .app-header .tab.active::after { box-shadow: 0 0 9px var(--tab-accent, var(--accent)); }
-/* Futuristic: the tab outline uses the SAME cyan as the .wizard-btn border (rgba(45,226,255,.7)) — top + left +
-   right, open bottom so it connects to the body, plus the theme's signature upward glow. */
-[data-theme="futuristic"] .app-header .tab.active,
-[data-theme="futuristic"] .settings-tabs .settings-main-tab.active {
-    box-shadow: inset 0 1px 0 rgba(45,226,255,.7), inset 1px 0 0 rgba(45,226,255,.7), inset -1px 0 0 rgba(45,226,255,.7), 0 -2px 10px rgba(45,226,255,.3);
-}
+/* t2085 (P4e) — DELETED two rules that used to sit here, both verified dead: `.app-header .tab.active::after
+   { box-shadow: 0 0 9px var(--tab-accent, var(--accent)); }` and the redundant `.app-header .tab.active,
+   .settings-tabs .settings-main-tab.active { box-shadow: inset ... rgba(45,226,255,.7) ×3, 0 -2px 10px
+   rgba(45,226,255,.3); }`. The FIRST is structurally dead — futuristic sets `content: none` on this exact
+   ::after (a few lines above, the "no feet" list), so the pseudo-element never renders and its box-shadow
+   paints nothing (confirmed via getComputedStyle(tab, '::after').content === 'none',
+   t2085_futuristic_tabglow_probe.mjs). The SECOND was fully redundant with the shared base `.tab.active`/
+   `.settings-main-tab.active` box-shadow rules once --tab-glow exists: the 3 inset layers already resolve to
+   the identical rgba(45,226,255,.7) via --tab-edge (declared a few lines above), and the 4th glow layer is now
+   supplied by --tab-glow (declared alongside --tab-edge) instead of restated here. Same rendered result,
+   confirmed by before/after computed-style diff. */
 [data-theme="futuristic"] .top-dock-header {
     background:
         repeating-linear-gradient(90deg, rgba(45,226,255,.04) 0 1px, transparent 1px 44px),
@@ -3385,9 +3469,9 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
         radial-gradient(135% 95% at 50% 32%, transparent 60%, rgba(0,10,22,.5) 100%);
 }
 
-/* HUD chip labels: uppercase + spaced, like instrument legends */
-[data-theme="futuristic"] .toolbar-btn .btn-tx,
-[data-theme="futuristic"] .op-btn .op-label,
+/* HUD chip labels: uppercase + spaced, like instrument legends. t2085 (P4e) — the .btn-tx/.op-label pair
+   moved to --btn-label-transform/-tracking (this theme's own block, alongside --btn-face); .app-header .tab
+   .app-tx stays a literal here — tab typography is a separate concern (TAB STATE), out of this token's scope. */
 [data-theme="futuristic"] .app-header .tab .app-tx { text-transform: uppercase; letter-spacing: .08em; }
 
 /* Big wizard buttons get a brighter cyan instrument edge */
@@ -3405,10 +3489,19 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     box-shadow: -6px 0 24px rgba(0,0,0,.6), inset 0 0 36px rgba(45,226,255,.07);
 }
 
-/* Active tab breathes; respects reduced-motion */
-@keyframes op-pulse { 0%,100% { box-shadow: 0 0 6px var(--tab-accent, var(--accent)); } 50% { box-shadow: 0 0 15px var(--tab-accent, var(--accent)); } }
-[data-theme="futuristic"] .app-header .tab.active::after { animation: op-pulse 2.6s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { [data-theme="futuristic"] .app-header .tab.active::after { animation: none; } }
+/* Active tab breathes; respects reduced-motion. t2085 (P4e) — RELOCATED from `.app-header .tab.active::after`
+   to the tab itself: that ::after is the SAME pseudo-element futuristic suppresses via `content: none` (the
+   "no feet" rule, this theme is square), so this animation has been fully inert since it was written — never
+   once painted a frame, confirmed the same way as the two deleted box-shadow rules above. The insets are
+   restated every keyframe (animating box-shadow replaces the WHOLE property, not just one layer) using the
+   same --tab-edge already resolved for this theme, so the ring never disappears mid-pulse; only the glow
+   layer's blur/colour actually animates. */
+@keyframes op-pulse {
+    0%,100% { box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge), 0 0 6px var(--tab-accent, var(--accent)); }
+    50%     { box-shadow: inset 0 1px 0 var(--tab-edge), inset 1px 0 0 var(--tab-edge), inset -1px 0 0 var(--tab-edge), 0 0 15px var(--tab-accent, var(--accent)); }
+}
+[data-theme="futuristic"] .app-header .tab.active { animation: op-pulse 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { [data-theme="futuristic"] .app-header .tab.active { animation: none; } }
 
 /* ============================================
    THEME: ORGANIC (Earth Tones)
@@ -3603,11 +3696,9 @@ body[data-theme="organic"] #editor.editor-layer { caret-color: #d97a5c !importan
 .wiz-body .grid-2 > *, .wiz-body .grid-3 > *, .wiz-body .grid-4 > * { min-width: 0; }
 .wiz-body input[type="text"], .wiz-body input[type="number"], .wiz-body input:not([type]) { min-width: 0; max-width: 100%; }
 
-/* Labels - Tighter Spacing */
-.label {
-    font-size: 8px;
-    margin-bottom: 2px;
-}
+/* t2085 (P4e) — DELETED: "Labels - Tighter Spacing" used to restate font-size:8px/margin-bottom:2px a second
+   time here, cascade-overriding the base .label rule's own 9px/4px. Consolidated into the base rule directly
+   (above) instead of a two-rule split with the same specificity — same effective values, one source. */
 
 .section-label {
     font-size: 9px;
@@ -3936,7 +4027,11 @@ svg [id*="Zfirst_travel"] {
 .viz-legend-line.travel  { background: var(--viz-path-rapid, #ffcc00); }   /* rapid = solid yellow (Fusion) */
 
 /* Hint text below inputs */
-.hint { font-size: 9px; color: var(--text-dim); margin-top: 3px; display: block; font-style: italic; }
+/* t2085 (P4e) — --hint-size/-style/-ink declared inline (the --tab-fill pattern). */
+.hint {
+    --hint-size: 9px; --hint-style: italic; --hint-ink: var(--text-dim);
+    font-size: var(--hint-size); color: var(--hint-ink); margin-top: 3px; display: block; font-style: var(--hint-style);
+}
 
 /* WCS crosshair groups in SVG — hidden by default, revealed by animator */
 svg [id$="_wcs"] { display: none; }

@@ -1,0 +1,15 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+await page.addInitScript(() => { try { localStorage.setItem('ddcs_theme', 'studio'); } catch (_) { } });
+await page.goto('http://localhost:3211', { waitUntil: 'networkidle' });
+await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings, undefined, { timeout: 20000 });
+await page.waitForTimeout(400);
+await page.locator('.dock-header .header-center .toolbar-dropdown > button.toolbar-btn', { hasText: 'Probe' }).click();
+await page.waitForTimeout(300);
+const item = page.locator('.toolbar-dropdown.active .toolbar-dropdown-content button').first();
+await item.hover();
+await page.waitForTimeout(150);
+const filter = await item.evaluate((el) => getComputedStyle(el).filter);
+console.log(JSON.stringify({ hoverFilter: filter }, null, 2));
+await browser.close();
