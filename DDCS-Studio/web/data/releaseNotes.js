@@ -31,6 +31,25 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.2": [
+    { short: "Send jobs through your own Google Drive",
+      full: "You can now send a program to your machine from anywhere, over the internet, using YOUR "
+        + "Google Drive — no IP addresses, no port forwarding, no account of ours. Turn it on in "
+        + "Gateway → Setup → Cloud storage: click Connect Google Drive, then tick \"Send jobs through my "
+        + "Google Drive\" and restart. Do it on both PCs with the SAME Google account — the one you send "
+        + "from writes the job, the one wired to the controller picks it up within about 15 seconds. "
+        + "Live progress still runs on the serial cable, never on this." },
+    { short: "Job history says how far a stopped run got",
+      full: "A run that stopped early used to say only \"stalled\". It now says how far it actually got "
+        + "— \"signal lost at 12/40\", or \"no signal after delivery\" when the job was delivered but "
+        + "never started. It still never guesses WHY it stopped: an operator abort, a lost cable and a "
+        + "genuine hang look identical from here, so naming one would be a lie." },
+    { short: "DM500 dumps now read real machine settings",
+      full: "Importing a DM500 (V3) controller dump used to show every value as \"N/A\" — its settings "
+        + "file is stored in a different format than the Expert and V4.1, and that format had never been "
+        + "decoded. It has been now, so a DM500 dump reads its real envelope, homing and speeds like the "
+        + "other controllers." },
+  ],
   "2026.08.19.1": [
     { short: "The command deck now works on a phone",
       full: "Opening the deck on a narrow screen used to hide its entire keypad — all 22 keys were "
