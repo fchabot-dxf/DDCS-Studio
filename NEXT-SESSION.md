@@ -6372,3 +6372,34 @@ not invent a second probe.
 ⚠ **Two listed PCs genuinely connected at once is out of scope** — the human states it cannot happen
 ("its never simultaneously"). Do NOT build leader election or arbitration for it. If it ever does happen,
 the duplicate-delivery hazard is real, so it is worth a LOG LINE naming the collision — but nothing more.
+
+## ⛔⛔ THE ROOT-VS-BODY TRAP — found t2073, applies to EVERY token added from here on
+
+**Declaring an alias only at `:root` does NOT track a skin override.** `:root` is `html`; `[data-theme]`
+lives on **`body`**. So `var(--panel)` inside a `:root`-only declaration resolves against **html's own base
+fallback**, not whatever body overrides it to.
+
+**Observed, not theorised:** t2073's first pass shipped exactly this. `getComputedStyle(body)` showed
+`--surface` / `--ink` / `--edge` / `--band-bg` collapsing to the SAME base value in **four of five themes**,
+and the active-tab band would have rendered identical grey everywhere.
+
+⇒ **ANY new token declared at `:root` that aliases another token MUST ALSO BE RE-DECLARED INSIDE EACH OF
+THE FIVE SKIN BLOCKS.** This is a property of the file's own theme mechanism, not a one-off mistake, and
+P4 adds roughly 120 more tokens — every one carries it.
+
+⭐ **AND THE REASON THE GATE HAS TWO HALVES.** The worker's own words: *a screenshot comparison alone would
+probably NOT have caught it, because several base-fallback values look like plausible neutral tones at a
+glance.* The computed-style cross-check caught what pixels would have hidden. **Never let one substitute
+for the other**, and treat a token showing the same value across multiple themes as a FAILURE to
+investigate, not a coincidence.
+
+⇒ **P4 IS THEREFORE DISPATCHED IN STAGES** (P4a buttons, then modal shell, screen, dock, menu, field, tab,
+typography) rather than as one 231-patch turn — a systematic version of this bug inside a giant diff would
+be very hard to isolate.
+
+## QUEUED (small) — a test keys off the REAL current version
+A t2067 test asserts behaviour for a version it assumes has **no composed release notes** — and reads
+`bakedVersion()`, i.e. whatever is actually live. Cutting **V2026.08.18.1** with composed notes therefore
+broke it retroactively, mid-turn, through no fault of the code under test. **Fix: key that test off a
+SYNTHETIC version string, never the real current one**, so a real release can never retroactively break a
+test. (Advisor's own doing — the release landed while the worker was mid-turn.)
