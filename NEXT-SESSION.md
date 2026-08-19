@@ -6594,3 +6594,32 @@ browser, so the condition exists.
 *"Settings → Controller → Gateway"*. Verify that path still exists after the Setup/admin changes, and note
 that LAN serving is [[one-box-stays-forever]]-condemned pending the cloud proof — so that answer may need
 rewriting rather than just re-pointing.
+
+### ⭐ REFINEMENT — IT EXISTED, ON THE GATEWAY TAB, AND IT ONLY NEEDS RE-WIRING
+*(human: "personnally i liked that it was on the gateway tab" — their memory is correct, evidence below.)*
+
+**Do NOT build a new download affordance. Restore the one that exists.**
+
+- `.gateway-dl-pop` with `.dl-btn` and `.dl-note` is **still in `styles.css`, fully styled** — a fixed
+  popover, max-width 270px, with a button and a footnote. The P1 deletion pass correctly left it alone.
+- ⭐ **It is also theme-correct as of t2073 in this very arc**, whose own comment records that it *"used to
+  fall all the way through a chain of DANGLING names (`--panel-bg`, `--border-color` — never declared
+  anywhere) to a hardcoded literal, meaning it never once actually read the theme, in any skin."*
+- **What removed it:** commit `9256574f` *"Gateway tab always opens (no gateway needed)"* stripped 28 lines
+  from `ui/gatewayStatus.js`. Making the tab always open also deleted the *no-gateway-detected → download
+  the app* prompt that lived there. Collateral damage from a genuine UX fix.
+
+⇒ **The fix is to re-wire the trigger on the GATEWAY TAB**, which is where the human wants it and where the
+need actually becomes apparent — you open Gateway, it cannot reach a machine because you are in a browser,
+and that is the moment to offer the download. The help panel is a worse home: it requires going looking.
+
+⚠ **Keep what `9256574f` fixed.** The tab must STILL always open — do not restore a gate that blocks it.
+The popover is an OFFER shown when no gateway is reachable, never a wall.
+
+⚠ **And do not show it in the exe** — `/api/update/status` already distinguishes the desktop app from a
+browser, and someone already running the gateway does not need a download link.
+
+⭐ **Note the shape of this for the record:** this arc spent effort making a component theme-correct that
+nothing renders. That is the project's signature failure — declared, correct-looking, never running —
+appearing for the fifth time today, and this instance was found by the human REMEMBERING a feature rather
+than by any check.
