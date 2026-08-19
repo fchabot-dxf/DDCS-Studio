@@ -6252,3 +6252,31 @@ release) is **unnecessary**. There are no external consumers to migrate. Rename 
   skins, so the splash and system bars stay right whatever theme is active.
 - **`display: standalone`** — this is what removes the URL bar, which is the whole reason the PWA helps the
   phone layout.
+
+## ⏸ PWA — ON HOLD (human, 2026-08-18: "pwa is hold")
+Fully specified above (network-first caching, exe icon, standalone, after the CSS arc) but **NOT queued for
+work.** Do not start it. The spec stays so it costs nothing to resume; the decision to build it has not
+been made.
+
+## 💡 CANDIDATE SHAPE — THE WORKSPACE REGISTERS PCs AND THEIR ROLES
+*(human, 2026-08-18: "im also thinking workspace should register pc with roles")* — **an idea captured, not
+a task. Do not build it.**
+
+The thought: the `.ddcs` workspace already IS the machine ([[one-workspace-one-machine]]). It could also
+declare **which PC plays which role for that machine** — e.g. `CNC-FAIRY = gateway`, everything else =
+client.
+
+**Why it is attractive:** it turns the proposed first-run question (*"is your CNC connected to this
+computer?"*) from a prompt into a **declaration** — the declare-over-handroll pattern this project runs on.
+A PC opening the workspace could compare its own hostname against the registered gateway and know what it
+is, with nobody answering anything. And the pieces already exist: `config.py` carries `machine_id` /
+`machine_name`, `fairy/identity.py` writes an identity file to the controller, and `~/.ddcs-bridge/install_id`
+already identifies an install.
+
+**It would also kill the two-exe stomp by construction** — a PC that is not the registered gateway simply
+never starts the publishers, rather than being gated by a setting someone could get wrong.
+
+⚠ **Open questions, unresolved — this is why it is a shape and not a plan:** does deployment topology
+belong in a file that describes a *machine*? What happens when the gateway PC is replaced or renamed? How
+does a brand-new PC bootstrap before it has the workspace? Does this survive the headless-gateway future
+(a Pi or tablet at the machine, where every UI is remote)? None of these are answered.
