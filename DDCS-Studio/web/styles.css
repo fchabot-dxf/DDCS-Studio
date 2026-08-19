@@ -155,7 +155,9 @@ svg [id*="Zfirst_travel"] {
        raised simply adopts that existing mechanism under the new name rather than inventing a second one. */
     --surface:        var(--panel);
     --surface-raised: var(--panel2, color-mix(in srgb, var(--panel) 86%, var(--text)));
-    --scrim: rgba(0, 0, 0, .55);                                 /* modal / overlay backdrop     */
+    --scrim: rgba(0, 0, 0, .85);                                 /* modal / overlay backdrop — t2077: relocated
+       from .overlay's own always-shipped value (see the .overlay rule) rather than kept at the old .55, which
+       nothing had ever actually painted for normal/studio/steampunk */
     --elev-1: 0 2px 8px rgba(0, 0, 0, .18);
     --elev-2: 0 8px 22px rgba(0, 0, 0, .34);
 
@@ -181,6 +183,25 @@ svg [id*="Zfirst_travel"] {
     --btn-success-face: var(--success); --btn-success-ink: #fff;
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
+
+    /* t2077 (P4b) — MODAL SHELL: the dialog face/rim/radius/shadow, title bar face+ink, footer separator, and
+       the close key. Defaults here match exactly what the base .wiz-box/.wiz-head/.wiz-foot/.wiz-close rules
+       already render, so declaring these tokens changes nothing on their own — each skin's own block relocates
+       its existing values. --modal-face is var(--panel), NOT var(--surface) — checked, not assumed: --surface
+       aliases --panel with the SAME value in 4 of 5 skins, but futuristic deliberately overrides --surface to
+       a translucent variant (t2073, for the welcome modal's own glass look) while its --panel stays opaque —
+       the wizard has always rendered opaque, so --panel is the value that's actually been shown. --modal-radius
+       accepts a full border-radius shorthand (organic's corners are asymmetric by design — a single-number
+       token would silently square them off). --scrim (declared above, t2073) is REUSED as-is, not renamed —
+       see the .overlay fix below for why it needed a real consumer. */
+    --modal-face: var(--panel); --modal-edge: var(--accent); --modal-edge-w: 2px; --modal-radius: var(--radius);
+    --modal-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    --modal-head-face: var(--accent); --modal-head-ink: #000;
+    --modal-foot-edge: var(--border);
+    --modal-close-face: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%);
+    --modal-close-edge: #8e1408; --modal-close-edge-w: 1px; --modal-close-radius: 6px;
+    --modal-close-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
+    --modal-close-text-shadow: 0 1px 1px rgba(0,0,0,.35);
 
     /* Typography */
     --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
@@ -1897,11 +1918,14 @@ button.primary:hover {
    RENDER path could. Sizing/position (width/max-height/padding/display above) stays .wiz-box-only — the pane has
    its own container that already sizes it. */
 .wiz-box, #blk_wiz_user {
-    /* Theme Defaults */
-    background: var(--panel);
-    border: 2px solid var(--accent);
-    border-radius: var(--radius, 6px);   /* corners follow each theme's own radius token */
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    /* t2077 (P4b) — was background:var(--panel); border:2px solid var(--accent); border-radius:var(--radius,
+       6px); box-shadow:0 8px 24px rgba(0,0,0,.5) — the modal-shell tokens all default to exactly these same
+       values (see the :root contract), so this is byte-identical on its own; each theme's own block now
+       overrides the tokens instead of a second selector. */
+    background: var(--modal-face);
+    border: var(--modal-edge-w) solid var(--modal-edge);
+    border-radius: var(--modal-radius);   /* accepts a full shorthand — organic's corners are asymmetric */
+    box-shadow: var(--modal-shadow);
 }
 
 /* Shared 3D-preview host height (single-pane wizards). Two-pane grows it to fill. */
@@ -2193,8 +2217,12 @@ button.primary:hover {
     padding: 10px 15px;
     
     flex-shrink: 0;             /* Don't shrink */
-    background: var(--accent);
-    color: #000;
+    /* t2077 (P4b) — face/ink now token-driven (was var(--accent)/#000 directly — the tokens default to the
+       same values, byte-identical on their own); the corner tuck stays derived from --radius directly (a
+       structural detail, not named in this turn's own token list, and --radius itself isn't an alias so it
+       has no standing-trap risk here). */
+    background: var(--modal-head-face);
+    color: var(--modal-head-ink);
     font-weight: bold;
     display: flex;
     justify-content: space-between;
@@ -2212,6 +2240,13 @@ button.primary:hover {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px; cursor: pointer;
     color: #fff; font-size: 14px; font-weight: 700; line-height: 1;
+}
+/* t2077 (P4b) — .wiz-gear/.wiz-templates keep their own literal steel-grey look (never diverges per theme,
+   out of this turn's scope — only "the close key" was named); .wiz-close moves to the modal-close tokens
+   below. Same shared radius/shadow/text-shadow values, just no longer entangled with the close key's own
+   per-theme overrides. */
+.wiz-head .wiz-gear,
+.wiz-head .wiz-templates {
     border-radius: 6px;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35);
     text-shadow: 0 1px 1px rgba(0,0,0,.35);
@@ -2269,9 +2304,16 @@ button.primary:hover {
 .wiz-tpl-pop .wt-where { opacity: .8; }
 .wiz-tpl-pop .wt-del { border: none; background: transparent; color: var(--text-dim, #9aa); cursor: pointer; padding: 0 4px; font-size: 13px; }
 .wiz-tpl-pop .wt-del:hover { color: #ef4d33; }
+/* t2077 (P4b) — was border:1px solid #8e1408; background:<gradient> directly; the modal-close tokens default
+   to exactly this same gradient (see the :root contract), so byte-identical on its own — each theme's own
+   block below now overrides the tokens instead of a 6th selector-based variant. text-shadow reads the shared
+   token too (was already 0 1px 1px rgba(0,0,0,.35) via the .wiz-gear/.wiz-templates rule above, same value). */
 .wiz-head .wiz-close {
-    border: 1px solid #8e1408;
-    background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%);
+    border: var(--modal-close-edge-w) solid var(--modal-close-edge);
+    border-radius: var(--modal-close-radius);
+    background: var(--modal-close-face);
+    box-shadow: var(--modal-close-shadow);
+    text-shadow: var(--modal-close-text-shadow);
 }
 .wiz-head .wiz-gear {
     border: 1px solid #444c55;
@@ -2282,42 +2324,13 @@ button.primary:hover {
 .wiz-head .wiz-close:active,
 .wiz-head .wiz-gear:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
 
-/* per-theme close-key variants — always a red box with a white ✕, dressed to fit */
-[data-theme="normal"] .wiz-head .wiz-close {           /* clean + flat */
-    border: 1px solid #b21505;
-    background: linear-gradient(180deg, #f04634, #d62311);
-    box-shadow: 0 1px 2px rgba(0,0,0,.25); text-shadow: none;
-}
-[data-theme="studio"] .wiz-head .wiz-close {           /* red hardware key, same rim trick as the chassis */
-    border: 2px solid transparent;
-    background:
-        linear-gradient(180deg, #ff6a5a, #d62311 60%, #a31205) padding-box,
-        linear-gradient(to bottom right, #ffb3a8, #f0705e 35%, #8e1408 65%, #4c0a02) border-box;
-    box-shadow: none;
-}
-[data-theme="steampunk"] .wiz-head .wiz-close {        /* oxblood enamel in a brass bezel */
-    border: 1px solid #8b6914; border-radius: 4px;
-    background: linear-gradient(180deg, #9e2b1b, #6e1409);
-    box-shadow: inset 0 1px 0 rgba(255,220,150,.25), 0 1px 2px rgba(0,0,0,.5);
-}
-[data-theme="futuristic"] .wiz-head .wiz-close {       /* neon red */
-    border: 1px solid #ff5252; border-radius: 8px;
-    background: linear-gradient(180deg, #ff4d4d, #c40f0f);
-    box-shadow: 0 0 8px rgba(255,56,56,.55), inset 0 1px 0 rgba(255,255,255,.3);
-}
-[data-theme="organic"] .wiz-head .wiz-close {          /* soft matte tomato */
-    border: 1px solid #b8432f; border-radius: 10px;
-    background: #d9533e;
-    box-shadow: 0 1px 3px rgba(0,0,0,.2); text-shadow: none;
-}
-
 .wiz-foot {
     margin: 0 !important;       /* No gaps */
     width: 100%;                /* Fill the 520px box */
     padding: 15px;
 
     flex-shrink: 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--modal-foot-edge);   /* t2077 (P4b) — was var(--border) directly; same default */
     display: flex;
     justify-content: flex-end;
     gap: 15px;
@@ -2514,7 +2527,14 @@ button.primary:hover {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.85);
+    /* t2077 (P4b) — was the literal rgba(0,0,0,.85) directly; --scrim (t2073) already existed as "modal /
+       overlay backdrop" but this, the actual wizard-opening overlay, never read it — only the newer welcome
+       modal did. Relocated .overlay's OWN already-shipped, always-seen value into --scrim's root DEFAULT
+       (replacing its old .55 alpha) rather than the reverse, so the wizard — by far the more common surface —
+       stays byte-identical for normal/studio/steampunk; futuristic/organic already had a distinct, deliberately
+       tuned --scrim (colour-tinted to match their own dark palette, alpha .72) that this now finally reaches
+       for the first time. See WORK-LOG for the full reasoning. */
+    background: var(--scrim);
     /* Raised well above toolbars so wizards are always on top */
     z-index: 10000;
     align-items: center;
@@ -2685,10 +2705,16 @@ button.primary:hover {
     --btn-success-face: var(--success); --btn-success-ink: #fff;
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
-}
 
-[data-theme="normal"] .wiz-box, [data-theme="normal"] #blk_wiz_user {
-    border: 2px solid var(--accent);
+    /* t2077 (P4b) — modal shell. --modal-face/-edge/-radius/-head-face/-foot-edge re-asserted here even though
+       the VALUE is unchanged (var(--surface)/var(--accent)/var(--radius)/var(--accent)/var(--border)) — same
+       standing-trap reason as the button tokens above: a :root-only alias tracks html's fallback, not this
+       skin's own override, unless re-declared at this scope. Close key relocated from the OLD selector-based
+       override this replaces (below, now deleted). */
+    --modal-face: var(--panel); --modal-edge: var(--accent); --modal-radius: var(--radius);
+    --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
+    --modal-close-edge: #b21505; --modal-close-face: linear-gradient(180deg, #f04634, #d62311);
+    --modal-close-shadow: 0 1px 2px rgba(0,0,0,.25); --modal-close-text-shadow: none;
 }
 
 /* ============================================================================
@@ -2762,6 +2788,23 @@ button.primary:hover {
         linear-gradient(180deg, #ffe4b0, #ffc463) padding-box,
         linear-gradient(to bottom right, #fff3d6, #ffd98f 35%, #a86f1d 65%, #5e3a06) border-box;
     --btn-warn-ink: #5e3500;
+
+    /* t2077 (P4b) — modal shell: silver key-tray, same recipe as the button bevel above but its OWN simpler
+       2-stop gradient (relocated from the selector-based rules this replaces, below). Title bar becomes a
+       navy plate rather than the flat accent every other skin uses — needs its own light ink to read. */
+    --modal-face:
+        linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    --modal-edge: transparent; --modal-edge-w: 3px; --modal-radius: 10px;
+    --modal-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    --modal-head-face: linear-gradient(180deg, #2a4f82, #123a66); --modal-head-ink: #eef4fb;
+    --modal-foot-edge: var(--bv-mid-dark);
+    --modal-close-edge: transparent; --modal-close-edge-w: 2px;
+    --modal-close-face:
+        linear-gradient(180deg, #ff6a5a, #d62311 60%, #a31205) padding-box,
+        linear-gradient(to bottom right, #ffb3a8, #f0705e 35%, #8e1408 65%, #4c0a02) border-box;
+    --modal-close-shadow: none;
 
     --phosphor:      #15e000;   /* primary CRT green */
     --phosphor-2:    #00b400;
@@ -2947,20 +2990,13 @@ button.primary:hover {
 [data-theme="studio"] .var-item .var-desc { font-family: var(--sans); color: var(--cyan); }
 
 /* --- Wizard / modal → silver dialog --- */
-/* silver key-tray, same recipe as the toolbar dropdown */
-[data-theme="studio"] .wiz-box, [data-theme="studio"] #blk_wiz_user {
-    border: 3px solid transparent; border-radius: 10px;
-    background:
-        linear-gradient(180deg, var(--sv-2), var(--sv-3)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
-                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-}
+/* t2077 (P4b) — face/edge/edge-w/radius/shadow/head-face/head-ink/foot-edge now come from the modal-shell
+   tokens declared in this theme's own block above; the title bar's own corner-tuck radius stays here (a
+   structural derivation from --radius elsewhere, not part of this turn's token list — see the base .wiz-head
+   rule's own comment). */
 [data-theme="studio"] .wiz-head {
-    color: #eef4fb; background: linear-gradient(180deg, #2a4f82, #123a66);
     border-radius: 7px 7px 0 0;   /* tuck the title bar into the rounded dialog */
 }
-[data-theme="studio"] .wiz-foot { border-top: 1px solid var(--bv-mid-dark); }
 /* footer actions = the big soft keys (C4) — chassis keys stay at 6px */
 [data-theme="studio"] .wiz-foot button { border-radius: 14px; padding: 8px 18px; }
 [data-theme="studio"] .label {
@@ -3092,15 +3128,23 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-success-face: var(--success); --btn-success-ink: #fff;
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
+
+    /* t2077 (P4b) — modal shell, relocated from the selector-based rule this replaces (below, now deleted).
+       --modal-edge was the literal #8b6914 — matches this skin's own --accent exactly, so relocated to the
+       var() form (one source, not a coincidentally-duplicated hex). No head/foot/close-key overrides needed:
+       genuinely no distinct value for this concept (checked, not guessed — the base rule's own defaults
+       already read var(--accent)/#000/var(--border) via the re-declarations below, which is what was
+       ACTUALLY rendering). */
+    --modal-face: var(--panel); --modal-edge: var(--accent); --modal-radius: var(--radius);
+    --modal-shadow: 0 0 20px rgba(139, 105, 20, 0.5);
+    --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
+    --modal-close-edge: #8b6914; --modal-close-radius: 4px;
+    --modal-close-face: linear-gradient(180deg, #9e2b1b, #6e1409);
+    --modal-close-shadow: inset 0 1px 0 rgba(255,220,150,.25), 0 1px 2px rgba(0,0,0,.5);
 }
 
 [data-theme="steampunk"] .wizard {
     background: rgba(40, 20, 0, 0.85);
-}
-
-[data-theme="steampunk"] .wiz-box, [data-theme="steampunk"] #blk_wiz_user {
-    border: 2px solid #8b6914;
-    box-shadow: 0 0 20px rgba(139, 105, 20, 0.5);
 }
 
 /* ============================================
@@ -3175,6 +3219,17 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-success-face: var(--success); --btn-success-ink: #fff;
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
+
+    /* t2077 (P4b) — modal shell, relocated from the selector-based rule this replaces (below, now deleted).
+       --modal-edge (#00ffff, pure cyan) is DELIBERATELY not var(--accent) (#2de2ff, a slightly softer cyan) —
+       a genuinely distinct rim colour, kept as its own literal rather than "corrected" to match accent. No
+       head/foot/close-key overrides beyond the close key: no distinct value found for title bar or footer. */
+    --modal-face: var(--panel); --modal-edge: #00ffff; --modal-radius: var(--radius);
+    --modal-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+    --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
+    --modal-close-edge: #ff5252; --modal-close-radius: 8px;
+    --modal-close-face: linear-gradient(180deg, #ff4d4d, #c40f0f);
+    --modal-close-shadow: 0 0 8px rgba(255,56,56,.55), inset 0 1px 0 rgba(255,255,255,.3);
 }
 
 /* HUD header: faint vertical grid, cyan hairline + glow, glowing brand & active tab */
@@ -3222,11 +3277,6 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 
 [data-theme="futuristic"] .wizard {
     background: rgba(10, 14, 26, 0.9);
-}
-
-[data-theme="futuristic"] .wiz-box, [data-theme="futuristic"] #blk_wiz_user {
-    border: 2px solid #00ffff;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
 }
 
 /* t2075 (P4a) — colour/background/border/shadow/text-shadow/transform now come from the button-material
@@ -3335,13 +3385,24 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 
+    /* t2077 (P4b) — modal shell, relocated from the two selector-based rules this replaces (below, now
+       deleted). --modal-edge (#6e5840, a muted sinew brown) is deliberately NOT var(--accent) (#d97a5c, the
+       brighter coral) — a quieter rim than the semantic accent, kept as its own literal. --modal-radius is
+       the FOUR-VALUE shorthand itself (not a single number) — organic's dialog corners are asymmetric by
+       design, the exact reason this token accepts a full shorthand rather than one radius value. */
+    --modal-face: var(--panel); --modal-edge: #6e5840; --modal-edge-w: 1px; --modal-radius: 30px 12px 30px 12px;
+    --modal-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20);
+    --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
+    --modal-close-edge: #b8432f; --modal-close-radius: 10px;
+    --modal-close-face: #d9533e;
+    --modal-close-shadow: 0 1px 3px rgba(0,0,0,.2); --modal-close-text-shadow: none;
+
     /* contract */
     --scrim: rgba(12,8,5,.72);
     --screen: #120d09;        /* the body-cavity editor */
 }
 
 [data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
-[data-theme="organic"] .wiz-box, [data-theme="organic"] #blk_wiz_user { border: 1px solid #6e5840; box-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20); }
 
 /* Editor = the body cavity; bone text, coral caret, arterial line-numbers */
 [data-theme="organic"] .editor-container { background: var(--screen); }
@@ -3365,9 +3426,9 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 }
 
 /* Biomorph SHAPES — organic & asymmetric (not boxy): blob panels + pebble keys with varied radii,
-   so the deck reads like a grown exoskeleton rather than a grid of rectangles. */
+   so the deck reads like a grown exoskeleton rather than a grid of rectangles. .wiz-box's own asymmetric
+   radius moved to --modal-radius (t2077, P4b — see this theme's own block above). */
 [data-theme="organic"] .dock-body .deck-tab-panel { border-radius: 0 30px 36px 32px; }
-[data-theme="organic"] .wiz-box, [data-theme="organic"] #blk_wiz_user { border-radius: 30px 12px 30px 12px; }
 [data-theme="organic"] #controller-dock .dock-body .toolbar-btn { border-radius: 18px 26px 16px 22px; }
 [data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(2n) { border-radius: 26px 16px 22px 18px; }
 [data-theme="organic"] #controller-dock .dock-body .toolbar-btn:nth-child(3n) { border-radius: 16px 22px 28px 14px; }

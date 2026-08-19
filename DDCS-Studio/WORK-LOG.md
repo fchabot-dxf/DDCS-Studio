@@ -44114,3 +44114,123 @@ attributable to this turn that are still unresolved.
 - `DDCS-Studio/verification/t2075-{before,after}-*.png` — 40 screenshots.
 
 🔨 turn 2075
+
+# t2077 — P4b of the stylesheet arc: MODAL SHELL (scrim, dialog face/rim/radius/shadow, title bar, footer, close key)
+
+Reference implementation named by the dispatch: `.ddcs-welcome-modal` (t2075) already reads only declared
+tokens with zero hex — copied its SHAPE (declared face/edge/radius/shadow tokens, no invented mechanism), not
+its exact token names where the two surfaces have genuinely always differed (see Finding #1 below).
+
+## The token set
+
+`--modal-face/-edge/-edge-w/-radius/-shadow` (the dialog itself), `--modal-head-face/-head-ink` (title bar),
+`--modal-foot-edge` (footer separator), `--modal-close-face/-edge/-edge-w/-radius/-shadow/-text-shadow` (the
+✕ key — `.wiz-gear`/`.wiz-templates`, the other two keys in the same header row, were NOT touched: the
+dispatch named only "the close key," and neither ever diverges per theme, so there's nothing to relocate).
+`--scrim` (t2073) is REUSED as-is for the wizard's own backdrop — see below. `--modal-radius` accepts a full
+border-radius shorthand, not a single number — organic's dialog corners are asymmetric by design
+(`30px 12px 30px 12px`), and a scalar token would have silently squared them off.
+
+## The scrim bug — two parts, both named in the dispatch, both closed
+
+**Part 1: `.overlay` (the wizard's real backdrop) never read `--scrim` at all.** Confirmed the actual DOM host
+by opening a real wizard and walking up from `.wiz-box` — it's `.overlay` (`background: rgba(0,0,0,0.85)`
+directly), not the class named in the dispatch note (`.wizard`), which turned out to be **dead CSS**: three
+`[data-theme="X"] .wizard {...}` blocks exist (steampunk/futuristic/organic) plus one base rule, and a full
+sweep (grep across `web/*.js` for any `classList`/`className` assignment) found zero consumers — nothing ever
+attaches `.wizard` to an element. Left untouched (out of scope to delete unasked; noted here so it's not
+mistaken for live).
+
+**Part 2: futuristic's own `--scrim` (`rgba(3,7,16,.72)`) disagreed with what actually painted** — because
+nothing consumed the token, tuning it had zero visible effect; the wizard stayed uniform `rgba(0,0,0,.85)`
+across all 5 themes regardless. **Decided which value is "intended," with evidence, per the dispatch's own
+ask**: the root `--scrim` comment already said "modal / overlay backdrop" (not "welcome-modal backdrop"),
+reading as a declared intent to cover BOTH surfaces from the start. Relocated `.overlay`'s own always-shipped,
+universally-seen value (`.85`) INTO `--scrim`'s root default (replacing the old `.55`) rather than the reverse
+— the wizard is opened constantly, by every user, for the entire life of the product; the welcome modal is
+desktop-only, post-update-only, and new. This keeps the wizard byte-identical for normal/studio/steampunk
+(confirmed below) while letting futuristic/organic's already-deliberately-tuned, colour-matched `--scrim`
+values (alpha .72, tinted to each theme's own dark palette) finally reach the wizard for the first time — a
+real, positive, evidence-based visible change to exactly 2 of 5 themes, not a guess. The welcome modal itself
+absorbs a smaller, narrower change: normal/studio/steampunk's version darkens from `.55` to `.85` alpha
+(confirmed via a dedicated probe that opens it through its own real trigger, `checkWelcomeNotice()`).
+
+## Two real bugs found by verification, not by inspection — both fixed before this turn's gate
+
+**Bug 1 — `--modal-face: var(--surface)` accidentally imported the welcome-modal's OWN deliberate translucency
+into the wizard for futuristic.** Copying welcome-modal's literal token choice seemed like the most faithful
+way to "copy its shape" — but `--surface` and `--panel` are byte-identical in 4 of 5 skins (surface just
+aliases panel with no override), so the mistake was invisible until futuristic's actual computed style was
+diffed against HEAD: `.wiz-box`'s background gained an alpha channel (`rgb(14,22,38)` → `rgba(14,22,38,.92)`)
+that was never there before. Root cause: futuristic is the ONE skin where t2073 deliberately overrode
+`--surface` to a translucent variant, specifically for the welcome modal's own glass look — `--panel` stayed
+opaque. The wizard has always rendered opaque (the old base rule read `var(--panel)` directly); `--modal-face`
+now reads `var(--panel)` at root and in every skin's own re-declaration, closing the gap. Zero other themes
+were affected (surface==panel for all of them), confirmed by the same diff showing no other divergence.
+
+**Bug 2 — organic's dialog border width silently doubled (1px → 2px).** `--modal-edge-w`'s root default (2px)
+matches normal/steampunk/futuristic's own shared value, but organic's ORIGINAL border was `1px solid #6e5840`
+— a fact this turn's first pass simply didn't check before assuming the shared default applied. Caught by the
+same before/after computed-style diff (`t2077_modal_probe.mjs`, resting box borderWidth), fixed by giving
+organic its own explicit `--modal-edge-w: 1px`.
+
+Both bugs are exactly the class of error the standing-trap discipline exists to catch — not the alias-tracking
+mechanism itself this time, but the same underlying failure mode (assuming a shared default applies without
+checking each skin's actual prior rendering). Re-verified after both fixes: the diff against HEAD is now EXACTLY
+2 properties across all 5 themes × 8 measured properties each — both are the deliberate `.overlay` scrim change
+for futuristic/organic, nothing else moved.
+
+## Scope discipline
+
+Screen/syntax, dock/bevel, menu, field, tab, and typography groups were not touched — swept the diff to confirm
+(no new selectors added under `#controller-dock`, `.toolbar-dropdown`, `.form-field`, `.tab`, or font-stack
+rules). `.wiz-foot button { border-radius: 14px; ...}` (studio's own footer-button sizing) and `.wiz-head`'s
+corner-tuck `calc(var(--radius, 6px) - 2px)` derivation were both left as their own small residual overrides —
+neither is named in the dispatch's token list (only "title bar face and ink," not radius), and the corner-tuck
+calc has no standing-trap risk (`--radius` is a base token, not itself an alias).
+
+## Gate-gap ask — narrow viewport for the modal group
+
+Cheap: a second Playwright page at 390×844 (iPhone-sized), same wizard-open gesture, one extra screenshot per
+theme (`t2077-{before,after}-{theme}-narrow-wizard-open.png`). No breakage found — the modal's `dvh`/safe-area
+rules already handle it; visually spot-checked (normal) shows the expected full-screen mobile layout with the
+close/gear keys and INSERT button correctly token-styled.
+
+## Non-vacuity
+
+Comment-aware brace-depth balance re-verified after every edit, ending at depth 0 throughout. Both real bugs
+this turn were caught by `getComputedStyle`/geometry diffing against HEAD — a third and fourth time this exact
+discipline (now established since t2073) has caught something neither reading the CSS nor a screenshot glance
+would have shown reliably (Bug 1's alpha channel is barely visible at a glance; Bug 2's 1px-vs-2px border is
+sub-pixel at normal screenshot zoom).
+
+## Gate
+
+Node tier: 193/193. Full Playwright suite (2,649 tests): 2,605 passed, 11 flaky (recovered on retry, none
+CSS/modal-related by name), 25 skipped, 8 failed.
+
+**All 8 match, byte-for-byte, the SAME pre-existing set confirmed unrelated across every prior turn in this
+arc** (not re-verified against HEAD again, per established precedent): `controller-import-one-door-1221`,
+`editor-indent-1450` (×3), `pull-modal-stacking`, `ring-descent-1404`, `send-history-real-path-2065`'s
+stalled-job test, and `update-check.spec.js`'s "NO composed notes" test (still unfixed — the advisor's own
+queued version-keying fix from t2075's pass-back hasn't landed yet). **Zero new failures this turn** — unlike
+t2075, which had 2 genuinely new baseline failures requiring investigation, this turn's gate is clean relative
+to the established set on the first run.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the modal-shell token contract + all 5 skins' relocated values + the
+  `.overlay`/`--scrim` wiring fix + the two verification-caught bug fixes (--modal-face, organic's edge-w).
+- `DDCS-Studio/verification/t2077_var_probe.mjs` — new, raw `--modal-*`/`--scrim` token dump across all 5
+  themes (no rendering involved).
+- `DDCS-Studio/verification/t2077_modal_probe.mjs` — new, rendered resting computed-style probe for
+  `.wiz-box`/`.wiz-head`/`.wiz-foot`/`.wiz-close`/`.overlay` on a real opened wizard, all 5 themes — the tool
+  that caught both bugs.
+- `DDCS-Studio/verification/t2077_scrim_probe.mjs` — new, one-off DOM-walk probe that identified `.overlay` as
+  the wizard's real backdrop host (vs. the dead `.wizard` class named in the dispatch).
+- `DDCS-Studio/verification/t2077_welcome_scrim_probe.mjs` — new, opens the welcome modal via its real trigger
+  (`checkWelcomeNotice()`) and confirms its own scrim change across all 5 themes.
+- `DDCS-Studio/verification/t2077-modal-screens.mjs` — new, before/after screenshot capture (main + wizard-open
+  + Blocks tab + Gateway tab + a narrow-viewport wizard-open, all 5 themes).
+- `DDCS-Studio/verification/t2077-{before,after}-*.png` — 50 screenshots.
+
+🔨 turn 2077
