@@ -308,7 +308,12 @@ test('welcome modal: a version with NO composed notes still appears — bare hea
   await page.waitForFunction(() => window.__ddcsUpd);
   await page.evaluate(() => {
     window.pywebview = {};
-    localStorage.setItem('ddcs_seen_version', '0.0.1');   // RELEASE_NOTES has no entry for the current baked version
+    localStorage.setItem('ddcs_seen_version', '0.0.1');
+    // ESTABLISH the no-notes premise instead of assuming it. This used to rely on the shipped
+    // RELEASE_NOTES happening to have no entry for the current baked version — so cutting a REAL
+    // release with composed notes broke this test retroactively, through no fault of the code under
+    // test (V2026.08.18.1 did exactly that). Deleting the entry makes the premise true whatever ships.
+    delete window.__ddcsUpd.RELEASE_NOTES[window.__ddcsUpd.bakedVersion()];
     const real = window.fetch;
     window.fetch = async (url, opts) => {
       const s = String(url);
