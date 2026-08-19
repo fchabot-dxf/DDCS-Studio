@@ -6028,3 +6028,52 @@ discovery layer — the `0.0.0.0` bind toggle, `_lan_ip()`, the admin.js LAN hin
 YOU NEED** — a Google Cloud project, an OAuth client id/secret, a signed-in account. Do not simulate the
 result, do not infer it from docs, and do not report a partial as a pass. An honest "blocked, here is the
 one thing I need from you" is worth far more than a green tick on the half that could be faked.
+
+## ⭐ RULING — ONE CLOUD TECHNIQUE: THE DRIVE API (OAuth), GATED ON THE SPIKE
+*(human, 2026-08-18: "honestly id rather use one technique, if oauth works then fine")*
+
+Two cloud paths were on the table. **Only the OAuth/Drive-API path ships.** The synced-folder route
+(point `--root` at a Dropbox/Drive-Desktop/Syncthing folder and let `local_folder.py` do the work) was a
+real option requiring **zero backend code** — but it is **DROPPED**, deliberately.
+
+**Why OAuth wins the trade:** it costs US more (~250-300 lines of `drive.py`) and costs THE USER less (sign
+in and go). The synced folder inverted that — free for us, but the user must install a sync tool, choose
+**mirroring not streaming**, and pick the right folder, which is exactly the teaching burden the human
+flagged as risky for other users. Trading our effort for their simplicity is the right direction.
+⇒ **Do not build both. Do not offer the synced folder as a documented alternative** — a second path is a
+second setup flow, a second failure mode and a second thing to support.
+
+⚠ **STILL GATED.** "If oauth works then fine" is a condition, not an approval. The end-to-end proof stands:
+a real job → Drive → gateway claim → real controller → history. Until then nothing is deleted and nothing
+is committed to.
+
+**What the readiness audit changed about the spike (do not dispatch the old question):**
+- ⭐ **The exe and the browser ALREADY SHARE ONE OAuth client id** — verified by string equality between
+  `web/ui/cloud/providers.js` and `fairy/google_oauth.json`, whose top-level key is **`"web"`**, and
+  `config.py` reads `oauth_data.get("web") or oauth_data.get("installed")`. So the two-client visibility
+  question **cannot bite in this configuration**. The premise of the original spike was wrong.
+- ⚠ **The loopback consent has probably never completed** — the bundled client JSON has **no
+  `redirect_uris`**, and `docs/archive/REMINDERS.md` says *"Redirect URIs stay empty"*. Expect
+  `redirect_uri_mismatch` on first Connect. **Route A (recommended): add the five loopback URIs
+  `http://127.0.0.1:8765..8769/oauth/google/callback` to the EXISTING web client** — keeping one client id
+  keeps the visibility question dead. Do NOT register a separate Desktop client; that re-creates the
+  problem.
+- ⛔ **Keep scope `drive.file`.** It is non-sensitive ⇒ no Google verification. Anyone proposing `drive` or
+  `drive.readonly` "to make listing easier" is trading a click for a security assessment. Refuse it.
+- ⚠ **Consent screen Testing mode expires refresh tokens after 7 days** — fine for the spike, unusable for
+  a shop gateway. Publish to Production before any real deployment (a click, at this scope).
+
+**THE HAZARD THAT MATTERS MOST — `delete_job`.** Drive permits **duplicate filenames** in one folder, and
+`files.delete` is permanent while `trashed=true` leaves the file *visible to queries*. `poller.py`'s
+guarantee that a crashed/restarted fairy **cannot re-deliver a job to a controller mid-cut** rests entirely
+on delete removing the ONLY copy. On Drive that guarantee must be re-earned: create-or-update in `put_job`,
+delete ALL name matches, and carry `trashed=false` on every query.
+⭐ **Write the offline test FIRST:** a fake Drive backend that PERMITS DUPLICATE NAMES reproduces the
+re-delivery bug deterministically, with no credentials and no account. **The failure mode is a duplicate
+program reaching a live machine** — that is why this is not a normal backend port.
+
+**Also unhandled, and it bites any shared-rendezvous shape:** `bridge.py` runs `explorer.tick()` and
+`_publish_heartbeat()` **unconditionally**, with no check for a configured controller. A second exe with no
+controller would overwrite `cncdisk/index.json` with an empty list and `heartbeat.json` with
+`controller_connected: false` — **making the real shop gateway look dead.** Job claiming is safe (the poller
+returns early with no dest), but the console would lie about liveness. Gate both on having a destination.
