@@ -311,8 +311,24 @@ html, body { overflow-x: clip; }
    inactive tab = header colour. */
 body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !important; }
 /* Wizard bar (studio top action bar) = the unified below-header strip colour in EVERY theme (was the theme accent
-   — grey/gold/cyan), so the active STUDIO tab connects to it. Flat: no border/shadow. (organic overrides to pink.) */
-.top-dock-header { background: var(--panel) !important; border: none !important; box-shadow: none !important; }
+   — grey/gold/cyan), so the active STUDIO tab connects to it. Flat: no border/shadow by default — a theme
+   overrides via its own MORE-SPECIFIC [data-theme=X] .top-dock-header rule (organic overrides to pink; studio and
+   futuristic have their own here too). t2069 — this used to carry !important at (0,1,0), which unconditionally
+   beat every one of those more-specific per-theme rules regardless of source order — the "overrides" the comment
+   above describes were never actually reaching the screen for studio/futuristic/organic. Removing !important lets
+   normal cascade/specificity do what this rule already documented as the intent.
+   A SECOND collision, found only by screenshotting normal/steampunk (they have no dedicated per-theme rule, so
+   nothing hid it before): this element carries BOTH classes, `class="dock-header top-dock-header"`, and the
+   bare `.dock-header {...}` rule (line ~1294 in this file) sets `background: var(--accent)` for an ENTIRELY
+   different surface (the command deck's own header). Same (0,1,0) specificity as a plain `.top-dock-header`,
+   and `.dock-header` sits LATER in the file — so once !important stopped forcing this rule to win regardless,
+   normal/steampunk fell through to `.dock-header`'s unrelated accent band instead of this flat default (verified
+   live: the bar rendered solid var(--accent) blue, not var(--panel)). Compounding the selector to
+   `.dock-header.top-dock-header` (0,2,0) beats plain `.dock-header` (0,1,0) by specificity regardless of source
+   order, while staying EQUAL to (and so still losing to, by source order) the per-theme `[data-theme=X]
+   .top-dock-header` rules below — the fix each of those two other rules needs, at their own specificity, without
+   reaching for !important again. normal/steampunk now correctly render this flat base with no accent bleed. */
+.dock-header.top-dock-header { background: var(--panel); border: none; box-shadow: none; }
 
 /* GATEWAY tab when no gateway is reachable (hosted / standalone): greyed but clickable —
    clicking offers the desktop exe download (see ui/gatewayStatus.js). */
@@ -1102,90 +1118,6 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .editor-container::selection { background: #00ff00; color: #000; }
 textarea#editor::selection, #editor::selection { background: #00ff00; color: #000; }
 
-/* ============================================
-   SECONDARY TOOLBAR - CLEAN CONSOLIDATED
-   ============================================ */
-.secondary-toolbar {
-    display: flex;
-    flex-direction: column;
-    /* Raised to fit stacked chips */
-    min-height: 76px; /* fits two-line var chips comfortably */
-    height: auto;
-    padding: 0;
-    margin: 0;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    position: relative;
-    z-index: 100;
-}  
-
-.secondary-toolbar.raised-seam {
-    box-sizing: border-box;
-}
-
-.secondary-toolbar-row {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    height: 76px; /* increased to match min-height */
-    width: 100%;
-} 
-
-/* Left controls */
-.secondary-toolbar .toolbar-left {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-    padding: 0 8px;
-    border-right: 1px solid var(--border);
-}
-
-/* CSV import button: adhere to global .toolbar-btn for consistent sizing */
-.secondary-toolbar .toolbar-left label.toolbar-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    /* Do not override width/font/padding - inherit from .toolbar-btn */
-    min-width: auto;
-    /* overflow: hidden removed — would clip the ::before double-border groove */
-}
-
-/* Force all 3 toolbar-left buttons to the same height */
-.secondary-toolbar .toolbar-left .toolbar-btn {
-    height: 28px;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Compact search input */
-.secondary-toolbar #search {
-    width: 70px;
-    min-width: 50px;
-    padding: 4px 6px;
-    font-size: 11px;
-    transition: width 0.2s ease;
-}
-
-.secondary-toolbar #search:focus {
-    width: 120px;
-}
-
-/* Right controls */
-.secondary-toolbar .toolbar-right {
-    flex: 1;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
-    white-space: nowrap;
-    padding: 0 10px;
-    scrollbar-width: thin; /* subtle by default */
-    scrollbar-color: rgba(0,0,0,0.06) transparent; /* more visible thumb */
-}
 
 /* Toolbar dropdowns used in the dock header */
 .toolbar-dropdown {
@@ -1310,177 +1242,6 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     margin-right: 6px;
 }
 
-/* WebKit: transparent thin scrollbar with subtle thumb on hover */
-.secondary-toolbar .toolbar-right::-webkit-scrollbar {
-    height: 6px;
-    background: transparent;
-}
-.secondary-toolbar .toolbar-right::-webkit-scrollbar-track {
-    background: transparent;
-}
-.secondary-toolbar .toolbar-right::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.06);
-    border-radius: 3px;
-    transition: background-color 160ms ease;
-}
-.secondary-toolbar .toolbar-right:hover::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.14);
-}
-
-/* Filterbar dropdown - full width, pushes content down */
-.filterbar-menu {
-    width: 100%;
-    display: none;
-    background: var(--panel);
-    border-top: 1px solid var(--border);
-    padding: 6px 12px;
-}
-
-.filterbar-menu:not(.hidden) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 12px;
-}
-
-.filterbar-menu .filters-inner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    font-size: 11px;
-    align-items: center;
-}
-
-.filterbar-menu .filters-inner label {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 6px;
-    border-radius: 3px;
-    background: rgba(0,0,0,0.03);
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.filterbar-menu .filters-inner label:hover {
-    background: rgba(0,0,0,0.07);
-}
-
-.filterbar-menu .filters-inner label span {
-    font-size: 10px;
-}
-
-.filterbar-menu .panel-actions {
-    margin-left: auto;
-}
-
-#filterbarClear {
-    font-size: 10px;
-    padding: 4px 8px;
-}
-
-/* ============================================================================
-   DESIGN 2: HORIZONTAL LAYOUT - Number | Description side-by-side
-   ============================================================================ */
-
-/* Container - white background with subtle scrollbar (stacked chips) */
-.secondary-toolbar .var-list {
-    margin-left: 8px;
-    background: #ffffff;
-    border-radius: 6px;
-    padding: 6px 6px; /* more padding to fit stacked text */
-    max-height: 56px; /* increased to allow two-line chips */
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-    position: relative;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* WebKit scrollbar - nearly invisible */
-.secondary-toolbar .var-list::-webkit-scrollbar {
-    height: 4px;
-    background: transparent;
-}
-
-.secondary-toolbar .var-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-/* Firefox scrollbar - subtle but visible */
-.secondary-toolbar .var-list {
-    scrollbar-color: rgba(0,0,0,0.12) transparent; /* More visible thumb */
-}
-
-/* Scrollbar thumb - subtle but noticeable */
-.secondary-toolbar .var-list::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.12); /* Default thumb opacity */
-    border-radius: 2px;
-    transition: background-color 160ms ease;
-}
-
-/* On hover - more visible */
-.secondary-toolbar .var-list:hover::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.20);
-}
-
-/* Stacked chip - number on top, description below */
-.secondary-toolbar .var-list .var-item {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    min-width: 44px;
-    max-width: 88px;
-    height: auto; /* flexible to fit two lines */
-    padding: 6px 8px;
-    margin-right: 6px;
-    border-radius: 6px;
-    background: #f8fafc;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    cursor: pointer;
-    transition: all 120ms ease;
-}
-
-/* Hover effect - light blue background with lift */
-.secondary-toolbar .var-list .var-item:hover {
-    background: #e0f2fe;
-    box-shadow: 0 2px 3px rgba(0,0,0,0.06);
-    transform: translateY(-1px);
-}
-
-/* Variable number - top, bold, dark blue */
-.secondary-toolbar .var-list .var-item .var-id {
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1;
-    color: #0c4a6e;
-    text-align: center;
-    margin: 0;
-    padding: 0;
-}
-
-/* Description - below number, slightly smaller, centered and truncated */
-.secondary-toolbar .var-list .var-item .var-desc {
-    font-size: 9px;
-    color: #475569;
-    opacity: 0.95;
-    line-height: 1.1;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-}
-
-/* Hover increases description contrast */
-.secondary-toolbar .var-list .var-item:hover .var-desc {
-    opacity: 1;
-    color: #334155;
-}
 
 /* Global tooltip styling (used by UIUtils.showTooltip) */
 #global-tooltip {
@@ -1502,8 +1263,6 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     pointer-events: none;
 }
 
-/* Maintain some compatibility for .search-box children */
-.secondary-toolbar .search-box { display: none; }
 
 /* Controller Dock - adaptive flow item (was overlay) */
 #controller-dock.controller-dock {
@@ -1790,145 +1549,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     z-index: 2;
 }
 
-/* ============================================
-   COMPACT SEARCH INPUT (END-APPENDED)
-   ============================================ */
-.secondary-toolbar #search {
-    width: 70px;
-    min-width: 50px;
-    padding: 4px 6px;
-    font-size: 11px;
-    transition: width 0.2s ease;
-}
 
-.secondary-toolbar #search:focus {
-    width: 120px;
-}
-
-/* Tighter toolbar-left spacing */
-.secondary-toolbar .toolbar-left {
-    gap: 6px;
-    padding: 0 8px;
-}
-
-/* ============================================
-   MORE COMPACT VARIABLE CHIPS (END-APPENDED)
-   ============================================ */
-.secondary-toolbar .var-list .var-item {
-    min-width: 40px !important;
-    max-width: 52px !important;
-    height: 36px !important;
-    padding: 3px 5px !important;
-    margin-right: 4px !important;
-    border-radius: 4px;
-}
-
-.secondary-toolbar .var-list .var-item .var-id {
-    font-size: calc(11px * .85) !important;
-}
-
-.secondary-toolbar .var-list .var-item .var-desc {
-    font-size: calc(8px * .85) !important;
-    margin-top: 0 !important;
-}
-
-/* Search Panel */
-.search-box {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    flex-direction: column;
-}
-
-.search-box input {
-    flex: 1;
-    padding: 8px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: white; /* Changed background to white */
-    color: var(--text-main);
-    outline: none;
-}
-
-.search-box input:focus {
-    border-color: var(--accent);
-}
-
-/* Variable List */
-.var-list {
-    background: transparent;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-}
-
-/* Secondary toolbar: make variable list horizontal and scrollable */
-.secondary-toolbar .var-list {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-}
-
-/* DDCS Industrial Theme for Variable Chips */
-.variable-chip {
-    background: linear-gradient(180deg, #e0e0e0 0%, #b0b0b0 100%); /* Silver metallic gradient */
-    border: 2px solid #808080;
-    border-top-color: #ffffff; /* Highlight for 3D effect */
-    border-left-color: #ffffff;
-    border-radius: 2px; /* Square/slightly rounded industrial look */
-    color: #1a1a1a; /* Dark text for high contrast on silver */
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-weight: bold;
-    font-size: 12px;
-    padding: 4px 8px;
-    margin: 2px;
-    box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
-}
-
-/* Change color when a chip is active or hovered */
-.variable-chip:active {
-    background: #d0d0d0;
-    border: 2px solid #ffffff;
-    border-top-color: #606060;
-    border-left-color: #606060;
-    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
-    transform: translateY(1px);
-}
-
-/* Styling the variable number (#0, #1, etc.) */
-.variable-chip-label {
-    color: #0055aa; /* Classic blue numbering used in DDCS hardware */
-    margin-right: 4px;
-}
-.secondary-toolbar .var-list .category-content {
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    align-items: center;
-}
-.secondary-toolbar .var-list .category-header {
-    display: none; /* compact toolbar: hide category header */
-}
-.secondary-toolbar .var-list .var-item {
-    flex: 0 0 auto; /* prevent auto-stretching */
-}
-
-/* Maintain backward compat with .sidebar.search-mode */
-.sidebar.search-mode .var-list {
-    display: block;
-}
-.sidebar.search-mode .deck-panel {
-    display: none;
-}
-
-/* New toolbar/dock search-mode behavior */
-.secondary-toolbar.search-mode .var-list { display: block; }
 #controller-dock.search-mode .deck-panel { display: none; }
 
 
@@ -2051,7 +1672,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     z-index: 1;
 }
 
-/* Old .editor-toolbar removed as part of layout refactor; toolbar controls moved to .secondary-toolbar */
+/* Old .editor-toolbar removed as part of a layout refactor; its own successor, .secondary-toolbar, was itself
+   confirmed dead and deleted at t2069 (no live JS/HTML reference — the controls it once held moved on again). */
 
 .editor {
     flex: 1;
@@ -2595,7 +2217,6 @@ button.primary:hover {
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
 /* Labels */
 .label { 
@@ -2761,10 +2382,6 @@ button.primary:hover {
 /* Utility: hide blocks when toggle is off */
 .hidden { display: none !important; }
 
-.g-comment {
-    color: var(--success); /* Comments: Green */
-}
-
 /* Checkboxes */
 .checkbox-inline {
     font-size: 10px; 
@@ -2895,26 +2512,18 @@ button.primary:hover {
     border-color: #808080 #fff #fff #808080;
     padding-top: 2px;
 }
-/* --- 3D Plates: Top (controls),
-Middle (handle) {
-    /* Top Plate: raised look with 4-color blueish shaded border (top/left/right/bottom)
-       Using CSS variables so the tones are easy to tweak */
-    --ddcs-hdr-top: #2a4f82; /* header top gradient tone */
-    --ddcs-hdr-btm: #123a66; /* header bottom gradient tone */
-    --ddcs-border-top: #a2c3e7;   /* very light blue (highlight) */
-    --ddcs-border-left: #3f669e;  /* light blue */
-    --ddcs-border-right: #305681; /* mid blue */
-    --ddcs-border-bottom: #06131e;/* deep blue (shadow) */
-
-    background: linear-gradient(180deg, var(--ddcs-hdr-top), var(--ddcs-hdr-btm)) !important;
-    height: 50px;
-    flex: 0 0 50px;
-    box-sizing: border-box !important;
-    border-top: 4px solid var(--ddcs-border-top) !important;
-    border-left: 4px solid var(--ddcs-border-left) !important;
-    border-right: 4px solid var(--ddcs-border-right) !important;
-    border-bottom: 4px solid var(--ddcs-border-bottom) !important;
-}
+/* t2069 — DELETED a broken nested comment that used to sit here (a "3D Plates" header-plate rule). CSS
+   comments do not nest: the block opened one comment, then a SECOND comment-opening sequence partway
+   through was just text to the parser, and the block's own would-be selector brace got swallowed as
+   comment text too — so its FIRST comment-closing sequence ended the whole thing early, several lines
+   before the block's author meant it to. Everything after that point was orphaned declarations with no
+   selector, silently discarded by the browser (confirmed: a whole 50px header plate rule never rendered).
+   DECIDED: delete, not restore. Evidence: its 6 custom properties (--ddcs-hdr-top/-btm, --ddcs-border-*) are
+   declared and consumed ONLY inside this same dead block — nothing else in the file reads them. Its two
+   colours (#2a4f82, #123a66) are the EXACT pair already used directly, working, at [data-theme="studio"]
+   .wiz-head (line ~3201) — the visual this block was going for already ships, just not through this rule.
+   No selector in any HTML/JS matches a "plate" class this could have targeted. This reads as an abandoned
+   pre-theme-system draft superseded when theming was introduced, not a currently-needed style. */
 /* ============================================
    THEME: NORMAL (Clean Modern)
    ============================================ */
@@ -3082,7 +2691,13 @@ Middle (handle) {
 }
 
 /* --- Top action toolbar → generator/wizard keys --- */
-[data-theme="studio"] .top-dock-header {
+/* t2069 — a THIRD collision, found only by screenshotting studio specifically (the fix above already covers
+   normal/steampunk): this same element also carries the bare .dock-header class, and
+   `[data-theme="studio"] .dock-header { background: transparent; }` (below, intended for .dock-header's OTHER
+   uses — left untouched, not this rule's business) is EQUAL specificity (0,2,0) and sits LATER in the file, so
+   it was winning here too, same shape as the .top-dock-header/.dock-header collision above. Compounding in
+   .dock-header raises this to (0,3,0), beating both contenders without touching either of them. */
+[data-theme="studio"] .dock-header.top-dock-header {
     background: linear-gradient(180deg, var(--sv-2), var(--sv-3));
     border-bottom: 2px solid var(--bv-dark);
     border-top: 2px solid var(--bv-lite);
@@ -3219,6 +2834,13 @@ Middle (handle) {
         linear-gradient(#fff, #fff) padding-box,
         linear-gradient(to bottom right, var(--bv-dark), var(--bv-mid-dark) 35%,
                                          var(--bv-mid-lite) 65%, var(--bv-lite-2)) border-box;
+}
+/* t2069 — the sunken-well outline:none above had NO replacement: every form input in this (the DEFAULT)
+   theme had no focus ring at all. Same :focus-visible pattern already used elsewhere in this file
+   (.wiz-pane-bar, .form-sec-hdr). */
+[data-theme="studio"] .wiz-body input:focus-visible,
+[data-theme="studio"] .wiz-body select:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: -2px;
 }
 [data-theme="studio"] .wiz-body input[type="checkbox"] { width: auto; }
 
@@ -3599,7 +3221,6 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 .grid-2 { gap: 8px; margin-bottom: 6px; }
 .grid-3 { gap: 6px; margin-bottom: 6px; }
 .grid-4 { gap: 6px; margin-bottom: 6px; }
-.row-2 { gap: 8px; }
 
 /* Form Inputs - Compact Padding */
 .wiz-body input[type="text"],
@@ -3623,7 +3244,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 /* Fields flex to fill their grid cell but may shrink BELOW their intrinsic width — grid items default to
    min-width:auto (≈ the input's ~150px natural width), which makes grid-3/grid-4 overflow a narrow panel and clip.
    min-width:0 on the cells + inputs lets the 1fr columns shrink to fit, keeping them flexible. (Across all wizards.) */
-.wiz-body .grid-2 > *, .wiz-body .grid-3 > *, .wiz-body .grid-4 > *, .wiz-body .row-2 > * { min-width: 0; }
+.wiz-body .grid-2 > *, .wiz-body .grid-3 > *, .wiz-body .grid-4 > * { min-width: 0; }
 .wiz-body input[type="text"], .wiz-body input[type="number"], .wiz-body input:not([type]) { min-width: 0; max-width: 100%; }
 
 /* Labels - Tighter Spacing */
@@ -3664,10 +3285,6 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     white-space: pre-wrap;        /* Wrap long lines */
     width: 100%;
     margin: 0;
-}
-
-.g-comment {
-    color: var(--success); /* Comments: Green */
 }
 
 /* Viz Container - Reduce Padding */
@@ -3714,9 +3331,6 @@ body #editor.editor-layer {
     color: #ffffff; /* Code color */
     z-index: 1;
 }
-
-/* Comment Color */
-.g-comment { color: var(--success) !important; font-weight: bold; }
 
 /* === EDITOR HIGHLIGHTING ENGINE === */
 .editor-container {
@@ -4283,12 +3897,12 @@ svg [id$="_wcs"] { display: none; }
 .dock-body .deck-tab.active { color: var(--text-main) !important; opacity: 1; z-index: 3; margin-bottom: -1px; }
 .dock-body .deck-tab + .deck-tab { margin-left: 0 !important; }
 /* per-tab accent colours. Active tab tint uses LITERAL colours (matching its panel exactly) so the
-   colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface. */
-.dock-body .deck-tab[data-deck-tab="move"]      { --tab-color: #3b82f6; }
-.dock-body .deck-tab[data-deck-tab="gm"]        { --tab-color: #f59e0b; }
-.dock-body .deck-tab[data-deck-tab="math"]      { --tab-color: #14b8a6; }
-.dock-body .deck-tab[data-deck-tab="logic"]     { --tab-color: #a855f7; }
-.dock-body .deck-tab[data-deck-tab="variables"] { --tab-color: #10b981; }
+   colour-mix can't fall through to transparent — the active tab + its panel are one tinted surface.
+   t2069 — the --tab-color custom-property declarations that used to sit here (one per tab, e.g.
+   `--tab-color: #3b82f6;`) were DEAD: this comment's own "uses LITERAL colours instead" explains why —
+   they were superseded by the hardcoded-hex rules below and never cleaned up. Confirmed zero var(--tab-color)
+   reads anywhere in the file — the 5 further down (#deck-tab-move etc.) carry the same dead declaration
+   alongside a genuinely-used background rule; only the dead property was removed from those, not the rule. */
 .dock-body .deck-tab[data-deck-tab="move"].active      { background: color-mix(in srgb, var(--panel) 90%, #3b82f6) !important; border-top-color: #3b82f6 !important; }
 .dock-body .deck-tab[data-deck-tab="gm"].active        { background: color-mix(in srgb, var(--panel) 90%, #f59e0b) !important; border-top-color: #f59e0b !important; }
 .dock-body .deck-tab[data-deck-tab="math"].active      { background: color-mix(in srgb, var(--panel) 90%, #14b8a6) !important; border-top-color: #14b8a6 !important; }
@@ -4310,11 +3924,11 @@ svg [id$="_wcs"] { display: none; }
     display: flex; flex-direction: column;
     overflow: hidden;
 }
-#deck-tab-move      { --tab-color: #3b82f6; background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
-#deck-tab-gm        { --tab-color: #f59e0b; background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }
-#deck-tab-math      { --tab-color: #14b8a6; background: color-mix(in srgb, var(--panel) 90%, #14b8a6); }
-#deck-tab-logic     { --tab-color: #a855f7; background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
-#deck-tab-variables { --tab-color: #10b981; background: color-mix(in srgb, var(--panel) 90%, #10b981); }
+#deck-tab-move      { background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
+#deck-tab-gm        { background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }
+#deck-tab-math      { background: color-mix(in srgb, var(--panel) 90%, #14b8a6); }
+#deck-tab-logic     { background: color-mix(in srgb, var(--panel) 90%, #a855f7); }
+#deck-tab-variables { background: color-mix(in srgb, var(--panel) 90%, #10b981); }
 
 /* ============================================================================
    GLASS KEYBOARD — "frosted command glass"
@@ -5284,38 +4898,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .blk-sug-opt:hover { filter:brightness(1.12); }
 #blocks-app .blk-sug-opt kbd { position:relative; z-index:1; font:600 9px/1 inherit; padding:1px 4px;
     border:1px solid currentColor; border-radius:3px; opacity:.8; letter-spacing:.03em; }
-/* left rail (palette) — chrome */
-#blocks-app .palette { background:var(--panel); border-right:1px solid var(--line); padding:10px; overflow:auto; }
-#blocks-app .palette h3 { margin:0 0 8px; font-size:11px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
-/* 2-level palette: LEVEL 1 = colour-coded category rail (filters); LEVEL 2 = the shaped block list */
-#blocks-app .pal-rail { display:flex; flex-wrap:wrap; gap:4px; margin:0 0 10px; }
-#blocks-app .pal-cat { font-size:10px; font-weight:700; letter-spacing:.02em; padding:3px 7px; border-radius:10px;
-                       border:1px solid var(--cat,var(--line)); background:transparent; color:var(--muted); cursor:pointer; }
-#blocks-app .pal-cat.pal-all { --cat:var(--accent); }
-#blocks-app .pal-cat:hover { color:var(--ink); }
-#blocks-app .pal-cat.on { background:var(--cat); border-color:var(--cat); color:#fff; }
-#blocks-app .pal-list { display:flex; flex-direction:column; gap:7px; }
-#blocks-app .palette .cat { margin:10px 0 1px; font-size:10px; letter-spacing:.08em; color:var(--cat,var(--muted));
-                            text-transform:uppercase; opacity:.85; }
-#blocks-app .pal-list > .cat:first-child { margin-top:0; }
-/* a palette entry in its real silhouette (shares --cat with the canvas cards) */
-#blocks-app .pal-blk { position:relative; width:100%; text-align:left; border:0; cursor:grab; font:600 12px/1.3 inherit;
-                       background:var(--cat); color:#fff; padding:6px 10px; border-radius:5px; }
-#blocks-app .pal-blk .pal-lbl { position:relative; z-index:1; }
-/* statement + wrapper stack → top notch + bottom dovetail bump (mini of the canvas silhouette) */
-#blocks-app .pal-blk.pal-stmt::before, #blocks-app .pal-blk.pal-wrap::before { content:''; position:absolute; top:0; left:13px;
-    width:18px; height:5px; background:var(--panel); clip-path:polygon(0 0,100% 0,calc(100% - 4px) 100%,4px 100%); }
-#blocks-app .pal-blk.pal-stmt::after, #blocks-app .pal-blk.pal-wrap::after { content:''; position:absolute; bottom:-4px; left:13px;
-    width:18px; height:5px; background:var(--cat); clip-path:polygon(4px 0,calc(100% - 4px) 0,calc(100% - 8px) 100%,8px 100%); }
-/* wrapper (C-block): label bar + a recessed mouth slot behind a cat-coloured left arm */
-#blocks-app .pal-blk.pal-wrap { padding:0; }
-#blocks-app .pal-blk.pal-wrap .pal-lbl { display:block; padding:6px 10px 5px; }
-#blocks-app .pal-blk.pal-wrap .pal-mouth { display:block; height:9px; margin:0 0 5px 11px; background:var(--panel); border-radius:3px 0 0 3px; }
-/* reporter = rounded pill; boolean = hexagon (no stack connectors — they plug into value sockets) */
-#blocks-app .pal-blk.pal-rep { border-radius:999px; padding:5px 12px; }
-#blocks-app .pal-blk.pal-bool { border-radius:0; padding:5px 16px;
-    clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%); }
-#blocks-app .palette p { color:var(--muted); font-size:11px; margin-top:14px; }
+/* t2069 — DELETED the .palette/.pal-* left-rail block renderer (~32 lines) that used to sit here: its source
+   page, blocks/blocks.html, no longer exists in the repo, and no live JS anywhere references .palette or any
+   .pal-* class (the actual palette today is rendered elsewhere, into different markup). */
 /* block canvas + cards — chrome */
 #blocks-app .viewport { position:relative; overflow:hidden; cursor:grab; }
 #blocks-app .viewport.panning { cursor:grabbing; }
@@ -5452,7 +5037,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .rep-x:hover { opacity:1; }
 #blocks-app input.f-socket.socket-target { outline:2px solid var(--accent); outline-offset:1px;
                                            background:color-mix(in srgb, var(--accent) 18%, var(--field)); }
-#blocks-app .rep-ghost { position:fixed; z-index:9999; pointer-events:none; background:var(--cat-variables); color:#fff;
+/* t2069 — was z-index:9999, one below the wizard overlay (10000) it can be dragged over — the ghost vanished
+   under any open wizard mid-drag. Bumped just above it, matching this file's own convention elsewhere
+   (10050/12000 are both commented "above the wizard"). */
+#blocks-app .rep-ghost { position:fixed; z-index:10002; pointer-events:none; background:var(--cat-variables); color:#fff;
                          padding:2px 9px; border-radius:11px; font-size:11px; box-shadow:0 4px 12px #0006; }
 /* boolean (hexagon) socket type — Compare pills plug into the If condition; empty = "?" prompt */
 #blocks-app .rep.cat-control { background:var(--cat-control); }
@@ -5688,7 +5276,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* ── Setup sheet (t850) — a print-ready single job page. On-screen: a THEMED modal frame wrapping a white
    "paper" sheet (theme-independent, legible in both). Print: strip the scrim + chrome; the sheet fills the
    page black-on-white (the @media print block below). ────────────────────────────────────────────────── */
-.setup-sheet-overlay { position:fixed; inset:0; z-index:4000; display:flex; align-items:flex-start; justify-content:center; padding:24px; overflow:auto; background:rgba(0,0,0,.55); }
+/* t2069 — was z-index:4000, so this rendered UNDERNEATH the wizard (10000) it is opened from — invisible,
+   not just behind. Slotted into the modal-overlay family (library 13100 / workspace-manager 13200 /
+   help 13300) rather than inventing a new scale (that's P5 of the stylesheet arc, not this fix). */
+.setup-sheet-overlay { position:fixed; inset:0; z-index:13400; display:flex; align-items:flex-start; justify-content:center; padding:24px; overflow:auto; background:rgba(0,0,0,.55); }
 .setup-sheet-modal { width:100%; max-width:820px; max-height:calc(100vh - 48px); display:flex; flex-direction:column; background:var(--panel, #1a1f27); color:var(--text, #e7edf5); border:1px solid var(--border, #333a45); border-radius:8px; box-shadow:0 12px 40px rgba(0,0,0,.5); overflow:hidden; }
 .setup-sheet-chrome { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--border, #333a45); flex:0 0 auto; }
 .setup-sheet-chrome-title { font-weight:600; font-size:14px; letter-spacing:.02em; }
@@ -5918,10 +5509,11 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     background: rgba(8, 11, 16, 0.55); backdrop-filter: blur(2px); }
 .ddcs-busy-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 30px; border-radius: 12px;
     background: rgba(20, 26, 34, 0.94); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+/* t2069 — was its own animation: ddcs-busy-rot, a byte-identical twin of ddcs-busy-spin below (both just
+   `to { transform: rotate(360deg); }`) — consolidated onto the one keyframe both spinners now share. */
 .ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.18);
-    border-top-color: #4ab3ff; animation: ddcs-busy-rot 0.8s linear infinite; }
+    border-top-color: #4ab3ff; animation: ddcs-busy-spin 0.8s linear infinite; }
 .ddcs-busy-text { color: #dbe6f2; font-size: 13px; letter-spacing: 0.2px; }
-@keyframes ddcs-busy-rot { to { transform: rotate(360deg); } }
 
 /* t1287 (user, live, refined) — WHAT THE SAVE WROTE, as a dismissible popup. It was a label beside the disk chip,
    and the refinement names why that failed: on a narrow screen the chip is not rendered at all, so the feedback went

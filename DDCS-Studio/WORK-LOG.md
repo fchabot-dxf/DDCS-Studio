@@ -43561,3 +43561,183 @@ Broader gateway sweep (my own choice, since `server.py` is shared): `gateway-job
 - `DDCS-Studio/tests/update-check.spec.js` — 6 new tests (2 self-update relaunch-honesty, 4 welcome modal).
 
 🔨 turn 2067
+
+# t2069 — THE STYLESHEET ARC, P0 (bugs) + P1 (deletions)
+
+Read the full arc entry at the end of NEXT-SESSION.md first, as instructed, before touching anything — the
+8-agent audit's measured facts and the two governing constraints (position encodes meaning; no reordering/no
+file split until P4; CSS has no test, so the gate is before/after screenshots across all five themes) shaped
+every decision below.
+
+## P0 — the five named bugs, each independently verified
+
+**1. `styles.css:3215` `outline:none` with no replacement (studio's `.wiz-body input/select`).** Every form
+input in the DEFAULT theme had no focus ring. Fixed with the SAME `:focus-visible` pattern already used 4x
+elsewhere in the file (`.wiz-pane-bar`, `.form-sec-hdr`): `outline: 2px solid var(--accent); outline-offset:
+-2px;`. Verified two ways: `element.matches(':focus-visible')` returns `true` with a `2px solid` computed
+outline on a real click-focused `<select>` in the wiz body (a programmatic `.focus()` call does NOT trigger
+`:focus-visible` in Chromium — that's a Playwright/browser nuance, not a bug in the fix); a real keyboard
+Tab/Shift-Tab screenshot shows the SAME 2px accent ring on the wizard's own section-header button, confirming
+the mechanism this fix reuses is genuinely live.
+
+**2. `styles.css:315` `.top-dock-header { ... !important }` at (0,1,0) blocking three themes' own styling —
+turned out to be THREE stacked collisions, not one, found only by actually screenshotting all 5 themes rather
+than reasoning from the code alone:**
+ - The named one: removing the blanket `!important` lets studio (2717)/futuristic (3379)/organic (3539)'s own
+   `[data-theme=X] .top-dock-header` rules win by normal specificity, exactly as the original comment already
+   documented as the intent ("organic overrides to pink").
+ - A SECOND, undocumented collision this surfaced: the element carries BOTH `.dock-header` and
+   `.top-dock-header` classes, and bare `.dock-header { background: var(--accent); color: #fff; }` (line
+   ~1294, meant for a completely different surface — the command deck's own header) is EQUAL specificity and
+   sits LATER in the file. Screenshotting normal/steampunk (the two themes with no dedicated override) showed
+   the bar rendering solid accent-blue instead of `var(--panel)` — confirmed live via computed style before
+   diagnosing. Fixed by compounding the base rule to `.dock-header.top-dock-header` (0,2,0), beating plain
+   `.dock-header` by specificity without touching it.
+ - A THIRD, only in studio: `[data-theme="studio"] .dock-header { background: transparent; }` (line ~2778,
+   again meant for `.dock-header`'s OTHER uses) is equal-specificity to studio's own `.top-dock-header` gradient
+   rule and sits LATER, so it was winning there too — studio rendered fully transparent. Fixed the same way:
+   compounded studio's own override to `[data-theme="studio"] .dock-header.top-dock-header` (0,3,0), beating
+   both other contenders without editing either of them.
+ - Screenshot-verified final state, all 5 themes, computed styles cross-checked against each theme's own
+   `--panel`: normal/steampunk render the flat base with zero accent bleed (unchanged from before); studio's
+   gradient + top/bottom borders now genuinely render; futuristic's subtle repeating-gradient + bottom border
+   now genuinely render; organic's background is unchanged (still governed by a separate, correctly
+   higher-specificity `!important` rule targeting `#studio-app .top-dock-header` specifically) but its own
+   top/bottom borders now genuinely render too — this is a REAL visual change for 3 themes, screenshotted
+   before and after, not slipped in.
+
+**3. Two named z-index collisions.** `.setup-sheet-overlay` (was 4000, the wizard that opens it is 10000) —
+confirmed invisible-not-just-behind via a real screenshot (called `openSetupSheet()` over an open wizard;
+nothing appeared). Moved into the existing modal-overlay family (library 13100 / workspace-manager 13200 /
+help 13300 → setup-sheet 13400) rather than inventing a new scale (explicitly P5, not this turn). Re-screenshot
+confirms it now renders correctly on top. `#blocks-app .rep-ghost` (drag ghost, was 9999, one below the wizard
+at 10000) — bumped to 10002, matching this file's own convention of picking "one more than the thing it must
+clear" (10050/12000 carry the same kind of comment already).
+
+**4. `styles.css:2898-2917` (original numbering) — a broken nested comment silently discarding a 50px header
+plate rule.** CSS comments don't nest: a second `/*`-looking sequence inside the first comment is just text,
+but the block's own opening `{` got swallowed as comment text too, so the FIRST real comment-closing sequence
+ended it several lines early — everything after was orphaned declarations with no selector. DECIDED: delete,
+not restore. Evidence, not a guess: its 6 custom properties (`--ddcs-hdr-top/-btm`, `--ddcs-border-*`) are
+declared AND consumed only inside this same dead block, read nowhere else in 5,500+ lines; its two colours
+(`#2a4f82`, `#123a66`) are the exact pair already used directly, working, at `[data-theme="studio"] .wiz-head`
+— the visual it was going for already ships, just not through this rule; no selector in any HTML/JS matches a
+"plate" class it could have targeted. Reads as an abandoned pre-theme-system draft, superseded when theming
+was introduced. **Self-inflicted bug found and fixed while writing this fix's OWN comment**: I initially quoted
+the broken syntax literally inside my replacement comment (including real `/*`/`*/`/`{` sequences as
+"examples") — which reproduced the EXACT bug I was documenting, closing my own comment early and leaving one
+unmatched `{` loose in the file. Caught it with a comment-aware brace-depth scanner (opens==closes should hold
+end-to-end; it didn't, off by exactly 1) before it ever reached a gate — rewrote the comment to describe the
+bug in prose instead of quoting the broken delimiters verbatim.
+
+**5. `ui/dockManager.js:18` `querySelector('.secondary-toolbar')` — always null, confirmed no such class
+exists in any HTML.** Removed the dead field and its 4 no-op call sites (all were already behind `?.` — never
+a crash, just permanently inert). `this.controllerDock` (the real element) and its own search-mode toggling
+were untouched. **A second, unnamed instance of the exact same pattern, found but NOT fixed (out of the named
+P0 scope):** `varListPanel.js:9` has `this.sidebar = el('sidebar')` — `el()` is `getElementById`, and no
+element with `id="sidebar"` exists either. Also write-only (no other read of `this.sidebar` in that file).
+Left alone and reported here rather than acted on.
+
+## P1 — deletions, each verified against live JS/HTML before removal, not assumed from the audit's summary
+
+The audit's own line range (1108-1931) was NOT a contiguous dead block — it interleaves the dead subsystem
+with heavily-live code (`.toolbar-dropdown*`, `#global-tooltip`, `#controller-dock.controller-dock`,
+`.dock-header`/`.header-handle`/`.command-deck-handle`/`.dock-body`/`.editor-keys-row`/`.deck-group*`,
+`.dock-row`). Deleting the range as a block would have destroyed the command deck's own working chrome. Instead
+mapped every individual selector in the range, verified each against `grep -rl` across all of `web/*.js
+web/ui/*.js web/blocks/*.js web/index.html`, and deleted only the confirmed-dead ones (25 precise line ranges,
+377 lines) — plus `.filterbar-menu`/`#filterbarClear` (found independently unreferenced, sitting inside the
+same dead cluster, not on the dispatch's own named list but verified the same way) and `#controller-dock.
+search-mode .deck-panel` (kept — genuinely live, since `this.controllerDock` still gets `.search-mode` toggled;
+only `.secondary-toolbar.search-mode .var-list`, the OTHER half of that same rule pair, was dead and removed).
+`.sidebar` itself (bare, structurally-adjacent, not on the named list, ALSO apparently dead per the same greps)
+was deliberately left untouched — named as a finding, not acted on, to respect the turn's own scope.
+
+- **The `.secondary-toolbar`/`.var-list`/`.variable-chip`/`.search-box`/`.toolbar-left`/`.toolbar-right`
+  subsystem**: 377 lines removed via 25 precisely-bounded ranges (not a block delete — see above).
+- **The `.pal-*`/`.palette` block renderer** (32 lines): `blocks/blocks.html` confirmed absent from the repo;
+  zero live references to `.palette` or any `.pal-*` class.
+- **`.row-2`**: a byte-identical clone of `.grid-2` (same properties, same later tweaks) with zero live uses;
+  removed its 2 standalone declarations and its entry in the shared `min-width:0` compound selector, leaving
+  `.grid-2`/`.grid-3`/`.grid-4` (all genuinely live) untouched.
+- **Twin spin keyframes** `ddcs-busy-spin`/`ddcs-busy-rot`: both were, individually, genuinely referenced by a
+  live consumer (`.is-busy::after` used the former, the `.ddcs-busy-spin` class used the latter) — but their
+  bodies were byte-identical (`to { transform: rotate(360deg); }`), so BOTH consumers now share the one
+  surviving keyframe rather than each keeping a redundant private copy.
+- **`.g-comment`, 4 definitions → 1**: all 4 were bare (no theme scope), so only the LAST one in source order
+  (`!important`, at the very end) was ever actually rendering — the other 3 were pure dead weight, confirmed by
+  reasoning through the cascade, not by guessing. Deleted the 3 that never applied; kept the one that does.
+  Every per-theme override (`[data-theme=X] ... .g-comment`, all higher-specificity) is untouched and
+  unaffected either way.
+- **The one concretely-named dead token, `--tab-color`** (10 declarations, 0 reads anywhere): the file's own
+  comment explains why — "Active tab tint uses LITERAL colours... instead" — this was superseded scaffolding
+  never cleaned up. Removed 5 standalone declarations entirely (rules that were ONLY that one property) and
+  stripped the property from the other 5 (kept their genuinely-live `background: color-mix(...)` sibling
+  declaration). Did NOT attempt the audit's full "16 dead tokens" count beyond this one named, concretely
+  verified example — the other ~15 aren't individually named in the dispatch, and hunting them down without the
+  audit's own methodology risked scope creep and error in an already-large turn; flagged here rather than
+  guessed at.
+- Collapsed a handful of blank-line runs left behind by the deletions (cosmetic only, re-verified brace-balance
+  unaffected).
+
+## Non-vacuity, for a domain with no test
+
+CSS has no test — the dispatch's own framing, and correct. What stands in for it here:
+- **Comment-aware brace-depth balance, whole-file, before and after every edit pass**: opens must equal
+  closes at every point the parser would consider "top level," and the file must end at depth 0. Caught ONE
+  real, self-inflicted bug this way (see bug 4) before it ever reached a screenshot or a gate.
+- **Every dead-code claim verified by grep against live JS/HTML, not trusted from the audit's summary** — the
+  1108-1931 range check is the clearest example: trusting the summary would have deleted live command-deck
+  chrome.
+- **Before/after screenshots across all 5 themes**, captured via a new `verification/t2069-stylesheet-arc-
+  screens.mjs` script (main view + an open wizard + the setup sheet stacked over it, per theme; studio also
+  gets a keyboard-focus capture) — 16 screenshots per pass, committed under `DDCS-Studio/verification/`.
+  Surfaces captured: the main app header/top-dock-header area, an open Probe→Corner wizard, the setup sheet
+  stacked over an open wizard, and (studio only) a keyboard-focused form input. Surfaces NOT captured: the
+  Blocks tab's palette/canvas (not directly touched by any P0/P1 change), the Gateway/Macros tabs, and any
+  mobile/narrow-viewport layout — said plainly per the dispatch's own instruction, not implied as covered.
+- **Direct computed-style assertions via Playwright** (`getComputedStyle`, `.matches(':focus-visible')`) at
+  the specific elements each bug touches, not just visual eyeballing — this is what caught the SECOND and THIRD
+  `.top-dock-header` collisions that a screenshot comparison alone would likely have shown as "looks about
+  right" without revealing the WRONG rule was winning for the wrong reason.
+
+## Gate
+
+Node tier: 193/193. Full Playwright suite (2,656 tests, all specs, not just CSS-adjacent ones — the dispatch's
+own "run the normal node + browser tiers"): first full run — 2605 passed, 10 flaky (recovered on Playwright's
+own retry), 26 skipped, 8 failed. Investigated every one of the 8 individually rather than assuming; did not
+accept the raw count as the gate.
+
+**6 of 8 are pre-existing, confirmed by direct comparison, not inferred**: reverted `styles.css`/`dockManager.js`
+to unmodified HEAD and re-ran the exact same 5 spec files — `controller-import-one-door-1221`,
+`editor-indent-1450` (×3 tests), `pull-modal-stacking`, `ring-descent-1404` all failed IDENTICALLY on HEAD (same
+assertions, same messages — the ring-descent one is a G-code emission test entirely unrelated to CSS, the others
+are UI-flow tests unrelated to anything this turn touched). Restored my changes after confirming.
+
+**1 of 8 (`send-history-real-path-2065`'s stalled-job test) is the SAME pre-existing environment flake already
+documented in this WORK-LOG's own t2067 entry** — unrelated to this turn (nothing here touches the bridge/gateway
+code that test exercises).
+
+**1 of 8 (`screenshot-baselines-1792`, "the MODAL (corner, form3d+2d)") was a REAL, INTENTIONAL consequence of
+this turn's own P0 item 1 fix — investigated, not dismissed.** It passed clean on HEAD (confirming it, uniquely
+among the 8, WAS caused by this turn), then the diff image was inspected directly: 271 of ~22,000 pixels
+different (0.01%), all inside one red-outlined box around the "Max Probe Dist" field — exactly the new
+`:focus-visible` ring bug 1 added, landing there because this test's own flow tabs through form fields. This is
+the CORRECT new appearance, not a regression — updated the baseline (`--update-snapshots`, that one test only,
+inspected the regenerated image before accepting it) and re-ran clean.
+
+**Final consolidated re-check** (all 6 previously-failing specs + the newly-fixed baseline spec +
+`update-check.spec.js`, since t2067 also touched CSS-adjacent surface): 37 passed, the same 6 pre-existing
+failures reproduce byte-identically, `screenshot-baselines-1792` and `update-check` both fully green.
+
+No net change to pass/fail counts beyond the intentional baseline update — this turn introduces zero new
+regressions in the full suite.
+
+## Files
+- `DDCS-Studio/web/styles.css` — P0 items 1/2/3/4 + P1 deletions (~467 net lines removed).
+- `DDCS-Studio/web/ui/dockManager.js` — P0 item 5 (dead `.secondary-toolbar` wire removed).
+- `DDCS-Studio/verification/t2069-stylesheet-arc-screens.mjs` — new, the before/after screenshot capture script.
+- `DDCS-Studio/verification/t2069-{before,after}-*.png` — 32 screenshots (16 before, 16 after), all 5 themes.
+- `DDCS-Studio/tests/screenshot-baselines-1792.spec.js-snapshots/modal-corner-win32.png` — updated baseline, the real new focus ring from P0 item 1 (inspected before accepting, not blindly regenerated).
+
+🔨 turn 2069

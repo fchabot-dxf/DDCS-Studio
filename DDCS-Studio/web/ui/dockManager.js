@@ -15,17 +15,14 @@ export class DockManager {
         console.debug('DockManager.constructor - creating instance, count=', window.__dockManagerCount);
         // register this instance
         window.__dockManagerInstance = this;
-        this.toolbar = document.querySelector('.secondary-toolbar');
         this.controllerDock = document.getElementById('controller-dock');
         this.varListPanel = new VarListPanel(variableDB, editorManager);
         this.commandDeck = new CommandDeck(editorManager, variableDB);
 
         this.varListPanel.onSearchChange = (hasText) => {
             if (hasText) {
-                this.toolbar?.classList.add('search-mode');
                 this.controllerDock?.classList.add('search-mode');
             } else {
-                this.toolbar?.classList.remove('search-mode');
                 this.controllerDock?.classList.remove('search-mode');
             }
         };
@@ -116,10 +113,8 @@ export class DockManager {
             const searchEl = document.getElementById('search');
             const hasSearchText = searchEl && searchEl.value && searchEl.value.trim().length > 0;
             if (!hasSearchText) {
-                this.toolbar?.classList.remove('search-mode');
                 this.controllerDock?.classList.remove('search-mode');
             } else {
-                this.toolbar?.classList.add('search-mode');
                 this.controllerDock?.classList.add('search-mode');
             }
 
