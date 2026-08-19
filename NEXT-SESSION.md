@@ -6779,3 +6779,30 @@ browser-side. Consolidate the ACCOUNT, keep the two feature switches.
 ⚠ Also unresolved and adjacent: the browser (hosted page) uses the WEB client id while the exe now uses
 the DESKTOP one, so browser-side Drive files and exe-side Drive files are NOT mutually visible
 (`drive.file` is scoped per client). Fine for exe-to-exe, a trap the day someone tries to mix them.
+
+# ═══ BACKLOG (human, 2026-08-19) — THE EDITOR'S BOTTOM-LEFT BUTTON CLUSTER IS OVERGROWN ═══
+*(human: "backlog, indent button are still in the editor bottom cluster". NOT dispatched — recorded.)*
+
+**What is stacked over the editor's bottom-left corner today** (all absolutely positioned in `index.html`,
+each with its own hardcoded `left`/`bottom`):
+```
+  bottom:72px   ⇤  ⇥  ;  ↶  ↷        outdent · indent · comment · undo · redo
+  bottom:40px   ＋ Make ▾
+  bottom:8px    ⟳ Transform
+```
+⚠ **t2077 made this worse, not better** — undo/redo were moved here out of the header to free space for the
+account chip, which is why the human noticed. Honest attribution: the cluster was already crowded; this turn
+added two more.
+
+**Why it is a real problem, not just taste:** every one is `position:absolute` with a MAGIC `left` offset, so
+adding a button means hand-computing the next multiple of 36px, and any label change silently overlaps its
+neighbour. There is no row container — the "cluster" is a coincidence of coordinates, not a layout.
+
+**Shape of a fix:** one flex toolbar element anchored bottom-left, buttons as its children, no per-button
+`left`. Then grouping/ordering is declarative and adding one costs nothing. Candidates to fold in or demote
+while there: `⟳ Transform` and `＋ Make ▾` are op-level actions that may belong in the editor's own ▾ file
+menu (the t1227 precedent — Load/Insert/Export moved there rather than floating).
+
+⚠ Keep the ids: `saveStates.js` syncs `#btn-undo`/`#btn-redo` disabled state by id, and
+`editorTextOps.js` wires `#editor-indent`/`#editor-outdent`/`#editor-comment` by id (and depends on their
+`mousedown` preventDefault to keep the textarea selection — do not lose that in a reflow).
