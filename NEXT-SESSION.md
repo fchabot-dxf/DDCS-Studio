@@ -6749,3 +6749,33 @@ can surface (`~/.ddcs-bridge/gateway.log`, rotated) BEFORE switching to `--windo
 
 ⚠ Check `desktop/fairy_gateway.py` for anything reading stdin/writing stdout that assumes a console exists;
 under `--windowed` `sys.stdout` can be None on Windows and a bare `print()` then RAISES.
+
+# ═══ BACKLOG (human, 2026-08-19) — TWO PLACES CONNECT GOOGLE DRIVE; THERE SHOULD BE ONE ═══
+*(human: "So where exactly do I connect to Google Drive in the exe. There are at least 2 places, shouldnt
+there be only one". NOT dispatched — recorded. A real UX defect, found the day the second one shipped.)*
+
+**The two, and they are genuinely different FEATURES sharing one credential:**
+
+| surface | purpose | code |
+|---|---|---|
+| Gateway ▸ Setup → "Cloud storage" | **send JOBS** through Drive (backend=drive) | `views/admin.js` (t2076) |
+| Library / Projects → cloud account | **save PROJECT files** to Drive | `ui/cloudAccount.js` |
+
+**They are not as independent as they look — MEASURED, not assumed.** In the exe,
+`cloudAccount.connectGoogleDesktop()` (`cloudAccount.js:76`) hits the SAME `/oauth/google/start` endpoint
+the new Setup button does, and `oauth.py` persists to the SAME `~/.ddcs-bridge/google_token.json`. ⇒
+**Connecting in EITHER place authenticates the gateway for BOTH.** The only extra thing the projects one
+does is cache the access token in `localStorage` so the BROWSER can call Drive directly.
+
+**Why it is still a defect:** nothing on either surface says the other exists or that they share a
+sign-in. A user connects in one, sees the other still saying "not connected" (they read different state:
+one polls `/api/oauth/google/status`, the other reads `localStorage`), and reasonably concludes it failed.
+
+**Shape of a fix:** ONE "Google account" connection state, read by both surfaces from one source, with the
+two FEATURES (send jobs / save projects) presented as toggles on top of it — not two connect buttons. ⚠ Do
+not simply delete one: they serve different features, and the projects path additionally needs the token
+browser-side. Consolidate the ACCOUNT, keep the two feature switches.
+
+⚠ Also unresolved and adjacent: the browser (hosted page) uses the WEB client id while the exe now uses
+the DESKTOP one, so browser-side Drive files and exe-side Drive files are NOT mutually visible
+(`drive.file` is scoped per client). Fine for exe-to-exe, a trap the day someone tries to mix them.
