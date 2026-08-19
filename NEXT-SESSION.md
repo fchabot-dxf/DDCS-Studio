@@ -6534,3 +6534,31 @@ exist there too. Verify rather than assume.
 and `.wizard` goes entirely — including from the prose comments that still mention it, so a future reader
 does not think both are live. Consistent with [[no-legacy-burden]]: pre-release, no install base, delete
 rather than maintain. Same for the CAM surface if it shows the same mismatch.
+
+## ⭐ PRIORITY — MOBILE JUMPS AHEAD OF THE REST OF THE ARC
+*(advisor recommended, human agreed 2026-08-19: "like you say, i agree")*
+
+**Order from here: P4c (running) → MOBILE → P4d → P4e → P5.**
+
+**Why mobile goes first:** the remaining arc phases are internal quality — real, but invisible to a user.
+Mobile is a surface where **the app does not work for its primary purpose**: the command deck's keypad is
+clipped out of existence with no scroll path (22 of 22 keys, all five themes, independent of the URL bar),
+`ENTER` and the `# VARIABLES` tab are sliced off the right edge, `#btn-clear` becomes unreachable after a
+runtime theme switch, and roughly 90% of controls sit under the 44px touch floor. The human found the first
+symptom by picking up their phone; everything else was measured afterwards.
+
+**The mobile turn's scope is the re-scoped entry above — the DECK PANE FIRST.** Fixing reachability of a
+keypad that is not rendered is pointless, so the pane must be able to scroll (or the dock must size to fit
+its content) BEFORE the dvh/safe-area work matters.
+
+⚠ **Carry the verification trap into that turn:** a passing Playwright tap PROVES NOTHING here, because
+Playwright scroll-into-views and `overflow: hidden` still permits programmatic scrollTop. **Verify
+reachability by geometry plus elementFromPoint, never by tap success.** And check CONTAINER
+scrollWidth/clientWidth, not the document's — `document.scrollWidth` reports a false all-clear while two
+controls are being eaten.
+
+⭐ **The wizard is the in-house pattern to copy** — `dvh`-sized with `env(safe-area-inset-bottom)`, body
+genuinely scrollable, footer buttons 151x55. It is the one surface that already works on a phone.
+
+**P4d and P4e prep is already banked** (dock/bevel ramp and the small groups), so the arc loses nothing by
+waiting a turn — the sheets do not go stale.
