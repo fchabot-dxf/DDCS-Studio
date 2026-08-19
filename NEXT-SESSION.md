@@ -6403,3 +6403,36 @@ A t2067 test asserts behaviour for a version it assumes has **no composed releas
 broke it retroactively, mid-turn, through no fault of the code under test. **Fix: key that test off a
 SYNTHETIC version string, never the real current one**, so a real release can never retroactively break a
 test. (Advisor's own doing — the release landed while the worker was mid-turn.)
+
+## ⭐⭐ THE TRAP-DODGE — put the fallback in the COMPONENT, not in a :root alias
+*(found during P4d prep, 2026-08-19. This supersedes the "re-declare every alias in all five skins"
+workaround for NEW tokens — that remains correct for what already shipped.)*
+
+The root-vs-body trap only bites an alias declared **at `:root`**. It does not bite a `var()` fallback
+written **at the element**, because substitution happens where the rule applies — inside `<body>` — where
+the skin override IS visible:
+
+```
+  .var-item { background: var(--chip-face, var(--surface, var(--panel))); }
+                                            ↑ resolves against BODY. sees the skin.
+```
+
+⇒ **Zero `:root` declarations, zero per-skin boilerplate, trap-immune.** For the dock group alone this
+avoids ~65 re-declarations (5 skins × 13 tokens).
+
+**Not novel — already shipping in this file:** `.hdr-quick-item` uses
+`var(--kbd-glass, var(--panel, #1e1e1e))` and `var(--kbd-edge, var(--border, #444))`.
+
+**And it explains why the kbd group never hit the trap:** every kbd token is set with a **literal** in all
+five skins, so no alias ever has to track. That is the second viable strategy — use it where the value
+genuinely differs per skin; use the component-fallback where it does not.
+
+**Two rules that follow:**
+1. An alias chain declared entirely **inside one `[data-theme]` block** is SAFE (studio already proves it:
+   `--hdr-bg: var(--sv-3)` works). A skin may freely alias its own tokens within its own block.
+2. ⛔ A RAW RAMP IS SKIN-AUTHORING MATERIAL ONLY — **no component may read it.** Components read
+   COMPOSITE tokens (one token holding a full multi-layer background string, as `--kbd-glass` holds three
+   stacked gradients and `--btn-face` holds two). Letting a component read raw tones is exactly the mistake
+   `--sv-*`/`--bv-*` made: **65 of its 89 reads are in selector rules**, and that is the whole defect.
+   **Enforceable as a one-line lint:** a grep for the raw ramp must match ONLY inside `[data-theme]` token
+   blocks; any hit inside a selector rule is the regression.
