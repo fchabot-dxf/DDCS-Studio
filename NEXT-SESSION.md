@@ -6505,3 +6505,26 @@ do not regress it.
 
 **Verify on a narrow viewport with a real wizard open** (`window.openWiz('corner')` works), and check both
 the pane heights AND that the form below is still usable.
+
+## QUEUED (one line, real round-trip bug) — IMPORT DOES NOT ACCEPT WHAT EXPORT WRITES
+*(surfaced 2026-08-19 when the human asked whether the .wizard extension was confusing — it is not the
+confusion that matters, the inconsistency underneath it is.)*
+
+**The app exports `.wiz` and its import picker does not accept `.wiz`.**
+
+- `ui/wizardManager.js` writes the file as `<name>.wiz` (`downloadFile`), the button says **"Export .wiz"**,
+  and every user-facing string says `.wiz` ("standalone .wiz files", "No .wiz files in your Drive app
+  folder yet").
+- `ui/wizardManagerPanel.js` sets the import filter to **`accept = '.wizard,.json'`** — `.wiz` is absent.
+
+⇒ **A user cannot re-import the wizard they just exported** without switching the picker to "All files",
+assuming they work out that is the problem. A silent round-trip break in a share/backup path.
+
+**Fix: make the accept filter match what export produces.** `.wiz` has clearly already won — it is what is
+written and what every label says; `.wizard` survives only in that one stale string and in prose comments.
+**Do NOT rename the extension** — the human asked whether it should become `.wiz` for clarity, and the
+answer is that it already effectively is.
+
+⚠ **Check the CAM surface for the same shape while you are there** — a comment notes the library folder
+holds ".wiz here, .cam on the CAM surface", so the same export-writes-X / import-accepts-Y mismatch may
+exist there too. Verify rather than assume.
