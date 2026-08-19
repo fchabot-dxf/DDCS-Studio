@@ -31,9 +31,20 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
-  // "2026.08.17.11": [
-  //   { short: "One-click update no longer hangs", full: "The in-place update used to get stuck on "
-  //     + "“Updated — restarting…” forever. It's fixed — if it ever fails now you'll "
-  //     + "see the real reason instead of a stuck screen." },
-  // ],
+  "2026.08.18.1": [
+    { short: "One-click update no longer hangs",
+      full: "The in-place update used to stick on “Updated — restarting…” forever. "
+        + "It now relaunches properly, and if anything does go wrong it tells you the real reason instead "
+        + "of a frozen screen. ⚠ Updating INTO this version from an older one may still appear to "
+        + "hang — that is the old bug having one last go. If it does: close DDCS Studio and open it "
+        + "again. The update is already installed and you will come back on the new version." },
+    { short: "You now get told when an update lands",
+      full: "After updating, a short panel tells you which version you are on and what changed — one "
+        + "page per item, and “Skip all” closes it. It appears only when the version actually "
+        + "changes, never on an ordinary launch." },
+    { short: "Machine values read correctly again",
+      full: "Pulling settings from the controller was reading the wrong slot, so a taught work offset "
+        + "could come back as 000. Fixed, and the same address is now defined in one place instead of "
+        + "four, so it cannot drift apart again." },
+  ],
 };
