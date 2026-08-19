@@ -6217,3 +6217,24 @@ lands, and the moment something new lands you get it.**
 ⚠ Still verify like a release when this ships: install the PWA, deploy a change, and confirm the INSTALLED
 app picks it up. Fetch the served file and check its bytes — do not trust the version chip, which is the
 standing rule here for exactly this reason.
+
+## ⭐ RULING — NO USER-AUTHORED SKINS ⇒ THE TOKEN NAMES ARE INTERNAL
+*(human, 2026-08-18: "no user skin")*
+
+The token vocabulary is **not a public API**. Nobody outside the project will ever author a theme against
+these names, so there is **no compatibility burden, ever**: pick the clearest name, rename freely whenever
+a better one appears, and never preserve a bad name for backwards compatibility.
+
+⇒ **P3 NO LONGER BLOCKS ON THE HUMAN.** It was queued as a design act needing their sign-off *because*
+naming would have been user-facing. It is not. **The advisor takes the naming decision**, exactly as with
+the colour calls the human delegated ("most css question i trust you"). Do not send a 142-token list to
+them for approval.
+
+⇒ **Consequence: delete the "SKIN TEMPLATE" comment block** near the top of `styles.css`. It is ~17 lines
+of dead text that documents a contract **different from the one actually implemented** (the audit found it
+describes tokens and a structure that were never built). It only had a reason to exist as instructions for
+an outside skin author — and there is no such person. Deleting it removes a second, wrong description of
+the system.
+
+⇒ Also settled: the deprecated-alias step the draft proposed (keeping `--text*` as one-line aliases for a
+release) is **unnecessary**. There are no external consumers to migrate. Rename in one pass.
