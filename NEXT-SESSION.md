@@ -5935,3 +5935,20 @@ rather than silently offering one dead URL.
 ## SIZE
 Small and self-contained. Good candidate for a turn BETWEEN the stylesheet phases — it touches
 `ui/gateway/views/admin.js` and `ops.py` only, and shares no files with the CSS arc.
+
+### ADDENDUM (human: "but on a pc its not very usefull") — TWO PRIMARIES, NOT ONE
+A QR cannot be scanned by a desktop, and the clipboard does not cross machines, so neither the QR nor a
+copy button helps the PC-to-PC case. **The answer there is the HOSTNAME, not the IP.**
+
+**Verified on the dev machine:** `http://RENDERRANCHY:8765/api/descriptor` returned **HTTP 200** — the
+server answers by computer name. A name the user already knows and can type beats `10.0.0.34:8765`, which
+they cannot remember and which changes.
+
+⇒ **Show the hostname URL as the PC-facing primary**, the QR as the phone-facing primary, and keep the raw
+IP behind the disclosure as the fallback when neither resolves.
+
+⚠ **What that test did NOT prove.** It resolved the machine's own name FROM ITSELF, which is trivially
+true. It does **not** establish that a second PC can resolve the first — that needs NetBIOS/mDNS working on
+the network, which on this user's studio WiFi is exactly the unadministered, untested variable. So: lead
+with the hostname because it is the friendliest thing that usually works, **never present it as
+guaranteed**, and keep the IP reachable for when name resolution is unavailable.
