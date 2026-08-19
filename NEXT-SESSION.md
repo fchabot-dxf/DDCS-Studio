@@ -6623,3 +6623,23 @@ browser, and someone already running the gateway does not need a download link.
 nothing renders. That is the project's signature failure — declared, correct-looking, never running —
 appearing for the fifth time today, and this instance was found by the human REMEMBERING a feature rather
 than by any check.
+
+### ⭐ CORRECTION — THE DOWNLOAD LINK IS UNCONDITIONAL
+*(human, 2026-08-19: "just to clarify that id want the download link to be unconditional" — this SUPERSEDES
+the two conditions I wrote above.)*
+
+**Always present on the Gateway tab. No detection, no gating, no state.**
+
+- ⛔ **NOT** "shown when no gateway is reachable" — I wrote that and it is wrong.
+- ⛔ **NOT** hidden in the exe — I wrote that too and it is also wrong.
+
+**Why unconditional is the better design, not just the simpler one:** conditional visibility is a thing
+that can BE WRONG. A link gated on no-gateway-detected has a detection path that can misfire, and when it
+does the user sees nothing and cannot tell why — the same silent-failure shape this project keeps digging
+out. **An always-present link has no failure mode.**
+
+**And it is genuinely useful inside the exe**, not redundant: someone running the desktop app on their desk
+PC may want the installer **for the shop PC**. A download link is not an admission that you lack the app.
+
+⇒ Re-wire `.gateway-dl-pop` (still styled, still theme-correct after t2073) as a permanent affordance on
+the Gateway tab. Keep `9256574f`'s fix intact — the tab still always opens; nothing gates it.
