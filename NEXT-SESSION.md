@@ -6673,3 +6673,26 @@ must keep that hierarchy visible; the problem is proportion, not priority.
 
 **Gate:** `tests/update-check.spec.js` asserts button classes/labels (`.upd-self` contains the version,
 `.upd-dl` reads "Download manually") — a wording change there is a test change, so read it first.
+
+# ═══ BACKLOG (human, 2026-08-19) — THE EXE ONLY CHECKS FOR UPDATES AT BOOT ═══
+*(human: "Is it possible that the update banner can appear while the app is running, or does it need to be
+booted, and then the banner appears?" — ANSWERED: boot only. NOT dispatched; recorded.)*
+
+**Measured, not assumed:** `initUpdateCheck()` is called exactly once, from `web/index.html:1297`, at
+startup. `updateCheck.js`'s own header says it plainly — *"one check per launch"*. There is no timer and
+no re-check. ⇒ **A release cut while Studio is open is invisible until the app is restarted.**
+
+**The asymmetry that makes this a gap rather than a choice:** the WEB build already re-checks —
+`initWebVersionNudge()` (`updateCheck.js:194-196`) calls `checkWebVersion()` again on every
+`visibilitychange`, so a hosted tab notices a deploy when you come back to it. The EXE, the build that
+CANNOT reload itself and is the one that actually needs telling, has no equivalent for the GitHub release
+check. The mechanism exists; it was simply never pointed at the desktop path.
+
+**Why it matters here specifically:** this app is left open at a machine for a whole shift. The user just
+hit exactly this — a release was cut mid-session and the banner only appeared after a restart.
+
+**Shape of a fix (not a dispatch, just so it is not re-derived):** re-run the release check on
+`visibilitychange` like the web nudge already does, throttled (the GitHub API is unauthenticated and rate
+limited — `_lastWebCheck` is the existing throttle precedent). ⚠ The dismissal contract must survive:
+`ddcs_update_dismissed` is keyed per-version and a re-check must NOT re-nag a version already dismissed
+(`update-check.spec.js` asserts this — "dismissed version does not re-nag").
