@@ -141,10 +141,16 @@
 
         </nav>
         <div class="hdr-controls">
-            <button type="button" id="btn-undo" class="toolbar-btn icon-only hdr-undo" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history)" aria-label="Undo" disabled>↶</button>
-            <button type="button" id="btn-redo" class="toolbar-btn icon-only hdr-undo" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history)" aria-label="Redo" disabled>↷</button>
+            <!-- t2077 — UNDO / REDO MOVED, NOT LOST: they now sit in the EDITOR pane beside indent/comment (the
+                 pane they act on), the same "moved not lost" curation t1227 applied to Load/Insert/Export, PLUS
+                 real Ctrl+Z / Ctrl+Y bindings they never had. TRANSFER is DELETED: it was permanently `hidden`
+                 and superseded by the Gateway tab's own Send. The space they held is the account chip's.
+                 ⚠ bridgeTransfer.js no-ops when #transferBtn is absent (`if (!btn) return;`) — checked, not assumed. -->
             <button type="button" id="btn-clear" class="toolbar-btn icon-only hdr-undo hdr-clear" onclick="window.clearCode && window.clearCode()" title="Clear the program (editor + blocks)" aria-label="Clear program"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
-            <button class="op-btn hidden" id="transferBtn" title="Send the current program to the machine"><span class="op-icon">📡</span><span class="op-label">TRANSFER</span></button>
+            <!-- t2077 — THE ONE ACCOUNT DOOR (ui/headerAccount.js). Header, not a settings page: signing in is a
+                 first-run action. Signed out it reads "Sign in" with real width; signed in it shows the Drive
+                 avatar (photoLink from Drive's own about.get — no extra OAuth scope) + first name. -->
+            <div id="hdrAccount" class="hdr-acct signed-out"></div>
         </div>
     </header>
 
@@ -172,10 +178,20 @@
                 <!-- t1450 — BLOCK INDENT / OUTDENT on the selection. Real leading spaces in the file (the user's
                      ruling: no display-only padding anywhere). Tab / Shift+Tab and the right-click menu run the same
                      one implementation; these buttons are the visible door the other two shortcut. -->
-                <button id="editor-outdent" type="button" class="toolbar-btn settings-io" title="Outdent the selected lines (Shift+Tab) — removes one level of REAL leading spaces" aria-label="Outdent selection" style="position:absolute; left:8px; bottom:72px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">⇤</button>
-                <button id="editor-indent" type="button" class="toolbar-btn settings-io" title="Indent the selected lines (Tab) — inserts one level of REAL leading spaces" aria-label="Indent selection" style="position:absolute; left:44px; bottom:72px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">⇥</button>
+                <!-- t2077 — THE ⇤ / ⇥ BUTTONS ARE GONE (human: "remove indent button now"), thinning the bottom-left
+                     cluster. THE FEATURE IS NOT LOST: Tab / Shift+Tab still indent and outdent the selection
+                     (editorTextOps.js's own keydown, which was always the primary path), and the right-click menu
+                     keeps its rows. editorTextOps' button loop skips ids that are absent, so nothing breaks by
+                     their removal — checked, not assumed. ⚠ t2070: on DDCS these are REAL leading spaces, and the
+                     Expert REJECTS an indented N-label, so indenting by hand is a thing to do knowingly. -->
+
                 <button id="editor-file-btn" type="button" class="toolbar-btn editor-file-float" onclick="ddcsEditorFileMenu(this)" title="Program file — Load, Insert, Export, Clear" aria-label="Program file menu"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="editor-file-caret" aria-hidden="true">▾</span></button>
-                <button id="editor-comment" type="button" class="toolbar-btn settings-io" title="Comment / uncomment the selected lines (Ctrl+/) — a leading ; on each line, the form the factory macros use (a ( ) wrap cannot nest, and DDCS refuses a nested comment)" aria-label="Comment or uncomment selection" style="position:absolute; left:80px; bottom:72px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">;</button>
+                <button id="editor-comment" type="button" class="toolbar-btn settings-io" title="Comment / uncomment the selected lines (Ctrl+/) — a leading ; on each line, the form the factory macros use (a ( ) wrap cannot nest, and DDCS refuses a nested comment)" aria-label="Comment or uncomment selection" style="position:absolute; left:8px; bottom:72px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">;</button>
+                <!-- t2077 — PROGRAM UNDO / REDO, moved here from the header (the account chip took that space).
+                     This is the BLOCK/PROGRAM history (blocks/saveStates.js), NOT the textarea's native text undo —
+                     which is exactly why it needs its own door. saveStates.js keeps enabling/disabling them by id. -->
+                <button id="btn-undo" type="button" class="toolbar-btn settings-io" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history) — Ctrl+Z" aria-label="Undo" disabled style="position:absolute; left:44px; bottom:72px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">↶</button>
+                <button id="btn-redo" type="button" class="toolbar-btn settings-io" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history) — Ctrl+Shift+Z or Ctrl+Y" aria-label="Redo" disabled style="position:absolute; left:80px; bottom:72px; z-index:3; opacity:.75; font-size:11px; padding:3px 8px;">↷</button>
                 <button id="editor-copy-btn" type="button" class="toolbar-btn editor-copy-float" title="Copy the program to the clipboard" aria-label="Copy program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                 <div id="editor-statusbar" class="editor-statusbar hidden">
                     <button class="editor-status-copy" id="editor-status-copy" type="button" title="Copy errors to the clipboard" aria-label="Copy errors">
@@ -1287,6 +1303,10 @@
                 const { initBridgeTransfer } = await import('./ui/bridgeTransfer.js');
                 initBridgeTransfer();             // before gatewayStatus so it catches the first tick
             } catch (err) { console.error('bridge transfer init failed', err); }
+            try {
+                const { initHeaderAccount } = await import('./ui/headerAccount.js');
+                initHeaderAccount();              // t2077 — the ONE account door in the header (re-renders on ddcs:cloud-account)
+            } catch (err) { console.error('header account init failed', err); }
 
             try {
                 const { initGatewayStatus } = await import('./ui/gatewayStatus.js');

@@ -12,15 +12,16 @@ import { makeChallenge, makeState, buildAuthUrl, exchangeCode } from './cloud/pk
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh', NAME = 'ddcs_cloud_name';
+const PIC = 'ddcs_cloud_pic';   // t2077 — the avatar, from Drive's own about.get (no extra OAuth scope)
 
 export function getAccount() {
     try {
-        return { connected: !!localStorage.getItem(TOK), provider: localStorage.getItem(PROV) || '', email: localStorage.getItem(EMAIL) || '', name: localStorage.getItem(NAME) || '' };
-    } catch (e) { return { connected: false, provider: '', email: '', name: '' }; }
+        return { connected: !!localStorage.getItem(TOK), provider: localStorage.getItem(PROV) || '', email: localStorage.getItem(EMAIL) || '', name: localStorage.getItem(NAME) || '', picture: localStorage.getItem(PIC) || '' };
+    } catch (e) { return { connected: false, provider: '', email: '', name: '', picture: '' }; }
 }
 
 export function disconnect() {
-    try { [TOK, PROV, EMAIL, REFRESH, NAME].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
+    try { [TOK, PROV, EMAIL, REFRESH, NAME, PIC].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
@@ -32,6 +33,7 @@ async function captureGoogleIdentity() {
         const u = await getUserInfo();
         if (u.email) localStorage.setItem(EMAIL, u.email);
         if (u.name) localStorage.setItem(NAME, u.name);
+        if (u.picture) localStorage.setItem(PIC, u.picture);
     } catch (e) { /* identity is optional */ }
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
