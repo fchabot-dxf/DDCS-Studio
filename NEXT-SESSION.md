@@ -6633,13 +6633,16 @@ the two conditions I wrote above.)*
 - ⛔ **NOT** "shown when no gateway is reachable" — I wrote that and it is wrong.
 - ⛔ **NOT** hidden in the exe — I wrote that too and it is also wrong.
 
-**Why unconditional is the better design, not just the simpler one:** conditional visibility is a thing
-that can BE WRONG. A link gated on no-gateway-detected has a detection path that can misfire, and when it
-does the user sees nothing and cannot tell why — the same silent-failure shape this project keeps digging
-out. **An always-present link has no failure mode.**
+**THE HUMAN'S OWN REASON, which is the real one:** *"its unconditionnal just because i want it there all
+the time, its not because i have the app open that i dont want to download it again."*
 
-**And it is genuinely useful inside the exe**, not redundant: someone running the desktop app on their desk
-PC may want the installer **for the shop PC**. A download link is not an admission that you lack the app.
+⇒ **Running the app is not evidence that you do not want the installer.** You might want it for another
+machine, or again later, or for no reason a UI is entitled to ask about. There is no state worth inferring
+here, so infer none.
+
+*(I had originally justified this with an argument about conditional visibility having a failure mode.
+That is true but it is not the point — it was a rationalisation layered on top of a plain requirement.
+Recording the plain requirement instead.)*
 
 ⇒ Re-wire `.gateway-dl-pop` (still styled, still theme-correct after t2073) as a permanent affordance on
 the Gateway tab. Keep `9256574f`'s fix intact — the tab still always opens; nothing gates it.
