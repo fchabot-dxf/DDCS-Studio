@@ -164,6 +164,24 @@ svg [id*="Zfirst_travel"] {
     --tab-accent: var(--accent);  /* the active-tab glow colour; a skin overrides it only when the glow wants to differ from the flat accent (futuristic does). */
     --band-bg:    var(--panel);   /* the strip directly under the header — .app-header's own --tab-fill (below) derives from this rather than restating it. */
 
+    /* t2075 (P4a) — BUTTON MATERIAL: the group all five skins patch independently, the strongest possible
+       signal of a missing token. Defaults here match exactly what the base button rule already renders
+       (below), so declaring these tokens changes nothing on their own — each skin's OWN block relocates its
+       existing values into them. --btn-face/-hover/-active can each be a FULL multi-layer background (a
+       gradient, or two stacked padding-box/border-box gradients for a bevel) — one token holds the whole
+       value, exactly as --kbd-glass already holds three stacked gradients; that mechanism is what makes a
+       bevel tokenisable at all. --btn-filter-hover defaults to none — only a skin that genuinely uses a
+       brightness filter instead of a colour change on hover (studio) overrides it. */
+    --btn-face: var(--bg); --btn-edge: var(--border); --btn-edge-w: 1px; --btn-ink: var(--text);
+    --btn-face-hover: var(--accent); --btn-edge-hover: var(--accent); --btn-ink-hover: var(--accent-ink);
+    --btn-shadow: none; --btn-shadow-hover: none;
+    --btn-face-active: var(--btn-face-hover); --btn-transform-active: none;
+    --btn-radius: var(--radius); --btn-text-shadow: none; --btn-filter-hover: none;
+    --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
+    --btn-success-face: var(--success); --btn-success-ink: #fff;
+    --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
+    --btn-warn-face: var(--warn); --btn-warn-ink: #000;
+
     /* Typography */
     --font-ui:   var(--sans, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif);
     --font-code: var(--mono, ui-monospace, "Consolas", "Liberation Mono", monospace);
@@ -1767,15 +1785,21 @@ button,
     padding: 6px;
     font-size: 12px;
     cursor: pointer;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
+    background: var(--btn-face);
+    border: var(--btn-edge-w) solid var(--btn-edge);
+    border-radius: var(--btn-radius);
+    color: var(--btn-ink);
     font-family: inherit;
     transition: all 0.15s ease;
     min-height: 24px;
     line-height: 1.2;
+    box-shadow: var(--btn-shadow);
+    text-shadow: var(--btn-text-shadow);
 }
+/* t2075 (P4a) — was background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
+   color:var(--text); box-shadow/text-shadow unset — the button-material tokens all default to exactly these
+   same values (see the :root contract), so this is byte-identical on its own; each theme's own block below
+   now overrides the tokens instead of re-declaring this whole rule. */
 /* t2071 P2 — no :focus-visible ring existed on the base button rule either; same pattern as the form fields
    above. Bare-tag/class selectors at the SAME specificity the base rule already has — any component that
    already overrides button styling (most do, via a more specific selector) is unaffected. */
@@ -1791,15 +1815,27 @@ button:hover,
 .btn:hover,
 .op-btn:hover,
 .toolbar-btn:hover {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
+    background: var(--btn-face-hover);
+    color: var(--btn-ink-hover);
+    border-color: var(--btn-edge-hover);
+    box-shadow: var(--btn-shadow-hover);
+    filter: var(--btn-filter-hover);
 }
+button:active,
+.btn:active,
+.op-btn:active,
+.toolbar-btn:active {
+    background: var(--btn-face-active);
+    transform: var(--btn-transform-active);
+}
+/* t2075 (P4a) — was background/color/border-color:var(--accent)/white; the tokens default to exactly these
+   same values, so byte-identical on their own. :active (pressed) is NEW — nothing set it generically before;
+   defaults to the SAME face as hover with no transform, so still zero visual change until a skin overrides it. */
 
 button.primary {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
+    background: var(--btn-primary-face);
+    color: var(--btn-primary-ink);
+    border-color: var(--btn-primary-face);
 }
 
 button.primary:hover {
@@ -1813,9 +1849,9 @@ button.primary:hover {
    THEIR rule !important too, so by source-order the later (theme-specific) one wins for that theme. */
 [data-theme] button.primary,
 [data-theme] .toolbar-btn.primary {
-    background: var(--accent) !important;
-    color: #fff !important;
-    border-color: var(--accent) !important;
+    background: var(--btn-primary-face) !important;
+    color: var(--btn-primary-ink) !important;
+    border-color: var(--btn-primary-face) !important;
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
     font-weight: 600;
 }
@@ -2630,21 +2666,25 @@ button.primary:hover {
     --edge: var(--border);
     --surface: var(--panel); --surface-raised: var(--panel2, color-mix(in srgb, var(--panel) 86%, var(--text)));
     --band-bg: var(--panel);
-}
 
-[data-theme="normal"] .toolbar-btn {
-    border-radius: 6px;
-}
-
-/* hover: deep navy instead of the accent blue — the base hover used var(--accent),
-   which is the same colour as the wizard title bar, so hovered buttons melted into it */
-[data-theme="normal"] button:hover,
-[data-theme="normal"] .btn:hover,
-[data-theme="normal"] .op-btn:hover,
-[data-theme="normal"] .toolbar-btn:hover {
-    background: #1f4e8c;
-    border-color: #1f4e8c;
-    color: #fff;
+    /* t2075 (P4a) — button material, relocated from the two selector-based overrides this replaces (below,
+       now deleted): a 6px toolbar radius, and hover: deep navy rather than the accent blue — the base hover
+       used to read var(--accent) directly, which is the same colour as the wizard title bar, so a hovered
+       button melted into it. Same values, now token-driven instead of a second selector chain.
+       ⚠ ALSO re-asserting --btn-face/-edge/-ink and the semantic variants here even though their values are
+       IDENTICAL to the :root defaults (var(--bg)/var(--border)/var(--text)/var(--accent)/var(--accent-ink)) —
+       the standing trap (t2073/t2075): a :root-only alias resolves against <html>'s OWN base fallback, not
+       this skin's override on <body>, so without this the button material would render html's fallback
+       (#e0e0e0/#999/#000/#666) instead of normal's real colours. Caught via getComputedStyle(body) diffing
+       the SAME way t2073 caught it originally — confirmed live regression, not theoretical. */
+    --btn-face: var(--bg); --btn-edge: var(--border); --btn-ink: var(--text);
+    --btn-radius: 6px;
+    --btn-face-hover: #1f4e8c; --btn-edge-hover: #1f4e8c; --btn-ink-hover: #fff;
+    --btn-face-active: var(--btn-face-hover);
+    --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
+    --btn-success-face: var(--success); --btn-success-ink: #fff;
+    --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
+    --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 }
 
 [data-theme="normal"] .wiz-box, [data-theme="normal"] #blk_wiz_user {
@@ -2686,6 +2726,43 @@ button.primary:hover {
     --surface: var(--panel); --surface-raised: color-mix(in srgb, var(--panel) 86%, var(--text));
     --band-bg: var(--panel);
 
+    /* t2075 (P4a) — button material: relocated from the selector-based rules this replaces (below). Studio's
+       "edge" is a GRADIENT (the bevel), which a plain border-color can't hold — the bevel lives in --btn-face's
+       OWN border-box layer instead, and --btn-edge stays transparent with --btn-edge-w carrying the 2px width
+       the bevel needs (a small, consistent extension of --edge-w's own naming, not part of the original P4a
+       list but the same pattern). Studio uses a FILTER on hover, not a colour change (its own confirmed
+       precedent, `.op-btn:hover { filter: brightness(1.05); }`) — --btn-face/-edge/-ink-hover stay identical to
+       resting, only --btn-filter-hover differs. */
+    --btn-face:
+        linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
+        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
+                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    --btn-edge: transparent; --btn-edge-w: 2px; --btn-ink: var(--text);
+    --btn-face-hover: var(--btn-face); --btn-edge-hover: transparent; --btn-ink-hover: var(--text);
+    --btn-filter-hover: brightness(1.05);
+    --btn-face-active:
+        linear-gradient(180deg, var(--sv-3), var(--sv-2) 60%, var(--sv-1)) padding-box,
+        linear-gradient(to top left, var(--bv-lite-2), var(--bv-mid-lite) 35%,
+                                     var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
+    --btn-transform-active: translate(1px, 1px);
+    --btn-radius: 6px; --btn-text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    --btn-primary-face:
+        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
+        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
+    --btn-primary-ink: #fff;
+    --btn-success-face:
+        linear-gradient(180deg, #d6f7dc, #a7e6b4) padding-box,
+        linear-gradient(to bottom right, #ffffff, #b9e8c2 35%, #4c8a5b 65%, #1d4527) border-box;
+    --btn-success-ink: #044a18;
+    --btn-danger-face:
+        linear-gradient(180deg, #ffd2d2, #ffa9a9) padding-box,
+        linear-gradient(to bottom right, #ffffff, #ffc3c3 35%, #a85656 65%, #5c1f1f) border-box;
+    --btn-danger-ink: #6e0606;
+    --btn-warn-face:
+        linear-gradient(180deg, #ffe4b0, #ffc463) padding-box,
+        linear-gradient(to bottom right, #fff3d6, #ffd98f 35%, #a86f1d 65%, #5e3a06) border-box;
+    --btn-warn-ink: #5e3500;
+
     --phosphor:      #15e000;   /* primary CRT green */
     --phosphor-2:    #00b400;
     --dro-white:     #f4f4f4;
@@ -2721,68 +2798,39 @@ button.primary:hover {
 /* App header: silver chassis plate via the shared --hdr-* tokens (base rule). */
 
 /* --- Buttons → silver hardware keys --- */
+/* t2075 (P4a) — colour/background/border/text-shadow/filter/transform ALL come from the button-material
+   tokens declared in this theme's own block above (via the token-driven base button rule); only studio's
+   genuinely STRUCTURAL differences (font, layout) stay here as their own override. */
 [data-theme="studio"] button,
 [data-theme="studio"] .toolbar-btn,
 [data-theme="studio"] label.toolbar-btn,
 [data-theme="studio"] .op-btn {
     font-family: var(--sans); font-weight: 700; font-size: 12px;
-    color: var(--text); cursor: pointer; border-radius: 6px;
-    padding: 6px; min-height: 24px; line-height: 1.2;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    /* bevel = gradient rim in the border ring; light from top-left, wraps the radius */
-    border: 2px solid transparent;
-    background:
-        linear-gradient(180deg, var(--sv-1), var(--sv-2) 60%, var(--sv-3)) padding-box,
-        linear-gradient(to bottom right, var(--bv-lite), var(--bv-mid-lite) 35%,
-                                         var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
-    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
     transition: filter 0.1s ease;
-}
-[data-theme="studio"] button:hover,
-[data-theme="studio"] .toolbar-btn:hover,
-[data-theme="studio"] .op-btn:hover { filter: brightness(1.05); }
-[data-theme="studio"] button:active,
-[data-theme="studio"] .toolbar-btn:active,
-[data-theme="studio"] .op-btn:active {
-    background:
-        linear-gradient(180deg, var(--sv-3), var(--sv-2) 60%, var(--sv-1)) padding-box,
-        linear-gradient(to top left, var(--bv-lite-2), var(--bv-mid-lite) 35%,
-                                     var(--bv-mid-dark) 65%, var(--bv-dark)) border-box;
-    transform: translate(1px, 1px);
 }
 [data-theme="studio"] .op-icon { font-size: 13px; }
 [data-theme="studio"] .op-label { font-weight: 700; }
 
-/* colour-coded keys — each carries its own tinted rim in the border-box layer */
+/* colour-coded keys — each carries its own tinted rim in the border-box layer, now token-driven */
 [data-theme="studio"] .toolbar-btn.m-green,
 [data-theme="studio"] button.green {
-    color: #044a18;
-    background:
-        linear-gradient(180deg, #d6f7dc, #a7e6b4) padding-box,
-        linear-gradient(to bottom right, #ffffff, #b9e8c2 35%, #4c8a5b 65%, #1d4527) border-box;
+    color: var(--btn-success-ink); background: var(--btn-success-face);
 }
 [data-theme="studio"] .toolbar-btn.m-red,
 [data-theme="studio"] button.danger,
 [data-theme="studio"] button.red {
-    color: #6e0606;
-    background:
-        linear-gradient(180deg, #ffd2d2, #ffa9a9) padding-box,
-        linear-gradient(to bottom right, #ffffff, #ffc3c3 35%, #a85656 65%, #5c1f1f) border-box;
+    color: var(--btn-danger-ink); background: var(--btn-danger-face);
 }
 [data-theme="studio"] button.amber {
-    color: #5e3500;
-    background:
-        linear-gradient(180deg, #ffe4b0, #ffc463) padding-box,
-        linear-gradient(to bottom right, #fff3d6, #ffd98f 35%, #a86f1d 65%, #5e3a06) border-box;
+    color: var(--btn-warn-ink); background: var(--btn-warn-face);
 }
 [data-theme="studio"] .toolbar-btn.axis-blue,
 [data-theme="studio"] button.primary,
 [data-theme="studio"] .toolbar-btn.primary,
 [data-theme="studio"] button.blue {
-    color: #fff !important;
-    background:
-        linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
-        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box !important;
+    color: var(--btn-primary-ink) !important;
+    background: var(--btn-primary-face) !important;
     text-shadow: 0 1px 1px rgba(0,0,0,0.4);
 }
 
@@ -3024,6 +3072,26 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --edge: var(--border);
     --surface: var(--panel); --surface-raised: color-mix(in srgb, var(--panel) 86%, var(--text));
     --band-bg: var(--panel);
+
+    /* t2075 (P4a) — button material, relocated from the two selector-based rules this replaces (below, now
+       deleted). ⚠ CORRECTION to this comment's own first draft: "resolve correctly through the :root
+       defaults" was WRONG — that is exactly the standing trap (t2073/t2075). A :root-only alias resolves
+       against <html>'s base fallback (--accent:#666666, --radius:0), not steampunk's own <body> override
+       (--accent:#8b6914, --radius:4px), so primary buttons rendered grey and the toolbar radius collapsed to
+       0 until re-declared here — caught via getComputedStyle(body) diffing, a confirmed live regression.
+       --btn-ink-hover is var(--text) (not var(--accent-ink)): relocated from the SAME confirmed precedent
+       already cited for --accent-ink itself above ("hover-filled — .toolbar-btn:hover keeps its own --text,
+       not white"), so hover ink deliberately stays steampunk's tan, not accent-ink. */
+    --btn-face: linear-gradient(180deg, #6b5329, #4a3819); --btn-edge: #8b6914; --btn-ink: var(--text);
+    --btn-radius: 4px;
+    --btn-face-hover: linear-gradient(180deg, #8b6914, #6b5329);
+    --btn-edge-hover: var(--accent); --btn-ink-hover: var(--text);
+    --btn-shadow-hover: 0 0 10px rgba(139, 105, 20, 0.5);
+    --btn-face-active: var(--btn-face-hover);
+    --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
+    --btn-success-face: var(--success); --btn-success-ink: #fff;
+    --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
+    --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 }
 
 [data-theme="steampunk"] .wizard {
@@ -3033,19 +3101,6 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 [data-theme="steampunk"] .wiz-box, [data-theme="steampunk"] #blk_wiz_user {
     border: 2px solid #8b6914;
     box-shadow: 0 0 20px rgba(139, 105, 20, 0.5);
-}
-
-[data-theme="steampunk"] .toolbar-btn,
-[data-theme="steampunk"] button {
-    background: linear-gradient(180deg, #6b5329, #4a3819);
-    border: 1px solid #8b6914;
-    color: #d4a574;
-}
-
-[data-theme="steampunk"] .toolbar-btn:hover,
-[data-theme="steampunk"] button:hover {
-    background: linear-gradient(180deg, #8b6914, #6b5329);
-    box-shadow: 0 0 10px rgba(139, 105, 20, 0.5);
 }
 
 /* ============================================
@@ -3097,6 +3152,29 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
        the ink family and --band-bg were still missing here. */
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
     --band-bg: var(--panel);
+
+    /* t2075 (P4a) — button material, relocated from the selector-based rules this replaces (below). Futuristic
+       uses a genuine colour change on hover (not a filter) — its OWN general button hover, unlike the
+       keyboard-specific `.editor-keys-row .toolbar-btn[data-ddcs-role]:hover` brightness filter, which is
+       DOCK material (P4b+, out of this turn's scope), left untouched. --btn-transform-active is a press-down,
+       no face change (no --btn-face-active override needed — matches the token's own default alias). */
+    --btn-face: linear-gradient(180deg, rgba(28,42,66,.92), rgba(10,16,28,.95));
+    --btn-edge: rgba(45,226,255,.45); --btn-ink: #b7f3ff;
+    --btn-shadow: inset 0 1px 0 rgba(45,226,255,.10); --btn-text-shadow: 0 0 6px rgba(45,226,255,.22);
+    --btn-radius: 8px;
+    --btn-face-hover: linear-gradient(180deg, rgba(45,226,255,.18), rgba(20,40,60,.95));
+    --btn-edge-hover: rgba(45,226,255,.9); --btn-ink-hover: #eafdff;
+    --btn-shadow-hover: 0 0 14px rgba(45,226,255,.42), inset 0 0 8px rgba(45,226,255,.12);
+    --btn-transform-active: translateY(1px);
+    --btn-face-active: var(--btn-face-hover);
+    /* ⚠ standing trap correction (same as steampunk above): --btn-radius and the semantic variants below were
+       missing here on the first pass — a :root-only alias resolves against <html>'s fallback (--radius:0,
+       --accent:#666666), not futuristic's own <body> override (--radius:8px, --accent:#2de2ff), confirmed via
+       getComputedStyle(body) (border-radius measured 0px instead of 8px before this fix). */
+    --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
+    --btn-success-face: var(--success); --btn-success-ink: #fff;
+    --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
+    --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 }
 
 /* HUD header: faint vertical grid, cyan hairline + glow, glowing brand & active tab */
@@ -3151,25 +3229,13 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
 }
 
+/* t2075 (P4a) — colour/background/border/shadow/text-shadow/transform now come from the button-material
+   tokens (this theme's own block above, via the token-driven base button rule); only the transition timing
+   (a structural detail, not a colour) stays here. */
 [data-theme="futuristic"] .toolbar-btn,
 [data-theme="futuristic"] button {
-    background: linear-gradient(180deg, rgba(28,42,66,.92), rgba(10,16,28,.95));
-    border: 1px solid rgba(45,226,255,.45);
-    color: #b7f3ff;
-    box-shadow: inset 0 1px 0 rgba(45,226,255,.10);
-    text-shadow: 0 0 6px rgba(45,226,255,.22);
     transition: box-shadow .12s ease, background .12s ease, color .12s ease, border-color .12s ease;
 }
-
-[data-theme="futuristic"] .toolbar-btn:hover,
-[data-theme="futuristic"] button:hover {
-    background: linear-gradient(180deg, rgba(45,226,255,.18), rgba(20,40,60,.95));
-    color: #eafdff;
-    border-color: rgba(45,226,255,.9);
-    box-shadow: 0 0 14px rgba(45,226,255,.42), inset 0 0 8px rgba(45,226,255,.12);
-}
-[data-theme="futuristic"] .toolbar-btn:active,
-[data-theme="futuristic"] button:active { transform: translateY(1px); }
 
 /* ===== OPERATOR · heavy detailing — make it feel like a real HUD device, not a recolor ===== */
 
@@ -3247,6 +3313,28 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --edge: var(--border);
     --surface: var(--panel); --surface-raised: var(--panel2);
 
+    /* t2075 (P4a) — button material, relocated from the two selector-based rules this replaces (below, now
+       deleted). Organic's resting ink (#2a2117) is dark — the light bone-coloured face needs it, unlike the
+       page's own light --text on a dark page background; --btn-ink-hover reuses the ALREADY-declared
+       --accent-ink above rather than restating the same hex a second time. */
+    --btn-face: linear-gradient(180deg, #e7dbc0, #ccbd99); --btn-edge: #8a7657; --btn-ink: #2a2117;
+    --btn-radius: 14px; --btn-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
+    --btn-text-shadow: none;
+    --btn-face-hover: linear-gradient(180deg, #f1c6af, #d98a6f); --btn-edge-hover: var(--accent);
+    --btn-ink-hover: var(--accent-ink);
+    /* the OLD hover rule never touched box-shadow, so the resting shadow just kept showing through hover —
+       relocated as an explicit self-reference rather than left to fall through the :root default (none),
+       which would have silently dropped the shadow on hover (caught via getComputedStyle(body) diffing). */
+    --btn-shadow-hover: var(--btn-shadow);
+    --btn-face-active: var(--btn-face-hover);
+    /* ⚠ standing trap: organic is the one skin that ALSO overrides --success/--danger/--warn (muscle-green/
+       arterial/resin), so its semantic buttons need re-asserting here too, not just primary — a :root-only
+       alias would otherwise resolve against <html>'s bare --success/--danger/--warn instead of these. */
+    --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
+    --btn-success-face: var(--success); --btn-success-ink: #fff;
+    --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
+    --btn-warn-face: var(--warn); --btn-warn-ink: #000;
+
     /* contract */
     --scrim: rgba(12,8,5,.72);
     --screen: #120d09;        /* the body-cavity editor */
@@ -3254,22 +3342,6 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 
 [data-theme="organic"] .wizard { background: rgba(14,9,6,.82); }
 [data-theme="organic"] .wiz-box, [data-theme="organic"] #blk_wiz_user { border: 1px solid #6e5840; box-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20); }
-
-/* Bone keycaps / buttons: ivory cap, sinew rim, soft organic shadow, big curvature */
-[data-theme="organic"] .toolbar-btn,
-[data-theme="organic"] button {
-    background: linear-gradient(180deg, #e7dbc0, #ccbd99);
-    border: 1px solid #8a7657;
-    color: #2a2117;
-    border-radius: 14px;
-    box-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
-    text-shadow: none;
-}
-[data-theme="organic"] .toolbar-btn:hover,
-[data-theme="organic"] button:hover {
-    background: linear-gradient(180deg, #f1c6af, #d98a6f);
-    border-color: #d97a5c; color: #2a1712;
-}
 
 /* Editor = the body cavity; bone text, coral caret, arterial line-numbers */
 [data-theme="organic"] .editor-container { background: var(--screen); }

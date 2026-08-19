@@ -43956,3 +43956,161 @@ Zero failures attributable to this turn's token changes.
 - `DDCS-Studio/verification/t2073-{before,after}-*.png` — 20 screenshots (main + wizard-open, before and after, all 5 themes).
 
 🔨 turn 2073
+
+# t2075 — P4a of the stylesheet arc: BUTTON MATERIAL (the biggest single block, ~55 patch parts, all 5 skins)
+
+The dispatch named this group as "the strongest possible signal of a missing token" — the one concept every
+skin patches independently — and split it out of the wider P4 dispatch specifically because the t2073 standing
+trap ("a `:root`-only alias doesn't track a skin's `<body>` override") would recur with every token P4 adds. It
+did recur — twice, in two different shapes — and both are the real finding of this turn, not the token
+declaration itself.
+
+## The token set
+
+`--btn-face/-edge/-edge-w/-ink` (resting), `--btn-face-hover/-edge-hover/-ink-hover` + `--btn-filter-hover`
+(studio and futuristic both change on hover, but studio uses a `brightness()` filter and futuristic a genuine
+colour change — resolved by giving the filter its own token, defaulting to `none`, rather than assuming both
+skins share one mechanism), `--btn-shadow/-shadow-hover`, `--btn-face-active/-transform-active` (a `:active`
+rule is new — nothing styled the pressed state generically before), `--btn-radius/-text-shadow`, and 4 semantic
+pairs (`--btn-primary/-success/-danger/-warn-face` + matching `-ink`). Every value RELOCATED from a skin's own
+existing rule, not invented — where a skin genuinely had no distinct value, it explicitly re-declares the alias
+anyway (see below for why "just inherit" isn't safe here). Studio's bevel needed one addition beyond the
+dispatch's own list: `--btn-edge-w` (border WIDTH, not just colour) — its bevel lives entirely in `--btn-face`'s
+own border-box gradient layer, with `--btn-edge: transparent` and `--btn-edge-w: 2px` carrying the width the
+bevel needs — the same "one token holds a multi-layer background" mechanism `--kbd-glass` already established.
+
+## Finding #1 — the standing trap bit the DEFAULT aliases too, not just the accent-derived extras
+
+t2073's trap was already known and was checked for PROACTIVELY this turn — every `--btn-*` token was declared
+inside each skin's own block from the start, not discovered after the fact. That still wasn't enough. The
+`:root` block's own DEFAULTS (`--btn-face: var(--bg)`, `--btn-primary-face: var(--accent)`, `--btn-radius:
+var(--radius)`, etc.) are themselves aliases, and I assumed a skin that didn't need a DISTINCT look for a
+concept could just leave the alias unset and "inherit" — but inheriting a `:root`-only alias means inheriting
+`<html>`'s bare fallback (`--bg:#e0e0e0`, `--accent:#666666`, `--radius:0`), not `<body>`'s real per-theme
+value, for exactly the reason t2073 already named. A skin that never overrides `--accent` away from `:root`'s
+own bare value is safe leaving `--btn-primary-face` unset — but EVERY skin overrides `--accent`, so EVERY skin
+needed it re-declared, and I'd only actually done that for studio (which sets its own literal gradients anyway,
+never relying on the alias).
+
+**Caught by the SAME mechanism t2073 established — `getComputedStyle(document.body)` per theme — applied to the
+generic `.toolbar-btn.wizard-btn` surface specifically** (`verification/t2075_var_probe.mjs`, `t2075_btn_probe.mjs`):
+normal's resting face/edge/ink read `#e0e0e0/#999/#000` (html's bare fallback) instead of its own
+`#f5f5f5/#ddd/#333`; steampunk was missing `--btn-ink` (rendered black instead of tan), `--btn-edge-hover`/
+`--btn-ink-hover` (grey/white instead of its own accent/text), and `--btn-radius` (0 instead of 4px); futuristic
+was missing `--btn-radius` (0 instead of 8px); organic was missing `--btn-shadow-hover` (dropped its ambient
+shadow on hover instead of keeping it, which is what the OLD hover rule actually did by never touching
+box-shadow at all). **Every skin except studio was also missing all 4 semantic pairs** — with zero per-skin
+`.primary`/`.danger`/etc. overrides anywhere else in the file to compensate, EVERY primary button (e.g. the
+wizard's own INSERT) in normal/steampunk/futuristic/organic would have rendered `--accent:#666666` grey
+instead of its theme's real accent, and steampunk/futuristic/organic's primary-button ink would have been
+`#fff` instead of their own established `--accent-ink` (steampunk `#d4a574`, futuristic `#0a0e1a`, organic
+`#2a1712` — all three already correctly per-skin per t2073).
+
+**Fix**: every skin now explicitly re-declares `--btn-face/-edge/-ink`, the hover triple, `--btn-face-active`,
+`--btn-radius`, and all 4 semantic pairs, even where the value is `var(--accent)`/`var(--success)`/etc. —
+re-asserted at a scope where the `var()` resolves against THAT skin's own `<body>`-level override, not
+`<html>`'s bare fallback. Verified with a raw token dump (`t2075_var_probe.mjs`, no CSS rendering involved —
+`getComputedStyle(body).getPropertyValue('--btn-primary-face')` etc., 20 tokens × 5 themes) showing every value
+now genuinely diverges per skin with zero accidental collisions, THEN re-verified with the full resting+real-hover
+probe (`t2075_btn_probe.mjs`, using Playwright's actual `.hover()` pointer action, not a CSS class hack) showing
+the generic button surface is now byte-identical to pre-turn HEAD in every theme except the one deliberate change
+below.
+
+## Finding #2 — a specificity collision, not an alias gap: studio's segmented controls were never their own shape
+
+The full Playwright gate (below) failed 2 screenshot baselines that were NOT in the established pre-existing
+set — both under `screenshot-baselines-1792.spec.js`, both showing a ~20,500-pixel diff concentrated in the
+modal's "Manual/Auto" and "Dogleg/Diagonal" segmented toggles and everything below them (a smaller widget
+shifts the whole form up). Investigated by measuring the actual `.seg-btn` box model
+(`verification/t2075_seg_probe.mjs`) against HEAD rather than guessing from the diff image: on HEAD, `.seg-btn`
+(a real `<button class="seg-btn">`, per `formWidgets.js:422`) rendered with `padding:6px`/`border:2px solid
+transparent`/height 30.4px — none of which is `.seg-btn`'s OWN rule (`padding:5px 12px; border:none;
+border-right:1px solid...`, `styles.css:2420`). The actual source: `[data-theme="studio"] button, .toolbar-btn,
+.op-btn { padding:6px; border:2px solid transparent; background: <bevel gradient>; ... }` — specificity
+`(0,1,1)`, beating `.seg-btn`'s own `(0,1,0)` for every property they share. **This is a PRE-EXISTING bug,
+unrelated to t2073/t2075's token work** — studio's bare-`button` selector was always broad enough to
+accidentally sweep up `.seg-btn`, and no other skin has an equivalent theme-scoped bare-`button` rule (checked:
+`grep` for `[data-theme="X"] button,` finds only studio), so `.seg-btn` has correctly rendered as its own
+compact toggle in normal/steampunk/futuristic/organic the whole time — studio was the one outlier.
+
+**This turn's OWN edit exposed it, without causing it**: simplifying the studio rule down to its genuinely
+structural properties (font/layout/transition — the whole point of P4a) removed the padding/border/background
+that used to accidentally out-specify `.seg-btn`, so `.seg-btn`'s own intended styling now wins in studio too,
+for the first time. Confirmed as the CORRECT rendering, not a regression, three ways: (1) it makes studio
+consistent with all four other themes' already-correct behaviour, (2) `.seg-btn`'s own comment names it as "a
+compact 2-3 value enum toggle" — the bulky bevel-button look was never its intent, (3) a direct look at the new
+render (`t2075-after-studio-wizard-open.png`) shows a clean, legible, compact flat-blue segmented toggle, not
+anything broken. Fixed the two now-stale baselines the documented way — `screenshot-baselines-1792.spec.js`'s
+own header comment: `--update-snapshots` only after confirming the new render is intended, never to turn red
+green unseen — then re-ran the spec fresh (not from the update run) to confirm it holds: 2/2 pass.
+
+## The one deliberate, intentional visible change (documented, not silently absorbed)
+
+`[data-theme] button.primary` used to hardcode `color:#fff !important`; now reads `var(--btn-primary-ink)`,
+which resolves to each skin's own `--accent-ink` (t2073's token, built for exactly this). Normal and studio are
+unaffected (`--accent-ink` is `#fff` in both already). **Steampunk, futuristic, and organic's primary buttons
+(e.g. the wizard's INSERT) get real ink-colour changes** — white → steampunk `#d4a574` (tan), futuristic
+`#0a0e1a` (dark navy), organic `#2a1712` (dark brown) — all three a genuine contrast improvement, screenshotted
+before/after (`t2075-{before,after}-{steampunk,futuristic,organic}-wizard-open.png`).
+
+## Scope discipline — what stayed untouched, and why
+
+Dock-scoped (`#controller-dock .dock-body .toolbar-btn`, `.editor-keys-row .toolbar-btn[data-ddcs-role]`,
+organic's key-shape radii, futuristic's keyboard-specific `filter: brightness(1.18)` hover) and menu-scoped
+(`.toolbar-dropdown`/`.toolbar-dropdown-content`) button rules are P4b+ per the dispatch and were swept and
+confirmed untouched (`grep` for both patterns after the edit — every remaining per-theme button rule in the
+file is one of these two, or pure structural sizing). Futuristic's GENERAL button hover is a genuine colour
+change, not a filter — only checked this because the dispatch's own framing ("studio and futuristic both use
+brightness") turned out to be imprecise: the filter is real but lives on the keyboard-specific dock rule, not
+the general one, which was already correctly excluded either way.
+
+## Gate-gap ask — Blocks/Gateway tabs
+
+Cheap: `window.showApp('blocks'|'gateway')` is a global, one call, no extra boot cost. Captured this turn for
+all 5 themes, before and after (`t2075-{before,after}-{theme}-{blocks,gateway}-tab.png`) — spot-checked
+visually, no breakage (Blocks' "Save wizard...", "Define Custom Wizard" buttons and the header app-switcher
+tabs all render with the new tokens correctly; Gateway's Status sub-tab has no toolbar-btn material on its
+default landing view specifically, but the tab switching itself and the shared header chrome are covered).
+Narrow viewports and the Macros tab remain uncaptured — not attempted this turn, same honest gap as prior turns.
+
+## Non-vacuity
+
+Comment-aware brace-depth balance re-verified after every edit, ending at depth 0 throughout. Both real bugs
+found this turn were caught by computed-value/geometry measurement, not by reading the CSS or eyeballing a
+screenshot — the SAME discipline t2073 established, applied a second and third time, and it paid for itself
+twice more.
+
+## Gate
+
+Node tier: 193/193. Full Playwright suite (2,649 tests): 2,603 passed, 11 flaky (recovered on retry, none
+CSS/button-related by name — general behaviour/logic specs, consistent with this suite's normal flake pattern),
+25 skipped, 10 failed at the initial run.
+
+**8 of the 10 match, byte-for-byte, the same pre-existing set confirmed unrelated on prior turns** (not
+re-verified against HEAD again, per established precedent — identical assertions already investigated in
+t2069's own gate): `controller-import-one-door-1221`, `editor-indent-1450` (×3), `pull-modal-stacking`,
+`ring-descent-1404`, `send-history-real-path-2065`'s stalled-job test, and `update-check.spec.js`'s "NO
+composed notes" test (still broken — the advisor's own queued fix for its version-keying design flaw hasn't
+landed yet; not mine to fix this turn, flagged again for visibility).
+
+**The other 2 (`screenshot-baselines-1792`'s two tests) are Finding #2 above** — investigated, root-caused to a
+real pre-existing specificity bug this turn's simplification exposed, confirmed the new render is correct, and
+fixed via the documented baseline-update path. Re-ran that spec alone after the update: 2/2 pass. Zero failures
+attributable to this turn that are still unresolved.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the button-material token contract + all 5 skins' relocated values + the
+  standing-trap re-declarations + studio's simplified bare-button rule (the segmented-control fix).
+- `DDCS-Studio/tests/screenshot-baselines-1792.spec.js-snapshots/modal-corner-win32.png`,
+  `pane-corner-win32.png` — updated baselines (studio's segmented control now renders its own intended shape).
+- `DDCS-Studio/verification/t2075_var_probe.mjs` — new, raw `--btn-*` token dump across all 5 themes (no
+  rendering involved) — the tool that caught Finding #1.
+- `DDCS-Studio/verification/t2075_btn_probe.mjs` — new, resting + REAL-hover (`.hover()`, not a class hack)
+  computed-style probe for a representative generic `.toolbar-btn`, across all 5 themes.
+- `DDCS-Studio/verification/t2075_seg_probe.mjs` — new, `.seg-btn` box-model probe — the tool that caught
+  Finding #2.
+- `DDCS-Studio/verification/t2075-btn-screens.mjs` — new, before/after screenshot capture (main + wizard-open +
+  Blocks tab + Gateway tab, all 5 themes).
+- `DDCS-Studio/verification/t2075-{before,after}-*.png` — 40 screenshots.
+
+🔨 turn 2075
