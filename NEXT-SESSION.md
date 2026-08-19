@@ -5883,3 +5883,55 @@ do not simulate the answer or reason it out from documentation and present that 
 - **`prefers-color-scheme` is a SEED, never an override.** The five named themes are an explicit user
   choice and the OS must not second-guess it. But on **first run with nothing chosen**, use the system
   preference to pick a sensible default instead of always landing on the same skin.
+
+---
+
+# ═══ QUEUED — "GET MY PHONE ONTO STUDIO" (human asked 2026-08-18) ═══
+
+## THE REFRAME — this is the important part, do not build the first version
+The human first asked *"can the app list the IPs so I can copy them"*, then corrected the framing
+themselves: *"honestly i dont understand this very well, and im not sure anyone does, can we make this
+effortless by hiding the ip used under a tooltip or something and just automatically choose the right
+one"*, and then *"i like the qr code too"*.
+
+⇒ **The feature is NOT "list the LAN addresses". It is "get my phone onto Studio".** Nobody ever wanted an
+IP address. A list of addresses with copy buttons is the WRONG build: it asks the user to know their own
+network topology in order to choose, and a clipboard does not cross devices anyway — they are reading the
+screen on the PC and typing on a phone.
+
+## WHAT EXISTS TODAY
+- `ops.py:1045` `_lan_ip()` — opens a UDP socket to 8.8.8.8 (sends nothing) purely to resolve which
+  interface routes outbound, and returns that single IP.
+- `admin.js:193-198` renders it as **plain text** in a label: *"On your phone/tablet, open http://IP:PORT"*.
+- Measured on the dev machine: the app advertised `10.0.0.34`; the PC actually has **10.0.0.34 AND
+  10.0.0.30**. The heuristic happened to be right, but only one is offered and there is no recourse when
+  it is wrong.
+
+## THE BUILD
+1. ⭐ **A QR CODE IS THE PRIMARY AFFORDANCE.** Point the phone camera, done — no reading, no typing, no
+   remembering. This is the whole point of the feature; everything else is fallback.
+2. **Auto-pick, improved and deterministic.** Keep the outbound-route heuristic, but **rank candidates and
+   skip the obvious impostors**: VMware / Hyper-V / VirtualBox / WSL / VPN adapters all present
+   real-looking IPv4 addresses that no phone can reach. Also exclude loopback and APIPA (169.254.x).
+3. **The raw address hides behind an (i) / tooltip / disclosure** — the chosen URL, plus the other
+   candidates if any, for the rare case the QR does not land. Present, not prominent.
+4. **Only show it when LAN serving is actually ON** (`config.host == "0.0.0.0"`). With the default
+   `127.0.0.1` bind the address is localhost-only and a QR would be a **lie** — a phone scanning it gets
+   nothing. Off state should say what to tick, not show a dead code.
+
+## ⛔ THE CONSTRAINT THAT WILL OTHERWISE BE SOLVED WRONG
+**The gateway is offline-first** — `fairy/server.py` is stdlib `http.server`, documented as working fully
+offline, and the exe ships a self-contained bundle. **A CDN `<script>` tag for a QR library would break
+offline use and would not be noticed until someone is in a shop with no internet — i.e. exactly the user
+this feature is for.** Generate the QR **locally**: a small bundled encoder, or draw it from a
+locally-computed matrix. No network fetch, no external host, no new heavyweight dependency.
+
+## ⚠ HONESTY REQUIREMENT
+Auto-pick **cannot be right 100% of the time** — the app cannot see which network the phone is on. Do not
+write copy that promises it works. The fallback exists precisely because the guess can miss; keep it
+reachable and make the failure legible ("scanned and nothing happened?" → show the other addresses)
+rather than silently offering one dead URL.
+
+## SIZE
+Small and self-contained. Good candidate for a turn BETWEEN the stylesheet phases — it touches
+`ui/gateway/views/admin.js` and `ops.py` only, and shares no files with the CSS arc.
