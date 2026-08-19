@@ -6077,3 +6077,57 @@ program reaching a live machine** — that is why this is not a normal backend p
 controller would overwrite `cncdisk/index.json` with an empty list and `heartbeat.json` with
 `controller_connected: false` — **making the real shop gateway look dead.** Job claiming is safe (the poller
 returns early with no dest), but the console would lie about liveness. Gate both on having a destination.
+
+---
+
+# ═══ QUEUED — THE COMMAND DECK IS UNREACHABLE ON A PHONE ═══
+*(human, 2026-08-18, on Android at ddcs-studio.pages.dev: "on android i dont see the command deck button")*
+
+**Real bug, not cleanup. Queue it with P2 rather than waiting for a responsive phase.**
+
+## NOT A REGRESSION — established before anything else
+`.command-deck-handle` **is dead CSS** (defined in styles.css, created by no JS or HTML), but it is **not
+the handle**. The live one is `#controller-dock .header-handle`, which `ui/dockManager.js` binds click and
+keydown to. The t2069 deletion pass did **not** touch it — verified against the commit diff.
+
+**Measured on the deployed site at 360x690, organic skin:** `#controller-dock` at y=647 h=43;
+`.header-handle` at y=648 h=42, fully visible, and `elementFromPoint` at its centre returns its own
+chevron — i.e. **hittable in an emulated viewport.** The failure is specific to a REAL phone browser.
+
+## ROOT CAUSE — two compounding, both already solved elsewhere in this very file
+
+**1. The large-viewport trap (`100vh` vs `100dvh`).** The shell and dock sit against `100vh`, which
+**includes the area behind Chrome's URL bar**, so the dock's bottom is pushed below the visible region.
+
+⭐ **This project already found and fixed this exact bug** — the stylesheet says so in its own words at the
+Settings modal: *"t782 — 100dvh = the CURRENT visible height, so the top tab strip is never clipped under
+the phone browser's URL bar (100vh = the LARGE viewport, the centered modal overflowed and its head hid
+above)"*. **`dvh` appears 7 times in the file and every single one is a MODAL** (wizard, Settings,
+workspace manager, help). The app shell and the dock never received the fix. Diagnosed, solved, never
+propagated.
+
+**2. No bottom safe-area inset on the dock.** `env(safe-area-inset-bottom)` appears 6 times — all on
+wizards and drawers, **none on the dock**. So the handle also sits in Android's gesture strip, where taps
+go to the system rather than the app. A 42px handle minus the gesture zone leaves a tap target well under
+the 44px minimum.
+
+## THE FIX
+`dvh` on the shell/dock height, and a `safe-area-inset-bottom` on the dock. Both patterns already exist in
+the file — **copy them, do not invent.**
+
+⚠ **Changing the shell from `vh` to `dvh` can shift layout everywhere**, and `dvh` re-measures as the URL
+bar shows and hides, which can cause reflow on scroll. This is exactly why the **five-theme before/after
+screenshot gate applies** — and this one additionally needs a **narrow-viewport** capture, which t2069
+explicitly listed as NOT covered.
+
+## THE AUDIT PREDICTED THIS WITHOUT SEEING A PHONE
+The conventions sweep flagged a **1,064-line stretch with zero responsive handling** covering precisely the
+dock and the futuristic operator console, and concluded *"the two densest newest modules have the thinnest
+responsive coverage."* The human then hit the user-facing consequence. ⇒ **Treat the rest of that stretch
+as suspect**: if the dock was never given mobile handling, its neighbours probably were not either. Report
+what else in that range breaks at 360px, but do not fix it in this turn.
+
+## ALSO WORTH KNOWING
+`.command-deck-handle` is dead CSS for a handle that no longer exists — a small deletion candidate, but
+**do not bundle it with this fix**; a dead-code removal tangled into a live responsive bug makes the
+before/after harder to read.
