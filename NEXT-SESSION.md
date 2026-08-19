@@ -6238,3 +6238,17 @@ the system.
 
 ⇒ Also settled: the deprecated-alias step the draft proposed (keeping `--text*` as one-line aliases for a
 release) is **unnecessary**. There are no external consumers to migrate. Rename in one pass.
+
+### PWA IDENTITY — DECIDED (human, 2026-08-18: "same as exe is great")
+- **Icon: reuse the DESKTOP EXE's icon — `desktop/ddcs.ico`** (285 KB, referenced by
+  `desktop/build_fairy.ps1` as PyInstaller's `--icon` and watched by `desktop-build-check.yml`). Extract
+  its largest frame and export the PWA sizes (192, 512, plus a **maskable** variant with safe padding —
+  Android crops to a circle/squircle and an un-padded mark gets its edges cut). ⇒ **The installed web app
+  and the installed desktop app look like the same product**, which is the point.
+  ⚠ Do NOT redraw it and do NOT substitute `assets/svg/favicon.svg` — that mark stays the browser-tab
+  favicon; the home-screen icon matches the exe.
+- **Name:** `DDCS Studio` (fits the short-name limit; no abbreviation needed).
+- **Theme colour:** the brand black with the gold logo — the one thing that looks identical across all five
+  skins, so the splash and system bars stay right whatever theme is active.
+- **`display: standalone`** — this is what removes the URL bar, which is the whole reason the PWA helps the
+  phone layout.
