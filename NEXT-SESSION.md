@@ -6475,3 +6475,33 @@ a max-width:600px rule, and the wizard footer buttons are 151x55.
 
 ⇒ **RE-SCOPE: the deck pane must be able to scroll (or the dock must size to fit its content) BEFORE the
 dvh/safe-area work matters.** Fixing reachability of a keypad that is not rendered is pointless.
+
+## QUEUED (small, human-asked) — THE TWO WIZARD PREVIEWS OPEN TOO SHORT ON A PHONE
+*(human, 2026-08-19, with a screenshot of the Corner wizard on Android: "can the 2 preview be abit more
+opened by default")*
+
+**The symptom:** in the stacked (narrow) two-pane layout, the 3D preview and the 2D layout panes each open
+as a thin strip — roughly 40px of visible canvas — so neither preview shows anything useful without
+dragging the splitter.
+
+**The mechanism (found, not guessed):** `.wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body` takes
+`height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5))` for the 3D pane and the complement for
+the 2D pane. `--viz-stack-h` is written by `ui/paneAccordion.js` `applyVisualHeight()`, documented as the
+ONE writer of the visual's height, derived as `height − chrome`, measured.
+
+⚠ **AND HERE IS THE OPEN QUESTION — measured remotely at 360x690 on the live site, both were UNSET:**
+`--viz-stack-h` unset (so the 400px default applies) and `--pane-ratio` unset (so 0.5). That should give
+**200px per pane**, and the human's screenshot shows roughly a fifth of that. **So the default is not what
+is producing the observed height — something downstream is shrinking it.** Find that before changing any
+number; raising the default would be treating a symptom whose cause is unknown.
+
+**What the human actually wants:** both previews open tall enough to be readable by default on a phone.
+They are draggable, so this is about the DEFAULT, not the range.
+
+⚠ **Do not fix this by making the previews so tall the form is pushed off-screen** — the visual is pinned
+at the top while the form scrolls under it, so an over-tall default costs the form its space. The wizard is
+the one surface that currently works well on mobile (dvh-sized, scrollable body, 151x55 footer buttons);
+do not regress it.
+
+**Verify on a narrow viewport with a real wizard open** (`window.openWiz('corner')` works), and check both
+the pane heights AND that the form below is still usable.
