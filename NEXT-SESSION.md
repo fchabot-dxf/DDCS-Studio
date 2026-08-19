@@ -6436,3 +6436,42 @@ genuinely differs per skin; use the component-fallback where it does not.
    `--sv-*`/`--bv-*` made: **65 of its 89 reads are in selector rules**, and that is the whole defect.
    **Enforceable as a one-line lint:** a grep for the raw ramp must match ONLY inside `[data-theme]` token
    blocks; any hit inside a selector rule is the regression.
+
+## ⚠⚠ THE MOBILE FIX WAS SCOPED WRONG — measured 2026-08-19, all 5 themes at 360x690
+
+The queued entry ("dvh + safe-area on the dock") fixes the symptom the human noticed and **leaves a bigger
+bug untouched**. Measured against the live site, not inferred:
+
+**1. ⭐ THE DECK KEYPAD DOES NOT EXIST ON A PHONE — and the URL bar is irrelevant to it.**
+Expand the deck at a full 690px viewport: the active pane is `clientHeight 41px` against
+`scrollHeight 205px` with `overflow: hidden`. **22 of 22 keys clipped, 16 rendered fully below the
+viewport.** `.dock-body` is not scrollable (scrollHeight == clientHeight) and the page does not scroll on
+the Studio tab. **There is no scroll path.** Identical in all five themes ⇒ ONE fix, not five.
+Cause: `.dock-body .deck-tab-panel { flex: 1 1 auto; min-height: 0; overflow: hidden; }` — the pane absorbs
+the whole vertical deficit and then silently eats its own content.
+
+**2. ⛔ A VERIFICATION TRAP — a passing Playwright tap PROVES NOTHING HERE.** `page.tap()` on those keys
+SUCCEEDS, because Playwright calls `scrollIntoViewIfNeeded()` and `overflow: hidden` still permits
+*programmatic* `scrollTop` (confirmed: setting scrollTop=200 lands at 164). **A finger cannot do that** —
+`hidden` gives no touch panning and no scrollbar. Same family as the green-tests-over-a-dead-path failures
+this project keeps hitting. **Verify reachability by geometry + elementFromPoint, never by tap success.**
+
+**3. Two more clipped in all five themes:** `ENTER` 24px past the right edge; the `# VARIABLES` deck tab
+51px past (whole tab gone). ⚠ **`document.scrollWidth` reports 360 here — a FALSE ALL-CLEAR** — because
+`overflow-x: hidden` hides the evidence rather than preventing the overflow. Check CONTAINER
+scrollWidth/clientWidth, not just the document's.
+
+**4. A destructive control goes unreachable after a runtime theme switch** (normal/organic/steampunk):
+`#btn-clear` lands at x=363-407, fully off-screen, and `html,body { overflow-x: clip }` means it cannot be
+scrolled to. The header fit ladder in `ui/commandDeck.js` adds 5 of its 6 rungs and stops one short; a
+single `resize` event restores it instantly ⇒ a timing bug, probably measuring mid-transition.
+
+**5. ~90% of controls are under the 44px touch floor** — 22-23 of 25 on the main surface, several at
+14-24px (`.pp-copy` is 14x24). Two exceptions prove the standard is achievable: `#btn-clear` is 44x44 via
+a max-width:600px rule, and the wizard footer buttons are 151x55.
+
+⭐ **THE WIZARD IS THE ONE CORRECT SURFACE AND THE PATTERN TO COPY** — sized in `dvh` with
+`env(safe-area-inset-bottom)`, body genuinely scrollable, footer reachable, buttons 151x55.
+
+⇒ **RE-SCOPE: the deck pane must be able to scroll (or the dock must size to fit its content) BEFORE the
+dvh/safe-area work matters.** Fixing reachability of a keypad that is not rendered is pointless.
