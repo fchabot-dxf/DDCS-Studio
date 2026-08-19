@@ -4,7 +4,7 @@
  * The bar has three SECTIONS (left · centre · right), each holding dropdowns, each holding wizards. This panel
  * renders that tree (blocks/wizardLibrary.getLibrary, includeHidden + includeEmpty) and lets the user design it
  * without touching code: add / delete / rename a dropdown, move a dropdown between sections, and show/hide, rename,
- * re-group, re-order any wizard (built-ins included), delete or export a custom op, import a `.wizard`, fork a
+ * re-group, re-order any wizard (built-ins included), delete or export a custom op, import a `.wiz`, fork a
  * built-in into an editable copy, or reset to factory. Every edit persists through the library layer (the bar
  * layout in `ddcs_wizard_layout`, user ops in `ddcs_user_ops`) and is pushed LIVE to the bar (ddcsRefreshWizardBar).
  *
@@ -134,7 +134,7 @@ function importWizardFile(onDone) {
     if (!_importInput) {
         _importInput = document.createElement('input');
         _importInput.type = 'file';
-        _importInput.accept = '.wizard,.json';
+        _importInput.accept = '.wiz,.json';
         _importInput.style.display = 'none';
         document.body.appendChild(_importInput);
     }
@@ -147,7 +147,7 @@ function importWizardFile(onDone) {
         r.onload = (e) => {
             try {
                 const def = importWizard(e.target.result || '');
-                if (!def) { dlgNotice('That isn’t a valid .wizard file.'); return; }
+                if (!def) { dlgNotice('That isn’t a valid .wiz file.'); return; }
                 // t1275 — SAY what did and did not come across. A wizard file carries data; the author's code hooks
                 // do not travel, and a silent loss is the thing the ruling forbids.
                 if (def.importNote) dlgNotice(`“${def.label || def.opType}” imported. ${def.importNote}`);
@@ -193,9 +193,9 @@ export function renderWizardLibrary(container) {
 
     const actions = document.createElement('div');
     actions.className = 'settings-row'; actions.style.marginTop = '8px';
-    actions.appendChild(mkBtn('⬆ Import a file…', () => importWizardFile(apply), { title: 'Load a .wiz / .wizard file from anywhere on disk (the shelf below is the folder you keep them in)' }));
+    actions.appendChild(mkBtn('⬆ Import a file…', () => importWizardFile(apply), { title: 'Load a .wiz file from anywhere on disk (the shelf below is the folder you keep them in)' }));
     actions.appendChild(mkBtn('↺ Reset to factory', async () => {
-        if (await dlgConfirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard operations are kept.', { danger: true, okLabel: 'Reset' })) { resetLayout(); apply(); }
+        if (await dlgConfirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wiz operations are kept.', { danger: true, okLabel: 'Reset' })) { resetLayout(); apply(); }
     }, { title: 'Discard all bar customisation (keeps your custom operations)' }));
     head.appendChild(actions);
     container.appendChild(head);
