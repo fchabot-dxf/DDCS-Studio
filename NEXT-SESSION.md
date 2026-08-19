@@ -6696,3 +6696,30 @@ hit exactly this — a release was cut mid-session and the banner only appeared 
 limited — `_lastWebCheck` is the existing throttle precedent). ⚠ The dismissal contract must survive:
 `ddcs_update_dismissed` is keyed per-version and a re-check must NOT re-nag a version already dismissed
 (`update-check.spec.js` asserts this — "dismissed version does not re-nag").
+
+# ═══ t2076 SETUP PREREQ — THE LOOPBACK REDIRECT URIs MUST BE REGISTERED IN GOOGLE CLOUD CONSOLE ═══
+*(hit live on ASUS, 2026-08-19, first Connect attempt: `Error 400: redirect_uri_mismatch`.)*
+
+**Symptom:** "Access blocked: This app's request is invalid — Error 400: redirect_uri_mismatch" on the
+Google consent page, before any Drive call is made.
+
+**Cause, and it is a consequence of the thing that makes Drive work at all.** The shipped client id
+(`…m2o0e77`) is a **Web application** client — the SAME one the hosted page uses, which is exactly why
+`drive.file` visibility is a non-issue between the two ends (verified 2026-08-19). But a Web client
+accepts ONLY redirect URIs registered against it, whereas a native "Desktop app" client would accept any
+`127.0.0.1` port automatically. The gateway's loopback flow (`server.py:234`) sends
+`http://127.0.0.1:<serve-port>/oauth/google/callback`, and none of those were registered.
+
+**Fix (Google Cloud Console → APIs & Services → Credentials → the OAuth client → Authorized redirect
+URIs), all five, because the app takes the first free port of 8765-8769:**
+```
+http://127.0.0.1:8765/oauth/google/callback   ...8766 ...8767 ...8768 ...8769
+```
+
+⛔ **Do NOT resolve this by creating a separate "Desktop app" client.** It would accept any loopback port,
+but it would be a DIFFERENT client id from the web one — reintroducing the two-client `drive.file`
+visibility problem the spike measured away. One client + registered URIs keeps that property.
+
+⇒ **This is a one-time account-side prerequisite, not a code bug.** Worth surfacing in the UI though: the
+Connect button currently reports Google's failure only as a browser page the user has to read. A future
+turn could pre-flight it, or at minimum name `redirect_uri_mismatch` in the Setup hint.
