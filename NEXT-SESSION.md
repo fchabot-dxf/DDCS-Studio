@@ -6646,3 +6646,30 @@ Recording the plain requirement instead.)*
 
 ⇒ Re-wire `.gateway-dl-pop` (still styled, still theme-correct after t2073) as a permanent affordance on
 the Gateway tab. Keep `9256574f`'s fix intact — the tab still always opens; nothing gates it.
+
+# ═══ BACKLOG (human, 2026-08-19) — THE UPDATE BANNER IS NOT WELL BALANCED ═══
+*(human, seeing the V2026.08.19.2 banner in the exe: "backlog, the update banner isnt very well balenced".
+NOT dispatched — recorded only. Cosmetic; the banner FUNCTIONS correctly.)*
+
+**Observed on the real exe** (`ui/updateCheck.js` `showBanner`), not a mock:
+
+```
+  ↑ Update available — v2026.08.19.2   [ Update to v2026.08.19.2 and restart ]
+  [ Download manually ]  [ What's new ▾ ]   ✕
+```
+
+**What is actually unbalanced, so a fix does not have to re-derive it:**
+- **The version is printed TWICE**, once in the label and again inside the primary button — and the button
+  carries the longer of the two. "Update and restart" needs no version; the label already said it.
+- **The primary button dominates the row** because its text grows with the version string, so the layout
+  reflows differently for a short vs long version — the banner is not testable at one width.
+- **The actions split across two rows with no rule**: primary on row 1, two secondaries + the close ✕ on
+  row 2. The ✕ floats at the end of a row of buttons rather than sitting in a corner like every other
+  dismiss in the app.
+
+⚠ **Do not "fix" it by shrinking the primary action** — t2066 established the in-place update is the
+PREFERRED path and the dated manual Download is deliberately demoted (`upd-dl-fallback`). Any rebalance
+must keep that hierarchy visible; the problem is proportion, not priority.
+
+**Gate:** `tests/update-check.spec.js` asserts button classes/labels (`.upd-self` contains the version,
+`.upd-dl` reads "Download manually") — a wording change there is a test change, so read it first.
