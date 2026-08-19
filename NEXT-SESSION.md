@@ -6000,3 +6000,31 @@ real controller, not merely the OAuth visibility question answered. `backend/r2.
 ⇒ **The queued "get my phone onto Studio" feature (QR + hostname + adapter ranking) is now ON HOLD and
 should die unbuilt** if cloud lands. Do not build it. It solves an addressing problem that only exists
 inside the layer being removed.
+
+## ⭐ SCOPE UPGRADE — THE DRIVE WORK IS NOW "PROVE IT, THEN WE DELETE LOCAL"
+*(human, 2026-08-18: "dont worry just make the cloud tests and we remove local if it works")*
+
+The queued Drive entry above was written as a narrow OAuth-visibility spike. **The human has raised it:
+the job is to TEST THE CLOUD PATH FOR REAL**, and if it works, LAN serving comes out.
+
+**Still run the cheap checks FIRST, in this order — any one of them can end the turn early:**
+1. ⭐ **The exe-to-exe escape hatch.** If both ends run the exe they share one desktop client ID, so
+   `drive.file` visibility is a non-issue by construction. Establish this before testing anything.
+2. **The two-client visibility question** (desktop client vs web client, same Google account).
+3. **Only then** the end-to-end run.
+
+**WHAT "PROVEN" MEANS — and it is deliberately strict.** A real job submitted from the console, written to
+the user's Drive, **polled and claimed by the gateway, delivered to a real controller**, with the job
+appearing in history. ⚠ **NOT** proven by: unit tests against a mocked Drive, a successful OAuth handshake,
+or reasoning from Google's documentation. `backend/r2.py` has been tagged `[TO TEST]` for months and reads
+like a working cloud path to anyone skimming the code — that is the exact trap, and the only thing that
+disarms it is watching a file arrive.
+
+**IF IT IS PROVEN**, the follow-on is a SEPARATE turn (do not bundle it): delete LAN serving and its whole
+discovery layer — the `0.0.0.0` bind toggle, `_lan_ip()`, the admin.js LAN hint — leaving **one-box**
+(permanent, ruled) and **cloud**. The unbuilt QR/hostname feature dies with it.
+
+⚠ **IF YOU CANNOT TEST IT WITHOUT CREDENTIALS THE HUMAN MUST SUPPLY, SAY SO PLAINLY AND SAY EXACTLY WHAT
+YOU NEED** — a Google Cloud project, an OAuth client id/secret, a signed-in account. Do not simulate the
+result, do not infer it from docs, and do not report a partial as a pass. An honest "blocked, here is the
+one thing I need from you" is worth far more than a green tick on the half that could be faked.
