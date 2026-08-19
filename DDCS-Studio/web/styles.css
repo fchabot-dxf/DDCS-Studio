@@ -1145,7 +1145,17 @@ html, body { overflow-x: clip; }
     flex-direction: column; /* stacked: toolbar -> main -> dock */
     /* Occupy full viewport minus header */
     position: absolute;
-    top: 54px; bottom: 0; left: 0; right: 0;
+    top: 54px; left: 0; right: 0;
+    /* t2081 (MOBILE) — was bottom: 0, which anchors to the INITIAL containing block (the viewport as if the
+       mobile URL bar were always hidden) — the same problem as a raw 100vh, just spelled with top+bottom
+       instead of height. On a phone with the URL bar showing, this sizes the shell TALLER than what's
+       actually visible, leaving less real room than the layout assumes — exactly what starved the dock's own
+       expanded height. height: calc(100dvh - 54px) tracks the CURRENT visible viewport instead (falls back to
+       the old vh behaviour on browsers before dvh landed, since it's declared first and dvh-unaware browsers
+       simply never reach the override). bottom is intentionally dropped: over-constrained with top+height set,
+       it would be ignored anyway per spec — cleaner to just not declare it. */
+    height: calc(100vh - 54px);
+    height: calc(100dvh - 54px);
     overflow: hidden; /* Prevent body scroll */
 }
 
@@ -1497,10 +1507,18 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     display: none;  /* collapsed: take NO space (no white strip below the tabs) */
     flex-direction: column !important; /* Forces distinct rows */
     gap: 12px;
-    padding: 2px 12px 12px; /* minimal top gap so the keys sit just under the tabs */
+    /* t2081 (MOBILE) — bottom padding now clears the home-indicator/gesture-bar area on a phone, copying the
+       wizard footer's own established pattern (padding-bottom: calc(45px + env(safe-area-inset-bottom))) —
+       the dock had NONE of the six safe-area-inset-bottom uses already in the file before this turn, despite
+       being the one other surface (besides modals) that sits at the bottom of the screen. env() resolves to
+       0 on a device with no inset, so this is a no-op everywhere it doesn't apply. */
+    padding: 2px 12px calc(12px + env(safe-area-inset-bottom)); /* minimal top gap so the keys sit just under the tabs */
     background: var(--panel);
     height: auto;            /* fit the content — no empty space below the keyboard */
-    max-height: 50vh;        /* cap at ~half the viewport */
+    /* was max-height: 50vh — the LARGE viewport (as if a phone's URL bar were always hidden); dvh tracks what's
+       actually visible. Declared after vh so dvh-unaware browsers keep the old behaviour untouched. */
+    max-height: 50vh;
+    max-height: 50dvh;        /* cap at ~half the viewport */
     overflow-y: auto;
     overflow-x: hidden; /* Prevent horizontal overflow */
     opacity: 0;
@@ -1513,8 +1531,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     display: flex;
     opacity: 1;
     visibility: visible;
-    height: var(--dock-h, clamp(200px, 33vh, 380px));   /* drag handle sets --dock-h; the keys flex to fill — smaller default so ~50% of editor */
+    /* t2081 (MOBILE) — same vh->dvh reasoning as above. Measured at 360x690: this is where the dock's real
+       height starves the deck-tab-panel down to ~41px against ~205px of actual key content (see that rule's
+       own note) — dvh alone doesn't fix the clipping (that's the panel's own overflow fix), but it does mean
+       the dock's height now matches the ACTUALLY visible viewport instead of quietly overestimating it. */
+    height: var(--dock-h, clamp(200px, 33vh, 380px));
+    height: var(--dock-h, clamp(200px, 33dvh, 380px));   /* drag handle sets --dock-h; the keys flex to fill — smaller default so ~50% of editor */
     max-height: 85vh;
+    max-height: 85dvh;
 }
 
 /* Row 1: Editor Keys */
@@ -1528,7 +1552,14 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 }
 .editor-keys-row button {
     flex: 1;             /* Stretch to fill the constrained width */
-    min-width: 120px;    /* Ensure buttons remain usable on small viewports */
+    /* t2081 (MOBILE) — was min-width: 120px. That floor did the opposite of its own comment on a real phone:
+       3 buttons x 120px = 360px, wider than the ~334px .editor-keys-row actually has at 360px viewport width
+       (measured) — ENTER was clipped 24px past the right edge, in all 5 themes, with no scroll path (overflow
+       is hidden on every ancestor up to the document, which reports scrollWidth===clientWidth — a false
+       all-clear; the real overflow only shows at the CONTAINER, .dock-body, whose own scrollWidth genuinely
+       exceeds its clientWidth). There are always exactly 3 children here, so flex:1 alone divides the
+       available width evenly with no floor needed — still comfortably above the 44px touch-target minimum at
+       any realistic phone width (~94-106px per button at 320-360px viewports, measured). */
     max-width: 320px;    /* Prevent one button from being huge on wide screens */
     height: 44px;
     font-weight: bold;
@@ -4200,9 +4231,24 @@ svg [id$="_wcs"] { display: none; }
 /* Tab strip at the top of the dock body — hidden with the body when collapsed, spaced (no overlap) */
 /* margin-bottom cancels the dock-body's 12px flex gap (+2px) so the tab strip sits ON the panel
    and the active tab merges into it — no floating gap between tab and panel body. */
-.dock-body .deck-tabs { display: flex; gap: 4px; align-items: flex-end; margin: 0 0 -12px; padding: 0; position: relative; z-index: 2; }
+/* t2081 (MOBILE) — overflow-x:auto added: measured at 360px viewport width, the 5 tabs' natural width pushes
+   VARIABLES 51px past the right edge — invisibly, since .dock-body's own overflow-x:hidden clips it with no
+   scroll path (document.scrollWidth stays a false-all-clear 360, matching the container's clientWidth exactly;
+   only THIS container's own scrollWidth shows the real overflow). A real horizontal swipe reaches it now,
+   matching deck-tab-panel's own fix above rather than a redesign of the tab strip itself.
+   ⚠ min-height:33px is REQUIRED alongside overflow-x:auto, not decorative: per the CSS Overflow spec, setting
+   overflow-x to anything but visible forces overflow-y to COMPUTE as auto too, even written here as `visible`
+   explicitly (confirmed: measured overflowY as "auto" regardless) — and this container's own height, driven
+   by the -12px negative margin trick, collapsed to ~11.7px against the tabs' own real ~32.4px height, so the
+   NOW-real vertical scroll container was clipping/hit-test-blocking most of every tab (a real regression this
+   turn's own first pass introduced and then caught: a scrolled-into-view VARIABLES tab still failed a real
+   Playwright click, "dock-body intercepts pointer events" — measured, not assumed). Sizing the container to
+   the tabs' own natural height removes the vertical overflow entirely, so the forced overflow-y:auto has
+   nothing left to clip. */
+.dock-body .deck-tabs { display: flex; gap: 4px; align-items: flex-end; margin: 0 0 -12px; padding: 0; position: relative; z-index: 2; overflow-x: auto; overflow-y: visible; min-height: 33px; }
 .dock-body .deck-tab {
     position: relative;
+    flex-shrink: 0;   /* t2081 — keep each tab at its natural width; the strip scrolls instead of squishing them */
     padding: 7px 18px 8px !important;
     min-height: 0 !important;
     font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
@@ -4249,7 +4295,15 @@ svg [id$="_wcs"] { display: none; }
     position: relative; z-index: 1;
     flex: 1 1 auto; min-height: 0;          /* fill the dock body's height → every tab is the SAME height */
     display: flex; flex-direction: column;
-    overflow: hidden;
+    /* t2081 (MOBILE) — was overflow: hidden, with NO scroll path anywhere: .dock-body's own overflow-y:auto
+       never activates because this flex child SHRINKS to whatever space is left (min-height:0) instead of
+       overflowing its parent, so .dock-body's scrollHeight always equals its clientHeight. On a real phone
+       (measured 360x690) this panel gets ~41px of the dock's ~228px, against ~205px of actual content — 22 of
+       22 keys clipped with genuinely no way to reach them (a passing Playwright tap here proves nothing:
+       scrollIntoViewIfNeeded + a programmatic scrollTop both work through overflow:hidden; a finger cannot).
+       auto here gives the panel ITSELF the scrollbar/touch-pan path directly over its own clipped content. */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 #deck-tab-move      { background: color-mix(in srgb, var(--panel) 90%, #3b82f6); }
 #deck-tab-gm        { background: color-mix(in srgb, var(--panel) 90%, #f59e0b); }

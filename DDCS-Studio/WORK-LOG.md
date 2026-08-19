@@ -44400,3 +44400,143 @@ why it wasn't re-run in full.
 - `DDCS-Studio/verification/t2079-{before,after}-*.png` — 30 screenshots.
 
 🔨 turn 2079
+
+# t2081 — MOBILE: the app did not work on a phone for its primary purpose
+
+Jumps ahead of P4d/P4e/P5 (the rest of the stylesheet arc — internal quality, real but invisible) by explicit
+human+advisor agreement: a real functional gap outranks token cleanup. Arc prep is banked, not stale, and
+resumes after this. Four issues, fixed in the dispatch's own priority order, each verified by GEOMETRY
+(`getBoundingClientRect`/`elementFromPoint`/container `scrollWidth` vs `clientWidth`) — never by a passing
+Playwright tap, which the dispatch correctly warned proves nothing here (`scrollIntoViewIfNeeded` + a
+programmatic `scrollTop` both work straight through `overflow: hidden`; a real finger cannot).
+
+## Fix 1 — the deck pane had no scroll path at all (DONE FIRST, per the dispatch)
+
+Confirmed exactly as briefed at 360×690: `.dock-body .deck-tab-panel` (`flex: 1 1 auto; min-height: 0; overflow:
+hidden`) shrinks to whatever space is left after its sibling rows, rather than overflowing its parent — so
+`.dock-body`'s own `overflow-y: auto` never activates (`scrollHeight === clientHeight`, measured 228 === 228 in
+every theme) even though the panel's OWN content genuinely doesn't fit (`clientHeight: 41` vs `scrollHeight:
+205`, 22 of 22 keys clipped, confirmed byte-for-byte against the dispatch's own numbers). Changed `overflow:
+hidden` to `overflow-y: auto; overflow-x: hidden` on the panel itself — the clipped content now has a real
+scroll container directly over it. Verified: `.deck-tab-panel`'s `overflowY` reads `auto` after the fix, and
+scrolling it programmatically (`scrollTop = scrollHeight`) reveals the previously-clipped keys, confirmed both
+by measurement and a screenshot (`t2081-after-*-deck-scrolled.png` shows axis/numpad keys that were entirely
+absent from `t2081-before-*-deck-open.png`).
+
+## Fix 2 — ENTER (24px) and VARIABLES (51px) horizontal clipping — two different root causes, one shared trap
+
+**ENTER**: `.editor-keys-row button { min-width: 120px; }` — 3 buttons × 120px = 360px, wider than the row's own
+~334px at this viewport. The comment's own stated intent ("Ensure buttons remain usable on small viewports")
+backfired on a genuinely small viewport. Removed the floor — there are always exactly 3 children, so `flex: 1`
+alone divides the available width evenly with no risk of them collapsing to nothing. Measured 24px overflow
+before, `inViewport: true` after, in all 5 themes.
+
+**VARIABLES**: found via a dedicated offender-sweep (`t2081_hoverflow_debug.mjs`, walks every `.dock-body`
+descendant and reports which ones extend past the container) — the 5 deck-tabs' combined natural width doesn't
+fit `.deck-tabs`'s own row, and with no wrap/scroll/shrink accommodation the last tab (VARIABLES) is pushed 51px
+past the edge, exactly matching the dispatch's own number. `document.scrollWidth` stayed a false-all-clear `360`
+throughout (the dispatch's own named trap) — only `.dock-body`'s OWN `scrollWidth` (411/419/384 depending on
+theme) showed the real overflow. Added `overflow-x: auto` to `.deck-tabs`.
+
+**A regression this turn's own first pass introduced, then caught before it shipped**: adding `overflow-x:
+auto` alone broke real interactivity. Per the CSS Overflow spec, setting overflow-x to anything but `visible`
+forces overflow-y to compute as `auto` too — even though this file explicitly wrote `overflow-y: visible`
+right next to it, the browser's own quirk overrides that (confirmed by measuring `getComputedStyle(...).
+overflowY` as `"auto"` despite the literal CSS). `.deck-tabs`'s own height, collapsed to ~11.7px by the
+existing `margin-bottom: -12px` overlap trick, was suddenly a REAL clipping/hit-testing boundary against tabs
+that are genuinely ~32px tall — a scrolled-into-view VARIABLES tab still failed a real Playwright click
+(`"dock-body intercepts pointer events"`, not a synthetic success). Fixed by giving `.deck-tabs` an explicit
+`min-height: 33px` so nothing needs to vertically overflow in the first place — confirmed via
+`elementFromPoint` at the tab's own center returning the tab itself (not `.dock-body`) after scrolling, and a
+real `.click()` succeeding (screenshot: `t2081-after-*-variables-tab.png` shows the panel switched and its
+search bar rendered).
+
+## Fix 3 — btn-clear off-screen after a runtime theme switch: a genuine stale-measurement bug, not a race
+
+Confirmed exactly as briefed: after switching themes at runtime (not on page load), `#btn-clear` lands at
+x=363–407 (off a 360px viewport) on normal/steampunk/organic specifically, with `_fitAppHeader()`'s
+`HEADER_YIELD` loop (`hy-logo, is-compact, hy-tabscale, is-mini, is-tiny, hy-controls` — six rungs, matching the
+dispatch's count exactly) stuck at 5 of 6 classes. **Tested the "just needs more time" hypothesis directly and
+disproved it**: still broken at 1.2s after the switch — not a race that resolves given real time, a decision
+made once on a stale measurement that's never revisited. **Tested whether a fresh call fixes it** (calling
+`_fitHeader()`/`_fitAppHeader()` again, by hand): yes, instantly — confirming the loop itself is correct, only
+the FIRST measurement (taken via the existing single-`requestAnimationFrame` handler) is stale. **Tested
+double-rAF** (a well-known "wait for a settled layout" pattern): still stale — one or two animation frames is
+not enough here, which rules out simple render-timing and points at something slower (most likely font-metric
+swap, given the code's own comment already knew "studio buttons are larger than normal-theme ones"). **Tested a
+250ms delayed re-verify**: reliably correct. Implemented as a re-verify specifically on the theme-mutation path
+(the only one exhibiting this — resize/fonts.ready/initial load don't need it): call `fit()` immediately as
+before, AND schedule a second `_fitHeader()`/`_fitAppHeader()` call 250ms later. Verified end-to-end through the
+real `MutationObserver` → app code path (not just my test harness): briefly wrong for well under 250ms after a
+switch (down from being PERMANENTLY wrong until an unrelated resize), then self-corrects — confirmed at every
+theme, both the early (150ms) and settled (550ms) state captured in the gate evidence.
+
+## Fix 4 — dvh/safe-area on the shell and dock, copying the wizard's own already-working pattern
+
+The wizard (`.wiz-box`) already does this correctly (`max-height: 95dvh`, `margin-bottom:
+env(safe-area-inset-bottom)`) — confirmed it's the only surface that already works on a phone, per the
+dispatch's own framing, and copied its shape rather than inventing a new one. Found the dock's own sizing used
+raw `vh` in all three places (`max-height: 50vh`, `height: var(--dock-h, clamp(200px, 33vh, 380px))`,
+`max-height: 85vh`) — none of the file's existing 7 `dvh` uses touched the dock, all of them modals, exactly as
+briefed. Added `dvh` fallback-pairs alongside each (declared second, after the `vh` line, so browsers without
+`dvh` support keep the untouched original behaviour) and `env(safe-area-inset-bottom)` to the dock's own bottom
+padding (previously none of the file's 6 safe-area uses touched the dock either). Also found and fixed the
+SAME class of bug one level up: `.app-shell` sizes itself via `position: absolute; top: 54px; bottom: 0;` —
+functionally identical to a raw `100vh` (anchored to the large/initial viewport, not the currently-visible
+one) despite not literally being that token. Replaced `bottom: 0` with an explicit `height: calc(100dvh -
+54px)` (vh-paired the same way) — a minimal, targeted change: `position: absolute` and the other three offsets
+are untouched, so the containing-block behaviour for any absolutely-positioned descendant is unaffected;
+`bottom` is simply redundant once `top` + `height` are both set (ignored per spec either way).
+
+## Non-vacuity
+
+Brace-depth balance and `node --check` on `commandDeck.js` re-verified after every edit. Every fix was measured
+before AND after, not assumed — Fix 2's own mid-turn regression (the vertical-clip side effect of `overflow-x:
+auto`) is the clearest example: caught by a REAL Playwright `.click()` failing with a real error message, not
+by re-reading the CSS. Fix 3's four sequential hypothesis tests (immediate re-run / 1.2s wait / double-rAF /
+250ms delayed re-verify) are each their own falsifiable probe, kept as separate scripts rather than collapsed
+into one "it works now" claim.
+
+## What could not be measured, said plainly (per the dispatch's own instruction)
+
+Playwright cannot emulate the real mobile URL bar showing/hiding or the on-screen keyboard appearing — the dvh
+fix (item 4) is therefore VERIFIED AS CORRECT CSS (the token resolves, the fallback pairing is right, the
+wizard's own established pattern is matched) but its real-world effect on a genuine phone with a
+collapsing/expanding URL bar is COMPUTED, not measured, exactly as the dispatch asked to have this labelled.
+
+## Gate
+
+Node tier: 193/193. `node --check web/ui/commandDeck.js`: clean. Full Playwright suite (2,649 tests): 2,606
+passed, 10 flaky (recovered on retry, none mobile/commandDeck-related by name), 25 skipped, 8 failed — **all 8
+match the established pre-existing set from every prior turn in this arc, zero new failures** (same clean
+result as t2077's and t2079's own gates) — confirming the `commandDeck.js` JS change carries no regression risk
+either, not just the CSS.
+
+Mobile geometry gate (the REAL evidence per the dispatch): `t2081_mobile_geometry_probe.mjs`, measured at
+360×690 across all 5 themes, before AND after — `dockBody.hClipped` true→false (all 5), `deckTabPanel.
+overflowY` hidden→auto (all 5, real scroll path confirmed), `enterKey.inViewport` false→true (all 5),
+`variablesTab` real-click success (all 5, after the mid-turn regression fix), `btnClear` at 150ms
+false→(false for the 3 affected themes, matching the brief self-correction window)→true at 550ms (all 5,
+fully settled).
+
+## Files
+- `DDCS-Studio/web/styles.css` — the deck-tab-panel scroll fix, the editor-keys-row/deck-tabs horizontal-
+  overflow fixes (+ the deck-tabs min-height correction for the regression those introduced), the app-shell/
+  dock-body dvh + safe-area-inset-bottom additions.
+- `DDCS-Studio/web/ui/commandDeck.js` — the theme-switch header-fit re-verify (250ms delayed re-check).
+- `DDCS-Studio/verification/t2081_mobile_geometry_probe.mjs` — new, the main gate: geometry measurements at
+  360x690 across all 5 themes (container overflow, element reachability, real-click success).
+- `DDCS-Studio/verification/t2081_hoverflow_debug.mjs` — new, walks `.dock-body` descendants to find exactly
+  which elements overflow and by how much — the tool that found the 24px/51px numbers.
+- `DDCS-Studio/verification/t2081_tabs_height_debug.mjs` — new, found the deck-tabs collapsed-height /
+  forced-overflow-y CSS quirk behind the mid-turn regression.
+- `DDCS-Studio/verification/t2081_vartab_debug.mjs` — new, verifies the VARIABLES tab is genuinely
+  hit-testable (not just geometrically positioned) after scrolling.
+- `DDCS-Studio/verification/t2081_timing_debug.mjs`, `_debug2.mjs`, `_debug3.mjs`, `_debug4.mjs` — new, the
+  four sequential hypothesis tests for the btn-clear timing bug (immediate re-run / long wait / double-rAF /
+  delayed re-verify) — kept as separate scripts since each is its own falsifiable test, not collapsed into one.
+- `DDCS-Studio/verification/t2081-mobile-screens.mjs` — new, before/after screenshot capture at 360x690
+  (main, deck-open, deck-scrolled, variables-tab, after-runtime-switch), all 5 themes.
+- `DDCS-Studio/verification/t2081-{before,after}-*.png` — 50 screenshots.
+
+🔨 turn 2081

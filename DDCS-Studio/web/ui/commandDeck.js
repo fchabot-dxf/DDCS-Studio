@@ -657,7 +657,24 @@ export class CommandDeck {
             window.addEventListener('resize', fit);
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);   // t748 — re-fit once webfonts settle (fallback metrics are narrower), so a cold load can't leave the nav overflowing
             if (window.MutationObserver) {
-                const mo = new MutationObserver(fit);
+                // t2081 (MOBILE) — a THEME SWITCH specifically (not resize, not initial load) leaves a stale
+                // measurement: the rAF-scheduled fit() reads header scrollWidth/clientWidth before the new
+                // theme's own metrics (its buttons render at a different size/font) have actually settled, so
+                // the yield loop in _fitAppHeader() can stop one rung short of what the SETTLED layout needs —
+                // confirmed empirically at 360x690: btn-clear landed fully off-screen (x=363-407) after a
+                // runtime switch to normal/steampunk/organic, with the header stuck at 5 of HEADER_YIELD's 6
+                // classes even 1.2s later (so NOT a race that resolves given more real time — the stale
+                // decision, once made, never gets revisited). Calling _fitHeader()/_fitAppHeader() AGAIN with
+                // fresh metrics — via resize, or a manual re-call — fixes it instantly (also confirmed). A
+                // single or even double rAF after the mutation was NOT enough (also tested, still stale); a
+                // one-shot re-verify once things have genuinely settled reliably was. Scoped to the theme
+                // MutationObserver only — resize/fonts.ready/initial load don't exhibit this, so they don't
+                // need the extra call.
+                const fitThemeSwitch = () => {
+                    fit();
+                    setTimeout(() => { this._fitHeader(); this._fitAppHeader(); }, 250);
+                };
+                const mo = new MutationObserver(fitThemeSwitch);
                 mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
                 if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
             }
