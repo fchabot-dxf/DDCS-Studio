@@ -158,3 +158,27 @@ links repeat runs). `ui/cloud/googleDrive.js` already has the upload/list primit
 ⚠ Reuse the UPSERT discipline — Drive permits duplicate names, so a blind create duplicates a job.
 ⚠ Prove it end to end (a real browser submit → a real gateway claim → a real controller delivery) before
 believing it; that rule is what months of `[TO TEST]` on r2.py earned.
+
+### 9. A job sent while the controller is OFF is discarded, not queued
+*(found 2026-08-19 while answering the human's "is CNC-FAIRY a gateway when the controller is on and a
+client when it's shut down?" — the role answer is no, but the instinct behind it exposed this.)*
+
+`poller._claim()`: when `transfer.deliver()` raises `OSError` (share unreachable = controller powered down,
+cable out, network blip) the job is marked **`failed`** and **`delete_job()`d from the inbox** — comment:
+*"don't wedge the queue on a bad job"*. Correct for a genuinely bad job (malformed, wrong machine); **wrong
+for a machine that is merely OFF**, which is the ordinary case of authoring in the evening.
+
+⚠ **The Drive path makes this materially worse, and it is new as of t2080:** a client sends from a phone,
+the UI honestly says "queued — the machine picks it up when it next runs", and the first poll of a sleeping
+gateway *deletes it*. The user is told to expect asynchrony and then silently loses the job. **A client's
+send is supposed to be offline-tolerant BY CONSTRUCTION** (ROLES-PLAN.md) — this is the one thing that
+breaks that promise.
+
+**Shape of a fix:** distinguish TRANSIENT from FATAL. Unreachable/`OSError` ⇒ leave the job in the inbox and
+retry on a later tick (the queue is FIFO and the job is already durable, so "wedging" is not what happens —
+it simply waits, which is the correct behaviour). Reserve delete-and-fail for a job that cannot ever
+succeed: refused identity, unreadable content.
+⚠ Keep a real ceiling so a genuinely dead destination does not retry forever in silence — an attempt count
+or an age, and when it trips, fail it LOUDLY with the reason (`t2073`'s honesty rule: never a silent drop).
+⚠ `test_poller_track_gate.py` and `test_history_real_path_2065.py` both drive this path — read them first;
+one asserts the failed-job cleanup that this changes.
