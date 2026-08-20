@@ -72,11 +72,23 @@ Three separable asks, in increasing cost — the first is worth doing alone:
    convenient or easy"*. Cheap version: an optional `go` field on a note (`{ short, full, go }`) whose value is
    an existing global the app already exposes (`window.openSettings`, `showApp('gateway')`, the quick menu).
    ⛔ Do NOT invent a navigation layer for this; if a note's target has no existing door, it simply gets no link.
-3. **A screenshot per note.** Most expensive and needs thought before any code: images have to be produced at
-   release time, kept in sync with a UI that changes weekly (this session alone moved the account chip, the
-   editor row and the file menu), and either bundled into the exe — which is size the gateway is deliberately
-   slim about — or fetched, which breaks the offline-first rule. **Measure the cost before committing**: a stale
-   screenshot is worse than none, because it teaches a layout that no longer exists.
+3. **A screenshot per note.** ⚠ **MY FIRST OBJECTION HERE WAS WRONG AND IS CORRECTED, so it does not get
+   re-raised:** I argued images would go stale against a weekly-changing UI. The human's answer —
+   *"of course they go stale, but that's why we release new updates"* — is right, and it dissolves the problem:
+   **release notes are VERSIONED AND IMMUTABLE.** A picture in the V2026.08.19.4 notes documents what
+   V2026.08.19.4 introduced; it is a historical record, not a live document, and it is CORRECT for it to keep
+   showing that release's layout forever.
+
+   That reframing also makes it cheap, via a fact about the surface: **the welcome modal only ever fires for the
+   version just installed** (`checkWelcomeNotice` compares stored-vs-current at boot). So only the CURRENT
+   release's images can ever render — historical ones are never displayed and must NOT be accumulated in the
+   bundle. ⇒ **Ship images for the newest release only; drop the previous release's when cutting a new one.**
+   The note TEXT stays for history (the banner still reads older entries); the images do not.
+
+   Remaining real costs, neither fatal: (a) someone must capture + crop at release time — a per-release chore
+   the ritual has to name, or it silently stops happening; (b) they must be BUNDLED, not fetched — the gateway is
+   offline-first, so a CDN URL would break exactly the shop-with-no-internet user this is for. Budget a few tens
+   of KB for ~3 cropped PNGs and keep them out of `--onefile` growth by replacing rather than appending.
 
 Files: `web/data/releaseNotes.js` (the authored source), `web/ui/updateCheck.js` (`checkWelcomeNotice` renders
 one panel per entry). ⚠ `update-check.spec.js` asserts the modal's panel-per-entry structure and the
