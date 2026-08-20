@@ -6906,3 +6906,47 @@ human's own rule ("any workspace can only have one controller") names the folder
    derived default).
 2. **Namespace the Drive inbox per machine** — unblocks the V4.1 on this path.
 3. `BACKLOG.md` — 8 small items, each with its diagnosis and trap.
+
+# ═══ THE "DELETE LOCAL" GATE — measured against the human's own rule (2026-08-19) ═══
+*(human, reiterating: "im willing to let go of local when we know its really replaced". The standing ruling
+is in this file above — ONE BOX is permanent; LAN SERVING dies once cloud is PROVEN; the gate was written
+strictly BECAUSE `backend/r2.py` read like a working cloud path for months while tagged `[TO TEST]`.)*
+
+## THE RULE, verbatim from the ruling
+> *a real job submitted from the console, written to the user's Drive, **polled and claimed by the gateway,
+> delivered to a real controller**, with the job appearing in history.* NOT proven by unit tests against a
+> mocked Drive, a successful OAuth handshake, or reasoning from documentation.
+
+## STATUS — the transport is proven; THE LOOP IS NOT
+| link | proven? |
+|---|---|
+| OAuth sign-in + token refresh | ✅ live, the human's account |
+| Drive folder tree, `put_job` / `list_inbox` / `get_job` | ✅ live |
+| UPSERT (3 status writes → 1 file) | ✅ live |
+| delete-on-deliver empties the inbox | ✅ live |
+| a BROWSER-shaped job is listed/read/classified by the real `DriveBackend` | ✅ live |
+| **a gateway running `backend=drive` CLAIMS it** | ❌ **never run** |
+| **DELIVERED to a real controller (lands on CNCDISK)** | ❌ **never run** |
+| **appears in history** | ❌ **never run** |
+
+⇒ **Every piece has been exercised against real Google; they have never been run as ONE CHAIN onto a
+machine.** That is exactly the shape the gate exists to catch. **The gate is NOT met.**
+
+## ⚠ AN ARGUMENT THE RULING NEVER CONSIDERED — the offline shop
+LAN serving is the only path from a PHONE to the machine **in a shop with no internet**. Cloud cannot cover
+it (Google must be reachable) and one-box cannot either (that is localhost, the same PC). ⇒ *"Cloud replaces
+LAN"* is true only for the INTERNET-CONNECTED case. Deleting LAN silently drops the offline case, and the
+ruling does not say whether that case matters — **it must be answered explicitly, not by omission.**
+
+## TWO DEFECTS THAT MAKE CLOUD LESS RELIABLE THAN LAN TODAY
+- **BACKLOG #9** — a job sent while the controller is OFF is DISCARDED, not queued (`poller._claim` deletes
+  it on `OSError`). Cloud sending is asynchronous by nature, so this bites the cloud path hardest — a phone
+  is told "queued", and a sleeping gateway's first poll destroys the job.
+- **Backend switching STRANDS the queue** — local↔drive inboxes are mutually invisible, nothing migrates,
+  nothing warns. Likely to happen at the same moment as a role change and to be blamed on roles.
+
+## ⇒ RECOMMENDATION, for the human to accept or overrule
+**Do not delete LAN yet.** Order: (1) run the full loop end to end onto the Expert; (2) fix #9 so an
+offline machine queues instead of discarding; (3) answer the offline-shop question explicitly; THEN decide.
+The honest sentence at that point is *"cloud replaces LAN for the internet-connected case"* — and whether
+the remaining case is worth the messy middle is the human's call, made with evidence rather than optimism.
