@@ -7249,3 +7249,41 @@ though the name does the routing.
 ⭐ It also removes the risky half of S4's picker: **the browser does not need to enumerate Drive to know
 what machines exist — it opens the workspace it already has.** Enumeration is then needed only for the
 live/dead dot, narrowing the unverified cross-client-visibility question to one non-critical read.
+
+## ⚠ CONTRADICTION SWEEP — 2026-08-19, before resuming the loop
+*(human: "so any other contradictions before looping". All three VERIFIED in code, not inferred.)*
+
+### ① THE DRIVE POLL CADENCE CONTRADICTS ITS OWN QUOTA WARNING — and it bites at the bench
+`drive.py:46-48` warns: *"Drive's per-user limits are far tighter than R2's; a 5s poll is antisocial and
+will meet them. `config.drive_poll_s` defaults to 15s."* `config.py:29` declares `drive_poll_s = 15.0`.
+⛔ **Nothing reads it.** `bridge.py:161` sleeps `config.run_poll_interval_s if poller.active else
+config.poll_interval_s` — 1.0s / **5.0s**, identical for every backend. ⇒ **Drive polls at exactly the
+cadence its own module calls antisocial**, via a field declared for this purpose and never wired.
+⭐ **Ninth instance of declared-never-run**, and the first with a RUNTIME consequence: a Google quota trip
+during the bench session, on the path being tested. Fix with the Drive backend's cadence, not a new one.
+
+### ② "CLIENT-SIDE TRACKING" CONTRADICTS "NEVER ON THIS PATH"
+`NEXT-SESSION.md:89` queues *"client-side Tracking mirroring the gateway's published status."*
+`drive.py:47-49` states Drive is *"right for SENDING and wrong for live progress — which is fine and by
+design: live tracking runs on the serial cable, never on this path."*
+
+⭐ **Root cause: the Tracking tab conflates two things with 10x different cadences.**
+- **JOB STATE** (queued → delivering → done). Coarse. Fine at 15s. Cloud CAN carry it.
+- **MACHINE POSITION** (2s Modbus reads, `position_poll_interval_s`). Cloud CANNOT carry it.
+⇒ Whoever builds that line will ship a job-state mirror while a user expects a live DRO. **Split the
+words before building:** "Tracking" must stop naming both.
+
+⚠ **A CAPABILITY LOSS THE LAN-REMOVAL PLAN DOES NOT ACKNOWLEDGE.** Today a second PC browses
+`&lt;gateway&gt;:8765` and watches live position, because the gateway relays serial over HTTP. **Delete LAN
+serving and there is no cloud replacement** — the cable is at the machine. Probably acceptable (you stand
+at the machine while it cuts) but it must be a STATED DECISION, not a discovery afterwards.
+⇒ **"Cloud works" must be defined as: cloud carries SENDING.** It does not carry live position.
+
+### ③ SOME PUBLISHERS ARE GUARDED, SOME ARE NOT — now load-bearing
+`poller.py:54` and `ops.py:221` guard on `expert_dest`; `bridge.py:146-150` runs `explorer.tick()` and
+`_publish_heartbeat()` **unconditionally**. ⇒ a second exe with no controller overwrites
+`cncdisk/index.json` with an empty list and `heartbeat.json` with `controller_connected: false` — **making
+the real gateway look dead.** Job claiming stays safe; the console lies about liveness.
+⚠ **This was cosmetic when first written and is not any more:** the online-flag design (above) and ② both
+propose READING the heartbeat, so an unguarded publisher stops being noise and starts feeding a decision.
+Gate both publishers, and prove it with two instances against one rendezvous — not a unit test on a flag.
