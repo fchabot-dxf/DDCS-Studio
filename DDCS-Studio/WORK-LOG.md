@@ -46196,3 +46196,42 @@ pre-existing, already-documented unrelated 403.
 
 🔨 turn 2107
 
+# t2109 — the one-character V4.1 profile-id bug (urgent: blocked a live bench test in progress)
+
+Dispatch: `ops.py:56`'s `_CONTROLLERS["v4.1"]["id"]` was `"ddcs-v4.1"` (with a dot). Fourteen other files
+(`controllerProfiles.js`, the dialect module's own filename `web/wizards/dialects/ddcs-v41.js`,
+`dumpImport.js`, `portingArc.js`, `PORTING.md`, golden snapshots, 8 specs) all agree on `"ddcs-v41"` (no dot)
+— `ops.py` was the ONE file that disagreed. `t1229`'s hard-block (`compareController`) compares
+`descriptor().controller_profile_id` against the workspace's `controllerId`; the dotted spelling made a
+PERFECTLY CORRECT V4.1 setup read as a mismatch, unconditionally, with no override by design — blocking every
+send. The human has a real V4.1 hooked up bench-testing this right now.
+
+**Fixed**: one line, `"ddcs-v4.1"` → `"ddcs-v41"`. Did NOT touch the browser side (already fixed by the
+advisor; that id is persisted in user `.ddcs` files and is the dialect module's own filename).
+
+**Why no existing test caught it**: `gateway-mismatch-gate-1229.spec.js` mocks `profile` as `{id: 'ddcs-v41'}`
+— the BROWSER's own spelling — so it proved the hard-block works against a value the real gateway never
+actually produces. A test entirely on the browser side of the seam, silent about what the gateway itself
+publishes.
+
+**The durable fix, per the dispatch's own framing** ("the one-character change is trivial; the test is the
+real deliverable"): new `tests/test_controller_id_agreement_2109.py`. Reads `controllerProfiles.js` LIVE (a
+small regex over the actual file's own 4-space-indented top-level keys — never a hardcoded copy of them, which
+would be exactly the kind of second source that let the dot drift in unnoticed in the first place) and asserts
+every id `ops.py`'s own `_CONTROLLERS` table publishes is a real key there. Loops over EVERY family, not just
+one — Expert already agreed, which is exactly how this hid as long as it did (some sends worked fine).
+
+**Non-vacuity, proven the same way as t2107's cache fix**: reverted the one-line fix, ran the new test,
+watched it fail with the EXACT reported symptom (`ops.py's _CONTROLLERS['v4.1'] publishes id='ddcs-v4.1',
+which controllerProfiles.js does NOT recognise`), restored the fix, confirmed green.
+
+## Gate
+
+Full bridge-app pytest: 104/104 (101 + 3 new). `--self-test`: unchanged at the established 47-`[ok]` baseline.
+
+## Files
+- `bridge/bridge-app/fairy/ops.py` — the one-character fix (`_CONTROLLERS["v4.1"]["id"]`).
+- `bridge/bridge-app/tests/test_controller_id_agreement_2109.py` — new, 3 tests.
+
+🔨 turn 2109
+

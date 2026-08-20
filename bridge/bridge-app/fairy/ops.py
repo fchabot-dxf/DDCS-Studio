@@ -53,7 +53,11 @@ class Ops:
         "expert-m350": {"id": "ddcs-expert-m350", "name": "DDCS Expert M350", "source": "builtin",
                         "hardwareTabs": ["probes", "limits"],
                         "atc": {"toolTableBaseVar": 1430, "defaultToolCount": 10}},
-        "v4.1": {"id": "ddcs-v4.1", "name": "DDCS V4.1", "source": "builtin",
+        # t2109 — "ddcs-v41", NO DOT. Was "ddcs-v4.1" (one character, "." — blocked every send to a V4.1):
+        # the browser's own controllerProfiles.js key, the dialect module's own filename
+        # (web/wizards/dialects/ddcs-v41.js), dumpImport.js, portingArc.js, PORTING.md, golden snapshots, and
+        # 8 specs all agree on "ddcs-v41" — this was the one place, of fourteen files, that disagreed.
+        "v4.1": {"id": "ddcs-v41", "name": "DDCS V4.1", "source": "builtin",
                  "hardwareTabs": ["probes", "limits"], "atc": None},
     }
     _FW_KEYS = ("DDCSV4", "DDCSE", "Expert", "M350", "MSETDATA", "MGETDATA", "Modbus")
