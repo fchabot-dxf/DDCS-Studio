@@ -16,6 +16,7 @@ import re
 
 from . import __version__, cncdisk, identity
 from .config import effective_role, role_conflict
+from .transfer import controller_disk_reachable
 
 _SLUG = re.compile(r"[^A-Za-z0-9_.-]+")
 
@@ -219,12 +220,9 @@ class Ops:
 
     # --- identity / descriptor ---------------------------------------------
     def controller_reachable(self):
-        if not self.cfg.expert_dest:
-            return False
-        try:
-            return os.path.isdir(self.cfg.expert_dest)
-        except OSError:
-            return False
+        # t2105 — delegates to the SAME function the Poller's claim gate now uses (transfer.py), so this
+        # descriptor/UI check and the fact that decides whether a job gets claimed can never disagree.
+        return controller_disk_reachable(self.cfg.expert_dest)
 
     def descriptor(self):
         """Who this gateway is + its live-ish state. Basis for the heartbeat and the Admin view."""

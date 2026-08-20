@@ -335,10 +335,34 @@ export default {
     // clobbered back to "Send (deliver-only)" the moment anything re-synced — the label would flicker or
     // silently lie about which transport a click uses.
     this._viaDrive = false;
+    // t2105 - THE GREY. 'Is a gateway running' is AMBIENT state, knowable before the click, so it belongs
+    // in the same family as 'no Google account' (which t1327 already greys) rather than with the
+    // envelope/spindle/controller checks, which are JOB-SPECIFIC and can only be judged once you look.
+    // ⚠ IT IS ALSO THE EXPENSIVE ONE: unlike gateway reachability (a localhost call on every tick), this
+    //    is a Google Drive request, and drive.py's own docstring warns that Drive's per-user quota is far
+    //    tighter than R2's. So it is polled ONLY when it can matter - no local gateway AND signed in - and
+    //    no faster than the heartbeat it reads (written every 20s; stale at 60s).
+    // ⭐ THE GREY IS INFORMATIVE, THE CLICK IS AUTHORITATIVE. This cache can be up to HB_REFRESH_MS stale,
+    //    so the refusal inside onclick re-reads and stays the real gate. Same shape as the mismatch block:
+    //    the UI disarms on what it knows, the click re-checks before anything leaves the browser.
+    this._hbState = null;      // null = not looked yet; never treated as 'no gateway'
+    this._hbAt = 0;
+    const HB_REFRESH_MS = 30000;
+    this._refreshHeartbeat = () => {
+      if (this._gatewayReachable || !canSendViaDrive()) return;   // nothing to ask about
+      const now = Date.now();
+      if (now - this._hbAt < HB_REFRESH_MS) return;
+      this._hbAt = now;
+      readGatewayHeartbeat((getMachine() || {}).name)
+        .then((r) => { this._hbState = r && r.state; this.applyState(this._lastDesc); })
+        .catch(() => { this._hbState = 'unreadable'; });   // ignorance, not absence
+    };
     this._sendLabel = () => (this._viaDrive ? 'Send via Drive'
                                             : (beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)'));
     this.applyState = (desc) => {
+      this._lastDesc = desc;
       const c = contractFor('send');
+      this._refreshHeartbeat();
       const out = isUnreachable(desc);
       this._gatewayReachable = !out;
       // ⚠ DECLARED FIRST because BOTH the banner and the button read it — it used to be declared below the
@@ -352,9 +376,13 @@ export default {
       // t2080b — the banner must not contradict the button. `c.reason` ends "...sending needs a machine",
       // which stopped being true the moment a signed-in client could route the job through Drive: the user
       // would read "you cannot send" directly above a live Send button.
+      // t2105 - the banner promised ~15s unconditionally. That is only true when a gateway is actually
+      // polling; with none running the job would not be picked up AT ALL, so the promise became the lie.
+      const noGw = viaDrive && (this._hbState === 'stale' || this._hbState === 'unseen');
       banner.textContent = out
-        ? (viaDrive ? 'No gateway on this device — sending goes through your Google Drive; the machine picks it up within ~15s.'
-                    : c.reason)
+        ? (noGw ? 'No gateway is running for this machine — start Studio on the PC wired to it, then send.'
+                : viaDrive ? 'No gateway on this device — sending goes through your Google Drive; the machine picks it up within ~15s.'
+                : c.reason)
         : '';
       // t2080b — A CLIENT HAS NO GATEWAY AND THAT IS NOT AN ERROR ANY MORE. t1327 disarmed Send whenever no
       // gateway answered, which was right when the gateway was the only transport. It is not: a signed-in
@@ -362,8 +390,12 @@ export default {
       // button DEAD ON A PHONE — no error, no toast, nothing — which is exactly how this was reported.
       // ⚠ The banner still shows: "no gateway here" remains true and worth saying; it just no longer means
       // "you cannot send".
-      btn.disabled = (out && !viaDrive) || !file.text;
-      btn.title = viaDrive ? 'No gateway on this device — sends through your Google Drive; the machine picks it up within ~15s'
+      // ⭐ noGw greys on a KNOWN absence only. this._hbState null (not looked yet) or 'unreadable'
+      //   leaves the button LIVE - refusing on ignorance would break sending outright if the
+      //   browser turns out not to see desktop-written Drive files, the one direction never measured.
+      btn.disabled = (out && !viaDrive) || noGw || !file.text;
+      btn.title = noGw ? 'No gateway is running for this machine, so nothing would collect this job'
+                       : viaDrive ? 'No gateway on this device — sends through your Google Drive; the machine picks it up within ~15s'
                            : (out ? c.reason : '');
       btn.textContent = this._sendLabel();
       // the offline half stays live on purpose — dropping a file, using the Studio program, naming the job

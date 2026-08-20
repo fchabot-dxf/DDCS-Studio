@@ -73,6 +73,14 @@ class Poller:
             return
         if not self.cfg.expert_dest:
             return                                  # gateway role, but no controller configured yet (Setup) — leave jobs queued
+        # t2105 (JOB-RULES.md §2) — THE THIRD CLAIM CHECK, previously missing: CONFIGURED is not REACHABLE.
+        # Without this, switching the mill off claimed the next job anyway, transfer.deliver() raised OSError,
+        # and the existing except-branch called delete_job — the job was DESTROYED because a machine was
+        # switched off. The inbox IS the queue (no retry counter/backoff/ceiling — deliberately not built,
+        # JOB-RULES.md §6): not claiming already means waiting, so this simply leaves the job queued exactly
+        # like the expert_dest check above, rather than claiming it into a delivery that cannot succeed.
+        if not self.transfer.reachable():
+            return
         ids = self.backend.list_inbox()
         if ids:
             self._claim(ids[0])                    # oldest jobId == FIFO

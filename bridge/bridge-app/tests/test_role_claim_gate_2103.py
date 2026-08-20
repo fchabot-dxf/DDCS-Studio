@@ -25,6 +25,11 @@ class _StubTransfer:
     def __init__(self):
         self.calls = []
 
+    def reachable(self):
+        # t2105 — this file is about the ROLE gate specifically; stay reachable so the (separate) t2105
+        # reachability gate never interferes with what these tests are actually proving.
+        return True
+
     def deliver(self, nc, name):
         self.calls.append((nc, name))
         return r"\\stub\cncdisk\%s" % name

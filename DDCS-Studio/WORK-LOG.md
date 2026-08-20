@@ -45981,3 +45981,125 @@ what a warning is for. Rewritten in plain ASCII. Re-verified: the same live scen
 
 🔨 turn 2103
 
+# t2105 — JOB-RULES.md: the reachability claim gate + the shutdown warning; the third item built then reverted
+
+Dispatch: implement the `[RULED]` items in the new `bridge/bridge-app/JOB-RULES.md` (read first, per the
+advisor's own instruction — the ONE source for job-lifecycle behaviour now, every line tagged `[SHIPPED]`
+(verified) or `[RULED]` (decided, not built)). Three items originally: the reachability claim gate, a shutdown
+warning, and a restart-discard policy. **The third was explicitly withdrawn mid-turn** by the advisor (two
+amendments, the second definitive) after the human corrected the advisor's own justification for it. Built it,
+then reverted it cleanly — recorded in full below since the withdrawal reasoning is itself worth keeping.
+
+## THE REAL DEFECT, closed
+
+`poller._maybe_claim` gated on role (t2103) and on `expert_dest` being CONFIGURED, but never on it being
+REACHABLE. With the mill switched off: the job was claimed, removed from the inbox, `transfer.deliver()` raised
+`OSError`, and the pre-existing `except OSError` branch called `delete_job` — **the job was destroyed because a
+machine was switched off.**
+
+`ops.controller_reachable()` already existed (`ops.py:220`, already published as `controller_connected`,
+already rendered in three UI places) — simply never consulted at the one moment that decides whether a job
+lives or dies. Rather than give `Poller` a dependency on `Ops` (backwards — `Ops` is the higher orchestration
+layer) or duplicate three lines of `os.path.isdir` logic, extracted the check into `transfer.py` as
+`controller_disk_reachable(expert_dest)` — the ONE source now, with `Transfer.reachable()` as a convenience for
+callers (like `Poller`) that already hold a `Transfer`, and `Ops.controller_reachable()` delegating to the same
+function. A UI that says "reachable" and a poller that just destroyed a job for being unreachable can no longer
+disagree about what "reachable" means, because they're reading the identical fact.
+
+`_maybe_claim` now checks `self.transfer.reachable()` right after the existing `expert_dest` check, in the SAME
+shape ("leave it queued", no claim, no delete) — matching JOB-RULES.md §6's explicit "nothing to build" framing:
+the inbox IS the queue, so not claiming already means waiting. No retry counter, no ceiling, no backoff, no
+persisted retry state — that machinery was proposed (BACKLOG #9) and the human does not want it; this rule
+supersedes its implementation half.
+
+## The shutdown warning
+
+`run_loop`'s `finally` block (not just the clean-Ctrl+C branch — an unexpected crash leaves the inbox exactly
+as unattended as a deliberate stop) now reports the count if the inbox is non-empty at exit: *"N job(s) still
+waiting in the inbox — nothing will deliver them while this is closed."* Read-only, wrapped in its own
+try/except so a reporting failure can never mask whatever actually happened at exit.
+
+## A regression found and fixed while verifying, twice
+
+Adding `self.transfer.reachable()` to the claim gate broke every EXISTING test whose own hand-rolled stub
+`Transfer` class didn't implement the new method — `AttributeError`, not a logic bug, but a real break all the
+same. Found via the full pytest run (8 failures), not assumed clean from the new tests alone. Traced and fixed
+THREE separate stub classes across two files (`test_poller_track_gate.py`'s module-level `_StubTransfer` AND a
+second, locally-defined `_SnoopTransfer` inside one specific test — a `grep -l` (files-only) search had
+correctly found the file but not the second definition inside it, caught by re-running full and reading the
+NEW failure's own traceback rather than assuming the first fix was sufficient) and `test_role_claim_gate_2103.py`'s
+own `_StubTransfer`. A SECOND regression surfaced the same way on the next full self-test run:
+`fairy/bridge.py`'s own `self_test()` has a THIRD stub, `_Boom` (deliberately raises `OSError` to test the
+delivery-failure path), also missing `.reachable()` — self-test's own `[ok]` count dropped from 47 to 19 before
+the crash, caught by comparing against the known-good baseline rather than reading exit code alone. All three
+fixed to return `True` (each test's own subject is what happens AFTER a successful claim, not reachability
+itself).
+
+## A second, more severe bug found and fixed while verifying LIVE (not by inspection)
+
+The `role_conflict` warning added in t2103 used `⚠` (U+26A0). Verified live via a real `run_loop()` in a
+thread — confirmed this session's console codepage (cp1252) has no encoding for it, throwing an uncaught
+`UnicodeEncodeError` that crashed the ENTIRE `run_loop` thread. A warning line taking the whole gateway process
+down with it — the opposite of what a warning exists to do. Rewritten in plain ASCII in that same turn's
+commit; the advisor has since made this a standing project rule (keep runtime strings in `bridge/bridge-app`
+ASCII) rather than a one-off fix.
+
+## ITEM 3 — built, then withdrawn; the withdrawal itself recorded because the reasoning matters
+
+Built first, per the original dispatch: `Poller.discard_stale_inbox()` — on startup, if the mill was NOT
+reachable at that exact moment, every job currently queued was discarded with a `failed` status naming the
+reason ("the gateway restarted before this could be delivered"); a no-op if the mill WAS reachable (the
+ordinary tick loop already delivers everything it can — no special "resume" logic needed for that half, already
+`[SHIPPED]`). Wired into `run_loop()` right after `build()` succeeds. 7 driven tests written and passing,
+including the two shapes that matter most (discards everything when unreachable; untouched when reachable).
+
+**Then withdrawn, in two amendments, the second definitive.** The advisor's own original justification —
+"a job sent Monday, surviving to Thursday, is stale G-code, a hazard a stale email is not" — turned out to be
+built on an assumption the human corrected: **nothing ever auto-starts on a DDCS.** A delivered file sits on
+the controller's disk until an operator manually selects and runs it, so a surviving job is delivered LATE, not
+executed dangerously — the real residual risk (an operator mis-picking an old file from a list) is real but far
+weaker than "stale code could run itself." Compounding this: the advisor's own §5 phone rule (a phone may not
+send unless a gateway is genuinely running right now) means a job can only be CREATED while something is there
+to drain it — so surviving to a restart requires send-while-running, then the mill going off, then the gateway
+restarting before the mill returns: a window measured in minutes, not the days the original justification
+imagined. **The stated principle: prevention at the moment of action beats cleanup after the fact** — at send
+time a human is present and can be told no; at a restart hours later, cleanup machinery is answering a question
+nobody is there to hear the answer to. `JOB-RULES.md` §3 now carries the item as `[DROPPED]` with this reasoning
+as the source of record.
+
+**Reverted cleanly, not left half-in:** `discard_stale_inbox()` removed from `poller.py`; the `run_loop()` call
+site removed from `bridge.py` (plus a stray comment elsewhere that still referenced the removed method, caught
+by a repo-wide grep for the name after the main revert, not assumed complete); the 3 tests specific to it
+removed from the new test file, keeping the 4 that prove the claim gate itself (which is unaffected by the
+withdrawal — items 1 and 2 were explicitly unchanged throughout both amendments). Full pytest re-run clean
+after the revert: 99/99 (102 with item 3, minus the 3 removed tests).
+
+## Verified against the real symptom throughout
+
+- New `tests/test_reachability_claim_gate_2105.py` (4 tests, after the item-3 tests were removed), against the
+  REAL `Transfer` class (not a stub) reading the REAL filesystem — `expert_dest` pointing at a path that
+  genuinely does not exist: the job survives a tick, survives 10 repeated ticks, and never even gets a status
+  written (proving it was never claimed at all, not claimed-then-somehow-recovered). The common (reachable —
+  a real, existing directory) case still delivers and the file genuinely lands on disk. `Ops.controller_reachable()`
+  and `Transfer.reachable()` proven to agree across reachable/unreachable/blank inputs, directly, not assumed
+  from reading that they call the same function.
+- The shutdown warning driven live twice: a client-role poller with a seeded, never-claimed job (own dedicated
+  scratch scenario, since `run_loop` isn't otherwise unit-testable) — the exact count-naming line printed on
+  `KeyboardInterrupt`; a second run with an empty inbox confirmed no warning fires.
+- Full bridge-app pytest: 99/99 (89 baseline + 6 t2103 role tests + 4 t2105 reachability tests). `--self-test`:
+  back to the established 47-`[ok]` baseline with the same single pre-existing, already-documented (t2097/
+  t2099/t2103 WORK-LOG) unrelated 403; confirmed unchanged after both the fix and the item-3 revert.
+
+## Files
+- `bridge/bridge-app/fairy/transfer.py` — `controller_disk_reachable()` (the one source), `Transfer.reachable()`.
+- `bridge/bridge-app/fairy/poller.py` — `_maybe_claim`'s third check.
+- `bridge/bridge-app/fairy/ops.py` — `controller_reachable()` now delegates to the shared function.
+- `bridge/bridge-app/fairy/bridge.py` — the shutdown warning (`finally`, all exit paths); the item-3 call site
+  added then removed; a stray comment referencing the removed method corrected.
+- `bridge/bridge-app/tests/test_reachability_claim_gate_2105.py` — new, 4 tests (down from 7 after the
+  item-3 tests were removed).
+- `bridge/bridge-app/tests/test_poller_track_gate.py`, `tests/test_role_claim_gate_2103.py` — stub `Transfer`
+  classes given `.reachable()`.
+
+🔨 turn 2105
+

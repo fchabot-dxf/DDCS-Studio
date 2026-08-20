@@ -35,6 +35,11 @@ class _StubTransfer:
     def __init__(self):
         self.calls = []
 
+    def reachable(self):
+        # t2105 — this file's own tests are about what happens AFTER a job claims (tracked/deliver-only,
+        # enable_slave), not about reachability itself; stay reachable so the claim gate never blocks them.
+        return True
+
     def deliver(self, nc, name):
         self.calls.append((nc, name))
         return r"\\stub\cncdisk\%s" % name
@@ -142,6 +147,9 @@ def test_delivering_state_is_visible_during_the_write_then_becomes_delivered():
         seen = {}   # a transfer that snapshots the state a concurrent reader (the launcher) would see MID-WRITE
 
         class _SnoopTransfer:
+            def reachable(self):
+                return True   # t2105 — this test is about the mid-write status snapshot, not reachability
+
             def deliver(self, nc, name):
                 st = backend.get_status(job["jobId"])       # what /api/queue would report during the copy
                 seen["mid"] = st["state"] if st else None

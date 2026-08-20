@@ -213,6 +213,19 @@ def run_loop(config):
     except KeyboardInterrupt:
         print("\n[bridge] stopped")
     finally:
+        # t2105 (JOB-RULES.md §3) — "the one moment the person can still act": say so if anything is still
+        # waiting, on EVERY exit path (finally, not just the clean Ctrl+C branch above) — an unexpected crash
+        # leaves the inbox exactly as unattended as a deliberate stop does, and the operator needs the same
+        # answer either way. Read-only (list_inbox), never touches or discards the jobs themselves — §3's own
+        # restart-discard idea was RULED OUT entirely (see JOB-RULES.md's [DROPPED] tag and its reasoning);
+        # a surviving job just waits for the next reachable tick, exactly like any other queued job.
+        try:
+            n_waiting = len(backend.list_inbox())
+            if n_waiting:
+                print(f"[bridge] {n_waiting} job(s) still waiting in the inbox — nothing will deliver them "
+                      f"while this is closed.")
+        except Exception:
+            pass   # a shutdown-time report must never mask whatever actually happened at exit
         if position_poller is not None:
             position_poller.stop()
         if server is not None:
@@ -390,6 +403,8 @@ def self_test():
     job_id = seed(backend)
 
     class _Boom:
+        def reachable(self):
+            return True   # t2105 — this test is about deliver() itself failing, not reachability
         def deliver(self, *a):
             raise OSError("simulated SMB failure")
     poller.transfer = _Boom()
