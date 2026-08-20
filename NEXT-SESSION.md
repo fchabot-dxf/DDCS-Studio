@@ -7206,3 +7206,46 @@ for display only. Do not compute staleness from the JSON field.
 on Drive the file describes whichever gateway wrote last. Correct with one gateway; wrong with two.
 ⚠ **Also depends on the exe --backend blocker above** — the exe never runs the Drive poller, so it has never
 published a heartbeat to Drive at all.
+
+## ⛔ SCOPE RULING — "REMOVE LOCAL" IS ONLY THE GATEWAY'S LAN SERVING
+*(human, 2026-08-19: "removing local is only about gateway". Read this BEFORE deleting anything with
+"local" in its name — the word covers three unrelated things here.)*
+
+| what | what it is | fate |
+|---|---|---|
+| **the LOCAL BACKEND** | `backend=local`, `~/.ddcs-bridge/_bridge_data`. Studio + gateway on ONE PC: no account, no internet, no addressing. | ⭐ **PERMANENT** — [[one-box-stays-forever]]. Never delete. |
+| **LAN SERVING** | bind `0.0.0.0`, browsing `http://&lt;gateway&gt;:8765` from another PC, the addressing story, the unbuilt QR feature, the LAN help copy. | ⛔ **DIES** once the cloud loop is proven end-to-end. Gateway-side only. |
+| **LOCAL FILES** | the `.ddcs` on disk, localStorage as a buffer. | ⭐ **PERMANENT** — [[persistence-user-owned-file-principle]]. |
+
+⇒ **Only the middle row is condemned.** It is a bind address plus the addressing story around it
+(`fairy_gateway.py:148` documents that seam). The local BACKEND and local FILES are untouched by that plan.
+
+### ⭐ THIS DETERMINES THE SHAPE OF THE `--backend local` BLOCKER FIX
+The fix is **NOT** "make the exe default to drive" — one-box must keep working with no account and no
+internet, forever. The fix is narrower: **stop FORCING the flag; keep `local` as the default when nothing
+is persisted; let a saved Drive choice survive the restart.** Exactly the `_persisted_beacons_on` shape.
+
+### ⭐ AND THE WORKSPACE ALREADY SYNCS — NO NEW CONFIG FILE ON DRIVE
+*(human: "yes it follows it already does" — VERIFIED: `workspaceSave.js:206` / `workspaceManager.js:238`
+ride `googleDrive.js`'s ensureRoot/list/read/write into the `DDCS Studio` folder.)*
+
+There are already TWO records of the same machine on one Drive, **with no key joining them**:
+- `DDCS Studio/&lt;MachineName&gt;.ddcs` — browser-written, already travels between PCs.
+  `{name, controllerId, kind, chuck, toolPost}`. ⛔ **No `machine_id` anywhere on the web side** (grepped).
+- `DDCS Bridge/gateway/heartbeat.json` — gateway-written. `machine_id`, `machine_name`,
+  `controller_connected`. ⛔ `machine_id` unset on both of the human's machines.
+
+⇒ **Do NOT add a `machine.json`.** The `.ddcs` IS that declaration and it already syncs; a third record of
+one machine is the two-sources shape this project keeps deleting. What is missing is a **JOIN KEY**, and it
+is nearly free: the workspace enforces the ONE-NAME RULE (`workspaceMachine.js:13-16` — name = filename =
+what every surface shows) and the gateway already collects and persists `machine_name`. Same string ⇒ join.
+Confirms S4's "name routes, id verifies" from the other side.
+
+⚠ **CONSEQUENCE TO DESIGN FOR: the workspace name IS its filename, so Save As RENAMES THE MACHINE** — which
+under S4 re-homes its Drive inbox and orphans anything queued under the old name. The stable `machine_id`
+in the heartbeat is what makes that DETECTABLE, which is the concrete reason the id cannot be skipped even
+though the name does the routing.
+
+⭐ It also removes the risky half of S4's picker: **the browser does not need to enumerate Drive to know
+what machines exist — it opens the workspace it already has.** Enumeration is then needed only for the
+live/dead dot, narrowing the unverified cross-client-visibility question to one non-critical read.
