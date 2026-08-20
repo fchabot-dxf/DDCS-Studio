@@ -45107,3 +45107,118 @@ here so it's recognized as pre-existing, not re-litigated as a t2089 regression,
 
 🔨 turn 2089
 
+# t2091 — P5c: the invisible-half color-notation cleanup (deliberately narrow scope)
+
+## Verified the audit's own numbers against the current file first — several didn't hold
+
+Same discipline as every recent turn: checked before trusting. The dispatch's specific examples were mostly
+stale (the GENERAL findings held, the SPECIFIC numbers/hexes often didn't):
+- The `.467`/`.533` three-decimal alphas cited don't exist anywhere in the file — only `.045` does (one
+  instance, a HUD grid-line gradient stop).
+- The `9fb4cc`/`9fb4c8`/`9fb3c8` cluster cited doesn't exist — the REAL near-duplicate cluster in that
+  neighbourhood is `#9fb0c4`(×5)/`#9fb0c0`(×1)/`#9fb2c6`(×1), distances 4.00 and 2.83.
+- `3b82f6`/`2d7ff9` (the two rival brand blues, correctly named out of scope) are at 21 and 9 uses respectively
+  in the current file, not the cited 37/25 — the FORK itself is real and correctly left untouched, just at
+  different counts.
+- "roughly 300 versus 205" for leading-dot vs leading-zero alpha notation: measured 215 vs 114 (comment-aware,
+  excluding the two exempt zones) — same direction, different exact count.
+
+None of this changed the plan — the invisible-half categories the dispatch named are all genuinely present and
+worth normalizing; only the specific illustrative numbers needed correcting before acting on them.
+
+## The two exempt zones, located precisely and protected programmatically, not just by eyeballing
+
+`comm-dialog` (found via its own start/end selectors, not hardcoded line numbers, since those shift) and
+`setup-sheet-page` + its `@media print` block. Found ONE real near-miss during the survey: `.comm-simple-note`
+(inside comm-dialog) uses `rgba(0,0,0,0.5)` — a leading-zero alpha that would have been a genuine notation-
+normalization target anywhere else in the file. Confirmed after applying: both exempt zones are **byte-for-
+byte identical**, before and after (diffed directly, not inferred).
+
+## The transformation, applied via one script rather than hand-editing hundreds of sites
+
+`t2091_transform.mjs` — comment-aware AND exempt-zone-aware (every substitution checks both before touching
+anything), dry-run by default:
+1. **Hex notation**: `#ffffff` → `#fff` (15 sites), `#000000` → `#000` (8 sites) — the dominant shorthand form
+   already, by a wide margin (65 `#fff` vs 15 `#ffffff` pre-change).
+2. **Named keyword → hex**: the bare `white` keyword, used as a REAL CSS colour value exactly 4 times (not 66
+   — the other 62 "white" matches in a naive scan were prose in comments or part of `--dro-white`, a token
+   NAME, not a colour use; comment-stripping first was essential here, not optional). `black` had zero real
+   uses. All 4 `white` → `#fff`.
+3. **Near-identical colour collapse**: Euclidean RGB distance ≤ 4 (chosen conservative — every collapsed pair
+   in the resulting set measures 1.00–4.00, well under any threshold where a side-by-side comparison could
+   plausibly show a difference; none of these colours are ever rendered adjacent to each other anyway, since
+   each is an independent fallback/literal in an unrelated component). 18 clusters, 22 members collapsed
+   (`clustersCollapsed` stat counts 29 including repeated per-occurrence hits of the same member hex).
+   Verified the star-clustering is non-transitive (every member is directly within 4 of ITS OWN cluster's
+   canonical, not chain-linked through an intermediate colour) — an earlier draft of the clustering script had
+   exactly that bug (a naive first-seed-wins walk let A-B-C chain to a real distance exceeding the stated
+   threshold once re-sorted by usage count for display); caught it by manually verifying a reported distance
+   against the raw RGB math, not by trusting the script's own output.
+4. **Alpha notation**: leading-zero (`0.5`) → leading-dot (`.5`) inside `rgba()`, 113 sites (114 minus the one
+   exempt-zone occurrence inside comm-dialog, confirmed protected).
+5. **The one three-decimal alpha**: `.045` → `.05` (rounds to the same 2-decimal granularity every neighbouring
+   stop in that gradient already uses).
+
+## Proven computationally invisible, not just assumed
+
+Built a real-Chromium equivalence check (`t2091_notation_equiv.mjs`) before relying on the CSS spec alone:
+`#fff`/`#ffffff`/`white` all resolve to the identical `rgb(255, 255, 255)`; `rgba(...,.5)`/`rgba(...,0.5)` both
+resolve to identical `rgba(..., 0.5)`; `#000`/`#000000` both resolve to identical `rgb(0, 0, 0)`. This is what
+makes items 1/2/4/5 above genuinely zero-computed-change, not merely visually-close. Item 3 (the 22 collapsed
+near-duplicates) is the ONE category with a real, non-zero computed-value delta by design — named explicitly
+here rather than glossed over: every collapsed pair's exact magnitude is in the cluster report above (1.00–4.00
+Euclidean RGB distance), and none exceed the stated threshold.
+
+## Gate
+
+Comment-delimiter + brace-balance check: 0 suspects, depth 0. Ramp enforceability: 32 hits, unchanged. Node
+tier: 193/193. Screenshots: 5 themes × {main, deck-open, popover-open, blocks-tab, gateway-tab}, before/after —
+visually pixel-identical throughout (spot-checked directly), matching the "invisible" claim. Full Playwright
+suite (2,649 tests, 44.8m): 2,607 passed, 10 flaky (recovered on retry, none colour/notation-related by name),
+25 skipped, 7 failed — **all 7 match the established pre-existing set exactly**
+(`controller-import-one-door-1221`, `editor-indent-1450`×3, `pull-modal-stacking`, `ring-descent-1404`,
+`send-history-real-path-2065`); `send-gate-wiring-1585` (the NEW failure flagged and confirmed pre-existing at
+t2089) passed cleanly this run, further confirming it was an unrelated environmental flake, not connected to
+either turn's changes.
+
+## P5c's other half — spacing/type scale PROPOSALS, explicitly not implemented
+
+Per the dispatch's own instruction: report, don't touch. `t2091_scale_survey.mjs` (comment-aware) found:
+- **Spacing**: 31 distinct integer-px values across 806 padding/margin/gap declarations — every integer 1–16
+  is in use, confirming the audit's own framing even though this turn didn't re-derive its exact 1-to-16 phrasing
+  independently. The 8 even values 2/4/6/8/10/12/14/16px alone account for 619 of 806 declarations (~77%).
+  **Proposed scale** (5 steps, matching the dispatch's own "five tokens" framing):
+  `--space-xs:4px; --space-sm:8px; --space-md:12px; --space-lg:16px; --space-xl:24px` — rounds every odd value
+  and outlier to its nearest step. Touches roughly 806 declarations if applied file-wide (every padding/
+  margin/gap using a px literal), a real, visible, MOVES-PIXELS change — exactly why this turn stopped short of
+  it.
+- **Type**: 26 distinct font-size values across 209 declarations (not literally 34 — same "audit is stale"
+  pattern as the color-notation numbers above, general finding held, exact count didn't). The 4 most-used
+  values (11/12/10/13px) alone cover 139 of 209 (~66%). **Proposed scale** (6 steps, matching the dispatch's
+  "six" framing): `--text-2xs:8px; --text-xs:10px; --text-sm:11px; --text-base:12px; --text-md:14px;
+  --text-lg:16px` — covers the dense core range; the rare "hero" sizes (18/19/20/22/26px, mostly big DRO/
+  status displays) would need either their own literal or a 7th tier, a decision for whoever picks this up.
+  Touches roughly 209 declarations if applied file-wide — also a real, visible type change.
+
+Neither implemented, per the explicit instruction; both are proposals for a future turn where the human sees
+and approves the scale steps first.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the notation normalization + near-duplicate colour collapse (162 lines
+  changed; zero lines in either exempt zone).
+- `DDCS-Studio/verification/t2091_color_scan.mjs`, `t2091_color_scan2.mjs` — the initial (naive, then
+  comment-aware) survey scripts; `_scan2` is the corrected one after finding the comment-contamination bug in
+  `_scan`'s "66 white uses" count.
+- `DDCS-Studio/verification/t2091_color_clusters.mjs` — the standalone clustering analysis; documents the
+  transitive-chaining bug found and fixed mid-turn.
+- `DDCS-Studio/verification/t2091_transform.mjs` — the actual transformation script (dry-run by default,
+  `--apply` to write); comment-aware AND exempt-zone-aware.
+- `DDCS-Studio/verification/t2091_notation_equiv.mjs` — the real-Chromium proof that all four notation forms
+  (hex-short/hex-long/keyword, leading-dot/leading-zero alpha) resolve identically.
+- `DDCS-Studio/verification/t2091_scale_survey.mjs` — the spacing/type scale survey behind the two proposals
+  above (report-only, no CSS changes from this script or turn).
+- `DDCS-Studio/verification/t2091-screens.mjs` — before/after screenshot capture.
+- `DDCS-Studio/verification/t2091-{before,after}-*.png` — screenshots.
+
+🔨 turn 2091
+

@@ -96,8 +96,8 @@ svg [id*="Zfirst_travel"] {
     --bg: #e0e0e0;
     --panel: #f0f0f0;
     --accent: #666666;
-    --text: #000000;
-    --text-main: #000000;
+    --text: #000;
+    --text-main: #000;
     --text-dim: #666666;
     --border: #999999;
     --radius: 0;
@@ -195,7 +195,7 @@ svg [id*="Zfirst_travel"] {
        token would silently square them off). --scrim (declared above, t2073) is REUSED as-is, not renamed —
        see the .overlay fix below for why it needed a real consumer. */
     --modal-face: var(--panel); --modal-edge: var(--accent); --modal-edge-w: 2px; --modal-radius: var(--radius);
-    --modal-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    --modal-shadow: 0 8px 24px rgba(0, 0, 0, .5);
     --modal-head-face: var(--accent); --modal-head-ink: #000;
     --modal-foot-edge: var(--border);
     --modal-close-face: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%);
@@ -228,7 +228,7 @@ svg [id*="Zfirst_travel"] {
        one. --code-comment is gone outright: its only real value (comment = --success green) already had a
        correctly-working consumer (the base .g-comment rule, reading --success directly) — the token added an
        indirection layer nothing needed; futuristic's own comment colour is now a literal in its own rule. */
-    --screen: #000000;
+    --screen: #000;
     --screen-caret-shape: bar;   /* t2079 amendment — real caret-shape values only; bar is the default everywhere except studio/futuristic */
 }
 
@@ -374,8 +374,8 @@ html, body { overflow-x: clip; }
    theme block), the exact gap point (c) of this turn's dispatch named as the reason this patch existed at
    all. Same resolved colour. */
 /* Organic's bars are a saturated colour → inactive tab labels need lighter, higher-contrast text. */
-[data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255,255,255,0.82); }
-[data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255,255,255,0.7); }
+[data-theme="organic"] .settings-tabs .settings-main-tab:not(.active) { color: rgba(255, 255, 255, .82); }
+[data-theme="organic"] .app-header .tab:not(.active) { color: rgba(255, 255, 255, .7); }
 
 /* --- Active-tab outward "feet": concave quarter-curves at the bottom-outer corners that flare into the bar.
    Sized by --tab-flare; filled with --tab-fill (the tab colour) with a 1px --tab-edge ring tracing the curve so
@@ -610,10 +610,10 @@ html, body { overflow-x: clip; }
     width: 9px; height: 9px; border-radius: 50%;
     background: #5a5a5a;
     opacity: .55;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,0.35);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(0, 0, 0, .35);
 }
-.gateway-led.led-ok  { background: #36c45a; opacity: 1; box-shadow: 0 0 7px #36c45a, 0 0 0 1px rgba(0,0,0,0.35); }
-.gateway-led.led-bad { background: #d04545; opacity: 1; box-shadow: 0 0 6px #d04545, 0 0 0 1px rgba(0,0,0,0.35); }
+.gateway-led.led-ok  { background: #36c45a; opacity: 1; box-shadow: 0 0 7px #36c45a, 0 0 0 1px rgba(0, 0, 0, .35); }
+.gateway-led.led-bad { background: #d04545; opacity: 1; box-shadow: 0 0 6px #d04545, 0 0 0 1px rgba(0, 0, 0, .35); }
 
 .hdr-controls {
     display: flex;
@@ -800,18 +800,18 @@ html, body { overflow-x: clip; }
     flex: 0 0 auto; width: 22px; height: 22px; min-width: 22px; margin: 0 2px; box-sizing: border-box;
     color: #2a1d04; background: #f0b429; border: 1px solid #ffcf4d; border-radius: 50%;
     font-size: 13px; line-height: 1; font-weight: bold; cursor: help; user-select: none;
-    box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.6); animation: hdrPostWarnPulse 1.8s ease-out infinite;
+    box-shadow: 0 0 0 0 rgba(240, 180, 41, .6); animation: hdrPostWarnPulse 1.8s ease-out infinite;
 }
 .hdr-post-warn[hidden] { display: none; }
 @keyframes hdrPostWarnPulse {
-    0%   { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.55); }
+    0%   { box-shadow: 0 0 0 0 rgba(240, 180, 41, .55); }
     70%  { box-shadow: 0 0 0 8px rgba(240, 180, 41, 0); }
     100% { box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
 }
 @media (prefers-reduced-motion: reduce) { .hdr-post-warn { animation: none; } }
 
 /* Editor op hover-to-edit: highlight the hovered op's lines (in the #editor-highlight overlay) + a float chip. */
-#editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, 0.16); border-radius: 2px; }
+#editor-highlight .g-line.op-hover { background: rgba(14, 165, 233, .16); border-radius: 2px; }
 /* Block-edited lines: the CHARACTERS glow (a text-shadow halo on the glyphs), not a full-width row wash — so the
    glow hugs the edited code itself (e.g. `#100=20`) and never the empty rest of the line. Gentle breathing pulse. */
 @keyframes blockEditedBreathe {
@@ -850,7 +850,7 @@ html, body { overflow-x: clip; }
     position: absolute; left: 12px; z-index: 12;
     font: 700 11px/1 inherit; padding: 4px 11px; border-radius: 999px; cursor: pointer;
     background: var(--accent, #0ea5e9); color: #fff;
-    border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 55%, #ffffff);
+    border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 55%, #fff);
     box-shadow: 0 2px 10px rgba(0,0,0,.42), 0 0 0 3px color-mix(in srgb, var(--accent, #0ea5e9) 30%, transparent);
     text-shadow: 0 1px 1px rgba(0,0,0,.35); white-space: nowrap; opacity: 1;
 }
@@ -862,7 +862,7 @@ html, body { overflow-x: clip; }
     position: absolute; left: 8px; bottom: 38px; z-index: 12;
     display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden;
     box-shadow: 0 2px 10px rgba(0,0,0,.42), 0 0 0 3px color-mix(in srgb, #f0b429 30%, transparent);
-    border: 1px solid color-mix(in srgb, #f0b429 60%, #ffffff);
+    border: 1px solid color-mix(in srgb, #f0b429 60%, #fff);
 }
 .editor-container .xform-badge[hidden] { display: none; }
 .editor-container .xform-badge-label, .editor-container .xform-badge-x {
@@ -871,7 +871,7 @@ html, body { overflow-x: clip; }
 }
 .editor-container .xform-badge-x { padding: 4px 8px; border-left: 1px solid color-mix(in srgb, #f0b429 50%, #000); font-weight: 800; }
 .editor-container .xform-badge-label:hover { filter: brightness(1.06); }
-.editor-container .xform-badge-x:hover { background: #ffd264; }
+.editor-container .xform-badge-x:hover { background: #ffd166; }
 /* t838 — the PRE-FLIGHT ENVELOPE badge (top-left of the editor): green fits / amber can't-verify / red N-outside, a solid
    pill in the xform-badge visual language; click → a popover of violations (row-click jumps to the line). */
 .editor-container .preflight-badge { position: absolute; left: 8px; top: 8px; z-index: 12; display: inline-flex; flex-direction: column; align-items: flex-start; }
@@ -891,15 +891,15 @@ html, body { overflow-x: clip; }
 .editor-container .preflight-red    .preflight-badge-label { background: #e5484d; color: #2a0407; border-color: color-mix(in srgb, #ff5964 55%, #000); box-shadow: 0 2px 10px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, #ff5964 30%, transparent); }
 .editor-container .preflight-pop {
     margin-top: 6px; min-width: 210px; max-width: 330px; max-height: 42vh; overflow: auto;
-    background: var(--panel, #161b22); color: var(--text, #e6edf5); border: 1px solid var(--border, #30363d);
+    background: var(--panel, #161b22); color: var(--text, #e6edf3); border: 1px solid var(--border, #30363d);
     border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 8px 10px; font: 500 11px/1.45 inherit;
 }
 .editor-container .preflight-pop[hidden] { display: none; }
-.editor-container .preflight-pop-head { font-weight: 700; margin-bottom: 6px; color: var(--text, #e6edf5); }
+.editor-container .preflight-pop-head { font-weight: 700; margin-bottom: 6px; color: var(--text, #e6edf3); }
 .editor-container .preflight-pop-list { list-style: none; margin: 0 0 2px; padding: 0; }
-.editor-container .preflight-row { padding: 4px 7px; border-radius: 6px; cursor: pointer; font-variant-numeric: tabular-nums; color: var(--text, #e6edf5); }
+.editor-container .preflight-row { padding: 4px 7px; border-radius: 6px; cursor: pointer; font-variant-numeric: tabular-nums; color: var(--text, #e6edf3); }
 .editor-container .preflight-row:hover { background: color-mix(in srgb, #ff5964 20%, transparent); }
-.editor-container .preflight-pop-note { margin-top: 6px; opacity: .82; font-size: 10.5px; color: var(--text, #e6edf5); }
+.editor-container .preflight-pop-note { margin-top: 6px; opacity: .82; font-size: 10.5px; color: var(--text, #e6edf3); }
 /* t862/t903 — INLINE PER-LINE PRE-FLIGHT DIAGNOSTIC. A red-tinted annotation at the violating line's row RIGHT edge
    ("Z+ 3.0mm over"). Absolutely positioned inside the .g-line overlay span (out of the text flow → adds NO line height,
    so the highlight overlay stays aligned with the textarea, and it can never push the code off-canvas). pointer-events
@@ -922,8 +922,8 @@ html, body { overflow-x: clip; }
 .editor-container .time-estimate-chip[hidden] { display: none; }
 /* t738 — the PREVIEW VISIBILITY modal rows: a visible toggle + label on the left, an opacity slider on the right. */
 .vis-modal-pop .vis-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 3px 0; }
-.vis-modal-pop .vis-tog { display: flex; align-items: center; gap: 7px; cursor: pointer; white-space: nowrap; color: var(--text, #e6edf5); }
-.vis-modal-pop .vis-head { color: var(--text, #e6edf5); }
+.vis-modal-pop .vis-tog { display: flex; align-items: center; gap: 7px; cursor: pointer; white-space: nowrap; color: var(--text, #e6edf3); }
+.vis-modal-pop .vis-head { color: var(--text, #e6edf3); }
 .vis-modal-pop .vis-tog input { cursor: pointer; }
 .vis-modal-pop .vis-alpha { width: 96px; cursor: pointer; accent-color: var(--accent, #0ea5e9); }
 /* Mobile portrait: the 3D preview is a bottom sheet (height --viz3d-size). Push the Transform button UP so it
@@ -985,7 +985,7 @@ html, body { overflow-x: clip; }
     border: none; background: transparent; color: var(--text-main, #e6edf3); cursor: pointer; white-space: nowrap;
 }
 .op-ctx-item:hover:not(:disabled) { background: var(--accent, #0ea5e9); color: #fff; }
-.op-ctx-item:disabled { color: var(--text-dim, #8a93a0); cursor: default; }
+.op-ctx-item:disabled { color: var(--text-dim, #8b949e); cursor: default; }
 
 /* Capability gating: grey (not hide) a field the active post can't use — layout stays put; tooltip explains. */
 .cap-off { opacity: .4; }
@@ -1226,8 +1226,8 @@ html, body { overflow-x: clip; }
     position: absolute;
     bottom: 0; left: 0; right: 0;
     min-height: 24px;
-    background: rgba(200, 50, 50, 0.9);
-    color: white;
+    background: rgba(200, 50, 50, .9);
+    color: #fff;
     display: flex; align-items: center;
     padding: 2px 8px;
     z-index: 10;
@@ -1238,7 +1238,7 @@ html, body { overflow-x: clip; }
     display: none;
 }
 .editor-statusbar .editor-status-copy {
-    background: transparent; border: none; color: white;
+    background: transparent; border: none; color: #fff;
     cursor: pointer; padding: 0; margin-right: 8px;
     display: flex; align-items: center;
 }
@@ -1262,7 +1262,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     position: relative; /* anchor for absolute dropdown content */
     display: inline-block;
     --menu-face: var(--panel); --menu-edge: var(--border); --menu-radius: var(--radius, 6px);
-    --menu-shadow: 0 4px 10px rgba(0,0,0,0.35); --menu-item-ink: var(--text); --menu-sep: rgba(0,0,0,0.06);
+    --menu-shadow: 0 4px 10px rgba(0, 0, 0, .35); --menu-item-ink: var(--text); --menu-sep: rgba(0, 0, 0, .06);
     --menu-trigger-face: var(--accent); --menu-trigger-ink: #fff;
 }
 
@@ -1364,7 +1364,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 [data-theme="studio"] .dock-header .header-center .toolbar-dropdown.active > button.toolbar-btn:focus {
     background: var(--menu-trigger-face) !important;
     color: var(--menu-trigger-ink) !important;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .4);
 }
 [data-theme="studio"] .toolbar-dropdown {
     --menu-trigger-face:
@@ -1405,11 +1405,11 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     width: auto;
     white-space: pre-line;
     padding: 8px 10px;
-    background: rgba(0,0,0,0.9);
-    color: #ffffff;
+    background: rgba(0, 0, 0, .9);
+    color: #fff;
     border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.06);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255, 255, 255, .06);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
     line-height: 1.3;
     font-size: 12px;
     transform: translateY(100px);
@@ -1425,7 +1425,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     width: 100%;
     background: var(--panel);
     border-top: 1px solid var(--border);
-    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, .1);
 
     /* Sizes to the chevron handle when collapsed, or handle + body when expanded. */
     height: auto;
@@ -1459,7 +1459,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     grid-template-columns: 1fr auto 1fr; /* Left(flex) Center(auto) Right(flex) */
     align-items: center;
     padding: 6px 10px;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, .1);
 
     /* FIX: Force header controls to an explicit height so header fills the area */
     height: 50px;
@@ -1508,8 +1508,8 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     height: 60px;
     flex: 0 0 60px;
     /* subtle 3D hardware look: silver gradient + crisp top/bottom edges */
-    background: linear-gradient(to bottom, #f5f5f5 0%, #d9d9d9 50%, #c4c4c4 100%);
-    border-top: 2px solid #ffffff;
+    background: linear-gradient(to bottom, #f4f4f4 0%, #d9d9d9 50%, #c4c4c4 100%);
+    border-top: 2px solid #fff;
     border-bottom: 2px solid #808080;
     cursor: pointer;
     display: flex;
@@ -1517,11 +1517,11 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     align-items: center;
     position: relative;    /* ensure it can sit above header controls */
     z-index: 2;            /* sit above header-controls to avoid visual overlap */
-    box-shadow: 0 -1px 0 rgba(0,0,0,0.06) inset; /* subtle separation */
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, .06) inset; /* subtle separation */
     touch-action: none; /* prevents browser gesture interference while dragging */
 }
 .header-handle:hover { filter: brightness(0.98); }
-.header-handle:focus { outline: 2px solid rgba(0,0,0,0.12); }
+.header-handle:focus { outline: 2px solid rgba(0, 0, 0, .12); }
 
 .header-handle .chevron {
     color: var(--text-main); /* high-contrast chevron color */
@@ -1540,7 +1540,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     align-items: center;
     justify-content: center;
     background: linear-gradient(to bottom, #f7f7f7 0%, #e0e0e0 50%, #cfcfcf 100%);
-    border-top: 2px solid #ffffff;
+    border-top: 2px solid #fff;
     border-bottom: 2px solid #808080;
     cursor: pointer;
     touch-action: none; /* Prevents browser scrolling while dragging */
@@ -1619,7 +1619,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     height: 44px;
     font-weight: bold;
     font-size: 16px;
-    border-bottom: 3px solid rgba(0,0,0,0.15);
+    border-bottom: 3px solid rgba(0, 0, 0, .15);
 }
 /* Editor keys: COLOURED background + black label + a cleaner font (Back red, Space blue, Enter green). */
 .dock-body .editor-keys-row .toolbar-btn { font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif !important; letter-spacing: .4px; }
@@ -1637,7 +1637,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, .1);
     min-width: 0;
     max-width: 100%;
     overflow-x: auto;          /* last resort if even icons don't fit — header scrolls, page never does */
@@ -1737,7 +1737,7 @@ textarea#editor::selection, #editor::selection { background: #00ff00; color: #00
 }
 
 .var-item:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, .05);
 }
 
 .var-id {
@@ -1970,7 +1970,7 @@ button.primary:hover {
     background: var(--btn-primary-face) !important;
     color: var(--btn-primary-ink) !important;
     border-color: var(--btn-primary-face) !important;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .35);
     font-weight: 600;
 }
 
@@ -2172,7 +2172,7 @@ button.primary:hover {
     /* Lock the preview at the top: it stays pinned while the form scrolls under it (single-column view). */
     .wiz-2pane > .wiz-visual {
         position: sticky; top: 0; z-index: 3;
-        background: var(--panel); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        background: var(--panel); box-shadow: 0 4px 8px rgba(0, 0, 0, .3);
     }
 }
 
@@ -2539,7 +2539,7 @@ button.primary:hover {
     display: block;
     width: 100%;
     text-align: center;
-    background: rgba(0,0,0,0.9);
+    background: rgba(0, 0, 0, .9);
     padding: 6px 10px;
     border-radius: var(--radius);
     font-size: 12px;
@@ -2582,15 +2582,15 @@ button.primary:hover {
 .num-field .num-stepper { display: flex; flex-direction: column; gap: 1px; }
 .num-field.num-stepper-left .num-stepper { order: -1; }   /* flex order → the spinner element sits on the LEFT of the input */
 .num-step-btn { display: block; width: 18px; height: 12px; line-height: 9px; padding: 0; font-size: 8px; cursor: pointer; color: inherit; background: var(--bg, #0b0f14); border: 1px solid var(--border, #2a3340); border-radius: 3px; }
-.num-step-btn:hover { border-color: #3a4a5a; }
+.num-step-btn:hover { border-color: #3a4a5c; }
 .num-input-bare::-webkit-inner-spin-button, .num-input-bare::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .num-input-bare { -moz-appearance: textfield; appearance: textfield; }
 /* t323 — segmented control: a compact 2-3 value enum toggle ([ Auto | Manual ]), both segments visible, selected highlighted */
 .seg-control { display: inline-flex; border: 1px solid var(--border, #2a3340); border-radius: 6px; overflow: hidden; }
 .seg-btn { padding: 5px 12px; font: inherit; font-size: 12px; line-height: 1.2; color: var(--text-dim, #90a0b2); background: var(--bg, #0b0f14); border: none; border-right: 1px solid var(--border, #2a3340); cursor: pointer; }
 .seg-btn:last-child { border-right: none; }
-.seg-btn:not(.seg-on):hover { color: inherit; background: rgba(255, 255, 255, 0.05); }
-.seg-btn.seg-on { color: #fff; background: var(--accent, #3b6ea5); }
+.seg-btn:not(.seg-on):hover { color: inherit; background: rgba(255, 255, 255, .05); }
+.seg-btn.seg-on { color: #fff; background: var(--accent, #3a6ea5); }
 /* t309 — the Layout hosts a 2D-ANIMATION OVERLAY under the SVG: the CONTAINER owns the black bg + isolates the z-stack,
    the SVG goes TRANSPARENT so the overlay canvas (z-index:-1, behind the SVG, above the bg) shows through — under the
    interactive handles (which stay topmost). Scoped to #userVizContainer so every OTHER featureCanvas is untouched. */
@@ -2601,7 +2601,7 @@ button.primary:hover {
 .feature-canvas .fc-grid-major { stroke: #243446; stroke-width: 1; }
 .feature-canvas .fc-axis-x { stroke: #7a3b3b; stroke-width: 1.5; }
 .feature-canvas .fc-axis-y { stroke: #3b7a48; stroke-width: 1.5; }
-.feature-canvas .fc-stock { fill: rgba(80,110,150,0.08); stroke: #46566a; stroke-width: 1.5; }
+.feature-canvas .fc-stock { fill: rgba(80, 110, 150, .08); stroke: #46566a; stroke-width: 1.5; }
 .feature-canvas .fc-guide { fill: none; stroke: #2e8b9a; stroke-width: 1; stroke-dasharray: 4 3; }
 /* EDGE datum (t339 E3): the probed WALL LINE (cyan, prominent — the edge you're finding) + the APPROACH travel from the start marker toward it (dashed yellow, the direction). Edge's datum = a LINE + a direction (vs corner's POINT). */
 .feature-canvas .fc-edge-wall { fill: none; stroke: #22d3ee; stroke-width: 2.5; }
@@ -2613,16 +2613,16 @@ button.primary:hover {
 .feature-canvas .fc-rotary-touch { fill: #ffcc00; stroke: #7a5b00; stroke-width: 0.5; }
 /* The FEATURE being probed (op-type-declared, stock-overridable): a pocket cavity (blue) or a boss protrusion (green),
    matching the 3D preview's fill colours, so the 2D canvas shows WHAT'S being probed — not just the stock rectangle. */
-.feature-canvas .fc-feature-pocket { fill: rgba(106,143,190,0.18); stroke: #86b6ff; stroke-width: 1.5; }
-.feature-canvas .fc-feature-boss { fill: rgba(143,174,106,0.18); stroke: #a6d77c; stroke-width: 1.5; }
+.feature-canvas .fc-feature-pocket { fill: rgba(106, 143, 190, .18); stroke: #86b6ff; stroke-width: 1.5; }
+.feature-canvas .fc-feature-boss { fill: rgba(143, 174, 106, .18); stroke: #a6d77c; stroke-width: 1.5; }
 .feature-canvas .fc-path-ghost { fill: none; stroke: #43525f; stroke-width: 1.2; }   /* original path (before rotate) */
 .feature-canvas .fc-path { fill: none; stroke: #4ab3ff; stroke-width: 1.8; }          /* rotated result — cut moves */
 .feature-canvas .fc-path-rapid { fill: none; stroke: #4ab3ff; stroke-width: 1; stroke-dasharray: 4 3; opacity: .5; }
 .feature-canvas .fc-rest { fill: none; stroke: #ff9d3c; stroke-width: 1.4; stroke-dasharray: 2 2; }   /* t871 — REST corner slivers (a 2nd smaller tool clears these), a distinct amber */
-.feature-canvas .fc-hole { fill: rgba(63,182,255,0.18); stroke: #3fb6ff; stroke-width: 1.5; }
+.feature-canvas .fc-hole { fill: rgba(63, 182, 255, .18); stroke: #3fb6ff; stroke-width: 1.5; }
 /* t1299 — WHERE THE STYLUS TOUCHES, in the same red as the 3D ruby ball: one colour for "the probe contacts here",
    whichever view you are looking at. Declared rules, because an invented class matches nothing and draws nothing. */
-.feature-canvas .fc-probe-touch { fill: rgba(255,42,68,0.85); stroke: #ff2a44; stroke-width: 1; }
+.feature-canvas .fc-probe-touch { fill: rgba(255, 42, 68, .85); stroke: #ff2a44; stroke-width: 1; }
 .feature-canvas .fc-probe-approach { fill: none; stroke: #ff2a44; stroke-width: 1.4; stroke-dasharray: 3 3; opacity: .85; }
 .feature-canvas .fc-hole-skip { fill: none; stroke: #5a6470; stroke-width: 1.2; stroke-dasharray: 3 2; }
 .feature-canvas .fc-hole-label { fill: #9fd8ff; font: 10px var(--mono, monospace); text-anchor: middle; }
@@ -2631,13 +2631,13 @@ button.primary:hover {
 .feature-canvas .fc-handle-label { fill: #ffce54; font: 10px var(--mono, monospace); }
 /* t112 — GUI corner-selector: clickable ring on each stock corner (FL/FR/BL/BR). Hollow = pickable, filled = the current
    corner; hover brightens. Distinct from the gold drag-handles + blue stock-attach markers. */
-.feature-canvas .fc-corner-pick { fill: rgba(255,90,90,0.10); stroke: #ff6b6b; stroke-width: 1.5; transition: fill .1s ease, stroke .1s ease; }
-.feature-canvas .fc-corner-pick:hover { fill: rgba(255,90,90,0.32); stroke: #ff9a9a; stroke-width: 2; }
+.feature-canvas .fc-corner-pick { fill: rgba(255, 90, 90, .10); stroke: #ff6b6b; stroke-width: 1.5; transition: fill .1s ease, stroke .1s ease; }
+.feature-canvas .fc-corner-pick:hover { fill: rgba(255, 90, 90, .32); stroke: #ff9a9a; stroke-width: 2; }
 .feature-canvas .fc-corner-pick-cur { fill: #ff6b6b; stroke: #ffdada; stroke-width: 2; }
 /* EDGE picker (t339 E6): 4 clickable WALL strips — click one to set axis+dir. Wide + faint (an easy hit-target that hover-brightens); the CURRENT wall is already marked by the cyan .fc-edge-wall (E3 datum glyph). */
-.feature-canvas .fc-edge-pick { stroke: rgba(34,211,238,0.10); stroke-width: 8; cursor: pointer; transition: stroke .1s ease; }
-.feature-canvas .fc-edge-pick:hover { stroke: rgba(34,211,238,0.45); stroke-width: 9; }
-.feature-canvas .fc-edge-pick-cur { stroke: rgba(34,211,238,0.25); }
+.feature-canvas .fc-edge-pick { stroke: rgba(34, 211, 238, .10); stroke-width: 8; cursor: pointer; transition: stroke .1s ease; }
+.feature-canvas .fc-edge-pick:hover { stroke: rgba(34, 211, 238, .45); stroke-width: 9; }
+.feature-canvas .fc-edge-pick-cur { stroke: rgba(34, 211, 238, .25); }
 
 /* Preview Block */
 .preview-block { margin-top: 15px; }
@@ -2647,7 +2647,7 @@ button.primary:hover {
     padding: 8px;
     background: #000;
     border: 1px solid var(--border);
-    color: #ffffff; /* Default: White */
+    color: #fff; /* Default: White */
     white-space: pre-wrap;
     border-radius: var(--radius);
     min-height: 100px;
@@ -2671,7 +2671,7 @@ button.primary:hover {
 }
 
 .checkbox-panel {
-    background: rgba(0,0,0,0.2); 
+    background: rgba(0, 0, 0, .2); 
     padding: 12px; 
     border-radius: var(--radius); 
     border: 1px dashed var(--border);
@@ -2797,7 +2797,7 @@ button.primary:hover {
     min-height: 48px; /* Standard Apple/Google touch target */
     font-size: 15px;
     font-weight: bold;
-    text-shadow: 1px 1px 0px rgba(255,255,255,0.5); /* Retro 95 look */
+    text-shadow: 1px 1px 0px rgba(255, 255, 255, .5); /* Retro 95 look */
     border: 2px solid;
     border-color: #fff #808080 #808080 #fff; /* Classic 3D border */
     background: #c0c0c0;
@@ -2823,11 +2823,11 @@ button.primary:hover {
    THEME: NORMAL (Clean Modern)
    ============================================ */
 [data-theme="normal"] {
-    --bg: #f5f5f5;
-    --panel: #ffffff;
+    --bg: #f4f4f4;
+    --panel: #fff;
     --accent: #4a90e2;
     --text: #333333;
-    --text-main: #000000;
+    --text-main: #000;
     --text-dim: #666666;
     --border: #dddddd;
     --radius: 6px;
@@ -2845,7 +2845,7 @@ button.primary:hover {
        instead); relocated the value .app-header actually rendered before this turn (--bg) into --hdr-bg itself,
        so the header stays the deeper tone it always was, now via the token that's supposed to carry it. */
     --hdr-bg: var(--bg);
-    --hdr-ink: #000000;
+    --hdr-ink: #000;
     --hdr-dim: #666666;
     --accent-studio: #4a90e2;
     --accent-gateway: #22a55e;
@@ -2899,7 +2899,7 @@ button.primary:hover {
 [data-theme="studio"] {
     --bg:            #c4bfb5;   /* silver chassis */
     --panel:         #cfcabf;   /* silver plate */
-    --screen:        #000000;   /* readout / editor black */
+    --screen:        #000;   /* readout / editor black */
     --screen-caret-shape: block;   /* t2079 amendment (human) — a block caret reads as a real CRT terminal, matching this skin's whole identity */
     --accent:        #1668ff;   /* electric-blue selection */
     --text:          #101010;
@@ -2945,18 +2945,18 @@ button.primary:hover {
         linear-gradient(to top left, var(--bevel-hi-dim), var(--bevel-mid-hi) 35%,
                                      var(--bevel-mid-lo) 65%, var(--bevel-lo)) border-box;
     --btn-transform-active: translate(1px, 1px);
-    --btn-radius: 6px; --btn-text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    --btn-radius: 6px; --btn-text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
     --btn-primary-face:
         linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
         linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
     --btn-primary-ink: #fff;
     --btn-success-face:
         linear-gradient(180deg, #d6f7dc, #a7e6b4) padding-box,
-        linear-gradient(to bottom right, #ffffff, #b9e8c2 35%, #4c8a5b 65%, #1d4527) border-box;
+        linear-gradient(to bottom right, #fff, #b9e8c2 35%, #4c8a5b 65%, #1d4527) border-box;
     --btn-success-ink: #044a18;
     --btn-danger-face:
         linear-gradient(180deg, #ffd2d2, #ffa9a9) padding-box,
-        linear-gradient(to bottom right, #ffffff, #ffc3c3 35%, #a85656 65%, #5c1f1f) border-box;
+        linear-gradient(to bottom right, #fff, #ffc3c3 35%, #a85656 65%, #5c1f1f) border-box;
     --btn-danger-ink: #6e0606;
     --btn-warn-face:
         linear-gradient(180deg, #ffe4b0, #ffc463) padding-box,
@@ -2971,7 +2971,7 @@ button.primary:hover {
         linear-gradient(to bottom right, var(--bevel-hi), var(--bevel-mid-hi) 35%,
                                          var(--bevel-mid-lo) 65%, var(--bevel-lo)) border-box;
     --modal-edge: transparent; --modal-edge-w: 3px; --modal-radius: 10px;
-    --modal-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    --modal-shadow: 0 6px 18px rgba(0, 0, 0, .45);
     --modal-head-face: linear-gradient(180deg, #2a4f82, #123a66); --modal-head-ink: #eef4fb;
     --modal-foot-edge: var(--bevel-mid-lo);
     --modal-close-edge: transparent; --modal-close-edge-w: 2px;
@@ -3001,7 +3001,7 @@ button.primary:hover {
        else in the file is the regression this turn exists to close. The old bv-dark-2 (#16140f) is dropped
        outright, not renamed — confirmed zero reads anywhere (grep for var(--bv-dark-2) before this rename). */
     --plate-hi: #e2dfd7; --plate-mid: #cfcabf; --plate-lo: #b6b1a5;
-    --bevel-hi: #ffffff; --bevel-hi-dim: #f0eee8;
+    --bevel-hi: #fff; --bevel-hi-dim: #f0eee8;
     --bevel-mid-hi: #b8b3a8; --bevel-mid-lo: #6f6a60;
     --bevel-lo: #3a362f;
 
@@ -3088,7 +3088,7 @@ button.primary:hover {
 [data-theme="studio"] button.blue {
     color: var(--btn-primary-ink) !important;
     background: var(--btn-primary-face) !important;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .4);
 }
 
 /* --- Top action toolbar → generator/wizard keys --- */
@@ -3264,7 +3264,7 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
 }
 [data-theme="studio"] .viz-status {
     font-family: var(--pixel); font-size: 12px; color: var(--phosphor);
-    background: rgba(0,0,0,0.9); text-align: center; padding: 6px 10px; letter-spacing: 1px;
+    background: rgba(0, 0, 0, .9); text-align: center; padding: 6px 10px; letter-spacing: 1px;
 }
 [data-theme="studio"] .preview-block pre {
     font-family: var(--mono); color: var(--dro-white);
@@ -3301,7 +3301,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     background:
         linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
         linear-gradient(to bottom right, #8fbcff, #5f97ff 35%, #0a3a9e 65%, #062a72) border-box;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .4);
 }
 [data-theme="studio"] .numpad .key:active, [data-theme="studio"] .vbtn:active { transform: translate(1px,1px); }
 
@@ -3353,7 +3353,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --btn-radius: 4px;
     --btn-face-hover: linear-gradient(180deg, #8b6914, #6b5329);
     --btn-edge-hover: var(--accent); --btn-ink-hover: var(--text);
-    --btn-shadow-hover: 0 0 10px rgba(139, 105, 20, 0.5);
+    --btn-shadow-hover: 0 0 10px rgba(139, 105, 20, .5);
     --btn-face-active: var(--btn-face-hover);
     --btn-primary-face: var(--accent); --btn-primary-ink: var(--accent-ink);
     --btn-success-face: var(--success); --btn-success-ink: #fff;
@@ -3367,7 +3367,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
        already read var(--accent)/#000/var(--border) via the re-declarations below, which is what was
        ACTUALLY rendering). */
     --modal-face: var(--panel); --modal-edge: var(--accent); --modal-radius: var(--radius);
-    --modal-shadow: 0 0 20px rgba(139, 105, 20, 0.5);
+    --modal-shadow: 0 0 20px rgba(139, 105, 20, .5);
     --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
     --modal-close-edge: #8b6914; --modal-close-radius: 4px;
     --modal-close-face: linear-gradient(180deg, #9e2b1b, #6e1409);
@@ -3389,8 +3389,8 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --panel: #0e1626;
     --accent: #2de2ff;
     --text: #d4e3ff;
-    --text-main: #ffffff;
-    --text-dim: #7488a8;
+    --text-main: #fff;
+    --text-dim: #7788aa;
     --border: #20344f;
     --radius: 8px;
     --block-edited: #ff5daa;   /* hot-pink neon */
@@ -3408,7 +3408,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 
     /* contract: editor "screen" + syntax. --code-comment retired (t2079, P4c) — inlined as a literal directly
        into this theme's own .g-comment rule below, its only consumer; no other skin ever read it. */
-    --screen: #080f1c;
+    --screen: #0a0e1a;
     --screen-caret-shape: underscore;   /* t2079 amendment (human) — HUD prompt */
     --code-text: #cdd9f5;
     --code-num: #ffce6a;
@@ -3416,8 +3416,8 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
     --code-ln: #ff5d9e;
 
     /* header */
-    --hdr-bg: #0b1322;
-    --hdr-ink: #eafcff;
+    --hdr-bg: #0c1422;
+    --hdr-ink: #eafdff;
     --hdr-dim: #6f86a8;
     --accent-studio: #2de2ff;
     --accent-gateway: #2bd47a;
@@ -3461,7 +3461,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
        a genuinely distinct rim colour, kept as its own literal rather than "corrected" to match accent. No
        head/foot/close-key overrides beyond the close key: no distinct value found for title bar or footer. */
     --modal-face: var(--panel); --modal-edge: #00ffff; --modal-radius: var(--radius);
-    --modal-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+    --modal-shadow: 0 0 30px rgba(0, 255, 255, .3);
     --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
     --modal-close-edge: #ff5252; --modal-close-radius: 8px;
     --modal-close-face: linear-gradient(180deg, #ff4d4d, #c40f0f);
@@ -3471,7 +3471,7 @@ body #macros-app .settings-head, body #settings-app .settings-head, body .gatewa
 /* HUD header: faint vertical grid, cyan hairline + glow, glowing brand & active tab */
 [data-theme="futuristic"] .app-header {
     background:
-        repeating-linear-gradient(90deg, rgba(45,226,255,.045) 0 1px, transparent 1px 44px),
+        repeating-linear-gradient(90deg, rgba(45,226,255,.05) 0 1px, transparent 1px 44px),
         var(--hdr-bg);
     border-bottom: 1px solid rgba(45,226,255,.32);
     box-shadow: 0 1px 14px rgba(45,226,255,.12);
@@ -3613,7 +3613,7 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     --hdr-dim: #9d8a6b;
     --accent-studio: #d97a5c;
     --accent-gateway: #8aa15a;
-    --accent-ink: #2a1712;   /* t2073 — relocated from organic's own confirmed button:hover precedent (dark ink on a lighter coral fill, line ~3182) */
+    --accent-ink: #2a1810;   /* t2073 — relocated from organic's own confirmed button:hover precedent (dark ink on a lighter coral fill, line ~3182) */
     --band-bg: #bf6850;      /* t2073 — relocated from the t2071 coral fix (the .top-dock-header gradient's own top stop); tab-fill now derives from this instead of restating it (see .app-header .tab.active) */
 
     /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this). */
@@ -3625,7 +3625,7 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        deleted). Organic's resting ink (#2a2117) is dark — the light bone-coloured face needs it, unlike the
        page's own light --text on a dark page background; --btn-ink-hover reuses the ALREADY-declared
        --accent-ink above rather than restating the same hex a second time. */
-    --btn-face: linear-gradient(180deg, #e7dbc0, #ccbd99); --btn-edge: #8a7657; --btn-ink: #2a2117;
+    --btn-face: linear-gradient(180deg, #e7dbc0, #ccbd99); --btn-edge: #8b7355; --btn-ink: #2a2117;
     --btn-radius: 14px; --btn-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
     --btn-text-shadow: none;
     --btn-face-hover: linear-gradient(180deg, #f1c6af, #d98a6f); --btn-edge-hover: var(--accent);
@@ -3672,7 +3672,7 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
    below: the base rules now read var(--screen) directly (trap-dodge) and reach this theme's own value without
    a selector override. Only the genuinely distinct colours (bone text, gutter number tone) stay. */
 [data-theme="organic"] #editor-highlight { color: #e9dcc4; }
-[data-theme="organic"] #editor-gutter { color: #6e5b42; }
+[data-theme="organic"] #editor-gutter { color: #6e5840; }
 /* t2079 (P4c, bug #1) — plain !important measured as NOT enough; see studio's own block above for the fuller
    note (same fix, same reasoning: matching body[data-theme] #editor.editor-layer reaches specificity (1,2,1),
    which beats the base rule's (1,1,1) outright regardless of file position). */
@@ -3802,7 +3802,7 @@ body[data-theme="organic"] #editor.editor-layer { caret-color: #d97a5c !importan
     padding: 8px;
     background: #000;
     border: 1px solid var(--border);
-    color: #ffffff; /* Default: White */
+    color: #fff; /* Default: White */
     white-space: pre-wrap;
     border-radius: var(--radius);
     min-height: 100px;
@@ -3857,7 +3857,7 @@ body[data-theme="organic"] #editor.editor-layer { caret-color: #d97a5c !importan
 body #editor.editor-layer {
     background: transparent !important;
     color: transparent !important;
-    caret-color: white !important;
+    caret-color: #fff !important;
     caret-shape: var(--screen-caret-shape, bar) !important;
     z-index: 2;
 }
@@ -3871,8 +3871,8 @@ body #editor.editor-layer {
    declared in their own blocks) now finally reach here directly, and their duplicate selector-based overrides
    below are deleted as redundant. */
 #editor-highlight {
-    background-color: var(--screen, #000000) !important; /* The real background color */
-    color: var(--code-text, #ffffff); /* Code color */
+    background-color: var(--screen, #000) !important; /* The real background color */
+    color: var(--code-text, #fff); /* Code color */
     z-index: 1;
 }
 
@@ -3913,8 +3913,8 @@ body #editor.editor-layer {
 /* Bottom Layer: The Colors */
 #editor-highlight {
     z-index: 1;
-    color: var(--code-text, #ffffff);
-    background-color: var(--screen, #000000);
+    color: var(--code-text, #fff);
+    background-color: var(--screen, #000);
     pointer-events: none;
 }
 
@@ -3926,28 +3926,28 @@ body #editor.editor-layer {
 /* Executing-line highlight — UNIFIED across the Studio editor (#editor-highlight) and the wizard CODE PREVIEW
    (pre[id$=_code]): same blue, same pulse (each newly-executing line flashes then settles), and neither view
    scrolls while playing (the editor's setActiveLine no longer calls _scrollToLine). */
-@keyframes ddcs-exec-pulse { from { background: rgba(64, 130, 220, 0.65); } to { background: rgba(64, 110, 171, 0.42); } }
+@keyframes ddcs-exec-pulse { from { background: rgba(64, 130, 220, .65); } to { background: rgba(64, 110, 171, .42); } }
 /* EXEC-LINE-VISIBILITY: bolder active line — stronger fill + left accent bar */
 #editor-highlight .g-line.active-line,
 pre[id^="wiz_"][id$="_code"] .g-line.active-line {
-    background: rgba(64, 110, 171, 0.42);
+    background: rgba(64, 110, 171, .42);
     border-radius: 2px;
-    box-shadow: inset 3px 0 0 rgba(100, 160, 255, 0.85);
+    box-shadow: inset 3px 0 0 rgba(100, 160, 255, .85);
     animation: ddcs-exec-pulse 0.45s ease;
 }
 /* EXEC-LINE-VISIBILITY: smooth fade on all g-lines so trail aging transitions instead of snapping */
 #editor-highlight .g-line { transition: background-color 0.45s ease; }
 /* EXEC-LINE-VISIBILITY: comet-tail trail — 5 depth levels, decreasing opacity */
-#editor-highlight .g-line[data-exec-age="1"] { background: rgba(64, 110, 171, 0.28); }
-#editor-highlight .g-line[data-exec-age="2"] { background: rgba(64, 110, 171, 0.20); }
-#editor-highlight .g-line[data-exec-age="3"] { background: rgba(64, 110, 171, 0.14); }
-#editor-highlight .g-line[data-exec-age="4"] { background: rgba(64, 110, 171, 0.09); }
-#editor-highlight .g-line[data-exec-age="5"] { background: rgba(64, 110, 171, 0.05); }
+#editor-highlight .g-line[data-exec-age="1"] { background: rgba(64, 110, 171, .28); }
+#editor-highlight .g-line[data-exec-age="2"] { background: rgba(64, 110, 171, .20); }
+#editor-highlight .g-line[data-exec-age="3"] { background: rgba(64, 110, 171, .14); }
+#editor-highlight .g-line[data-exec-age="4"] { background: rgba(64, 110, 171, .09); }
+#editor-highlight .g-line[data-exec-age="5"] { background: rgba(64, 110, 171, .05); }
 
 /* SLICE 2 — WCS VISIBLE: a temporal FLASH on a WCS/start call line as the sim reaches it (paired with the 3D marker
    glow). flash-wcs = amber (WCS select/set), flash-start = warm red (spindle/program start); both fade out. */
-@keyframes ddcs-flash-wcs   { 0% { background: rgba(255, 214, 107, 0); } 14% { background: rgba(255, 214, 107, 0.55); } 100% { background: rgba(255, 214, 107, 0); } }
-@keyframes ddcs-flash-start { 0% { background: rgba(255, 138, 122, 0); } 14% { background: rgba(255, 138, 122, 0.55); } 100% { background: rgba(255, 138, 122, 0); } }
+@keyframes ddcs-flash-wcs   { 0% { background: rgba(255, 214, 107, 0); } 14% { background: rgba(255, 214, 107, .55); } 100% { background: rgba(255, 214, 107, 0); } }
+@keyframes ddcs-flash-start { 0% { background: rgba(255, 138, 122, 0); } 14% { background: rgba(255, 138, 122, .55); } 100% { background: rgba(255, 138, 122, 0); } }
 #editor-highlight .g-line.flash-event.flash-wcs   { border-radius: 2px; animation: ddcs-flash-wcs 0.7s ease-out; }
 #editor-highlight .g-line.flash-event.flash-start { border-radius: 2px; animation: ddcs-flash-start 0.7s ease-out; }
 
@@ -3977,7 +3977,7 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
     z-index: 2;
     color: transparent !important; /* Hide raw text */
     background: transparent !important; /* See through to highlights */
-    caret-color: white; /* Keep cursor visible */
+    caret-color: #fff; /* Keep cursor visible */
 }
 
 /* Comment Color */
@@ -4080,7 +4080,7 @@ svg [id*="Zfirst_travel"] {
     gap: 6px 14px;
     padding: 5px 8px;
     margin-top: 6px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid rgba(255, 255, 255, .08);
 }
 .viz-legend-item {
     display: flex;
@@ -4353,7 +4353,7 @@ svg [id$="_wcs"] { display: none; }
 }
 
 /* Wizard usage instructions */
-.wiz-usage { font-size: 10px; color: var(--text-dim); padding: 6px 8px; margin: 4px 0 6px; border-left: 2px solid var(--accent); background: rgba(255,255,255,0.03); line-height: 1.5; }
+.wiz-usage { font-size: 10px; color: var(--text-dim); padding: 6px 8px; margin: 4px 0 6px; border-left: 2px solid var(--accent); background: rgba(255, 255, 255, .03); line-height: 1.5; }
 
 /* Wizard parameter forms (ATC + others) — these were unstyled, so they inherited the modal's large default
    font and read as a "block of text". Lay fields out in a compact responsive grid; notes are small. */
@@ -4374,7 +4374,7 @@ svg [id$="_wcs"] { display: none; }
 .wiz-note {
     font-size: 10.5px; color: var(--text-dim); line-height: 1.45;
     margin: 4px 0 8px; padding: 6px 8px;
-    border-left: 2px solid var(--border); background: rgba(127,127,127,0.05); border-radius: 0 4px 4px 0;
+    border-left: 2px solid var(--border); background: rgba(127, 127, 127, .05); border-radius: 0 4px 4px 0;
 }
 
 /* ============================================
@@ -4402,18 +4402,18 @@ svg [id$="_wcs"] { display: none; }
     justify-content: center;
     padding: 0 !important;
     color: #eaf4ff !important;
-    background: rgba(28, 86, 140, 0.95) !important;
-    border: 1px solid rgba(130, 195, 255, 0.65) !important;
+    background: rgba(28, 86, 140, .95) !important;
+    border: 1px solid rgba(130, 195, 255, .65) !important;
     border-right: none !important;
     border-radius: 8px 0 0 8px !important;
-    box-shadow: -3px 0 10px rgba(0, 0, 0, 0.45) !important;
+    box-shadow: -3px 0 10px rgba(0, 0, 0, .45) !important;
     cursor: pointer;
     touch-action: none !important;   /* the handle captures drags (resize) instead of scrolling on touch */
     transition: right 0.22s ease, background 0.12s ease;
 }
 .editor-container .viz3d-handle::before { display: none !important; } /* kill theme bevel */
 .editor-container .viz3d-handle.open { right: var(--viz3d-size, 50%) !important; } /* ride the (resizable) drawer edge */
-.editor-container .viz3d-handle:hover { background: rgba(42, 120, 190, 0.98) !important; }
+.editor-container .viz3d-handle:hover { background: rgba(42, 120, 190, .98) !important; }
 .editor-container .viz3d-handle:active { transform: translateY(-50%) !important; }
 .viz3d-handle-cube { display: block; }
 /* While dragging the handle to resize the drawer, kill transitions so it tracks the pointer 1:1 */
@@ -4595,7 +4595,7 @@ svg [id$="_wcs"] { display: none; }
         repeating-linear-gradient(90deg, rgba(222,206,170,.06) 0 2px, transparent 2px 11px),
         repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 1px, transparent 1px 7px);
     --kbd-blur: 4px;
-    --kbd-handle: linear-gradient(180deg, #4a3b2a, #211a12);
+    --kbd-handle: linear-gradient(180deg, #4a3a2a, #211a12);
     --kbd-grip: rgba(231,219,192,.65);     /* bone grip */
     --kbd-edge: #6e5840;                    /* sinew seam */
 }
@@ -4606,7 +4606,7 @@ svg [id$="_wcs"] { display: none; }
     --kbd-blur: 9px;
     --kbd-handle: linear-gradient(180deg, rgba(255,255,255,.9), rgba(245,245,245,.97));
     --kbd-grip: rgba(74,144,226,.6);
-    --kbd-edge: #cfd8e3;
+    --kbd-edge: #cdd9e6;
 }
 
 /* ---- Component (reads ONLY tokens) ---- */
@@ -4666,7 +4666,7 @@ svg [id$="_wcs"] { display: none; }
 /* Keep the ORIGINAL colour-coded keys: each category sets the glass tokens (fill/border/ink/glow) the
    rule above + the press-flash read — so axis keys stay blue, m-red red, m-green green, all as glowing glass. */
 [data-theme="futuristic"] #controller-dock .dock-body .axis-blue {
-    --kbd-key: rgba(40,82,150,.30); --kbd-key-bd: rgba(96,165,250,.6); --kbd-key-ink: #d6e6ff; --kbd-key-glow: 96,165,250;
+    --kbd-key: rgba(40,82,150,.30); --kbd-key-bd: rgba(96,165,250,.6); --kbd-key-ink: #d4e3ff; --kbd-key-glow: 96,165,250;
 }
 [data-theme="futuristic"] #controller-dock .dock-body .m-red {
     --kbd-key: rgba(150,48,48,.28); --kbd-key-bd: rgba(248,113,113,.6); --kbd-key-ink: #ffdada; --kbd-key-glow: 248,113,113;
@@ -4711,7 +4711,7 @@ svg [id$="_wcs"] { display: none; }
 [data-theme="futuristic"] #controller-dock .dock-body .toolbar-btn:not([data-ddcs-role]):active {
     background: rgba(45,226,255,.22) !important;
     box-shadow: 0 0 18px rgba(45,226,255,.6), inset 0 0 10px rgba(45,226,255,.25) !important;
-    color: #ffffff !important;
+    color: #fff !important;
 }
 
 /* BACK / SPACE / ENTER — keep their colour tint but as translucent glass that glows (was solid) */
@@ -4860,8 +4860,8 @@ svg [id$="_wcs"] { display: none; }
     bottom: 0;
     width: var(--viz3d-size, 50%);
     background: #05070a;
-    border-left: 1px solid rgba(120, 190, 255, 0.45);
-    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.55);
+    border-left: 1px solid rgba(120, 190, 255, .45);
+    box-shadow: -6px 0 18px rgba(0, 0, 0, .55);
     transform: translateX(105%);
     transition: transform 0.22s ease;
     z-index: 4;
@@ -4876,9 +4876,9 @@ svg [id$="_wcs"] { display: none; }
     width: 10px;
     cursor: ew-resize;
     touch-action: none;
-    background: linear-gradient(90deg, rgba(120, 190, 255, 0.28), transparent);
+    background: linear-gradient(90deg, rgba(120, 190, 255, .28), transparent);
 }
-.viz3d-drawer .viz3d-resize:hover { background: linear-gradient(90deg, rgba(120, 190, 255, 0.55), transparent); }
+.viz3d-drawer .viz3d-resize:hover { background: linear-gradient(90deg, rgba(120, 190, 255, .55), transparent); }
 /* The shared preview panel fills the drawer but leaves the 10px resize grip on the left edge. */
 #viz3d-panel-host { position: absolute; inset: 0 0 0 10px; }
 .viz3d-status,
@@ -4887,7 +4887,7 @@ svg [id$="_wcs"] { display: none; }
     font-family: monospace;
     font-size: 11px;
     color: #7fd0ff;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, .55);
     padding: 3px 7px;
     border-radius: 3px;
     z-index: 2;
@@ -4899,8 +4899,8 @@ svg [id$="_wcs"] { display: none; }
     transition: background 0.2s, color 0.2s;
 }
 .viz3d-status.has-error {
-    color: #ff6b6b; background: rgba(80, 0, 0, 0.75);
-    border: 1px solid rgba(255, 80, 80, 0.4);
+    color: #ff6b6b; background: rgba(80, 0, 0, .75);
+    border: 1px solid rgba(255, 80, 80, .4);
 }
 /* Status + Copy on ONE translucent bar (top-left), so it's clear the copy button copies THIS status line.
    Status text shrunk to the legend size. (createPreviewPanel wraps them in .pp-statusbar.) */
@@ -4908,7 +4908,7 @@ svg [id$="_wcs"] { display: none; }
     position: absolute; top: 6px; left: 8px; right: auto; z-index: 10;
     display: flex; align-items: center; gap: 5px;
     width: fit-content; max-width: calc(100% - 16px);
-    background: rgba(0, 0, 0, 0.4); border-radius: 5px; padding: 2px 5px;
+    background: rgba(0, 0, 0, .4); border-radius: 5px; padding: 2px 5px;
 }
 .pp-statusbar .viz3d-status {
     position: static; top: auto; left: auto; right: auto;
@@ -4952,7 +4952,7 @@ svg [id$="_wcs"] { display: none; }
        note sits centred at the top clear of both (max-width keeps it off the DRO/cube even at their widest). */
     position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
     font-family: monospace; font-size: 10px; color: #cbb98a;
-    background: rgba(0, 0, 0, 0.5); padding: 2px 8px; border-radius: 3px;
+    background: rgba(0, 0, 0, .5); padding: 2px 8px; border-radius: 3px;
     z-index: 4; white-space: nowrap; pointer-events: none; max-width: calc(100% - 240px);
     overflow: hidden; text-overflow: ellipsis;
 }
@@ -4963,7 +4963,7 @@ svg [id$="_wcs"] { display: none; }
 .pp-frame-note {
     position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
     font-family: monospace; font-size: 10px; color: #cbb98a;
-    background: rgba(0, 0, 0, 0.5); padding: 2px 8px; border-radius: 3px;
+    background: rgba(0, 0, 0, .5); padding: 2px 8px; border-radius: 3px;
     z-index: 4; white-space: nowrap; pointer-events: none; max-width: calc(100% - 240px);
     overflow: hidden; text-overflow: ellipsis;
 }
@@ -4971,7 +4971,7 @@ svg [id$="_wcs"] { display: none; }
     position: absolute; bottom: 6px; right: 8px; z-index: 6;
     display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
     max-width: 64%;
-    background: rgba(0, 0, 0, 0.62); padding: 4px 6px; border-radius: 8px;  /* float over the canvas */
+    background: rgba(0, 0, 0, .62); padding: 4px 6px; border-radius: 8px;  /* float over the canvas */
 }
 /* Mobile: the preview pane is narrow (wizard stacks at 860px). The SINGLE controls bar spans the pane width and
    centre-wraps into clean rows; the jog grid still pops above it. Tighter pills. */
@@ -4989,35 +4989,35 @@ svg [id$="_wcs"] { display: none; }
 .viz3d-drawer .viz3d-status-copy {
     font-size: 10px;
     padding: 3px 7px;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, .55);
     color: #cfe6ff;
-    border: 1px solid rgba(120, 190, 255, 0.45);
+    border: 1px solid rgba(120, 190, 255, .45);
     border-radius: 7px;            /* sleek translucent pill */
 }
 .viz3d-controls button,
 .viz3d-jog-pendant .jog-bar button { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
-.viz3d-jog-pendant .jog-bar button:hover { background: rgba(30, 70, 110, 0.65); border-color: rgba(150, 210, 255, 0.7); }
+.viz3d-jog-pendant .jog-bar button:hover { background: rgba(30, 70, 110, .65); border-color: rgba(150, 210, 255, .7); }
 .viz3d-controls button.on,
-.viz3d-jog-pendant .jog-bar button.on { background: rgba(40, 120, 80, 0.8); border-color: #4dff7a; color: #eaffea; }
+.viz3d-jog-pendant .jog-bar button.on { background: rgba(40, 120, 80, .8); border-color: #4dff7a; color: #eaffea; }
 .viz3d-jog-pendant .jog-start-btns button {
     min-width: 20px; padding: 2px 6px; font-size: 10px; cursor: pointer;
-    background: rgba(0, 0, 0, 0.55); color: #cfe6ff; border: 1px solid rgba(120, 190, 255, 0.45); border-radius: 4px;
+    background: rgba(0, 0, 0, .55); color: #cfe6ff; border: 1px solid rgba(120, 190, 255, .45); border-radius: 4px;
 }
-.viz3d-jog-pendant .jog-start-btns button.on { background: rgba(40, 120, 80, 0.85); border-color: #4dff7a; color: #eaffea; }
+.viz3d-jog-pendant .jog-start-btns button.on { background: rgba(40, 120, 80, .85); border-color: #4dff7a; color: #eaffea; }
 /* Wizard preview controls keep the transparent main-viewer look (beat the wizard form-select styling) */
 .wiz-viz3d .viz3d-controls select,
 .wiz-viz3d .viz3d-controls button {
-    background: rgba(0, 0, 0, 0.55) !important;
+    background: rgba(0, 0, 0, .55) !important;
     color: #cfe6ff !important;
-    border: 1px solid rgba(120, 190, 255, 0.45) !important;
+    border: 1px solid rgba(120, 190, 255, .45) !important;
     border-radius: 4px !important;
 }
-.wiz-viz3d .viz3d-controls button.on { background: rgba(40, 120, 80, 0.8) !important; border-color: #4dff7a !important; color: #eaffea !important; }
+.wiz-viz3d .viz3d-controls button.on { background: rgba(40, 120, 80, .8) !important; border-color: #4dff7a !important; color: #eaffea !important; }
 .viz3d-legend {
     position: absolute; top: 28px; left: 8px; z-index: 3;
     display: flex; flex-wrap: wrap; gap: 2px 8px;
     font-size: 8px; font-weight: 600; color: #cdd9e6;
-    background: rgba(0, 0, 0, 0.42); padding: 3px 6px; border-radius: 6px;
+    background: rgba(0, 0, 0, .42); padding: 3px 6px; border-radius: 6px;
     max-width: 70%; pointer-events: none;
 }
 .viz3d-legend span { white-space: nowrap; }   /* text coloured by its path type (set inline); no line swatch */
@@ -5028,7 +5028,7 @@ svg [id$="_wcs"] { display: none; }
 .pp-dro {
     /* LEFT side, stacked UNDER the status pill (top:6) + legend (top:28) — clear of the top-right ViewCube (navCube.js). */
     position: absolute; top: 52px; left: 8px; right: auto; z-index: 6;
-    background: rgba(0, 0, 0, 0.55); border-radius: 6px; padding: 3px 6px 4px;
+    background: rgba(0, 0, 0, .55); border-radius: 6px; padding: 3px 6px 4px;
     font: 600 9px/1.25 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     color: #cdd9e6; pointer-events: none; user-select: none;
 }
@@ -5047,7 +5047,7 @@ svg [id$="_wcs"] { display: none; }
 
 .pp-dro-m { color: var(--coord-mach); }   /* the MACHINE frame color (declared token) */
 @keyframes ddcs-dro-flash {
-    0% { color: #fff; text-shadow: 0 0 6px rgba(255, 224, 138, 0.95); }
+    0% { color: #fff; text-shadow: 0 0 6px rgba(255, 224, 138, .95); }
     100% { color: inherit; text-shadow: none; }
 }
 .pp-dro-flash .pp-dro-w { animation: ddcs-dro-flash 0.75s ease-out; }
@@ -5062,23 +5062,23 @@ svg [id$="_wcs"] { display: none; }
 .viz3d-views button {
     font-size: 10px;
     padding: 3px 8px;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, .55);
     color: #cfe6ff;
-    border: 1px solid rgba(120, 190, 255, 0.35);
+    border: 1px solid rgba(120, 190, 255, .35);
     border-radius: 4px;
     cursor: pointer;
 }
-.viz3d-views button:hover { background: rgba(40, 80, 120, 0.7); }
+.viz3d-views button:hover { background: rgba(40, 80, 120, .7); }
 
 /* Preview-panel transparent overlay buttons (same look as .viz3d-views): the 2D/3D toggle (top-right) and the
    status Copy button (top-left). The toggle is top-right so the status (which spans to right:8) stops short of it. */
 .viz3d-2dtoggle,
 .preview-panel .pp-copy {
     font-size: 10px; padding: 3px 8px; border-radius: 4px; cursor: pointer; line-height: 1.2;
-    background: rgba(0, 0, 0, 0.55); color: #cfe6ff; border: 1px solid rgba(120, 190, 255, 0.35);
+    background: rgba(0, 0, 0, .55); color: #cfe6ff; border: 1px solid rgba(120, 190, 255, .35);
 }
 .viz3d-2dtoggle:hover,
-.preview-panel .pp-copy:hover { background: rgba(40, 80, 120, 0.7); }
+.preview-panel .pp-copy:hover { background: rgba(40, 80, 120, .7); }
 .preview-panel .pp-copy { background: transparent; border: none; padding: 0 1px; z-index: 10; display: none; }   /* lives in .pp-statusbar now */
 .preview-panel .pp-copy.visible { display: inline-flex; }
 /* status keeps the base .viz3d-status position (top, left:74 → right:8): copy sits in the left gap, status to its
@@ -5089,9 +5089,9 @@ svg [id$="_wcs"] { display: none; }
     position: fixed; top: 110px; right: 24px; z-index: 10050;   /* above the wizard overlay (10000) */
     display: none; flex-direction: column;
     width: 330px; min-width: 220px; min-height: 170px; max-width: 92vw; max-height: 85vh;
-    background: rgba(10, 14, 20, 0.96);
+    background: rgba(10, 14, 20, .96);
     border: 1px solid #3a4a5c; border-radius: 8px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .5);
     overflow: hidden;   /* the body scrolls internally; a visible .io-resize grip handles resize (t187) */
 }
 .io-panel.visible { display: flex; }
@@ -5104,7 +5104,7 @@ svg [id$="_wcs"] { display: none; }
 .io-panel.embedded .io-panel-head { cursor: default; }
 .io-panel-head {
     display: flex; align-items: center; gap: 10px; padding: 6px 10px;
-    background: rgba(38, 52, 68, 0.9); border-bottom: 1px solid #3a4a5c;
+    background: rgba(38, 52, 68, .9); border-bottom: 1px solid #3a4a5c;
     cursor: move; user-select: none; touch-action: none;
 }
 .io-panel-title { font-size: 11px; color: #cfe3f5; letter-spacing: 1px; flex: 1; }
@@ -5115,14 +5115,14 @@ svg [id$="_wcs"] { display: none; }
 .io-panel-section { font-size: 9px; color: #7fa8cc; letter-spacing: 1px; margin-top: 2px; }
 .io-panel-wait {
     display: none; font-size: 10px; color: #ffd166;
-    background: rgba(120, 90, 0, 0.25); border: 1px solid rgba(255, 209, 102, 0.4);
+    background: rgba(120, 90, 0, .25); border: 1px solid rgba(255, 209, 102, .4);
     border-radius: 4px; padding: 4px 6px;
 }
 .io-led-grid { display: flex; flex-wrap: wrap; gap: 4px; }   /* reflows as the panel resizes */
 .io-led {
     display: flex; align-items: center; gap: 4px;
     font-size: 10px; color: #a8b6c6;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, .04);
     border: 1px solid #2c3a48; border-radius: 4px; padding: 3px 6px; min-width: 34px;
 }
 button.io-led { cursor: pointer; font-family: inherit; }
@@ -5141,13 +5141,13 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .io-panel .io-resize {
     position: absolute; z-index: 3; right: 0; bottom: 0; width: 16px; height: 16px;
     cursor: nwse-resize; touch-action: none; border-bottom-right-radius: 8px;
-    background: linear-gradient(135deg, transparent 45%, rgba(120, 190, 255, 0.5) 45%);
+    background: linear-gradient(135deg, transparent 45%, rgba(120, 190, 255, .5) 45%);
 }
-.io-panel .io-resize:hover { background: linear-gradient(135deg, transparent 45%, rgba(120, 190, 255, 0.85) 45%); }
+.io-panel .io-resize:hover { background: linear-gradient(135deg, transparent 45%, rgba(120, 190, 255, .85) 45%); }
 .io-panel.embedded .io-resize { display: none; }   /* docked → fills its pane, no resize */
 @keyframes ioWaitPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 209, 102, 0); }
-    50% { box-shadow: 0 0 8px 2px rgba(255, 209, 102, 0.7); }
+    50% { box-shadow: 0 0 8px 2px rgba(255, 209, 102, .7); }
 }
 
 /* ===== Settings overlay ===== */
@@ -5325,8 +5325,8 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
         width: 100%;
         height: var(--viz3d-size, 50%);
         border-left: none;
-        border-top: 1px solid rgba(120, 190, 255, 0.45);
-        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.55);
+        border-top: 1px solid rgba(120, 190, 255, .45);
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, .55);
         transform: translateY(105%);
     }
     .viz3d-drawer.open { transform: translateY(0); }
@@ -5336,7 +5336,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
         left: 0; right: 0; top: 0; bottom: auto;
         width: auto; height: 12px;
         cursor: ns-resize;
-        background: linear-gradient(180deg, rgba(120, 190, 255, 0.32), transparent);
+        background: linear-gradient(180deg, rgba(120, 190, 255, .32), transparent);
     }
 
     /* Cube pull-tab on the bottom edge, horizontally centred */
@@ -5348,7 +5348,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
         transform: translateX(-50%) !important;
         width: 72px !important;
         height: 28px !important;
-        border: 1px solid rgba(130, 195, 255, 0.65) !important;
+        border: 1px solid rgba(130, 195, 255, .65) !important;
         border-bottom: none !important;
         border-radius: 8px 8px 0 0 !important;
     }
@@ -5402,7 +5402,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     --cat-spindlefeed:#f97316; --cat-coordinates:#0ea5e9; --cat-program:#64748b; --cat-probing:#e11d48; --cat-signals:#8b5cf6;
     --cat-control:#f59e0b; --cat-math:#84cc16; --cat-variables:#06b6d4; --cat-wizardui:#d946ef; --cat-markup:#94a3b8;
     --field: var(--bg);
-    --screen:#000; --screen-ink:#cdd9e5; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
+    --screen:#000; --screen-ink:#cdd9e6; --screen-dim:#8b9bb0;   /* fixed: the screen is black in every theme */
     display:grid; grid-template-columns:1fr var(--blk-pv-w, 380px); grid-template-rows:minmax(0,1fr);
     background:var(--bg); color:var(--ink);
     font:13px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
@@ -5470,7 +5470,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 #blocks-app .blk-edit-chip[hidden] { display:none; }
 /* the expose marker is a Blockly FieldLabel (SVG <text>) — subordinate (dim, small) by default so the code stays the
    thing your eye lands on; accent + bold when its field is exposed (devMode.refreshExposeMark toggles .blk-expose-lit). */
-.blk-expose-mark { fill:var(--text-dim,#9fb0c0) !important; font-size:9px; opacity:.6; }
+.blk-expose-mark { fill:var(--text-dim,#9fb0c4) !important; font-size:9px; opacity:.6; }
 .blk-expose-lit  { fill:var(--accent,#3b82f6) !important; opacity:1; font-weight:700; }
 #blocks-app .blk-sug-opt {
     position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; overflow:visible;
@@ -5860,7 +5860,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .ddcs-rate-toast .rate-stars.rate-shake { animation:ddcs-rate-shake 360ms; }
 .ddcs-rate-toast .rate-star { background:none; border:none; cursor:pointer; font-size:26px; line-height:1; padding:0 2px; color:var(--border,#4a5262); transition:color .12s; }
 .ddcs-rate-toast .rate-star.on, .ddcs-rate-toast .rate-star:hover { color:#f5b301; }
-.ddcs-rate-toast .rate-comment { width:100%; box-sizing:border-box; resize:vertical; min-height:38px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg,#0b0f14); color:var(--text-main,#e6ecf2); font:inherit; }
+.ddcs-rate-toast .rate-comment { width:100%; box-sizing:border-box; resize:vertical; min-height:38px; padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg,#0b0f14); color:var(--text-main,#e6edf3); font:inherit; }
 .ddcs-rate-toast .rate-actions { display:flex; align-items:center; gap:8px; }
 .ddcs-rate-toast .rate-btn {
     padding:5px 13px; border-radius:7px; border:1px solid var(--border); background:transparent;
@@ -6100,7 +6100,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wss-lbl { display: block; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
 .wss-namerow { display: flex; align-items: center; gap: 6px; }
 .wss-box .wss-name { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 6px 9px; border-radius: 5px;
-    border: 1px solid var(--border, #333a45); background: var(--bg, #11151c); color: var(--text-main, #e7edf5); }
+    border: 1px solid var(--border, #333a45); background: var(--bg, #11151c); color: var(--text-main, #e6edf3); }
 .wss-ext { font-size: 13px; color: var(--text-dim); }
 .wss-folder { margin: 12px 0 16px; font-size: 12px; min-height: 18px; }
 .wss-dim { color: var(--text-dim); }
@@ -6128,9 +6128,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge); box-shadow: var(--modal-shadow); }
 /* t2069 — was its own animation: ddcs-busy-rot, a byte-identical twin of ddcs-busy-spin below (both just
    `to { transform: rotate(360deg); }`) — consolidated onto the one keyframe both spinners now share. */
-.ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.18);
+.ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .18);
     border-top-color: #4ab3ff; animation: ddcs-busy-spin 0.8s linear infinite; }
-.ddcs-busy-text { color: #dbe6f2; font-size: 13px; letter-spacing: 0.2px; }
+.ddcs-busy-text { color: #dbe8f5; font-size: 13px; letter-spacing: 0.2px; }
 
 /* t1287 (user, live, refined) — WHAT THE SAVE WROTE, as a dismissible popup. It was a label beside the disk chip,
    and the refinement names why that failed: on a narrow screen the chip is not rendered at all, so the feedback went
@@ -6146,10 +6146,10 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     box-shadow: var(--modal-shadow); }
 .saved-pop-title { font-size: 15px; font-weight: 700; letter-spacing: .3px; color: #7ddc9a; }
 .saved-pop-name { font-size: 12.5px; color: #cfe0f2; word-break: break-word; }
-.saved-pop-what { font-size: 12px; color: #9fb2c6; line-height: 1.45; word-break: break-word; }
+.saved-pop-what { font-size: 12px; color: #9fb0c4; line-height: 1.45; word-break: break-word; }
 .saved-pop-ok { margin-top: 8px; min-width: 84px; min-height: 36px; padding: 8px 18px; border-radius: 8px; cursor: pointer;
-    background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); color: #e6edf5; font-size: 13px; }
-.saved-pop-ok:hover { background: rgba(255, 255, 255, 0.16); }
+    background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .18); color: #e6edf3; font-size: 13px; }
+.saved-pop-ok:hover { background: rgba(255, 255, 255, .16); }
 
 
 /* t1323 (USER SCREENSHOT) — THE TIME CHIP GETS ITS OWN SPACE. It floats at the top of the editor while the code
