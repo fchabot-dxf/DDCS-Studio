@@ -96,3 +96,48 @@ two disagree silently: if the role says client but a controller disk is set, say
 `gatewayPanel.js` view registration, `views/admin.js` Setup fields, and the poller's claim gate. Existing
 specs that touch these: `gateway-state-contract-1327` (every data tab clear when unreachable — a role must
 not confuse that contract), `gateway-quiet-offline-1307`, `header-account-2077`.
+
+---
+
+## ⚠ MULTI-CONTROLLER — THE HAZARD RETURNS (human, 2026-08-19: "we need to make this work for 4.1 too")
+
+**I retracted the wrong-controller hazard above on the strength of "two gateways are never for two separate
+controllers." Wanting the V4.1 on this path RESTORES it, so the retraction is itself hereby narrowed:** it
+holds for one controller, and fails the moment a second gateway joins the same Google account.
+
+```
+  Expert  @ the studio  ── gateway on CNC-FAIRY  ─┐
+                                                  ├─► ONE Drive folder: DDCS Bridge/inbox/
+  V4.1    @ home        ── gateway on RENDERRANCHY┘
+```
+`poller._maybe_claim()` claims `ids[0]` from the shared inbox with no notion of which machine a job is FOR,
+and `identity.verify()` is inert while `machine_id` is unset (it returns ok when no id is configured — and
+both of the human's machines have it empty). ⇒ **A program authored for the Expert can be delivered to the
+V4.1** — a different envelope AND a different dialect. This is the one genuinely unsafe combination in the
+whole Drive design.
+
+⛔ **Until this is built: do not run Drive mode on a second gateway.** One gateway on Drive is safe.
+
+### The fix, and most of it already exists
+- **The gateway's folder is ALREADY per-config**: `config.drive_folder` (default `"DDCS Bridge"`),
+  read by `DriveBackend.__init__`. Two gateways pointed at two folders already cannot see each other's jobs.
+- **The browser client HARDCODES it**: `driveJobs.js` `ROOT_NAME = 'DDCS Bridge'`. This is the only place
+  that must change to make targeting possible.
+- **The naming is decided by the human's own rule** — *"any workspace can only have one controller"* — so the
+  WORKSPACE (its machine name) names the folder. No new concept: `cfg.machine_name` already exists and the
+  Setup UI already collects it.
+
+### What that makes the client's job
+A client must SEND TO A MACHINE, not merely "to Drive": pick the target workspace/machine, write into that
+machine's inbox. With one machine configured it should stay invisible (pick it automatically); the choice
+only has to surface once a second exists.
+
+⚠ **Turn `machine_id` on while doing this.** Namespacing prevents the mix-up by construction; the identity
+check is the belt-and-braces that REFUSES a delivery if a job ever reaches the wrong gateway anyway. Both,
+not either — the folder is a convention, the identity file is a verification.
+
+⚠ **Beacons are NOT the V4.1 blocker people will assume.** V4.1 has no Modbus RTU, so tracked sends already
+degrade honestly to "delivered" (t2020, `poller._claim`'s `enable_slave` branch) — and a Drive send is
+deliver-only by construction anyway. Delivery itself is controller-agnostic: `transfer.deliver()` writes
+bytes to `<expert_dest>/<name>` and cares about nothing else. **The V4.1 works on this path today; it is the
+SECOND GATEWAY that is the problem, not the V4.1.**
