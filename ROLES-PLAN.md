@@ -175,3 +175,41 @@ degrade honestly to "delivered" (t2020, `poller._claim`'s `enable_slave` branch)
 deliver-only by construction anyway. Delivery itself is controller-agnostic: `transfer.deliver()` writes
 bytes to `<expert_dest>/<name>` and cares about nothing else. **The V4.1 works on this path today; it is the
 SECOND GATEWAY that is the problem, not the V4.1.**
+
+---
+
+## ⭐⭐ THE TWO GATING AXES — the human's own framing, and the design conclusion
+> *"the client is really hiding the settings that help connect the gateway to the controller"*
+> *"if we gate settings by roles we should also gate settings by status of gateway being online"*
+
+**The crisp definition of a client, in the human's words:** it is not "fewer tabs" — it is **no
+gateway↔controller wiring configuration**. Controller disk, beacons/COM, controller profile: all describe a
+cable this machine does not have. Everything else stays.
+
+**And gating has TWO ORTHOGONAL AXES. Conflating them is the bug already paid for once:**
+
+| axis | question | governs | lifetime |
+|---|---|---|---|
+| **ROLE** | *what kind of machine is this?* | what EXISTS (settings, tabs) | permanent, declared |
+| **STATUS** | *is the gateway reachable right now?* | what is AVAILABLE (actions) | momentary, observed |
+
+⚠ **t1327 implemented ONLY the status axis and then used it to answer a ROLE question** — "no gateway
+answering ⇒ you cannot send". True for a gateway machine, false for a client, and that single conflation is
+what left a phone with a dead Send button and no error (t2080b).
+
+### The composed matrix — each cell has a DIFFERENT right answer
+|  | gateway ONLINE | gateway OFFLINE |
+|---|---|---|
+| **GATEWAY role** | everything live | ⚠ controller settings STAY VISIBLE — they are how the user FIXES it; sending/browsing disarmed with the reason (today's t1327 behaviour, correct here) |
+| **CLIENT role** | everything live except controller wiring | ⭐ **SEND STILL WORKS** — it queues in Drive and the gateway claims it whenever it wakes; live status/tracking honestly unavailable |
+
+⭐ **THE PROPERTY THIS UNCOVERS, worth building deliberately rather than stumbling into:** a client's send is
+**asynchronous and offline-tolerant BY CONSTRUCTION** — the job sits in the inbox until a gateway appears.
+The machine does not have to be on, or even in the same country. The current UI actively HIDES this by
+greying Send whenever the gateway is unreachable; the correct client-side message is *"queued — the machine
+picks it up when it next runs"*, not *"sending needs a machine"*.
+
+⛔ **Do not collapse the axes into one enum** ("online-gateway / offline-gateway / client"). They vary
+independently and at different rates — role changes when a PC is re-purposed, status changes every poll. One
+enum would have to be recomputed on every heartbeat and would silently re-introduce exactly the conflation
+above.
