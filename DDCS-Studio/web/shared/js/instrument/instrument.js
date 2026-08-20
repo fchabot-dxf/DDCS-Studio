@@ -5,7 +5,16 @@
 import { scan, stripComment } from "./gcode-parse.js";
 import { estimateProgram } from "../../../engine/timeEstimate.js";   // t848 — the ONE time model (the engine trace, same as the editor chip)
 
-export const DEFAULTS = { max: 255, varNum: 250, markerVar: 251, marker: 111, pacing: "time",
+// t2113 - BEACON COUNT DEFAULTS TO 100, NOT THE MAXIMUM (human: "make it 100").
+// Every beacon inserts `#var = n` + MSETDATA at a Z-up, and MSETDATA is a SYNCHRONOUS Modbus transaction: the
+// controller stops feeding motion, completes a serial round-trip, and resumes. Defaulting to the field maximum
+// meant a program could carry 255 of those - far more progress resolution than anyone reads, paid for in machine
+// time on every single run.
+// ⚠ ON A CONTROLLER WITHOUT MODBUS IT WAS WORSE THAN USELESS: the human measured 1-2 SECONDS PER BEACON on a
+//   V4.1, because each write blocks until it times out with nothing listening. That path is now gated shut
+//   (send.js requires the Expert), but the default should not have been the maximum in the first place.
+// ⚠ The field still ACCEPTS up to 255 - this is a default, not a new limit.
+export const DEFAULTS = { max: 100, varNum: 250, markerVar: 251, marker: 111, pacing: "time",
                           rapid: 6000, defaultFeed: 1000 };
 
 export const msetdataCall = (varNum = 250) => `MSETDATA[${varNum},1,0,2,16,300]`;
