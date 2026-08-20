@@ -170,14 +170,17 @@ export default {
           //    direction Drive visibility was never measured in (see driveJobs.js's header). If that turns
           //    out not to work, failing open on 'unreadable' costs a warning; failing closed would break
           //    sending entirely while blaming a gateway that is running perfectly.
-          if (_hb && (_hb.state === 'stale' || _hb.state === 'unseen')) {
-            const when = _hb.state === 'stale' && _hb.ageS != null
+          const _millOffNow = !!(_hb && _hb.state === 'fresh' && _hb.hb && _hb.hb.controller_connected === false);
+          if (_hb && (_hb.state === 'stale' || _hb.state === 'unseen' || _millOffNow)) {
+            const when = _millOffNow
+              ? 'The machine is switched off.'
+              : _hb.state === 'stale' && _hb.ageS != null
               ? `The gateway for this machine last checked in ${Math.round(_hb.ageS / 60)} min ago.`
               : 'Studio cannot see a gateway for this machine on your Drive.';
             await dlgNotice(
               when + '\n\nNothing is listening, so this job would sit on your Drive instead of reaching the '
               + 'machine. Start Studio on the PC wired to it, then send again.',
-              { title: 'No gateway is running - send blocked', okLabel: 'Cancel' },
+              { title: 'Nothing can deliver this right now - send blocked', okLabel: 'Cancel' },
             );
             return;   // the finally block re-enables the button
           }
@@ -303,9 +306,7 @@ export default {
         toast('Queued ' + r.jobId);
         // t2105 - a time promise is only honest when a gateway is polling AND the mill can take it.
         info.textContent = r.via === 'drive'
-          ? (this._millOff
-              ? `Queued ${r.jobId} via your Google Drive — waiting for the machine to be switched on (deliver-only).`
-              : `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`)
+          ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`
           : `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
         // t2057 — SAY SO AT THE MOMENT OF SENDING: the bridge can request tracking (this checkbox) while its
         // own Modbus receiver is off or dead — two independent toggles nothing else compares. The toast fades
@@ -389,13 +390,18 @@ export default {
       // would read "you cannot send" directly above a live Send button.
       // t2105 - the banner promised ~15s unconditionally. That is only true when a gateway is actually
       // polling; with none running the job would not be picked up AT ALL, so the promise became the lie.
-      const noGw = viaDrive && (this._hbState === 'stale' || this._hbState === 'unseen');
+      // t2105 - THE HEARTBEAT IS TWOFOLD (human): it says whether a GATEWAY IS RUNNING (freshness) and
+      // whether the CNC IS POWERED (controller_connected, the gateway's own live disk probe). BOTH must be
+      // true to send. Either one false means nothing can carry this job right now, so there is one
+      // condition here, not two states - the earlier 'it will wait' wording is gone, because waiting is
+      // exactly what this policy refuses to create. The inbox is a WIRE, never a store.
+      const noGw = viaDrive && (this._hbState === 'stale' || this._hbState === 'unseen' || this._millOff);
       // ⚠ MILL OFF IS NOT AN ERROR AND MUST NOT GREY THE BUTTON. A gateway IS running and WILL deliver
       // once the machine is switched on - that is the whole point of the claim gate leaving the job in
       // the inbox. It only has to be STATED, because the alternative wording promises ~15s and is false.
       banner.textContent = out
-        ? (noGw ? 'No gateway is running for this machine — start Studio on the PC wired to it, then send.'
-                : this._millOff ? 'The gateway is running, but the machine is switched off — this will be delivered when you switch it on.'
+        ? (this._millOff ? 'The machine is switched off — switch it on, then send.'
+                : noGw ? 'No gateway is running for this machine — start Studio on the PC wired to it, then send.'
                 : viaDrive ? 'No gateway on this device — sending goes through your Google Drive; the machine picks it up within ~15s.'
                 : c.reason)
         : '';
@@ -409,7 +415,8 @@ export default {
       //   leaves the button LIVE - refusing on ignorance would break sending outright if the
       //   browser turns out not to see desktop-written Drive files, the one direction never measured.
       btn.disabled = (out && !viaDrive) || noGw || !file.text;
-      btn.title = noGw ? 'No gateway is running for this machine, so nothing would collect this job'
+      btn.title = this._millOff ? 'The machine is switched off, so this job could not be delivered'
+                       : noGw ? 'No gateway is running for this machine, so nothing would collect this job'
                        : viaDrive ? 'No gateway on this device — sends through your Google Drive; the machine picks it up within ~15s'
                            : (out ? c.reason : '');
       btn.textContent = this._sendLabel();
