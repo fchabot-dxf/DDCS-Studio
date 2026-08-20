@@ -7287,3 +7287,17 @@ the real gateway look dead.** Job claiming stays safe; the console lies about li
 ⚠ **This was cosmetic when first written and is not any more:** the online-flag design (above) and ② both
 propose READING the heartbeat, so an unguarded publisher stops being noise and starts feeding a decision.
 Gate both publishers, and prove it with two instances against one rendezvous — not a unit test on a flag.
+
+### ⭐ RULING — LIVE DRO IS DEFERRED (human, 2026-08-19)
+Remote live position readout is **DEFERRED, not cancelled.** Consequences, all simplifying:
+
+- **② above dissolves.** "Client-side Tracking" (NEXT-SESSION.md:89) now unambiguously means **JOB STATE
+  ONLY** — queued → delivering → done. Coarse, cloud-friendly, no contradiction with `drive.py:47-49`.
+  ⛔ Do not build a cloud position mirror. ⛔ Do not label a job-state view "live tracking".
+- **The LAN-removal gate narrows to SENDING.** "Cloud works" = a job goes phone/PC → Drive → gateway →
+  controller, honestly reported. Live position is explicitly NOT part of that gate.
+- **The capability loss is ACCEPTED, not overlooked:** deleting LAN serving removes a second PC's ability to
+  watch live position (gateway relays serial over HTTP today; the cable is at the machine and Drive cannot
+  carry a 2s cadence). Recorded here so a later revisit starts from a decision rather than a surprise.
+- ⚠ **Live tracking at the machine itself is UNAFFECTED** — it is serial + local, and remains Expert-only
+  per the earlier V3/V4.1 finding. Nothing in the cloud arc touches it.
