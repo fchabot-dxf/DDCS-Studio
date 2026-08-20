@@ -90,14 +90,26 @@ inbox. There is no "resume" logic and none is needed.
 undeliverable** — and write each discarded job a status (`failed`, reason *"the gateway restarted before
 this could be delivered"*) so the sender finds out.
 
-⭐ **WHY DISCARD AT ALL — and the reason is safety, not tidiness.** A job sent Monday to a mill that is off,
-surviving a restart, and landing on the controller's disk on Thursday is **a program the operator does not
-remember sending**, quite possibly for a setup that has since been torn down. **Stale G-code is a hazard in
-a way a stale email is not.** That, not [[nothing-is-precious-delete-freely]], is the justification.
+⭐ **WHY DISCARD AT ALL - AND THE ORIGINAL JUSTIFICATION WAS OVERSTATED, CORRECTED HERE.**
+This rule was first justified as *"stale G-code is a hazard - a Monday program landing on the controller
+Thursday"*. ⚠ **The human has since confirmed: NOTHING EVER AUTO-STARTS ON A DDCS.** A delivered file sits
+on the controller's disk until an operator selects and runs it. ⇒ the risk is a **MIS-PICK** (a stale file
+sitting among current ones, chosen by mistake) - real, and expensive on a mill, but **not** the
+auto-execution hazard originally claimed. The corrected reason is housekeeping plus keeping the inbox a
+WIRE rather than a STORE, not safety-critical prevention.
 
-⛔ **DO NOT discard unconditionally on restart.** With the mill ON at startup those jobs are perfectly
-deliverable, and binning them would mean a 3am Windows update destroys work that would have gone through at
-3:01. Deliver first; discard only what remains stuck.
+⭐⭐ **AND THIS RULE MAY NOT BE WORTH BUILDING AT ALL - DECIDE BEFORE IMPLEMENTING.** §5's rule (a phone may
+not send unless a gateway is running) means a job can only be CREATED while something is there to drain it.
+For a job to survive to a restart it must have been sent while the gateway ran, then the mill switched off,
+then the gateway restarted before the mill came back - **a window measured in minutes.** And under
+"nothing auto-starts", a job that does survive it is not dangerous; it is simply delivered later.
+⇒ **Advisor recommendation: keep §5, drop this.** §5 is the simple strong rule and now carries the weight
+this one was invented for. Building discard logic plus per-job failure statuses for that window is
+machinery for a case that barely exists.
+
+⛔ **IF IT IS BUILT ANYWAY: do NOT discard unconditionally on restart.** With the mill ON at startup those
+jobs are perfectly deliverable, and binning them would mean a 3am Windows update destroys work that would
+have gone through at 3:01. Deliver first; discard only what remains stuck.
 
 **`[RULED]`** On shutdown, if the inbox is not empty, **say so**: *"3 jobs are waiting and nothing will
 deliver them while this is closed."* It is the one moment the person can still act.
