@@ -750,12 +750,60 @@ Modbus EXCEPTION frame, not one byte). ⇒ Do not go re-deriving registers until
 `#279 = Slave` and `#267/#296/#297 = 115200 / None / 1` read **out of the SYSDISK `setting` file**;
 COM6 present in Device Manager (FTDI); controller reachable at 192.168.0.99.
 
+### ⭐ `#279` IS THE MODE SELECT, AND ITS NAMING IS INVERTED — read this before suspecting the mode
+`P279` is a **three-way**: `NO / Poll / Slave` (OEM parameter table, quoted in
+`assets/community/modbus-slave-2025-12-11/FLASH-DAY.md`; introduced by the 2026-04-10 firmware). The trap is
+that the modes are named for what the **CONTROLLER** does, which is the opposite of what the PC does:
+
+| `#279` | Who initiates | Which of our two features it feeds |
+|---|---|---|
+| `Poll` | the **controller** is MASTER — *it* polls | `MSETDATA` checkpoint push ⇒ **beacons** (`slave.py`, PC is the SLAVE) |
+| `Slave` | the **controller ANSWERS** our FC03 | **position polling** (`master.py`, PC is the MASTER) |
+
+⇒ Position polling needs **`Slave`**, NOT `Poll` — "Poll" is the renamed *master* mode, the one MGETDATA
+needs. Mutually exclusive: one mode, one serial port, so beacons **or** position polling, never both.
+
+**The stored value corroborates the ordering** `0=NO / 1=Poll / 2=Slave`, decoded straight out of our own
+two captures — it moved exactly across flash day:
+```
+assets/capture/20260610T163337Z/SYSDISK/setting   #279 = 1   -> Poll  (the beacon-era setting)
+assets/capture/20260731T181343Z/SYSDISK/setting   #279 = 2   -> Slave (after the 2026-04-10 flash)
+```
+⚠ Still an INFERENCE from label order, not a panel reading — which is why check 3 below stands. But it makes
+mode selection the **least** likely cause of the `0x00`, not the most. Reboot and wiring move ahead of it.
+⛔ Do NOT read `assets/community/.../setting` as a working-slave reference: it is the **factory default**
+shipped inside the firmware bundle (`read.me.txt`: *"Factory parameter file"*), and its `#279 = 0` means
+only "off". Flashing it would wipe the machine's entire setup.
+
 ### ⇒ THE THREE THINGS TO CHECK AT THE MACHINE, in order
 1. **REBOOT the controller.** This file already says `#279` + **a reboot** are required for the live serial
    link. The value was read from the STORED setting file — that is not proof the RUNNING firmware applied it.
+   The OEM manual says it too, in as many words: *"Please restart the system after setting the parameters!"*
 2. **Confirm the SABRENT is on DB9 PORT 2.** Modbus is **Serial 2** (`#267`); port 1 is the M3K keyboard
-   port and would present exactly this symptom.
+   port and would present exactly this symptom. (Weakest of the three — port 2 was already proven live once
+   in the studio test recorded above — but it costs one look.) The OEM wiring page adds: **Modbus uses DB9
+   pins 7, 8 and 9.**
 3. **Confirm `#279` reads `Slave` ON THE PANEL** (not just in the file), and the slave id the panel expects.
+
+### ⇒ THE BETTER TEST: an INDEPENDENT ORACLE, before any of the three
+`FLASH-DAY.md` step 7 names the OEM's own **`M350_LiveG_v1.7.exe`** (github.com/foinnc/M350-LiveG), which
+talks to the controller in slave mode over this same COM cable. It splits the fault in ONE test instead of
+three blind checks:
+* **LiveG also fails** ⇒ the fault is machine-side (reboot / wiring / mode not applied). Nothing of ours is
+  implicated, and the register map stays untouched.
+* **LiveG connects and we do not** ⇒ the fault is OURS, and only *then* does the unattested register map
+  become a legitimate suspect.
+
+### ⛔ THE OEM MODBUS MANUAL CANNOT UPGRADE OUR REGISTER MAP — checked, all 17 pages
+`assets/community/modbus-slave-2025-12-11/M350-Modbus Manual_V1_1.pdf` looks like the answer to "where is the
+real slave register map" and **is not**. Its entire body is the controller-as-MASTER direction — §4 is
+`MGETDATA[]`/`MSETDATA[]` macro syntax end to end (its "(03H) Read Holding Register" section is the
+controller reading *from* someone else's slave, i.e. the ⛔ forbidden path). Its own intro states
+*"Master-slave mode: **Default master mode**"*, and §2 still describes `279` as a two-state *"Modbus RTU
+Enable"* — this is a **V1.1 document predating the 2026-04-10 firmware that introduced `Slave`**.
+⇒ **No OEM documentation of slave-mode registers exists in this corpus.** `master.py`'s map (7080 / 7260 /
+10002, from foinnc/M3X-M350-IoT-Bridge) remains the ONLY source and remains unattested. Do not re-open this
+PDF looking for it.
 
 ### ⛔ A SEPARATE, SHIPPED-BLOCKING FINDING — the exe cannot enable polling at all
 `enable_position_poll` is CLI-only (`--position-poll`). It is **absent from `Config._PERSIST_KEYS`**, so the
