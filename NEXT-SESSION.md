@@ -116,6 +116,73 @@ around a limit: read the code or call the API.** The gateway already publishes m
 **Built 2026-08-10 with the user. A FINITE cycle: it ends when the end condition below is met, and the advisor
 runs `handoff.py done` rather than inventing a next act.**
 
+---
+
+# ═══ TRIAGE — the OTHER station's entries, reconciled against this plan (2026-08-20) ═══
+
+**Two advisor/worker pairs ran concurrently on 2026-08-19. The CODE merged clean (different files); the
+PLAN collided — both appended to this one file.** Everything below the checklist above was queued by the
+RENDERRANCHY pair. Triaged here so there is ONE list, not two. **The checklist above is the running order.**
+
+## ✅ DONE — shipped, ignore the entries below that describe them
+- **The whole STYLESHEET ARC, P0 → P5c.** 5 real bugs · ~410 lines of dead CSS removed · the token
+  vocabulary · buttons, modals, editor/syntax, dock + a public bevel ramp, menus/fields/tabs/typography ·
+  the shared modal base (14 hand-rolled scrims → one) · the invisible-half colour cleanup.
+- **MOBILE.** The command deck's keypad was clipped out of existence on every phone (22/22 keys, no scroll
+  path); `ENTER` and the `VARIABLES` tab were sliced off; `#btn-clear` went unreachable after a theme
+  switch; the shell and dock now use `dvh` + safe-area.
+- **The Gateway DESKTOP-DOWNLOAD link**, restored and UNCONDITIONAL per the human's ruling.
+- `.wiz` import filter (export wrote `.wiz`, import rejected it) · the `bakedVersion` test premise ·
+  BENCH-CHECKLIST **STEP ZERO** (the update-appears-to-hang warning).
+- ⚠ **IN FLIGHT at the moment of the merge:** the six "pre-existing" test failures. One is PROVEN to be a
+  stale premise — `editor-indent-1450` asserts the corpus emits indented lines, which **t2070 deliberately
+  made impossible**. It has been counted as "pre-existing" in every gate since. See that entry below.
+
+## ⛔ SUPERSEDED — do not work these; the checklist above replaces them
+- **"The workspace names its gateway"** + its allowed-list amendment ⇒ **superseded by S0: roles are
+  AUTOMATIC, derived from configuration.** The human's ruling at the other station is the better answer —
+  a declared list is exactly the manual step S0 removes.
+- **"Role-aware settings panel"** ⇒ **superseded by S1** (gate settings by role), which is more precisely
+  specified than my sketch.
+- **The Drive OAuth spike / "one cloud technique" / "prove it then delete local"** ⇒ **superseded: the
+  BYO-cloud arc SHIPPED (t2076-t2080, V2026.08.19.7).** Transport is proven live. ⚠ Note the loop is NOT —
+  see D in the checklist.
+- **"Get my phone onto Studio" (QR + hostname + adapter ranking)** ⇒ **dead, unbuilt, as intended.** It
+  solved an addressing problem inside the LAN layer that is now condemned. Do not revive it.
+- **The two-exe stomp / publisher gating** ⇒ folded into the roles model; and the sharper version of the
+  hazard is **safety fact 1** above (one gateway on Drive at a time), which S4 fixes.
+
+## 🔵 STILL LIVE — fold these into the checklist rather than losing them
+- **The 44px TAP-TARGET SWEEP.** Measured: ~90% of controls are under the touch floor, several at 14-24px
+  (`.pp-copy` is 14x24). Real, large, and deliberately excluded from the mobile turn so it did not bury the
+  unreachable-control fixes. **Belongs in E.**
+- **The wizard PREVIEW HEIGHTS on a phone** — both panes open as ~40px strips. Mechanism found
+  (`--viz-stack-h` × `--pane-ratio`), cause NOT explained: both measured UNSET, so the 400px default should
+  give 200px each. ⚠ **Investigate before changing a number.** Blocked on one human answer: does it reset on
+  app CLOSE (storage) or on reopening the WIZARD (re-apply)? **Belongs in E.**
+- **The VISIBLE-HALF design decisions** — a 5-step spacing scale and 6-step type scale, surveyed and
+  proposed but NOT implemented, because they move things on screen across all five themes. Needs a human
+  look at the proposal. **Belongs in E, flagged as a decision not a task.**
+- **The PWA** — fully specified (network-first caching, exe icon, standalone, `version.json` never cached)
+  and **explicitly ON HOLD** by the human. Not queued. The spec costs nothing to keep.
+- **A CONNECTIVITY CHECK** — the biggest unqueued idea. **SIX times on 2026-08-19** something was declared,
+  correct-looking in source, and had never run: the caret · the tab glow · a breathing animation that never
+  rendered a frame · the `.g-*` syntax classes · the download popover (found only because the human
+  REMEMBERED it) · `.wizard`, which matched zero elements because the DOM has `id="wizard" class="overlay"`.
+  ⭐ **No single check caught them; each was found a different way.** The project already turns lessons into
+  mechanical checks (the ratchet test, the comment-brace checker, the raw-ramp grep) — this class deserves
+  the same: every declared token has ≥1 reader, every class appears somewhere in JS/HTML, with an allowlist
+  for runtime-constructed names exactly as the ratchet has an inventory.
+
+## ⚠ A PATTERN BOTH STATIONS HIT INDEPENDENTLY, THE SAME NIGHT
+The other station recorded: *four times tonight I asserted a limit without testing it and was wrong each
+time.* **The RENDERRANCHY advisor did the same four times** — naming `.wizard` as the wizard's backdrop
+(dead CSS), a delete range that interleaved live code, a "free CSS-only" fix whose classes are never
+emitted, and re-quoting stale audit numbers as fact. **Two independent sessions, same failure, same night.**
+⇒ The inherited instruction stands and is now doubly evidenced: **read the code or call the API before
+designing around a limit.** In this codebase, add: **and re-derive a number before repeating it — an audit
+goes stale within a few turns.**
+
 ## WHAT THE USER GETS AT THE END, in his own words
 
 > Type `#500` into a wizard field and the program takes that number **from the controller** instead of a fixed
