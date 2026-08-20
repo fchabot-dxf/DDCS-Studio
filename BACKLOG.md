@@ -280,3 +280,27 @@ marked CLI-only — the same family as the connectivity check already on this li
 - **Both PCs must sync the same folder** — the part users genuinely do work out themselves.
 ⇒ ⭐ **None of these block a user doing it manually today.** They are the cost of making it discoverable,
 and they are the honest reason it is a documented path rather than a promoted feature.
+
+---
+
+## WIZARD PREVIEW PANES: A SENSIBLE DEFAULT FOR SOMEONE WHO HAS NEVER DRAGGED
+*(the residue of t2113. The reported defect — "both panes open at ~40px" — is FIXED; this is what is left.)*
+
+**FIXED, do not re-report:** the app's fit-to-screen clamp was being WRITTEN BACK over the user's dragged
+height (`applyVisualHeight` persisted the heal), so a drag survived until the next tight layout and then
+vanished — reopening at the 160px floor, which after ~92px of pane headers leaves **~40px per pane**. That
+number was reproduced exactly (51 then 34 across opens) and matches the human's report. The heal now
+APPLIES without being SAVED. ⭐ **Last-used size wins** (human: *"the last used size is great"*).
+
+⬜ **WHAT REMAINS — the first-time case.** `getVisualHeight()` returns null when the user has never dragged,
+and the code then falls through to *"the layout's own flex sizing holds"*. On a phone that is whatever is
+left after the form, so **someone opening a wizard on a phone for the first time can still get strips** —
+with no reason to suspect the panes are draggable at all.
+⇒ Give the never-dragged case a **sensible minimum** rather than the leftover. ⛔ NOT a new setting: a
+stored drag already overrides it, and the human explicitly wanted no third knob.
+⚠ Safe to do because the phone layout already puts the previews ON TOP of a scrollable body
+(`.two-pane .wiz-body { overflow-y: auto }`, `.wiz-visual { order: 1 }`), so a taller minimum pushes the
+form down rather than clipping anything — ⛔ unlike the command-deck bug, where content was cut off with no
+scroll path at all. **Verify that property still holds before changing the number.**
+⚠ Check whether the previews are STICKY on a phone (the CSS comment says they "stay sticky"): a tall
+minimum plus sticky could pin most of the screen while the form scrolls under it. Deliberate either way.
