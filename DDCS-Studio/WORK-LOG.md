@@ -46410,3 +46410,156 @@ BEFORE STARTING #2 so we do not collide."
 
 🔨 turn 2113
 
+# t2115 — INVESTIGATION: can master.py's Modbus POLLING retire beacons? (gateway/Python + docs read only; no code changes; read-only against the live V4.1, no serial port opened)
+
+Dispatch: the human ran a job on the V4.1 and reported beacons lagging 1-2s at every checkpoint. Confirmed
+cause: `instrument()` injects an MSETDATA push at every Z-up, MSETDATA is a synchronous Modbus transaction,
+and the V4.1 has zero Modbus RTU in firmware — every one blocks until timeout. The advisor has already gated
+this on the browser side (beacons forced off unless `controller_family === 'expert-m350'`) — ⛔ not re-done
+here. The human's own framing ("beacons feel archaic") and `JOB-PROGRESS-PLAN.md`'s "lines are not time"
+motivate the real question: can `fairy/master.py` (a Modbus MASTER that polls the Expert's own Slave-mode
+registers, P279=Slave, read-only, program untouched) eventually replace beacons on the Expert, where Modbus
+genuinely works? Four questions, answered from reading the code + the full evidence trail in this WORK-LOG
+and the reference docs — not from probing the live machine, for reasons below.
+
+## 0 — SCOPE CORRECTION, foregrounded because it reframes the whole question
+
+**master.py is Expert-only, unconditionally — the V4.1 that triggered this cannot benefit from ANY Modbus
+approach, push or poll.** Confirmed by TWO independent, already-closed findings, not re-investigated here:
+`controllers/README.md`'s matrix ("Serial = Modbus RTU … ❌ [CONFIRMED] not in firmware (checked 2 builds)"
+for V4.1) and t2063's own "V4.1: NO, confirmed, multiple independent lines of evidence — zero Modbus RTU in
+firmware... Not a gap in asking; a closed question." So this investigation answers a longer-term architecture
+question (should Expert eventually retire beacons for something better) — it does NOT bear on the V4.1 bug,
+which is already correctly fixed. V3/DM500 Modbus capability is separately still UNKNOWN (t2063: "genuinely
+never asked") — unchanged, not investigated this turn either (out of scope).
+
+## 1 — How complete is master.py? Real client, thoroughly tested — but STOPS AT RAW REGISTERS
+
+`ModbusMaster.read()` is a genuine, working Modbus RTU FC03 client (not a stub): connects, reads a declared
+register block, and fails LOUDLY (one exception type, `ModbusMasterError`) on a timeout, a Modbus error
+response, or a wrong-length reply — never a silent stale/wrong value. `PositionPoller` wraps it in a
+background thread with the same honest `status()` contract slave.py's receiver uses (t2057) — a poller that
+keeps looping while every read fails still reports unhealthy, proven directly in t2063's own test (three
+consecutive failed cycles, thread alive throughout, watched not asserted).
+
+**But `read()` returns the RAW register list — nothing anywhere in this file decodes it.**
+`M350-MODBUS-REFERENCE.md` §1 gives the decode formula for position (`((uint32_t)r2 << 16) | r1`, reassembled
+per axis, cast to float) — master.py never applies it. Worse: the reference doc doesn't even give the actual
+INTEGER VALUES that mean IDLE vs BUSY vs RESET for the `10002` state register — that mapping is itself
+unestablished, not just unimplemented. `ops.py`'s own `position_status()` confirms this precisely in its own
+docstring: "RAW, UNDECODED register values... decoding here would be a SECOND unverified guess stacked on the
+first" (t2073) — deliberate, not an oversight: decoding an unconfirmed register map would just add a second
+unverified layer on top of the first.
+
+**Never proven against the real Expert.** Every test (`test_master_2059.py`, `test_position_poller_2063.py`)
+runs against a LOCAL SYNTHETIC slave — for the "real round-trip" tests, an in-process Modbus **TCP** server
+standing in for the real **RTU serial** link, not even the same transport. t2063 handed the human a full bench
+procedure (find the COM port, run `--position-poll`, watch for `[bridge] position-poll OK — {...}` with real
+numbers) explicitly because "the Expert is unreachable from here." **I found no later WORK-LOG entry
+reporting that procedure was ever run or its result.** `ops.py`'s t2073 comment calls it "bench-proven to
+read the controller's own registers" — I read that as loose wording for the synthetic-slave test SUITE
+("bench" as in test bench), not a claim of a real hardware run, because it directly contradicts t2063's own
+explicit "could not do this, the human's run is the one confirming test nobody else can run for them" and
+nothing since closes that loop. **Flagging the wording as ambiguous rather than resolving it either way** —
+worth a direct one-line confirmation from whoever last actually ran this against the real Expert, if anyone
+has.
+
+**Answer: not a stub, but not a working position/state SOURCE either — a proven read mechanism with no
+interpretation layer, unconfirmed against the hardware it exists for.**
+
+## 2 — What does it need to run alongside slave.py? Nothing — they are ALREADY wired as strict alternatives, and that has a cost worth naming
+
+Confirmed at the CONTROLLER level, not just the software's own choice: the Expert's own `P279` parameter is a
+three-way mode select (`NO`/`Poll`/`Slave`) — "Poll" is explicitly the renamed MASTER mode MSETDATA/MGETDATA
+need, "Slave" is what `master.py`'s polling needs. **One controller, one mode, ever** — this is a firmware
+fact, not a bridge-side restriction to relax. `bridge.py`'s `build()` already enforces it: `enable_position_poll`
+forces `beacons = SimBeaconSource()` regardless of `enable_slave`'s own value.
+
+**The cost, not previously stated plainly**: `SimBeaconSource` is a TEST STUB — `.feed()` is the only way a
+beacon ever lands in it, and nothing in production code ever calls `.feed()`. So today, turning
+`enable_position_poll` on doesn't SWAP IN an equivalent tracking mechanism — it silently DISCONNECTS
+beacon-based completion tracking entirely. A tracked job delivered under position-poll mode would sit in
+`Poller._watch()`'s stall-check branch (`latest()` always `None`) until `stall_seconds` elapses, then report
+"stalled" — even while the machine is genuinely running fine. **Nothing today reads `PositionPoller`'s own
+live data back into job tracking at all** — `master.py`'s own docstring says so directly ("DELIBERATELY NOT a
+BeaconSource, and NOT wired into Poller/job-tracking this turn"), and this remains true as of today's
+`master.py` (unchanged since t2063 — checked git log, 2 commits total, both from that arc).
+
+**Answer: nothing extra needed to avoid a port conflict (already handled) — but turning position-poll on
+today would actively break job-completion tracking, not merely change its source, because nothing bridges
+PositionPoller's data back into Poller.**
+
+## 3 — Can it deliver percent/op/line/ETA today? No — for a structural reason, not a missing decode
+
+Even fully decoded, the register map (§1 of `M350-MODBUS-REFERENCE.md`) has exactly THREE blocks: work
+position, machine position, system state. **No line-number register anywhere** — confirmed as absent from
+this map at t2053 (Amendment Q2), though explicitly not proven absent from the firmware's full register
+space, just absent from the one third-party map we have. Position/state alone cannot answer "which
+operation, how much time left" without a translation layer: `JOB-PROGRESS-PLAN.md`'s own design (§"Anchor by
+ADVANCING A CURSOR, not by matching position") is exactly this translation — walk Studio's own sim playback
+forward as live positions arrive, so "where is the tool" becomes "which move, how far into the plan" without
+the ambiguity of a program crossing the same point twice. t2053 (Amendment Q3) judged this design SOUND and
+already closes its own stated failure mode (a revisit never gets consulted as a match candidate, since the
+cursor only advances). **But it is explicitly, repeatedly named as NOT BUILT** — master.py's own docstring,
+t2063's "Not built this turn," and JOB-PROGRESS-PLAN.md's own "Status: scoping note. Nothing built."
+
+**Answer: today, master.py can deliver raw position + raw state only — 0 of percent/op/line/ETA. The path to
+all four exists on paper (JOB-PROGRESS-PLAN's cursor design, independently judged sound) but needs the same
+unbuilt cursor-advance machinery regardless of which of the four you want first.**
+
+## 4 — Can polling ALONE detect a stall? Not with what exists today; likely YES once the cursor is built — so the "complementary" argument is probably not permanent
+
+`JOB-PROGRESS-PLAN.md`'s own stated counter-argument: beacons know semantic position (op/line), Modbus knows
+physical position and whether it's moving, and only TOGETHER do they detect a stall — a beacon-only tracker
+can't tell "finished" from "died at line 40" (both look like "no new beacon").
+
+Today, as built: **no.** Two independent gaps, not one: (a) the `10002` state register is undecoded AND its
+own integer-to-meaning mapping (which value means IDLE vs BUSY vs RESET) is not established anywhere in the
+evidence trail — even the source reference doc only names the three states, not their codes; (b) even a fully
+decoded state value is a coarse run-state, not necessarily rich enough on its own to distinguish "program
+completed normally" from "alarmed/e-stopped mid-run" — both could plausibly read as the same "not moving"
+condition, and nothing in the current evidence confirms otherwise either way.
+
+**But position ALONE could plausibly resolve this without needing the state register's fine semantics at
+all**, once the cursor-advance machinery exists: Studio already knows the expected FINAL position of a
+program (it wrote the program, per JOB-PROGRESS-PLAN's own central claim). "Idle/not-moving AND at the
+expected end position" = finished; "idle/not-moving and NOT at the expected end position, with moves still
+remaining in the plan" = stalled. This is the exact SAME position-vs-plan comparison the cursor already needs
+to build for percent/ETA in question 3 above — not a separate feature, a side effect of the one already
+planned.
+
+**Answer: polling alone cannot detect a stall with what's built today (no decode, no cursor, unconfirmed
+state semantics) — but the SAME unbuilt cursor-advance machinery that's required for percent/op/line/ETA
+anyway would very likely also answer the stall question via position-vs-expected-position, without needing
+the state register at all. If that holds, JOB-PROGRESS-PLAN's "beacons and Modbus are complementary" is true
+of TODAY'S unbuilt state, not a permanent structural fact — building the cursor for progress reporting would
+likely also retire the stated need for beacons-as-stall-detector on the Expert, as a side effect rather than
+a separate project.**
+
+## Why I did not attempt a live read against the real Expert, and did not open the serial port
+
+The dispatch explicitly permits read-only file/isdir/fingerprint probing and explicitly requires SAYING SO
+FIRST before opening the serial port — treated that as a gate I have not cleared this turn, not an invitation
+read as implicit consent. Also: the machine connected and powered right now (10.0.0.50) is the **V4.1**, which
+(§0 above) cannot speak Modbus at all — a live probe of it would tell me nothing about the Expert question
+this investigation is actually about. **Flagging, not doing**: the single highest-value next empirical step is
+a READ-ONLY `master.py` `ModbusMaster.read("state")`/`read("work_position")` FC03 poll against the real
+Expert (whenever it, not the V4.1, is the machine on hand and P279 is confirmed still set to Slave) — this
+would resolve whether the register addresses are actually correct for this firmware and start answering the
+state-code-meaning gap in §4. I have not done this; it needs the explicit go-ahead the dispatch itself
+requires.
+
+## Files
+None changed — investigation only, per the dispatch's own framing ("it is an INVESTIGATION first, not an
+implementation"). Read: `fairy/master.py`, `fairy/slave.py`, `fairy/bridge.py` (`build()`), `fairy/poller.py`
+(`_watch`), `fairy/ops.py` (`position_status`), `fairy/config.py`, `tests/test_master_2059.py`,
+`tests/test_position_poller_2063.py`, `M350-MODBUS-REFERENCE.md`, `JOB-PROGRESS-PLAN.md`,
+`bridge/controllers/README.md`, and this file's own t2053/t2059/t2061/t2063 entries in full. Live: read-only
+peek at `~/.ddcs-bridge/config.json` (confirms the currently-running gateway has both `enable_slave` and
+position-poll off — pure deliver-only, no serial contention exists right now either way) and a plain HTTP GET
+of the live gateway's own `/api/descriptor` (confirms it's genuinely connected to the real V4.1 — the reason
+I did not attempt any live Modbus read this turn). No serial port opened; no file written anywhere, local or
+on either controller.
+
+🔨 turn 2115
+
