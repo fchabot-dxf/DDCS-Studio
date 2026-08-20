@@ -1,19 +1,113 @@
-# TODAY — the running order (2026-08-10, built with the user)
+# TODAY — the running order (2026-08-19, rebuilt with the user)
+
+**Read this first. The 2026-08-10 header that used to sit here was nine days stale and described a cycle
+that has since closed.**
 
 ```
-  RUNNING   t1698   the map's checker                        worker has it
-  THEN      RELEASE 7 commits sitting unreleased             ADVISOR does this
-            incl. the glyph fix — the last of the user's five corner symptoms
-  THEN      THE CYCLE below, 4 acts, and it ENDS
+  SHIPPED TONIGHT   the BYO-CLOUD ARC, t2076-t2080 -> V2026.08.19.7
+                    a job can travel through the user's OWN Google Drive, proven live on their account
+  NEXT              1. the V4.1 bench test          the human is doing this
+                    2. S4  namespace the Drive inbox      SAFETY, blocks a second gateway
+                    3. run the FULL cloud loop onto the Expert     the delete-LAN gate
+                    4. the ROLES feature            ROLES-PLAN.md, argued and re-shaped
 ```
 
-**The release is the advisor's, not a worker act.** Gate it (full suite, once), push, bump, verify the deploy,
-then start the cycle. Do NOT dispatch a cycle act while the release suite runs — that collision manufactured
-false reds twice on 2026-08-09.
+## ⛔ THREE SAFETY FACTS — read before touching the machine or enabling anything
+1. **ONE GATEWAY ON DRIVE AT A TIME.** Two gateways share one `DDCS Bridge/inbox/`; `_maybe_claim()` takes
+   `ids[0]` with no notion of which machine a job is FOR, and `identity.verify()` is INERT while `machine_id`
+   is unset (it is unset on both of the human's machines). ⇒ with the V4.1 also on Drive, an **Expert program
+   can be delivered to the V4.1**. Fixed by S4; until then, only one.
+2. **A JOB SENT WHILE THE CONTROLLER IS OFF IS DESTROYED**, not queued — `poller._claim()` deletes it on
+   `OSError` and records `failed` (BACKLOG #9). This bites the cloud path hardest: a phone is told "queued"
+   and a sleeping gateway's first poll discards it.
+3. **SWITCHING `backend` local↔drive STRANDS THE QUEUE** — the two inboxes are mutually invisible, nothing
+   migrates, nothing warns. Likely to coincide with a role change and be blamed on roles.
 
-**What is waiting to reach the user:** the glyph resolver (the last corner symptom he reported), `_writable`
-declared, the preview gate's marker gap closed, 34 dead screenshot paths repointed, the lathe frame ruling,
-`ARCHITECTURE.md`, and CI disabled.
+## WHERE THINGS STAND
+- **Cloud transport: PROVEN LIVE** (sign-in, token refresh, folder tree, job write/list/read, upsert,
+  delete-on-deliver) on the human's own Google account — not mocks.
+- **The cloud LOOP: NOT PROVEN.** No gateway running `backend=drive` has ever claimed a job and delivered it
+  to a controller. **The delete-LAN gate is therefore NOT met** — see the gate assessment at the end of this
+  file, including the offline-shop argument the original ruling never considered.
+- **Sign-in was broken for EVERY user** (wrong OAuth client kind) and is fixed for fresh AND existing
+  installs (t2079/t2079b).
+- **A client can send with no local gateway** (t2080) — the phone case, fixed after being reported dead.
+
+## OPEN RULINGS — blocked on the human, nothing else
+1. **Roles: the override's SHAPE.** Roles are AUTOMATIC (ruled) and derived from configuration. The human
+   ruled that changing role must never destroy config, so a non-destructive override stays — its UI is
+   undecided.
+2. **The offline shop.** LAN serving is the only phone→machine path with no internet. Cloud cannot cover it;
+   one-box cannot either. Whether that case still matters decides whether LAN is ever deleted.
+
+## THE PLANS, and what each is for
+| file | what it holds |
+|---|---|
+| `ROLES-PLAN.md` | the roles feature: the model, the TWO GATING AXES (role=what exists, status=what is available), the argument that re-shaped it, and the build slices S0-S5 with S4 promoted to first |
+| `BACKLOG.md` | 9 small, diagnosed, one-sitting items — created tonight because backlog was being appended into THIS file, where a to-do list cannot be found |
+| `ROADMAP.md` | the canonical feature backlog; the BYO-cloud arc is recorded under Recently Shipped |
+| `bridge/controllers/expert-m350/BENCH-CHECKLIST.md` | the at-the-machine work, incl. STEP ZERO |
+
+## ☑ THE CHECKLIST — everything planned, in the order it should happen
+*(tick these; an item is done when it leaves the list, not when a commit mentions it)*
+
+### A. AT THE MACHINE — needs the human, cannot be done remotely
+- [ ] **V4.1 bench test** (in progress). ⛔ leave "Send jobs through my Google Drive" **OFF** on the V4.1's
+      gateway while CNC-FAIRY's is on — see safety fact 1.
+- [ ] **Run the FULL cloud loop onto the Expert** — send from a client → gateway with `backend=drive` claims
+      → delivers to CNCDISK → appears in History. **This is the delete-LAN gate.** Nothing else satisfies it.
+- [ ] **Expert bench re-check of t2070** (flush labels + IF-GOTO clamps) — parse test, then a foam/air cut.
+- [ ] **Set `machine_id` on each machine + provision the identity file** — turns `identity.verify()` from
+      inert to real; the only thing that REFUSES a delivery to the wrong controller.
+- [ ] Optional cleanup: delete the OLDER Google client secret (two are listed); clear ASUS's stale
+      `\10.0.0.50\cncdisk` if it is now a client.
+
+### B. SAFETY / CORRECTNESS — before the cloud path is trusted or widened
+- [ ] **S4 — namespace the Drive inbox per CONTROLLER** (not per PC: two PCs may serve one controller, and a
+      PC-named folder orphans the queue when the role moves). Unblocks a second gateway. `drive_folder` is
+      already per-config; only `driveJobs.js`'s hardcoded `ROOT_NAME` + a target picker are missing.
+- [ ] **BACKLOG #9 — queue instead of discard** when the controller is unreachable. Distinguish TRANSIENT
+      (`OSError` → leave in the inbox, retry) from FATAL (refused identity, unreadable → fail LOUDLY). Keep a
+      ceiling so a dead destination cannot retry forever in silence.
+- [ ] **Warn when switching `backend` with a non-empty inbox** — today local↔drive strands the queue
+      silently. Name what is stranded and where.
+
+### C. THE ROLES FEATURE — `ROLES-PLAN.md` (S4 above runs first)
+- [ ] **S0 — the role exists, AUTOMATICALLY.** Derived from configuration (controller disk set ⇒ gateway).
+      ⛔ the claim gate lives in `_maybe_claim()`, never in the UI. ⛔ never derive from REACHABILITY — that
+      is the status axis. ⛔ never implement "client" by not starting the daemon (it serves the local UI).
+      Include the non-destructive override (the human ruled: changing role must not destroy config).
+- [ ] **S1 — gate SETTINGS by role.** Hide on a client: controller disk · beacons/COM · controller profile.
+      Keep: machine name · cloud + account · daemon URL · serve port. Reduce Setup, never hide it.
+- [ ] **S2 — compose the TWO AXES** (role = what exists, status = what is available). Client + gateway
+      offline ⇒ **Send stays armed** and queues. Gateway + controller offline ⇒ controller settings stay
+      VISIBLE. Retire t2080b's `viaDrive` special case into the role.
+- [ ] **S3 — the backend-mediated file view.** Browse via the published `cncdisk/index.json` (producer
+      exists, only the retired R2 console reads it); delete via the command channel (the gateway already
+      polls it). ⚠ label it a ~15s SNAPSHOT. ⛔ `SAFE_OPS = {"delete"}` stays — a client must never RUN.
+- [ ] **S5 (later)** — read file CONTENTS from a client (needs a new request/response channel; the index is
+      a listing only) · client-side Tracking mirroring the gateway's published status.
+
+### D. THE DELETE-LAN DECISION — only after A and B
+- [ ] Full loop proven (A) + #9 fixed (B) + **the offline-shop question answered explicitly** (LAN is the
+      only phone→machine path with no internet). Then decide, with evidence.
+
+### E. SMALL — `BACKLOG.md`, any order, good downtime work
+- [ ] #1 avatar shows initials though a photo exists (check `localStorage.ddcs_cloud_pic` first — likely just
+      never cached for a pre-t2077 sign-in; re-fetch identity at boot)
+- [ ] #2 theme selector → Settings · [ ] #3 hide the console window (log to a FILE first)
+- [ ] #4 exe checks for updates only at boot · [ ] #5 update-banner balance (version printed twice)
+- [ ] #6 welcome panel: shorter + optional links + screenshots (versioned, so staleness is fine)
+- [ ] #7 the lathe icon does not read as a lathe setup · [ ] #8 browser-side Drive send (⭐ mostly DONE by
+      t2080 — reduce to "verify end to end from a real phone")
+
+
+## ⚠ A PATTERN FROM TONIGHT WORTH INHERITING
+Four times I asserted a capability limit without testing it and was wrong each time — `drive.file` scope
+(per PROJECT, not per client), release-note screenshots (versioned, so staleness is fine), CNCDISK on a
+client (already published, just unread), and "clear the config to change role" (that IS the data loss).
+Each time the human's plainer model was right. **Before hiding a tab, refusing a feature, or designing
+around a limit: read the code or call the API.** The gateway already publishes more than Studio consumes.
 
 ---
 
