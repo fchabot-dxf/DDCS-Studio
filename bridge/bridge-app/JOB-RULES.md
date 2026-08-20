@@ -14,9 +14,30 @@ restate it — a rule written down twice is a rule that will disagree with itsel
 
 ## THE ONE-SENTENCE RULE
 
-**A gateway never takes a job it cannot deliver, and a job that is discarded always says so.**
+**A job may only be created when a gateway is running AND the CNC is powered.**
 
-Everything below is that sentence applied to specific moments.
+*(human, 2026-08-20: "if gateway is on but cnc off then it should be a no send policy".)*
+
+⭐ **THE HEARTBEAT IS TWOFOLD**, and that is the whole mechanism — it answers both halves at once:
+
+| the heartbeat says | from | if false |
+|---|---|---|
+| **a gateway is running** | freshness of `gateway/heartbeat.json` (written every 20s, stale at 60s) | no send |
+| **the CNC is powered** | `controller_connected` — the gateway's own live disk probe | no send |
+
+⇒ **Both true, or no send.** There is no "the job waits for the mill" state: waiting is exactly what this
+policy refuses to create. **THE INBOX IS A WIRE, NOT A STORE.**
+
+⚠ **AND A DROPPED STRAGGLER IS ACCEPTABLE** (human, explicit: *"i dont care if the file is dropped when the
+cnc is off"*). The mill can still be switched off between a send and the next poll; the claim gate declines
+to take it and it may be discarded. ⛔ Do NOT build machinery to rescue that case — it is a race, and the
+human has ruled the outcome fine.
+
+**THE POLICY APPLIES AT BOTH ENTRY POINTS, or it does not apply at all:**
+- **Drive path** (phone / client) — the browser greys Send and refuses on click. `[SHIPPED]`
+- **Local path** (`Ops.submit_job`) — refuse before `make_job_id`. `[RULED]` ⛔ **currently ungated**, so
+  Studio on the gateway PC with the mill off still accepts a job that will never be claimed — the exact
+  state this rule exists to prevent, arriving through the front door.
 
 ---
 
