@@ -89,6 +89,15 @@ class Config:
     # --- audio feedback (chime.py; t2097) -----------------------------------
     enable_chime: bool = True               # --no-chime to turn off; Windows-only regardless (see chime.py)
 
+    # --- PC role: gateway vs client (ROLES-PLAN.md S0; t2103) ---------------
+    # ⛔ DERIVED, NEVER STORED AS THE PRIMARY SIGNAL: role_override is empty by default, and effective_role()
+    # below computes gateway/client fresh from expert_dest every time — "almost nothing user-visible" (the
+    # plan's own words) means every existing install keeps behaving exactly as it does today, with zero
+    # config migration. This field exists ONLY for the one case derivation gets wrong: a machine carrying
+    # STALE controller config (a disk path left over from bench work) would auto-classify as gateway and
+    # claim jobs it should not. Set to "gateway" or "client" to override; "" (default) = trust the derivation.
+    role_override: str = ""
+
     # config.json key (what the Setup UI / set_config writes) -> Config attribute it restores.
     _PERSIST_KEYS = {
         "dest": "expert_dest", "machine_name": "machine_name", "machine_id": "machine_id",
@@ -96,6 +105,7 @@ class Config:
         "host": "host",   # LAN serving toggle ("127.0.0.1" | "0.0.0.0") — COMBINED-APP-PLAN Step 3
         "google_client_id": "google_client_id",   # Google Desktop OAuth client id (BYO cloud / Drive sign-in)
         "enable_chime": "enable_chime",   # t2097 — Setup toggle, default ON
+        "role_override": "role_override",   # t2103 (S0) — "", "gateway", or "client"
         "google_client_secret": "google_client_secret",
     }
 
@@ -228,3 +238,31 @@ class Config:
             from .backend.local_folder import migrate_legacy_root
             migrate_legacy_root(c.local_root)
         return c
+
+
+# --- PC role: gateway vs client (ROLES-PLAN.md S0; t2103) -------------------------------------------------
+# "Client" does NOT mean no daemon — every exe runs the same gateway daemon and serves Studio's own UI on
+# localhost regardless of role (ROLES-PLAN.md:24-28, the human's own words: "client also still are
+# technically gateways"). The role governs exactly two things: whether the poller CLAIMS
+# (poller.py's _maybe_claim, the authoritative gate — never the UI alone), and which settings the UI shows.
+ROLE_GATEWAY = "gateway"
+ROLE_CLIENT = "client"
+
+
+def effective_role(config):
+    """gateway ⇔ a controller disk is configured; client otherwise — DERIVED, never from reachability (a
+    gateway with its controller unplugged is still a gateway; that is a STATUS question, a different axis).
+    An explicit role_override wins when set, for the one case derivation gets wrong: stale config left over
+    from bench work that no longer reflects what this PC actually is."""
+    if config.role_override in (ROLE_GATEWAY, ROLE_CLIENT):
+        return config.role_override
+    return ROLE_GATEWAY if (config.expert_dest or "").strip() else ROLE_CLIENT
+
+
+def role_conflict(config):
+    """True when an explicit 'client' override coexists with a configured controller disk — a
+    misconfiguration that must be SEEN, never silently resolved either way (ROLES-PLAN.md S0's own
+    constraint). Only this direction is a conflict: an explicit 'gateway' override with no disk configured is
+    not contradictory — it names an intent (this PC IS the gateway) that Setup just hasn't been finished for
+    yet, not a disagreement between two facts."""
+    return config.role_override == ROLE_CLIENT and bool((config.expert_dest or "").strip())

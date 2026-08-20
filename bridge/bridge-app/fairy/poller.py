@@ -22,6 +22,7 @@ import datetime
 import time
 
 from . import identity, tracker
+from .config import ROLE_GATEWAY, effective_role
 
 
 def _iso(ts):
@@ -64,8 +65,14 @@ class Poller:
 
     # -- idle: pick up the next job ------------------------------------------
     def _maybe_claim(self):
+        # t2103 (S0, ROLES-PLAN.md) — THE CLAIM GATE IS AUTHORITATIVE, never the UI: a role that hides tabs
+        # while the poller still claims is worse than no role at all. Checked via effective_role (which
+        # respects an explicit override), not expert_dest directly — a stale-config override to "client" must
+        # win even when a leftover disk path is still configured.
+        if effective_role(self.cfg) != ROLE_GATEWAY:
+            return
         if not self.cfg.expert_dest:
-            return                                  # no controller configured yet (Setup) — leave jobs queued
+            return                                  # gateway role, but no controller configured yet (Setup) — leave jobs queued
         ids = self.backend.list_inbox()
         if ids:
             self._claim(ids[0])                    # oldest jobId == FIFO

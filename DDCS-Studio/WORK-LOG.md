@@ -45889,3 +45889,95 @@ claim time. No coordination needed on my side: the browser reader treats the fie
 
 🔨 turn 2101
 
+# t2103 — S0: the role exists, automatically (ROLES-PLAN.md); Python side only
+
+Dispatch: derive a PC's role (gateway/client) from configuration, with an optional persisted override for the
+one case derivation gets wrong (stale controller config left from bench work). The claim gate is the
+authoritative enforcement point — never the UI — and disagreement between an explicit override and the
+configured disk must be surfaced, never silently resolved. Gateway/Python + pytest only; the UI half is the
+advisor's, running its own full Playwright gate in parallel this turn.
+
+## The design (verified against ROLES-PLAN.md directly, not re-derived from the dispatch note alone)
+
+Read the plan's own S0 section (line 265) plus the surrounding "where the role is decided" and "client does not
+mean no daemon" sections before writing anything: `expert_dest` non-empty ⇒ gateway, empty ⇒ client, DERIVED
+fresh every time (never stored as the primary signal — the plan's own words: "almost nothing user-visible,"
+meaning every existing install keeps behaving exactly as it does today with zero config migration). An optional
+`role_override` ("", "gateway", or "client") wins when set. Two module-level functions in `config.py`
+(`effective_role`, `role_conflict`) are the ONE place both the claim gate and the descriptor read from, so the
+UI and the actual claim behaviour can never drift apart from each other.
+
+## What changed
+
+**`fairy/config.py`.** `role_override: str = ""`, persisted (`_PERSIST_KEYS["role_override"]`). `ROLE_GATEWAY`/
+`ROLE_CLIENT` constants. `effective_role(config)` — override wins if it's a valid value, else derives from
+`expert_dest`; an invalid override (garbage string) falls back to the derivation rather than crashing or
+silently picking gateway. `role_conflict(config)` — true ONLY for an explicit `client` override coexisting with
+a configured disk; a `gateway` override with no disk yet is a stated intent, not a contradiction (documented
+directly in the function's own docstring, since this asymmetry is easy to get backwards later).
+
+**`fairy/poller.py`** — `_maybe_claim` (the plan's own explicit call-out: this is where the gate MUST live, not
+the UI) now checks `effective_role(self.cfg) != ROLE_GATEWAY` first, before the pre-existing `not
+self.cfg.expert_dest` check (kept, unchanged — a `gateway` override with no real disk still must not attempt
+delivery into nothing). Both checks stay, because they guard different things: role gates WHO gets to claim,
+the disk-path check gates WHETHER there is actually somewhere to deliver to.
+
+**`fairy/ops.py`** — `descriptor()` gains `role`/`role_conflict` (the heartbeat/Admin-view side); `get_config()`
+gains `role`/`role_override`/`role_conflict` (the Setup-UI side, including the raw override so Setup can show
+it as a stated choice rather than re-deriving it); `set_config()` accepts `role_override` as a LIVE, no-restart
+field (validated against the three legal values) — `effective_role`/the claim gate both read `cfg.role_override`
+fresh on every call, so a Setup change is authoritative the very next poll tick, no wiring needed.
+
+**`fairy/bridge.py`** — the startup line now STATES the derivation, not just the outcome, per the plan's own
+example wording ("Gateway — because a controller disk is configured"): `role=gateway (a controller disk is
+configured)` / `role=client (role_override)` / etc. A `role_conflict` gets its own separate, loud line.
+`--role gateway|client` CLI flag added for consistency with the rest of the file's config surface.
+
+## A real bug found and fixed while verifying live, not by inspection
+
+The `role_conflict` warning originally used `⚠` (U+26A0). Verified live (a real `run_loop()` in a thread, the
+same pattern used to verify t2097/t2101's own DriveError catches) rather than assumed correct from reading the
+code: it threw an uncaught `UnicodeEncodeError` on this machine's console codepage (cp1252 has no U+26A0) and
+crashed the ENTIRE `run_loop` thread — a warning line taking the whole gateway down with it, the opposite of
+what a warning is for. Rewritten in plain ASCII. Re-verified: the same live scenario now prints correctly and
+`run_loop` survives into its normal polling state.
+
+## Verified against the real symptom throughout
+
+- New `tests/test_role_claim_gate_2103.py` (6 tests), matching `test_poller_track_gate.py`'s own established
+  pattern (real `Poller`/`LocalFolderBackend`/`Ops`, a transfer stub whose `.calls` list proves whether delivery
+  was ever even ATTEMPTED — not just whether a status flag says so): client role, derived, leaves a job queued
+  and never touches transfer. **The property S0 actually adds**: an explicit client override wins even with a
+  real controller disk configured — the job stays queued, transfer is never touched, proving the override beats
+  the disk path rather than merely coexisting with it. The common case (derived gateway, real disk) still claims
+  and delivers exactly as before this turn — the plan's own gate requirement ("the derived default reproduces
+  today's behaviour for every existing install"). A `gateway` override with no disk yet still refuses (the
+  disk-path check holds independently of role). `effective_role`/`role_conflict` also unit-tested in isolation
+  across every input combination, including the invalid-override fallback.
+- `bridge()`'s startup lines and the `role_conflict` warning driven live (real `run_loop()`, real thread,
+  `is_alive()` checked before and after) for three cases: client-override-with-a-disk (warning fires, no crash
+  after the fix; crashed before it), derived-gateway-no-conflict (correct stated line, no warning), — closing
+  the loop on the exact same live-entry-path discipline this turn's earlier work already established.
+- A REAL regression scare, investigated and ruled out rather than assumed transient: a full pytest run showed
+  `test_history_real_path_2065.py` (2 of 3 tests) failing with "real bridge server never came up." Manually
+  replicated that test's own setup (`build()` + `start_server()`, no test harness) and it worked perfectly —
+  `ops.descriptor()` returned the new `role`/`role_conflict` fields correctly, the HTTP endpoint answered
+  correctly. `netstat` showed dozens of `TIME_WAIT` entries on the test's hardcoded port 18765 (no active
+  LISTENER) — consistent with port-reuse contention from running the same hardcoded-port test repeatedly within
+  this one working session, not a code defect. Re-ran the isolated file clean: 3/3 passed in 12s (vs the
+  73s-plus-timeout the contended run took). Re-ran the FULL suite clean: 95/95.
+- Full `bridge-app` pytest: 95/95 (89 + 6 new). `--self-test`: same pre-existing, already-documented (t2097/
+  t2099 WORK-LOG) unrelated 403; unchanged.
+
+## Files
+- `bridge/bridge-app/fairy/config.py` — `role_override` field + persist key; `ROLE_GATEWAY`/`ROLE_CLIENT`;
+  `effective_role()`; `role_conflict()`.
+- `bridge/bridge-app/fairy/poller.py` — `_maybe_claim` gates on `effective_role`.
+- `bridge/bridge-app/fairy/ops.py` — `descriptor()`/`get_config()`/`set_config()` all read/write the role
+  through the same two functions.
+- `bridge/bridge-app/fairy/bridge.py` — stated-derivation startup line, `role_conflict` warning (ASCII, fixed
+  live), `--role` CLI flag.
+- `bridge/bridge-app/tests/test_role_claim_gate_2103.py` — new, 6 tests.
+
+🔨 turn 2103
+

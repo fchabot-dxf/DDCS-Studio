@@ -15,6 +15,7 @@ import os
 import re
 
 from . import __version__, cncdisk, identity
+from .config import effective_role, role_conflict
 
 _SLUG = re.compile(r"[^A-Za-z0-9_.-]+")
 
@@ -247,6 +248,13 @@ class Ops:
             "dest": self.cfg.expert_dest,            # which controller disk this gateway is pointed at
             "backend": self.cfg.backend,
             "version": __version__,
+            # t2103 (S0, ROLES-PLAN.md) — DERIVED (or overridden), same as controller_profile_id above: read,
+            # never guessed, from the ONE function that also gates the poller's claim (effective_role) — so the
+            # UI and the claim behaviour can never silently disagree about which this PC is. role_conflict is
+            # true only for an explicit client override with a disk still configured; the reverse (gateway
+            # override, no disk yet) is a stated intent, not a contradiction — see role_conflict's own docstring.
+            "role": effective_role(self.cfg),
+            "role_conflict": role_conflict(self.cfg),
         }
 
     # --- controller detection (V4.1 vs Expert) -----------------------------
@@ -1071,6 +1079,9 @@ class Ops:
             "host": c.host, "port": c.port, "lan_ip": self._lan_ip(),
             "is_remote": is_network_share(c.expert_dest),
             "controller_connected": self.controller_reachable(),
+            # t2103 (S0) — the SAME derivation the claim gate uses (never a separate UI-only guess), plus the
+            # raw override so Setup can show it as an explicit choice rather than re-deriving what's already set.
+            "role": effective_role(c), "role_override": c.role_override, "role_conflict": role_conflict(c),
         }
 
     def _config_file(self):
@@ -1086,6 +1097,8 @@ class Ops:
                 return {"ok": False, "error": r"controller disk must be a network share like \\10.0.0.50\cncdisk (not a local folder)"}
         if "host" in updates and updates["host"] is not None and updates["host"] not in ("127.0.0.1", "0.0.0.0"):
             return {"ok": False, "error": 'host must be "127.0.0.1" (this PC only) or "0.0.0.0" (LAN)'}
+        if "role_override" in updates and updates["role_override"] not in (None, "", "gateway", "client"):
+            return {"ok": False, "error": 'role_override must be "" (auto), "gateway", or "client"'}
         restart = False
         if "machine_name" in updates: c.machine_name = (updates["machine_name"] or "").strip()
         if "machine_id" in updates: c.machine_id = (updates["machine_id"] or "").strip()
@@ -1093,6 +1106,10 @@ class Ops:
         if updates.get("com_port"): c.com_port = updates["com_port"].strip()
         if "enable_chime" in updates and updates["enable_chime"] is not None:
             c.enable_chime = bool(updates["enable_chime"])   # t2097 — live toggle, no restart (see bridge.py's _on_sound)
+        if "role_override" in updates and updates["role_override"] is not None:
+            # t2103 (S0) — live, no restart: effective_role()/the claim gate both read c.role_override
+            # fresh on every call, so a Setup change is authoritative the very next poll tick.
+            c.role_override = updates["role_override"]
         for k in ("enable_slave", "backend", "host"):   # host rebind needs a server restart
             if k in updates and updates[k] is not None and getattr(c, k) != updates[k]:
                 setattr(c, k, updates[k]); restart = True

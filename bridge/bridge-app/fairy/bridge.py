@@ -21,7 +21,7 @@ import time
 from .backend import make_backend
 from .backend.drive import DriveError
 from .cncdisk import CncDiskService
-from .config import Config
+from .config import Config, ROLE_GATEWAY, effective_role, role_conflict
 from .ops import Ops
 from .poller import Poller
 from .master import PositionPoller
@@ -162,7 +162,20 @@ def run_loop(config):
     else:
         st = beacons.status()
         slave = f"{config.com_port}@{config.baud}" if st.get("ok") else f"FAILED — {st.get('error') or 'unknown reason'}"
-    print(f"[bridge] up — backend={config.backend}  machine={machine}  dest={config.expert_dest}  slave={slave}")
+    # t2103 (S0) — the STATED derivation, not just the outcome (ROLES-PLAN.md's own example wording): says
+    # WHY, so a stale --dest reads as an explanation the operator can act on ("that's not right, override it")
+    # rather than a bare label. role_conflict gets its own loud line — never folded silently into "client".
+    role = effective_role(config)
+    why = "role_override" if config.role_override else ("a controller disk is configured" if config.expert_dest else "no controller disk is configured")
+    print(f"[bridge] up — backend={config.backend}  machine={machine}  dest={config.expert_dest}  slave={slave}  role={role} ({why})")
+    if role_conflict(config):
+        # t2103 — plain ASCII on purpose: a genuine UnicodeEncodeError was hit live testing this exact line
+        # with a non-UTF-8 Windows console codepage (cp1252 has no U+26A0 WARNING SIGN), which crashed the
+        # WHOLE run_loop thread on an uncaught exception — a warning line must never be able to take the
+        # gateway down with it.
+        print(f"[bridge] WARNING: role is overridden to 'client' but a controller disk IS configured "
+              f"({config.expert_dest}) - this PC will NOT claim jobs even though it looks wired to a machine. "
+              f"Clear the override in Setup if that is not what you meant.")
     if position_poller is not None:
         # t2063 — SAME discipline: report the poller's REAL post-start status, not the fact that --position-poll
         # was passed. A moment after start() the thread has usually either failed the port probe already or is
@@ -601,6 +614,8 @@ def main(argv):
     ap.add_argument("--machine-id", dest="machine_id", help="expected controller id (enables verify-before-deliver)")
     ap.add_argument("--name", dest="machine_name", help="machine label, e.g. \"Ultimate Bee\"")
     ap.add_argument("--no-chime", action="store_true", help="don't play the RECEIVED/DELIVERED/FAILED audio feedback (Windows-only regardless; on by default)")
+    ap.add_argument("--role", choices=["gateway", "client"],
+                    help="override the auto-derived PC role (gateway if --dest is set, else client) -- for the one case the derivation gets wrong: stale --dest left over from bench work on a PC that should no longer claim jobs")
     args = ap.parse_args(argv)
 
     cfg = Config.from_env(
@@ -617,6 +632,7 @@ def main(argv):
         enable_ws=(True if args.enable_ws else None),
         ws_port=getattr(args, 'ws_port', None),
         enable_chime=(False if args.no_chime else None),
+        role_override=args.role,
     )
     if args.provision:
         return provision(cfg, args.machine_id, args.machine_name)
