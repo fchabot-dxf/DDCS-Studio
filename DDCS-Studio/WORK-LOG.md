@@ -44978,3 +44978,132 @@ actual failed-test names, not just the trailing count.
 
 🔨 turn 2087
 
+# t2089 — P5a follow-up + P5b: the real .wizard deletion, and the family merges
+
+## The follow-up, first: t2087's own .wizard deletion never actually landed
+
+The advisor's review caught it directly in the committed file: `.wizard`/`.wizard.active` (lines 2023/2033)
+were STILL PRESENT in `354cdd0d`, despite t2087's own WORK-LOG entry claiming they'd been deleted — including
+the `z-index: var(--z-modal-wizard)` change from that same turn's earlier pass. The live verification I ran
+during t2087 (the probe, the classList dump, the screenshots) genuinely matched a correctly-edited version of
+the file — confirmed this turn by diffing the current fix against t2087's own saved `after.json`, which shows
+**zero diffs**, meaning that JSON capture really was taken against the deleted-rule state. Somewhere between
+that verification and the final commit, the edit was lost (most likely: the `cp .../t2087_styles_final.css`
+backup was taken from a stale copy of the working tree, before this specific edit, rather than after it — the
+exact mechanism wasn't pinned down, and isn't the point).
+
+**Re-verified "what actually makes the wizard visible" three ways before deleting again, per the advisor's
+explicit instruction — none of it taken on the strength of the prior turn's own claim:**
+1. `t2087_wizard_class_debug.mjs` (re-run): the real element is still `id="wizard" class="overlay"`.
+2. Read `wizardManager.js` directly: `this.wizardElement = el('wizard')` (a `getElementById` lookup on the ID,
+   not a class query) calls `.classList.add('active')`/`.remove('active')` on that element — landing on
+   `.overlay.active { display: flex; }`, never on `.wizard.active`.
+3. Repo-wide search for `class="wizard"` and `classList.add('wizard')`: zero matches, either way.
+
+Deleted the block for real this time, verified the edit actually landed in the file (`grep` returns nothing),
+and re-ran the full computed-style diff non-vacuously: all 5 themes' wizard-scrim values are still
+byte-identical to t2087's own genuine BEFORE baseline. Corrected the deletion comment to say plainly that this
+is the second attempt and why the first one didn't take — a stale, confidently-wrong comment in this exact
+spot is precisely the failure mode this arc keeps finding and fixing elsewhere; better to name it here too
+than let it happen silently.
+
+## P5b — the family merges, each verified against the CURRENT file first
+
+The dispatch's audit is several turns old; two of its named merge targets don't hold against the file as it
+stands now — reported plainly rather than forced:
+- **`.row-2`**: does not exist anywhere in the file. No merge target.
+- **The wiz-2pane child set "duplicated under a blocks-app prefix"**: the real match is `#blk_wiz_user` (the
+  Blocks tab's embedded wizard pane), and its overrides of `.wiz-2pane`/`.wiz-controls`/`.wiz-visual` are
+  genuinely VALUE-DIFFERENT (order:2 vs order:1, flex:0 0 auto vs flex:0 0 360px, flex-direction:column for
+  the stacked mobile-style layout) — legitimate, intentional overrides for a different layout, not a verbatim
+  duplicate.
+
+**Confirmed and merged:**
+- **`.deck-header` / `.section-label`**: byte-identical, all 7 declarations (padding/font-size/letter-
+  spacing/color/background/border/margin-top). Merged into one comma-selector rule; deleted the standalone
+  `.section-label` restatement. Also found and deleted `.deck-header.no-box`, a fully redundant modifier —
+  its own 4 properties matched the base rule's exactly, providing zero differentiation. (Other `.section-label`
+  cascade-override rules elsewhere in the file, adding font-size/margin/uppercase for specific contexts, are
+  untouched — they still cascade on top of the merged base exactly as before.)
+- **`.proj-savefoot` / `.cloud-modal-foot`**: found a genuine gap left by t2087's own modal-harmonization pass
+  — `.cloud-modal-foot` was migrated to `var(--modal-foot-edge)` but its direct sibling `.proj-savefoot` was
+  missed, left reading plain `var(--border)`. `--modal-foot-edge` equals `var(--border)` in every skin except
+  studio (its own bevel-derived tone), so finishing the migration is a real, if minor, visual change for
+  `.proj-savefoot` in studio specifically — confirmed via computed style (both now read
+  `rgb(111, 106, 96)` in studio, where they used to differ). Merged into one rule once aligned.
+- **`.gateway-app .settings-tabs` / `.wsm-cur-actions`**: byte-identical (`display:flex; gap:8px;
+  flex-wrap:wrap;`, exactly 3 declarations). Merged.
+
+**The seven modal close buttons — six exist, not seven, and only one genuinely lacks a focus state:**
+Audited all six (`wiz-close`, `settings-close`, `library-x`, `wsm-x`, `help-close`, `setup-sheet-btn-close`)
+via live CSS-rule matching (`document.styleSheets` + `Element.matches()`), not static reading of styles.css
+alone — this is what surfaced the real picture:
+- `library-x`, `wsm-x`, `help-close`, `setup-sheet-btn-close` are real `<button>` elements that ALREADY
+  correctly inherit the generic `button:focus-visible { outline: 2px solid var(--accent); }` rule — nothing to
+  fix, confirmed live via keyboard-driven `:focus-visible` matching (not `.focus()`, which doesn't reliably
+  trigger `:focus-visible` in headless Chromium — a real methodology trap hit and worked around this turn).
+- `settings-close` has its OWN dedicated focus-visible rule — but it lives entirely OUTSIDE styles.css, in a
+  `<style>` block injected by `settingsPanel.js` (a previously-invisible-to-this-arc parallel CSS-in-JS
+  system). Hardcoded white (`#fff`), not token-driven, but deliberately so: a t1287 human ruling explicitly
+  documented in that same file — "SMALLER AND MORE ELEGANT... The GLYPH shrinks and goes quiet... a control
+  that shouts drowns the one thing on this bar that IS worth reading." Left entirely untouched — out of
+  styles.css's scope, and a documented deliberate design choice besides.
+- `wiz-close` — the one genuine gap, and a more serious one than "missing a ring": it was a
+  `<span class="wiz-close" onclick="closeWiz()">` (web/index.html:219), not a `<button>` — not keyboard-
+  focusable at all, regardless of any CSS. Converted to `<button type="button">` (kept the same `onclick`,
+  added `aria-label="Close"` matching the other five). Added `padding:0; margin:0; font-family:inherit;` to
+  the existing rule (native buttons carry UA defaults a span never had; the fixed 24×24 flex box already
+  centres the glyph, so these must stay zero) and a dedicated `.wiz-close:focus-visible` rule
+  (`outline: 2px solid var(--accent); outline-offset: 2px` — outward, matching settings-close's own +2px
+  choice rather than the generic rule's inset -2px, since the button's own border already sits close to its
+  edge). Verified thoroughly: tag is now BUTTON with tabIndex 0; a real click still calls `closeWiz()`; a
+  keyboard Enter press (previously impossible on a span) NOW ALSO closes the wizard — the actual
+  keyboard-operability fix, not just a visual ring. `.wiz-gear` (the settings cog beside it) has the identical
+  span+onclick shape and is NOT fixed here — the dispatch named close buttons specifically; flagging `.wiz-
+  gear` as a related, not-yet-addressed finding rather than silently expanding scope.
+
+## Non-vacuity
+
+`t2089_probe.mjs`: real-flow + direct-injection checks across 5 themes for all four merges plus the
+`.wizard`-class-count sanity check (0 everywhere, confirmed). Before/after: **5 diffs total, all
+`wizCloseTag: SPAN → BUTTON`** — every merge (deck-header/section-label, proj-savefoot/cloud-modal-foot,
+settings-tabs/wsm-cur-actions) produced zero measurable computed-style change, exactly as expected for pure
+syntactic consolidations of byte-identical rule bodies. `.deck-header` itself wasn't reachable via a quick
+live trigger this turn (noted, not chased further) — its merge doesn't need live proof regardless: combining
+two selectors with IDENTICAL declaration bodies into one comma-list is mathematically guaranteed equivalent,
+not something a live measurement could ever contradict.
+
+## Gate
+
+Node tier: 193/193. Comment-delimiter + brace-balance check: 0 suspects, depth 0. Ramp enforceability: 32
+hits, unchanged. Full Playwright suite (2,649 tests, 44.6m): 2,607 passed, 9 flaky (recovered on retry, none
+related to this turn's changes by name), 25 skipped, 8 failed — 7 match the established pre-existing set
+(`controller-import-one-door-1221`, `editor-indent-1450`×3, `pull-modal-stacking`, `ring-descent-1404`,
+`send-history-real-path-2065`); the 8th, `send-gate-wiring-1585.spec.js` ("the real Send button raises the
+real gate dialog, naming the line"), is NEW to this set — investigated rather than assumed unrelated: re-ran
+it in isolation (single worker, no parallelism ordering effects) against the CURRENT file — failed
+identically — then reverted `styles.css`/`index.html` to HEAD (`354cdd0d`, before any t2089 change) and ran it
+again — **failed identically there too**, same expected/received strings. Confirmed pre-existing and
+unconnected to this turn's CSS/HTML work (a controller-mismatch dialog wording assertion, nothing touched
+here relates to Send, gates, or controller detection); restored the verified files afterward. Recording it
+here so it's recognized as pre-existing, not re-litigated as a t2089 regression, the next time it surfaces.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the real `.wizard`/`.wizard.active` deletion (+ corrected comment); deck-
+  header/section-label merge (+ the no-box duplicate deletion); proj-savefoot/cloud-modal-foot merge (+ the
+  modal-foot-edge gap fix); settings-tabs/wsm-cur-actions merge; wiz-close's padding/margin/font-family reset
+  + its own focus-visible rule.
+- `DDCS-Studio/web/index.html` — `.wiz-close` converted from `<span onclick>` to `<button type="button"
+  aria-label="Close">`.
+- `DDCS-Studio/verification/t2089_close_focus_debug.mjs`, `t2089_close_focus_tab.mjs`,
+  `t2089_accent_debug.mjs`, `t2089_accent_debug2.mjs`, `t2089_all_close_focus.mjs` — the sequence of
+  diagnostics that found settings-close's hidden JS-injected focus rule and confirmed the other four buttons
+  already inherit the generic one.
+- `DDCS-Studio/verification/t2089_wizclose_verify.mjs` — confirms the button conversion: tag, click-still-
+  works, keyboard-Enter-now-works.
+- `DDCS-Studio/verification/t2089_probe.mjs` — the main before/after computed-style gate for the four merges.
+- `DDCS-Studio/verification/t2089-screens.mjs` — before/after screenshot capture.
+- `DDCS-Studio/verification/t2089-{before,after}-*.png` — screenshots.
+
+🔨 turn 2089
+
