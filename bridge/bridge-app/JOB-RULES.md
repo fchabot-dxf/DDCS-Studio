@@ -86,30 +86,18 @@ One sentence, statable to a user, and it is the rule the rest of this section im
 **`[SHIPPED]`** A restart needs no special code to deliver: the poller simply starts ticking and drains the
 inbox. There is no "resume" logic and none is needed.
 
-**`[RULED]`** On startup: **poll once, deliver everything the mill can take, then discard whatever is still
-undeliverable** — and write each discarded job a status (`failed`, reason *"the gateway restarted before
-this could be delivered"*) so the sender finds out.
-
-⭐ **WHY DISCARD AT ALL - AND THE ORIGINAL JUSTIFICATION WAS OVERSTATED, CORRECTED HERE.**
-This rule was first justified as *"stale G-code is a hazard - a Monday program landing on the controller
-Thursday"*. ⚠ **The human has since confirmed: NOTHING EVER AUTO-STARTS ON A DDCS.** A delivered file sits
-on the controller's disk until an operator selects and runs it. ⇒ the risk is a **MIS-PICK** (a stale file
-sitting among current ones, chosen by mistake) - real, and expensive on a mill, but **not** the
-auto-execution hazard originally claimed. The corrected reason is housekeeping plus keeping the inbox a
-WIRE rather than a STORE, not safety-critical prevention.
-
-⭐⭐ **AND THIS RULE MAY NOT BE WORTH BUILDING AT ALL - DECIDE BEFORE IMPLEMENTING.** §5's rule (a phone may
-not send unless a gateway is running) means a job can only be CREATED while something is there to drain it.
-For a job to survive to a restart it must have been sent while the gateway ran, then the mill switched off,
-then the gateway restarted before the mill came back - **a window measured in minutes.** And under
-"nothing auto-starts", a job that does survive it is not dangerous; it is simply delivered later.
-⇒ **Advisor recommendation: keep §5, drop this.** §5 is the simple strong rule and now carries the weight
-this one was invented for. Building discard logic plus per-job failure statuses for that window is
-machinery for a case that barely exists.
-
-⛔ **IF IT IS BUILT ANYWAY: do NOT discard unconditionally on restart.** With the mill ON at startup those
-jobs are perfectly deliverable, and binning them would mean a 3am Windows update destroys work that would
-have gone through at 3:01. Deliver first; discard only what remains stuck.
+**`[DROPPED]`** ~~On startup, discard whatever is still undeliverable.~~ **NOT BUILT, DELIBERATELY.**
+Two reasons, both from the human:
+1. **Nothing ever auto-starts on a DDCS.** A delivered file waits on the controller's disk for an operator
+   to select it, so a surviving job is delivered LATE, not dangerously. The original justification (stale
+   G-code executing itself) was simply wrong.
+2. **Section 5 makes the case nearly empty.** A job can only be created while a gateway is running, so to
+   survive to a restart it must be sent while the gateway ran, then the mill switched off, then the gateway
+   restarted before the mill came back - minutes, not days.
+=> Discard logic plus per-job failure statuses would be machinery for a window that barely exists.
+**PREVENTION AT SEND (section 5) REPLACES CLEANUP AT RESTART**, and is better for a reason worth keeping:
+at send time the person is holding the phone and can act; at restart they walked away hours ago.
+⛔ Do not reintroduce this without withdrawing section 5 first - they are alternatives, not partners.
 
 **`[RULED]`** On shutdown, if the inbox is not empty, **say so**: *"3 jobs are waiting and nothing will
 deliver them while this is closed."* It is the one moment the person can still act.
@@ -149,13 +137,24 @@ Sending requires a **FRESH heartbeat** for that machine; anything else refuses, 
 | **fresh** (<60s) | a gateway is alive and polling | **allowed** |
 | stale | nobody is listening | refused - say when it last checked in |
 | not visible | cannot see a gateway for this machine | refused - say exactly that |
-| unreadable / signed out | cannot reach Drive at all | refused (a write would fail anyway) |
+| **unreadable** | cannot see Drive at all - we do not KNOW | **allowed, with a warning** (see below) |
+| signed out | no Google account | disarmed, with its reason (unchanged, t2080) |
 
 ⭐⭐ **THIS IS THE STALE-G-CODE ARGUMENT APPLIED AT CREATION INSTEAD OF AT CLEANUP, and it is strictly
 better.** §3 discards stale jobs because a Monday program reaching the controller on Thursday is a hazard;
 this rule means such a job can never be CREATED. ⇒ the inbox only fills while something is there to drain
 it, "waits indefinitely until you switch on" stops existing, and §3's restart-discard becomes a rare edge
 rather than the normal path.
+
+⭐⭐ **REFUSE ON A KNOWN ABSENCE, NEVER ON IGNORANCE.** This reuses the project's OWN existing doctrine
+rather than inventing a second one - `controllerMatch.js`: *"UNKNOWN IS NOT A MISMATCH. If nothing
+identified the controller we cannot claim it is wrong. Blocking on an absence would be a guess wearing a
+safety hat."* Same shape here: a stale or missing heartbeat is EVIDENCE that nothing is listening; a failed
+lookup is only evidence that we could not look.
+⚠ **AND IT REMOVES THE ONE FATAL RISK IN THIS RULE.** The browser reading a DESKTOP-written heartbeat is
+UNMEASURED (`driveJobs.js`'s header proved only the reverse direction). If that turns out not to work, a
+refuse-on-everything rule would break sending entirely while blaming a gateway that is running fine.
+Failing open on `unreadable` means the worst case is a warning, not a dead Send button.
 
 ⚠ **THE CAPABILITY THIS DELIBERATELY GIVES UP:** no "fire and forget from the couch" - you cannot queue a
 job at home for a shop that is closed. Accepted knowingly, for the reason above.
