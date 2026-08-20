@@ -405,9 +405,22 @@ first-class gateway** — [[one-box-stays-forever]] makes that setup permanent, 
 | **client + drive** | hide | **SHOW** — ⛔ hiding this breaks the only transport a client HAS |
 | **client + local** | hide | ⚠ cannot send anywhere: a fresh install, or a mistake. **State it**, do not hide it |
 
-⇒ **ROLE gates the controller wiring. BACKEND gates the cloud settings.** Two independent questions.
-⚠ The tempting shortcut — "clients are the cloud ones, gateways are the local ones" — is false in both
-directions and would break the human's own two machines.
+⇒ ⚠ **CORRECTION, SAME DAY, BY THE HUMAN: "what cloud setting would need hiding anyways" — NONE.**
+The table above is right that role and backend are different questions, but it implied a SECOND GATING
+AXIS that does not exist. **"Not needed" is not "hidden", and I conflated them.** Walk the cells:
+
+- the **Drive toggle** — hiding it on a local box means you can never turn Drive ON. It is the DOOR to the
+  capability; hiding a door is the bug, not the feature.
+- **Connect Google Drive** — you click it BEFORE switching the backend, so it must be live either way.
+- **Service URL / token** — already sits under a section labelled "Service (optional)" and reads as optional.
+
+⇒ ⭐ **NO CLOUD SETTING IS EVER HIDDEN. S1 HAS ONE AXIS AND ONE GROUP:**
+**`role == client` hides the controller-wiring fields. Everything else is always shown.**
+The backend axis gates nothing in Setup — it matters in the Send view (which transport, what the status
+readout says), which is a different surface and already handled.
+
+⚠ **Keep the table above anyway** — it is still the correct statement that a Drive-less PC is a
+first-class gateway, which is the error worth not making. Just do not build a second gate from it.
 
 **WHAT S1 ACTUALLY TRIMS ON A CLIENT** (`views/admin.js`): the controller disk field, the beacons/Modbus
 toggle, the Controller-profile card, and the COM port if exposed.
