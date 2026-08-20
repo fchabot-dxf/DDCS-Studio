@@ -182,3 +182,35 @@ succeed: refused identity, unreadable content.
 or an age, and when it trips, fail it LOUDLY with the reason (`t2073`'s honesty rule: never a silent drop).
 ⚠ `test_poller_track_gate.py` and `test_history_real_path_2065.py` both drive this path — read them first;
 one asserts the failed-job cleanup that this changes.
+
+---
+
+## SOUND — ONE MASTER TOGGLE IN SETTINGS
+*(human, 2026-08-20: "backlog general sound toggle in setting")*
+
+**One user intent — "make it quiet" — but there are TWO sound producers, in two processes, potentially on
+two different machines.** That split is the whole design problem; the toggle itself is trivial.
+
+| producer | what it plays | where it runs | today |
+|---|---|---|---|
+| `DDCS-Studio/web/ui/sound.js` | UI click feedback (`playClick`, `playClickReverse`), 8 call sites in `app.js` + `wizardManager.js` | the BROWSER | always on, no setting at all |
+| the gateway daemon's chime | door / register / buzzer on job received, delivered, failed | the GATEWAY PC's Python process | being added now, with its own Setup toggle |
+
+⭐ **WHAT TO BUILD:** a single user-facing "Sounds" control in Studio's settings that reads as one switch,
+even though it has to reach two places. ⚠ **Do NOT ship two unrelated checkboxes in two panels** — that is
+the shape the roles work is currently deleting elsewhere.
+
+⚠ **The one real question to settle first:** the browser's clicks and the gateway's chimes are genuinely
+different things, and someone may reasonably want clicks OFF and job chimes ON (the chime is a
+NOTIFICATION about the machine; the click is keypress feedback). ⇒ Likely **one master off-switch plus two
+sub-toggles**, not a single boolean. Decide this before writing the setting, not after.
+
+⚠ **A gateway on another PC cannot read a browser localStorage setting.** If the master switch must govern
+a remote gateway's chime, it has to live somewhere both read — the same join problem as
+[[the machine-identity join]]. **Cheapest honest answer: the toggle governs THIS machine's sounds**, and
+the gateway's own chime is set in that gateway's Setup. State that in the UI rather than implying reach it
+does not have.
+
+**Also worth folding in while there:** `sound.js` hardcodes one asset and a fixed `VOLUME = 0.5` with no
+way to change either. A volume slider is the obvious neighbour of an on/off switch, and the module already
+routes WebAudio through a `gainNode` that nothing currently adjusts.
