@@ -301,8 +301,11 @@ export default {
           r = await submitJobToDrive(name, file.text, contentHash, (getMachine() || {}).name);   // the ORIGINAL program: no beacons on this path
         }
         toast('Queued ' + r.jobId);
+        // t2105 - a time promise is only honest when a gateway is polling AND the mill can take it.
         info.textContent = r.via === 'drive'
-          ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`
+          ? (this._millOff
+              ? `Queued ${r.jobId} via your Google Drive — waiting for the machine to be switched on (deliver-only).`
+              : `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`)
           : `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
         // t2057 — SAY SO AT THE MOMENT OF SENDING: the bridge can request tracking (this checkbox) while its
         // own Modbus receiver is off or dead — two independent toggles nothing else compares. The toast fades
@@ -346,6 +349,7 @@ export default {
     //    so the refusal inside onclick re-reads and stays the real gate. Same shape as the mismatch block:
     //    the UI disarms on what it knows, the click re-checks before anything leaves the browser.
     this._hbState = null;      // null = not looked yet; never treated as 'no gateway'
+    this._millOff = false;     // gateway alive, controller not answering - a WAIT, not a failure
     this._hbAt = 0;
     const HB_REFRESH_MS = 30000;
     this._refreshHeartbeat = () => {
@@ -354,8 +358,15 @@ export default {
       if (now - this._hbAt < HB_REFRESH_MS) return;
       this._hbAt = now;
       readGatewayHeartbeat((getMachine() || {}).name)
-        .then((r) => { this._hbState = r && r.state; this.applyState(this._lastDesc); })
-        .catch(() => { this._hbState = 'unreadable'; });   // ignorance, not absence
+        .then((r) => {
+          this._hbState = r && r.state;
+          // t2105 - the heartbeat carries the gateway's OWN reachability probe, so a client can tell
+          // 'nobody is listening' apart from 'someone is listening but the mill is off'. Those need
+          // opposite treatment: the first blocks, the second is normal and just has to be SAID.
+          this._millOff = !!(r && r.state === 'fresh' && r.hb && r.hb.controller_connected === false);
+          this.applyState(this._lastDesc);
+        })
+        .catch(() => { this._hbState = 'unreadable'; this._millOff = false; });   // ignorance, not absence
     };
     this._sendLabel = () => (this._viaDrive ? 'Send via Drive'
                                             : (beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)'));
@@ -379,8 +390,12 @@ export default {
       // t2105 - the banner promised ~15s unconditionally. That is only true when a gateway is actually
       // polling; with none running the job would not be picked up AT ALL, so the promise became the lie.
       const noGw = viaDrive && (this._hbState === 'stale' || this._hbState === 'unseen');
+      // ⚠ MILL OFF IS NOT AN ERROR AND MUST NOT GREY THE BUTTON. A gateway IS running and WILL deliver
+      // once the machine is switched on - that is the whole point of the claim gate leaving the job in
+      // the inbox. It only has to be STATED, because the alternative wording promises ~15s and is false.
       banner.textContent = out
         ? (noGw ? 'No gateway is running for this machine — start Studio on the PC wired to it, then send.'
+                : this._millOff ? 'The gateway is running, but the machine is switched off — this will be delivered when you switch it on.'
                 : viaDrive ? 'No gateway on this device — sending goes through your Google Drive; the machine picks it up within ~15s.'
                 : c.reason)
         : '';
