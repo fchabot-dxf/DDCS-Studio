@@ -284,9 +284,14 @@ gateway Setup is byte-for-byte what it is today.
 
 ## S2 — COMPOSE THE TWO AXES  *(the correctness slice; this is the bug already paid for)*
 Implement the matrix above: ROLE decides what EXISTS, STATUS decides what is AVAILABLE.
-- **Client + gateway offline ⇒ Send STAYS ARMED.** The job queues in Drive and is claimed whenever the
-  gateway wakes. Message: *"queued — the machine picks it up when it next runs"*, never *"sending needs a
-  machine"*.
+- ⛔ ~~**Client + gateway offline ⇒ Send STAYS ARMED**, the job queues in Drive~~ **SUPERSEDED 2026-08-20,
+  DO NOT BUILD THIS.** The human ruled the opposite: *"if gateway is on but cnc off then it should be a no
+  send policy"*, and a phone may not send when no gateway is running at all. ⇒ **Client + nothing listening
+  = Send GREYED and the click REFUSED**, naming which of the two facts is false. The job must never be
+  created, because a job that waits is a job that can go stale. See `bridge/bridge-app/JOB-RULES.md` §5 —
+  that file is the source for this behaviour and it is ALREADY SHIPPED in `send.js`.
+  ⚠ **This bullet described the behaviour that existed when the plan was written.** It is kept struck
+  through rather than deleted so a reader who remembers it does not "restore" it.
 - **Gateway + controller offline ⇒ controller settings STAY VISIBLE** (they are how the user fixes it) while
   send/browse disarm with the reason — today's t1327 behaviour, which is correct for this cell only.
 - **Retire the t2080b special case**: `viaDrive` in `send.js` is a patch standing in for the missing role and
