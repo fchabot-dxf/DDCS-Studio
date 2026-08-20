@@ -222,18 +222,32 @@ above.
 session already paid for cannot recur:** (a) do not hide a tab without reading its code — "it needs the
 controller" has been wrong more often than right; (b) do not answer a ROLE question with a STATUS signal.
 
-**⚠ ONE RULING NEEDED BEFORE S0 (the only thing blocked on the human):** is the role **DERIVED** from the
-controller-disk field, or **DECLARED** in Setup? Recommend **declared, defaulting to derived** — otherwise
-clearing that field to tidy up silently re-roles the machine, and the UI cannot adapt before a controller is
-ever configured. Everything below assumes declared-with-derived-default; if the ruling goes the other way,
-only S0 changes.
+**✅ RULED (human, 2026-08-19): THE ROLE IS AUTOMATIC.** *"cant the roles be automatically given"* — yes, and
+it is the better answer: nobody should have to think about roles. **The rule:** a controller disk is
+configured ⇒ GATEWAY; none ⇒ CLIENT. A phone or a fresh browser has no config at all and is therefore
+correctly a client with zero user input.
+
+⚠ **It gets exactly ONE case wrong, and it is live right now:** a machine carrying STALE controller config
+(ASUS still holds `\10.0.0.50\cncdisk` from bench work) is auto-classified a GATEWAY and will claim jobs.
+Stale config is indistinguishable from intent. ⇒ **State the derivation and allow an override** — not a
+selector the user must answer, but a visible line (*"Gateway — because a controller disk is configured"*)
+with a way to say otherwise. Automatic by default, correctable when the guess is wrong.
+
+⛔ **DERIVE FROM CONFIGURATION ONLY, NEVER FROM REACHABILITY.** "Is the controller responding" is the STATUS
+axis; using it to pick a role re-introduces the exact conflation that killed the phone's Send button. A
+gateway with its controller unplugged is still a gateway.
 
 ---
 
-## S0 — THE ROLE EXISTS  *(small; nothing user-visible except one control)*
-**Build:** one persisted field (`role: "gateway" | "client"`), defaulted from the existing signal
-(`expert_dest` non-empty ⇒ gateway), surfaced as a Role control in Setup, and exposed to the UI the way
-connection state already is.
+## ⭐ S4 RUNS FIRST — the human is about to test the V4.1 (2026-08-19)
+*"i will be testing the 4.1 yes"* ⇒ a SECOND gateway is imminent, which is the one genuinely unsafe
+combination in this design (see S4). It is the only slice with a safety edge; the rest are quality-of-life.
+**Do S4 before S0-S3, or run the V4.1 with Drive mode OFF until it lands.**
+
+## S0 — THE ROLE EXISTS, AUTOMATICALLY  *(small; almost nothing user-visible)*
+**Build:** derive the role from configuration (`expert_dest` non-empty ⇒ gateway), expose it to the UI the
+way connection state already is, and persist an OPTIONAL override for the stale-config case above. No
+mandatory selector — a stated derivation plus a way to correct it.
 **⛔ The claim gate stays authoritative:** `poller._maybe_claim()` must ALSO refuse when role is client —
 never rely on the UI. A role that hides tabs while the poller still claims is worse than no role.
 **⚠ Surface disagreement, never resolve it silently:** role=client WITH a controller disk set is a
