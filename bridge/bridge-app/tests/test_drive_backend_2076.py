@@ -123,10 +123,12 @@ class FakeDrive:
         return meta, content
 
 
-def _backend():
-    cfg = Config(backend="drive", google_client_id="cid", google_client_secret="sec")
+def _backend(machine_name="CNC-FAIRY", fake=None):
+    # t2101 (S4) — machine_name is now REQUIRED (DriveBackend.__init__ raises DriveError on blank); every
+    # existing test in this file gets one so the blank-name refusal (tested on its own below) doesn't break them.
+    cfg = Config(backend="drive", google_client_id="cid", google_client_secret="sec", machine_name=machine_name)
     b = DriveBackend(cfg)
-    fake = FakeDrive()
+    fake = fake if fake is not None else FakeDrive()
     b._req = fake.req                      # the ONLY seam replaced — all real logic above it runs
     b._token = lambda: "fake-token"        # no live OAuth in this tier
     return b, fake
@@ -222,6 +224,55 @@ def test_heartbeat_and_cncdisk_index_are_single_well_known_files():
         b.put_cncdisk_index({"files": [f"f{i}.nc"]})
     assert len([f for f in fake.files.values() if f["name"] == "heartbeat.json"]) == 1
     assert len([f for f in fake.files.values() if f["name"] == "index.json"]) == 1
+
+
+def test_a_blank_machine_name_refuses_rather_than_falling_back_to_the_flat_folder():
+    """t2101 (S4) — the ONE thing this feature must never do: a blank name is exactly the state that would
+    otherwise silently reuse the shared flat layout, which is the cross-machine-delivery hazard itself."""
+    cfg = Config(backend="drive", google_client_id="cid", google_client_secret="sec", machine_name="")
+    try:
+        DriveBackend(cfg)
+    except DriveError:
+        return
+    raise AssertionError("DriveBackend must refuse to construct with a blank machine_name")
+
+
+def test_two_machines_get_DISJOINT_inboxes_on_the_SAME_drive():
+    """t2101 (S4) — the actual safety property: an Expert's job and a V4.1's job, submitted to the same
+    human's Drive, land in two different folders and neither backend ever sees the other's file."""
+    fake = FakeDrive()
+    expert, _ = _backend("Shop Expert M350", fake)
+    v41, _ = _backend("Bench V4.1", fake)
+    expert.put_job("E1", "(expert)\nM30\n", {"total_beacons": 1})
+    v41.put_job("V1", "(v41)\nM30\n", {"total_beacons": 1})
+    assert expert.list_inbox() == ["E1"], expert.list_inbox()
+    assert v41.list_inbox() == ["V1"], v41.list_inbox()
+    # and the two machine folders are genuinely separate nodes in the fake Drive, both under ONE container
+    machine_folders = sorted(f["name"] for f in fake.files.values()
+                              if f["mimeType"] == _FOLDER_MIME and f["name"] in ("Shop Expert M350", "Bench V4.1"))
+    assert machine_folders == ["Bench V4.1", "Shop Expert M350"], machine_folders
+    containers = [f for f in fake.files.values() if f["name"] == "DDCS Bridge"]
+    assert len(containers) == 1, f"the container itself must still be shared, not duplicated: {containers}"
+
+
+def test_legacy_flat_jobs_detector_fires_on_a_seeded_legacy_folder_and_stays_quiet_otherwise():
+    """t2101 (S4) — proving the detector actually detects, not just that it reports 0 when there is nothing:
+    a quiet detector and a broken one look identical unless something is seeded for it to find."""
+    b, fake = _backend()
+    assert b.legacy_flat_jobs() == 0, "nothing seeded yet — must report zero, not error"
+
+    # seed the OLD flat layout directly (container/inbox/*.nc), bypassing the namespaced _folder() this
+    # backend now uses, exactly as a pre-S4 gateway would have left it
+    legacy_inbox = b._mkdir("inbox", b._root())
+    fake.files[fake._new_id("file")] = {"name": "20260101T000000-old.nc", "parents": [legacy_inbox], "mimeType": "", "content": b"(old)"}
+    fake.files[fake._new_id("file")] = {"name": "20260101T000000-old.map.json", "parents": [legacy_inbox], "mimeType": "", "content": b"{}"}
+
+    assert b.legacy_flat_jobs() == 1, "one legacy .nc job seeded — the map.json sidecar must not double-count"
+
+    # a SECOND, fresh backend on the SAME drive (different machine, same fake) must see it too — it is a
+    # container-level fact, not something the per-machine namespacing should hide
+    other, _ = _backend("Some Other Machine", fake)
+    assert other.legacy_flat_jobs() == 1, other.legacy_flat_jobs()
 
 
 if __name__ == "__main__":

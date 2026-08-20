@@ -237,6 +237,13 @@ class Ops:
             "controller_connected": self.controller_reachable(),
             "controller_family": det.get("family"),       # v4.1 | expert-m350 | unknown (read-only fingerprint)
             "controller_firmware": det.get("firmware"),
+            # t2101 — the SAME id profile() already serves (self._CONTROLLERS[family]['id']), not a parallel
+            # lookup: controller_family ('v4.1'/'expert-m350'/'unknown') and a workspace's controllerId
+            # ('ddcs-expert-m350' etc, a CONTROLLER_PROFILES key) are different vocabularies, so a browser
+            # comparing family directly against controllerId would false-block a correctly matched machine.
+            # None/absent when the family is unknown — never a guess (controllerMatch.js's own doctrine: an
+            # absence must never read as a mismatch), so an older gateway that never sends this stays safe.
+            "controller_profile_id": (self._CONTROLLERS.get(det.get("family")) or {}).get("id"),
             "dest": self.cfg.expert_dest,            # which controller disk this gateway is pointed at
             "backend": self.cfg.backend,
             "version": __version__,

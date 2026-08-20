@@ -86,7 +86,22 @@ class DriveBackend(Backend):
     def __init__(self, config):
         self.cfg = config
         self.root_name = getattr(config, "drive_folder", "") or "DDCS Bridge"
+        # t2101 (S4) — EACH MACHINE GETS ITS OWN FOLDER. Before this, every machine's gateway shared ONE flat
+        # inbox: poller._maybe_claim takes ids[0] with no notion of which machine a job is FOR, and identity.verify
+        # is inert while machine_id is unset — an Expert program could be delivered to a V4.1 (different envelope,
+        # different dialect). The name is machine_name VERBATIM, trimmed, never slugged: a slug would force two
+        # independent implementations (here and driveJobs.js on the web side) to agree on one transform forever,
+        # which is exactly the jobId hazard t2080 already paid for once. Drive takes spaces in a folder name fine.
+        # ⛔ A BLANK NAME MUST NOT FALL BACK TO THE FLAT FOLDER — that fallback IS the hazard this exists to close,
+        # so it refuses to start instead. Raised here, in __init__, so the caller learns before any Drive call
+        # is even attempted, not on the first operation.
+        self.machine_name = (getattr(config, "machine_name", "") or "").strip()
+        if not self.machine_name:
+            raise DriveError(
+                "Drive backend needs a machine name to keep each machine's jobs in their own folder — "
+                "set one in Setup before turning Drive on")
         self._root_id = None
+        self._machine_root_id = None
         self._folders = {}          # "inbox" -> folder id (resolved once, then cached)
 
     # ── plumbing ────────────────────────────────────────────────────────────────────────────────
@@ -152,6 +167,9 @@ class DriveBackend(Backend):
         return resp["id"]
 
     def _root(self):
+        """The CONTAINER folder ("DDCS Bridge") — shared across every machine. Reserve the six legacy leaf
+        names (inbox/status/history/commands/gateway/cncdisk) below this: a child folder called one of those
+        is the OLD flat layout, never a machine (t2101 — legacy_flat_jobs() below relies on that)."""
         if self._root_id:
             return self._root_id
         q = (f"name = '{_q(self.root_name)}' and mimeType = '{_FOLDER_MIME}' "
@@ -160,13 +178,35 @@ class DriveBackend(Backend):
         self._root_id = files[0]["id"] if files else self._mkdir(self.root_name)
         return self._root_id
 
+    def _machine_root(self):
+        """t2101 (S4) — THIS machine's own folder, nested under the container: <container>/<machine_name>/."""
+        if self._machine_root_id:
+            return self._machine_root_id
+        container = self._root()
+        self._machine_root_id = self._find_child(container, self.machine_name, folder=True) \
+            or self._mkdir(self.machine_name, container)
+        return self._machine_root_id
+
     def _folder(self, name):
         if name in self._folders:
             return self._folders[name]
-        root = self._root()
+        root = self._machine_root()
         fid = self._find_child(root, name, folder=True) or self._mkdir(name, root)
         self._folders[name] = fid
         return fid
+
+    def legacy_flat_jobs(self):
+        """t2101 (S4) — DETECT, never migrate, pre-namespace jobs sitting in the OLD flat <container>/inbox
+        (before this machine had its own folder). Read-only: uses _find_child, never _folder/_mkdir, so
+        checking for the legacy folder can never manufacture it. Auto-migrating would have to GUESS which
+        machine each legacy job was originally for — that guess IS the safety bug this whole feature exists
+        to close, re-committed as migration code. Returns the count of .nc jobs still sitting there flat (0 =
+        nothing to report); bridge.py logs it once at startup so it is a support answer, not a mystery."""
+        inbox_id = self._find_child(self._root(), _INBOX, folder=True)
+        if not inbox_id:
+            return 0
+        files = self._list(f"'{_q(inbox_id)}' in parents and trashed = false")
+        return len([f for f in files if f["name"].endswith(".nc")])
 
     def _upsert(self, folder, name, data, mime=None):
         """Create the file, or REPLACE its content if a file of that name is already there. Drive

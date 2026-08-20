@@ -19,6 +19,7 @@ import sys
 import time
 
 from .backend import make_backend
+from .backend.drive import DriveError
 from .cncdisk import CncDiskService
 from .config import Config
 from .ops import Ops
@@ -86,7 +87,14 @@ def build(config, beacons=None, position_poller=None):
 
 
 def run_loop(config):
-    backend, _, beacons, poller, position_poller = build(config)
+    # t2101 (S4) — DriveBackend now REFUSES to construct with a blank machine name (the fallback to the old
+    # flat, shared-across-machines folder is the exact hazard S4 closes). Caught here as one legible line, not
+    # a raw traceback: the operator needs "go set a machine name," not a stack trace pointing at Drive internals.
+    try:
+        backend, _, beacons, poller, position_poller = build(config)
+    except DriveError as e:
+        print(f"[bridge] {e}")
+        return
     explorer = CncDiskService(backend, config, config.cncdisk_refresh_s)
     ops = Ops(backend, config, beacons, position_poller)   # t2057 — cross-check a tracked send against the receiver's REAL state; t2073 — position_status()
     beacons.start()
@@ -94,6 +102,18 @@ def run_loop(config):
         position_poller.start()
     explorer.publish()                          # publish an initial CNCDISK listing at startup
     _publish_heartbeat(backend, ops, poller)    # announce liveness immediately
+    # t2101 (S4) — DETECT, never auto-move, jobs left behind in the pre-namespace flat layout (see
+    # DriveBackend.legacy_flat_jobs' own docstring for why migration stays manual). Logged once at startup so
+    # "History looks empty" on a freshly-namespaced gateway has an answer here instead of becoming a support call.
+    if config.backend == "drive":
+        try:
+            n = backend.legacy_flat_jobs()
+            if n:
+                print(f"[bridge] {n} job(s) found in the pre-machine-namespace flat Drive folder — "
+                      f"they are NOT auto-migrated (see WORK-LOG t2101 for why); move them into this machine's "
+                      f"own folder by hand if they still matter.")
+        except Exception as e:
+            print(f"[bridge] legacy-jobs check skipped ({e})")
 
     # --- WebSocket Command Center (opt-in: --ws) ---
     telemetry_server = None

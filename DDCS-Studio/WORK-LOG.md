@@ -45780,3 +45780,112 @@ Ramp grep: 32, unchanged.
 
 🔨 turn 2099
 
+# t2101 — S4: namespace the Drive inbox per machine (gateway half); belt-and-braces at claim time and send time
+
+Dispatch: the real hazard this closes — `poller._maybe_claim` takes `ids[0]` from a SHARED Drive inbox with no
+notion of which machine a job is FOR, and `identity.verify` is inert while `machine_id` is unset (unset on both
+machines the human is about to bench-test). An Expert program could be delivered to a V4.1: different envelope,
+different dialect. Gateway side only — `DDCS-Studio/web` (driveJobs.js, send.js, the machine picker) is the
+advisor's this turn.
+
+## The design (advisor's, verified rather than re-derived)
+
+Folder name = `cfg.machine_name` verbatim, trimmed, never slugged (a slug would force two independent
+implementations — here and `driveJobs.js` — to agree on one transform forever; Drive takes spaces fine). Nested:
+`DDCS Bridge/<machine name>/{inbox,status,history,commands,gateway,cncdisk}`. `machine_name` was already
+persisted (`_PERSIST_KEYS`) and already collected by Setup, so this needed no new config field — confirmed
+directly against `config.py`, not assumed from ROLES-PLAN.md's own text (which the advisor flagged as stale on
+one specific claim: `drive_folder` is NOT actually settable anywhere — no `_PERSIST_KEYS` entry, no
+`set_config` handling, no CLI flag, no Setup UI — so using `machine_name` instead genuinely avoids that gap
+rather than inheriting it).
+
+## What changed
+
+**`fairy/backend/drive.py`.** `_root()` (the shared "DDCS Bridge" container) is unchanged. New `_machine_root()`
+resolves/creates `<container>/<machine_name>`, cached the same way `_root()` already is. `_folder(name)` now
+parents every leaf (inbox/status/history/commands/gateway/cncdisk) under `_machine_root()` instead of `_root()`
+— about 10 lines, exactly as sized, because all 13 `Backend` methods already funnel through `_folder`.
+`DriveBackend.__init__` now raises `DriveError` when `machine_name` is blank, **before any Drive call is even
+attempted** — a blank name must never fall back to the old flat folder, since that fallback IS the hazard this
+whole feature exists to close. New `legacy_flat_jobs()`: read-only (uses `_find_child`, never `_folder`/`_mkdir`,
+so checking for the legacy folder can never manufacture it), counts `.nc` files still sitting in the OLD flat
+`<container>/inbox`. Migration stays **detect-and-report only** — auto-moving would have to guess which machine
+each legacy job was originally for, and that guess IS the safety bug re-committed as migration code.
+
+**`fairy/bridge.py`.** `run_loop()`'s `build(config)` call is now wrapped: a `DriveError` (the blank-name refusal)
+prints one legible line — "Drive backend needs a machine name..." — and returns, instead of an unhandled
+traceback pointing at Drive internals the operator can't act on. **Verified live**, not assumed: ran `run_loop`
+in a thread with `machine_name=''`, confirmed the exact clean line and that the thread exits (`is_alive() ==
+False`) rather than crashing with a traceback. Also added the legacy-jobs log (once at startup, `backend ==
+"drive"` only): if `legacy_flat_jobs()` finds anything, it's named in one line and explicitly told it is NOT
+auto-migrated. **New evidence the advisor gathered independently, worth recording**: the human's actual live
+Drive `DDCS Bridge` folder (created 2026-08-20, real inspection) contains only an empty `inbox` and a single
+49-byte hand-made test status file — no `history`/`gateway`/`commands`/`cncdisk` folders at all, meaning (since
+`_folder` creates lazily) no gateway has ever actually published a heartbeat or completed a job through Drive
+yet. The migration half of S4 is a genuine no-op against real data today — nothing is stranded, so namespacing
+costs the human nothing and needed no decision from them.
+
+**`fairy/poller.py`** — a SECOND, independent layer, belt-and-braces with the folder namespacing rather than a
+replacement for it (namespacing should make this unreachable in practice, but "should" is exactly the word a
+safety layer doesn't get to rely on alone). After the existing controller-identity check, `_claim` now also
+refuses when the job's own map carries a `machine_id` that is PRESENT and DIFFERENT from `cfg.machine_id` —
+present-and-mismatched only, never require-present, since a gateway-local send never sets this field at all and
+refusing an absent one would refuse every local job. Uses the exact same put-status-failed-then-delete_job shape
+the existing identity refusal already uses, for the same reason stated there: `_maybe_claim` always takes
+`ids[0]`, so leaving a mismatched job queued instead of deleting it would wedge the FIFO on that one job forever.
+**One judgment call made and flagged rather than silently guessed on**: the new check only fires when
+`cfg.machine_id` is ALSO configured (`job_machine_id and self.cfg.machine_id and job_machine_id != ...`) — matching
+the existing `identity.verify`'s own "skipped if no machine_id configured" convention, so a gateway that has never
+set `machine_id` (true of most current setups — it is a separate, older field from `machine_name`, and S4 only
+requires the latter) does not suddenly start refusing every Drive job the moment the web side begins tagging
+maps with it. If the intent was a stricter "job says something and my own identity is blank = refuse anyway,"
+that is a one-line change (`and self.cfg.machine_id`) away from the current version — flagging rather than
+guessing, per standing practice.
+
+**`fairy/ops.py`** — an additive, same-file amendment absorbed mid-turn (not a redirect): `descriptor()` now
+publishes `controller_profile_id`, reusing the EXACT `self._CONTROLLERS` table `profile()` already builds from
+— not a parallel lookup, and deliberately `None`/absent when the family is `"unknown"` rather than a guess
+(`controllerMatch.js`'s own doctrine, per the amendment: an absence must never read as a mismatch, so an older
+gateway that never publishes this field stays safe by construction). This closes a RELATED hazard the advisor
+found while building the browser-side heartbeat reader: `send.js`'s existing hard-block (t1229 A2,
+`controllerMatch.js`) needs `ctx.client.profile()`, which needs a reachable gateway — on the Drive path there is
+no gateway to ask, so the block silently cannot run at all, the exact S4 hazard caught at send time instead of
+claim time. No coordination needed on my side: the browser reader treats the field as optional today.
+
+## Verified against the real symptom throughout
+
+- `tests/test_drive_backend_2076.py`: fixture (`_backend()`) updated with a `machine_name` (every existing test
+  needed one once blank names are refused) and a `fake` parameter (so two `DriveBackend`s can share one
+  simulated Drive). Three new tests, all against the SAME `FakeDrive` harness the file already establishes, not
+  a new one: blank `machine_name` refuses to construct; two different machine names produce genuinely disjoint
+  inboxes on one shared Drive (and the container itself stays a single shared folder, not duplicated); and —
+  per the advisor's explicit instruction not to trust "it reported nothing" as proof — `legacy_flat_jobs()` is
+  driven against a SEEDED legacy folder (bypassing the new namespaced `_folder()` on purpose, exactly as a
+  pre-S4 gateway would have left one) and proven to report exactly 1 (not double-counting the `.map.json`
+  sidecar), then proven to still see it from a SECOND, different-machine backend on the same drive (a
+  container-level fact, correctly not hidden by the per-machine namespacing). 12/12 pass (was 9).
+- `poller._claim`'s new refusal driven end-to-end against the REAL `Poller` class (same `_StubTransfer`/
+  `LocalFolderBackend` pattern established in `tests/test_poller_track_gate.py`), with a REAL seeded
+  `.bridge-machine.json` so the EXISTING identity check passes first and the new check actually gets exercised
+  (an earlier attempt without this seeded file hit the wrong refusal — the pre-existing identity check firing
+  first — caught before drawing any conclusion from it): mismatched job `machine_id` → refused, with the exact
+  new reason string; matching → delivered; absent from the map entirely (gateway-local send) → delivered, never
+  refused; gateway itself unconfigured (`cfg.machine_id=""`) → delivered, matching the documented judgment call
+  above. All four the intended shape.
+- `ops.descriptor()`'s new field driven directly (not read from source and trusted): unknown family → `None`;
+  `expert-m350` → `ddcs-expert-m350`; `v4.1` → `ddcs-v4.1` — exactly the `_CONTROLLERS` table's own `id` values,
+  confirming the reused-table claim rather than assuming it.
+- Full `bridge-app` pytest suite: 89/89 (was 86 before this turn's 3 new tests). `--self-test`: same
+  pre-existing, already-documented (t2097 WORK-LOG) unrelated 403 on the local-server smoke test; unchanged.
+
+## Files
+- `bridge/bridge-app/fairy/backend/drive.py` — `_machine_root()`, `_folder()` re-pointed, blank-name refusal,
+  `legacy_flat_jobs()`.
+- `bridge/bridge-app/fairy/bridge.py` — `DriveError` import + clean catch around `build()`; legacy-jobs startup log.
+- `bridge/bridge-app/fairy/poller.py` — the present-and-mismatched `machine_id` refusal in `_claim`.
+- `bridge/bridge-app/fairy/ops.py` — `descriptor()` gains `controller_profile_id`.
+- `bridge/bridge-app/tests/test_drive_backend_2076.py` — fixture updated; 3 new tests (blank-name refusal,
+  disjoint inboxes, legacy-detection proven against a seeded folder).
+
+🔨 turn 2101
+

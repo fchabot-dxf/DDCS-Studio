@@ -88,6 +88,25 @@ class Poller:
             self.backend.delete_job(job_id)
             return
 
+        # t2101 (S4) — a SECOND, independent layer: the Drive backend now namespaces each machine's inbox by
+        # folder, so this should never fire in practice, but the map itself may ALSO carry a machine_id (set by
+        # whichever client submitted the job) — and if a job ever does end up in front of the wrong gateway
+        # (a manual copy, a future backend without folder namespacing, a bug), this is the last line before an
+        # Expert program reaches a V4.1. PRESENT-AND-MISMATCHED only, never require-present: a gateway-local
+        # send never sets this field at all, and refusing an absent one would refuse every local job.
+        job_machine_id = m.get("machine_id")
+        if job_machine_id and self.cfg.machine_id and job_machine_id != self.cfg.machine_id:
+            reason = f"job is for machine '{job_machine_id}', this gateway is '{self.cfg.machine_id}'"
+            self.log(f"[poller] REFUSED {job_id}: {reason}")
+            self._sound("failed")
+            # t2066 — the SAME put-status-failed-then-delete_job as the identity refusal above, and for the
+            # SAME reason: _maybe_claim always takes ids[0], so leaving this queued instead would wedge the
+            # FIFO on this one job forever — every later job stuck behind a refusal that never resolves.
+            self.backend.put_status(
+                job_id, tracker.build_status(job_id, name, m, "failed", 0, events + [f"refused: {reason}"]))
+            self.backend.delete_job(job_id)
+            return
+
         # t2066 — DECLARE the one genuinely-unsafe window so a take-over can SEE it. The write to the controller is
         # the synchronous deliver() just below; until it returns there was no queue state meaning "a file is being
         # written right now" — delivered/running/stalled are ALL post-write. Mark "delivering" here so /api/queue
