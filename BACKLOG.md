@@ -53,11 +53,24 @@ that pattern, throttled (`_lastWebCheck` is the precedent). ⚠ Must not re-nag 
 `update-check.spec.js` asserts that.
 
 ### 5. The update banner is not well balanced
-*(human, 2026-08-19, on the real exe)* — the version prints TWICE (label *and* inside the button, which carries
-the longer copy); the primary button's width grows with the version string so the layout reflows unpredictably;
-the ✕ floats at the end of a button row instead of sitting in a corner. ⚠ Do not "fix" it by shrinking the
-primary action — t2066 deliberately made in-place update prominent over the dated manual Download. It is a
-proportion problem, not a priority one. `update-check.spec.js` asserts button classes/labels.
+*(human, 2026-08-19, on the real exe — twice, second time with the specific symptom: "the buttons seem to
+clutter to the left and have a big empty space on the right")*
+
+**The measured symptom:** the bar is WIDER than its content and everything is left-packed, so the controls bunch
+up on the left with dead space trailing off to the right. Two candidate causes, and they want checking before
+either is "fixed": the container is being stretched (a `width`/`min-width` or a stretching flex parent) rather
+than hugging its content, and/or there is no `justify-content`/`margin-left:auto` giving the ✕ its own corner.
+
+**Compounding it, from the first report:** the version prints TWICE — in the label AND inside the primary
+button, which carries the longer copy ("Update to v2026.08.19.2 and restart"). So the widest element is also
+the most redundant one, and its width grows with the version string, meaning the layout reflows differently per
+release and cannot be judged at one width. Dropping the version from the button ("Update and restart") both
+shortens the row and removes the duplication.
+
+⚠ Do not "fix" it by shrinking or demoting the primary action — t2066 deliberately made the in-place update
+prominent over the dated manual Download, which users kept grabbing by mistake. It is a proportion problem, not
+a priority one. ⚠ `update-check.spec.js` asserts button classes and the exact "Download manually" label, so a
+copy change is a test change — read it first.
 
 ### 6. The welcome / "What's new" panel: shorter, and link to the thing it describes
 *(human, 2026-08-19: "the panel on boot can be a little bit less lines and perhaps a link on each panel to go to
