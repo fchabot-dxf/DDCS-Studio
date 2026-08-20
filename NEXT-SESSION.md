@@ -6827,3 +6827,22 @@ the pattern it already runs on (wizards-as-data, one stack many views).
 
 ⇒ Next time this row is touched: promote/demote by USE, and never inline a handler that already exists.
 Deciding WHICH actions earn the fast lane is a real question — worth measuring rather than guessing.
+
+# ═══ BACKLOG (human, 2026-08-19) — MOVE THE THEME SELECTOR OUT OF THE QUICK MENU INTO SETTINGS ═══
+*(human: "backlog put the team [theme] selector that's in quick menu in the settings". NOT dispatched.)*
+
+**Today:** `headerPost.js` `themeSection` renders a "Theme" heading + a row of five colour chips
+(`.hq-theme-chip`, one per THEMES entry) inside the quick menu, wired through `setQuickTheme()`.
+
+**Why it should move:** by the rule the human set this same session — the quick menu is the complete set of
+FREQUENT actions and the editor row is its fast lane — a theme is picked once and then never again. It is
+occupying prime space in a menu that is meant to be short (the t851 "menu diet" cut it from ~17 rows to ~9;
+the theme block is five chips plus a heading).
+
+**Shape of a fix:** move the chips into Settings (they are an appearance preference, which is what Settings
+is for), and leave NOTHING behind in the quick menu — a "Theme…" row that merely opens Settings would keep
+the row it was meant to free.
+
+⚠ Keep ONE implementation: `setQuickTheme()` already persists + applies; Settings must call it rather than
+re-implement theme switching. ⚠ The active-theme ring (`aria-checked` / `.active`) is real state — whatever
+renders the chips must still reflect the live `data-theme`.
