@@ -810,3 +810,41 @@ PDF looking for it.
 Setup UI cannot set it and `config.json` cannot carry it ⇒ **a double-clicked exe can never turn position
 polling on.** Same shape as the boto3/R2 problem: built (t2059-t2063), unreachable in the shipped product.
 Testing it today requires running the gateway from source. **Fix before the feature can be called usable.**
+
+---
+
+## SYSDISK exposes LIVE-ISH RUN STATE OVER SMB — a possible progress route with NO Modbus  `[EVIDENCE, live-behaviour UNVERIFIED]`
+*(advisor, 2026-08-20, read-only listing + reads against the studio V4.1 at `\10.0.0.50`. Prompted by the
+human: "there must be a way to decipher the line number while running code", after the Modbus probe returned
+0x00. ⚠ Read on a **V4.1**, so the Expert must be re-checked before any of this is relied on there.)*
+
+⭐ **`SYSDISK` holds far more than `setting`/`uservar`.** 170 entries, including two that are not per-program:
+
+| file | size | contents (decoded read-only) |
+|---|---|---|
+| **`.file`** | 332 B | `/local/VARPROBE.nc` — **the currently loaded program path**, NUL-padded plain text |
+| **`.break0-0`** | 860 B | `/udisk-sda1/1001 bbbbbb.tap` in a 256-byte path field, then a numeric body |
+| `<prog>.pos` (×44) | 60 B | 7 × f64 + i32. **Program EXTENTS, not a resume point** — `.1001.nc.pos` = `[200,200,3, 100,100,3, 2.5]`; an unscanned file reads the `-200000` sentinel |
+| `<prog>.env` (×44) | 888 B | mostly zeros in the sample read; not yet decoded |
+
+⭐⭐ **`.break0-0`'s body carries `40932` at offset 320** (i32), with small ints following (`17, 91, 15, 94,
+20, 40, 49, 99, 54`). For a `.tap` program, 40932 reads as a **BYTE OFFSET into the file**, which is how
+controllers usually store a resume point. ⇒ **A byte offset answers the human's question better than a line
+number does:** `offset / filesize` is a percentage directly, and Studio can count newlines up to that offset
+to get the LINE, because it already has the file it sent.
+
+### ⛔ WHAT IS NOT ESTABLISHED — do not build on this yet
+1. **Whether ANY of it updates DURING a run.** `.break0-0` is named for a BREAKPOINT, which suggests it is
+   written when you STOP, not continuously. `ops.py` already warns the disk snapshot is *"flushed at run
+   start/end"*. **This is the one thing that decides whether it is a progress source or just a resume record.**
+2. **Whether 40932 is really an offset** — it is an inference from magnitude and file type, not decoded.
+3. **The Expert.** Everything above is a V4.1 reading.
+
+### ⚠ THE BENCH TEST, and one trap in it
+Run a program and poll `.file` and `.break0-0`, **comparing CONTENT, never mtime.**
+⛔ **mtimes on this controller are meaningless** — the samples read `1969-12-31` and `2011-10-04`, so its
+clock is unset. Any freshness check built on timestamps would silently always-or-never fire.
+⚠ Read-only throughout: `os.listdir` + file reads. ⛔ Never `MGETDATA` (wedges the controller).
+⭐ If content changes mid-run, this is progress tracking on **EVERY controller including the V4.1** — no
+Modbus, no instrumentation, no cost to the machine. If it only changes at stop, it is still the honest
+answer to "where did it stop", which beacons cannot give either.
