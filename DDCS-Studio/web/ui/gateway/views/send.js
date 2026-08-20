@@ -8,8 +8,9 @@ import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
 import { GcodeExecutionEngine } from '../../../engine/GcodeExecutionEngine.js';   // t1585 — the send gate reads the FILE, with the same parser the sim runs
 import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
+import { getMachine } from '../../../data/workspaceMachine.js';   // t2101 - the workspace's machine NAME is the Drive folder the gateway publishes under
 import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
-import { submitJobToDrive, canSendViaDrive } from '../../cloud/driveJobs.js';   // t2080 — the CLIENT transport: no gateway on this device, so the job goes to the Drive inbox the machine's gateway polls
+import { submitJobToDrive, canSendViaDrive, readGatewayHeartbeat } from '../../cloud/driveJobs.js';   // t2080 — the CLIENT transport: no gateway on this device, so the job goes to the Drive inbox the machine's gateway polls
 import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
@@ -123,6 +124,55 @@ export default {
           }
         } catch (_) { /* no gateway answer → nothing to compare; the other guards still apply */ }
 
+        // t2101 - THE SAME BLOCK, ON THE PATH IT COULD NOT REACH. The catch above is not a bug, but its comment
+        // ("no gateway answer -> nothing to compare") stopped being the whole truth at t2080: when no gateway
+        // answers we now SEND THROUGH DRIVE rather than not sending at all, so the hard block silently did not
+        // apply to the one path where a job travels furthest from the person who sent it. A gateway publishes
+        // `gateway/heartbeat.json` every 20s carrying what it is attached to; ask THAT instead of the client.
+        // ⛔ ONE COMPARISON, NEVER TWO: this reuses compareController/mismatchStatement unchanged, so the Drive
+        //    path cannot drift into describing the same fact differently from the local path.
+        // ⚠ UNKNOWN STAYS UNKNOWN. An older gateway does not publish `controller_profile_id`, and
+        //    controllerMatch.js rules that an absence is NOT a mismatch - so this degrades to exactly today's
+        //    behaviour rather than blocking on ignorance. Do NOT substitute `controller_family` here: it is a
+        //    different vocabulary ('expert-m350') from the workspace's profile id ('ddcs-expert-m350'), and
+        //    feeding it in would hard-block a PERFECTLY MATCHED machine.
+        let _hb = null;
+        if (!this._gatewayReachable && canSendViaDrive()) {
+          try {
+            _hb = await readGatewayHeartbeat((getMachine() || {}).name);
+            if (_hb.state === 'fresh' && _hb.hb && _hb.hb.controller_profile_id) {
+              const cmp = compareController(_hb.hb.controller_profile_id);
+              if (!cmp.match) {
+                await dlgNotice(
+                  mismatchStatement(cmp)
+                  + '\n\nThe gateway for this machine is attached to a different controller, so nothing here can '
+                  + 'be sent to it - its travel, work offsets, tool table and macros all belong to another machine.',
+                  { title: 'Wrong controller - send blocked', okLabel: 'Cancel' },
+                );
+                return;   // the finally block re-enables the button
+              }
+            }
+          } catch (_) { _hb = null; /* advisory - never block a send because the status lookup itself failed */ }
+
+          // ⚠ NOT A FAILURE, AND THE WORDING MUST NOT PRETEND IT IS. A Drive job PERSISTS in the inbox until some
+          // gateway claims it, so "no gateway right now" means WAITING, not lost. What was wrong before is the
+          // promise: the view said "picks it up within ~15s" with nothing running to pick it up.
+          // ⛔ AND WE CANNOT SAY "no gateway has ever run": `drive.file` scoping means an unreadable folder and an
+          //    absent one look identical from here. "Studio cannot see" is true under both; "never ran" is a guess.
+          if (_hb && (_hb.state === 'stale' || _hb.state === 'unseen')) {
+            const since = _hb.state === 'stale' && _hb.ageS != null
+              ? `The gateway for this machine last checked in ${Math.round(_hb.ageS / 60)} min ago.`
+              : 'Studio cannot see a gateway for this machine on your Drive.';
+            const ok = await dlgConfirm(
+              since + '\n\nThe job will be written to your Drive and will WAIT there until a gateway for it '
+              + 'is running - it is not lost, but nothing will reach the controller until then.\n\nSend anyway?',
+              { title: 'No gateway is listening', okLabel: 'Send anyway', cancelLabel: 'Cancel' },
+            );
+            if (!ok) return;
+          }
+        }
+
+
         // t1585 THE SEND GATE — REFUSE WHAT THE CONTROLLER WOULD REFUSE, JUDGED FROM THE FILE.
         //
         // Runs BEFORE the envelope check on purpose: a file whose coordinates do not parse cannot be meaningfully
@@ -228,7 +278,7 @@ export default {
           r = await ctx.client.submitJob(name, nc, map, contentHash);
         } else {
           if (!canSendViaDrive()) throw new Error('No gateway on this PC, and no Google account connected — sign in (top right) to send through your Drive.');
-          r = await submitJobToDrive(name, file.text, contentHash);   // the ORIGINAL program: no beacons on this path
+          r = await submitJobToDrive(name, file.text, contentHash, (getMachine() || {}).name);   // the ORIGINAL program: no beacons on this path
         }
         toast('Queued ' + r.jobId);
         info.textContent = r.via === 'drive'
