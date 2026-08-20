@@ -21,6 +21,24 @@
       └── CLIENT PCs   everything else. Author and submit. NEVER claim.
 ```
 
+### ⚠ "CLIENT" DOES NOT MEAN "NO GATEWAY PROCESS" (human, 2026-08-19: *"client also still are technically gateways"*)
+**Every exe runs the gateway daemon** — it serves Studio's own UI on localhost and answers `/api/*` whether or
+not a controller is attached. So a client is **a gateway with no controller**, never a different program.
+⛔ **Do NOT implement the client role by not starting the daemon.** That would take the UI down with it.
+The role governs whether the poller CLAIMS and whether controller-wiring settings are shown — nothing else.
+
+**Consequence, and it corrects an under-statement in t2080:** a job reaches Drive by two different routes
+depending on whether a LOCAL daemon exists, and both are correct:
+
+| device | local gateway? | route to the Drive inbox |
+|---|---|---|
+| phone / browser, no exe | no | `driveJobs.js` writes the inbox directly (built t2080) |
+| a PC running the exe, client role | **yes** | `submitJob` → its OWN local daemon → `backend=drive` → Drive |
+
+⇒ t2080b's "Send is dead with no gateway" only ever applied to the browser-without-exe case. On a client PC
+running the exe the button was never dead — its own daemon answers. ⚠ A client-role exe still TICKS its
+poller, which is exactly why S0's claim gate must live in `_maybe_claim()` and not in the UI.
+
 ⭐ **THIS IS MOSTLY NAMING WHAT IS ALREADY TRUE, not new machinery.** `poller._maybe_claim()` already
 returns immediately when `cfg.expert_dest` is empty — *"no controller configured yet — leave jobs queued"*.
 So an unconfigured PC is ALREADY a client mechanically. What is missing is that the role is implicit,
