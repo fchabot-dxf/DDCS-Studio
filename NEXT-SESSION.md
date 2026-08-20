@@ -7301,3 +7301,46 @@ Remote live position readout is **DEFERRED, not cancelled.** Consequences, all s
   carry a 2s cadence). Recorded here so a later revisit starts from a decision rather than a surprise.
 - ⚠ **Live tracking at the machine itself is UNAFFECTED** — it is serial + local, and remains Expert-only
   per the earlier V3/V4.1 finding. Nothing in the cloud arc touches it.
+
+## ⚖ TRIAGE OF THE 15 — THEY ARE NOT ONE BUCKET (advisor, 2026-08-20)
+*(human ruled: "fix it here, all of it". Fixing all 15 does NOT mean making 15 things green the same way —
+most are stale tests and a few are real defects, and the two need OPPOSITE fixes.)*
+
+⭐ **THE KEY EVIDENCE, and it is in the accused commit's own words.** `da280131` touches TWO things, and the
+worker correctly noted the `.editor-toolbar` CSS is scoped to the editor pane and cannot explain a header
+failure. The other half is `web/ui/headerPost.js`, whose new comment says:
+
+> *"⚠ THIS REVERSES t1227, which moved them OUT of here... **t1227's test was right**; these three simply
+> fall on the app side of it."*
+
+⇒ **The author KNEW they were invalidating t1227's premise, documented it, and did not update the test.**
+That is precisely the stale-premise class t2095 just cleared seven of — not a regression.
+
+### THE SPLIT — verify each before acting, but expect roughly this
+**STALE PREMISE — the change was DELIBERATE and documented ⇒ update the TEST:**
+- `editor-file-menu-1227` — asserts Load/Insert/Export are NOT in the quick menu. They were put back on
+  purpose. [OBSERVED — the commit says so explicitly]
+- `editor-chrome` desktop case *"header Clear + floating Copy wired"* — the editor's own ▾ file button is
+  **gone with this commit** by design. [OBSERVED — "The editor's own ▾ file button is gone with this"]
+- `editor-indent-1450` "THE TOOLBAR BUTTON" / "THE LAYOUT" — the toolbar was restructured deliberately.
+  [INFERRED — read them]
+- `settings-ia-regroup-1245`, `header-profile-menu`, `context-menu-pass-1452` — menu-content assertions,
+  likely same cause. [INFERRED — read them]
+
+**REAL DEFECT — nobody intended this ⇒ fix the APP, never the test:**
+- ⭐ `editor-chrome` PHONE case — `#btn-clear` measures **24px against a required 44px**
+  (`editor-chrome.spec.js:68`). Caused by `.editor-toolbar > button { font-size:11px; padding:3px 8px }`.
+  The spec's own comment says it exists to catch exactly this. **CONFIRMED by the advisor independently.**
+- `header-responsive` — the header overflows its 390px container by **exactly 15px**, which is
+  `.app-header`'s own `padding: 0 15px 0 0` (`styles.css:263`). ⚠ **The responsible rule is NOT yet pinned** —
+  the worker said so honestly and I have not pinned it either. ⭐ Prime suspect: a header child sized to the
+  full viewport width (100vw, or left:0/right:0 against a non-header ancestor) starting at the content-box
+  origin, so it runs 15px past a 375px content box. **MEASURE IT, do not assume.**
+
+⛔ **THE TRAP IN "FIX ALL 15":** making the two REAL ones green by relaxing the assertion would delete the
+44px touch floor and the phone-width overflow guard — the two things the mobile arc existed to establish.
+⛔ **And the mirror trap:** "fixing" the app to satisfy `editor-file-menu-1227` would UNDO the human-directed
+quick-menu change. Each of the 15 gets a verdict FIRST, then the matching fix.
+
+⚠ `da280131`'s own gate was 18 specs and touched none of these 15. That is the second time in two days a
+narrow gate shipped a change whose blast radius nobody measured. **Run the FULL suite on this fix.**
