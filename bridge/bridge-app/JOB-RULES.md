@@ -219,3 +219,43 @@ Rules here were settled 2026-08-19/20 across the advisor/worker loop. The reason
 objection that turned out to be **backwards** (arguing jobs would "pile up unclaimed" as a drawback, when
 the status quo destroys them outright) — is recorded in `NEXT-SESSION.md` under the claim-gate ruling.
 ⭐ That wrong turn is kept on purpose: it is why §1's two axes are stated so emphatically.
+
+---
+
+## 6. DRIVE IS INBOUND-ONLY FOR A GATEWAY  `[RULED]`
+*(human, 2026-08-20: "gateway should never send through drive". Reached by asking why the Drive toggle is a
+toggle at all — "why turn it off?" — and finding that ON is a DOWNGRADE, not an addition.)*
+
+**THE DEFECT.** `make_backend()` returns exactly ONE backend, and `ops.submit_job()` writes to it. So with
+`backend = "drive"`, a job submitted **on the gateway PC itself** is uploaded to Google and polled back
+down — internet dependency, quota, and a 15s floor for a job that never needed to leave the building.
+
+⚠ **AND IT MAKES A PREFERENCE IN THE UI A LIE.** `send.js` reads as though it prefers the local path:
+```js
+if (this._gatewayReachable) { await ctx.client.submitJob(...) }   // "local"
+else                        { submitJobToDrive(...) }             // fallback
+```
+But that local call hands the job to *the configured backend*, which is Drive. **There is no local-fast
+path once the toggle is on** — the branch is real, the preference is not.
+
+⭐ **THE RULE.** A gateway's `backend` is doing two unrelated jobs at once:
+
+| | direction | must be |
+|---|---|---|
+| *where I put MY OWN jobs* | outbound | **ALWAYS LOCAL.** Never Drive. Never the internet. |
+| *where I look for OTHER people's* | inbound | local **and/or** Drive — additive |
+
+⇒ **Split them.** The gateway always has a local store for its own submissions; Drive becomes an
+**additional inbound source**, polled alongside it. `_maybe_claim` then draws from both, FIFO by jobId
+(the timestamp prefix already orders them globally, so no new ordering concept is needed).
+
+⭐⭐ **WHY THIS IS THE RIGHT SHAPE, not just a faster one:** it deletes the question. "Send jobs through my
+Drive" is a transport swap a user must reason about and can get wrong; **"let this machine receive jobs
+from elsewhere"** is a capability that costs nothing to leave on. ⛔ A setting whose correct value depends
+on where you happen to be standing is a setting that should not exist.
+
+⚠ **NOT SMALL.** The Poller takes one backend and claims `ids[0]` from one inbox. This needs a composite
+inbound source (or a poller that iterates sources), plus care that `delete_job` after delivery goes to the
+source the job came FROM. ⛔ Do not start it inside another turn — it is its own slice.
+⚠ **Until it lands, the toggle stays a genuine trade-off** and the current wording is honest: turning Drive
+on really does route local sends through Google. Do not "simplify" the label before the behaviour changes.
