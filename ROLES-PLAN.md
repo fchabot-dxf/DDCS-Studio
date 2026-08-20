@@ -335,3 +335,55 @@ that mirrors the gateway's published status · promoting `status` to *"is the wo
 - **No widening of the remote command surface.** Delete stays the only remote op.
 - **No tab-hiding as a substitute for wiring.** S3 exists precisely because hiding Files would have shipped a
   crippled client and left the real work undone.
+
+---
+
+# ⚖ THE ARGUMENT (2026-08-19) — where the plan was wrong, and the law that came out of it
+
+The human called this *"a major turnpoint"* and asked to argue it. Three challenges were put to the plan;
+two stood, one was overturned BY the human. Recorded as reasoning, not conclusions, so it can be re-argued.
+
+## 1. "Don't STORE the role, compute it" — PARTLY WRONG, overturned by the human
+The argument was: the role is fully determined by whether a controller disk is configured, so storing it
+creates a second source of truth that can disagree, and the override merely papers over stale config —
+*"the honest fix is to clear it."*
+
+⚠ **The human's answer kills that: "changing roles should not allow data to be lost."** Clearing the
+controller disk to become a client IS the data loss — ASUS's `\10.0.0.50\cncdisk` is CORRECT config for
+when it goes back to bench duty, and deleting it means retyping it later. **Proposing destruction as the
+mechanism for changing role was the error.**
+⇒ **The override stands, for a better reason than it was first given:** not to contradict the derivation,
+but so a user NEVER has to destroy configuration to change role. It is a "not right now", not a "clear".
+
+## 2. The role is per (PC, WORKSPACE), not per PC — STANDS
+`expert_dest` lives in `~/.ddcs-bridge/config.json` — **per PC**. A workspace carries its OWN controller and
+can be opened on any PC. So: open the V4.1 workspace on CNC-FAIRY, which is wired to the Expert. That PC is
+a gateway *for the Expert* and a client *for that workspace* — same machine, same moment, two answers.
+Not hypothetical: `compareController()` and `gateway-mismatch-gate-1229` exist because someone already hit it.
+⇒ **The question is not "what kind of PC is this" but "is THIS PC's gateway wired to the controller THIS
+workspace targets?"** Which is inherently computed — it changes when you switch workspaces.
+
+## 3. The Drive inbox keys on the CONTROLLER, not the PC — STANDS
+The human's own rule: two PCs may serve one controller, one after the other. An inbox named per PC ORPHANS
+THE QUEUE the moment the gateway role moves machines — jobs sit in the retired PC's folder forever.
+⇒ Key it on the controller/workspace identity (`machine_name` = the CNC machine, e.g. "Ultimate Bee" —
+NOT the PC). ⚠ S4 said "per machine", which is dangerously ambiguous: it means the CNC machine.
+
+## ⭐ THE LAW THIS PRODUCES — the constraint that governs the whole feature
+> **A ROLE CHANGE MUST BE SIDE-EFFECT-FREE. Role affects DISPLAY and CLAIM BEHAVIOUR only — never data
+> lifecycle.**
+
+It follows from (2): if the role is per (PC, workspace), it changes EVERY TIME THE USER SWITCHES WORKSPACES.
+Anything a role change touches — cleanup, migration, clearing a queue — would then fire on an ordinary
+workspace switch and silently destroy state. ⇒ The computed model is not merely simpler, it is SAFER: making
+role changes routine forces them to be harmless.
+
+⛔ **Nothing may be deleted, migrated, cleared or re-homed on a role change.** Not the inbox, not history,
+not the controller disk setting, not credentials.
+
+## ⚠ THE NEARBY DATA-LOSS VECTOR THAT IS NOT THE ROLE'S FAULT — but will be blamed on it
+Switching `backend` between `local` and `drive` STRANDS THE QUEUE: jobs in the local inbox are invisible to
+the Drive backend and vice versa. Nothing migrates them and nothing says so. If that happens right after a
+role change (likely — the two get configured together), roles will take the blame for a pre-existing defect.
+⇒ **Name it before shipping roles**: at minimum warn when switching backend with a non-empty inbox; better,
+report what is stranded and where. It is BACKLOG material in its own right, not part of roles.
