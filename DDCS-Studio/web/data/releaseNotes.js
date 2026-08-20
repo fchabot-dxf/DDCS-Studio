@@ -31,6 +31,15 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.5": [
+    { short: "Google sign-in works now",
+      full: "Signing in to Google failed on every machine with \"this app's request is invalid\". The app was "
+        + "shipping the wrong kind of Google credential — one that can't be used by a desktop app. Click the "
+        + "avatar in the top-right and sign in; there is nothing to configure." },
+    { short: "A failed sign-in now tells you why",
+      full: "It used to say only \"Sign-in failed\". It now shows Google's own reason, so a problem can be "
+        + "acted on instead of guessed at." },
+  ],
   "2026.08.19.4": [
     { short: "The editor's buttons are one tidy row up top",
       full: "The buttons that used to float over the bottom-left corner of the editor — Make, Transform, undo, "
