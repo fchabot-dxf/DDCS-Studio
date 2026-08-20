@@ -7168,3 +7168,41 @@ A test asserting from_env's precedence would pass today with the exe still broke
 ⭐ **This is the SEVENTH instance this week of the project's signature failure — declared, correct in
 source, never run.** The first six were CSS and a beacon. This one is load-bearing for a bench test.
 It is the strongest argument yet for the CONNECTIVITY CHECK in the triage above.
+
+## ⭐ THE "IS THE GATEWAY ONLINE" FLAG ALREADY EXISTS AND IS READ BY NOBODY
+*(human, 2026-08-19: "is there a way to flag an online gateway on google cloud so the client knows".
+Answer: yes — it is already written. VERIFIED in code, not inferred.)*
+
+`_publish_heartbeat` (bridge.py:36-40) writes `ops.descriptor()` + `last_seen` + `active_job` to
+`gateway/heartbeat.json` — **at startup (bridge.py:96) and every `heartbeat_s` = 20s (bridge.py:148).**
+It already carries everything a client needs: `last_seen`, **`controller_connected`** (the live
+`controller_reachable()` probe), `active_job`, `machine_name`, `machine_id`, `dest`, `backend`, `version`.
+
+⛔ **Nothing reads it.** There is no `get_heartbeat` anywhere in the Python side — the Backend ABC has
+`put_heartbeat` and no reader. `driveJobs.js` exports exactly `makeJobId`, `submitJobToDrive`,
+`canSendViaDrive`. ⭐ And the client seam was DESIGNED for it and left unfilled: `client.js:91` is
+`if ("online" in d) {   // cloud (mirror via heartbeat freshness)`, under a comment at line 76 saying
+*"CloudClient will add the mirror/offline interpretations from the heartbeat later."*
+**Eighth instance this week of declared-correct-never-run.**
+
+### ⚠ THIS CORRECTS THE #9 RULING'S "CLOUD CANNOT PREVENT"
+The cloud sender cannot know the state AT DELIVERY TIME, but it can know it as of ≤20s ago. That is enough
+to refuse an obviously-doomed send instead of promising "picked up within ~15s":
+
+| heartbeat | meaning | what the sender says |
+|---|---|---|
+| fresh (< ~60s = 3 missed beats), `controller_connected: true` | all well | send normally |
+| fresh, `controller_connected: false` | gateway up, machine off | "the controller is switched off" — refuse or warn hard |
+| stale (> ~60s) | nobody is listening | "no gateway has checked in since &lt;time&gt;" |
+| absent | never configured | "no gateway has ever published to this Drive" |
+
+### ⚠⚠ THE HAZARD — WHOSE CLOCK
+`last_seen` is stamped by the GATEWAY's clock and would be compared against the PHONE's. A few minutes of
+skew makes a live gateway look dead, or a dead one look live. ⭐ **Use Drive's server-side `modifiedTime`
+on the heartbeat file for the freshness decision — one clock, both sides read it** — and keep `last_seen`
+for display only. Do not compute staleness from the JSON field.
+
+⚠ **Depends on S4:** today every gateway overwrites the SAME `gateway/heartbeat.json`, so with the V4.1 also
+on Drive the file describes whichever gateway wrote last. Correct with one gateway; wrong with two.
+⚠ **Also depends on the exe --backend blocker above** — the exe never runs the Drive poller, so it has never
+published a heartbeat to Drive at all.
