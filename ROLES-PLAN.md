@@ -213,3 +213,93 @@ picks it up when it next runs"*, not *"sending needs a machine"*.
 independently and at different rates — role changes when a PC is re-purposed, status changes every poll. One
 enum would have to be recomputed on every heartbeat and would silently re-introduce exactly the conflation
 above.
+
+---
+
+# THE BUILD PLAN — slices in dependency order
+
+**Sequenced so each slice ships something usable and provable on its own, and so the two mistakes this
+session already paid for cannot recur:** (a) do not hide a tab without reading its code — "it needs the
+controller" has been wrong more often than right; (b) do not answer a ROLE question with a STATUS signal.
+
+**⚠ ONE RULING NEEDED BEFORE S0 (the only thing blocked on the human):** is the role **DERIVED** from the
+controller-disk field, or **DECLARED** in Setup? Recommend **declared, defaulting to derived** — otherwise
+clearing that field to tidy up silently re-roles the machine, and the UI cannot adapt before a controller is
+ever configured. Everything below assumes declared-with-derived-default; if the ruling goes the other way,
+only S0 changes.
+
+---
+
+## S0 — THE ROLE EXISTS  *(small; nothing user-visible except one control)*
+**Build:** one persisted field (`role: "gateway" | "client"`), defaulted from the existing signal
+(`expert_dest` non-empty ⇒ gateway), surfaced as a Role control in Setup, and exposed to the UI the way
+connection state already is.
+**⛔ The claim gate stays authoritative:** `poller._maybe_claim()` must ALSO refuse when role is client —
+never rely on the UI. A role that hides tabs while the poller still claims is worse than no role.
+**⚠ Surface disagreement, never resolve it silently:** role=client WITH a controller disk set is a
+misconfiguration the user should see stated, not have quietly picked for them.
+**Gate:** a client never claims (drive a real inbox with a client-role poller and assert it stays queued);
+the derived default reproduces today's behaviour for every existing install.
+
+## S1 — GATE THE SETTINGS BY ROLE  *(the human's own definition of the feature)*
+> *"the client is really hiding the settings that help connect the gateway to the controller"*
+
+**Hide on a client** (`views/admin.js`): controller disk · beacons (Modbus) · the controller-profile block.
+COM port too if exposed. **Keep:** machine name · cloud storage + account · daemon URL · serve port.
+**⚠ REDUCE, never hide, the Setup tab itself** — it is where the role is chosen.
+**Gate:** the client Setup renders with no controller-wiring field present (not merely disabled); the
+gateway Setup is byte-for-byte what it is today.
+
+## S2 — COMPOSE THE TWO AXES  *(the correctness slice; this is the bug already paid for)*
+Implement the matrix above: ROLE decides what EXISTS, STATUS decides what is AVAILABLE.
+- **Client + gateway offline ⇒ Send STAYS ARMED.** The job queues in Drive and is claimed whenever the
+  gateway wakes. Message: *"queued — the machine picks it up when it next runs"*, never *"sending needs a
+  machine"*.
+- **Gateway + controller offline ⇒ controller settings STAY VISIBLE** (they are how the user fixes it) while
+  send/browse disarm with the reason — today's t1327 behaviour, which is correct for this cell only.
+- **Retire the t2080b special case**: `viaDrive` in `send.js` is a patch standing in for the missing role and
+  should dissolve into it.
+⛔ **Do not collapse the axes into one enum.** They vary independently and at different rates.
+**Gate:** `gateway-state-contract-1327` must still pass unchanged for the GATEWAY role (it is the contract
+for that cell); `client-send-2080` covers the client cell.
+
+## S3 — THE BACKEND-MEDIATED FILE VIEW  *(makes the client genuinely useful)*
+The real shape of a client: **Studio talking to the BACKEND instead of a local gateway.** The gateway is
+already publishing more than Studio consumes.
+- **Browse** — read the published `cncdisk/index.json` instead of `GET /api/files`. 🟢 producer already
+  exists (incl. `DriveBackend`); the only consumer today is the retired Phase-3 R2 console.
+- **Delete** — write a command instead of `POST /api/files/delete`. 🟢 the gateway already polls
+  `list_commands`, executes, and clears.
+- ⚠ **Say it is a SNAPSHOT** (~15s, `updated_at` is in the index) — a file deleted at the machine lingers in
+  the view until the next publish. An honest staleness label, not a pretence of live.
+- ⛔ **`SAFE_OPS = {"delete"}` STAYS.** A remote client must never be able to RUN anything. Roles must not
+  widen this line.
+- 🔴 **Reading file CONTENTS is NOT in this slice** — `build_index` publishes a listing only. A
+  request/response channel (client asks, gateway uploads that one file) is a separate feature.
+**Gate:** a client with no gateway lists the disk and deletes a file, end to end, against a real gateway.
+
+## S4 — NAMESPACE THE DRIVE INBOX PER MACHINE  *(unblocks the V4.1; SAFETY)*
+⛔ **Until this ships, only ONE gateway may run Drive mode.** Two gateways share one inbox,
+`_maybe_claim()` takes `ids[0]` with no notion of which machine a job is for, and `identity.verify()` is
+inert while `machine_id` is unset ⇒ an Expert program can be delivered to the V4.1.
+**Build:** the inbox folder is named per machine — `config.drive_folder` is ALREADY per-config, so only
+`driveJobs.js`'s hardcoded `ROOT_NAME` and a target picker are missing. The human's own rule ("any workspace
+can only have one controller") names the folder; `machine_name` already exists and Setup already collects it.
+**Client-side:** sending becomes *"send to a MACHINE"*, invisible with one machine configured, a choice once
+there are two.
+**⚠ Turn `machine_id` on while here** — namespacing prevents the mix-up by convention; `identity.verify()`
+REFUSES it by verification. Both, not either.
+**Gate:** two gateways with distinct folders cannot see each other's jobs; a job placed in the wrong one is
+refused by identity rather than delivered.
+
+## S5 — LATER, ONLY IF WANTED
+Read a file's contents from a client (needs the request/response channel above) · a client-side Tracking view
+that mirrors the gateway's published status · promoting `status` to *"is the workspace's gateway alive"*.
+
+---
+
+## WHAT THIS PLAN DELIBERATELY DOES NOT DO
+- **No new transport.** Everything rides the backend that is already there and already proven live (t2076).
+- **No widening of the remote command surface.** Delete stays the only remote op.
+- **No tab-hiding as a substitute for wiring.** S3 exists precisely because hiding Files would have shipped a
+  crippled client and left the real work undone.
