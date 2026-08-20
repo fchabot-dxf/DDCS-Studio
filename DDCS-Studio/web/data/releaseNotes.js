@@ -31,6 +31,30 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+    '2026.08.20.1': [
+        { short: 'Sending through your Google Drive actually works now',
+          full: 'The app was hard-wired to the local gateway: choosing Google Drive in Setup saved correctly, '
+              + 'then the restart it asked you to do put it straight back to local. So Drive was never really '
+              + 'reachable from the installed app. It is now - pick it in Setup > Cloud storage, connect your '
+              + 'account, and restart once.' },
+        { short: 'Send is blocked unless the machine can actually take it',
+          full: 'Studio now checks two things before letting you send: that a gateway is running, and that the '
+              + 'CNC is powered on. Both are shown above the Send button with a coloured dot each. Previously a '
+              + 'job sent to a switched-off machine was accepted and then quietly destroyed on delivery - it is '
+              + 'now refused up front, while you are still standing there and can do something about it.' },
+        { short: 'A chime when a job arrives, lands, or fails',
+          full: 'The gateway PC plays a sound at the machine: a shop-door chime when a job arrives, a cash-register '
+              + 'ding when it reaches the controller, and a buzzer if it fails. Three different sounds on purpose - '
+              + 'you can tell them apart across a shop without looking. Turn it off in Setup if you would rather not.' },
+        { short: 'A job for the wrong controller is refused, wherever you send from',
+          full: 'Sending a program to a controller it was not written for was already blocked when Studio could see '
+              + 'your gateway directly. That check could not run when sending through Drive from a phone - the exact '
+              + 'case where you are furthest from the machine. It now runs on both paths, using the same comparison.' },
+        { short: 'Phone fixes: the trash button and the header at 390px',
+          full: 'On a phone the editor toolbar trash had shrunk below a usable tap size, and the top header ran '
+              + 'slightly wider than the screen. Both fixed, and the header now tells the console when it runs out '
+              + 'of room to shrink instead of silently giving up.' },
+    ],
   "2026.08.19.7": [
     { short: "Send now works on a phone or a PC with no gateway",
       full: "The Send button did nothing at all on a device that isn't wired to the machine — no error, no "
