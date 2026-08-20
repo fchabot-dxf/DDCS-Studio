@@ -115,3 +115,22 @@ no-notes fallback — read it before changing the schema.
   header, both features (save projects / send jobs) hang off it.
 - ~~**The editor's bottom-left button cluster is overgrown**~~ — closed by **t2078**: one flex toolbar row above
   the editor; indent/comment buttons retired to their keyboard shortcuts.
+
+### 7. The lathe icon doesn't read as a lathe setup
+*(human, 2026-08-19: "the lathe icon is not really looking like a lathe setup")*
+
+⚠ **Establish WHICH icon before touching anything — there are two distinct families and they have different
+histories:**
+- **The lathe OP icons** (`ui/wizIcons.js`, `user_lathe_facing` / `odturn` / `parting` / `centerdrill` /
+  `polygon`) — a deliberately-designed set (t1911) sharing one constant: a steel bar on a red dashed
+  centreline, each op differing by what the CUT removes. ⚠ These were ALREADY revised once (t1918) after the
+  human found the first pass too small at the real 14px render — the fix was heavier, fewer marks, re-derived
+  from `rotary_center`'s proven weight. Do not quietly undo that.
+- **The lathe MACHINE-KIND mark** — whatever represents "this workspace is a lathe" (the identity line renders
+  `· Lathe` as TEXT today; `settingsPanel.js` has `latheEnvelopeSvg`). If the complaint is about the machine
+  rather than the ops, this is the one, and it may not exist as an icon at all.
+
+**Ask the human which, and get the specific "doesn't look like":** a lathe setup reads as chuck + bar +
+tool-on-a-cross-slide; the current op family draws bar + centreline + cut only, with no chuck and no tool
+post — which is a plausible reason it reads as "a rod" rather than "a lathe". ⚠ Whatever changes, it must
+survive **14px** — that constraint is what t1918 was entirely about, and it is where the first attempt died.
