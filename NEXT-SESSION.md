@@ -7377,3 +7377,45 @@ the first real Drive job, not after.**
 ⚠ Still BUILD the detect-and-report path (a later user, or the V4.1's own Drive, can be in the old shape) —
 just know it will find nothing here, so **do not treat "it reported nothing" as proof it works.** Test it
 against a deliberately seeded legacy folder or it is an untested branch.
+
+## ⭐ RULING — A GATEWAY MUST NOT CLAIM A JOB IT CANNOT DELIVER (human, 2026-08-20)
+*(Reached by the human arguing the opposite position and my objection failing. Recorded WITH that history,
+because the wrong turn is the instructive part.)*
+
+**THE DEFECT, observed in code.** `poller._maybe_claim` gates on role and on `expert_dest` being
+**CONFIGURED** — never on it being **REACHABLE**. So with the mill powered off: the job is claimed, removed
+from the inbox, `transfer.deliver` raises `OSError`, and `poller.py:133` calls `delete_job`. ⇒ **THE JOB IS
+DESTROYED.** Not queued, not retried — gone, because the machine was switched off.
+
+**THE ARGUMENT, and where I was wrong.** The human proposed that unplugging should make a PC stop being a
+gateway. I objected that jobs would then "pile up unclaimed" — ⛔ **but piling up is STRICTLY BETTER than
+being claimed and deleted.** I offered as a drawback of their idea something better than the status quo.
+⭐ The human was identifying a real defect; only the mechanism was worth pushing back on.
+
+**THE STANDARD-PATTERN ANSWER (human: "i want the standard way"), which both framings converge on:**
+
+| question | answered by | axis |
+|---|---|---|
+| *is this PC set up as a gateway?* | config (`expert_dest` / `role_override`) — **stable, survives power cycles** | ROLE |
+| *can it deliver right now?* | `ops.controller_reachable()` — **live** | STATUS |
+
+⇒ **Role stays exactly as S0 built it. Add ONE check to `_maybe_claim`,** beside the `expert_dest` check
+already there (whose own comment already says *"leave jobs queued"*):
+```python
+if not self.ops.controller_reachable(): return   # mill is off - leave it in the inbox
+```
+
+⭐⭐ **THERE IS NO QUEUE TO BUILD. THE INBOX IS THE QUEUE.** Not claiming = waiting. No retry counter, no
+ceiling, no backoff, no persisted retry state — this is the two-line version of everything BACKLOG #9
+proposed building, and it **supersedes that entry's implementation half.**
+⭐ `controller_reachable()` already exists (`ops.py:220`), is already published as `controller_connected`,
+and is already rendered in three places. It is simply not consulted at the one moment that decides whether
+a job lives or dies.
+
+⚠ **UI WORDING: "gateway - controller offline".** State identity and health separately. ⛔ Never "client" —
+that reads as a demotion the user did not ask for, and their settings must NOT vanish when the mill is off
+(that is exactly when they may want to look at them).
+⚠ **STILL FAILS, CORRECTLY:** a mill switched off *mid-delivery*. That is a genuine failure worth reporting,
+not a foreseeable one worth preventing. Leave that path alone.
+⭐ **BONUS, BY CONSTRUCTION:** two PCs configured for one mill now hand over automatically — whichever can
+currently see the disk claims. That is the human's "unplug one PC, plug in another, don't edit any roles".
