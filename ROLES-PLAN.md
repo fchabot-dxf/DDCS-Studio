@@ -387,3 +387,31 @@ the Drive backend and vice versa. Nothing migrates them and nothing says so. If 
 role change (likely — the two get configured together), roles will take the blame for a pre-existing defect.
 ⇒ **Name it before shipping roles**: at minimum warn when switching backend with a non-empty inbox; better,
 report what is stranded and where. It is BACKLOG material in its own right, not part of roles.
+
+---
+
+## ⭐ S1 CLARIFIED — TWO AXES GATE THE SETTINGS, AND THEY ARE ORTHOGONAL
+*(human, 2026-08-20: "unconnected from drive can be a gateway too, as this can be a simple pc to cnc
+station". Recorded because the obvious implementation of S1 gets this WRONG.)*
+
+⛔ **DO NOT gate the cloud settings on the role.** "Gateway" says a PC is wired to a controller. It says
+NOTHING about whether that PC uses Drive. **A plain PC cabled to the CNC, no account and no internet, is a
+first-class gateway** — [[one-box-stays-forever]] makes that setup permanent, not a degraded case.
+
+| | controller wiring<br>(disk · beacons · profile · COM) | cloud / Drive<br>(backend toggle · Connect Drive) |
+|---|---|---|
+| **gateway + local** | **SHOW** | not needed — ⛔ never imply it is missing |
+| **gateway + drive** | **SHOW** | **SHOW** |
+| **client + drive** | hide | **SHOW** — ⛔ hiding this breaks the only transport a client HAS |
+| **client + local** | hide | ⚠ cannot send anywhere: a fresh install, or a mistake. **State it**, do not hide it |
+
+⇒ **ROLE gates the controller wiring. BACKEND gates the cloud settings.** Two independent questions.
+⚠ The tempting shortcut — "clients are the cloud ones, gateways are the local ones" — is false in both
+directions and would break the human's own two machines.
+
+**WHAT S1 ACTUALLY TRIMS ON A CLIENT** (`views/admin.js`): the controller disk field, the beacons/Modbus
+toggle, the Controller-profile card, and the COM port if exposed.
+**WHAT IT KEEPS:** machine name, cloud storage + account, daemon URL, serve port.
+⚠ **REDUCE the Setup tab, never hide it** — it is where the role is corrected when derivation is wrong.
+⚠ **The claim gate stays authoritative regardless** (S0, `poller._maybe_claim`): the UI must never be the
+thing that decides. A role that hides fields while the poller still claims is worse than no role.
