@@ -292,7 +292,29 @@ vanished — reopening at the 160px floor, which after ~92px of pane headers lea
 number was reproduced exactly (51 then 34 across opens) and matches the human's report. The heal now
 APPLIES without being SAVED. ⭐ **Last-used size wins** (human: *"the last used size is great"*).
 
-⬜ **WHAT REMAINS — the first-time case.** `getVisualHeight()` returns null when the user has never dragged,
+⬜ **WHAT REMAINS — the first-time case: 140px PER PANE** (human: *"can new user panel be 140"*).
+⚠ **ATTEMPTED AND REVERTED 2026-08-20 — read this before trying again, it fails in a specific way.**
+A default of `panes x 140 + chrome` when nothing is stored WORKS (measured: 140/140 at 390x780, form still
+fully reachable — `.wiz-body` scrolls, 201 fields, the last one and INSERT both reachable). ⛔ But it
+**breaks t1468's collapse contract** and `collapsible-panes-752` catches it in two places:
+
+- Counting only the OPEN panes makes the visual TOTAL shrink when one is folded. t1468's contract is the
+  opposite: **the total stays put and the SURVIVOR grows into the freed height.**
+- Counting ALL panes fixes that, but then the survivor lands at 146px against a spec demanding >150.
+  ⇒ the freed height is not reaching the survivor; something downstream still caps it. **That is the
+  actual open question — find what caps the survivor before touching the default again.**
+
+⚠ AND THE FLOOR MUST APPLY TO A STORED DRAG TOO, or a drag is WORSE than no drag: measured at 390x780,
+nothing stored gave 140px panes while a deliberate drag to 500 was clamped to 51px by `visualMaxHeight`'s
+leftover-space cap. Whoever builds this must make both paths share one floor.
+
+⭐ Safe to push the form down: the phone layout puts previews on TOP of a scrolling body, verified — ⛔
+unlike the command-deck bug, where content was clipped with no scroll path.
+
+---
+
+*(original note follows)*
+⬜ **the first-time case.** `getVisualHeight()` returns null when the user has never dragged,
 and the code then falls through to *"the layout's own flex sizing holds"*. On a phone that is whatever is
 left after the form, so **someone opening a wizard on a phone for the first time can still get strips** —
 with no reason to suspect the panes are draggable at all.
