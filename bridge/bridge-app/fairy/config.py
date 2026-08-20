@@ -11,7 +11,7 @@ from dataclasses import dataclass
 @dataclass
 class Config:
     # --- backend (the rendezvous store; PROTOCOL §3) -----------------------
-    backend: str = "local"                  # "local" (test) | "r2" (prod)
+    backend: str = "local"                  # "local" (test) | "r2" (dev's bucket) | "drive" (user's own Drive)
     local_root: str = "./_bridge_data"      # local-folder backend root (inbox/ status/)
 
     # --- R2 (only used when backend == "r2"); pulled from env --------------
@@ -19,6 +19,14 @@ class Config:
     r2_bucket: str = ""
     r2_access_key: str = ""
     r2_secret_key: str = ""
+
+    # --- Google Drive (backend == "drive"): BYO cloud, t2076 ---------------
+    # Auth is the loopback OAuth already shipped (google_client_id/secret below + oauth.py) — no extra
+    # credential to configure. The folder is created in the user's Drive root on first use.
+    drive_folder: str = "DDCS Bridge"
+    # ⚠ Drive's per-user API quota is far tighter than R2's; a 5s poll is antisocial and will meet it.
+    # 15s is the deliberate floor for SENDING. Live progress never rides this path — it is the serial cable.
+    drive_poll_s: float = 15.0
 
     # --- transfer to the controller (transfer.py — the only hardware path) -
     # The controller's CNCDISK network share, e.g. \\192.168.0.99\CNCDISK or \\10.0.0.50\cncdisk.
@@ -123,7 +131,46 @@ class Config:
         except (OSError, ValueError):
             pass
 
-        # Seed Google OAuth if missing
+        # ── Seed Google OAuth ────────────────────────────────────────────────────────────────────────
+        # t2079b — SEEDING "IF MISSING" WAS NOT ENOUGH, and this is the correction to t2079's own fix.
+        # t2079 made a FRESH install pick the Desktop client, but an EXISTING install already had the wrong
+        # (Web) client PERSISTED in config.json from an earlier run — and a persisted value is never
+        # re-seeded, so updating the app changed nothing and sign-in kept dying on redirect_uri_mismatch.
+        # Hit live on ASUS immediately after shipping t2079.
+        #
+        # So a value that this code SEEDED is now marked as such (`google_client_source: "bundled"`), and a
+        # bundled value that has since changed REPLACES it. A client id the USER typed carries no marker and
+        # is never touched — the distinction the first attempt could not make, which is exactly why it could
+        # only ever be a no-op or a clobber.
+        bundled_id = bundled_secret = ""
+        try:
+            _bo = os.path.join(os.path.dirname(__file__), "google_oauth.json")
+            if os.path.exists(_bo):
+                with open(_bo, encoding="utf-8") as f:
+                    _od = json.load(f)
+                _cr = _od.get("installed") or _od.get("web") or {}
+                bundled_id, bundled_secret = _cr.get("client_id", ""), _cr.get("client_secret", "")
+        except Exception:
+            pass
+        # An install seeded BEFORE provenance existed carries no marker, which is precisely ASUS's case — so
+        # the marker alone would never fire for the very machines that need it. One extra, SURGICAL signal:
+        # the exact WEB client id that used to be seeded by mistake. It is public (it ships in
+        # web/ui/cloud/providers.js for the browser, where a Web client is CORRECT), and matching it is proof
+        # this value was auto-seeded rather than typed — nobody hand-enters the browser's client into the
+        # gateway. Anything else with no marker is left alone.
+        _MISSEEDED_WEB_ID = "895572525139-mapt84pm4lfudmjfq553k6pm4m2o0e77.apps.googleusercontent.com"
+        was_seeded = (persisted.get("google_client_source") == "bundled"
+                      or c.google_client_id == _MISSEEDED_WEB_ID)
+        if bundled_id and was_seeded and c.google_client_id != bundled_id:
+            c.google_client_id, c.google_client_secret = bundled_id, bundled_secret
+            persisted["google_client_id"] = bundled_id
+            persisted["google_client_secret"] = bundled_secret
+            try:
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    json.dump(persisted, f, indent=2)
+            except OSError:
+                pass
+
         seeded = False
         if not c.google_client_id:
             try:
@@ -131,7 +178,15 @@ class Config:
                 if os.path.exists(bundled_oauth):
                     with open(bundled_oauth, encoding="utf-8") as f:
                         oauth_data = json.load(f)
-                    creds = oauth_data.get("web") or oauth_data.get("installed") or {}
+                    # t2079 — INSTALLED FIRST, and this ordering is the whole bug. THIS process is the
+                    # desktop gateway: it signs in through the LOOPBACK flow
+                    # (http://127.0.0.1:<port>/oauth/google/callback). A Google "Web application" client
+                    # accepts ONLY redirect URIs registered against it one by one, so seeding a web client
+                    # here produced `Error 400: redirect_uri_mismatch` on every machine — hit live on
+                    # 2026-08-19. A "Desktop app" (installed) client accepts any loopback port by
+                    # construction, which is exactly what this flow needs. Prefer it; fall back to `web`
+                    # only so an old single-client credentials file still starts.
+                    creds = oauth_data.get("installed") or oauth_data.get("web") or {}
                     cid = creds.get("client_id", "")
                     csec = creds.get("client_secret", "")
                     if cid:
@@ -139,6 +194,7 @@ class Config:
                         c.google_client_secret = csec
                         persisted["google_client_id"] = cid
                         persisted["google_client_secret"] = csec
+                        persisted["google_client_source"] = "bundled"   # t2079b — provenance: safe to replace later
                         seeded = True
             except Exception:
                 pass

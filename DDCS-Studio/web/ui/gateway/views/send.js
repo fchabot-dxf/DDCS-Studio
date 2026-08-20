@@ -9,6 +9,7 @@ import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — 
 import { GcodeExecutionEngine } from '../../../engine/GcodeExecutionEngine.js';   // t1585 — the send gate reads the FILE, with the same parser the sim runs
 import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
 import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
+import { submitJobToDrive, canSendViaDrive } from '../../cloud/driveJobs.js';   // t2080 — the CLIENT transport: no gateway on this device, so the job goes to the Drive inbox the machine's gateway polls
 import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
@@ -82,7 +83,7 @@ export default {
     };
     const sync = () => {
       settings.classList.toggle('hidden', !beacons.checked);
-      btn.textContent = beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)';
+      btn.textContent = this._sendLabel ? this._sendLabel() : (beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)');
     };
     beacons.onchange = sync;
 
@@ -215,9 +216,24 @@ export default {
         // t2020 — hashed from file.text (the ORIGINAL, pre-instrumentation program), so tracked and
         // deliver-only sends of the same logical job hash the same regardless of the beacon settings above.
         const contentHash = await contentHashOf(file.text);
-        const r = await ctx.client.submitJob(name, nc, map, contentHash);
+        // t2080 — NO GATEWAY? SEND THROUGH DRIVE. A CLIENT (a phone, or a PC not wired to the controller)
+        // has no gateway of its own to POST to, so it writes the job straight into the same Drive inbox the
+        // gateway already polls — the gateway then claims and delivers it exactly as if a local gateway had
+        // queued it. Preferring the gateway when one IS reachable is deliberate: it is instant and offline,
+        // whereas Drive costs a poll interval (~15s) and an internet round trip. Drive is the FALLBACK, not
+        // the default. ⚠ A Drive send is DELIVER-ONLY by construction — beacons are a Modbus link between the
+        // controller and ITS gateway, so a client has nothing to instrument for.
+        let r;
+        if (this._gatewayReachable) {
+          r = await ctx.client.submitJob(name, nc, map, contentHash);
+        } else {
+          if (!canSendViaDrive()) throw new Error('No gateway on this PC, and no Google account connected — sign in (top right) to send through your Drive.');
+          r = await submitJobToDrive(name, file.text, contentHash);   // the ORIGINAL program: no beacons on this path
+        }
         toast('Queued ' + r.jobId);
-        info.textContent = `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
+        info.textContent = r.via === 'drive'
+          ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`
+          : `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
         // t2057 — SAY SO AT THE MOMENT OF SENDING: the bridge can request tracking (this checkbox) while its
         // own Modbus receiver is off or dead — two independent toggles nothing else compares. The toast fades
         // in 3.2s like any other, so ALSO append to the durable `info` line the operator already reads —
@@ -239,14 +255,47 @@ export default {
     // KEEPS its staged text — the operator's own program, which they can prepare and edit with the machine off — and
     // DISARMS the send, greying it with the reason on the control (postGating's rule, not a hidden button).
     const banner = el('div', { class: 'gw-state-banner', 'data-gw-state': '', style: 'display:none' });
+    // t2080b — the Send handler needs to know which transport to use, and `bridged` (which the first cut of
+    // the Drive fallback referenced) never existed in this scope: it threw a ReferenceError on every click.
+    // The state contract ALREADY computes reachability for the banner, so record it here rather than
+    // inventing a second, driftable source.
+    this._gatewayReachable = true;
+    // ONE rule for the button's label, because TWO were setting it: sync() (on the beacons checkbox) and
+    // applyState() (on every gateway-status tick). Whichever ran last won, so "Send via Drive" was being
+    // clobbered back to "Send (deliver-only)" the moment anything re-synced — the label would flicker or
+    // silently lie about which transport a click uses.
+    this._viaDrive = false;
+    this._sendLabel = () => (this._viaDrive ? 'Send via Drive'
+                                            : (beacons.checked ? 'Send (tracked)' : 'Send (deliver-only)'));
     this.applyState = (desc) => {
       const c = contractFor('send');
       const out = isUnreachable(desc);
+      this._gatewayReachable = !out;
+      // ⚠ DECLARED FIRST because BOTH the banner and the button read it — it used to be declared below the
+      // banner, so every applyState() threw a temporal-dead-zone ReferenceError and the banner silently
+      // rendered EMPTY. Caught by gateway-state-contract-1327, which is exactly the contract this change
+      // touches; the failure looked like a copy change and was a crash.
+      const viaDrive = out && canSendViaDrive();
+      this._viaDrive = viaDrive;
       banner.style.display = out ? '' : 'none';
       banner.setAttribute('data-gw-state', out ? 'unreachable' : 'connected');
-      banner.textContent = out ? c.reason : '';
-      btn.disabled = out || !file.text;                         // staging stays usable; SENDING is what needs a machine
-      btn.title = out ? c.reason : '';
+      // t2080b — the banner must not contradict the button. `c.reason` ends "...sending needs a machine",
+      // which stopped being true the moment a signed-in client could route the job through Drive: the user
+      // would read "you cannot send" directly above a live Send button.
+      banner.textContent = out
+        ? (viaDrive ? 'No gateway on this device — sending goes through your Google Drive; the machine picks it up within ~15s.'
+                    : c.reason)
+        : '';
+      // t2080b — A CLIENT HAS NO GATEWAY AND THAT IS NOT AN ERROR ANY MORE. t1327 disarmed Send whenever no
+      // gateway answered, which was right when the gateway was the only transport. It is not: a signed-in
+      // client can put the job in Drive for the machine's gateway to claim. Disarming on `out` alone left the
+      // button DEAD ON A PHONE — no error, no toast, nothing — which is exactly how this was reported.
+      // ⚠ The banner still shows: "no gateway here" remains true and worth saying; it just no longer means
+      // "you cannot send".
+      btn.disabled = (out && !viaDrive) || !file.text;
+      btn.title = viaDrive ? 'No gateway on this device — sends through your Google Drive; the machine picks it up within ~15s'
+                           : (out ? c.reason : '');
+      btn.textContent = this._sendLabel();
       // the offline half stays live on purpose — dropping a file, using the Studio program, naming the job
       for (const elm of [drop, useStudio, nameField, beacons, count, pacing, varN, markerV, markerN]) elm.disabled = false;
     };

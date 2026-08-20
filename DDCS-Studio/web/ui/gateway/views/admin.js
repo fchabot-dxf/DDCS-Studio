@@ -65,8 +65,9 @@ export default {
     };
     local.onchange = cloud.onchange = sync;
 
-    const gdrive = el("button", { class: "op-btn", disabled: "" }, "🔗 Connect Google Drive (OAuth) — coming soon");
-
+    // t2076 — the dead "Connect Google Drive — coming soon" button lived here and is GONE: Drive is real
+    // now, and it belongs in Setup beside the transport it actually configures, not in the Service card
+    // (which chooses which GATEWAY this browser talks to — a different question entirely).
     const apply = el("button", { class: "primary" }, "Apply");
     apply.onclick = () => {
       // LOCAL with a typed daemon URL is still an explicit base — the same seam, just named for what it is here.
@@ -87,7 +88,6 @@ export default {
       localFields,
       el("label", { class: "row", style: "gap:6px;cursor:pointer" }, cloud, "Cloud service"),
       cloudFields,
-      el("div", { class: "row", style: "margin-top:8px" }, gdrive),
       el("div", { class: "row", style: "margin-top:12px" }, apply));
     sync();
   },
@@ -203,6 +203,35 @@ export default {
     const PORTS = GATEWAY_PORTS;   // t1325 — one source: the same registered ports the loopback auto-probe scans
     const portSel = el("select", {}, PORTS.map((p) => el("option", { value: String(p) }, String(p))));
     portSel.value = String(cfg.port || 8765);
+    // t2076 — BYO CLOUD: send jobs through the user's OWN Google Drive instead of this PC's folder.
+    // The gateway's `backend` IS the transport ("local" = this PC, "drive" = their Drive), so the toggle
+    // writes exactly that. Both ends sign into the same Google account and share one OAuth client, so the
+    // sending machine's Drive folder IS the receiving gateway's inbox — no ports, no addresses, no LAN.
+    const useDrive = el("input", { type: "checkbox" });
+    useDrive.checked = cfg.backend === "drive";
+    const gConnect = el("button", { class: "op-btn" }, "🔗 Connect Google Drive");
+    const gState = el("span", { class: "hint" }, "checking…");
+    const paintGoogle = (st) => {
+      const on = !!(st && st.connected);
+      gState.textContent = !st || !st.configured
+        ? "No Google client configured in this build — Drive sending unavailable."
+        : on ? "Connected to Google Drive." : "Not connected — click Connect and approve in your browser.";
+      gConnect.textContent = on ? "🔗 Reconnect Google Drive" : "🔗 Connect Google Drive";
+      gConnect.disabled = !!(st && !st.configured);
+    };
+    ctx.client.googleStatus().then(paintGoogle).catch(() => paintGoogle(null));
+    gConnect.onclick = async () => {
+      gConnect.disabled = true;
+      try {
+        const r = await ctx.client.googleConnect();
+        if (r && r.ok) {
+          // The gateway opened the SYSTEM browser (Google blocks OAuth inside an embedded webview).
+          gState.textContent = "Approve DDCS Studio in the browser window, then click Connect again to confirm.";
+        } else toast((r && r.error) || "could not start Google sign-in", true);
+      } catch (e) { toast("sign-in failed: " + e.message, true); }
+      finally { gConnect.disabled = false; }
+    };
+
     const save = el("button", { class: "primary" }, "Save");
     const info = el("div", { class: "hint" });
 
@@ -212,6 +241,7 @@ export default {
         const r = await ctx.client.setConfig({
           machine_name: name.value, dest: destField.value.trim(), enable_slave: beacons.checked,
           host: lan.checked ? "0.0.0.0" : "127.0.0.1", port: parseInt(portSel.value, 10),
+          backend: useDrive.checked ? "drive" : "local",
         });
         if (!r.ok) { toast(r.error || "save failed", true); info.textContent = r.error || ""; }
         else {
@@ -242,6 +272,20 @@ export default {
       el("div", { style: "margin-top:12px" },
         el("span", { class: "label" }, "Serve port (desktop app)"), portSel,
         el("span", { class: "hint" }, "Loopback port the app serves on (8765-8769). Restart to apply.")),
+
+      // t2076 — the "send from anywhere" path. Deliberately in Setup (not the Service card): this is the
+      // GATEWAY's own transport, not which gateway the browser talks to.
+      el("div", { class: "section-label", style: "margin-top:18px" }, "Cloud storage (send from anywhere)"),
+      el("div", { class: "wiz-usage" },
+        "Sends jobs through YOUR Google Drive instead of this PC. Sign in on both machines with the same "
+        + "Google account: the one you send from writes the job, the one wired to the controller picks it "
+        + "up and delivers it. No ports, no IP addresses, works over the internet."),
+      el("div", { class: "row", style: "margin-top:8px;gap:8px" }, gConnect),
+      gState,
+      el("label", { class: "row", style: "margin-top:10px;gap:6px;cursor:pointer" },
+        useDrive, "Send jobs through my Google Drive"),
+      el("span", { class: "hint" }, "Restart the gateway to apply. Polls every ~15s (Drive's rate limits) — "
+        + "fine for sending; live progress always uses the serial cable, never this."),
       el("div", { class: "row", style: "margin-top:14px" }, save), info,
 
       this.profileBlock(prof),

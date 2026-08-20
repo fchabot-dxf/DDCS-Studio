@@ -67,15 +67,40 @@ def _post_token(data):
     body = urllib.parse.urlencode(data).encode()
     req = urllib.request.Request(_TOKEN, data=body,
                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        # t2079 — GOOGLE'S OWN REASON, NOT A BARE FALSE. The token endpoint returns a JSON body naming the
+        # fault ({"error":"invalid_client","error_description":"Unauthorized"} for a missing/wrong secret,
+        # "invalid_grant" for a stale or reused code). That body was being thrown away by a blanket `except`,
+        # leaving the user a "Sign-in failed" page with nothing to act on -- exactly the opaque-failure shape
+        # this project keeps having to fix. Re-raised as a message so the callback can surface it.
+        try:
+            body_txt = e.read().decode("utf-8", "replace")
+        except Exception:
+            body_txt = ""
+        raise OAuthError(f"HTTP {e.code} from Google's token endpoint: {body_txt[:300]}") from e
+    except OSError as e:
+        raise OAuthError(f"could not reach Google's token endpoint: {e}") from e
+
+
+class OAuthError(RuntimeError):
+    """A sign-in that failed for a REASON worth showing. Carries Google's own error text."""
 
 
 def callback(client_id, client_secret, state, code):
-    """Loopback handler: exchange code+verifier -> tokens, persist refresh+access. True on success."""
+    """Loopback handler: exchange code+verifier -> tokens, persist refresh+access.
+
+    Returns (ok, reason). t2079 -- it used to return a bare bool, so every distinct failure (an expired
+    code, a wrong secret, a state that belongs to a previous process) rendered the same dead-end page.
+    """
     p = _pending.pop(state, None)
-    if not p or not code:
-        return False
+    if not p:
+        return False, ("this sign-in did not start in this app session -- if the app restarted mid-sign-in, "
+                       "click Connect again")
+    if not code:
+        return False, "Google returned no authorization code"
     data = {
         "client_id": client_id, "code": code, "code_verifier": p["verifier"],
         "redirect_uri": p["redirect_uri"], "grant_type": "authorization_code",
@@ -84,17 +109,24 @@ def callback(client_id, client_secret, state, code):
         data["client_secret"] = client_secret   # Google Desktop clients include the (non-confidential) secret
     try:
         tok = _post_token(data)
-    except Exception:
-        return False
+    except OAuthError as e:
+        msg = str(e)
+        if "invalid_client" in msg or "Unauthorized" in msg:
+            msg += ("  --  this client needs its CLIENT SECRET configured: Google requires it in the token "
+                    "exchange even for a Desktop client (PKCE alone is not enough). Add one in Google Cloud "
+                    "Console -> Credentials -> this OAuth client -> Add secret, then set it in gateway config.")
+        return False, msg
+    except Exception as e:
+        return False, f"unexpected failure exchanging the code: {e}"
     if "access_token" not in tok:
-        return False
+        return False, f"Google's reply carried no access_token: {str(tok)[:200]}"
     prev = _load()
     _save({
         "refresh_token": tok.get("refresh_token") or prev.get("refresh_token", ""),
         "access_token": tok["access_token"],
         "expiry": time.time() + int(tok.get("expires_in", 3600)) - 60,
     })
-    return True
+    return True, ""
 
 
 def _load():

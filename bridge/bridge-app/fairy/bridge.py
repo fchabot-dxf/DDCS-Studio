@@ -3,7 +3,7 @@
   python -m fairy.bridge --self-test            # offline logic checks (no hardware/cloud)
   python -m fairy.bridge --demo                 # full pipeline on a temp LocalFolder, sim beacons
   python -m fairy.bridge run                    # real: ModbusBeaconSource + SMB, loop forever
-      [--backend local|r2] [--root DIR] [--dest PATH] [--port COM6] [--baud 115200]
+      [--backend local|r2|drive] [--root DIR] [--dest PATH] [--port COM6] [--baud 115200]
       [--slave 1] [--stall 120] [--poll 5]
       [--position-poll [--position-poll-interval 2]]   # t2063 — Option 1: read live position/state instead
                                                         # of receiving checkpoints; needs P279=Slave on the
@@ -536,7 +536,7 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="fairy.bridge")
     ap.add_argument("cmd", nargs="?", default="run", choices=["run"])
     ap.add_argument("--provision", action="store_true", help="write the machine-identity file to the controller and exit")
-    ap.add_argument("--backend", choices=["local", "r2"])
+    ap.add_argument("--backend", choices=["local", "r2", "drive"])
     ap.add_argument("--root", dest="local_root")
     ap.add_argument("--dest", dest="expert_dest")
     ap.add_argument("--port", dest="com_port", help="serial COM port for the Modbus slave (e.g. COM6)")

@@ -50,8 +50,13 @@ function runQuickAction(act) {
         case 'open':   document.getElementById('projOpenBtn')?.click(); break;
         case 'save':   document.getElementById('projSaveBtn')?.click(); break;
         case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an operation in the Blocks tab first, then save it as a wizard.'); break;
-        // t1227 — load / insert / export / clear left this router with their rows: they are the EDITOR's file
-        // actions and now live in the editor's corner menu (ui/globalFunctions.js EDITOR_FILE_ACTIONS).
+        // t2078 — Load / Insert / Export are BACK (see the fileRows comment for the human's reasoning: they act
+        // on the program as a whole, not on the text under the caret). ONE implementation — these call the same
+        // window globals ui/globalFunctions.js EDITOR_FILE_ACTIONS called, never a second copy of the logic.
+        // ⛔ CLEAR is deliberately NOT routed here (t1255): the 🗑 in the editor toolbar is the one clear.
+        case 'fileLoad':   window.loadGcodeFile ? window.loadGcodeFile() : dlgNotice('Loading is unavailable.'); break;
+        case 'fileInsert': window.insertGcodeFile ? window.insertGcodeFile() : dlgNotice('Insert is unavailable.'); break;
+        case 'fileExport': window.downloadFile ? window.downloadFile() : dlgNotice('Export is unavailable.'); break;
         case 'standalone':
             // The "standalone" IS the desktop EXE (bundles the gateway, runs fully offline) — open the SAME
             // release link the Gateway page uses (gatewayStatus.EXE_DOWNLOAD_URL → the latest GitHub release).
@@ -200,11 +205,32 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
 
+        // t2078 (human: "the load insert export button can go in the quick menu") — THE PROGRAM FILE ROWS RETURN.
+        // ⚠ THIS REVERSES t1227, which moved them OUT of here because this menu is for APP things, "not what to
+        // do with the program in front of you". The human's own refinement of that rule, which is why it is a
+        // correction and not a flip-flop: Load / Insert / Export act on the program AS A WHOLE — they are what you
+        // reach for with an EMPTY editor (start one) or a FINISHED one (ship it), never mid-edit. t1227's test was
+        // right; these three simply fall on the app side of it, unlike Comment/Indent/Undo which act on the text
+        // under the caret and stay in the pane. The editor's own ▾ file button is gone with this, so these are
+        // once again the ONE door to Load/Insert/Export, not a second one. Handlers are the SAME globals the editor menu called (loadGcodeFile / insertGcodeFile /
+        // downloadFile), so there is one implementation, not a copy.
+        // ⛔ CLEAR IS STILL NOT HERE (t1255): the 🗑 is the one clear, now in the editor's toolbar row. Two doors
+        // to a destructive action is one too many.
+        const fileRows =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load…</span></button>'
+            + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileInsert">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">➕ Insert…</span></button>'
+            + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Export…</span></button>';
+
         // ── ASSEMBLE — the workspace, then app-level entries (t1227: the editor's file rows are no longer here) ──
         menu.innerHTML =
             identityRow          // t1227 — the quiet name · dialect line sits WITH the workspace buttons (save context)
             + workspaceRow
             + wizardsRow         // t1617 — the wizard manager, beside the workspace it serves
+            + '<div class="hdr-quick-sep"></div>'
+            + fileRows
             + '<div class="hdr-quick-sep"></div>'
             + libraryRow
             + themeSection

@@ -5292,6 +5292,29 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 
 /* Floating Copy-program button, top-right of the editor (mirrors the bottom-left ⟳ Transform overlay). Clear of
    the vertically-centred 3D pull-tab; gets covered by the 3D drawer when it's open (copy is for the code view). */
+/* ── t2078 — THE EDITOR TOOLBAR ROW ──────────────────────────────────────────────────────────────────────────
+   One flex row in the previously-empty top strip, replacing seven separately absolutely-positioned buttons whose
+   `left`/`bottom` offsets were hand-computed multiples of 36px (add one and you recomputed the rest; change a
+   label and it silently overlapped its neighbour). Order is now declarative — it is the DOM order.
+
+   ⚠ ANCHORED RIGHT so it never starts on top of the PRE-FLIGHT BADGE, whose home is top-left of this same strip.
+   ⚠ AND THE BADGE OUTRANKS IT (human's call): the badge carries z-index 12, this row 3, so when a long
+   "N outside envelope" pill overflows toward the middle it covers these buttons rather than being covered — a
+   safety readout must never be hidden behind a convenience button. The row stays right-anchored, so the buttons
+   nearest the edge (file, copy) survive the overlap longest. */
+.editor-toolbar {
+    position: absolute; right: 8px; top: 8px; z-index: 3;
+    display: flex; align-items: center; gap: 4px;
+    max-width: calc(100% - 16px);
+}
+.editor-toolbar > button {
+    opacity: .75; font-size: 11px; padding: 3px 8px; line-height: 1;
+    display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto;
+}
+.editor-toolbar > button:hover:not(:disabled) { opacity: 1; }
+.editor-toolbar > button:disabled { opacity: .3; }
+/* the two icon buttons keep their tighter icon padding */
+.editor-toolbar > #editor-copy-btn, .editor-toolbar > #editor-file-btn { padding: 4px 6px; line-height: 0; }
 .editor-copy-float {
     position: absolute; right: 8px; top: 8px; z-index: 3; opacity: .75;
     padding: 4px 6px; line-height: 0; display: inline-flex; align-items: center;
@@ -6172,3 +6195,50 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .editor-container #editor-gutter { top: var(--editor-chip-inset); height: calc(100% - var(--editor-chip-inset)); }
 
 [data-theme="studio"] #editor-gutter { font-size: 15px; padding: 14px 8px 14px 0; }
+
+/* ── t2077 — THE HEADER ACCOUNT AVATAR (ui/headerAccount.js) ──────────────────────────────────────────────────
+   The ONE sign-in door, as a single round control in BOTH states — the universal convention: a generic
+   silhouette when signed out, the user's photo when signed in. One shape always, so the header neither jumps
+   nor restyles itself the moment you sign in; only the circle's CONTENTS change. Fully tokenised (styles.css's
+   own rule: a skin sets the tokens, components read them) — no hardcoded colour anywhere below. */
+.hdr-acct { display: flex; align-items: center; }
+.hdr-acct-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; background: none; border: 0; border-radius: 50%;
+    cursor: pointer; line-height: 0; color: var(--text-dim);
+}
+/* the round slot every state shares — photo, initials or the empty silhouette all sit in the same 26px box */
+.hdr-acct-slot {
+    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 26px; overflow: hidden;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--panel); box-shadow: inset 0 0 0 1px var(--border);
+    transition: box-shadow .12s ease, color .12s ease;
+}
+.hdr-acct-btn:hover .hdr-acct-slot { box-shadow: inset 0 0 0 1px var(--accent); }
+.hdr-acct-btn:hover { color: var(--text); }
+.hdr-acct-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* the photo fills the circle; initials sit in the same box so a failed photo never reflows the header
+   (Google's CDN 403s some referrers — headerAccount.js swaps to initials on error) */
+.hdr-acct-pic { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hdr-acct-ini {
+    width: 100%; height: 100%; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .3px; line-height: 1;
+}
+.hdr-acct-ini[hidden] { display: none; }
+
+.hdr-acct-menu {
+    z-index: 1200; min-width: 240px; max-width: 300px;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.hdr-acct-name { font-weight: 600; font-size: 13px; }
+.hdr-acct-mail { color: var(--text-dim); font-size: 11px; margin-top: 2px; word-break: break-all; }
+/* Says what the account is FOR — signing in does not by itself route jobs through the cloud. */
+.hdr-acct-note { color: var(--text-dim); font-size: 11px; margin: 8px 0 10px; line-height: 1.45; }
+.hdr-acct-act {
+    width: 100%; padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer;
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius);
+}
+.hdr-acct-act:hover { border-color: var(--danger); color: var(--danger); }

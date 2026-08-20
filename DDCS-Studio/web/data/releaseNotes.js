@@ -31,6 +31,82 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.7": [
+    { short: "Send now works on a phone or a PC with no gateway",
+      full: "The Send button did nothing at all on a device that isn't wired to the machine — no error, no "
+        + "message, just silence. It was being switched off because no gateway answered, which stopped being "
+        + "the right rule once a signed-in device can send through your Google Drive. It now reads \"Send via "
+        + "Drive\" and tells you the machine picks the job up within about 15 seconds." },
+  ],
+  "2026.08.19.6": [
+    { short: "Google sign-in now fixes itself on existing installs",
+      full: "The previous release fixed sign-in for NEW installs only — a machine that had already run the "
+        + "app kept the broken credential and still failed with \"this app's request is invalid\". It now "
+        + "repairs itself on start. Just update and sign in; nothing to edit." },
+    { short: "Send a job from a browser, with no gateway on that PC",
+      full: "A PC or phone that isn't wired to the controller can now send too: the job goes into your Google "
+        + "Drive and the machine's gateway picks it up within about 15 seconds. It sends as deliver-only "
+        + "(no live progress bar) — progress needs the cable between the controller and its own gateway." },
+  ],
+  "2026.08.19.5": [
+    { short: "Google sign-in works now",
+      full: "Signing in to Google failed on every machine with \"this app's request is invalid\". The app was "
+        + "shipping the wrong kind of Google credential — one that can't be used by a desktop app. Click the "
+        + "avatar in the top-right and sign in; there is nothing to configure." },
+    { short: "A failed sign-in now tells you why",
+      full: "It used to say only \"Sign-in failed\". It now shows Google's own reason, so a problem can be "
+        + "acted on instead of guessed at." },
+  ],
+  "2026.08.19.4": [
+    { short: "The editor's buttons are one tidy row up top",
+      full: "The buttons that used to float over the bottom-left corner of the editor — Make, Transform, undo, "
+        + "redo — now sit in a single row along the top of the editor, together with Copy and Clear. Make and "
+        + "Transform show just their icon now; hover any button to see what it does. If the pre-flight envelope "
+        + "warning is long it will overlap them, on purpose: a safety message should never hide behind a button." },
+    { short: "Load, Insert and Export moved to the ▾ menu",
+      full: "They have left the editor's corner and now live in the ▾ quick menu beside the logo, with Save and "
+        + "Open — the things you reach for when starting a program or finishing one. Clear stays down by the "
+        + "editor, where the program it clears is." },
+    { short: "The ; comment button is gone",
+      full: "Commenting out selected lines is still there — press Ctrl+/ or use the right-click menu. The button "
+        + "was one more glyph in a crowded corner for something two other doors already did." },
+  ],
+  "2026.08.19.3": [
+    { short: "One sign-in, in the header, with your photo",
+      full: "Signing in used to be in two different places that disagreed with each other about whether you "
+        + "were connected. There is now ONE account button in the top-right of the header: a plain avatar you "
+        + "click to sign in, which becomes your Google profile picture once you have. Click it any time for "
+        + "your account details or to sign out. Signing in does not switch anything on by itself — saving "
+        + "projects and sending jobs through Drive stay their own settings." },
+    { short: "Undo and redo finally have keyboard shortcuts",
+      full: "Program undo/redo had no shortcut at all — the two header buttons were the only way to reach it. "
+        + "They now respond to Ctrl+Z, and Ctrl+Shift+Z or Ctrl+Y to redo, and the buttons themselves moved "
+        + "down beside the editor. Typing in a text box is untouched: Ctrl+Z there still undoes your typing, "
+        + "not your program." },
+    { short: "A tidier editor and header",
+      full: "The indent and outdent buttons are gone from the editor's corner — Tab and Shift+Tab already did "
+        + "the same thing. The old Transfer button, which had been hidden for a long time and was replaced by "
+        + "the Gateway tab's own Send, is removed too." },
+  ],
+  "2026.08.19.2": [
+    { short: "Send jobs through your own Google Drive",
+      full: "You can now send a program to your machine from anywhere, over the internet, using YOUR "
+        + "Google Drive — no IP addresses, no port forwarding, no account of ours. Turn it on in "
+        + "Gateway → Setup → Cloud storage: click Connect Google Drive, then tick \"Send jobs through my "
+        + "Google Drive\" and restart. Do it on both PCs with the SAME Google account — the one you send "
+        + "from writes the job, the one wired to the controller picks it up within about 15 seconds. "
+        + "Live progress still runs on the serial cable, never on this." },
+    { short: "Job history says how far a stopped run got",
+      full: "A run that stopped early used to say only \"stalled\". It now says how far it actually got "
+        + "— \"signal lost at 12/40\", or \"no signal after delivery\" when the job was delivered but "
+        + "never started. It still never guesses WHY it stopped: an operator abort, a lost cable and a "
+        + "genuine hang look identical from here, so naming one would be a lie." },
+    { short: "DM500 dumps now read real machine settings",
+      full: "Importing a DM500 (V3) controller dump used to show every value as \"N/A\" — its settings "
+        + "file is stored in a different format than the Expert and V4.1, and that format had never been "
+        + "decoded. It has been now, so a DM500 dump reads its real envelope, homing and speeds like the "
+        + "other controllers." },
+  ],
   "2026.08.19.1": [
     { short: "The command deck now works on a phone",
       full: "Opening the deck on a narrow screen used to hide its entire keypad — all 22 keys were "

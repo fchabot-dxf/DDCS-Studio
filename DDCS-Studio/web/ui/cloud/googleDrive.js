@@ -153,7 +153,10 @@ export async function rename(id, name) { await api(`${API}/files/${id}?fields=id
 /** The signed-in account → { name, email }. about.get works with the drive.file scope (no extra consent). Best-effort. */
 export async function getUserInfo() {
     try {
+        // t2077 — `photoLink` comes from Drive's OWN about.get, so the avatar costs NO extra scope: asking for
+        // a picture the normal way (userinfo.profile / openid) would widen consent beyond `drive.file`, which is
+        // what keeps this app's consent screen non-sensitive and verification-free.
         const u = (await (await api(`${API}/about?fields=user`)).json()).user || {};
-        return { name: u.displayName || '', email: u.emailAddress || '' };
-    } catch (e) { return { name: '', email: '' }; }
+        return { name: u.displayName || '', email: u.emailAddress || '', picture: u.photoLink || '' };
+    } catch (e) { return { name: '', email: '', picture: '' }; }
 }

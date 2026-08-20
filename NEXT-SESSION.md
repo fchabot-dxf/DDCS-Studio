@@ -1,19 +1,113 @@
-# TODAY — the running order (2026-08-10, built with the user)
+# TODAY — the running order (2026-08-19, rebuilt with the user)
+
+**Read this first. The 2026-08-10 header that used to sit here was nine days stale and described a cycle
+that has since closed.**
 
 ```
-  RUNNING   t1698   the map's checker                        worker has it
-  THEN      RELEASE 7 commits sitting unreleased             ADVISOR does this
-            incl. the glyph fix — the last of the user's five corner symptoms
-  THEN      THE CYCLE below, 4 acts, and it ENDS
+  SHIPPED TONIGHT   the BYO-CLOUD ARC, t2076-t2080 -> V2026.08.19.7
+                    a job can travel through the user's OWN Google Drive, proven live on their account
+  NEXT              1. the V4.1 bench test          the human is doing this
+                    2. S4  namespace the Drive inbox      SAFETY, blocks a second gateway
+                    3. run the FULL cloud loop onto the Expert     the delete-LAN gate
+                    4. the ROLES feature            ROLES-PLAN.md, argued and re-shaped
 ```
 
-**The release is the advisor's, not a worker act.** Gate it (full suite, once), push, bump, verify the deploy,
-then start the cycle. Do NOT dispatch a cycle act while the release suite runs — that collision manufactured
-false reds twice on 2026-08-09.
+## ⛔ THREE SAFETY FACTS — read before touching the machine or enabling anything
+1. **ONE GATEWAY ON DRIVE AT A TIME.** Two gateways share one `DDCS Bridge/inbox/`; `_maybe_claim()` takes
+   `ids[0]` with no notion of which machine a job is FOR, and `identity.verify()` is INERT while `machine_id`
+   is unset (it is unset on both of the human's machines). ⇒ with the V4.1 also on Drive, an **Expert program
+   can be delivered to the V4.1**. Fixed by S4; until then, only one.
+2. **A JOB SENT WHILE THE CONTROLLER IS OFF IS DESTROYED**, not queued — `poller._claim()` deletes it on
+   `OSError` and records `failed` (BACKLOG #9). This bites the cloud path hardest: a phone is told "queued"
+   and a sleeping gateway's first poll discards it.
+3. **SWITCHING `backend` local↔drive STRANDS THE QUEUE** — the two inboxes are mutually invisible, nothing
+   migrates, nothing warns. Likely to coincide with a role change and be blamed on roles.
 
-**What is waiting to reach the user:** the glyph resolver (the last corner symptom he reported), `_writable`
-declared, the preview gate's marker gap closed, 34 dead screenshot paths repointed, the lathe frame ruling,
-`ARCHITECTURE.md`, and CI disabled.
+## WHERE THINGS STAND
+- **Cloud transport: PROVEN LIVE** (sign-in, token refresh, folder tree, job write/list/read, upsert,
+  delete-on-deliver) on the human's own Google account — not mocks.
+- **The cloud LOOP: NOT PROVEN.** No gateway running `backend=drive` has ever claimed a job and delivered it
+  to a controller. **The delete-LAN gate is therefore NOT met** — see the gate assessment at the end of this
+  file, including the offline-shop argument the original ruling never considered.
+- **Sign-in was broken for EVERY user** (wrong OAuth client kind) and is fixed for fresh AND existing
+  installs (t2079/t2079b).
+- **A client can send with no local gateway** (t2080) — the phone case, fixed after being reported dead.
+
+## OPEN RULINGS — blocked on the human, nothing else
+1. **Roles: the override's SHAPE.** Roles are AUTOMATIC (ruled) and derived from configuration. The human
+   ruled that changing role must never destroy config, so a non-destructive override stays — its UI is
+   undecided.
+2. **The offline shop.** LAN serving is the only phone→machine path with no internet. Cloud cannot cover it;
+   one-box cannot either. Whether that case still matters decides whether LAN is ever deleted.
+
+## THE PLANS, and what each is for
+| file | what it holds |
+|---|---|
+| `ROLES-PLAN.md` | the roles feature: the model, the TWO GATING AXES (role=what exists, status=what is available), the argument that re-shaped it, and the build slices S0-S5 with S4 promoted to first |
+| `BACKLOG.md` | 9 small, diagnosed, one-sitting items — created tonight because backlog was being appended into THIS file, where a to-do list cannot be found |
+| `ROADMAP.md` | the canonical feature backlog; the BYO-cloud arc is recorded under Recently Shipped |
+| `bridge/controllers/expert-m350/BENCH-CHECKLIST.md` | the at-the-machine work, incl. STEP ZERO |
+
+## ☑ THE CHECKLIST — everything planned, in the order it should happen
+*(tick these; an item is done when it leaves the list, not when a commit mentions it)*
+
+### A. AT THE MACHINE — needs the human, cannot be done remotely
+- [ ] **V4.1 bench test** (in progress). ⛔ leave "Send jobs through my Google Drive" **OFF** on the V4.1's
+      gateway while CNC-FAIRY's is on — see safety fact 1.
+- [ ] **Run the FULL cloud loop onto the Expert** — send from a client → gateway with `backend=drive` claims
+      → delivers to CNCDISK → appears in History. **This is the delete-LAN gate.** Nothing else satisfies it.
+- [ ] **Expert bench re-check of t2070** (flush labels + IF-GOTO clamps) — parse test, then a foam/air cut.
+- [ ] **Set `machine_id` on each machine + provision the identity file** — turns `identity.verify()` from
+      inert to real; the only thing that REFUSES a delivery to the wrong controller.
+- [ ] Optional cleanup: delete the OLDER Google client secret (two are listed); clear ASUS's stale
+      `\10.0.0.50\cncdisk` if it is now a client.
+
+### B. SAFETY / CORRECTNESS — before the cloud path is trusted or widened
+- [ ] **S4 — namespace the Drive inbox per CONTROLLER** (not per PC: two PCs may serve one controller, and a
+      PC-named folder orphans the queue when the role moves). Unblocks a second gateway. `drive_folder` is
+      already per-config; only `driveJobs.js`'s hardcoded `ROOT_NAME` + a target picker are missing.
+- [ ] **BACKLOG #9 — queue instead of discard** when the controller is unreachable. Distinguish TRANSIENT
+      (`OSError` → leave in the inbox, retry) from FATAL (refused identity, unreadable → fail LOUDLY). Keep a
+      ceiling so a dead destination cannot retry forever in silence.
+- [ ] **Warn when switching `backend` with a non-empty inbox** — today local↔drive strands the queue
+      silently. Name what is stranded and where.
+
+### C. THE ROLES FEATURE — `ROLES-PLAN.md` (S4 above runs first)
+- [ ] **S0 — the role exists, AUTOMATICALLY.** Derived from configuration (controller disk set ⇒ gateway).
+      ⛔ the claim gate lives in `_maybe_claim()`, never in the UI. ⛔ never derive from REACHABILITY — that
+      is the status axis. ⛔ never implement "client" by not starting the daemon (it serves the local UI).
+      Include the non-destructive override (the human ruled: changing role must not destroy config).
+- [ ] **S1 — gate SETTINGS by role.** Hide on a client: controller disk · beacons/COM · controller profile.
+      Keep: machine name · cloud + account · daemon URL · serve port. Reduce Setup, never hide it.
+- [ ] **S2 — compose the TWO AXES** (role = what exists, status = what is available). Client + gateway
+      offline ⇒ **Send stays armed** and queues. Gateway + controller offline ⇒ controller settings stay
+      VISIBLE. Retire t2080b's `viaDrive` special case into the role.
+- [ ] **S3 — the backend-mediated file view.** Browse via the published `cncdisk/index.json` (producer
+      exists, only the retired R2 console reads it); delete via the command channel (the gateway already
+      polls it). ⚠ label it a ~15s SNAPSHOT. ⛔ `SAFE_OPS = {"delete"}` stays — a client must never RUN.
+- [ ] **S5 (later)** — read file CONTENTS from a client (needs a new request/response channel; the index is
+      a listing only) · client-side Tracking mirroring the gateway's published status.
+
+### D. THE DELETE-LAN DECISION — only after A and B
+- [ ] Full loop proven (A) + #9 fixed (B) + **the offline-shop question answered explicitly** (LAN is the
+      only phone→machine path with no internet). Then decide, with evidence.
+
+### E. SMALL — `BACKLOG.md`, any order, good downtime work
+- [ ] #1 avatar shows initials though a photo exists (check `localStorage.ddcs_cloud_pic` first — likely just
+      never cached for a pre-t2077 sign-in; re-fetch identity at boot)
+- [ ] #2 theme selector → Settings · [ ] #3 hide the console window (log to a FILE first)
+- [ ] #4 exe checks for updates only at boot · [ ] #5 update-banner balance (version printed twice)
+- [ ] #6 welcome panel: shorter + optional links + screenshots (versioned, so staleness is fine)
+- [ ] #7 the lathe icon does not read as a lathe setup · [ ] #8 browser-side Drive send (⭐ mostly DONE by
+      t2080 — reduce to "verify end to end from a real phone")
+
+
+## ⚠ A PATTERN FROM TONIGHT WORTH INHERITING
+Four times I asserted a capability limit without testing it and was wrong each time — `drive.file` scope
+(per PROJECT, not per client), release-note screenshots (versioned, so staleness is fine), CNCDISK on a
+client (already published, just unread), and "clear the config to change role" (that IS the data loss).
+Each time the human's plainer model was right. **Before hiding a tab, refusing a feature, or designing
+around a limit: read the code or call the API.** The gateway already publishes more than Studio consumes.
 
 ---
 
@@ -6646,3 +6740,307 @@ Recording the plain requirement instead.)*
 
 ⇒ Re-wire `.gateway-dl-pop` (still styled, still theme-correct after t2073) as a permanent affordance on
 the Gateway tab. Keep `9256574f`'s fix intact — the tab still always opens; nothing gates it.
+
+# ═══ BACKLOG (human, 2026-08-19) — THE UPDATE BANNER IS NOT WELL BALANCED ═══
+*(human, seeing the V2026.08.19.2 banner in the exe: "backlog, the update banner isnt very well balenced".
+NOT dispatched — recorded only. Cosmetic; the banner FUNCTIONS correctly.)*
+
+**Observed on the real exe** (`ui/updateCheck.js` `showBanner`), not a mock:
+
+```
+  ↑ Update available — v2026.08.19.2   [ Update to v2026.08.19.2 and restart ]
+  [ Download manually ]  [ What's new ▾ ]   ✕
+```
+
+**What is actually unbalanced, so a fix does not have to re-derive it:**
+- **The version is printed TWICE**, once in the label and again inside the primary button — and the button
+  carries the longer of the two. "Update and restart" needs no version; the label already said it.
+- **The primary button dominates the row** because its text grows with the version string, so the layout
+  reflows differently for a short vs long version — the banner is not testable at one width.
+- **The actions split across two rows with no rule**: primary on row 1, two secondaries + the close ✕ on
+  row 2. The ✕ floats at the end of a row of buttons rather than sitting in a corner like every other
+  dismiss in the app.
+
+⚠ **Do not "fix" it by shrinking the primary action** — t2066 established the in-place update is the
+PREFERRED path and the dated manual Download is deliberately demoted (`upd-dl-fallback`). Any rebalance
+must keep that hierarchy visible; the problem is proportion, not priority.
+
+**Gate:** `tests/update-check.spec.js` asserts button classes/labels (`.upd-self` contains the version,
+`.upd-dl` reads "Download manually") — a wording change there is a test change, so read it first.
+
+# ═══ BACKLOG (human, 2026-08-19) — THE EXE ONLY CHECKS FOR UPDATES AT BOOT ═══
+*(human: "Is it possible that the update banner can appear while the app is running, or does it need to be
+booted, and then the banner appears?" — ANSWERED: boot only. NOT dispatched; recorded.)*
+
+**Measured, not assumed:** `initUpdateCheck()` is called exactly once, from `web/index.html:1297`, at
+startup. `updateCheck.js`'s own header says it plainly — *"one check per launch"*. There is no timer and
+no re-check. ⇒ **A release cut while Studio is open is invisible until the app is restarted.**
+
+**The asymmetry that makes this a gap rather than a choice:** the WEB build already re-checks —
+`initWebVersionNudge()` (`updateCheck.js:194-196`) calls `checkWebVersion()` again on every
+`visibilitychange`, so a hosted tab notices a deploy when you come back to it. The EXE, the build that
+CANNOT reload itself and is the one that actually needs telling, has no equivalent for the GitHub release
+check. The mechanism exists; it was simply never pointed at the desktop path.
+
+**Why it matters here specifically:** this app is left open at a machine for a whole shift. The user just
+hit exactly this — a release was cut mid-session and the banner only appeared after a restart.
+
+**Shape of a fix (not a dispatch, just so it is not re-derived):** re-run the release check on
+`visibilitychange` like the web nudge already does, throttled (the GitHub API is unauthenticated and rate
+limited — `_lastWebCheck` is the existing throttle precedent). ⚠ The dismissal contract must survive:
+`ddcs_update_dismissed` is keyed per-version and a re-check must NOT re-nag a version already dismissed
+(`update-check.spec.js` asserts this — "dismissed version does not re-nag").
+
+# ═══ t2076 SETUP PREREQ — THE LOOPBACK REDIRECT URIs MUST BE REGISTERED IN GOOGLE CLOUD CONSOLE ═══
+*(hit live on ASUS, 2026-08-19, first Connect attempt: `Error 400: redirect_uri_mismatch`.)*
+
+**Symptom:** "Access blocked: This app's request is invalid — Error 400: redirect_uri_mismatch" on the
+Google consent page, before any Drive call is made.
+
+**Cause, and it is a consequence of the thing that makes Drive work at all.** The shipped client id
+(`…m2o0e77`) is a **Web application** client — the SAME one the hosted page uses, which is exactly why
+`drive.file` visibility is a non-issue between the two ends (verified 2026-08-19). But a Web client
+accepts ONLY redirect URIs registered against it, whereas a native "Desktop app" client would accept any
+`127.0.0.1` port automatically. The gateway's loopback flow (`server.py:234`) sends
+`http://127.0.0.1:<serve-port>/oauth/google/callback`, and none of those were registered.
+
+**Fix (Google Cloud Console → APIs & Services → Credentials → the OAuth client → Authorized redirect
+URIs), all five, because the app takes the first free port of 8765-8769:**
+```
+http://127.0.0.1:8765/oauth/google/callback   ...8766 ...8767 ...8768 ...8769
+```
+
+⛔ **Do NOT resolve this by creating a separate "Desktop app" client.** It would accept any loopback port,
+but it would be a DIFFERENT client id from the web one — reintroducing the two-client `drive.file`
+visibility problem the spike measured away. One client + registered URIs keeps that property.
+
+⇒ **This is a one-time account-side prerequisite, not a code bug.** Worth surfacing in the UI though: the
+Connect button currently reports Google's failure only as a browser page the user has to read. A future
+turn could pre-flight it, or at minimum name `redirect_uri_mismatch` in the Setup hint.
+
+# ═══ BACKLOG (human, 2026-08-19) — HIDE THE CONSOLE WINDOW WHEN LAUNCHING THE EXE ═══
+*(human: "backlog can we hide this window when launcing the exe". NOT dispatched — recorded.)*
+
+**What the user sees:** launching DDCS-Studio.exe opens a black console window alongside the app:
+```
+=== fairy gateway started 2026-08-19 19:23:24 (pid 18024) ===
+[fairy] serving on http://127.0.0.1:8765
+```
+It sits there for the whole session. For a shop-floor app that is noise, and closing it kills the gateway.
+
+**Cause:** `desktop/build_fairy.ps1` passes neither `--windowed`/`--noconsole` nor `--console` to
+PyInstaller, so it defaults to a CONSOLE build. The gateway's `print()` logging goes there.
+
+⚠ **DO NOT just add `--windowed` and call it done — the log is load-bearing.** Real diagnoses this project
+has depended on came off that window (the startup line naming the bound host/port, the beacon/slave status
+line that reports a FAILED serial probe, `[poller]` delivery + stall lines). With `--windowed`, stdout on a
+frozen Windows build goes nowhere and those become unobservable — trading a cosmetic annoyance for a
+debugging blackout, on the one platform where users cannot run it from a terminal to get them back.
+
+**Shape of a fix (so it is not re-derived):** keep the logs, lose the window — write them to a FILE the app
+can surface (`~/.ddcs-bridge/gateway.log`, rotated) BEFORE switching to `--windowed`, and give Setup a
+"show log" affordance. `--windowed` first, logging second, is the wrong order.
+
+⚠ Check `desktop/fairy_gateway.py` for anything reading stdin/writing stdout that assumes a console exists;
+under `--windowed` `sys.stdout` can be None on Windows and a bare `print()` then RAISES.
+
+# ═══ BACKLOG (human, 2026-08-19) — TWO PLACES CONNECT GOOGLE DRIVE; THERE SHOULD BE ONE ═══
+*(human: "So where exactly do I connect to Google Drive in the exe. There are at least 2 places, shouldnt
+there be only one". NOT dispatched — recorded. A real UX defect, found the day the second one shipped.)*
+
+**The two, and they are genuinely different FEATURES sharing one credential:**
+
+| surface | purpose | code |
+|---|---|---|
+| Gateway ▸ Setup → "Cloud storage" | **send JOBS** through Drive (backend=drive) | `views/admin.js` (t2076) |
+| Library / Projects → cloud account | **save PROJECT files** to Drive | `ui/cloudAccount.js` |
+
+**They are not as independent as they look — MEASURED, not assumed.** In the exe,
+`cloudAccount.connectGoogleDesktop()` (`cloudAccount.js:76`) hits the SAME `/oauth/google/start` endpoint
+the new Setup button does, and `oauth.py` persists to the SAME `~/.ddcs-bridge/google_token.json`. ⇒
+**Connecting in EITHER place authenticates the gateway for BOTH.** The only extra thing the projects one
+does is cache the access token in `localStorage` so the BROWSER can call Drive directly.
+
+**Why it is still a defect:** nothing on either surface says the other exists or that they share a
+sign-in. A user connects in one, sees the other still saying "not connected" (they read different state:
+one polls `/api/oauth/google/status`, the other reads `localStorage`), and reasonably concludes it failed.
+
+**Shape of a fix:** ONE "Google account" connection state, read by both surfaces from one source, with the
+two FEATURES (send jobs / save projects) presented as toggles on top of it — not two connect buttons. ⚠ Do
+not simply delete one: they serve different features, and the projects path additionally needs the token
+browser-side. Consolidate the ACCOUNT, keep the two feature switches.
+
+⚠ Also unresolved and adjacent: the browser (hosted page) uses the WEB client id while the exe now uses
+the DESKTOP one, so browser-side Drive files and exe-side Drive files are NOT mutually visible
+(`drive.file` is scoped per client). Fine for exe-to-exe, a trap the day someone tries to mix them.
+
+# ═══ BACKLOG (human, 2026-08-19) — THE EDITOR'S BOTTOM-LEFT BUTTON CLUSTER IS OVERGROWN ═══
+*(human: "backlog, indent button are still in the editor bottom cluster". NOT dispatched — recorded.)*
+
+**What is stacked over the editor's bottom-left corner today** (all absolutely positioned in `index.html`,
+each with its own hardcoded `left`/`bottom`):
+```
+  bottom:72px   ⇤  ⇥  ;  ↶  ↷        outdent · indent · comment · undo · redo
+  bottom:40px   ＋ Make ▾
+  bottom:8px    ⟳ Transform
+```
+⚠ **t2077 made this worse, not better** — undo/redo were moved here out of the header to free space for the
+account chip, which is why the human noticed. Honest attribution: the cluster was already crowded; this turn
+added two more.
+
+**Why it is a real problem, not just taste:** every one is `position:absolute` with a MAGIC `left` offset, so
+adding a button means hand-computing the next multiple of 36px, and any label change silently overlaps its
+neighbour. There is no row container — the "cluster" is a coincidence of coordinates, not a layout.
+
+**Shape of a fix:** one flex toolbar element anchored bottom-left, buttons as its children, no per-button
+`left`. Then grouping/ordering is declarative and adding one costs nothing. Candidates to fold in or demote
+while there: `⟳ Transform` and `＋ Make ▾` are op-level actions that may belong in the editor's own ▾ file
+menu (the t1227 precedent — Load/Insert/Export moved there rather than floating).
+
+⚠ Keep the ids: `saveStates.js` syncs `#btn-undo`/`#btn-redo` disabled state by id, and
+`editorTextOps.js` wires `#editor-indent`/`#editor-outdent`/`#editor-comment` by id (and depends on their
+`mousedown` preventDefault to keep the textarea selection — do not lose that in a reflow).
+
+# ═══ DESIGN NOTE (human, 2026-08-19) — THE EDITOR ROW IS A FAST LANE, NOT A SECOND MENU ═══
+*(human: "this row and the quick menu can have shared functions. The editor row is really just about an even
+quicker menu for the most used functions.")*
+
+⭐ **This settles what would otherwise become a recurring argument** ("does X belong in the quick menu or the
+editor row?") and it is NOT the rule t1227 used. t1227 split by SUBJECT — app things in the menu, program
+things in the pane — which is why Load/Insert/Export were exiled to the editor and have now come back.
+
+**The rule instead:** the quick menu is the COMPLETE set; the editor row is a SHORTCUT to the most-used
+members of it. Overlap is CORRECT, not duplication — the same action may legitimately appear in both, and an
+action's home is decided by frequency, not category.
+
+⚠ **The constraint that makes overlap safe: ONE implementation, two surfaces.** Both must call the same
+function (t2078 already does this — the quick menu's fileLoad/fileInsert/fileExport call the very
+`window.loadGcodeFile`/`insertGcodeFile`/`downloadFile` globals the editor's own menu called). Two surfaces
+with two copies of the logic is the drift this project keeps paying for; two surfaces over one function is
+the pattern it already runs on (wizards-as-data, one stack many views).
+
+⇒ Next time this row is touched: promote/demote by USE, and never inline a handler that already exists.
+Deciding WHICH actions earn the fast lane is a real question — worth measuring rather than guessing.
+
+# ═══ BACKLOG (human, 2026-08-19) — MOVE THE THEME SELECTOR OUT OF THE QUICK MENU INTO SETTINGS ═══
+*(human: "backlog put the team [theme] selector that's in quick menu in the settings". NOT dispatched.)*
+
+**Today:** `headerPost.js` `themeSection` renders a "Theme" heading + a row of five colour chips
+(`.hq-theme-chip`, one per THEMES entry) inside the quick menu, wired through `setQuickTheme()`.
+
+**Why it should move:** by the rule the human set this same session — the quick menu is the complete set of
+FREQUENT actions and the editor row is its fast lane — a theme is picked once and then never again. It is
+occupying prime space in a menu that is meant to be short (the t851 "menu diet" cut it from ~17 rows to ~9;
+the theme block is five chips plus a heading).
+
+**Shape of a fix:** move the chips into Settings (they are an appearance preference, which is what Settings
+is for), and leave NOTHING behind in the quick menu — a "Theme…" row that merely opens Settings would keep
+the row it was meant to free.
+
+⚠ Keep ONE implementation: `setQuickTheme()` already persists + applies; Settings must call it rather than
+re-implement theme switching. ⚠ The active-theme ring (`aria-checked` / `.active`) is real state — whatever
+renders the chips must still reflect the live `data-theme`.
+
+# ═══ t2076-t2080 — THE CLOUD PATH IS REAL: BYO Drive, proven end to end (2026-08-19 evening) ═══
+
+**What the human asked for, and got:** send a job to the machine over the internet, through THEIR OWN Google
+Drive — no dev bucket, no shared token, no IP addresses. It works, on their account, proven live rather than
+by test doubles.
+
+## SHIPPED (V2026.08.19.2 → .6, all released)
+- **t2076 — the Drive backend** (`bridge/bridge-app/fairy/backend/drive.py`). ⭐ STDLIB ONLY, and that is the
+  point: `r2.py` needs boto3 and `build_fairy.ps1` EXCLUDES boto3 from the exe, so the R2 cloud path could
+  never run in the shipped app — which is why it sat `[TO TEST]` for months. This one ships inside the exe.
+  Handles Drive's two non-object-store behaviours: names are not keys (every write UPSERTs, or the poller's
+  per-beacon status rewrites duplicate) and paths do not exist (folder ids resolved once, cached).
+- **t2077 — ONE account door**, a round avatar in the header (generic silhouette → the user's Drive photo).
+  Replaced two sign-in surfaces that read DIFFERENT state while secretly sharing one credential. Room made by
+  deleting the long-hidden Transfer button and moving undo/redo into the editor — where they finally gained
+  Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, guarded so they never hijack native text undo.
+- **t2078 — the editor toolbar row**; Load/Insert/Export to the quick menu (the human's refinement of t1227:
+  those three act on the program AS A WHOLE, never mid-edit).
+- **t2079 + t2079b — sign-in was broken for EVERY user, twice.** (a) `config.from_env()` preferred the `web`
+  OAuth block over `installed`, so every machine seeded a Web client whose loopback redirect Google refuses →
+  `redirect_uri_mismatch` everywhere. (b) The fix only helped FRESH installs — an existing machine kept the
+  wrong client persisted, so updating changed nothing (hit live on ASUS minutes after shipping). Values this
+  code seeds now carry provenance and follow the bundle, plus a surgical match on the exact mis-seeded id for
+  installs predating the marker. A user-typed client is never touched — tested both ways.
+  Also: a failed sign-in now carries GOOGLE'S OWN REASON to the page and the log, which is how the second
+  failure was identified in one step ("client_secret is missing").
+- **t2080 + t2080b — a CLIENT can send with no gateway** (`web/ui/cloud/driveJobs.js`): writes the job into
+  the same Drive inbox the gateway polls. jobId is CROSS-CHECKED byte-for-byte against `ops.make_job_id`
+  (the poller claims `ids[0]` from a sorted list, so the id format IS the queue order); the `.map.json` is
+  written BEFORE the `.nc` because `list_inbox` keys off the `.nc` — a job must never be claimable before its
+  metadata is readable.
+
+## ⭐ TWO ASSERTIONS OF MINE THE HUMAN OVERTURNED — both were blocking good work
+1. **"Screenshots in release notes go stale."** Their answer: *"of course they go stale, but that's why we
+   release new updates."* Release notes are VERSIONED AND IMMUTABLE; a picture documenting V19.4 should keep
+   showing V19.4 forever. And only the newest release's notes ever render in the welcome modal, so old images
+   need not ship at all. (BACKLOG #6.)
+2. **"`drive.file` scopes visibility per OAuth CLIENT, so a browser-written job would be invisible to the
+   gateway."** I designed a client-unification decision around it. **Measured instead: the gateway's Desktop
+   client listed AND read a folder created by the browser's Web client.** Visibility is per Cloud PROJECT.
+   It was one API call away all session. Their framing — *"cant we make the gateway simply watch a folder on
+   my drive"* — was the correct model, and the gateway already did exactly that.
+
+## ⛔ THE ONE UNSAFE COMBINATION, and it is NOT built around yet
+Two gateways on ONE Google account share one `DDCS Bridge/inbox/`. `poller._maybe_claim()` takes `ids[0]`
+with no notion of which machine a job is FOR, and `identity.verify()` is INERT while `machine_id` is unset
+(both the human's machines have it empty). ⇒ **with the V4.1 also on Drive, an Expert program can be
+delivered to the V4.1** — different envelope, different dialect.
+**One gateway on Drive is safe. Do not enable a second until the inbox is namespaced per machine.**
+Most of the fix exists: `config.drive_folder` is already per-config; only `driveJobs.js` hardcodes it; and the
+human's own rule ("any workspace can only have one controller") names the folder. See `ROLES-PLAN.md`.
+
+## NEXT, in the human's own priority
+1. **THE ROLES FEATURE** — `ROLES-PLAN.md`, now with live evidence (the phone's dead Send button was the
+   missing role concept, not a UI bug). They asked which tabs/settings a client cannot have; answered there.
+   ONE open ruling: is the role DERIVED from the controller disk or DECLARED in Setup (recommend declared,
+   derived default).
+2. **Namespace the Drive inbox per machine** — unblocks the V4.1 on this path.
+3. `BACKLOG.md` — 8 small items, each with its diagnosis and trap.
+
+# ═══ THE "DELETE LOCAL" GATE — measured against the human's own rule (2026-08-19) ═══
+*(human, reiterating: "im willing to let go of local when we know its really replaced". The standing ruling
+is in this file above — ONE BOX is permanent; LAN SERVING dies once cloud is PROVEN; the gate was written
+strictly BECAUSE `backend/r2.py` read like a working cloud path for months while tagged `[TO TEST]`.)*
+
+## THE RULE, verbatim from the ruling
+> *a real job submitted from the console, written to the user's Drive, **polled and claimed by the gateway,
+> delivered to a real controller**, with the job appearing in history.* NOT proven by unit tests against a
+> mocked Drive, a successful OAuth handshake, or reasoning from documentation.
+
+## STATUS — the transport is proven; THE LOOP IS NOT
+| link | proven? |
+|---|---|
+| OAuth sign-in + token refresh | ✅ live, the human's account |
+| Drive folder tree, `put_job` / `list_inbox` / `get_job` | ✅ live |
+| UPSERT (3 status writes → 1 file) | ✅ live |
+| delete-on-deliver empties the inbox | ✅ live |
+| a BROWSER-shaped job is listed/read/classified by the real `DriveBackend` | ✅ live |
+| **a gateway running `backend=drive` CLAIMS it** | ❌ **never run** |
+| **DELIVERED to a real controller (lands on CNCDISK)** | ❌ **never run** |
+| **appears in history** | ❌ **never run** |
+
+⇒ **Every piece has been exercised against real Google; they have never been run as ONE CHAIN onto a
+machine.** That is exactly the shape the gate exists to catch. **The gate is NOT met.**
+
+## ⚠ AN ARGUMENT THE RULING NEVER CONSIDERED — the offline shop
+LAN serving is the only path from a PHONE to the machine **in a shop with no internet**. Cloud cannot cover
+it (Google must be reachable) and one-box cannot either (that is localhost, the same PC). ⇒ *"Cloud replaces
+LAN"* is true only for the INTERNET-CONNECTED case. Deleting LAN silently drops the offline case, and the
+ruling does not say whether that case matters — **it must be answered explicitly, not by omission.**
+
+## TWO DEFECTS THAT MAKE CLOUD LESS RELIABLE THAN LAN TODAY
+- **BACKLOG #9** — a job sent while the controller is OFF is DISCARDED, not queued (`poller._claim` deletes
+  it on `OSError`). Cloud sending is asynchronous by nature, so this bites the cloud path hardest — a phone
+  is told "queued", and a sleeping gateway's first poll destroys the job.
+- **Backend switching STRANDS the queue** — local↔drive inboxes are mutually invisible, nothing migrates,
+  nothing warns. Likely to happen at the same moment as a role change and to be blamed on roles.
+
+## ⇒ RECOMMENDATION, for the human to accept or overrule
+**Do not delete LAN yet.** Order: (1) run the full loop end to end onto the Expert; (2) fix #9 so an
+offline machine queues instead of discarding; (3) answer the offline-shop question explicitly; THEN decide.
+The honest sentence at that point is *"cloud replaces LAN for the internet-connected case"* — and whether
+the remaining case is worth the messy middle is the human's call, made with evidence rather than optimism.

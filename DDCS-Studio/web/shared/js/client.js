@@ -56,6 +56,10 @@ export function makeClient(opts = {}) {
     listHistory: (limit = 100) => call("/api/history?limit=" + limit),
     getStatus: (id) => call("/api/status?id=" + encodeURIComponent(id)),
     getPosition: () => call("/api/position"),   // t2073 — {enabled, connected, error, raw, read_at}; an HONEST STUB (raw undecoded registers, no job-progress claim — see Ops.position_status)
+    // t2076 — BYO cloud (Drive backend). status is CSRF-guarded (it discloses the connection state); start
+    // returns the consent URL and the gateway opens the SYSTEM browser (an embedded webview can't run Google's flow).
+    googleStatus: () => call("/api/oauth/google/status", { headers: { "X-DDCS-Local": "1" } }),
+    googleConnect: () => call("/oauth/google/start"),
     listFiles: () => call("/api/files"),
     readFile: (name) => call("/api/file?name=" + encodeURIComponent(name), { headers: { "X-DDCS-Local": "1" } }),   // CSRF-guarded (leaks CNCDISK file content); same-origin Studio sends it
     deleteFile: (name) => postJSON("/api/files/delete", { name }),

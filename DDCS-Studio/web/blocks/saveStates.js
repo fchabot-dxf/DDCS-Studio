@@ -116,6 +116,32 @@ export function initSaveStates() {
     // + undo/redo; sync() runs once now for the initial state.
     const sync = () => { const ub = document.getElementById('btn-undo'), rb = document.getElementById('btn-redo'); if (ub) ub.disabled = !canUndo(); if (rb) rb.disabled = !canRedo(); };
     onChange(sync); sync();
+    installUndoKeys();
+}
+
+/**
+ * t2077 — PROGRAM UNDO/REDO ON THE KEYBOARD. Until now the two header buttons were the ONLY door to this history;
+ * when they moved into the editor pane the shortcut they never had became a requirement, not a nicety.
+ *
+ * ⛔ IT MUST NOT FIRE WHILE THE USER IS TYPING, and that is the whole subtlety. Ctrl+Z inside a text field means
+ * the FIELD's native character-level undo — a different, expected behaviour that a machinist mid-word would be
+ * furious to lose. This history is the BLOCK/PROGRAM one. So the binding bails whenever focus is in a textarea,
+ * input, select or anything contenteditable, leaving native undo untouched there; the editor's own buttons remain
+ * the door while typing.
+ *
+ * Ctrl+Shift+Z AND Ctrl+Y both redo — the modern convention and the older Windows one; apps that pick only one
+ * are wrong for half their users. ⌘ counts as Ctrl so a Mac build behaves.
+ */
+function installUndoKeys() {
+    document.addEventListener('keydown', (e) => {
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+        const t = e.target;
+        const tag = t && t.tagName;
+        if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || (t && t.isContentEditable)) return;   // native undo owns it here
+        const k = (e.key || '').toLowerCase();
+        if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+        if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+    });
 }
 
 // Undo/Redo for the toolbar buttons (saveStates owns the history; snapshots arrive via the onChange subscription).
