@@ -31,6 +31,13 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.7": [
+    { short: "Send now works on a phone or a PC with no gateway",
+      full: "The Send button did nothing at all on a device that isn't wired to the machine — no error, no "
+        + "message, just silence. It was being switched off because no gateway answered, which stopped being "
+        + "the right rule once a signed-in device can send through your Google Drive. It now reads \"Send via "
+        + "Drive\" and tells you the machine picks the job up within about 15 seconds." },
+  ],
   "2026.08.19.6": [
     { short: "Google sign-in now fixes itself on existing installs",
       full: "The previous release fixed sign-in for NEW installs only — a machine that had already run the "
