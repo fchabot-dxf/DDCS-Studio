@@ -5199,6 +5199,29 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 
 /* Floating Copy-program button, top-right of the editor (mirrors the bottom-left ⟳ Transform overlay). Clear of
    the vertically-centred 3D pull-tab; gets covered by the 3D drawer when it's open (copy is for the code view). */
+/* ── t2078 — THE EDITOR TOOLBAR ROW ──────────────────────────────────────────────────────────────────────────
+   One flex row in the previously-empty top strip, replacing seven separately absolutely-positioned buttons whose
+   `left`/`bottom` offsets were hand-computed multiples of 36px (add one and you recomputed the rest; change a
+   label and it silently overlapped its neighbour). Order is now declarative — it is the DOM order.
+
+   ⚠ ANCHORED RIGHT so it never starts on top of the PRE-FLIGHT BADGE, whose home is top-left of this same strip.
+   ⚠ AND THE BADGE OUTRANKS IT (human's call): the badge carries z-index 12, this row 3, so when a long
+   "N outside envelope" pill overflows toward the middle it covers these buttons rather than being covered — a
+   safety readout must never be hidden behind a convenience button. The row stays right-anchored, so the buttons
+   nearest the edge (file, copy) survive the overlap longest. */
+.editor-toolbar {
+    position: absolute; right: 8px; top: 8px; z-index: 3;
+    display: flex; align-items: center; gap: 4px;
+    max-width: calc(100% - 16px);
+}
+.editor-toolbar > button {
+    opacity: .75; font-size: 11px; padding: 3px 8px; line-height: 1;
+    display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto;
+}
+.editor-toolbar > button:hover:not(:disabled) { opacity: 1; }
+.editor-toolbar > button:disabled { opacity: .3; }
+/* the two icon buttons keep their tighter icon padding */
+.editor-toolbar > #editor-copy-btn, .editor-toolbar > #editor-file-btn { padding: 4px 6px; line-height: 0; }
 .editor-copy-float {
     position: absolute; right: 8px; top: 8px; z-index: 3; opacity: .75;
     padding: 4px 6px; line-height: 0; display: inline-flex; align-items: center;
