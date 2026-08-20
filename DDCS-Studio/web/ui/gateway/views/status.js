@@ -22,11 +22,12 @@ export default {
     // (styles.css, t2073) — the same markup + copy the old click-toggled popover used (removed in 9256574f
     // when the tab stopped gating on a gateway answering); .gateway-dl-pop's own position:fixed is dropped
     // (styles.css) since this is now a permanent in-flow card, not a floating overlay anchored to a click.
-    this.download = el('section', { class: 'block gateway-dl-pop' },
-      el('p', {}, 'The Gateway talks to your controller, so it runs on your own PC — not in the cloud.'),
-      el('a', { class: 'dl-btn', href: EXE_DOWNLOAD_URL, target: '_blank', rel: 'noopener' },
-         '⬇ Download DDCS Studio for desktop'),
-      el('p', { class: 'dl-note' }, 'Full app — Studio + Gateway in one exe.'));
+    // t2113 - the desktop-download offer MOVED TO THE QUICK MENU (human: "maybe the exe download can go
+    // back in the quick menu"). Still UNCONDITIONAL - that ruling is unchanged, it just lives in
+    // headerPost.js's downloadRow now. It stopped being a bordered card with a filled primary button under
+    // a gateway reading `live`, which read as an action to take while already running the app offered.
+    // Do not re-add it here without removing it there: two doors to one download is the shape t2077 spent
+    // a turn deleting for the account.
     // t2112 - THIS TAB ASKED THE WRONG QUESTION ON A PHONE. It reports whether THIS DEVICE can reach a
     // gateway, which on a phone is always 'no' and always will be - there is no daemon on a phone and
     // never will be. So it rendered 'unreachable - still looking on this PC' plus a desktop download
@@ -48,7 +49,7 @@ export default {
       try { this._hb = await readGatewayHeartbeat((getMachine() || {}).name); }
       catch (_) { this._hb = { state: 'unreadable' }; }   // ignorance, not absence
     };
-    ctx.root.append(this.conn, this.desc, this.vars, this.download);
+    ctx.root.append(this.conn, this.desc, this.vars);
     this.onPoll(ctx);
   },
 

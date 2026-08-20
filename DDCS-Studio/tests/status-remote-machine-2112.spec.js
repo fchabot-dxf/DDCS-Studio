@@ -111,11 +111,18 @@ test('NO DAEMON + nothing has ever reported: the ORIGINAL guidance stands — it
     await expect(root(page).getByText(/Machine state unknown/)).toHaveCount(1);
 });
 
-test('the desktop download card is present in EVERY state — unconditional, per the human ruling', async ({ page }) => {
+test('the desktop download offer is NOT on Status — it moved to the quick menu (still unconditional)', async ({ page }) => {
+    // t2113 - PREMISE UPDATED, NOT DELETED. This asserted the download card in every Status state, which was
+    // right while the offer lived here. The human moved it ("maybe the exe download can go back in the quick
+    // menu") because a bordered card with a FILLED PRIMARY button under a gateway reading `live` reads as an
+    // action to take while you are evidently already running the app it offers.
+    // ⭐ THE UNCONDITIONAL RULING IS UNCHANGED and now lives in headerPost.js's downloadRow - it is not gated
+    //    on a gateway answering there either. What this test protects now is that there is exactly ONE door:
+    //    two doors to one download is the shape t2077 spent a turn deleting for the account.
     await boot(page);
-    for (const hb of [FRESH_ON, FRESH_OFF, UNSEEN]) {
+    for (const hb of [FRESH_ON, UNSEEN]) {
         await mountStatus(page, { hb, hasDaemon: false });
-        await expect(root(page).getByText(/Download DDCS Studio for desktop/), 'download offer survives every state').toHaveCount(1);
+        await expect(root(page).getByText(/Download DDCS Studio for desktop/), 'no download offer on Status').toHaveCount(0);
     }
 });
 

@@ -54,6 +54,14 @@ function runQuickAction(act) {
         // on the program as a whole, not on the text under the caret). ONE implementation — these call the same
         // window globals ui/globalFunctions.js EDITOR_FILE_ACTIONS called, never a second copy of the logic.
         // ⛔ CLEAR is deliberately NOT routed here (t1255): the 🗑 in the editor toolbar is the one clear.
+        case 'getDesktop': {
+            // opened through the SAME door the update banner uses: in the exe the gateway opens the real
+            // system browser server-side, which fires exactly once — window.open double-fired inside the
+            // embedded webview (t2066).
+            import('./updateCheck.js').then((m) => (m.openExternal || window.open)(EXE_DOWNLOAD_URL, '_blank'))
+                .catch(() => window.open(EXE_DOWNLOAD_URL, '_blank', 'noopener'));
+            break;
+        }
         case 'fileLoad':   window.loadGcodeFile ? window.loadGcodeFile() : dlgNotice('Loading is unavailable.'); break;
         case 'fileInsert': window.insertGcodeFile ? window.insertGcodeFile() : dlgNotice('Insert is unavailable.'); break;
         case 'fileExport': window.downloadFile ? window.downloadFile() : dlgNotice('Export is unavailable.'); break;
@@ -200,6 +208,17 @@ export function initHeaderPost() {
         // t598 — always-available Rate / Feedback. t1245 — and now the ONE feedback door: Settings' Report-a-bug
         // button was a bare mailto pointing at the same maintainer this toast already reaches (with stars and a
         // comment), so it retired rather than being carried along beside it.
+        // t2113 (human: "maybe the exe download can go back in the quick menu") — THE DESKTOP DOWNLOAD MOVES
+        // HERE FROM THE STATUS TAB. It belongs on the APP side of t1227's rule — it is about the application
+        // itself, not about the program in front of you — which is exactly what this menu is for.
+        // ⚠ THE UNCONDITIONAL RULING SURVIVES THE MOVE: the human ruled this is never gated on whether a
+        //    gateway answers ("its not because i have the app open that i dont want to download it again"), and
+        //    it is not gated here either. What they objected to was a bordered card with a FILLED PRIMARY
+        //    button sitting under a gateway reading `live` — an action you are told to take while evidently
+        //    already running the thing offered. Same availability, one row, no visual weight.
+        const downloadRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="getDesktop">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⬇ Get DDCS Studio for desktop</span></button>';
         const rateRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
@@ -234,7 +253,7 @@ export function initHeaderPost() {
             + libraryRow
             + themeSection
             + '<div class="hdr-quick-sep"></div>'
-            + setupSheetRow + checklistRow + settingsRow + helpRow + rateRow;
+            + setupSheetRow + checklistRow + settingsRow + helpRow + downloadRow + rateRow;
 
         btn.title = `Quick actions — ${ap.name || 'untitled workspace'} · ${apCtrl}`;
         btn.setAttribute('aria-label', `Quick actions (${ap.name || 'untitled workspace'} · ${apCtrl})`);

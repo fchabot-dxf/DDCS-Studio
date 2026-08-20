@@ -6287,3 +6287,13 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .hb-dot.ok      { background: var(--ok, #22c55e); }
 .hb-dot.bad     { background: var(--danger, #ef4444); }
 .hb-dot.unknown { background: var(--warn, #f59e0b); }
+
+/* t2113 - THE QUIET DOWNLOAD LINE. Replaces the bordered .gateway-dl-pop card on the Status tab: the human
+   objected to the TREATMENT, not the presence (their unconditional ruling stands). A filled primary button
+   under a gateway reading `live` reads as an action you should take, while you are evidently already running
+   the app it offers. ⚠ .gateway-dl-pop is KEPT, not deleted - it is still the shape any FUTURE surface that
+   genuinely needs to sell the download should use; this tab simply is not that surface. */
+.gateway-dl-line { font-size: 12px; line-height: 1.5; padding: 2px 0; background: none; border: none; box-shadow: none; }
+.gateway-dl-line .dl-link { color: var(--link, var(--accent, #4a90e2)); text-decoration: none; font-weight: 500; }
+.gateway-dl-line .dl-link:hover { text-decoration: underline; }
+.gateway-dl-line .dl-note { opacity: .6; }
