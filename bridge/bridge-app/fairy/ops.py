@@ -15,7 +15,7 @@ import os
 import re
 
 from . import __version__, cncdisk, identity
-from .config import effective_role, role_conflict
+from .config import ROLE_GATEWAY, effective_role, role_conflict
 from .transfer import controller_disk_reachable
 
 _SLUG = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -67,7 +67,28 @@ class Ops:
         so it survives for a deliver-only job too (mapping would otherwise be None/absent): it is what lets
         two sends of the identical program LINK in the History view, independent of tracked vs deliver-only
         and independent of jobId, which stays a fresh timestamp per send on purpose (never collapses two
-        sends into one record)."""
+        sends into one record).
+
+        t2107 — THE LOCAL HALF of the no-send policy (the human's own ruling: "if gateway is on but cnc off
+        then it should be a no send policy" — the heartbeat is twofold, gateway running AND controller
+        powered). The browser already refuses on the DRIVE path when the heartbeat is stale/unseen/reports
+        controller_connected false — but Studio running ON the gateway PC never goes through that check at
+        all, so a job submitted locally with the mill off used to sail straight in, only for the NEW claim
+        gate (t2105) to then refuse it forever. Same front door the browser's own check protects, closed here
+        for the local one. Reads controller_disk_reachable() — the SAME function submit/claim/descriptor all
+        share — so this can never disagree with what the poller will do a moment later.
+
+        ⚠ GATED ON ROLE, NOT UNCONDITIONAL — caught before shipping, not assumed safe from the dispatch alone.
+        A CLIENT PC has NO controller wired (expert_dest is empty BY DESIGN — that is what makes it a client),
+        and its own submit_job still runs (its OWN local daemon relays through Drive to whichever PC IS the
+        gateway for this workspace's machine, per ROLES-PLAN.md). Checking THIS PC's own expert_dest there
+        would refuse every client submission unconditionally — the exact thing the client role exists to
+        allow. Only a GATEWAY-role PC's own expert_dest is what its own poller will actually try to deliver
+        through, so only a gateway checks it here."""
+        if effective_role(self.cfg) == ROLE_GATEWAY and not controller_disk_reachable(self.cfg.expert_dest):
+            return {"ok": False, "code": "controller_unreachable",
+                    "error": f"The machine at {self.cfg.expert_dest or '(no controller disk configured)'} "
+                             f"is switched off or unreachable — switch it on and send again."}
         if content_hash:
             mapping = {**(mapping or {}), "content_hash": content_hash}
         job_id = make_job_id(name)
@@ -253,7 +274,21 @@ class Ops:
             # override, no disk yet) is a stated intent, not a contradiction — see role_conflict's own docstring.
             "role": effective_role(self.cfg),
             "role_conflict": role_conflict(self.cfg),
+            # t2107 — DISPLAY ONLY: lets a client say "start Studio on CNC-FAIRY" instead of the more abstract
+            # "start the gateway for Ultimate Bee". ⛔ NEVER keyed on: a PC rename would silently re-home
+            # everything if routing/folder-naming/identity read this instead of the declared machine_name
+            # (Drive folder) / machine_id (identity.verify) — hostname is incidental, those are declared.
+            # None if unavailable (best-effort; a reader already degrades to generic wording when absent).
+            "hostname": self._hostname(),
         }
+
+    @staticmethod
+    def _hostname():
+        try:
+            import socket
+            return socket.gethostname()
+        except Exception:
+            return None
 
     # --- controller detection (V4.1 vs Expert) -----------------------------
     @staticmethod
@@ -275,11 +310,23 @@ class Ops:
         """Read-only fingerprint of the connected controller (V4.1 vs Expert), from its firmware `.out`
         on the SYSDISK share — the Python port of controllers/identify-controller.ps1. The filename is
         decisive in the common case (`ddcsv4.out` = V4.1); only an ambiguous name triggers a string
-        scan of the binary (Modbus is Expert-only). Cached per dest. Read-only; never raises."""
+        scan of the binary (Modbus is Expert-only). Cached per dest. Read-only; never raises.
+
+        t2107 — DOES NOT CACHE IGNORANCE AS KNOWLEDGE. The cache is keyed on dest alone and only ever
+        invalidated by dest CHANGING — so a probe taken while the controller was unreachable (SYSDISK isn't
+        even a directory yet — `_fingerprint_sysdisk`'s own early return) used to cache "unknown" for the
+        LIFE OF THE PROCESS, even once the mill came on and the disk became readable: the human's own normal
+        setup (PC always on, only the CNC cycles). That silently disabled the Drive mismatch block and served
+        the wrong profile baseline, with no error anywhere. Caching "unknown" is still correct — and still
+        happens — when the disk WAS reachable and the firmware was genuinely unrecognisable; that is a real,
+        stable answer worth the cache. Only an UNREACHABLE-at-probe-time result skips the cache, so the next
+        call re-probes instead of trusting a stale absence."""
         dest = self.cfg.expert_dest or ""
         if self._detect_cache and self._detect_cache[0] == dest:
             return self._detect_cache[1]
-        result = self._fingerprint_sysdisk(self._sysdisk_path())
+        sysdisk = self._sysdisk_path()
+        reachable = bool(sysdisk and os.path.isdir(sysdisk))   # the SAME check _fingerprint_sysdisk itself uses
+        result = self._fingerprint_sysdisk(sysdisk)
         if result.get("family") == "unknown":
             # Firmware `.out` missing/ambiguous → fall back to the `setting` param COUNT, a reliable
             # discriminator the validator already relies on: a V4.1's setting has ~1500 params, an
@@ -295,7 +342,8 @@ class Ops:
                 if fam != "unknown":
                     result = {**result, "family": fam,
                               "signals": {**result.get("signals", {}), "paramCount": n, "via": "param-count"}}
-        self._detect_cache = (dest, result)
+        if reachable:
+            self._detect_cache = (dest, result)
         return result
 
     def _fingerprint_sysdisk(self, sysdisk):

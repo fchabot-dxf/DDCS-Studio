@@ -46103,3 +46103,96 @@ after the revert: 99/99 (102 with item 3, minus the 3 removed tests).
 
 🔨 turn 2105
 
+# t2107 — the local half of no-send, detect_controller's stale-ignorance cache, hostname for display
+
+Dispatch: three items in `ops.py`, all amended in while t2105 was finishing. Gateway/Python only —
+`DDCS-Studio/web` (S1, hiding controller-wiring fields on a client) is the advisor's.
+
+## ITEM 1 — the local half of the no-send policy, and a real design bug caught before shipping it
+
+The human's ruling: "if gateway is on but cnc off then it should be a no send policy... the heartbeat is
+twofold, is gateway running and is cnc powered." The browser already refuses on the Drive path when the
+heartbeat says the controller is unreachable — but `Ops.submit_job` validated nothing about the controller, so
+Studio running ON the gateway PC with the mill off still accepted a job, which t2105's new claim gate would
+then correctly refuse FOREVER. Same front door, closed for the local case: `submit_job` now checks
+`controller_disk_reachable()` (t2105's own shared function) before `make_job_id`, returning `{"ok": False,
+"code": "controller_unreachable", "error": "..."}` — the same shape `read_file`/`delete_file` already use, so
+existing callers checking `.ok` need no new branch.
+
+**Caught and fixed before it shipped, not assumed correct from the dispatch text alone**: an UNCONDITIONAL
+version of this check would have refused every CLIENT-role submission too — a client PC has NO controller
+wired (`expert_dest` empty BY DESIGN, per ROLES-PLAN.md), and its own `submit_job` is supposed to relay through
+Drive to whichever PC IS the gateway for the workspace's machine. Checking THIS PC's own `expert_dest` on a
+client would have refused every one of those, unconditionally — the exact thing the client role exists to
+allow. Gated on `effective_role(self.cfg) == ROLE_GATEWAY` (already imported for t2103's own work): only a
+gateway-role PC's own `expert_dest` is what its own poller will actually try to deliver through, so only a
+gateway checks it here.
+
+**Fixture fallout, fixed deliberately, never by weakening the check** (the dispatch's own explicit instruction,
+and it undercounted the scope — 16 failures across 4 files, not the 2 named): every test using the established
+placeholder `expert_dest=r"\bench\cncdisk"` (a fake UNC string, never meant to be reachable, just non-empty —
+`test_beacon_health_2057.py`, `test_poller_track_gate.py`) now genuinely fails the new check. Fixed by pointing
+each at a REAL, `tempfile.mkdtemp()`-backed directory instead — matching `transfer.py`'s own already-documented
+convention ("for a no-hardware test, point dest at an ordinary folder; it behaves identically"), not a new
+pattern invented for this turn. Separately, two of t2105's/t2103's OWN tests (`test_reachability_claim_gate_2105.py`
+×2, `test_role_claim_gate_2103.py` ×1) were testing the CLAIM gate specifically by submitting through
+`Ops.submit_job` against an unreachable dest — which the NEW submit-time gate now ALSO correctly refuses,
+before the job ever reaches the inbox, making the claim-gate assertion moot. Fixed by seeding those three
+directly via `backend.put_job()` (bypassing `Ops.submit_job` on purpose) for the "job was already queued when
+gateway-role-but-no-real-disk" cases, and by submitting WHILE reachable then removing the directory
+immediately after for the "reachable at submit, gone by the time the poller ticks" cases — the latter is
+actually a more faithful reproduction of what the claim gate protects against than the original test's
+"unreachable from the start" scenario, which t2107's own submit gate now correctly intercepts earlier anyway.
+
+## ITEM 2 — detect_controller() was caching ignorance as knowledge
+
+The cache (`self._detect_cache`, a `(dest, result)` pair) is invalidated only when `dest` CHANGES.
+`_fingerprint_sysdisk()` returns `family: "unknown"` the instant SYSDISK isn't even a directory — exactly the
+state while the mill is off. So: gateway starts with the mill off → caches "unknown" → mill comes on → cache
+hit on an unchanged dest → returns "unknown" for the LIFE OF THE PROCESS. This is the human's own normal setup
+(PC always on, only the CNC cycles) — `controller_family`/`controller_firmware`/`controller_profile_id` would
+all stay null forever, silently disabling t2101's Drive mismatch block and serving the wrong `profile()`
+baseline, with no error anywhere.
+
+Fixed by checking reachability (`os.path.isdir(sysdisk)` — the exact same check `_fingerprint_sysdisk` already
+uses internally, not a new definition of "reachable") BEFORE deciding whether to write the cache: an
+unreachable-at-probe-time result is never cached, so the next call re-probes; a genuinely reachable-but-
+ambiguous firmware answer still gets cached exactly as before (the advisor's own explicit constraint — a
+fingerprint lists SYSDISK and may string-scan a firmware binary, far too heavy for a 5s tick, so "never cache"
+was never the fix).
+
+**Verified exactly as instructed — watch it fail first, then confirm the fix**: wrote
+`tests/test_detect_controller_cache_2107.py`, drove `detect_controller()` against a dest whose SYSDISK does
+not exist (unknown), then created a real SYSDISK with a fingerprintable `ddcsv4.out` firmware file and probed
+again — with the fix reverted (one line, `if reachable:` → unconditional), the SECOND probe genuinely returned
+the FIRST probe's stale `{'family': 'unknown', 'firmware': None, ...}`, reproducing the exact reported symptom
+byte for byte. Restored the fix, re-ran: correctly returns `family: 'v4.1'`. A second test proves the "still
+cache a genuine reachable-but-ambiguous answer" half wasn't lost in the process (removes the firmware file
+after the first probe; the SECOND probe still reports the CACHED filename, not a re-probed `None`).
+
+## ITEM 3 — hostname, display only
+
+`descriptor()` gains `hostname` (`socket.gethostname()`, wrapped so it can never raise — best-effort, `None`
+if unavailable). Documented explicitly, in the field's own comment, as NEVER to be keyed on for routing,
+folder naming, or identity — a PC rename would silently re-home everything if any of those read it instead of
+the declared `machine_name` (the Drive folder) / `machine_id` (`identity.verify`), which is exactly the kind
+of silent-drift hazard this whole session has been closing elsewhere. Verified directly against the real
+`socket.gethostname()`, not assumed to match.
+
+## Gate
+
+Full bridge-app pytest: 101/101 (99 + 2 new `test_detect_controller_cache_2107.py` tests). A single, isolated
+`test_csrf_guard.py` failure (`ConnectionAbortedError`) appeared on one full-suite run and was confirmed
+transient — 10/10 clean in isolation, and the full suite re-ran clean immediately after — not investigated
+further as a code defect. `--self-test`: unchanged at the established 47-`[ok]` baseline with the same single
+pre-existing, already-documented unrelated 403.
+
+## Files
+- `bridge/bridge-app/fairy/ops.py` — `submit_job`'s new gate (role-scoped); `detect_controller`'s cache fix;
+  `descriptor()`'s `hostname`.
+- `bridge/bridge-app/tests/test_beacon_health_2057.py`, `test_poller_track_gate.py`,
+  `test_role_claim_gate_2103.py`, `test_reachability_claim_gate_2105.py` — fixture fallout, fixed deliberately.
+- `bridge/bridge-app/tests/test_detect_controller_cache_2107.py` — new, 2 tests.
+
+🔨 turn 2107
+

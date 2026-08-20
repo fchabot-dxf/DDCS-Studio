@@ -56,15 +56,21 @@ def _submit(backend, cfg, name="part.nc", nc="G0 X0\nM30\n"):
 # ── the actual defect, closed ────────────────────────────────────────────────────────────────────────────────
 
 def test_unreachable_controller_leaves_the_job_queued_not_destroyed():
-    """⭐ THE core property. expert_dest points at a path that does NOT exist (the mill is off, or the share
-    is unmounted) -- the job must survive the tick, sitting exactly where it was."""
+    """⭐ THE core property, and the REALISTIC shape of it: the mill was ON when the job was submitted (so
+    submit_job's own t2107 gate let it through — this test is about the CLAIM gate specifically, the window
+    BETWEEN a good submit and a tick that finds the mill gone), then goes off before the poller ever ticks.
+    The job must survive the tick, sitting exactly where it was."""
     tmp = tempfile.mkdtemp()
-    unreachable = os.path.join(tmp, "does_not_exist", "cncdisk")   # never created
+    dest = os.path.join(tmp, "cncdisk")
+    os.makedirs(dest)
     try:
-        poller, backend, cfg, root = _make(unreachable)
+        poller, backend, cfg, root = _make(dest)
         try:
             r = _submit(backend, cfg)
+            assert "jobId" in r, r   # sanity: submit succeeded while the mill was reachable
             assert backend.list_inbox() == [r["jobId"]], "sanity: the job is queued before the tick"
+
+            shutil.rmtree(dest)   # the mill goes off / the share vanishes, right before the poller looks
 
             poller.tick()
 
@@ -99,13 +105,17 @@ def test_reachable_controller_still_delivers_normally():
 def test_the_job_survives_repeated_ticks_while_the_mill_stays_off():
     """Not just the FIRST tick — the inbox is the queue, and a mill that stays off must never destroy a job
     no matter how many times the poller ticks over it (JOB-RULES.md §6: no retry ceiling, because there is
-    no retry — this is just 'not claiming', repeated)."""
+    no retry — this is just 'not claiming', repeated). Submitted while reachable (t2107's own gate would
+    otherwise refuse it before it ever reached the inbox), then the mill goes off for good."""
     tmp = tempfile.mkdtemp()
-    unreachable = os.path.join(tmp, "still_off")
+    dest = os.path.join(tmp, "still_on_for_now")
+    os.makedirs(dest)
     try:
-        poller, backend, cfg, root = _make(unreachable)
+        poller, backend, cfg, root = _make(dest)
         try:
             r = _submit(backend, cfg)
+            assert "jobId" in r, r
+            shutil.rmtree(dest)
             for _ in range(10):
                 poller.tick()
             assert backend.list_inbox() == [r["jobId"]], "still queued after 10 ticks with the mill off"

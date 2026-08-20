@@ -80,6 +80,17 @@ class _DeadBeacons:
     def status(self): return {"ok": False, "error": "could not open COM6: FileNotFoundError"}
 
 
+def _real_dest(tmp):
+    """t2107 — expert_dest must now be a REAL, reachable directory: submit_job() refuses at the door
+    otherwise (the local half of the no-send policy). These tests are about the beacon-health cross-check,
+    not reachability, so give them a real one — matching transfer.py's own stated convention ("for a
+    no-hardware test, point dest at an ordinary folder; it behaves identically") rather than the placeholder
+    UNC string these predate."""
+    dest = os.path.join(tmp, "cncdisk")
+    os.makedirs(dest, exist_ok=True)
+    return dest
+
+
 def _submit(backend, cfg, beacons, name, nc, mapping=None):
     ops = Ops(backend, cfg, beacons)
     return ops.submit_job(name, nc, mapping)
@@ -90,7 +101,7 @@ def test_no_warning_for_a_deliver_only_send_regardless_of_receiver_health():
     tmp = tempfile.mkdtemp()
     try:
         backend = LocalFolderBackend(tmp)
-        cfg = Config(local_root=tmp, expert_dest=r"\\bench\cncdisk", enable_slave=True)
+        cfg = Config(local_root=tmp, expert_dest=_real_dest(tmp), enable_slave=True)
         r = _submit(backend, cfg, _DeadBeacons(), "probe.nc", "#520=5\nM30\n", None)
         assert r["tracked"] is False and r["warning"] is None, r
     finally:
@@ -101,7 +112,7 @@ def test_no_warning_for_a_tracked_send_when_the_receiver_is_genuinely_healthy():
     tmp = tempfile.mkdtemp()
     try:
         backend = LocalFolderBackend(tmp)
-        cfg = Config(local_root=tmp, expert_dest=r"\\bench\cncdisk", enable_slave=True)
+        cfg = Config(local_root=tmp, expert_dest=_real_dest(tmp), enable_slave=True)
         r = _submit(backend, cfg, _HealthyBeacons(), "part.nc", "M30\n", {"total_beacons": 7})
         assert r["tracked"] is True and r["warning"] is None, r
     finally:
@@ -115,7 +126,7 @@ def test_warning_when_tracking_is_requested_but_enable_slave_is_off():
     tmp = tempfile.mkdtemp()
     try:
         backend = LocalFolderBackend(tmp)
-        cfg = Config(local_root=tmp, expert_dest=r"\\bench\cncdisk", enable_slave=False)
+        cfg = Config(local_root=tmp, expert_dest=_real_dest(tmp), enable_slave=False)
         r = _submit(backend, cfg, _HealthyBeacons(), "part.nc", "M30\n", {"total_beacons": 7})
         assert r["tracked"] is True, r    # the REQUEST was still tracked (the map has beacons) — the warning is the new signal
         assert r["warning"] and "Modbus disabled" in r["warning"], r
@@ -129,7 +140,7 @@ def test_warning_when_tracking_is_requested_and_enable_slave_is_on_but_the_recei
     tmp = tempfile.mkdtemp()
     try:
         backend = LocalFolderBackend(tmp)
-        cfg = Config(local_root=tmp, expert_dest=r"\\bench\cncdisk", enable_slave=True)
+        cfg = Config(local_root=tmp, expert_dest=_real_dest(tmp), enable_slave=True)
         r = _submit(backend, cfg, _DeadBeacons(), "part.nc", "M30\n", {"total_beacons": 7})
         assert r["tracked"] is True, r
         assert r["warning"] and "not running" in r["warning"] and "COM6" in r["warning"], r
@@ -143,7 +154,7 @@ def test_no_beacons_object_at_all_never_crashes_matching_existing_test_call_site
     tmp = tempfile.mkdtemp()
     try:
         backend = LocalFolderBackend(tmp)
-        cfg = Config(local_root=tmp, expert_dest=r"\\bench\cncdisk", enable_slave=True)
+        cfg = Config(local_root=tmp, expert_dest=_real_dest(tmp), enable_slave=True)
         ops = Ops(backend, cfg)   # no beacons — matches test_poller_track_gate.py's own _submit()
         r = ops.submit_job("part.nc", "M30\n", {"total_beacons": 7})
         assert r["tracked"] is True and r["warning"] is None, r

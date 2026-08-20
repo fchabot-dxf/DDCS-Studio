@@ -57,7 +57,14 @@ class _StubBeacons:
 
 def _make_poller(tmp_root, enable_slave):
     backend = LocalFolderBackend(tmp_root)
-    cfg = Config(local_root=tmp_root, expert_dest=r"\\bench\cncdisk", enable_slave=enable_slave)
+    # t2107 — expert_dest must now be a REAL, reachable directory: Ops.submit_job() refuses at the door
+    # otherwise (the local half of the no-send policy, checked against the real filesystem regardless of
+    # what the stub Transfer's own .reachable() says — that stub only gates the POLLER's claim, not submit).
+    # This file is about tracked/deliver-only + content-hash linking, not reachability, so give it a real
+    # one — matching transfer.py's own stated convention rather than the placeholder UNC string it predates.
+    dest = os.path.join(tmp_root, "cncdisk")
+    os.makedirs(dest, exist_ok=True)
+    cfg = Config(local_root=tmp_root, expert_dest=dest, enable_slave=enable_slave)
     return Poller(backend, _StubTransfer(), _StubBeacons(), cfg, log=lambda *a: None), backend, cfg
 
 

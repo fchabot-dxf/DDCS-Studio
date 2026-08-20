@@ -17,7 +17,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 from fairy.backend.local_folder import LocalFolderBackend    # noqa: E402
 from fairy.config import Config, ROLE_CLIENT, ROLE_GATEWAY, effective_role, role_conflict   # noqa: E402
-from fairy.ops import Ops                                     # noqa: E402
+from fairy.ops import Ops, make_job_id                        # noqa: E402
 from fairy.poller import Poller                                # noqa: E402
 
 
@@ -105,13 +105,18 @@ def test_gateway_role_still_claims_and_delivers_the_common_case_unchanged():
 
 def test_gateway_override_with_no_disk_yet_still_does_not_claim():
     """An explicit 'gateway' override with expert_dest EMPTY is a stated intent, not a green light to deliver
-    into nothing: the pre-existing 'no controller configured' guard must still hold beneath the role gate."""
+    into nothing: the pre-existing 'no controller configured' guard must still hold beneath the role gate.
+    Seeded directly via backend.put_job() (not Ops.submit_job): t2107 added the identical check to submit_job
+    too, which is correct defense in depth, but it means this test's own subject — the CLAIM gate's
+    independent 'no expert_dest' guard — needs a job that reaches the inbox some other way, exactly as it
+    would if the workspace's disk field were cleared AFTER a job was already queued."""
     tmp = tempfile.mkdtemp()
     try:
         poller, backend, cfg, transfer = _make_poller(tmp, expert_dest="", role_override=ROLE_GATEWAY)
-        r = _submit(backend, cfg)
+        job_id = make_job_id("part.nc")
+        backend.put_job(job_id, "G0 X0\nM30\n", None)
         poller.tick()
-        assert backend.list_inbox() == [r["jobId"]], "gateway role alone is not enough without an actual disk path"
+        assert backend.list_inbox() == [job_id], "gateway role alone is not enough without an actual disk path"
         assert transfer.calls == []
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
