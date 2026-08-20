@@ -58,10 +58,41 @@ export function setGatewayPanelVisible(on) {
     if (on && inited) poll();
 }
 
+/**
+ * t2113 (human: "the tracking tab should be gated") — A VIEW THAT CANNOT WORK ON THIS CONTROLLER SAYS SO.
+ *
+ * A view declares its own requirement (`requiresModbus`) and this reads it; the panel holds no list of which
+ * controller gets which tab. A second capability-gated view is one line in that view, not a branch here.
+ *
+ * ⭐ STATED, NEVER SILENTLY HIDDEN. A missing tab reads as a bug or a lost feature; a tab that explains itself
+ * teaches the difference between the two controllers. It is also what the tab was doing WRONG before — the
+ * human found Tracking showing a job at 63% from a status record two months old, on a machine that cannot
+ * report progress at all.
+ * ⚠ UNKNOWN IS NOT INCAPABLE: with no descriptor, or a family we cannot read, the tab stays available. Gating
+ *   on ignorance would hide a working feature from anyone whose gateway is momentarily unreachable.
+ */
+function viewUnavailable(view, desc) {
+    if (!view.requiresModbus) return null;
+    if (!desc || !desc.controller_family) return null;                 // unknown -> leave it alone
+    if (desc.controller_family !== 'v4.1') return null;
+    return 'Live tracking needs Modbus, which the DDCS V4.1 does not have. A sent job still reports "delivered" '
+         + '— it just cannot report progress while it runs. On a DDCS Expert this tab works.';
+}
+
 function activate(view) {
     active = view;
-    [...tabsEl.children].forEach((t, i) => t.classList.toggle('active', VIEWS[i] === view));
+    [...tabsEl.children].forEach((t, i) => {
+        t.classList.toggle('active', VIEWS[i] === view);
+        t.classList.toggle('cap-off', !!viewUnavailable(VIEWS[i], ctx.desc));   // dimmed, still clickable: the reason is the point
+    });
     clear(ctx.root);
+    const why = viewUnavailable(view, ctx.desc);
+    if (why) {
+        ctx.root.append(el('section', { class: 'block' },
+            el('div', { class: 'section-label' }, view.label),
+            el('div', { class: 'muted' }, why)));
+        return;
+    }
     view.mount(ctx);
 }
 

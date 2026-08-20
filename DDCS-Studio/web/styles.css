@@ -6297,3 +6297,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .gateway-dl-line .dl-link { color: var(--link, var(--accent, #4a90e2)); text-decoration: none; font-weight: 500; }
 .gateway-dl-line .dl-link:hover { text-decoration: underline; }
 .gateway-dl-line .dl-note { opacity: .6; }
+
+/* t2113 - a gateway tab this CONTROLLER cannot use. Dimmed, never hidden and never disabled: clicking it is
+   how you find out WHY, and a tab that vanishes reads as a lost feature rather than an absent capability. */
+.settings-main-tab.cap-off { opacity: .45; }

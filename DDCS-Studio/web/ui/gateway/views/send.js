@@ -48,6 +48,8 @@ export default {
     const nameField = el('input', { type: 'text', placeholder: 'job name (e.g. bracket_v3.nc)', style: 'flex:1' });
 
     const beacons = el('input', { type: 'checkbox', checked: '' });
+    // t2113 - why beacons are unavailable, stated where the control is. Empty on a capable controller.
+    const beaconNote = el('div', { class: 'hint', style: 'margin-top:4px' });
     const count = el('input', { type: 'number', value: String(DEFAULTS.max), min: '1', max: '255', style: 'width:90px' });
     const pacing = el('select', {},
       el('option', { value: 'time' }, 'by time (wall-clock)'),
@@ -395,6 +397,16 @@ export default {
       // ⚠ ONLY when a gateway actually ANSWERED (!out). No descriptor means no knowledge, and refusing on
       //    ignorance is the habit we keep removing - `undefined` must never read as 'the mill is off'.
       const millOffLocal = !out && !!desc && desc.controller_connected === false;
+      // t2113 - BEACONS NEED MODBUS RTU, AND THE V4.1 HAS NONE. The label has said "Expert only; leave off
+      // for V4.1" all along - but a parenthetical is advice, not a gate, and the line below this used to
+      // re-enable the checkbox unconditionally on every state update. Meanwhile the app KNOWS: the descriptor
+      // carries controller_family.
+      // ⚠ THE COST OF GETTING IT WRONG IS NOT ZERO, which is why advice was never enough: instrument() injects
+      //    `#var = n` + MSETDATA at every Z-up, and with no Modbus slave to answer, EACH ONE BLOCKS ON A
+      //    TIMEOUT. The human measured 1-2 SECONDS PER BEACON on a V4.1 - pure cost, and zero progress data,
+      //    because nothing can receive it. Up to 255 of those in one program.
+      // ⭐ Capability gates the control, the way the controller's own capabilities gate fields elsewhere.
+      const noModbus = !!desc && desc.controller_family === 'v4.1';
       banner.style.display = (out || millOffLocal) ? '' : 'none';
       banner.setAttribute('data-gw-state', out ? 'unreachable' : millOffLocal ? 'controller-offline' : 'connected');
       // t2080b — the banner must not contradict the button. `c.reason` ends "...sending needs a machine",
@@ -440,7 +452,16 @@ export default {
                            : (out ? c.reason : '');
       btn.textContent = this._sendLabel();
       // the offline half stays live on purpose — dropping a file, using the Studio program, naming the job
-      for (const elm of [drop, useStudio, nameField, beacons, count, pacing, varN, markerV, markerN]) elm.disabled = false;
+      // the offline half stays live on purpose - dropping a file, using the Studio program, naming the job
+      for (const elm of [drop, useStudio, nameField, count, pacing, varN, markerV, markerN]) elm.disabled = false;
+      // ⛔ beacons is NOT in that list any more: a blanket re-enable would undo the capability gate on every
+      //    tick. It is set explicitly, and forced OFF so a checkbox ticked before the controller was known
+      //    cannot silently instrument a program that can never report.
+      beacons.disabled = noModbus;
+      if (noModbus && beacons.checked) { beacons.checked = false; beacons.dispatchEvent(new Event('change', { bubbles: true })); }
+      if (beaconNote) beaconNote.textContent = noModbus
+        ? 'Progress beacons need Modbus, which the V4.1 does not have — a tracked send would pause 1-2s at every retract and report nothing.'
+        : '';
       this._renderHeartbeatStatus();
     };
 
@@ -488,6 +509,7 @@ export default {
       el('div', { class: 'row', style: 'margin-top:10px' }, useStudio),
       el('div', { class: 'row', style: 'margin-top:12px' },
         el('label', { class: 'row', style: 'gap:6px;cursor:pointer' }, beacons, 'Beacons (track progress)')),
+      beaconNote,
       settings,
       el('div', { class: 'row', style: 'margin-top:12px' }, nameField, btn),
       info,

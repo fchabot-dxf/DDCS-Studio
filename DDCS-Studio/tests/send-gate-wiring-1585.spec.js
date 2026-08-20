@@ -31,7 +31,7 @@ test('the real Send button raises the real gate dialog, naming the line', async 
 
     const clickBtn = (txt) => page.evaluate((t) => {
         const hit = [...document.querySelectorAll('button')]
-            .filter((e) => (e.textContent || '').includes(t))
+            .filter((e) => (e.textContent || '').trim().startsWith(t))   // t2113: prefix, so the transport label may vary
             .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length)[0];
         if (!hit) return false;
         hit.disabled = false;   // see the header: the CONNECTION contract only, never the gate
@@ -45,7 +45,13 @@ test('the real Send button raises the real gate dialog, naming the line', async 
     await page.waitForTimeout(700);
     expect(await clickBtn('Use current Studio program'), 'the current program stages').toBe(true);
     await page.waitForTimeout(900);
-    expect(await clickBtn('Send (tracked)'), 'and the send is attempted').toBe(true);
+    // t2113 - MATCH THE SEND BUTTON, NOT ONE OF ITS LABELS. This asked for the exact text 'Send (tracked)',
+    // which silently assumed the beacons checkbox defaults to ON - and that now depends on the CONTROLLER:
+    // a V4.1 has no Modbus, so beacons are gated off and the button reads 'Send (deliver-only)'. The test
+    // began failing on a dev machine with a real V4.1 attached, because the app auto-adopts a local gateway
+    // and the descriptor is real. ⭐ This test is about the GATE DIALOG, not about which transport label the
+    // button happens to carry, so it should never have pinned the label.
+    expect(await clickBtn('Send'), 'and the send is attempted').toBe(true);
     await page.waitForTimeout(12_000);   // the mismatch probe must time out against a dead gateway first
 
     const dlg = await page.evaluate(() => [...document.querySelectorAll('dialog,.dlg,.modal,[role=dialog]')]

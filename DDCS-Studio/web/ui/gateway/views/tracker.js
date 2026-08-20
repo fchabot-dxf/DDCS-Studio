@@ -8,6 +8,13 @@ const stat = (k, v) => el("div", { class: "bt-stat" },
 
 export default {
   id: "tracker",
+  // t2113 (human: "the tracking tab should be gated") - LIVE TRACKING NEEDS MODBUS RTU AND THE V4.1 HAS NONE.
+  // Every number this tab can show arrives via beacons over Modbus, so on a V4.1 it can only ever render an
+  // empty frame - or worse, a STALE one: the human found it displaying a job at 63% from a status record two
+  // months old. A tab that cannot answer should say so, not present blank furniture.
+  // ⛔ DECLARED, not hand-rolled into the panel: the view states its own requirement and gatewayPanel reads it,
+  //    so a second capability-gated view adds a line here rather than a branch there.
+  requiresModbus: true,
   label: "Tracking",
 
   mount(ctx) {
