@@ -154,19 +154,39 @@ export default {
             }
           } catch (_) { _hb = null; /* advisory - never block a send because the status lookup itself failed */ }
 
-          // ⚠ NOT A FAILURE, AND THE WORDING MUST NOT PRETEND IT IS. A Drive job PERSISTS in the inbox until some
-          // gateway claims it, so "no gateway right now" means WAITING, not lost. What was wrong before is the
-          // promise: the view said "picks it up within ~15s" with nothing running to pick it up.
-          // ⛔ AND WE CANNOT SAY "no gateway has ever run": `drive.file` scoping means an unreadable folder and an
-          //    absent one look identical from here. "Studio cannot see" is true under both; "never ran" is a guess.
+          // t2105 - A PHONE MAY NOT SEND WHEN NO GATEWAY IS RUNNING (human ruling). This REPLACED an
+          // earlier warn-and-confirm: prevention at the moment of action beats cleanup after the fact,
+          // because here the person is holding the phone and can do something about it, whereas the
+          // alternative (discard the job at the gateway's next restart) tells someone who walked away
+          // hours ago. It also means a stale job can never be CREATED rather than being cleaned up later.
+          // ⚠ THE PRODUCT SHAPE THIS CHOOSES: the Drive inbox is a WIRE, not a STORE. `expert_dest` was
+          // always a share that either accepts the file or does not (the LinuxCNC shape); adding Drive
+          // accidentally created somewhere for a job to LINGER, and this rule declines that. The cost,
+          // accepted knowingly: no sending from home to a shop whose gateway is switched off.
+          // ⭐⭐ REFUSE ON A KNOWN ABSENCE, NEVER ON IGNORANCE - the same doctrine controllerMatch.js
+          //    already states ("blocking on an absence would be a guess wearing a safety hat"). A stale or
+          //    missing heartbeat is EVIDENCE nothing is listening; a FAILED LOOKUP is only evidence that we
+          //    could not look. ⚠ This is not pedantry - a browser reading a DESKTOP-written file is the one
+          //    direction Drive visibility was never measured in (see driveJobs.js's header). If that turns
+          //    out not to work, failing open on 'unreadable' costs a warning; failing closed would break
+          //    sending entirely while blaming a gateway that is running perfectly.
           if (_hb && (_hb.state === 'stale' || _hb.state === 'unseen')) {
-            const since = _hb.state === 'stale' && _hb.ageS != null
+            const when = _hb.state === 'stale' && _hb.ageS != null
               ? `The gateway for this machine last checked in ${Math.round(_hb.ageS / 60)} min ago.`
               : 'Studio cannot see a gateway for this machine on your Drive.';
+            await dlgNotice(
+              when + '\n\nNothing is listening, so this job would sit on your Drive instead of reaching the '
+              + 'machine. Start Studio on the PC wired to it, then send again.',
+              { title: 'No gateway is running - send blocked', okLabel: 'Cancel' },
+            );
+            return;   // the finally block re-enables the button
+          }
+          if (_hb && _hb.state === 'unreadable') {
+            // Ignorance, not absence: allow it, but do not repeat the 15s promise further down.
             const ok = await dlgConfirm(
-              since + '\n\nThe job will be written to your Drive and will WAIT there until a gateway for it '
-              + 'is running - it is not lost, but nothing will reach the controller until then.\n\nSend anyway?',
-              { title: 'No gateway is listening', okLabel: 'Send anyway', cancelLabel: 'Cancel' },
+              'Studio could not check whether a gateway is running (your Drive did not answer).'
+              + '\n\nSend anyway?',
+              { title: 'Cannot check the gateway', okLabel: 'Send anyway', cancelLabel: 'Cancel' },
             );
             if (!ok) return;
           }
