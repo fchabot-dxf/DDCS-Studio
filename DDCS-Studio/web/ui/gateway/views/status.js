@@ -13,7 +13,19 @@ export default {
     this.conn = el('section', { class: 'block' });
     this.desc = el('section', { class: 'block' });
     this.vars = el('section', { class: 'block' });
-    ctx.root.append(this.conn, this.desc, this.vars);
+    // t2093 — the desktop-download offer, UNCONDITIONAL (human ruling): not gated on whether a gateway is
+    // reachable, not hidden when the exe is already running — "its not because i have the app open that i
+    // dont want to download it again." Static content, built once here rather than on every onPoll() like
+    // the sections above (nothing in it depends on connection state). Reuses .gateway-dl-pop/.dl-btn/.dl-note
+    // (styles.css, t2073) — the same markup + copy the old click-toggled popover used (removed in 9256574f
+    // when the tab stopped gating on a gateway answering); .gateway-dl-pop's own position:fixed is dropped
+    // (styles.css) since this is now a permanent in-flow card, not a floating overlay anchored to a click.
+    this.download = el('section', { class: 'block gateway-dl-pop' },
+      el('p', {}, 'The Gateway talks to your controller, so it runs on your own PC — not in the cloud.'),
+      el('a', { class: 'dl-btn', href: EXE_DOWNLOAD_URL, target: '_blank', rel: 'noopener' },
+         '⬇ Download DDCS Studio for desktop'),
+      el('p', { class: 'dl-note' }, 'Full app — Studio + Gateway in one exe.'));
+    ctx.root.append(this.conn, this.desc, this.vars, this.download);
     this.onPoll(ctx);
   },
 
@@ -40,9 +52,10 @@ export default {
           el('a', { href: '#', class: 'gw-link', id: 'gw-goto-console',
                     onclick: (e) => { e.preventDefault(); if (window.ddcsGatewayGoConsole) window.ddcsGatewayGoConsole(); } },
              'Enter a daemon URL in the Console tab'),
-          ' if it is somewhere else, or:'),
-        el('a', { class: 'op-btn', href: EXE_DOWNLOAD_URL, target: '_blank', rel: 'noopener',
-                  style: 'margin-top:10px;display:inline-block;text-decoration:none' }, '⬇ Get DDCS Studio for desktop'));
+          ' if it is somewhere else.'));
+      // t2093 — the inline "⬇ Get DDCS Studio for desktop" link that used to sit here is gone: the download
+      // offer below (this.download, mount()) is now unconditional and covers this case too, so this branch
+      // only needs to state ITS OWN specific guidance (finding an already-running gateway).
     } else {
       const rows = [
         ['machine', d.machine_name || deviceName(d) || '—'],

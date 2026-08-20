@@ -45222,3 +45222,86 @@ and approves the scale steps first.
 
 🔨 turn 2091
 
+# t2093 — the Gateway desktop-download link, restored (not rebuilt) and made unconditional
+
+## The regression: collateral damage from a genuine UX fix
+
+Commit `9256574f` ("Gateway tab always opens — no gateway needed") fixed a real chicken-and-egg problem: the
+tab used to gate on a gateway answering, but the Service picker that *connects* one lives inside the tab. That
+fix was correct and stays exactly as it was. Its side effect: the 28-line `toggleDownloadPop()` function it
+deleted was the ONLY way a web visitor could ever get to the desktop-app download — leaving `helpPanel.js`'s
+own "Do I need the desktop app? Yes." answer with no way to act on it, and the only other download affordance
+(`updateCheck.js`'s banner) only ever shows when an update is already detected, invisible to a first-time
+visitor.
+
+## Verified before building anything
+
+Confirmed via `git show 9256574f` exactly what was deleted (not reconstructed from memory): the old
+`toggleDownloadPop()` built a `.gateway-dl-pop` card (`<p>` message + `.dl-btn` + `.dl-note`), positioned it
+under the tab via a bounding-rect calc, and toggled it on click when not bridged. Confirmed the CSS for
+`.gateway-dl-pop`/`.dl-btn`/`.dl-note` is still in `styles.css` (made theme-correct at t2073, its own comment
+records the same "fell through a chain of dangling names to a hardcoded literal" bug this whole arc keeps
+finding), and confirmed via a repo-wide grep it has had **zero JS consumers** since 9256574f — genuinely
+orphaned, not almost-dead. Confirmed `EXE_DOWNLOAD_URL` (`gatewayStatus.js:13`,
+`.../releases/latest`) already matches `fairy/selfupdate.py`'s `RELEASES_PAGE` value exactly — nothing to
+reconcile there, the dispatch's "don't mint a second URL" instruction was already satisfied.
+
+## What changed
+
+The human's ruling overrides two conditions the dispatch itself had proposed (gated on reachability; hidden in
+the exe) — "its unconditionnal just because i want it there all the time." Implemented literally:
+- `ui/gateway/views/status.js`: the download card (same `.gateway-dl-pop` markup, same copy the deleted
+  popover used) is now built ONCE in `mount()`, appended alongside the existing `.conn`/`.desc`/`.vars`
+  sections, structurally outside and before the `if (!d) {...} else {...}` branching in `onPoll()` — by
+  construction this can never disappear based on connection state, since nothing in its own render path reads
+  `d` at all. Deleted the OLD conditional inline "⬇ Get DDCS Studio for desktop" link from the `if (!d)`
+  branch (now redundant with the unconditional card below it) and trimmed that branch's own sentence, which
+  used to dangle into the removed link ("...or:").
+  - `9256574f`'s own fix verified INTACT and untouched: the tab's click handler still unconditionally calls
+    `showApp('gateway')` — confirmed by reading the current handler directly, not assumed.
+- `styles.css`: `.gateway-dl-pop` loses `position: fixed; z-index: 1000;` — it's no longer a floating overlay
+  anchored to a click, so the positioning math (previously done in the deleted JS function) has nothing to
+  drive it. Everything else (background/border/radius/shadow/font-size/line-height/max-width, and the `p`/
+  `.dl-note`/`.dl-btn` sub-rules) is untouched — same visual card, just in-flow instead of floating. Updated a
+  stale cross-reference in the modal z-index scale's own comment (t2087) that still named
+  `.gateway-dl-pop at 1000`.
+
+## The LAN-guidance check — verified accurate, NOT rewritten
+
+`helpPanel.js`'s "Can I use Studio on my phone?" answer points to **Settings → Controller → Gateway** for the
+LAN URL. Traced it directly in `settingsPanel.js`: `set_tab_gateway` still exists, still contains a "LAN
+ACCESS" section with a live `#set_lan_mount` render point. **The path is currently accurate — nothing broken,
+nothing rewritten**, per the explicit instruction not to touch the LAN story on my own authority. Noted for
+whoever eventually retires LAN serving (pending the cloud proof, per the project's own standing understanding)
+that this FAQ answer is the one that will need rewriting then, not now.
+
+## Non-vacuity
+
+Live-verified the card: renders (`SECTION`, `position: static`), correct href/copy, AND — critically — the
+mem-server test environment happens to simulate a CONNECTED gateway (`live · 10.0.0.50`), so the screenshot
+gate itself exercises the exact "app is open, still want the download" scenario the human's ruling names
+directly, not just the disconnected case. `gateway-state-contract-1327.spec.js`'s own "THE OTHER DIRECTION —
+with a gateway answering..." test (which predates this turn) passed unchanged, confirming the new
+unconditional card doesn't interfere with the connected-state rendering it already checks.
+
+## Gate
+
+Scoped per the dispatch (not the full suite): node 193/193; the 6 `gateway-*.spec.js` files plus
+`settings-controller-group`/`settings-done-faq`/`settings-ia-regroup-1245`/`standalone-download` — 51 passed, 2
+skipped (pre-existing skips, unrelated), 0 failed. Comment-delimiter + brace-balance check: 0 suspects, depth
+0. Ramp enforceability: 32 hits, unchanged. Screenshots: 5 themes × Gateway Status tab, before/after — before
+shows no card at all (even connected); after shows the themed card, correctly accent-coloured per skin
+(spot-checked studio and futuristic directly).
+
+## Files
+- `DDCS-Studio/web/ui/gateway/views/status.js` — the unconditional download card; removed the now-redundant
+  conditional inline link.
+- `DDCS-Studio/web/styles.css` — `.gateway-dl-pop` de-positioned (no longer `position:fixed`); one stale
+  cross-reference comment corrected.
+- `DDCS-Studio/verification/t2093_gateway_dl_probe.mjs` — confirms the card's structure/content/position and
+  that the tab still always opens.
+- `DDCS-Studio/verification/t2093-screens.mjs` — before/after Gateway-tab screenshot capture, 5 themes.
+- `DDCS-Studio/verification/t2093-{before,after}-*-gateway-status.png` — screenshots.
+
+🔨 turn 2093
+

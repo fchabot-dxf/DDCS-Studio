@@ -209,8 +209,10 @@ svg [id*="Zfirst_travel"] {
        A naming pass, not a re-ordering: every value here is IDENTICAL to what the file already used before
        this turn — checked, not assumed. No two of these collided before this turn either (the dispatch's
        "two of those tie" did not hold up against the current file: the only real ties found were with
-       NON-modal surfaces — #global-tooltip at 12000, .scale-pop/.gateway-dl-pop at 1000, .toolbar-dropdown-
-       content at 2000, a mobile-keyboard editor pin at 10000 — none of which are modals). */
+       NON-modal surfaces — #global-tooltip at 12000, .scale-pop/.gateway-dl-pop at 1000 (as of t2087;
+       .gateway-dl-pop lost its z-index entirely at t2093, re-wired from a floating popover to an in-flow
+       card), .toolbar-dropdown-content at 2000, a mobile-keyboard editor pin at 10000 — none of which are
+       modals). */
     --z-modal-save: 2000; --z-modal-cloud: 2100; --z-modal-wizard: 10000; --z-modal-settings: 12000;
     --z-modal-library: 13100; --z-modal-workspace: 13200; --z-modal-help: 13300; --z-modal-setup-sheet: 13400;
     --z-modal-first-save: 20000; --z-modal-busy: 100000; --z-modal-saved: 100001; --z-modal-welcome: 100002;
@@ -453,10 +455,14 @@ html, body { overflow-x: clip; }
 
 /* t2073 — this rule's own background/border used to fall all the way through a chain of DANGLING names
    (--panel-bg, --border-color — never declared anywhere) to a hardcoded literal, meaning it never once
-   actually read the theme, in any skin. Fixed to read the real declared tokens directly. */
+   actually read the theme, in any skin. Fixed to read the real declared tokens directly.
+   t2093 — position:fixed/z-index DELETED: this was the click-toggled popover anchored under the Gateway tab
+   (JS-positioned via a bounding-rect calc in gatewayStatus.js's own toggleDownloadPop()), removed by 9256574f
+   when the tab stopped gating on a gateway answering — orphaned CSS with zero JS consumers ever since
+   (confirmed: no file referenced .gateway-dl-pop/.dl-btn/.dl-note anywhere before this turn). Re-wired as a
+   permanent in-flow card in the Gateway Status view instead (ui/gateway/views/status.js) — the SAME classes,
+   the SAME copy, just no longer a floating overlay that needs positioning math. */
 .gateway-dl-pop {
-    position: fixed;
-    z-index: 1000;
     max-width: 270px;
     padding: 12px 14px;
     background: var(--surface, #1e1e1e);
