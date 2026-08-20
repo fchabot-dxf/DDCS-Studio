@@ -129,9 +129,34 @@ makes a live gateway look dead. `last_seen` is for display only.
 
 ## 5. THE DRIVE PATH — a phone with no gateway anywhere
 
-**`[SHIPPED]`** A signed-in phone sends with **no gateway running at all** (t2080): it writes straight into
-`DDCS Bridge/<machine name>/inbox/`, and whichever gateway serves that mill picks it up when it next runs.
-Without a Google account the button is disarmed **with its reason shown** — never silently dead.
+**`[RULED]`** ⛔⛔ **A PHONE MAY NOT SEND WHEN NO GATEWAY IS RUNNING.** (human, 2026-08-20, explicit.)
+Sending requires a **FRESH heartbeat** for that machine; anything else refuses, with the reason stated:
+
+| heartbeat | meaning | send |
+|---|---|---|
+| **fresh** (<60s) | a gateway is alive and polling | **allowed** |
+| stale | nobody is listening | refused - say when it last checked in |
+| not visible | cannot see a gateway for this machine | refused - say exactly that |
+| unreadable / signed out | cannot reach Drive at all | refused (a write would fail anyway) |
+
+⭐⭐ **THIS IS THE STALE-G-CODE ARGUMENT APPLIED AT CREATION INSTEAD OF AT CLEANUP, and it is strictly
+better.** §3 discards stale jobs because a Monday program reaching the controller on Thursday is a hazard;
+this rule means such a job can never be CREATED. ⇒ the inbox only fills while something is there to drain
+it, "waits indefinitely until you switch on" stops existing, and §3's restart-discard becomes a rare edge
+rather than the normal path.
+
+⚠ **THE CAPABILITY THIS DELIBERATELY GIVES UP:** no "fire and forget from the couch" - you cannot queue a
+job at home for a shop that is closed. Accepted knowingly, for the reason above.
+
+⚠ **CURRENT BUILD DIFFERS AND MUST BE CHANGED.** t2080 shipped the opposite (a signed-in phone sends with
+no gateway running anywhere - `client-send-2080.spec.js:39`, *"Send offers the DRIVE route instead of going
+dead"*), and t2101 softened it only to a *warning* with a **Send anyway** button. ⇒ That confirm must become
+a **refusal**, and the spec that asserts the old contract must be rewritten to the new one.
+⚠ The advisor initially read this ruling as a factual claim about current behaviour and "corrected" the
+human with spec evidence. It was a REQUIREMENT. Recorded so the next reader does not re-litigate it.
+
+**`[SHIPPED]`** Without a Google account the button is disarmed **with its reason shown** - never silently
+dead. That contract is unchanged and is the model the refusals above should follow.
 
 **`[SHIPPED]`** ⛔ The browser **refuses to send when the workspace has no machine name** rather than falling
 back to a flat `DDCS Bridge/inbox/`. That fallback is the entire hazard S4 removes: `_maybe_claim` takes
