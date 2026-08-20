@@ -243,9 +243,29 @@ function visualMaxHeight(visual) {
 function stackChrome(v) {
     const bodies = [...v.querySelectorAll('[data-viz-pane] > .wiz-pane-body')];
     if (!bodies.length) return null;
+    // ⛔⛔ t2113 - THE COMMENT ABOVE CLAIMED THIS WAS STABLE ("the next pass reproduces exactly that
+    // difference") AND IT IS NOT. `visual - bodies` infers chrome from whatever is not body - but the bodies
+    // were ALREADY SHRUNK by the previous pass's --viz-stack-h. So each run measures a larger chrome, sets a
+    // smaller body, and the next run measures larger still. REPRODUCED at 390px, five opens of one wizard:
+    // pane bodies 51 -> 34 -> 24 -> 14 -> 4px. That is the human's "both panes open as ~40px strips", and it
+    // keeps going to zero. The stored height is NOT the ratchet - it pins at the 160 floor on the first open
+    // and stays there while the panes carry on shrinking.
+    // ⇒ MEASURE WITH THE VARIABLE CLEARED, so the bodies are at their NATURAL size and the reading cannot be
+    //   contaminated by our own previous write. Same 'ask the layout' philosophy the original chose - it just
+    //   has to ask a layout we have not already deformed.
+    // ⚠ BOTH of our own variables come off, not just one. Clearing --viz-stack-h alone still leaves
+    //   --viz-explicit-h from the previous pass driving `vh`, and the reading stays contaminated - measured:
+    //   that version traded a downward ratchet (51->34->24->14->4) for an upward one (51->58->65->72->79).
+    //   Chrome is headers + splitter + sizer; it must be read from a layout WE have not touched at all.
+    const hadStack = v.style.getPropertyValue('--viz-stack-h');
+    const hadExpl = v.style.getPropertyValue('--viz-explicit-h');
+    if (hadStack) v.style.removeProperty('--viz-stack-h');
+    if (hadExpl) v.style.removeProperty('--viz-explicit-h');
     const vh = v.getBoundingClientRect().height;
+    const sum = bodies.reduce((a, b) => a + b.getBoundingClientRect().height, 0);   // forced reflow: intentional
+    if (hadStack) v.style.setProperty('--viz-stack-h', hadStack);
+    if (hadExpl) v.style.setProperty('--viz-explicit-h', hadExpl);   // restored; the caller overwrites both
     if (!(vh > 0)) return null;                                   // not laid out → no opinion, leave the default
-    const sum = bodies.reduce((a, b) => a + b.getBoundingClientRect().height, 0);
     return Math.max(0, Math.round(vh - sum));
 }
 
@@ -266,9 +286,16 @@ function applyVisualHeight(h) {
         v.style.setProperty('--viz-explicit-h', fit + 'px');
         if (chrome != null) v.style.setProperty('--viz-stack-h', Math.max(0, fit - chrome) + 'px');
     });
-    // Persist the heal AFTER the layout pass, and only from a measurable visual. setVisualHeight no-ops on an
-    // unchanged value, and re-entering here with the healed number clamps to itself — so this settles, it does not loop.
-    if (healed != null && healed !== px) setVisualHeight(healed);
+    // ⛔ t2113 - THE HEAL IS NO LONGER PERSISTED, and that is the point of the change.
+    // getVisualHeight's own contract is "the visual block's height in px, or NULL WHEN THE USER HAS NEVER
+    // DRAGGED IT". A fit-to-screen clamp is not a drag - it is an accommodation to the window in front of
+    // you right now - and writing it into that slot made one device's constraint into every device's
+    // preference. Open a wizard on a PHONE, where the form leaves ~160px for the visual, and the floor value
+    // was saved; open the same wizard on a 1920px monitor and it started from the phone's number.
+    // ⭐ The clamp still APPLIES (--viz-explicit-h below is the fit, never the raw request), so a stored 900
+    // still cannot reopen a wizard with its handle buried. It is simply recomputed from the real window each
+    // time instead of being written down, which is what a viewport-derived value should always have been.
+    // ⚠ `healed` is deliberately still computed above: it is what feeds the clamp. Only the WRITE is gone.
 }
 
 function addVisualSizer(split) {
