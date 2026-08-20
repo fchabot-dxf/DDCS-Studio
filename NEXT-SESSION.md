@@ -7111,3 +7111,27 @@ ruling does not say whether that case matters — **it must be answered explicit
 offline machine queues instead of discarding; (3) answer the offline-shop question explicitly; THEN decide.
 The honest sentence at that point is *"cloud replaces LAN for the internet-connected case"* — and whether
 the remaining case is worth the messy middle is the human's call, made with evidence rather than optimism.
+
+## ⭐ RULING — BACKLOG #9 IS "SIGNAL FAILURE", NOT "QUEUE INSTEAD OF DISCARD"
+*(human, 2026-08-20: "well undeliverable gcode dont need queued, just signal failure." This SUPERSEDES the
+B-section wording above and the BACKLOG #9 entry.)*
+
+**The defect is not the discard. It is the LIE.** A phone is told "queued", a sleeping gateway's first poll
+destroys the job, and **nothing ever contradicts the original claim.** The fix is HONESTY, not persistence.
+
+⛔ **DO NOT BUILD:** a retry queue · a retry ceiling · retry state surviving a restart · leaving the job in
+the inbox · backoff. All of that was proposed and is now out of scope.
+
+✅ **DO BUILD:** whatever is smallest to make the failure VISIBLE to whoever sent the job — especially a
+browser or phone sender that is not the gateway. Prefer the status the poller ALREADY writes over inventing
+a new one. ⚠ If nothing on the sending side ever READS that status, **that is the actual bug and the actual
+fix.**
+
+**Keep the transient-vs-fatal distinction ONLY as far as it changes the MESSAGE** — "your controller was not
+reachable" and "this job was refused by the wrong controller" are different things a human acts on
+differently. It must NOT change whether the job is kept; it is not kept either way.
+
+⭐ **Why this is the better call:** the project's recurring failure all week has been SILENCE — a beacon
+that never fired, a caret that never painted, a popover nothing rendered, "pre-existing" hiding a stale
+test. Undeliverable G-code that vanishes quietly is the same shape. Making it speak is the fix; making it
+persist is a feature nobody asked for.
