@@ -45625,3 +45625,158 @@ changed; this turn is entirely `bridge/bridge-app` + one `desktop/` file.
 
 🔨 turn 2097
 
+# t2099 — the 15: a verdict per spec, two real defects fixed (not papered), the gate genuinely green
+
+Dispatch: the human ruled "fix them here, all of them" on the 15 UI-overflow failures t2095/t2096 surfaced and
+flagged rather than touched. The advisor pre-classified two explicitly (editor-file-menu-1227 stale, editor-chrome
+PHONE's 44px real), named four more as "expect stale, READ THEM, do not assume," left five fully unclassified, and
+set two hard constraints: never weaken a Group-B (real defect) assertion, and run the FULL Playwright gate — since
+a scoped 18-spec gate (da280131/t2078's own) is the documented cause of this whole turn.
+
+## VERDICTS — GROUP A, stale premise (test rewritten), 13 of 15
+
+All thirteen trace to one of three already-shipped, already-documented, deliberate changes whose own narrow gates
+never touched these specs:
+
+- **`editor-file-menu-1227.spec.js`** (2 tests) — t2078 retired the corner file menu (`#editor-file-btn`/
+  `#editor-file-menu`) entirely and put Load/Insert/Export back in the quick menu (reversing t1227, which the
+  commit's own message names explicitly: "t1227's test was right; these three simply fall on the app side of it
+  after all"). Rewrote both around the current door, preserving the ordered click-through / handler-firing proof
+  `editor-toolbar-2078.spec.js` doesn't already do.
+- **`editor-chrome.spec.js`** DESKTOP case — same retirement; the whole file's premise (Clear beside undo/redo in
+  the header, hidden on phone; a corner file menu) is the architecture t2078 replaced. Rewritten around the
+  current `.editor-toolbar` shape.
+- **`editor-indent-1450.spec.js`** TOOLBAR BUTTON + LAYOUT — t2077 (earlier, human: "remove indent button now")
+  retired `#editor-indent`/`#editor-outdent`; Tab/Shift+Tab became the primary path, not a second one
+  (`editorTextOps.js`'s own header: "always the primary path"). TOOLBAR BUTTON's one claim not already covered by
+  the sibling 'TAB / SHIFT+TAB' test (that lines above/below the selection stay untouched) was preserved, driven
+  by keyboard instead of a button that no longer exists. LAYOUT was **deleted**, not rewritten: its whole premise
+  (floating overlay buttons that could visually collide) is gone — t2078 replaced seven absolutely-positioned
+  buttons with one flex row where overlap is structurally impossible, and `editor-toolbar-2078.spec.js`'s own
+  first test already proves exactly that property more directly. Nothing was left for a same-named test to assert.
+- **`kbutton-authoring.spec.js`** — t2078 made the ✚Make button icon-only (`editor-toolbar-2078.spec.js`'s own
+  proof: visible text is just '▾'). The "Make" word moved into `aria-label`, not away; fixed the assertion to
+  read the attribute that now actually carries it.
+- **`header-profile-menu.spec.js`** — same t2078 reversal as editor-file-menu-1227, from the quick-menu's own
+  side: it used to assert Load/Insert/Export were ABSENT (9 rows); they're back (13 rows, DOM order verified —
+  right after `wizards`, matching `headerPost.js`'s own assembly order exactly on the first attempt, which is
+  the strongest confirmation the mental model was right, not guessed). Two now-misleading-but-technically-passing
+  checks (`gcodeRows`/`editorFileActs`, querying retired class/attribute names that coincidentally still return 0)
+  were replaced with checks against the CURRENT names rather than left as vacuous-by-accident.
+- **`context-menu-pass-1452.spec.js`** (2 tests) — RULE 1's own premise ("every menu entry has a VISIBLE BUTTON")
+  was invalidated by TWO separate, deliberate retirements (t2077: indent/outdent buttons; t2078: the comment
+  button) — both documented as "the keyboard door survives" moves, not "menu becomes the only path" regressions.
+  Re-encoded RULE 1 around driving the REAL surviving doors (Tab/Shift+Tab/Ctrl+/) rather than locating buttons
+  that no longer exist — a stricter, more direct proof of the rule's actual invariant than the button check ever
+  was. COMMENT/UNCOMMENT's byte-level claims are unchanged; only its trigger (`#editor-comment` click → `Ctrl+/`)
+  needed to change, since it drives the same `commentEditor()` implementation either way.
+- **`canvas-handle-writable-1804.spec.js`** — uses the corner file menu ONLY as unrelated test setup (loading a
+  program before the test's real subject, a canvas drag). Same t2078 door swap, mechanical fix.
+- **`gateway-mismatch-gate-1229.spec.js`** + **`preflight-badge-838.spec.js`** — a THIRD, separate cause (t2080,
+  the Drive BYO-cloud client transport): `send.js`'s `mount()` now calls `this.applyState(ctx.desc)` as its own
+  last line, and the real orchestrator (`gatewayPanel.js`) always populates `ctx.desc` from a real
+  `client.descriptor()` before mounting. Both tests synthetically `mount()` the Send view directly, predating
+  t2080, and never provided `desc` — so `applyState(undefined)` correctly reads as "no gateway," routes through
+  the Drive fallback instead of the mocked `client.submitJob`, and (no real Google sign-in in the test) throws.
+  Not a bug: confirmed by reading `make_backend`/`applyState`/`gatewayState` directly, not guessed. Fixed by
+  passing a realistic `desc` in the mount `ctx`, matching what the real orchestrator always provides.
+
+## VERDICTS — GROUP B, real defect (app fixed, never the test), 2 of 15
+
+**`editor-chrome.spec.js` PHONE case (44px touch target).** `#btn-clear` measured 24px against the spec's 44px
+floor. `styles.css:5267-5270`'s `.hdr-controls .hdr-clear` rule (t1255's own ≥44px phone-width ruling) was
+correct and never touched — it simply stopped matching anything: t2078 moved the button into `.editor-toolbar`
+and it lost the `.hdr-undo`/`.hdr-clear` classes along the way (confirmed via `grep` — those classes exist
+nowhere in current `index.html`). Re-homed the rule to `#btn-clear` in its actual current location (base rule +
+media query together, not a corpse selector left behind plus a second new one), keeping the t1255 reasoning
+attached to wherever the button actually lives.
+
+**`header-responsive.spec.js` + `settings-ia-regroup-1245.spec.js` (390px header overflow) — the deep one.**
+Both looked like the same bug (405 vs 390, exact match) but are NOT: `header-responsive` measures `.app-header`
+itself; `settings-ia-regroup-1245` measures `document.body.scrollWidth` with the Settings modal open — a
+coincidental matching number that led down a wrong path briefly before being caught and re-diagnosed from
+scratch. The REAL, shared root cause, once found:
+
+1. `commandDeck.js`'s `_fitAppHeader()` (`HEADER_YIELD`, six declared stages) sheds one stage at a time, breaking
+   the instant `scrollWidth <= clientWidth`, and — this was the structural bug — **if all six apply and it still
+   doesn't fit, the loop just ends, silently, forever broken.** No warning, no signal, the exact "silent failure"
+   shape this whole week of fixes keeps finding. Added a one-time `console.warn` naming the measured overflow
+   when the ladder is exhausted and the header still doesn't fit.
+2. **The immediate 15px gap**, MEASURED (not estimated) at 390px: the header's children sum to 405px against a
+   375px content box; `.hdr-tabs` (248px) is `flex: 0 1 auto` with the implicit `min-width: auto` every flex item
+   gets, already at its own min-content size, unable to shrink further regardless of `flex-shrink`. Two things
+   recover the room, applied in the ORDER their cost justifies, both scoped to the LAST rung (`hy-controls`) so
+   nothing is sacrificed before every cheaper stage has already been tried:
+   - **Margin collapse (the real fix — tried first).** `.hdr-quick`/`.file-save-chip`/`.hdr-tabs`'s inter-group
+     margins sum to 32px — almost exactly the 15px deficit, with headroom, and removes zero information (no
+     control hidden, no label dropped, nothing scrolls off). This alone resolved every measured case.
+   - **`.hdr-tabs { min-width: 0; overflow-x: auto; }` (the backstop — last resort, not the first move).**
+     Overrides the implicit min-width floor so the tab strip can shrink into an internal scroll rather than
+     forcing `.app-header` past the viewport, for whatever content combination margin-collapse alone doesn't
+     cover. **First attempt applied this UNCONDITIONALLY** (not scoped to `hy-controls`) — caught by a full-sweep
+     re-run: it made the header trivially "fit" at every width by letting `.hdr-tabs` scroll immediately, so the
+     ENTIRE yield ladder stopped engaging at all (0 of 6 stages ever applied, at any width), which
+     `collapsible-panes-752.spec.js`'s own "the yield ladder did real work" assertion correctly caught as a
+     regression — tab discoverability quietly traded away for a fit the ladder was never asked to give up that
+     much for. Re-scoped to `.app-header.hy-controls .hdr-tabs` only, matching the advisor's explicit priority
+     ("last resort, not the first move") and restoring the ladder's normal staged behavior everywhere else.
+3. **A third, genuinely separate contributor, found only by tracing the exact DOM element at fault** (not
+   assumed from the first two): `#hdrAccount` (t2077's header account/sign-in button) was contributing real
+   width that a COLD LOAD's fit pass never saw. `index.html`'s boot sequence calls `initHeaderAccount()` (which
+   populates `#hdrAccount`'s content) on a LATER step than `commandDeck.js`'s own first `_fitAppHeader()` rAF
+   call — traced directly via `grep`, not inferred — so the very first fit measured the header while
+   `#hdrAccount` was still an empty, zero-width div, and nothing ever re-measured afterward. This is the SAME
+   "stale fit decision never revisited" bug class t2081 already found and partially fixed for theme switches
+   specifically (its own comment: "resize/fonts.ready/initial load don't exhibit this" — turns out initial load
+   DOES, just via a different trigger t2081 didn't have visibility into). Exposed `window.ddcsRefitHeader` (the
+   existing `fit` closure, already used by resize/fonts.ready) and called it from `renderHeaderAccount()` itself,
+   right after `host.innerHTML` is actually set (an earlier placement — before the content exists — was caught
+   and fixed before verifying, since a refit against an still-empty host is a no-op), covering every render:
+   cold load AND every later sign-in/out.
+
+**Verified against the real symptom throughout, not assumed fixed by inspection.** Live diagnostics (mem-server
+started manually, killed after each check per the shared-server-cleanup discipline) confirmed: the exact class
+list applied at 390px before any fix (5 of 6 stages, `hy-controls` never reached — the header was already
+narrower than the old test suite assumed, from t2078 alone); the exact DOM element (`#hdrAccount`) and its exact
+right-edge overflow (405 vs a 390px viewport) with settings open; the header rendering cleanly at 390px
+(screenshot, `verification/t2099-header-390.png`, not committed — scratch evidence, kept locally). Then the full
+originally-failing 15 (all specs, not just the two Group-B ones) were re-run together twice: once mid-fix (caught
+the unconditional-scroll regression), once final (71/71 passed, `editor-toolbar-2078.spec.js` included as the
+authoritative cross-check).
+
+## Amendments absorbed mid-turn
+
+Two arrived and were incorporated: (1) a process note — `git stash` was used to compare against the clean tree
+while diagnosing t2097's earlier 403 self-test failure; corrected for future turns to `git show <ref>:<path>` /
+`git checkout <ref> -- <paths>` instead, since this repo is shared with a second station and the stash stack is
+global. (2) A same-file comment mislabel — every `t2097` comment written this turn (this IS t2099; t2097 was the
+earlier gateway turn) was bulk-corrected via a scoped `sed` across exactly the files this turn touched, verified
+by a zero-match `grep` afterward. (A third amendment briefly redirected to an S4 gateway task, then was
+explicitly cancelled by the advisor's own next message before any S4 work started — no trace of it in this
+turn's files.)
+
+## Gate
+
+Full `npm test` (node + entire Playwright suite, backgrounded ~30min, real exit code read from the log's own
+`PLAYWRIGHT_DONE_$?` marker, not a piped `tail`): **node 193/193; Playwright 2605 passed, 27 flaky, 0 unexpected,
+26 skipped. test:node exit 0, test:e2e exit 0.** The gate the advisor's own dispatch said this turn exists to
+make readable again is genuinely, fully green — not argued green. Comment-brace check: depth 0, 0 suspects.
+Ramp grep: 32, unchanged.
+
+## Files
+- `DDCS-Studio/tests/editor-file-menu-1227.spec.js`, `editor-chrome.spec.js`, `editor-indent-1450.spec.js`,
+  `kbutton-authoring.spec.js`, `header-profile-menu.spec.js`, `context-menu-pass-1452.spec.js`,
+  `canvas-handle-writable-1804.spec.js`, `gateway-mismatch-gate-1229.spec.js`, `preflight-badge-838.spec.js`,
+  `collapsible-panes-752.spec.js` — Group A rewrites (stale premises) + the one Group A softened assertion
+  (collapsible-panes-752's yield-step count, content-dependent by the mechanism's own design).
+- `DDCS-Studio/web/styles.css` — `#btn-clear` re-homed (44px floor, base rule + media query); `.hy-controls`
+  stage gains margin-collapse (the real fix) + a scoped `.hdr-tabs` scroll backstop (last resort).
+- `DDCS-Studio/web/ui/commandDeck.js` — `_fitAppHeader()` warns once on ladder exhaustion; exposes
+  `window.ddcsRefitHeader`.
+- `DDCS-Studio/web/ui/headerAccount.js` — `renderHeaderAccount()` asks for a header refit after its own render
+  (cold load and every later sign-in/out), fixing the stale-cold-load-fit race at its actual source.
+- `DDCS-Studio/web/ui/headerPost.js` — one stale comment (pre-t2078 architecture) corrected in passing, directly
+  adjacent to code this turn's own investigation required reading closely.
+
+🔨 turn 2099
+

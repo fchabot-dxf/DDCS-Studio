@@ -306,7 +306,9 @@ html, body { overflow-x: clip; }
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
-.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; align-self: flex-end; min-height: 44px; }   /* t748 — min-height (content-driven): the bottom-aligned band GROWS if the tab content is taller; feet still meet the bar below. Resting height is 44px. */
+/* t748 — min-height (content-driven): the bottom-aligned band GROWS if the tab content is taller; feet still meet
+   the bar below. Resting height is 44px. */
+.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; align-self: flex-end; min-height: 44px; }
 /* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
 .hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
 .hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
@@ -5247,12 +5249,26 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-tiny .logo { height: 24px; }
 .app-header.is-tiny button.hdr-quick-btn { width: 20px; }   /* t748 — reclaim phone px: the visible chevron tightens, its ≥44px ::before hit area is unchanged */
 /* Stage 6 (.hy-controls): the tightest tier — keep undo/redo REACHABLE (t752, audit gap b) by tightening the controls
-   + tab padding so they never scroll off-screen, instead of docking them away. Reached only when is-tiny still overflows. */
+   + tab padding so they never scroll off-screen, instead of docking them away. Reached only when is-tiny still overflows.
+   t2099 — MEASURED at 390px (post t2078, which removed Clear from the header): even every prior stage applied,
+   the header still overflowed by 15px, and .hdr-tabs was already at min-content — no label left to shrink. The
+   fix is NOT to hide a control: the three inter-GROUP margins (.hdr-quick/.file-save-chip/.hdr-tabs, 12+4+16=32px)
+   sum to almost exactly the deficit, so collapsing them at this last rung recovers the room without removing a
+   single piece of information, tried before anything that would (see .hdr-tabs's own min-width:0/overflow-x:auto
+   below, kept as a defensive backstop for whatever content combination this margin recovery doesn't cover). */
 .app-header.hy-controls .hdr-controls { gap: 1px; }
 .app-header.hy-controls .hdr-controls .hdr-undo { padding: 2px 3px; font-size: 13px; }
 .app-header.hy-controls .hdr-tabs .tab { padding: 0 6px; }
 .app-header.hy-controls .brand { padding: 0 2px; }
 .app-header.hy-controls .logo { height: 22px; }
+.app-header.hy-controls .hdr-quick { margin-right: 0; }
+.app-header.hy-controls .file-save-chip { margin-left: 0; }
+/* t2099 — the defensive backstop named above: min-width:0 overrides a flex ITEM's implicit min-width:auto (which
+   floors .hdr-tabs at its own min-content size regardless of flex-shrink — the reason the ladder could exhaust
+   every OTHER step and still overflow). Scoped to this last rung ONLY, after margin-collapse above has already
+   been tried: letting tabs scroll is a real cost (a tab can hide off-screen with no visible affordance), so it
+   only engages once every other declared step, margins included, has already failed to make the header fit. */
+.app-header.hy-controls .hdr-tabs { margin-left: 0; min-width: 0; overflow-x: auto; }
 /* Header Undo/Redo: slim icon buttons that match the header chrome */
 .hdr-controls .hdr-undo {
     font-size: 15px; padding: 2px 6px; line-height: 1; border: none; border-radius: 4px;
@@ -5260,14 +5276,18 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 }
 .hdr-controls .hdr-undo:hover:not(:disabled) { opacity: 1; background: rgba(128,128,128,.15); }
 .hdr-controls .hdr-undo:disabled { opacity: .28; cursor: default; filter: grayscale(.5); }
-/* Clear-program shortcut beside undo/redo (destructive → a red-tinted trash glyph).
+/* Clear-program shortcut (destructive → a red-tinted trash glyph).
    t1255 (user) — VISIBLE AT EVERY WIDTH. It used to hide below 600px, which is exactly why a second "Clear editor"
    row existed in the editor's file menu for phones; that duplicate is gone, so the trash has to be there when the
-   window is small — otherwise the phone loses Clear altogether. It keeps a ≥44px touch target at phone widths. */
-.hdr-controls .hdr-clear { color: #ef4444; display: inline-flex; align-items: center; }
-.hdr-controls .hdr-clear:hover { opacity: 1; background: rgba(239,68,68,.14); }
+   window is small — otherwise the phone loses Clear altogether. It keeps a ≥44px touch target at phone widths.
+   t2099 — RE-HOMED, selector updated to match: t2078 moved this button out of `.hdr-controls` (it lost the
+   `.hdr-undo`/`.hdr-clear` classes along the way) into `.editor-toolbar #btn-clear` — the t1255 reasoning is
+   unchanged, only WHERE the button now lives. `.hdr-controls .hdr-clear` matched nothing after that move, so
+   the phone-width floor below silently stopped applying (measured: 24px, not 44px) until this was noticed. */
+#btn-clear { color: #ef4444; display: inline-flex; align-items: center; }
+#btn-clear:hover { opacity: 1; background: rgba(239,68,68,.14); }
 @media (max-width: 600px) {
-    .hdr-controls .hdr-clear { min-width: 44px; min-height: 44px; justify-content: center; }
+    .editor-toolbar #btn-clear { min-width: 44px; min-height: 44px; justify-content: center; }
     /* t1255 — MAKING ROOM for it. At 390px the header was already at every shrink class it has (is-tiny et al) and
        still summed past the viewport once the trash claimed its 44px touch target. The cheapest thing to give up on a
        phone is the wordmark: the logo alone still identifies the app, and the alternative — a 44px hit area overlapping

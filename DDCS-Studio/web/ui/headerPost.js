@@ -148,10 +148,9 @@ export function initHeaderPost() {
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
             + `</div>`;
 
-        // t1227 CURATION (user ruling): the GCODE ROW (Load / Insert / Export) and CLEAR EDITOR are GONE from here.
-        // They act on the program in the editor pane, and this menu is where you look for APP things — so they moved
-        // to the editor's own corner file menu (index.html #editor-file-btn → ddcsEditorFileMenu). Same handlers, one
-        // place. What is left in this menu is the WORKSPACE and app-level entries.
+        // t1227 CURATION (user ruling), REVERSED BY t2078 — see the fileRows comment below for the current story.
+        // Load / Insert / Export are back in THIS menu; the editor's own corner file button/menu is gone entirely.
+        // Clear alone stayed out (t1255) — it lives in the editor's own toolbar row.
 
         // ── t1223 (1) — WORKSPACE ROW: Save + Open are the PRIMARY buttons, and all workspace management lives
         //    here rather than in a new header menu. ────────────────────────────────────────────────────────────

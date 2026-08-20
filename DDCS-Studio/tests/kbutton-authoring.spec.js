@@ -23,9 +23,11 @@ test('Parts 2+3: editor ＋Make▾ menu → K-button saves + Generate; CAM slot 
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsEditorMakeMenu && document.getElementById('editor-cam-btn') && window.ddcsGetSettings);
   await page.evaluate(() => { document.getElementById('editor').value = 'G0 X0 Y0\nG1 Z-2 F100\nG1 X10\nM30\n'; });
-  // Part 2 — the button is a Make menu, NOT a standalone CAM-slot button
-  const label = await page.evaluate(() => document.getElementById('editor-cam-btn').textContent.trim());
-  expect(label, 'the editor button is the ＋ Make ▾ menu').toContain('Make');
+  // Part 2 — the button is a Make menu, NOT a standalone CAM-slot button.
+  // t2099 — t2078 made Make icon-only (editor-toolbar-2078.spec.js: visible text is just '▾'); the "Make"
+  // word moved from the button's text into its aria-label/title instead of disappearing.
+  const label = await page.evaluate(() => document.getElementById('editor-cam-btn').getAttribute('aria-label') || '');
+  expect(label, 'the editor button is still named Make, now via aria-label (icon-only text)').toContain('Make');
   await page.evaluate(() => document.getElementById('editor-cam-btn').click());
   await page.waitForSelector('#editor-make-menu [data-mk="kbtn"]', { timeout: 8000 });
   const items = await page.evaluate(() => [...document.querySelectorAll('#editor-make-menu [data-mk]')].map((b) => b.dataset.mk));

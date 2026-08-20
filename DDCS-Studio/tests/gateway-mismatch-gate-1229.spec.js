@@ -208,8 +208,14 @@ test('a MATCHING controller sends as before — the gate only fires on a real mi
         // the same machine this workspace targets → no gate; and a wide envelope so the pre-flight stays green
         const s = window.ddcsGetSettings(); s.machine = s.machine || {};
         Object.assign(s.machine, { x: 3000, y: 3000, z: -300 }); s.machine.wcs = { active: 1, table: [{ x: 0, y: 0, z: 0 }] };
+        // t2099 — t2080 added a real gateway-reachability gate: mount()'s own last line calls
+        // this.applyState(ctx.desc), and gatewayPanel.js (the real orchestrator) always populates ctx.desc
+        // from a real ctx.client.descriptor() BEFORE calling mount(). Omitting it here (as this test always
+        // has) makes applyState(undefined) correctly read as "no gateway" and route through the Drive
+        // fallback instead of the mocked client.submitJob — not a bug, just a mock that predates t2080.
         mod.default.mount({
             root,
+            desc: { id: 'ddcs-expert-m350', name: 'DDCS Expert M350' },
             client: {
                 profile: async () => ({ id: 'ddcs-expert-m350', name: 'DDCS Expert M350' }),
                 submitJob: async () => { window.__submitted++; return { jobId: 'J1', tracked: false }; },

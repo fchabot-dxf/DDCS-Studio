@@ -243,7 +243,7 @@ test.describe('motion tokens + reduced-motion', () => {
 });
 
 test.describe('header rider + emit', () => {
-  test('undo/redo stay REACHABLE (on-screen) at 360px (hy-controls yield step)', async ({ page }) => {
+  test('undo/redo stay REACHABLE (on-screen) at 360px (the yield ladder actually engaged)', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
@@ -253,12 +253,19 @@ test.describe('header rider + emit', () => {
     const r = await page.evaluate(() => {
       const h = document.querySelector('.app-header');
       const onScreen = (id) => { const e = document.getElementById(id); if (!e || e.offsetParent === null) return false; const b = e.getBoundingClientRect(); return b.left >= -0.5 && b.right <= window.innerWidth + 0.5; };
-      return { overflow: h.scrollWidth - h.clientWidth, undo: onScreen('btn-undo'), redo: onScreen('btn-redo'), foldStep: h.classList.contains('hy-controls') };
+      // t2099 — HEADER_YIELD (commandDeck.js) stops the instant the header fits, so exactly WHICH steps engage
+      // is content-dependent, not a fixed fact this test should pin: t2078 removed Clear from the header
+      // entirely, so the header now has less to shed and fits at 360px after only 5 of the 6 declared steps —
+      // 'hy-controls' (the last, tightest rung) is never reached anymore. Checking that this specific rung
+      // engaged was never the real claim; the real claim (still true, re-asserted below) is that the LADDER
+      // did real work to get here, not that the header happened to already fit unyielded.
+      const HEADER_YIELD = ['hy-logo', 'is-compact', 'hy-tabscale', 'is-mini', 'is-tiny', 'hy-controls'];
+      return { overflow: h.scrollWidth - h.clientWidth, undo: onScreen('btn-undo'), redo: onScreen('btn-redo'), yieldSteps: HEADER_YIELD.filter((c) => h.classList.contains(c)) };
     });
     expect(r.overflow, 'the header fits at 360px').toBeLessThanOrEqual(0);
     expect(r.undo, 'undo is on-screen at 360px').toBe(true);
     expect(r.redo, 'redo is on-screen at 360px').toBe(true);
-    expect(r.foldStep, 'the hy-controls yield step engaged').toBe(true);
+    expect(r.yieldSteps.length, 'the yield ladder did real work to make this fit, not a lucky unyielded default').toBeGreaterThan(0);
   });
 
   test('emit is BYTE-IDENTICAL whether a pane is collapsed or not (view-only)', async ({ page }) => {

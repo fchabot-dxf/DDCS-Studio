@@ -117,44 +117,30 @@ test('THE WIDTH IS ONE CONSTANT — the editor indents by exactly what the emitt
     expect(r.ddcsForceFlushesEvenWhenAskedIndented, 'DDCS flushes even if indentStyle:"indented" is requested explicitly').toBe(true);
 });
 
-test('THE TOOLBAR BUTTON — select, click, the BYTES carry the spaces; outdent puts them back', async ({ page }) => {
+test('THE KEYBOARD DOOR — select, Tab, the BYTES carry the spaces; Shift+Tab puts them back, boundaries untouched', async ({ page }) => {
+    // t2099 — t2077 (human: "remove indent button now") retired #editor-indent/#editor-outdent entirely: Tab /
+    // Shift+Tab became the primary path, not a second one (editorTextOps.js's own header: "always the primary
+    // path"). The sibling 'TAB / SHIFT+TAB' test below already proves the byte-level indent/outdent claim; this
+    // one's remaining unique value — that lines ABOVE and BELOW the selection stay untouched — is preserved here,
+    // driven the same way the button used to be driven.
     await boot(page);
     const s = await select(page, 1, 3);
-    await page.click('#editor-indent');
+    await page.keyboard.press('Tab');
     const v = await val(page);
     expect(v, 'exactly the selected lines gained REAL leading spaces — and nothing else moved').toBe(withIndent(s.before, 1, 3, '  '));
     expect(v.split('\n')[0], 'the line ABOVE the selection is untouched').toBe(s.lines[0]);
     expect(v.split('\n')[4], '…and the line below it').toBe(s.lines[4]);
-    await page.click('#editor-outdent');
+    await page.keyboard.press('Shift+Tab');
     expect(await val(page), 'outdent restores the original bytes exactly').toBe(s.before);
 });
 
-/**
- * THE BUTTONS JOIN THE EDITOR'S DECLARED BUTTON STACK — asserted, because the first cut did not.
- *
- * The editor's overlay buttons stack off `--kbd-clear` (and off the 3D drawer in portrait), 32px apart, in CSS —
- * the INLINE `bottom` each carries is overridden there. Picking an inline offset therefore looked right at the test
- * viewport and OVERLAPPED "✚ Make" at a wide one; caught by eyeballing the screenshot, then measured. The pair now
- * takes the next slot in that same declared stack, and this keeps it that way.
- */
-test('THE LAYOUT — the indent pair stacks with the other editor buttons, never over them', async ({ page }) => {
-    await boot(page);
-    const r = await page.evaluate(() => {
-        const o = {};
-        for (const id of ['editor-indent', 'editor-outdent', 'editor-cam-btn', 'align-rotate-btn']) {
-            const e = document.getElementById(id);
-            if (!e) return null;
-            const b = e.getBoundingClientRect();
-            o[id] = [Math.round(b.top), Math.round(b.bottom)];
-        }
-        return o;
-    });
-    expect(r, 'all four editor overlay buttons exist').not.toBeNull();
-    const hits = (a, b) => a[0] < b[1] && b[0] < a[1];
-    for (const mine of ['editor-indent', 'editor-outdent'])
-        for (const other of ['editor-cam-btn', 'align-rotate-btn'])
-            expect(hits(r[mine], r[other]), `${mine} must not overlap ${other} — ${JSON.stringify(r)}`).toBe(false);
-});
+// t2099 — 'THE LAYOUT' (the indent/outdent overlay pair must not visually collide with the other editor overlay
+// buttons) is DELETED, not rewritten: t2078 retired the whole floating-overlay-button architecture this test's own
+// premise depended on (seven absolutely-positioned buttons, hand-computed offsets) in favour of ONE flex row
+// (.editor-toolbar) where overlap is structurally impossible, not merely avoided by careful positioning. That
+// property — one row, nothing absolutely positioned, no stray buttons — is already fully proven by
+// editor-toolbar-2078.spec.js's own first test ('one row, the six pane tools, none absolutely positioned'). There
+// is nothing left for a same-named test here to assert that spec doesn't already cover more directly.
 
 test('TAB / SHIFT+TAB — the same one implementation, from the keyboard', async ({ page }) => {
     await boot(page);

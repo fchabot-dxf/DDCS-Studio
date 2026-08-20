@@ -69,8 +69,10 @@ test('COLD page, real Load: corner\'s reposition handle exists and writes into t
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
     page.once('dialog', (d) => d.accept());
     const chooserPromise = page.waitForEvent('filechooser');
-    await page.locator('#editor-file-btn').click();
-    await page.locator('[data-efm="load"]').click();
+    // t2099 — the corner file menu (#editor-file-btn/[data-efm]) is retired (t2078); Load now reaches the same
+    // loadGcodeFile handler via the header quick menu instead — same file-chooser trigger, different door.
+    await page.locator('#hdrPostBtn').click();
+    await page.locator('#hdrPostMenu [data-act="fileLoad"]').click();
     const chooser = await chooserPromise;
     await chooser.setFiles(tmpFile);
 

@@ -1,11 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * t1227 — THE CURATION (all user-ruled).
+ * t1227 — THE CURATION (all user-ruled), REVERSED BY t2078 for three of the four actions.
  *
- * Load / Insert / Export / Clear act on the PROGRAM IN THE EDITOR, so they left the header quick menu (where you look
- * for app-level things) for the editor pane's own corner menu. The same handlers run — this spec drives the new door
- * and asserts each one reaches the function the quick-menu row used to call, so "moved" is proven, not assumed.
+ * t1227: Load / Insert / Export / Clear act on the PROGRAM IN THE EDITOR, so they left the header quick menu
+ * (where you look for app-level things) for the editor pane's own corner menu.
+ *
+ * t2099 — t2078 (human: "the load insert export button can go in the quick menu") reversed the Load/Insert/
+ * Export half: the editor's own corner file button/menu (#editor-file-btn / #editor-file-menu) is RETIRED
+ * entirely, not relocated — those three are back in the quick menu, the human's own refinement of t1227's
+ * rule ("act on the program AS A WHOLE", never mid-edit, so they fall on the app side of it after all). Clear
+ * alone stayed OUT of the quick menu (t1255) and lives in the editor's own toolbar row (`#btn-clear`) instead
+ * of either menu. Same handlers throughout — only which door reaches them changed. The authoritative source
+ * for the current shape is `editor-toolbar-2078.spec.js`; these tests are updated to match it rather than
+ * duplicate it, while keeping the ordered-click-through coverage that spec doesn't do.
  *
  * Also here: the workspace manager's Browse… escape is gone (the granted folder is the ONE way in), and Duplicate…
  * does not appear before there is a file to duplicate.
@@ -24,43 +32,33 @@ async function boot(page) {
     });
 }
 
-test('the editor corner carries a FILE menu: Load / Insert / Export / Clear, each reaching its own handler', async ({ page }, testInfo) => {
+test('the editor corner FILE MENU IS RETIRED (t2078): Load / Insert / Export reach the quick menu, Clear reaches its own toolbar button, same handlers as before', async ({ page }, testInfo) => {
     await boot(page);
 
-    const btn = page.locator('#editor-file-btn');
-    await expect(btn, 'the file button sits in the editor pane, not the header').toBeVisible();
-    expect(await page.evaluate(() => !!document.querySelector('.editor-container #editor-file-btn')), 'inside the editor container').toBe(true);
-    await expect(page.locator('#editor-copy-btn'), 'the copy button STAYS beside it').toBeVisible();
+    // t2078 — the corner door is gone entirely, not just relocated (editor-toolbar-2078.spec.js's own 'gone' check).
+    expect(await page.evaluate(() => !!document.getElementById('editor-file-btn')), 'the corner file button no longer exists').toBe(false);
+    expect(await page.evaluate(() => !!document.getElementById('editor-file-menu')), 'the corner file menu no longer exists').toBe(false);
+    await expect(page.locator('#editor-copy-btn'), 'the copy button stays in the editor toolbar').toBeVisible();
 
-    await btn.click();
-    const menu = page.locator('#editor-file-menu');
-    await expect(menu).toBeVisible();
-    // t1255 (user) — THREE, not four: Clear left this menu. The header trash is THE clear at every width now, and
-    // two doors to a destructive action is one too many. Named, so a re-added row has to be explained.
-    await expect(menu.locator('[data-efm]')).toHaveCount(3);
-    for (const [id, label] of [['load', /Load/], ['insert', /Insert/], ['export', /Export/]]) {
-        await expect(menu.locator(`[data-efm="${id}"]`), `${id} is offered`).toHaveText(label);
-    }
-    await expect(menu.locator('[data-efm="clear"]'), 'and Clear is NOT here — the trash owns it').toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath('editor-corner-menu.png'), clip: { x: 980, y: 90, width: 300, height: 230 } });
-
-    // every item RUNS the handler its quick-menu row used to run
-    await menu.locator('[data-efm="load"]').click();
-    await expect(menu, 'picking an item closes the menu').toHaveCount(0);
-    for (const id of ['insert', 'export']) {
-        await btn.click();
-        await page.locator(`#editor-file-menu [data-efm="${id}"]`).click();
+    // Load / Insert / Export: the quick menu's rows now, same handlers, and picking one closes the menu —
+    // driven one at a time (not just checked for presence) to prove each ACTUALLY reaches its own handler, in order.
+    for (const act of ['fileLoad', 'fileInsert', 'fileExport']) {
+        await page.locator('#hdrPostBtn').click();
+        await expect(page.locator('#hdrPostMenu')).toBeVisible();
+        await page.locator(`#hdrPostMenu [data-act="${act}"]`).click();
+        await expect(page.locator('#hdrPostMenu'), 'picking an item closes the menu').toBeHidden();
     }
     expect(await page.evaluate(() => window.__fired)).toEqual(['loadGcodeFile', 'insertGcodeFile', 'downloadFile']);
+    await page.screenshot({ path: testInfo.outputPath('quick-menu-file-rows.png') });
 
-    // and it toggles closed on a second press of its own button
-    await btn.click();
-    await expect(page.locator('#editor-file-menu')).toBeVisible();
-    await btn.click();
-    await expect(page.locator('#editor-file-menu')).toHaveCount(0);
+    // Clear: the editor toolbar's own trash button — not a menu row anywhere (t1255: one door to a destructive action)
+    await page.locator('#btn-clear').click();
+    expect(await page.evaluate(() => window.__fired.at(-1)), 'the trash reaches the same clearCode handler').toBe('clearCode');
+    await page.locator('#hdrPostBtn').click();
+    await expect(page.locator('#hdrPostMenu [data-act="clear"]'), 'no Clear row anywhere in the quick menu').toHaveCount(0);
 });
 
-test('the header quick menu no longer offers the editor file actions (they moved, they did not multiply)', async ({ page }, testInfo) => {
+test('the header quick menu offers Load / Insert / Export (t2078 reversal) but never Clear', async ({ page }, testInfo) => {
     await boot(page);
     // initHeaderPost wires + FILLS the menu asynchronously on boot; clicking before that no-ops (it flaked exactly
     // once under -workers contention). Poll the way the account-row spec does instead of assuming boot has settled.
@@ -70,12 +68,15 @@ test('the header quick menu no longer offers the editor file actions (they moved
         if (!open) await page.locator('#hdrPostBtn').click();
         await expect(menu.locator('.hq-ws-row')).toBeVisible({ timeout: 1500 });
     }).toPass({ timeout: 15000 });
-    await expect(menu.locator('.hq-gcode-row')).toHaveCount(0);
-    await expect(menu.locator('[data-act="load"], [data-act="insert"], [data-act="export"], [data-act="clear"]')).toHaveCount(0);
+    // t2099 — t2078 put these three BACK (this used to assert their absence; see the file-header comment).
+    await expect(menu.locator('[data-act="fileLoad"]'), 'Load is back — acts on the program as a whole').toBeVisible();
+    await expect(menu.locator('[data-act="fileInsert"]'), 'Insert is back').toBeVisible();
+    await expect(menu.locator('[data-act="fileExport"]'), 'Export is back').toBeVisible();
+    await expect(menu.locator('[data-act="clear"]'), 'Clear alone stayed out (t1255) — one door, the toolbar trash').toHaveCount(0);
     await expect(menu.locator('.hq-ws-row [data-act="wsSave"]'), 'the workspace row stays — it is app-level').toBeVisible();
     await expect(menu.locator('[data-act="library"]'),
         'Library STAYS: its tabs are Projects + Wizards, and the wizard library is app-level, not editor content').toBeVisible();
-    await menu.screenshot({ path: testInfo.outputPath('quick-menu-slimmed.png') });
+    await menu.screenshot({ path: testInfo.outputPath('quick-menu-file-rows-present.png') });
 });
 
 test('the workspace manager has ONE way in — the granted folder; Browse… is gone', async ({ page }, testInfo) => {

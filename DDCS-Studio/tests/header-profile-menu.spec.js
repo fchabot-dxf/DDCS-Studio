@@ -14,13 +14,17 @@ const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.w
 // is GONE; profile lives in the ONE compound IDENTITY row (name · controller · ☁ cloud state, with the ↧ pull icon).
 // Recents + Save-as moved to the Library; Save/Open moved to the Library; dialect list already gone.
 // t1217 — the name now comes from THIS WORKSPACE'S MACHINE record, not the retired profile library.
+// t2099 — t2078 (human: "the load insert export button can go in the quick menu") REVERSED t1227's own gcode-row
+// removal below: Load/Insert/Export are back in this menu (as hdr-quick-item rows, data-act="fileLoad" etc — not
+// the retired .hq-gcode-row/data-act="load" shape this file used to check for), because those three act on the
+// program AS A WHOLE, never mid-edit. Clear alone stayed out (t1255) — the editor's own toolbar owns it now.
 const seedProfile = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.evaluate(() => { window.ddcsSetMachine({ name: 'Rig B' }, false); });
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the compact diet menu: identity line (name·controller, ↧) + one workspace row + Library; the EDITOR file rows are gone, 9 rows', async ({ page }) => {
+test('the compact diet menu: identity line (name·controller, ↧) + one workspace row + Library; the file rows are BACK (t2078), 13 rows', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -39,9 +43,9 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),   // t1243 — must now be FALSE (the badge moved to the manager's Cloud tab)
             hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
             hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
-            // t1227 CURATION — the editor's file rows left this menu for the editor's own corner menu
-            gcodeRows: menu.querySelectorAll('.hq-gcode-row').length,
-            editorFileActs: menu.querySelectorAll('[data-act="load"], [data-act="insert"], [data-act="export"], [data-act="clear"]').length,
+            // t2099 — t2078 REVERSED t1227's removal: Load/Insert/Export are back, as plain hdr-quick-item rows
+            // (data-act="fileLoad"/"fileInsert"/"fileExport"), not the retired .hq-gcode-row/data-act="load" shape.
+            fileRows: menu.querySelectorAll('[data-act="fileLoad"], [data-act="fileInsert"], [data-act="fileExport"]').length,
             hasClear: menu.querySelectorAll('[data-act="clear"]').length,
             hasSetupSheet: menu.querySelectorAll('[data-act="setupSheet"]').length,
             hasSettings: menu.querySelectorAll('[data-act="settings"]').length,
@@ -62,7 +66,7 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             // menu showed 10 — a diet number kept true by not looking. The declared target moves instead.
             wsRows: menu.querySelectorAll('.hq-ws-row').length,
             wsBtns: menu.querySelectorAll('.hq-ws-row [data-act="wsSave"], .hq-ws-row [data-act="wsOpen"]').length,
-            rowCount: menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hq-gcode-row, .hdr-quick-subitems[data-subitems="theme"]').length,
+            rowCount: menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hdr-quick-subitems[data-subitems="theme"]').length,
             // every row, named — so a count change has to be explained, not just re-numbered
             rowNames: [...menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hdr-quick-subitems[data-subitems="theme"]')]
                 .map((r) => r.dataset.act || r.dataset.subitems || r.className.split(' ')[0]),
@@ -80,12 +84,11 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     expect(m.hasPull, 'so does the ↧ pull tap target').toBe(true);
     // The compact rows
     expect(m.hasLibrary, 'Library row').toBe(1);
-    expect(m.gcodeRows, 'the gcode row is GONE — Load/Insert/Export live in the editor corner menu now').toBe(0);
-    expect(m.editorFileActs, 'no editor file action survives in this menu (Load/Insert/Export/Clear)').toBe(0);
+    expect(m.fileRows, 'Load/Insert/Export are BACK (t2078) — they act on the program as a whole').toBe(3);
     expect(m.wsRows, 'ONE workspace row').toBe(1);
     expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
     expect(m.hasSetupSheet + m.hasSettings + m.hasRate, 'the app-level rows stay: Setup sheet + Settings + Rate').toBe(3);
-    expect(m.hasClear, 'Clear editor is NOT app-level — it went to the editor corner menu').toBe(0);
+    expect(m.hasClear, 'Clear alone stayed OUT (t1255) — the editor toolbar\'s own trash owns it').toBe(0);
     expect(m.themeChips, 'theme swatches present').toBeGreaterThan(1);
     // RETIRED shape gone
     expect(m.recents, 'no recents rows (moved to the Library)').toBe(0);
@@ -96,15 +99,21 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     // The diet target, re-encoded honestly after the t1227 curation — and it came DOWN, as t1225 said it would:
     // identity · workspace · Library · theme · setup sheet · checklist · settings · rate. Nothing is hidden from the
     // count by class (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
+    // t2099 — t2078 put fileLoad/fileInsert/fileExport BACK, in DOM order right after wizards (headerPost.js's own
+    // assembly: identity + workspace + wizards + fileRows + library + theme + ...) — up by three, stated, not
+    // silently re-numbered.
     expect(m.rowNames, 'exactly these rows, in this order').toEqual([
-        'hq-identity-line', 'hq-ws-row', 'wizards', 'library', 'theme', 'setupSheet', 'checklist', 'settings', 'help', 'rate',
+        'hq-identity-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileInsert', 'fileExport', 'library', 'theme', 'setupSheet', 'checklist', 'settings', 'help', 'rate',
     ]);
     // t1245 — the count goes UP by one, and that is stated rather than quietly re-numbered: HELP came OUT of Settings
     // (FAQ + About are not settings), so the menu gained a row while Settings lost five subtabs. A diet number that
     // only ever falls would be a number kept true by not counting.
     // t1617 — up by one AGAIN, stated: the WIZARD MANAGER's entry (Wizards…) lands beside the workspace row it is
     // the sibling of. Wizard lifecycle earned a user-facing door; the row is the door.
-    expect(m.rowCount, 'the diet menu is 10 rows (9 + the t1617 Wizards… row)').toBe(10);
+    // t2099 — up by THREE again, stated: t2078 reversed t1227's own removal of the file rows (see the file-header
+    // comment). A count that only ever moves one direction from here on would be the same "kept true by not
+    // looking" trap t1225 already named once.
+    expect(m.rowCount, 'the diet menu is 13 rows (10 + the t2078 file-row reversal)').toBe(13);
 
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.

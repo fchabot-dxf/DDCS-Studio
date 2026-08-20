@@ -129,7 +129,12 @@ test('SEND CONFIRM: a red program asks an explicit confirm before the push (read
         root.style.cssText = 'position:fixed;inset:0;z-index:99990;background:var(--bg,#111);overflow:auto;padding:20px';
         document.body.appendChild(root);
         window.__submitted = 0; window.__mountErr = null;
-        try { mod.default.mount({ root, client: { submitJob: async () => { window.__submitted++; return { jobId: 'J1', tracked: false }; } } }); }
+        // t2099 — t2080 added a real gateway-reachability gate: mount()'s own last line calls
+        // this.applyState(ctx.desc), and gatewayPanel.js (the real orchestrator) always populates ctx.desc
+        // from a real ctx.client.descriptor() BEFORE calling mount(). Omitting it here (as this test always
+        // has) makes applyState(undefined) correctly read as "no gateway" and route through the Drive
+        // fallback instead of the mocked client.submitJob — not a bug, just a mock that predates t2080.
+        try { mod.default.mount({ root, desc: { id: 'ddcs-expert-m350', name: 'DDCS Expert M350' }, client: { submitJob: async () => { window.__submitted++; return { jobId: 'J1', tracked: false }; } } }); }
         catch (e) { window.__mountErr = String(e && e.message || e); }
         const cb = root.querySelector('input[type=checkbox]'); if (cb) { cb.checked = false; cb.dispatchEvent(new Event('change', { bubbles: true })); }
     });

@@ -78,6 +78,13 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && _menuOpen) closeMenu(); });
 
+// t2099 — this button's width appears underneath the header's OWN initial fit pass: initHeaderAccount()
+// (index.html) runs on a LATER boot step than commandDeck.js's first _fitAppHeader() rAF, so a cold load
+// measured the header before #hdrAccount had any content at all (it starts as an empty div). Called AFTER
+// host.innerHTML is actually set (before that, there is nothing real yet to measure) — every render, cold
+// load and later sign-in/out alike, rather than assuming the header's own fit already saw the real width.
+const _refit = () => { try { window.ddcsRefitHeader && window.ddcsRefitHeader(); } catch (_) { /* header not ready yet — its own initial fit will still run */ } };
+
 export function renderHeaderAccount() {
     const host = document.getElementById('hdrAccount');
     if (!host) return;
@@ -104,6 +111,7 @@ export function renderHeaderAccount() {
             + `<circle cx="12" cy="8.6" r="3.9"/><path d="M12 13.6c-3.6 0-6.6 2.2-7.7 5.3a10 10 0 0 0 15.4 0c-1.1-3.1-4.1-5.3-7.7-5.3z"/>`
             + `</svg></span></button>`;
         host.querySelector('button').onclick = () => connect('google');
+        _refit();
         return;
     }
 
@@ -126,6 +134,7 @@ export function renderHeaderAccount() {
         if (_menuOpen) { closeMenu(); return; }
         openMenu(e.currentTarget, acct);
     };
+    _refit();
 }
 
 // ONE source of truth for "is there an account": cloudAccount fires this on every connect/disconnect/identity

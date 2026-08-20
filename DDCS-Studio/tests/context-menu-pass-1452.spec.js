@@ -4,10 +4,18 @@ import { test, expect } from '@playwright/test';
  * t1452 — THE CONTEXT-MENU PASS: the EDITOR surface, plus the mechanism every other surface will reuse.
  *
  * ── THE TWO HARD RULES, AND HOW THEY ARE ASSERTED ────────────────────────────────────────────────────────────────
- *   1. AN ENTRY ONLY SHORTCUTS AN ACTION THAT ALREADY EXISTS SOMEWHERE VISIBLE — never the only path. So the test
- *      does not just check the entries render: it checks each one has a VISIBLE BUTTON too. That rule is why
- *      comment/uncomment arrived as a FEATURE (button + Ctrl+/ + menu) rather than as a menu entry: it existed
- *      nowhere before, and a menu-only action is exactly what the rule forbids.
+ *   1. AN ENTRY ONLY SHORTCUTS AN ACTION THAT ALREADY EXISTS SOMEWHERE ELSE — never the only path. Originally
+ *      operationalized as "a VISIBLE BUTTON too" (t1452), which is why comment/uncomment arrived as a FEATURE
+ *      (button + Ctrl+/ + menu) rather than as a menu entry: it existed nowhere before, and a menu-only action is
+ *      exactly what the rule forbids.
+ *      t2099 — t2077 removed the indent/outdent buttons (human: "remove indent button now" — Tab/Shift+Tab were
+ *      "always the primary path" per its own comment) and da280131/t2078 removed the comment button ("Ctrl+/ and
+ *      the right-click menu keep it"). Both are documented, deliberate decisions that the dedicated BUTTON is no
+ *      longer needed, not a menu-only regression — `editorTextOps.js`'s own header still states the invariant RULE
+ *      1 actually protects: "Three ways in, ONE implementation: the toolbar buttons, Tab / Shift+Tab, and the
+ *      right-click menu all call `indentEditor(dir)`" (buttons are now optional/absent, the other two doors are
+ *      not). RULE 1 below is re-encoded around the KEYBOARD doors that survive, driven for real, rather than a
+ *      button id that no longer exists for any of the three actions.
  *   2. LONG-PRESS = RIGHT-CLICK. The user tests on a phone, where there is no right button — so a menu without it is
  *      a menu that does not exist on the surface it is most needed. Driven here as real touch events.
  *
@@ -53,19 +61,43 @@ const select = async (page, a, b) => {
 
 const val = (page) => page.evaluate(() => document.getElementById('editor').value);
 
-test('RULE 1 — every editor menu entry also has a VISIBLE button (the menu is never the only path)', async ({ page }) => {
+/** Re-select lines [a, b] of the editor's CURRENT value — unlike select(), never re-seeds it. For proving a
+ * round trip (indent then outdent) where the second selection must land on the FIRST step's own result. */
+const reselect = (page, a, b) => page.evaluate(({ a, b }) => {
+    const ed = document.getElementById('editor');
+    const L = ed.value.split(String.fromCharCode(10));
+    const start = L.slice(0, a).reduce((n, l) => n + l.length + 1, 0);
+    const end = L.slice(0, b + 1).reduce((n, l) => n + l.length + 1, 0) - 1;
+    ed.focus();
+    ed.setSelectionRange(start, end);
+}, { a, b });
+
+test('RULE 1 — every editor menu entry also has a KEYBOARD door (the menu is never the only path)', async ({ page }) => {
     await boot(page);
-    await select(page, 1, 2);
+    const s = await select(page, 1, 2);
     const box = await page.locator('#editor').boundingBox();
     await page.mouse.click(box.x + 40, box.y + 60, { button: 'right' });
     const labels = await page.locator('.op-ctx-menu .op-ctx-item').allTextContents();
     expect(labels.length, 'the plain-text menu offers its entries').toBeGreaterThanOrEqual(3);
-    // …and each of those actions is reachable WITHOUT the menu
-    for (const id of ['editor-indent', 'editor-outdent', 'editor-comment'])
-        await expect(page.locator('#' + id), `${id} is a visible door for its menu entry`).toBeVisible();
     expect(labels.join(' | ')).toMatch(/Indent/);
     expect(labels.join(' | ')).toMatch(/Outdent/);
     expect(labels.join(' | ')).toMatch(/Comment/);
+    await page.keyboard.press('Escape');
+
+    // t2099 — none of the three keep a dedicated button (t2077/t2078 both retired theirs), so RULE 1's real claim
+    // is proven by DRIVING the keyboard door each one still has, not by locating a button id.
+    await page.locator('#editor').click();
+    await reselect(page, 1, 2);
+    await page.keyboard.press('Tab');
+    expect(await val(page), 'Tab genuinely indents (editorTextOps.js: same implementation the menu calls)').not.toBe(s.before);
+    await reselect(page, 1, 2);   // the SAME lines, on the now-indented text — never re-seeded
+    await page.keyboard.press('Shift+Tab');
+    expect(await val(page), 'and Shift+Tab genuinely outdents it back — a real round trip, not a no-op key').toBe(s.before);
+    await reselect(page, 1, 2);
+    await page.keyboard.press('Control+/');
+    expect(await val(page), 'Ctrl+/ genuinely comments (the third door — also its own dedicated test below)').not.toBe(s.before);
+    await page.keyboard.press('Control+z');
+    expect(await val(page), 'undo leaves the editor exactly as this test found it').toBe(s.before);
 });
 
 test('RULE 2 — LONG-PRESS opens the same menu (there is no right button on a phone)', async ({ page }) => {
@@ -110,9 +142,12 @@ test('A SCROLL IS NOT A PRESS — dragging past the slop cancels', async ({ page
 });
 
 test('COMMENT / UNCOMMENT — real `;` bytes, a clean toggle, and blank lines left alone', async ({ page }) => {
+    // t2099 — da280131/t2078 retired the dedicated #editor-comment button ("Ctrl+/ and the right-click menu keep
+    // it"); Ctrl+/ drives the SAME commentEditor() implementation (editorTextOps.js), so the byte-level claims
+    // this test makes are unchanged — only the door changed.
     await boot(page);
     const s = await select(page, 1, 4);
-    await page.click('#editor-comment');
+    await page.keyboard.press('Control+/');
     const on = await val(page);
     const L = on.split('\n'), B = s.before.split('\n');
     for (let i = 1; i <= 4; i++) {
@@ -120,7 +155,7 @@ test('COMMENT / UNCOMMENT — real `;` bytes, a clean toggle, and blank lines le
         else expect(L[i], `line ${i} carries a REAL leading semicolon`).toBe(';' + B[i]);
     }
     expect(L[0], 'the unselected line is untouched').toBe(B[0]);
-    await page.click('#editor-comment');
+    await page.keyboard.press('Control+/');
     expect(await val(page), 'toggling back restores the original bytes exactly').toBe(s.before);
 });
 

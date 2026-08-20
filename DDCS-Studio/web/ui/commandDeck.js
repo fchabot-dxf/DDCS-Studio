@@ -656,6 +656,9 @@ export class CommandDeck {
             const fit = () => requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); });
             window.addEventListener('resize', fit);
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);   // t748 — re-fit once webfonts settle (fallback metrics are narrower), so a cold load can't leave the nav overflowing
+            window.ddcsRefitHeader = fit;   // t2099 — exposed so a header CHILD initialized on its own later boot
+            // step (headerAccount.js's initHeaderAccount, index.html) can ask for a re-measure once it renders,
+            // rather than the header's own initial rAF fit silently measuring the header before that child exists.
             if (window.MutationObserver) {
                 // t2081 (MOBILE) — a THEME SWITCH specifically (not resize, not initial load) leaves a stale
                 // measurement: the rAF-scheduled fit() reads header scrollWidth/clientWidth before the new
@@ -875,6 +878,14 @@ export class CommandDeck {
         for (const step of HEADER_YIELD) {
             if (h.scrollWidth <= h.clientWidth) break;
             h.classList.add(step);
+        }
+        // t2099 — EXHAUSTION USED TO BE SILENT: every declared step could apply and the header could still
+        // overflow (measured live at 390px, before .hdr-tabs got its own min-width:0 + overflow-x:auto below the
+        // ladder's floor), and this loop would just end with no signal anywhere — the exact shape that let it
+        // sit unnoticed. Loud now, so the NEXT time content outgrows the ladder it is a console warning, not a
+        // silent 15px overflow someone has to measure by hand to even find.
+        if (h.scrollWidth > h.clientWidth) {
+            console.warn(`[commandDeck] app-header still overflows after every HEADER_YIELD step (scrollWidth=${h.scrollWidth} > clientWidth=${h.clientWidth}) — the yield ladder ran out of rungs.`);
         }
     }
 
