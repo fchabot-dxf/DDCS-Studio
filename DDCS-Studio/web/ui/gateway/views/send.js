@@ -364,6 +364,8 @@ export default {
           // t2105 - the heartbeat carries the gateway's OWN reachability probe, so a client can tell
           // 'nobody is listening' apart from 'someone is listening but the mill is off'. Those need
           // opposite treatment: the first blocks, the second is normal and just has to be SAID.
+          this._hb = (r && r.hb) || null;
+          this._hbAgeTxt = (r && r.ageS != null) ? `${Math.round(r.ageS / 60)} min ago` : '';
           this._millOff = !!(r && r.state === 'fresh' && r.hb && r.hb.controller_connected === false);
           this.applyState(this._lastDesc);
         })
@@ -422,11 +424,49 @@ export default {
       btn.textContent = this._sendLabel();
       // the offline half stays live on purpose — dropping a file, using the Studio program, naming the job
       for (const elm of [drop, useStudio, nameField, beacons, count, pacing, varN, markerV, markerN]) elm.disabled = false;
+      this._renderHeartbeatStatus();
+    };
+
+    // t2105 - THE TWO FACTS, SHOWN AND NOT ONLY ENFORCED (human: 'the client side should also display these
+    // status, is gateway CNC-FAIRY running and is cnc on'). The same heartbeat that GATES the send is the
+    // only thing that can answer them, so this is a readout of a decision already made rather than a second
+    // source that could disagree with the button.
+    // ⭐⭐ THE DEPENDENCY IS THE HONEST PART: the CNC is observable ONLY THROUGH the gateway. With no gateway
+    //    running we do not know whether the machine is on, and saying 'off' would be a guess printed as a
+    //    fact - the exact habit this codebase keeps removing. So it reads UNKNOWN, and says why.
+    const dot = (cls) => el('span', { class: 'hb-dot ' + cls, 'aria-hidden': 'true' });
+    const gwRow = el('div', { class: 'row hb-row' });
+    const cncRow = el('div', { class: 'row hb-row' });
+    const hbBox = el('div', { class: 'hb-status', style: 'display:none' }, gwRow, cncRow);
+    this._renderHeartbeatStatus = () => {
+      const st = this._hbState;
+      if (!this._viaDrive || st === null) { hbBox.style.display = 'none'; return; }   // nothing asked yet
+      hbBox.style.display = '';
+      const hb = this._hb || {};
+      const host = hb.hostname ? ` (${hb.hostname})` : '';
+      const live = st === 'fresh';
+      gwRow.replaceChildren(
+        dot(live ? 'ok' : st === 'unreadable' ? 'unknown' : 'bad'),
+        el('span', {}, live ? `Gateway${host} is running`
+          : st === 'unreadable' ? 'Cannot reach your Drive to check the gateway'
+          : st === 'stale' ? `Gateway${host} is not responding${this._hbAgeTxt ? ' - last seen ' + this._hbAgeTxt : ''}`
+          : 'No gateway has been seen for this machine'),
+      );
+      // ⚠ Only a LIVE gateway can report the machine. Anything else is unknown, never 'off'.
+      const cncOn = live && hb.controller_connected === true;
+      const cncOff = live && hb.controller_connected === false;
+      cncRow.replaceChildren(
+        dot(cncOn ? 'ok' : cncOff ? 'bad' : 'unknown'),
+        el('span', {}, cncOn ? 'Machine is powered on'
+          : cncOff ? 'Machine is switched off'
+          : 'Machine state unknown - no gateway to ask'),
+      );
     };
 
     const block = el('section', { class: 'block', style: 'flex-shrink: 0' },
       el('div', { class: 'section-label' }, 'Send a program'),
       banner,
+      hbBox,
       drop, input,
       el('div', { class: 'row', style: 'margin-top:10px' }, useStudio),
       el('div', { class: 'row', style: 'margin-top:12px' },
