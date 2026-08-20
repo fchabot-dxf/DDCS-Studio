@@ -7344,3 +7344,36 @@ quick-menu change. Each of the 15 gets a verdict FIRST, then the matching fix.
 
 ⚠ `da280131`'s own gate was 18 specs and touched none of these 15. That is the second time in two days a
 narrow gate shipped a change whose blast radius nobody measured. **Run the FULL suite on this fix.**
+
+## 🔬 THE LIVE DRIVE STATE, READ DIRECTLY (advisor, 2026-08-20) — S4's MIGRATION RISK IS ZERO *RIGHT NOW*
+*(The S4 prep agent said "I cannot determine statically whether the live Drive folder currently holds jobs
+— that needs a signed-in list." It has now been listed, via the claude.ai Drive connector.)*
+
+```
+DDCS Bridge/            created 2026-08-20T00:28:53Z, in My Drive root
+  inbox/                EMPTY
+  status/
+    LIVETEST-0001.json  49 bytes: {"jobId":"LIVETEST-0001","state":"done"}
+  (no history/  no gateway/  no commands/  no cncdisk/)
+```
+⭐ **Folders here are created LAZILY by `_folder()` on first use, so their ABSENCE IS EVIDENCE:**
+- **no `gateway/`** ⇒ **no gateway has ever published a heartbeat to Drive.** Direct live confirmation of
+  the `--backend local` blocker, from the system rather than from reading code.
+- **no `history/`** ⇒ **no job has ever completed on this path.**
+- **`inbox/` empty** ⇒ **NOTHING IS STRANDED. There is nothing to migrate.**
+
+⚠ **And "transport proven live" (t2076-t2080) means less than it sounded.** That status file is HAND-MADE —
+a real `tracker.build_status` object carries `name`, `events`, `pct` and `machine`, and this has none. So
+what was proven is **an OAuth + put/get round-trip on one folder**, NOT an end-to-end job. ⇒ **The full
+cloud loop (item D) remains genuinely unproven**; do not let the earlier wording imply otherwise.
+
+### ⭐⭐ CONSEQUENCE — DO S4 NOW, WHILE IT IS FREE
+The whole migration half of S4 (detect legacy jobs, warn about orphaned history, offer an explicit move) is
+currently **a no-op against real data**: one disposable test file and an empty inbox. Namespacing today
+strands nothing and needs no user decision.
+⚠ **This expires the moment a real job is sent on the flat layout.** If the human runs the bench test
+before S4 lands, the inbox and history fill up and the migration work becomes real. **Sequence S4 BEFORE
+the first real Drive job, not after.**
+⚠ Still BUILD the detect-and-report path (a later user, or the V4.1's own Drive, can be in the old shape) —
+just know it will find nothing here, so **do not treat "it reported nothing" as proof it works.** Test it
+against a deliberately seeded legacy folder or it is an untested branch.
