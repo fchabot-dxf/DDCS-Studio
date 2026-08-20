@@ -82,6 +82,19 @@ Full context in [`TOOL-SETTER.md`](TOOL-SETTER.md). Workflow is **NO ATC** — m
 ---
 
 ## Recently Shipped (Session Updates)
+- **BYO CLOUD — send a job over the internet through YOUR OWN Google Drive (2026-08-19, V2026.08.19.2-.6)**:
+  the "anywhere" leg of the topology, PROVEN LIVE on the human's account (job written → claimed → read back →
+  upserted → cleaned up), not by mocks. A stdlib-only `DriveBackend` — deliberately, because `r2.py` needs
+  boto3 which the exe build EXCLUDES, so the R2 cloud path could never actually run in the shipped app. Plus:
+  ONE account door (a header avatar) replacing two sign-ins that disagreed about their own shared credential;
+  a CLIENT (phone / unwired PC) can now send with no gateway at all, writing straight into the Drive inbox the
+  gateway polls; and sign-in itself — broken for EVERY user by an OAuth-block ordering bug — fixed for fresh
+  AND existing installs, with Google's real reason now surfaced instead of a bare "Sign-in failed".
+  ⛔ **One gateway on Drive is safe; a SECOND one is not yet** — two gateways share one inbox and the
+  wrong-controller guard is inert while `machine_id` is unset. Namespacing the inbox per machine is the fix
+  and is scoped in `ROLES-PLAN.md`. **Next: the PC ROLE system (gateway vs client)**, whose absence is what
+  made a phone's Send button silently dead — see `ROLES-PLAN.md` and `BACKLOG.md`.
+
 - **Tool-library / feeds / units arc + depth GUI (2026-07-21, V2026.07.21.1–.10)**: (1) **dual mm/inch + IPM display** — on the op forms (mm-native, byte-identical, the inch/IPM hint sits left of the input, 4-digit) AND the **tool-library editor** (Ø/length in inch, feeds in IPM) via ONE shared `ui/units.js` leaf (MM_PER_IN/toDisp/fromDisp, ~4 consumers, drift designed away). (2) a declared **tool catalog** (`data/toolCatalog.js`, 30 templates: flat/ball/tapered/vbit/surfacing/drill, imperial+metric) with an **＋Add-from-catalog** picker in the tool library. (3) the **cutting-op RPM** fix — a socket-held `rpm` binding → progstart on all 6 mill ops, so the tool/form rpm reaches `M3 S<rpm>` (was always the Head default; spindleHeadPatch yields to it). (4) the no-tool **cut-feed default → 2000** (surfacing/contour/pocket/slot + line/move/arc; bore/drill/plunge unchanged). (5) **soft-limit asymmetric per-end** box — envelopeCheck reads the real per-end #161-168 min/max (±9999 = unbounded sentinel), closing a machine-confirmed false-green. (6) **corner probe start-marker Z-drag** fixed — an X/Y drag no longer moves the sim start Z (sim-only, emit-safe, `!machineFrameTool` so homing's draggable Z persists). (7) the **in-form depth-ruler** (`.zd-ruler` in formWidgets) — a compact Z axis with `depthLevels()` pass ticks + draggable depth/stepdown grips beside the number fields (dual-unit hint preserved), tag `widget:'zdepth'` → any depth op inherits; replaced an explored layout cross-section (reverted). (8) "Modular" dropped from the window title. All byte-identical emit except the feed-default bump (goldens moved only the feed value).
 - **The G53 safety arc (complete)**: every safe-height retract on every controller is machine-frame with an adjacent G90 (jump-proof, factory-grounded), a boot-seeded margin register with an unset-guard, and a corpus guard covering the wizard AND CAM-slot emits. Found and driven by real field crashes.
 - **Pre-flight envelope check**: the editor badge reads the program's travel in the machine frame before anything runs — "line N exceeds Z+ by 3mm", honest amber when the placement isn't declared.
