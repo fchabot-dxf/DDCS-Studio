@@ -74,9 +74,11 @@ export function setGatewayPanelVisible(on) {
 function viewUnavailable(view, desc) {
     if (!view.requiresModbus) return null;
     if (!desc || !desc.controller_family) return null;                 // unknown -> leave it alone
-    if (desc.controller_family !== 'v4.1') return null;
-    return 'Live tracking needs Modbus, which the DDCS V4.1 does not have. A sent job still reports "delivered" '
-         + '— it just cannot report progress while it runs. On a DDCS Expert this tab works.';
+    // ⚠ Modbus RTU is an EXPERT capability. Naming the controllers that LACK it is a blacklist that silently
+    //    admits the next one - the V3/DM500 has no Modbus either (its eng has zero hits for it).
+    if (desc.controller_family === 'expert-m350') return null;
+    return 'Live tracking needs Modbus RTU, which only the DDCS Expert has — not the V4.1 or the V3. A sent job '
+         + 'still reports "delivered"; it just cannot report progress while it runs.';
 }
 
 function activate(view) {

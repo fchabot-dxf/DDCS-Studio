@@ -406,7 +406,11 @@ export default {
       //    TIMEOUT. The human measured 1-2 SECONDS PER BEACON on a V4.1 - pure cost, and zero progress data,
       //    because nothing can receive it. Up to 255 of those in one program.
       // ⭐ Capability gates the control, the way the controller's own capabilities gate fields elsewhere.
-      const noModbus = !!desc && desc.controller_family === 'v4.1';
+      // ⚠ POSITIVE CAPABILITY, NOT A BLACKLIST. My first version tested `family === 'v4.1'`, which would let a
+      //    V3 straight through into the same timeouts - bridge/controllers/dm500/FINDINGS.md: grepping the
+      //    whole 311-param DM500 eng for modbus|master|slave|serial.*mode gives ZERO HITS. Modbus RTU is an
+      //    EXPERT feature; everything else lacks it, including anything added later. Name what HAS it.
+      const noModbus = !!desc && !!desc.controller_family && desc.controller_family !== 'expert-m350';
       banner.style.display = (out || millOffLocal) ? '' : 'none';
       banner.setAttribute('data-gw-state', out ? 'unreachable' : millOffLocal ? 'controller-offline' : 'connected');
       // t2080b — the banner must not contradict the button. `c.reason` ends "...sending needs a machine",

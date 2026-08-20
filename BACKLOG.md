@@ -326,3 +326,35 @@ form down rather than clipping anything — ⛔ unlike the command-deck bug, whe
 scroll path at all. **Verify that property still holds before changing the number.**
 ⚠ Check whether the previews are STICKY on a phone (the CSS comment says they "stay sticky"): a tall
 minimum plus sticky could pin most of the screen while the form scrolls under it. Deliberate either way.
+
+---
+
+## AUDIT: WHICH GATEWAY TABS A V4.1 (AND A V3) CAN ACTUALLY USE
+*(human, 2026-08-20: "backlog audit which gateway tab the 4.1 actually can use" — after finding beacons
+costing 1-2s each on a V4.1, and the Tracking tab showing a job at 63% from a status record two months old.)*
+
+⭐ **THE CAPABILITY THAT DECIDES MOST OF IT: Modbus RTU is EXPERT-ONLY.** The V4.1 has none, and
+`bridge/controllers/dm500/FINDINGS.md` records that grepping the whole 311-param DM500 eng for
+`modbus|master|slave|serial.*mode|comm.*mode` gives **ZERO hits**. ⛔ So never write this as a v4.1
+blacklist — name what HAS the capability, or the next controller inherits a permission by default.
+
+| tab | Expert | V4.1 / V3 | status |
+|---|---|---|---|
+| **Send** | ✅ | ✅ deliver-only | works. Beacons now gated off without Modbus (t2113) |
+| **Status** | ✅ | ✅ | works |
+| **Jobs** | ✅ | ✅ | queue + history are backend state, controller-agnostic |
+| **Files (CNCDISK)** | ✅ | ✅ | a file share, no Modbus involved |
+| **Console / Setup** | ✅ | ✅ | works |
+| **Tracking** | ✅ | ⛔ **GATED (t2113)** | needs Modbus; dimmed + explains itself |
+| **Merge** | ? | ? | ⚠ **UNAUDITED — the one genuine unknown** |
+
+⬜ **THE REMAINING WORK IS MERGE.** ROLES-PLAN.md flags it *"VERIFY, do not assume"* because an earlier
+claim about it ("operates on controller-side files") was made without reading the code and was never
+checked. It is the last tab whose controller-dependence nobody has established.
+⚠ `state.js:45` declares it `keeps:''/clears:true`, which pre-bakes wiping the operator's own staged list —
+worth understanding before touching it.
+
+⚠ **ALSO SPOTTED, NOT YET RULED: BEACON COUNT DEFAULTS TO 255**, the maximum. On an Expert that is 255
+Modbus round-trips inserted into one program; on anything else it was 255 timeouts. Even where beacons DO
+work, 255 checkpoints is far more progress resolution than anyone reads. ⇒ **pick a sane default** (a dozen
+or so) and let the field go to 255 for someone who wants it.
