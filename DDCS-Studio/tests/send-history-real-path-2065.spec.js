@@ -192,6 +192,11 @@ test('a REAL tracked send that is never fed a beacon genuinely stalls, and the r
         const rows = [...root.querySelectorAll('table tr')].slice(1);
         return rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
     });
-    const stalledRow = r.find((row) => row[1] === 'stalled');
+    // t2095 — this used to check row[1] === 'stalled' exactly. jobs.js's resultLabel() (t2049, documented at
+    // jobs.js:15-20/28-41) deliberately never renders the bare word 'stalled' — it appends HOW FAR the run
+    // got ('stalled — no signal after delivery' when zero beacons ever arrived, matching this exact scenario,
+    // or 'stalled — signal lost at N/total' otherwise), a real UX improvement this test's exact-match assertion
+    // was never updated to match. Matches the family of stalled labels instead of the retired bare literal.
+    const stalledRow = r.find((row) => /^stalled/.test(row[1] || ''));
     expect(stalledRow, 'the real stalled job is recorded honestly in real History, not silently dropped').toBeTruthy();
 });

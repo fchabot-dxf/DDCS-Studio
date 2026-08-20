@@ -68,21 +68,53 @@ const val = (page) => page.evaluate(() => document.getElementById('editor').valu
 /** The expected result: `before` with lines [a,b] each prefixed by `pad` — and NOTHING else touched. */
 const withIndent = (before, a, b, pad) => before.split('\n').map((l, i) => (i >= a && i <= b ? pad + l : l)).join('\n');
 
+/**
+ * t2095 — REWRITTEN after t2070 made `flush` the DEFAULT emit style for every dialect, and DDCS dialects
+ * additionally FORCE it regardless of what a caller asks for (`dialect.flushIndent`, bench-confirmed: the
+ * Expert throws a syntax error on an indented N-label). `emitMapped(stack)` with no options resolves to the
+ * DEFAULT dialect, which is the Expert — so the old call here has emitted flush, not indented, since t2070,
+ * and this test's own non-vacuity guard (`indentedLines > 0`) has been failing ever since. Confirmed live
+ * before rewriting anything (t2095_indent_diag.mjs): the Expert force-flushes even when `indentStyle:
+ * 'indented'` is passed explicitly (`noOptsEqualsExplicitIndented: true`) — the ONLY way to see the emitters'
+ * own raw indent unit now is a dialect without `flushIndent` (e.g. centroid) PLUS the explicit option; that
+ * combination measured 28 indented lines at a minimum width of 2, matching INDENT_WIDTH exactly.
+ *
+ * The claim this test makes is UNCHANGED — the editor's manual indent width IS the unit the emitters
+ * internally write, which is what makes a hand-indented line and a wizard-regenerated one agree. What changed
+ * is ONLY how you have to ASK for the emitters' raw, pre-flush output to measure it; DDCS's own actual current
+ * behaviour (force-flush regardless of the setting) gets its own explicit assertion below rather than being
+ * silently assumed away.
+ */
 test('THE WIDTH IS ONE CONSTANT — the editor indents by exactly what the emitters write', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { INDENT, INDENT_WIDTH } = await import('/data/indentStyle.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { surfacingStack } = await import('/wizards/surfacingWizard.js');
-        const text = emitMapped(surfacingStack({ w: 120, h: 90, toolDia: 12, depth: 1, stepdown: 0.5, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5 })).text;
-        const widths = text.split(String.fromCharCode(10)).map((l) => (l.match(/^ +/) || [''])[0].length).filter((n) => n > 0);
-        return { INDENT, INDENT_WIDTH, minEmitted: Math.min(...widths), indentedLines: widths.length };
+        const stack = surfacingStack({ w: 120, h: 90, toolDia: 12, depth: 1, stepdown: 0.5, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5 });
+        const widthsOf = (text) => text.split(String.fromCharCode(10)).map((l) => (l.match(/^ +/) || [''])[0].length).filter((n) => n > 0);
+        // a dialect WITHOUT flushIndent, explicitly asking for the raw (pre-strip) form — the only path left
+        // that still shows the emitters' own indent unit.
+        const raw = emitMapped(stack, { profileId: 'centroid', indentStyle: 'indented' }).text;
+        const widths = widthsOf(raw);
+        // the ACTUAL default path every DDCS user hits: no options at all, the Expert dialect, force-flushed.
+        const ddcsDefault = emitMapped(stack).text;
+        const ddcsExplicitIndented = emitMapped(stack, { indentStyle: 'indented' }).text;
+        return {
+            INDENT, INDENT_WIDTH, minEmitted: widths.length ? Math.min(...widths) : null, indentedLines: widths.length,
+            ddcsDefaultIndentedLines: widthsOf(ddcsDefault).length,
+            ddcsForceFlushesEvenWhenAskedIndented: ddcsDefault === ddcsExplicitIndented,
+        };
     });
-    expect(r.indentedLines, 'a parametric body really does emit indented lines').toBeGreaterThan(0);
+    expect(r.indentedLines, 'a parametric body really does emit indented lines (raw, pre-flush)').toBeGreaterThan(0);
     // The claim that matters: the constant the EDITOR uses is the unit the EMITTER writes. Two numbers that merely
     // agree today is exactly the drift a shared constant exists to prevent, so this reads it off the real output.
     expect(r.minEmitted, 'the editor indents by the same unit the emitters write').toBe(r.INDENT_WIDTH);
     expect(r.INDENT).toBe('  ');
+    // t2070, asserted directly rather than assumed: every DDCS dialect is the DEFAULT and force-flushes, so a
+    // user never sees the raw form above without deliberately picking a non-DDCS profile.
+    expect(r.ddcsDefaultIndentedLines, 'the DEFAULT path (DDCS, no options) is flush — the bench-confirmed N-label fix').toBe(0);
+    expect(r.ddcsForceFlushesEvenWhenAskedIndented, 'DDCS flushes even if indentStyle:"indented" is requested explicitly').toBe(true);
 });
 
 test('THE TOOLBAR BUTTON — select, click, the BYTES carry the spaces; outdent puts them back', async ({ page }) => {
@@ -180,6 +212,17 @@ test('THE RIGHT-CLICK MENU — the third door, over plain text', async ({ page }
  * its indented line with leading whitespace removed (the transform did what it says), AND both programs are
  * identical once ALL whitespace is deleted (nothing else moved, anywhere). The second is the one that would catch a
  * transform that helpfully tidied a coordinate.
+ *
+ * t2095 — REWRITTEN after t2070 (same root cause as the test above, see its own comment for the full story).
+ * `a` used to be `emitMapped(stack, {})` on the ASSUMPTION that the true default was indented; it has been flush
+ * since t2070 (the DEFAULT dialect is the Expert, which force-flushes), making `a === b` in every case and the
+ * corpus's own `indented` count permanently 0 — the exact "Expected greater than 50. Received 0" failure. Both
+ * `a` and `b` now explicitly pin `profileId: 'centroid'` (no `flushIndent`, so the `indentStyle` option is
+ * actually respected) and differ ONLY in that option — `a` genuinely indented, `b` genuinely flush, the SAME
+ * dialect so the comparison stays whitespace-only rather than picking up a different G-code post's own syntax.
+ * The old `defaultIsIndented` per-case field is DELETED, not patched: it compared the true DDCS default against
+ * `a`, a comparison that no longer means what its name says now that `a` is deliberately non-default — the test
+ * just above this one already covers "the DDCS default is flush" directly, so nothing here duplicates it.
  */
 test('THE EMIT SETTING — flush is the same program with the leading spaces gone, and nothing else', async ({ page }) => {
     await boot(page);
@@ -211,7 +254,8 @@ test('THE EMIT SETTING — flush is the same program with the leading spaces gon
             ['surfacing helix', surfacingStack({ w: 120, h: 90, toolDia: 12, depth: 2, stepdown: 1, stepoverPct: 60, entry: 'helix', helixDia: 8, helixPitch: 0.5, feed: 2000, plunge: 200, clearance: 5 })],
         ];
         return CASES.map(([name, stack]) => {
-            const a = emitMapped(stack, {}).text, b = emitMapped(stack, { indentStyle: 'flush' }).text;
+            const a = emitMapped(stack, { profileId: 'centroid', indentStyle: 'indented' }).text;
+            const b = emitMapped(stack, { profileId: 'centroid', indentStyle: 'flush' }).text;
             const la = a.split(NL), lb = b.split(NL);
             let mismatch = 0, indented = 0;
             for (let i = 0; i < Math.max(la.length, lb.length); i++) {
@@ -220,7 +264,7 @@ test('THE EMIT SETTING — flush is the same program with the leading spaces gon
             }
             const squash = (s) => s.split(NL).map((l) => l.replace(/\s+/g, '')).join(NL);
             return { name, lines: la.length, sameCount: la.length === lb.length, mismatch, indented,
-                squashEqual: squash(a) === squash(b), defaultIsIndented: emitMapped(stack).text === a };
+                squashEqual: squash(a) === squash(b) };
         });
     });
 
@@ -229,7 +273,6 @@ test('THE EMIT SETTING — flush is the same program with the leading spaces gon
         expect(c.sameCount, `${c.name}: the line COUNT cannot move — map/absorbed/feedFolds are line indices`).toBe(true);
         expect(c.mismatch, `${c.name}: every flush line IS its indented line minus the leading whitespace`).toBe(0);
         expect(c.squashEqual, `${c.name}: and with ALL whitespace deleted the two programs are identical — nothing else moved`).toBe(true);
-        expect(c.defaultIsIndented, `${c.name}: the DEFAULT is today's bytes, so every existing path is unchanged`).toBe(true);
     }
     // The sweep must actually contain indentation, or every assertion above is vacuously true.
     expect(r.reduce((n, c) => n + c.indented, 0), 'the corpus really does emit indented lines').toBeGreaterThan(50);
@@ -251,6 +294,15 @@ test('THE EMIT SETTING — flush is the same program with the leading spaces gon
  * PARSER / ROUND-TRIP TOLERANCE at the new entry points — the thing the act must not break.
  * An indented USER line still parses and still traces the same motion; and a regenerated op region comes back in its
  * canonical form regardless of what the user did to the whitespace around it.
+ *
+ * t2095 — `r.regen`'s second half used to assert the DEFAULT emit CONTAINS an indented line (`/^ {2}\S/m`); since
+ * t2070 the default canonical form is flush (see the two tests above for the full story), so that regex can never
+ * match again — a stale premise, not a broken feature. The claim worth keeping is stronger, not weaker: a
+ * regenerated region comes back in TODAY'S canonical form — flush — regardless of what whitespace the user typed
+ * around it, which is exactly what the negated check below still proves (and would catch a real regression: if
+ * indentation ever leaked back into the default path, this line would start failing again, for the right reason).
+ * The determinism half (`emitMapped(stack).text === emitMapped(stack).text`) needed no change — it was never about
+ * indentation.
  */
 test('TOLERANCE — an indented line traces identically, and the emit re-canonicalises', async ({ page }) => {
     await boot(page);
@@ -265,10 +317,10 @@ test('TOLERANCE — an indented line traces identically, and the emit re-canonic
         const stack = surfacingStack({ w: 120, h: 90, toolDia: 12, depth: 1, stepdown: 0.5, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5 });
         return {
             flat: segs(flat), bumpy: segs(bumpy),
-            regen: emitMapped(stack).text === emitMapped(stack).text && /^ {2}\S/m.test(emitMapped(stack).text),
+            regen: emitMapped(stack).text === emitMapped(stack).text && !/^[ \t]+\S/m.test(emitMapped(stack).text),
         };
     });
     expect(r.flat.length, 'the sample really cuts').toBeGreaterThan(0);
     expect(r.bumpy, 'leading spaces AND tabs change nothing about the traced motion').toEqual(r.flat);
-    expect(r.regen, 'a regenerated op region re-emits its canonical indented form').toBe(true);
+    expect(r.regen, 'a regenerated op region re-emits its canonical FLUSH form (t2070), deterministically').toBe(true);
 });

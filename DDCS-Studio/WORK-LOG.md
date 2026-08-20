@@ -45305,3 +45305,174 @@ shows no card at all (even connected); after shows the themed card, correctly ac
 
 🔨 turn 2093
 
+# t2095 — the six "pre-existing" failures, investigated individually + a NEW blocker found by the full gate
+
+Dispatch: the advisor's own full-suite gate run found 6 failures and, rather than lumping them as
+"pre-existing" (a label the advisor's own framing called out as "a label that stopped investigation"),
+personally traced ONE (`editor-indent-1450`) to a stale premise and asked me to do the same for the rest,
+individually, with a VERDICT PER TEST and evidence — and an explicit constraint: fix a stale premise, but if
+any is a real defect, say so and STOP rather than paper over it.
+
+## VERDICT 1 — `editor-indent-1450.spec.js`, all 3 originally-failing cases: STALE PREMISE, FIXED
+
+Root cause, traced via `git show 69acd0f4` (t2070, bench-confirmed on the real Expert 2026-08-17: a leading
+space before an N-label is a hard syntax error — `  N50` throws, `N50` parses; indented statements are fine,
+labels are not). t2070 made `DEFAULT_INDENT_STYLE = 'flush'` (`web/data/indentStyle.js`) AND gave the 3 DDCS
+dialects `flushIndent: true`, which FORCE-OVERRIDES any caller's own `indentStyle` request
+(`blockEmitter.js:535`). Confirmed empirically with a throwaway diagnostic (`verification/t2095_indent_diag.mjs`)
+before touching the test: the ONLY combination that still emits genuinely-indented raw output is
+`profileId:'centroid'` (a non-DDCS dialect) + explicit `indentStyle:'indented'` — DDCS force-flushes
+regardless of what's asked.
+
+All three cases' non-vacuity guards were right to exist; their PREMISE (that the DEFAULT emit path is
+indented) was what t2070 deliberately made false. Rewrote each around what's still true:
+- **"THE WIDTH IS ONE CONSTANT"**: the raw-indent-width claim now goes through `centroid` + explicit
+  `indented`, plus two NEW assertions that state t2070's behaviour directly (`ddcsDefaultIndentedLines` = 0,
+  `ddcsForceFlushesEvenWhenAskedIndented` = true even when the caller explicitly asks for `indented`).
+- **"THE EMIT SETTING"**: `a`/`b` (the two "same content, different style" texts) now both go through
+  `centroid` so the diff-driven assertions below them (the >50-line corpus guard, the zero-indentation list,
+  slot/slot-literal pairing) are exercised against a real premise again. Deleted `defaultIsIndented` — no case
+  left where DDCS's default is indented, so there was nothing left to assert.
+- **"TOLERANCE"**: the regen-determinism check flipped from asserting indentation exists to asserting it does
+  NOT (the flush canonical form), message updated to name t2070 directly.
+
+Non-vacuity: watched all three fail for the stated reason pre-fix (unmodified — these were the 3 of the
+advisor's 6). Then, for the two NEW assertions specifically, temporarily set `flushIndent: false` on
+`ddcs-expert-m350.js` and confirmed `ddcsForceFlushesEvenWhenAskedIndented` correctly flips to fail — then
+restored the file (diff-confirmed identical to before). `npx playwright test tests/editor-indent-1450.spec.js
+--workers=1` → 8 passed, twice (once post-fix, once again after the restore).
+
+## VERDICT 2 — `pull-modal-stacking.spec.js:55`: STALE PREMISE, FIXED
+
+The test's regex matched the literal string `'Gateway not reachable — is the bridge / desktop app running?'`.
+`git log`/`git show` traced that exact literal to commit `70243fa5` ("spell out that 'Live via the Gateway'
+needs the desktop app open alongside the website") — a deliberate, already-shipped copy improvement; the
+test's regex was simply never updated in that commit. Confirmed the CURRENT message
+(`settingsPanel.js:2503-2513`, its own comment explains the two-branch no-controller/no-gateway distinction is
+intentional) still makes the same actionable claim, just in different words. Rewrote the regex to
+`/desktop app.*running/i`, matching the current wording's own distinct claim rather than the retired one.
+Non-vacuity: failed on the pre-fix text (captured), passes post-fix — `npx playwright test
+tests/pull-modal-stacking.spec.js --workers=1` → 3 passed.
+
+## VERDICT 3 — `ring-descent-1404.spec.js:215`: STALE PREMISE (same root cause as #1 — t2070), FIXED
+
+This one looked, at first, like it could be a genuine NEW instance of the t1500 label-collision bug class
+documented at length in `surfaceraster.js:2041-2057` (two flow branches sharing a fallback N-number because a
+declaration under-reported what a body emits) — worth being suspicious of given the stakes ("ambiguous on the
+controller exactly as in the sim"). Traced it fully before concluding otherwise:
+
+The test asserted `inset:0` emits no trace of the literal string `'GOTO95'` (its own comment: "no guard, no
+label, no comment"). It does — but not from `insetErrLabel` (which per `flowLabels()`'s `insetOnDecl` gate is
+correctly NOT declared/emitted at all when inset is 0). The `95` comes from `applyInlineClampSkip`
+(`blockEmitter.js:556-572`, ALSO added by t2070, same commit as the flush-indent change): it rewrites the
+ring-count-floor clamp (`IF n<1 THEN n=1`, unconditional for every `concentric` config, unrelated to inset —
+`surfaceraster.js:1652`) into a GOTO-skip form, since DDCS rejects inline `IF...THEN...=`. Its label number is
+picked dynamically ("one above the highest N-label already in the program", per its own comment) — for
+`inset:0`, the declared pairs (errLabel/okLabel/ringStepLabel/ringCutLabel) top out at 94, leaving 95 free for
+the clamp-skip. For `inset:3`, the SAME clamp-skip mechanism lands on a different number (insetErrLabel/
+insetOkLabel now occupy 93/94, shifting ringStepLabel to 95) — meaning the test's OTHER assertion
+(`toContain('GOTO95')` for the inset:3 case) was ALSO passing for an incidental reason, not because `95` is
+inset's number. No actual collision exists (`applyInlineClampSkip` scans for the true max before allocating,
+per its own design comment) — this is a coincidental REUSE of the digit string "95" by two unrelated
+mechanisms, not two different jump targets sharing one number.
+
+Confirmed the real, number-independent inset markers (`surfaceraster.js:1057`/`1094`: `"leaves no width to
+clear"` / `"leaves no area to clear"`, only emitted when `insetOn`) and rewrote both assertions around those
+instead of the incidental digit string. Non-vacuity: the SAME regex is asserted absent on real zero-inset text
+and present on real three-inset text in the same run — proves it discriminates, not just passes vacuously.
+`npx playwright test tests/ring-descent-1404.spec.js --workers=1` → 15 passed (all tests in the file, not just
+the target).
+
+## VERDICT 4 — `send-history-real-path-2065.spec.js:172`: STALE PREMISE (t2049), FIXED
+
+`row[1] === 'stalled'` (an exact match) against the real History table's rendered text. Read `jobs.js`'s
+`resultLabel()` (lines 35-41, its own t2049 doc-comment explains the reasoning at length): a stalled row NEVER
+renders the bare word `'stalled'` — it deliberately appends HOW FAR the run got before signal stopped
+(`'stalled — no signal after delivery'` for the zero-beacon case this spec drives, or `'stalled — signal lost
+at N/total'` otherwise), specifically so an operator isn't told a false cause. This is a real, documented,
+intentional UX decision the test's exact-match assertion predates. Confirmed via the project's own
+server-side proof (`bridge/bridge-app/tests/test_history_real_path_2065.py`, 3/3 pass) that the backend
+history-recording path itself is sound — the mismatch was purely in what the frontend renders vs. what the
+test string-matched. Fixed to `/^stalled/.test(row[1])`. Non-vacuity: failed 3/3 (with retries) pre-fix on the
+real rendered text ("stalled — no signal after delivery"), passes post-fix —
+`npx playwright test tests/send-history-real-path-2065.spec.js --workers=1` → 2 passed (both real end-to-end
+tests, real bridge subprocess, no mocked routes).
+
+## A 7th failure the full gate surfaced: `controller-import-one-door-1221.spec.js:78` — STALE PREMISE
+## (same commit as #2), FIXED
+
+Not one of the advisor's original 6 — found because the dispatch's own instruction ("run the full gate...
+so the gate becomes readable") meant actually running it, not assuming 6-fixed = green. Identical bug class to
+Verdict 2: asserted the literal retired string `/gateway not reachable/i`; the test's own comment even said
+"two other specs assert this string" (pull-modal-stacking + this one — grepped the whole suite to confirm no
+third copy exists). Fixed identically: `/desktop app.*running/i`. Non-vacuity: failed 3/3 pre-fix (captured
+the exact old-vs-new text mismatch), passes post-fix — `npx playwright test
+tests/controller-import-one-door-1221.spec.js --workers=1` → 3 passed.
+
+## ⚠ THE ACTUAL BLOCKER — a real, currently-live layout regression, NOT fixed, flagging per the explicit STOP
+## instruction
+
+Running the full gate a second time (required to confirm all 6+1 fixes actually make it clean) surfaced 15
+NEW unexpected failures, none touching anything I edited this turn. First hypothesis was resource contention
+from two ~28-minute full runs back-to-back (a documented past failure mode, [[serialize-gate-and-worker-suites]])
+— **ruled out**: re-ran the 15 in a fully isolated, cold-start batch (`--workers=2`, nothing else loaded) and
+they ALL failed again, identically. Narrowed to one spec alone (`header-responsive.spec.js`, nothing else
+running): still fails, 3/3, deterministically — `.app-header`'s `scrollWidth - clientWidth` = 15 on a 390px
+viewport where the test expects ≤0 (i.e. the header now overflows its own phone-width container by exactly
+15px, which is suspicious in itself — that's `.app-header`'s own right-padding value, `styles.css:263`, though
+I have NOT pinned the exact rule responsible for a child ignoring that padding).
+
+Traced it to a specific, already-landed commit: `da280131` ("feat(editor): the floating buttons become ONE
+toolbar row (t2078)"), which reached this branch via merge commit `2d207f37` ("Merge remote-tracking branch
+'origin/main' into wizards-as-data-blocks") — its parents are `c8bdb2b0` (my branch's own tip, t2093) and
+`7314d18c` (an `origin/main` commit). `da280131` is co-authored by "Claude Opus 4.8," not part of this
+worker/advisor turn sequence — it reads as separate, human-directed work (its own message: "The human spotted
+the empty strip above the editor...") that landed on `main` and merged into this branch outside this loop's
+visibility. It touches `web/ui/headerPost.js` (rewires the quick-menu's contents — adds Load/Insert/Export
+rows back into the header's dropdown, reversing t1227) and `web/styles.css` (a new `.editor-toolbar` rule,
+though that one is scoped to the editor pane, not `.app-header`, so it's not the obvious culprit by itself).
+Its own commit message reports "18 browser specs pass" — a scoped gate that did not include
+`header-responsive`, `editor-chrome`, `editor-file-menu-1227`, `context-menu-pass-1452`,
+`header-profile-menu`, `kbutton-authoring`, `canvas-handle-writable-1804`, `collapsible-panes-752`,
+`gateway-mismatch-gate-1229`, `preflight-badge-838`, `settings-ia-regroup-1245`, or the 2 other
+`editor-indent-1450` cases beyond the 3 I fixed ("THE TOOLBAR BUTTON", "THE LAYOUT") — all 15 are DIFFERENT
+tests from the 7 I fixed, and none of my edits touch `web/` at all (confirmed via `git status --porcelain
+web/` — clean).
+
+**I did not attempt a fix.** Per the explicit instruction ("if one of these is a real defect, say so and STOP
+rather than papering it") and because this is layout/JS code in an area another, apparently still-separate
+session was actively shaping by direct human instruction minutes before this gate run (commit timestamp
+20:08:26 on what reads as the same day) — editing it myself risks colliding with in-progress work I have no
+visibility into. This is the standout finding of the turn and the actual reason the gate is not clean: **6+1
+stale-premise tests are genuinely fixed, but the full suite is NOT green** — 15 tests fail for what looks like
+one real, current header/quick-menu-overflow regression on narrow viewports, introduced by `da280131`/merged
+via `2d207f37`, needing someone with visibility into that other session's intent to fix correctly.
+
+## Gate
+
+Node tier: 193/193. Comment-brace check: depth 0, 0 suspects (unchanged, no CSS touched). Ramp grep: 32
+(unchanged). Full Playwright, run twice:
+- Run 1 (before the `controller-import-one-door-1221` fix): 2598 passed, 25 flaky, 1 unexpected
+  (`controller-import-one-door-1221`, same stale-string bug as #2), 25 skipped.
+- Run 2 (after all 7 fixes): 2596 passed, 23 flaky, **15 unexpected** — the header/quick-menu regression above.
+  None of the 15 are among the 7 I fixed or was asked to investigate; isolated re-runs confirm they are real,
+  not contention-induced.
+
+The gate is NOT clean. It is clean of the 7 stale-premise tests the advisor asked about; it is blocked on a
+newly-surfaced, unrelated, real regression.
+
+## Files
+- `DDCS-Studio/tests/editor-indent-1450.spec.js` — all 3 originally-failing cases rewritten around t2070's
+  actual (flush) behaviour.
+- `DDCS-Studio/tests/pull-modal-stacking.spec.js` — stale literal regex → current actionable wording.
+- `DDCS-Studio/tests/ring-descent-1404.spec.js` — inset-zero/inset-three assertions switched from the
+  incidental `'GOTO95'` digit string to the real, number-independent inset-refusal wording.
+- `DDCS-Studio/tests/send-history-real-path-2065.spec.js` — exact-match `'stalled'` → `/^stalled/`, matching
+  t2049's deliberate "how far did it get" labels.
+- `DDCS-Studio/tests/controller-import-one-door-1221.spec.js` — same stale literal as pull-modal-stacking, same
+  fix.
+- `DDCS-Studio/verification/t2095_indent_diag.mjs` — throwaway diagnostic confirming the dialect/indentStyle
+  interaction before writing any test fix.
+
+🔨 turn 2095
+

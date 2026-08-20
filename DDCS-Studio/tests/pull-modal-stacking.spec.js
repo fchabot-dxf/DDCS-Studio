@@ -65,7 +65,13 @@ test('no gateway → Pull shows a VISIBLE, on-top error naming the gateway (not 
         const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
         return { txt: document.querySelector('#import-body').innerText, insideModal: !!(top && top.closest('#import-modal')) };
     });
-    expect(info.txt, 'the error names the gateway as the reason (no-gateway branch)').toMatch(/gateway not reachable/i);
+    // t2095 — the literal 'Gateway not reachable — is the bridge / desktop app running?' this regex used to match
+    // was deliberately REPLACED by commit 70243fa5 ("spell out that 'Live via the Gateway' needs the desktop app
+    // open alongside the website") with more actionable wording — a genuine copy improvement, not a regression;
+    // this test's own regex was simply never updated in that same commit. Matches the CURRENT message's own
+    // actionable claim instead of the retired literal phrase.
+    expect(info.txt, 'the error names the gateway as the reason and says what to do about it (no-gateway branch)')
+        .toMatch(/desktop app.*running/i);
     expect(info.insideModal, 'the error message is visible on top of settings, not buried').toBe(true);
 });
 

@@ -237,8 +237,18 @@ test('INSET — the walk moves in, the declared footprint does NOT', async ({ pa
     expect(r.three.walk, 'inset 3 → 3mm in on every side').toEqual({ minX: 13, maxX: 87, minY: 8, maxY: 62 });
     // AND THE ZERO CASE ADDS NOTHING TO THE TEXT — no guard, no label, no comment. (Byte-identity against HEAD was
     // measured in a worktree across 54 configs; this is the same promise stated where a reader will see it.)
-    expect(r.zero.text, 'inset 0 emits no inset machinery at all').not.toContain('GOTO95');
-    expect(r.three.text, 'a declared inset brings its own guard').toContain('GOTO95');
+    // t2095 — this used to check the LITERAL 'GOTO95', because insetErrLabel used to always land on 95. t2070 added
+    // applyInlineClampSkip (blockEmitter.js), a POST pass that rewrites the unconditional ring-count floor clamp
+    // (`IF n<1 THEN n=1`, present for every concentric config regardless of inset) into its own GOTO-skip, numbered
+    // dynamically as "one above the highest N-label already in the program". For inset:0, insetErrLabel/insetOkLabel
+    // are not declared at all (see flowLabels' insetOnDecl gate), which shifts the declared numbering down and leaves
+    // 95 as that dynamic clamp's number — a coincidental reuse of the digits '95' by an UNRELATED mechanism, not an
+    // inset guard leaking through. (No collision inside the program itself: applyInlineClampSkip only ever picks a
+    // number strictly above the max N-label already emitted, per its own comment.) The semantic property this test
+    // actually cares about — whether the INSET-refusal machinery specifically ran — is the inset-only wording
+    // (surfaceraster.js:1057/1094), which is independent of whatever number either mechanism happens to allocate.
+    expect(r.zero.text, 'inset 0 emits no inset machinery at all').not.toMatch(/leaves no (width|area) to clear/);
+    expect(r.three.text, 'a declared inset brings its own guard').toMatch(/leaves no width to clear/);
     // A WRONG OPERATOR MESSAGE IS A DEFECT: an inset that eats the area must not refuse by blaming the stepover.
     expect(r.collapse.text, 'the collapse refuses in its own words').toMatch(/inset leaves no area to clear/);
     expect(r.collapse.text, 'and not by blaming a knob the operator did not touch')

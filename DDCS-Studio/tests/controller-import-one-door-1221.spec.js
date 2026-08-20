@@ -74,8 +74,11 @@ test('the modal offers BOTH transports, and the live read still starts on open (
     await expect(file).toHaveAttribute('title', /parameter file the controller saves to USB/i);
     await expect(live, 'opening the door reads LIVE by default — the row is not a gate').toHaveClass(/is-active/);
 
-    // the honest no-gateway message survives the consolidation (two other specs assert this string)
-    await expect(page.locator('#import-body')).toContainText(/gateway not reachable/i);
+    // the honest no-gateway message survives the consolidation. t2095 — the literal 'gateway not reachable'
+    // wording was deliberately REPLACED by commit 70243fa5 ("spell out that 'Live via the Gateway' needs the
+    // desktop app open alongside the website") with more actionable copy; this assertion was never updated in
+    // that same commit (pull-modal-stacking.spec.js had the identical stale string, fixed the same way this turn).
+    await expect(page.locator('#import-body')).toContainText(/desktop app.*running/i);
     // ONE door means one of each: the empty state points AT the transport row instead of repeating its button
     await expect(page.locator('#import-src-file'), 'exactly one way to reach the USB transport').toHaveCount(1);
     await expect(page.locator('#import-fromdump'), 'no duplicate USB button inside the modal').toHaveCount(0);
