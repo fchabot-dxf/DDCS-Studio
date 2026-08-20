@@ -385,8 +385,18 @@ export default {
       // touches; the failure looked like a copy change and was a crash.
       const viaDrive = out && canSendViaDrive();
       this._viaDrive = viaDrive;
-      banner.style.display = out ? '' : 'none';
-      banner.setAttribute('data-gw-state', out ? 'unreachable' : 'connected');
+      // t2111 (S2, ROLES-PLAN) - STATUS DECIDES WHAT IS AVAILABLE, ON BOTH PATHS. The Drive path already
+      // refuses when the heartbeat says the machine is off; the LOCAL path did not, because `noGw` is
+      // gated on `viaDrive`. So a gateway PC with its mill switched off kept a live Send button, accepted
+      // the job, and the poller then correctly declined to claim it - the job sat in the inbox forever,
+      // which is precisely the state the no-send policy exists to prevent, arriving by the commonest route.
+      // ⭐ ONE RULE, TWO SOURCES: over Drive the fact comes from the heartbeat's controller_connected;
+      //    locally it comes from the descriptor's own controller_connected. Same field, same meaning.
+      // ⚠ ONLY when a gateway actually ANSWERED (!out). No descriptor means no knowledge, and refusing on
+      //    ignorance is the habit we keep removing - `undefined` must never read as 'the mill is off'.
+      const millOffLocal = !out && !!desc && desc.controller_connected === false;
+      banner.style.display = (out || millOffLocal) ? '' : 'none';
+      banner.setAttribute('data-gw-state', out ? 'unreachable' : millOffLocal ? 'controller-offline' : 'connected');
       // t2080b — the banner must not contradict the button. `c.reason` ends "...sending needs a machine",
       // which stopped being true the moment a signed-in client could route the job through Drive: the user
       // would read "you cannot send" directly above a live Send button.
@@ -398,10 +408,17 @@ export default {
       // condition here, not two states - the earlier 'it will wait' wording is gone, because waiting is
       // exactly what this policy refuses to create. The inbox is a WIRE, never a store.
       const noGw = viaDrive && (this._hbState === 'stale' || this._hbState === 'unseen' || this._millOff);
+      // ⚠ AFTER noGw ON PURPOSE - see the temporal-dead-zone warning above. A const referenced before its
+      //    own declaration throws on EVERY applyState, and the symptom is an empty banner and a stale
+      //    button label, which reads like a copy bug rather than a crash. This file has been bitten by
+      //    that once already (t2080b); I reproduced it verbatim writing this line.
+      const cannotDeliver = noGw || millOffLocal;
       // ⚠ MILL OFF IS NOT AN ERROR AND MUST NOT GREY THE BUTTON. A gateway IS running and WILL deliver
       // once the machine is switched on - that is the whole point of the claim gate leaving the job in
       // the inbox. It only has to be STATED, because the alternative wording promises ~15s and is false.
-      banner.textContent = out
+      banner.textContent = millOffLocal
+        ? 'The machine is switched off — switch it on, then send. The job would not reach it.'
+        : out
         ? (this._millOff ? 'The machine is switched off — switch it on, then send.'
                 : noGw ? 'No gateway is running for this machine — start Studio on the PC wired to it, then send.'
                 : viaDrive ? 'No gateway on this device — sending goes through your Google Drive; the machine picks it up within ~15s.'
@@ -416,8 +433,8 @@ export default {
       // ⭐ noGw greys on a KNOWN absence only. this._hbState null (not looked yet) or 'unreadable'
       //   leaves the button LIVE - refusing on ignorance would break sending outright if the
       //   browser turns out not to see desktop-written Drive files, the one direction never measured.
-      btn.disabled = (out && !viaDrive) || noGw || !file.text;
-      btn.title = this._millOff ? 'The machine is switched off, so this job could not be delivered'
+      btn.disabled = (out && !viaDrive) || cannotDeliver || !file.text;
+      btn.title = (this._millOff || millOffLocal) ? 'The machine is switched off, so this job could not be delivered'
                        : noGw ? 'No gateway is running for this machine, so nothing would collect this job'
                        : viaDrive ? 'No gateway on this device — sends through your Google Drive; the machine picks it up within ~15s'
                            : (out ? c.reason : '');
