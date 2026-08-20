@@ -68,6 +68,53 @@ def test_no_bundle_leaves_google_disabled_rather_than_guessing():
     assert c.google_client_id == "", c.google_client_id
 
 
+# ── t2079b — the correction: an EXISTING install must migrate, not just a fresh one ──────────────────────────
+# t2079 fixed the seed order, which fixed FRESH installs. It did nothing for a machine that already had the
+# wrong client PERSISTED from an earlier run -- and a persisted value is never re-seeded, so updating the app
+# changed nothing there. Hit live on ASUS minutes after t2079 shipped: same redirect_uri_mismatch, new build.
+
+_MISSEEDED = "895572525139-mapt84pm4lfudmjfq553k6pm4m2o0e77.apps.googleusercontent.com"
+
+
+def _with_persisted(persisted, creds={"installed": {"client_id": "DESKTOP", "client_secret": "d"}}):
+    if os.path.exists(_BUNDLE):
+        return None, None
+    json.dump(creds, open(_BUNDLE, "w", encoding="utf-8"))
+    try:
+        cfgp = os.path.join(tempfile.mkdtemp(), "config.json")
+        json.dump(persisted, open(cfgp, "w", encoding="utf-8"))
+        return Config.from_env(config_path=cfgp), cfgp
+    finally:
+        os.remove(_BUNDLE)
+
+
+def test_an_existing_install_on_the_misseeded_web_client_is_migrated():
+    """THE LIVE REGRESSION. No provenance marker (it predates the marker) -- recognised by the exact WEB
+    client id that used to be auto-seeded, which nobody would ever type into the gateway by hand."""
+    c, cfgp = _with_persisted({"google_client_id": _MISSEEDED, "google_client_secret": "old"})
+    if c is None:
+        return
+    assert c.google_client_id == "DESKTOP", f"still on the web client -> sign-in stays broken: {c.google_client_id}"
+    assert json.load(open(cfgp, encoding="utf-8"))["google_client_id"] == "DESKTOP", "migration must PERSIST"
+
+
+def test_a_client_the_user_set_themselves_is_never_touched():
+    """The distinction the first attempt could not make: without it this is a clobber, not a migration."""
+    c, _ = _with_persisted({"google_client_id": "MY-OWN", "google_client_secret": "mine"})
+    if c is None:
+        return
+    assert c.google_client_id == "MY-OWN", c.google_client_id
+
+
+def test_a_marked_bundled_value_follows_the_bundle_when_it_changes():
+    """Provenance for everything seeded from here on, so no future client swap needs a hardcoded id."""
+    c, _ = _with_persisted({"google_client_id": "OLD-BUNDLED", "google_client_secret": "x",
+                            "google_client_source": "bundled"})
+    if c is None:
+        return
+    assert c.google_client_id == "DESKTOP", c.google_client_id
+
+
 if __name__ == "__main__":
     for name, fn in sorted((n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)):
         fn()

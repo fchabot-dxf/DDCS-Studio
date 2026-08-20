@@ -215,9 +215,25 @@ export default {
         // t2020 — hashed from file.text (the ORIGINAL, pre-instrumentation program), so tracked and
         // deliver-only sends of the same logical job hash the same regardless of the beacon settings above.
         const contentHash = await contentHashOf(file.text);
-        const r = await ctx.client.submitJob(name, nc, map, contentHash);
+        // t2080 — NO GATEWAY? SEND THROUGH DRIVE. A CLIENT (a phone, or a PC not wired to the controller)
+        // has no gateway of its own to POST to, so it writes the job straight into the same Drive inbox the
+        // gateway already polls — the gateway then claims and delivers it exactly as if a local gateway had
+        // queued it. Preferring the gateway when one IS reachable is deliberate: it is instant and offline,
+        // whereas Drive costs a poll interval (~15s) and an internet round trip. Drive is the FALLBACK, not
+        // the default. ⚠ A Drive send is DELIVER-ONLY by construction — beacons are a Modbus link between the
+        // controller and ITS gateway, so a client has nothing to instrument for.
+        let r;
+        if (bridged) {
+          r = await ctx.client.submitJob(name, nc, map, contentHash);
+        } else {
+          const { submitJobToDrive, canSendViaDrive } = await import('../../cloud/driveJobs.js');
+          if (!canSendViaDrive()) throw new Error('No gateway on this PC, and no Google account connected — sign in (top right) to send through your Drive.');
+          r = await submitJobToDrive(name, file.text, contentHash);   // the ORIGINAL program: no beacons on this path
+        }
         toast('Queued ' + r.jobId);
-        info.textContent = `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
+        info.textContent = r.via === 'drive'
+          ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`
+          : `Queued ${r.jobId} — ${r.tracked ? `tracked (${map.total_beacons} beacons, est ${map.total_est_time_s}s)` : 'deliver-only'}`;
         // t2057 — SAY SO AT THE MOMENT OF SENDING: the bridge can request tracking (this checkbox) while its
         // own Modbus receiver is off or dead — two independent toggles nothing else compares. The toast fades
         // in 3.2s like any other, so ALSO append to the durable `info` line the operator already reads —

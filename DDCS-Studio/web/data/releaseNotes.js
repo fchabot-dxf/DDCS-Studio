@@ -31,6 +31,16 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.6": [
+    { short: "Google sign-in now fixes itself on existing installs",
+      full: "The previous release fixed sign-in for NEW installs only — a machine that had already run the "
+        + "app kept the broken credential and still failed with \"this app's request is invalid\". It now "
+        + "repairs itself on start. Just update and sign in; nothing to edit." },
+    { short: "Send a job from a browser, with no gateway on that PC",
+      full: "A PC or phone that isn't wired to the controller can now send too: the job goes into your Google "
+        + "Drive and the machine's gateway picks it up within about 15 seconds. It sends as deliver-only "
+        + "(no live progress bar) — progress needs the cable between the controller and its own gateway." },
+  ],
   "2026.08.19.5": [
     { short: "Google sign-in works now",
       full: "Signing in to Google failed on every machine with \"this app's request is invalid\". The app was "
