@@ -174,6 +174,21 @@ export default {
   },
 
   renderSetup(ctx, d, cfg, prof) {
+    // t2111 (S1, ROLES-PLAN) - GATE THE CONTROLLER-WIRING FIELDS BY ROLE. The human's own definition of the
+    // feature: 'the client is really hiding the settings that help connect the gateway to the controller'.
+    // A client is a PC with no controller wired to it, so the disk path, the Modbus beacons and the
+    // controller-profile card are settings for hardware it does not have.
+    // ⛔ ROLE GATES ONLY THIS GROUP. The cloud/account settings below are NOT gated and must never be: a
+    //    client's ONLY transport is Drive, so hiding them would remove the one thing it needs, and a
+    //    Drive-less gateway is a first-class setup that must still be able to REACH them (hiding a door is
+    //    the bug, not the feature). See ROLES-PLAN's retraction of the second gating axis.
+    // ⚠ REDUCE, NEVER HIDE, THE WAY TO CORRECT A WRONG ROLE. role_conflict = an explicit 'client' override
+    //    with a controller disk still configured. If we hid the disk field in that state the user could
+    //    never CLEAR it, and the contradiction would be permanent. So a conflict SHOWS the fields and says
+    //    what is wrong - stated, never silently resolved (S0's own constraint).
+    const isClient = d.role === 'client';
+    const conflict = !!d.role_conflict;
+    const hideWiring = isClient && !conflict;
     const dest = (cfg.dest || "");
     const isRemote = dest.startsWith("\\\\") || dest.startsWith("//");
     const statusText = !dest ? "no controller set — enter the controller disk below"
@@ -259,13 +274,18 @@ export default {
       el("div", { class: "row" }, el("span", { class: "dot " + statusDot }), el("span", {}, statusText)),
 
       el("div", { class: "section-label", style: "margin-top:18px" }, "Setup"),
+      ...(conflict ? [el("div", { class: "wiz-usage", style: "border-left:3px solid var(--warn,#f59e0b);padding-left:8px" },
+        "This PC is set to CLIENT, but a controller disk is still configured. Those disagree - clear the disk below, "
+        + "or set the role back to gateway. Nothing has been changed for you.")] : []),
       el("div", {}, el("span", { class: "label" }, "Machine name"), name),
+      ...(hideWiring ? [] : [
       el("div", { style: "margin-top:10px" },
         el("span", { class: "label" }, "Controller disk (network share)"),
         destField,
         el("span", { class: "hint" }, "Must be a network share, e.g. \\\\10.0.0.50\\cncdisk — local folders aren't allowed.")),
       el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
         beacons, "Beacons (Modbus progress — Expert only; leave off for V4.1)"),
+      ]),
       el("label", { class: "row", style: "margin-top:12px;gap:6px;cursor:pointer" },
         lan, "Allow other devices on my network (serve Studio on the LAN)"),
       lanHint,
@@ -288,7 +308,7 @@ export default {
         + "fine for sending; live progress always uses the serial cable, never this."),
       el("div", { class: "row", style: "margin-top:14px" }, save), info,
 
-      this.profileBlock(prof),
+      ...(hideWiring ? [] : [this.profileBlock(prof)]),
       el("div", { class: "wiz-usage" }, `gateway v${d.version || "?"} · backend ${d.backend || "?"}`));
   },
 };
