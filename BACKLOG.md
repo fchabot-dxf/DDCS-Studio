@@ -134,3 +134,30 @@ histories:**
 tool-on-a-cross-slide; the current op family draws bar + centreline + cut only, with no chuck and no tool
 post — which is a plausible reason it reads as "a rod" rather than "a lathe". ⚠ Whatever changes, it must
 survive **14px** — that constraint is what t1918 was entirely about, and it is where the first attempt died.
+
+### 8. Let the BROWSER send jobs through Drive too (not just the exe)
+*(human, 2026-08-19: "what if i want the browser to send too")*
+
+Today only the exe can send: `client.submitJob()` POSTs `/api/jobs` → the gateway → `backend.put_job()`.
+The hosted page has no gateway to call, and its own Drive code (`ui/cloud/googleDrive.js`) writes PROJECT
+files, not jobs.
+
+⛔ **DECIDE THE OAUTH CLIENT FIRST — this is the load-bearing choice, and getting it wrong fails SILENTLY.**
+`drive.file` scopes visibility per CLIENT, and the two ends now use different ones: the browser the **Web**
+client (`…mapt`, `providers.js`), the exe the **Desktop** client (`…607m`, seeded from the bundle since
+t2079). Files one creates are invisible to the other ⇒ a browser-written job would sit in Drive while the
+gateway polled forever, logging nothing. That is the exact failure shape this project has been bitten by.
+- **Option A — ONE Web client for both.** A Web client CAN register loopback redirect URIs
+  (`127.0.0.1:8765-8769`, already added to `…mapt` on 2026-08-19) and so can serve the exe's loopback flow
+  AND the browser's JS-origin flow. One visibility domain; browser-send becomes possible. ⚠ Cost: the exe's
+  sign-in then depends on those URIs staying registered and on the serve port staying inside that range —
+  which is precisely the fragility t2079 moved AWAY from. Reverting it is a real trade, not a free win.
+- **Option B — keep them separate**, and browser-send is simply not offered. Robust; answers "no".
+
+**The work, once A is chosen:** a browser-side `put_job` mirroring `backend/drive.py` — write
+`DDCS Bridge/inbox/<jobId>.nc` + the `.map.json` sidecar, same folder layout, same `make_job_id` timestamp
+convention, same `content_hash` (send.js already computes it) so History still links repeat runs. ⚠ Reuse
+the UPSERT discipline: Drive permits duplicate names, so blind-create duplicates a job.
+
+⚠ **Prove it end to end before believing it** (the standing rule that r2.py's months as `[TO TEST]` earned):
+a job submitted from a real browser, claimed by a real gateway, delivered to a real controller.
