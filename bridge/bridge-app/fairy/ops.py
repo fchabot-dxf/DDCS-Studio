@@ -1060,6 +1060,7 @@ class Ops:
             "machine_name": c.machine_name, "machine_id": c.machine_id,
             "dest": c.expert_dest, "com_port": c.com_port,
             "backend": c.backend, "enable_slave": c.enable_slave,
+            "enable_chime": c.enable_chime,   # t2097 — Setup toggle; takes effect live, no restart
             "host": c.host, "port": c.port, "lan_ip": self._lan_ip(),
             "is_remote": is_network_share(c.expert_dest),
             "controller_connected": self.controller_reachable(),
@@ -1083,6 +1084,8 @@ class Ops:
         if "machine_id" in updates: c.machine_id = (updates["machine_id"] or "").strip()
         if "dest" in updates: c.expert_dest = (updates["dest"] or "").strip()
         if updates.get("com_port"): c.com_port = updates["com_port"].strip()
+        if "enable_chime" in updates and updates["enable_chime"] is not None:
+            c.enable_chime = bool(updates["enable_chime"])   # t2097 — live toggle, no restart (see bridge.py's _on_sound)
         for k in ("enable_slave", "backend", "host"):   # host rebind needs a server restart
             if k in updates and updates[k] is not None and getattr(c, k) != updates[k]:
                 setattr(c, k, updates[k]); restart = True

@@ -24,9 +24,11 @@ class Config:
     # Auth is the loopback OAuth already shipped (google_client_id/secret below + oauth.py) — no extra
     # credential to configure. The folder is created in the user's Drive root on first use.
     drive_folder: str = "DDCS Bridge"
-    # ⚠ Drive's per-user API quota is far tighter than R2's; a 5s poll is antisocial and will meet it.
-    # 15s is the deliberate floor for SENDING. Live progress never rides this path — it is the serial cable.
-    drive_poll_s: float = 15.0
+    # t2097 — the poll floor used to live here, unread (bridge.py's run_loop slept poll_interval_s /
+    # run_poll_interval_s for every backend alike, never this field). Removed — two sources for one number
+    # is the shape this project keeps removing. The floor is now DriveBackend.POLL_FLOOR_S
+    # (backend/drive.py) — the backend that knows its own quota declares it, and run_loop's sleep is
+    # max(configured interval, backend.POLL_FLOOR_S).
 
     # --- transfer to the controller (transfer.py — the only hardware path) -
     # The controller's CNCDISK network share, e.g. \\192.168.0.99\CNCDISK or \\10.0.0.50\cncdisk.
@@ -84,12 +86,16 @@ class Config:
     enable_ws: bool = False                 # --ws: start the WebSocket telemetry server
     ws_port: int = 8766                     # WebSocket bind port (separate from the HTTP port 8765)
 
+    # --- audio feedback (chime.py; t2097) -----------------------------------
+    enable_chime: bool = True               # --no-chime to turn off; Windows-only regardless (see chime.py)
+
     # config.json key (what the Setup UI / set_config writes) -> Config attribute it restores.
     _PERSIST_KEYS = {
         "dest": "expert_dest", "machine_name": "machine_name", "machine_id": "machine_id",
         "com_port": "com_port", "backend": "backend", "enable_slave": "enable_slave",
         "host": "host",   # LAN serving toggle ("127.0.0.1" | "0.0.0.0") — COMBINED-APP-PLAN Step 3
         "google_client_id": "google_client_id",   # Google Desktop OAuth client id (BYO cloud / Drive sign-in)
+        "enable_chime": "enable_chime",   # t2097 — Setup toggle, default ON
         "google_client_secret": "google_client_secret",
     }
 

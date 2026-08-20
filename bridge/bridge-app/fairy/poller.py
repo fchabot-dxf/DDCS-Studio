@@ -31,7 +31,7 @@ def _iso(ts):
 
 
 class Poller:
-    def __init__(self, backend, transfer, beacons, config, log=print, on_checkpoint=None):
+    def __init__(self, backend, transfer, beacons, config, log=print, on_checkpoint=None, on_sound=None):
         self.backend = backend
         self.transfer = transfer
         self.beacons = beacons
@@ -41,6 +41,19 @@ class Poller:
         # Optional hook: on_checkpoint(n: int, active: dict) called after every new beacon.
         # Injected by bridge.py when --ws is active; None = no-op (self-test / demo unaffected).
         self.on_checkpoint = on_checkpoint
+        # t2097 — optional hook: on_sound(event: 'received'|'delivered'|'failed') at the moments
+        # PROVENANCE.md's three sounds name (a job was claimed / delivered to the controller / refused,
+        # delivery failed, or stalled). Injected by bridge.py's run_loop() (mirroring on_checkpoint) only
+        # when the Setup chime toggle is on; None = no-op, so fairy's own unit tests / --self-test (which
+        # call build() directly and never reach run_loop()) can never trigger a sound.
+        self.on_sound = on_sound
+
+    def _sound(self, event):
+        if self.on_sound is not None:
+            try:
+                self.on_sound(event)
+            except Exception:      # never let a sound hook crash the poller
+                pass
 
     # -- one iteration --------------------------------------------------------
     def tick(self):
@@ -63,11 +76,13 @@ class Poller:
         tracked = bool(m.get("total_beacons"))     # has a map with beacons -> Fusion cut; else deliver-only
         self.beacons.reset(m.get("marker") or 111)  # per-job marker; forget the previous job's beacons (§4)
         events = [f"claimed {job_id}"]
+        self._sound("received")   # t2097 — a job came in, look up (the door chime)
 
         # safety: never deliver to the wrong controller (CONFIGS §7). Skipped if no machine_id configured.
         ok, reason = identity.verify(self.cfg.expert_dest, self.cfg.identity_filename, self.cfg.machine_id)
         if not ok:
             self.log(f"[poller] REFUSED {job_id}: {reason}")
+            self._sound("failed")   # t2097 — a sibling bad outcome to delivery failure; same sound, free to share
             self.backend.put_status(
                 job_id, tracker.build_status(job_id, name, m, "failed", 0, events + [f"refused: {reason}"]))
             self.backend.delete_job(job_id)
@@ -86,12 +101,16 @@ class Poller:
             dest = self.transfer.deliver(nc, name)
         except OSError as e:
             self.log(f"[poller] DELIVERY FAILED {job_id}: {e}")
+            self._sound("failed")   # t2097 — the buzzer: wrong, every game show ever
             self.backend.put_status(
                 job_id, tracker.build_status(job_id, name, m, "failed", 0, events + [f"delivery failed: {e}"]))
             self.backend.delete_job(job_id)        # don't wedge the queue on a bad job
             self._record_history(job_id, name, m, "failed", 0, None, None)
             return
         self.backend.delete_job(job_id)            # delivered -> bucket copy no longer needed (controller has it)
+        # t2097 — the register: the transaction completed. ALL THREE success branches below pass through
+        # this one line (deliver-only terminal, no-Modbus terminal, tracked-active), so one call covers all.
+        self._sound("delivered")
         now = time.time()
         if not tracked:
             # deliver-only (probe / utility .nc): no beacons to watch; "delivered" is terminal
@@ -167,6 +186,7 @@ class Poller:
         if now - a["last_progress_at"] > self.cfg.stall_seconds:
             where = f"after beacon {a['last_beacon']}" if a["last_beacon"] else "after delivery (no Start?)"
             a["events"].append(f"stalled {where}")
+            self._sound("failed")   # t2097 — the other sibling bad outcome; same shared failure sound
             self._put("stalled")                   # inbox copy already deleted at delivery
             self._record_history(a["job_id"], a["name"], a["map"], "stalled", a["last_beacon"], a["delivered_at"], a["started_at"])
             self.log(f"[poller] {a['name']}: STALLED {where}")

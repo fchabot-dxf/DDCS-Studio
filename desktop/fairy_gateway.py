@@ -143,13 +143,22 @@ def _run_gateway(user_args):
     # No --host here: the bind address comes from Setup's persisted config (default 127.0.0.1;
     # "0.0.0.0" when the user enables LAN serving). The window still opens on 127.0.0.1 either way.
     argv = [
-        "run", "--serve", "--backend", "local",
+        "run", "--serve",
         "--http-port", str(PORT),
         "--console", _asset("console"), "--shared", _asset("shared"),
     ]
     # Studio at / (COMBINED-APP-PLAN Step 1); tolerate an older frozen build without the studio bundle.
     if os.path.isdir(_asset("studio")):
         argv += ["--studio", _asset("studio")]
+    # t2097 — a Drive/R2 choice made in Setup was reverted on EVERY launch: this used to hardcode
+    # "--backend local" unconditionally, and Config.from_env's own persisted-config.json < explicit-CLI
+    # precedence (config.py) means an explicit CLI value always wins, so the persisted choice never stood a
+    # chance. Same shape as the Beacons check below (its own, independent gate — a caller forcing one has
+    # nothing to do with the other) — read what Setup actually saved and pass THAT, unless the caller is
+    # already forcing one. "local" (the permanent one-box default, per the human's own ruling — no
+    # account/internet/addressing required) only when nothing has been persisted, never as an override.
+    if "--backend" not in user_args:
+        argv += ["--backend", _persisted_backend()]
     # Safe default: no serial slave unless the user wired it — avoids a COM-port open failure on a box
     # with no SABRENT. But respect a persisted Beacons=on (Setup), so the saved choice survives relaunch.
     forced_flags = any(a in user_args for a in ("--port", "--no-slave"))
@@ -157,6 +166,18 @@ def _run_gateway(user_args):
         argv.append("--no-slave")
     argv += user_args
     main(argv)
+
+
+def _persisted_backend():
+    """The saved Setup backend choice ('local' | 'r2' | 'drive') — so a relaunch/restart (which the config UI
+    itself demands via restart_needed) doesn't silently revert it back to 'local'. Falls back to 'local' (the
+    permanent one-box default) when nothing is persisted yet."""
+    try:
+        import json
+        with open(os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "config.json"), encoding="utf-8") as f:
+            return json.load(f).get("backend") or "local"
+    except Exception:
+        return "local"
 
 
 def _persisted_beacons_on():

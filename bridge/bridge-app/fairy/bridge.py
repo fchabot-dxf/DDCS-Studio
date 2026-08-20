@@ -106,6 +106,20 @@ def run_loop(config):
 
         poller.on_checkpoint = _on_checkpoint
 
+    # --- audio feedback (Setup toggle, default ON; chime.py) — t2097 ---
+    # Wired here, never inside fairy's own build()/self-test path (see chime.py's own header): run_loop()
+    # is only ever reached by the real gateway, so a bare Poller() built by a test never gets a sound hook.
+    # The hook re-reads config.enable_chime on EVERY fire (rather than gating whether it's wired at all) so
+    # flipping the Setup toggle takes effect immediately — unlike backend/enable_slave, this changes no
+    # wiring, so it never needs the restart those do.
+    from . import chime
+
+    def _on_sound(event):
+        if config.enable_chime:
+            chime.play(config.studio_dir, event)
+
+    poller.on_sound = _on_sound
+
     server = None
     if config.serve:
         from .server import start_server
@@ -158,7 +172,11 @@ def run_loop(config):
                     print(f"[bridge] position-poll OK — {position_poller.latest()}")
                 else:
                     print(f"[bridge] position-poll UNHEALTHY — {pst.get('error')}")
-            time.sleep(config.run_poll_interval_s if poller.active else config.poll_interval_s)
+            # t2097 — the backend's OWN declared floor (Backend.POLL_FLOOR_S) applies to BOTH the idle and
+            # the active-job cadence: run_poll_interval_s (1s default) would poll Drive at 60 req/min while
+            # a job is tracked, worse than the idle case its own quota warning is about (drive.py).
+            base_interval = config.run_poll_interval_s if poller.active else config.poll_interval_s
+            time.sleep(max(base_interval, backend.POLL_FLOOR_S))
     except KeyboardInterrupt:
         print("\n[bridge] stopped")
     finally:
@@ -562,6 +580,7 @@ def main(argv):
                     help="WebSocket telemetry port (default 8766; change if 8766 is already in use)")
     ap.add_argument("--machine-id", dest="machine_id", help="expected controller id (enables verify-before-deliver)")
     ap.add_argument("--name", dest="machine_name", help="machine label, e.g. \"Ultimate Bee\"")
+    ap.add_argument("--no-chime", action="store_true", help="don't play the RECEIVED/DELIVERED/FAILED audio feedback (Windows-only regardless; on by default)")
     args = ap.parse_args(argv)
 
     cfg = Config.from_env(
@@ -577,6 +596,7 @@ def main(argv):
         open_browser=(True if args.open_browser else None),
         enable_ws=(True if args.enable_ws else None),
         ws_port=getattr(args, 'ws_port', None),
+        enable_chime=(False if args.no_chime else None),
     )
     if args.provision:
         return provision(cfg, args.machine_id, args.machine_name)

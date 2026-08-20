@@ -16,6 +16,13 @@ from abc import ABC, abstractmethod
 
 
 class Backend(ABC):
+    # t2097 — the loop's own poll cadence (bridge.py run_loop) used to be ONE number for every backend,
+    # even though Drive's quota ceiling (see drive.py's own warning) makes a 1-5s poll actively harmful
+    # there while being exactly right for local/R2. The backend is the thing that knows its own quota, so
+    # it declares the floor rather than the loop growing a per-backend branch — 0 = no floor (the loop's
+    # own configured interval stands as-is).
+    POLL_FLOOR_S = 0.0
+
     @abstractmethod
     def list_inbox(self) -> list:
         """Return jobIds in inbox/, sorted ascending (== FIFO creation order)."""

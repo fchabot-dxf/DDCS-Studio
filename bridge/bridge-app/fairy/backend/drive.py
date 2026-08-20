@@ -44,8 +44,13 @@ LAYOUT — a faithful port of the R2 key structure, so the Poller cannot tell th
     cached (`_folder`). A cache miss costs one extra request, never a wrong answer.
 
 ⚠ POLLING QUOTA. Drive's per-user limits are far tighter than R2's; a 5s poll is antisocial and will meet
-them. `config.drive_poll_s` defaults to 15s. This makes Drive right for SENDING and wrong for live
-progress — which is fine and by design: live tracking runs on the serial cable, never on this path.
+them — and the idle case is not the only exposure: `run_poll_interval_s` (the FASTER cadence bridge.py
+uses while a job is actively tracked) is 1s by default, which would poll Drive at 60 requests a minute,
+worse than the idle rate this warning is about. `POLL_FLOOR_S` below is this backend's own declared
+floor (t2097) — `run_loop`'s sleep is `max(configured interval, backend.POLL_FLOOR_S)`, so the floor
+holds in BOTH the idle and the active-job case, regardless of what poll_interval_s/run_poll_interval_s
+are configured to. This makes Drive right for SENDING and wrong for live progress — which is fine and by
+design: live tracking runs on the serial cable, never on this path.
 """
 import json
 import mimetypes
@@ -76,6 +81,8 @@ def _q(s):
 
 
 class DriveBackend(Backend):
+    POLL_FLOOR_S = 15.0   # t2097 — the deliberate floor for SENDING (see the module docstring's quota warning)
+
     def __init__(self, config):
         self.cfg = config
         self.root_name = getattr(config, "drive_folder", "") or "DDCS Bridge"

@@ -45476,3 +45476,152 @@ newly-surfaced, unrelated, real regression.
 
 🔨 turn 2095
 
+# t2097 — a gateway turn: the exe can't run Drive at all, Drive's own poll floor was unread, and the chime
+
+Dispatch: three parts, all Python (bridge/bridge-app) plus one desktop file. Explicitly separate from the 15
+UI-overflow failures from t2095/t2096 — the advisor's own note said NOT to touch those yet (the human hasn't
+ruled on who fixes another station's commit) and independently confirmed at least one (editor-chrome's 44px
+touch-target) is a real defect, not a stale premise. Left those alone entirely this turn.
+
+## PART 1 — the desktop exe could never run Drive/R2, only local
+
+`desktop/fairy_gateway.py:146` hardcoded `"--backend", "local"` into the argv it hands `fairy.bridge.main`,
+unconditionally, on every launch. `Config.from_env`'s own precedence (persisted config.json < explicit CLI,
+`config.py:213-215`, `if v is not None: setattr(...)`) is correct — the bug was that the CLI value was
+NEVER absent: a Drive backend chosen in Setup got persisted correctly, but the very next launch (including
+the restart `set_config`'s own `restart_needed: True` demands) clobbered it straight back to `local`.
+
+Fixed by mirroring `_persisted_beacons_on`'s existing pattern (the exact same shape, right below the bug):
+added `_persisted_backend()` (reads `config.json`'s `backend` key, falls back to `"local"` — the permanent
+one-box default — when nothing is persisted) and only append `--backend <value>` when the caller hasn't
+already forced one via `user_args`. Kept this gate INDEPENDENT of the existing `--port`/`--no-slave` gate
+for the beacons check below it (my first draft accidentally shared one `forced_flags` between both — passing
+`--backend` explicitly would have silently also suppressed the unrelated beacons-forcing logic; caught and
+fixed before verifying).
+
+**Verified the real symptom, not a from_env unit check** (per the dispatch's own explicit instruction — a
+from_env-only test would pass today with the exe still broken, because the argv construction was the bug,
+not the precedence logic). Launched through the actual `_run_gateway` entry point three times, each with a
+fresh temp HOME:
+- Persisted `{"backend": "drive"}`, no CLI args: the loop reached `DriveBackend.put_cncdisk_index` (a real
+  Drive operation, not a cosmetic print) and raised `DriveError: not signed in` — direct proof `config.backend
+  == "drive"` propagated all the way through the unmodified entry path into real backend I/O.
+- No config.json at all: ran clean, no Drive/R2-related error — stayed on the `local` default.
+- Persisted `{"backend": "local"}` + explicit CLI `["--backend", "r2"]`: resolved to `R2Backend`, which
+  raised its own `"needs R2_ENDPOINT and R2_BUCKET"` error — confirms an explicit override still wins over a
+  persisted value, exactly as `Config.from_env`'s own precedence promises.
+
+## PART 2 — Drive's poll rate tripped its own documented quota warning
+
+`drive.py`'s own module docstring warned "a 5s poll is antisocial and will meet [Google's] limits" and named
+`config.drive_poll_s` (15.0) as the mitigation — but `bridge.py`'s `run_loop()` slept
+`run_poll_interval_s`/`poll_interval_s` (1.0/5.0) for every backend alike; nothing ever read
+`drive_poll_s`. Worse than the idle case the docstring warned about: `run_poll_interval_s` (the FASTER
+cadence used while a job is actively tracked) would have polled Drive at 60 requests/minute had the field
+ever been wired the obvious way.
+
+Shape (the advisor's own, matching how a 4th backend would extend it without the loop growing a branch): each
+`Backend` subclass now declares its own `POLL_FLOOR_S` class attribute (base class default `0.0` — no
+floor; `DriveBackend.POLL_FLOOR_S = 15.0`). `run_loop()`'s sleep is `max(configured interval,
+backend.POLL_FLOOR_S)`, applied to BOTH the idle and active-job branch so the floor holds throughout a
+tracked Drive delivery, not just while idle. Deleted `config.drive_poll_s` entirely (two sources for one
+number) and rewrote `drive.py`'s docstring to describe the actual mechanism instead of the dead field.
+Confirmed via repo-wide grep that nothing else referenced it.
+
+**Verified two ways.** Direct: instantiated real `DriveBackend`/`LocalFolderBackend` objects and confirmed
+`max(base, backend.POLL_FLOOR_S)` for all four (idle/active × drive/local) combinations gives 15.0/15.0 for
+Drive (both floored, fixing the active-job case) and 5.0/1.0 for Local (byte-identical to before — no
+regression). Then closed the loop against the ACTUAL `bridge.py` source (not my own reimplementation of the
+formula): patched `time.sleep`, ran the real `run_loop()` with a real local-backend config for 3 ticks, and
+captured `[5.0, 5.0, 5.0]` — matching the unmodified `poll_interval_s` exactly.
+
+## PART 3 — the chime (human's feature; sounds already chosen, already committed, already bundled)
+
+Wired `Poller.on_sound` as an injected callback — same shape as the existing `on_checkpoint` hook
+(`on_sound=None` default; a private `_sound(event)` helper wraps the call in try/except so a hook can never
+crash the poller). Five call sites, exactly where the dispatch named them: RECEIVED right after `events =
+[f"claimed {job_id}"]`; REFUSED at the identity-mismatch log line; FAILED inside `except OSError` (delivery
+failure) AND at the stall-detection branch in `_watch()` (the two "sibling bad outcomes," sharing the one
+failure sound per the dispatch's own note); DELIVERED right after the single `delete_job(job_id)` line all
+three success branches (deliver-only terminal, no-Modbus terminal, tracked-active) pass through — one call
+site covers all three, exactly as the dispatch described it.
+
+The actual playback logic lives in a new `fairy/chime.py`, never imported/called except through that
+callback — `run_loop()` wires it (mirroring `on_checkpoint`'s own placement), and `run_loop()` is never
+reached by `build()`-based unit tests or `--self-test`, so nothing in fairy's own test surface can trigger a
+sound (the dispatch's explicit trap to avoid). `winsound` is imported lazily inside the fire-and-forget
+thread function, not at module scope, so importing `chime.py` itself never touches a Windows-only stdlib
+module. WAV bytes are read once per event and cached; playback is `winsound.PlaySound(data, SND_MEMORY |
+SND_ASYNC)` on a daemon thread, matching the dispatch's spec exactly. Guarded on `sys.platform == 'win32'`
+(no macOS CI exists, per the dispatch's correction to a stale assumption elsewhere).
+
+**Setup toggle**: `Config.enable_chime` (default `True`) + `--no-chime` CLI flag + `_PERSIST_KEYS` entry.
+Made it a LIVE toggle rather than restart-required (unlike `backend`/`enable_slave`/`host`, which need a
+restart because they change what's actually built): the `_on_sound` closure re-reads `config.enable_chime`
+on every fire rather than baking in "wired or not" at `run_loop()` startup, and `ops.set_config` updates
+`c.enable_chime` directly without setting `restart=True`. `ops.get_config()` exposes it. The dispatch scoped
+Part 3 to "all Python... plus one desktop file" — no web/HTML file was named, so the actual Setup-panel
+checkbox (DDCS-Studio side) is not part of this turn; the backend capability (config field, API surface,
+persistence, live toggle) is complete and ready for a future UI turn to call `set_config({enable_chime:
+...})` against.
+
+**Non-vacuity — driven, not asserted.** Wrote a throwaway script using the SAME `_StubTransfer`/
+`LocalFolderBackend` pattern `tests/test_poller_track_gate.py` already establishes, and drove the REAL
+`Poller` class through 6 scenarios with a list-appending `on_sound`:
+- tracked delivery → `['received', 'delivered']`
+- deliver-only (no map) → `['received', 'delivered']` (confirms the one-call-site-covers-three-branches claim)
+- identity-mismatch refusal → `['received', 'failed']`
+- delivery `OSError` → `['received', 'failed']`
+- claim then stall (past `stall_seconds`) → `['received', 'delivered', 'failed']`
+- no `on_sound` wired at all → no crash (proves the self-test/unit-test safety claim directly, not just by
+  inspection)
+
+Separately verified `chime.play()` itself: loaded all 3 real bundled WAVs from the real `DDCS-Studio/web`
+tree and confirmed exact byte counts against `ls -la` (247268/243024/53062 — RIFF headers, no truncation);
+confirmed `play()` safely no-ops on an empty studio_dir, an unmapped event name, and a nonexistent directory
+(none raised); called the real `play()` end-to-end with real audio data on this Windows machine and it
+completed without raising. Verified `enable_chime` default/persistence/override precedence (from_env: no
+config → `True`; persisted `False` → `False`; persisted `False` + explicit override `True` → `True`) and the
+`set_config`/`get_config` round-trip, including confirming `restart_needed: False` for the live-toggle path.
+
+## Noted while investigating, NOT fixed (per the dispatch's explicit "record them, leave them")
+
+- `poller.py`'s `_claim()` catches only `OSError` around `transfer.deliver()` — anything else escapes `tick()`
+  into `run_loop()`'s bare `while True` and kills the loop silently, no crash log, nothing.
+- `poller.py`'s identity-verify-then-transfer sequence (`_claim()`) is a check-then-use race with `transfer.py`
+  — a controller could disconnect/change between the identity check and the actual write.
+
+Neither touched. Confirmed via re-reading both after finishing Parts 1-3 that nothing I changed altered
+either shape.
+
+## Gate
+
+`python -m fairy.bridge --self-test`: exits 1 on an unrelated, PRE-EXISTING failure — a `403 Forbidden` from
+the local-server smoke test's own `POST /api/jobs` call (missing the CSRF `X-DDCS-Local` header the real
+client always sends). Confirmed pre-existing, not caused by this turn: `git stash`'d all of this turn's
+changes and re-ran on the clean tree — identical 403, identical exit 1. Popped the stash back immediately
+after confirming. Not fixed (out of scope for this dispatch; noted here so it isn't mistaken for something
+this turn broke).
+`python -m pytest tests/ -q` (bridge-app's own suite): 86 passed, 0 failed — confirms the `Poller.__init__`
+signature change (added `on_sound=None`) and all other edits didn't regress any existing test.
+Full DDCS-Studio node/Playwright gate NOT re-run this turn — nothing under `DDCS-Studio/web` or `tests/`
+changed; this turn is entirely `bridge/bridge-app` + one `desktop/` file.
+
+## Files
+- `desktop/fairy_gateway.py` — `_persisted_backend()` added; argv no longer hardcodes `--backend local`.
+- `bridge/bridge-app/fairy/backend/__init__.py` — `Backend.POLL_FLOOR_S = 0.0` (base default).
+- `bridge/bridge-app/fairy/backend/drive.py` — `DriveBackend.POLL_FLOOR_S = 15.0`; docstring rewritten to
+  describe the actual floor mechanism instead of the deleted config field.
+- `bridge/bridge-app/fairy/config.py` — `drive_poll_s` deleted; `enable_chime: bool = True` added +
+  persisted key.
+- `bridge/bridge-app/fairy/bridge.py` — `run_loop()`'s sleep now `max(interval, backend.POLL_FLOOR_S)`;
+  `--no-chime` CLI flag; `on_sound` wiring (mirrors `on_checkpoint`).
+- `bridge/bridge-app/fairy/poller.py` — `on_sound` hook + `_sound()` helper; 5 call sites (received,
+  refused, delivery-failed, delivered, stalled).
+- `bridge/bridge-app/fairy/chime.py` — new. The actual WAV-loading + `winsound` playback, only ever reached
+  through the injected callback.
+- `bridge/bridge-app/fairy/ops.py` — `enable_chime` in `get_config()`; live (no-restart) update path in
+  `set_config()`.
+
+🔨 turn 2097
+
