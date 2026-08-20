@@ -55,7 +55,7 @@ Sorted by whether they mean anything with no controller attached:
 | **jobs** | ✅ KEEP | queue + history are shared state, readable from anywhere |
 | **status** | ⚠ REFRAME | today it reports THIS PC's controller link. On a client it should report the WORKSPACE's gateway (is one alive, is it reachable) — a different question, not a hidden tab |
 | **tracker** | ⚠ REFRAME or hide | live progress comes off the gateway's serial cable; a client can only mirror what the gateway published |
-| **files** (CNCDISK) | ✅ **KEEP** | ⭐ **CORRECTED — I was wrong twice about this.** A client does NOT need a path to the disk: the gateway PUBLISHES the listing (`put_cncdisk_index`, implemented by `DriveBackend`) and the client issues DELETE through the command channel (`list_commands`/`clear_command`) which the gateway polls and executes. Remote disk management is already designed in, end to end. ⚠ It is a SNAPSHOT (the gateway's last publish, ~15s), not the live disk — say so in the UI. ⛔ `SAFE_OPS = {"delete"}` with bare-filename-only validation: a remote client can never RUN anything, and that line stays. |
+| **files** (CNCDISK) | ⚠ **POSSIBLE, NOT WIRED** | ⭐ **CORRECTED TWICE — read this whole cell before acting.** First I said HIDE ("no path to the disk"); then, told the disk should be remotely manageable, I said KEEP because the gateway publishes an index and a delete-command channel exists. Both were too fast. **Traced: the producer exists, the consumer is a DIFFERENT APP.** `put_cncdisk_index` is implemented (incl. `DriveBackend`) and the gateway polls `list_commands`, but Studio's Files view calls `ctx.client.listFiles()` → **`/api/files`, the GATEWAY's own HTTP API** — which simply fails with no gateway. The ONLY consumer of the published index is `bridge/bridge-app/web/functions/api/[[path]].js`, the retired Phase-3 R2 console. ⇒ On a client today the tab is DEAD; making it work is a small, real piece of wiring, not a hide/show decision. |
 | **merge** | ⚠ VERIFY, do not assume | I claimed it "operates on controller-side files" without checking — after being wrong twice tonight (see above and the `drive.file` scope), that claim is unverified and must be read from the code before it is acted on. |
 | **console** (admin/Setup) | ⚠ REDUCE, never hide | the client still needs Setup — but only the parts that apply |
 
@@ -73,6 +73,19 @@ Three times in one session I asserted a CAPABILITY LIMIT without testing it, and
 fine), and CNCDISK on a client (already publishable + commandable). Each time the human's plainer model was
 the correct one. ⇒ **Before this plan hides ANY tab, read the code for that tab.** "It needs the controller"
 has been wrong more often than right — the gateway already publishes most of what a client would want.
+
+### 2a-ii. ⭐ THE SEAM THIS KEEPS EXPOSING — the actual shape of the roles work
+Three features tonight have the SAME defect, and it is not a UI defect:
+
+| feature | gateway-mediated path (exists) | backend-mediated path (a client needs) |
+|---|---|---|
+| send a job | `POST /api/jobs` | ✅ BUILT t2080 (`driveJobs.js` writes the inbox) |
+| browse CNCDISK | `GET /api/files` | ❌ missing (the gateway publishes an index nothing reads) |
+| delete a file | `POST /api/files/delete` | ❌ missing (the command channel exists, unused by Studio) |
+
+⇒ **A CLIENT IS NOT "STUDIO WITH TABS HIDDEN". It is Studio talking to the BACKEND instead of to a local
+gateway.** Every capability already has, or needs, a backend-mediated twin; the gateway publishes most of
+the data already. Framing roles as tab-hiding would ship a crippled client and leave the real work undone.
 
 ### 2b. ⭐ EVIDENCE THE ROLE IS MISSING, not a nice-to-have (t2080b, live from the human's phone)
 > *"On my phone, I'm connected, and the send button doesn't do anything. Not even fail or success. Just silence."*
