@@ -368,3 +368,44 @@ test('What\'s new banner prefers composed release notes over derived commit titl
   expect(notes).toContain('COMPOSED HEADLINE ONE');
   expect(notes).toContain('COMPOSED HEADLINE TWO');
 });
+
+/**
+ * t2113 (BACKLOG #5) — THE BAR MUST RENDER ON ONE ROW. Geometry, because the reported symptom was geometric
+ * and no assertion could see it: "the buttons cluster to the left and have a big empty space on the right".
+ *
+ * ⭐ The cause was the CENTRING, not the width cap. `position:fixed; left:50%` halves the AVAILABLE width, so
+ * width:max-content was clamped to 50vw, the 694px row could not fit at 1280px, and the short wrapped row
+ * left the dead space. I tuned max-width TWICE on the wrong hypothesis and shipped a 3-row regression before
+ * measuring. This test is the measurement, kept.
+ *
+ * ⚠ ROWS ARE COUNTED BY HEIGHT, NOT BY offsetTop. `align-items:center` gives items of different heights
+ * different tops ON THE SAME ROW - counting distinct tops reports 3 rows for a perfectly fine bar, which is
+ * exactly the false alarm that sent me tuning the wrong number.
+ */
+test('the update bar renders on ONE row and hugs its content (BACKLOG #5)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1');
+  const r = await page.evaluate(() => {
+    const bar = document.createElement('div');
+    bar.className = 'ddcs-update-bar';
+    bar.innerHTML = '<span class="upd-msg">⬆ Update available — <b>v2026.08.20.11</b></span>'
+      + '<button class="upd-btn upd-self" type="button">Update and restart</button>'
+      + '<button class="upd-btn upd-dl upd-dl-fallback" type="button">Download manually</button>'
+      + '<button class="upd-btn upd-what" type="button">What’s new ▾</button>'
+      + '<button class="upd-x" type="button">✕</button>'
+      + '<div class="upd-notes" hidden></div>';
+    document.body.appendChild(bar);
+    const kids = [...bar.children].filter((c) => c.offsetParent !== null);
+    const tallest = Math.max(...kids.map((c) => c.getBoundingClientRect().height));
+    const b = bar.getBoundingClientRect();
+    const cs = getComputedStyle(bar);
+    const inner = b.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const widest = Math.max(...kids.map((c) => c.getBoundingClientRect().right));
+    bar.remove();
+    return { rowsHeight: inner, tallest, width: b.width, slackRight: b.right - widest };
+  });
+  expect(r.rowsHeight, 'the bar is ONE row tall, not wrapped').toBeLessThan(r.tallest * 1.6);
+  expect(r.width, 'and it is wide enough for the whole row at 1280px').toBeGreaterThan(690);
+  expect(r.slackRight, 'it hugs its content — no dead band on the right').toBeLessThan(20);
+});
