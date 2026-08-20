@@ -6846,3 +6846,63 @@ the row it was meant to free.
 ⚠ Keep ONE implementation: `setQuickTheme()` already persists + applies; Settings must call it rather than
 re-implement theme switching. ⚠ The active-theme ring (`aria-checked` / `.active`) is real state — whatever
 renders the chips must still reflect the live `data-theme`.
+
+# ═══ t2076-t2080 — THE CLOUD PATH IS REAL: BYO Drive, proven end to end (2026-08-19 evening) ═══
+
+**What the human asked for, and got:** send a job to the machine over the internet, through THEIR OWN Google
+Drive — no dev bucket, no shared token, no IP addresses. It works, on their account, proven live rather than
+by test doubles.
+
+## SHIPPED (V2026.08.19.2 → .6, all released)
+- **t2076 — the Drive backend** (`bridge/bridge-app/fairy/backend/drive.py`). ⭐ STDLIB ONLY, and that is the
+  point: `r2.py` needs boto3 and `build_fairy.ps1` EXCLUDES boto3 from the exe, so the R2 cloud path could
+  never run in the shipped app — which is why it sat `[TO TEST]` for months. This one ships inside the exe.
+  Handles Drive's two non-object-store behaviours: names are not keys (every write UPSERTs, or the poller's
+  per-beacon status rewrites duplicate) and paths do not exist (folder ids resolved once, cached).
+- **t2077 — ONE account door**, a round avatar in the header (generic silhouette → the user's Drive photo).
+  Replaced two sign-in surfaces that read DIFFERENT state while secretly sharing one credential. Room made by
+  deleting the long-hidden Transfer button and moving undo/redo into the editor — where they finally gained
+  Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, guarded so they never hijack native text undo.
+- **t2078 — the editor toolbar row**; Load/Insert/Export to the quick menu (the human's refinement of t1227:
+  those three act on the program AS A WHOLE, never mid-edit).
+- **t2079 + t2079b — sign-in was broken for EVERY user, twice.** (a) `config.from_env()` preferred the `web`
+  OAuth block over `installed`, so every machine seeded a Web client whose loopback redirect Google refuses →
+  `redirect_uri_mismatch` everywhere. (b) The fix only helped FRESH installs — an existing machine kept the
+  wrong client persisted, so updating changed nothing (hit live on ASUS minutes after shipping). Values this
+  code seeds now carry provenance and follow the bundle, plus a surgical match on the exact mis-seeded id for
+  installs predating the marker. A user-typed client is never touched — tested both ways.
+  Also: a failed sign-in now carries GOOGLE'S OWN REASON to the page and the log, which is how the second
+  failure was identified in one step ("client_secret is missing").
+- **t2080 + t2080b — a CLIENT can send with no gateway** (`web/ui/cloud/driveJobs.js`): writes the job into
+  the same Drive inbox the gateway polls. jobId is CROSS-CHECKED byte-for-byte against `ops.make_job_id`
+  (the poller claims `ids[0]` from a sorted list, so the id format IS the queue order); the `.map.json` is
+  written BEFORE the `.nc` because `list_inbox` keys off the `.nc` — a job must never be claimable before its
+  metadata is readable.
+
+## ⭐ TWO ASSERTIONS OF MINE THE HUMAN OVERTURNED — both were blocking good work
+1. **"Screenshots in release notes go stale."** Their answer: *"of course they go stale, but that's why we
+   release new updates."* Release notes are VERSIONED AND IMMUTABLE; a picture documenting V19.4 should keep
+   showing V19.4 forever. And only the newest release's notes ever render in the welcome modal, so old images
+   need not ship at all. (BACKLOG #6.)
+2. **"`drive.file` scopes visibility per OAuth CLIENT, so a browser-written job would be invisible to the
+   gateway."** I designed a client-unification decision around it. **Measured instead: the gateway's Desktop
+   client listed AND read a folder created by the browser's Web client.** Visibility is per Cloud PROJECT.
+   It was one API call away all session. Their framing — *"cant we make the gateway simply watch a folder on
+   my drive"* — was the correct model, and the gateway already did exactly that.
+
+## ⛔ THE ONE UNSAFE COMBINATION, and it is NOT built around yet
+Two gateways on ONE Google account share one `DDCS Bridge/inbox/`. `poller._maybe_claim()` takes `ids[0]`
+with no notion of which machine a job is FOR, and `identity.verify()` is INERT while `machine_id` is unset
+(both the human's machines have it empty). ⇒ **with the V4.1 also on Drive, an Expert program can be
+delivered to the V4.1** — different envelope, different dialect.
+**One gateway on Drive is safe. Do not enable a second until the inbox is namespaced per machine.**
+Most of the fix exists: `config.drive_folder` is already per-config; only `driveJobs.js` hardcodes it; and the
+human's own rule ("any workspace can only have one controller") names the folder. See `ROLES-PLAN.md`.
+
+## NEXT, in the human's own priority
+1. **THE ROLES FEATURE** — `ROLES-PLAN.md`, now with live evidence (the phone's dead Send button was the
+   missing role concept, not a UI bug). They asked which tabs/settings a client cannot have; answered there.
+   ONE open ruling: is the role DERIVED from the controller disk or DECLARED in Setup (recommend declared,
+   derived default).
+2. **Namespace the Drive inbox per machine** — unblocks the V4.1 on this path.
+3. `BACKLOG.md` — 8 small items, each with its diagnosis and trap.

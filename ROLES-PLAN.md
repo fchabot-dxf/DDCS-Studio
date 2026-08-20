@@ -67,6 +67,20 @@ A client needs: **machine name**, **cloud storage / account**, and the service (
 A client does NOT need: controller disk, beacons, the controller profile block — all of which describe a
 controller it is not attached to. ⚠ *Reduce, do not hide the tab*: Setup is where the role itself is chosen.
 
+### 2b. ⭐ EVIDENCE THE ROLE IS MISSING, not a nice-to-have (t2080b, live from the human's phone)
+> *"On my phone, I'm connected, and the send button doesn't do anything. Not even fail or success. Just silence."*
+
+`t1327` DISARMS Send whenever no gateway answers, and greys it with a reason. That rule is **correct for a
+gateway machine and wrong for a client** — but the code cannot tell them apart, so it applied the gateway
+rule to a phone and killed the button on the exact device the Drive path was built for. The banner
+underneath said *"sending needs a machine"*, which had silently become false.
+
+The fix shipped as a `viaDrive` special-case bolted onto the disarm rule — **a patch standing in for the
+missing concept.** With roles it is not a special case at all: a CLIENT expects no gateway, so there is no
+"unreachable" state to disarm on. ⇒ **Roles would have PREVENTED this, not merely tidied it.** Every question
+tonight — which tabs, which settings, may the poller claim, which Drive folder — is *"what kind of machine is
+this?"* asked in four ad-hoc ways.
+
 ### 3. Where the role is DECIDED — the one real design question
 Two candidates, and this wants the human's ruling before code:
 - **(a) DERIVED from the controller disk** — non-empty = gateway, empty = client. Zero new state, matches
