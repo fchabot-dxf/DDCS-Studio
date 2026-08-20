@@ -139,7 +139,15 @@ class Config:
                 if os.path.exists(bundled_oauth):
                     with open(bundled_oauth, encoding="utf-8") as f:
                         oauth_data = json.load(f)
-                    creds = oauth_data.get("web") or oauth_data.get("installed") or {}
+                    # t2079 — INSTALLED FIRST, and this ordering is the whole bug. THIS process is the
+                    # desktop gateway: it signs in through the LOOPBACK flow
+                    # (http://127.0.0.1:<port>/oauth/google/callback). A Google "Web application" client
+                    # accepts ONLY redirect URIs registered against it one by one, so seeding a web client
+                    # here produced `Error 400: redirect_uri_mismatch` on every machine — hit live on
+                    # 2026-08-19. A "Desktop app" (installed) client accepts any loopback port by
+                    # construction, which is exactly what this flow needs. Prefer it; fall back to `web`
+                    # only so an old single-client credentials file still starts.
+                    creds = oauth_data.get("installed") or oauth_data.get("web") or {}
                     cid = creds.get("client_id", "")
                     csec = creds.get("client_secret", "")
                     if cid:

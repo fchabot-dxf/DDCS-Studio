@@ -54,6 +54,10 @@ LOCAL_HEADER = "X-DDCS-Local"
 LOCAL_VALUE = "1"
 
 
+def _html_escape(t):
+    return (str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
 def _has_local_header(headers):
     """True iff the request carries the non-CORS-able X-DDCS-Local: 1 header — the CSRF guard's shared predicate."""
     return headers.get(LOCAL_HEADER) == LOCAL_VALUE
@@ -237,11 +241,19 @@ class _Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._send_json({"ok": False, "error": str(e)}, 500)
         if path == "/oauth/google/callback":
-            ok = oauth.callback(self.ops.cfg.google_client_id, self.ops.cfg.google_client_secret, (q.get("state") or [""])[0], (q.get("code") or [""])[0])
+            ok, why = oauth.callback(self.ops.cfg.google_client_id, self.ops.cfg.google_client_secret, (q.get("state") or [""])[0], (q.get("code") or [""])[0])
+            # t2079 — SHOW GOOGLE'S OWN REASON. This page used to say "Sign-in failed" and nothing else, so a
+            # missing client secret, a stale code and a restarted app were indistinguishable to the one person
+            # who could act on the difference. The reason is printed here AND logged to the gateway console.
+            if not ok:
+                print("[oauth] sign-in failed: %s" % why)
             note = ("Signed in to Google Drive — close this tab and return to DDCS Studio." if ok
                     else "Sign-in failed — close this tab and try again from DDCS Studio.")
+            detail = "" if ok else ("<p style='font:13px/1.5 system-ui;color:#a33;max-width:46em;margin:1.5em auto;"
+                                    "text-align:left;white-space:pre-wrap'>%s</p>" % _html_escape(why))
             return self._send_html("<!doctype html><meta charset=utf-8><title>DDCS Studio</title>"
-                                   "<body style='font:16px system-ui;padding:3em;text-align:center'><h2>%s</h2></body>" % note)
+                                   "<body style='font:16px system-ui;padding:3em;text-align:center'><h2>%s</h2>%s</body>"
+                                   % (note, detail))
         if path == "/api/oauth/google/token":
             cid = self.ops.cfg.google_client_id
             return self._send_json({"access_token": oauth.access_token(cid, self.ops.cfg.google_client_secret) if cid else "", "connected": oauth.connected()})
