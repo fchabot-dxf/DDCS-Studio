@@ -15,7 +15,7 @@ import os
 import re
 
 from . import __version__, cncdisk, identity
-from .config import ROLE_GATEWAY, effective_role, role_conflict
+from .config import Config, ROLE_GATEWAY, effective_role, role_conflict
 from .transfer import controller_disk_reachable
 
 _SLUG = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -241,6 +241,23 @@ class Ops:
                 os.remove(p + ".bak")
             return {"ok": True, "name": name}
         except OSError as e:
+            return {"ok": False, "error": str(e)}
+
+    def open_log(self):
+        """t2113 (BACKLOG #3) — open the desktop exe's log file in the OS default viewer, so Setup can offer
+        a "view log" affordance without the gateway needing to serve/stream the file's contents itself.
+        Computes the SAME path fairy_gateway.py's own _setup_logging writes to (Config.default_log_path,
+        the one declared source — see its docstring), so this can never point somewhere the log doesn't
+        actually land. Honest, not silent, when there's nothing to open: a dev/server launch never writes
+        this file at all (only the desktop exe's _setup_logging does), and a brand-new install may not have
+        logged anything yet."""
+        path = Config.default_log_path()
+        if not os.path.exists(path):
+            return {"ok": False, "error": f"no log file yet at {path}"}
+        try:
+            os.startfile(path)   # Windows-only, matching the rest of the desktop launcher (fairy_gateway._msgbox)
+            return {"ok": True, "path": path}
+        except Exception as e:
             return {"ok": False, "error": str(e)}
 
     # --- identity / descriptor ---------------------------------------------

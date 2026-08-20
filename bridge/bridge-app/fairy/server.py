@@ -22,6 +22,8 @@ API (all JSON):
   GET  /api/file?name=<file>           -> { ok, name, content }  (read a CNCDISK file)
   POST /api/jobs   {name, nc, map?, contentHash?}-> { jobId, name, tracked }   (queue a job)
   POST /api/files/delete{name}         -> { ok, ... }                 (safe delete on CNCDISK)
+  POST /api/open-log                   -> { ok, path } | { ok: false, error } (t2113 — open the desktop
+                                           exe's log file host-side, e.g. Setup's "view log" affordance)
 """
 import json
 import mimetypes
@@ -308,6 +310,11 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._send_json({"ok": False, "error": "only http(s) links can be opened"}, 400)
             import webbrowser
             return self._send_json({"ok": bool(webbrowser.open(url))})
+        # t2113 (BACKLOG #3) — open the desktop exe's log file HOST-SIDE (os.startfile), same shape as
+        # /api/open-external just above: the action happens on the machine running the gateway, which for
+        # the desktop exe is the same machine the user is looking at. CSRF-guarded by the same check above.
+        if self.path == "/api/open-log":
+            return self._send_json(self.ops.open_log())
         if self.path == "/api/sysfile":
             b = self._read_body()
             return self._send_json(self.ops.write_sysfile(b.get("name", ""), b.get("content", ""), b.get("mode", "write")))

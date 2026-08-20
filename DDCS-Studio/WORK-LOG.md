@@ -46306,3 +46306,107 @@ touched or caused.
 
 🔨 turn 2111
 
+# t2113 (part 1 of 2) — BACKLOG #3, hide the console window (gateway/Python + build script only; web/ off-limits, advisor building S1/S2/backlog there in parallel)
+
+Dispatch: `build_fairy.ps1` passes neither `--windowed` nor `--console`, so PyInstaller defaults to a console
+build and a black log window sits beside the app all session. Explicit order: log to a file FIRST (rotated),
+give Setup a way to open it, and only THEN hide the window — never just add `--windowed`, since the console
+log is load-bearing (bound host/port, a failed serial probe, `[poller]` delivery/stall lines) and on a frozen
+windowed build a bare `print()` can RAISE when `sys.stdout` is `None` (the same class of hazard as t2103's
+Unicode crash — a windowed build turns EVERY print into that hazard, not just one non-ASCII line).
+
+## What was already there vs what was actually missing
+
+`fairy_gateway.py` already tees stdout/stderr to `~/.ddcs-bridge/fairy.log` via a `_Tee` class (`_setup_logging`,
+called first thing in `main()`) — this predates t2113 and already filters `None` streams, so a bare `print()`
+after setup was already windowed-safe. What was genuinely missing: (1) no rotation — the file only ever grows;
+(2) no way for Setup to open it — `_setup_logging`'s return value was discarded, no API existed; (3) the actual
+`--windowed` flag itself was never passed.
+
+## Built
+
+**Rotation** (`desktop/fairy_gateway.py`): new `_RotatingLogFile`, a plain file-like writer used by `_Tee`
+instead of a bare `open()` handle — rotates `<path> -> .1 -> .2` (oldest dropped) once the live file crosses
+5MB. Every failure (open, rotate, write) is swallowed — it sits directly behind `sys.stdout`/`sys.stderr`, so
+it must never be able to crash the very process whose output it exists to capture.
+
+**One declared log path, not two** (`fairy/config.py`): new `Config.default_log_path()` — `~/.ddcs-bridge/
+gateway.log` (renamed from `fairy.log`; the human's own BACKLOG.md text and the dispatch both say
+`gateway.log` explicitly, so treated as deliberate, not a relay typo — updated the two sibling-convention
+comments in `config.py`/`selfupdate.py` that named the old filename). `fairy_gateway.py`'s own `LOG_PATH` now
+calls this (moved the file's dev-mode `sys.path.insert` up to module level so the import can resolve before
+`_setup_logging` runs, with a same-formula hardcoded fallback if the import fails for any reason — logging
+setup must not become a NEW way to fail boot).
+
+**"Give Setup a way to open it" — the backend half only** (`fairy/ops.py`, `fairy/server.py`): new
+`Ops.open_log()` (`os.startfile` on the path from `Config.default_log_path()`, honest `{ok: false, error}`
+when nothing's been logged yet) and `POST /api/open-log`, modeled directly on the existing `/api/open-external`
+precedent (host-side open, same CSRF guard). ⚠ **The actual Setup-tab button is NOT built this turn** — that's
+`DDCS-Studio/web`, explicitly off-limits while the advisor works there in parallel. This declares the
+capability; the button is a small follow-up whenever web/ is free.
+
+**`--windowed`** (`desktop/build_fairy.ps1`): added last, after everything above was verified.
+
+## Verified — the real symptom, not a config check
+
+New `bridge/tools/desktop-tests/test_gateway_log_2113.py` (6 tests), run against a fully scratch `HOME` (never
+touches this machine's real `~/.ddcs-bridge/`): drives the REAL `fairy.bridge.self_test()` (not a synthetic
+print) and asserts the startup banner, a real `[poller] delivered` line, and a real `[poller] DELIVERY FAILED`
+line all land in the file; reproduces the EXACT t2103-class hazard directly (a fake console stream that raises
+`UnicodeEncodeError` on write) and asserts the line still reaches the file and `print()` still doesn't raise;
+an unwritable log directory degrades to "no file logging" without raising; rotation actually rotates without
+losing the most recent line, and caps the backup count; `fairy_gateway.LOG_PATH` and `Config.default_log_path()`
+agree.
+
+**Non-vacuity, mutation-tested (not a one-line revert, since this is new code, not a fix to a known-bad
+line)**: temporarily neutered the rotation trigger — `test_rotation_caps_the_backup_count...` failed exactly
+as expected (`AssertionError: the configured number of backups must actually be kept`). Temporarily stripped
+`_Tee`'s per-stream exception isolation — `test_a_console_write_failure_never_blocks...` failed by actually
+raising `UnicodeEncodeError` straight out of `print()`, reproducing the t2103 shape byte for byte. Both
+restored from a scratch copy (not `HEAD` — this work wasn't committed yet either way, but same discipline).
+
+**The `--windowed` flag itself**: built a real, separately-named scratch exe (`t2113test.exe`, cleaned up after)
+via `pwsh build_fairy.ps1 -Name t2113test` — confirmed PyInstaller selected the WINDOWED bootloader
+(`runw.exe`, not `run.exe`). ⚠ **Did NOT launch it.** Before attempting a live smoke-test I checked whether
+anything was already listening on the exe's candidate ports (8765–8769) — port 8765 answered, and
+`/api/descriptor` confirmed it's the human's own real, live gateway session connected to the bench V4.1
+(`controller_connected: true`, `dest: \\10.0.0.50\cncdisk`). `fairy_gateway.main()`'s own single-instance logic
+would have detected that and TAKEN IT OVER (force-killing the real session) — the port-probe range is a
+hardcoded module constant, not scoped by any HOME/config override I could have used to isolate the test. Ruled
+this too risky to run from here and did not attempt it. The exe build + bootloader check + the isolated
+Python-level mechanism proof above are the verification available from this environment; an actual launch
+against a real config is worth one manual smoke-test before wide release, flagging for the human/advisor.
+
+## Also found, not fixed (out of scope, flagged per standing discipline)
+
+`desktop/build_fairy.ps1`'s (and `fairy_gateway.py`'s, pre-existing, moved verbatim not introduced) dev-mode
+`sys.path.insert(0, HERE + "bridge/bridge-app")` is wrong — `desktop/bridge/bridge-app` doesn't exist; the
+real location is `<repo root>/bridge/bridge-app`, one level up from `HERE` (`desktop/`). Confirmed this
+predates t2113 (the code was relocated verbatim, not altered) and is currently harmless only because my new
+`Config` import wraps itself in a `try/except` that falls back to an identical hardcoded path formula.
+`bridge/tools/desktop-tests/test_webview_storage.py` has the same class of stale path-math bug (`ModuleNotFoundError:
+No module named 'fairy'` when run standalone) — also not touched.
+
+## Gate
+
+Full bridge-app pytest: 113/113 (unchanged — this turn's new tests live in `bridge/tools/desktop-tests/`, not
+the pytest-collected `bridge/bridge-app/tests/`). `--self-test`: unchanged at the established 47-`[ok]`
+baseline, same single pre-existing 403.
+
+## Files
+- `bridge/bridge-app/fairy/config.py` — new `Config.default_log_path()`; sibling-convention comment updated.
+- `bridge/bridge-app/fairy/selfupdate.py` — comment updated (`fairy.log` -> `gateway.log`).
+- `bridge/bridge-app/fairy/ops.py` — new `Ops.open_log()`.
+- `bridge/bridge-app/fairy/server.py` — new `POST /api/open-log`; API doc comment updated.
+- `desktop/fairy_gateway.py` — `_RotatingLogFile`; `_setup_logging` rewritten to use it; `LOG_PATH` now
+  shares `Config.default_log_path()` (with a same-formula fallback); dev-mode `sys.path.insert` moved to
+  module level.
+- `desktop/build_fairy.ps1` — added `--windowed`.
+- `bridge/tools/desktop-tests/test_gateway_log_2113.py` — new, 6 tests.
+
+⛔ **Not started: BACKLOG #4 (update-check on `visibilitychange`)** — touches `index.html`/web JS per the
+dispatch's own explicit instruction, passing back now rather than starting it, per "do #1 first and PASS BACK
+BEFORE STARTING #2 so we do not collide."
+
+🔨 turn 2113
+

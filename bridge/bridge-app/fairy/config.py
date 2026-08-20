@@ -120,10 +120,18 @@ class Config:
         PyInstaller build unpacks to a temp dir each run (an exe-relative path is discarded on exit), and
         even the unpacked desktop exe reads it as cwd-relative (see START_GATEWAY.bat / fairy_gateway.py),
         so a full reinstall to a new folder silently starts a fresh, empty store while the old one sits
-        orphaned. Sibling to config.json/fairy.log/install_id — the SAME already-shipped stable-per-user
+        orphaned. Sibling to config.json/gateway.log/install_id — the SAME already-shipped stable-per-user
         convention (fairy_gateway.py) — directly under the user's home folder rather than buried in
         AppData, so it is a path the user can actually find and back up, not just a durable one."""
         return os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "data")
+
+    @staticmethod
+    def default_log_path():
+        """t2113 (BACKLOG #3) — the ONE declared source for the desktop exe's log file location, so
+        fairy_gateway.py (which writes it — see its own _setup_logging) and Ops.open_log (which offers to
+        open it for Setup's 'view log' affordance) can never disagree about where it lives. Same sibling
+        convention as config.json/install_id/data above."""
+        return os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "gateway.log")
 
     @classmethod
     def from_env(cls, **overrides):

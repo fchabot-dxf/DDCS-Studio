@@ -60,7 +60,7 @@ def sweep_old(directory: str = None) -> list:
 
     t2075 — a locked-file skip used to be a bare `pass`, fully silent: nothing distinguished "there was nothing
     to sweep" from "there IS a .old.exe and it would not go away" (the exact shape a Downloads-folder leftover
-    from months back was found in). Prints ONE line per skip so it lands in fairy.log (fairy_gateway.py's own
+    from months back was found in). Prints ONE line per skip so it lands in gateway.log (fairy_gateway.py's own
     _setup_logging tees stdout there before this is ever called) — still never raises, still never blocks boot."""
     directory = directory or os.path.dirname(exe_path())
     removed = []

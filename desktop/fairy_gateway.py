@@ -24,6 +24,10 @@ import urllib.request
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# t2113 — moved up from inside _run_gateway() so EVERY fairy import in this file (not just the gateway
+# thread's own) can resolve in dev mode; frozen builds never need this (PyInstaller bundles fairy directly).
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, os.path.join(HERE, "bridge", "bridge-app"))
 HOST = "127.0.0.1"
 # Port fallback: the exe binds the first FREE port in this range (so it still launches if 8765 is taken).
 # ALL of these must be registered as Google OAuth "Authorized JavaScript origins" (http://127.0.0.1:<p>) so the
@@ -31,7 +35,15 @@ HOST = "127.0.0.1"
 PORTS = [8765, 8766, 8767, 8768, 8769]
 PORT = PORTS[0]
 TITLE = "DDCS Studio"   # the desktop app = Studio UI + embedded gateway ("fairy" is just the gateway daemon inside)
-LOG_PATH = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "fairy.log")
+try:
+    from fairy.config import Config
+    LOG_PATH = Config.default_log_path()
+except Exception:
+    # t2113 — defensive: logging setup must never be the thing that fails boot. Same formula as
+    # Config.default_log_path(); kept independent so a fairy import problem can't take this out too.
+    LOG_PATH = os.path.join(os.path.expanduser("~"), ".ddcs-bridge", "gateway.log")
+LOG_MAX_BYTES = 5 * 1024 * 1024   # cap a single log file at ~5MB of text before rotating
+LOG_BACKUPS = 2                    # gateway.log.1, gateway.log.2 kept; oldest dropped
 
 
 class _Tee:
@@ -55,17 +67,79 @@ class _Tee:
                 pass
 
 
+class _RotatingLogFile:
+    """A plain file-like writer for _Tee: rotates LOG_PATH -> .1 -> .2 (oldest dropped) once the live file
+    crosses LOG_MAX_BYTES, so neither a long-running session nor months of launches can grow the log
+    without bound (t2113, BACKLOG #3). Every failure — open, rotate, or write — is swallowed: this sits
+    directly behind sys.stdout/sys.stderr, so it must never be able to crash the process whose own output
+    it exists to capture (the SAME class of hazard t2103 found in a bare print() — see _setup_logging)."""
+    def __init__(self, path, max_bytes=LOG_MAX_BYTES, backups=LOG_BACKUPS):
+        self.path = path
+        self.max_bytes = max_bytes
+        self.backups = backups
+        self._f = None
+        self._size = 0
+        self._open()
+
+    def _open(self):
+        try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            self._f = open(self.path, "a", buffering=1, encoding="utf-8")
+            self._size = os.path.getsize(self.path)
+        except Exception:
+            self._f = None
+            self._size = 0
+
+    def _rotate(self):
+        try:
+            if self._f is not None:
+                self._f.close()
+        except Exception:
+            pass
+        try:
+            oldest = f"{self.path}.{self.backups}"
+            if os.path.exists(oldest):
+                os.remove(oldest)
+            for i in range(self.backups - 1, 0, -1):
+                src, dst = f"{self.path}.{i}", f"{self.path}.{i + 1}"
+                if os.path.exists(src):
+                    os.replace(src, dst)
+            if os.path.exists(self.path):
+                os.replace(self.path, f"{self.path}.1")
+        except Exception:
+            pass
+        self._open()
+
+    def write(self, data):
+        if self._f is None:
+            return
+        try:
+            self._f.write(data)
+            self._f.flush()
+        except Exception:
+            self._f = None
+            return
+        self._size += len(data.encode("utf-8", "ignore"))
+        if self._size >= self.max_bytes:
+            self._rotate()
+
+    def flush(self):
+        try:
+            if self._f is not None:
+                self._f.flush()
+        except Exception:
+            pass
+
+
 def _setup_logging():
-    """Tee stdout/stderr to ~/.ddcs-bridge/fairy.log so the gateway's [bridge] lines are visible even
-    though the pywebview window hides the console. Returns the log path (also exposed in the UI title)."""
-    try:
-        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-        f = open(LOG_PATH, "a", buffering=1, encoding="utf-8")
-        sys.stdout = _Tee(sys.__stdout__, f)
-        sys.stderr = _Tee(sys.__stderr__, f)
-        print(f"\n=== fairy gateway started {datetime.datetime.now():%Y-%m-%d %H:%M:%S} (pid {os.getpid()}) ===")
-    except Exception as e:
-        print(f"[fairy] could not open log file {LOG_PATH}: {e}", file=sys.stderr)
+    """Tee stdout/stderr to LOG_PATH (rotated, t2113) so the gateway's [bridge]/[poller] lines are visible
+    even with the console window hidden — and stay bounded across a long session or months of launches.
+    Returns the log path (also computed independently by Ops.open_log via Config.default_log_path, so
+    Setup's 'view log' affordance can never disagree with where this actually writes)."""
+    rotating = _RotatingLogFile(LOG_PATH)
+    sys.stdout = _Tee(sys.__stdout__, rotating)
+    sys.stderr = _Tee(sys.__stderr__, rotating)
+    print(f"\n=== fairy gateway started {datetime.datetime.now():%Y-%m-%d %H:%M:%S} (pid {os.getpid()}) ===")
     return LOG_PATH
 
 
@@ -137,8 +211,8 @@ def _beacon_launch():
 
 def _run_gateway(user_args):
     """Run the blocking gateway (serve + poll loop) — invoked in a daemon thread."""
-    if not getattr(sys, "frozen", False):
-        sys.path.insert(0, os.path.join(HERE, "bridge", "bridge-app"))
+    # t2113 — the dev-mode sys.path.insert now happens once at module level (near HERE/LOG_PATH), so
+    # every fairy import in this file resolves, not just this one.
     from fairy.bridge import main
     # No --host here: the bind address comes from Setup's persisted config (default 127.0.0.1;
     # "0.0.0.0" when the user enables LAN serving). The window still opens on 127.0.0.1 either way.

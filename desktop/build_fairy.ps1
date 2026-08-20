@@ -91,7 +91,14 @@ VSVersionInfo(
 "@ | Out-File -Encoding ascii $verFile
     Write-Host "[build] version resource -> $ver (filevers $filevers)" -ForegroundColor Cyan
     $pyArgs = @(
-        "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noupx", "--name", $Name,
+        # t2113 (BACKLOG #3) — --windowed (PyInstaller's --noconsole) hides the black console window that
+        # used to sit beside the app all session. Safe ONLY because fairy_gateway.py's _setup_logging now
+        # tees every print() to a ROTATED ~/.ddcs-bridge/gateway.log first (Ops.open_log/Setup can open it) —
+        # a frozen --windowed build has no console at all, so an un-tee'd print() can raise (sys.stdout is
+        # None); see _Tee's per-stream isolation. Verified: the log file receives the startup line, a real
+        # [poller] delivery line, and a real [poller] DELIVERY FAILED line (test_gateway_log_2113.py) BEFORE
+        # this flag was added.
+        "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--noupx", "--windowed", "--name", $Name,
         "--icon", "desktop/ddcs.ico",
         "--version-file", $verFile,
 
