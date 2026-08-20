@@ -10,6 +10,8 @@ The instrumented job sets two vars and pushes them at each safe retract:
 ```
 #251 = 111        ; marker, set once near the top
 #250 = <n>        ; beacon number, 1..255
+
+> ⚠ **BEHAVIOUR lives in [`JOB-RULES.md`](../JOB-RULES.md), not here.** This file describes the *layout and wire shape* — what a job looks like and where it sits. **When** a gateway claims one, what happens when it cannot deliver, what survives a restart, and what the sender is told are settled there, once. Do not restate any of it in this file; reference it.
 MSETDATA[250,1,0,2,16,300]
 ```
 `MSETDATA[250,1,0,2,16,300]` = write **2 bytes** from `#250` to **holding register 0** of slave id **1**,
