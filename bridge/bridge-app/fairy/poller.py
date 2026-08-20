@@ -86,6 +86,30 @@ class Poller:
             self._claim(ids[0])                    # oldest jobId == FIFO
 
     def _claim(self, job_id):
+        try:
+            self._do_claim(job_id)
+        except Exception as e:
+            # t2111 -- backend.get_job (first line of _do_claim) can raise far more than OSError: a
+            # corrupt local .map.json raises FileNotFoundError/ValueError, and the Drive backend raises
+            # DriveError (a RuntimeError, NOT an OSError). Only the delivery step below was guarded
+            # (except OSError); nothing else in _do_claim was, so any of these escaped _claim -> tick()
+            # -> run_loop(), where only KeyboardInterrupt is caught -- one malformed job or one bad Drive
+            # response killed the whole daemon. Same shape as every refusal inside _do_claim: fail THIS
+            # job honestly (status failed + delete_job, so the FIFO can't wedge on it), log it loudly,
+            # and keep polling -- never take the process down over one bad entry.
+            name = self._job_name(job_id, {})
+            reason = f"claim failed: {e}"
+            self.log(f"[poller] CLAIM FAILED {job_id}: {reason}")
+            self._sound("failed")
+            try:
+                self.backend.put_status(
+                    job_id, tracker.build_status(job_id, name, {}, "failed", 0,
+                                                 [f"claimed {job_id}", f"refused: {reason}"]))
+                self.backend.delete_job(job_id)
+            except Exception as e2:
+                self.log(f"[poller] could not clean up {job_id} after claim failure: {e2}")
+
+    def _do_claim(self, job_id):
         nc, m = self.backend.get_job(job_id)
         name = self._job_name(job_id, m)
         tracked = bool(m.get("total_beacons"))     # has a map with beacons -> Fusion cut; else deliver-only

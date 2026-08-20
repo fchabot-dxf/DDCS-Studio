@@ -46235,3 +46235,74 @@ Full bridge-app pytest: 104/104 (101 + 3 new). `--self-test`: unchanged at the e
 
 🔨 turn 2109
 
+# t2111 — two "silent daemon death" defects, same class as t2103's Unicode crash (gateway/Python only, web/ off-limits: advisor building S1/S2 there in parallel)
+
+## ITEM 1 — poller.py's `_claim` let a non-`OSError` escape and kill the whole gateway
+
+`transfer.deliver()` was wrapped in `except OSError`, but `backend.get_job(job_id)` at the very top of
+`_claim` was not wrapped at all. A corrupt local `.map.json` raises `json.JSONDecodeError` (a `ValueError`
+subclass) or `FileNotFoundError`; the Drive backend raises `DriveError`, a `RuntimeError` — neither is an
+`OSError`. Unwrapped, either escaped `_claim` → `tick()` → `run_loop()`, whose only handler is
+`except KeyboardInterrupt` — so it ran straight through the `finally` block (shutting the HTTP server down)
+and killed the process. One malformed job or one bad Drive response took the whole gateway offline.
+
+**Fixed**: renamed the existing body to `_do_claim`, made `_claim` a thin wrapper —
+`try: self._do_claim(job_id) except Exception as e: ...`. On any escape (not just from `get_job`; this
+also nets any other surprise anywhere in the claim path), it fails THAT job honestly: logs it, sounds
+"failed", writes a `failed` status with the reason, calls `delete_job` — the exact same shape the existing
+delivery-failure branch already uses, so the FIFO can't wedge on it — then returns so `tick()` (and the
+next tick's claim) is unaffected. Not a silent swallow: every failure is logged and recorded in the job's
+own status; the outer wrap only ever fires for what the existing, more specific branches (delivery's own
+`except OSError`, the identity/machine-id refusals) don't already handle, so their richer handling
+(`_record_history` on delivery failure, etc.) is untouched.
+
+**Verified the real symptom, not that an exception type changed**: `tests/test_claim_survives_bad_job_2111.py`
+drives a real `Poller` + real `LocalFolderBackend` against a genuinely corrupt `.map.json` on disk — asserts
+`tick()` doesn't raise, the bad job is removed from the inbox with a `failed` status, AND a later, valid job
+still claims and delivers normally on the next tick (proving it keeps polling, not just survives once). A
+fourth test feeds a stub backend that raises a plain `RuntimeError` from `get_job` (standing in for
+`DriveError`) to prove the catch isn't accidentally scoped to `ValueError`/`OSError`. **Non-vacuity**: reverted
+the fix to HEAD, ran the corrupt-map test, watched the exact reported symptom reproduce byte for byte
+(`json.decoder.JSONDecodeError` propagating straight out of `tick()`, traceback and all), restored from a
+scratch copy (not from HEAD — HEAD is the pre-fix version), confirmed green again.
+
+## ITEM 2 — identity.py's `verify()` reported a "wrong machine" message for a merely offline controller
+
+`read()` swallows `OSError` and returns `None` on absent, corrupt, and unreachable alike — it cannot tell
+them apart. `verify()` turned that single `None` into `"no identity file on the controller (run provision)"`
+regardless of which it actually was. Inert today (`machine_id` is unset everywhere), but the human is about
+to set it — the moment they do, a controller that's simply powered off starts reporting the most misleading
+message in the whole set: it reads as "this is the wrong controller" when it's just switched off.
+
+**Fixed**: `verify()` now probes `controller_disk_reachable()` (imported from `transfer.py` — the ONE shared
+source for this question, already used by the claim gate, `submit_job`'s gate, and `Ops.controller_reachable`)
+BEFORE ever calling `read()`. Unreachable → `ok=True, "unverified (controller unreachable)"` — skipped, the
+same shape as the existing no-`machine_id`-configured case, never refused. Per the standing rule: refuse on
+a KNOWN mismatch, never on ignorance. A genuinely reachable-but-unprovisioned controller (disk answers, no
+identity file on it) keeps its original, accurate "run provision" message unchanged; a genuinely reachable
+and mismatched controller keeps its original, accurate mismatch message unchanged.
+
+**Verified**: `tests/test_identity_verify_unreachable_2111.py` — five cases (unreachable / reachable-but-
+unprovisioned / reachable-and-mismatched / reachable-and-matching / no-machine_id-configured-at-all), each
+asserting both the `ok` value and the exact wording (the unreachable case explicitly asserts the words
+"wrong"/"mismatch" are ABSENT from its reason, not just that `ok` flipped). **Non-vacuity**: reverted to
+HEAD, ran the unreachable-controller test, watched it fail with `(False, 'no identity file on the controller
+(run provision)')` — the exact reported symptom — restored from the scratch copy, confirmed green.
+
+## Gate
+
+Full bridge-app pytest: 113/113 (104 + 9 new across the two files above). `--self-test`: unchanged at the
+established 47-`[ok]` baseline. Confirmed the self-test's single pre-existing `POST /api/jobs` → 403 failure
+(missing `X-DDCS-Local` CSRF header in the self-test's own `urlopen` call, `server.py`'s guard from an earlier
+turn) is present identically on an unmodified `HEAD` — same 47 `[ok]`s, same traceback — so it's the same
+already-documented, unrelated pre-existing gap noted in t2107's own WORK-LOG entry, not something this turn
+touched or caused.
+
+## Files
+- `bridge/bridge-app/fairy/poller.py` — `_claim` now a thin try/except wrapper around the renamed `_do_claim`.
+- `bridge/bridge-app/fairy/identity.py` — `verify()` probes `controller_disk_reachable` before `read()`.
+- `bridge/bridge-app/tests/test_claim_survives_bad_job_2111.py` — new, 4 tests.
+- `bridge/bridge-app/tests/test_identity_verify_unreachable_2111.py` — new, 5 tests.
+
+🔨 turn 2111
+

@@ -12,6 +12,8 @@ import json
 import os
 import uuid
 
+from .transfer import controller_disk_reachable
+
 
 def new_machine_id():
     return uuid.uuid4().hex
@@ -40,9 +42,17 @@ def provision(disk, filename, machine_id, name):
 
 def verify(disk, filename, expected_id):
     """(ok, reason). If no expected_id is configured, verification is skipped (ok=True) — first-run /
-    unconfigured. Otherwise the controller's identity file must exist and match."""
+    unconfigured. t2111 — same for an UNREACHABLE controller: skipped (ok=True), not refused. read()
+    swallows OSError and returns None on absent/corrupt/unreachable alike, so without this check a
+    controller that is merely switched off produced the exact same "no identity file (run provision)"
+    reason as one that was reachable but never provisioned — the most misleading shape, since the wording
+    implies a wrong/unconfigured controller rather than one that's simply offline. Refuse on a KNOWN
+    mismatch only, never on ignorance; if it's unreachable here, the delivery attempt right after this
+    call fails honestly on its own (transfer.deliver's own OSError handling)."""
     if not expected_id:
         return True, "unverified (no machine_id configured)"
+    if not controller_disk_reachable(disk):
+        return True, "unverified (controller unreachable)"
     found = read(disk, filename)
     if found is None:
         return False, "no identity file on the controller (run provision)"
