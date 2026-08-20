@@ -16,7 +16,13 @@ Each entry names where the evidence is, so nobody re-derives it.
 
 ## OPEN
 
-### 1. The avatar shows initials even when a photo exists
+### 1. ~~The avatar shows initials even when a photo exists~~ ✅ **CLOSED — t2113**
+> Cause (1), plus a second nobody had spotted. The boot backfill EXISTED but its guard was
+> `!name && !email` (pre-t2077, when identity had no picture), so an already-connected session never
+> qualified; and it lived in `renderCloudLogin()`, which the header avatar never calls. Both fixed:
+> `backfillIdentity()` re-asks when ANY part is missing, and `initHeaderAccount()` calls it.
+> An account with no photo asks once per load and keeps initials. `avatar-backfill-2113.spec.js`.
+
 *(human, 2026-08-19: "the avatar icon, it is my initials when I'm connected, but can it actually be my avatar image?")*
 
 `headerAccount.js` ALREADY renders `acct.picture` when present and only falls back to initials — and
