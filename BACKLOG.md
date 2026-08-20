@@ -116,6 +116,10 @@ no-notes fallback — read it before changing the schema.
 - ~~**The editor's bottom-left button cluster is overgrown**~~ — closed by **t2078**: one flex toolbar row above
   the editor; indent/comment buttons retired to their keyboard shortcuts.
 
+## OPEN (continued)
+*(⚠ these numbered items were appended BELOW the RECENTLY CLOSED list by earlier turns and
+read as closed at a glance. They are not. Header restored 2026-08-20.)*
+
 ### 7. The lathe icon doesn't read as a lathe setup
 *(human, 2026-08-19: "the lathe icon is not really looking like a lathe setup")*
 
@@ -135,7 +139,9 @@ tool-on-a-cross-slide; the current op family draws bar + centreline + cut only, 
 post — which is a plausible reason it reads as "a rod" rather than "a lathe". ⚠ Whatever changes, it must
 survive **14px** — that constraint is what t1918 was entirely about, and it is where the first attempt died.
 
-### 8. Let the BROWSER send jobs through Drive too (not just the exe)
+### 8. ~~Let the BROWSER send jobs through Drive too (not just the exe)~~ ✅ **CLOSED — t2080**
+> Shipped: `ui/cloud/driveJobs.js` writes straight into the machine's Drive inbox; `client-send-2080.spec.js`
+> covers both contract cases. Since extended by S4 (per-machine folder) and by the no-send policy below.
 *(human, 2026-08-19: "what if i want the browser to send too", then — cutting through my overcomplication —
 "cant we make the gateway simply watch a folder on my drive")*
 
@@ -159,7 +165,21 @@ links repeat runs). `ui/cloud/googleDrive.js` already has the upload/list primit
 ⚠ Prove it end to end (a real browser submit → a real gateway claim → a real controller delivery) before
 believing it; that rule is what months of `[TO TEST]` on r2.py earned.
 
-### 9. A job sent while the controller is OFF is discarded, not queued
+### 9. ~~A job sent while the controller is OFF is discarded, not queued~~ ✅ **CLOSED — t2105/t2107**
+> ⛔ **DO NOT BUILD WHAT THIS ENTRY PROPOSES.** The retry queue, attempt ceiling and persisted retry state
+> described below were all explicitly rejected by the human. The defect was real; the fix was the opposite
+> of elaborate:
+> - `poller._maybe_claim` now checks `transfer.reachable()` beside the `expert_dest` check, so an
+>   undeliverable job is simply **NOT CLAIMED** — and **the inbox IS the queue**, so not claiming already
+>   means waiting. No counter, no ceiling, no backoff, no state.
+> - and the job should not exist in the first place: **a send is refused unless a gateway is running AND
+>   the CNC is powered** (the twofold heartbeat). Prevention at the moment of action beat cleanup after it.
+>
+> ⭐ The full reasoning, including an advisor objection that was **backwards**, is in
+> [`bridge/bridge-app/JOB-RULES.md`](bridge/bridge-app/JOB-RULES.md) — the one source for this behaviour.
+> The original text is kept below only so a re-report is recognised, not re-investigated.
+
+#### (original report, superseded)
 *(found 2026-08-19 while answering the human's "is CNC-FAIRY a gateway when the controller is on and a
 client when it's shut down?" — the role answer is no, but the instinct behind it exposed this.)*
 
