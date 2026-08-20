@@ -84,6 +84,27 @@ export default {
         el('div', { class: 'muted', style: 'margin-top:6px' },
            String(live.controller_name || live.controller_family || 'controller unknown')
            + (hb.ageS != null ? '  ·  last seen ' + Math.round(hb.ageS) + 's ago' : '')));
+    } else if (hb && (hb.state === 'stale' || hb.state === 'unseen' || hb.state === 'unreadable')) {
+      // t2113 - THE NEGATIVE ANSWER IS STILL AN ANSWER, and leaving it out was my own gap. t2112 taught this
+      // tab to report the machine, but only accepted 'fresh' - so a gateway that STOPPED, or a Drive that
+      // would not answer, fell straight back to 'still looking on this PC', the phone-hostile copy t2112
+      // existed to remove. Send already words all three states correctly off the SAME heartbeat, so the two
+      // tabs disagreed about one fact again - the exact failure t2112 was fixing, one state to the left.
+      // ⚠ 'unreadable' is IGNORANCE, NOT ABSENCE, and must not be phrased as 'no gateway': the browser
+      //    reading a DESKTOP-written Drive file is the one visibility direction never measured, so a failed
+      //    lookup may mean we cannot see rather than that nothing is there. Amber, and it says so.
+      const stale = hb.state === 'stale';
+      const unreadable = hb.state === 'unreadable';
+      this.desc.append(
+        el('div', { class: 'row hb-row' }, el('span', { class: 'hb-dot ' + (unreadable ? 'unknown' : 'bad') }),
+           el('span', {}, unreadable
+             ? 'Studio could not check whether a gateway is running (your Drive did not answer)'
+             : stale
+               ? ('The gateway for this machine last checked in '
+                  + (hb.ageS != null ? Math.round(hb.ageS / 60) + ' min ago' : 'a while ago'))
+               : 'Studio cannot see a gateway for this machine on your Drive')),
+        el('div', { class: 'row hb-row' }, el('span', { class: 'hb-dot unknown' }),
+           el('span', {}, 'Machine state unknown — no gateway to ask')));
     } else if (!d) {
       this.desc.append(
         // t1325 — THE MESSAGE IS NOW A PATH, not a description of one. It named the Console tab while the Console had

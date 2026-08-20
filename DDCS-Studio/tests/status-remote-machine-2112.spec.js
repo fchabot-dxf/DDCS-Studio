@@ -34,6 +34,9 @@ const routeDrive = async (page, hbState) => {
         const url = route.request().url();
         const q = decodeURIComponent(url);
         const json = (o) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+        // ⚠ 'unreadable' means the LOOKUP ITSELF failed, so it can only be produced by an actual failure -
+        //    fulfilling with a 200 makes the real code return 'unseen' and the test then proves nothing.
+        if (hbState.state === 'unreadable') return route.fulfill({ status: 500, body: 'nope' });
         if (/alt=media/.test(url)) return json(hbState.hb || {});
         if (/DDCS Bridge/.test(q)) return json({ files: [{ id: 'rootId' }] });
         if (/'gateway'/.test(q)) return json({ files: hbState.state === 'unseen' ? [] : [{ id: 'gwId' }] });
@@ -102,7 +105,10 @@ test('NO DAEMON + nothing has ever reported: the ORIGINAL guidance stands — it
     await mountStatus(page, { hb: UNSEEN, hasDaemon: false });
     // ⚠ With no heartbeat there is genuinely nothing to say about the machine, so the daemon-URL path is
     //    correct. The bug was showing it when the machine HAD answered, not showing it at all.
-    await expect(root(page).getByText(/still looking on this PC/)).toHaveCount(1);
+    // t2113 - UPDATED PREMISE. This used to assert the daemon-URL fallback, which was correct when Status
+    // only understood 'fresh'. It now answers the negative states too, off the same heartbeat Send uses.
+    await expect(root(page).getByText(/cannot see a gateway for this machine/)).toHaveCount(1);
+    await expect(root(page).getByText(/Machine state unknown/)).toHaveCount(1);
 });
 
 test('the desktop download card is present in EVERY state — unconditional, per the human ruling', async ({ page }) => {
@@ -122,4 +128,25 @@ test('A LOCAL DAEMON answers: the heartbeat is never asked for — no needless D
     //    exactly what drive.py's own docstring warns about. With a daemon there is nothing to ask.
     expect(driveCalls, 'no Drive read when a local gateway answered').toBe(0);
     await expect(root(page).getByText('controller disk')).toHaveCount(1);
+});
+
+const STALE = { state: 'stale', ageS: 4 * 3600, hb: { hostname: 'RenderRanchy', controller_connected: true } };
+const UNREADABLE = { state: 'unreadable', hb: null };
+
+test('a gateway that STOPPED says when it was last seen — not "look for a daemon on this PC"', async ({ page }) => {
+    await boot(page);
+    await mountStatus(page, { hb: STALE, hasDaemon: false });
+    await expect(root(page).getByText(/last checked in \d+ min ago/)).toHaveCount(1);
+    await expect(root(page).getByText(/still looking on this PC/), 'the phone-hostile copy stays gone').toHaveCount(0);
+});
+
+test('a Drive that will not answer is IGNORANCE, not absence — amber, and it says so', async ({ page }) => {
+    await boot(page);
+    await mountStatus(page, { hb: UNREADABLE, hasDaemon: false });
+    // ⛔ must never read as "no gateway": the browser reading a DESKTOP-written Drive file is the one
+    //    visibility direction never measured, so a failed lookup may mean we cannot SEE rather than
+    //    that nothing is THERE.
+    await expect(root(page).getByText(/could not check whether a gateway is running/)).toHaveCount(1);
+    const amber = await root(page).locator('.hb-dot.unknown').count();
+    expect(amber, 'ignorance is drawn amber, not red').toBeGreaterThan(0);
 });
