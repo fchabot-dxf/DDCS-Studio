@@ -31,6 +31,20 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+  "2026.08.19.4": [
+    { short: "The editor's buttons are one tidy row up top",
+      full: "The buttons that used to float over the bottom-left corner of the editor — Make, Transform, undo, "
+        + "redo — now sit in a single row along the top of the editor, together with Copy and Clear. Make and "
+        + "Transform show just their icon now; hover any button to see what it does. If the pre-flight envelope "
+        + "warning is long it will overlap them, on purpose: a safety message should never hide behind a button." },
+    { short: "Load, Insert and Export moved to the ▾ menu",
+      full: "They have left the editor's corner and now live in the ▾ quick menu beside the logo, with Save and "
+        + "Open — the things you reach for when starting a program or finishing one. Clear stays down by the "
+        + "editor, where the program it clears is." },
+    { short: "The ; comment button is gone",
+      full: "Commenting out selected lines is still there — press Ctrl+/ or use the right-click menu. The button "
+        + "was one more glyph in a crowded corner for something two other doors already did." },
+  ],
   "2026.08.19.3": [
     { short: "One sign-in, in the header, with your photo",
       full: "Signing in used to be in two different places that disagreed with each other about whether you "
