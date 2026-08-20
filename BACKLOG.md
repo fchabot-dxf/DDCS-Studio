@@ -136,28 +136,25 @@ post — which is a plausible reason it reads as "a rod" rather than "a lathe". 
 survive **14px** — that constraint is what t1918 was entirely about, and it is where the first attempt died.
 
 ### 8. Let the BROWSER send jobs through Drive too (not just the exe)
-*(human, 2026-08-19: "what if i want the browser to send too")*
+*(human, 2026-08-19: "what if i want the browser to send too", then — cutting through my overcomplication —
+"cant we make the gateway simply watch a folder on my drive")*
 
-Today only the exe can send: `client.submitJob()` POSTs `/api/jobs` → the gateway → `backend.put_job()`.
-The hosted page has no gateway to call, and its own Drive code (`ui/cloud/googleDrive.js`) writes PROJECT
-files, not jobs.
+⭐ **THE BLOCKER I DESCRIBED DOES NOT EXIST. MEASURED 2026-08-19, correcting my own claim.** I asserted that
+`drive.file` scopes visibility per OAUTH CLIENT, so a job written by the browser (Web client `…mapt`) would
+be invisible to the gateway (Desktop client `…607m`) and would fail SILENTLY. **Tested instead of argued:
+the gateway's Desktop client listed and read `DDCS Studio/` — a folder created 2026-06-15 by the BROWSER's
+Web client — including its contents.** ⇒ `drive.file` visibility is scoped to the **Cloud project**, not the
+client. Both clients live in project `895572525139`, so the two ends ALREADY share one visibility domain.
+No client unification, no re-registering redirect URIs, no reverting t2079.
 
-⛔ **DECIDE THE OAUTH CLIENT FIRST — this is the load-bearing choice, and getting it wrong fails SILENTLY.**
-`drive.file` scopes visibility per CLIENT, and the two ends now use different ones: the browser the **Web**
-client (`…mapt`, `providers.js`), the exe the **Desktop** client (`…607m`, seeded from the bundle since
-t2079). Files one creates are invisible to the other ⇒ a browser-written job would sit in Drive while the
-gateway polled forever, logging nothing. That is the exact failure shape this project has been bitten by.
-- **Option A — ONE Web client for both.** A Web client CAN register loopback redirect URIs
-  (`127.0.0.1:8765-8769`, already added to `…mapt` on 2026-08-19) and so can serve the exe's loopback flow
-  AND the browser's JS-origin flow. One visibility domain; browser-send becomes possible. ⚠ Cost: the exe's
-  sign-in then depends on those URIs staying registered and on the serve port staying inside that range —
-  which is precisely the fragility t2079 moved AWAY from. Reverting it is a real trade, not a free win.
-- **Option B — keep them separate**, and browser-send is simply not offered. Robust; answers "no".
+⚠ The lesson worth more than the item: this was ONE API call away for the entire session and I designed
+around it instead of testing it. The human's "can't we simply watch a folder" was the correct model all
+along — the gateway already does exactly that (`DriveBackend` polls `DDCS Bridge/inbox/`).
 
-**The work, once A is chosen:** a browser-side `put_job` mirroring `backend/drive.py` — write
-`DDCS Bridge/inbox/<jobId>.nc` + the `.map.json` sidecar, same folder layout, same `make_job_id` timestamp
-convention, same `content_hash` (send.js already computes it) so History still links repeat runs. ⚠ Reuse
-the UPSERT discipline: Drive permits duplicate names, so blind-create duplicates a job.
-
-⚠ **Prove it end to end before believing it** (the standing rule that r2.py's months as `[TO TEST]` earned):
-a job submitted from a real browser, claimed by a real gateway, delivered to a real controller.
+**What actually remains — small:** the browser must WRITE a job in the layout the gateway polls. Mirror
+`backend/drive.py`'s `put_job`: `DDCS Bridge/inbox/<jobId>.nc` + the `.map.json` sidecar, the same
+`make_job_id` timestamp convention, and the `content_hash` `send.js` already computes (so History still
+links repeat runs). `ui/cloud/googleDrive.js` already has the upload/list primitives.
+⚠ Reuse the UPSERT discipline — Drive permits duplicate names, so a blind create duplicates a job.
+⚠ Prove it end to end (a real browser submit → a real gateway claim → a real controller delivery) before
+believing it; that rule is what months of `[TO TEST]` on r2.py earned.
