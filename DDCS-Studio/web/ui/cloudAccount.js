@@ -38,6 +38,29 @@ async function captureGoogleIdentity() {
     window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
 }
 
+/**
+ * Backfill identity for a session that connected BEFORE we captured some part of it. Once per load, no loop
+ * on failure.
+ *
+ * ⭐ t2113 - THIS ALREADY EXISTED AND COULD NOT FIRE FOR THE CASE IT WAS WRITTEN FOR. Its condition was
+ * `!a.name && !a.email`, from when identity meant name + email. t2077 added the PICTURE, and anyone who had
+ * already connected has name and email stored - so the condition is false, the backfill never runs, and the
+ * avatar stays initials forever. The only way out was to disconnect and reconnect. ⇒ a missing PICTURE is
+ * now equally a reason to re-ask.
+ * ⚠ AND IT LIVED IN renderCloudLogin(), which only Settings (Network) and the Project Manager drawer call.
+ * The HEADER AVATAR renders on every load and never triggered it - so the one surface that shows the
+ * picture could not ask for it. It is exported now and called from there too.
+ * ⚠ A Google account with NO photo set is a legitimate empty: `_tried` keeps it to one attempt per load, so
+ * that case costs a single request and correctly keeps the initials.
+ */
+export function backfillIdentity() {
+    const a = getAccount();
+    if (!a.connected || captureGoogleIdentity._tried) return;
+    if (a.name && a.email && a.picture) return;   // nothing missing
+    captureGoogleIdentity._tried = true;
+    captureGoogleIdentity();
+}
+
 /** Connect a provider (BYO). Uses the shipped public client ID; falls back to a one-time paste if none is set
  *  (dev/self-host). Google uses GIS (its token model); Dropbox/OneDrive use the PKCE popup. */
 export async function connect(provider = 'google') {
@@ -161,8 +184,7 @@ async function openConnectModal(provider) {
 export function renderCloudLogin(container) {
     if (!container) return;
     const a = getAccount();
-    // Backfill identity for a session that connected before we captured it (once per load; no loop on failure).
-    if (a.connected && !a.name && !a.email && !captureGoogleIdentity._tried) { captureGoogleIdentity._tried = true; captureGoogleIdentity(); }
+    backfillIdentity();
     const wrap = document.createElement('div');
     wrap.className = 'cloud-login';
     const status = document.createElement('div');

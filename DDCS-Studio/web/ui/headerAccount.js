@@ -23,7 +23,7 @@
  * consent screen into sensitive scopes and drag the app into Google verification. Initials are the fallback, and a
  * broken/expired photo URL falls back to them too rather than showing a dead image.
  */
-import { getAccount, connect, disconnect } from './cloudAccount.js';
+import { getAccount, connect, disconnect, backfillIdentity } from './cloudAccount.js';
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -141,4 +141,12 @@ export function renderHeaderAccount() {
 // resolve, so every surface that shows account state re-renders from the same event instead of polling.
 window.addEventListener('ddcs:cloud-account', renderHeaderAccount);
 
-export function initHeaderAccount() { renderHeaderAccount(); }
+export function initHeaderAccount() {
+    // ⭐ t2113 - THE AVATAR IS THE ONE SURFACE THAT SHOWS THE PICTURE, so it is the one that must ask for it.
+    // The backfill lived only in renderCloudLogin(), which fires when Settings (Network) or the Project
+    // Manager drawer opens - surfaces a user may never touch. So a session that connected before t2077 kept
+    // rendering initials indefinitely, and the only cure was to disconnect and reconnect.
+    // ⚠ Best-effort and non-blocking: it re-renders itself via the ddcs:cloud-account event when it lands.
+    backfillIdentity();
+    renderHeaderAccount();
+}
