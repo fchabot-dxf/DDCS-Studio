@@ -7135,3 +7135,36 @@ differently. It must NOT change whether the job is kept; it is not kept either w
 that never fired, a caret that never painted, a popover nothing rendered, "pre-existing" hiding a stale
 test. Undeliverable G-code that vanishes quietly is the same shape. Making it speak is the fix; making it
 persist is a feature nobody asked for.
+
+## 🔴🔴 BLOCKER FOUND 2026-08-19 — THE SHIPPED EXE CANNOT RUN THE DRIVE BACKEND
+*(found by the #9 prep agent, then VERIFIED line-by-line by the advisor. Not inferred — read the code.)*
+
+**`desktop/fairy_gateway.py:146` hardcodes `"--backend", "local"` into the argv it hands `fairy.bridge.main`.**
+`Config.from_env` resolves `defaults < env < persisted config.json < CLI overrides`, and applies overrides
+with `if v is not None` (config.py:212-214). `"local"` is not None. ⇒ **a Drive backend chosen in Setup is
+overridden on every single launch.**
+
+⭐ **And the loop closes on itself:** `ops.set_config` persists `backend` correctly AND returns
+`restart_needed: True` (ops.py:1086, 1110) — because the backend object is built once at `bridge.py:64`
+`make_backend(config)` and never rebuilt, so the choice does nothing until a restart. **The restart the UI
+demands is exactly what reverts the choice.** Pick Drive → told to restart → restart → you are on local.
+
+⚠ **THIS GATES THREE QUEUED ITEMS.** Do not start any of them before this is fixed:
+- **D — the full cloud loop onto the Expert (the delete-LAN gate).** The bench test cannot exercise Drive
+  through the app. Whatever proved transport in t2076-t2080 was NOT the exe path.
+- **S4 — per-controller inbox namespacing.** Its browser picker discovers machines by reading
+  `gateway/heartbeat.json` **written to Drive by a gateway** — which never happens from the exe.
+- **#9 cloud-signal half.** The poller that writes the `failed` status is the Drive poller; it never runs.
+
+✅ **THE FIX IS ALREADY WRITTEN, EIGHT LINES BELOW THE BUG.** `_persisted_beacons_on()`
+(fairy_gateway.py:153-157) is exactly the "read the persisted value, don't force the flag" pattern — the
+author built it for beacons and not for backend. Mirror it: read the persisted `backend` and omit the flag
+when one is saved. ⚠ Keep `local` as the default when nothing is persisted.
+
+⚠ **VERIFY THE REAL SYMPTOM, NOT A UNIT TEST:** launch the actual exe with `backend: "drive"` already in
+`~/.ddcs-bridge/config.json` and confirm the startup line `[bridge] up — backend=drive` (bridge.py:131).
+A test asserting from_env's precedence would pass today with the exe still broken — the argv is the bug.
+
+⭐ **This is the SEVENTH instance this week of the project's signature failure — declared, correct in
+source, never run.** The first six were CSS and a beacon. This one is load-bearing for a bench test.
+It is the strongest argument yet for the CONNECTIVITY CHECK in the triage above.
