@@ -83,7 +83,11 @@ async function addSelfUpdate(bar, tag) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'upd-btn upd-self';
-  btn.textContent = `Update to ${tag} and restart`;
+  // t2113 (BACKLOG #5) - THE VERSION USED TO APPEAR TWICE: here AND in .upd-msg two elements to the left.
+  // The duplication was not just noise - this was the WIDEST element in the row, so the bar's width grew
+  // with the version string and the layout reflowed differently per release, which is why the balance could
+  // never be judged at one width. The bar still names the version, once, where it belongs.
+  btn.textContent = 'Update and restart';
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     const was = btn.textContent;

@@ -120,12 +120,20 @@ test('in-place update available → self-update primary, dated Download demoted 
     const dl = document.querySelector('.ddcs-update-bar .upd-dl');
     return {
       selfText: self && self.textContent,
+      barText: document.querySelector('.ddcs-update-bar')?.textContent || '',
       selfBeforeDl: !!(self && dl && (self.compareDocumentPosition(dl) & Node.DOCUMENT_POSITION_FOLLOWING)),
       dlText: dl && dl.textContent,
       dlDemoted: !!(dl && dl.classList.contains('upd-dl-fallback')),
     };
   });
-  expect(r.selfText, 'the in-place update names the version').toContain('v9999.0');
+  // t2113 - PREMISE UPDATED, NOT DELETED (BACKLOG #5). This asserted the version inside the BUTTON. That
+  // made the button the widest element in the bar, and its width grew with the version string, so the bar
+  // reflowed differently per release and its balance could not be judged at any one width. The version now
+  // appears ONCE, in .upd-msg, two elements to the left.
+  // ⭐ The INTENT survives and is what is asserted now: a user must be able to see WHICH version they are
+  //    about to install, before clicking. That was always a property of the BAR, not of the button.
+  expect(r.barText, 'the bar names the version being installed').toContain('v9999.0');
+  expect(r.selfText, 'the in-place action is short and does not repeat the version').toBe('Update and restart');
   expect(r.selfBeforeDl, 'the in-place update sits before the manual Download').toBe(true);
   expect(r.dlText, 'Download is relabelled as a manual fallback').toBe('Download manually');
   expect(r.dlDemoted, 'Download carries the demoted fallback class').toBe(true);
