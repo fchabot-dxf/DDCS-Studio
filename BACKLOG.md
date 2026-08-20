@@ -234,3 +234,43 @@ does not have.
 **Also worth folding in while there:** `sound.js` hardcodes one asset and a fixed `VOLUME = 0.5` with no
 way to change either. A volume slider is the obvious neighbour of an on/off switch, and the module already
 routes WebAudio through a `gainNode` that nothing currently adjusts.
+
+---
+
+## THE JOBS FOLDER IS SETTABLE — FOLD THE "SYNC FOLDER" ROUTE INTO **LOCAL**, NOT A THIRD OPTION
+*(human, 2026-08-20: "i dont like that it would look like a 3rd option can we fold this in the local folder
+option". Correct, and the reason is structural: **a synced folder IS a local folder.**)*
+
+⭐ **THE GATEWAY DOES NOT KNOW OR CARE THAT A FOLDER SYNCS.** `LocalFolderBackend` polls whatever directory
+it is handed. Pointing `local_root` at `C:\Users\you\Google Drive\DDCS Bridge` gives PC-to-PC transport with
+**no adapter, no OAuth, no quota, no new code** — the sync client does the moving, and that arrangement is
+between the user and Dropbox/Google, invisible to the app. ⛔ So it must NOT appear as a third transport
+beside Local and Drive; that would invent a mode where there is only a path.
+
+### THE ONLY THING MISSING: `local_root` HAS NO SETTER
+⛔ Not in `Config._PERSIST_KEYS`. ⛔ Not in `Ops.set_config`. ⛔ Not in the Setup UI. ✅ Only the CLI
+`--root`, which the exe never passes. ⇒ The capability exists and is unreachable from the app.
+
+⚠ **THIS IS THE SECOND FIELD WITH EXACTLY THIS SHAPE** — `drive_folder` was the same (declared, no setter,
+resets every restart; corrected during S4 by using `machine_name` instead). **Two is a pattern, not a
+coincidence:** a `Config` field is cheap to add and easy to leave unwired, and nothing fails loudly when it
+is. ⭐ Worth a check that every `_PERSIST_KEYS`-eligible field is either wired to `set_config` or explicitly
+marked CLI-only — the same family as the connectivity check already on this list.
+
+### THE BUILD
+1. `local_root` into `_PERSIST_KEYS` + `Ops.set_config`, validated as a writable directory.
+   ⚠ `dest` validates as a network share; this is the opposite — a LOCAL path, and a UNC would be a
+   different (untested) story. Say which you accept.
+2. One field in `admin.js` **under the existing Local radio**, showing the current root, with a one-line
+   hint that a synced folder reaches other PCs. ⛔ No new radio. ⛔ No "sync" mode anywhere in the code.
+3. ⚠ **Changing the root ORPHANS whatever sits in the old inbox** — same class as S4's migration question.
+   Detect and report; ⛔ never move files on the user's behalf.
+
+### ⚠ THREE SYNC-SPECIFIC HAZARDS, only once this is a SUPPORTED path
+- **Write ORDER is load-bearing and sync does not preserve it.** `put_job` writes `.map.json` BEFORE `.nc`
+  because `list_inbox` keys off the `.nc` — the moment it appears the job is claimable. A sync client gives
+  no ordering guarantee between two files, so a job can be claimed before its sidecar lands.
+- **Conflict copies become jobs.** `job (1).nc` matches the `.nc` suffix and would be claimed as real.
+- **Both PCs must sync the same folder** — the part users genuinely do work out themselves.
+⇒ ⭐ **None of these block a user doing it manually today.** They are the cost of making it discoverable,
+and they are the honest reason it is a documented path rather than a promoted feature.
