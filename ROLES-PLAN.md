@@ -55,8 +55,8 @@ Sorted by whether they mean anything with no controller attached:
 | **jobs** | ✅ KEEP | queue + history are shared state, readable from anywhere |
 | **status** | ⚠ REFRAME | today it reports THIS PC's controller link. On a client it should report the WORKSPACE's gateway (is one alive, is it reachable) — a different question, not a hidden tab |
 | **tracker** | ⚠ REFRAME or hide | live progress comes off the gateway's serial cable; a client can only mirror what the gateway published |
-| **files** (CNCDISK) | ❌ HIDE | it browses a controller disk this PC has no path to |
-| **merge** | ❌ HIDE | operates on controller-side files |
+| **files** (CNCDISK) | ✅ **KEEP** | ⭐ **CORRECTED — I was wrong twice about this.** A client does NOT need a path to the disk: the gateway PUBLISHES the listing (`put_cncdisk_index`, implemented by `DriveBackend`) and the client issues DELETE through the command channel (`list_commands`/`clear_command`) which the gateway polls and executes. Remote disk management is already designed in, end to end. ⚠ It is a SNAPSHOT (the gateway's last publish, ~15s), not the live disk — say so in the UI. ⛔ `SAFE_OPS = {"delete"}` with bare-filename-only validation: a remote client can never RUN anything, and that line stays. |
+| **merge** | ⚠ VERIFY, do not assume | I claimed it "operates on controller-side files" without checking — after being wrong twice tonight (see above and the `drive.file` scope), that claim is unverified and must be read from the code before it is acted on. |
 | **console** (admin/Setup) | ⚠ REDUCE, never hide | the client still needs Setup — but only the parts that apply |
 
 ### 2. Setup, which is mostly controller configuration
@@ -66,6 +66,13 @@ LAN serving · **serve port** · cloud storage + account · controller profile.
 A client needs: **machine name**, **cloud storage / account**, and the service (daemon URL) row.
 A client does NOT need: controller disk, beacons, the controller profile block — all of which describe a
 controller it is not attached to. ⚠ *Reduce, do not hide the tab*: Setup is where the role itself is chosen.
+
+### 2a. ⚠ A PATTERN IN MY OWN ERRORS, worth stating because it shaped this plan
+Three times in one session I asserted a CAPABILITY LIMIT without testing it, and was wrong each time:
+`drive.file` visibility (per project, not per client), release-note screenshots (versioned, so staleness is
+fine), and CNCDISK on a client (already publishable + commandable). Each time the human's plainer model was
+the correct one. ⇒ **Before this plan hides ANY tab, read the code for that tab.** "It needs the controller"
+has been wrong more often than right — the gateway already publishes most of what a client would want.
 
 ### 2b. ⭐ EVIDENCE THE ROLE IS MISSING, not a nice-to-have (t2080b, live from the human's phone)
 > *"On my phone, I'm connected, and the send button doesn't do anything. Not even fail or success. Just silence."*
