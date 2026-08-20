@@ -725,3 +725,40 @@ Expert SYSDISK capture and the CAM-menu install set. Counts are occurrences in f
       lines parsed and were silently skipped, which no error message would have reported.
 - [ ] Find the system var holding the live alarm code → log *which* error.
 - [ ] Port the V4.1 `M47` dispatcher to `sysstart.nc` here (file-reload trick over SMB) — **safety first** (E-stop).
+
+## Live position polling — FIRST REAL ATTEMPT, and it did NOT work `[MEASURED on machine 2026-08-20]`
+Ran `PositionPoller` (pymodbus 3.6.9) and then a RAW FC03 probe against the studio Expert over the SABRENT
+adapter, COM6 @ 115200 8N1, slave id 1. **Read-only throughout — plain FC03 reads, never `MGETDATA`.**
+
+**The symptom, and it is precise:** the controller replies with **exactly one byte, `0x00`, to every
+request** — `work_position` (7080), `machine_position` (7260) and `state` (10002) alike.
+```
+sent 01031ba8000a42c9  ->  recv 1 byte: 00      (work_position, 7080)
+sent 01031c5c000a024f  ->  recv 1 byte: 00      (machine_position, 7260)
+sent 0103271200026eba  ->  recv 1 byte: 00      (state, 10002)
+```
+pymodbus reports it as *"Incomplete message received, expected at least 4 bytes (1 received)"* on the first
+read and *"No Response received"* thereafter. ⇒ **The port opens and something is on the wire, but the
+Expert is not answering as a Modbus slave.** A single constant `0x00` is what an idle/floating RX yields when
+nothing is transmitting — it is not a malformed Modbus frame, it is silence with a line artifact.
+
+⚠ **This does NOT yet prove the register map is wrong.** All three addresses fail identically, which is the
+signature of "no slave answering at all", not "wrong address" (a live slave answers a bad address with a
+Modbus EXCEPTION frame, not one byte). ⇒ Do not go re-deriving registers until a slave actually answers.
+
+### What PREFLIGHT established (so these are already ruled out)
+`#279 = Slave` and `#267/#296/#297 = 115200 / None / 1` read **out of the SYSDISK `setting` file**;
+COM6 present in Device Manager (FTDI); controller reachable at 192.168.0.99.
+
+### ⇒ THE THREE THINGS TO CHECK AT THE MACHINE, in order
+1. **REBOOT the controller.** This file already says `#279` + **a reboot** are required for the live serial
+   link. The value was read from the STORED setting file — that is not proof the RUNNING firmware applied it.
+2. **Confirm the SABRENT is on DB9 PORT 2.** Modbus is **Serial 2** (`#267`); port 1 is the M3K keyboard
+   port and would present exactly this symptom.
+3. **Confirm `#279` reads `Slave` ON THE PANEL** (not just in the file), and the slave id the panel expects.
+
+### ⛔ A SEPARATE, SHIPPED-BLOCKING FINDING — the exe cannot enable polling at all
+`enable_position_poll` is CLI-only (`--position-poll`). It is **absent from `Config._PERSIST_KEYS`**, so the
+Setup UI cannot set it and `config.json` cannot carry it ⇒ **a double-clicked exe can never turn position
+polling on.** Same shape as the boto3/R2 problem: built (t2059-t2063), unreachable in the shipped product.
+Testing it today requires running the gateway from source. **Fix before the feature can be called usable.**
