@@ -6806,3 +6806,24 @@ menu (the t1227 precedent — Load/Insert/Export moved there rather than floatin
 ⚠ Keep the ids: `saveStates.js` syncs `#btn-undo`/`#btn-redo` disabled state by id, and
 `editorTextOps.js` wires `#editor-indent`/`#editor-outdent`/`#editor-comment` by id (and depends on their
 `mousedown` preventDefault to keep the textarea selection — do not lose that in a reflow).
+
+# ═══ DESIGN NOTE (human, 2026-08-19) — THE EDITOR ROW IS A FAST LANE, NOT A SECOND MENU ═══
+*(human: "this row and the quick menu can have shared functions. The editor row is really just about an even
+quicker menu for the most used functions.")*
+
+⭐ **This settles what would otherwise become a recurring argument** ("does X belong in the quick menu or the
+editor row?") and it is NOT the rule t1227 used. t1227 split by SUBJECT — app things in the menu, program
+things in the pane — which is why Load/Insert/Export were exiled to the editor and have now come back.
+
+**The rule instead:** the quick menu is the COMPLETE set; the editor row is a SHORTCUT to the most-used
+members of it. Overlap is CORRECT, not duplication — the same action may legitimately appear in both, and an
+action's home is decided by frequency, not category.
+
+⚠ **The constraint that makes overlap safe: ONE implementation, two surfaces.** Both must call the same
+function (t2078 already does this — the quick menu's fileLoad/fileInsert/fileExport call the very
+`window.loadGcodeFile`/`insertGcodeFile`/`downloadFile` globals the editor's own menu called). Two surfaces
+with two copies of the logic is the drift this project keeps paying for; two surfaces over one function is
+the pattern it already runs on (wizards-as-data, one stack many views).
+
+⇒ Next time this row is touched: promote/demote by USE, and never inline a handler that already exists.
+Deciding WHICH actions earn the fast lane is a real question — worth measuring rather than guessing.
