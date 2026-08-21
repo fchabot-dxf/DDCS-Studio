@@ -36,7 +36,10 @@ test('the tree renders the ACTIVE controller declaration: Expert wraps panels, V
     await page.waitForFunction(() => [...document.querySelectorAll('#macros_tree .settings-tab')].some((b) => /probe-fix\.nc/.test(b.textContent)));
     const v41 = await treeFiles(page);
     expect(v41, 'V4.1 shows its firmware files (not the Expert builders)').toEqual(expect.arrayContaining(['advstart.nc', 'M6.rc', 'selcoord.nc', 'probe-fix.nc', 'gotoz.nc', 'safez.nc']));
-    expect(v41, 'V4.1 has NO CAM builder file').not.toContain('macro_camN.nc');
+    // t2118 -- this guard went dead on t2117's own rename: not.toContain('macro_camN.nc') can never fail now
+    // that the file is called camN.nc (mutation-tested: pushing the CAM entry into the V4.1 tree still passed
+    // the old assertion). Fixed to the real, current name.
+    expect(v41, 'V4.1 has NO CAM builder file').not.toContain('camN.nc');
     // open probe-fix.nc → the simple editor, seeded from the dump, LAN Push
     await page.evaluate(() => [...document.querySelectorAll('#macros_tree .settings-tab')].find((b) => /probe-fix\.nc/.test(b.textContent)).click());
     await page.waitForFunction(() => document.getElementById('macfile_body'));

@@ -76,7 +76,7 @@ Build a distributable **DDCS Expert CAM-menu pack** — parameterized macro slot
 - **8 premium shape generators** (pocket / circular-pocket / surfacing / corner / edge / slot / drill / bore + inside/boss probe) *plus a universal fallback* that turns **any** custom op into a CAM slot.
 - **Probing → CAM slots**: self-positioning probe sequences with branch selectors the operator flips at the machine.
 - **Icon Builder** — a layer-based composer (shapes / glyph library / text / imported BMP, with an auto-glyph per op type) that exports the exact factory 24-bit `camN.bmp`.
-- **In-wizard simulation** of the slot's toolpath, auto shared-`#`-param allocation with collision flags, **Export pack (.zip)** (`macro_camN.nc` + `camN.bmp` + eng lines + install README), and **Merge eng** (append your pack into the controller's current `eng`, collisions flagged — never a full replace).
+- **In-wizard simulation** of the slot's toolpath, auto shared-`#`-param allocation with collision flags, **Export pack (.zip)** (`camN.nc` + `install/CAM/camN.bmp` + eng/chs lines + install README), and **Merge eng** (append your pack into the controller's current `eng`, collisions flagged — never a full replace).
 
 ### K-buttons & controller files
 Author each physical **K-key macro** (`key-N.nc`, K1–K16) — from the editor via **＋ Make ▾ → K-button**, or in the Macros panel. Author program-callable **custom M-codes** (`O100nn` ⇄ M`nn`), and edit the system hooks (`sysstart.nc` boot / `T.nc` tool-change / `error.nc` alarm / `probe.nc`). Load-from / Deploy-to the controller with a merge-vs-replace conflict resolver.

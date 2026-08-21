@@ -520,6 +520,11 @@ export function createUserOpView(ns, opts) {
                 inp.setAttribute('data-op-gated', off ? 'on' : 'off');
                 inp.title = off && spec.tip ? spec.tip : '';
                 row.style.opacity = off ? '0.5' : '';
+                // t2118 — the SAME auto-clear the data-option-gate below already does for a select: a gated-off CHECKBOX
+                // must not leave a stored `true` behind it. `rigid` surviving a machine swap to a non-tapCapable spindle,
+                // un-editable because the checkbox is greyed, was exactly this shape — the emit path is now separately
+                // safe regardless (tap.js reads the live attestation itself), but the stored value should not lie either.
+                if (off && inp.type === 'checkbox' && inp.checked) { inp.checked = false; inp.dispatchEvent(new Event('change', { bubbles: true })); }
             });
             // t961 — DECLARED per-OPTION enable gate (optionGate): grey a single <option> (Max/Hop stay usable) unless requireAll
             // holds, and AUTO-REVERT the select to `fallback` + dispatch change when the gated option is the current value. Marks

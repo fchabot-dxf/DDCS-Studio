@@ -168,12 +168,12 @@ export function initMacrosApp() {
                     <div class="settings-section">
                         <div class="settings-section-title">CAM PACK BUILDER</div>
                         <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Author each slot in the wizard — <b>＋ New CAM slot</b> composes it from your program's ops; this panel displays the pack and exports it.</i></div>
-                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_build_slot" title="Author a CAM slot from an op in your program: seed the expose/bake table, choose which params the operator fills (Expose) vs freezes (Bake), preview, then Build to a slot.">＋ New CAM slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Write every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README straight to your deploy folder — grant the USB stick and the CAM/ tree lands on it ready to use. Falls back to a .zip only where the browser cannot write to a folder.">📦 Deploy pack</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
+                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_build_slot" title="Author a CAM slot from an op in your program: seed the expose/bake table, choose which params the operator fills (Expose) vs freezes (Bake), preview, then Build to a slot.">＋ New CAM slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Write every slot (camN.nc + install/CAM/camN.bmp) + the eng and chs lines to merge + an install README straight to your deploy folder — grant the USB stick and the files land on it ready to use. Falls back to a .zip only where the browser cannot write to a folder.">📦 Deploy pack</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
                         <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                         <div id="cam_slots" style="margin-top:6px;"></div>
                         <!-- t1247 — SHARED CAM RECIPES (.cam): the same granted library folder the .wiz shelf uses. A
                              recipe carries a slot's declared OPS, so importing rebuilds it through buildSlotFromOps and
-                             it lands editable — never a baked macro_camN.nc, which nobody could change. -->
+                             it lands editable — never a baked camN.nc, which nobody could change. -->
                         <div class="settings-section-title" style="margin-top:14px;">SHARED CAM RECIPES (.cam) — YOUR LIBRARY FOLDER</div>
                         <div class="settings-hint">A <code>.cam</code> is a slot's SOURCE — its ops, not its generated macro — so an imported recipe rebuilds into a slot you can edit like your own.</div>
                         <div id="cam_library_shelf" style="margin-top:8px;"></div>
@@ -1913,7 +1913,7 @@ function isV41Post() {
     // caller check CAM-ability before offering the action.
     window.ddcsOpenCamAuthoring = (op) => openCamAuthoring(op);
     window.ddcsCamTypeOf = (op) => camTypeOf(op);
-    // Pack export: bundle the whole pack into a USB-ready .zip (CAM/ folder + eng-merge + README).
+    // Pack export: bundle the whole pack into a USB-ready .zip (camN.nc root + install/CAM/ icons + eng/chs-merge + README).
     const packBytes = (dataUrl) => { const bin = atob(String(dataUrl || '').split(',')[1] || ''); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
     const readmeText = (name) => [name, '',
         'INSTALL (DDCS Expert / M350):',
@@ -1961,8 +1961,9 @@ function isV41Post() {
         const name = (_camPack.meta && _camPack.meta.name) || 'CAM pack';
         files.push({ name: 'README.txt', data: readmeText(name) });
         // t1249 — DEPLOY THE FILE SET, not a zip. Every byte is identical to what the download produced; what changes
-        // is the destination. A stick wants CAM/ sitting on it (step 3 of the README is "cursor on the CAM folder"),
-        // so writing the tree directly removes the unzip step that stood between the export and the machine.
+        // is the destination. A stick wants this exact layout sitting on it (step 3 of the README is "cursor on
+        // each cam<N>.nc file"), so writing the tree directly removes the unzip step that stood between the
+        // export and the machine.
         const D = await import('../data/deployFolder.js');
         const r = await D.deployFiles(files, {
             fallbackDownload: (fs) => downloadBytes(name.replace(/[^\w-]+/g, '_') + '.zip', makeZip(fs)),

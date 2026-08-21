@@ -24,16 +24,36 @@ test('t2117 T5 -- additions land BEFORE a trailing && line, CRLF preserved, no i
     const bareLfCount = (merged.match(/(?<!\r)\n/g) || []).length;
     expect(bareLfCount, 'zero bare LF -- every line ending must be CRLF, matching the real file').toBe(0);
 
-    expect(merged, 'no `(` comment line -- the eng format has no comment syntax at all').not.toContain('(');
+    // t2118 -- not.toContain('(') was stronger than the property the code actually earns: real eng files carry
+    // mid-line '(' inside -s1"..." labels routinely (26-57 occurrences per file, advisor-measured against all
+    // seven real captures), so this blocked the exact real-file fixture it should have invited. The property
+    // that matters is that no line STARTS a `( ===== ... )` comment -- the format has no comment syntax, but
+    // a label is free to contain a literal paren.
+    expect(merged.split(/\r?\n/).some((l) => l.trimStart().startsWith('(')),
+        'no line starts a ( comment -- the eng format has no comment syntax at all').toBe(false);
 });
 
 test('t2117 T5 -- with no trailing && marker, falls back to appending (previous behaviour, still correct)', () => {
     const existing = '#100 -p0 -a3 =0 -t0 -s1"Existing" -s2" " -m10 -min=0 -max=100\n';
     const additions = '#1100 -p0 -a3 =0 -t0 -s1"New" -s2" " -m30 -min=0 -max=100';
     const { merged } = mergeEng(existing, additions);
-    expect(merged.trim().endsWith(additions)).toBe(true);
-    // dominant ending (bare LF in this fixture) is reused, never hardcoded to CRLF
-    expect(merged).not.toContain('\r');
+    // t2118 -- a bare-LF fixture with ZERO CR is exactly the shape a real caller (a textarea) always produces,
+    // so this now defaults to CRLF (item 2's own fix) rather than reusing the fixture's own LF -- asserting the
+    // param landed, not the exact byte tail, since the line ending itself changed on purpose.
+    expect(merged).toContain(additions.replace(/\n/g, '\r\n'));
+    expect(merged.endsWith('\r\n')).toBe(true);
+});
+
+test('t2118 -- item 2: a genuinely CR-bearing input (not a textarea round-trip) still picks its OWN dominant ending', () => {
+    // 1 real CRLF pair + 2 bare LF -- crlfCount(1) !== 0, so this skips the zero-CR default and falls to the
+    // genuine comparison, where LF still dominates numerically and must still win.
+    const existingMixed =
+        '#100 -p0 -a3 =0 -t0 -s1"A" -s2" " -m10 -min=0 -max=100\r\n' +
+        '#200 -p0 -a3 =0 -t0 -s1"B" -s2" " -m11 -min=0 -max=100\n' +
+        '#300 -p0 -a3 =0 -t0 -s1"C" -s2" " -m12 -min=0 -max=100\n';
+    const additions = '#1100 -p0 -a3 =0 -t0 -s1"New" -s2" " -m30 -min=0 -max=100';
+    const { merged } = mergeEng(existingMixed, additions);
+    expect(merged.endsWith('\n') && !merged.endsWith('\r\n')).toBe(true);
 });
 
 test('t2117 T5 -- paramCollisions / groupCollisions / added return contract is unchanged', () => {

@@ -40,10 +40,14 @@ test('the floating-holder cycle emits M3 + dwell → feed-to-depth at the locked
   expect(/G1 Z-8 F508/.test(r.imperial), '1/4-20 emits the derived F508 to depth').toBe(true);
 });
 
-test('the RIGID variant emits a G84-style cycle with a verify note (gating is upstream)', async ({ page }) => {
+test('the RIGID variant emits a G84-style cycle with a verify note (attested tapCapable spindle)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const g = await page.evaluate(async () => {
+    // t2118 -- rigid now needs a LIVE tapCapable attestation, not just rigid:true (the t2117 fix on its own was
+    // the blocker: it emitted the no-spindle-start sequence unconditionally). Attest it explicitly here, the
+    // same way cutting-rpm-996.spec.js sets spindle settings directly.
+    window.ddcsGetSettings().spindle = { ...window.ddcsGetSettings().spindle, tapCapable: true };
     const { tapStack } = await import('/wizards/tapWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     return emitMapped(tapStack({ depth: 12, rpm: 500, pitch: 1.0, rigid: true })).text;
@@ -58,4 +62,26 @@ test('the RIGID variant emits a G84-style cycle with a verify note (gating is up
   expect(/M181/.test(g), 'returns to the analog spindle after the cycle').toBe(true);
   expect(/VERIFY/i.test(g), 'carries the honest unverified-on-hardware note').toBe(true);
   expect(/G1 Z-12 F/.test(g), 'rigid does NOT use the floating-holder feed move').toBe(false);
+  // t2118 -- COVERAGE GAP the advisor named directly: program-level ORDERING was asserted nowhere at this
+  // (wizard -> blockEmitter) integration layer, only presence via independent regexes -- a framing-layer
+  // reorder would not have gone red. Assert the real sequence order here, not just in the unit-level test.
+  const iM180 = g.indexOf('M180'), iM29 = g.indexOf('M29 S500'), iG84 = g.indexOf('G98 G84'), iM181 = g.indexOf('M181');
+  expect(iM180, 'M180 present').toBeGreaterThanOrEqual(0);
+  expect(iM29, 'M29 follows M180').toBeGreaterThan(iM180);
+  expect(iG84, 'the cycle follows M29').toBeGreaterThan(iM29);
+  expect(iM181, 'M181 is last').toBeGreaterThan(iG84);
+});
+
+test('t2118 -- rigid:true WITHOUT a tapCapable attestation folds to the floating-holder cycle, even through the full wizard path', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const g = await page.evaluate(async () => {
+    window.ddcsGetSettings().spindle = { ...window.ddcsGetSettings().spindle, tapCapable: false };
+    const { tapStack } = await import('/wizards/tapWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    return emitMapped(tapStack({ depth: 12, rpm: 500, pitch: 1.0, rigid: true })).text;
+  });
+  expect(/M180/.test(g), 'must NOT switch to servo mode on an unattested spindle').toBe(false);
+  expect(/M29/.test(g), 'must NOT emit M29 -- it starts nothing on an analog spindle').toBe(false);
+  expect(/M3 S500/.test(g), 'must fall back to the real spindle-start word').toBe(true);
 });

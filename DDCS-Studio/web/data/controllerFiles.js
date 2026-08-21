@@ -34,9 +34,9 @@ export const CONTROLLER_FILES = {
                 { path: 'error.nc',       title: 'error.nc',       sub: 'Alarm / fault hook', panel: 'macros_panel_error' },
                 { path: 'probe.nc',       title: 'probe.nc',       sub: 'Native probing',    panel: 'macros_panel_probe' },
                 { path: 'key-N.nc',       title: 'key-N.nc',       sub: 'K-buttons',         panel: 'macros_panel_kbtn' },
-                { group: 'CAM/', children: [
-                    { path: 'camN.nc', title: 'camN.nc', sub: 'CAM Pack Builder', panel: 'macros_panel_cam' },
-                ] },
+                // t2118 -- flattened out of a CAM/ group: camN.nc lives at the SYSDISK root (t2117's own
+                // rename), and the 2026-07-31 capture confirms the real controller's files sit flat there too.
+                { path: 'camN.nc', title: 'camN.nc', sub: 'CAM Pack Builder', panel: 'macros_panel_cam' },
             ] },
         ],
     },

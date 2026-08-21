@@ -46720,3 +46720,135 @@ bench check, per the plan. **Not started: HELD items H1/H2** — need a human ru
 
 🔨 turn 2117
 
+# t2118 — advisor review response: closed the BLOCKER (own fault of the t2117 plan) + 6 "if cheap" items + own-commit honesty fixes
+
+Dispatch: `bridge/controllers/expert-m350/T2118-REVIEW.md`, a fresh-eyes adversarial review of commit 21080973
+(34 findings raised, 27 survived, 7 refuted). ⛔ HOLD THE RELEASE on one blocker — explicitly the advisor's own
+fault (the plan they wrote specified the defect; I implemented it faithfully).
+
+## THE BLOCKER — closed
+
+`tap.js:33`'s `rigidOk` only checked `p.rigid` + the Expert post; nothing checked whether the machine's
+spindle is actually servo-wired. t2117's own fix replaced `M3 S<rpm>` with `M29 S<rpm>` — and M29 does not
+START a spindle, it SYNCHRONISES an already-running SERVO one. On an ANALOG spindle (the human's own
+machine — advisor decoded `Pr079 = 0` from `SYSDISK/setting` on both captures) the rigid branch fed the tap
+to full depth with a DEAD spindle (`slib-g.nc:101-114`'s O9084 is plain feed moves, nothing else turns it on).
+Reachable from the Blocks tab with **no gate at all** — `tapBlock` declares no `gate:` key, and the only
+form-time grey (`tapData.js`'s `_rigidOk`) is UI-only, never enforced at emit.
+
+**Fixed at the source of truth**: `tapCycle` now reads the LIVE `settings.spindle.tapCapable` attestation at
+EMIT TIME (`liveTapCapable()`, mirroring the exact read `userOpView.js`'s own form-time `_rigidOk` already
+does) — `rigidOk` now requires it. A `rigid:true` that is not currently attested — however it got set (a
+stored value surviving a machine swap, or a Blocks-tab tick that never rendered the form's grey at all) —
+folds SAFELY to the floating-holder cycle, unconditionally.
+
+**Also closed the stored-value half**: extended `userOpView.js`'s existing `data-gate` handler (the SAME
+generic mechanism `data-option-gate` already uses to auto-revert a gated select) to auto-UNCHECK a gated-off
+checkbox and dispatch a change event — so `rigid:true` can no longer survive un-editable behind a greyed
+checkbox either. Scoped correctly: grepped every `dataOps/*.js` file for a toggle+gate combination — `rigid`
+is the ONLY one, so this touches nothing else.
+
+**Deliberately NOT added**: a whole-block `gate:` on `tapBlock` for the Blocks-canvas palette. The sibling
+pattern (`cnc.js:34`) disables the ENTIRE block when its gate condition fails — but `tapBlock` is fine
+WITHOUT `rigid` (the floating-holder default always works), so a whole-block gate would incorrectly grey
+out safe tapping too. The Blocks canvas (`blocksApp.js`) has no PER-FIELD gating mechanism the way the form
+layer does — building one is real, separate work, not "same turn if cheap." The core safety property (emit
+can never produce the dangerous sequence) is fully closed regardless of what the palette shows.
+
+**Regression risk found and fixed while verifying**: `settingsPanel.js`'s default `spindle.tapCapable` is
+`false`, so EVERY existing test relying on `rigid: true` alone triggering the rigid path would now silently
+fall through to the floating-holder cycle. Found and fixed three: `vendor-pack-rigid-tap-2117.test.mjs` (my
+own — added a `withTapCapable()` mock helper), `tapping-776.spec.js`, `tap-twin-778.spec.js` — all now
+explicitly attest `tapCapable: true` before asserting the rigid path, the same way `cutting-rpm-996.spec.js`
+already sets spindle settings directly. Added new tests at BOTH layers (the raw `tapCycle()` unit and the
+full wizard→`blockEmitter` integration path) proving the fold-to-safe behaviour, closing the coverage gap the
+review named directly (program-level M180/M29/G84/M181 ORDERING was asserted nowhere before this).
+
+## The 6 "same turn if cheap" items
+
+1. **`bore` (G85) doesn't exist on any DDCS family** — G/M list: "No code... Subroutine Contents Empty", no
+   `O9085` in any captured slib. `drillCycleBlock.emit` now folds `bore` to an honest comment on DDCS dialects
+   (same shape `noFlow` already uses), never a dead G85 line. Fixed my own test, which had certified `G98 G85`
+   as conformant.
+2. **`mergeEng`'s CRLF detection was inert on its only production path** — a browser textarea always
+   normalizes pasted text to bare LF (advisor-measured: real clipboard CRLF x4 → `textarea.value` LF x4), so
+   `crlfCount` was always 0 and the dominant-ending comparison always picked `'\n'`, silently reintroducing
+   t2117's own defect (1) at the one call site that matters. Zero CR through a textarea is evidence of browser
+   normalization, not an LF-native file — now defaults to CRLF whenever no `\r` survived at all; the genuine
+   comparison only runs when the input demonstrably still carries CR (a direct file read, not a textarea
+   round-trip).
+3. **M180 writes a STORED controller parameter (Pr079/#579)** — an abort between M180/M181 leaves the
+   controller in servo mode permanently. No program-footer mechanism exists in this codebase to hook a
+   guaranteed cleanup into (checked), and no in-band G-code fix exists for a genuine abort regardless (code
+   cannot run after one). Named the hazard explicitly in a comment at the point of risk rather than leaving it
+   silent — the real mitigation is item 4's hoist, deferred with it.
+4. **M180/M29/M181 emitted PER HOLE in a pattern** — reproduced by the advisor: a 3×2 array emits each ×6.
+   Hoisting the bracket to once-per-group needs a NEW hook in the shared array/pattern composer
+   (`blockEmitter.js`'s generic per-point child-stamping loop has no concept of "run this once before/after
+   the loop, not per point") — investigated, genuinely not cheap (a new declared capability, not a local
+   patch), and the review's own framing downgrades this to "cost is program shape and cycle time, not
+   safety" (re-issuing M29 per hole is the conservative arrangement). **Deferred, not attempted**, with the
+   reasoning above.
+5. **`controller-file-tree.spec.js:39`'s V4.1 guard was dead** — `not.toContain('macro_camN.nc')` orphaned by
+   t2117's own rename; mutation-tested (pushing the CAM entry into the V4.1 tree still passed the old
+   assertion). Fixed to `camN.nc`.
+6. **`vendor-pack-mergeeng-2117.test.mjs:27`'s `not.toContain('(')` was stronger than the property earned** —
+   real eng files carry 26-57 mid-line `(` inside `-s1"…"` labels per file; the assertion would have blocked
+   the exact real-file fixture it should invite. Fixed to "no line starts with `(`".
+
+## Own-commit honesty fixes, found while verifying the above
+
+- **`cnc.js`'s T2 comment overclaimed**: it read as though `G98` alone closed the modal-inheritance hazard;
+  it only fixes WHICH retract mode, not WHAT the "initial plane" resolves to (still whatever Z the previous
+  op left live, since no lead-in move exists). Corrected the comment to name what's still open — the
+  underlying hazard itself is pre-existing and NOT fixed this turn (needs a lead-in move at every canned-cycle
+  composition site, a separate, larger change).
+- **Five stale `macro_cam<N>.nc` / `CAM/` references from my own T6 work**, missed because T6's own enumerated
+  copy-site list didn't include them: the Deploy-pack button's tooltip, two internal comments in `macrosApp.js`
+  (a `t1247` doc comment, the `t1249` deploy-mechanism comment), and the repo-root `README.md`'s feature
+  description. All updated to `camN.nc` / `install/CAM/` / the eng-AND-chs wording.
+- **`controllerFiles.js`'s now-inert `{ group: 'CAM/' }` wrapper** — flattened; the real 2026-07-31 capture
+  confirms the controller's own files sit flat at the SYSDISK root, matching t2117's own rename.
+- **`vendor-pack-canned-cycle-retract-2117.test.mjs`'s second test was vacuous** (named "names WHY", asserted
+  only `not.toContain('G99')`, passed on a full revert) — renamed to what it actually verifies, and a
+  dedicated new test added for the bore fold-to-comment behaviour.
+- **`deploy-folder-1249.spec.js`'s folder-tree assertion was logically dead** — the line right above it
+  already names the literal `install/CAM/cam22.bmp`, which alone proves the same fact. Dropped.
+
+## Verification
+
+Non-vacuity on the blocker: reverted `tap.js` to the t2117-committed state, ran the two new t2118 safety
+tests, watched them fail with the exact pre-fix symptom (the no-M3 servo sequence present, `M3 S<rpm>`
+absent), restored from a scratch copy, confirmed green. Checked for OTHER regression risk from the emit-time
+gate systematically (grepped every file referencing `rigid: true`/`rigid:true`, not just the ones I already
+suspected) — found and fixed `tap-twin-778.spec.js` this way, which I would otherwise have missed. Checked
+the `data-gate` checkbox-auto-clear extension for blast radius (grepped every `dataOps/*.js` for a toggle+gate
+combination — `rigid` is the only one).
+
+## Gate
+
+Node tier: 209/209 (198 prior + 11 new/updated this turn). Targeted Playwright re-runs of every touched/
+affected spec: `tapping-776`, `tap-twin-778`, `controller-file-tree`, `deploy-folder-1249`, `cam-substack`,
+`spindle-declaration-774`, `dump-import-ui` — 26/26. **Full `npm test` re-run: 2617 passed / 5 failed / 28
+flaky / 25 skipped — the exact same 5 pre-existing, unrelated failures as t2117's own final gate**
+(`header-profile-menu`, `pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`,
+`validation-divzero-not-syntax-1603`), checked by name, not just count — zero new failures from this turn.
+
+## Files
+- `DDCS-Studio/web/wizards/ops/tap.js` — the blocker fix (`liveTapCapable`), the abort-safety comment.
+- `DDCS-Studio/web/wizards/views/userOpView.js` — `data-gate` checkbox auto-clear extension.
+- `DDCS-Studio/web/wizards/ops/cnc.js` — bore/G85 fold-to-comment, the T2 comment correction.
+- `DDCS-Studio/web/data/slotPack.js` — `mergeEng`'s CRLF-default-on-zero-CR fix.
+- `DDCS-Studio/web/data/controllerFiles.js` — flattened the inert `CAM/` group.
+- `DDCS-Studio/web/ui/macrosApp.js` — 3 stale tooltip/comment fixes.
+- `README.md` — the stale feature-description fix.
+- `DDCS-Studio/tests/node/vendor-pack-rigid-tap-2117.test.mjs` — `withTapCapable()` helper + 3 new blocker tests.
+- `DDCS-Studio/tests/node/vendor-pack-canned-cycle-retract-2117.test.mjs` — bore test, vacuous-test rename.
+- `DDCS-Studio/tests/node/vendor-pack-mergeeng-2117.test.mjs` — the over-strict assertion fix + a new CR-bearing-input test.
+- `DDCS-Studio/tests/tapping-776.spec.js` — `tapCapable` attestation, ordering assertions, a new blocker test.
+- `DDCS-Studio/tests/tap-twin-778.spec.js` — `tapCapable` attestation (regression found while verifying).
+- `DDCS-Studio/tests/controller-file-tree.spec.js` — the dead-guard fix.
+- `DDCS-Studio/tests/deploy-folder-1249.spec.js` — dropped the dead assertion.
+
+🔨 turn 2119
+

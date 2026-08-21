@@ -167,10 +167,19 @@ export function mergeEng(existingEng, additions) {
     //     either reading. Insert immediately before a trailing `&&` line when one exists; else append as before.
     // (3) the format has NO comment syntax — the old merge injected `( ===== merged CAM pack params (DDCS Studio)
     //     ===== )`, an illegal line in a file with zero `(` line-starts. Dropped entirely, not replaced.
+    // t2118 — the detection above was INERT on its only production path: a browser textarea always normalizes
+    // pasted text to bare LF (measured in headed Chromium with a real OS-clipboard paste — clipboard delivers
+    // CRLF x4, textarea.value returns LF x4), so crlfCount was always 0 and `crlfCount >= lfOnlyCount` always
+    // picked '\n', silently reintroducing defect (1) at the ONE call site that matters (macrosApp.js's own
+    // merge handler reads its eng text from a textarea). A caller can never observe a genuine \r THROUGH a
+    // textarea — zero CR is not evidence of an LF-native file, it is evidence of the browser's own normalization
+    // — so default to CRLF (the real file's own shape) whenever no \r survived at all; only trust the LF/CRLF
+    // COMPARISON when the input demonstrably still carries CR (e.g. a file read directly, not round-tripped
+    // through a textarea).
     const raw = String(existingEng || '');
     const crlfCount = (raw.match(/\r\n/g) || []).length;
     const lfOnlyCount = (raw.match(/(?<!\r)\n/g) || []).length;
-    const nl = crlfCount >= lfOnlyCount ? '\r\n' : '\n';   // dominant ending wins; CRLF on a tie (the real file's own shape)
+    const nl = crlfCount === 0 ? '\r\n' : (crlfCount >= lfOnlyCount ? '\r\n' : '\n');
     const base = raw.replace(/\s+$/, '');
     const addBlock = addLines.join(nl);
     const lines = base.split(/\r?\n/);

@@ -37,16 +37,25 @@ export const drillCycleBlock = {
     // canned cycles → fold to a comment (use the Drill wizard, which expands to plain moves).
     emit: (p, dx, dy, dialect) => {
         if (noFlow(dialect)) return [`( ${p.cycle} drill cycle - no canned cycles on ${dialect.name}; use the Drill wizard )`];
+        // t2118 -- G85 (bore) does not exist on ANY DDCS family: the G/M list's own G85 row reads "No code...
+        // Subroutine Contents Empty", and no O9085 hook exists in any slib this project has captured (Expert
+        // x2 dumps, V4.1, DM500). Emitting it silently would be dead code the controller ignores -- the bored
+        // feature is simply never machined. Fold to an honest comment, the same shape noFlow already uses above.
+        if (p.cycle === 'bore' && isDDCS(dialect)) return [`( bore drill cycle - G85 has no O9085 hook on ${dialect.name}; use peck or dwell instead )`];
         const G = { drill: 'G81', dwell: 'G82', peck: 'G83', bore: 'G85' }[p.cycle] || 'G81';
         const at = (axis, v) => (v === '' || v == null) ? '' : ` ${axis}${r3(num(v, 0))}`;
         // ⭐ t2117 — G98 IS EXPLICIT, and was missing entirely (zero G98/G99 in the whole web tree before this).
-        // The retract plane is MODAL, and the vendor never documents the power-on default, so without it the plane
-        // was whatever the previously-composed op happened to leave live. Between holes that is the difference
-        // between clearing a clamp and driving through it. Both of foinnc's own examples write `G98 G83 ...` /
-        // `G98 G84 ...`.
-        // ⚠ G98 = retract to the INITIAL plane (safe, clears fixtures); G99 = retract to R only (faster, does not).
-        //   G98 is the deliberate default. G99 is NOT offered as a field - nobody asked for the choice, and the
-        //   fast one is the one that hits clamps.
+        // Without it the RETRACT MODE itself was whatever modal happened to be live — between holes that is the
+        // difference between clearing a clamp and driving through it. Both of foinnc's own examples write
+        // `G98 G83 ...` / `G98 G84 ...`.
+        // ⚠ G98 = retract to the INITIAL plane; G99 = retract to R only (faster, does not clear as far). G98 is
+        //   the deliberate default; G99 is NOT offered as a field — nobody asked, and it's the one that hits clamps.
+        // ⛔ t2118 — WHAT G98 DOES NOT FIX, named so it is not mistaken for solved: G98 chooses WHICH mode
+        //   (initial-plane vs R-only), but this block still emits NO LEAD-IN MOVE, so "the initial plane" is
+        //   still whatever Z the previously-composed op happened to leave live (e.g. a contour ending at Z-6) —
+        //   the SAME pre-existing modal-inheritance hazard this comment used to imply G98 alone had closed.
+        //   Fixing that needs an explicit safe-Z move before this line, which is a separate, larger change
+        //   (every canned-cycle composition site, not just this one) — flagged, not fixed, this turn.
         let s = `G98 ${G}${at('X', p.x)}${at('Y', p.y)} Z${r3(num(p.z, -5))} R${r3(num(p.r, 2))}`;
         if (p.cycle === 'peck') s += ` Q${r3(num(p.q, 1))}`;
         if (p.cycle === 'dwell') s += ` P${r3(num(p.dwell, 0))}`;   // dwell in this dialect's units (ms / s)

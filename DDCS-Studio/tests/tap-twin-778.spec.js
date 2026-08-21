@@ -64,6 +64,10 @@ test('the RIGID toggle is gated on _rigidOk (spindle.tapCapable AND Expert); the
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async () => {
+    // t2118 -- rigid now ALSO needs a live tapCapable attestation at emit time (the t2117 fix on its own was
+    // the blocker: it emitted the no-spindle-start sequence unconditionally, safe only on a servo-wired
+    // machine). Attest it explicitly so this test still exercises the Expert+rigid path.
+    window.ddcsGetSettings().spindle = { ...window.ddcsGetSettings().spindle, tapCapable: true };
     const { tapDataDef } = await import('/blocks/dataOps/tapData.js');
     const { tapStack } = await import('/wizards/tapWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');

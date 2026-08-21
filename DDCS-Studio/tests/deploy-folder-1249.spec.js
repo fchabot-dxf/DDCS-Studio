@@ -111,8 +111,9 @@ test('THE CAM BUNDLE deploys the SAME FILE SET the download produced — byte fo
         expect(await page.evaluate((k) => window.__deploy.get(k), n), `${n} is byte-identical to what the download carried`).toBe(body);
     }
     expect(downloads, 'and no .zip fell into Downloads').toBe(0);
-    // t2117 -- the icon still wants a real subdirectory (install/CAM/), even though the macro itself is flat at root
-    expect(names.some((n) => n.startsWith('install/CAM/')), 'written as a real folder tree, not a zip to unpack').toBe(true);
+    // t2118 -- dropped a redundant assertion here: line 108's arrayContaining already names the literal
+    // 'install/CAM/cam22.bmp', which alone proves the subdirectory write; a separate startsWith check on the
+    // same fact added no coverage.
 });
 
 test('A DECLINED PICKER WRITES NOTHING AND DOWNLOADS NOTHING — a refusal is an answer', async ({ page }) => {
