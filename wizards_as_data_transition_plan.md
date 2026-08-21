@@ -57,8 +57,21 @@ We are migrating the layout data directly into the wizard's block template. The 
 - `param_group`: Acts as a container for all the form inputs.
 - `formfield` / `layoutwidget`: Individual blocks nested inside the `param_group` that define each input, its default value, its label, and its tooltip.
 
-**Once every form field is authored as a block, the wizard's layout becomes 100% lossless.** 
-When a user opens a built-in wizard, they will see the entire layout on the canvas. When they edit it and save it as a custom wizard, the layout blocks travel with it, perfectly preserving the structure.
+**Once every form field is authored as a block, the wizard's layout becomes 100% lossless.**
+When a user opens a built-in wizard, they see its entire layout on the canvas, and a block stack built from
+that layout reproduces the wizard indistinguishably — form, gating and preview included.
+
+> ### ⛔ CUT 2026-08-21 — "editing a built-in in place" is NOT a goal
+> This paragraph used to end *"when they **edit it** and save it as a custom wizard…"*. The owner removed
+> that: *"we can remove the edit built in goal."*
+>
+> **Built-ins do not need to be editable.** Fork-to-custom is a perfectly good path, and whether a built-in
+> is read-only is now irrelevant to whether this project is finished. ⚠ Do not reintroduce it as a
+> stretch goal — it drags work toward an editing UX that nobody asked for and that the done-condition does
+> not measure.
+>
+> What survives is the half that mattered: **the layout must travel losslessly**, so that what you fork
+> into can express everything the original did.
 
 ---
 
