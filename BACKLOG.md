@@ -423,3 +423,45 @@ REQUESTS A START ON AN UNATTENDED MACHINE. Never write `#1620`–`#1626` from th
 themselves are documented R/W, but this feature only ever needs to READ them — there is no read-only
 sub-range declared, so any code touching this block must be reviewed for which direction it writes, not
 just which addresses it names.
+
+---
+
+## ANALYTICS BOT DETECTION — an unmerged branch that was deliberately NOT pruned
+*(logged 2026-08-21 during the advisor branch sweep — human: "backlog the analytic bot detection")*
+
+**The sweep took 28 refs down to 10.** Every deleted branch was verified content-present in the trunk first.
+**Two were held back**, and this is why:
+
+| ref | holds |
+|---|---|
+| `analytics-bot-detection` | `086e6428` (2026-07-20) |
+| `worktree-agent-a02253c19308a22ae` | the same commit — an agent worktree twin |
+
+`086e6428` — *"bot detection — Layer B ingest classifier (blob10) + dashboard split"*:
+`classifyBot(request, cf, app)` plus `CRAWLER_UA` / `AUTOMATION_UA` / `DATACENTER_ORG` regexes, written as
+`blob10` in the fetch `writeDataPoint`. ⭐ It short-circuits `app === 'exe'` → `'clean'` **before any UA
+check**, because the exe beacon is Python-relayed and its user-agent is meaningless — a real insight worth
+not losing.
+
+### ⛔ WHY IT WAS NOT DELETED
+1. **The code is not in this repo's trunk at all.** `grep -rl classifyBot DDCS-Studio/web cloud bridge`
+   returns nothing. Unlike every branch that *was* pruned, this one is not duplicate history — deleting it
+   would have destroyed the only copy here.
+2. **A concurrent agent is working on it right now.** `ANALYTICS-BOT-DETECTION.md` was sitting UNTRACKED in
+   the working tree during the sweep. A second analytics agent shares this repo, and deleting its branch is
+   the same cross-seat damage this repo has already suffered twice.
+
+### THE OPEN QUESTION — where does this belong?
+The usage-analytics Worker is a **standalone Cloudflare Worker**, deployed separately from Studio. So:
+
+- **If analytics lives in its own repo**, this branch is a stray in the wrong repository and should be moved
+  there and then deleted here — not merged into the Studio trunk.
+- **If it is meant to live here**, it needs a home directory and a merge, and the branch stops being an
+  orphan.
+
+⚠ **Either way it should not stay as an unmerged branch indefinitely** — that is exactly the state that made
+the whole sweep necessary. ⛔ Do not resolve it by merging into the Studio trunk without deciding the first
+question; "merge it so the branch is gone" would put Worker code in an app repo permanently.
+
+⚠ **Coordinate with the analytics agent before touching either ref.** The untracked `.md` in the tree means
+the work is live, not abandoned.

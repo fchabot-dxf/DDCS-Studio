@@ -848,3 +848,136 @@ clock is unset. Any freshness check built on timestamps would silently always-or
 ⭐ If content changes mid-run, this is progress tracking on **EVERY controller including the V4.1** — no
 Modbus, no instrumentation, no cost to the machine. If it only changes at stop, it is still the honest
 answer to "where did it stop", which beacons cannot give either.
+
+---
+
+## [CONFIRMED] The vendor Modbus manual (V1.1) — read in full, 17 pages
+
+Source: `M350-main/Docs/Modbus开发资料/M350-Modbus Manual_V1_1.pdf`, from foinnc's own development pack.
+Extracted with `pypdf`. This settles several things we had been guessing at.
+
+### ⛔ THE NEGATIVE RESULT, stated plainly: there is NO slave register map, because there is no slave.
+> *"Master-slave mode: **Default master mode**"* — §1, Introduction.
+
+The entire manual documents the M350 **initiating** transactions (`MGETDATA` / `MSETDATA`) against
+**other** devices. Every one of the 15 occurrences of "slave" in the document is the M350 addressing a
+slave; none is the M350 **being** one. `Parameter 279` is named **"Modbus RTU Enable"**, not a mode
+selector. **Supported function codes: 01H, 02H, 03H, 04H, 0FH, 10H.**
+
+⇒ **This explains the dead poll.** Polling the controller returned `0x00` because nothing is listening —
+not because we had the wrong register. **There is no register to find.** ⛔ Stop looking for a line-number
+register in this firmware; the search space is empty, not unexplored.
+
+⚠ The word *"Default"* is the one crack: a later firmware (≥2025-12-11) reportedly adds a **P279 SLAVE**
+setting. That is **NOT** in this manual, so if slave mode exists, **its register map is undocumented** and
+only foinnc can supply it. That, precisely, is what a question to the vendor should ask for.
+
+### ⭐ SIGNATURE CORRECTION — we had the last parameter wrong
+Both calls are `M[GET|SET]DATA[X1,X2,X3,X4,X5,X6]`:
+
+| | meaning |
+|---|---|
+| X1 | macro var 50-499; **one macro address holds ONE BYTE** |
+| X2 | slave station number |
+| X3 | starting register address |
+| X4 | length **in BYTES** (a Modbus register is 2 bytes) |
+| X5 | function-code selector — read `01H`=1 `02H`=2 `03H`=3 `04H`=4 / write `0FH`=15 `10H`=16 |
+| X6 | macro var 50-499 **receiving the EXCEPTION CODE** |
+
+⚠ **X6 is NOT a timeout.** We had recorded it as one. In our beacon `MSETDATA[250,1,0,2,16,300]` the `300`
+is **`#300`, the slot the outcome lands in** — there is no tunable timeout anywhere in the API.
+
+**Exception codes:** `0x00` normal · `0x01` bad function · `0x02` bad address · `0x03` bad data ·
+`0x04` failed · `0x05` in progress · `0x06` busy · `0x0B` **target device unresponsive** · `0xE0` bad frame ·
+`0xFF` **timeout**.
+
+### ⭐⭐ THE BEACON LAG NOW HAS A TESTABLE CAUSE — and `#300` is the instrument
+The human measured *"a good 1-2 second"* per beacon. `MSETDATA` is **synchronous**, and our frame targets
+**slave 1 — which is not connected on this machine.** A write to an absent slave cannot return early; it can
+only run out its internal timeout, and retries multiply that. **1-2 s is what an unanswered transaction
+costs.**
+
+⇒ **HYPOTHESIS, cheap to falsify:** after any beacon, `#300` reads `0xFF` (timeout) or `0x0B`
+(unresponsive). If so, the lag is **absence of a listener, not cost of the mechanism** — and the same beacon
+against a live slave should complete in milliseconds.
+
+⚠ **THE TEST IS FREE AND READ-ONLY:** run one instrumented program, then **read `#300` off the controller**.
+Studio already reads macro vars. No Modbus poll, no `MGETDATA`, nothing written.
+⛔ Do not conclude "beacons are slow" until `#300` has been read — we would be retiring a mechanism over a
+missing cable.
+
+### ⭐ `#300` is unclaimed — the clobber is harmless, the slot is useful
+Nothing in `DDCS-Studio/web/` reserves `#300`; the only references are the beacon's own. So every beacon
+already writes its own success/failure into a variable **we can read back**, and always has. That makes
+per-beacon delivery **observable for free** — worth surfacing rather than leaving as an accident.
+
+### On `RECORD[]` (`M350宏函数说明.docx`, read)
+`RECORD[x1,x2,x3,x4,x5,x6,x7]` — `x1` `-1` clears / `0` appends; `x2` file index (`RecordData<N>.txt`);
+`x3`-`x6` up to four values, space-separated, one line per call; path is `local`.
+⇒ **A second, Modbus-free beacon channel:** the controller can append progress to a file on its own disk,
+which the gateway already reads over the share. ⚠ Same synchronous-cost question applies, but with **no
+network transaction** — a local file append should be far cheaper than an unanswered serial write.
+
+---
+
+## [CONFIRMED — FROM THE VENDOR] There is no line-number register. One is being ADDED (~2026-08-27)
+
+**Source: Q.G. Zhang (foinnc) directly, 2026-08-20, in reply to the human's question.** This is the
+strongest evidence class available to us — the author of the firmware, answering the exact question — and it
+**supersedes every inference** recorded above from the manual, the macro table, and the dead poll.
+
+> *"Currently, there is no register that exposes the current G-code line number or file progress.*
+> *However, I'm planning to allocate an address for this register once I get back from my business trip —*
+> *roughly in about a week."*
+
+### ⛔ THE SEARCH IS CLOSED — stop spending turns on it
+Everything we found independently was right, and now has an authoritative cause:
+- the Modbus poll returning `0x00` — nothing to find, not the wrong register;
+- the manual documenting master mode only;
+- the macro address table containing no run-state variable;
+- `.break0-0` being a resume record rather than a live position.
+⇒ **None of these were dead ends to re-examine. There was nothing there.** Any future turn that starts
+"maybe the line number is in..." should stop and read this section.
+
+### ⭐⭐ WHAT CHANGES: this stops being a reverse-engineering problem and becomes an INTEGRATION one
+A register is coming. That converts the question from *"can we discover progress?"* to *"is Studio shaped to
+accept a progress source when one appears?"* — and those want opposite reflexes. We should NOT build the
+machinery now. We SHOULD make sure the beacon is not the only thing Studio can imagine.
+
+⚠ **Beacons remain the only mechanism today — but ONLY on the Expert.** ⛔ **The V4.1 CANNOT run beacons at
+all**, and `send.js:464` already disables the control for it (`noModbus`, a positive capability test for
+`expert-m350`): Modbus RTU is an Expert feature, and the DM500/V3 lacks it too — grepping its whole
+311-param eng for `modbus|master|slave|serial.*mode` gives zero hits. So beacons are not superseded by the
+coming register; they become one source among several **on one controller family**.
+
+⛔⛔ **THE 1-2 s MEASUREMENT WAS TAKEN ON A V4.1** — a controller with no Modbus subsystem whatsoever. That
+number therefore says nothing about what a beacon costs on an **Expert**, which is the only machine that can
+run one. **We have never measured beacon cost on the hardware that supports it.**
+⇒ The `#300` exception-code test (above) must be run **on the Expert**, and it is the Expert's timeout — not
+the V4.1's — that decides whether the cost is intrinsic or just a missing listener.
+
+### ⛔ THE V4.1 HAS NO PROGRESS PATH AT ALL — and the new register will not give it one
+No Modbus ⇒ no beacons, no `MSETDATA`, and nothing to read a future register with. A new address in new
+**M350** firmware does not reach a V4.1 ever. ⇒ **The disk-file route (`.file` / `.break0-0` on SYSDISK) is
+the ONLY candidate that could ever report progress on a V4.1** — and that finding was already a V4.1
+reading. Its one open question, *"does it update DURING a run or only at stop?"*, stops being a curiosity
+and becomes **the deciding test for a whole controller family.**
+
+### ⚠ WHAT WE STILL DO NOT KNOW — the questions worth asking when he is back
+These decide the shape of the integration, and none is answered yet:
+1. **Line number or BYTE OFFSET?** An offset divides straight into a percentage and survives comments and
+   blank lines; a line number needs Studio to count lines the same way the controller does. We have said we
+   want the LINE, so if it is an offset we must map offset → line ourselves.
+2. **Readable HOW?** A Modbus register implies the controller acting as a **slave** — but the V1.1 manual
+   documents master mode only. Does this arrive with the `P279 SLAVE` mode, and which function code
+   (`03H` holding vs `04H` input)?
+3. **Is there a RUN STATE companion?** idle / running / paused / alarm. Progress without state cannot tell
+   "finished" from "stopped at line 400", which is the distinction an operator actually cares about.
+4. **Which firmware version**, so Studio can gate the feature on something checkable.
+
+### ⭐ THE ONE THING TO DO NOW, and only this
+Keep the progress SOURCE a named, declared concept rather than "the beacon path". Beacons, a future
+register, and `RECORD[]`-to-file are three implementations of one idea: *something reports how far along the
+job is*. Declaring that seam is inert data and costs nothing; building a polling engine for a register whose
+shape, transport, and units are all still unknown would be building on four guesses. ⛔ Do not build the
+reader until questions 1-4 are answered.
