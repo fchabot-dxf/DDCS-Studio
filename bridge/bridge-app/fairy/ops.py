@@ -1142,7 +1142,7 @@ class Ops:
             "machine_name": c.machine_name, "machine_id": c.machine_id,
             "dest": c.expert_dest, "com_port": c.com_port,
             "backend": c.backend, "enable_slave": c.enable_slave,
-            "enable_chime": c.enable_chime,   # t2097 — Setup toggle; takes effect live, no restart
+            "sound_enabled": c.sound_enabled, "sound_off": c.sound_off,   # t2125 — master + per-sound toggles; both live, no restart
             "host": c.host, "port": c.port, "lan_ip": self._lan_ip(),
             "is_remote": is_network_share(c.expert_dest),
             "controller_connected": self.controller_reachable(),
@@ -1171,8 +1171,10 @@ class Ops:
         if "machine_id" in updates: c.machine_id = (updates["machine_id"] or "").strip()
         if "dest" in updates: c.expert_dest = (updates["dest"] or "").strip()
         if updates.get("com_port"): c.com_port = updates["com_port"].strip()
-        if "enable_chime" in updates and updates["enable_chime"] is not None:
-            c.enable_chime = bool(updates["enable_chime"])   # t2097 — live toggle, no restart (see bridge.py's _on_sound)
+        if "sound_enabled" in updates and updates["sound_enabled"] is not None:
+            c.sound_enabled = bool(updates["sound_enabled"])   # t2125 — live toggle, no restart (see bridge.py's _on_sound)
+        if "sound_off" in updates and isinstance(updates.get("sound_off"), list):
+            c.sound_off = list(updates["sound_off"])   # t2125 amendment 3 — the per-sound off-list, same live path
         if "role_override" in updates and updates["role_override"] is not None:
             # t2103 (S0) — live, no restart: effective_role()/the claim gate both read c.role_override
             # fresh on every call, so a Setup change is authoritative the very next poll tick.

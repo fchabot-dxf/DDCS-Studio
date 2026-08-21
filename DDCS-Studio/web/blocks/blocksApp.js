@@ -194,6 +194,12 @@ async function buildWorkspace() {
     toolbox: buildToolbox([...opToolboxCategories(), ...learnerToolboxCategories()]), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
+    // t2125 (SOUND-PLAN.md section 5b) — Blockly ships its OWN click/delete/disconnect/error-beep audio system,
+    // with its own defaults (sounds:true, pathToMedia a Google CDN) unless told otherwise. The one-toggle ruling
+    // requires our switch to genuinely silence the Blocks tab, so Blockly's own system is muted here; the
+    // equivalent feedback that matters (a refused connection) is routed through sfx() instead — see
+    // blocks/blockly/tokenGuard.js's own refusal path.
+    sounds: false,
   });
   installTokenGuard(ws);   // t1712 (cycle ACT 5) — REFUSE an ineligible token connection, the third authoring surface
 

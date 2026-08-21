@@ -5,7 +5,7 @@ R2 credentials are read from the environment so secrets never live in the repo.
 """
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -86,8 +86,20 @@ class Config:
     enable_ws: bool = False                 # --ws: start the WebSocket telemetry server
     ws_port: int = 8766                     # WebSocket bind port (separate from the HTTP port 8765)
 
-    # --- audio feedback (chime.py; t2097) -----------------------------------
-    enable_chime: bool = True               # --no-chime to turn off; Windows-only regardless (see chime.py)
+    # --- audio feedback (chime.py; t2125, SOUND-PLAN.md) ---------------------------------------------
+    # ⛔ NO CLI FLAG HERE ON PURPOSE. SOUND-PLAN.md's ruling is "exactly ONE toggle anywhere in the
+    # product" — a --no-sound flag would be a second, independent source that could silently disagree
+    # with what Studio's browser toggle says. This field exists ONLY as the gateway's live copy of that
+    # ONE toggle, kept current by whatever Studio last pushed via POST /api/config (sound.js's
+    # syncGatewaySound). Default True so a gateway that has never heard from a browser still chimes.
+    # No `theme` field: SOUND-PLAN.md section 5 keeps the job sounds as the existing WAVs, unthemed —
+    # chime.py has never needed a theme and still doesn't.
+    sound_enabled: bool = True
+    # t2125 amendment 3 — a MASTER mute (above) plus a PER-SOUND toggle. sound_off lists the action names
+    # (ui/sound.js's ACTION keys, e.g. "job.arrived") Studio's browser has individually silenced; chime.py
+    # is only ever asked about "job.arrived"/"job.delivered"/"job.failed", so entries for browser-only
+    # actions (ui.*, job.sent) just sit here unused — same JSON list either way, no filtering needed.
+    sound_off: list = field(default_factory=list)
 
     # --- PC role: gateway vs client (ROLES-PLAN.md S0; t2103) ---------------
     # ⛔ DERIVED, NEVER STORED AS THE PRIMARY SIGNAL: role_override is empty by default, and effective_role()
@@ -104,7 +116,8 @@ class Config:
         "com_port": "com_port", "backend": "backend", "enable_slave": "enable_slave",
         "host": "host",   # LAN serving toggle ("127.0.0.1" | "0.0.0.0") — COMBINED-APP-PLAN Step 3
         "google_client_id": "google_client_id",   # Google Desktop OAuth client id (BYO cloud / Drive sign-in)
-        "enable_chime": "enable_chime",   # t2097 — Setup toggle, default ON
+        "sound_enabled": "sound_enabled",   # t2125 — the master toggle, live from whatever Studio last pushed
+        "sound_off": "sound_off",           # t2125 amendment 3 — the per-sound off-list, same channel
         "role_override": "role_override",   # t2103 (S0) — "", "gateway", or "client"
         "google_client_secret": "google_client_secret",
     }

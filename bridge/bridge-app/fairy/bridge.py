@@ -126,16 +126,24 @@ def run_loop(config):
 
         poller.on_checkpoint = _on_checkpoint
 
-    # --- audio feedback (Setup toggle, default ON; chime.py) — t2097 ---
+    # --- audio feedback (the ONE toggle, live from Studio; chime.py) — t2125, SOUND-PLAN.md ---
     # Wired here, never inside fairy's own build()/self-test path (see chime.py's own header): run_loop()
     # is only ever reached by the real gateway, so a bare Poller() built by a test never gets a sound hook.
-    # The hook re-reads config.enable_chime on EVERY fire (rather than gating whether it's wired at all) so
-    # flipping the Setup toggle takes effect immediately — unlike backend/enable_slave, this changes no
-    # wiring, so it never needs the restart those do.
+    # The hook re-reads config.sound_enabled on EVERY fire (rather than gating whether it's wired at all)
+    # so a POST /api/config from Studio takes effect immediately — no restart, same as the old enable_chime
+    # toggle it replaces. chime.py itself is UNCHANGED (still the existing WAVs, unthemed — SOUND-PLAN.md
+    # section 5 corrected the original "zero samples" plan: job sounds keep the learned door/register/
+    # buzzer, only the browser's UI actions get themed synthesis).
     from . import chime
 
+    # t2125 amendment 3 — the per-sound off-list travels as ui/sound.js's own ACTION names ("job.arrived" /
+    # "job.delivered" / "job.failed"), not poller.py's short event names ("received" / "delivered" /
+    # "failed") — same mapping ACTION itself declares (job.arrived -> 'in' etc is the EVENT side; this is
+    # the ACTION-NAME side), kept here since chime.py has no reason to know about Studio's naming.
+    _SOUND_ACTION_FOR = {"received": "job.arrived", "delivered": "job.delivered", "failed": "job.failed"}
+
     def _on_sound(event):
-        if config.enable_chime:
+        if config.sound_enabled and _SOUND_ACTION_FOR.get(event) not in config.sound_off:
             chime.play(config.studio_dir, event)
 
     poller.on_sound = _on_sound
@@ -628,7 +636,6 @@ def main(argv):
                     help="WebSocket telemetry port (default 8766; change if 8766 is already in use)")
     ap.add_argument("--machine-id", dest="machine_id", help="expected controller id (enables verify-before-deliver)")
     ap.add_argument("--name", dest="machine_name", help="machine label, e.g. \"Ultimate Bee\"")
-    ap.add_argument("--no-chime", action="store_true", help="don't play the RECEIVED/DELIVERED/FAILED audio feedback (Windows-only regardless; on by default)")
     ap.add_argument("--role", choices=["gateway", "client"],
                     help="override the auto-derived PC role (gateway if --dest is set, else client) -- for the one case the derivation gets wrong: stale --dest left over from bench work on a PC that should no longer claim jobs")
     args = ap.parse_args(argv)
@@ -646,7 +653,6 @@ def main(argv):
         open_browser=(True if args.open_browser else None),
         enable_ws=(True if args.enable_ws else None),
         ws_port=getattr(args, 'ws_port', None),
-        enable_chime=(False if args.no_chime else None),
         role_override=args.role,
     )
     if args.provision:

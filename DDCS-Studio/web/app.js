@@ -12,7 +12,7 @@ import { DockManager } from './ui/dockManager.js';
 import { WizardManager } from './wizardManager.js';
 import { el } from './ui/uiUtils.js';
 import { setupGlobalFunctions } from './ui/globalFunctions.js';
-import { playClick } from './ui/sound.js';  // click feedback sound
+import { sfx } from './ui/sound.js';  // themed earcon suite (t2125)
 import { loadUserOps, listUserOps, createUserOp, updateUserOp, deleteUserOp, getUserDef } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops; t1107 — per-wizard Restore-to-factory reseed
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
@@ -192,7 +192,7 @@ class DDCSStudio {
 
                     if (newActive && !this._keyboardActive) {
                         // keyboard just opened
-                        playClick();
+                        sfx('keyboard.opened');
                     }
                     this._keyboardActive = newActive;
 

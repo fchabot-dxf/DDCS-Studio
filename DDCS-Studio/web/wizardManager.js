@@ -12,7 +12,7 @@ import { WIZARD_VIEWS, viewByType } from './wizards/views/index.js';
 import { userOpView, setUserOpDef } from './wizards/views/userOpView.js';   // ONE generic view for every user_* op (reuses #wiz_user)
 import { listUserOps } from './blocks/userOps.js';
 const isUserOp = (t) => typeof t === 'string' && t.startsWith('user_');
-import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
+import { sfx } from './ui/sound.js';  // themed earcon suite (t2125)
 import { toast } from './ui/gateway/util.js';   // the shared transient toast (round-trip discoverability hint)
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
@@ -223,7 +223,7 @@ export class WizardManager {
         // thin pass-through when the hardware is present (or the user already chose to proceed).
         if (needsPrereqPrompt(type, variant, bypassPrereq)) return;
         // play a feedback sound whenever a wizard is opened
-        playClick();
+        sfx('wizard.opened');
         this._activeType = type;   // for the Templates popover (save/load this op's parameter templates)
         closeTemplatesPopover();
         this.editingOpId = null;   // a fresh open is a NEW op; openForEdit re-marks it. Clear the edit glow.
@@ -443,7 +443,7 @@ export class WizardManager {
         // so a trailing update can't ghost-fire ~200ms after the modal closes.
         { const view = this.activeView(); if (view && typeof view.onHide === 'function') view.onHide(this); }
         if (reverse) {
-            playClickReverse();
+            sfx('wizard.closed');
         }
         if (isCancel && this._formSnapshot) {
             this._restoreForm(this._formSnapshot);
@@ -497,7 +497,7 @@ export class WizardManager {
                 const tgt = findOpById(prog, this.editingOpId);   // t1958 — the same reach as openForEdit; t1970 — direct import, not a window-guarded fallback
                 if (tgt && tgt.opType === 'group') {
                     committed = await userOpView.applyGroupEdits(this.editingOpId);
-                    if (committed) { this.close(false, false); playClick(); return; }
+                    if (committed) { this.close(false, false); sfx('wizard.inserted'); return; }
                 }
                 // EDIT: rebuild THIS op from the new params (single source of truth) and replace it in place.
                 const { getLastOp } = await import('./blocks/opRecord.js');
@@ -510,7 +510,7 @@ export class WizardManager {
                     if (choice === 'merge') {
                         // True AST Merge: weave custom atoms into the newly generated form code
                         committed = ops.mergeOpBlocks ? ops.mergeOpBlocks(this.editingOpId, op.params) : false;
-                        if (committed) { this.close(false); playClick(); return; }
+                        if (committed) { this.close(false); sfx('wizard.inserted'); return; }
                     }
                 }
                 if (!committed) {
@@ -561,7 +561,7 @@ export class WizardManager {
                     if (window.ddcsSetSpindleStart) window.ddcsSetSpindleStart(ws.x, ws.y, ws.z, 0);
                 }
             } catch (e) { /* preview is optional */ }
-            playClick();
+            sfx('wizard.inserted');
             try { window.dispatchEvent(new CustomEvent('ddcs:op-inserted')); } catch (_) { /* t598 — the success moment: rate-prompt counter + trigger (ratePrompt.js listens) */ }
         } else {
             console.warn('WizardManager: No visible wizard or empty code.');

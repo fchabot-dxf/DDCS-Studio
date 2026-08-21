@@ -12,6 +12,7 @@ import { getMachine } from '../../../data/workspaceMachine.js';   // t2101 - the
 import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
 import { submitJobToDrive, canSendViaDrive, readGatewayHeartbeat } from '../../cloud/driveJobs.js';   // t2080 — the CLIENT transport: no gateway on this device, so the job goes to the Drive inbox the machine's gateway polls
 import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
+import { sfx } from '../../sound.js';   // t2125 — job.sent marks the moment a job LEAVES this browser (client-only; arrived/delivered/failed are the gateway's own)
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
@@ -306,6 +307,7 @@ export default {
           r = await submitJobToDrive(name, file.text, contentHash, (getMachine() || {}).name);   // the ORIGINAL program: no beacons on this path
         }
         toast('Queued ' + r.jobId);
+        sfx('job.sent');
         // t2105 - a time promise is only honest when a gateway is polling AND the mill can take it.
         info.textContent = r.via === 'drive'
           ? `Queued ${r.jobId} via your Google Drive — the machine's gateway picks it up within ~15s (deliver-only).`

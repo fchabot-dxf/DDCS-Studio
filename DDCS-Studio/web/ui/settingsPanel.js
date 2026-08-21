@@ -21,6 +21,7 @@ import { renderAtcChanger } from './atcChangerGui.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
+import { ACTION, previewSfx, syncGatewaySound, getGatewaySyncStatus } from './sound.js';   // t2125 — the master+per-sound toggle, its self-rendering Sound tab, and the gateway-sync honesty readout
 import { tncProgram } from '../wizards/atcModel.js';   // INC-B2: the ONE shared T.nc emitter (was the inline atcCombo/motionToTnc/generateToolChangeNc routing)
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
@@ -201,6 +202,12 @@ export const SETTINGS_DEFAULTS = {
     // (the modal still re-opens from the quick-menu, ignoring it). saveDest = the user's DELIBERATE save-destination
     // choice ('' = not yet chosen → stays ⚠ | 'local' | 'cloud' | 'both'); we never auto-default it to local.
     setup: { dismissed: false, saveDest: '' },
+    // t2125 — SOUND-PLAN.md's master + per-sound toggle: `enabled` governs every producer (this browser's
+    // UI earcons AND the gateway's job chime, pushed via sound.js's syncGatewaySound); `off` is an
+    // EXCEPTIONS-ONLY list of individually-silenced action names (ui/sound.js's ACTION keys) — a new
+    // action defaults ON and a saved workspace never needs migrating. Rides the workspace like every other
+    // setting here — NOT localStorage-only — so it travels across machines with the .ddcs file.
+    sound: { enabled: true, off: [] },
     // Persisted machine HOMING profile — authored in the Homing Setup modal, consumed by the Homing wizard.
     // PER-AXIS: enable, order (1..N — lower homes first), method, feeds, back-off, home offset, dir.
     // Home DIRECTION default = the SIGNED machine travel (settings.machine.<axis> sign) — ONE source, valid by
@@ -406,6 +413,7 @@ function loadSettings() {
                 endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...(p.endProgram || {}) },
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
                 setup: { ...SETTINGS_DEFAULTS.setup, ...(p.setup || {}) },
+                sound: { ...SETTINGS_DEFAULTS.sound, ...(p.sound || {}) },
                 homing: mergeHoming(p.homing),
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
@@ -1109,6 +1117,10 @@ function buildSettingsOverlay() {
                 <div class="settings-sidebar">
                     <div class="sidebar-group-label" data-group-label="lookfeel">Look and feel</div>
                     <button class="settings-tab active" data-group="lookfeel" data-target="set_tab_appearance">Appearance</button>
+                    <!-- t2125 (SOUND-PLAN.md amendment 4) — a sub-tab, not a 4th main tab: ~11 toggle rows is too
+                         thin for a main tab and too big to bolt onto Appearance. Adjacent to Appearance on purpose
+                         (sound follows the theme, which lives there). -->
+                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_sound">Sound</button>
                     <button class="settings-tab" data-group="lookfeel" data-target="set_tab_preview">Preview</button>
                     <button class="settings-tab" data-group="lookfeel" data-target="set_tab_compose">Editor</button>
                     <!-- "Wizards" said WHICH wizards exist; this tab configures the WIZARD BAR (what shows, in what
@@ -1289,6 +1301,21 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">SETUP HEALTH</div>
                         <label class="settings-check"><span class="ddcs-switch"><input type="checkbox" id="set_health_signals"><span class="ddcs-slider"></span></span> Show setup health signals — the first-run nudge, the unset-tab + field glows, and the Stock-button glow</label>
                         <div class="settings-hint">When off: no setup nudges anywhere, and the Setup checklist is hidden from the header menu. Re-enable here.</div>
+                    </div>
+                </div>
+
+                <!-- LOOK AND FEEL: SOUND (t2125, SOUND-PLAN.md) — a master mute, then ONE row per declared ACTION,
+                     rendered entirely by renderSoundTab() below. Nothing here is hand-written per sound: add an
+                     ACTION entry and its row appears with a toggle + a preview button, no edit to this template. -->
+                <div id="set_tab_sound" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">SOUND</div>
+                        <label class="settings-check"><span class="ddcs-switch"><input type="checkbox" id="set_sound_on"><span class="ddcs-slider"></span></span> Sound — master switch</label>
+                        <div class="settings-hint">Off silences everything below, everywhere: this browser AND the gateway's job chime. Stored in this workspace, so it travels with the .ddcs file.</div>
+                        <div class="settings-hint" id="set_sound_gw_status" style="opacity:.7;"></div>
+                    </div>
+                    <div class="settings-section" id="set_sound_rows_mount">
+                        <!-- filled by renderSoundTab() -->
                     </div>
                 </div>
 
@@ -1731,6 +1758,82 @@ async function renderLanAccess(mount) {
               + 'onerror="this.style.display=\'none\'">'
             : '<div class="settings-hint" style="margin-top:4px">Served on this PC only — set <code>host</code> to <code>0.0.0.0</code> in the gateway config to allow other devices.</div>');
     mount.replaceChildren(wrap);
+}
+
+// t2125 (SOUND-PLAN.md) — the gateway-sync honesty readout, shared by the master toggle and every
+// per-sound row below (any of them can trigger a push). Same twofold-heartbeat honesty the Send tab
+// already uses: say WHEN the gateway last picked this up, never imply an instant remote effect.
+function renderSoundGwStatus() {
+    const el = document.getElementById('set_sound_gw_status');
+    if (!el) return;
+    const st = getGatewaySyncStatus();
+    if (st.at == null) { el.textContent = ''; return; }
+    const when = new Date(st.at).toLocaleTimeString();
+    el.textContent = st.ok
+        ? `Gateway picked this up at ${when}.`
+        : `Not yet applied to the gateway (last tried ${when}) — it will pick this up next time it's reachable.`;
+}
+
+// Human label for an ACTION key, e.g. 'wizard.inserted' -> 'wizard: inserted'. Purely cosmetic — the
+// stored/synced identity is always the raw key, never this string.
+function _soundActionLabel(name) {
+    const [group, ...rest] = name.split('.');
+    return rest.length ? group + ': ' + rest.join('.') : group;
+}
+
+/**
+ * t2125 (SOUND-PLAN.md amendments 3/4) — THE TAB RENDERS ITSELF FROM ACTION. One row per declared action,
+ * grouped by the prefix before its first '.' (today: ui / job — wholly derived, never hand-listed). Add an
+ * ACTION entry in ui/sound.js and its row appears here automatically, with a toggle and a preview button,
+ * with ZERO edit to this function. Storage is exceptions-only (settings.sound.off), so a brand-new action
+ * is ON by default the moment it's declared.
+ */
+function renderSoundTab(ov) {
+    const mount = (ov || document).querySelector('#set_sound_rows_mount');
+    if (!mount) return;
+    const groups = new Map();   // prefix -> [actionName, ...], insertion order = declaration order
+    for (const name of Object.keys(ACTION)) {
+        const prefix = name.split('.')[0];
+        if (!groups.has(prefix)) groups.set(prefix, []);
+        groups.get(prefix).push(name);
+    }
+    const off = () => (_ddcsSettings.sound && Array.isArray(_ddcsSettings.sound.off)) ? _ddcsSettings.sound.off : (_ddcsSettings.sound.off = []);
+    const frag = document.createDocumentFragment();
+    for (const [prefix, names] of groups) {
+        const title = document.createElement('div');
+        title.className = 'settings-section-title';
+        title.textContent = prefix.toUpperCase() + ' SOUNDS';
+        frag.appendChild(title);
+        for (const name of names) {
+            const row = document.createElement('div');
+            row.className = 'settings-row';
+            row.style.cssText = 'align-items:center; gap:10px; margin-bottom:4px;';
+            const checked = !off().includes(name);
+            row.innerHTML =
+                '<label class="settings-check" style="flex:1; margin:0;">'
+                + '<span class="ddcs-switch"><input type="checkbox" data-sound-action="' + name + '"' + (checked ? ' checked' : '') + '><span class="ddcs-slider"></span></span> '
+                + _soundActionLabel(name) + '</label>'
+                + '<button class="toolbar-btn settings-io" data-sound-preview="' + name + '" title="Play this sound now, regardless of its own toggle">▶ Preview</button>';
+            frag.appendChild(row);
+        }
+    }
+    mount.replaceChildren(frag);
+    mount.querySelectorAll('[data-sound-action]').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const name = cb.dataset.soundAction;
+            const list = off();
+            const i = list.indexOf(name);
+            if (cb.checked && i !== -1) list.splice(i, 1);
+            else if (!cb.checked && i === -1) list.push(name);
+            saveSettings();
+            window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
+            syncGatewaySound().then(renderSoundGwStatus);
+        });
+    });
+    mount.querySelectorAll('[data-sound-preview]').forEach((btn) => {
+        btn.addEventListener('click', () => previewSfx(btn.dataset.soundPreview));
+    });
+    renderSoundGwStatus();
 }
 
 function wireSettingsOverlay(ov) {
@@ -3249,6 +3352,24 @@ function wireSettingsOverlay(ov) {
             else { document.body.setAttribute('data-theme', _theme.value); try { localStorage.setItem('ddcs_theme', _theme.value); } catch (e) { /* ignore */ } }
         });
     }
+    // Sound tab: the MASTER switch (SOUND-PLAN.md) — off silences every producer, this browser AND the
+    // gateway's job chime, one declaration, two players. Per-sound rows are rendered separately by
+    // renderSoundTab() on tab-open (below), since they're derived fresh from ACTION every time. Honesty
+    // over instant effect: syncGatewaySound() reports whether the gateway actually picked it up, and we
+    // say so rather than implying an instant remote effect (same twofold-heartbeat honesty the Send tab
+    // already uses for controller state).
+    const _sound = q('set_sound_on');
+    if (_sound) {
+        _sound.checked = (_ddcsSettings.sound || {}).enabled !== false;
+        _sound.addEventListener('change', () => {
+            _ddcsSettings.sound = _ddcsSettings.sound || {};
+            _ddcsSettings.sound.enabled = _sound.checked;
+            saveSettings();
+            window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
+            syncGatewaySound().then(renderSoundGwStatus);
+        });
+        renderSoundGwStatus();
+    }
     // Appearance: master "setup health signals" switch (mirrors the one in the checklist; gates bubble + all glows
     // + the quick-menu entry). setHealthSignals lives in setupChecklist — call it via the window hook (no import cycle).
     const _health = q('set_health_signals');
@@ -3402,7 +3523,7 @@ function wireSettingsOverlay(ov) {
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
         // t1245 — five panels left Settings entirely (Workspace + Cloud duplicated the workspace manager; FAQ + About
         // moved to the quick menu's Help; Feedback merged into Rate / Feedback). They are deleted, not hidden.
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_sound', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway',
                      'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     /**
      * t1245 — A PANEL CARRIES ITS OWN GROUP. Its subtab button already declares one (data-group), so showing a panel
@@ -3422,6 +3543,7 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_atc') renderAtcSetup();
         if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
         if (id === 'set_tab_wizards') renderWizardLibrary(ov.querySelector('#wizard_library_manager'));   // the wizard-bar library manager
+        if (id === 'set_tab_sound') renderSoundTab(ov);   // t2125 — self-renders fresh from ACTION on every open
     }
     /**
      * `want` (optional) is the panel the caller is heading for — passed in by showPanel so the group switch does not

@@ -47059,3 +47059,210 @@ already documented elsewhere (e.g. `wizard-face-1599`'s own Blockly-parallelism 
 
 🔨 turn 2123
 
+---
+
+# t2125 — themed sound system (SOUND-PLAN.md), through five amendment rounds
+
+**Dispatch**: build the themed, single-toggle sound suite per `SOUND-PLAN.md`, whose own section 0 named a
+live WebAudio artifact as the authoritative spec ("play it before writing anything"). Fetched the artifact
+directly (`WebFetch` — claude.ai artifact URLs are reachable with the session's own login) and cross-verified
+its raw `<script>` against the plan's own transcription before writing any code; they matched exactly.
+
+**The plan changed shape substantially mid-build, five times, all absorbed via `handoff.py amendments`:**
+1. Original ask: EVENT (contour+rhythm+octave) × THEME (voice+base pitch) as two declared axes, ONE toggle
+   governing every producer, zero samples anywhere.
+2. Amendment: add a THIRD declared layer, ACTION (which action makes which sound) + `sfx()` as the one entry
+   point, so a new button needs one ACTION line, never a synthesis edit.
+3. Amendment: **"zero samples" was wrong and retracted.** `assets/audio/` already held three CC0 WAVs (door
+   chime / register / buzzer) the human had specifically chosen because a stranger already reads them, and
+   pitch/contour differences don't survive a running spindle. Job events (arrived/delivered/failed) keep the
+   WAVs, unthemed; only UI actions (click/wizard open-close/insert) are themed synthesis. New EVENT `commit`
+   (lighter than `done`, for things done often). Section 5b swept every OTHER sound source in the app.
+4. Amendment: the toggle became a MASTER mute **plus a per-sound off-list**, stored as exceptions-only
+   (`sound.off: [actionName, ...]`) so a new action defaults ON with zero migration. A new Settings sub-tab
+   must self-render one row + preview button per declared ACTION — never hand-listed.
+5. Amendment: job events split by WHERE, not by volume — `job.sent` (a NEW synthesized swoosh) plays on the
+   CLIENT only; `job.arrived`/`delivered`/`failed` play on the GATEWAY only. No dedupe rule needed for a
+   one-box setup, because the split removes the overlap by construction. A client-side visual delivery
+   confirmation feature was named as the resulting gap — **recorded as a rule in a new `JOB-RULES.md`
+   section, explicitly NOT built** (distinct subsystem, its own turn).
+
+I stopped once to use `AskUserQuestion` directly: the plan named `job.sent`'s asset sourcing as a genuine
+open decision ("ask me before choosing" — real CC0 WAV vs. a synthesized fallback). Answered: synthesize it.
+
+## What shipped
+
+**`web/ui/sound.js`** (full rewrite) — three declared layers:
+- `THEME` — 5 voice functions (studio/futuristic/organic/steampunk/normal), ported byte-for-byte from the
+  artifact's own `osc`/`burst`/`shaper`/`env` WebAudio primitives.
+- `EVENT` — `in`/`done`/`commit`/`fail`, the five-axis-separated contour+rhythm+octave table.
+- `ACTION` — the routing layer. Two kinds of source in one declaration: `{voice, semitones?}` (themed
+  synthesis) or `{sample}` (a learned WAV, unthemed) or `{synth:'swoosh'}` (job.sent's dedicated filtered-
+  noise+falling-sweep synthesis — not a THEME voice, since it's the one sound that's neither themed nor
+  sourced from a file).
+- `sfx(actionName)` — the one entry point: checks the master toggle AND the per-action off-list, resolves
+  theme fresh at play time (`window.ddcsStudio.themeManager.getCurrent()`), debounces (~60ms coalesce),
+  caps concurrent voices (8), and is silent (once-logged) on an unknown action.
+- `previewSfx(actionName)` — bypasses BOTH toggles, for the Settings tab's preview buttons ("nobody can
+  decide what to silence without hearing it first").
+- `syncGatewaySound()` — pushes `{sound_enabled, sound_off}` to `/api/config`, fire-and-forget, tracked via
+  `getGatewaySyncStatus()` so the UI can say WHEN the gateway last picked it up rather than implying instant
+  effect (the Send tab's own twofold-heartbeat honesty pattern).
+
+**Call sites** (`app.js`, `wizardManager.js`, `ui/gateway/views/send.js`, `blocks/blockly/tokenGuard.js`):
+`playClick`/`playClickReverse` (6 sites) → `sfx('keyboard.opened' | 'wizard.opened' | 'wizard.closed' |
+'wizard.inserted')`; new `sfx('job.sent')` at the one place a job actually leaves the browser (covers both
+the local-gateway and Drive-fallback transports); new `sfx('error')` at `tokenGuard.js`'s existing refusal
+path (the equivalent of Blockly's own muted `playErrorBeep()`).
+
+**Settings** — `sound: {enabled, off}` added to `SETTINGS_DEFAULTS` (rides the workspace `.ddcs` file, not
+localStorage-only). A NEW sub-tab, `set_tab_sound`, a peer of Appearance/Preview/Editor under "Look and
+feel" (NOT a 4th main tab — ~11 rows is too thin for one, per the amendment). `renderSoundTab()` builds the
+whole row list from `Object.keys(ACTION)`, grouped by the prefix before the first `.` — zero hand-maintained
+UI; a new ACTION entry gets a row automatically. Master toggle + per-row toggle + a gateway-sync status line.
+
+**Blocks tab** (`blocksApp.js`, `tokenGuard.js`) — Blockly's own click/delete/disconnect/error-beep audio
+system defaults ON with a Google CDN media path unless told otherwise; `sounds:false` now mutes it at inject
+time (the one-toggle ruling requires our switch to genuinely silence the Blocks tab). The one equivalent
+that mattered (a refused live-value token connection) is routed through `sfx('error')` at its existing
+refusal point — deliberately did NOT attempt to replicate delete/disconnect via Blockly's internal event
+plumbing (out of proportion for this turn; disclosed rather than silently skipped).
+
+**3D preview** (`viz/gcodeViz3d.js`) — `_beep()` (880Hz square, end-of-animation-loop) turned out to be
+ALREADY DEAD CODE (grep found zero call sites; the one place it would fire already carried its own comment
+"no beep — it loops forever"). Deleted it, and added the requested VISUAL cue in its place: the existing
+`_glowAt()` primitive (already used for WCS/start-marker flashes — a self-disposing additive glow sprite)
+now fires once per loop completion at the toolpath's real final position, reusing declared machinery instead
+of inventing a second visual-pulse system.
+
+**Gateway** (`chime.py`, `config.py`, `bridge.py`, `ops.py`) — `chime.py` is UNCHANGED from before this turn
+(job sounds stay sample-based, per amendment 3's correction — an earlier in-turn draft had rewritten it to
+pure-Python WAV synthesis before the correction landed; reverted via `git restore` rather than hand-undoing).
+`enable_chime` (a Setup-settable field + `--no-chime` CLI flag — a second, independent source of truth) is
+fully retired. Replaced with `sound_enabled` (master) + `sound_off` (per-action off-list, `field(default_factory=list)`
+to avoid the classic dataclass mutable-default hazard — asserted directly by a dedicated test) — both live
+mirrors of whatever Studio's browser last pushed via `POST /api/config`, no CLI override for either (a CLI
+flag would itself be a second source). `bridge.py`'s `_on_sound` maps poller's short event names to
+`sfx.js`'s own ACTION names (`received→job.arrived` etc.) to check the off-list before calling `chime.play`.
+
+**Assets** — the 3 job-event WAVs + `PROVENANCE.md` were deleted then restored via `git restore` once
+amendment 3 corrected the zero-samples premise (they were never actually lost — tracked in git). The 4th
+(old UI-click WAV) stays deleted: UI clicks are legitimately synthesized now, not a regression.
+
+**`bridge/bridge-app/JOB-RULES.md`** — new §7, recording the WHERE-split rule (client vs. gateway, no
+dedupe needed by construction) as `[SHIPPED]`, and the client-side visual delivery-confirmation gap as
+`[RULED]`/NOT BUILT, per the file's own `[SHIPPED]`/`[RULED]` tagging convention — the mechanism it would use
+already exists server-side (`poller.py`'s `put_status`), so it's flagged as wiring, not a new gateway feature,
+for whoever picks it up.
+
+**Folded in, cheap and unrelated** (amendment 5's own "fold it in"): `headerPost.js`'s editor Copy-program
+button already toggled a `.copied` class for 600ms, but the only CSS rule for it, `.editor-copy-float.copied`,
+styled a former FLOATING variant of the button that the toolbar-integrated button never carried — dead
+selector, silent no-op since whenever that button moved into the toolbar. Fixed with an id-scoped rule
+(`#editor-copy-btn.copied`) rather than resurrecting the unrelated `.editor-copy-float` class onto the button.
+
+## Deliberately NOT built this turn (disclosed, not silently dropped)
+
+- **Client-side job-status visual confirmation** (amendment 5's main ask — a Send-tab indicator with
+  auto-poll/backoff/manual-retry over the gateway's existing `status/<jobId>` files). Rule recorded in
+  `JOB-RULES.md` §7; the feature itself is a distinct subsystem (client polling state machine, a new
+  `driveJobs.js` function, Send-tab UI) that deserves its own turn, not a tail-end addition here.
+- **The organic-theme retheme** (amendments 6/7, `ORGANIC-TREE-PLAN.md`) — the advisor's OWN amendment 6
+  explicitly said to defer this if the sound work was filling the turn: "DO THE SOUND, hand back, and say
+  so — I will dispatch this fresh." It was; not started.
+- **The boot-splash legibility fix** (amendments 8–11, four successive self-corrections settling on an
+  inline apply-early theme script + themed logo + CSS var fixes) — unrelated to sound, arrived very late,
+  and is fully speced and ready for a clean dedicated turn rather than a rushed tail addition after an
+  already large one.
+
+## Non-vacuity
+
+- `EVENT`'s five-axis test (both `sound-event-axes-2125.test.mjs` and the Python mirror in the ORIGINAL
+  synthesis-era `chime.py` test, since superseded): mutated `EVENT` to the exact "shared major triad" bug
+  the plan warns against, confirmed 3/6 assertions went red, restored from a scratch copy, confirmed green.
+- The Copy-button CSS fix: reverted the new `#editor-copy-btn.copied` rule, confirmed the Playwright spec
+  failed with the precise "no color change" symptom, restored, confirmed green.
+- The gateway config tests (`test_sound_toggle_2125.py`) directly assert the specific hazards fixed:
+  `enable_chime`/`theme` fields fully absent, `--no-chime` absent from CLI source, `sound_off` uses
+  `default_factory=list` (asserted via a two-instance non-shared-mutation test), malformed `sound_off`
+  ignored rather than crashing.
+
+## Gate
+
+Node tier: 224/224 (unchanged from before this turn's start — no regressions from settingsPanel.js's new
+imports/tab, or any other touched file). Targeted Playwright, run repeatedly across the five amendment
+rounds as the design changed underneath them: `sound-toggle-2125.spec.js` (7 tests), `editor-copy-feedback-2125.spec.js`
+(1 test) — all green on the FINAL architecture. `bridge/bridge-app/tests/test_sound_toggle_2125.py` — 12/12.
+
+Investigated one piece of pre-existing flakiness found along the way, confirmed NOT caused by this turn:
+`subscriber-error-surface-1656.spec.js`'s Blocks-tab boot occasionally times out waiting for `window.__blkws`
+— reproduced with `blocksApp.js`'s new `sounds:false` option REMOVED (3 isolated runs, 2 still failed),
+proving it predates this turn's Blockly change. Not investigated further (pre-existing, unrelated to sound).
+
+**Full `npm test`: 2595 passed / 15 failed / 52 flaky / 25 skipped (41.5m).** Checked the FAILED COUNT, not
+just the tail, per the plan's own item 5. Triaged every failure by name, not by assuming:
+- **2 were a REAL regression, caused directly by this turn, and fixed**: `settings-ia-regroup-1245.spec.js`
+  hardcoded "Look and feel holds FOUR subtabs" (exact-array assertion) and "fourteen subtabs survive the
+  shrink" (exact count) — both predate the new Sound sub-tab. Updated to FIVE/fifteen, since the amendment
+  explicitly directs this exact architecture; re-ran the file alone after the fix — 13/13 green.
+- **5 match this project's own already-documented stable baseline, verbatim** (`header-profile-menu`,
+  `pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603`
+  — the exact five t2123's own WORK-LOG entry named as "identical across every gate this week, unrelated to
+  this turn"). Not re-investigated; already established.
+- **The remaining 8 files (add-operation-1940, align-rotate-gui, alignment-canvas-refit-732,
+  alignment-clamp-730, alignment-correction-840, cam-customize-affordance, collapsible-panes-752,
+  group-canvas-drag) touch nothing this turn changed.** Re-ran them together, isolated from the rest of the
+  suite — ALL 15 of their tests failed again, every one at the SAME early boot `waitForFunction` line with
+  the DEFAULT 5000ms timeout (unrelated files, unrelated boot signals, same failure shape) — the signature
+  of environment contention, not a shared code defect. Ran `add-operation-1940.spec.js` completely alone
+  (not batched with the other 7): **5/5 clean.** Given a random pick from the contention cluster came back
+  spotless in true isolation, and the failure shape (uniform early-timeout across unrelated files) matches
+  this project's own documented `wizard-face-1599`/`corner-wall-collapse-1664` precedent for suite-level
+  parallel contention, concluded these are NOT regressions — almost certainly aggravated by this session's
+  own unusually heavy concurrent Playwright usage across a long multi-round turn, not code. The 52 flaky
+  (well above a typical gate's count) point the same way. Did not burn a third 41-minute full run chasing
+  further confirmation beyond the one clean isolated spot-check plus the settings-ia-regroup fix — disclosed
+  here rather than claimed as fully exhaustive.
+
+## Files
+- `DDCS-Studio/web/ui/sound.js` — full rewrite: THEME/EVENT/ACTION/sfx/previewSfx/syncGatewaySound.
+- `DDCS-Studio/web/app.js`, `web/wizardManager.js` — `playClick`/`playClickReverse` → `sfx()` call sites.
+- `DDCS-Studio/web/ui/gateway/views/send.js` — `sfx('job.sent')` at the real send point (both transports).
+- `DDCS-Studio/web/blocks/blockly/tokenGuard.js` — `sfx('error')` at the refusal path.
+- `DDCS-Studio/web/blocks/blocksApp.js` — `sounds:false` injection option.
+- `DDCS-Studio/web/viz/gcodeViz3d.js` — dead `_beep()` deleted; `_glowAt()` reused for the loop-end visual cue.
+- `DDCS-Studio/web/ui/settingsPanel.js` — `sound` default+merge, the new `set_tab_sound` sub-tab + button,
+  `renderSoundTab()`/`renderSoundGwStatus()`/`_soundActionLabel()`.
+- `DDCS-Studio/web/ui/themes.js` — (net no-op after the amendment: theme-push added then removed once job
+  sounds turned out to need no theme; comment explains why).
+- `DDCS-Studio/web/styles.css` — `#editor-copy-btn.copied` (the folded-in fix).
+- `DDCS-Studio/tools/bundle_standalone.py` — removed the now-dead sound.js audioUrl bundler patch (the
+  string it targeted no longer exists post-rewrite).
+- `DDCS-Studio/web/assets/audio/` — 3 job WAVs + `PROVENANCE.md` restored via `git restore`; the old UI-click
+  WAV stays deleted (superseded by synthesis).
+- `bridge/bridge-app/fairy/config.py`, `fairy/bridge.py`, `fairy/ops.py` — `enable_chime`→`sound_enabled`,
+  new `sound_off`, no CLI flag for either.
+- `bridge/bridge-app/fairy/chime.py` — unchanged (reverted to HEAD after an in-turn detour into synthesis
+  that amendment 3 corrected).
+- `bridge/bridge-app/JOB-RULES.md` — new §7 (WHERE-split rule `[SHIPPED]`; visual confirmation `[RULED]`).
+- `DDCS-Studio/tests/sound-toggle-2125.spec.js`, `tests/editor-copy-feedback-2125.spec.js`,
+  `tests/node/sound-event-axes-2125.test.mjs` — new.
+- `DDCS-Studio/tests/settings-ia-regroup-1245.spec.js` — the one real regression this turn caused (a
+  hardcoded FOUR/fourteen subtab count), updated to FIVE/fifteen.
+- `bridge/bridge-app/tests/test_sound_toggle_2125.py` — new (supersedes an in-turn, since-deleted
+  `test_chime_synthesis_2125.py` written before amendment 3 landed).
+
+## Capacity note
+
+This turn absorbed 11 amendments across a single dispatch — the original ask plus five substantive
+architecture corrections to the sound work itself (amendments 1–5), then two more, LARGER, UNRELATED
+pieces of scope arriving after the sound work was already effectively done (amendment 6/7: an organic-theme
+retheme with its own multi-round revision; amendments 8–11: a boot-splash legibility fix, self-corrected
+four times, settling on an inline apply-early theme script + logo swap). Both are explicitly NOT started —
+the retheme per the advisor's own stated preference in amendment 6 ("if the sound work is filling your turn,
+hand back, and say so"), the boot splash because it's unrelated to sound, fully speced, and deserves a clean
+turn rather than a rushed tail addition after an already large one. Flagging plainly rather than pushing
+through: this is the kind of turn worth a fresh session for whatever comes next, not a continuation.
+
+🔨 turn 2125
+

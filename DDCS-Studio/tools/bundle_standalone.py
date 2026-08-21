@@ -256,12 +256,6 @@ def generate_bundle(src_dir, index_html_text):
     assignments = '\n'.join([f'window["{name}"] = {name};' for name in exported_all if name])
     inner = '\n'.join(bundle_parts) + '\n' + assignments + '\n// initialize app (if it attaches to window)\nif (typeof window.ddcsStudio === "undefined" && typeof DDCSStudio !== "undefined") { window.ddcsStudio = new DDCSStudio(); }'
 
-    # patch sound.js: replace hardcoded audio URL with __ASSETS_BIN fallback (must be before bundle_script is built)
-    inner = inner.replace(
-        "const audioUrl = 'assets/audio/421337__jaszunio15__click_100.wav';",
-        "const audioUrl = (window.__ASSETS_BIN && (window.__ASSETS_BIN['audio/421337__jaszunio15__click_100.wav'] || window.__ASSETS_BIN['421337__jaszunio15__click_100.wav'])) || 'assets/audio/421337__jaszunio15__click_100.wav';"
-    )
-
     # escape any closing script tags that might appear inside the generated JS
     # (e.g., from embedded strings) so the script tag isn't closed early.
     if '</script>' in inner:

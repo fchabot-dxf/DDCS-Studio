@@ -43,5 +43,9 @@ export class ThemeManager {
         if (styleBtn) {
             styleBtn.innerHTML = '<span class="op-icon">🎨</span><span class="op-label">' + themeName.toUpperCase() + '</span>';
         }
+        // t2125 (SOUND-PLAN.md) — sound follows the visual theme: ui/sound.js reads the live theme fresh
+        // at play time (window.ddcsStudio.themeManager.getCurrent()), so no push is needed here. The
+        // gateway's own chime is unthemed (SOUND-PLAN.md section 5 — job sounds keep the learned WAVs),
+        // so it has no theme to receive either.
     }
 }

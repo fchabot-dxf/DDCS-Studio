@@ -984,9 +984,15 @@ export class GcodeViz3D {
             const total = this._animMs || 1;
             if (!this._animPaused) {
                 this._animDist += dt * 1000 * (this._animSimSpeed || 1);
-                if (this._animDist >= total) {       // reached the end → hold 2s (final datum/result visible), then loop (no beep — it loops forever)
+                if (this._animDist >= total) {       // reached the end → hold 2s (final datum/result visible), then loop
                     this._animDist = total;
                     this._animPaused = true;
+                    // t2125 (SOUND-PLAN.md section 5b) — a sound here was redundant (you're watching the preview,
+                    // not away from it) and fired every loop forever; replaced with the SAME quiet glow pulse
+                    // already used for the WCS/start markers (_glowAt), at the toolpath's real final position —
+                    // this branch runs exactly once per completion (guarded by _animPaused above).
+                    const lastSeg = segs[segs.length - 1];
+                    if (lastSeg && this.THREE) this._glowAt(new this.THREE.Vector3(lastSeg.bx, lastSeg.by, lastSeg.bz), 0xa0e8b0);
                     setTimeout(() => { this._animDist = 0; this._animPaused = false; this._animLast = 0; }, 2000);
                 }
             }
@@ -1036,22 +1042,6 @@ export class GcodeViz3D {
         this._partFlip = axis ? (String(axis).toUpperCase() === 'Y' ? 'Y' : 'X') : null;
         this._applyPartRotation(this._jogA || 0, this._jogB || 0);
         this.render();
-    }
-
-    // Short beep at the end of each animation loop (Web Audio; silent until a user gesture)
-    _beep() {
-        try {
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if (!Ctx) return;
-            if (!this._audio) this._audio = new Ctx();
-            const ctx = this._audio;
-            if (ctx.state === 'suspended') ctx.resume();
-            const o = ctx.createOscillator(), g = ctx.createGain();
-            o.type = 'square'; o.frequency.value = 880;
-            g.gain.value = 0.04;
-            o.connect(g); g.connect(ctx.destination);
-            o.start(); o.stop(ctx.currentTime + 0.12);
-        } catch (_) { /* ignore */ }
     }
 
     _ndc(e) {

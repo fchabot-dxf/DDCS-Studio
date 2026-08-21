@@ -36,6 +36,7 @@ import { flattenBlocks, getUserDef } from '../userOps.js';
 import { matches } from '../dataOps/deriveBindings.js';
 import { tokenPolicyFor, isTokenAttempt } from '../../wizards/ops/util.js';
 import { toast } from '../../ui/gateway/util.js';
+import { sfx } from '../../ui/sound.js';   // t2125 — Blockly's own error-beep is muted; this is its replacement
 
 /** The token-relevant specs for a def — identity-based (match/key) when available, else the frozen blockIndex
  *  (only safe for a def with no bindingSpecs — see module doc). Only specs actually declaring a token policy. */
@@ -106,6 +107,7 @@ export function installTokenGuard(ws) {
         if (!verdict || verdict.eligible) return;
         child.unplug();
         toast(verdict.refusal, true);
+        sfx('error');
         const parent = ws.getBlockById(e.newParentId);
         if (parent && parent.setHighlighted) {
             parent.setHighlighted(true);

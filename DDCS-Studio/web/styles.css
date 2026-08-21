@@ -5335,6 +5335,10 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .editor-toolbar > button:disabled { opacity: .3; }
 /* the two icon buttons keep their tighter icon padding */
 .editor-toolbar > #editor-copy-btn, .editor-toolbar > #editor-file-btn { padding: 4px 6px; line-height: 0; }
+/* t2125 — the button's own copy-feedback flash (headerPost.js adds/removes .copied for 600ms). Scoped by id,
+   not by .editor-copy-float below: that class styles a former FLOATING variant of this button, which moved
+   into the toolbar and never carried it — the old `.editor-copy-float.copied` rule could never match here. */
+#editor-copy-btn.copied { color: #22c55e; opacity: 1; }
 .editor-copy-float {
     position: absolute; right: 8px; top: 8px; z-index: 3; opacity: .75;
     padding: 4px 6px; line-height: 0; display: inline-flex; align-items: center;

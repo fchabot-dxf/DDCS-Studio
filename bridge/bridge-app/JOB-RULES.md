@@ -259,3 +259,61 @@ inbound source (or a poller that iterates sources), plus care that `delete_job` 
 source the job came FROM. ⛔ Do not start it inside another turn — it is its own slice.
 ⚠ **Until it lands, the toggle stays a genuine trade-off** and the current wording is honest: turning Drive
 on really does route local sends through Google. Do not "simplify" the label before the behaviour changes.
+
+---
+
+## 7. SOUND ON A JOB — WHERE, NOT VOLUME  `[SHIPPED]` (t2125, SOUND-PLAN.md amendment 5)
+
+**THE PRINCIPLE** *(human's own decisions, converging, now stated once)*: **sound where you are NOT
+looking, visual where you ARE.** The 3D preview's end-of-loop beep became a visual glow pulse because you
+are watching the preview when it fires. The job-event chime lives on the gateway because you are away from
+the screen when a job actually lands. The client — where you ARE looking when you press Send — gets a
+sound too, but only for the one moment that happens AT the click: the send itself.
+
+**`[SHIPPED]`** The WHERE-split, exactly, no overlap and no dedupe rule needed:
+
+| event | plays on | never on | why |
+|---|---|---|---|
+| `job.sent` | the CLIENT (the browser that pressed Send) | the gateway | marks the moment a job LEAVES this browser — a synthesized swoosh (`ui/sound.js`), not a learned sample |
+| `job.arrived` / `job.delivered` / `job.failed` | the GATEWAY (`chime.py`) | the client | you're away from the screen; the door chime / register / buzzer are learned sounds a stranger can already read |
+
+⭐ **A ONE-BOX SETUP (Studio + gateway on the same PC) NEEDS NO SUPPRESSION RULE.** An earlier draft of
+SOUND-PLAN.md put `delivered`/`failed` on both sides, which would have fired twice from the same speakers
+on localhost and needed an explicit dedupe to fix. Splitting by WHERE instead of by EVENT removes the
+overlap by construction — there is nothing to suppress because there is nothing to collide.
+
+⚠ **ACCEPTED CONSEQUENCE, named on purpose:** send a job from a phone and walk away, and you hear only the
+swoosh. The job sounds are for whoever is AT THE MACHINE, not for the sender.
+
+### The gap this leaves — client-side delivery confirmation  `[RULED]`, **NOT YET BUILT**
+
+Today the client's last word on a sent job is the `Send` tab's toast (`Queued <jobId>`) plus the `info`
+line — permanent, even though the job carries on to claimed → delivered/failed. *(human: "on the client we
+can receive a visual confirmation the file was transferred correctly.")*
+
+⭐ **THE MECHANISM ALREADY EXISTS — this is wiring, not a new gateway feature.** `poller.py` already calls
+`put_status` at every stage transition, writing `claimed` / `delivering` / `delivered` / `failed` into
+`status/<jobId>` (confirmed live by `bridge.py`'s own `self_test()`). The client side simply never reads
+it: `driveJobs.js` has `submitJobToDrive`, `canSendViaDrive`, `readGatewayHeartbeat` — and no status reader
+at all. ⛔ Do not invent a second gateway-side mechanism; add ONE new function mirroring
+`readGatewayHeartbeat`, plus a small indicator under Send.
+
+**The shape, once built:**
+- Three advancing states — **sent → picked up → delivered**, with **failed** as the alternative terminal.
+- ⛔ **THE HONESTY RULE (non-negotiable, same doctrine as §4/§5 above):** an unreadable status is
+  IGNORANCE, not failure. Amber "cannot confirm" — **never** a green tick, **never** a red cross, on a
+  failed lookup. Refuse on a known absence, never on ignorance.
+- **Retry is mandatory, and two-part**: auto-poll with backoff (~3s → 6s → 12s → 24s, stopping the instant
+  the state is terminal) **plus** a manual control for when auto-poll gives up or the job is still queued.
+  ⚠ Polling MUST be bounded — `drive.py`'s own docstring already warns about hammering Drive's per-user
+  quota; a client polling forever after the user walks away repeats that mistake.
+- ⚠ **Label it "Check again", never "Retry".** It re-reads the status; it does not resend the job. "Retry"
+  reads as "send it again", which on a mill is a dangerous misreading.
+- ⭐ **Why this matters more than the usual amber case:** the client is often a phone on shop wifi, so a
+  transient read failure is likely AND the job has almost certainly already succeeded — the state you most
+  need to re-ask about is also the one most likely to be wrong on the first read.
+
+⛔ **Deliberately deferred, not forgotten.** This is a distinct feature (client-side polling UI, a new
+`driveJobs.js` function, Send-tab indicator state) from the sound work that surfaced it, and belongs in its
+own turn rather than folded into a sound-system build. Recorded here — the declared one-source for job
+lifecycle — rather than in SOUND-PLAN.md, per this file's own opening rule.
