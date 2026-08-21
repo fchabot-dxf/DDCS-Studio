@@ -60,6 +60,21 @@ test('a NON-reversible declared spindle warns in the status (the plain why); rev
   expect(r.ok, 'reversible → no warning').not.toMatch(/non-reversible/i);
 });
 
+test('t2123 -- the non-reversible warning also fires in the REFUSED-rigid fold case (rigid:true but unattested still emits M4)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetSettings);
+  const r = await page.evaluate(async () => {
+    const { tapDataDef } = await import('/blocks/dataOps/tapData.js');
+    const hint = tapDataDef().statusHint;
+    const s = window.ddcsGetSettings();
+    s.spindle = { ...s.spindle, reversible: false, tapCapable: false };   // rigid requested but NOT attested
+    return hint({ rpm: 400, pitch: 1.0, rigid: true });
+  });
+  // t2123 -- this used to be silent (guarded on !p.rigid, which is false here) even though the ACTUAL emit
+  // folds to the floating-holder cycle (unattested) and DOES emit M4 -- the exact case the warning exists for.
+  expect(r, 'the fold case still runs M4, so the warning must still fire').toMatch(/non-reversible|back out/i);
+});
+
 test('the RIGID toggle is gated on _rigidOk (spindle.tapCapable AND Expert); the emit degrades rigid→floating off-Expert', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);

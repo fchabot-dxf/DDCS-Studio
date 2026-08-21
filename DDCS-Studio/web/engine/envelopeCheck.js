@@ -38,11 +38,24 @@ const TRAVERSE_BLOCKS = new Set(['clearlift', 'safehop', 'saferetract', 'safetra
 // EXCLUDES probes by construction, with no block-types (simpler than the through-stock class). Returns [] or one violation.
 function spindleGuard(program) {
     const lines = String(program).split('\n');
-    let commanded = false;   // an M3/M4 has turned the spindle on somewhere above
+    let commanded = false;   // an M3/M4 (or M29, the rigid-tap sync) has turned the spindle on somewhere above
     for (let i = 0; i < lines.length; i++) {
         const code = lines[i].replace(/\([^)]*\)/g, ' ').toUpperCase();   // drop ( comments ) so a commented M3/G1 doesn't count
-        if (/\bM0*[34]\b/.test(code)) { commanded = true; continue; }      // M3 / M4 (M03/M04) — spindle on
+        // t2123 — M29 (rigid-tap mode: syncs the SERVO spindle to Z, following M180) counts as spindle-on too —
+        // the vendor's own rigid-tap sequence never emits M3/M4 at all, that IS correct for a working rigid tap
+        // (see foinnc's G84测试.txt: M180/M29 S2000/.../G98 G84.../M30 — no M3 anywhere, and it is the correct
+        // program). Recognizing ONLY M3/M4 here would have false-flagged every correct rigid tap.
+        if (/\bM0*[34]\b/.test(code) || /\bM29\b/.test(code)) { commanded = true; continue; }
         if (!commanded && /\bG0*[123]\b/.test(code)) return [{ line: i + 1, kind: 'no-spindle' }];   // a feed cut (G1/G2/G3, not G0) before any spindle-on
+        // t2123 (t2118/t2121's own defence-in-depth gap, closed here) — a G8x CANNED CUTTING CYCLE (drill/dwell/
+        // peck/bore/rigid-tap: G81-G89, G80 excluded — it CANCELS a cycle, never cuts) is ALSO a motion command
+        // that needs a spindle on first, and was previously invisible to the check above: G84 never matches
+        // G0*[123], so a rigid-tap whose M180/M29 mode-switch silently no-ops on the controller (no I/O port
+        // assigned — t2118/t2121's own finding) sailed through as "no violation" even though the controller's
+        // OWN canned-cycle body (slib-g.nc) feeds to depth internally with a dead spindle — invisible to any
+        // text scan of what STUDIO emits, which is exactly why this text-level guard needs to catch it upstream,
+        // at the point the cycle is COMMANDED, rather than trying to see inside the controller's own macro.
+        if (!commanded && /\bG0*8[1-9]\b/.test(code)) return [{ line: i + 1, kind: 'no-spindle' }];
     }
     return [];
 }

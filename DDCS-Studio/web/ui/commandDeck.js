@@ -110,7 +110,11 @@ function wizItemHtml(e) {
 }
 function wizGroupHtml(group) {
     const icon = WIZ_GROUP_ICON[group.id] || HEADER_ICONS.custom;
-    const btnAttrs = group.id === 'setup' ? ' title="Setup — Comm, Warm-up, I/O"' : ' style="min-width: 100px;"';
+    // t2123 — this was an either/or ternary: Setup got a title but NOT the min-width every other group got (so it
+    // sized to content and sat narrower than its siblings), and simultaneously was the ONLY group with a tooltip
+    // at all. Every group now gets BOTH — Setup keeps its specific authored copy; the rest get a generic one
+    // derived from their own label rather than staying silent on hover.
+    const btnAttrs = ` style="min-width: 100px;" title="${_escHtml(group.id === 'setup' ? 'Setup — Comm, Warm-up, I/O' : group.label + ' wizards')}"`;
     const items = group.items.map(wizItemHtml).join('');
     const extra = group.id === 'setup' ? WIZ_IO_SECTION : '';
     return `<div class="toolbar-dropdown">

@@ -54,6 +54,16 @@ function liveTapCapable() {
     } catch (_) { return false; }
 }
 
+/** t2123 — EXPORTED so a caller other than tapCycle itself can ask "will the rigid cycle actually run" without
+ *  duplicating the attestation + dialect check separately (a second, drift-prone copy — the exact shape this
+ *  session keeps finding and fixing elsewhere). `tapData.js`'s statusHint uses this to decide when the
+ *  non-reversible-spindle warning applies: it needs to fire whenever the FLOATING-HOLDER cycle actually runs
+ *  (which emits M4), not merely whenever `p.rigid` is false — `p.rigid:true` on an unattested/wrong-post
+ *  machine ALSO falls to the floating-holder cycle, and the warning was silent in exactly that case. */
+export function rigidAttested(dialect) {
+    return liveTapCapable() && !!dialect && String(dialect.id || '').startsWith('ddcs-expert');
+}
+
 /** t2121 — WHY a rigid REQUEST was refused (only ever called when p.rigid is true and rigidOk is false), so the
  *  fold to the floating-holder cycle below leaves a trace instead of looking byte-identical to a plain
  *  rigid:false request — the SAME honesty cnc.js's bore fold already uses. Matters most on the Blocks canvas,
@@ -61,7 +71,7 @@ function liveTapCapable() {
 function rigidRefusalReason(dialect) {
     if (!liveTapCapable()) return 'no live tapCapable attestation (Settings → Machine → Spindle: "rigid-tap capable")';
     if (!dialect || !String(dialect.id || '').startsWith('ddcs-expert')) return 'rigid tapping needs the Expert post (the only dump-evidenced firmware)';
-    return 'refused';
+    return 'refused';   // unreachable when rigidAttested's own two checks are exhaustive; never a silent blank
 }
 
 /** The pitch-locked floating-holder tap cycle at a point. `dialect` supplies the dwell's P units (ms/s). */
@@ -73,7 +83,7 @@ export function tapCycle(pt, p, dialect) {
     // attestation (t2118 — checked HERE, at emit time, not just at the form's grey gate; see liveTapCapable's
     // own docstring for why the form-time-only check was the actual defect). Any other combination HONESTLY
     // degrades to the floating-holder cycle below — never silently emits the no-spindle rigid sequence.
-    const rigidOk = !!p.rigid && liveTapCapable() && !!dialect && String(dialect.id || '').startsWith('ddcs-expert');
+    const rigidOk = !!p.rigid && rigidAttested(dialect);   // t2123 — the shared predicate, not a second copy of it
     if (rigidOk) {
         return [
             `( rigid tap ${pitch}mm pitch - vendor G84 sequence; VERIFY the servo-spindle build on your controller )`,

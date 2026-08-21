@@ -43,7 +43,12 @@ async function fieldUnder(page, profileId, param) {
             poll();
         });
         const inp = document.querySelector(`[data-param="${param}"]`);
-        return { found: !!inp, disabled: inp.disabled, title: inp.title };
+        // t2123 — for a checkbox-shaped field (widget:'toggle'), the real <input> is styled 0×0 and invisible
+        // (.ddcs-switch input { opacity:0; width:0; height:0 } — styles.css) and its title is unreachable by
+        // hover; the row itself is what userOpView.js now ALSO sets the tip on (the ancestor a hover on the
+        // visible .ddcs-slider actually resolves to). Read both so a test on a non-checkbox field is unaffected.
+        const row = inp && inp.closest('[data-gate]');
+        return { found: !!inp, disabled: inp.disabled, title: inp.title, rowTitle: row ? row.title : '' };
     }, { profileId, param });
 }
 
@@ -56,7 +61,10 @@ test('PRIMARY EVIDENCE, both directions: sync is LIVE on Expert, GREYED with its
     const v41 = await fieldUnder(page, V41, 'sync');
     expect(v41.found, 'V4.1: still exists (greyed, not hidden)').toBe(true);
     expect(v41.disabled, 'V4.1: greyed — no #883/#884 equivalent').toBe(true);
-    expect(v41.title, 'the tooltip explains why').toContain('DDCS-Expert-specific');
+    // t2123 — was asserting inp.title, a property the user can never actually hover to see (sync is a
+    // checkbox-shaped toggle whose real <input> is styled 0×0/invisible — the visible slider inherits the
+    // ROW's title on hover, not the input's own). Assert the reachable property.
+    expect(v41.rowTitle, 'the tooltip explains why, reachable on the actually-visible element').toContain('DDCS-Expert-specific');
 });
 
 test('DM500 matches V4.1 (identical caps: ddcs-v41.js:19 / ddcs-v3-dm500.js:23, both wcsSync:false)', async ({ page }) => {

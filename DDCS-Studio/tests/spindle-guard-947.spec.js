@@ -74,6 +74,27 @@ test('DATA-OP (post-C): a surfacing data-op emit (has the Head M3) does NOT flag
     expect(r.violations.some((v) => v.kind === 'no-spindle'), 'the Option-C-fixed data-op has M3 → no dead-spindle flag').toBe(false);
 });
 
+test('t2123 -- a G84 rigid-tap cycle with NEITHER M3/M4 NOR M29 is flagged (the canned-cycle blind spot the guard used to have)', async ({ page }) => {
+    // no M3/M4 AND no M29 -- if M180's port-assignment silently no-ops on the controller (t2118/t2121's own
+    // finding), THIS is exactly what Studio's own emitted text would look like: a canned cycle commanded with
+    // nothing having turned the spindle on at all.
+    const r = await run(page, 'G21 G90\nG0 X10 Y0\nG0 Z2\nG98 G84 X10 Y0 Z-10 R2 F2000\nG80', DECLARED);
+    expect(r.status, 'a dead-spindle canned cycle is RED').toBe('red');
+    const v = r.violations.find((x) => x.kind === 'no-spindle');
+    expect(v, 'a no-spindle violation exists').toBeTruthy();
+    expect(v.line, 'flagged at the G84 line itself (line 4), not G80 (which cancels, never cuts)').toBe(4);
+});
+
+test('t2123 -- the vendor\'s OWN correct rigid-tap sample (M180/M29/G98 G84/M30) does NOT false-positive', async ({ page }) => {
+    const r = await run(page, 'G21 G90\nM180\nM29 S2000\nG0 X10 Y0 Z2\nG98 G84 X10 Y0 Z-10 R2 F2000\nM30', DECLARED);
+    expect(r.violations.some((v) => v.kind === 'no-spindle'), 'M29 satisfies the guard -- the correct rigid sequence must never flag').toBe(false);
+});
+
+test('t2123 -- G80 (cancel cycle) alone never counts as the cutting command -- only G81-G89 do', async ({ page }) => {
+    const r = await run(page, 'G21 G90\nG0 X10 Y0\nG80', DECLARED);
+    expect(r.violations.some((v) => v.kind === 'no-spindle'), 'G80 cancels a cycle, it does not cut -- must never flag on its own').toBe(false);
+});
+
 test('SEND GATE: a dead-spindle program asks the DEAD-SPINDLE confirm before the push; Cancel aborts the send', async ({ page }) => {
     await page.evaluate(async () => {
         const mod = await import('/ui/gateway/views/send.js');

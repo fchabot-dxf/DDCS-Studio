@@ -518,7 +518,14 @@ export function createUserOpView(ns, opts) {
                 if (!inp) return;
                 inp.disabled = off;
                 inp.setAttribute('data-op-gated', off ? 'on' : 'off');
-                inp.title = off && spec.tip ? spec.tip : '';
+                const gateTip = off && spec.tip ? spec.tip : '';
+                inp.title = gateTip;
+                // t2123 — a CHECKBOX-shaped field (widget:'toggle') styles its real <input> at 0×0 and invisible
+                // (styles.css .ddcs-switch input { opacity:0; width:0; height:0 }) — the visible element is the
+                // sibling .ddcs-slider, which never gets this tip, so the tooltip set above is unreachable by
+                // hover. Set it on the ROW too, so hovering the actually-visible slider (inside the row) reaches
+                // it — the native title-tooltip lookup walks up to the nearest ancestor that carries one.
+                row.title = gateTip;
                 row.style.opacity = off ? '0.5' : '';
                 // t2118/t2121 — the SAME auto-clear the data-option-gate below already does for a select: a gated-off
                 // CHECKBOX must not leave a stored `true` behind it. `rigid` surviving a machine swap to a

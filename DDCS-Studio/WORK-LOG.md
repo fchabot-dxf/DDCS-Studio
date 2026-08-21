@@ -46968,3 +46968,94 @@ final gates, checked by name — zero new failures.**
 
 🔨 turn 2121
 
+# t2123 — RELEASE V2026.08.21.1, then 4 small follow-up items (separate commit)
+
+Dispatch: t2122 REVIEW PASSED — ship it. Advisor independently re-verified both items I'd flagged as
+untested (the reproject-listener ordering, `clearWhenOff`'s scope) and confirmed both correct.
+
+## Task 1 — the release, its own clean commit
+
+Bumped V2026.08.20.1 → **V2026.08.21.1** across all three files: `web/index.html` (title tag + `.ver`
+span), `web/version.json`, `package.json` (unpadded `2026.8.21`). Added a `RELEASE_NOTES` entry naming three
+things: rigid tapping's spindle-sync fix and the canned-cycle retract-plane fix, both described as **verified
+by test and review**; the CAM pack export fix, explicitly flagged as **documentation-conformant but NOT yet
+verified on real hardware** — worded carefully so the note cannot be read as claiming Stage B works, per the
+dispatch's own explicit mandate (the human has confirmed no Studio-built pack has ever been loaded).
+`check-version-sync.cjs` confirmed agreement, re-run ON the release commit as instructed, not before it.
+
+**Merge to main, verified by hash comparison, not a trusted exit code**: pushed `wizards-as-data-blocks`
+directly onto `origin/main` (`git push origin wizards-as-data-blocks:main`) — a clean fast-forward,
+`2af0dd2a..cf67b64f`. Per the dispatch's own explicit warning ("do not trust a piped git merge exit code, it
+gets eaten"), independently re-fetched `origin/main` and compared the actual hashes rather than trusting the
+push output: `wizards-as-data-blocks` tip and `origin/main` both resolved to `cf67b64f8f1bf4f300f5dd11c4943121a5d266dd`
+— confirmed match.
+
+**Deployed result verified by fetching the served file, not a browser reload**: `Invoke-WebRequest` against
+the live `ddcs-studio.pages.dev` root (following the `/index.html` → `/` redirect), grepped the actual
+response body — both the `<title>` and the `.ver` chip read `V2026.08.21.1` in a 137929-byte live fetch.
+
+## Task 2 — four small items, separate commit after the release landed
+
+1. **`commandDeck.js`'s wizard-group button attrs were an either/or ternary**: Setup got a `title` but not
+   the `min-width:100px` every other group got (sized to content, narrower than its siblings), and was
+   simultaneously the ONLY group with a tooltip at all. Every group now gets both — Setup keeps its specific
+   authored copy, the rest get a generic one derived from their own label.
+2. **`envelopeCheck.js`'s dead-spindle guard had a real blind spot for canned cycles**: it only recognized
+   M3/M4 as spindle-on evidence and only G1/G2/G3 as needing one — a G84 rigid-tap line never matches
+   `G0*[123]`, so if M180's silently-no-op'd port assignment leaves the spindle dead (t2118/t2121's own
+   finding), the guard provided zero defence-in-depth. Fixed exactly as the dispatch specified: M29 now also
+   counts as spindle-on (the vendor's rigid-tap sample never emits M3/M4 at all — that's the CORRECT program,
+   confirmed not to false-positive), and G81-G89 (G80 excluded — it cancels, never cuts) now also need a
+   preceding spindle-on. Three new tests: the new detection, the vendor sample NOT flagging, and G80-alone
+   NOT flagging.
+3. **`tapData.js`'s non-reversible-spindle warning was guarded on `!p.rigid`** — silent in exactly the FOLD
+   case (rigid requested, refused, floating-holder runs anyway) that DOES emit M4. Exported a shared
+   `rigidAttested(dialect)` predicate from `tap.js` (refactoring `tapCycle`'s own `rigidOk` to use it too, so
+   there's one source, not two copies) and switched the warning's guard to the real "will the floating-holder
+   cycle actually run" condition.
+4. **`userOpView.js`'s gate tip was being written to a 0×0, invisible input**: a checkbox-shaped field
+   (`widget:'toggle'`) styles its real `<input>` at 0×0/opacity:0 (`styles.css` `.ddcs-switch input`) — the
+   visible element is the sibling `.ddcs-slider`, which never received the tip, so the tooltip was
+   unreachable by hover. Now also set on the row (the native title-tooltip lookup walks up to the nearest
+   ancestor that carries one). Repaired `tests/wcs-sync-gate-1906.spec.js`'s own wrong-property test, which
+   asserted `inp.title` — a property that was passing but testing something a real user could never actually
+   see; now asserts the row's title instead.
+
+## Verification
+
+Non-vacuity on every behavioural fix (2, 3, 4): reverted the relevant file to `HEAD`, watched the specific
+new assertion fail with the precise symptom, restored from a scratch copy. Item 2 in particular: confirmed
+the detection test fails on revert while the two "must not false-positive" guard tests correctly still pass
+regardless (they're regression guards, not proof of the new capability). New/updated tests: `spindle-guard-947.spec.js`
+(+3), `tap-twin-778.spec.js` (+1), `wcs-sync-gate-1906.spec.js` (repaired, 1).
+
+## Gate
+
+Node tier: 215/215 (unchanged — Task 2's fixes are all Playwright-tier). Targeted Playwright:
+`spindle-guard-947`, `tap-twin-778`, `tapping-776`, `wcs-sync-gate-1906`, `wizard-bar`, `version-sync-1311`,
+`update-check` — 44/44.
+
+**Full `npm test`, two runs, both investigated rather than argued.** Run 1: 2626 passed / 6 failed / 22
+flaky. The extra 6th name (beyond the established 5) was `palette-by-role-1623.spec.js` — investigated: a
+LEFTOVER mem-server process (PID from an earlier full-gate run this same turn) was still holding port 3211,
+so a later isolated re-run genuinely could not connect — an environment artifact, not a code failure. Killed
+the stray process, re-ran the full gate a second time: 2632 passed / 6 failed / 16 flaky, and the extra 6th
+name changed to `corner-wall-collapse-1664.spec.js` — a DIFFERENT test than run 1's extra, unrelated to any
+file this turn touched. Isolated re-run: both `palette-by-role-1623` and `corner-wall-collapse-1664` pass
+cleanly alone (2.4s and 14.8s respectively) — two different tests, each clean in isolation, each only
+failing once under full-suite parallel contention, is the same transient-contention shape this project has
+already documented elsewhere (e.g. `wizard-face-1599`'s own Blockly-parallelism starving). **The stable
+5 — `header-profile-menu`, `pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`,
+`validation-divzero-not-syntax-1603` — are identical across every gate this week, unrelated to this turn.**
+
+## Files
+- `DDCS-Studio/web/index.html`, `web/version.json`, `package.json`, `web/data/releaseNotes.js` — the release.
+- `DDCS-Studio/web/ui/commandDeck.js` — the button-attrs either/or fix.
+- `DDCS-Studio/web/engine/envelopeCheck.js` — the canned-cycle dead-spindle blind spot.
+- `DDCS-Studio/web/blocks/dataOps/tapData.js`, `web/wizards/ops/tap.js` — the shared `rigidAttested` predicate.
+- `DDCS-Studio/web/wizards/views/userOpView.js` — the row-title fix for the 0×0 input tooltip.
+- `DDCS-Studio/tests/spindle-guard-947.spec.js`, `tests/tap-twin-778.spec.js`,
+  `tests/wcs-sync-gate-1906.spec.js` — new/repaired tests.
+
+🔨 turn 2123
+

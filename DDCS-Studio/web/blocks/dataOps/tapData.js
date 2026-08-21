@@ -14,6 +14,9 @@ import { appendToolSel } from '../../wizards/ops/toolsel.js';
 import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';
 import { tapFeed } from '../../wizards/threads.js';
+import { rigidAttested } from '../../wizards/ops/tap.js';   // t2123 — the SAME predicate tapCycle's own rigidOk uses
+import { resolveActivePost } from '../../wizards/dialects/index.js';
+import { getActiveProfile } from '../../shared/js/profiles/controllerProfiles.js';
 
 /** Author defaults — match tapStack's num() fallbacks. optIn:true (tap is absolute placement). */
 export const TAP_DEFAULTS = {
@@ -111,7 +114,14 @@ export function tapDataDef() {
         const rpm = _n(p.rpm, 400), pitch = _n(p.pitch, 1);
         let s = ` · feed ${tapFeed(rpm, pitch)} mm/min (pitch-locked to ${rpm} rpm)`;
         const sp = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {};
-        if (!p.rigid && sp.reversible === false) s += ' · ⚠ your spindle is declared NON-reversible — floating-holder tapping needs M4 to back out; declare it reversible in Settings → Machine → Spindle';
+        // t2123 — the REAL predicate for "will the floating-holder cycle actually run" (the one that emits M4),
+        // not just `!p.rigid`: a rigid REQUEST the emit path refuses (unattested spindle, non-Expert post) also
+        // falls to the floating-holder cycle — this warning used to stay silent in exactly that fold case, the
+        // one time it matters most (the user thinks they are getting the rigid cycle and are not).
+        let dialect = null;
+        try { dialect = resolveActivePost(getActiveProfile().id); } catch (_) { /* headless — no dialect to resolve */ }
+        const floatingHolderRuns = !p.rigid || !rigidAttested(dialect);
+        if (floatingHolderRuns && sp.reversible === false) s += ' · ⚠ your spindle is declared NON-reversible — floating-holder tapping needs M4 to back out; declare it reversible in Settings → Machine → Spindle';
         return s;
     };
     return def;
