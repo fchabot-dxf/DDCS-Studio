@@ -55,7 +55,14 @@ const TAP_EXEC_BINDINGS = [
     // M3/M4 sequence, tap.js:21-43) — different line count/content, hardware-safety-gated. Categorical, not deferrable.
     {
         param: 'rigid', tokenRefusal: 'Picks between two structurally different tapping cycles (a canned G84 cycle vs. a floating-holder M3/M4 sequence) — a categorical choice gated on declared spindle hardware, not a value inside one.', blockIndex: 3, key: 'rigid', type: 'bool', default: TAP_DEFAULTS.rigid, widget: 'toggle', label: 'Rigid tap (G84)',
-        gate: { param: '_rigidOk', is: false, tip: 'Rigid tapping needs a DECLARED encoder/servo spindle (Settings → Machine → Spindle: "rigid-tap capable") AND the Expert post — the only firmware with dump evidence. Otherwise the floating-holder cycle runs.' },
+        // t2121 — `clearWhenOff` is the ONLY field in the whole app that opts into userOpView.js's checkbox
+        // auto-clear (declared per-field on purpose — see that file's own comment on why it must not be generic).
+        // ⚠ the tip now names BOTH vendor steps, not just the spindle: O10180 (slib-m.nc:1775-1781) is
+        // `IF #2==0 GOTO30` on `#1296` (the port-enable var), and that GOTO skips BOTH the output-port write AND
+        // `#579=1` — so with no port assigned, M180 silently no-ops, the spindle stays analog, and G84 still
+        // feeds to depth. A truthful user who genuinely has a servo spindle but never did step 2 would still hit
+        // the original hazard on a good-faith tick — the checkbox must say so, not just attest the hardware.
+        gate: { param: '_rigidOk', is: false, clearWhenOff: true, tip: 'Rigid tapping needs TWO things: a DECLARED encoder/servo spindle (Settings → Machine → Spindle: "rigid-tap capable") AND an assigned I/O output port for the M180/M181 mode switch (vendor setup, step 2) — plus the Expert post, the only firmware with dump evidence. Missing either, M180 silently no-ops and the spindle stays analog; the floating-holder cycle is the safe default until both are done.' },
     },
 ];
 

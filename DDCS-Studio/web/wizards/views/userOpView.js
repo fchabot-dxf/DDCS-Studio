@@ -520,11 +520,28 @@ export function createUserOpView(ns, opts) {
                 inp.setAttribute('data-op-gated', off ? 'on' : 'off');
                 inp.title = off && spec.tip ? spec.tip : '';
                 row.style.opacity = off ? '0.5' : '';
-                // t2118 — the SAME auto-clear the data-option-gate below already does for a select: a gated-off CHECKBOX
-                // must not leave a stored `true` behind it. `rigid` surviving a machine swap to a non-tapCapable spindle,
-                // un-editable because the checkbox is greyed, was exactly this shape — the emit path is now separately
-                // safe regardless (tap.js reads the live attestation itself), but the stored value should not lie either.
-                if (off && inp.type === 'checkbox' && inp.checked) { inp.checked = false; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+                // t2118/t2121 — the SAME auto-clear the data-option-gate below already does for a select: a gated-off
+                // CHECKBOX must not leave a stored `true` behind it. `rigid` surviving a machine swap to a
+                // non-tapCapable spindle, un-editable because the checkbox is greyed, was exactly this shape.
+                // ⛔ t2121 — MUST BE A DECLARED OPT-IN (`gate.clearWhenOff`), NOT generic over every `data-gate` row:
+                // the first version cleared ANY gated-off checkbox unconditionally, and this mechanism is reused by
+                // fields where clearing is WRONG — `atcTableData.js`'s `includeLengths` (default true; a grbl-post
+                // gate visit would silently flip it false, and back on Expert the whole tool-lengths section would
+                // vanish from the emit with no note) and `wcsData.js`'s `sync`/`slave` (sharing `WCS_SYNC_GATE`,
+                // losing the slave-axis write the same way). Only a field whose gate spec EXPLICITLY opts in
+                // (`rigid`'s own `_rigidOk` gate, `tapData.js`) gets cleared; every other `data-gate` checkbox keeps
+                // its PRE-EXISTING behaviour (greyed, disabled, value preserved) exactly as it always has.
+                if (off && spec.clearWhenOff && inp.type === 'checkbox' && inp.checked) {
+                    inp.checked = false;
+                    // t2121 — sync the LOCAL `params` snapshot directly, not just the DOM: `params` was already
+                    // read (line ~452, BEFORE this gate loop runs) and is what `recordOp`/emit below use — a
+                    // dispatched 'change' event alone can trigger a RE-ENTRANT nested update() that records the
+                    // correct value, but this OUTER call resumes right after and overwrites it with the STALE
+                    // pre-clear snapshot once it reaches its own recordOp/emit. Fixing `params` here directly
+                    // means the outer call's own recordOp/emit are correct regardless of any re-entrancy.
+                    if (inp.dataset.param) params[inp.dataset.param] = false;
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             });
             // t961 — DECLARED per-OPTION enable gate (optionGate): grey a single <option> (Max/Hop stay usable) unless requireAll
             // holds, and AUTO-REVERT the select to `fallback` + dispatch change when the gated option is the current value. Marks

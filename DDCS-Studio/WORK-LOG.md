@@ -46852,3 +46852,119 @@ flaky / 25 skipped — the exact same 5 pre-existing, unrelated failures as t211
 
 🔨 turn 2119
 
+# t2121 — advisor RE-review response: blocker confirmed closed, one NEW regression this turn's own commit introduced + 4 more findings
+
+Dispatch: `T2118-REVIEW.md`'s re-review of commit 07f5e3b7 — 22 findings raised, 19 survived, 3 refuted. The
+blocker itself: CONFIRMED CLOSED (advisor independently re-verified the gate line and all 7 reachable
+surfaces — wizard form, Blocks palette, stored wizard, CAM slot generators, twin/preview, marker round-trip,
+headless). Ship-blocked on one thing t2118's OWN commit introduced.
+
+## (1) HIGHEST — the checkbox auto-clear was GENERIC, not scoped to `rigid` as claimed
+
+t2118's commit message said `rigid` was the only toggle+gate combination in the app — WRONG, and the advisor
+found it by actually checking the guard condition (`inp.type === 'checkbox' && inp.checked`, nothing else) and
+searching for OTHER fields with a `type: 'bool'` implicit-toggle + a `gate:`. My own earlier search only
+matched EXPLICIT `widget: 'toggle'` declarations — `atcTableData.js`'s `includeLengths` and `wcsData.js`'s
+`sync` are both `type: 'bool'` with NO explicit widget (the default `bool → toggle` mapping applies
+implicitly), so my grep silently missed both. Real consequence, reproduced by the advisor: open a rigid-tap
+op under a grbl post override (gates `includeLengths` off too, unrelated field), edit ANY other field,
+Insert — `includeLengths` (default `true`) commits `false`, and back on Expert the whole TOOL LENGTHS section
+silently vanishes from the emit. `wcsData.js`'s `sync`/`slave` share the same shape, losing the slave-axis
+write.
+
+**Fixed properly, not patched**: the auto-clear now requires an explicit `gate.clearWhenOff: true` opt-in.
+Set ONLY on `rigid`'s own gate spec (`tapData.js`); every other `data-gate` checkbox in the app reverts to its
+ORIGINAL (pre-t2118) grey-only behaviour — this is a strict narrowing back toward the prior, safe default, not
+a new capability anyone else could stumble into.
+
+## (2) `recordOp` was re-writing the pre-clear snapshot over the clearing render
+
+The gate loop mutates the checkbox DOM (`inp.checked = false`) and dispatches a `change` event — but `params`
+(the object `recordOp`/emit actually use) was already READ from the widgets, in full, BEFORE this loop runs.
+A dispatched event can trigger a re-entrant nested `update()` that records the correct value, but the OUTER
+call resumes right after and overwrites it with the stale pre-clear `params` once IT reaches its own
+`recordOp`/emit. Net effect: the checkbox visually unchecks, but `getLastOp().params.rigid` stayed `true` and
+the exported marker still read `rigid:true` — the exact "the stored value should not lie" property t2118's
+own commit message claimed to close was not actually met on this code path.
+
+**Fixed at the actual cause**: sync the local `params` object directly in the same gate-loop pass
+(`params[inp.dataset.param] = false`), so the outer call's own `recordOp`/emit are correct regardless of
+whatever the dispatched event's re-entrancy does or doesn't do — not a fix that depends on event ordering.
+
+## (3) `tapCapable` never actually attested the port-assignment half of the vendor's own requirement
+
+The checkbox (and `tapData.js`'s gate tip) named only "a declared encoder/servo spindle" — but `O10180`
+(`slib-m.nc:1775-1781`) is `IF #2==0 GOTO30` on `#1296` (the port-enable var), and that GOTO skips BOTH the
+port write AND `#579=1` — so with no I/O output port assigned for the M180/M181 mode switch, M180 SILENTLY
+NO-OPS regardless of how good the spindle wiring is, and the spindle stays analog. A truthful user with a
+genuinely servo-wired spindle who had not done this SECOND vendor setup step would still tick the box in good
+faith and hit the original hazard. Fixed: `settingsPanel.js`'s checkbox label + title, and `tapData.js`'s
+gate tip, both now name BOTH steps explicitly. Corrected `tap.js`'s own docstring, which had asserted
+`tapCapable` already attested the port — it did not, until this fix.
+
+**A correction absorbed, not just applied**: the advisor's own t2118 note ("Pr079=0 proves the human's
+machine is analog") was itself withdrawn this turn — `#579` is the LIVE mode M180 writes, not a fixed
+hardware fact; a servo machine at rest also reads 0. Removed this reasoning from `tap.js`'s docstring and
+`vendor-pack-rigid-tap-2117.test.mjs`'s own header comment, which had repeated the same overstated claim.
+
+## (4) A refused rigid request was byte-identical to a plain `rigid:false` one — zero trace
+
+When `p.rigid` was true but the gate refused it, the fold to the floating-holder cycle carried no signal that
+anything had been requested-and-denied — indistinguishable from a user who simply never asked. Matters most
+on the Blocks canvas, the one surface with no form-time messaging at all. Fixed the same way `cnc.js`'s bore
+fold (t2118) already does it: one conditional comment line, only when `p.rigid && !rigidOk`, naming which of
+the two gates failed (`rigidRefusalReason()`).
+
+## (5) The projected editor text never reprojects when settings change after the fact
+
+`programModel.js`'s `proj` is cached, recomputed only by `setStack` — `ddcsRefreshBlocks` (`= setStack(stack,
+'refresh')`) is the existing hook, but its only two callers were both post-selector `change` handlers.
+Un-ticking `tapCapable` (or ticking it) after a rigid tap is already in the program left the editor showing
+the stale M180/M29/G84 text, which `editorManager.js` exports verbatim regardless of what the live setting
+now says. Fixed: a dedicated `change` listener on `set_spin_tapcapable` calls `ddcsRefreshBlocks()` — scoped
+to just this one field, not folded into the shared `onInput` bulk-save handler (which also fires on every
+OTHER settings field, including continuous range-slider drags; reprojecting the whole program on every
+unrelated edit would be real, avoidable cost).
+
+## Logged, not fixed (explicitly out of scope this turn, per the dispatch)
+
+- `envelopeCheck.js:45` misses the rigid sequence as defence-in-depth. ⛔ Do NOT widen its regex naively — it
+  would red-flag the CORRECT servo program and the vendor's own sample; any future fix must condition on the
+  attestation or on "G8x-tapping with neither M3/M4 nor M29."
+- `tapData.js:107`'s non-reversible-spindle warning is guarded on `!p.rigid`, so it stays silent in exactly
+  the FOLD case (rigid requested, refused, floating-holder runs) — which DOES emit M4, the exact thing the
+  warning exists to flag.
+- `userOpView.js:521` writes a gate's `tip` to a 0x0 collapsed input (accessibility gap, cosmetic).
+
+## Verification
+
+Non-vacuity: mutation-tested the new `clearWhenOff` scoping test (removed the opt-in from `tapData.js`,
+watched the specific assertion fail, restored from a scratch copy). New tests: `clear-when-off-scope-2121.test.mjs`
+(3, item 1's scope, against the REAL declared data in all three files, not a copy) + 3 more in
+`vendor-pack-rigid-tap-2117.test.mjs` (item 4's disclosure comment, including the negative case — a plain
+`rigid:false` request must carry NO refusal text). ⚠ **Honest limit, not silently skipped**: items 2 and 5
+are DOM-level fixes inside `userOpView.js`'s form-render code and `settingsPanel.js`'s live wiring; no
+existing spec in this suite drives that render path directly (every twin-spec checked — `tap-twin-778`
+included — tests at the builder/`emitMapped` level, bypassing the DOM gate loop entirely), and building a new
+modal-driving harness from scratch wasn't something to rush under an already large turn. Verified by careful,
+repeated re-reading of the exact control flow instead — flagged here plainly rather than claiming test
+coverage that doesn't exist.
+
+## Gate
+
+Node tier: 215/215 (209 prior + 6 new). Targeted Playwright: `tapping-776`, `tap-twin-778`, `atc-table-twin`,
+`atc-table-in-place`, `spindle-declaration-774` — 15/15. Broader sweep (every `wcs*`/`atc-*` spec, given
+`userOpView.js`'s gate loop is shared infrastructure) — 151/151. **Full `npm test` re-run: 2621 passed / 5
+failed / 24 flaky / 25 skipped — the exact same 5 pre-existing, unrelated failures as t2117/t2118/t2119's own
+final gates, checked by name — zero new failures.**
+
+## Files
+- `DDCS-Studio/web/wizards/views/userOpView.js` — `clearWhenOff` opt-in scoping, the `params` sync-ordering fix.
+- `DDCS-Studio/web/blocks/dataOps/tapData.js` — `clearWhenOff: true` on `rigid`'s gate, the two-step tip text.
+- `DDCS-Studio/web/ui/settingsPanel.js` — the checkbox label/title (both steps), the dedicated reproject listener.
+- `DDCS-Studio/web/wizards/ops/tap.js` — the docstring corrections, `rigidRefusalReason()` + the disclosure comment.
+- `DDCS-Studio/tests/node/vendor-pack-rigid-tap-2117.test.mjs` — 3 new item-4 tests, the Pr079 correction.
+- `DDCS-Studio/tests/node/clear-when-off-scope-2121.test.mjs` — new, 3 tests.
+
+🔨 turn 2121
+

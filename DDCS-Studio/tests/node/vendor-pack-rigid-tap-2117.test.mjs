@@ -9,12 +9,17 @@ import { tapCycle } from '../../web/wizards/ops/tap.js';
  *
  * t2118 (advisor review) — THAT FIX ITSELF WAS THE BLOCKER: it replaced M3 with M29, and M29 does not
  * START a spindle, it SYNCHRONISES an already-running SERVO one. `rigidOk` only checked `p.rigid` + the
- * Expert post; nothing checked whether the machine's own spindle is actually servo-wired. On an ANALOG
- * spindle (confirmed live: the human's own machine reads Pr079=0/Analog on both SYSDISK captures) the
- * rigid branch fed the tap to full depth with a DEAD spindle. Fixed: `tapCycle` now reads the LIVE
- * `settings.spindle.tapCapable` attestation at EMIT TIME (`liveTapCapable()`) and folds to the safe
+ * Expert post; nothing checked whether the machine's own spindle is actually servo-wired — on an analog
+ * one, the rigid branch fed the tap to full depth with a DEAD spindle. Fixed: `tapCycle` now reads the
+ * LIVE `settings.spindle.tapCapable` attestation at EMIT TIME (`liveTapCapable()`) and folds to the safe
  * floating-holder cycle when it is not attested — regardless of how `p.rigid` became true (a stored
  * value surviving a machine swap, or the Blocks tab, which had no gate of its own at all).
+ *
+ * t2121 (advisor re-review, one correction to t2118's own note, carried here) — Pr079/#579 is NOT a fixed
+ * hardware fact: it is the LIVE mode M180 itself writes, so a genuinely servo-wired machine sitting at
+ * rest also reads 0/Analog. Do not reason from Pr079 (or Pr080) as proof of what hardware a hidden
+ * machine has — the point this test actually proves is narrower and still true either way: an UNATTESTED
+ * spindle (whatever the hardware really is) must never receive the no-M3 sequence.
  */
 
 const pt = { x: 10, y: 0 };
@@ -115,5 +120,31 @@ test('t2118 -- rigid:true, tapCapable:true, but a non-Expert dialect still folds
         const joined = lines.join('\n');
         expect(joined).not.toContain('M180');
         expect(joined).toContain('M3 S2000');
+    });
+});
+
+// ── t2121 item 4 -- a REFUSED rigid request must not look identical to a plain rigid:false one ────────────────
+
+test('t2121 -- a refused rigid request (unattested spindle) names WHY in the emitted comment', () => {
+    withTapCapable(false, () => {
+        const lines = tapCycle(pt, rigidParams, expertDialect);
+        expect(lines[0], 'the first line must disclose the refusal').toMatch(/rigid tap requested but REFUSED/);
+        expect(lines[0]).toContain('tapCapable');
+    });
+});
+
+test('t2121 -- a refused rigid request (non-Expert dialect) names WHY in the emitted comment', () => {
+    withTapCapable(true, () => {
+        const v41Dialect = { id: 'ddcs-v41' };
+        const lines = tapCycle(pt, rigidParams, v41Dialect);
+        expect(lines[0], 'the first line must disclose the refusal').toMatch(/rigid tap requested but REFUSED/);
+        expect(lines[0]).toContain('Expert');
+    });
+});
+
+test('t2121 -- a plain rigid:false request (never asked for rigid) carries NO refusal comment -- nothing was denied', () => {
+    withTapCapable(false, () => {
+        const lines = tapCycle(pt, { ...rigidParams, rigid: false }, expertDialect);
+        expect(lines[0]).not.toContain('REFUSED');
     });
 });

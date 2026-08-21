@@ -19,17 +19,27 @@
  *    against a free-running analog spindle — the failure mode is a snapped tap, not a bad finish.
  * ⚠ The FEED was already right: `F = rpm x pitch` is exactly the vendor's `S2000/F2000` for a 1 mm pitch.
  * ⚠ M180/M181 switch spindle MODE and need an output port assigned for it (vendor setup doc, alongside Pr080 spindle
- *   mapping axis and Pr006/Pr007 pulses-per-rev). That is machine-side; `tapCapable` is the user's own attestation of it.
+ *   mapping axis and Pr006/Pr007 pulses-per-rev). That is machine-side.
  *
  * ⛔⛔ t2118 (advisor review, own fault of the t2117 dispatch, corrected here) — THE t2117 FIX REMOVED THE ONLY
  * SPINDLE-START WORD (`M3`) AND REPLACED IT WITH `M29`, WHICH ON THIS CONTROLLER MEANS "sync an ALREADY-RUNNING
  * servo spindle to Z" — IT DOES NOT START ANYTHING. `rigidOk` only checked `p.rigid` + the Expert post; nothing
- * checked whether the machine's spindle is actually servo-wired. On an ANALOG spindle (the human's own machine:
- * `Pr079 = 0`, decoded from SYSDISK/setting on both captures) the rigid branch fed the tap to full depth with a
- * DEAD, non-spinning spindle — `slib-g.nc:101-114`'s O9084 is plain feed moves, nothing else turns the spindle on.
- * Fixed: `rigidOk` now ALSO reads the LIVE `settings.spindle.tapCapable` attestation at EMIT TIME (not just the
- * form's grey-out, which a Blocks-tab tick or a stored value surviving a machine swap both bypass) — a `rigid:true`
- * that is not currently attested folds SAFELY to the floating-holder cycle below, regardless of how it got set.
+ * checked whether the machine's spindle is actually servo-wired. Fixed: `rigidOk` now ALSO reads the LIVE
+ * `settings.spindle.tapCapable` attestation at EMIT TIME (not just the form's grey-out, which a Blocks-tab tick
+ * or a stored value surviving a machine swap both bypass) — a `rigid:true` that is not currently attested folds
+ * SAFELY to the floating-holder cycle below, regardless of how it got set.
+ *
+ * ⛔⛔ t2121 (advisor re-review, two corrections) — (1) `tapCapable` did NOT actually attest the port assignment
+ * above: the checkbox only ever named the SPINDLE, never the port, so a truthful user with a genuinely
+ * servo-wired spindle who had not done the port step still ticked it in good faith and got the original
+ * hazard — `O10180` (`slib-m.nc:1775-1781`) is `IF #2==0 GOTO30` on `#1296` (the port-enable var), and that
+ * GOTO skips BOTH the port write AND `#579=1`, so with no port assigned M180 silently no-ops and the spindle
+ * stays analog. Fixed at the source: `settingsPanel.js`'s checkbox and `tapData.js`'s gate tip now both name
+ * BOTH steps explicitly, so `tapCapable` genuinely attests what this file needs it to. (2) the advisor's own
+ * earlier claim that the human's machine is provably analog (`Pr079 = 0`) was ITSELF overstated and is
+ * withdrawn: `#579` is the LIVE mode M180 writes, not a fixed hardware fact — a servo machine at rest also
+ * reads 0. Do not reason from `Pr079`/`Pr080` as hardware attestations anywhere in this codebase; the decisive
+ * value is `#1296`, which Studio never reads and no captured dump decodes.
  */
 import { num, r3 } from './util.js';
 
@@ -42,6 +52,16 @@ function liveTapCapable() {
         const s = (typeof window !== 'undefined') && window.ddcsGetSettings && window.ddcsGetSettings();
         return !!(s && s.spindle && s.spindle.tapCapable);
     } catch (_) { return false; }
+}
+
+/** t2121 — WHY a rigid REQUEST was refused (only ever called when p.rigid is true and rigidOk is false), so the
+ *  fold to the floating-holder cycle below leaves a trace instead of looking byte-identical to a plain
+ *  rigid:false request — the SAME honesty cnc.js's bore fold already uses. Matters most on the Blocks canvas,
+ *  the one surface with no form-time messaging of its own at all. */
+function rigidRefusalReason(dialect) {
+    if (!liveTapCapable()) return 'no live tapCapable attestation (Settings → Machine → Spindle: "rigid-tap capable")';
+    if (!dialect || !String(dialect.id || '').startsWith('ddcs-expert')) return 'rigid tapping needs the Expert post (the only dump-evidenced firmware)';
+    return 'refused';
 }
 
 /** The pitch-locked floating-holder tap cycle at a point. `dialect` supplies the dwell's P units (ms/s). */
@@ -80,6 +100,8 @@ export function tapCycle(pt, p, dialect) {
         ];
     }
     return [
+        // t2121 — a rigid REQUEST that got refused must not look byte-identical to a plain rigid:false ask.
+        ...(p.rigid ? [`( rigid tap requested but REFUSED - ${rigidRefusalReason(dialect)}; using the floating-holder cycle instead )`] : []),
         `( floating-holder tap - pitch ${pitch}mm, feed ${feed} mm/min at ${rpm} rpm )`,
         `G0 X${r3(pt.x)} Y${r3(pt.y)}`,
         `G0 Z${r3(clr)}`,

@@ -1403,7 +1403,7 @@ function buildSettingsOverlay() {
                             <label>Min RPM<input type="number" id="set_spin_minrpm" step="1" min="0"></label>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_spin_reversible"> Spindle can reverse (M4) — floating-holder tapping</label>
-                        <label class="settings-check"><input type="checkbox" id="set_spin_tapcapable"> Rigid-tap capable — encoder/servo spindle, wired (you attest)</label>
+                        <label class="settings-check" title="TWO steps, both needed: (1) a declared encoder/servo spindle, wired, AND (2) an I/O output port assigned for the M180/M181 mode switch (vendor setup, step 2). Missing step 2, M180 silently no-ops on the controller and the spindle stays analog even with this ticked — Studio cannot see whether step 2 is done, so this attests both, not just the spindle."><input type="checkbox" id="set_spin_tapcapable"> Rigid-tap capable — servo spindle AND its mode-switch port assigned (you attest both)</label>
                     </div>
                 </div>
 
@@ -3219,6 +3219,12 @@ function wireSettingsOverlay(ov) {
         el.addEventListener('input', onInput);
         el.addEventListener('change', onInput);
     });
+    // t2121 — reproject on tapCapable changing, the SAME way the two post-selector handlers already reproject on
+    // switching profile: without this, un-ticking (or ticking) the attestation after a rigid tap is already in the
+    // program leaves the EDITOR showing stale M180/M29/G84 text — editorManager exports it verbatim regardless of
+    // the live setting. Scoped to just this one field (not the whole onInput, which fires on every settings input
+    // including continuous range drags) — reprojecting the whole program on every unrelated field edit is real cost.
+    if (q('set_spin_tapcapable')) q('set_spin_tapcapable').addEventListener('change', () => { if (window.ddcsRefreshBlocks) window.ddcsRefreshBlocks(); });
 
     // Smart suggestion bar toggle (not part of the settings model — just localStorage + an event the bar listens for).
     const _sg = q('set_suggest_on');
