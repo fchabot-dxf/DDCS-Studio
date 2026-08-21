@@ -37,7 +37,7 @@ export const hasFSA = () => typeof window !== 'undefined' && typeof window.showD
 /**
  * DEPLOY a set of baked files to the target.
  *
- * @param {Array<{name:string, data:string|Uint8Array}>} files  names may declare subfolders ("CAM/macro_cam22.nc")
+ * @param {Array<{name:string, data:string|Uint8Array}>} files  names may declare subfolders ("install/CAM/cam22.bmp")
  * @param {{fallbackDownload?: (files) => void}} [opts]
  *   fallbackDownload — the TRUE no-File-System-Access path only. It is never used to paper over a DECLINED picker:
  *   a user who backs out of choosing a folder has said no, and turning that into a surprise download would be the

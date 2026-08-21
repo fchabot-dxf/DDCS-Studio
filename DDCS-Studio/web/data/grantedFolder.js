@@ -93,7 +93,7 @@ export function makeGrantedFolder({ key, pickerId, what }) {
     const ready = async () => { const d = await get(); return !!(d && await handleGranted(d)); };
 
     /**
-     * WRITE FILES into the folder, creating any subdirectories a name declares ("CAM/macro_cam22.nc" makes CAM/).
+     * WRITE FILES into the folder, creating any subdirectories a name declares ("install/CAM/cam22.bmp" makes install/CAM/).
      * All-or-nothing is deliberately NOT promised — a USB stick that fills up halfway has written what it wrote, and
      * pretending otherwise would be a lie — so the result reports exactly which files landed and which did not.
      * @param {Array<{name:string, data:string|Uint8Array}>} files

@@ -1917,11 +1917,13 @@ function isV41Post() {
     const packBytes = (dataUrl) => { const bin = atob(String(dataUrl || '').split(',')[1] || ''); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
     const readmeText = (name) => [name, '',
         'INSTALL (DDCS Expert / M350):',
-        '1. Copy the CAM/ folder onto a FAT32 USB stick.',
+        '1. Copy this whole exported set (the cam<N>.nc files, install/CAM/, eng-additions.txt,',
+        '   chs-additions.txt, this README) onto a FAT32 USB stick, keeping the folder layout as-is.',
         '2. Power off the controller, insert the USB, power on, wait for restart.',
-        '3. F2 -> Program -> F1 (select U-disk) -> cursor on the CAM folder -> F4 (copy to local).',
+        '3. F2 -> Program -> F1 (select U-disk) -> cursor on each cam<N>.nc file -> F4 (copy to local).',
         '   Macros MUST run from internal storage — running from USB silently does nothing.',
-        '4. MERGE eng-additions.txt into the controller eng (and chs) language file — do NOT replace it.',
+        '4. MERGE eng-additions.txt into the controller eng language file, and chs-additions.txt into',
+        '   the chs language file — do NOT replace either.',
         '5. Open the CAM page: bind a K-key (K1-K7) to function code 1399 (parameter range Pr210-252),',
         '   then press it. The new slots (cam22+) appear as icons — tap one, fill the form, press Start.',
         '', 'Spindle: the cutting slots run M3/M5 themselves. If your CAM workflow starts the spindle',
@@ -1932,12 +1934,30 @@ function isV41Post() {
         const v = slotPack.validatePack(_camPack, { bandsOf: camBandsOf });
         if (!v.ok && !await dlgConfirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
         const files = [], eng = [];
+        // ⭐ t2117 — FILENAME AND FOLDER, CORRECTED TO THE VENDOR'S OWN SPEC (`Docs/自定义CAM/Custom CAM.pdf`), not what
+        // Studio previously guessed. The dispatcher parameter `#968 -s2"camxx.nc"` — present in THIS machine's own live
+        // SYSDISK/eng, not just the vendor sample — looks for `cam<N>.nc` at the `/local` ROOT, never `CAM/macro_cam<N>.nc`.
+        // Corroborated four ways: the controller screenshot title bar (`cam10.nc`), the vendor's own Notepad screenshot
+        // (`cam10.nc`), and the community packs' own eng comments (which read `cam14` even though their files say
+        // `macro_cam14`). `install/` is the vendor's USB STAGING folder the controller installs FROM — icons land there
+        // (`install\CAM\cam10.bmp` … `cam19.bmp`); the 2026-07-31 SYSDISK dump shows them flat at the controller's own
+        // root once installed, which reconciles once `install/` is read as source and the root as destination.
+        // ⛔ UNTESTED END-TO-END: the human has never loaded a Studio-built CAM pack onto a controller, so there is no
+        // observed working behaviour this changes — only a naming documented nowhere, corrected to match the vendor's.
         _camPack.slots.forEach((slot) => {
-            files.push({ name: `CAM/macro_cam${slot.slot}.nc`, data: slotPack.slotMacro(slot) });
-            if (slot.icon && slot.icon.data) files.push({ name: `CAM/cam${slot.slot}.bmp`, data: packBytes(slot.icon.data) });
-            eng.push(`( ===== cam${slot.slot} — ${slot.name || ''} ===== )`, slotPack.slotEng(slot), '');
+            files.push({ name: `cam${slot.slot}.nc`, data: slotPack.slotMacro(slot) });
+            if (slot.icon && slot.icon.data) files.push({ name: `install/CAM/cam${slot.slot}.bmp`, data: packBytes(slot.icon.data) });
+            // ⚠ `;` not `( )`: the eng format has NO comment syntax (line-start census of the real file: # 585,
+            //   - 390, blank 199, & 2 — zero `(`). `mergeEng` filters to `^#nnnn` lines anyway, so these only
+            //   matter if a human hand-pastes the file; `;` is what the community packs use.
+            eng.push(`; ===== cam${slot.slot} — ${slot.name || ''} =====`, slotPack.slotEng(slot), '');
         });
-        files.push({ name: 'eng-additions.txt', data: '( MERGE these lines into the controller eng/chs language file — do NOT replace it. )\n\n' + eng.join('\n') });
+        const engHead = '; MERGE these lines into the controller eng language file — do NOT replace it.\n\n';
+        files.push({ name: 'eng-additions.txt', data: engHead + eng.join('\n') });
+        // C3 — the `chs` TWIN. The vendor installs eng AND chs; a Chinese-language controller reads `chs`, so
+        // without this every Studio field renders as a blank label on it. Same bytes: the labels stay English,
+        // but the FIELDS exist, which is the difference between a usable form and an empty one.
+        files.push({ name: 'chs-additions.txt', data: engHead.replace('eng language', 'chs language') + eng.join('\n') });
         const name = (_camPack.meta && _camPack.meta.name) || 'CAM pack';
         files.push({ name: 'README.txt', data: readmeText(name) });
         // t1249 — DEPLOY THE FILE SET, not a zip. Every byte is identical to what the download produced; what changes

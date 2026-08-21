@@ -10,7 +10,11 @@
 import { makeBigram } from '../blocks/bigram.js';
 
 const S = (text, hint) => ({ text, hint: hint || text });
-const GCODES = ['G0 rapid','G1 feed','G2 arc CW','G3 arc CCW','G4 dwell','G17 XY plane','G18 XZ plane','G19 YZ plane','G20 inch','G21 mm','G28 home','G31 probe','G53 machine','G54 WCS1','G55 WCS2','G90 absolute','G91 incremental','G92 set pos','G94 feed/min','G95 feed/rev'].map((s) => S(s.split(' ')[0], s.split(' ').slice(1).join(' ')));
+// ⭐ t2117 — G20/G21 are NOT unit modals on DDCS: the G/M list is explicit ("G20 | XYZAB F | Moving axes in the
+// inch system. Works like G1."), so "G20 X1 Y1 F300" actually MOVES to X25.4 Y25.4 — same shape as G1, just in
+// inches. Studio's own emit already never produces either (data/latheTools.js: "NEVER G20/G21") — this hint text
+// was the only place still implying the Fanuc-style unit-modal reading.
+const GCODES = ['G0 rapid','G1 feed','G2 arc CW','G3 arc CCW','G4 dwell','G17 XY plane','G18 XZ plane','G19 YZ plane','G20 MOVE (inch, not a modal!)','G21 MOVE (mm, not a modal!)','G28 home','G31 probe','G53 machine','G54 WCS1','G55 WCS2','G90 absolute','G91 incremental','G92 set pos','G94 feed/min','G95 feed/rev'].map((s) => S(s.split(' ')[0], s.split(' ').slice(1).join(' ')));
 const MCODES = ['M0 stop','M1 opt stop','M3 spindle CW','M4 spindle CCW','M5 spindle off','M7 mist','M8 flood','M9 coolant off','M30 end','M98 call sub','M99 return'].map((s) => S(s.split(' ')[0], s.split(' ').slice(1).join(' ')));
 const AXES = [S('X', 'x'), S('Y', 'y'), S('Z', 'z'), S('A', 'rotary'), S('F', 'feed'), S('S', 'rpm'), S('P', 'param'), S('I', 'arc x'), S('J', 'arc y')];
 const HINT = {}; [...GCODES, ...MCODES, ...AXES].forEach((s) => { HINT[s.text.toUpperCase()] = s.hint; });

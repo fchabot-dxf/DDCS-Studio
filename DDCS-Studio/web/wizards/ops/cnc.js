@@ -39,7 +39,15 @@ export const drillCycleBlock = {
         if (noFlow(dialect)) return [`( ${p.cycle} drill cycle - no canned cycles on ${dialect.name}; use the Drill wizard )`];
         const G = { drill: 'G81', dwell: 'G82', peck: 'G83', bore: 'G85' }[p.cycle] || 'G81';
         const at = (axis, v) => (v === '' || v == null) ? '' : ` ${axis}${r3(num(v, 0))}`;
-        let s = `${G}${at('X', p.x)}${at('Y', p.y)} Z${r3(num(p.z, -5))} R${r3(num(p.r, 2))}`;
+        // ⭐ t2117 — G98 IS EXPLICIT, and was missing entirely (zero G98/G99 in the whole web tree before this).
+        // The retract plane is MODAL, and the vendor never documents the power-on default, so without it the plane
+        // was whatever the previously-composed op happened to leave live. Between holes that is the difference
+        // between clearing a clamp and driving through it. Both of foinnc's own examples write `G98 G83 ...` /
+        // `G98 G84 ...`.
+        // ⚠ G98 = retract to the INITIAL plane (safe, clears fixtures); G99 = retract to R only (faster, does not).
+        //   G98 is the deliberate default. G99 is NOT offered as a field - nobody asked for the choice, and the
+        //   fast one is the one that hits clamps.
+        let s = `G98 ${G}${at('X', p.x)}${at('Y', p.y)} Z${r3(num(p.z, -5))} R${r3(num(p.r, 2))}`;
         if (p.cycle === 'peck') s += ` Q${r3(num(p.q, 1))}`;
         if (p.cycle === 'dwell') s += ` P${r3(num(p.dwell, 0))}`;   // dwell in this dialect's units (ms / s)
         return [`${s} F${r3(num(p.feed, 200))}`];

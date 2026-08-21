@@ -77,7 +77,10 @@ test('THE CAM BUNDLE deploys the SAME FILE SET the download produced — byte fo
         const mv = { type: 'move', params: { x: 0, y: 0, z: { type: 'param', params: { name: 'depth', value: -5 } } } };
         U.createUserOp(U.userOpFromStack('deploy_op', 'Deploy Op', [mv], U.extractParamBlocks([mv])));
         localStorage.setItem('ddcs_campack', JSON.stringify({ meta: { name: 'Shop pack', baseSlot: 22 }, slots: [
-            { slot: 22, name: 'Slot A', ops: [{ type: 'universal', variant: '', values: {}, exposed: {}, baked: {}, opType: 'user_deploy_op', defV: 1 }] },
+            // t2117 -- an icon on the fixture slot so this test still exercises SUBDIRECTORY writing
+            // (install/CAM/, per T3) now that the macro itself moved to the flat root as cam22.nc.
+            { slot: 22, name: 'Slot A', icon: { data: 'data:image/bmp;base64,dGVzdA==' },
+              ops: [{ type: 'universal', variant: '', values: {}, exposed: {}, baked: {}, opType: 'user_deploy_op', defV: 1 }] },
         ] }));
         (await import('/ui/macrosApp.js')).initMacrosApp();
     });
@@ -88,25 +91,28 @@ test('THE CAM BUNDLE deploys the SAME FILE SET the download produced — byte fo
 
     // THE EXPECTED SET, computed from the same declared sources the exporter reads — so this asserts the bytes, not
     // "some files appeared". If the exporter ever stops emitting one, the comparison says which.
+    // t2117 -- cam<N>.nc at the ROOT, not CAM/macro_cam<N>.nc: the vendor's own dispatcher parameter (#968) looks
+    // for cam<N>.nc at the controller's /local root, confirmed against THIS machine's own live SYSDISK/eng
+    // (VENDOR-PACK-FIXES-PLAN.md T3/T4).
     const expected = await page.evaluate(async () => {
         const sp = await import('/data/slotPack.js');
         const pack = JSON.parse(localStorage.getItem('ddcs_campack'));
         const out = {};
-        pack.slots.forEach((s) => { out[`CAM/macro_cam${s.slot}.nc`] = sp.slotMacro(s); });
+        pack.slots.forEach((s) => { out[`cam${s.slot}.nc`] = sp.slotMacro(s); });
         return out;
     });
 
     await page.click('#cam_export_pack');
     await page.waitForFunction(() => window.__deploy && window.__deploy.size > 0, null, { timeout: 10000 });
     const names = await deployed(page);
-    expect(names, 'the macro, the eng lines to merge, and the install README — the whole bundle').toEqual(
-        expect.arrayContaining(['CAM/macro_cam22.nc', 'eng-additions.txt', 'README.txt']));
+    expect(names, 'the macro, the icon, the eng/chs lines to merge, and the install README — the whole bundle').toEqual(
+        expect.arrayContaining(['cam22.nc', 'install/CAM/cam22.bmp', 'eng-additions.txt', 'chs-additions.txt', 'README.txt']));
     for (const [n, body] of Object.entries(expected)) {
         expect(await page.evaluate((k) => window.__deploy.get(k), n), `${n} is byte-identical to what the download carried`).toBe(body);
     }
     expect(downloads, 'and no .zip fell into Downloads').toBe(0);
-    // the stick wants CAM/ sitting on it — step 3 of the README is "cursor on the CAM folder"
-    expect(names.some((n) => n.startsWith('CAM/')), 'written as a real folder tree, not a zip to unpack').toBe(true);
+    // t2117 -- the icon still wants a real subdirectory (install/CAM/), even though the macro itself is flat at root
+    expect(names.some((n) => n.startsWith('install/CAM/')), 'written as a real folder tree, not a zip to unpack').toBe(true);
 });
 
 test('A DECLINED PICKER WRITES NOTHING AND DOWNLOADS NOTHING — a refusal is an answer', async ({ page }) => {

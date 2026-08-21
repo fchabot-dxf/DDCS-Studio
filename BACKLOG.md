@@ -44,7 +44,14 @@ t851 "menu diet" cut to ~9 rows. A theme is chosen once; Settings is where appea
 NOTHING behind (a "Theme…" row that opens Settings keeps the row it was meant to free). ⚠ Reuse
 `setQuickTheme()` — do not re-implement switching — and keep the active-theme ring reflecting live `data-theme`.
 
-### 3. Hide the console window when launching the exe
+### 3. ~~Hide the console window when launching the exe~~ ✅ **CLOSED — t2113**
+> Shipped in the order the report demanded: rotated file logging first (`_RotatingLogFile`,
+> `~/.ddcs-bridge/gateway.log`, 5MB cap), a backend "view log" affordance (`Ops.open_log` + `POST
+> /api/open-log`, `os.startfile` — the Setup-tab BUTTON itself is a small web/ follow-up, not yet wired),
+> THEN `--windowed` added to `build_fairy.ps1`. Verified against a real `self_test()` run in an isolated
+> scratch HOME that the startup banner + a real `[poller] delivered` line + a real `[poller] DELIVERY
+> FAILED` line all reach the file, and that a console-write failure (the exact t2103 hazard) doesn't stop
+> the file write or raise out of `print()`. `bridge/tools/desktop-tests/test_gateway_log_2113.py`.
 *(human, 2026-08-19)* — `build_fairy.ps1` passes neither `--windowed` nor `--console`, so PyInstaller defaults to
 a console build and a black log window sits beside the app all session. ⛔ **Do not just add `--windowed`**: that
 log is load-bearing (bound host/port, a FAILED serial probe, `[poller]` delivery/stall lines) and on a frozen
@@ -358,3 +365,61 @@ worth understanding before touching it.
 Modbus round-trips inserted into one program; on anything else it was 255 timeouts. Even where beacons DO
 work, 255 checkpoints is far more progress resolution than anyone reads. ⇒ **pick a sane default** (a dozen
 or so) and let the field go to 255 for someone who wants it.
+
+---
+
+## VENDOR PACK — CAPABILITIES WORTH BUILDING (not started; captured 2026-08-21 so they are not lost)
+*(t2117 amendment: the foinnc dev-pack sweep's own "Worth building" section — full detail in
+[`bridge/controllers/expert-m350/VENDOR-PACK-SWEEP.md`](bridge/controllers/expert-m350/VENDOR-PACK-SWEEP.md)
+§4 — lives ONLY there today and would be lost without a pointer here. These four, each with its exact
+mechanism; the sweep names several more not repeated below.)*
+
+### A. A Studio-owned G-code library
+`G100`–`G199` map to `O9100`–`O9199` in a firmware file named **`slibuser.nc`**, installed by dropping it in
+`install/` or `psys/`. Argument words: `#0=X #1=Y #2=Z #3=A #4=B #5=C #6=I #7=J #8=K #9=R #10=L #11=H #12=P
+#13=Q #14=D #15=F #16=S #17=T`. Eight more empty hooks exist: `G12`(`O9012`), `G13`(`O9013`), `G76`,
+`G85`–`G89`.
+⚠ **THE STICKY-ARGUMENT CAVEAT (the actual cost of this feature):** an OMITTED axis word yields the
+CURRENT work coordinate, and a non-axis letter inherits the PREVIOUS line's value — so a caller must always
+pass every word, every time, or a stale value silently rides along. ⚠ The G/M list contradicts the vendor's
+own docx on `T` ("The letter 'T' is reserved for tool changes", and only `#0`–`#16` documented) — resolve
+which is true before authoring against it. Benefit: a declarable post capability, compact parameterised
+emit instead of inlined macro bodies. ⛔ The whole file must be Studio-owned — the vendor pack states two
+slib-prefixed files cannot declare the same subprogram number, so this can't be split or shared.
+
+### B. Barcode job dispatch straight from the gateway share
+`Pr279` (mirrored at macro `#779` — confirmed the SAME parameter, not two: the macro-table neighbourhood
+proves it, see VENDOR-PACK-SWEEP.md §5) `= 2` selects **NetDisk** as the barcode file's source (`0 Local, 1
+Udisk, 2 NetDisk`), `Pr278 = 2` selects Scanner input, `Pr210 = 1396` binds K1 to the barcode input box (both
+`-p1`, need a restart). Operator presses K1, scans a barcode naming a file, confirms; the controller opens
+`<barcode>.nc` — straight out of the gateway's own share, no browsing.
+⚠ **NO auto-run, no acknowledgement, no error path is documented anywhere in the vendor pack** (checked all
+four barcode docs, EN+CN, PDF+docx — same five steps, nothing added). The scan only fills a filename text
+box; the operator must still press confirm, and nothing tells the PC what was scanned or whether the named
+file existed. `Pr283 "Barcode scanning processing"` (`0 No / 1 Yes / 2 Test`) might be an auto-run variant,
+but the vendor's own text says "contact the supplier to determine the model before opening" — undocumented.
+Benefit: keyboard-free, browse-free job selection for a shop floor operator, using ONLY parameters + a
+printable label — no new gateway code.
+
+### C. `RECORD[]` → file-based progress — the strongest remaining progress candidate
+`RECORD[0,1,<n>,0,0,0,0]` (cache) + `RECORD[-2,1,0,0,0,0,0]` (flush) at the same Z-up points
+`instrument.js` already picks for beacons, writing to `/local/RecordData<n>.txt` — a plain file the gateway
+ALREADY reaches over the SMB share, no Modbus/serial wiring, no listener, no RS232 port contention with
+anything else. Directly relevant to [[t2115's own finding]] (this WORK-LOG, turn 2115): no line-number
+register exists anywhere in the documented Modbus map, so this file-based channel is now the most credible
+non-Modbus progress source on the table.
+⚠ Costs: the SAME weaving-into-emit machinery beacons already need (still per-op instrumentation, not free);
+uncosted flash-write time per write; the `-2` flush form needs firmware ≥2022-05-25-00; the Chinese-language
+twin of the same vendor doc describes an OLDER, SMALLER spec (`-1`/`0` only, `X3`–`X6` not `X3`–`X7`) — the
+cache-then-flush pattern itself may be firmware-gated, unconfirmed on this user's own controller.
+
+### D. Run-state variables `#1630`–`#1636` — the run-state half of progress
+"Analyze the state of channel 1..7: −1 idle, 0 running, 1 pause" — R/W, per-channel. Directly answers the
+"is it running, paused, or done" question a beacon-only or RECORD[]-only tracker cannot on its own — the
+missing half of stall-vs-finished detection named in JOB-PROGRESS-PLAN.md and investigated in t2115.
+⛔⛔ **SAFETY, CARRY THIS INTO ANY IMPLEMENTATION: `#1620`–`#1626` sit RIGHT BESIDE these (execution
+strategy: `0` request start/restart, `1` internal suspend, `2` external suspend) — writing `0` to `#1620`
+REQUESTS A START ON AN UNATTENDED MACHINE. Never write `#1620`–`#1626` from the gateway.** `#1630`–`#1636`
+themselves are documented R/W, but this feature only ever needs to READ them — there is no read-only
+sub-range declared, so any code touching this block must be reviewed for which direction it writes, not
+just which addresses it names.

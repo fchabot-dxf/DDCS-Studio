@@ -46563,3 +46563,160 @@ on either controller.
 
 🔨 turn 2115
 
+# t2117 — VENDOR PACK FIXES (Stages A-C), plus a standing ruling that retires the web/=advisor-owned split
+
+Dispatch: `VENDOR-PACK-FIXES-PLAN.md` (repo root), the advisor's task spec written against a 10-reader sweep of
+foinnc's own 112-file development pack (`bridge/controllers/expert-m350/VENDOR-PACK-SWEEP.md`, 127 claims
+adversarially re-verified, 5 killed). **ROLE EXCEPTION at dispatch time**: `DDCS-Studio/web/` is normally
+advisor-owned; this batch the worker writes, the advisor reviews the diff fresh-eyes. Mid-turn amendment (see
+below) RETIRED that framing entirely — it is not an exception going forward.
+
+## Stage A — emit correctness
+
+**T1 — rigid tapping now emits the vendor's own M180/M29/G98 G84/M181 sequence.** `wizards/ops/tap.js`'s
+`rigidOk` branch was emitting `M3 S<rpm>` + `G84` — a tapping cycle against a FREE-RUNNING analog spindle
+(zero `M29`/`M180`/`M181` anywhere in the whole web tree, confirmed by grep). Failure mode: a snapped tap, not
+a bad finish. Fixed to the vendor's exact sequence (`foinnc`'s own `G84测试.txt`): `M180` (servo spindle) →
+`M29 S<rpm>` (sync spindle to Z) → `G98 G84 X_ Y_ Z_ R_ F<rpm×pitch>` (X/Y ride IN the block, as the vendor
+writes it) → `G80` (kept deliberately — this is a composed FRAGMENT, not a standalone program ending at M30,
+so leaving G84 modal would re-trigger on the next Z move) → `M5` → `M181` (back to analog, leave the machine
+as found). Feed formula was already correct (`rpm × pitch` matches the vendor's `S2000/F2000` exactly).
+
+**T2 — canned cycles now emit `G98` explicitly.** Zero `G98`/`G99` anywhere in the web tree before this —
+the retract plane was whatever modal the previously-composed op happened to leave live; between holes that's
+the difference between clearing a clamp and driving through it. `wizards/ops/cnc.js`'s `drillCycleBlock.emit`
+now prefixes every canned-cycle line with `G98` (both vendor examples do). `G99` deliberately not offered as
+a field — nobody asked, and it's the one that hits clamps.
+
+## Stage B — the CAM pack was writing a filename the controller doesn't look for
+
+⭐ Premise confirmed by the human 2026-08-20: "never loaded a cam" — no working behaviour to regress, only a
+naming documented nowhere being corrected to the vendor's. ⚠ Equally, none of this is verified end-to-end
+(no pack has ever been loaded onto a real controller) — the release note must say so, not claim it works.
+
+Studio wrote `CAM/macro_cam<N>.nc`; the controller's own dispatcher parameter (`#968 -s2"camxx.nc"`) — present
+in THIS machine's own live SYSDISK/eng, not just the vendor sample — looks for `cam<N>.nc` at the `/local`
+ROOT. Wrong on both name and folder, corroborated four ways (controller screenshot, vendor's own Notepad
+shot, community pack eng comments, the dispatcher parameter itself).
+
+**T3** (`ui/macrosApp.js` `_camExport`): slot macros now export as `cam<N>.nc` at the root; icons as
+`install/CAM/cam<N>.bmp` (`install/` is the vendor's USB staging folder the controller installs FROM — the
+2026-07-31 SYSDISK dump shows icons flat at the root once installed, reconciling once `install/` is read as
+source and the root as destination). The eng-merge comment syntax changed from `( ... )` to `;` — the eng
+format has NO comment syntax at all (line-start census of the real file: `#` 585, `-` 390, blank 199, `&` 2 —
+ZERO `(`); `mergeEng` filters to `^#nnnn` anyway so this only matters if a human hand-pastes the file. Added a
+`chs-additions.txt` twin (same bytes; a Chinese-language controller reads `chs`, so without this every field
+renders as a blank label on it).
+
+**T4** (`data/slotPack.js`): `slotMacro()`'s own header comment and the module docstring updated from
+`macro_cam<N>.nc` to `cam<N>.nc`, matching T3.
+
+**T5** (`data/slotPack.js` `mergeEng`) — three defects, all found reading the real SYSDISK eng byte-for-byte:
+(1) joined with a hardcoded `'\n'` into a file that is 1176 CRLF, 0 bare LF — now detects the DOMINANT ending
+actually present and reuses it; (2) appended AFTER the file's own trailing `&&` end marker (INFERRED as a
+terminator — the vendor format doc never states it, but inserting before it is the conservative reading
+either way) — now inserts immediately before a trailing `&&` line when one exists, else appends as before;
+(3) injected an illegal `( ===== ... )` comment line into a format with zero comment syntax — dropped
+entirely. `paramCollisions`/`groupCollisions`/`added` return contract unchanged.
+
+**T6**: install instructions updated to match T3 across `macrosApp.js`'s `readmeText()`, `ui/helpPanel.js`,
+`data/controllerFiles.js` (the file-tree entry, path/title only — left the "CAM/" group nesting as the plan
+specifically scoped it), `data/deployFolder.js` and `data/grantedFolder.js` (doc-comment examples only, no
+behaviour change).
+
+## Stage C — small, safe
+
+**T7** (`wizards/probeBlocks.js`): named the full `#1920`–`#1924` probe result-code meanings in a comment (0
+No detection · 1 Initial detection · 2 Signal detected · 3 Negative limit touched · 4 Positive limit touched)
+and the adjacent declared blocks (`#1895`–`#1929`, detect speed/signal/stop/level/limit/trigger-coord).
+Comment only — Studio's `!=2` check is already STRICTER than the vendor's own `<=2` (which retries in reverse
+on a limit hit); named so the next reader knows 3/4 is a different failure shape, not an oversight.
+
+**T8** (`ui/editorAutocomplete.js`): `G20`/`G21` are MOVES on this controller ("Moving axes in the inch
+system. Works like G1" — `G20 X1 Y1 F300` moves to X25.4 Y25.4), not unit modals. Emit side was already
+correct and deliberate (`data/latheTools.js`: "NEVER G20/G21"); only the autocomplete hint text implied the
+Fanuc-style modal reading — relabelled. **`blocks/gcodeToStack.js:98`'s `MODAL_RE` assessed, left
+unchanged**: its own comment explains G20/G21 are captured there ONLY so a units word riding alongside a real
+motion leaf survives a round-trip instead of being silently dropped (no atom of its own; a solo line already
+falls to `raw`, byte-safe) — this is round-trip preservation, not a claim about G20/G21's move-vs-modal
+semantics, and changing it would make round-tripping WORSE, not more honest.
+
+## Verified — new tests, all mutation-tested for non-vacuity (this is new code, not a known-bad-line fix)
+
+`tests/node/vendor-pack-rigid-tap-2117.test.mjs` (5), `vendor-pack-canned-cycle-retract-2117.test.mjs` (3),
+`vendor-pack-mergeeng-2117.test.mjs` (3) — 11 new node-tier tests, all passing (204/204 node tier overall).
+Non-vacuity: reverted `tap.js`/`cnc.js`/`slotPack.js` to `HEAD`, ran the three new files, watched 5 specific
+assertions fail with the exact pre-fix symptoms (the old unsynced M3+G84 shape present; canned cycles missing
+`G98`; `mergeEng` landing the new param 130 chars past where it should, i.e. after the `&&` not before it),
+restored from scratch copies, confirmed green again.
+
+## Fallout — 4 pre-existing Playwright specs asserted the OLD (pre-vendor-fix) behaviour; fixed, not weakened
+
+Full `npm test` (both tiers) run TWICE: first run surfaced 9 failed / 19 flaky / 2621 passed. **Confirmed
+which of the 9 were actually caused by this turn** (not assumed): reverted all 10 changed `web/` files to
+`HEAD` and re-ran the 9 failing specs — 5 of them (`header-profile-menu`, `pane-sizer-1353`,
+`send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603`) failed
+IDENTICALLY on unmodified `HEAD` — pre-existing, unrelated, not touched. The other 4 only failed with this
+turn's changes:
+- `cam-substack.spec.js` — asserted `slotMacro()`'s header contains `( macro_cam` (T4's own rename).
+- `controller-file-tree.spec.js` — asserted the Expert file tree lists `macro_camN.nc` (T6's rename).
+- `deploy-folder-1249.spec.js` — asserted `CAM/macro_cam22.nc` in the deployed set (T3's rename); also lost
+  its own "written as a real folder tree, not a zip" proof once the macro moved to the flat root, so the
+  fixture now gives the slot an icon too, restoring that proof against `install/CAM/cam22.bmp` instead.
+- `tapping-776.spec.js` — asserted `/G84 Z-12/` immediately adjacent (T1's X/Y-in-the-block change broke the
+  adjacency); updated to `/G98 G84.*Z-12/` and added assertions for the new M180/M29/M181 sequence at this
+  higher (wizard→blockEmitter) integration layer, not just the raw `tapCycle()` unit level.
+All four updated to assert the NEW, vendor-corrected behaviour — not skipped, not weakened. Re-ran: 16/16
+green. **Final full `npm test` re-run: 5 failed / 28 flaky / 2616 passed — the exact same 5 pre-existing
+failures, zero new ones, flaky count within normal run-to-run variance** (`wizard-face-1599` among them, the
+same Blockly-parallelism contention the advisor already diagnosed at t2110).
+
+## Mid-turn amendment — THE FILE SPLIT IS RETIRED, PERMANENTLY
+
+Human ruling relayed via the advisor, verbatim: *"file split is useless dispatch everything to worker."*
+`DDCS-Studio/web/` is no longer advisor-owned in any sense — the worker (me) writes EVERYTHING (`web/`,
+`bridge/`, `desktop/`, docs, `BACKLOG.md`) going forward; the advisor plans, reviews the diff fresh-eyes, gates
+risky moves, and cuts releases, but does not write code, because that is what protects the one independent
+review left in the loop. Saved to memory (`file-split-retired-worker-writes-everything.md`) so this isn't
+re-litigated next session. Staging discipline (explicit paths only, never `-A`/`.`, an empty commit means the
+other seat already took it) is unchanged and reaffirmed — that was always the real hazard, not the split.
+
+## Added mid-turn: captured the vendor sweep's "Worth building" items before they were lost
+
+`VENDOR-PACK-SWEEP.md` §4 lives only in that one file; four of its items captured into `BACKLOG.md` with full
+mechanism detail per the amendment's own instruction: (A) a Studio-owned G-code library (`G100`-`G199` →
+`O9100`-`O9199` in `slibuser.nc`, sticky-argument caveat named explicitly); (B) barcode job dispatch
+(`Pr279`/`#779` — confirmed the SAME mirrored parameter against the sweep's own §5 resolution, not the
+amendment's "Pr779" digit, which the primary source itself explains as a common false alarm); (C) `RECORD[]`
+file-based progress — flagged as directly connecting to **t2115's own finding** (this file, turn 2115: no
+line-number register exists anywhere in the documented Modbus map) as the strongest remaining non-Modbus
+progress candidate; (D) run-state variables `#1630`-`#1636`, with the mandatory safety note carried forward
+verbatim: `#1620`-`#1626` sit right beside them and writing `0` to `#1620` REQUESTS A START on an unattended
+machine — never write that range from the gateway. Also closed out `BACKLOG.md` item #3 (console window),
+which t2113 had already shipped but the file was never updated to reflect.
+
+## Gate
+
+Full `npm test`, final run: node tier 204/204; e2e 2616 passed / 5 failed (all 5 pre-existing, confirmed
+against unmodified `HEAD`, none touched this turn) / 28 flaky (normal contention variance) / 25 skipped.
+
+## Files
+- `DDCS-Studio/web/wizards/ops/tap.js` — T1 (rigid tap M180/M29/G98 G84/M181).
+- `DDCS-Studio/web/wizards/ops/cnc.js` — T2 (canned-cycle `G98`).
+- `DDCS-Studio/web/ui/macrosApp.js` — T3 (CAM export naming/folders/chs twin), T6 (readme text).
+- `DDCS-Studio/web/data/slotPack.js` — T4 (macro header/docstring), T5 (`mergeEng` three fixes).
+- `DDCS-Studio/web/ui/helpPanel.js`, `data/controllerFiles.js`, `data/deployFolder.js`,
+  `data/grantedFolder.js` — T6 (install-instruction/doc-comment updates).
+- `DDCS-Studio/web/wizards/probeBlocks.js` — T7 (probe result-code comment).
+- `DDCS-Studio/web/ui/editorAutocomplete.js` — T8 (G20/G21 hint text).
+- `DDCS-Studio/tests/node/vendor-pack-rigid-tap-2117.test.mjs`,
+  `vendor-pack-canned-cycle-retract-2117.test.mjs`, `vendor-pack-mergeeng-2117.test.mjs` — new, 11 tests.
+- `DDCS-Studio/tests/cam-substack.spec.js`, `controller-file-tree.spec.js`, `deploy-folder-1249.spec.js`,
+  `tapping-776.spec.js` — fallout, updated to the new vendor-corrected behaviour.
+- `BACKLOG.md` — item #3 closed out; new "VENDOR PACK — CAPABILITIES WORTH BUILDING" section (A-D).
+
+⛔ **Not started: Stage D (T9, the work↔machine frame equation)** — explicitly gated behind a human go +
+bench check, per the plan. **Not started: HELD items H1/H2** — need a human ruling, per the plan.
+
+🔨 turn 2117
+

@@ -35,7 +35,7 @@ export const CONTROLLER_FILES = {
                 { path: 'probe.nc',       title: 'probe.nc',       sub: 'Native probing',    panel: 'macros_panel_probe' },
                 { path: 'key-N.nc',       title: 'key-N.nc',       sub: 'K-buttons',         panel: 'macros_panel_kbtn' },
                 { group: 'CAM/', children: [
-                    { path: 'macro_camN.nc', title: 'macro_camN.nc', sub: 'CAM Pack Builder', panel: 'macros_panel_cam' },
+                    { path: 'camN.nc', title: 'camN.nc', sub: 'CAM Pack Builder', panel: 'macros_panel_cam' },
                 ] },
             ] },
         ],

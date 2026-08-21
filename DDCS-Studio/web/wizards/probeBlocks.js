@@ -12,6 +12,17 @@
  *   result  #1925/#1926/#1927  (trigger position, machine coordinates)
  *   stop    #1905/#1906/#1907  (0 decelerate, 1 emergency)
  *   limit   #1915/#1916/#1917  (0 off, 1 negative, 2 positive protection)
+ *
+ * ⭐ t2117 — THE STATUS CODE, NAMED (foinnc's own vendor pack, `#1920`–`#1924` R/W FLOAT result code):
+ *   0 No detection · 1 Initial detection · 2 Signal detected · 3 Negative limit touched · 4 Positive limit touched.
+ *   ⛔ NO BEHAVIOUR CHANGE — Studio's `!=2` check (this file, everywhere) is STRICTER than the vendor's own
+ *   `IF #[1920+#1]<=2` (which retries in reverse on hitting a limit): 3/4 mean "hit a limit", not "missed", and
+ *   our `!=2` correctly treats both as a failure rather than silently retrying into a limit switch. Naming this
+ *   so the next reader knows 3/4 is a DIFFERENT failure shape than 0/1, not an oversight in the comparison.
+ *   Related declared blocks, same vendor evidence: `#1895`–`#1899` detect speed, `#1900`–`#1904` signal number,
+ *   `#1905`–`#1909` stop mode, `#1910`–`#1914` level, `#1915`–`#1919` limit scheme, `#1925`–`#1929` trigger
+ *   machine coordinate — this file only uses status/result/stop/limit above; the rest are named for the next
+ *   reader who needs them, not consumed here.
  */
 import { w, G, F, P, L, Q, set, line, comment } from './words.js';
 import { ifGoto } from './dialect.js';

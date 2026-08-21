@@ -26,7 +26,9 @@ test('the tree renders the ACTIVE controller declaration: Expert wraps panels, V
     // Expert (default) — its builder tree; slib-m.nc → the M-codes panel is selected by default (byte-equal wrap)
     await setController(page, 'ddcs-expert-m350');
     const expert = await treeFiles(page);
-    expect(expert, 'Expert shows its SYSDISK builder surfaces').toEqual(expect.arrayContaining(['slib-m.nc', 'sysstart.nc', 'T.nc', 'key-N.nc', 'macro_camN.nc']));
+    // t2117 -- camN.nc, not macro_camN.nc: the vendor's own dispatcher parameter (#968) looks for camN.nc at
+    // the controller's /local root, confirmed against THIS machine's own live SYSDISK/eng (VENDOR-PACK-FIXES-PLAN.md T6).
+    expect(expert, 'Expert shows its SYSDISK builder surfaces').toEqual(expect.arrayContaining(['slib-m.nc', 'sysstart.nc', 'T.nc', 'key-N.nc', 'camN.nc']));
     expect(await page.evaluate(() => getComputedStyle(document.getElementById('macros_panel_mcode')).display !== 'none'), 'Expert default panel = M-codes (unchanged)').toBeTruthy();
 
     // V4.1 — its real firmware set; a plain file opens the simple editor with a LAN Push button; global deploy visible

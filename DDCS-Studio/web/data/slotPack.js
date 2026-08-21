@@ -3,7 +3,7 @@
  * (Was `camPack.js` — these are DDCS controller "CAM" slots, not an industry-CAM toolpath system.) Phase 1.
  *
  * A DDCS Expert "CAM" slot is a parameterized macro launcher (see docs/archive/CAM-MENU-RESEARCH.md):
- *   - macro_cam<slot>.nc reads form values at RUNTIME from the #2600+ mirrors (never bakes literals),
+ *   - cam<slot>.nc reads form values at RUNTIME from the #2600+ mirrors (never bakes literals),
  *   - the form is defined by `eng` language-file lines (#11xx … -m<slot+20> …),
  *   - the form value persists in `camsetting` (firmware-owned — NEVER written by us).
  *
@@ -70,11 +70,11 @@ export function slotEng(slot) {
     return (slot.fields || []).map((f) => engLine(f, slot.slot)).join('\n');
 }
 
-/** The macro_cam<slot>.nc text: a labelled mirror-read block (#var = #[idx+1500]) per field, then the
+/** The cam<slot>.nc text: a labelled mirror-read block (#var = #[idx+1500]) per field, then the
  *  author's body, then M99. The author references each field's `var` (default #1,#2,… in field order). */
 export function slotMacro(slot) {
     const fields = slot.fields || [];
-    const head = [`( macro_cam${num(slot.slot, 0)}.nc — ${esc(slot.name) || 'CAM slot ' + num(slot.slot, 0)} )`,
+    const head = [`( cam${num(slot.slot, 0)}.nc — ${esc(slot.name) || 'CAM slot ' + num(slot.slot, 0)} )`,
         '( form values are read live from the #2600+ mirrors — never edit camsetting )'];
     if (slot.wcs && slot.wcs !== 'active') head.push(`${esc(slot.wcs)}   ( work offset )`);
     const body = String(slot.body || '').replace(/\r/g, '').replace(/\s+$/, '');
@@ -157,8 +157,27 @@ export function mergeEng(existingEng, additions) {
     addLines.forEach((l) => { const p = paramOf(l); (have.has(p) ? paramCollisions : added).push(p); });
     const addGroups = [...new Set(addLines.map(groupOf).filter((g) => g != null))];
     const groupCollisions = addGroups.filter((g) => haveGroups.has(g));
-    const base = String(existingEng || '').replace(/\s+$/, '');
-    const merged = base + '\n\n( ===== merged CAM pack params (DDCS Studio) ===== )\n' + addLines.join('\n') + '\n';
+    // t2117 — THREE DEFECTS FIXED, all found reading the real SYSDISK eng byte-for-byte (1176 lines, line-start
+    // census # 585 / - 390 / blank 199 / & 2 — ZERO `(`):
+    // (1) the real file is 1176 CRLF, 0 bare LF — a hardcoded '\n' join corrupted every line ending in the merged
+    //     output. Detect the DOMINANT ending actually present in existingEng and reuse it, never assume '\n'.
+    // (2) the file ends `...-s3"..."`CRLF + six blank CRLFs + `&&`CRLF (both `&&` lines confirmed present in the
+    //     real file). That `&&` is an END MARKER is INFERRED — the vendor's own format doc never mentions it — but
+    //     inserting BEFORE it is the conservative reading, and appending after a terminator is strictly worse under
+    //     either reading. Insert immediately before a trailing `&&` line when one exists; else append as before.
+    // (3) the format has NO comment syntax — the old merge injected `( ===== merged CAM pack params (DDCS Studio)
+    //     ===== )`, an illegal line in a file with zero `(` line-starts. Dropped entirely, not replaced.
+    const raw = String(existingEng || '');
+    const crlfCount = (raw.match(/\r\n/g) || []).length;
+    const lfOnlyCount = (raw.match(/(?<!\r)\n/g) || []).length;
+    const nl = crlfCount >= lfOnlyCount ? '\r\n' : '\n';   // dominant ending wins; CRLF on a tie (the real file's own shape)
+    const base = raw.replace(/\s+$/, '');
+    const addBlock = addLines.join(nl);
+    const lines = base.split(/\r?\n/);
+    const hasTrailingMarker = lines.length > 0 && lines[lines.length - 1].trim() === '&&';
+    const merged = hasTrailingMarker
+        ? lines.slice(0, -1).join(nl) + nl + nl + addBlock + nl + nl + lines[lines.length - 1] + nl
+        : base + nl + nl + addBlock + nl;
     return { merged, paramCollisions: [...new Set(paramCollisions)], groupCollisions: [...new Set(groupCollisions)], added };
 }
 

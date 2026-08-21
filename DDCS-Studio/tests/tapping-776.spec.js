@@ -48,8 +48,14 @@ test('the RIGID variant emits a G84-style cycle with a verify note (gating is up
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     return emitMapped(tapStack({ depth: 12, rpm: 500, pitch: 1.0, rigid: true })).text;
   });
-  expect(/G84 Z-12/.test(g), 'a G84-style rigid cycle to depth').toBe(true);
+  // t2117 -- X/Y now ride IN the G84 block (the vendor's own form) and G98 is explicit, so Z-12 no longer
+  // follows G84 immediately; and the sequence is vendor-corrected: M180 (servo spindle) + M29 (sync to Z)
+  // precede the cycle, M181 (back to analog) follows it (VENDOR-PACK-FIXES-PLAN.md T1).
+  expect(/G98 G84.*Z-12/.test(g), 'a G98 G84-style rigid cycle to depth').toBe(true);
   expect(/G80/.test(g), 'cancels the canned cycle').toBe(true);
+  expect(/M180/.test(g), 'switches to the servo spindle before the cycle').toBe(true);
+  expect(/M29 S500/.test(g), 'synchronises the spindle to Z before the cycle').toBe(true);
+  expect(/M181/.test(g), 'returns to the analog spindle after the cycle').toBe(true);
   expect(/VERIFY/i.test(g), 'carries the honest unverified-on-hardware note').toBe(true);
   expect(/G1 Z-12 F/.test(g), 'rigid does NOT use the floating-holder feed move').toBe(false);
 });

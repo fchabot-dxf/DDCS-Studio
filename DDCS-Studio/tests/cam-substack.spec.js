@@ -106,7 +106,10 @@ test('S1b subStackToSlot — a standard sub-unit stays LIVE (generator loop) + c
     expect(r.body.indexOf(';raster row count'), 'surfacing before custom').toBeLessThan(r.body.indexOf(`Z${r.cz.var}`));
 
     // (5) slotMacro renders a valid macro (header + the composed body)
-    expect(r.macro, 'slotMacro renders').toContain('( macro_cam');
+    // t2117 -- the header comment is `( cam<N>.nc — ... )`, not `( macro_cam<N>.nc — ... )`: the vendor's own
+    // dispatcher parameter (#968) looks for `cam<N>.nc` at the controller's /local root, confirmed against
+    // THIS machine's own live SYSDISK/eng, not just the vendor sample (VENDOR-PACK-FIXES-PLAN.md T4).
+    expect(r.macro, 'slotMacro renders').toContain('( cam');
     expect(r.macro).toContain(`F${r.cfeed.var}`);
 });
 

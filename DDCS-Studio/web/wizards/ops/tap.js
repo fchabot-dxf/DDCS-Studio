@@ -6,8 +6,20 @@
  * feed is DERIVED here (F = RPM × pitch), never a stored param — valid-by-construction, so the form's F can't drift.
  *
  * RIGID (G84-style, opt-in): a canned cycle — gated UPSTREAM on a declared encoder/servo spindle (spindle.tapCapable) AND
- * the Expert post (the only dump-evidenced firmware). The exact G-code surface is UNVERIFIED on hardware (TAPPING-CAPABILITY.md),
- * so it carries a VERIFY comment.
+ * the Expert post (the only dump-evidenced firmware).
+ *
+ * ⭐ t2117 — THE RIGID SURFACE IS NO LONGER GUESSWORK. foinnc's own `G83_G84钻孔攻丝指令说明/G84测试.txt` is five lines
+ * and we differed on four of them:
+ *     M180            切换到伺服主轴   - switch to the SERVO spindle
+ *     M29 S2000       刚性攻丝模式     - enter rigid-tapping mode (this, not M3, carries the speed)
+ *     G00 X10 Y0 Z2
+ *     G98 G84 X10 Y0 Z-10 R2 F2000    - 螺距1mm = S2000/F2000
+ *     M30
+ * ⛔ WITHOUT `M29` THE SPINDLE IS NOT SYNCHRONISED TO Z. We were emitting `M3 S<rpm>` + `G84`, i.e. a tapping cycle
+ *    against a free-running analog spindle — the failure mode is a snapped tap, not a bad finish.
+ * ⚠ The FEED was already right: `F = rpm x pitch` is exactly the vendor's `S2000/F2000` for a 1 mm pitch.
+ * ⚠ M180/M181 switch spindle MODE and need an output port assigned for it (vendor setup doc, alongside Pr080 spindle
+ *   mapping axis and Pr006/Pr007 pulses-per-rev). That is machine-side; the upstream tapCapable gate is what attests it.
  */
 import { num, r3 } from './util.js';
 
@@ -21,13 +33,20 @@ export function tapCycle(pt, p, dialect) {
     const rigidOk = !!p.rigid && !!dialect && String(dialect.id || '').startsWith('ddcs-expert');
     if (rigidOk) {
         return [
-            `( rigid tap ${pitch}mm pitch - G84-style; VERIFY the cycle + spindle-axis build on your controller )`,
+            `( rigid tap ${pitch}mm pitch - vendor G84 sequence; VERIFY the servo-spindle build on your controller )`,
+            `M180   ( switch to the SERVO spindle - rigid tapping needs it )`,
+            `M29 S${rpm}   ( rigid-tapping mode: synchronise the spindle to Z. WITHOUT THIS THE TAP IS NOT SYNCED )`,
             `G0 X${r3(pt.x)} Y${r3(pt.y)}`,
             `G0 Z${r3(clr)}`,
-            `M3 S${rpm}`,
-            `G84 Z${r3(-depth)} R${r3(clr)} F${feed}   ( rigid tap to depth, pitch-synced )`,
+            // ⚠ X/Y ride IN the G84 block, as the vendor writes it. G98 is explicit: the retract plane must not be
+            //    inherited from whatever modal happens to be live when this fragment is composed after another op.
+            `G98 G84 X${r3(pt.x)} Y${r3(pt.y)} Z${r3(-depth)} R${r3(clr)} F${feed}   ( rigid tap to depth, pitch-synced )`,
+            // ⚠ WE KEEP G80; the vendor's sample does not have it because it ends at M30, which resets modals for it.
+            //    This is a FRAGMENT that gets composed with following ops, so leaving G84 modal would re-trigger the
+            //    cycle on the next Z move. Deliberate divergence, not an oversight.
             `G80   ( cancel cycle )`,
             `M5   ( spindle off )`,
+            `M181   ( back to the analog spindle - leave the machine as we found it )`,
         ];
     }
     return [
