@@ -31,6 +31,25 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+    '2026.08.21.1': [
+        { short: 'Rigid tapping now actually synchronizes the spindle (a real safety fix)',
+          full: 'Rigid (G84-style) tapping was missing the controller vendor\'s spindle-sync sequence — on a '
+              + 'servo spindle it could feed the tap to full depth with the spindle not actually turning. It now '
+              + 'emits the correct switch-to-servo / sync / tap / switch-back sequence, and only when Settings > '
+              + 'Machine > Spindle attests you actually have a rigid-tap-capable servo spindle with its mode-switch '
+              + 'port wired — otherwise it safely falls back to the standard floating-holder cycle instead. '
+              + 'Verified by automated test and independent review.' },
+        { short: 'Drill/peck/dwell cycles now set an explicit retract plane',
+          full: 'Canned drilling cycles used to retract to whatever plane the previous operation happened to '
+              + 'leave live — between holes that could mean clearing a clamp, or driving through it. They now '
+              + 'explicitly retract to the safe initial plane every time. Verified by automated test.' },
+        { short: 'CAM pack export now matches the vendor\'s real file layout',
+          full: 'The CAM-menu pack builder was writing files at a name and location the controller\'s own '
+              + 'dispatcher does not look for. It now matches the vendor\'s documented layout, confirmed against '
+              + 'a real controller\'s own settings file. ⚠ Documentation-conformant, but NOT yet verified end to '
+              + 'end on real hardware — no Studio-built CAM pack has been loaded onto a machine yet. Treat this '
+              + 'as unproven until someone confirms it on a real controller.' },
+    ],
     '2026.08.20.1': [
         { short: 'Sending through your Google Drive actually works now',
           full: 'The app was hard-wired to the local gateway: choosing Google Drive in Setup saved correctly, '
