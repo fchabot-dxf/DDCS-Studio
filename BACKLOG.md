@@ -674,10 +674,15 @@ the rest."
 op under the caret makes the program's structure discoverable only by scrolling through it. All of them
 visible at once IS the map: you can see what the program is made of without reading the G-code.
 
-⚠ The open question is layout, not visibility: a row of chips above the code works for three ops and does
-not for fifteen. Wrapping, a scroll strip, or chips pinned to each op's own first line are all viable —
-⭐ the last is probably best, since it puts each chip beside the code it owns and scales to any length
-without a container that overflows.
+⭐ **ICON ONLY, no label** *(human, 2026-08-22: "they can use only the icon no label")* — which resolves the
+layout question outright. `✎ Corner (data) · ≈ 28 s` becomes just the op's icon. Fifteen icons fit where
+three labelled chips do not, so a row above the code stays viable at any program length, and the wizard
+icons are already a designed per-op set (`ui/wizIcons.js`).
+
+⚠ Then the icon carries the whole identity, so it has to be legible at its render size and distinguishable
+op-from-op — ⭐ **the same 14px legibility constraint as the lathe icon work**, and the same trap: a set that
+reads fine enlarged and blurs into one shape at size. A tooltip/`aria-label` restores the name for anyone who
+needs it, but the icon must do the work unaided.
 
 ⚠ Also check whether the `≈ 28 s` estimate belongs on this chip at all — it is a different fact (cycle time)
 riding on a navigation control.
