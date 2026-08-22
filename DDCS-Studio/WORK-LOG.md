@@ -47708,3 +47708,56 @@ it lands before this pass, else the advisor's own merge gate covers it.
 
 🔨 turn 2133
 
+---
+
+# t2135 — release V2026.08.22.2: mobile sound hotfix (t2134)
+
+**Dispatch**: t2134's review passed both fixes with no further findings, explicitly praised the STOP on the
+Corner-port attempt as the best thing in that turn, and ordered a tight hotfix release — full gate first
+(not the partial 460/2600 run from t2133, correctly stopped there but insufficient for a release), then
+merge + verify by hash comparison, then verify the deploy by fetching the served file.
+
+**Full gate, twice**: the first run failed on a leftover `mem-server.cjs` still holding port 3211 from
+t2133's own targeted test runs (never torn down before backgrounding the full suite) — `test:e2e` couldn't
+start its own webServer and the whole run aborted before a single Playwright test ran. Killed the stray
+process (PID 45120), confirmed port 3211 free, re-ran clean: **2639 passed, 5 failed, 32 flaky, 25 skipped
+(27.1m)**. All 5 failures match the established stable-baseline names VERBATIM
+(`header-profile-menu.spec.js`, `pane-sizer-1353.spec.js`, `send-gate-wiring-1585.spec.js`,
+`send-history-real-path-2065.spec.js`, `validation-divzero-not-syntax-1603.spec.js`) — no new name, nothing
+in either the failed or the 32-flaky list touches `sound.js`/`formField.js`/`userOps.js` (this turn's own
+`sound-toggle-2125.spec.js`/`formfield-block.spec.js` both ran clean, not flaky).
+
+**Version bump**: ran the ONE writer (`scripts/bump-version.cjs`), which reads today's date + the chip's
+existing daily counter — correctly produced V2026.08.22.2 (same day, `.1`→`.2`) with no manual editing.
+`package.json` genuinely did not change (`git status` confirmed it) — `check-version-sync.cjs`'s own
+`dateOnly()` maps both `.1` and `.2` to the identical `2026.8.22`, so a same-day patch release has nothing
+for that surface to bump; not an oversight, the declared behavior of the one 3-part-vs-4-part surface.
+`check-version-sync.cjs` run clean on the release commit itself (not just before it).
+
+**Release note** (`releaseNotes.js`, new `'2026.08.22.2'` entry): states plainly that sound was silent on iOS
+and unreliable on Android in the prior release, both are fixed, and — per the dispatch's explicit
+instruction not to soften this — that the iOS fix is written to Apple's documented requirement but not yet
+confirmed on a real device, inviting the user to say so if it's still silent for them.
+
+**Merge, verified by hash comparison, not the push's own exit code**: confirmed `origin/main`'s pre-push tip
+(`9ff5b87d…`) as an ancestor of the release commit before pushing (genuine fast-forward, no merge commit).
+Pushed `wizards-as-data-blocks:main`, independently `git fetch origin main` and compared resolved hashes —
+local HEAD, `origin/main`, and `FETCH_HEAD` all read `466e1b4138fe8a7f9a88d955cb557bcaec5bf12f`.
+
+**Deploy verified by fetching the served file, twice — the first fetch was a Cloudflare edge-cache false
+negative**: the root page (`Invoke-WebRequest`) confirmed V2026.08.22.2 in both the `<title>` and the `.ver`
+chip immediately (200, 140663 bytes). Fetching `ui/sound.js` directly WITHOUT a cache-busting param first
+came back 200/18148 bytes with NEITHER `resume().then(go)` NOR the `t2134` marker present — despite the
+`Cache-Control: public, max-age=0, must-revalidate` header claiming it shouldn't be cacheable, Cloudflare's
+edge apparently served a stale cached copy on the first miss. A cache-busted request (`?bust=<random>`)
+returned a genuinely different, larger response (20580 bytes) WITH both markers present; a follow-up
+no-bust re-fetch 3 seconds later also came back fresh (edge cache had updated by then). Recorded as a real
+gotcha, not glossed over: **a single un-busted fetch of a non-HTML asset is not sufficient evidence of a
+live deploy on this host — bust the cache, or re-fetch after a short wait, before trusting a "not found"
+result.**
+
+## Files
+- `DDCS-Studio/web/index.html`, `web/version.json`, `web/data/releaseNotes.js` — the release (package.json unchanged).
+
+🔨 turn 2135
+
