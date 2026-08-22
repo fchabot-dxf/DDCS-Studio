@@ -175,9 +175,18 @@ read as closed at a glance. They are not. Header restored 2026-08-20.)*
 > new icon-only reopen chips have different needs, and one source beats fifteen — the same declare-once shape
 > as everything else in this backlog.
 >
-> ⚠ **Check what 16px does to the rows it sits in.** These are baseline-aligned beside menu labels; +2px can
-> shift row height, and the wizard menu was deliberately cut to ~9 rows by the t851 "menu diet". Verify the
-> menu, the palette and the Blocks tab, not just one surface.
+> ### ⭐ ADAPT THE UI TO THE ICONS — do not shrink the icons to fit the UI
+> *(human, 2026-08-22: "yes adapt the ui for it")*
+>
+> 16px is the DECIDED size; the surrounding layout gives way, not the icon. Row height, line-height,
+> baseline alignment and padding all adjust to accommodate it.
+> ⛔ **If a row gets tight, do NOT reduce the icon back toward 14px** — that is the reflex to resist, and it
+> would silently undo the decision while looking like a fix.
+> ⚠ Surfaces to check and adapt, not just one: the wizard menu (deliberately cut to ~9 rows by the t851
+> "menu diet" — +2px per row is real vertical cost there), the Blocks palette, the Blocks tab, the quick
+> menu, and the new icon-only reopen chips.
+> ⚠ Where an icon sits inline with text, the fix is usually `vertical-align` / `line-height` rather than a
+> wrapper — several of these carry a hardcoded `vertical-align:-2px` tuned for 14px that will be wrong at 16.
 > ⚠ Bigger is not automatically better: t1918 deliberately COARSENED the lathe family for 14px (the polygon's
 > facets, the old probe ball). Those marks scale cleanly but look SPARSE — detail cut for a small size does
 > not return by enlarging. ⭐ The machine frame has the opposite property: drawn to survive 14px, it has
