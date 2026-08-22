@@ -602,3 +602,41 @@ becomes contextual:
 the first?), how it behaves on a very long line that is already scrolled off to the right, and whether it
 should hide while typing and reappear on idle. ⭐ The appeal is that it puts the action where the user is
 already looking instead of making them travel to a toolbar — same instinct as the sound-preview ▶ button.
+
+---
+
+## THE PROFILE TAB BECOMES "DIALECT" — and loses two of its three sections
+*(human, 2026-08-22, decided live)*
+
+`settingsPanel.js:1234-1269` — the tab is **35 lines** holding three sections. Two of them go with the
+indentation removal above, and one belongs elsewhere:
+
+| section | fate |
+|---|---|
+| **CONTROLLER** — the dialect dropdown + Pull from controller | ⭐ **STAYS. It becomes the whole tab.** |
+| **G-CODE OUTPUT** — Indentation | ⛔ deleted (see "NO INDENTATION, EVER") |
+| **EDITOR** — *"Select lines and press Shift+Tab"* | ⛔ deleted — it documents a keybinding being removed |
+| **EDITOR** — *"Smart suggestion bar (predictive keys above the keyboard)"* `:1262` | → **move to Appearance** |
+
+### The rename
+**`Profile` → `Dialect`.** Once the other sections are gone the tab IS the controller dropdown, so the label
+matches the content exactly.
+
+⛔ **NOT "Machine"** — an earlier suggestion of mine, and wrong. The tab's intro prose (*"THIS WORKSPACE'S
+MACHINE… controller, envelope, WCS, boot macro, variables"*) describes the whole **Controller group**, not
+this tab; the envelope, WCS and variables live on the SIBLING tabs (`WCS`, `Variables`, `Program`). Naming
+it "Machine" would promise all of that and deliver one dropdown.
+
+⭐ **And it retires an overloaded word.** "Profile" currently means three things in this codebase: this tab,
+`CONTROLLER_PROFILES` (the dialect — alive), and `profileStore`/`profileModal` (the machine-profile library —
+RETIRED July, see the dead-code entry above). That collision misread me twice in one session.
+
+### Why the suggestion bar moves
+`settingsPanel.js:3342` notes it is *"not part of the settings model — just localStorage + an event the bar
+listens for."* It is an on-screen-keyboard DISPLAY preference persisted like other view state — same family
+as the theme and panel layout — sitting on a machine-identity tab purely because both were once filed under
+"editor". Appearance is its real home.
+
+⚠ **Check the Appearance tab's own grouping before dropping it in**, and check whether the setup checklist,
+help text or tour reference "Profile" by name — a renamed tab still called Profile in three explanations is
+worse than either name alone.
