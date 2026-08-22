@@ -134,6 +134,49 @@ no-notes fallback — read it before changing the schema.
 read as closed at a glance. They are not. Header restored 2026-08-20.)*
 
 ### 7. The lathe icon doesn't read as a lathe setup
+> ## ⭐ SETTLED 2026-08-22 — decided across a long session, recorded here so it is dispatchable
+>
+> **WHICH ICONS: both families** *(human: "all lathe icon are wrong")* — the question this entry opened with
+> is answered.
+>
+> **THE DIAGNOSIS.** The shipped set is a steel bar on a red dashed centreline: **no chuck, no bed, no tool
+> post**. Every reference lathe mark the human supplied carries a headstock left, a bed underneath, a
+> tailstock right and a tool post mid-bed. Ours draws the STOCK, not the MACHINE.
+>
+> **⛔ A FIRST REDESIGN WAS REJECTED.** Three stacked rectangles (bed slab + headstock + bar) — human:
+> *"still just a slot shape not a machine shape."* Uniform silhouette reads as a slot; the references get
+> their machine-ness from an IRREGULAR profile.
+>
+> **✅ THE SECOND DRAFT IS APPROVED — judged at 14px, the column that ships.** Solid headstock left, jaws
+> stepping out of it, bed slab underneath, per-op cut on the right. Drafted in the icon sheet artifact.
+>
+> ### The trade that bought it
+> ⛔ **The red dashed centreline is DROPPED.** Its pixels pay for the headstock and bed. ⚠ t1911 deliberately
+> tied that dash to `rotary_center`'s "this rotates" convention app-wide, so the lathe family stops sharing
+> that mark with the rotary ops. A chuck says *rotates* better than a dash — but it is a deliberate break,
+> **not yet ruled on**. ⭐ It does buy one thing free: red then means only the probe ruby, instead of meaning
+> both the axis and the probe.
+>
+> ### What is NOT done
+> - **Only 5 of 7 drafted** — facing, parting, OD-turn, centre-drill, OD-probe. ⛔ **polygon and face-probe
+>   were never drawn** and must match the same frame.
+> - The approved drawings live only in the artifact; nothing is in `ui/wizIcons.js`.
+>
+> ### ⭐ SIZE — 16px, and it is not a resolution question
+> The icons are **pure SVG, zero raster** — all 15 are `viewBox="0 0 24 24"` with a hardcoded
+> `width="14" height="14"`. Nothing to re-save; the render size is an attribute. **Human: try 16px.**
+> ⭐ Better: drop the hardcoded width/height and let CSS size per surface, since the menu and the new
+> icon-only reopen chips have different needs.
+> ⚠ Bigger is not automatically better: t1918 deliberately COARSENED this family for 14px (the polygon's
+> facets, the old probe ball). Those marks scale up cleanly but look SPARSE — detail cut for a small size
+> does not return by enlarging. ⭐ The machine frame has the opposite property: drawn to survive 14px, it has
+> headroom at 16-20px for a tool post or tailstock it does not currently use.
+>
+> ### ⚠ COUPLED TO THE REOPEN CHIPS
+> Those are **icon-only** and inherit this set — so a lathe machine silhouette is a far better tell beside
+> lathe G-code than a rod. ⛔ But do NOT gate the chips on this: the human ruled ship-first, redesign only
+> what proves illegible in use.
+
 *(human, 2026-08-19: "the lathe icon is not really looking like a lathe setup")*
 
 ⚠ **Establish WHICH icon before touching anything — there are two distinct families and they have different
