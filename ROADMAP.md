@@ -1,6 +1,56 @@
 # DDCS Studio — Roadmap
 
 ## 🔁 ACTIVE LOOP QUEUE (advisor-reconciled 2026-07-31 — the live order; NEXT-SESSION.md carries the current act)
+
+> # ⭐ THE LIVE QUEUE — advisor-reconciled 2026-08-22
+> **This supersedes the 2026-07-31 reconciliation below**, which is ~3 weeks stale and describes work long
+> since shipped. ⛔ Do NOT delete what follows it: it carries the PORTING arc ledger and the **attested V4.1
+> firmware insights** (macro-parser mode `#122` / the `macro_` filename prefix; `ATAN[dy, dx]` requiring a
+> comma) — those are evidence, not queue items, and they must survive any future tidy.
+>
+> ```
+>   IN FLIGHT
+>     t2143  systemHooks data loss + the macrosApp NUL byte
+>            tail: remove the M6.rc entry from the V4.1 tree      (queued as an amendment)
+>
+>   READY — ruled and specced, dispatch in this order
+>     0  MENU SPLIT: the logo owns the APP menu, the filename owns the FILE menu.
+>            Sequenced AFTER t2147 by the human. Un-linking the logo also REMOVES the
+>            navigate-away mis-click that forced t2147's whole layout argument.   BACKLOG 9
+>     1  F2   workspace: DELETE the name field, display the filename   BACKLOG F2
+>     2  #1+7 menu merge: theme chips OUT, version to footer,
+>              workspace name OUT to the header  — ONE turn            BACKLOG 1 + 7
+>     3  #4   lathe icons: centreline removed, draw polygon +
+>              face-probe, re-judge the five at 16px FIRST              BACKLOG 4
+>
+>   NEXT ARC — ✅ CHOSEN BY THE HUMAN 2026-08-22 ("i think roles")
+>     4  ROLES S1: derive the role CLIENT-SIDE
+>            ⚠ the blocker for everything else in that project: admin.js:97 reads the role from
+>            descriptor(), which needs a RUNNING DAEMON — so on a phone it throws, render() bails,
+>            and NO gating code runs. Nothing gates and no tab is labelled until this lands.
+>            Chosen over wizards-as-data because it is smaller, fully diagnosed, and it is the
+>            thing the human actually complained about.
+>
+>   ⭐ STANDING POLICY — human, 2026-08-22: "everyturn add a small item from backlog"
+>     Each dispatch = the ARC step + ONE small backlog item as a TAIL.
+>     ⛔ THE TAIL COMMITS SEPARATELY. A one-line tree removal must never share a diff with an arc
+>       step — that is what keeps a review possible. (Precedent: the M6.rc tail on t2143.)
+>     ⚠ THE TAIL RUNS AFTER the main task is done and green, never alongside it.
+>     ⚠ IF THE TAIL IS RISKY OR TOUCHES THE SAME FILES as the arc step, it goes in its OWN turn
+>       instead — the policy is to drain the board, not to manufacture entangled diffs.
+>
+>   PARKED — explicitly, by the human, 2026-08-22
+>     F5   organic wordmark      mock-up first, "in time"
+>     C    RECORD[] progress     "dont worry about that" — and its premise expires ~08-27
+>     —    analytics branch      "analytic can wait"
+> ```
+>
+> ⭐ **NOTE ON ITEM 1:** the SEAT B line at the end of the stale block below already carried
+> *"workspace name=filename (its rename lands -> seat A's menu absence-lock flips by design)"*. That decision
+> was made once, queued to a window that was never opened, and re-derived from scratch on 2026-08-22.
+> ⚠ **Its second half is still live and is NOT in the BACKLOG spec:** the rename landing is supposed to flip
+> a menu absence-lock in the other seat. Whoever builds F2 must find that lock and check it.
+
 **THE MILL-PARAMETRIC ARC's WIZARD CONVERSIONS ARE DONE** (V2026.07.31.7, t1319→t1464): surfacing /
 drill family / rect pocket emit parametric macro bodies end to end (live pendant knobs, one clearing
 emitter shared by wizard + CAM, @work-declared trace caps, the too-small law); slot / non-rect /

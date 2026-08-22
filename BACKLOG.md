@@ -40,11 +40,33 @@ from a machine that is not a client.** Until the role is derived CLIENT-SIDE, no
 and the Status tab cannot know which variant to draw. That derivation is the whole of S1.
 
 ### F2. A rename button for workspaces
-⇒ **BACKLOG. Small and self-contained.** ⚠ But not yet diagnosed enough to hand over: the workspace list is
-`workspaceFiles` (`ui/settingsPanel.js:193`, whitelisted at `:430`) and there is **no rename path anywhere** —
-grep finds no `renameWorkspace` and no rename affordance at all. So this is a genuine ADD, not a wiring job.
-Whoever takes it must first find where the list is RENDERED (the array is only *declared* and *persisted* in
-settingsPanel), and check that a rename does not orphan the per-file bodies that ride on `workspace{}` at `:429`.
+> ## ✅ RULED — THERE IS NO "NAME". DISPLAY THE FILE NAME.
+> *(human, 2026-08-22: "we dont need a name just display the file name")*
+>
+> ⛔ **DELETE the separate workspace-name concept.** Do not sync two fields — there is only the `.ddcs` file.
+> The UI shows its filename. Rename = rename the file. Nothing else stores a name.
+>
+> ### Blast radius — THREE readers, verified
+> ```
+>   ui/headerPost.js:151      ap.name || 'Untitled workspace'   -> show the filename instead
+>   ui/settingsPanel.js:505   getMachine().name || 'unnamed'    -> WARNING, see below
+>   data/profileStore.js:33   name: machine.name || ''          -> the dying profile library (already backlogged)
+> ```
+> ⚠ **CHECK `settingsPanel.js:505` BEFORE DELETING ANYTHING.** If it uses the name to BUILD a default export
+> filename, the dependency is circular once the filename becomes the name — the fix is to read the saved
+> filename directly (`fileSavedName()`), not to keep the field alive for it.
+>
+> ### The only real consequence, and it is a GOOD one
+> A workspace never saved to a file **has no name**. Show that honestly ("Not saved", not a fake title).
+> ⭐ That makes the standing principle visible rather than implied: localStorage is a TEMPORARY buffer, and
+> only a file is saved. An untitled-but-named workspace was quietly claiming otherwise.
+>
+> ### Build
+> 1. Locate where the workspace list is RENDERED. ⚠ `workspaceFiles` appears only DECLARED
+>    (`settingsPanel.js:193`) and PERSISTED (`:430`) — the renderer has NOT been found yet. Start here.
+> 2. Display the filename wherever the name was shown; "Not saved" when there is no file.
+> 3. Rename button: prompt -> rename the `.ddcs` -> refresh. No internal field to update.
+> 4. Remove the `name` field and its three readers.
 
 ### F3. Remove the clicking sounds; propose sounds for invisible states
 ⇒ **SPLIT — half is backlog, half is a proposal the advisor owes.**
@@ -72,6 +94,10 @@ not doing it now.")* Five firmware-native features incl. **Array machining** and
 in [`ROADMAP.md`](ROADMAP.md) under "V4.1 ADVANCED MACHINING". Photos: `images/4.1 advance machining1 (1)/`.
 
 ### F5. The DDCS wordmark in ORGANIC: rounder, probably sans
+> ⏸ **MOCK-UP FIRST, AND NOT URGENT** *(human, 2026-08-22: "make a mock up, in time")* — the advisor owes a
+> visual comparison of 2-3 humanist-rounded candidates ON the green canopy band, before any code is written.
+> ⛔ Do not pick a typeface from prose. The colour fix (`#A89000` is stale) and the outline-to-paths decision
+> ride with the mock-up, not ahead of it.
 ⇒ **BACKLOG.** *(human, 2026-08-22: "the logo needs to be rounded more, maybe sans serif")*
 
 Current mark — `index.html`, `<symbol id="mark-organic">`:
@@ -133,6 +159,10 @@ right in the type specimen and wrong in the header. If outlining to paths, bake 
 ## OPEN
 
 ### 1. Move the theme selector out of the quick menu into Settings
+> ⭐ **MERGE THIS WITH ITEM 7 — ONE TURN, NOT TWO.** *(human, 2026-08-22: "yes")* Both restructure the SAME
+> quick-menu popover (`ui/headerPost.js`): this item REMOVES the theme chips, item 7 moves the version INTO
+> the menu footer and the workspace name OUT to the header. Done separately, that file gets opened twice and
+> the layout gets re-decided twice. ⛔ Do not start either alone.
 *(human, 2026-08-19)* — `headerPost.js` `themeSection` renders a heading + five `.hq-theme-chip`s in a menu the
 t851 "menu diet" cut to ~9 rows. A theme is chosen once; Settings is where appearance preferences live. ⚠ Leave
 NOTHING behind (a "Theme…" row that opens Settings keeps the row it was meant to free). ⚠ Reuse
@@ -183,6 +213,31 @@ no-notes fallback — read it before changing the schema.
 ---
 
 ### 4. The lathe icon doesn't read as a lathe setup
+> ## ✅ RULED 2026-08-22 — the last blocker is gone, this is now DISPATCHABLE
+> *(human: "item 4, yes remove centerline, and draw the 2 missing")*
+>
+> **1. THE CENTRELINE IS REMOVED.** The entry below called this *"a deliberate break, not yet ruled on"* —
+> it is ruled now. The lathe family stops sharing `rotary_center`'s red-dash "this rotates" convention; the
+> chuck carries that meaning instead. ⭐ **And it buys the thing the entry already identified: red now means
+> ONLY the probe ruby**, instead of meaning both the rotary axis and the probe. That is a net simplification
+> of the colour language, not just a pixel budget win.
+> ⚠ `rotary_center` itself KEEPS its dash — the break is lathe-only. Do not sweep the convention app-wide.
+>
+> **2. DRAW THE TWO MISSING: `polygon` and `face-probe`.** Follow the approved second draft exactly — solid
+> headstock left, jaws stepping out of it, bed slab underneath, the per-op cut on the right. ⛔ Do not
+> redesign the five that are already approved.
+>
+> ### ⚠ THE APPROVED DRAFT WAS JUDGED AT THE WRONG SIZE — resolve this BEFORE drawing
+> This entry records the second draft as *"judged at 14px, the column that ships."* But the human later ruled
+> **16px, all of them, with the UI adapted** (see the icon-size item). ⇒ the approved silhouette was assessed
+> at a size it will not ship at.
+> ⭐ 16px is 30% more pixels, which usually HELPS a detailed silhouette — but the headstock/jaws/bed stack was
+> tuned to survive 14px, and a mark tuned for a smaller box can read empty or loose when scaled up.
+> **Re-judge the five approved marks at 16px FIRST**, then draw the two new ones directly at 16px.
+> ⛔ If any of the five now reads wrong at 16px, REPORT it — do not silently retune an approved mark.
+>
+> **VERIFY:** all seven rendered together at the shipping size, in the real app, as a screenshot. The human
+> judges these visually, not from a description — that is the standing rule for icon work here.
 > ## ⭐ SETTLED 2026-08-22 — decided across a long session, recorded here so it is dispatchable
 >
 > **WHICH ICONS: both families** *(human: "all lathe icon are wrong")* — the question this entry opened with
@@ -296,6 +351,8 @@ confirm the save path serializes the live object before assuming the chain; do n
 this again on the NEXT setting somebody adds. Decide whether unknown keys should be PRESERVED rather than dropped.
 
 ### 7. The header shows the VERSION where it should show the WORKSPACE
+> ⭐ **DO THIS TOGETHER WITH ITEM 1** *(human, 2026-08-22)* — same popover, same file. The menu gets its
+> final shape once: theme chips OUT (to Settings), version IN (footer), workspace name OUT (to the header).
 *(human, 2026-08-22: "i think the workspace should be visible instead of the version number, and version
 number should be in the bottom of quickmenu, we can repeat the workspace name with more info in the
 quickmenu still, maybe with 1-2 more datapoints.")*
@@ -429,11 +486,248 @@ Studio can surface the DATA those dialogs read (e.g. `template.txt`), never the 
 3. Did any OTHER `.rc` entry leak into a declared tree the same way? Audit `controllerFiles.js` for
    non-`.nc` paths carrying `editable: true`.
 
-#### The likely fix, once verified
-Drop `editable: true` from `M6.rc` (show it read-only as reference, or remove it), and point "tool-change"
-at `slib-m.nc` where the editable behaviour lives. ⛔ Do NOT ship this as a silent tidy-up — it changes what
-a user is permitted to write to their controller, so it wants a human ruling first.
+#### ✅ RULED — REMOVE THE ENTRY
+*(human, 2026-08-22: "id remove it if no one should edit it")*
 
+**The condition is met, and it needed no hardware to answer.** `M6.rc` is a GUI_Builder-generated C file for
+an embedded graphics toolkit — editing it meaningfully requires that tool and a compile step. It is a
+firmware asset, not something an operator authors. The unverified runtime question only decides whether a
+push would be DANGEROUS or merely USELESS; it does not change whether anyone should be editing it.
+
+⭐ **THE DECIDING ARGUMENT, and it is a consistency one:** the declared tree ALREADY OMITS every other `.rc`
+file on the controller — `array.rc`, `advstart.rc`, `break.rc`, `center.rc`, `adjush.rc` and the rest are all
+absent. `M6.rc` is the ONLY non-`.nc` path in ANY declared tree (verified: one hit across the whole file).
+Its presence was the anomaly. Removing it makes the tree what it evidently meant to be — G-code files only.
+
+**THE CHANGE:** delete the `M6.rc` line from `CONTROLLER_FILES['ddcs-v41'].tree` (`data/controllerFiles.js:50`).
+
+⛔ **A TEST DEPENDS ON IT AND WILL GO RED — that is EXPECTED, not a regression.**
+`tests/controller-file-tree.spec.js:38` asserts the V4.1 tree contains `'M6.rc'`:
+```js
+expect(v41, 'V4.1 shows its firmware files (not the Expert builders)')
+  .toEqual(expect.arrayContaining(['advstart.nc', 'M6.rc', 'selcoord.nc', ...]));
+```
+Remove `'M6.rc'` from that array. ⚠ Do NOT weaken the assertion — the OTHER names in it are load-bearing, and
+the sibling `not.toContain('camN.nc')` guard two lines below must stay exactly as it is (it went vacuous once
+already on a rename, at t2117, and was repaired at t2118).
+
+⚠ **Consider in the same pass, do not assume:** `slib-m.nc`'s subtitle is "M-macro library". Since the actual
+tool-change SEQUENCE lives there (`slib-m.nc:11-13`), a user who came looking for tool change now has nothing
+pointing them at it. Whether the subtitle should say so is a judgement call — raise it, do not silently reword.
+
+#### ✅ THE "RUNTIME OR BAKED-IN?" QUESTION IS NOW SETTLED — no machine needed
+*(human, 2026-08-22: "is it editable" — the file answers it)*
+
+`M6.rc` is **465 lines of real C source**, not a declarative resource table:
+```c
+#include "DIALOG.h"
+#define ID_FRAMEWIN_0   (GUI_ID_USER + 0x4A)
+#define ID_BUTTON_0     (GUI_ID_USER + 0x53)
+```
+C source must be COMPILED before it can draw anything. A controller cannot interpret it. ⇒ the `.rc` on the
+controller's disk is **vendor BUILD MATERIAL shipped inside the firmware package** — the source the dialog was
+compiled FROM — and `MarcoDialog "M6.rc"` names a dialog already baked into the firmware binary.
+
+⇒ **Editing it in Studio changes NOTHING on the machine.** Best case a push is inert; worst case it overwrites
+a file the firmware package expects intact. There is no version of this entry that does something useful,
+which is why the removal is not a risk-appetite judgement — it removes something that could never have worked.
+
+⚠ **STILL UNVERIFIED (needs the machine, does NOT block this removal):** whether `advstart.nc` in the tab is
+real or got conflated with its `advstart.rc` twin. ⭐ Given the finding above, treat EVERY `.rc` in that
+firmware directory as build material — so if any other declared entry ever resolves to a `.rc`, it is the
+same defect.
+
+
+### 9. SPLIT THE ONE MENU IN TWO — the logo owns the APP, the filename owns the FILE
+*(human, 2026-08-22: "should we split the menu items in 2, using the ddcs logo as a entry point" — agreed, and sequenced AFTER t2147 lands)*
+
+**The diagnosis: the quick menu is two menus wearing one hat.** Its rows do not share a scope —
+
+```
+  Workspace identity · Saved <when> · Save · Open · Load…      FILE scope
+  Wizards… · Settings… · theme chips · the version             APP  scope
+```
+
+⛔ **And t2147 makes the mismatch WORSE, which is why this follows it.** Once that menu hangs off the
+workspace filename, *"Settings…"* under your filename reads as **this file's** settings. Filename-as-menu-door
+is a normal, well-established pattern (Figma's `[file name ∨]` is exactly it) — **but only when the menu holds
+file-scoped actions.** Ours does not yet.
+
+### ✅ THE SPLIT, WORKED OUT WITH THE HUMAN 2026-08-22
+
+**The test that resolves every row:** *does going through this door bring something INTO your work, or come
+out of it?* Save/Open/Load/Insert/Export obviously do. Wizards inserts an op into THIS program. Setup sheet and
+checklist are documents ABOUT this job. Everything else is about the product itself.
+
+```
+  ┌─ DDCS ∨ ─────────────┐   ┌─ <filename> ∨ ─────────────────┐
+  │  ⚙  Settings…            │   │  Workspace: … · role · envelope     │
+  │  ────────────────────  │   │  ──────────────────────────────  │
+  │  ❓ Help — FAQ & About   │   │  💾 Save          📂 Open        │
+  │  ↓  Get Studio for desk… │   │  ──────────────────────────────  │
+  │  ⭐ Rate / Feedback      │   │  📘 Library…   ✨ Wizards…        │
+  │  ────────────────────  │   │  📁 Load…  ➕ Insert…  ↧ Export…  │
+  │  V2026.08.22.2           │   │  ──────────────────────────────  │
+  └────────────────────────┘   │  📄 Setup sheet…  ✅ Setup checklist │
+     THE PRODUCT — small,       └──────────────────────────────────┘
+     rarely visited                THIS JOB — the working menu
+```
+⭐ **THE LOPSIDEDNESS IS CORRECT, not a flaw.** The product menu SHOULD be small and rarely opened. The file
+menu carries the weight because that is where the work happens. A 50/50 split would mean the line was drawn
+in the wrong place.
+
+⭐ **LIBRARY GOES IN THE FILE MENU** *(human: "shouldnt library be in the file menu?")*. Its NAME sounds
+app-ish — a library is where you look things up — but its FUNCTION is a **loading dock**: you go in to bring
+something back. `libraryModal.js:2` — "ONE tabbed modal for the user's stuff: **Projects · Wizards**".
+**Projects** is your saved work browsable in folders (`projects/projectStore.js`); **Wizards** is the
+catalogue, built-in plus your own. Both are unambiguously "bring something into the current job".
+
+⚠ **A STALE COMMENT FOUND WHILE DECIDING THIS — fix it in the same turn.** `headerPost.js:206` reads
+*"the Library: one door to Profiles · Projects · Wizards"*, but the **Profiles tab was RETIRED at t1217**
+(`libraryModal.js:3`: "the Profiles tab retired with the profile library; the workspace's ONE machine lives
+in Settings"). The tab went; the comment advertising it stayed — the removal-chain pattern again.
+
+⭐ **DOES "PROJECTS" NAME ITSELF? A NEAR-MISS WORTH RECORDING** *(2026-08-22)*. The human proposed RETIRING
+projects on the premise that *"a project is a wizard in a specific config — most of the time we dont need to
+repeat it exactly and the wizard alone is fine."* ⛔ **The premise is wrong**: a `.mjson` holds a MULTI-OP
+PROGRAM (`projectModal.js:194` imports via `openMacroText`; the failure reads "Not a valid .mjson macro"), and
+it is not browser-trapped either — there is a Drive volume (`:283`, `:440`) and file Import/Export (`:90`,
+`:387`). Retiring it would have deleted the JOB LIBRARY.
+
+⚠ **BUT THE MISREAD IS THE FINDING, not the error.** The person who BUILT this app modelled a project as one
+wizard's parameters. If it does not read as a job library to him, it reads that way to nobody. The label is not
+carrying its meaning — "Projects" gives no hint these are whole programs, where **"Jobs"** or **"Programs"**
+would. ⭐ The menu split is exactly when labels get looked at, so weigh a rename then; ⛔ but do NOT rename
+on this note alone — it is a naming call for the human, and `.mjson`/`projectStore`/the drawer all carry the
+word.
+
+⭐ **THE SHAPE THAT CAME OUT OF IT, and it is coherent — no redundancy to resolve:**
+```
+  .ddcs workspace  =  THE MACHINE   config, settings, user files + whatever program is loaded
+  .mjson project   =  A JOB         the program itself, in folders, local + Drive
+```
+ONE workspace, MANY projects — one mill, many parts. The only surviving overlap is that the workspace ALSO
+carries a program, so "save what I am working on" has two answers; the disk chip already says
+"Workspace: …", which probably settles which one the Save button means.
+
+⚠ **THREE DOORS TO "OPEN A SAVED THING", within four rows of each other:** `Open`, `Load…`, and
+`Library → Projects`. They may be genuinely distinct (open a WORKSPACE vs load a PROGRAM into the editor) —
+**CHECK BEFORE BUILDING.** If two are the same act, this split is the natural moment to collapse them; if
+they differ, the LABELS must say how, because right now they do not.
+
+### The shape
+```
+  ┌─ DDCS ∨ ────────────┐              ┌─ MILLING-DDDD4.1 ∨ ─┐
+  │  Settings…          │              │  Saved 14:22  ☁     │
+  │  Wizards…           │              │  Save    Open       │
+  │  Theme  ▸           │              │  Load…              │
+  │  ─────────────      │              └─────────────────────┘
+  │  Open the website   │
+  │  V2026.08.22.2      │                 FILE scope — what t2147 built,
+  └─────────────────────┘                 minus the three app rows
+     APP scope — new
+```
+The split runs along the one line people actually navigate by: **am I acting on the APP, or on this FILE?**
+
+### ⭐ THE SECOND PAYOFF — it dissolves the hazard that drove t2147's whole layout argument
+The brand logo is currently an `<a href="https://ddcs-studio.pages.dev">` that **navigates AWAY from the app**.
+That is the mis-click risk that forced the workspace chip across the header in the first place. **Make the
+logo a MENU BUTTON and the hazard is gone** — and "open the website" becomes one ROW inside it, which is where
+it always belonged. ⇒ this is not just tidying; it removes a live footgun.
+
+### ⛔ UN-LINKING THE LOGO IS A REMOVAL — sweep the chain
+The `<a class="brand">` stops being a link. Account for every survivor: the `href`, `target`, `rel`, its
+`title` tooltip, any `:hover`/`:visited` styling that only made sense on a link, and any test asserting the
+brand navigates. ⚠ A test that checks the logo links out must be **INVERTED** to assert it opens the menu —
+not deleted. ⚠ Keep it a real `<button>` with the accessible name the anchor had, so the tab order and screen
+readers do not regress.
+
+### What moves, exactly
+- **OUT of the file menu, INTO the app menu:** `Settings…`, `Wizards…`, the theme control, and the version.
+- ⚠ **The version is moved TWICE across the two turns** — t2147 puts it in the quick-menu footer, this turn
+  moves it to the app menu. That is one row and it is cheap; do not "optimise" by skipping t2147's placement,
+  which is correct for the menu as it exists at that moment.
+- ⚠ **Theme:** t2147 already relocates the chips to Settings. So the app menu's `Theme ▸` is a POINTER to that
+  Settings section, not a second copy of the chips. ⛔ Do NOT reinstate chips in the menu — BACKLOG item 1's
+  own warning applies: a row that merely opens Settings must EARN its place, or it keeps the row it freed.
+  ⇒ if `Settings…` already reaches the theme in one step, **drop `Theme ▸` entirely** and say so.
+- **STAYS in the file menu:** the identity line, `Saved <when> + place icon`, `Save`, `Open`, `Load…`.
+
+### ⚠ Cares
+- **Two menus, one dismissal contract.** `ui/opContextMenu.js`'s `openMenu()` already exists precisely so
+  there is not a second floating-menu implementation to dismiss, clamp to the viewport and forget on
+  `ddcs:stop-previews`. ⛔ Reuse the existing menu machinery; do not write a second popover.
+- **Opening one must CLOSE the other.** Two menus that can be open simultaneously is a bug, not a feature.
+- ⚠ **The narrow header.** Two entry points instead of one, at opposite ends. Verify at 390px
+  (`verification/t2099-header-390.png`) that both survive alongside the tabs.
+- ⭐ **Recent ▸ is NOT in scope** — it is drawn in the sketch above as where it would go, not as work. Do not
+  build it.
+
+**Verify:** screenshots of BOTH menus open (separately), desktop and 390px, so the human can judge the split
+visually — the standing rule for anything that changes what a surface looks like.
+
+
+### 10. MULTI-OP APPROACHABILITY: the wizard preview shows ONE op, with no idea where it sits
+*(design conversation with the human, 2026-08-22)*
+
+**The complaint:** *"without [a cad editor] multiop is lacking approachability."* Open a wizard on op 3 of a
+12-op program and you cannot see where your pocket sits relative to anything else.
+
+⛔ **IT IS NOT A CAD PROBLEM — that was ruled out in the conversation and must not be reopened.** The human's
+own reframe settles it: *"we are sortof modeling using the gcode toolpath themselves."* There is no part to
+model — the ops ARE the model. `viz/featureCanvas.js:5` already states the commitment defensively: handles
+drive PARAMETERS, never freeform geometry, *"so we never reopen the CAM trap"*.
+
+### What actually exists (measured, not assumed)
+```
+  createPreviewPanel   ONE component, THREE hosts (Studio editor · Blocks · wizard).
+                       The ONLY difference is opts.getGcode.
+    Studio / Blocks    fed the WHOLE program   -> the multi-op view ALREADY EXISTS
+    wizard             fed host.__gcode        -> just THIS op   (wizardManager.js:591)
+```
+⭐ So no new surface is needed. The whole-program view is already there in two hosts; the wizard simply is
+not given it, and neither host can say WHICH op a line belongs to.
+
+### ⭐ THE FIX: FEED THE WIZARD'S PREVIEW THE WHOLE PROGRAM
+*(human: "would it make sense to add whole program to wizard previews?" — yes, and it is better than the
+backdrop the advisor first proposed; that earlier answer is superseded, see the note at the end.)*
+
+`wizardManager.js:591` is `getGcode: () => host.__gcode || ''` — that op's code alone. Give it the program.
+
+⭐ **THE ARGUMENT THAT DECIDES IT: the per-op sim inputs exist BECAUSE the op is previewed in isolation.**
+```
+  getStart · getStartHints · getPinnedStarts
+     ↳ they HINT where the op begins, because nothing before it is traced
+```
+Trace the whole program and the start position is **COMPUTED, not hinted** — it falls out of the preceding ops.
+So this does not fight that machinery, it removes the reason some of it exists. And it is ONE code path: the
+same `getGcode` the Studio and Blocks hosts already use, proven at whole-program scale.
+
+### ⚠ Two things it must answer — neither argues for a backdrop
+- **PLAY SCOPE.** Press Play while editing op 3 and you would sit through ops 1-2. ⇒ Play starts at THIS op's
+  first line, not the program's. That is a start OFFSET, not a different renderer.
+- **RE-TRACE COST**, the one real risk. ⭐ Mitigation: ops BEFORE yours do not change while you type — trace
+  them once and re-trace only from your op onward. The trace is already segmented by `emitMapped`'s `map`.
+  ⚠ MEASURE this before assuming it is fine; a 12-op program re-tracing per keystroke is the failure mode.
+
+⚠ **FALLBACK IF THE TRACE COST PROVES PROHIBITIVE** (and only then): draw the rest of the program as a STATIC
+BACKDROP, re-traced only when the program changes, with Play left scoped to this op. ⛔ It is the fallback, not
+the plan — it keeps the isolation AND adds a second render path, which is why it lost.
+
+### Then, if that is not enough
+- ⭐ **Emphasis, not hue, to distinguish ops** — selected op bright, the rest dimmed. ⛔ Do NOT colour per-op:
+  that channel is TAKEN (`gcodeViz3d`: *"Feed moves: bright, tinted by Z depth. Rapid moves: dim red"*), and
+  twelve op-colours would destroy the legend that says what is a rapid and how deep you are.
+- An **op selector** — already specced as the reopen-chip item; put it on `createPreviewPanel` so all THREE
+  hosts gain it at once, rather than inside the wizard modal where only one host benefits.
+- **Handles composed into the preview** — the overlay seam exists (`featureCanvas.js:71`, an overlaid
+  `toolpath2d` re-pins from the host `_tf`, pixel-exact under the handles). ⚠ This is the REAL engineering:
+  joining two components that each own a view transform. Do not start here.
+
+⚠ **Order matters.** Backdrop first; it is cheap and it TESTS whether the rest is warranted. Two more ambitious
+designs were argued and dropped in the same conversation — a program-scoped canvas (would add a fourth surface
+beside a component already doing the job) and an op selector inside the wizard modal (helps one host of three).
+⛔ Do not resurrect either without new evidence.
 
 ## THE JOBS FOLDER IS SETTABLE — FOLD THE "SYNC FOLDER" ROUTE INTO **LOCAL**, NOT A THIRD OPTION
 *(human, 2026-08-20: "i dont like that it would look like a 3rd option can we fold this in the local folder
@@ -587,6 +881,11 @@ Benefit: keyboard-free, browse-free job selection for a shop floor operator, usi
 printable label — no new gateway code.
 
 ### C. `RECORD[]` → file-based progress — the strongest remaining progress candidate
+> ⏸ **DEPRIORITISED 2026-08-22** *(human: "dont worry about that")* — left in place, NOT killed.
+> ⚠ Context for whoever picks it up: this item's own premise is *"no line-number register exists anywhere in
+> the documented Modbus map"*, and the vendor has said one is coming (~2026-08-27). If it ships, this becomes
+> a workaround for a solved problem. ⭐ **Item D does NOT fall with it** — run-state (`is it running / paused
+> / idle`) is a question a line-number register cannot answer. Re-read that premise before spending a turn here.
 `RECORD[0,1,<n>,0,0,0,0]` (cache) + `RECORD[-2,1,0,0,0,0,0]` (flush) at the same Z-up points
 `instrument.js` already picks for beacons, writing to `/local/RecordData<n>.txt` — a plain file the gateway
 ALREADY reaches over the SMB share, no Modbus/serial wiring, no listener, no RS232 port contention with
@@ -655,6 +954,8 @@ consider motion.
 
 
 ## ANALYTICS BOT DETECTION — an unmerged branch that was deliberately NOT pruned
+> ⏸ **CAN WAIT** *(human, 2026-08-22: "analytic can wait")* — no action queued. ⛔ The branch still must NOT
+> be pruned: it holds work not in this trunk and belongs to the concurrent analytics agent.
 *(logged 2026-08-21 during the advisor branch sweep — human: "backlog the analytic bot detection")*
 
 **The sweep took 28 refs down to 10.** Every deleted branch was verified content-present in the trunk first.
