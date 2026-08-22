@@ -31,6 +31,28 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+    '2026.08.22.1': [
+        { short: 'A themed sound suite, with one switch for everything',
+          full: 'UI clicks, wizard open/close/insert, and Blocks-canvas errors now have themed sound — each of '
+              + 'the five visual themes has its own voice (5 themes x 4 events). Job-arrived / delivered / failed '
+              + 'keep the same learned door-chime / cash-register / buzzer sounds as before, unthemed, and now '
+              + 'play on the gateway (the machine) only, not the browser; a new synthesized swoosh marks the '
+              + 'moment a job leaves your browser instead. One master mute, plus a per-sound off-list if you only '
+              + 'want to silence one thing — both in Settings > Look and feel > Sound, and both travel with your '
+              + 'workspace file and reach the gateway too, so the switch never lies on one machine.' },
+        { short: 'Organic theme retired its coral accents for a green-and-brown "grove" look',
+          full: 'The organic theme\'s palette was originally anatomical (coral/bone tones) while its icon and '
+              + 'motion were always meant to read as botanical. It now matches: green above (the header/topbar '
+              + 'band), brown grounds below, amber for anything interactive — sap and bark, not coral.' },
+        { short: 'The loading screen no longer flashes the wrong theme on startup',
+          full: 'Every non-default theme used to show a brief flash of the default look before switching over on '
+              + 'every single load. Your saved theme now applies before the very first pixel paints, and the '
+              + 'loading card shows your theme\'s own logo mark instead of hard-to-read placeholder text.' },
+        { short: 'The editor\'s Copy button now actually shows it worked',
+          full: 'Clicking Copy already copied the program to your clipboard, but the "copied!" flash that was '
+              + 'supposed to confirm it never actually appeared — a leftover styling mismatch. Fixed; the button '
+              + 'now visibly confirms the copy.' },
+    ],
     '2026.08.21.1': [
         { short: 'Rigid tapping now actually synchronizes the spindle (a real safety fix)',
           full: 'Rigid (G84-style) tapping was missing the controller vendor\'s spindle-sync sequence — on a '
