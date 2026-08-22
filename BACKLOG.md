@@ -162,16 +162,27 @@ read as closed at a glance. They are not. Header restored 2026-08-20.)*
 >   were never drawn** and must match the same frame.
 > - The approved drawings live only in the artifact; nothing is in `ui/wizIcons.js`.
 >
-> ### ⭐ SIZE — 16px, and it is not a resolution question
-> The icons are **pure SVG, zero raster** — all 15 are `viewBox="0 0 24 24"` with a hardcoded
-> `width="14" height="14"`. Nothing to re-save; the render size is an attribute. **Human: try 16px.**
-> ⭐ Better: drop the hardcoded width/height and let CSS size per surface, since the menu and the new
-> icon-only reopen chips have different needs.
-> ⚠ Bigger is not automatically better: t1918 deliberately COARSENED this family for 14px (the polygon's
-> facets, the old probe ball). Those marks scale up cleanly but look SPARSE — detail cut for a small size
-> does not return by enlarging. ⭐ The machine frame has the opposite property: drawn to survive 14px, it has
-> headroom at 16-20px for a tool post or tailstock it does not currently use.
+> ### ⭐ SIZE — 16px for EVERY icon, and it is not a resolution question
+> *(human, 2026-08-22: "if we can try 16px that can work" … "all of them though")*
 >
+> ⛔ **This is a GLOBAL change, not part of the lathe redesign** — every entry in `ui/wizIcons.js` (15 with a
+> hardcoded size, mill + probe + lathe + ATC alike) goes from 14px to **16px**. Do it as its own commit,
+> separate from any redesign, so a size regression and a drawing regression can never be confused.
+>
+> The icons are **pure SVG, zero raster** — all `viewBox="0 0 24 24"` with a hardcoded
+> `width="14" height="14"`. Nothing to re-save; the render size is an attribute.
+> ⭐ **Better than editing 15 literals: DROP the hardcoded width/height and size from CSS.** The menu and the
+> new icon-only reopen chips have different needs, and one source beats fifteen — the same declare-once shape
+> as everything else in this backlog.
+>
+> ⚠ **Check what 16px does to the rows it sits in.** These are baseline-aligned beside menu labels; +2px can
+> shift row height, and the wizard menu was deliberately cut to ~9 rows by the t851 "menu diet". Verify the
+> menu, the palette and the Blocks tab, not just one surface.
+> ⚠ Bigger is not automatically better: t1918 deliberately COARSENED the lathe family for 14px (the polygon's
+> facets, the old probe ball). Those marks scale cleanly but look SPARSE — detail cut for a small size does
+> not return by enlarging. ⭐ The machine frame has the opposite property: drawn to survive 14px, it has
+> headroom at 16px for detail it does not currently use.
+
 > ### ⚠ COUPLED TO THE REOPEN CHIPS
 > Those are **icon-only** and inherit this set — so a lathe machine silhouette is a far better tell beside
 > lathe G-code than a rod. ⛔ But do NOT gate the chips on this: the human ruled ship-first, redesign only
