@@ -505,3 +505,52 @@ stop being bespoke code and become data.
 ~70 files, and **three are safety gates** where a refactor bug means offering an operation the machine
 cannot perform — the tap-into-steel class. The wizards-as-data port needs only four attributes on one block
 and touches no safety gate; do that first, shaped as DATA so this has less to clean up later.
+
+---
+
+## THE UNSAVED GATE — reword it, and delete the dead third caller
+*(human, 2026-08-22, live from the app)*
+
+`confirmDiscardBuffer` (`ui/workspaceManager.js:37`) fires a three-way prompt whose copy describes STATE,
+not the CHOICE:
+
+> *"Opening these controller parameters replaces everything in this workspace, and you have changes that
+> are not in a file yet."*
+
+Human: *"anytime this modal comes up I'm not sure which to press, I'm just doing a pull, why would it
+matter."* ⭐ The buttons (Cancel / Discard changes / Save and continue) answer a question the sentence never
+asks. Reword to ask it:
+
+| call site | reads as |
+|---|---|
+| `workspaceManager.js:191` — open a workspace | **"Save before opening a workspace?"** |
+| `settingsPanel.js:2653` — apply a pull | **"Save before applying these controller values?"** |
+| ~~`profileStore.js:131`~~ | ⛔ **DEAD — delete, see below** |
+
+⚠ **The pull wording is wrong twice over.** You are not *opening* — you are APPLYING, at the Apply step
+*after* the import-review dialog. And it does not replace *everything*: `settingsPanel.js:2655` says it
+rewrites **envelope / WCS / homing / spindle**. Both halves of the sentence describe something else, which
+is exactly why the buttons read as unanswerable.
+
+⭐ **KEEP the prompt on both live paths.** An earlier reading of mine — "the review dialog already asked, so
+drop it" — was WRONG: the review asks *which values to take*, this asks *what about your unsaved work*.
+Different questions. (The mismatch branch above it correctly skips the prompt, because duplicating into a
+new workspace IS a save.)
+
+### ⛔ DEAD CODE — the profile library left its machinery behind
+`ui/profileModal.js` has **ZERO references** anywhere in the app — no import, no button, no entry point.
+`git log`: *"2026-07-26 feat(workspace): retire the profile library — a workspace IS one machine"*. The
+ruling took the door and left the room.
+
+⇒ Delete `profileModal.js`, and `profileStore.js`'s import path with its now-unreachable
+`confirmDiscardBuffer('this machine configuration')` call. ⚠ Check what else in `profileStore.js` is still
+reachable before deleting wholesale — Export/Import of settings may still be wired elsewhere.
+This is the exact pattern the *"no legacy burden — delete rather than maintain"* ruling exists to prevent.
+
+### ⚠ SEPARATE, NOT FIXED BY ANY REWORDING
+The gate fires on a workspace the human calls clean. `isWorkspaceDirtyToFile()` (`data/backup.js:397`)
+compares a whole-workspace **signature** against a watermark — it answers *"is anything different from the
+last save"*, not *"did the USER change anything"*. Any normalising read, boot backfill or same-content
+rewrite moves the signature. ⭐ And because it is one opaque hash it can only ever say "something differs",
+never WHAT — so the prompt cannot show what to review even if it wanted to. **A confirmation that fires
+when there is nothing to confirm teaches you to click through confirmations.**
