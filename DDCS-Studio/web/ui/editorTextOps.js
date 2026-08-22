@@ -6,6 +6,13 @@
  * `data/indentStyle.js` (now deleted) held alongside it by filing accident — `COMMENT_MARK` and the
  * whole-line block-selection helper — so this file is the ONE remaining home for the editor's text ops.
  *
+ * t2147 — TWO DOORS IN, ONE IMPLEMENTATION: Ctrl+/ and the right-click context menu both drive this file's ONE
+ * `commentEditor()` — never a second copy of the toggle logic per door. (The dedicated toolbar BUTTON was a
+ * third door once; t2099/da280131 retired it deliberately, "Ctrl+/ and the right-click menu keep it" — a
+ * documented decision, not a regression, so the count here is TWO, current, not the three it once was. Its own
+ * `#editor-comment` lookup below still runs — the element it looks for is gone from index.html, so it is
+ * inert, not wired to anything; named here rather than silently left to look load-bearing.)
+ *
  * ── IT WRITES REAL BYTES, AND THAT IS THE RULING ─────────────────────────────────────────────────────────────────
  * No display-only padding anywhere (ruled OUT by the user; deliberately not built). The editor is a byte-truth
  * surface: what you see is what the controller reads. So this edits the textarea's VALUE directly, and the
@@ -107,14 +114,17 @@ function applyBlock(ed, op) {
 }
 
 /**
- * Wire the comment toggle's two entry points (Ctrl+/ and the toolbar button). Idempotent — safe to call again
- * after a re-render, which the editor does often.
+ * Wire the comment toggle's entry points. Idempotent — safe to call again after a re-render, which the editor
+ * does often. t2147 — the `#editor-comment` lookup below is VESTIGIAL: that button left index.html at
+ * t2099/da280131 ("Ctrl+/ and the right-click menu keep it"), so `b` is always null now and its wiring never
+ * runs. Left in place (harmless, not load-bearing) rather than deleted here — a small doc fix, not a code
+ * removal; flagged for whoever next touches this file.
  */
 export function installEditorTextOps() {
     const ed = editorEl();
     if (!ed || ed.dataset.textOpsWired === '1') return;
     ed.dataset.textOpsWired = '1';
-    // t1452 — Ctrl+/ is the comment toggle every editor has. Same one implementation as the button and the menu.
+    // t1452/t2147 — Ctrl+/ is the comment toggle every editor has. Same one implementation as the menu.
     ed.addEventListener('keydown', (e) => {
         if (e.key !== '/' || !(e.ctrlKey || e.metaKey)) return;
         e.preventDefault();
