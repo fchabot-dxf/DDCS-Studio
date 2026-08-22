@@ -47532,3 +47532,35 @@ in the run's failure/flaky list is a name this turn's files could plausibly caus
 
 🔨 turn 2129
 
+---
+
+# t2131 — release V2026.08.22.1: themed sound suite, organic GROVE retheme, boot-splash fix
+
+**Dispatch**: t2130 review passed both blockers with no further findings; cut and ship the release
+(themed sound suite, organic GROVE retheme, boot-splash apply-before-paint, editor Copy-button fix).
+
+Three files bumped: `web/index.html` (title + `.ver` span), `web/version.json`, `package.json` (short
+unpadded form, `2026.8.22`). `web/data/releaseNotes.js` got a new `'2026.08.22.1'` entry covering all four
+user-visible changes honestly, and explicitly does NOT touch or restate the prior release's CAM-pack entry
+— it stays exactly as written (documentation-conformant, unverified on real hardware), carried forward by
+simply not contradicting it; CAM pack was untouched this release. `check-version-sync.cjs` confirmed
+agreement both before AND after the release commit, per the dispatch's own instruction to re-check on the
+release commit itself, not before it.
+
+**Merge to main, verified by hash comparison, not a trusted push exit code**: `wizards-as-data-blocks` was
+confirmed to have `origin/main`'s pre-push tip (`cf67b64f8f1bf4f300f5dd11c4943121a5d266dd`) as an ancestor
+before pushing (`git merge-base --is-ancestor`), so the push was a genuine fast-forward, not a merge commit.
+Pushed `wizards-as-data-blocks:main`, then independently `git fetch origin main` and compared the actual
+resolved hashes rather than trusting the push command's own stdout: `wizards-as-data-blocks`, `origin/main`,
+and `FETCH_HEAD` all resolved to the identical `254e7016663fa1680899c7554f0e9d024a5603cb` — confirmed match.
+
+**Deployed result verified by fetching the served file, not a browser reload**: `Invoke-WebRequest` against
+the live `ddcs-studio.pages.dev` root, grepped the actual response body (200, 140277 bytes) — both the
+`<title>` and the `.ver` chip read `V2026.08.22.1`, and the fetched HTML source visibly carries the new
+boot-splash inline theme-apply script, confirming this is the real new build, not a cached edge response.
+
+## Files
+- `DDCS-Studio/web/index.html`, `web/version.json`, `package.json`, `web/data/releaseNotes.js` — the release.
+
+🔨 turn 2131
+
