@@ -31,6 +31,16 @@
  * ruling named plainly; not derived, not generated, not this file's job to keep populated automatically.
  */
 export const RELEASE_NOTES = {
+    '2026.08.22.2': [
+        { short: 'Sound was silent on iOS and unreliable on Android — both fixed (mobile hotfix)',
+          full: 'The themed sound suite shipped in the last release did not actually play on a phone: on '
+              + 'Android it was a race (the app started playing before the browser had finished waking up '
+              + 'audio, so the sound landed too late to be heard); on iOS it was silent outright, because '
+              + 'Safari requires a sound to be started directly inside your very first tap before it will '
+              + 'allow any sound at all. Both are fixed. ⚠ The Android fix is confirmed on a real device; '
+              + 'the iOS fix is written exactly to Apple\'s documented requirement but has not yet been '
+              + 'confirmed on a real iPhone — if sound is still silent for you on iOS, please say so.' },
+    ],
     '2026.08.22.1': [
         { short: 'A themed sound suite, with one switch for everything',
           full: 'UI clicks, wizard open/close/insert, and Blocks-canvas errors now have themed sound — each of '
