@@ -14,78 +14,138 @@ Each entry names where the evidence is, so nobody re-derives it.
 
 ---
 
+## FREDERIC'S ITEMS — classified 2026-08-22
+
+**How these were classified** against this file's own rule at the top: BACKLOG takes what is *noticed in
+passing, already diagnosed, and finishable in one sitting*. An ARC, a decision the human owes, or anything
+needing hardware belongs in [`ROADMAP.md`](ROADMAP.md) / [`NEXT-SESSION.md`](NEXT-SESSION.md) instead.
+**Three of the five stay here; two do not.**
+
+---
+
+### F1. Gateway tabs still don't gate by role; Status should differ client vs gateway
+⇒ **NOT BACKLOG — this is the ROLES ARC.** Belongs in `ROLES-PLAN.md`. It is S1, it is blocked, and the
+blocker is diagnosed here so nobody re-derives it.
+
+⭐ **THE SUB-QUESTION IS ANSWERED, so it is not a task.** *"on a gateway pc, is there a difference between the
+browser and the exe, are the roles still gateway for both?"* — **No difference. Both are `gateway`.**
+`effective_role()` at `bridge/bridge-app/fairy/config.py:273-280` derives the role from the DAEMON's config
+(a controller disk configured ⇒ gateway, else client), with an explicit `role_override` winning. Both shells
+on that PC ask the same local daemon. **The role belongs to the machine, not to the shell you view it through.**
+
+⚠ **AND THAT IS EXACTLY WHY NOTHING GATES.** `ui/gateway/views/admin.js:97` reads the role from
+`ctx.client.descriptor()` — which needs a RUNNING DAEMON. On a phone there is none, `descriptor()` throws,
+`render()` bails to "gateway unreachable", and no gating code ever runs. **The client role is only knowable
+from a machine that is not a client.** Until the role is derived CLIENT-SIDE, no amount of tab work will gate,
+and the Status tab cannot know which variant to draw. That derivation is the whole of S1.
+
+### F2. A rename button for workspaces
+⇒ **BACKLOG. Small and self-contained.** ⚠ But not yet diagnosed enough to hand over: the workspace list is
+`workspaceFiles` (`ui/settingsPanel.js:193`, whitelisted at `:430`) and there is **no rename path anywhere** —
+grep finds no `renameWorkspace` and no rename affordance at all. So this is a genuine ADD, not a wiring job.
+Whoever takes it must first find where the list is RENDERED (the array is only *declared* and *persisted* in
+settingsPanel), and check that a rename does not orphan the per-file bodies that ride on `workspace{}` at `:429`.
+
+### F3. Remove the clicking sounds; propose sounds for invisible states
+⇒ **SPLIT — half is backlog, half is a proposal the advisor owes.**
+
+⭐ **The ruling generalises, so record it as a rule and not just a deletion:** *a sound is only justified when
+the state it reports is NOT already visible on screen.* (human, 2026-08-22)
+
+**F3a — BACKLOG (one sitting, fully diagnosed).** In `ui/sound.js`'s `ACTION` table (`:202-223`):
+- DELETE the visible-state chirps — `ui.click`, `ui.toggle`, `wizard.opened`, `wizard.closed`, `keyboard.opened`.
+- KEEP/ADD **block snapping** — the human's own exception: *"ambiguous enough to be kept audible"*. It has no
+  sound today; adding one is the same one-line-per-action shape.
+- ⚠ Do NOT delete the EVENT/voice machinery, only the ACTION rows. The table is inert data; the synthesis is not.
+
+**F3b — NOT BACKLOG.** *"propose new sounds for invisible states"* is a design proposal, and it is the
+advisor's to write, not a task to pick up in downtime. → `NEXT-SESSION.md`.
+
+⭐ **It also settles the iOS audio-session trade.** The objection to `navigator.audioSession.type = 'playback'`
+was that it is non-mixing — a UI click would pause the phone's music. Delete the clicks and the objection
+evaporates: interrupting music for a *job-failed alert* is correct; for a chirp it never was.
+
+### F4. The V4.1 "Advanced machining" tab
+⇒ **MOVED OUT — ROADMAP arc, DEFERRED.** *(human, 2026-08-22: "the advanced machining is another arc,
+not doing it now.")* Five firmware-native features incl. **Array machining** and **Sequence machining**
+(a `template.txt` origin list with per-cell rotation). Full evidence + the three reasons it matters now live
+in [`ROADMAP.md`](ROADMAP.md) under "V4.1 ADVANCED MACHINING". Photos: `images/4.1 advance machining1 (1)/`.
+
+### F5. The DDCS wordmark in ORGANIC: rounder, probably sans
+⇒ **BACKLOG.** *(human, 2026-08-22: "the logo needs to be rounded more, maybe sans serif")*
+
+Current mark — `index.html`, `<symbol id="mark-organic">`:
+`font-family="Georgia,'Times New Roman',serif"`, **bold ITALIC**, `fill="#A89000"`.
+
+- **Rounded: agreed, and it is the theme's own word.** Organic is `--tab-radius: 16px` and its source describes
+  its motion as *"humanist soft — a slow UNFOLD"*. The wordmark is the only sharp, angular, high-contrast
+  element in a theme built entirely on soft curves — it fights its own chrome.
+- **Sans: yes, but HUMANIST rounded, not geometric.** Geometric-rounded reads tech-toy; humanist-rounded reads
+  warm and botanical. "Humanist" is the theme's own declared adjective — match it rather than picking a taste.
+- ⚠ **THE COLOUR IS STALE, AND MAY MATTER MORE THAN THE LETTERFORMS.** `#A89000` is a dull olive-gold from
+  BEFORE the tree retheme. The mark now sits on the green canopy band `--band-bg: #25301a` — two desaturated
+  yellow-greens fighting each other. Use the sap amber `--accent: #d9a03c` or the sapwood `--text: #ece0c6`.
+  The subtitle's `#7d7d6f` grey-olive is stale for the same reason.
+- ⚠ **CONSTRAINT — decide before drawing:** a rounded humanist sans is NOT a system font on Windows. For a
+  LOGO the right answer is to convert the wordmark to OUTLINED PATHS: a logo whose shape depends on the
+  viewer's installed fonts is not a logo. ⚠ Paths also change how `textLength` behaves — see F5b.
+
+#### F5a — CHECKED ACROSS ALL FIVE MARKS: the stale colour is ORGANIC ONLY
+*(human, 2026-08-22: "verify those 2 against the other themes too, if they also are to be fixed")*
+
+| mark | wordmark fill | verdict |
+|---|---|---|
+| `mark-normal` | `#C7A900` brand gold | ✅ fine — sits on a light `--band-bg: var(--panel)` that never moved |
+| `mark-studio` | `#f0eee8` over `#55514a`, two-layer engraved | ✅ fine — deliberately tuned to `--hdr-bg: var(--bg)` |
+| `mark-futuristic` | `#FFF100` + `filter="url(#neon)"` | ✅ fine — the neon IS the theme |
+| **`mark-organic`** | **`#A89000`** | ⛔ **STALE — the only one** |
+| `mark-steampunk` | `url(#brass)` gradient | ✅ fine — brass is thematically correct |
+
+⭐ **AND IT IS A SECOND INSTANCE OF A HAZARD THE RETHEME ALREADY DOCUMENTED.**
+`ORGANIC-TREE-PLAN.md` warned: *"⛔ `--edit-glow-rgb` is the one that gets forgotten. It is the same coral in
+RGB … change the accent alone and the pink survives in the animation."* The retheme moved `--band-bg` from
+coral `#bf6850` to moss `#25301a` and caught the glow — **but the logo holds its own hardcoded colour and was
+missed by exactly the same mechanism.** The other four marks are fine only because their bands never changed.
+
+⭐ **THE STRUCTURAL FIX, if anyone wants it:** all five marks HARDCODE their palette, with nothing reconciling
+them to the theme tokens — five two-homes instances waiting to go stale the next time a theme moves.
+`fill="currentColor"` plus one CSS rule per theme would make this class of drift impossible.
+⚠ It does NOT cover all five: studio needs two colours (engraved), futuristic a filter, steampunk a gradient.
+It cleanly fixes **organic and normal**. Worth doing for those two; do not force the other three.
+
+#### F5b — CHECKED: `textLength` is SHARED BY ALL FIVE, and I was wrong to call it a bug
+`textLength="146" lengthAdjust="spacingAndGlyphs"` is on **every text element of every mark** — both the
+wordmark and the "CNC MACRO STUDIO" line, all five themes.
+
+⇒ **That makes it an INTENTIONAL DEVICE, not a defect.** Forcing both lines to exactly 146 units is what makes
+the wordmark and its tagline align into one tidy block. ⛔ **Do not "fix" it, and do not strip it from the
+other four.** I called it a deformation earlier; that was wrong — it is a justification device used
+consistently.
+
+⚠ **BUT IT IS STILL LIVE FOR THIS TASK, for a narrower reason (INFERRED, not measured):** the amount of
+distortion depends on how far a face's natural width sits from 146. The three Arial Black marks are already
+wide and take it well. **Organic and steampunk are Georgia — a narrower face, stretched further.** A rounded
+humanist sans is narrower still, so whatever is chosen will be stretched MORE than Georgia is now.
+⇒ **Whoever draws this must judge the new face AT 146 units**, not at its natural width, or it will look
+right in the type specimen and wrong in the header. If outlining to paths, bake the 146 width into the paths.
+
+---
 ## OPEN
 
-### 1. ~~The avatar shows initials even when a photo exists~~ ✅ **CLOSED — t2113**
-> Cause (1), plus a second nobody had spotted. The boot backfill EXISTED but its guard was
-> `!name && !email` (pre-t2077, when identity had no picture), so an already-connected session never
-> qualified; and it lived in `renderCloudLogin()`, which the header avatar never calls. Both fixed:
-> `backfillIdentity()` re-asks when ANY part is missing, and `initHeaderAccount()` calls it.
-> An account with no photo asks once per load and keeps initials. `avatar-backfill-2113.spec.js`.
-
-*(human, 2026-08-19: "the avatar icon, it is my initials when I'm connected, but can it actually be my avatar image?")*
-
-`headerAccount.js` ALREADY renders `acct.picture` when present and only falls back to initials — and
-`googleDrive.getUserInfo()` now requests `photoLink` (t2077). So the plumbing is there; the likely causes are
-mechanical, in order of probability:
-1. **The picture was never cached for an EXISTING sign-in.** `captureGoogleIdentity()` runs on CONNECT only, so
-   anyone who connected before t2077 has `ddcs_cloud_name`/`_email` stored but no `ddcs_cloud_pic`. ⇒ **Re-fetch
-   identity on boot when the account is connected but the picture is missing**, rather than making the user
-   disconnect and reconnect.
-2. `photoLink` came back empty — a Google account with no photo set. Initials are correct there.
-3. The `<img>` 403'd and the `onerror` fallback fired (Google's photo CDN rejects some referrers; the tag
-   already sends `referrerpolicy="no-referrer"`).
-**Check which it is before changing anything:** read `localStorage.ddcs_cloud_pic` — empty means (1), a URL
-means (2)/(3).
-
-### 2. Move the theme selector out of the quick menu into Settings
+### 1. Move the theme selector out of the quick menu into Settings
 *(human, 2026-08-19)* — `headerPost.js` `themeSection` renders a heading + five `.hq-theme-chip`s in a menu the
 t851 "menu diet" cut to ~9 rows. A theme is chosen once; Settings is where appearance preferences live. ⚠ Leave
 NOTHING behind (a "Theme…" row that opens Settings keeps the row it was meant to free). ⚠ Reuse
 `setQuickTheme()` — do not re-implement switching — and keep the active-theme ring reflecting live `data-theme`.
 
-### 3. ~~Hide the console window when launching the exe~~ ✅ **CLOSED — t2113**
-> Shipped in the order the report demanded: rotated file logging first (`_RotatingLogFile`,
-> `~/.ddcs-bridge/gateway.log`, 5MB cap), a backend "view log" affordance (`Ops.open_log` + `POST
-> /api/open-log`, `os.startfile` — the Setup-tab BUTTON itself is a small web/ follow-up, not yet wired),
-> THEN `--windowed` added to `build_fairy.ps1`. Verified against a real `self_test()` run in an isolated
-> scratch HOME that the startup banner + a real `[poller] delivered` line + a real `[poller] DELIVERY
-> FAILED` line all reach the file, and that a console-write failure (the exact t2103 hazard) doesn't stop
-> the file write or raise out of `print()`. `bridge/tools/desktop-tests/test_gateway_log_2113.py`.
-*(human, 2026-08-19)* — `build_fairy.ps1` passes neither `--windowed` nor `--console`, so PyInstaller defaults to
-a console build and a black log window sits beside the app all session. ⛔ **Do not just add `--windowed`**: that
-log is load-bearing (bound host/port, a FAILED serial probe, `[poller]` delivery/stall lines) and on a frozen
-Windows build stdout then goes nowhere — a bare `print()` can even raise when `sys.stdout` is None. **Log to a
-file first** (`~/.ddcs-bridge/gateway.log`, rotated) with a "show log" affordance in Setup, *then* hide the window.
-
-### 4. The exe only checks for updates at boot
+### 2. The exe only checks for updates at boot
 *(human, 2026-08-19)* — `initUpdateCheck()` is called once from `index.html` ("one check per launch"); a release
 cut while Studio is open is invisible until restart. The WEB build already re-checks on `visibilitychange`
 (`initWebVersionNudge`) — the exe, which cannot reload itself and most needs telling, has no equivalent. Reuse
 that pattern, throttled (`_lastWebCheck` is the precedent). ⚠ Must not re-nag a version already dismissed —
 `update-check.spec.js` asserts that.
 
-### 5. The update banner is not well balanced
-*(human, 2026-08-19, on the real exe — twice, second time with the specific symptom: "the buttons seem to
-clutter to the left and have a big empty space on the right")*
-
-**The measured symptom:** the bar is WIDER than its content and everything is left-packed, so the controls bunch
-up on the left with dead space trailing off to the right. Two candidate causes, and they want checking before
-either is "fixed": the container is being stretched (a `width`/`min-width` or a stretching flex parent) rather
-than hugging its content, and/or there is no `justify-content`/`margin-left:auto` giving the ✕ its own corner.
-
-**Compounding it, from the first report:** the version prints TWICE — in the label AND inside the primary
-button, which carries the longer copy ("Update to v2026.08.19.2 and restart"). So the widest element is also
-the most redundant one, and its width grows with the version string, meaning the layout reflows differently per
-release and cannot be judged at one width. Dropping the version from the button ("Update and restart") both
-shortens the row and removes the duplication.
-
-⚠ Do not "fix" it by shrinking or demoting the primary action — t2066 deliberately made the in-place update
-prominent over the dated manual Download, which users kept grabbing by mistake. It is a proportion problem, not
-a priority one. ⚠ `update-check.spec.js` asserts button classes and the exact "Download manually" label, so a
-copy change is a test change — read it first.
-
-### 6. The welcome / "What's new" panel: shorter, and link to the thing it describes
+### 3. The welcome / "What's new" panel: shorter, and link to the thing it describes
 *(human, 2026-08-19: "the panel on boot can be a little bit less lines and perhaps a link on each panel to go to
 the function associated with the note whenever possible… maybe it's nice to have a screenshot of the function or
 the menu for each note.")*
@@ -122,18 +182,7 @@ no-notes fallback — read it before changing the schema.
 
 ---
 
-## RECENTLY CLOSED  *(kept briefly so a re-report is recognised, not re-investigated)*
-
-- ~~**Two Google Drive connect surfaces sharing one credential**~~ — closed by **t2077**: one account door in the
-  header, both features (save projects / send jobs) hang off it.
-- ~~**The editor's bottom-left button cluster is overgrown**~~ — closed by **t2078**: one flex toolbar row above
-  the editor; indent/comment buttons retired to their keyboard shortcuts.
-
-## OPEN (continued)
-*(⚠ these numbered items were appended BELOW the RECENTLY CLOSED list by earlier turns and
-read as closed at a glance. They are not. Header restored 2026-08-20.)*
-
-### 7. The lathe icon doesn't read as a lathe setup
+### 4. The lathe icon doesn't read as a lathe setup
 > ## ⭐ SETTLED 2026-08-22 — decided across a long session, recorded here so it is dispatchable
 >
 > **WHICH ICONS: both families** *(human: "all lathe icon are wrong")* — the question this entry opened with
@@ -215,103 +264,176 @@ tool-on-a-cross-slide; the current op family draws bar + centreline + cut only, 
 post — which is a plausible reason it reads as "a rod" rather than "a lathe". ⚠ Whatever changes, it must
 survive **14px** — that constraint is what t1918 was entirely about, and it is where the first attempt died.
 
-### 8. ~~Let the BROWSER send jobs through Drive too (not just the exe)~~ ✅ **CLOSED — t2080**
-> Shipped: `ui/cloud/driveJobs.js` writes straight into the machine's Drive inbox; `client-send-2080.spec.js`
-> covers both contract cases. Since extended by S4 (per-machine folder) and by the no-send policy below.
-*(human, 2026-08-19: "what if i want the browser to send too", then — cutting through my overcomplication —
-"cant we make the gateway simply watch a folder on my drive")*
+### 5. ⛔ A raw NUL byte makes `macrosApp.js` INVISIBLE TO GREP
+*(found 2026-08-22 while re-running the t2139 orphan sweep)*
 
-⭐ **THE BLOCKER I DESCRIBED DOES NOT EXIST. MEASURED 2026-08-19, correcting my own claim.** I asserted that
-`drive.file` scopes visibility per OAUTH CLIENT, so a job written by the browser (Web client `…mapt`) would
-be invisible to the gateway (Desktop client `…607m`) and would fail SILENTLY. **Tested instead of argued:
-the gateway's Desktop client listed and read `DDCS Studio/` — a folder created 2026-06-15 by the BROWSER's
-Web client — including its contents.** ⇒ `drive.file` visibility is scoped to the **Cloud project**, not the
-client. Both clients live in project `895572525139`, so the two ends ALREADY share one visibility domain.
-No client unification, no re-registering redirect URIs, no reverting t2079.
+`web/ui/macrosApp.js:658`, inside `autostartGenSig()`, contains an actual **0x00 byte** in a string literal
+(used as a separator), not the two-character escape `\0`. `file(1)` reports the module as `data`; grep and
+ripgrep classify all 172,647 bytes as BINARY and skip it silently.
 
-⚠ The lesson worth more than the item: this was ONE API call away for the entire session and I designed
-around it instead of testing it. The human's "can't we simply watch a folder" was the correct model all
-along — the gateway already does exactly that (`DriveBackend` polls `DDCS Bridge/inbox/`).
+⭐ **THIS IS A REVIEW HAZARD, NOT A COSMETIC ONE.** Every grep-based sweep of `web/` has been blind to a
+live 2,000-line module. It is why the duplicate `homingPostIsExpert` survived a full sweep, and it produced a
+FALSE NEGATIVE that made me wrongly call a true finding "invented".
+⚠ **Three other files carry NUL bytes** — `DDCS-Studio/WORK-LOG.md`, `docs/archive/WORK-LOG-early-eras.md`,
+`analytics/test/worker.test.mjs`. **So grep over WORK-LOG.md is unreliable too**, which matters because the
+handoff protocol greps it.
 
-**What actually remains — small:** the browser must WRITE a job in the layout the gateway polls. Mirror
-`backend/drive.py`'s `put_job`: `DDCS Bridge/inbox/<jobId>.nc` + the `.map.json` sidecar, the same
-`make_job_id` timestamp convention, and the `content_hash` `send.js` already computes (so History still
-links repeat runs). `ui/cloud/googleDrive.js` already has the upload/list primitives.
-⚠ Reuse the UPSERT discipline — Drive permits duplicate names, so a blind create duplicates a job.
-⚠ Prove it end to end (a real browser submit → a real gateway claim → a real controller delivery) before
-believing it; that rule is what months of `[TO TEST]` on r2.py earned.
+**Fix:** replace the literal NUL with `\0` (or a normal separator such as `␟`). ⚠ If the byte is load-bearing
+for the signature's value, changing it INVALIDATES every stored `autostartGenSig` — check whether a
+mismatch merely shows a staleness note or triggers a regeneration before changing it.
 
-### 9. ~~A job sent while the controller is OFF is discarded, not queued~~ ✅ **CLOSED — t2105/t2107**
-> ⛔ **DO NOT BUILD WHAT THIS ENTRY PROPOSES.** The retry queue, attempt ceiling and persisted retry state
-> described below were all explicitly rejected by the human. The defect was real; the fix was the opposite
-> of elaborate:
-> - `poller._maybe_claim` now checks `transfer.reachable()` beside the `expert_dest` check, so an
->   undeliverable job is simply **NOT CLAIMED** — and **the inbox IS the queue**, so not claiming already
->   means waiting. No counter, no ceiling, no backoff, no state.
-> - and the job should not exist in the first place: **a send is refused unless a gateway is running AND
->   the CNC is powered** (the twofold heartbeat). Prevention at the moment of action beat cleanup after it.
->
-> ⭐ The full reasoning, including an advisor objection that was **backwards**, is in
-> [`bridge/bridge-app/JOB-RULES.md`](bridge/bridge-app/JOB-RULES.md) — the one source for this behaviour.
-> The original text is kept below only so a re-report is recognised, not re-investigated.
+### 6. Hand-authored T.nc / error.nc G-code is DISCARDED on reload
+*(found 2026-08-22, same sweep — and only findable because of the item above)*
 
-#### (original report, superseded)
-*(found 2026-08-19 while answering the human's "is CNC-FAIRY a gateway when the controller is on and a
-client when it's shut down?" — the role answer is no, but the instinct behind it exposed this.)*
+`ui/macrosApp.js:607-626` writes `getSettings().systemHooks.T` and `.error` — the user's **hand-written**
+tool-change and error macros. `loadSettings()` (`ui/settingsPanel.js:391+`) is a WHITELIST and does **not**
+list `systemHooks`. ⇒ written → persisted → **silently dropped on the next load**. `macrosSynced` (`:798`)
+goes the same way; a sweep counted **four** persisted-then-dropped keys total.
 
-`poller._claim()`: when `transfer.deliver()` raises `OSError` (share unreachable = controller powered down,
-cable out, network blip) the job is marked **`failed`** and **`delete_job()`d from the inbox** — comment:
-*"don't wedge the queue on a bad job"*. Correct for a genuinely bad job (malformed, wrong machine); **wrong
-for a machine that is merely OFF**, which is the ordinary case of authoring in the evening.
+⛔ This violates the standing principle that a saved file is USER-OWNED. ⚠ **Reproduce the loss first** —
+confirm the save path serializes the live object before assuming the chain; do not fix on this trace alone.
+⚠ The real fix is probably not "add four keys": a whitelist that silently drops anything unlisted will do
+this again on the NEXT setting somebody adds. Decide whether unknown keys should be PRESERVED rather than dropped.
 
-⚠ **The Drive path makes this materially worse, and it is new as of t2080:** a client sends from a phone,
-the UI honestly says "queued — the machine picks it up when it next runs", and the first poll of a sleeping
-gateway *deletes it*. The user is told to expect asynchrony and then silently loses the job. **A client's
-send is supposed to be offline-tolerant BY CONSTRUCTION** (ROLES-PLAN.md) — this is the one thing that
-breaks that promise.
+### 7. The header shows the VERSION where it should show the WORKSPACE
+*(human, 2026-08-22: "i think the workspace should be visible instead of the version number, and version
+number should be in the bottom of quickmenu, we can repeat the workspace name with more info in the
+quickmenu still, maybe with 1-2 more datapoints.")*
 
-**Shape of a fix:** distinguish TRANSIENT from FATAL. Unreachable/`OSError` ⇒ leave the job in the inbox and
-retry on a later tick (the queue is FIFO and the job is already durable, so "wedging" is not what happens —
-it simply waits, which is the correct behaviour). Reserve delete-and-fail for a job that cannot ever
-succeed: refused identity, unreadable content.
-⚠ Keep a real ceiling so a genuinely dead destination does not retry forever in silence — an attempt count
-or an age, and when it trips, fail it LOUDLY with the reason (`t2073`'s honesty rule: never a silent drop).
-⚠ `test_poller_track_gate.py` and `test_history_real_path_2065.py` both drive this path — read them first;
-one asserts the failed-job cleanup that this changes.
+**The principle:** the version is a **lookup** fact — consulted when reporting a bug or verifying a release.
+The workspace is an **identity** fact — needed continuously. Header space belongs to identity.
 
----
+```
+  HEADER                                     • = unsaved to file
+  ┌──────────────────────────────────────────────────────────────┐
+  │  DDCS                MILLING-DDDD4.1 •   [∨] [💾]   <> STUDIO│
+  │  CNC MACRO STUDIO    └── OUTSIDE the brand <a> ──┘           │
+  └──────────────────────────────────────────────────────────────┘
 
-## SOUND — ONE MASTER TOGGLE IN SETTINGS
-*(human, 2026-08-20: "backlog general sound toggle in setting")*
+  QUICK MENU
+  ┌────────────────────────────────────────────┐
+  │ Workspace: MILLING-DDDD4.1 · DDCS        ↧ │   (unchanged)
+  │ V4.1 · X 860  Y -855  Z -80                │   (unchanged)
+  │ Saved 14:22 · this PC             ← NEW    │
+  ├────────────────────────────────────────────┤
+  │ [💾 Save]                    [📂 Open]     │
+  │ ✨ Wizards…      📂 Load…                  │
+  ├────────────────────────────────────────────┤
+  │ V2026.08.22.2                     ← MOVED  │
+  └────────────────────────────────────────────┘
+```
 
-**One user intent — "make it quiet" — but there are TWO sound producers, in two processes, potentially on
-two different machines.** That split is the whole design problem; the toggle itself is trivial.
+#### ⛔ THE TRAP — read this before touching index.html
+`index.html:129` puts `<span class="ver">` **INSIDE** `<a class="brand" href="https://ddcs-studio.pages.dev">`.
+Drop the workspace name into that slot as-is and **clicking your own workspace name navigates to the website.**
+The name must live OUTSIDE the anchor. The version, moving to the menu, leaves the anchor entirely.
 
-| producer | what it plays | where it runs | today |
-|---|---|---|---|
-| `DDCS-Studio/web/ui/sound.js` | UI click feedback (`playClick`, `playClickReverse`), 8 call sites in `app.js` + `wizardManager.js` | the BROWSER | always on, no setting at all |
-| the gateway daemon's chime | door / register / buzzer on job received, delivered, failed | the GATEWAY PC's Python process | being added now, with its own Setup toggle |
+#### The one added datapoint, and why only one
+`Saved 14:22  ☁` — both halves already exist in `data/backup.js` (`fileSavedAt()`, `fileSavedPlace()`).
+No new state, only surfacing.
 
-⭐ **WHAT TO BUILD:** a single user-facing "Sounds" control in Studio's settings that reads as one switch,
-even though it has to reach two places. ⚠ **Do NOT ship two unrelated checkboxes in two panels** — that is
-the shape the roles work is currently deleting elsewhere.
+⭐ **WHERE matters more than it looks** in a two-PC shop: *saved locally* and *saved to Drive* are completely
+different answers to **"will the mill PC see this?"** — and nothing in the UI answers that today.
+*When* without *where* is half a fact.
 
-⚠ **The one real question to settle first:** the browser's clicks and the gateway's chimes are genuinely
-different things, and someone may reasonably want clicks OFF and job chimes ON (the chime is a
-NOTIFICATION about the machine; the click is keypress feedback). ⇒ Likely **one master off-switch plus two
-sub-toggles**, not a single boolean. Decide this before writing the setting, not after.
+#### ⭐ WHERE IS AN ICON, NOT WORDS *(human, 2026-08-22: "the where its saved can be a icon")*
+And the data makes this easy: **`fileSavedPlace()` (`data/backup.js:355`) returns exactly TWO values** —
+`'cloud'` or `'local'`, nothing else. A binary is precisely the case where an icon beats a word: the text form
+spends ~9 characters (`· this PC`) on one bit.
 
-⚠ **A gateway on another PC cannot read a browser localStorage setting.** If the master switch must govern
-a remote gateway's chime, it has to live somewhere both read — the same join problem as
-[[the machine-identity join]]. **Cheapest honest answer: the toggle governs THIS machine's sounds**, and
-the gateway's own chime is set in that gateway's Setup. State that in the UI rather than implying reach it
-does not have.
+```
+  Saved 14:22  [disk]     local  — this PC only
+  Saved 14:22  [cloud]    cloud  — travels to the other PC
+```
 
-**Also worth folding in while there:** `sound.js` hardcodes one asset and a fixed `VOLUME = 0.5` with no
-way to change either. A volume slider is the obvious neighbour of an on/off switch, and the module already
-routes WebAudio through a `gainNode` that nothing currently adjusts.
+⚠ **DO NOT put these in `ui/wizIcons.js`.** That file holds OPERATION icons (drill, bore, pocket, the lathe
+family) and has no chrome icon in it — a save-location glyph is UI CHROME, a different category. Find where
+the quick menu's existing chrome glyphs come from (the save/folder/chevron marks) and add it there. Putting a
+chrome icon in the op-icon registry is a miscategorisation that the next reader inherits.
 
----
+⚠ **Give it a `title`.** Two states are legible, but the first encounter is still a "what does that mean"
+moment; the tooltip costs nothing and removes it. ⛔ Emoji are NOT acceptable here — the app's icons are pure
+SVG with zero raster, and emoji render differently per platform.
+
+⚠ **THE TIMESTAMP NEEDS A HONESTY RULE**, or it lies by omission:
+```
+  today      ->  Saved 14:22
+  yesterday  ->  Saved yesterday 14:22
+  older      ->  Saved Aug 19 · 14:22
+```
+A workspace last saved three days ago must not read as if it were saved this afternoon — that is precisely
+the wrong impression before an overwrite.
+
+#### ⛔ CUT by the human — do not reinstate
+- **"Not saved to a file" as its own line.** *("not usefull")* The header dot already carries it.
+- **The filename row** (`MILLING-DDDD4.1.ddcs`). *("only keep the timedate stamp")* It is the workspace name
+  from the line above plus an extension — pure redundancy.
+
+#### ⭐ The dirty dot is the real win
+Once the name is in the header, the unsaved marker rides with it, the way an editor marks a modified tab.
+`isWorkspaceDirtyToFile()` (`data/backup.js:397`) already exists — this is an invisible state made visible
+where the eye already is. ⚠ It pairs with the standing rule that localStorage is a TEMPORARY buffer and only
+a file is "saved".
+
+#### ⚠ Two build cares
+- **Names are variable-length; the version was not.** `V2026.08.22.2` is a fixed 13 chars. A workspace can be
+  `Aluminum bracket - Jones run 3`. Needs `max-width` + ellipsis + a `title` tooltip. ⚠ The narrow header is
+  real and already exercised — see `verification/t2099-header-390.png`.
+- **Keep the version SELECTABLE** in the menu footer. It is read to confirm a release actually landed; a
+  decorative footer label that cannot be copied is a regression for that use.
+
+#### Also worth doing in the same pass
+Make the header name itself open the quick menu on click, not only the chevron. Clicking your workspace name
+to get workspace actions is the obvious gesture; the chevron then becomes a second door rather than the only one.
+
+**Files:** `web/index.html` (move the span out of the anchor), `web/ui/headerPost.js` (menu head + version
+footer, `Workspace:` line is at :151), `web/styles.css` (truncation).
+
+### 8. ⛔ `M6.rc` is offered as an EDITABLE G-code file — it is a compiled GUI resource
+*(human, 2026-08-22: "is m6.rc the right filename? not .nc?" — the name is right; the classification is not)*
+
+`data/controllerFiles.js:50` declares, in the V4.1 tree:
+`{ path: 'M6.rc', title: 'M6.rc', sub: 'Tool-change dialog', editable: true, seed: true }`
+
+**But `M6.rc` is not G-code.** Its first lines, from the real firmware dump
+(`bridge/controllers/v4.1/assets/firmware/ddcs v4.1/ddcsv4(2025-04-04)/.../M6.rc`):
+```
+/*  SEGGER Microcontroller GmbH & Co. KG
+ *  C-file generated by:
+ *     GUI_Builder for emWin version 5.12
+ *     Compiled Jun 29 2011 ...
+```
+It is a **compiled dialog resource for the controller's embedded GUI toolkit**. Studio currently presents an
+embedded-GUI C file inside a G-code editor, with G-code highlighting, and offers a LAN push button for it.
+
+⭐ **AND THE EDITABLE LOGIC IS SOMEWHERE ELSE.** `slib-m.nc:11-13` shows what `M6.rc` actually is —
+just the popup:
+```gcode
+G0G53X#1300Y#1301        <- the move
+MarcoDialog "M6.rc"      <- ONLY pops the dialog
+G43H#17                  <- the offset apply
+```
+The tool-change SEQUENCE is in `slib-m.nc`, which Studio already declares. So the "Tool-change dialog" entry
+points at the one part of the pair a user cannot usefully edit.
+
+⭐ **THE `.rc` FAMILY ALSO EXPLAINS THE ADVANCED-MACHINING SUBMENU** (see ROADMAP "V4.1 ADVANCED MACHINING"):
+`array.rc`, `advstart.rc`, `advstart-array.rc`, `advstart-sr.rc`, `break.rc`, `break-array.rc`, `break-sr.rc`,
+`center.rc`, `adjush.rc`. Those features are FIRMWARE DIALOGS, not user macros — which sharpens that arc:
+Studio can surface the DATA those dialogs read (e.g. `template.txt`), never the dialogs themselves.
+
+#### ⚠ VERIFY BEFORE CHANGING — this decides what a user may touch on their machine
+1. Does the controller load `M6.rc` from disk at RUNTIME, or is the dump copy merely source baked into
+   firmware? That decides whether "push" is meaningless or actively DANGEROUS.
+2. Is `advstart.nc` real, or did the tree conflate it with `advstart.rc`? The Macros tab shows
+   `advstart.nc — Advanced start (boot)`, which sounds right, but the `.rc` twin exists.
+3. Did any OTHER `.rc` entry leak into a declared tree the same way? Audit `controllerFiles.js` for
+   non-`.nc` paths carrying `editable: true`.
+
+#### The likely fix, once verified
+Drop `editable: true` from `M6.rc` (show it read-only as reference, or remove it), and point "tool-change"
+at `slib-m.nc` where the editable behaviour lives. ⛔ Do NOT ship this as a silent tidy-up — it changes what
+a user is permitted to write to their controller, so it wants a human ruling first.
+
 
 ## THE JOBS FOLDER IS SETTABLE — FOLD THE "SYNC FOLDER" ROUTE INTO **LOCAL**, NOT A THIRD OPTION
 *(human, 2026-08-20: "i dont like that it would look like a 3rd option can we fold this in the local folder
@@ -489,6 +611,49 @@ just which addresses it names.
 
 ---
 
+### E. Modbus Register 3000 — real-time G-code injection (Studio as an ACTIVE controller)
+*(rescued 2026-08-22 from an untracked root file `brainstorm_injection.md`, dated 2026-08-03, before deleting it)*
+
+⚠ **STATUS: SOURCE-DERIVED, NOT BENCH-VERIFIED.** Everything below was read out of the OEM's own
+`m350_liveg.py` (see `scratch_repos/M350-LiveG`), not observed on hardware. Same evidential tier as the
+register map in `bridge/controllers/expert-m350/FINDINGS.md` — treat as a lead, not a fact.
+Related, already tracked: `SLAVE-CHANNEL-TESTS.md`.
+
+**The claim:** firmware `2026-08-03-00` adds **G-code injection via Modbus Register 3000, 246 bytes max**.
+That would change Studio's relationship to the machine — from a passive observer (polling coordinates) plus a
+file server (dropping `.nc` on the share) into something that can actually command the controller.
+
+**The four mechanical details worth keeping** (these are the part that would take a day to re-derive):
+- **Write path:** Modbus **Function Code 16** → register **3000**.
+- **Payload encoding:** ASCII over 16-bit Modbus registers takes character PAIRS and **swaps their byte
+  order** — `"G0"` goes on the wire as `"0G"`.
+- **Buffer guard:** injecting while the controller is still executing the previous command returns exception
+  code **`0x90` (busy)**. ⭐ That is a real backpressure signal — streaming cannot silently overflow.
+- **Motion state:** register **10002** read as a 32-bit float. `> 0` = moving, `0` = stopped. Two consecutive
+  zeros ⇒ motion complete. ⭐ This is what would let a probe wizard know the probe has touched.
+- Bonus for the separate keycode hunt: the OEM block is `0x0140`–`0x0190`, so probing blank slots there beats
+  scanning 65,000 values.
+
+**What it would unlock, in the author's order:**
+1. **A true MDI** in the gateway Console tab — type `G0 X10 Y10` or `#100 = 5` and it executes. Today that
+   requires walking to the pendant.
+2. **On-screen jogging** in the Status tab — inject `G91 G1 X10 F500` instead of reverse-engineering the
+   controller's proprietary virtual keycodes. Variable-speed, diagonal and exact-step jogging become ordinary
+   UI rather than keycode hacks.
+3. **Remote execution** — Send already drops the file over SMB; injection could then fire `M98 P"job.nc"` so
+   the operator never touches the file menu.
+
+⛔ **THE SAFETY GATE, and it is not optional.** This is the first WRITE capability that commands MOTION.
+The standing ruling is that Studio stays **read-only on a powered controller when the user is away**
+(see the `live-cnc-readonly-when-away` rule). Any of the three uses above must be gated on the operator
+being present and having explicitly armed it — a jog button that works from a phone in another building is
+exactly what that ruling exists to prevent. ⚠ Decide the gate BEFORE building the MDI, not after.
+
+⚠ **VERIFY FIRST, IN THIS ORDER:** (1) does register 3000 exist on the user's actual firmware; (2) does a
+motion-free command (a variable set) round-trip; (3) does `0x90` actually appear under load. Only then
+consider motion.
+
+
 ## ANALYTICS BOT DETECTION — an unmerged branch that was deliberately NOT pruned
 *(logged 2026-08-21 during the advisor branch sweep — human: "backlog the analytic bot detection")*
 
@@ -620,68 +785,6 @@ when there is nothing to confirm teaches you to click through confirmations.**
 
 ---
 
-## NO INDENTATION, EVER — remove the toggle AND every path that writes one
-*(human, 2026-08-22: "i dont want it, no indentation ever" · "remove the toggle")*
-
-⛔ Studio must never generate or insert leading whitespace in G-code. Flush left, always, no preference.
-
-⚠ **Why this is not cosmetic.** `blockEmitter.js:531-535`: *"`  N50` throws a syntax error, `N50` parses;
-indented STATEMENTS are fine, labels are NOT"* — a dialect declaring `flushIndent` already forces flush
-**regardless of the user's setting**. So the machine-correctness case is handled by the dialect; this
-setting only ever governed the cosmetic case, and its DEFAULT was `indented` — i.e. Studio shipped G-code
-with leading spaces by default, on a controller family where one column rule is a syntax error.
-
-### Everything to remove — the toggle is only the visible half
-| what | where |
-|---|---|
-| the settings row + persisted key | `ui/settingsPanel.js:437` |
-| the emit branch | `blocks/blockEmitter.js:535`, `wizards/previewEmit.js`, `data/indentStyle.js` |
-| ⚠ **the Tab keybinding** | `ui/editorTextOps.js:76` — **still live** |
-| the menu entry + its wiring | `ui/editorTextOps.js:96, :102` (`"⇥ Indent (N spaces)"`) |
-
-⭐ **THE BUTTONS WERE ALREADY REMOVED AND THE FUNCTION WAS LEFT BEHIND.** `indentEditor` has **0 external
-callers** — but `editorTextOps.js:76` still indents on **Tab**. The door was removed, the room stayed.
-⚠ Same pattern as `profileModal.js` (retired July, still on disk with 0 refs). This is exactly what the
-*"no legacy burden — delete rather than maintain"* ruling exists to prevent: an ask to remove a CONTROL gets
-read as "hide the control", not "remove the capability", because nothing forces the question *"what else
-still calls this?"*
-
-⭐ **INDENTATION GOES ENTIRELY — setting, emit, Tab, menu entry, help text, persisted key. No exceptions.**
-
-⚠ The ONE thing to not take with it: `indentStyle.js` happens to hold **two unrelated features** — the indent
-code AND `COMMENT_MARK` / `commentBlock` (the comment toggle, which SURVIVES and becomes the caret-following
-button). That is a filing accident: both were once "editor text operations".
-### ⛔ NO "INDENT" ANYWHERE — INCLUDING FILENAMES
-*(human, 2026-08-22: "what i want is indent mentions gone even in filenames")*
-
-**21 files** contain the word; **3 carry it in the filename**:
-
-| file | fate |
-|---|---|
-| `web/data/indentStyle.js` | strip the indent half, RENAME (see below) |
-| `tests/editor-indent-1450.spec.js` | the feature is gone ⇒ delete the spec |
-| `verification/t2095_indent_diag.mjs` | a diagnostic for a removed feature ⇒ delete |
-
-⚠ Sweep all 21 for stale prose too, not just code — `blockEmitter.js`, `settingsPanel.js`, `index.html`,
-`styles.css`, `editorTextOps.js`, `releaseNotes.js`, `opToSlot.js`, `editorOpHover.js`, `opContextMenu.js`,
-`headerPost.js`. ⛔ **Except `vendor/blockly/blockly.min.js`** — third-party, never edit.
-⭐ Historical WORK-LOG entries stay: they RECORD that indentation existed, which is different from the app
-still mentioning it.
-
-⭐ **FIX: RENAME THE MODULE** *(human, 2026-08-22: "its a semantic problem, rename the module")* — the file
-is named after the half being deleted. Once the indent code is gone it holds only comment logic, so it
-holds only `COMMENT_MARK` + a `commentBlock` text helper.
-
-⚠ **Do NOT name it after "comment"** — `commentBlock` ALREADY means two different things: this text-surgery
-helper, and a G-code comment OP at `wizards/ops/comment.js:6`. A comment-named file makes that collision
-worse.
-⭐⭐ **DECIDED: fold both survivors into `ui/editorTextOps.js` and DELETE `data/indentStyle.js`.**
-That file already imports and re-exports both at `:23`, so keeping it would leave a module of two exports
-whose only consumer is a near-identically-named file — an indirection that exists solely because indentation
-used to live there. No new filename to argue about, one less hop, and the word disappears from the tree.
-
----
-
 ## COMMENT TOGGLE — a caret-follows button, not a toolbar item
 *(human, 2026-08-22: "comment should be a different kind of ui button… id want a button to appear only when
 the caret is in the editor, and button should appear at the end of the line")*
@@ -788,28 +891,6 @@ riding on a navigation control.
 
 ---
 
-## `ddcs_active_post` — TWO READERS SURVIVED THE t2137 COLLAPSE
-*(found 2026-08-22 during review of commit `30d0dc24`)*
-
-t2137 retired the `ddcs_active_post` localStorage override and added a boot migration that **deletes the
-key**. The worker grepped the literal key string (good — that is how they caught `homingPostIsExpert()` in
-`settingsPanel.js`) but did not sweep `ui/macrosApp.js`, which still reads it twice:
-
-| | |
-|---|---|
-| `macrosApp.js:1036` | `homingPostIsExpert()` — a **second copy** of the same predicate |
-| `macrosApp.js:1052` | `isV41Post()` |
-
-⭐ **NOT broken** — both have the shape `if (ap && ap !== 'auto') …; return <controller profile>`, so with the
-key deleted they fall through to the controller profile, which is exactly the intended behaviour. What is
-left is dead override-checking in two places.
-
-### But it names two real problems
-1. ⚠ **`homingPostIsExpert()` exists TWICE** — `settingsPanel.js` (fixed in t2137) and `macrosApp.js` (not).
-   One predicate, two implementations: the same two-homes shape the collapse was retiring.
-2. ⚠ **A second raw-string coupling underneath**: both fall back to
-   `localStorage.getItem('ddcs_controller_profile')` by literal key rather than through the workspace. The
-   comment at `:1049` also records an id-convention change (`'ddcs-v4.1'` → `'ddcs-v41'`) that a by-string
    reader cannot be protected from.
 
 ⇒ Delete the dead override branches, de-duplicate `homingPostIsExpert`, and route both through the workspace

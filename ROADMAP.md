@@ -336,6 +336,60 @@ Three custom-op authoring wins landed together (on `main`, redeployed to pages.d
 
 ---
 
+## V4.1 ADVANCED MACHINING — five firmware-native features Studio does not know about
+
+**Captured 2026-08-22** from three photos of the real controller (`images/4.1 advance machining1 (1)/`).
+⇒ **DEFERRED, deliberately.** *(human, same day: "the advanced machining is another arc, not doing it now.")*
+Filed here rather than in `BACKLOG.md` because that file takes only one-sitting work, and this is an arc.
+
+```
+  Advanced machining submenu   (V4.1, under the CONT screen)
+    • Advanced Startup
+    • Array machining              rows × cols × spacing, + rotation PER CELL
+    • Sequence machining           an arbitrary origin LIST read from template.txt
+    • Milling plane machining
+    • Milling cylindrical machining
+```
+
+**Array machining** — fields: Array Rows, Array Columns, Row spacing, Column spacing, Rotation angle,
+Rotation Center X, Rotation Center Y. On-screen note, verbatim:
+*"The rotation setting is used for each cell, not the entire array!"*
+
+**Sequence machining** — the significant one. Its node table columns are
+`No. | Origin-X | Origin-Y | Origin-Z | Origin-A | Rotate-angle | R-Center-X | R-Center-Y`,
+and its own on-screen message reads:
+*"The template file for serial machining is **template.txt** in the system directory; please write the
+template file in the order of the fields in the list above."*
+
+### ⭐ Why this matters to Studio — three reasons, in order of weight
+
+1. **⚠ IT ROTATES NATIVELY, AND THAT CONTRADICTS A STANDING PREMISE.** Both features take a rotation angle
+   AND a rotation centre. The alignment work was DEFERRED on the belief that these controllers have no
+   usable rotation (no `G68` on the Expert; Studio rotates geometry itself by `#1512` instead). That premise
+   was established for the **Expert** — this is the **V4.1**, and it plainly rotates. **Re-test before any
+   further alignment planning assumes otherwise.**
+2. **It is a DECLARED, FILE-DRIVEN feature.** `template.txt` is a plain text table Studio could WRITE; the
+   controller then runs one program at N origins. That is the declare-don't-hand-roll shape exactly, and it
+   is the rare case where the *controller* provides the declared seam.
+3. **It would replace UNROLLING.** Studio currently expands patterns into repeated G-code. The V4.1 does this
+   natively, so an emitted program could stay ONE part with the array living in data beside it — smaller
+   files, and a pattern that stays editable instead of being baked into the bytes.
+
+### ⛔ HARDWARE-GATED — do not build against the photos
+
+Every one of these is unknown until someone runs it on the V4.1:
+- `template.txt`'s exact **delimiter and number format** (the fields are only described as "in the order of
+  the list above").
+- Whether **`Origin-A`** addresses the rotary axis, and what it means on a 3-axis machine.
+- Whether the rotation **composes with an active WCS**, or replaces it.
+- Where "the system directory" is, and whether the gateway can write there at all — it may not be on the
+  share Studio already reaches.
+- What **Advanced Startup**, **Milling plane** and **Milling cylindrical** actually do — never opened.
+
+⚠ Related, and already known: `AUDIT: WHICH GATEWAY TABS A V4.1 (AND A V3) CAN ACTUALLY USE` in `BACKLOG.md`
+tracks what a V4.1 can reach today. This arc would ADD to that surface, not fit inside it.
+
+
 ## Parked / speculative (from `CRAZY-IDEAS.md` — no commitment to build)
 
 Several have already been **promoted** above (plasma/laser suite → STRATEGIC #6; community library → STRATEGIC #5;

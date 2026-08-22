@@ -63,3 +63,18 @@ DDCS-Studio/scratchpad/
 # stalled the loop. Same for .handoff/ (the per-role waiter bookmarks).
 HANDOFF.md
 .handoff/
+
+# Agent scratch probes — both the advisor and the worker write throwaway .mjs
+# harnesses into DDCS-Studio/ while measuring. They are disposable by construction
+# and neither seat reliably cleans up; ignore them rather than sweeping periodically.
+DDCS-Studio/_*.mjs
+DDCS-Studio/_*.js
+DDCS-Studio/**/_zz*.js
+.repro/
+
+# Vendor repo CLONES (M150S, M350-LiveG, M3X-M350-IoT-Bridge) - kept on disk as the raw
+# source the Modbus register map was mined from. NOT tracked: they are git clones (nested
+# .git), they are third-party code under their own licences, and the VALUE is already
+# extracted into bridge/controllers/expert-m350/FINDINGS.md. Submodule them if they ever
+# need to be authoritative.
+scratch_repos/
