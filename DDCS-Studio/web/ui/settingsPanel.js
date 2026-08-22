@@ -108,6 +108,13 @@ export const STOCK_TEMPLATES = [
     { name: 'Rotary block 3″', x: 150, y: 76.2, z: 76.2, shape: 'boss' },
     { name: 'Rotary cylinder Ø3″', x: 150, y: 76.2, z: 76.2, shape: 'cylinder' },
 ];
+// t2143 — top-level settings keys a saved file may still carry that must NOT resurrect on load. `loadSettings()`
+// otherwise passes through any key it doesn't itself recognize (so a future ad-hoc key isn't silently discarded,
+// the bug this list exists alongside) — a RETIRED key needs the opposite: an explicit, permanent refusal.
+const RETIRED_SETTINGS_KEYS = new Set([
+    'indentStyle',   // t2139 — NO INDENTATION, EVER; the emit is unconditionally flush regardless of what an old file says
+]);
+
 export const SETTINGS_DEFAULTS = {
     // `features` = the additive workpiece key (P0 of the stock→workpiece pivot): declared interior/edge
     // features on the outer block, read via engine/workpiece.getWorkpiece(). Optional + empty by default →
@@ -429,16 +436,29 @@ function loadSettings() {
                 // t664 (E3) — the user-added file list rides the profile too.
                 workspaceFiles: Array.isArray(p.workspaceFiles) ? p.workspaceFiles : [],
                 // t656 — the STORED autostart macro + its regen inputs persist with the profile (survive reload, export/import).
-                // t2139 — the indent-style setting is RETIRED (NO INDENTATION, EVER — BACKLOG.md), and this merge is
-                // a WHITELIST: dropping the key here means a legacy saved workspace's stale `indentStyle` is silently
-                // discarded on next load rather than resurrected — the correct outcome now that the emit is
-                // unconditionally flush regardless of what an old file says.
+                // (t2139's retired `indentStyle` is handled by RETIRED_SETTINGS_KEYS below, not by omission here.)
                 sysstartCustomGcode: typeof p.sysstartCustomGcode === 'string' ? p.sysstartCustomGcode : '',
                 autostartBody: typeof p.autostartBody === 'string' ? p.autostartBody : undefined,   // undefined = never seeded → the panel migrates it on first open
                 autostartHandEdited: !!p.autostartHandEdited,
                 autostartProfileId: typeof p.autostartProfileId === 'string' ? p.autostartProfileId : undefined,   // t656 amend 1 — the profile the body was built for (mismatch note)
                 autostartGenSig: typeof p.autostartGenSig === 'string' ? p.autostartGenSig : undefined,   // t696 a — the generator-input fingerprint (staleness note); rides the profile like the body
+                units: typeof p.units === 'string' ? p.units : SETTINGS_DEFAULTS.units,   // t2143 — was missing from this whitelist entirely (silently dropped every reload); now typed + defaulted like every other declared key
             });
+            // t2143 — PASS-THROUGH for any OTHER top-level key this whitelist doesn't yet know about. A sweep of every
+            // top-level `getSettings().<key> =` / `_ddcsSettings.<key> =` assignment across web/ found FOUR keys this
+            // whitelist silently dropped on every reload: `systemHooks` (ui/macrosApp.js — the user's HAND-WRITTEN
+            // tool-change/error macro text; the user-visible symptom that surfaced this), `macrosSynced`, `units` (now
+            // fixed above), and `toolChange` (the tool-change-mode selector, t772 P2b). None of the four has a
+            // SETTINGS_DEFAULTS entry, so none was ever going to get its own typed line here by the pattern every
+            // other key follows — and the NEXT key anyone adds the same way would be silently dropped too. A whitelist
+            // that must be remembered on every new setting is a bug generator, not a safeguard; unknown keys should
+            // survive by default. The one place an EXCLUSIVE whitelist is still correct is the opposite direction —
+            // a RETIRED key must NOT resurrect from an old save file (t2139: `indentStyle` must stay gone forever,
+            // because the emit is unconditionally flush now regardless of what a stale save says) — so retirement is
+            // its own declared list, checked here, rather than smuggled in by leaving the key off this object.
+            for (const k of Object.keys(p)) {
+                if (!(k in merged) && !RETIRED_SETTINGS_KEYS.has(k)) merged[k] = p[k];
+            }
             seedGantryFromHoming(merged.motors, p.homing);   // t648 — a pulled dual-gantry dump seeds the slave axes role (one source)
             if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
                 merged.atc.tools = standardTools();

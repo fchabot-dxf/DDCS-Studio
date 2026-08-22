@@ -655,7 +655,7 @@ export function initMacrosApp() {
     // with the body so the editor can flag a SILENT staleness: a homing-config change (e.g. a dual-Y enable, a feed) that
     // the old note (controller-mismatch only) missed. djb2 over the JSON — small + drift-exact.
     function autostartGenSig() {
-        try { const s = JSON.stringify(homingRunParams(getSettings())) + ' ' + String(getSettings().sysstartCustomGcode || ''); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h >>> 0); }
+        try { const s = JSON.stringify(homingRunParams(getSettings())) + '\0' + String(getSettings().sysstartCustomGcode || ''); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h >>> 0); }
         catch (e) { return ''; }
     }
     // Record the body + WHICH profile it was built for (t656 amend 1) + the generator-input fingerprint (t696 a).

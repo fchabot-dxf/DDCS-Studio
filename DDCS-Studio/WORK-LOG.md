@@ -48092,3 +48092,99 @@ touched file.
 
 🔨 turn 2141
 
+---
+
+# t2143 — NUL byte in macrosApp.js (grep-blind file), then DATA-LOSS: 4 settings keys silently dropped on reload
+
+## Part 1 — the NUL byte (done first, per dispatch: it was blocking the ability to verify part 2)
+
+`ui/macrosApp.js:658`, inside `autostartGenSig()`, contained a RAW NUL byte (0x00) as a string-literal separator
+(`JSON.stringify(...) + '<NUL>' + String(...)`), not the two-character escape `\0`. `file(1)`/grep/ripgrep all
+classify a file containing a raw NUL as binary and silently skip it — confirmed: `grep -n "autostartGenSig"`
+found nothing on this file until `-a` (force-text) was added; every prior grep-based sweep of `web/` was blind
+to this one file, which is how a duplicate `homingPostIsExpert()` survived an earlier full sweep (t2137).
+
+**Fix**: replaced the raw byte with the JS escape `\0` — a Node check confirms `'\0'` in a string literal
+evaluates to the exact same character (`charCodeAt` 0) as the raw byte did, so `autostartGenSig()`'s computed
+hash is byte-for-byte unchanged for any given input. No existing stored `autostartGenSig` goes stale from this
+fix (confirmed, not assumed — the whole point of choosing this escape over some other separator character).
+`file(1)` now reports the module as plain text; a plain (non `-a`) grep finds every symbol in it again.
+
+Swept the whole repo for other NUL-carrying source files (`.js/.mjs/.cjs/.py/.md/.json/.html/.css/.txt`, real
+binaries and `.venv`/`node_modules` excluded): confirms the dispatch's list of three others exactly —
+`WORK-LOG.md` (2, this file, append-only history, left alone), `docs/archive/WORK-LOG-early-eras.md` (1, left
+alone), `analytics/test/worker.test.mjs` (1, belongs to another agent, left alone). One extra hit,
+`.claude/worktrees/agent-afabd8864668cf46b/WORK-LOG.md`, is a stray worktree copy of the same WORK-LOG.md, not
+a distinct source file — noted, not a missed item.
+
+## Part 2 — DATA LOSS: `loadSettings()`'s whitelist silently drops any key it doesn't know about
+
+**THE BUG, reproduced first, per the dispatch's "that failing test is the deliverable's spine" instruction.**
+`saveSettings()` persists the WHOLE live settings object (`JSON.stringify(_ddcsSettings)`); `loadSettings()`
+rebuilds it from an EXPLICIT whitelist of top-level keys. Any key set on the live object outside that whitelist
+survives the save but is silently dropped on the next `loadSettings()` — i.e. on reload. The user-visible
+instance: hand-write a tool-change or error macro in `systemHooks` (`ui/macrosApp.js:607-626`), save, reload —
+the field is blank, with no error, no warning, and the `T_unlocked`/`error_unlocked` flags go too so it looks
+like the edit never happened. This is USER-AUTHORED G-code being destroyed.
+
+Wrote `tests/settings-whitelist-passthrough-2143.spec.js` FIRST, driving the real gesture (`window.ddcsGetSettings()`
++ `window.ddcsSaveSettings()`, then an actual `page.reload()` — not a re-called function, since only a real
+reload re-runs the module-level `loadSettings()`), and confirmed it FAILS against the pre-fix tree exactly as
+predicted (`systemHooks` comes back `undefined`).
+
+**Enumerated the exact set, not trusting the dispatch's count.** Grepped every top-level `getSettings().<key> =`
+and `_ddcsSettings.<key> =` assignment across `web/` and cross-referenced against the `loadSettings()` whitelist
+and `SETTINGS_DEFAULTS`. Confirmed FOUR keys, independently, matching the dispatch's count exactly:
+`systemHooks`, `macrosSynced` (macrosApp.js:798/864/1001), `units` (declared in `SETTINGS_DEFAULTS` with a
+default of `'mm'`, but never carried through the `loadSettings()` merge at all — so `units` was ALREADY
+silently reset to `undefined` on every reload, not just failing to fall back to its default), and `toolChange`
+(settingsPanel.js:3609, the tool-change-mode selector, t772 P2b).
+
+**THE DECISION — pass-through, with a declared retired-key list.** An exclusive whitelist that must be
+remembered on every new setting is a bug generator: the NEXT key anyone adds the same way (a direct
+`getSettings().newKey = ...` with no `SETTINGS_DEFAULTS` entry, matching how all four of these were added) gets
+silently dropped too, and nothing short of another sweep like this one would catch it. Chose PASS-THROUGH:
+after building the whitelisted `merged` object, any OTHER key still present in the raw persisted object is
+copied across, UNLESS it is on a new, explicitly declared `RETIRED_SETTINGS_KEYS` set — which exists for the
+opposite case, a key that must NOT resurrect from an old save file. Today that list holds exactly one entry:
+`indentStyle` (t2139 — NO INDENTATION, EVER; a stale save's `indentStyle` must stay dropped, not come back,
+since the emit is unconditionally flush regardless of what an old file says). `units` ALSO got its own
+explicit typed line (matching the pattern every other `SETTINGS_DEFAULTS`-backed key already follows), since
+it has a real default that should apply — pass-through alone would leave it `undefined` for a user who never
+touched it, same as before. `systemHooks`/`macrosSynced`/`toolChange` have no `SETTINGS_DEFAULTS` entry
+(genuinely ad-hoc keys), so pass-through is what saves them, and saves whatever the next one like them will be.
+
+**Non-vacuity.** The new spec's first test (all four keys through a real reload) — fails predictably pre-fix,
+passes post-fix. Its second test (a simulated legacy `indentStyle: 'indented'` save) confirms the retired-key
+guard still refuses to resurrect it through the new pass-through — this one was already vacuously true pre-fix
+(the key didn't exist to resurrect anyway), so its value is guarding the FUTURE: it fails the moment someone
+removes `RETIRED_SETTINGS_KEYS` or forgets to add the next retired key to it.
+
+## Gate
+
+Targeted: `settings-whitelist-passthrough-2143.spec.js` (2/2). Full settings regression:
+`settings-controller-group.spec.js` + `settings-ia-regroup-1245.spec.js` + `settings-modal.spec.js` +
+`settings-ux-1287.spec.js` + `workspace-roundtrip.spec.js` (28/28). Node tier: 227/227. Lint clean.
+
+⚠ **Ran the FULL Playwright suite** (per the dispatch's explicit instruction, citing the prior narrow-gate
+incident): 2648 passed, 6 failed, 21 flaky, 25 skipped (24.6 min). **Bisected the 6 failures against the
+pre-fix tree** (`git stash` the three t2143 files, re-run the 6 specs, restore, re-run again): 5 of the 6
+(`header-profile-menu`, `pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`,
+`validation-divzero-not-syntax-1603`) fail IDENTICALLY on both the pre-fix and post-fix tree — pre-existing,
+unrelated to this change. The 6th (`fork-parity-1593`) passed on one re-run and flaked (a `waitForFunction`
+timeout on `window.__blkws`, a Blocks-boot timing wait unrelated to settings) on the other, in BOTH the
+pre-fix and post-fix state — a pre-existing flake, not a regression. **Zero blast radius from this fix,
+confirmed by bisection, not assumed from a clean-looking diff.**
+
+## Files
+- `DDCS-Studio/web/ui/macrosApp.js` — the raw NUL byte in `autostartGenSig()` replaced with the `\0` escape
+  (byte-identical hash output).
+- `DDCS-Studio/web/ui/settingsPanel.js` — new `RETIRED_SETTINGS_KEYS` (currently just `indentStyle`);
+  `loadSettings()` gains an explicit `units` line + a pass-through loop for any other persisted top-level key
+  not already in the whitelist and not retired; the stale comment explaining `indentStyle`'s omission (which
+  now lives in the RETIRED_SETTINGS_KEYS declaration instead) trimmed.
+- `DDCS-Studio/tests/settings-whitelist-passthrough-2143.spec.js` — **new**, 2 tests (all-four-keys reload
+  round-trip; retired-key non-resurrection).
+
+🔨 turn 2143
+
