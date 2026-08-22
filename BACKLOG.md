@@ -651,8 +651,10 @@ still calls this?"*
 ⚠ The ONE thing to not take with it: `indentStyle.js` happens to hold **two unrelated features** — the indent
 code AND `COMMENT_MARK` / `commentBlock` (the comment toggle, which SURVIVES and becomes the caret-following
 button). That is a filing accident: both were once "editor text operations".
-⭐ **Preferred fix: move the comment code into its own module and DELETE `indentStyle.js` entirely.** A file
-named after a feature that no longer exists is exactly the leftover this session found three of.
+⭐ **FIX: RENAME THE MODULE** *(human, 2026-08-22: "its a semantic problem, rename the module")* — the file
+is named after the half being deleted. Once the indent code is gone it holds only comment logic, so it
+becomes e.g. `data/commentStyle.js` (or folds into `editorTextOps`). Simpler than moving code out, same
+result, and it removes a filename that documents a feature that no longer exists.
 
 ---
 
@@ -758,3 +760,33 @@ complaint.) Keep a tooltip / `aria-label` so the name is always recoverable.
 
 ⚠ Also check whether the `≈ 28 s` estimate belongs on this chip at all — it is a different fact (cycle time)
 riding on a navigation control.
+
+
+---
+
+## `ddcs_active_post` — TWO READERS SURVIVED THE t2137 COLLAPSE
+*(found 2026-08-22 during review of commit `30d0dc24`)*
+
+t2137 retired the `ddcs_active_post` localStorage override and added a boot migration that **deletes the
+key**. The worker grepped the literal key string (good — that is how they caught `homingPostIsExpert()` in
+`settingsPanel.js`) but did not sweep `ui/macrosApp.js`, which still reads it twice:
+
+| | |
+|---|---|
+| `macrosApp.js:1036` | `homingPostIsExpert()` — a **second copy** of the same predicate |
+| `macrosApp.js:1052` | `isV41Post()` |
+
+⭐ **NOT broken** — both have the shape `if (ap && ap !== 'auto') …; return <controller profile>`, so with the
+key deleted they fall through to the controller profile, which is exactly the intended behaviour. What is
+left is dead override-checking in two places.
+
+### But it names two real problems
+1. ⚠ **`homingPostIsExpert()` exists TWICE** — `settingsPanel.js` (fixed in t2137) and `macrosApp.js` (not).
+   One predicate, two implementations: the same two-homes shape the collapse was retiring.
+2. ⚠ **A second raw-string coupling underneath**: both fall back to
+   `localStorage.getItem('ddcs_controller_profile')` by literal key rather than through the workspace. The
+   comment at `:1049` also records an id-convention change (`'ddcs-v4.1'` → `'ddcs-v41'`) that a by-string
+   reader cannot be protected from.
+
+⇒ Delete the dead override branches, de-duplicate `homingPostIsExpert`, and route both through the workspace
+profile the way t2137 did for the `settingsPanel` copy.
