@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
 // element is in index.html from the first byte, so a click can land before anything is listening and the menu never
 // opens — which is exactly how this spec flaked under load (t1243).
 const openMenu = async (page) => {
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.locator('#hdrPostBtn').click();
     await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
 };

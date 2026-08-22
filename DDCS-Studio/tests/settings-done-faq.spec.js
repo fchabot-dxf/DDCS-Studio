@@ -37,7 +37,7 @@ test('settings has a Done button — and no longer carries FAQ / Feedback / Abou
 // t1245 — the questions that moved, asked of the surface that now answers them.
 test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still has its entries', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });
   await page.click('#hdrPostBtn');
   await page.waitForSelector('#hdrPostMenu:not([hidden])');
   await page.click('#hdrPostMenu [data-act="help"]');
@@ -74,7 +74,7 @@ test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still
  */
 test('the FAQ leads with the workspace chapter, and every entry it promises is there', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });
   await page.click('#hdrPostBtn');
   await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
   await page.click('#hdrPostMenu [data-act="help"]');

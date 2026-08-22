@@ -304,11 +304,9 @@ html, body { overflow-x: clip; }
 [data-theme="organic"] .logo-organic,
 [data-theme="steampunk"] .logo-steampunk { display: block; }
 
-.app-header .ver {
-    font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 10px;
-    color: var(--hdr-dim, var(--text-dim));
-}
+/* t2147 (BACKLOG #7) — .app-header .ver is GONE: the `<span class="ver">` element now carries `hidden`
+   unconditionally (its text is read once per menu open by headerPost.js, never displayed here), so a display
+   rule for it in the header has nothing left to style. See .hq-ver-footer for where it actually renders. */
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
@@ -645,6 +643,11 @@ html, body { overflow-x: clip; }
    and took the expander's right half, leaving a 34px (desktop) / 22px (phone) hittable span. Two adjacent controls
    cannot both own the same pixels — the gap has to be real, so it is declared here, next to the expander it protects. */
 .hdr-quick { position: relative; display: inline-flex; align-items: center; margin-right: 12px; }
+/* t2147 (BACKLOG #7, amended — human: "lets move the workspace/quickmenu single entry point beside the
+   avatar") — this SAME element (#hdrQuick) now also carries the workspace-chip role and sits in .hdr-controls,
+   where its own `gap` already spaces it from its neighbours — the margin above was tuned for its old spot
+   beside the brand and would double up here. */
+.hdr-ws-chip { margin-right: 0; align-self: center; }
 
 /* t1223 — THE PERSISTENCE INDICATOR IS ONE DISK BUTTON (user). The old fat pill carried a dot, a label and a
    timestamp; the state only ever needed a colour. UNSAVED = accent (asks for attention), SAVED = muted (findable, not
@@ -696,6 +699,28 @@ html, body { overflow-x: clip; }
 .app-header button.hdr-quick-btn[aria-expanded="true"] { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); }
 .app-header button.hdr-quick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 
+/* t2147 (BACKLOG #7, amended) — THE WORKSPACE CHIP: name + chevron, layered on the same .hdr-quick-btn chrome
+   above (border, hover, expanded state — nothing duplicated), just WIDER and left-aligned to hold text before
+   the icon. ⛔ WHY BOUNDED (the reason, so it is not undone later): a bare label has no edge and bleeds toward
+   whatever sits beside it; this chip's own border is the boundary, and the chevron is the affordance that says
+   "this is clickable" the way a bare label never would. */
+.app-header button.hdr-ws-chip-btn {
+    width: auto; max-width: 220px; height: 30px; padding: 0 8px 0 10px; gap: 6px; justify-content: flex-start;
+}
+.hdr-ws-name-txt {
+    flex: 1 1 auto; min-width: 0; text-align: left;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12.5px; font-weight: 600; color: var(--hdr-dim, var(--text-dim));
+}
+.app-header button.hdr-ws-chip-btn:hover .hdr-ws-name-txt,
+.app-header button.hdr-ws-chip-btn[aria-expanded="true"] .hdr-ws-name-txt { color: var(--text-main, #e6edf3); }
+.hdr-ws-chevron { flex: 0 0 auto; }
+.app-header button.hdr-ws-chip-btn[aria-expanded="true"] .hdr-ws-chevron { transform: rotate(180deg); }
+/* t2147 amendment 2 (human: "we can limit its width on phone") — ONLY THE NAME degrades on a narrow header;
+   the chevron and the chip's own padding/border stay full size so it never stops looking like a button. Uses
+   the SAME class-based yield ladder every other header control narrows through (.is-mini/.is-tiny below, driven
+   by ui/commandDeck.js's measured overflow), not a second, independent breakpoint system. */
+
 /* Popover menu (reuses .scale-pop chrome) — themed like the keyboard: same translucent "glass" material.
    t2085 (P4e) — was reading --kbd-glass/--kbd-blur/--kbd-edge DIRECTLY: a semantic lie (a popover is not a
    keyboard) that also meant any future divergence between the two would have to be faked back in. Now reads
@@ -706,7 +731,10 @@ html, body { overflow-x: clip; }
    --kbd-* value — byte-identical today; a skin can override just --menu-* later without touching kbd at all.
    Items are buttons → override the per-theme skin via (0,2,0). */
 .hdr-quick-menu {
-    left: 0; right: auto;                 /* the chevron now sits LEFT (by the logo) → menu opens leftward-anchored */
+    /* t2147 (BACKLOG #7, amended) — the chip MOVED to the right side of the header (beside the avatar); a
+       left-anchored menu from a right-edge trigger runs off the viewport (measured: 1307px right edge in a
+       1200px window). Right-anchored instead, so it opens LEFTWARD from its own right edge and stays on-screen. */
+    right: 0; left: auto;
     /* t1231 — a MAX width too: the identity line grew an envelope, and an unbounded shrink-to-fit popover simply got
        wider until its ☁ / ↧ targets were off the screen (the account-row spec caught it). Bounded, the line wraps. */
     min-width: min(300px, calc(100vw - 20px)); max-width: min(340px, calc(100vw - 20px)); max-height: min(72vh, 560px); overflow-y: auto;
@@ -717,7 +745,8 @@ html, body { overflow-x: clip; }
     border: 1px solid var(--menu-edge, var(--kbd-edge, var(--border, #444)));
 }
 .hdr-quick-menu[hidden] { display: none; }
-.hdr-quick-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .55; padding: 4px 8px 2px; }
+/* t2147 — .hdr-quick-head is GONE: it styled ONLY the theme section's "Theme" heading (BACKLOG #1), and had
+   zero other consumers (confirmed by sweep). */
 .hdr-quick-menu .hdr-quick-item {
     display: flex; align-items: center; justify-content: flex-start; gap: 6px; width: 100%;
     padding: 6px 8px; min-height: 0; border: 0; border-radius: 5px;
@@ -738,26 +767,12 @@ html, body { overflow-x: clip; }
 .hq-cur { font-weight: 400; opacity: .55; }
 .hq-caret { margin-left: auto; flex: 0 0 auto; opacity: .55; transition: transform .12s ease; }
 .hdr-quick-sub.is-open .hq-caret { transform: rotate(90deg); }
-.hdr-quick-subitems { display: flex; flex-direction: column; gap: 2px; margin: 1px 0 2px; }
-.hdr-quick-subitems[hidden] { display: none; }
-.hdr-quick-menu .hdr-quick-subitems .hdr-quick-item { padding-left: 16px; font-weight: 500; }
-/* Theme picker = a horizontal row of small chips, each PREVIEWING its own theme's style (shape/fill/outline/
-   bevel/glow) regardless of the active theme. Scoped + !important so the per-theme button skin can't hijack them. */
-.hdr-quick-subitems[data-subitems="theme"] { flex-direction: row !important; flex-wrap: wrap; gap: 10px; padding: 9px 12px 7px; }
-.hdr-quick-subitems .hq-theme-chip {
-    width: 26px !important; height: 26px !important; min-width: 0 !important; flex: 0 0 auto; padding: 0 !important;
-    cursor: pointer; text-shadow: none !important; transform: none; transition: transform .12s ease !important;
-    border: 1px solid transparent !important; border-radius: 6px !important; background: #888 !important;
-}
-.hdr-quick-subitems .hq-theme-chip:hover { transform: translateY(-1px) scale(1.08); }
-/* per-theme previews — roundness + fill + outline/border + bevel(neumorphic)/glow(futuristic)/flat(normal) */
-.hdr-quick-subitems .hq-theme-chip[data-theme="studio"]     { border-radius: 7px !important; background: linear-gradient(180deg,#e7e3db,#cfcabf 60%,#bdb8ac) !important; border-color: #b0aa9d !important; box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.25) !important; }
-.hdr-quick-subitems .hq-theme-chip[data-theme="steampunk"]  { border-radius: 6px !important; background: linear-gradient(180deg,#c79a2e,#8b6914 65%,#6b500f) !important; border-color: #4a3608 !important; box-shadow: inset 0 1px 0 rgba(255,224,150,.5), 0 1px 2px rgba(0,0,0,.4) !important; }
-.hdr-quick-subitems .hq-theme-chip[data-theme="organic"]    { border-radius: 50% !important; background: radial-gradient(circle at 35% 30%,#86b562,#6f9b4d 70%) !important; border-color: #4c6b34 !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.3) !important; }
-.hdr-quick-subitems .hq-theme-chip[data-theme="futuristic"] { border-radius: 2px !important; background: #0c1422 !important; border-color: rgba(45,226,255,.8) !important; box-shadow: 0 0 7px rgba(45,226,255,.55), inset 0 0 6px rgba(45,226,255,.25) !important; }
-.hdr-quick-subitems .hq-theme-chip[data-theme="normal"]     { border-radius: 4px !important; background: #f4f4f4 !important; border-color: #b9b9b9 !important; box-shadow: none !important; }
-/* active selection ring — sits OUTSIDE the chip so each theme's own look stays intact */
-.hdr-quick-subitems .hq-theme-chip.active { outline: 2px solid var(--text-main, #fff) !important; outline-offset: 2px; }
+/* t2147 (BACKLOG #1) — the theme picker (a row of .hq-theme-chip swatches under .hdr-quick-subitems) is RETIRED
+   from this menu: Settings' own #set_theme picker (Look and feel → Appearance) already switched independently
+   of these chips, so the destination needed nothing new — only this duplicate needed to go. .hdr-quick-sub /
+   .hq-caret below were the generic collapsible-submenu shell theme's markup never actually wired up to (its
+   header row was a plain .hdr-quick-head div, not a toggle) — pre-existing dead CSS, not part of this removal,
+   left in place and simply noted here for the next sweep. */
 
 /* ── MENU DIET (t851) — identity line + workspace row ────────────────────────────────── */
 /* t1227 (user) — the identity is a QUIET PLAIN-TEXT LINE above Save / Open, no longer a full-width button: no accent
@@ -778,6 +793,24 @@ html, body { overflow-x: clip; }
 .hq-identity-txt .hq-label { color: var(--text-dim, #9fb0c4); font-weight: 600; }
 /* the envelope wraps as ONE unit — a machine's travel must never break across a line mid-number */
 .hq-identity-txt .hq-env { white-space: nowrap; }
+
+/* t2147 (BACKLOG #7) — "Saved 14:22 [icon]": WHEN + WHERE. Same quiet-line convention as the identity row above
+   it, one size down (this is a supporting fact, not the subject line); the icon carries the binary WHERE so
+   the text never spends ~9 characters on one bit. */
+.hq-saved-line {
+    display: flex; align-items: center; gap: 5px; padding: 1px 4px 3px 10px;
+    font-size: 11px; font-weight: 400; color: var(--text-dim, #9fb0c4); opacity: .7;
+}
+.hq-saved-line .hq-ico { flex: 0 0 13px; width: 13px; height: 13px; opacity: .8; }
+
+/* t2147 (BACKLOG #7) — the app version, moved out of the header brand anchor entirely and into this footer.
+   SELECTABLE on purpose, overriding .hdr-quick-menu's inherited user-select:none (from .app-header) — read to
+   confirm a release landed, so it must be copyable, not just visible. */
+.hq-ver-footer {
+    padding: 4px 10px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
+    color: var(--text-dim, #9fb0c4); opacity: .55; text-align: center;
+    user-select: text; cursor: text;
+}
 .hq-pull-btn {
     /* t859 — the identity row's tap target is ≥44px. t1243 — the ☁ badge that shared this rule is retired (cloud
        moved to the workspace manager's Cloud tab), so only the ↧ pull remains. */
@@ -5259,13 +5292,21 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-mini .hdr-tabs .tab:not(.active) .app-tx { display: none; }   /* intermediate: inactive tabs collapse to icons, the ACTIVE tab keeps its label (UX standard) */
 .app-header.is-mini .hdr-tabs .tab .app-ico { margin-left: 0; }
 .app-header.is-mini .hdr-tabs .tab { padding: 0 18px; letter-spacing: 0; }   /* icon-only, full header height */
-.app-header.is-mini .ver { display: none; }
+/* t2147 (BACKLOG #7, amended) — the workspace NAME yields width, never the chip itself: it is the identity fact
+   this whole item promoted the header space FOR, unlike the version chip it replaced (which vanished outright
+   at this stage). Only the name text degrades (ellipsis); the chevron + border stay full size, per the human's
+   own amendment ("we can limit its width on phone" — the name gives up room, not the affordance). */
+.app-header.is-mini button.hdr-ws-chip-btn { max-width: 140px; }
 /* Stage 3 (.is-tiny): very narrow — ALL tab labels hidden (icons only) */
 .app-header.is-tiny .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-tiny .hdr-tabs .tab { padding: 0 10px; }
 .app-header.is-tiny .brand { padding: 0 4px; gap: 4px; }
 .app-header.is-tiny .logo { height: 24px; }
 .app-header.is-tiny button.hdr-quick-btn { width: 20px; }   /* t748 — reclaim phone px: the visible chevron tightens, its ≥44px ::before hit area is unchanged */
+/* ⚠ MUST WIN OVER THE RULE ABOVE for the workspace chip specifically — width:20px there would crush the name
+   text to nothing, which the human explicitly ruled against ("do not let the cap shrink the name to nothing").
+   Same specificity, declared after, so it wins; the chevron/border stay put, only max-width tightens further. */
+.app-header.is-tiny button.hdr-ws-chip-btn { width: auto; max-width: 90px; }
 /* Stage 6 (.hy-controls): the tightest tier — keep undo/redo REACHABLE (t752, audit gap b) by tightening the controls
    + tab padding so they never scroll off-screen, instead of docking them away. Reached only when is-tiny still overflows.
    t2099 — MEASURED at 390px (post t2078, which removed Clear from the header): even every prior stage applied,

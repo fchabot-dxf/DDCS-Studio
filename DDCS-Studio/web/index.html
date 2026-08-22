@@ -126,32 +126,14 @@
             <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
             <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
             <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-            <span class="ver">V2026.08.22.2</span>
         </a>
-        <!-- File / quick-actions menu — sits right of the logo (file + settings menus go top-left).
-             Opens the file-ops / post-processor / theme / settings popover (ui/headerPost.js). -->
-        <div class="hdr-quick" id="hdrQuick">
-            <button type="button" id="hdrPostBtn" class="hdr-quick-btn" aria-haspopup="menu" aria-expanded="false"
-                    title="Menu — open / save / export, post-processor, theme, settings">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
-        </div>
+        <!-- BACKLOG #7 (t2147) — the version chip LEAVES the header/brand anchor entirely, moving to the quick-menu
+             footer (ui/headerPost.js). The literal `<span class="ver">` element stays HERE, hidden: bump-version.cjs
+             and check-version-sync.cjs both locate it by a raw-text regex on this file, not a DOM query, so its
+             position (and visibility) is free to change without touching either script. headerPost.js reads its
+             live textContent on each menu open. -->
+        <span hidden class="ver">V2026.08.22.2</span>
         <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
-        <!-- t1223 (5, amended) — THE CLASSIC FLAT FLOPPY. The BUTTON-NESS is the state: UNSAVED = full-colour glyph
-             with a real button affordance (border + fill, clearly clickable); SAVED = the SAME artwork desaturated and
-             lowered in contrast, with the border/fill removed, so it recedes into the header as a quiet status mark.
-             Tooltip = the filename (+ the dialect it generates for). Nothing else sits beside it. -->
-        <button type="button" id="fileSaveChip" class="file-save-chip" title="Not saved yet">
-            <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="2" y="2" width="20" height="20" rx="3" fill="#2f6fd0"/>
-                <rect x="7" y="3" width="10" height="7.5" rx="1" fill="#ffffff"/>
-                <rect x="13" y="4.2" width="2.8" height="5.2" rx="0.5" fill="#2f6fd0"/>
-                <rect x="5.5" y="13" width="13" height="8" rx="1" fill="#ffffff"/>
-                <line x1="7.5" y1="15.5" x2="16.5" y2="15.5" stroke="#9db4d6" stroke-width="1.1"/>
-                <line x1="7.5" y1="17.8" x2="16.5" y2="17.8" stroke="#9db4d6" stroke-width="1.1"/>
-            </svg>
-        </button>
         <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
         <div class="macro-bar" id="macroBar">
             <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span></button>
@@ -168,6 +150,45 @@
 
         </nav>
         <div class="hdr-controls">
+            <!-- BACKLOG #7 (t2147, amended — human: "lets move the workspace/quickmenu single entry point beside
+                 the avatar") — THE WORKSPACE CHIP: name + chevron, ONE bounded control, ONE click target, opening
+                 the SAME quick-menu popover (ui/headerPost.js). #hdrPostBtn/#hdrPostMenu keep their IDs — every
+                 existing wire (initHeaderPost, every spec that clicks #hdrPostBtn) is unchanged; only the button
+                 now ALSO carries the name text, and the whole control moved from beside the brand to here.
+                 ⛔ WHY BOUNDED, WHY HERE (the reason, so it is not undone later): a bare label has no edge — it
+                 bleeds toward the brand <a href> next to it, and a click aimed at the name that lands 1px left
+                 navigates away to the marketing site. A chevron-bearing chip draws that boundary and reads as
+                 clickable on its own; moving it beside the avatar removes the brand adjacency entirely and groups
+                 the two CONTEXT facts — who you are, what you are working on. Populated + kept live by
+                 ui/fileSaveState.js's `refresh()` (the SAME function that already drives the disk chip below —
+                 one dirty-tracker, not two — see that file for why there is no dirty DOT here: t1223's own ruling
+                 already said the disk chip's colour is the one indicator, and putting a second one beside it
+                 would repeat what the colour already says). -->
+            <div class="hdr-quick hdr-ws-chip" id="hdrQuick">
+                <button type="button" id="hdrPostBtn" class="hdr-quick-btn hdr-ws-chip-btn" aria-haspopup="menu" aria-expanded="false"
+                        title="Menu — open / save / export, post-processor, settings">
+                    <span class="hdr-ws-name-txt"></span>
+                    <svg class="hdr-ws-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
+            </div>
+            <!-- t1223 (5, amended); t2147 — MOVED here WITH the workspace chip, not left behind: the STATE (the
+                 chip's name) and the ACTION that resolves it (this button) belong at the same end of the header.
+                 THE CLASSIC FLAT FLOPPY. The BUTTON-NESS is the state: UNSAVED = full-colour glyph with a real
+                 button affordance (border + fill, clearly clickable); SAVED = the SAME artwork desaturated and
+                 lowered in contrast, with the border/fill removed, so it recedes into the header as a quiet status
+                 mark. Tooltip = the filename (+ the dialect it generates for). Nothing else sits beside it — see
+                 t2147's own note above for why the workspace chip carries no second (dot) indicator of the same fact. -->
+            <button type="button" id="fileSaveChip" class="file-save-chip" title="Not saved yet">
+                <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="2" y="2" width="20" height="20" rx="3" fill="#2f6fd0"/>
+                    <rect x="7" y="3" width="10" height="7.5" rx="1" fill="#ffffff"/>
+                    <rect x="13" y="4.2" width="2.8" height="5.2" rx="0.5" fill="#2f6fd0"/>
+                    <rect x="5.5" y="13" width="13" height="8" rx="1" fill="#ffffff"/>
+                    <line x1="7.5" y1="15.5" x2="16.5" y2="15.5" stroke="#9db4d6" stroke-width="1.1"/>
+                    <line x1="7.5" y1="17.8" x2="16.5" y2="17.8" stroke="#9db4d6" stroke-width="1.1"/>
+                </svg>
+            </button>
             <!-- t2077 — UNDO / REDO MOVED, NOT LOST: they now sit in the EDITOR pane beside the comment button
                  (the pane they act on), the same "moved not lost" curation t1227 applied to Load/Insert/Export, PLUS
                  real Ctrl+Z / Ctrl+Y bindings they never had. TRANSFER is DELETED: it was permanently `hidden`

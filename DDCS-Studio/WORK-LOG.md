@@ -48455,3 +48455,163 @@ Node tier: 227/227 (stable across all runs). Smoke tier: 75/75.
   assertions/markers/locators updated to the new source, per file as detailed above.
 
 🔨 turn 2145
+
+---
+
+# t2147 — BACKLOG #1 + #7 MERGED: the quick-menu reshape (theme out, version out, workspace name in)
+
+## The three moves, and the amendment arc that reshaped move 3
+
+BACKLOG items 1 and 7 were merged into one turn (human ruling: "yes") because both restructure the SAME
+popover — done separately, `headerPost.js` gets opened twice and the layout re-decided twice.
+
+1. **THEME OUT, into Settings.** `headerPost.js`'s `themeSection`/`themeRow`/`HQ_THEME_SWATCH`/`setQuickTheme`
+   deleted outright, along with the click-handler branch, the CSS (`.hq-theme-chip` and everything scoped to
+   `.hdr-quick-subitems[data-subitems="theme"]`), and `.hdr-quick-head` (its only consumer). **Nothing new was
+   built at the destination**: Settings' own `#set_theme` picker (Look and feel → Appearance) already existed
+   and already switched independently (`tm.setCurrent`/localStorage fallback) — confirmed by reading it before
+   touching anything, matching the dispatch's "reuse, don't re-implement" instruction by finding there was
+   nothing left TO re-implement. That picker had **zero test coverage** once the quick-menu chips (its only
+   tested path) left — closed with a new test driving `#set_theme` directly (`header-responsive.spec.js`).
+2. **VERSION OUT of the header, into the quick-menu FOOTER, selectable.** The literal `<span class="ver">`
+   stays in `index.html` (bump-version.cjs/check-version-sync.cjs both locate it by a raw-text regex, not a
+   DOM query, so its position is free to move) — now `hidden`, read once per menu open by `headerPost.js` and
+   echoed into a new `.hq-ver-footer` row. ⚠ Found by running the regex against the edited HTML before trusting
+   it: reordering the span's attributes so `hidden` came before `class="ver"` broke the regex's contiguous
+   `class="ver">` match — fixed by putting `class="ver"` last, verified against `check-version-sync.cjs` for
+   real, not just re-read.
+3. **THE WORKSPACE NAME IN — and this is what the amendment arc actually rebuilt.** First pass: a separate
+   `#hdrWsName` button beside the brand, with its own dirty dot, mirroring the mockup literally. Three rounds
+   of amendment then RULED it differently, each resolving the previous round's open question:
+   - **Amendment 1**: merge the name and the chevron into ONE bounded control (a bare label "has no edge — it
+     bleeds toward the brand `<a href>`… the chevron inside the chip is the AFFORDANCE"), and relocate the
+     whole thing beside `#hdrAccount` (the avatar) — with `#fileSaveChip` moving too, so the STATE (the name)
+     and the ACTION that resolves it (Save) share one end of the header. It also RAISED, without resolving,
+     whether the dirty dot should survive now that it would sit directly beside the disk chip's own colour
+     indicator (`t1223`'s ruling: "the COLOUR is the whole state… no dot") — asked me to build it WITH the dot
+     and flag the conflict, since it judged as a two-second visual call for the human, not mine to guess at.
+   - **Amendment 2** resolved the width question amendment 1 left open (cap on narrow screens, name-only
+     degrades, chevron/border stay full size — "do not let the cap shrink the name to nothing").
+   - **Amendment 3** resolved the dot question amendment 1 raised: "we can remove the dot." Simplifies rather
+     than complicates — no dot at all, disk-chip colour remains the one indicator, and (per the skill's own
+     removal-sweep discipline, the SECOND live case this turn after theme) the whole dot chain came out: the
+     `<span class="hdr-ws-dot">` element, the `headerDot` ref + `headerDot.hidden = !dirty` line in
+     `fileSaveState.js`, its CSS rule. No test needed inverting (none had shipped asserting the dot present —
+     it never reached a committed state before amendment 3 arrived) — the NEW test instead asserts the dot's
+     absence directly (element count === 0), so it cannot come back by accident.
+
+   **Merging into `#hdrPostBtn` itself (not a new id) kept every existing wire intact**: `initHeaderPost()`'s
+   own `getElementById('hdrPostBtn')`, and every spec across the suite that already clicked `#hdrPostBtn` to
+   open the menu, needed zero changes — the button just also carries the name text now (prepended before the
+   chevron SVG), and `fileSaveState.js`'s `refresh()` writes ONLY the name text span, never the button's
+   `title` (that stays `headerPost.js`'s own single-writer fact — `fillMenu()` already builds "Quick actions —
+   `<name>` · `<ctrl>`" — writing it from both places would have been two owners racing one attribute).
+
+## ⭐ A real bug the relocation caused, caught by measuring, not assuming
+
+`.hdr-quick-menu`'s own CSS was `left: 0` with a comment explaining it was anchored that way because the
+trigger sat "LEFT (by the logo)". Once the trigger moved to the right edge (beside the avatar), a left-anchored
+popover ran off the viewport — **measured, not guessed**: `getBoundingClientRect().right` came back 1307px in
+a 1200px window. Flipped to `right: 0; left: auto` so it opens leftward from its own right edge instead.
+Verified with the same measurement after the fix (1108px, inside the 1200px viewport) — the kind of thing a
+visual screenshot alone would have shown ambiguously (the popover just looked "near the edge") but the real
+DOM rects proved unambiguously broken, then unambiguously fixed.
+
+## Non-vacuity
+
+New spec `tests/header-workspace-name-2147.spec.js` (8 tests: never-saved text, saved-stem text, no-dot,
+click-opens-menu, outside-the-brand-anchor, chip/disk/avatar DOM order, long-name truncation, and the 390px
+collision case named in the amendment — `verification/t2099-header-390.png`). Proven non-vacuous against the
+FINAL (post-all-3-amendments) code by `git checkout HEAD --` on the 5 touched source files and re-running: 5 of
+8 failed exactly as predicted; the other 3 passed on the pre-change tree too because they pin facts that were
+ALREADY true before this turn (`#hdrPostBtn` already opened the menu on click; it was already outside the brand
+anchor) — legitimate pins, not vacuous checks, since the turn's job for those specific facts was "don't break
+this while rebuilding everything around it," and the test proves exactly that. Restored, confirmed green.
+
+Also caught two REAL regressions the redesign itself introduced, both fixed and re-verified:
+- `header-profile-menu.spec.js`'s `seedProfile()` used `#hdrPostMenu .hdr-quick-head` (the retired Theme
+  heading) as its "menu has rendered" boot-signal — now permanently unmatchable, so EVERY test using that
+  helper (and 4 OTHER spec files copying the same idiom: `header-account-row-742`, `settings-done-faq` ×2,
+  `settings-ia-regroup-1245`, `role-derived-client-side-2145`) would have timed out forever. Swept all 5 to
+  `.hq-identity-line` (unconditional on every `fillMenu()`, theme or not) as the new stable signal.
+- The menu-anchor overflow above.
+
+## Gate
+
+Targeted: `header-profile-menu.spec.js`, `header-responsive.spec.js`, `header-workspace-name-2147.spec.js`,
+`header-account-row-742.spec.js`, `settings-done-faq.spec.js`, `settings-ia-regroup-1245.spec.js`,
+`role-derived-client-side-2145.spec.js`, `persistence-file-indicator.spec.js`, `mobile-layout.spec.js`,
+`context-menu-pass-1452.spec.js` — 47/47. Node tier: 227/227. Smoke tier: 76/76.
+
+Full Playwright suite run to completion (per the standing "don't trust a narrow gate" policy, and this turn
+touches header markup + the quick menu globally): **4 failed** — `pane-sizer-1353`, `send-gate-wiring-1585`,
+`send-history-real-path-2065`, `validation-divzero-not-syntax-1603` — all 4 the SAME pre-existing failures
+already bisected/confirmed in t2143/t2145's own turns. **`header-profile-menu.spec.js` DROPPED OUT of the
+baseline** — it was failing before this turn on a stale `getDesktop` row the spec's own row-list had never
+counted (a real, separate bug this turn's necessary row-list rewrite fixed as a natural byproduct, not a
+deliberate separate fix); baseline count moving from 5 to 4, named explicitly rather than left to drift
+silently in either direction. 29 flaky, all on files this turn never touched (blocks/canvas/wizard-view specs
+— the same `!!window.__blkws` and similar timing patterns seen throughout this session's flaky lists,
+parallel-worker contention). **2654 passed.**
+
+## Files
+- `DDCS-Studio/web/index.html` — the `.ver` span hidden + moved outside the brand anchor; the merged workspace
+  chip (`#hdrQuick`/`#hdrPostBtn` with the name text inside) relocated from beside the brand to `.hdr-controls`,
+  right before `#hdrAccount`; `#fileSaveChip` moved with it. Order: `[chip] [disk] [avatar]`.
+- `DDCS-Studio/web/ui/headerPost.js` — `themeRow`/`themeSection`/`HQ_THEME_SWATCH`/`setQuickTheme`/`THEMES`
+  import all deleted; the theme click-handler branch removed; new `local`/`cloud` chrome icons added to the
+  existing `HQ_ICONS` table (not `wizIcons.js` — chrome, not an operation icon); the new "Saved …" line
+  (`fileSavedAt()`/`fileSavedPlace()`, the today/yesterday/older honesty rule) inserted between the identity
+  line and the workspace row; the version footer appended at assembly's end.
+- `DDCS-Studio/web/ui/fileSaveState.js` — `headerName`/`headerNameTxt` refs added (now pointing at
+  `#hdrPostBtn` itself, not a separate element); `refresh()` writes the chip's name-text span only, never its
+  `title` (headerPost.js's single-writer fact); no dot code was ever left standing once amendment 3 landed.
+- `DDCS-Studio/web/styles.css` — the theme-chip/subitems CSS block removed (with the pre-existing, unrelated
+  `.hdr-quick-sub`/`.hq-caret` dead CSS named but not touched); `.hdr-ws-chip`/`.hdr-ws-chip-btn`/
+  `.hdr-ws-name-txt`/`.hq-saved-line`/`.hq-ver-footer` added; `.hdr-quick-menu`'s anchor flipped from
+  `left:0` to `right:0`; the narrow-width yield stages (`is-mini`/`is-tiny`) updated to shrink the chip's name
+  only, never its chevron/border.
+- `DDCS-Studio/tests/header-workspace-name-2147.spec.js` — **new**, 8 tests (see Non-vacuity above).
+- `DDCS-Studio/tests/header-profile-menu.spec.js` — theme assertions inverted to absence; `getDesktop` added to
+  the row-name list (closing a pre-existing gap); the identity-line-to-workspace-row sibling check updated for
+  the new Saved-line between them; the `.hdr-quick-head` boot-signal swept.
+- `DDCS-Studio/tests/header-responsive.spec.js` — the theme-picker test replaced with an absence check + a new
+  test covering Settings' own `#set_theme` (the coverage gap this turn's removal created); the "icon-only
+  chevron" assertion updated — the chip legitimately carries text now, the claim it was actually guarding (no
+  STALE dialect text) is what survives.
+- `DDCS-Studio/tests/header-account-row-742.spec.js`, `settings-done-faq.spec.js`,
+  `settings-ia-regroup-1245.spec.js`, `role-derived-client-side-2145.spec.js` — the same `.hdr-quick-head`
+  boot-signal swept to `.hq-identity-line`.
+
+🔨 turn 2147
+
+---
+
+# t2147 (tail) — restore an accurate invariant to editorTextOps.js's header
+
+t2139 deleted the sentence "Three ways in, ONE implementation" from `editorTextOps.js`'s header while, in the
+SAME commit, rewriting `tests/context-menu-pass-1452.spec.js:15-17` to quote that sentence as still present —
+nothing gates the mismatch (it is prose citing prose, not a machine-checked assertion), so it never went red,
+it was just false. Fixed in `editorTextOps.js` alone, per the dispatch's explicit preference (the spec CITES a
+source; this repo's habit is prose references, not restatement) — `context-menu-pass-1452.spec.js` untouched.
+
+**Not just restored — corrected**, because the original "Three ways" is no longer accurate either: t2099/
+da280131 later retired the dedicated toolbar BUTTON too ("Ctrl+/ and the right-click menu keep it"), so the
+count today is genuinely TWO doors (Ctrl+/, right-click menu), not three. The new header sentence states that,
+naming the button's retirement explicitly rather than silently dropping the count. Also corrected a second,
+adjacent stale comment found in the same file while fixing the first: `installEditorTextOps()`'s own docstring
+still said "Wire the comment toggle's two entry points (Ctrl+/ and the toolbar button)" — the `#editor-comment`
+lookup it refers to is now permanently inert (the element left `index.html` at the same retirement), left in
+place (a code deletion is a bigger move than this tail's own scope) but named as vestigial rather than left to
+look load-bearing to the next reader.
+
+## Gate
+`context-menu-pass-1452.spec.js` (7/7). Lint clean. File-disjoint from the main t2147 arc, as the dispatch
+required — confirmed by the fact this needed no other file touched.
+
+## Files
+- `DDCS-Studio/web/ui/editorTextOps.js` — the header invariant restored and corrected (two doors, not three,
+  and why); `installEditorTextOps()`'s docstring corrected to match; the dead `#editor-comment` wiring named
+  as vestigial in a comment, not removed (out of this tail's scope).
+
+🔨 turn 2147

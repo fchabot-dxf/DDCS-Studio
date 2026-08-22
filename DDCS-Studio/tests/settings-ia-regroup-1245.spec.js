@@ -30,7 +30,7 @@ const openSettings = async (page) => {
     await page.waitForSelector('#settings-app .settings-tabs .settings-main-tab', { timeout: 8000 });
 };
 const openMenu = async (page) => {
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });
     await page.click('#hdrPostBtn');
     await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
 };

@@ -23,7 +23,7 @@ const GATEWAY_DESC = { role: 'gateway', role_conflict: false, dest: '\\\\10.0.0.
 const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 4000 }); };
 const boot = async (page) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });
 };
 const identityText = (page) => page.evaluate(() => (document.querySelector('#hdrPostMenu .hq-identity-txt') || {}).textContent || '');
 

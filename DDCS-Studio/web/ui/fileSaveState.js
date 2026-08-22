@@ -14,11 +14,13 @@
  * localStorage-vs-.ddcs AWARENESS layer only. The workspace .ddcs is the config/library grain (settings, wizards, CAM
  * pack, presets, layout); the current PROGRAM is the separate .mjson job grain and is not part of this signal.
  */
-import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedName, changeLabel } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads
+import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedName, fileSavedStem, changeLabel } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads; t2147 — fileSavedStem for the header name (BACKLOG #7)
 import { getMachine } from '../data/workspaceMachine.js';   // t1223 — the tooltip names the file AND the dialect it generates for
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
 let chip = null;
+let headerName = null, headerNameTxt = null;   // t2147 (BACKLOG #7) — the header workspace chip's button + name text.
+                                                 // ⛔ NO dirty-dot element/ref here — see refresh() below for why.
 
 export { announceSaved, dismissSaved };   // t1287 — the Ctrl+S path announces through the same one voice
 
@@ -36,18 +38,30 @@ function dismissSaved() { try { document.getElementById('fileSaveSaid')?.remove(
  */
 function refresh() {
     const dirty = isWorkspaceDirtyToFile();
-    if (!chip) return dirty;
-    const name = fileSavedName();
-    let dialect = '';
-    try {
-        const cid = getMachine().controllerId;
-        dialect = (CONTROLLER_PROFILES[cid] || {}).name || cid || '';
-    } catch (_) { dialect = ''; }
-    chip.classList.toggle('dirty', dirty);
-    chip.classList.toggle('saved', !dirty);
-    // labelled "Workspace" so the tooltip says WHAT the name is, not just a bare filename floating on a header icon
-    chip.title = 'Workspace: ' + (name || 'not saved yet') + (dialect ? ' · ' + dialect : '');
-    chip.setAttribute('aria-label', dirty ? 'Save workspace (unsaved changes)' : 'Save workspace');
+    if (chip) {
+        const name = fileSavedName();
+        let dialect = '';
+        try {
+            const cid = getMachine().controllerId;
+            dialect = (CONTROLLER_PROFILES[cid] || {}).name || cid || '';
+        } catch (_) { dialect = ''; }
+        chip.classList.toggle('dirty', dirty);
+        chip.classList.toggle('saved', !dirty);
+        // labelled "Workspace" so the tooltip says WHAT the name is, not just a bare filename floating on a header icon
+        chip.title = 'Workspace: ' + (name || 'not saved yet') + (dialect ? ' · ' + dialect : '');
+        chip.setAttribute('aria-label', dirty ? 'Save workspace (unsaved changes)' : 'Save workspace');
+    }
+    // t2147 (BACKLOG #7) — THE HEADER WORKSPACE CHIP'S NAME TEXT, the same source as the disk chip above (one
+    // dirty-tracker, not two): the stem, not the full filename with its .ddcs extension — matches the identity
+    // line's own convention (headerPost.js). "Not saved" is the honest label when there is no file, never a
+    // fake title. ⛔ NO DIRTY DOT (amendment, human ruling — "we can remove the dot"): once this chip sits
+    // directly beside the disk chip, a dot here would only repeat what the disk chip's own COLOUR already says
+    // (t1223's ruling above, unchanged: "the COLOUR is the whole state ... no dot"). The dirty state is still
+    // fully legible — the disk chip beside this one carries it — nothing becomes invisible by dropping this.
+    // ⚠ NOT the button's `title` — the chip is #hdrPostBtn itself now (merged control), and headerPost.js's own
+    // fillMenu() already owns that tooltip ("Quick actions — <name> · <ctrl>"); writing it here too would be
+    // two owners racing over one attribute. Text only, here; the tooltip stays a single-writer fact.
+    if (headerNameTxt) headerNameTxt.textContent = fileSavedStem() || 'Not saved';
     return dirty;
 }
 
@@ -124,6 +138,12 @@ function install() {
     chip = document.getElementById('fileSaveChip');
     if (chip) chip.addEventListener('click', saveWorkspace);
     try { window.ddcsAnnounceSaved = announceSaved; window.ddcsDismissSaved = dismissSaved; } catch (_) {}   // t1287 — one voice for every save path
+
+    // t2147 (BACKLOG #7, amended — merged into ONE control) — the name text lives INSIDE #hdrPostBtn now, the
+    // SAME button that opens the quick menu (headerPost.js's own initHeaderPost() already wires its click) —
+    // no second "open the menu" implementation needed here, just the text to keep live.
+    headerName = document.getElementById('hdrPostBtn');
+    if (headerName) headerNameTxt = headerName.querySelector('.hdr-ws-name-txt');
 
     // t1221 — the beforeunload exit warning is REMOVED (user ruling). It warned about a loss that does not happen:
     // the localStorage buffer SURVIVES a reload or a tab close, so the browser's "Reload site?" prompt was crying

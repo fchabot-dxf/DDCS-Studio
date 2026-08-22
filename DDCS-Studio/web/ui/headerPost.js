@@ -20,8 +20,7 @@ import { getActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/con
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
 import { getMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the identity line names THIS WORKSPACE'S MACHINE; t1231 — with its signed envelope
-import { fileSavedStem } from '../data/backup.js';   // t2145 — the workspace's name IS its last-saved .ddcs file's name; no separate field
-import { THEMES } from './themes.js';
+import { fileSavedStem, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t2145 — the workspace's name IS its last-saved .ddcs file's name; no separate field. BACKLOG #7 — when + where it was saved, for the new menu footer line.
 import { EXE_DOWNLOAD_URL, getEffectiveRole } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page); t2145 — the client-side-derived PC role
 import { openExternal } from './openExternal.js';   // t2066 — open external links once, host-side in the exe
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
@@ -42,12 +41,16 @@ const HQ_ICONS = {
     setupSheet: { c: '#c084fc', d: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>' },
     library: { c: '#38bdf8', d: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
     wizard: { c: '#a855f7', d: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>' },
+    // BACKLOG #7 — the "Saved …" footer line's WHERE, an icon not a word (fileSavedPlace() is a strict binary).
+    // ⛔ NOT in ui/wizIcons.js — that registry holds OPERATION icons only; a save-location mark is UI CHROME, so
+    // it belongs beside this menu's other chrome glyphs, same table, same convention.
+    local: { c: '#0ea5e9', d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
+    cloud: { c: '#0ea5e9', d: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>' },
 };
 // data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
 // t1257 — HQ_ACTIONS / HQ_STANDALONE DELETED (authorized). They were the quick menu's gcode-row list until the t1227
 // curation moved those actions to the editor's own corner menu; nothing has read either since, and one of their
 // comments still called Clear "the phone access point", which stopped being true in t1227 and again in t1255.
-const HQ_THEME_SWATCH = { studio: '#9aa0a6', normal: '#4a90e2', steampunk: '#b07a2a', futuristic: '#00e5e5', organic: '#6b8e23' };
 
 function runQuickAction(act) {
     switch (act) {
@@ -91,14 +94,6 @@ function runQuickAction(act) {
     }
 }
 
-function setQuickTheme(name) {
-    try {
-        const tm = window.ddcsStudio && window.ddcsStudio.themeManager;
-        if (tm && tm.setCurrent) tm.setCurrent(name);
-        else { document.body.setAttribute('data-theme', name); localStorage.setItem('ddcs_theme', name); }
-    } catch (_) { document.body.setAttribute('data-theme', name); }
-}
-
 // t1243 — openCloudModal is DELETED with the ☁ badge that opened it. The shared renderCloudLogin it hosted is
 // still the ONE connect UI (Settings + the projects drawer use it); the workspace manager's Cloud tab is the
 // wizard-side door now, carrying sign-in, the signed-in account and sign-out.
@@ -114,19 +109,13 @@ export function initHeaderPost() {
     const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
 
     // Build the quick-actions popover — menu diet (t851): ~17 rows → ~9, and t1227 curation: 10 → 8.
-    // Layout: identity row · workspace row (Save/Open) · Library… · Theme · Setup sheet… · Setup checklist · Settings… · Rate.
+    // Layout: identity row · workspace row (Save/Open) · Library… · Setup sheet… · Setup checklist · Settings… · Rate.
     // MOVED NOT LOST: Save/Open/wizard → Library; Pull → Gateway (↧ on identity row); standalone/checklist → Settings;
-    // and t1227 Load/Insert/Export/Clear → the EDITOR's corner file menu, the pane they act on.
-    let themeSubOpen = false;
+    // t1227 Load/Insert/Export/Clear → the EDITOR's corner file menu, the pane they act on; BACKLOG #1 (t2147) —
+    // Theme → Settings' own #set_theme picker (Look and feel → Appearance), which already existed and already
+    // switched independently of this menu's retired chips — nothing new to build, only the duplicate to remove.
 
     const fillMenu = () => {
-        const curTheme = document.body.getAttribute('data-theme') || 'studio';
-        // (t1227 — the generic `actionRow` helper went with its last caller, the Clear editor row.)
-        const themeRow = (name) => {
-            const label = name[0].toUpperCase() + name.slice(1);
-            return `<button type="button" role="menuitemradio" class="hq-theme-chip${curTheme === name ? ' active' : ''}" data-theme="${name}" title="${label}" aria-label="${label} theme" aria-checked="${curTheme === name}" style="--chip:${HQ_THEME_SWATCH[name] || '#888'}"></button>`;
-        };
-
         // ── IDENTITY LINE (t1227 amendment, user) ─────────────────────────────────────────────────────
         // It was a big compound BUTTON whose tap opened the machine's settings — a door built for the retired profile
         // world. It is now one QUIET PLAIN-TEXT line, "<workspace> · <dialect>", sitting directly above Save / Open so
@@ -170,6 +159,30 @@ export function initHeaderPost() {
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
             + `</div>`;
 
+        // BACKLOG #7 (t2147) — "Saved 14:22 [icon]": WHEN + WHERE, both already declared in data/backup.js, only
+        // surfaced here. ⛔ Cut by the human, do not reinstate: a separate "Not saved to a file" line (the header
+        // dot carries that now — see index.html/headerName below) and a filename row (it's the identity line's
+        // name plus ".ddcs", pure redundancy) — so this row renders NOTHING at all when never saved, not a
+        // fallback line.
+        const at = fileSavedAt();
+        let savedRow = '';
+        if (at != null) {
+            const d = new Date(at), now = new Date();
+            const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+            const yest = new Date(now); yest.setDate(now.getDate() - 1);
+            const hhmm = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            // t2147 — THE HONESTY RULE: a save from days ago must not read as "just now" right before an overwrite.
+            const when = sameDay(d, now) ? hhmm
+                : sameDay(d, yest) ? `yesterday ${hhmm}`
+                : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${hhmm}`;
+            const place = fileSavedPlace();   // 'local' | 'cloud' — a strict binary, so an ICON, not ~9 chars of words
+            const placeTitle = place === 'cloud' ? 'Saved to your cloud — travels to another PC' : 'Saved to this PC only';
+            savedRow = `<div class="hq-saved-line" title="${esc(placeTitle)}">`
+                + `<span class="hq-cur">Saved ${esc(when)}</span>`
+                + svgIco(place === 'cloud' ? 'cloud' : 'local')
+                + `</div>`;
+        }
+
         // t1227 CURATION (user ruling), REVERSED BY t2078 — see the fileRows comment below for the current story.
         // Load / Insert / Export are back in THIS menu; the editor's own corner file button/menu is gone entirely.
         // Clear alone stayed out (t1255) — it lives in the editor's own toolbar row.
@@ -188,10 +201,6 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="wizards">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('wizard')
             + '<span class="hdr-quick-lbl">Wizards…</span></button>';
-
-        // ── THEME ─────────────────────────────────────────────────────────────────────────────────────
-        const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
-            + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
 
         // ── UTILITY ROWS ──────────────────────────────────────────────────────────────────────────────
         // t854 — the Library: one door to Profiles · Projects · Wizards.
@@ -256,18 +265,31 @@ export function initHeaderPost() {
             + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Export…</span></button>';
 
+        // BACKLOG #7 (t2147) — the version MOVES here, entirely out of the header/brand anchor. The literal
+        // `<span class="ver">` element stays in index.html (bump-version.cjs/check-version-sync.cjs both find it
+        // by a raw-text regex on the HTML file, not a DOM query — moving it in the page changes nothing for
+        // either script), just relocated OUTSIDE the anchor and hidden there; this reads its live text each open.
+        // ⚠ SELECTABLE, on purpose — plain text, not a button, and `.hdr-quick-menu`'s inherited `user-select:none`
+        // (from `.app-header`) is overridden for this one row: the human reads this string to confirm a release
+        // landed, so a footer that cannot be copied is a regression for that use.
+        const verText = (document.querySelector('.ver') || {}).textContent || '';
+        const versionFooter = verText
+            ? `<div class="hdr-quick-sep"></div><div class="hq-ver-footer" title="App version">${esc(verText)}</div>`
+            : '';
+
         // ── ASSEMBLE — the workspace, then app-level entries (t1227: the editor's file rows are no longer here) ──
         menu.innerHTML =
             identityRow          // t1227 — the quiet name · dialect line sits WITH the workspace buttons (save context)
+            + savedRow           // BACKLOG #7 — when + where this workspace was last saved; nothing when never saved
             + workspaceRow
             + wizardsRow         // t1617 — the wizard manager, beside the workspace it serves
             + '<div class="hdr-quick-sep"></div>'
             + fileRows
             + '<div class="hdr-quick-sep"></div>'
             + libraryRow
-            + themeSection
             + '<div class="hdr-quick-sep"></div>'
-            + setupSheetRow + checklistRow + settingsRow + helpRow + downloadRow + rateRow;
+            + setupSheetRow + checklistRow + settingsRow + helpRow + downloadRow + rateRow
+            + versionFooter;      // BACKLOG #7 — the version, moved out of the header entirely
 
         btn.title = `Quick actions — ${apName} · ${apCtrl}`;
         btn.setAttribute('aria-label', `Quick actions (${apName} · ${apCtrl})`);
@@ -365,7 +387,7 @@ export function initHeaderPost() {
 
     btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
 
-    // Route a menu click: an identity-line sub-target (☁ / ↧), a workspace button, a theme chip, or a menu row.
+    // Route a menu click: an identity-line sub-target (☁ / ↧), a workspace button, or a menu row.
     menu.addEventListener('click', (e) => {
         const exactPull = e.target.closest('.hq-pull-btn[data-profact]');
         if (exactPull) {
@@ -379,27 +401,16 @@ export function initHeaderPost() {
         const rowBtn = e.target.closest('.hq-ws-btn');
         if (rowBtn && rowBtn.dataset.act) { closeMenu(); runQuickAction(rowBtn.dataset.act); return; }
 
-        const it = e.target.closest('.hdr-quick-item, .hq-theme-chip');
+        const it = e.target.closest('.hdr-quick-item');
         if (!it) return;
 
-        // A submenu header toggles its list open/closed and keeps the menu open.
-        if (it.dataset.sub) {
-            const list = menu.querySelector(`.hdr-quick-subitems[data-subitems="${it.dataset.sub}"]`);
-            const willOpen = list ? list.hidden : false;
-            if (list) list.hidden = !willOpen;
-            it.classList.toggle('is-open', willOpen);
-            it.setAttribute('aria-expanded', String(willOpen));
-            if (it.dataset.sub === 'theme') themeSubOpen = willOpen;
-            return;
-        }
-
-        if (it.dataset.theme) { setQuickTheme(it.dataset.theme); fillMenu(); return; }   // chips stay open; just refresh the active ring
         closeMenu();
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
         // t1227 — the identity's own `browse` click (open the machine's settings) is GONE with its button: it was a
         // door built for the retired profile world. ☁ and ↧ are handled above, on the exact span that was tapped.
         // t2137 — dialect switching is retired entirely (no more post override — see dialects/index.js);
-        // there is no other row left for `it` to be at this point, so nothing further to do here.
+        // t2147 — theme switching is retired from this menu entirely (BACKLOG #1, Settings' own #set_theme picker
+        // is the one door now); there is no other row left for `it` to be at this point, so nothing further to do.
     });
 
     // Re-sync the 'Auto · <name>' tooltip + re-lint when the profile/post or program changes elsewhere.

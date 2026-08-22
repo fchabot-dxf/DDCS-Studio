@@ -19,7 +19,10 @@ const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.w
 // the retired .hq-gcode-row/data-act="load" shape this file used to check for), because those three act on the
 // program AS A WHOLE, never mid-edit. Clear alone stayed out (t1255) — the editor's own toolbar owns it now.
 const seedProfile = async (page) => {
-    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
+    // t2147 — the old signal (.hdr-quick-head, the Theme section's heading) is GONE with the theme section
+    // itself (BACKLOG #1); .hq-identity-line is unconditional (rendered on every fillMenu(), theme or not),
+    // so it is the stable "the menu has been filled at least once" signal now.
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     // t2145 — the identity line's name is the last-SAVED .ddcs file's name (BACKLOG F2), not a machine-record
     // field; stamp that directly rather than a name nothing reads any more.
     await page.evaluate(() => { window.ddcsMarkWorkspaceSaved('Rig B.ddcs'); });
@@ -40,8 +43,9 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             identityName: id ? (id.querySelector('b') || {}).textContent || '' : '',
             identityLabel: id ? (id.querySelector('.hq-identity-txt') || {}).textContent.trim() || '' : '',
             identityCtrl: id ? (id.querySelector('.hq-cur') || {}).textContent || '' : '',
-            // …and it sits directly above the Save / Open buttons, so a save has its context
-            identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.classList.contains('hq-ws-row')),
+            // …and it sits directly above the Save / Open buttons (t2147 — with the new Saved-line between them
+            // now, BACKLOG #7), so a save has its context
+            identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.nextElementSibling && id.nextElementSibling.nextElementSibling.classList.contains('hq-ws-row')),
             hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),   // t1243 — must now be FALSE (the badge moved to the manager's Cloud tab)
             hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
             hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
@@ -53,6 +57,13 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             hasSettings: menu.querySelectorAll('[data-act="settings"]').length,
             hasRate: menu.querySelectorAll('[data-act="rate"]').length,
             themeChips: menu.querySelectorAll('.hq-theme-chip[data-theme]').length,
+            // t2147 (BACKLOG #1/#7) — theme is gone from this menu (Settings' own #set_theme picker is the one
+            // door now); the "Saved …" line and the version footer are new.
+            hasThemeSection: menu.querySelectorAll('.hdr-quick-subitems, .hdr-quick-head').length,
+            savedLine: menu.querySelectorAll('.hq-saved-line').length,
+            savedLineText: (menu.querySelector('.hq-saved-line .hq-cur') || {}).textContent || '',
+            verFooter: menu.querySelectorAll('.hq-ver-footer').length,
+            verFooterText: (menu.querySelector('.hq-ver-footer') || {}).textContent || '',
             // RETIRED shape — must be absent
             recents: menu.querySelectorAll('[data-profswitch]').length,
             saveasRows: menu.querySelectorAll('[data-profact="saveas"]').length,
@@ -68,10 +79,10 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             // menu showed 10 — a diet number kept true by not looking. The declared target moves instead.
             wsRows: menu.querySelectorAll('.hq-ws-row').length,
             wsBtns: menu.querySelectorAll('.hq-ws-row [data-act="wsSave"], .hq-ws-row [data-act="wsOpen"]').length,
-            rowCount: menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hdr-quick-subitems[data-subitems="theme"]').length,
+            rowCount: menu.querySelectorAll('.hq-identity-line, .hq-saved-line, .hdr-quick-item, .hq-ws-row, .hq-ver-footer').length,
             // every row, named — so a count change has to be explained, not just re-numbered
-            rowNames: [...menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hdr-quick-subitems[data-subitems="theme"]')]
-                .map((r) => r.dataset.act || r.dataset.subitems || r.className.split(' ')[0]),
+            rowNames: [...menu.querySelectorAll('.hq-identity-line, .hq-saved-line, .hdr-quick-item, .hq-ws-row, .hq-ver-footer')]
+                .map((r) => r.dataset.act || r.className.split(' ')[0]),
         };
     });
     // The identity LINE — display only (t1227), with its two live sub-targets
@@ -91,21 +102,29 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
     expect(m.hasSetupSheet + m.hasSettings + m.hasRate, 'the app-level rows stay: Setup sheet + Settings + Rate').toBe(3);
     expect(m.hasClear, 'Clear alone stayed OUT (t1255) — the editor toolbar\'s own trash owns it').toBe(0);
-    expect(m.themeChips, 'theme swatches present').toBeGreaterThan(1);
+    // t2147 (BACKLOG #1) — NO theme in this menu any more: not the chips, not even the section shell (leave
+    // nothing behind — a row that merely opened Settings would still be the row the item meant to free).
+    expect(m.themeChips, 'no theme swatches — Settings\' own #set_theme picker is the one door now').toBe(0);
+    expect(m.hasThemeSection, 'no leftover theme section shell either').toBe(0);
+    // t2147 (BACKLOG #7) — the new "Saved …" line: WHEN + WHERE, present because seedProfile() stamped a save.
+    expect(m.savedLine, 'the Saved line is present once a file exists').toBe(1);
+    expect(m.savedLineText, 'it says WHEN').toMatch(/^Saved /);
+    // t2147 (BACKLOG #7) — the version, now a selectable footer instead of a header chip.
+    expect(m.verFooter, 'the version moved into the menu as its footer').toBe(1);
+    expect(m.verFooterText, 'and it is a real version string').toMatch(/^V\d/);
     // RETIRED shape gone
     expect(m.recents, 'no recents rows (moved to the Library)').toBe(0);
     expect(m.saveasRows + m.saveRows + m.openRows + m.wizardRows + m.standaloneRows, 'Save/Open/Save-as/Save-as-wizard/Standalone all moved out of the menu').toBe(0);
     expect(m.dialectItems, 'no dialect list').toBe(0);
     expect(m.oldCur, 'the old .hdr-quick-cur profile line is gone').toBe(0);
     expect(m.generateFor, 'the "Generate for" label is gone').toBe(false);
-    // The diet target, re-encoded honestly after the t1227 curation — and it came DOWN, as t1225 said it would:
-    // identity · workspace · Library · theme · setup sheet · checklist · settings · rate. Nothing is hidden from the
-    // count by class (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
-    // t2099 — t2078 put fileLoad/fileInsert/fileExport BACK, in DOM order right after wizards (headerPost.js's own
-    // assembly: identity + workspace + wizards + fileRows + library + theme + ...) — up by three, stated, not
-    // silently re-numbered.
+    // The diet target, re-encoded honestly after the t1227 curation. Nothing is hidden from the count by class
+    // (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
+    // t2147 — theme LEAVES (BACKLOG #1); the Saved line and the version footer ARRIVE (BACKLOG #7); and
+    // getDesktop (t2113 — the desktop-download row) is counted here for the first time — it was already
+    // rendered unconditionally, this spec's own row list had simply never named it.
     expect(m.rowNames, 'exactly these rows, in this order').toEqual([
-        'hq-identity-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileInsert', 'fileExport', 'library', 'theme', 'setupSheet', 'checklist', 'settings', 'help', 'rate',
+        'hq-identity-line', 'hq-saved-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileInsert', 'fileExport', 'library', 'setupSheet', 'checklist', 'settings', 'help', 'getDesktop', 'rate', 'hq-ver-footer',
     ]);
     // t1245 — the count goes UP by one, and that is stated rather than quietly re-numbered: HELP came OUT of Settings
     // (FAQ + About are not settings), so the menu gained a row while Settings lost five subtabs. A diet number that
@@ -113,9 +132,9 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     // t1617 — up by one AGAIN, stated: the WIZARD MANAGER's entry (Wizards…) lands beside the workspace row it is
     // the sibling of. Wizard lifecycle earned a user-facing door; the row is the door.
     // t2099 — up by THREE again, stated: t2078 reversed t1227's own removal of the file rows (see the file-header
-    // comment). A count that only ever moves one direction from here on would be the same "kept true by not
-    // looking" trap t1225 already named once.
-    expect(m.rowCount, 'the diet menu is 13 rows (10 + the t2078 file-row reversal)').toBe(13);
+    // comment). t2147 — DOWN one (theme), UP three (Saved line, getDesktop now counted, version footer) — net up
+    // two, stated rather than silently re-numbered, same discipline every prior change here has kept.
+    expect(m.rowCount, 'the diet menu is 15 rows (13, minus theme, plus Saved-line + getDesktop-now-counted + version-footer)').toBe(15);
 
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.
