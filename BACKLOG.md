@@ -663,15 +663,21 @@ editor.
 but the control must never be **absent** when the pointer is travelling toward it. Alternatively the chip's
 own hover zone must include the corridor between the code and the chip, so the trigger stays true en route.
 
-### ⭐ MULTI-OP: it currently shows ONE
-When the program contains several ops, the chip names only one. It should surface **all of them** — the
-editor is a view of an op STACK, and reopening is per-op. A program with a corner probe, a surfacing pass
-and a drill cycle should offer three ways back in, not one.
+### ⭐ MULTI-OP: show them ALL, always
+*(human, 2026-08-22: "the reopen buttons can all be always visible, even multi ops")*
 
-⚠ Design questions worth settling before building: does it list every op always (a long program could have
-many), or the op under the caret plus a way to reach the rest? ⭐ **Caret-scoped is probably right** — it
-matches the "comment button at the end of the current line" instinct from the same session: put the action
-where the user already is, rather than making them pick from a list of everything.
+The editor is a view of an op STACK, and reopening is per-op. **Every op gets its own chip, and every chip
+is always visible** — no hover reveal, no caret-scoping, no "the one under the cursor plus a way to reach
+the rest."
+
+⛔ **An earlier draft of this entry proposed CARET-SCOPED chips. The human rejected it** — surfacing only the
+op under the caret makes the program's structure discoverable only by scrolling through it. All of them
+visible at once IS the map: you can see what the program is made of without reading the G-code.
+
+⚠ The open question is layout, not visibility: a row of chips above the code works for three ops and does
+not for fifteen. Wrapping, a scroll strip, or chips pinned to each op's own first line are all viable —
+⭐ the last is probably best, since it puts each chip beside the code it owns and scales to any length
+without a container that overflows.
 
 ⚠ Also check whether the `≈ 28 s` estimate belongs on this chip at all — it is a different fact (cycle time)
 riding on a navigation control.
