@@ -646,8 +646,13 @@ callers** — but `editorTextOps.js:76` still indents on **Tab**. The door was r
 read as "hide the control", not "remove the capability", because nothing forces the question *"what else
 still calls this?"*
 
-⛔ **DO NOT delete `indentStyle.js` wholesale** — `COMMENT_MARK` / `commentBlock` / `commentEditor` live in
-the same module and MUST survive. Only the indent half goes.
+⭐ **INDENTATION GOES ENTIRELY — setting, emit, Tab, menu entry, help text, persisted key. No exceptions.**
+
+⚠ The ONE thing to not take with it: `indentStyle.js` happens to hold **two unrelated features** — the indent
+code AND `COMMENT_MARK` / `commentBlock` (the comment toggle, which SURVIVES and becomes the caret-following
+button). That is a filing accident: both were once "editor text operations".
+⭐ **Preferred fix: move the comment code into its own module and DELETE `indentStyle.js` entirely.** A file
+named after a feature that no longer exists is exactly the leftover this session found three of.
 
 ---
 
