@@ -127,9 +127,11 @@ test('prefers-reduced-motion → the toast shows instantly (no animation)', asyn
 
 test('the header ⋮ menu Rate/Feedback entry shows the toast with BOTH destinations (GitHub + email)', async ({ page }) => {
     await boot(page, { state: 'done' });   // even after "done", the unprompted menu path stays available
-    await page.click('#hdrPostBtn');
-    await page.waitForSelector('#hdrPostMenu .hdr-quick-item[data-act="rate"]');
-    await page.click('#hdrPostMenu .hdr-quick-item[data-act="rate"]');
+    // t2149 (BACKLOG #9) — Rate/Feedback moved from the file menu to the app menu (the logo): it is about the
+    // product, not this file.
+    await page.click('#hdrAppBtn');
+    await page.waitForSelector('#hdrAppMenu .hdr-quick-item[data-act="rate"]');
+    await page.click('#hdrAppMenu .hdr-quick-item[data-act="rate"]');
     await page.waitForSelector('.ddcs-rate-toast');
     const go = await page.getAttribute('.ddcs-rate-toast .rate-github', 'href');
     const fb = await page.getAttribute('.ddcs-rate-toast .rate-email', 'href');

@@ -1,7 +1,21 @@
 /**
- * ui/headerPost.js — the app header's quick-actions menu (#hdrPostBtn / #hdrPostMenu): workspace save/open,
- * the wizard manager, theme, and app-level utility rows, plus a capability LINT (#hdrPostWarn) on the loaded
- * program against the workspace's OWN controller.
+ * ui/headerPost.js — the app header's TWO menus: #hdrPostBtn / #hdrPostMenu (the FILE menu — workspace
+ * save/open, load/insert/export, the library, the wizard manager, setup docs) and #hdrAppBtn / #hdrAppMenu
+ * (the APP menu — Settings, FAQ, About, the desktop download, Rate, the website). Plus a capability LINT
+ * (#hdrPostWarn) on the loaded program against the workspace's OWN controller.
+ *
+ * t2149 (BACKLOG #9) — THE SPLIT, and the test that drew the line: does going through this door bring
+ * something INTO your work, or come OUT of it? Save/Open/Load/Insert/Export/Library/Wizards/Setup-sheet/
+ * Setup-checklist all do (FILE scope); Settings/FAQ/About/the desktop download/Rate/the version are about the
+ * PRODUCT itself, never this file (APP scope). Before this turn both lived in ONE menu hanging off the
+ * workspace filename chip — so "Settings…" under your filename read as THIS FILE's settings, a mismatch
+ * t2147 made worse by design. The logo, previously a plain `<a href>` out to the marketing site (a real
+ * mis-click hazard — the same one that forced t2147's whole layout argument), is now the APP menu's own
+ * trigger; "open the website" is one row inside it. Both menus share ONE dismissal contract (`makePopover`
+ * below) rather than being two hand-rolled popovers, and opening one closes the other.
+ * ⚠ THEME IS NOT A ROW HERE: t2147 already moved the theme picker to Settings (#set_theme, Look and feel →
+ * Appearance) and it already switches independently. A `Theme ▸` row would only point at Settings one click
+ * deeper for no reason — BACKLOG item 1's own warning — so it is deliberately absent, not forgotten.
  *
  * t2137 — this used to ALSO be a post-processor (dialect) picker: pick a different controller than the
  * workspace's own to preview its G-code (e.g. grbl/LinuxCNC from a DDCS bench). That picker's rows were
@@ -46,7 +60,12 @@ const HQ_ICONS = {
     // it belongs beside this menu's other chrome glyphs, same table, same convention.
     local: { c: '#0ea5e9', d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
     cloud: { c: '#0ea5e9', d: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>' },
+    // t2149 (BACKLOG #9) — the APP menu's "Open the website" row: the external-link glyph the retired brand
+    // <a href> used to imply just by being a link, now carried explicitly since the logo itself no longer is one.
+    website: { c: '#0ea5e9', d: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>' },
 };
+// t2149 — the marketing site the logo used to link to directly; now the APP menu's own "Open the website" row.
+const WEBSITE_URL = 'https://ddcs-studio.pages.dev';
 // data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
 // t1257 — HQ_ACTIONS / HQ_STANDALONE DELETED (authorized). They were the quick menu's gcode-row list until the t1227
 // curation moved those actions to the editor's own corner menu; nothing has read either since, and one of their
@@ -83,7 +102,11 @@ function runQuickAction(act) {
         case 'setupSheet': openSetupSheet(); break;   // t850 — the print-ready job page
         case 'library': openLibrary(); break;   // t854 — the Library (last-used tab)
         case 'rate': window.ddcsOpenRate?.(); break;   // t598 — the always-available Rate / Feedback path (opens the repo)
-        case 'help': import('./helpPanel.js').then((m) => m.openHelp()); break;   // t1245 — FAQ + About, out of Settings
+        // t2149 (human amendment: "i meant seperate them in 2 panel") — FAQ and About are TWO rows opening TWO
+        // panels now, not one Help row opening one two-section panel. See helpPanel.js's own header for why.
+        case 'helpFaq':   import('./helpPanel.js').then((m) => m.openHelp('faq')); break;
+        case 'helpAbout': import('./helpPanel.js').then((m) => m.openHelp('about')); break;
+        case 'openWebsite': openExternal(WEBSITE_URL); break;   // t2149 — the logo's old <a href>, now a menu row
         // t1223 — WORKSPACE (the .ddcs). Both open the ONE manager modal, on the half the user asked for: Save
         // focuses the current workspace + its delta, Open focuses the granted folder's cards.
         case 'wsSave': window.openWorkspaceManager?.('save'); break;
@@ -98,24 +121,82 @@ function runQuickAction(act) {
 // still the ONE connect UI (Settings + the projects drawer use it); the workspace manager's Cloud tab is the
 // wizard-side door now, carrying sign-in, the signed-in account and sign-out.
 
+// t2149 (BACKLOG #9) — TWO MENUS, ONE DISMISSAL CONTRACT. Rather than two hand-rolled show/hide pairs (which is
+// exactly the "second floating-menu implementation" the repo's op-context menu comment warns against), one small
+// factory wires a button+popover pair with the shared behaviour every quick-menu needs: opening one closes any
+// other tracked popover, outside-click and Escape close whichever is open, and each remembers its own `fill`.
+const openPopovers = new Set();
+let docDismissWired = false;
+function wireDocDismiss() {
+    if (docDismissWired) return;
+    docDismissWired = true;
+    document.addEventListener('click', (e) => {
+        for (const p of [...openPopovers]) if (!p.menu.contains(e.target) && !p.btn.contains(e.target)) p.close();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        for (const p of [...openPopovers]) { p.close(); p.btn.focus(); }
+    }, true);
+}
+function makePopover(btnId, menuId, fill) {
+    const btn = document.getElementById(btnId);
+    const menu = document.getElementById(menuId);
+    if (!btn || !menu) return null;
+    const api = { btn, menu };
+    api.close = () => {
+        if (menu.hidden) return;
+        menu.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+        openPopovers.delete(api);
+    };
+    api.open = () => {
+        for (const other of [...openPopovers]) if (other !== api) other.close();   // opening one closes the other
+        fill(btn, menu);
+        menu.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        openPopovers.add(api);
+    };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); menu.hidden ? api.open() : api.close(); });
+    wireDocDismiss();
+    return api;
+}
+// Route a menu click shared by BOTH popovers: an identity-line sub-target (☁ / ↧), a workspace button, or a
+// plain row. The app menu has no pull-btn/ws-btn rows, so those two branches simply never match there — one
+// listener, not two near-identical copies.
+function wireMenuClicks(pop) {
+    pop.menu.addEventListener('click', (e) => {
+        const exactPull = e.target.closest('.hq-pull-btn[data-profact]');
+        if (exactPull) {
+            pop.close();
+            if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' });
+            setTimeout(() => { const b = document.getElementById('set_profile_pull'); if (b) b.click(); }, 60);
+            return;
+        }
+        const rowBtn = e.target.closest('.hq-ws-btn');
+        if (rowBtn && rowBtn.dataset.act) { pop.close(); runQuickAction(rowBtn.dataset.act); return; }
+        const it = e.target.closest('.hdr-quick-item');
+        if (!it) return;
+        pop.close();
+        if (it.dataset.act) runQuickAction(it.dataset.act);
+    });
+}
+
 export function initHeaderPost() {
-    const btn = document.getElementById('hdrPostBtn');
-    const menu = document.getElementById('hdrPostMenu');
-    if (!btn || !menu) return;
     const warnEl = document.getElementById('hdrPostWarn');
 
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
 
-    // Build the quick-actions popover — menu diet (t851): ~17 rows → ~9, and t1227 curation: 10 → 8.
-    // Layout: identity row · workspace row (Save/Open) · Library… · Setup sheet… · Setup checklist · Settings… · Rate.
-    // MOVED NOT LOST: Save/Open/wizard → Library; Pull → Gateway (↧ on identity row); standalone/checklist → Settings;
-    // t1227 Load/Insert/Export/Clear → the EDITOR's corner file menu, the pane they act on; BACKLOG #1 (t2147) —
-    // Theme → Settings' own #set_theme picker (Look and feel → Appearance), which already existed and already
-    // switched independently of this menu's retired chips — nothing new to build, only the duplicate to remove.
+    // ── FILE MENU (#hdrPostBtn/#hdrPostMenu) — everything that acts on THIS workspace/program. ─────────────
+    // Layout: identity row · saved row · workspace row (Save/Open) · Wizards… · Load/Insert/Export · Library… ·
+    // Setup sheet… · Setup checklist. MOVED NOT LOST, across several turns: standalone/checklist-toggle → Settings
+    // (now the APP menu); t1227 Load/Insert/Export/Clear → the editor's corner menu, then t2078 brought
+    // Load/Insert/Export back HERE (Clear alone stayed in the editor toolbar, t1255); BACKLOG #1 (t2147) — Theme
+    // → Settings' own #set_theme picker; BACKLOG #9 (t2149) — Settings/FAQ/About/desktop-download/Rate/version →
+    // the new APP menu, because none of them act on this file (see this file's header comment for the test that split them).
 
-    const fillMenu = () => {
+    const fillFileMenu = (btn, menu) => {
         // ── IDENTITY LINE (t1227 amendment, user) ─────────────────────────────────────────────────────
         // It was a big compound BUTTON whose tap opened the machine's settings — a door built for the retired profile
         // world. It is now one QUIET PLAIN-TEXT line, "<workspace> · <dialect>", sitting directly above Save / Open so
@@ -160,10 +241,11 @@ export function initHeaderPost() {
             + `</div>`;
 
         // BACKLOG #7 (t2147) — "Saved 14:22 [icon]": WHEN + WHERE, both already declared in data/backup.js, only
-        // surfaced here. ⛔ Cut by the human, do not reinstate: a separate "Not saved to a file" line (the header
-        // dot carries that now — see index.html/headerName below) and a filename row (it's the identity line's
-        // name plus ".ddcs", pure redundancy) — so this row renders NOTHING at all when never saved, not a
-        // fallback line.
+        // surfaced here. ⛔ Cut by the human, do not reinstate: a separate "Not saved to a file" line (a saved/
+        // dirty state does not need its own line — the disk chip's colour is the one indicator, t1223's ruling,
+        // reaffirmed at t2147 amendment 3 which dropped the workspace chip's own dot for the same reason) and a
+        // filename row (it's the identity line's name plus ".ddcs", pure redundancy) — so this row renders
+        // NOTHING at all when never saved, not a fallback line.
         const at = fileSavedAt();
         let savedRow = '';
         if (at != null) {
@@ -202,10 +284,13 @@ export function initHeaderPost() {
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('wizard')
             + '<span class="hdr-quick-lbl">Wizards…</span></button>';
 
-        // ── UTILITY ROWS ──────────────────────────────────────────────────────────────────────────────
-        // t854 — the Library: one door to Profiles · Projects · Wizards.
+        // ── UTILITY ROWS (FILE-scoped) ────────────────────────────────────────────────────────────────
+        // t854/t2149 — the Library: one door to Projects · Wizards (the Profiles tab retired at t1217 — the
+        // workspace's ONE machine lives in Settings now, not a browsable list; this comment used to still name
+        // it, the removal-chain pattern again). Both Projects and Wizards are "bring something INTO this job",
+        // which is why Library stays FILE-scoped even though its own name sounds product-ish.
         const libraryRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="library">'
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="library" title="Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Load below">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('library')
             + '<span class="hdr-quick-lbl">Library…</span></button>';
         const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
@@ -219,32 +304,6 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="setupSheet">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('setupSheet')
             + '<span class="hdr-quick-lbl">Setup sheet…</span></button>';
-        const settingsRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
-            + '<span class="hdr-quick-lbl">Settings…</span></button>';
-        // t1245 (user) — HELP leaves Settings and lands here. FAQ and About are not settings: nothing on either
-        // changes how the app behaves, so a gear was the wrong door for them. One row, one small two-section panel.
-        const helpRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="help">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">❓ Help — FAQ &amp; About</span></button>';
-        // t598 — always-available Rate / Feedback. t1245 — and now the ONE feedback door: Settings' Report-a-bug
-        // button was a bare mailto pointing at the same maintainer this toast already reaches (with stars and a
-        // comment), so it retired rather than being carried along beside it.
-        // t2113 (human: "maybe the exe download can go back in the quick menu") — THE DESKTOP DOWNLOAD MOVES
-        // HERE FROM THE STATUS TAB. It belongs on the APP side of t1227's rule — it is about the application
-        // itself, not about the program in front of you — which is exactly what this menu is for.
-        // ⚠ THE UNCONDITIONAL RULING SURVIVES THE MOVE: the human ruled this is never gated on whether a
-        //    gateway answers ("its not because i have the app open that i dont want to download it again"), and
-        //    it is not gated here either. What they objected to was a bordered card with a FILLED PRIMARY
-        //    button sitting under a gateway reading `live` — an action you are told to take while evidently
-        //    already running the thing offered. Same availability, one row, no visual weight.
-        const downloadRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="getDesktop">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⬇ Get DDCS Studio for desktop</span></button>';
-        const rateRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
 
         // t2078 (human: "the load insert export button can go in the quick menu") — THE PROGRAM FILE ROWS RETURN.
         // ⚠ THIS REVERSES t1227, which moved them OUT of here because this menu is for APP things, "not what to
@@ -257,27 +316,20 @@ export function initHeaderPost() {
         // downloadFile), so there is one implementation, not a copy.
         // ⛔ CLEAR IS STILL NOT HERE (t1255): the 🗑 is the one clear, now in the editor's toolbar row. Two doors
         // to a destructive action is one too many.
+        // t2149 — Load…'s title disambiguates the "three doors to open a saved thing" (BACKLOG #9): Open (above)
+        // opens a WORKSPACE (.ddcs — the machine), Load opens a raw G-CODE FILE, Library→Projects opens a
+        // .mjson JOB. Genuinely three different file formats, not one act with three names — CHECKED, not
+        // assumed (Open reads a workspace via workspaceManager.js, Load reads a program via loadGcodeFile in
+        // globalFunctions.js, Projects reads a multi-op .mjson via projectModal.js's openMacroText).
         const fileRows =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad">'
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad" title="Load a G-code file into the editor (replaces the program) — not a workspace or a project">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load…</span></button>'
             + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileInsert">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">➕ Insert…</span></button>'
             + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Export…</span></button>';
 
-        // BACKLOG #7 (t2147) — the version MOVES here, entirely out of the header/brand anchor. The literal
-        // `<span class="ver">` element stays in index.html (bump-version.cjs/check-version-sync.cjs both find it
-        // by a raw-text regex on the HTML file, not a DOM query — moving it in the page changes nothing for
-        // either script), just relocated OUTSIDE the anchor and hidden there; this reads its live text each open.
-        // ⚠ SELECTABLE, on purpose — plain text, not a button, and `.hdr-quick-menu`'s inherited `user-select:none`
-        // (from `.app-header`) is overridden for this one row: the human reads this string to confirm a release
-        // landed, so a footer that cannot be copied is a regression for that use.
-        const verText = (document.querySelector('.ver') || {}).textContent || '';
-        const versionFooter = verText
-            ? `<div class="hdr-quick-sep"></div><div class="hq-ver-footer" title="App version">${esc(verText)}</div>`
-            : '';
-
-        // ── ASSEMBLE — the workspace, then app-level entries (t1227: the editor's file rows are no longer here) ──
+        // ── ASSEMBLE ──────────────────────────────────────────────────────────────────────────────────
         menu.innerHTML =
             identityRow          // t1227 — the quiet name · dialect line sits WITH the workspace buttons (save context)
             + savedRow           // BACKLOG #7 — when + where this workspace was last saved; nothing when never saved
@@ -288,29 +340,67 @@ export function initHeaderPost() {
             + '<div class="hdr-quick-sep"></div>'
             + libraryRow
             + '<div class="hdr-quick-sep"></div>'
-            + setupSheetRow + checklistRow + settingsRow + helpRow + downloadRow + rateRow
-            + versionFooter;      // BACKLOG #7 — the version, moved out of the header entirely
+            + setupSheetRow + checklistRow;
 
-        btn.title = `Quick actions — ${apName} · ${apCtrl}`;
-        btn.setAttribute('aria-label', `Quick actions (${apName} · ${apCtrl})`);
+        btn.title = `File menu — ${apName} · ${apCtrl}`;
+        btn.setAttribute('aria-label', `File menu (${apName} · ${apCtrl})`);
     };
 
-    const onDocClick = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); };
-    const onKey = (e) => { if (e.key === 'Escape') { closeMenu(); btn.focus(); } };
-    function closeMenu() {
-        if (menu.hidden) return;
-        menu.hidden = true;
-        btn.setAttribute('aria-expanded', 'false');
-        document.removeEventListener('click', onDocClick, true);
-        document.removeEventListener('keydown', onKey, true);
-    }
-    function openMenu() {
-        fillMenu();
-        menu.hidden = false;
-        btn.setAttribute('aria-expanded', 'true');
-        document.addEventListener('click', onDocClick, true);
-        document.addEventListener('keydown', onKey, true);
-    }
+    // ── APP MENU (#hdrAppBtn/#hdrAppMenu) — the product itself, never this file. Small and rarely opened,
+    //    which BACKLOG #9 calls out as correct, not lopsided: most of what a user does lives in the file menu. ──
+    const fillAppMenu = (btn, menu) => {
+        const settingsRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
+            + '<span class="hdr-quick-lbl">Settings…</span></button>';
+        // t1245 (user) — HELP leaves Settings and lands here. FAQ and About are not settings: nothing on either
+        // changes how the app behaves, so a gear was the wrong door for them.
+        // t2149 (human amendment: "i meant seperate them in 2 panel") — TWO rows, TWO panels, not one Help row
+        // opening one two-section panel: FAQ (searched when stuck) and About (identity — version, credits) are
+        // different things at very different visit frequencies. See helpPanel.js's own header for the full reasoning.
+        const faqRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="helpFaq">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">❓ FAQ</span></button>';
+        const aboutRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="helpAbout">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">ℹ About</span></button>';
+        // t598 — always-available Rate / Feedback. t1245 — and now the ONE feedback door: Settings' Report-a-bug
+        // button was a bare mailto pointing at the same maintainer this toast already reaches (with stars and a
+        // comment), so it retired rather than being carried along beside it.
+        // t2113 (human: "maybe the exe download can go back in the quick menu") — THE DESKTOP DOWNLOAD. It is
+        // about the application itself, not the program in front of you — exactly what this menu is for now.
+        // ⚠ THE UNCONDITIONAL RULING SURVIVES THE MOVE: the human ruled this is never gated on whether a
+        //    gateway answers ("its not because i have the app open that i dont want to download it again"), and
+        //    it is not gated here either.
+        const downloadRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="getDesktop">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⬇ Get DDCS Studio for desktop</span></button>';
+        const rateRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
+        // t2149 (BACKLOG #9) — "open the website" is the retired brand <a href>'s one function, carried over as
+        // a row now that the logo itself opens this menu instead of navigating away.
+        const websiteRow =
+            `<button type="button" role="menuitem" class="hdr-quick-item" data-act="openWebsite" title="${esc(WEBSITE_URL)}">`
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('website')
+            + '<span class="hdr-quick-lbl">Open the website</span></button>';
+
+        // BACKLOG #7 (t2147) — the version. The literal `<span class="ver">` element stays in index.html
+        // (bump-version.cjs/check-version-sync.cjs both find it by a raw-text regex on the HTML file, not a DOM
+        // query — moving it in the page changes nothing for either script); this reads its live text each open.
+        // ⚠ SELECTABLE, on purpose — plain text, not a button, and `.hdr-quick-menu`'s inherited `user-select:none`
+        // (from `.app-header`) is overridden for this one row: the human reads this string to confirm a release
+        // landed, so a footer that cannot be copied is a regression for that use.
+        const verText = (document.querySelector('.ver') || {}).textContent || '';
+        const versionFooter = verText ? `<div class="hq-ver-footer" title="App version">${esc(verText)}</div>` : '';
+
+        menu.innerHTML =
+            settingsRow
+            + '<div class="hdr-quick-sep"></div>'
+            + faqRow + aboutRow + downloadRow + rateRow + websiteRow
+            + (verText ? '<div class="hdr-quick-sep"></div>' : '')
+            + versionFooter;
+    };
 
     // Warn (don't break) when the loaded program uses capabilities the active post lacks.
     const lint = () => {
@@ -383,41 +473,22 @@ export function initHeaderPost() {
         });
     }
 
-    fillMenu();
+    // t2149 — TWO POPOVERS, ONE FACTORY (see makePopover above): each remembers its own fill function, and
+    // opening either closes the other. The file popover pre-existed under #hdrPostBtn/#hdrPostMenu — those IDs
+    // are UNCHANGED, so every prior wire (every spec that clicks #hdrPostBtn) keeps working untouched.
+    const filePop = makePopover('hdrPostBtn', 'hdrPostMenu', fillFileMenu);
+    const appPop = makePopover('hdrAppBtn', 'hdrAppMenu', fillAppMenu);
+    if (filePop) { wireMenuClicks(filePop); fillFileMenu(filePop.btn, filePop.menu); }   // paint once before first open (title/aria-label read on hover)
+    if (appPop) wireMenuClicks(appPop);
 
-    btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
-
-    // Route a menu click: an identity-line sub-target (☁ / ↧), a workspace button, or a menu row.
-    menu.addEventListener('click', (e) => {
-        const exactPull = e.target.closest('.hq-pull-btn[data-profact]');
-        if (exactPull) {
-            closeMenu();
-            if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' });
-            setTimeout(() => { const b = document.getElementById('set_profile_pull'); if (b) b.click(); }, 60);
-            return;
-        }
-
-        // workspace-row inline action buttons (they carry data-act)
-        const rowBtn = e.target.closest('.hq-ws-btn');
-        if (rowBtn && rowBtn.dataset.act) { closeMenu(); runQuickAction(rowBtn.dataset.act); return; }
-
-        const it = e.target.closest('.hdr-quick-item');
-        if (!it) return;
-
-        closeMenu();
-        if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
-        // t1227 — the identity's own `browse` click (open the machine's settings) is GONE with its button: it was a
-        // door built for the retired profile world. ☁ and ↧ are handled above, on the exact span that was tapped.
-        // t2137 — dialect switching is retired entirely (no more post override — see dialects/index.js);
-        // t2147 — theme switching is retired from this menu entirely (BACKLOG #1, Settings' own #set_theme picker
-        // is the one door now); there is no other row left for `it` to be at this point, so nothing further to do.
-    });
-
-    // Re-sync the 'Auto · <name>' tooltip + re-lint when the profile/post or program changes elsewhere.
-    window.addEventListener('ddcs:settings-changed', () => { fillMenu(); lint(); });
+    // Re-sync the file menu's title/identity + re-lint when the profile/post or program changes elsewhere.
+    // (The app menu has nothing live to resync — its rows are static until Settings/the version itself change,
+    // and it re-reads both on every open via fillAppMenu.)
+    const refreshFileMenu = () => { if (filePop) fillFileMenu(filePop.btn, filePop.menu); lint(); };
+    window.addEventListener('ddcs:settings-changed', refreshFileMenu);
     // t2145 — the identity line's role segment reads gatewayStatus.js's poll cache; refresh it as that poll
     // ticks so the line doesn't need a reopen to catch a daemon appearing/disappearing.
-    document.addEventListener('ddcs:gateway-status', fillMenu);
+    if (filePop) document.addEventListener('ddcs:gateway-status', () => fillFileMenu(filePop.btn, filePop.menu));
     const ed = document.getElementById('editor');
     if (ed) ed.addEventListener('input', lint);
     lint();

@@ -3,9 +3,9 @@ import { test, expect } from '@playwright/test';
 // Settings panel: a primary Done button in a footer.
 //
 // t1245 — the FAQ / Feedback / About part of this spec MOVED with its subject. Those three left Settings entirely
-// (FAQ + About are now the quick menu's Help panel; Feedback merged into Rate / Feedback), so asking Settings about
-// them would only prove they are absent. The questions themselves are worth keeping and are asked below of the
-// surface that now answers them — plus a guard that Settings did not keep a copy.
+// (FAQ + About are now two separate app-menu panels, t2149; Feedback merged into Rate / Feedback), so asking
+// Settings about them would only prove they are absent. The questions themselves are worth keeping and are asked
+// below of the surface that now answers them — plus a guard that Settings did not keep a copy.
 test.use({ viewport: { width: 1280, height: 900 } });
 
 test('settings has a Done button — and no longer carries FAQ / Feedback / About (t1245)', async ({ page }) => {
@@ -35,29 +35,46 @@ test('settings has a Done button — and no longer carries FAQ / Feedback / Abou
 });
 
 // t1245 — the questions that moved, asked of the surface that now answers them.
-test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still has its entries', async ({ page }) => {
+// t2149 (human amendment: "i meant seperate them in 2 panel") — FAQ and About are TWO rows opening TWO
+// separate panels now, never both at once; this test opens each in turn instead of one combined panel.
+test('FAQ and About are two app-menu rows, each opening its own panel, and the FAQ still has its entries', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });
-  await page.click('#hdrPostBtn');
-  await page.waitForSelector('#hdrPostMenu:not([hidden])');
-  await page.click('#hdrPostMenu [data-act="help"]');
-  await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
 
-  const h = await page.evaluate(() => ({
+  // FAQ row → the FAQ panel, About NOT present in it.
+  await page.click('#hdrAppBtn');
+  await page.waitForSelector('#hdrAppMenu:not([hidden])');
+  await page.click('#hdrAppMenu [data-act="helpFaq"]');
+  await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
+  const f = await page.evaluate(() => ({
     faqItems: document.querySelectorAll('#help_faq details').length,
-    hasAbout: /DDCS STUDIO/i.test(document.getElementById('help_about').textContent),
-    hasCredits: /CREDITS/i.test(document.getElementById('help_about').textContent),
-    version: (document.getElementById('help_about_ver') || {}).textContent,
+    aboutPresent: !!document.getElementById('help_about'),
     // the FAQ answer that used to send people to the retired Settings > Feedback tab
     pointsAtRate: /Rate \/ Feedback/.test(document.getElementById('help_faq').textContent),
     stillPointsAtSettingsFeedback: /Settings → <b>Feedback/.test(document.getElementById('help_faq').innerHTML),
   }));
-  expect(h.faqItems, 'the FAQ came over whole').toBeGreaterThanOrEqual(10);
-  expect(h.hasAbout, 'About came with it').toBe(true);
-  expect(h.hasCredits, 'credits and all').toBe(true);
-  expect(h.version, 'and the version reads from the one .ver source, not a hard-coded string').toMatch(/\d/);
-  expect(h.pointsAtRate, 'the bug-report answer names the ONE feedback door').toBe(true);
-  expect(h.stillPointsAtSettingsFeedback, 'and no longer names the retired one').toBe(false);
+  expect(f.faqItems, 'the FAQ came over whole').toBeGreaterThanOrEqual(10);
+  expect(f.aboutPresent, 'About is its own panel now, not a section of this one').toBe(false);
+  expect(f.pointsAtRate, 'the bug-report answer names the ONE feedback door').toBe(true);
+  expect(f.stillPointsAtSettingsFeedback, 'and no longer names the retired one').toBe(false);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#helpOverlay')).toHaveCount(0);
+
+  // About row → the About panel, FAQ NOT present in it.
+  await page.click('#hdrAppBtn');
+  await page.waitForSelector('#hdrAppMenu:not([hidden])');
+  await page.click('#hdrAppMenu [data-act="helpAbout"]');
+  await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
+  const a = await page.evaluate(() => ({
+    hasAbout: /DDCS STUDIO/i.test(document.getElementById('help_about').textContent),
+    hasCredits: /CREDITS/i.test(document.getElementById('help_about').textContent),
+    version: (document.getElementById('help_about_ver') || {}).textContent,
+    faqPresent: !!document.getElementById('help_faq'),
+  }));
+  expect(a.hasAbout, 'About renders').toBe(true);
+  expect(a.hasCredits, 'credits and all').toBe(true);
+  expect(a.version, 'and the version reads from the one .ver source, not a hard-coded string').toMatch(/\d/);
+  expect(a.faqPresent, 'the FAQ is its own panel now, not a section of this one').toBe(false);
 
   await page.keyboard.press('Escape');
   await expect(page.locator('#helpOverlay')).toHaveCount(0);
@@ -75,9 +92,10 @@ test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still
 test('the FAQ leads with the workspace chapter, and every entry it promises is there', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hq-identity-line'), null, { timeout: 15000 });
-  await page.click('#hdrPostBtn');
-  await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
-  await page.click('#hdrPostMenu [data-act="help"]');
+  // t2149 (BACKLOG #9) — FAQ moved from the file menu to the app menu (the logo), as its own row/panel now.
+  await page.click('#hdrAppBtn');
+  await page.waitForSelector('#hdrAppMenu:not([hidden])', { timeout: 6000 });
+  await page.click('#hdrAppMenu [data-act="helpFaq"]');
   await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
 
   const qs = await page.evaluate(() => [...document.querySelectorAll('#help_faq details summary')].map((s) => s.textContent.trim()));

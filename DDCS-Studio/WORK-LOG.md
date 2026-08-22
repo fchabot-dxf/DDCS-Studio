@@ -48615,3 +48615,197 @@ required — confirmed by the fact this needed no other file touched.
   as vestigial in a comment, not removed (out of this tail's scope).
 
 🔨 turn 2147
+
+---
+
+# t2149 — BACKLOG #9: SPLIT THE ONE MENU IN TWO (the logo owns the APP, the filename owns the FILE)
+
+Sequenced after t2147 by design — that turn hung the whole quick menu off the workspace filename chip, so
+"Settings…" under your filename read as *this file's* settings, a mismatch the human's own dispatch named as
+t2147's own doing ("t2147 makes the mismatch worse, which is why this follows it"). BACKLOG #9 had already
+worked the split out in detail with the human (the ✅-marked section), so this turn builds that, not a fresh
+design.
+
+## The test that drew the line, applied row by row
+
+*Does going through this door bring something INTO your work, or come OUT of it?* Save/Open/Load/Insert/
+Export/Library/Wizards/Setup-sheet/Setup-checklist all do → **FILE menu** (`#hdrPostBtn`/`#hdrPostMenu`,
+unchanged ids). Settings/Help/the desktop download/Rate/the version are about the product, never this file →
+**APP menu** (`#hdrAppBtn`/`#hdrAppMenu`, new — the logo).
+
+⚠ **A REAL CONTRADICTION IN THE BACKLOG'S OWN SPEC, surfaced rather than silently resolved.** BACKLOG.md
+carries TWO mockups for this split: the checkmarked "✅ THE SPLIT, WORKED OUT WITH THE HUMAN" section puts
+`Wizards…` in the FILE menu, reasoning it through explicitly ("Wizards inserts an op into THIS program"); an
+OLDER, unchecked "### The shape" sketch a few paragraphs later (predating that reasoning, never updated after
+it) draws Wizards in the APP menu instead, and a "What moves, exactly" bullet list copies that older draft.
+Built to the ✅ section's OWN stated reasoning — Wizards stays FILE-scoped — since it is the more recent,
+explicitly-reasoned-through ruling and its own ASCII mockup agrees with itself. **Flagging this for the
+advisor/human rather than silently picking a side**: BACKLOG.md's "What moves, exactly" list (line ~646)
+should be corrected to match the ✅ section, or the ✅ section overruled explicitly, so the doc stops
+disagreeing with itself for the next reader.
+
+## The logo stops being a link — a real hazard removed, not just tidying
+
+`<a class="brand" href="https://ddcs-studio.pages.dev" target="_blank">` is now `<button id="hdrAppBtn">` —
+same five per-theme logo SVGs, same `.brand` chrome, `href`/`target`/`rel` all gone, a small chevron added (the
+same affordance convention t2147 used for the workspace chip). This was a genuine mis-click hazard — the exact
+one BACKLOG #9 says forced t2147's whole workspace-chip-away-from-the-brand layout argument — and it is now
+gone at the source instead of worked around a second time. "Open the website" survives as one row inside the
+new menu (`data-act="openWebsite"` → `openExternal(WEBSITE_URL)`, the same `openExternal` path every other
+external link in this file already uses). No test asserted the old navigation (checked, not assumed — none
+existed to invert), so a NEW test asserts the non-navigation directly instead (`header-menu-split-2149.spec.js`,
+test 2): click, still on the same URL, menu opens.
+
+## Two menus, one dismissal contract
+
+Rather than duplicate `initHeaderPost()`'s hand-rolled open/close/outside-click/Escape wiring a second time for
+the new menu, `headerPost.js` now has a small `makePopover(btnId, menuId, fill)` factory: each popover tracks
+itself in a shared `openPopovers` Set, one shared document-level click/Escape listener closes whichever is
+open, and **opening either popover closes the other first** — a real behaviour, not just non-interference,
+since a mis-click landing NEAR one trigger while the other is open must not leave two floating menus stacked.
+`wireMenuClicks()` is similarly factored once and reused for both menus (the pull-btn/ws-btn branches simply
+never match in the app menu, since it has neither row type). `#hdrPostBtn`/`#hdrPostMenu` keep their exact ids
+— every existing test/wire that already clicked them needed zero id changes, only content changes (below).
+
+## The three doors, checked rather than assumed
+
+BACKLOG #9 named three doors sitting within a few rows of each other — `Open`, `Load…`, `Library → Projects`
+— and said CHECK before collapsing them, report rather than guess. Traced each to its actual reader:
+`Open` → `workspaceManager.js` (`.ddcs`, the machine + whatever program is loaded), `Load…` →
+`globalFunctions.js`'s `loadGcodeFile` (a raw G-code file), `Library → Projects` → `projectModal.js`'s
+`openMacroText` (a `.mjson` multi-op job). **Three genuinely different file formats, not one act with three
+names** — so nothing was collapsed. What WAS missing, per the dispatch's own fallback ("if they differ, the
+LABELS must say how, because right now they do not"): none of the three carried a disambiguating `title`.
+Added one to `Load…` and to `Library…` (`Open`'s title already named "workspace"); `header-menu-split-2149.spec.js`
+asserts all three by substring so the labels can't quietly drift apart from the rows again.
+
+## Fixed in the same pass (found while building this, not a separate task)
+
+- `headerPost.js:206`'s stale Library comment ("one door to Profiles · Projects · Wizards") — the Profiles tab
+  retired at t1217; comment never updated. Corrected to "Projects · Wizards", same removal-chain pattern this
+  session has now hit half a dozen times.
+- A second, adjacent stale comment on the same "Saved …" row (t2147's own): it still said "the header dot
+  carries that now — see index.html/headerName below", describing a dot that t2147's OWN amendment 3 had
+  already removed before that turn ended. Corrected to name the disk chip's colour as the actual indicator.
+
+## Non-vacuity
+
+`tests/header-menu-split-2149.spec.js` — 9 new tests (logo is a real button/not a link; clicking it opens the
+menu without navigating; app-menu row set + absence of file-scoped rows; file-menu row set + absence of
+app-scoped rows; mutual-exclusion both directions; Escape/outside-click; the three-doors title check; 390px
+survival of both entry points; a verification-screenshot test). Proven non-vacuous by `git checkout HEAD --` on
+the 3 touched source files (`index.html`, `styles.css`, `headerPost.js`; scratch-copied first, restored after —
+never stashed): all 9 failed against the pre-t2149 (t2147) tree — 8 as outright element-not-found/locator
+timeouts, 1 (the logo-is-a-button check) on the `<a>` tag/href assertions directly. Restored, re-ran, 9/9 green.
+
+Also caught and fixed 8 REAL regressions the split caused in EXISTING specs, each because a row this turn moved
+out of `#hdrPostMenu` was still being read from there. Six found by the targeted gate BEFORE the full run:
+- `header-profile-menu.spec.js` — the row-count/row-name assertions (rewritten: 10 rows now, not 15; the 5
+  moved rows named as absent-here rather than deleted from the count silently).
+- `header-responsive.spec.js` — asserted Settings/Rate present in the file menu; now asserts them absent there
+  (moved to the app menu, covered by the new spec instead of duplicated here).
+- `settings-done-faq.spec.js` (×2) and `settings-ia-regroup-1245.spec.js` (×2) — all four clicked
+  `#hdrPostMenu [data-act="help"]` / `[data-act="rate"]`, which no longer exist there; switched to opening
+  `#hdrAppBtn`/`#hdrAppMenu` instead (a new `openAppMenu()` helper added to the regroup spec, beside the
+  existing file-menu `openMenu()`, since other tests in that file still legitimately need the file menu).
+
+Two more surfaced only by the FULL suite run (outside the targeted set, so the standing "don't trust a narrow
+gate" policy earned its keep here) — both the exact same class of bug, same fix shape:
+- `rate-prompt.spec.js` — "the header ⋮ menu Rate/Feedback entry…" clicked `#hdrPostMenu [data-act="rate"]`.
+- `settings-modal.spec.js` — "settings opens as a modal from the chevron…" clicked `#hdrPostMenu [data-act="settings"]`.
+Both switched to `#hdrAppBtn`/`#hdrAppMenu`. A THIRD full-suite failure (`pane-visual-host-programmatic-1762.spec.js`
+— a 3D-canvas boot test, ~26s then timeout) was investigated and NOT fixed as a regression: it shares no
+selector with anything this turn touched, its own sibling test in the same file passed at 7.9s, and a targeted
+re-run of all three (it + the two real fixes) came back 15/15 green — the established parallel-worker/3D-canvas
+contention flake pattern this whole session has logged repeatedly, not a new defect.
+
+## Gate
+
+Targeted: `header-profile-menu.spec.js`, `header-responsive.spec.js`, `header-workspace-name-2147.spec.js`,
+`header-account-row-742.spec.js`, `header-menu-split-2149.spec.js`, `settings-done-faq.spec.js`,
+`settings-ia-regroup-1245.spec.js`, `role-derived-client-side-2145.spec.js`, `persistence-file-indicator.spec.js`,
+`mobile-layout.spec.js`, `context-menu-pass-1452.spec.js`, `status-remote-machine-2112.spec.js`,
+`rate-prompt.spec.js`, `settings-modal.spec.js`, `pane-visual-host-programmatic-1762.spec.js` — all green (84/84
+across the two targeted passes). Node tier: 227/227. Smoke tier: 76/76.
+
+Full suite run to completion (this turn touches header markup + the menu machinery globally, so the full run
+is warranted per the standing policy): **2669 passed, 7 failed, 20 flaky, 25 skipped (29.5m)**. Of the 7
+failed: **4 are the SAME pre-existing baseline** already bisected/confirmed across t2143/t2145/t2147 —
+`pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603`
+— unchanged, not this turn's doing. **3 were this turn's own regressions** (`rate-prompt.spec.js`,
+`settings-modal.spec.js`, `pane-visual-host-programmatic-1762.spec.js`), all diagnosed and the two real ones
+fixed above (the third confirmed flake, not fixed because there was nothing to fix). The 20 flaky entries are
+on files this turn never touched — the same `!!window.__blkws`-class parallel-worker contention this session's
+prior full runs have named repeatedly.
+
+⚠ Hit the known stale-transform-cache Playwright collection error mid-turn (`playwright-stale-cache-testuse-error`
+memory) while proving non-vacuity — `rm -rf "$TEMP/playwright-transform-cache"` cleared it, matching the
+documented fix exactly; not a new failure mode.
+
+## Files
+- `DDCS-Studio/web/index.html` — the brand `<a>` → `<button id="hdrAppBtn">` (no href/target/rel), a chevron
+  added, `#hdrAppWrap`/`#hdrAppMenu` added beside it; the workspace-chip comment block (t2147's own) corrected
+  where it referenced the now-gone link hazard; `#hdrPostBtn`'s title narrowed to file-scope wording.
+- `DDCS-Studio/web/ui/headerPost.js` — split into `fillFileMenu`/`fillAppMenu`; `makePopover`/`wireMenuClicks`/
+  `wireDocDismiss` factored out for the shared two-menu dismissal contract; `website` icon + `WEBSITE_URL` +
+  `openWebsite` action added; the stale Library/Saved-row comments fixed (see above).
+- `DDCS-Studio/web/styles.css` — `.hdr-app-wrap`/`.hdr-app-chevron`/`.hdr-app-menu` added (left-anchored popover,
+  mirroring the file menu's right-anchored one); `.brand` reset for real `<button>` UA chrome (a link never had
+  border/background to reset).
+- `DDCS-Studio/tests/header-menu-split-2149.spec.js` — **new**, 9 tests (see Non-vacuity above).
+- `DDCS-Studio/tests/header-profile-menu.spec.js`, `header-responsive.spec.js`, `settings-done-faq.spec.js`,
+  `settings-ia-regroup-1245.spec.js`, `rate-prompt.spec.js`, `settings-modal.spec.js` — updated for the 5 rows
+  that moved out of `#hdrPostMenu` (see the 8 regressions above; `settings-ia-regroup-1245.spec.js` gained a
+  new `openAppMenu()` helper).
+
+## AMENDMENT — FAQ and About split into TWO separate panels (absorbed before commit)
+
+Two mid-task amendments arrived, the second correcting the first. Amendment 1 asked to split the single
+"❓ Help — FAQ & About" row into two ROWS deep-linking into the existing panel's two SECTIONS, explicitly
+ruling "do NOT split the panel." Amendment 2 arrived immediately after, reversing that one instruction: the
+human clarified "i meant seperate them in 2 panel" — genuinely two panels, not two doors into one room.
+Building the correction only (amendment 1's draft was never committed): `helpPanel.js`'s `openHelp(section)`
+now renders exactly ONE section per open — `'faq'` (the default, so every pre-existing bare `openHelp()` call
+in the test suite kept working unmodified) or `'about'` — through the SAME overlay/close/Escape machinery
+either way, so this stayed the "clean cut" the amendment's own safety valve asked for rather than a second
+modal implementation. Two app-menu rows now: `data-act="helpFaq"` → `openHelp('faq')`, `data-act="helpAbout"`
+→ `openHelp('about')`; the old combined `case 'help'` and its single row are both gone (swept, not left as a
+dead branch).
+
+⚠ **THE VERSION DUPLICATION, FLAGGED PER THE AMENDMENT'S OWN INSTRUCTION, NOT SILENTLY RESOLVED.** The app
+menu's footer (`.hq-ver-footer`, BACKLOG #7/t2147) and the About panel's own version line
+(`#help_about_ver`, pre-existing) now BOTH show the app version, in the same menu tree — a real duplication
+this turn's own two changes created together. Both are kept; **the human should pick which survives** (or
+whether both are acceptable — the footer is a glance-without-opening-anything fact, About's line is inside a
+deliberately-opened "what is this app" panel, which is a real argument for keeping both rather than one
+being ambiguous). Not resolved unilaterally here, per the amendment's explicit "REPORT it — do not silently
+drop either."
+
+`BACKUP_STORES` stayed a single import in `helpPanel.js` (only `ddcsContents()`, used by `FAQ_HTML`, reads
+it) — checked before touching anything, per the amendment's care #3; no duplicate import was ever at risk
+since the file was never actually split in two, only the render/open path.
+
+### Gate (amendment)
+`header-menu-split-2149.spec.js`, `header-profile-menu.spec.js`, `settings-done-faq.spec.js`,
+`settings-ia-regroup-1245.spec.js`, `rate-prompt.spec.js`, `settings-modal.spec.js` — 45/45, re-run after the
+amendment landed. Lint clean. Verification screenshots: `t2149-app-menu-two-help-rows.png` (both rows in the
+app menu), `t2149-about-panel.png` (About alone, no FAQ content) — visually confirmed the panels are genuinely
+separate, not two sections still sharing one overlay.
+
+### Files (amendment)
+- `DDCS-Studio/web/ui/helpPanel.js` — `openHelp(section = 'faq')`, one section per overlay; header comment
+  rewritten to explain the two-panel ruling and cite the human's own correcting words; `fillVersion`'s comment
+  flags the version-duplication finding above.
+- `DDCS-Studio/web/ui/headerPost.js` — `case 'help'` → `case 'helpFaq'`/`case 'helpAbout'`; the single
+  `helpRow` → `faqRow`/`aboutRow`; top-of-file and FILE-menu-scope comments updated (Help → FAQ/About).
+- `DDCS-Studio/tests/header-menu-split-2149.spec.js`, `header-profile-menu.spec.js` — the `acts` lists /
+  selectors updated from `'help'`/`[data-act="help"]` to `'helpFaq'`/`'helpAbout'`.
+- `DDCS-Studio/tests/settings-ia-regroup-1245.spec.js` — the single-row/one-panel test INVERTED into a
+  two-row/two-panel test (asserts the old combined row is gone, each new row opens its own panel, neither
+  panel contains the other's content).
+- `DDCS-Studio/tests/settings-done-faq.spec.js` — the combined FAQ+About test split into two sequential opens
+  (FAQ row → assert FAQ content + About absent; About row → assert About content + FAQ absent); the other six
+  tests in the file needed NO changes — they call bare `openHelp()`, which now defaults to `'faq'` and reads
+  only `#help_faq`, exactly what they already did.
+
+🔨 turn 2149

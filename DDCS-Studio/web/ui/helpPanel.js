@@ -3,10 +3,17 @@
  *
  * FAQ and About were two of the nine subtabs under Settings' old "General" catch-all. Neither is a SETTING: nothing
  * on either panel changes how the app behaves, so putting them behind a gear taught people to go looking for answers
- * in the configuration screen. They are one small panel now, opened from the header quick menu's Help row — two
- * sections, the same content, moved intact.
+ * in the configuration screen.
  *
- * FEEDBACK went with them but NOT here: the quick menu already had a Rate / Feedback row whose toast takes stars, a
+ * t2149 (BACKLOG #9, human amendment: "i meant seperate them in 2 panel") — THEY ARE TWO PANELS NOW, not one panel
+ * with two sections. t1245's actual ruling was that neither belongs behind the gear — ONE panel was how that move
+ * got BUILT, not the point of it. FAQ (searched when stuck) and About (identity — version, credits) are genuinely
+ * different things with very different visit frequency; one panel made the rare one pad the common one. Both are
+ * still rows in the app menu (`data-act="helpFaq"` / `data-act="helpAbout"`), both still out of Settings.
+ * `openHelp(section)` builds ONE overlay containing only that section's content — the SAME overlay/close/Esc
+ * machinery either way, so this stayed a clean cut rather than two near-duplicate modal implementations.
+ *
+ * FEEDBACK went with them but NOT here: the app menu already has a Rate / Feedback row whose toast takes stars, a
  * comment and an email fallback, so the old Settings > Feedback button (a bare mailto) was a second, weaker door to
  * the same place. One feedback door, and the FAQ answer that used to point at the old one now names it.
  */
@@ -112,28 +119,35 @@ const ABOUT_HTML = `
 
 let _ov = null;
 
-/** Fill the version from the header .ver chip — the one place the app's version is written (same source as About was). */
+/** Fill the version from the header .ver chip — the one place the app's version is written (same source as About was).
+ *  ⚠ t2149 — NOW POTENTIALLY DUPLICATED with the app menu's own `.hq-ver-footer` (BACKLOG #7/#9, both land in the
+ *  same menu this turn). Deliberately NOT resolved here — the amendment that split this panel in two flagged the
+ *  duplication and asked to report it, not silently drop either: both are kept until the human picks which survives. */
 function fillVersion(root) {
     const v = document.querySelector('.ver');
     const el = root.querySelector('#help_about_ver');
     if (el) el.textContent = v ? v.textContent.trim() : '—';
 }
 
-export function openHelp() {
+// t2149 — ONE overlay, ONE section per open: 'faq' (the default — every existing bare openHelp() call in the
+// test suite reads #help_faq and keeps working unchanged) or 'about'. Never both at once any more.
+export function openHelp(section = 'faq') {
     closeHelp();
+    const isAbout = section === 'about';
     const ov = document.createElement('div');
     ov.className = 'help-overlay';
     ov.id = 'helpOverlay';
-    ov.innerHTML = `<div class="help-modal" role="dialog" aria-modal="true" aria-label="Help">
-        <div class="help-head"><b>Help</b>
+    ov.innerHTML = `<div class="help-modal" role="dialog" aria-modal="true" aria-label="${isAbout ? 'About' : 'FAQ'}">
+        <div class="help-head"><b>${isAbout ? 'About' : 'FAQ'}</b>
             <button type="button" class="help-close" id="helpClose" title="Close (Esc)" aria-label="Close help">&#10005;</button></div>
         <div class="help-body">
-            <div class="help-section" id="help_faq">${FAQ_HTML}</div>
-            <div class="help-section" id="help_about">${ABOUT_HTML}</div>
+            ${isAbout
+                ? `<div class="help-section" id="help_about">${ABOUT_HTML}</div>`
+                : `<div class="help-section" id="help_faq">${FAQ_HTML}</div>`}
         </div>
     </div>`;
     document.body.appendChild(ov);
-    fillVersion(ov);
+    if (isAbout) fillVersion(ov);
     ov.addEventListener('click', async (e) => {
         // t1251 — an in-app link: close Help, then open the surface the answer names. Closing FIRST matters — the
         // destination is often a modal of its own, and leaving Help on top of it would hide the thing you asked for.

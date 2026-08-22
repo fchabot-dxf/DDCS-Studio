@@ -29,7 +29,7 @@ const seedProfile = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the compact diet menu: identity line (name·controller, ↧) + one workspace row + Library; the file rows are BACK (t2078), 13 rows', async ({ page }) => {
+test('the FILE menu: identity line (name·controller, ↧) + one workspace row + Library; the file rows are BACK (t2078), 10 rows', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -54,8 +54,9 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             fileRows: menu.querySelectorAll('[data-act="fileLoad"], [data-act="fileInsert"], [data-act="fileExport"]').length,
             hasClear: menu.querySelectorAll('[data-act="clear"]').length,
             hasSetupSheet: menu.querySelectorAll('[data-act="setupSheet"]').length,
-            hasSettings: menu.querySelectorAll('[data-act="settings"]').length,
-            hasRate: menu.querySelectorAll('[data-act="rate"]').length,
+            // t2149 (BACKLOG #9) — Settings/FAQ/About/getDesktop/Rate/version all MOVED OUT to the new #hdrAppMenu;
+            // asserted absent from THIS menu here, present in the app menu by header-menu-split-2149.spec.js.
+            appScopedLeaked: menu.querySelectorAll('[data-act="settings"], [data-act="helpFaq"], [data-act="helpAbout"], [data-act="getDesktop"], [data-act="rate"]').length,
             themeChips: menu.querySelectorAll('.hq-theme-chip[data-theme]').length,
             // t2147 (BACKLOG #1/#7) — theme is gone from this menu (Settings' own #set_theme picker is the one
             // door now); the "Saved …" line and the version footer are new.
@@ -100,7 +101,8 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     expect(m.fileRows, 'Load/Insert/Export are BACK (t2078) — they act on the program as a whole').toBe(3);
     expect(m.wsRows, 'ONE workspace row').toBe(1);
     expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
-    expect(m.hasSetupSheet + m.hasSettings + m.hasRate, 'the app-level rows stay: Setup sheet + Settings + Rate').toBe(3);
+    expect(m.hasSetupSheet, 'Setup sheet stays — it is FILE-scoped (a document ABOUT this job)').toBe(1);
+    expect(m.appScopedLeaked, 't2149 — Settings/Help/getDesktop/Rate moved OUT to the app menu, none leaked back in').toBe(0);
     expect(m.hasClear, 'Clear alone stayed OUT (t1255) — the editor toolbar\'s own trash owns it').toBe(0);
     // t2147 (BACKLOG #1) — NO theme in this menu any more: not the chips, not even the section shell (leave
     // nothing behind — a row that merely opened Settings would still be the row the item meant to free).
@@ -109,9 +111,8 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     // t2147 (BACKLOG #7) — the new "Saved …" line: WHEN + WHERE, present because seedProfile() stamped a save.
     expect(m.savedLine, 'the Saved line is present once a file exists').toBe(1);
     expect(m.savedLineText, 'it says WHEN').toMatch(/^Saved /);
-    // t2147 (BACKLOG #7) — the version, now a selectable footer instead of a header chip.
-    expect(m.verFooter, 'the version moved into the menu as its footer').toBe(1);
-    expect(m.verFooterText, 'and it is a real version string').toMatch(/^V\d/);
+    // t2149 (BACKLOG #9) — the version footer moved OUT of this menu into the app menu; asserted absent here.
+    expect(m.verFooter, 'no version footer in the FILE menu any more').toBe(0);
     // RETIRED shape gone
     expect(m.recents, 'no recents rows (moved to the Library)').toBe(0);
     expect(m.saveasRows + m.saveRows + m.openRows + m.wizardRows + m.standaloneRows, 'Save/Open/Save-as/Save-as-wizard/Standalone all moved out of the menu').toBe(0);
@@ -120,21 +121,14 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     expect(m.generateFor, 'the "Generate for" label is gone').toBe(false);
     // The diet target, re-encoded honestly after the t1227 curation. Nothing is hidden from the count by class
     // (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
-    // t2147 — theme LEAVES (BACKLOG #1); the Saved line and the version footer ARRIVE (BACKLOG #7); and
-    // getDesktop (t2113 — the desktop-download row) is counted here for the first time — it was already
-    // rendered unconditionally, this spec's own row list had simply never named it.
+    // t2149 (BACKLOG #9) — settings/help/getDesktop/rate/hq-ver-footer LEAVE this menu for the new #hdrAppMenu
+    // (see header-menu-split-2149.spec.js for that side); nothing else in the row set changes.
     expect(m.rowNames, 'exactly these rows, in this order').toEqual([
-        'hq-identity-line', 'hq-saved-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileInsert', 'fileExport', 'library', 'setupSheet', 'checklist', 'settings', 'help', 'getDesktop', 'rate', 'hq-ver-footer',
+        'hq-identity-line', 'hq-saved-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileInsert', 'fileExport', 'library', 'setupSheet', 'checklist',
     ]);
-    // t1245 — the count goes UP by one, and that is stated rather than quietly re-numbered: HELP came OUT of Settings
-    // (FAQ + About are not settings), so the menu gained a row while Settings lost five subtabs. A diet number that
-    // only ever falls would be a number kept true by not counting.
-    // t1617 — up by one AGAIN, stated: the WIZARD MANAGER's entry (Wizards…) lands beside the workspace row it is
-    // the sibling of. Wizard lifecycle earned a user-facing door; the row is the door.
-    // t2099 — up by THREE again, stated: t2078 reversed t1227's own removal of the file rows (see the file-header
-    // comment). t2147 — DOWN one (theme), UP three (Saved line, getDesktop now counted, version footer) — net up
-    // two, stated rather than silently re-numbered, same discipline every prior change here has kept.
-    expect(m.rowCount, 'the diet menu is 15 rows (13, minus theme, plus Saved-line + getDesktop-now-counted + version-footer)').toBe(15);
+    // t1245/t1617/t2099 grew this menu across three turns (see WORK-LOG for that history); t2149 is the first
+    // turn to SHRINK it — five app-scoped rows (settings, help, getDesktop, rate, hq-ver-footer) moved out.
+    expect(m.rowCount, 'the FILE menu is 10 rows (15, minus the 5 rows that moved to the app menu)').toBe(10);
 
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.

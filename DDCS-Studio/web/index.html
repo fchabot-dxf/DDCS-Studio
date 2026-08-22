@@ -119,14 +119,26 @@
 
     <header class="app-header">
         <span data-fred-home-mount></span>
-        <a class="brand" href="https://ddcs-studio.pages.dev" target="_blank" rel="noopener"
-           title="Open DDCS Studio online — ddcs-studio.pages.dev">
-            <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
-            <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
-            <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
-            <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
-            <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
-        </a>
+        <!-- t2149 (BACKLOG #9) — THE LOGO STOPS BEING A LINK. It used to be `<a href="https://ddcs-studio.pages.dev"
+             target="_blank">` — a mis-click that navigated away from the app entirely, and the very hazard that
+             forced t2147's whole workspace-chip layout argument. It is now the APP menu's own trigger: "open the
+             website" becomes one row inside it (ui/headerPost.js, data-act="openWebsite"), where it belongs. The
+             logo SVGs, their per-theme show/hide rule, and .brand's own chrome are all UNCHANGED — only the
+             element and its link attributes are gone. #hdrAppBtn/#hdrAppMenu mirror #hdrPostBtn/#hdrPostMenu's
+             shape exactly (same .scale-pop/.hdr-quick-menu popover chrome), so the two menus share one
+             dismissal contract (ui/headerPost.js's makePopover) rather than being two hand-rolled popovers. -->
+        <div class="hdr-app-wrap" id="hdrAppWrap">
+            <button type="button" id="hdrAppBtn" class="brand" aria-haspopup="menu" aria-expanded="false"
+                    title="DDCS Studio menu — Settings, Help, the website" aria-label="DDCS Studio menu">
+                <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
+                <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
+                <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
+                <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
+                <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
+                <svg class="hdr-app-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div id="hdrAppMenu" class="scale-pop hdr-quick-menu hdr-app-menu" role="menu" hidden></div>
+        </div>
         <!-- BACKLOG #7 (t2147) — the version chip LEAVES the header/brand anchor entirely, moving to the quick-menu
              footer (ui/headerPost.js). The literal `<span class="ver">` element stays HERE, hidden: bump-version.cjs
              and check-version-sync.cjs both locate it by a raw-text regex on this file, not a DOM query, so its
@@ -156,17 +168,21 @@
                  existing wire (initHeaderPost, every spec that clicks #hdrPostBtn) is unchanged; only the button
                  now ALSO carries the name text, and the whole control moved from beside the brand to here.
                  ⛔ WHY BOUNDED, WHY HERE (the reason, so it is not undone later): a bare label has no edge — it
-                 bleeds toward the brand <a href> next to it, and a click aimed at the name that lands 1px left
-                 navigates away to the marketing site. A chevron-bearing chip draws that boundary and reads as
-                 clickable on its own; moving it beside the avatar removes the brand adjacency entirely and groups
-                 the two CONTEXT facts — who you are, what you are working on. Populated + kept live by
-                 ui/fileSaveState.js's `refresh()` (the SAME function that already drives the disk chip below —
-                 one dirty-tracker, not two — see that file for why there is no dirty DOT here: t1223's own ruling
-                 already said the disk chip's colour is the one indicator, and putting a second one beside it
-                 would repeat what the colour already says). -->
+                 bleeds toward whatever sits next to it, and at the time this was written that neighbour was the
+                 brand `<a href>`, so a stray click could navigate away to the marketing site. t2149 later removed
+                 that hazard from the OTHER direction (the logo stopped being a link at all — see #hdrAppBtn
+                 above), but the chip had already moved beside the avatar by then, so the boundary reasoning
+                 stands on its own regardless: a chevron-bearing chip reads as clickable; a bare label does not.
+                 Populated + kept live by ui/fileSaveState.js's `refresh()` (the SAME function that already drives
+                 the disk chip below — one dirty-tracker, not two — see that file for why there is no dirty DOT
+                 here: t1223's own ruling already said the disk chip's colour is the one indicator, and putting a
+                 second one beside it would repeat what the colour already says).
+                 t2149 (BACKLOG #9) — SETTINGS/HELP/DOWNLOAD/RATE/THEME/VERSION MOVED OUT of this menu into the
+                 new #hdrAppMenu (the logo above): this menu is FILE scope now — only rows that act on the
+                 workspace/program in front of you. See ui/headerPost.js for the row-by-row split and why. -->
             <div class="hdr-quick hdr-ws-chip" id="hdrQuick">
                 <button type="button" id="hdrPostBtn" class="hdr-quick-btn hdr-ws-chip-btn" aria-haspopup="menu" aria-expanded="false"
-                        title="Menu — open / save / export, post-processor, settings">
+                        title="File menu — save / open, load / insert / export, library, wizards, setup docs">
                     <span class="hdr-ws-name-txt"></span>
                     <svg class="hdr-ws-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>

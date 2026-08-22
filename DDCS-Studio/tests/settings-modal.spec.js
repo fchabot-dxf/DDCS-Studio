@@ -8,9 +8,10 @@ test('settings opens as a modal from the chevron, closes via Esc; no nav tab', a
   // No Settings tab in the nav anymore.
   expect(await page.locator('.hdr-tabs .tab[data-app="settings"]').count()).toBe(0);
 
-  // Open via the chevron quick-menu → Settings… row.
-  await page.click('#hdrPostBtn');
-  await page.click('#hdrPostMenu .hdr-quick-item[data-act="settings"]');
+  // Open via the app menu (the logo) → Settings… row. t2149 (BACKLOG #9) — Settings moved from the file menu
+  // to the app menu: it is about the product, not this file.
+  await page.click('#hdrAppBtn');
+  await page.click('#hdrAppMenu .hdr-quick-item[data-act="settings"]');
   await page.waitForTimeout(300);
 
   const overlayShown = await page.locator('#settings-overlay.active').count();

@@ -60,15 +60,15 @@ test('quick-menu chip: no stale dialect text on it; opens Program actions + Post
   expect(await page.locator('#hdrPostMenu').isHidden()).toBe(false);
   expect(await page.getAttribute('#hdrPostBtn', 'aria-expanded')).toBe('true');
 
-  // Program actions present (load/insert/clear/export/setupSheet/settings/library/checklist/rate).
-  // Copy moved to a floating #editor-copy-btn. Save/Open/wizard moved to Library. Standalone moved to Settings.
+  // Program actions present (load/insert/export/setupSheet/library/checklist). Copy moved to a floating
+  // #editor-copy-btn. Save/Open/wizard moved to Library. Standalone moved to Settings.
+  // t2149 (BACKLOG #9) — Settings…/Rate moved OUT of this menu to the new #hdrAppMenu (the logo) — this menu
+  // is FILE scope now (see header-menu-split-2149.spec.js for that split's own coverage).
   const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]').count();
   // Expect fewer items now. Let's just check the ones that exist.
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="library"]').count(), 'Library row present').toBe(1);
-  // Settings opens as a modal from the menu.
-  expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
-  // t598 — the always-available Rate / Feedback utility entry (alongside Settings / checklist).
-  expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="rate"]').count(), 'Rate / Feedback row present').toBe(1);
+  expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… moved to the app menu, not here').toBe(0);
+  expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="rate"]').count(), 'Rate / Feedback moved to the app menu, not here').toBe(0);
   // t688 b2 — the dialect (Generate-for) list is GONE from the menu. t1227 — and so is the identity's own door: the
   // machine name + dialect are a quiet DISPLAY line above Save/Open now, with no click of their own.
   // t2147 (BACKLOG #1) — and theme is gone too: Settings' own #set_theme picker is the one door now.
@@ -80,6 +80,8 @@ test('quick-menu chip: no stale dialect text on it; opens Program actions + Post
   expect(identityDoors, 'the identity is not a door any more (t1227)').toBe(0);
   expect(identityLine, 'it is a plain-text line — still there, just not pressable').toBe(1);
   expect(themeChips, 'no theme chips in this menu any more (BACKLOG #1)').toBe(0);
+  // t2149 — Settings…/Rate now live in the app menu (the logo button); see header-menu-split-2149.spec.js for
+  // that menu's own row coverage — not duplicated here.
 
   // Escape closes it.
   await page.keyboard.press('Escape');

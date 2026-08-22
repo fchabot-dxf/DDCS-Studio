@@ -34,6 +34,13 @@ const openMenu = async (page) => {
     await page.click('#hdrPostBtn');
     await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
 };
+// t2149 (BACKLOG #9) — Help and Rate/Feedback moved from the FILE menu (openMenu above, #hdrPostMenu) to the
+// new APP menu (the logo, #hdrAppMenu) — neither acts on this workspace/program.
+const openAppMenu = async (page) => {
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio, null, { timeout: 15000 });
+    await page.click('#hdrAppBtn');
+    await page.waitForSelector('#hdrAppMenu:not([hidden])', { timeout: 6000 });
+};
 
 test('the strip is THREE tabs — Look and feel, Controller, Hardware', async ({ page }) => {
     await openSettings(page);
@@ -100,24 +107,40 @@ test('SETTINGS HOLDS ZERO WORKSPACE CONTROLS — the manager owns saving, and sa
     expect(band.buttons, 'and still display-only').toBe(0);
 });
 
-test('HELP is one quick-menu row opening one small panel — FAQ and About, both sections', async ({ page }) => {
+// t2149 (human amendment: "i meant seperate them in 2 panel") — INVERTED: was ONE Help row opening ONE
+// two-section panel; now TWO rows, each opening its OWN panel. FAQ and About are different things at very
+// different visit frequencies (see helpPanel.js's own header for the full reasoning).
+test('FAQ and About are TWO quick-menu rows, each opening its OWN panel', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await openMenu(page);
-    const row = page.locator('#hdrPostMenu [data-act="help"]');
-    await expect(row, 'ONE Help row').toHaveCount(1);
-    await row.click();
+    await openAppMenu(page);
+    const faqRow = page.locator('#hdrAppMenu [data-act="helpFaq"]');
+    const aboutRow = page.locator('#hdrAppMenu [data-act="helpAbout"]');
+    await expect(faqRow, 'ONE FAQ row').toHaveCount(1);
+    await expect(aboutRow, 'ONE About row').toHaveCount(1);
+    // no combined "Help" row survives either
+    await expect(page.locator('#hdrAppMenu [data-act="help"]'), 'the old combined Help row is gone').toHaveCount(0);
+
+    await faqRow.click();
     await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
-    await expect(page.locator('#help_faq'), 'section one: the FAQ').toBeVisible();
-    await expect(page.locator('#help_about'), 'section two: About').toBeVisible();
+    await expect(page.locator('#help_faq'), 'the FAQ panel').toBeVisible();
+    await expect(page.locator('#help_about'), 'About is NOT in the same panel any more').toHaveCount(0);
     expect(await page.locator('#help_faq details').count(), 'the FAQ moved whole, not summarised').toBeGreaterThanOrEqual(10);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#helpOverlay'), 'Esc closes it').toHaveCount(0);
+
+    await openAppMenu(page);
+    await page.locator('#hdrAppMenu [data-act="helpAbout"]').click();
+    await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
+    await expect(page.locator('#help_about'), 'the About panel').toBeVisible();
+    await expect(page.locator('#help_faq'), 'FAQ is NOT in the same panel any more').toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(page.locator('#helpOverlay'), 'Esc closes it').toHaveCount(0);
 });
 
 test('ONE feedback door: the Settings Report-a-bug is gone and Rate / Feedback is still there', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await openMenu(page);
-    await expect(page.locator('#hdrPostMenu [data-act="rate"]'), 'the surviving door').toHaveCount(1);
+    await openAppMenu(page);
+    await expect(page.locator('#hdrAppMenu [data-act="rate"]'), 'the surviving door').toHaveCount(1);
     await page.keyboard.press('Escape');
     await page.evaluate(() => window.openSettings());
     await page.waitForSelector('#settings-app .settings-tabs');
