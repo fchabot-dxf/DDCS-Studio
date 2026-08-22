@@ -433,3 +433,72 @@ toggle, the Controller-profile card, and the COM port if exposed.
 ⚠ **REDUCE the Setup tab, never hide it** — it is where the role is corrected when derivation is wrong.
 ⚠ **The claim gate stays authoritative regardless** (S0, `poller._maybe_claim`): the UI must never be the
 thing that decides. A role that hides fields while the poller still claims is worse than no role.
+
+---
+
+# ⭐⭐ MEASURED 2026-08-22 — S0/S1/S2 ARE NOT ACTUALLY SHIPPED
+
+*(Found live by the human from a PHONE: "nowhere is it written what role it is, and it's not gating.")*
+
+Both claims verified. The role machinery exists **server-side** and is unreachable from the one device that
+is purely a client.
+
+## Finding 1 — the role is NEVER DISPLAYED, anywhere
+Every `role` occurrence in `DDCS-Studio/web/ui/**` is an **ARIA attribute** — `role="dialog"`,
+`role="menuitem"`, `role="menuitemradio"`. There is **no surface that tells the user which role this PC is.**
+
+S0 says *"expose it to the UI"*. It was exposed to `admin.js`'s **logic** and to nowhere a human can read.
+
+### ⭐ WHERE IT GOES (human, 2026-08-22)
+The quick-menu identity block — **after the dialect, before the envelope**:
+```
+  Workspace: copy-of-Milling expert ·
+  DDCS Expert                          <- the dialect
+  client                               <- HERE
+  M350 · X 756 Y -776 Z -180           <- the envelope
+```
+⭐ Better than a Settings row or a header chip: that block is already the "what am I connected to" summary,
+so the role reads as part of the machine IDENTITY rather than as a preference. It is a fact about this PC,
+not a setting.
+
+## ⛔ Finding 2 — THE ROLE CANNOT BE COMPUTED ON A CLIENT
+`ui/gateway/views/admin.js:97` → `d = await ctx.client.descriptor()`; `:189` → `const isClient = d.role === 'client'`.
+
+**The role comes from the DAEMON'S descriptor.** On a phone there is no daemon, `descriptor()` throws, and
+`isClient` is never computed ⇒ **no gating at all.**
+
+⇒ **The client role is only knowable from a machine that is running a gateway — i.e. from a machine that is
+not a client.** That is circular, and it is why the human sees no gating on the device the role exists for.
+
+### ⚠ WHY THE TESTS PASS ANYWAY
+`tests/settings-role-gate-2111.spec.js` mounts admin with a **hand-supplied `desc` object**. It proves the
+gating is correct *given a role*. It never asks where the role comes from, so it cannot catch its absence.
+⭐ Same shape as the t2125 sound bug: **the property tested was "does it work when handed the input", not
+"is the input there on the device that needs it."**
+
+## The corrected slice status
+| slice | claimed | actually |
+|---|---|---|
+| S4 namespace the Drive inbox | ✅ | ✅ shipped |
+| S0 the role exists | ✅ | ◐ **server-side only** — undiscoverable client-side, never displayed |
+| S1 gate the settings by role | ✅ | ◐ **logic correct, never fires on a client** |
+| S2 compose the two axes | ✅ | ◐ shipped, but its own cleanup clause was not done — see below |
+| S3 backend-mediated file view | — | ⛔ **zero code**; no `index.json` producer or consumer anywhere |
+
+## ⚠ S2's cleanup was never done
+S2 says: *"**Retire the t2080b special case** — `viaDrive` in `send.js` is a patch standing in for the
+missing role."* `viaDrive` is still there, **10 occurrences** in `ui/gateway/views/send.js`. So "can I
+send?" is now decided by BOTH the role composition AND a leftover boolean. They agree today; nothing makes
+them agree. ⭐ Same two-homes-one-fact shape as the post/dialect split and the sound-toggle sync.
+
+## THE BUILD ORDER — display last, not first
+```
+  1. derive the role CLIENT-SIDE, no daemon required
+     (no controller disk configured HERE => client. It is a LOCAL fact.)
+  2. render it in the quick-menu identity block (after dialect, before envelope)
+  3. S1 gating then actually fires on a phone — which is where it was always aimed
+  4. retire viaDrive
+  5. S3
+```
+⛔ **Do not start at step 2.** A readout for a value that is undefined on the device you are holding is
+worse than no readout — it would be blank exactly where it matters.
