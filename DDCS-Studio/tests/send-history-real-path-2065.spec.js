@@ -134,7 +134,9 @@ const stageAndSend = async (page, { beaconsOn }) => {
         hit.click();
         return true;
     }, txt);
-    await page.getByText('GATEWAY', { exact: false }).first().click();
+    // t2145 — no longer a unique text match: the quick-menu identity line now also shows the PC role ("gateway"
+    // / "client"), which matches this loose case-insensitive locator too. Target the real header tab directly.
+    await page.locator('.tab[data-app="gateway"]').click();
     await page.waitForTimeout(2000);   // let the REAL local-gateway auto-probe find the real bridge (no page.route to shortcut it)
     expect(await clickBtn('Send'), 'the Send view opens').toBe(true);
     await page.waitForTimeout(700);

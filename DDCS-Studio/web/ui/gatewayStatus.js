@@ -7,10 +7,37 @@
  * unlit grey when there is no gateway at all (hosted Studio / standalone) — in that state the GATEWAY
  * tab greys out too, and clicking it offers the desktop download (the full exe bundles the gateway;
  * the cloud never touches a machine).
+ *
+ * t2145 (ROLES-PLAN S0/S1 corrected) — ALSO the one place that derives the PC role CLIENT-SIDE. The server-side
+ * derivation (`effective_role()`, bridge config.py) needs a reachable daemon to ask; on a phone with no daemon
+ * `descriptor()` throws and the role was simply never computed. THE FIX: absence of a reachable daemon IS the
+ * answer, not an error to bail on.
+ *
+ * THE RULE (human ruling, 2026-08-22, overriding an earlier three-state design this comment used to describe —
+ * "i dont mind that its convert to client untill its restarted. or whatever the fix is."):
+ *   daemon reachable      → use ITS answer (server-side `effective_role()` stays the source of truth)
+ *   daemon NOT reachable  → CLIENT, unconditionally, no exceptions
+ * A gateway PC whose daemon crashed shows 'client' too — deliberately: if the daemon is down, the gateway
+ * features do not work anyway, so 'client' describes what this machine can actually DO right now, and it is
+ * NEVER persisted — the very next successful tick derives 'gateway' again with no restart or reset needed.
+ * ⛔ DO NOT reintroduce a remembered/cached role here. A downgrade that outlives the daemon-down condition
+ * that caused it is exactly the "cached-and-stuck" shape the human explicitly ruled out.
+ *
+ * SCOPE THIS TURN: derivation + a getter for DISPLAY only (the quick-menu identity line). Tab/settings GATING
+ * (`admin.js`'s `isClient`, still sourced from a reachable daemon's own descriptor only) is the next step.
  */
 import { makeClient, deriveStatus } from '../shared/js/client.js';
 
 export const EXE_DOWNLOAD_URL = 'https://github.com/fchabot-dxf/DDCS-Studio/releases/latest';
+
+let _lastRole = '';   // t2145 — the CURRENT tick's role only; never written to storage, so a daemon-down
+                       // downgrade to 'client' self-corrects the moment the daemon answers again
+
+/** t2145 — read the client-side-derived role without waiting on a daemon. See the module header for the rule.
+ * Returns 'gateway' | 'client' — the daemon's own answer when reachable, else 'client'. */
+export function getEffectiveRole() {
+    return _lastRole === 'gateway' ? 'gateway' : 'client';
+}
 
 export function initGatewayStatus() {
     const led = document.getElementById('gateway-led');
@@ -31,10 +58,15 @@ export function initGatewayStatus() {
             led.className = 'gateway-led ' + (s.dot === 'bad' ? 'led-bad' : 'led-ok');
             led.title = 'Gateway: ' + s.label + (s.device ? ' · ' + s.device : '');
             bridged = true;
+            // t2145 — only a LOCAL daemon's descriptor carries `.role` (a cloud-mirror descriptor has `online`
+            // instead and describes a REMOTE gateway, not this device). Not persisted anywhere — see the
+            // module header: a daemon-down downgrade must self-correct the moment the daemon answers again.
+            _lastRole = (d && (d.role === 'gateway' || d.role === 'client')) ? d.role : '';
         } catch (e) {
             led.className = 'gateway-led';   // unlit — no gateway (standalone / hosted / dev preview)
             led.title = 'Gateway: off';
             bridged = false;
+            _lastRole = '';   // t2145 — no reachable daemon this tick ⇒ getEffectiveRole() reports 'client'
             // Don't auto-kick out of the Gateway tab when nothing answers — its Console → Service picker is
             // how you point at one (a local daemon, the desktop exe's gateway, or a remote service).
         }

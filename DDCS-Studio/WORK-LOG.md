@@ -48227,3 +48227,90 @@ TEXT itself (the real macro's `MarcoDialog "M6.rc"` call by name) — correctly 
 
 🔨 turn 2143
 
+---
+
+# t2145 — ROLES S1: derive the PC role CLIENT-SIDE, no daemon required (new ARC)
+
+## The bug
+
+`ui/gateway/views/admin.js`'s `render()` gets the role from `ctx.client.descriptor()`, which needs a running
+daemon. On a phone with no daemon, `descriptor()` throws, `render()` bails to "gateway unreachable", and NO
+gating code runs — the client role was only knowable from a machine that is NOT a client (circular), and
+ROLES-PLAN.md's own 2026-08-22 measurement confirmed the role is never displayed anywhere either.
+
+## The fix — the rule, after two amendments
+
+Original instruction asked me to distinguish "no daemon, therefore client" from "a daemon exists but is
+temporarily unreachable." Amendment 1 replaced that with a three-state design (GATEWAY / CLIENT / GATEWAY
+UNREACHABLE, never silently downgrading). **Amendment 2 overrode amendment 1** on the human's own ruling
+("i dont mind that its convert to client untill its restarted"): drop the third state entirely — the rule is
+the plain binary I was first given: daemon reachable → use its answer; daemon not reachable → `'client'`,
+unconditionally, and **never persisted** — a gateway whose daemon is merely down shows `'client'` too (it
+correctly describes what the PC can DO right now) and self-corrects to `'gateway'` the moment the daemon
+answers again, no restart, no cached state to go stale.
+
+`ui/gatewayStatus.js` (already the one live `/api/descriptor` poller, so no second poll to keep in step) gained
+`getEffectiveRole()`: a plain module-level `let _lastRole` set by `tick()` each poll (only from a LOCAL
+descriptor's own `.role` field — a cloud-mirror descriptor has `online` instead and describes a REMOTE gateway,
+not this device) — never written to `localStorage`. Displayed in the quick-menu identity line
+(`ui/headerPost.js`), after the dialect and before the envelope, exactly where the human specified from a
+screenshot. Re-renders on the poll's own `ddcs:gateway-status` event so it doesn't need a menu reopen to
+reflect a daemon appearing/disappearing.
+
+**Scope held at derivation + display only**, per the dispatch: `admin.js`'s tab/settings gating still reads a
+reachable daemon's own `d.role` directly, unchanged — that's the next step, now that the derivation exists to
+wire it to.
+
+## Non-vacuity
+
+New spec `tests/role-derived-client-side-2145.spec.js` (3 tests), driving the REAL network path
+(`page.route('**/api/descriptor', …)`, not a hand-supplied descriptor object — the whole point, per
+ROLES-PLAN's own "why the tests pass anyway" finding, is that a mocked object proves gating correct GIVEN a
+role but never proves the role is reachable on the device that needs it): no daemon at all reads `client`; a
+daemon answering `gateway` reads `gateway`; and the self-correction test — daemon up (gateway) → down (client)
+→ back up (gateway), no reload — proving the "never cached-and-stuck" property directly, not just claiming it.
+Proven non-vacuous by reverting `gatewayStatus.js`/`headerPost.js` to HEAD via `git checkout HEAD -- <paths>`
+(not `git stash` — see the process note below) and confirming all 3 fail with no role segment in the identity
+line at all; restored, confirmed green again.
+
+## Gate
+
+Targeted: `role-derived-client-side-2145.spec.js` (3/3), `header-profile-menu.spec.js` / `header-responsive.spec.js`
+/ `lathe-model-1267.spec.js` / `settings-role-gate-2111.spec.js` / `gateway-quiet-offline-1307.spec.js` (32/33 —
+1 pre-existing failure, confirmed via bisection against the pre-change tree: identical failure, unrelated
+`getDesktop` row assertion). Node tier: 227/227. Smoke tier: 75/75. Full Playwright suite run per the
+dispatch's own caution about narrow gates; see the F2 entry below for the combined result (both changes landed
+together before the full run).
+
+## ⚠ Process note — `git stash`, do not use it here
+
+Used `git stash push -u --` mid-turn to bisect a test failure against the pre-change tree. **The advisor caught
+this in review**: the stash stack is repo-global and a concurrent analytics agent shares this working tree — a
+pop can take another agent's entry. No damage this time (the pop worked cleanly), but the stack was found to
+hold 2 unrelated entries (a stranded `paneAccordion.js` edit from 2026-08-20, a July worktree-agent stash) that
+a careless pop/drop could have destroyed. **Corrected for the rest of this turn and going forward**: use
+`git checkout HEAD -- <paths>` (or `git diff`/`git show` to just READ, no working-tree touch) — used exactly
+that for every subsequent bisection this turn. Saved to memory so it isn't repeated a third time.
+
+## Files
+- `DDCS-Studio/web/ui/gatewayStatus.js` — new `getEffectiveRole()` + `_lastRole` (module-level, never persisted);
+  `tick()` sets it from a local descriptor's own `.role`.
+- `DDCS-Studio/web/ui/headerPost.js` — identity line gains the role segment (dialect · role · envelope); a
+  `ddcs:gateway-status` listener refreshes the menu on each poll tick.
+- `DDCS-Studio/tests/role-derived-client-side-2145.spec.js` — **new**, 3 tests (no-daemon, daemon-answers,
+  self-correction).
+
+## ⚠ Side effect — 4 tests' `getByText('GATEWAY', {exact:false})` locator now collides
+
+Displaying the role as visible text ("gateway"/"client") in the identity line meant a loose, case-insensitive
+`page.getByText('GATEWAY', {exact:false}).first()` used by 4 send-flow specs to open the Gateway tab now ALSO
+matches the identity line's new text and sometimes grabs it instead (it is hidden inside the closed quick-menu,
+so the click then times out). Fixed by pointing all 4 at the real tab directly (`.tab[data-app="gateway"]`):
+`send-gate-wiring-1585.spec.js`, `send-beacon-warning-2057.spec.js`, `send-history-real-path-2065.spec.js`,
+`validation-divzero-not-syntax-1603.spec.js`. A locator-specificity fix, not a role-wording change — "gateway"/
+"client" are the correct words for the fact being shown.
+
+**Committed together with this role entry** (not the F2 tail below) even though they were only fully surfaced
+by the combined role+F2 full-suite run — the cause is the role text, not the workspace-name change.
+
+🔨 turn 2145

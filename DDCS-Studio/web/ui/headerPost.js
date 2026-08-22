@@ -20,8 +20,9 @@ import { getActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/con
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
 import { getMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the identity line names THIS WORKSPACE'S MACHINE; t1231 — with its signed envelope
+import { fileSavedStem } from '../data/backup.js';   // t2145 — the workspace's name IS its last-saved .ddcs file's name; no separate field
 import { THEMES } from './themes.js';
-import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
+import { EXE_DOWNLOAD_URL, getEffectiveRole } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page); t2145 — the client-side-derived PC role
 import { openExternal } from './openExternal.js';   // t2066 — open external links once, host-side in the exe
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
 import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
@@ -133,6 +134,12 @@ export function initHeaderPost() {
         // The ↧ span stays: it is its OWN tap target for a live feature (pull from the controller) — never the row's
         // retired click. (t1243 — the ☁ badge that sat beside it moved to the workspace manager's Cloud tab.)
         const ap = getMachine();
+        // t2145 (BACKLOG F2, human ruling 2026-08-22: "we dont need a name just display the file name") — THERE IS
+        // NO SEPARATE WORKSPACE-NAME FIELD ANY MORE. The name IS the last-saved `.ddcs` file's name (fileSavedName,
+        // data/backup.js) — never synced, never a second home for the same fact. A workspace that has never been
+        // saved to a file has no name to show: "Not saved" is the honest label, not a fake title (makes the
+        // localStorage-is-a-buffer principle visible instead of implied).
+        const apName = fileSavedStem() || 'Not saved';
         const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
         // t1231 (user) — the line also carries the ENVELOPE, signed, from the SAME formatter the manager rows and the
         // Settings band use. Three surfaces, one source: they cannot describe the same machine differently.
@@ -143,14 +150,21 @@ export function initHeaderPost() {
         // t1243 (user) — THE ☁ BADGE IS GONE. Cloud access lives in ONE place: the workspace manager's Local | Cloud
         // tabs, which carry the sign-in, the signed-in account and the sign-out. A second door in the header meant two
         // places to learn for one connection. The ↧ PULL span stays — that is a controller read, not a cloud thing.
+        // t2145 (ROLES-PLAN S0/S1, human 2026-08-22) — the PC role, right here: "Workspace: <name> · <dialect> ·
+        // <role> · <envelope>". This is the one surface it was always supposed to reach — see gatewayStatus.js's
+        // getEffectiveRole() for how it derives client-side with no daemon required. Deliberately DERIVED, not
+        // cached: a gateway whose daemon is down shows 'client' too (human ruling — it describes what this PC
+        // can actually DO right now) and self-corrects the moment the daemon answers again, no restart needed.
+        const roleText = getEffectiveRole();
         const identityRow =
             `<div class="hq-identity-line hq-identity">`
             // t1249 (user) — the line says WHAT it describes. Without the label it is three facts with no subject:
             // a reader has to work out that "Rig B" is the workspace and not, say, the controller. Same wording as
             // the disk tooltip, so the two surfaces name the same thing the same way.
-            + `<span class="hq-identity-txt"><span class="hq-label">Workspace: </span><b>${esc(ap.name || 'Untitled workspace')}</b>`
+            + `<span class="hq-identity-txt"><span class="hq-label">Workspace: </span><b>${esc(apName)}</b>`
             + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
             + `<span class="hq-cur">${esc(apKind)}</span>`
+            + `<span class="hq-cur"> · ${esc(roleText)}</span>`
             + (apEnv ? `<span class="hq-cur hq-env"> · ${esc(apEnv)}</span>` : '')
             + `</span>`
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
@@ -255,8 +269,8 @@ export function initHeaderPost() {
             + '<div class="hdr-quick-sep"></div>'
             + setupSheetRow + checklistRow + settingsRow + helpRow + downloadRow + rateRow;
 
-        btn.title = `Quick actions — ${ap.name || 'untitled workspace'} · ${apCtrl}`;
-        btn.setAttribute('aria-label', `Quick actions (${ap.name || 'untitled workspace'} · ${apCtrl})`);
+        btn.title = `Quick actions — ${apName} · ${apCtrl}`;
+        btn.setAttribute('aria-label', `Quick actions (${apName} · ${apCtrl})`);
     };
 
     const onDocClick = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); };
@@ -390,6 +404,9 @@ export function initHeaderPost() {
 
     // Re-sync the 'Auto · <name>' tooltip + re-lint when the profile/post or program changes elsewhere.
     window.addEventListener('ddcs:settings-changed', () => { fillMenu(); lint(); });
+    // t2145 — the identity line's role segment reads gatewayStatus.js's poll cache; refresh it as that poll
+    // ticks so the line doesn't need a reopen to catch a daemon appearing/disappearing.
+    document.addEventListener('ddcs:gateway-status', fillMenu);
     const ed = document.getElementById('editor');
     if (ed) ed.addEventListener('input', lint);
     lint();
