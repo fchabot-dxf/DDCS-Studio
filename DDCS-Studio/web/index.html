@@ -15,15 +15,26 @@
     <script defer src="assets/vendor/three.min.js"></script>
 </head>
 <body data-theme="studio">
+    <script>
+    // t2127 (BOOT-SPLASH-PLAN.md) — apply the SAVED theme before first paint. Must be inline, not
+    // deferred/external: blocking execution during parse is the entire mechanism — it runs before the
+    // loader div below is even parsed, so nothing ever paints under the wrong theme. Without this,
+    // data-theme="studio" above is hardcoded and every non-studio user gets a studio flash on every
+    // load (themes.js:40 only rewrites this attribute LATER, after boot). Guarded exactly like
+    // themes.js's own localStorage read (private mode / file:// throw); validated against the five
+    // known names so a stale/garbage value can't leave the app unstyled under an unknown data-theme.
+    (function () {
+        try {
+            var t = localStorage.getItem('ddcs_theme');
+            var known = ['studio', 'normal', 'steampunk', 'futuristic', 'organic'];
+            if (t && known.indexOf(t) !== -1) document.body.dataset.theme = t;
+        } catch (e) { /* private mode / file:// — data-theme="studio" above is the fallback */ }
+    })();
+    </script>
 
-    <div id="ddcs-boot-loader" style="position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; background: #0b1118; color: #dbe6f2; transition: opacity 0.3s ease;">
-        <div class="ddcs-busy-card">
-            <div class="ddcs-busy-spin"></div>
-            <div class="ddcs-busy-text">Loading DDCS Studio...</div>
-        </div>
-    </div>
-
-    <!-- Per-theme DDCS marks — one is shown at a time, switched by [data-theme] CSS -->
+    <!-- Per-theme DDCS marks — one is shown at a time, switched by [data-theme] CSS. Moved ABOVE the
+         boot-loader div (was below): a <use> referencing a symbol declared later can flash empty on
+         first paint, which is exactly the moment the loader exists for. -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 
       <!-- NORMAL: clean wordmark -->
@@ -89,6 +100,22 @@
       </symbol>
 
     </svg>
+
+    <div id="ddcs-boot-loader" style="position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; background: #0b1118; color: #dbe6f2; transition: opacity 0.3s ease;">
+        <div class="ddcs-busy-card">
+            <div class="ddcs-busy-spin"></div>
+            <!-- t2127 — the logo says WHO, the spinner says WORKING; the "Loading DDCS Studio..." text
+                 said both and was also the illegible-on-light-themes bug (Task 3). All five marks are in
+                 the DOM (mirrors .app-header .brand below); .ddcs-busy-card's OWN scoped hide/show rules
+                 (styles.css) pick the active one — the header's hide is scoped to .app-header and would
+                 never have reached these. -->
+            <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
+            <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
+            <svg class="logo logo-futuristic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-futuristic"/></svg>
+            <svg class="logo logo-organic" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-organic"/></svg>
+            <svg class="logo logo-steampunk" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-steampunk"/></svg>
+        </div>
+    </div>
 
     <header class="app-header">
         <span data-fred-home-mount></span>

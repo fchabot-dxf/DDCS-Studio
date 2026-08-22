@@ -13,7 +13,11 @@ addition cannot quietly slip in something that ISN'T CC0.
 | `361564__matthewwong__ding-dong.wav` | [361564](https://freesound.org/s/361564/) | MatthewWong | 2.80s | CC0 |
 | `209578__zott820__cash-register-purchase.wav` | [209578](https://freesound.org/s/209578/) | Zott820 | 2.75s | CC0 |
 | `700641__producing_raylite__incorrect-buzzer.wav` | [700641](https://freesound.org/s/700641/) | Producing_RayLite | 0.60s | CC0 |
-| `421337__jaszunio15__click_100.wav` | [421337](https://freesound.org/s/421337/) | jaszunio15 | — | (pre-existing; verify before reuse elsewhere) |
+
+t2125 — `421337__jaszunio15__click_100.wav` (the browser's UI-click sample) is gone from this table
+because it's gone from the folder: `ui/sound.js`'s themed synthesis replaced it, so there is no file
+left for this row to describe. The three job sounds above are unaffected — they stay sampled
+(SOUND-PLAN.md section 5), unthemed, on purpose.
 
 ## ⭐ WHY THESE THREE SOUNDS, and not "nicer" ones
 The human's design, and it is better than the one it replaced: **use sounds people have ALREADY

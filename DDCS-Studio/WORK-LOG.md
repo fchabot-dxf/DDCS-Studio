@@ -47266,3 +47266,122 @@ through: this is the kind of turn worth a fresh session for whatever comes next,
 
 🔨 turn 2125
 
+---
+
+# t2127 — the organic retheme (GROVE) + boot-splash apply-before-paint
+
+**Dispatch**: two paired specs at the repo root, both touching only `DDCS-Studio/web/styles.css` and
+`DDCS-Studio/web/index.html` — `ORGANIC-TREE-PLAN.md` (retire the anatomical "biomorph" palette for a
+green-canopy/brown-ground "grove") and `BOOT-SPLASH-PLAN.md` (apply the saved theme before first paint, then
+show the themed logo instead of illegible text). Preceded by two named defects from t2125 to fold in first.
+
+## Fold-in fixes from t2125
+
+1. **`assets/audio/PROVENANCE.md`** still listed `421337__jaszunio15__click_100.wav` as a row, but that file
+   was deleted in t2125 (UI clicks are synthesized now) — a licence manifest naming a file that doesn't
+   exist is exactly the rot the file exists to prevent. Removed the row, added a note explaining why (the
+   three job-sample rows are unaffected).
+2. **Three named scratch files** (`_probe_tmp.mjs`/`_probe_tmp2.mjs`/`_probe_tmp3.mjs`) — searched the whole
+   tree, found none. Either already cleaned up or never landed under those names; nothing to delete.
+
+## TASK A — organic retheme (ships the GROVE variant)
+
+Rewrote `[data-theme="organic"]`'s token block (`styles.css`) to the plan's exact table — `--band-bg`
+(#bf6850→#25301a, the canopy — this one value paints the header/settings-head/Blocks-topbar, "most of why
+organic reads pink") plus `--bg`/`--panel`/`--panel2`/`--border` (brown grounds), `--accent`/`--accent-studio`
+(sap amber), `--text`/`--text-main`/`--text-dim` (sapwood/weathered), `--success`/`--danger` (real green/red,
+explicitly NOT harmonised into the wood palette), `--block-edited` (pale gold), and `--edit-glow-rgb`
+(217,122,92→217,160,60, moved WITH the accent so the pink doesn't survive in the character/window pulse
+animation). Updated the block's own descriptive comments from anatomical language ("visceral dark body",
+"sinew seam", "arterial") to the tree vocabulary, since the stale language was part of the original identity
+confusion the plan diagnoses.
+
+**Beyond the literal table** (disclosed, not silently added): swept the whole file for every OTHER literal
+restatement of the old coral hex (`#d97a5c`/`#bf6850`/`217,122,92`) that a `var(--accent)`/`var(--band-bg)`
+reference wouldn't have caught — `--modal-shadow`'s accent rim, the editor caret/selection/gutter-line-number
+colours, `.g-comment`'s colour (was the OLD muscle-green literal, moved to the new `--success`), and
+`.top-dock-header`'s own gradient (historically shares `--band-bg`'s literal by the file's own t2071/t2073
+comments — left unmigrated it would have been a second, un-migrated coral surface right next to the fixed
+one). Also found `--btn-face-hover` was still a literal pink-to-coral gradient despite `--btn-edge-hover`
+already correctly referencing `var(--accent)` — moved to amber, since "interactive = amber" is the plan's
+own explicit rule and a coral hover state directly contradicts it. `--accent-gateway` deliberately left
+untouched: every theme's gateway accent is its own independent green convention, never coral, not this
+palette's concern.
+
+**Untouched, as required**: the theme chip (`styles.css:750`), the drawer motion/geometry block
+(`--drawer-*`, `--tab-radius`), the other four themes, `--modal-close-*` (red-family close-button colours,
+not accent-derived).
+
+## TASK B — boot splash: theme before paint, logo instead of text
+
+**`index.html`**: added a tiny inline (not deferred, not external) script as the literal first child of
+`<body>`, before everything else — reads `localStorage.ddcs_theme`, validates against the five known theme
+names, sets `document.body.dataset.theme` synchronously during parse, before the loader div is even parsed.
+`data-theme="studio"` stays in the markup as the correct first-run fallback. Moved the whole SVG symbol-defs
+block (all five wordmarks) from after the loader to before it (trap 2 — a `<use>` referencing a symbol
+declared later can flash empty on first paint, the exact moment the loader exists for). Replaced the
+"Loading DDCS Studio..." text with all five `<svg class="logo logo-X">` marks (mirrors `.app-header .brand`'s
+own five-marks-in-the-DOM pattern exactly), keeping each one's `aria-label`.
+
+**`styles.css`**: gave the splash its own scoped `.ddcs-busy-card .logo { display:none }` (trap 1 — the
+header's existing hide is scoped to `.app-header` and never reaches marks outside it, while the show rule
+`[data-theme=X] .logo-X{display:block}` is already global; without a splash-scoped hide, all five would
+stack). Fixed the hardcoded near-white ink (`.ddcs-busy-text`'s `#dbe8f5`, `.ddcs-busy-spin`'s
+`rgba(255,255,255,.18)` ring) to the house pattern (`.modal-card`'s own `background: var(--modal-face);
+color: var(--text)`) — `.ddcs-busy-card` already took its background from the theme; the text/ring didn't,
+which is white-on-white on any light theme (studio's own `--panel` is light silver, `--text` is near-black —
+confirmed via screenshot that the old bug was real and the fix reads correctly). That class has other users
+beyond the splash, so the fix applies regardless of the splash losing its own text.
+
+**Trap 3** (mark fills tuned to the header surface, not the card): looked at all five marks rendered on
+`--modal-face` via screenshot (see Files) — all five read clearly with no changes needed. Reporting rather
+than silently recolouring, per the plan's own instruction, even though nothing needed reporting this time.
+
+## Non-vacuity
+
+Reverted the inline theme-apply script (index.html), re-ran `boot-splash-2127.spec.js`: the two tests that
+depend on it (script-position, saved-theme-applies) correctly failed with the exact expected symptom
+(`document.body.dataset.theme` stayed `'studio'` instead of `'organic'`); the other five (independent of
+this specific script) stayed green, confirming they test something else. Restored, confirmed all 7 green
+again.
+
+## Gate
+
+Node tier: 224/224 (unchanged). Targeted Playwright: `boot-splash-2127.spec.js` (7 new tests, all green),
+plus a sanity pass on every existing theme-related spec found in the tree (`blocks-theme.spec.js`,
+`theme-motion-887.spec.js`, `modal-primary-accent.spec.js`) — 7/7, including the "no two themes declare an
+identical motion/accent" checks, confirming organic's new values didn't accidentally collide with another
+theme.
+
+**Full `npm test`: 2628 passed / 6 failed / 35 flaky / 25 skipped (34.7m).** Checked the FAILED COUNT
+against the 5-failure baseline the dispatch named, not just the tail. All 6 named failures: `header-profile-menu`,
+`pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603`
+— the EXACT established stable-5 baseline (same names t2123/t2125 already documented as unrelated,
+recurring every gate) — plus one new name, `pane-visual-host-programmatic-1762`. Ran that one alone,
+isolated from the rest of the suite: **2/2 clean.** Same contention shape already established twice this
+week (uniform early-run timeouts that clear on an isolated re-run) — not a regression from this turn.
+35 flaky (also consistent with the elevated-but-not-alarming range seen on other full runs this week).
+
+## Screenshots
+- `verification/t2127-splash-{studio,normal,steampunk,futuristic,organic}.png` — all five themed splash
+  cards; every mark reads, no stacking, spinner ring now visible on every background (was invisible on
+  normal's white card before the fix).
+- `verification/t2127-organic-wizard.png` — a wizard (Drill/Generator) open in organic: brown body, amber
+  modal head (`--modal-head-face: var(--accent)`, unchanged reference, correctly follows the accent move).
+- `verification/t2127-organic-blocks.png` — the Blocks tab in organic: the topbar shows the new dark-green
+  canopy band, confirming `--band-bg` reaches it live.
+- `verification/t2127-organic-settings.png` — Settings in organic, including the t2125 Sound sub-tab
+  coexisting correctly (5 "Look and feel" sub-tabs, all legible amber-on-brown).
+
+## Files
+- `DDCS-Studio/web/assets/audio/PROVENANCE.md` — removed the stale click-WAV row.
+- `DDCS-Studio/web/styles.css` — organic's full token block + every literal-coral leftover found beyond the
+  table (modal shadow, editor caret/selection/gutter/comment colours, `.top-dock-header` gradient,
+  `--btn-face-hover`); `.ddcs-busy-card .logo` scoped hide; `.ddcs-busy-text`/`.ddcs-busy-spin` house-pattern fix.
+- `DDCS-Studio/web/index.html` — the inline apply-early theme script; SVG defs moved above the loader; the
+  splash's text replaced with the five themed logo marks.
+- `DDCS-Studio/tests/boot-splash-2127.spec.js` — new, 7 tests.
+- `DDCS-Studio/verification/t2127-*.png` — the requested screenshots.
+
+🔨 turn 2127
+

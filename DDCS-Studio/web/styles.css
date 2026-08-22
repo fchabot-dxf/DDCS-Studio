@@ -292,6 +292,12 @@ html, body { overflow-x: clip; }
 
 /* Per-theme logo: all five marks are in the DOM, only the active theme's shows */
 .app-header .logo { height: 34px; width: auto; display: none; }
+/* t2127 (BOOT-SPLASH-PLAN.md, trap 1) — the boot splash carries its own five marks too (index.html),
+   OUTSIDE .app-header, so the hide rule above never reaches them. The SHOW rule below is already
+   global ([data-theme=X] .logo-X, no ancestor scope) and would show one mark correctly — but with no
+   matching hide, ALL FIVE stack on top of each other. This is the splash's OWN scoped hide, sized for
+   the card rather than the header strip. */
+.ddcs-busy-card .logo { height: 40px; width: auto; display: none; }
 [data-theme="normal"] .logo-normal,
 [data-theme="studio"] .logo-studio,
 [data-theme="futuristic"] .logo-futuristic,
@@ -1119,7 +1125,7 @@ html, body { overflow-x: clip; }
 [data-theme="normal"]     { --edit-glow-rgb: 74,144,226;  --edit-glow-speed: 1.9s; }   /* flat, calm blue */
 [data-theme="studio"]     { --edit-glow-rgb: 22,104,255;  --edit-glow-speed: 1.5s; }   /* clean electric-blue */
 [data-theme="steampunk"]  { --edit-glow-rgb: 201,154,46;  --edit-glow-speed: 2.4s; }   /* warm brass, slow ornate breathe */
-[data-theme="organic"]    { --edit-glow-rgb: 217,122,92;  --edit-glow-speed: 2.8s; }   /* soft coral, gentle */
+[data-theme="organic"]    { --edit-glow-rgb: 217,160,60;  --edit-glow-speed: 2.8s; }   /* sap amber, gentle — was coral (t2127); moves WITH the accent so the pink doesn't survive in the animation */
 [data-theme="futuristic"] { --edit-glow-rgb: 45,226,255;  --edit-glow-speed: .9s; }    /* neon cyan, fast + punchy */
 /* Futuristic is the eccentric one: a brighter, multi-layer neon pulse instead of the calm single halo. */
 [data-theme="futuristic"] .wiz-box.editing,
@@ -3593,21 +3599,25 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
 /* ============================================
    THEME: ORGANIC (Earth Tones)
    ============================================ */
-/* ===== SKIN: "BIOMORPH" (organic) — a biomorphic command deck. Dark visceral body, bone-ivory
-   keycaps (the exoskeleton), sinew seams, coral/arterial accents. Giger-ish anatomical command. ===== */
+/* ===== SKIN: "GROVE" (organic, t2127 retheme — ORGANIC-TREE-PLAN.md) — a green band over brown
+   grounds: green above (the canopy), brown below (forest floor, bark), amber for anything
+   interactive (sap). Was "BIOMORPH": visceral dark body, sinew seams, coral/arterial accents — the
+   anatomical palette the theme's own chip (leaf green) and motion (a slow SPRING unfold) never
+   actually matched. Geometry (--radius, the unfold) is untouched — it's soft, not anatomical, and
+   soft is as true of a tree as of a body. ===== */
 [data-theme="organic"] {
-    --bg: #15110d;            /* visceral dark body */
-    --panel: #241c15;         /* sinew / bone-shadow */
-    --panel2: #2f261c;
-    --accent: #d97a5c;        /* coral / arterial */
-    --text: #e9dcc4;          /* bone */
-    --text-main: #f8eed8;
-    --text-dim: #9d8a6b;      /* aged bone */
-    --border: #5a4836;        /* sinew seam */
-    --radius: 16px;           /* organic curvature */
-    --block-edited: #e6a24a;  /* sap / resin amber */
-    --success: #8aa15a;       /* muscle green */
-    --danger:  #c0473a;       /* arterial */
+    --bg: #14110b;            /* forest floor */
+    --panel: #211a11;         /* bark shadow */
+    --panel2: #2d2417;        /* bark */
+    --accent: #d9a03c;        /* sap amber — was coral/arterial */
+    --text: #ece0c6;          /* sapwood — was bone */
+    --text-main: #f8f0da;
+    --text-dim: #a08d69;      /* weathered — was aged bone */
+    --border: #5c4a30;        /* bark seam */
+    --radius: 16px;           /* organic curvature — untouched, soft is as true of a tree as a body */
+    --block-edited: #e6c04a;  /* pale gold */
+    --success: #4f9d5d;       /* a REAL green — semantic, not harmonised into the wood palette */
+    --danger:  #cf4436;       /* a REAL red — semantic, not harmonised into the wood palette */
     --warn:    #d99a3a;
 
     /* header — t2073: was #1d160f, a genuinely distinct value from both --bg and --panel — but since it was
@@ -3618,11 +3628,16 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
        keep an untested value nobody has ever seen on screen. */
     --hdr-bg: var(--bg);
     --hdr-ink: #f3e8d0;
-    --hdr-dim: #9d8a6b;
-    --accent-studio: #d97a5c;
-    --accent-gateway: #8aa15a;
+    --hdr-dim: #a08d69;
+    --accent-studio: #d9a03c;  /* t2127 — mirrors the new --accent, same relationship the old coral value had */
+    --accent-gateway: #8aa15a; /* untouched — every theme's gateway accent is its OWN green, not this palette's; not coral, not in scope */
     --accent-ink: #2a1810;   /* t2073 — relocated from organic's own confirmed button:hover precedent (dark ink on a lighter coral fill, line ~3182) */
-    --band-bg: #bf6850;      /* t2073 — relocated from the t2071 coral fix (the .top-dock-header gradient's own top stop); tab-fill now derives from this instead of restating it (see .app-header .tab.active) */
+    --band-bg: #25301a;      /* t2127 (ORGANIC-TREE-PLAN.md) — THE CANOPY. Was #bf6850 (coral); this single value paints
+       the header bar, the settings head AND the Blocks topbar (see .app-header .tab.active etc below) — a stripe
+       across the whole top of the app, more responsible for organic reading pink than the accent ever was. An
+       OVERRIDE of the t2071 ruling recorded below (not a bug fix — the human has now seen this green band
+       rendered and chosen it deliberately). Warm on purpose: hue ~90° (moss); an earlier draft at 135° read as
+       "too teal/blue" and was rejected — stay at or below ~95° if this is ever adjusted again. */
 
     /* t2073 — re-asserted per-skin (see normal's theme block for why a :root-only alias can't track this). */
     --ink: var(--text); --ink-strong: var(--text-main); --ink-dim: var(--text-dim);
@@ -3636,7 +3651,7 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     --btn-face: linear-gradient(180deg, #e7dbc0, #ccbd99); --btn-edge: #8b7355; --btn-ink: #2a2117;
     --btn-radius: 14px; --btn-shadow: 0 2px 5px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.5);
     --btn-text-shadow: none;
-    --btn-face-hover: linear-gradient(180deg, #f1c6af, #d98a6f); --btn-edge-hover: var(--accent);
+    --btn-face-hover: linear-gradient(180deg, #f2dba0, #d9a03c); --btn-edge-hover: var(--accent);   /* t2127 — was coral (#f1c6af, #d98a6f); interactive = amber, per the plan's own rule */
     --btn-ink-hover: var(--accent-ink);
     /* the OLD hover rule never touched box-shadow, so the resting shadow just kept showing through hover —
        relocated as an explicit self-reference rather than left to fall through the :root default (none),
@@ -3652,12 +3667,12 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 
     /* t2077 (P4b) — modal shell, relocated from the two selector-based rules this replaces (below, now
-       deleted). --modal-edge (#6e5840, a muted sinew brown) is deliberately NOT var(--accent) (#d97a5c, the
-       brighter coral) — a quieter rim than the semantic accent, kept as its own literal. --modal-radius is
+       deleted). --modal-edge (#6e5840, a muted bark brown) is deliberately NOT var(--accent) (#d9a03c, the
+       brighter sap amber) — a quieter rim than the semantic accent, kept as its own literal. --modal-radius is
        the FOUR-VALUE shorthand itself (not a single number) — organic's dialog corners are asymmetric by
        design, the exact reason this token accepts a full shorthand rather than one radius value. */
     --modal-face: var(--panel); --modal-edge: #6e5840; --modal-edge-w: 1px; --modal-radius: 30px 12px 30px 12px;
-    --modal-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,122,92,.20);
+    --modal-shadow: 0 12px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(217,160,60,.20);  /* t2127 — the accent rim moves with the accent */
     --modal-head-face: var(--accent); --modal-foot-edge: var(--border);
     --modal-close-edge: #b8432f; --modal-close-radius: 10px;
     --modal-close-face: #d9533e;
@@ -3675,29 +3690,34 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
 /* t2087 (P5a) — DELETED: same shape as steampunk/futuristic above — rgba(14,9,6,.82), blocked organic's
    own --scrim (rgba(12,8,5,.72), a genuinely different alpha and near-identical tint) from ever painting. */
 
-/* Editor = the body cavity; bone text, coral caret, arterial line-numbers.
+/* Editor = the forest floor; sapwood text, sap-amber caret, sap-amber line-numbers (t2127 — was
+   bone text, coral caret, arterial line-numbers).
    t2079 (P4c) — background-color/background deleted from #editor-highlight/.editor-container/#editor-gutter
    below: the base rules now read var(--screen) directly (trap-dodge) and reach this theme's own value without
-   a selector override. Only the genuinely distinct colours (bone text, gutter number tone) stay. */
-[data-theme="organic"] #editor-highlight { color: #e9dcc4; }
+   a selector override. Only the genuinely distinct colours (sapwood text, gutter number tone) stay. */
+[data-theme="organic"] #editor-highlight { color: #ece0c6; }
 [data-theme="organic"] #editor-gutter { color: #6e5840; }
 /* t2079 (P4c, bug #1) — plain !important measured as NOT enough; see studio's own block above for the fuller
    note (same fix, same reasoning: matching body[data-theme] #editor.editor-layer reaches specificity (1,2,1),
    which beats the base rule's (1,1,1) outright regardless of file position). */
-body[data-theme="organic"] #editor.editor-layer { caret-color: #d97a5c !important; }
+body[data-theme="organic"] #editor.editor-layer { caret-color: #d9a03c !important; }
 [data-theme="organic"] #editor::selection,
-[data-theme="organic"] #editor-highlight ::selection { background: rgba(217,122,92,.32); color: #fff; }
-[data-theme="organic"] #editor-highlight .g-comment, [data-theme="organic"] .g-comment { color: #8aa15a !important; }
+[data-theme="organic"] #editor-highlight ::selection { background: rgba(217,160,60,.32); color: #fff; }
+[data-theme="organic"] #editor-highlight .g-comment, [data-theme="organic"] .g-comment { color: #4f9d5d !important; }
 [data-theme="organic"] #editor-highlight .g-num  { color: #e4a06a; }
 [data-theme="organic"] #editor-highlight .g-word { color: #ecdcb4; }
-[data-theme="organic"] #editor-highlight .g-ln   { color: #d97a5c; }
+[data-theme="organic"] #editor-highlight .g-ln   { color: #d9a03c; }
 
-/* Header = bone/sinew bar; the program toolbar = a muscle-tissue band the bone keys sit on */
-[data-theme="organic"] .app-header { border-bottom: 1px solid #5a4836; box-shadow: 0 1px 12px rgba(0,0,0,.45); }
+/* Header = the canopy band; the program toolbar sits on the same green (t2127 — was "bone/sinew bar"
+   over "a muscle-tissue band") */
+[data-theme="organic"] .app-header { border-bottom: 1px solid #5c4a30; box-shadow: 0 1px 12px rgba(0,0,0,.45); }
 [data-theme="organic"] .app-header .brand .logo { filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+/* t2127 — was linear-gradient(180deg, #bf6850, #8d4533), the exact coral --band-bg replaced above; this
+   is the SAME band family (its own gradient historically shared --band-bg's literal, see styles.css:364-377's
+   own note), so it moves to the same green rather than leaving a second, un-migrated coral surface. */
 [data-theme="organic"] .top-dock-header {
-    background: linear-gradient(180deg, #bf6850, #8d4533);
-    border-top: 1px solid rgba(255,205,180,.16);
+    background: linear-gradient(180deg, #25301a, #182210);
+    border-top: 1px solid rgba(190,210,150,.16);
     border-bottom: 1px solid #4a3a2a;
 }
 
@@ -6195,9 +6215,16 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge); box-shadow: var(--modal-shadow); }
 /* t2069 — was its own animation: ddcs-busy-rot, a byte-identical twin of ddcs-busy-spin below (both just
    `to { transform: rotate(360deg); }`) — consolidated onto the one keyframe both spinners now share. */
-.ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .18);
+/* t2127 (BOOT-SPLASH-PLAN.md task 3) — the ring and the text below were hardcoded near-white
+   (rgba(255,255,255,.18) / #dbe8f5) while .ddcs-busy-card already takes its background from
+   var(--modal-face) (themed) — on any light-surfaced theme (studio is one) that's white-on-white, and
+   only the blue top-arc survived, exactly what a phone screenshot showed. The house pattern (see
+   .modal-card above: background var(--modal-face); color var(--text)) — the ring's base now derives
+   from --border (every theme's own "faint line" token), the top arc stays its own blue accent
+   (unaffected — it was already legible). This class has OTHER users besides the splash. */
+.ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--border, rgba(255, 255, 255, .18));
     border-top-color: #4ab3ff; animation: ddcs-busy-spin 0.8s linear infinite; }
-.ddcs-busy-text { color: #dbe8f5; font-size: 13px; letter-spacing: 0.2px; }
+.ddcs-busy-text { color: var(--text, #dbe8f5); font-size: 13px; letter-spacing: 0.2px; }
 
 /* t1287 (user, live, refined) — WHAT THE SAVE WROTE, as a dismissible popup. It was a label beside the disk chip,
    and the refinement names why that failed: on a narrow screen the chip is not rendered at all, so the feedback went
