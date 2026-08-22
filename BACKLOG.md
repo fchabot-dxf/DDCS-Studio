@@ -640,3 +640,38 @@ as the theme and panel layout — sitting on a machine-identity tab purely becau
 ⚠ **Check the Appearance tab's own grouping before dropping it in**, and check whether the setup checklist,
 help text or tour reference "Profile" by name — a renamed tab still called Profile in three explanations is
 worse than either name alone.
+
+---
+
+## THE "REOPEN WIZARD" CHIP IS A HOVER TRAP — and it hides the other ops
+*(human, 2026-08-22, live from the editor)*
+
+The `✎ Corner (data) · ≈ 28 s` chip above the G-code only appears **while hovering the code**, and
+**disappears as soon as the pointer leaves the code to reach it.** Human: *"it's hard to select and press
+since it only appears when hovering the code and disappears when we want to move the cursor over it."*
+
+⭐ **This is the classic hover-trap:** a control revealed by hovering region A, rendered outside region A.
+The path to the target destroys the target. It is not a sizing or a timing problem — no hover delay fixes
+it, because the pointer must cross a gap where the trigger is false.
+
+### The fix
+⛔ **Make it always visible** — not hover-revealed at all. It names which op owns the code you are looking
+at, which is useful *before* you decide to interact, and it is the only route back into the wizard from the
+editor.
+
+⚠ If always-on is too heavy visually, the acceptable version is *"visible always, emphasised on hover"* —
+but the control must never be **absent** when the pointer is travelling toward it. Alternatively the chip's
+own hover zone must include the corridor between the code and the chip, so the trigger stays true en route.
+
+### ⭐ MULTI-OP: it currently shows ONE
+When the program contains several ops, the chip names only one. It should surface **all of them** — the
+editor is a view of an op STACK, and reopening is per-op. A program with a corner probe, a surfacing pass
+and a drill cycle should offer three ways back in, not one.
+
+⚠ Design questions worth settling before building: does it list every op always (a long program could have
+many), or the op under the caret plus a way to reach the rest? ⭐ **Caret-scoped is probably right** — it
+matches the "comment button at the end of the current line" instinct from the same session: put the action
+where the user already is, rather than making them pick from a list of everything.
+
+⚠ Also check whether the `≈ 28 s` estimate belongs on this chip at all — it is a different fact (cycle time)
+riding on a navigation control.
