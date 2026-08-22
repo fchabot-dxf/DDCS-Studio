@@ -27,6 +27,27 @@
  * options, or number min/max/step/units). `dynamic: ['bindMode', 'widget']` (ddcs_dynfields) shows only the active
  * mode's socket field + the chosen widget's config, so the block stays readable. A DECLARATION, never inferred — the
  * composable substrate that lifts isMaintainedAsData (a spec authored as blocks round-trips losslessly).
+ *
+ * ── t2133 — "not a form field" + the canvas-drag TRIPLE + the two REUSED gate mechanisms ────────────────────────
+ * Five more attributes DECLARE what CORNER_BINDING_SPECS (and its siblings) already carry in hand-written JS, closing
+ * the exact gap that made the 2026-08-04 Corner port drop the drag handles (see cornerData.js's own CORNER_BINDING_SPECS
+ * for the worked example this mirrors field-for-field):
+ *   - `formHidden` — this socket is bound but NOT a visible form row (it lives on the canvas / drives a drag handle only).
+ *   - `group` / `role` — canvas-layout grouping: siblings sharing a `group` compose into ONE draggable handle, each
+ *     member's `role` ('x'/'y'/…) picks which axis/facet it drives. Read by panelTypes.layoutSpecFromOp (b.group/b.role),
+ *     unchanged — these fields just let a spec reach it as a block instead of only as hand-written JS.
+ *   - `relToRow` — an INCREMENTAL socket: the handle anchors to the op's declared sim-start row named here (e.g.
+ *     'wall1'), and a drag writes the delta, not an absolute world coord. Empty = no relTo (an absolute point, or no
+ *     canvas handle at all if `group`/`role` are also empty). Serializes deriveBindings' `relTo:{row}` shape (the only
+ *     shape ever used) as ONE text field — the same "declare the candidate shape, not a generic object" call guard.js
+ *     made for `when` (whentype) rather than inventing a nested-object field kind.
+ *   - `gate` / `optionGate` — REUSE, not reinvent: these are NOT new gate mechanisms (BACKLOG.md's "GATE
+ *     CONSOLIDATION" inventory is exactly why — eight already exist). Both ride as a JSON blob in one text field,
+ *     mirroring `bindingsFromStack`'s/`bindingsToBlocks`'s own t1880/t961-era round-trip (userOps.js), which already
+ *     read/write `gate`/`optionGate` on the SPEC — only the block-side field to carry them onto the canvas was
+ *     missing. `gate` greys the row (userOpView.js's data-gate loop; `gate.clearWhenOff` opts a checkbox into
+ *     auto-clear); `optionGate` greys one `<option>` (data-option-gate loop). `when` (whenparam/whenis, above) HIDES
+ *     a row outright — a different mechanism, already on this block, left untouched.
  */
 export const formFieldBlock = {
     type: 'formfield', label: 'form field', category: 'Wizard Inputs', kind: 'formfield',
@@ -41,12 +62,16 @@ export const formFieldBlock = {
         // t1613 — the DERIVED/WRITES sockets (the same two slots the shipped `passes` field declares): `derived` is
         // an expr over the form's params; `writes` is one-or-more "param = expr" lines fired on a user gesture.
         derived: '', writes: '',
+        // t2133 — NOT a visible form field (canvas/drag-only) + the group/role/relTo drag-handle triple.
+        formHidden: false, group: '', role: '', relToRow: '',
+        // t2133 — the two REUSED gate mechanisms (grey-a-row, grey-an-option), each a JSON blob; see the header note.
+        gate: '', optionGate: '',
     },
-    allFields: ['param', 'widget', 'label', 'dflt', 'bindMode', 'matchvar', 'atomType', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'options', 'nmin', 'nmax', 'nstep', 'units', 'derived', 'writes'],
+    allFields: ['param', 'widget', 'label', 'dflt', 'bindMode', 'matchvar', 'atomType', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'options', 'nmin', 'nmax', 'nstep', 'units', 'derived', 'writes', 'formHidden', 'group', 'role', 'relToRow', 'gate', 'optionGate'],
     fieldsFor(p) {
         const w = (p && p.widget) || 'number';
         const mode = (p && p.bindMode) || 'assign';
-        const f = ['param', 'widget', 'label', 'dflt', 'bindMode', mode === 'opparam' ? 'atomType' : 'matchvar', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'derived', 'writes'];
+        const f = ['param', 'widget', 'label', 'dflt', 'bindMode', mode === 'opparam' ? 'atomType' : 'matchvar', 'key', 'type', 'section', 'help', 'optional', 'readonly', 'readonlyhint', 'whenparam', 'whenis', 'derived', 'writes', 'formHidden', 'group', 'role', 'relToRow', 'gate', 'optionGate'];
         if (w === 'dropdown' || w === 'segmented') f.push('options');
         else if (w === 'number' || w === 'slider') f.push('nmin', 'nmax', 'nstep', 'units');
         return f;

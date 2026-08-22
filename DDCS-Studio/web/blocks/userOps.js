@@ -390,6 +390,16 @@ export function bindingsFromStack(children) {
         // t1880 — the GREY-gate's own reverse half (see bindingsToBlocks' own t1880 note: named in this file's t1756
         // comment as an example of the allow-list-drop class, but never actually wired until now).
         if (p.gate) { try { spec.gate = JSON.parse(p.gate); } catch (_) { /* malformed — drop rather than throw */ } }
+        // t2133 — "not a form field" + the canvas-drag triple + the per-option grey-gate: REUSE, no new mechanism (see
+        // formField.js's own t2133 note). formHidden/group/role mirror deriveBindings.js's existing allow-list
+        // (b.formHidden/b.group/b.role); relToRow serializes the ONE shape deriveBindings' `relTo` ever takes
+        // ({row}) as a single text field, matching guard.js's whentype precedent (declare the candidate shape, not
+        // a generic object). optionGate mirrors gate's own JSON-blob round-trip immediately above.
+        if (p.formHidden === true || p.formHidden === 'true' || p.formHidden === 'TRUE') spec.formHidden = true;
+        if (p.group) spec.group = String(p.group);
+        if (p.role) spec.role = String(p.role);
+        if (p.relToRow) spec.relTo = { row: String(p.relToRow) };
+        if (p.optionGate) { try { spec.optionGate = JSON.parse(p.optionGate); } catch (_) { /* malformed — drop rather than throw */ } }
         // t1756 — CARRY THE TOKEN-POLICY DECLARATION (tokenEligible/tokenRefusal/tokenDeferrable, t1704) through the
         // round-trip — the same allow-list-drop class as widgetConfig/gate/derived above (deriveBindings.js hit this
         // exact bug for its own derivation and was fixed at t1704; this is the SAME fix for the formfield-block
@@ -583,6 +593,11 @@ export function bindingsToBlocks(specs) {
             // (MIDDLE_BINDING_SPECS, this turn's probePort gate) carried a `gate` property. JSON round-trip, same
             // shape as `when`'s own reconstruction below, robust to the tip string's own punctuation.
             gate: s.gate ? JSON.stringify(s.gate) : '',
+            // t2133 — the reverse half of formHidden/group/role/relToRow/optionGate (see bindingsFromStack's own
+            // t2133 note + formField.js's header). relToRow un-nests deriveBindings' `relTo:{row}` back to text.
+            formHidden: !!s.formHidden, group: s.group || '', role: s.role || '',
+            relToRow: (s.relTo && s.relTo.row != null) ? String(s.relTo.row) : '',
+            optionGate: s.optionGate ? JSON.stringify(s.optionGate) : '',
         } };
     });
 }

@@ -27,6 +27,26 @@ test('LOSSLESS round-trip: bindingsFromStack(bindingsToBlocks(MIDDLE_BINDING_SPE
     expect(r.back, 'the round-trip is byte-lossless — section/help/when/match/readonly/optional/default all survive').toEqual(r.original);
 });
 
+test('t2133 LOSSLESS round-trip: formHidden/group/role/relTo/optionGate (the canvas-drag triple + the reused per-option gate) survive bindingsToBlocks->bindingsFromStack, byte-identical to a hand-written spec (e.g. corner\'s cross1_x/y)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio || window.ddcsGetSettings || true);
+    const r = await page.evaluate(async () => {
+        const U = await import('/blocks/userOps.js');
+        // mirrors CORNER_BINDING_SPECS' own shape: a formHidden drag-handle pair (group+role+relTo) and a value
+        // field carrying a per-option gate (clearMode's own optionGate) — the two mechanisms this turn declares.
+        const specs = [
+            { param: 'cross1_x', type: 'number', formHidden: true, group: 'reposition', role: 'x', relTo: { row: 'wall1' }, label: 'Wall 2 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#23' }, key: 'value' },
+            { param: 'cross1_y', type: 'number', formHidden: true, group: 'reposition', role: 'y', relTo: { row: 'wall1' }, label: 'Wall 2 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#24' }, key: 'value' },
+            { param: 'clearMode', type: 'enum', label: 'Clearance', section: 'GEOMETRY', match: { type: 'clearlift' }, key: 'clearMode', optionGate: { option: 'plane', requireAll: [{ param: 'wcs', is: 'active' }], fallback: 'hop', tip: 'needs Active WCS' } },
+        ];
+        const blocks = U.bindingsToBlocks(specs);
+        const back = U.bindingsFromStack(blocks);
+        return { original: specs, back, allFormfield: blocks.every((b) => b.type === 'formfield') };
+    });
+    expect(r.allFormfield, 'every spec (incl. the formHidden pair) renders as a formfield block').toBe(true);
+    expect(r.back, 'formHidden/group/role/relTo/optionGate round-trip byte-lossless, same as section/help/when/match already did').toEqual(r.original);
+});
+
 test('a formfield-authored op: registerUserOp DERIVES def.bindingSpecs (emit) + def.bindings (form) from the blocks; the value LANDS + emit reflects it', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);

@@ -50,6 +50,84 @@ async function installAudioSpy(page) {
 async function resetSpy(page) { await page.evaluate(() => { window.__audioSpy = { synthCount: 0, sampleCount: 0 }; }); }
 async function spyCounts(page) { return page.evaluate(() => window.__audioSpy); }
 
+/**
+ * t2134 — a REAL bug the synthCount spy above cannot see: node CREATION succeeds every time (that's all
+ * synthCount asserts); only whether the node was SCHEDULED before or after the context actually resumed
+ * decides whether it's audible. This spy fakes a suspended-then-resumed AudioContext (state + resume() are
+ * both overridable on a real context; `new OrigCtx()` still gives every other method/property for real) and
+ * timestamps two kinds of event — resume settling, and a node getting scheduled — so the test can assert the
+ * ORDER, independent of whatever autoplay policy this particular headless browser actually enforces (which is
+ * exactly why the desktop-Chromium run of every other test here passed against the broken code: headless
+ * Chromium's own autoplay policy is relaxed enough that `state` was never really 'suspended' to begin with).
+ */
+async function installSuspendedAudioSpy(page, resumeDelayMs = 60) {
+    await page.addInitScript((delay) => {
+        window.__suspSpy = { events: [], resumeCalled: false };
+        const OrigCtx = window.AudioContext || window.webkitAudioContext;
+        function SpyCtx(...args) {
+            const ctx = new OrigCtx(...args);
+            let suspended = true;
+            Object.defineProperty(ctx, 'state', { get: () => (suspended ? 'suspended' : 'running') });
+            ctx.resume = () => {
+                window.__suspSpy.resumeCalled = true;
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        suspended = false;
+                        window.__suspSpy.events.push({ type: 'resumeSettled', t: performance.now() });
+                        resolve();
+                    }, delay);
+                });
+            };
+            const origOsc = ctx.createOscillator.bind(ctx);
+            ctx.createOscillator = (...a) => { window.__suspSpy.events.push({ type: 'scheduled', t: performance.now() }); return origOsc(...a); };
+            const origBuf = ctx.createBufferSource.bind(ctx);
+            ctx.createBufferSource = (...a) => { window.__suspSpy.events.push({ type: 'scheduled', t: performance.now() }); return origBuf(...a); };
+            return ctx;
+        }
+        window.AudioContext = SpyCtx;
+        window.webkitAudioContext = SpyCtx;
+    }, resumeDelayMs);
+}
+
+test('t2134 MOBILE SILENCE FIX: sfx() on a SUSPENDED AudioContext defers scheduling until resume() actually settles — the live bug (V2026.08.22.1) was scheduling on a currentTime read BEFORE resume, which freezes then jumps past the scheduled time, so the sound plays into dead air with no error', async ({ page }) => {
+    await installSuspendedAudioSpy(page, 60);
+    await boot(page);
+    await page.evaluate(async () => {
+        const { sfx } = await import('/ui/sound.js');
+        sfx('ui.click');
+        await new Promise((r) => setTimeout(r, 200));   // let the fake resume()'s 60ms settle + the .then() fire
+    });
+    const { events, resumeCalled } = await page.evaluate(() => window.__suspSpy);
+    expect(resumeCalled, 'resume() must be called — synchronously, inside the gesture — that is what autoplay policy actually checks').toBe(true);
+    const settled = events.find((e) => e.type === 'resumeSettled');
+    const scheduled = events.filter((e) => e.type === 'scheduled');
+    expect(settled, 'the fake resume() must have settled during the wait').toBeTruthy();
+    expect(scheduled.length, 'a node must actually get scheduled once the context resumes (not silently dropped)').toBeGreaterThan(0);
+    for (const e of scheduled) {
+        expect(e.t, 'scheduling must happen AFTER resume settles — never before, which is the exact defect (t2134): currentTime is frozen while suspended, so a pre-resume schedule lands in the past the instant the clock actually starts').toBeGreaterThanOrEqual(settled.t);
+    }
+});
+
+test('t2134 iOS UNLOCK: the first real pointer/touch gesture on the page starts a silent buffer SYNCHRONOUSLY (the part iOS Safari autoplay policy actually checks), once, then stops listening', async ({ page }) => {
+    await installAudioSpy(page);
+    await boot(page);
+    await resetSpy(page);
+    // a real Playwright mouse click dispatches a genuine pointerdown — not a page.evaluate()-only call — so
+    // this exercises the actual listener a real tap/click on the page would trigger.
+    await page.mouse.move(50, 50);
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.waitForTimeout(50);
+    const first = await spyCounts(page);
+    expect(first.synthCount, 'the first real pointerdown must synchronously start exactly one (buffer) node — the unlock').toBe(1);
+    // a second gesture must NOT create another unlock node (once, then it stops listening)
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.waitForTimeout(50);
+    const second = await spyCounts(page);
+    expect(second.synthCount, 'a second gesture must not re-arm the unlock — it already removed its own listeners').toBe(1);
+});
+
 test('Sound is its own sub-tab under Look and feel, a peer of Appearance (amendment 4) — not bolted onto it', async ({ page }) => {
     await boot(page);
     await openSoundTab(page);

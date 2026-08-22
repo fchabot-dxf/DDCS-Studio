@@ -25,6 +25,33 @@ const live = [];
 
 function ac() { return ctx || (ctx = new (window.AudioContext || window.webkitAudioContext)()); }
 
+// t2134 — iOS SAFARI UNLOCK. resume().then(go) (renderAction, below) fixes the Android bug (a schedule raced
+// ahead of the context's own clock) but does NOT fix iOS: Safari's autoplay policy requires the FIRST audio
+// activity on a page to be a buffer STARTED synchronously inside a real touch/click gesture, or the hardware
+// never opens for ANY later programmatic sound — no error, just permanent silence (confirmed on-device:
+// Android worked before this listener existed, iOS did not). One document-level listener, fired once on the
+// first real pointer/touch, constructs the (still-lazy) context and starts a 1-sample silent buffer — that
+// single synchronous `start()` inside the gesture is what iOS actually checks; resume() alone is not enough.
+if (typeof document !== 'undefined') {
+    let unlocked = false;
+    const unlock = () => {
+        if (unlocked) return;
+        unlocked = true;
+        document.removeEventListener('pointerdown', unlock);
+        document.removeEventListener('touchstart', unlock);
+        try {
+            const a = ac();
+            const s = a.createBufferSource();
+            s.buffer = a.createBuffer(1, 1, a.sampleRate);
+            s.connect(a.destination);
+            s.start(0);
+            if (a.state === 'suspended') a.resume().catch(() => {});
+        } catch (_) { /* audio unavailable — never break the page */ }
+    };
+    document.addEventListener('pointerdown', unlock, { passive: true });
+    document.addEventListener('touchstart', unlock, { passive: true });
+}
+
 function noiseBuffer(a, ms) {
     const n = Math.max(1, Math.floor(a.sampleRate * ms / 1000));
     const b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
@@ -247,9 +274,20 @@ function renderAction(action, themeName) {
     }
     try {
         const a = ac();
-        if (a.state === 'suspended') a.resume().catch(() => {});
-        if (action.synth === 'swoosh') { playSwoosh(a, a.currentTime + 0.01); return; }
-        playVoice(a, a.currentTime + 0.01, themeName, action.voice, action.semitones || 0);
+        // t2134 — MOBILE SILENCE FIX (found live on a phone, V2026.08.22.1). A fresh/suspended AudioContext's
+        // `currentTime` stays frozen at (near) 0 until `resume()` actually settles. The old code read
+        // `a.currentTime` and scheduled `.start(t)` on it BEFORE `resume()` was even called — by the time
+        // resume completes and the clock starts moving, `t` is already in the past, so the node plays into
+        // dead air with no error (silent, not broken-looking — why every check here passed). `resume()` is
+        // still CALLED synchronously, inside the caller's gesture (that's the part autoplay policy actually
+        // checks) — only the SCHEDULING (which reads currentTime) waits for the promise to settle, so `t` is
+        // read fresh, after the clock is actually running.
+        const go = () => {
+            if (action.synth === 'swoosh') playSwoosh(a, a.currentTime + 0.01);
+            else playVoice(a, a.currentTime + 0.01, themeName, action.voice, action.semitones || 0);
+        };
+        if (a.state === 'suspended') a.resume().then(go).catch(() => {});
+        else go();
     } catch (_) { /* audio unavailable — never break the caller */ }
 }
 

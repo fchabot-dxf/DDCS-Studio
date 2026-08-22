@@ -47564,3 +47564,147 @@ boot-splash inline theme-apply script, confirming this is the real new build, no
 
 🔨 turn 2131
 
+---
+
+# t2133 — wizards-as-data step 1: extend `formfield` (formHidden/relTo/role/group + reused gate/optionGate);
+# Corner port ATTEMPTED and STOPPED — a real, empirically-confirmed engine hole, named rather than forced
+
+**Dispatch**: `wizards_as_data_transition_plan.md`'s "MEASURED 2026-08-22" survey found 0-of-32 twins carry
+layout as blocks (`param_group.children` empty on every one) — the 2026-08-04 Corner port (802e03e8, reset
+802e05) failed because the block vocabulary was a strict subset of the spec vocabulary: `formHidden` /
+`relTo` / `role` / `group` (the drag-handle declaration) appeared in zero block-def files. Ordered: (1)
+extend `formfield` with those four + finish `match`, (2) REUSE the existing gate machinery (`when`/
+`optionGate`/`clearWhenOff` — 27/16/4/2 files already) rather than inventing a ninth, (3) port Corner, (4)
+prove the drag handles survive with before/after screenshots.
+
+## (1)+(2) — the engine extension, DONE, tested, safe
+
+Read `cornerData.js`'s live `CORNER_BINDING_SPECS` (still hand-written JS, unchanged) as the worked example
+— it already carries every attribute the survey named: `formHidden`, `group`, `role`, `relTo:{row}` on the
+4 reposition-handle fields (cross1_x/y, startX/Y), plus `optionGate` on `clearMode`. Traced the CONSUMER
+side first (`deriveBindings.js`, `panelTypes.js`'s `layoutSpecFromOp`) and found it already reads `b.group`/
+`b.role`/`b.relTo`/`b.gate`/`b.optionGate` off a derived binding — that machinery was never the gap. The gap
+was narrower than the plan's own framing suggested: `bindingsFromStack`/`bindingsToBlocks` (userOps.js) had
+ALREADY been extended (a prior turn, not this one) to round-trip `gate`/`tokenEligible`/`derived`/`writes`
+— but the `formfield` BLOCK ITSELF (formField.js) had no `gate` field, so a real block could never carry a
+value for `bindingsFromStack` to read. Same shape for `optional`/`readonly`/`whenparam` (already both sides)
+vs `formHidden`/`group`/`role`/`relTo`/`optionGate` (spec-side ready, block-side missing).
+
+Added to `formField.js`: `formHidden` (bool), `group`/`role` (free text — matches the file's own precedent
+of free-text `matchvar`/`atomType` over a picker, and guard.js's `whentype` precedent of declaring the
+candidate shape as flat fields rather than a generic object), `relToRow` (free text — un-nests
+`relTo:{row}}`'s ONE shape, same call), `gate`/`optionGate` (JSON-blob text fields, mirroring `gate`'s own
+already-working round-trip). `match` needed no work: `bindMode:'opparam'` (shipped, prior turn) already
+produces `{type: atomType}`, which is exactly what `clearMode`/`hopDist`/`planeZ`'s hand-written
+`match:{type:'clearlift'}` needs — confirmed, not assumed, by using it in the Corner-port attempt below.
+
+Extended `bindingsFromStack`/`bindingsToBlocks` (userOps.js) to carry the five new fields, same
+conditional-set pattern as every existing field (`if (p.x) spec.x = ...`) so an unset field is OMITTED, not
+written as `false`/`''` — required for the existing byte-lossless round-trip test (MIDDLE_BINDING_SPECS
+carries none of these) to stay green with no changes.
+
+**New test** (`formfield-block.spec.js`): a lossless round-trip fixture built from Corner's own
+`cross1_x`/`cross1_y` (the formHidden/group/role/relTo drag pair) + `clearMode` (the optionGate field) —
+proven non-vacuous by reverting `bindingsFromStack`'s extraction and confirming the SAME test fails 1/1
+against the pre-change tree (deep-equal drops the 5 new keys), then restoring and confirming green.
+**Discovered in writing it, not fixed (out of scope)**: `bindingsFromStack`'s existing `default` extraction
+(`Number.isFinite(Number(p.dflt))`) silently drops any NON-NUMERIC default — `clearMode`'s own
+`default: 'hop'` (a string enum default) cannot survive a block round-trip today. Pre-existing, not
+introduced this turn; noted for whoever next touches an enum-typed formfield default.
+
+## (3)+(4) — Corner port ATTEMPTED, then STOPPED: an empirically-confirmed hole, not a guess
+
+Built the ported `paramGroup.children` the direct way — `bindingsToBlocks(CORNER_BINDING_SPECS)` (now that
+it carries all 13 specs losslessly) — and, BEFORE touching the committed file, ran the actual registration
+path (`resolveBindingsMeta`'s `deriveBindings(flattenBlocks(template), specs)`) against it in a scratch
+Playwright probe (deleted after, not shipped). Result, per spec:
+
+| specs | result |
+|---|---|
+| dist/retract/f_fast/f_slow/port/radius/travelDist/safeZ/scanDepth (9) | ✅ single match, would work today |
+| clearMode/hopDist/planeZ (the clearlift atom's own params) | ⛔ **"matched 8 blocks; need exactly 1"** |
+| cross1_x/cross1_y/startX/startY (the 4 drag-handle fields) | ⛔ **"matched 8 blocks; need exactly 1"** |
+
+**Root cause, confirmed by reading `cornerWizard.js` directly, not inferred**: Corner's EXECUTION mouth is
+`cornerStack(params, {superset:true})` — the FULL guarded superset, every structural fork's arms present at
+once (the 8-way nested `corner`×`probeSeq` guard alone). `resolveBindingsMeta`'s own comment states its
+scope plainly: *"v1: derive over the UNPRUNED template (an authored op carries no guards yet — a guarded
+authored op is a later slice)"* — a decision already made, by an earlier turn, that a formfield-authored op
+has no guards. Corner is nothing BUT guards; `mkA('#23', …)` and its siblings sit inside the same 8-way fork
+that duplicates most of Corner's body, so `#23`/`#24`/`#21`/`#22` (and the `clearlift` atom itself) each
+appear 8× in the unpruned template `resolveBindingsMeta` scans.
+
+⛔ **This is exactly the failure class the dispatch named and told me to stop at, not work around**: adding
+ALL 13 formfield blocks would make `registerUserOp` throw at Corner's own boot registration (an app-crashing
+regression, confirmed by the probe, not assumed). Porting ONLY the 9 safe scalars and dropping
+`def.bindingSpecs = CORNER_BINDING_SPECS` would silently drop the 4 drag-handle bindings from `def.bindings`
+— **reproducing the EXACT 802e03e8 symptom (drag handles vanish) under new packaging**, which is the one
+outcome every line of this dispatch exists to prevent. Neither is a real port. Left `cornerData.js`
+completely untouched — no `paramGroup.children` change, `def.bindingSpecs` assignment unchanged, no
+before/after screenshot pair (there is no "after" — nothing shipped). The Visual Canvas Check /
+before-after-screenshots verification step never applies to a change that wasn't made.
+
+**The next hole, named**: `resolveBindingsMeta` needs a way to derive over something other than the raw
+unpruned template for a def whose execution mouth is a guarded superset — e.g. accepting a caller-supplied
+prune context (mirroring `CORNER_BINDINGS`'s own existing `canonicalPrunedStack()` — this problem is ALREADY
+solved once, by hand, for the JS-spec path; the block-authored path has no equivalent). That is real new
+engine surface, not a 4-field addition, and building it un-reviewed inside the same turn that already
+crashed boot once via an under-scoped guess is exactly the risk this dispatch is guarding against by asking
+for the stop. Flagging for the advisor to scope as its own step rather than guessing at its shape here.
+
+## Mid-turn amendment absorbed: t2134, a LIVE production silence bug (higher priority, done first)
+
+Two amendments landed while wizards-as-data work was in progress, reporting the just-shipped V2026.08.22.1
+sound suite was SILENT on a real phone. Stopped the wizards-as-data work per the amendment's own instruction
+and fixed this first.
+
+**Bug 1 (both platforms, worse on Android-was-marginal)**: `sound.js`'s `renderAction()` called
+`a.resume()` on a suspended `AudioContext` WITHOUT awaiting it, then immediately scheduled playback at
+`a.currentTime + 0.01` — `currentTime` stays frozen while suspended, so by the time `resume()` actually
+settles the schedule is already in the past; the node plays into dead air, no error, nothing to catch.
+Fixed by building the play call as a thunk (`go`) and only invoking it from `resume().then(go)` when
+suspended — `resume()` is still called SYNCHRONOUSLY inside the caller's gesture (the part autoplay policy
+actually checks), only the scheduling (which reads `currentTime`) waits for the promise to settle.
+
+**Bug 2 (iOS-specific, the human-confirmed split — Android worked, iOS did not)**: Bug 1's fix alone still
+leaves iOS Safari silent — its policy requires the FIRST audio activity on the page to be a buffer STARTED
+synchronously inside a real touch gesture, or the hardware never opens for any later programmatic sound.
+Added one document-level `pointerdown`/`touchstart` listener (module-load side effect in `sound.js`), fired
+once on the first real gesture, that lazily constructs the (still-lazy, confirmed NOT built at module load —
+`ac()` is `ctx || (ctx = new …)`, called for the first time here) context and starts a 1-sample silent
+buffer, then removes both listeners.
+
+**Verification**: real device access is Android-only this session (the human's own phone, which they used
+to report/confirm the bug) — no iPhone to test on. Being explicit rather than confident: the iOS unlock is
+written to the documented Safari requirement (buffer `start()` synchronous inside the gesture, before any
+`resume()`), and is proven correct in the sense that (a) it fires exactly once on a real `pointerdown`
+(Playwright `page.mouse.down()`, a genuine DOM event, not a `page.evaluate()` call) and (b) a temporary
+removal of the listener block reproduces the exact predicted symptom (0 nodes created on the first gesture)
+— but it has NOT been confirmed to unlock actual audio on a physical iPhone. Two non-vacuous tests added to
+`sound-toggle-2125.spec.js`: one fakes a suspended-then-resumed `AudioContext` (real contexts don't
+reliably stay 'suspended' in headless Chromium, which is exactly why the ORIGINAL bug passed every existing
+test here) and asserts every scheduled node's timestamp is `>=` the resume-settled timestamp, never before;
+the other drives a real mouse gesture and asserts the unlock buffer is created exactly once, never on a
+second gesture. Both proven non-vacuous — reverted their respective fix, confirmed the exact predicted
+failure, restored, confirmed green.
+
+## Gate
+
+Node tier: 226/226, unchanged (this turn added no node-tested logic — the formfield/sound changes are both
+DOM-dependent). Targeted Playwright: `formfield-block.spec.js` 5/5, `sound-toggle-2125.spec.js` 13/13 (was
+11 — the two new t2134 tests), `corner-data-emit.spec.js` + `corner-data-drag.spec.js` +
+`corner-data-repos-handle.spec.js` + `corner-data-start-live.spec.js` + `help-slot.spec.js` (regression
+insurance for the shared `userOps.js` edit, since `cornerData.js` itself was never touched) — all green,
+20/20 together. Full `npm test` launched (release-bound hotfix); result to follow in a subsequent note if
+it lands before this pass, else the advisor's own merge gate covers it.
+
+## Files
+- `DDCS-Studio/web/wizards/ops/formField.js` — `formHidden`/`group`/`role`/`relToRow`/`gate`/`optionGate` fields.
+- `DDCS-Studio/web/blocks/userOps.js` — `bindingsFromStack`/`bindingsToBlocks` carry the 5 new attributes.
+- `DDCS-Studio/tests/formfield-block.spec.js` — new lossless round-trip test using Corner's own drag pair.
+- `DDCS-Studio/web/ui/sound.js` — t2134: `resume().then(go)` scheduling fix + the iOS gesture-unlock listener.
+- `DDCS-Studio/tests/sound-toggle-2125.spec.js` — 2 new non-vacuous tests for both t2134 fixes.
+- `DDCS-Studio/web/blocks/dataOps/cornerData.js` — **untouched**; the attempted port was reverted to nothing shipped.
+
+🔨 turn 2133
+
