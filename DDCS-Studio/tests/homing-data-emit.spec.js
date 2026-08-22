@@ -51,10 +51,12 @@ test('E1: the twin emit == homingStack byte-diff ZERO across the selection × Z-
 /**
  * t1900 — CROSS-DIALECT (t1896's own design opinion, dispatched): the E1 sweep above never varies the ACTIVE
  * DIALECT — it is the exact blind spot that let t1896's BROKEN `homing_data` row hide undetected. `homingStack`
- * reads the dialect at BUILD time (`getDialect()`), so this needs `setActivePostId` cycling the FULL registry
- * BEFORE calling the builder — `emitMapped`'s own `{dialect}` option (the cheap way for a SAFE/emit-time-only op)
- * cannot reach a build-time read. A SMALL representative param set × every registered dialect — not the full
- * 66-combo sweep × 7, which would be the same blanket multiplier already rejected once.
+ * reads the dialect at BUILD time (`getDialect()`), so this needs the dialect override cycling the FULL
+ * registry BEFORE calling the builder — `emitMapped`'s own `{dialect}` option (the cheap way for a SAFE/
+ * emit-time-only op) cannot reach a build-time read. A SMALL representative param set × every registered
+ * dialect — not the full 66-combo sweep × 7, which would be the same blanket multiplier already rejected once.
+ * t2137 — the live, user-facing override is retired; `__setDialectOverrideForTests` is the in-memory,
+ * test-only replacement (wizards/dialects/index.js) — unreachable from any real UI.
  */
 test('CROSS-DIALECT: user_homing_data == homingStack for EVERY registered dialect, not just the default (t1900)', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -65,7 +67,7 @@ test('CROSS-DIALECT: user_homing_data == homingStack for EVERY registered dialec
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { homingStack } = await import('/wizards/homingWizard.js');
-        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');
         registerUserOp(homingDataDef());
         const build = builderOf('user_homing_data');
         const cfg = { x: { enable: true, backoff: 5, seekFeed: 800, slowFeed: 100 }, y: { enable: true, backoff: 5 }, z: { enable: true, backoff: 5 } };
@@ -75,7 +77,7 @@ test('CROSS-DIALECT: user_homing_data == homingStack for EVERY registered dialec
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null, combos = 0;
         for (const dialectId of dialects) {
-            setActivePostId(dialectId);
+            __setDialectOverrideForTests(dialectId);
             for (const p of reps) {
                 combos++;
                 const twin = emitMapped(build({ ...p, softLimits: true })).text;
@@ -83,7 +85,7 @@ test('CROSS-DIALECT: user_homing_data == homingStack for EVERY registered dialec
                 if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p, twin: twin.slice(0, 400), builtin: builtin.slice(0, 400) }; }
             }
         }
-        setActivePostId('auto');
+        __setDialectOverrideForTests(null);
         return { diffs, first, combos, dialectCount: dialects.length };
     });
     if (r.first) console.log('HOMING XDIALECT DIFF ' + JSON.stringify(r.first));

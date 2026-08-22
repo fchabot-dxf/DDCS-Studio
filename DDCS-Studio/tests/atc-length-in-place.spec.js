@@ -63,16 +63,16 @@ test('CROSS-DIALECT: the twin emit == atcLengthStack for EVERY registered dialec
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcLengthStack } = await import('/wizards/atcLengthWizard.js');
         const { ATC_LENGTH_DEFAULTS } = await import('/blocks/dataOps/atcLengthData.js');
-        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');   // t2137 — in-memory, test-only (see dialects/index.js)
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null;
         for (const dialectId of dialects) {
-            setActivePostId(dialectId);
+            __setDialectOverrideForTests(dialectId);
             const twin = emitMapped(builderOf(OPTYPE)(ATC_LENGTH_DEFAULTS)).text;
             const builtin = emitMapped(atcLengthStack(ATC_LENGTH_DEFAULTS)).text;
             if (twin !== builtin) { diffs++; if (!first) first = { dialectId, twin: twin.slice(0, 600), builtin: builtin.slice(0, 600) }; }
         }
-        setActivePostId('auto');
+        __setDialectOverrideForTests(null);
         return { diffs, first, dialectCount: dialects.length };
     }, OPTYPE);
     if (r.first) console.log('ATC-LENGTH XDIALECT DIFF ' + JSON.stringify(r.first.dialectId) + '\n--TWIN--\n' + r.first.twin + '\n--BUILTIN--\n' + r.first.builtin);

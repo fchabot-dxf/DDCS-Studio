@@ -23,9 +23,11 @@ test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMa
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
-        // t1900 — setActivePostId (not setActiveProfile) reaches ALL 7 registered dialects, not just the 4 machine
-        // profiles: grbl/centroid/rs274ngc/grblhal are POST overrides, never a selectable profile.
-        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        // t1900 — the dialect override (not setActiveProfile) reaches ALL 7 registered dialects, not just the 4
+        // machine profiles: grbl/centroid/rs274ngc/grblhal have no profile counterpart. t2137 — the live,
+        // user-facing override is retired ([[one-workspace-one-machine]]); __setDialectOverrideForTests is its
+        // IN-MEMORY, test-only replacement (wizards/dialects/index.js) — unreachable from any real UI.
+        const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');
         registerUserOp(atcChangeDataDef());
         const build = builderOf('user_atc_change_data');
         const methods = ['m6', 'firmware', 'manual', 'generic', 'disk'];
@@ -34,7 +36,7 @@ test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMa
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null, combos = 0;
         for (const dialectId of dialects) {
-            setActivePostId(dialectId);
+            __setDialectOverrideForTests(dialectId);
             for (const cfg of [{ atc: {}, outputs: [], inputs: [] }, CFG_ATC]) {
                 window.__atcS = cfg; window.ddcsGetSettings = () => window.__atcS;
                 for (const method of methods) for (const callMacro of callMacros) {
@@ -46,7 +48,7 @@ test('E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMa
                 }
             }
         }
-        setActivePostId('auto');   // restore (localStorage persists across pages)
+        __setDialectOverrideForTests(null);   // restore (in-memory only — but be tidy)
         return { diffs, first, combos, dialectCount: dialects.length };
     }, { CFG_ATC });
     if (r.first) console.log('ATC-CHANGE E1 DIFF ' + JSON.stringify(r.first));

@@ -11,7 +11,7 @@ test('the Edge field shows High/Low on a DDCS post and all 4 on RS274; emit unch
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
 
     const edgeButtons = async (profile, shotName) => {
-        await page.evaluate(async (p) => { const { setActivePostId } = await import('/wizards/dialects/index.js'); setActivePostId(p); }, profile);
+        await page.evaluate(async (p) => { const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js'); __setDialectOverrideForTests(p); }, profile);
         await page.evaluate(() => window.openWiz('user_io_step', 'input'));
         await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
         await page.waitForTimeout(300);
@@ -31,7 +31,7 @@ test('the Edge field shows High/Low on a DDCS post and all 4 on RS274; emit unch
     // the fix touches ONLY the form options (ioEdgeOptions + the segmented widget) — NOT ioStepStack/the atoms/the emit, and
     // the segmented read() still returns the raw value (a hidden 'rise' stays 'rise'). So the emit is byte-identical; that is
     // pinned by io-step-emit.spec + io-step-twin.spec (re-run this turn), not re-asserted here through emitMapped's dialect.
-    await page.evaluate(async () => { const { setActivePostId } = await import('/wizards/dialects/index.js'); setActivePostId('auto'); });
+    await page.evaluate(async () => { const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js'); __setDialectOverrideForTests(null); });
     console.log('Edge Expert: ' + JSON.stringify(expert) + ' | RS274: ' + JSON.stringify(rs274));
 
     expect(expert.btns, 'DDCS Expert shows High/Low only (level, not edge)').toEqual(['High', 'Low']);

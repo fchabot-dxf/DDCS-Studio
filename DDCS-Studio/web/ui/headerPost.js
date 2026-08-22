@@ -1,18 +1,21 @@
 /**
- * ui/headerPost.js — the global POST-PROCESSOR (dialect) selector in the app header: a discreet chevron
- * quick-action button (#hdrPostBtn) that opens a popover picker (#hdrPostMenu) + a capability LINT (#hdrPostWarn).
+ * ui/headerPost.js — the app header's quick-actions menu (#hdrPostBtn / #hdrPostMenu): workspace save/open,
+ * the wizard manager, theme, and app-level utility rows, plus a capability LINT (#hdrPostWarn) on the loaded
+ * program against the workspace's OWN controller.
  *
- * The post decides WHICH controller's G-code is generated — distinct from the machine PROFILE (hardware
- * config, in Settings → Profile). `auto` follows the active profile's native post; pick a specific post to
- * emit for another controller (e.g. generate grbl / LinuxCNC from a DDCS bench). Changing it re-emits the
- * Blocks/editor projection and re-renders open previews.
+ * t2137 — this used to ALSO be a post-processor (dialect) picker: pick a different controller than the
+ * workspace's own to preview its G-code (e.g. grbl/LinuxCNC from a DDCS bench). That picker's rows were
+ * already gone from the menu (an earlier diet pass), and the underlying override mechanism is now retired
+ * outright (human ruling, 2026-08-22 — [[one-workspace-one-machine]]): the emitted code ALWAYS follows this
+ * workspace's ONE machine. Want a different controller's output — that is a different machine, so a
+ * different workspace.
  *
- * LINT (warn-don't-break): a loaded program re-emits into the chosen post live (the stack is post-agnostic).
- * But some posts can't RUN what a program uses — e.g. grbl has no #variables/flow, so a probe/ATC macro
- * re-emitted onto grbl is non-runnable (probing on grbl is host-side). Rather than silently hand over broken
- * G-code, a ⚠ next to the selector explains the mismatch. Cutting programs (no #vars) switch cleanly.
+ * LINT (warn-don't-break): a loaded program may use capabilities THIS workspace's controller lacks — e.g.
+ * grbl has no #variables/flow, so a probe/ATC macro built for it is non-runnable (probing on grbl is
+ * host-side). Rather than silently hand over broken G-code, a ⚠ explains the mismatch. Cutting programs (no
+ * #vars) are always fine.
  */
-import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActivePost, getCaps } from '../wizards/dialects/index.js';
+import { resolveActivePost, getCaps } from '../wizards/dialects/index.js';
 import { getActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
@@ -113,12 +116,9 @@ export function initHeaderPost() {
     // Layout: identity row · workspace row (Save/Open) · Library… · Theme · Setup sheet… · Setup checklist · Settings… · Rate.
     // MOVED NOT LOST: Save/Open/wizard → Library; Pull → Gateway (↧ on identity row); standalone/checklist → Settings;
     // and t1227 Load/Insert/Export/Clear → the EDITOR's corner file menu, the pane they act on.
-    let postSubOpen = false;    // (preserved for the post-switch handler below; no post rows emitted in the slimmed menu)
     let themeSubOpen = false;
 
     const fillMenu = () => {
-        const machinePost = getDialect(getActiveProfile().id);
-        const active = getActivePostId();
         const curTheme = document.body.getAttribute('data-theme') || 'studio';
         // (t1227 — the generic `actionRow` helper went with its last caller, the Clear editor row.)
         const themeRow = (name) => {
@@ -279,7 +279,7 @@ export function initHeaderPost() {
     // Warn (don't break) when the loaded program uses capabilities the active post lacks.
     const lint = () => {
         if (!warnEl) return;
-        const post = resolveActivePost(getActiveProfile().id);   // the post that's actually active (override or profile)
+        const post = resolveActivePost(getActiveProfile().id);   // t2137 — the workspace's own controller, always (no override any more)
         const caps = getCaps(post.id);
         const ed = document.getElementById('editor');
         const text = ed ? ed.value : '';
@@ -375,7 +375,6 @@ export function initHeaderPost() {
             if (list) list.hidden = !willOpen;
             it.classList.toggle('is-open', willOpen);
             it.setAttribute('aria-expanded', String(willOpen));
-            if (it.dataset.sub === 'post') postSubOpen = willOpen;
             if (it.dataset.sub === 'theme') themeSubOpen = willOpen;
             return;
         }
@@ -385,27 +384,8 @@ export function initHeaderPost() {
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
         // t1227 — the identity's own `browse` click (open the machine's settings) is GONE with its button: it was a
         // door built for the retired profile world. ☁ and ↧ are handled above, on the exact span that was tapped.
-        if (!it.dataset.post) return;   // (dialect switching removed from the menu — no data-post items remain)
-
-        setActivePostId(it.dataset.post);                           // persist the active post (override or 'auto')
-
-        // Automatically sync the variable DB to the active post's family
-        const post = resolveActivePost(getActiveProfile().id);
-        const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;
-        if (vdb && post) {
-            let fam = 'expert';
-            if (post.id.includes('v4')) fam = 'v4.1';
-            else if (post.id.includes('centroid')) fam = 'centroid';
-            else if (post.id.includes('rs274ngc') || post.id.includes('linuxcnc')) fam = 'rs274ngc';
-            else if (post.id.includes('mach3')) fam = 'mach3';
-            else if (post.id.includes('mach4')) fam = 'mach4';
-            else if (post.id.includes('uccnc')) fam = 'uccnc';
-            vdb.setControllerVars(fam);
-        }
-
-        if (window.ddcsRefreshBlocks) window.ddcsRefreshBlocks();   // re-project Blocks/editor in the new post
-        window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));   // re-render open previews/wizards
-        lint();
+        // t2137 — dialect switching is retired entirely (no more post override — see dialects/index.js);
+        // there is no other row left for `it` to be at this point, so nothing further to do here.
     });
 
     // Re-sync the 'Auto · <name>' tooltip + re-lint when the profile/post or program changes elsewhere.

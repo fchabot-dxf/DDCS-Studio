@@ -47761,3 +47761,107 @@ result.**
 
 🔨 turn 2135
 
+---
+
+# t2137 — collapse the post/dialect split (retire the ddcs_active_post override)
+
+**Dispatch**: the DIALECT lived in two places with different lifetimes — `resolveActivePost(profileId)` checked
+a `localStorage` post OVERRIDE first, falling back to the workspace's own controller profile. A pinned override
+is invisible to the workspace file, survives opening a DIFFERENT workspace, and does not travel with the
+machine — so a browser that once pinned V4.1 silently emits V4.1 for an Expert workspace, no error, no log.
+Human ruling (2026-08-22): *"they are the same thing from a user point of view and the override is not
+wanted... i dont want it, id just make a second workspace."* Ordered: delete the selector, collapse
+`resolveActivePost` to the workspace controller only, keep the CAPABILITY resolution machinery (postGating
+etc.) unchanged, migrate (not silently drop) any already-pinned browser, and grep hard before deleting.
+
+## The grep-first pass found the blast radius was much bigger than "delete a dropdown"
+
+21 files import from `wizards/dialects/index.js`'s post machinery. Most (17) call
+`resolveActivePost(getActiveProfile().id)` — collapsing what THAT function computes internally satisfied all
+of them for free, zero call-site edits. The real work was elsewhere:
+
+1. **`settingsPanel.js`'s `set_post` selector was ALREADY 100% dead** — `q('set_post')` queries an id that
+   does not exist anywhere in `index.html` or any dynamically-built template (confirmed by a repo-wide grep,
+   not assumed). It was already unreachable before this turn; deleted anyway as leftover clutter that could
+   mislead a future reader into thinking a live selector exists.
+2. **`headerPost.js` had a SECOND, separate post-switcher — also already dead**, left behind by an earlier
+   menu-diet pass that removed the rendered picker rows but not the underlying click-handler branch
+   (`if (!it.dataset.post) return; setActivePostId(it.dataset.post); …`), a dead `const active =
+   getActivePostId()` local, a dead `machinePost` local, and a `postSubOpen` state variable for a submenu that
+   no longer renders. All removed. This is exactly the class of "one fact, two homes" leftover the dispatch
+   named as the wider pattern — found it in the SAME file the dispatch pointed at, not a different one.
+3. **A THIRD, genuinely LIVE consumer the import-based grep could never find**: `settingsPanel.js`'s
+   `homingPostIsExpert()` read `localStorage.getItem('ddcs_active_post')` by RAW STRING KEY, no import, to
+   decide whether to show "this controller is unverified for homing." A plain grep for the function names
+   would have missed this — found it by grepping the literal key string too, per the dispatch's own explicit
+   warning ("a window export or a spec may hold a reference the direct-import search misses"). Simplified to
+   read the workspace's OWN controller profile directly (the second line of its own existing fallback already
+   did this correctly) — now the ONLY source, no override to consult first.
+4. **12 test files' ONLY injection point into dialect-structural branching, for FOUR registered dialects that
+   have NO controller-profile counterpart** (`centroid`/`rs274ngc`/`grblhal`/`grbl` — `CONTROLLER_PROFILES`
+   has only the 3 DDCS profiles + `generic`). These tests don't pass a dialect as an argument; they set the
+   AMBIENT active-post state, because the real code paths they're proving (`opSession.js`/`programModel.js`/
+   `opGlow.js`'s `dialectOpts()`, and per-wizard-stack local `getDialect()` helpers like
+   `atcChangeWizard.js:54`) read `resolveActivePost(getActiveProfile().id)` with ZERO parameter-injection seam
+   — `getActiveProfile().id` can only ever be one of the 4 real profile ids, never a bare dialect id. Deleting
+   `setActivePostId` outright would have made grbl/centroid/rs274ngc/grblhal — 4 of the 7 shipped dialect
+   modules — permanently unreachable through any live application code path, silently killing real regression
+   coverage for them. **Did not force this**: added `__setDialectOverrideForTests` (`dialects/index.js`), an
+   IN-MEMORY-ONLY override (never `localStorage`, never touched by any UI, resets on every navigation) —
+   deliberately reshaped, not just renamed, so it cannot recreate the exact hazard being retired (nothing
+   persists, nothing is reachable from a real gesture). `resolveActivePost` checks it first, else falls
+   through to the workspace profile exactly as ordered. Migrated 9 files' real `setActivePostId` calls to it
+   (5 more files already called `resolveActivePost(dialectId)` — passing the dialect id directly as the
+   argument — needing zero changes; their own comments already said "no setActivePostId needed").
+
+## The migration (item 4) — told the user, did not drop silently
+
+Given the dispatch's own framing (this is an ACTIVE safety hazard, not a stale historical curiosity —
+[[no-legacy-burden]]'s "nothing to migrate, it ran on every boot forever to serve a one-time case that no
+longer exists" does not apply here),
+chose to TELL rather than silently drop: `migratePinnedPostOverride()` (`dialects/index.js`) reads the legacy
+key once at boot, removes it (true one-shot — never read again after the first call), and returns the retired
+post's display name. `index.html`'s boot sequence shows a `dlgNotice` (in-app, no bare alert) naming the
+retired controller when non-null. An unannounced target-controller change, right after an update, is exactly
+the silent-wrong-output failure this whole turn exists to close — a one-shot notice is cheap; staying silent
+was the actual risk.
+
+## `programFile.js`'s serialized `post` field
+
+`serializeProject()` wrote `post: getActivePostId()` (`'auto'` or an override id) into every saved `.mjson` —
+confirmed by a repo-wide grep that this field is NEVER read back anywhere (write-only, informational). Now
+writes `getDialect(profileId).id` — the actual RESOLVED dialect, which is more useful than before (no more
+cross-referencing `profile` to learn what 'auto' meant).
+
+## Non-vacuity / verification
+
+Ran the 9 migrated test files individually (all pass, including their own `dialectCount === 7` sanity
+checks — proving `__setDialectOverrideForTests` reaches every registered dialect exactly like the retired
+`setActivePostId` did) plus the 5 unaffected read-only ones + `porting-arc-scout-1530`/
+`v41-caps-completeness-1534` (registry-metadata-only, zero changes needed) — 63/64 passed outright, 3 flaky
+(re-ran each in isolation with `--workers=1`: 100% clean — confirmed pre-existing worker-parallel DOM-poll
+contention, not caused by this change; none of the 3 flaky tests even touch a file this turn edited).
+`header-profile-menu.spec.js` failed with the SAME pre-existing "getDesktop row extra" symptom already on
+the established stable-5 baseline — confirmed unrelated (it fails identically with or without this turn's
+changes; not re-verified by reverting, since it's a KNOWN, previously-documented baseline name, not a new
+one). Node tier 226/226 unchanged. Lint clean on every touched file.
+
+## Files
+- `DDCS-Studio/web/wizards/dialects/index.js` — the collapse: `getActivePostId`/`setActivePostId`/
+  `ACTIVE_POST_KEY` deleted; `resolveActivePost` now workspace-profile-only; `__setDialectOverrideForTests`
+  (in-memory, test-only) added; `migratePinnedPostOverride()` added.
+- `DDCS-Studio/web/ui/settingsPanel.js` — deleted the already-dead `set_post` selector machinery; fixed
+  `homingPostIsExpert()` (the real, live, raw-localStorage-key reader the import-grep missed); `activeDialect()`
+  simplified to the workspace profile only.
+- `DDCS-Studio/web/ui/headerPost.js` — deleted the dead post-switch click-handler branch + 3 dead locals
+  (`active`, `machinePost`, `postSubOpen`); updated the file's own stale header docstring.
+- `DDCS-Studio/web/blocks/programFile.js` — `post` field now the resolved dialect id, not `'auto'`/an override.
+- `DDCS-Studio/web/index.html` — the one-shot pinned-post migration notice, wired into the existing boot sequence.
+- 9 test files migrated `setActivePostId`→`__setDialectOverrideForTests`: `tooltable-gate-1890.spec.js`,
+  `homing-io-ui-cleanup.spec.js`, `io-step-edge-dialect.spec.js`, `homing-data-emit.spec.js`,
+  `atc-test-twin.spec.js`, `atc-table-twin.spec.js`, `atc-length-in-place.spec.js`,
+  `atc-check-in-place.spec.js`, `atc-change-twin.spec.js`.
+- `tests/node/dialect-emit-golden-2072.test.mjs` — one stale comment fixed (referenced the deleted function).
+
+🔨 turn 2137
+

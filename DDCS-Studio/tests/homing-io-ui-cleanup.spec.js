@@ -38,7 +38,7 @@ test('(3) I/O-step Input: Result-var + Timeout are HIDDEN on a DDCS post, SHOWN 
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     const visOn = async (post) => {
-        await page.evaluate(async (p) => { const { setActivePostId } = await import('/wizards/dialects/index.js'); setActivePostId(p); }, post);
+        await page.evaluate(async (p) => { const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js'); __setDialectOverrideForTests(p); }, post);
         await page.evaluate(() => window.openWiz('user_io_step', 'input'));
         await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
         await page.waitForTimeout(300);
@@ -55,11 +55,11 @@ test('(3) I/O-step Input: Result-var + Timeout are HIDDEN on a DDCS post, SHOWN 
     const emit = await page.evaluate(async () => {
         const { ioStepStackResolved } = await import('/wizards/ioStepWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
-        const { setActivePostId } = await import('/wizards/dialects/index.js');
+        const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js');
         const p = { mode: 'input', inputRef: 'raw', waitPin: 4, mode2: 'rise', timeout: 500, var: '#5399' };
-        setActivePostId('ddcs-expert-m350'); return emitMapped(ioStepStackResolved(p)).text;
+        __setDialectOverrideForTests('ddcs-expert-m350'); return emitMapped(ioStepStackResolved(p)).text;
     });
-    await page.evaluate(async () => { const { setActivePostId } = await import('/wizards/dialects/index.js'); setActivePostId('auto'); });
+    await page.evaluate(async () => { const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js'); __setDialectOverrideForTests(null); });
     console.log('EXPERT: ' + JSON.stringify(expert) + ' | RS274: ' + JSON.stringify(rs274));
 
     expect(expert.input && expert.edge, 'Expert: Input + Edge render').toBe(true);

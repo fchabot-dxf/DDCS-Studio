@@ -1348,6 +1348,19 @@
                 initHeaderPost();
             } catch (err) { console.error('header post init failed', err); }
             try {
+                // t2137 — a browser that had PINNED a post override before this release is silently emitting for
+                // the wrong controller right now (the override is retired; every call site follows the workspace's
+                // own machine). One-time check + notice, never repeats (the key is removed the first time this runs).
+                const { migratePinnedPostOverride } = await import('./wizards/dialects/index.js');
+                const retiredName = migratePinnedPostOverride();
+                if (retiredName) {
+                    const { dlgNotice } = await import('./ui/dialog.js');
+                    dlgNotice(`Your pinned G-code target controller (${retiredName}) has been retired — DDCS Studio `
+                        + `now always generates code for this workspace's own configured controller. Want output `
+                        + `for a different controller? Make a workspace for that machine.`);
+                }
+            } catch (err) { console.error('pinned-post migration check failed', err); }
+            try {
                 const { initRatePrompt } = await import('./ui/ratePrompt.js');
                 initRatePrompt();                 // t598 — session counter + the success-moment rate toast + the ⭐ menu entry
             } catch (err) { console.error('rate prompt init failed', err); }

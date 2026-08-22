@@ -12,7 +12,7 @@
  */
 import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
-import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
+import { getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
 import { toast } from './gateway/util.js';   // t899 — the safe-Z Apply-Now feedback (submit + result), mirrors bridgeTransfer
 import { renderIoTable, renderMagazineTable, renderAtcPinPicker } from './ioTable.js';
@@ -802,12 +802,11 @@ function homingConfiguredAxes() {
     return out;
 }
 try { if (typeof window !== 'undefined') { window.__ddcsHomingAxes = homingConfiguredAxes; window.__ddcsRenderHoming = () => renderHomingGui(); } } catch (_) {}
+// t2137 — no more post override to consult first (retired — [[one-workspace-one-machine]]); the workspace's
+// own controller profile IS the dialect, always.
 function homingPostIsExpert() {
-    try {
-        const ap = localStorage.getItem('ddcs_active_post');
-        if (ap && ap !== 'auto') return ap === 'ddcs-expert-m350';
-        return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350';
-    } catch (_) { return true; }
+    try { return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350'; }
+    catch (_) { return true; }
 }
 function renderHomingGui() {
     const host = document.getElementById('set_homing_axes'); if (!host) return;
@@ -2021,33 +2020,6 @@ function wireSettingsOverlay(ov) {
         show('set_head_plasma', t === 'plasma');
         show('set_head_laser', t === 'laser');
     }
-    // Controller codegen-target picker — which controller's G-code the Blocks view emits (live).
-    const postSel = q('set_post');
-    function fillPostOptions() {
-        if (!postSel) return;
-        const machinePost = getDialect(getActiveProfile().id);
-        postSel.innerHTML = ['<option value="auto">Follow controller (' + machinePost.name + ')</option>']
-            .concat(listPosts().map((p) => '<option value="' + p.id + '">' + p.name + (p.verified ? '  ✓' : '  ⚠ unverified') + '</option>'))
-            .join('');
-        postSel.value = getActivePostId();
-        updatePostHint();
-    }
-    function updatePostHint() {
-        const hint = q('set_post_hint'); if (!hint) return;
-        const id = getActivePostId();
-        if (id === 'auto') { hint.textContent = 'Following the controller (' + getDialect(getActiveProfile().id).name + '). Override to generate for another controller.'; hint.style.color = ''; }
-        else if (!isPostVerified(id)) { hint.textContent = '⚠ Unverified controller — dump-derived, simulator/reference only. Not validated on hardware.'; hint.style.color = '#e0a020'; }
-        else { hint.textContent = 'Generating for ' + getDialect(id).name + ' (verified).'; hint.style.color = ''; }
-    }
-    if (postSel) {
-        fillPostOptions();
-        postSel.addEventListener('change', () => {
-            setActivePostId(postSel.value);
-            updatePostHint();
-            if (window.ddcsRefreshBlocks) window.ddcsRefreshBlocks();   // live re-emit the Blocks view
-        });
-    }
-
     const profileSel = q('set_profile');
     function fillProfileOptions() {
         if (!profileSel) return;
@@ -2082,11 +2054,9 @@ function wireSettingsOverlay(ov) {
                 if (factory) _ddcsSettings.macros = JSON.parse(JSON.stringify(factory));
             }
 
-            setActivePostId('auto');   // t658 — the CONTROLLER dropdown IS the working controller; the emit follows it (no separate post override)
             saveSettings();
             fill();
             applyHardwareTabs();
-            fillPostOptions();
             setMachine({ controllerId: profileSel.value }, false);   // t1217 — the controller is THIS machine's property (false: setActiveProfile already ran above)
             renderMachineLine();
         });
@@ -2198,15 +2168,13 @@ function wireSettingsOverlay(ov) {
     applyHardwareTabs();
 
     // Profile load (profileStore.applyProfile) calls this after switching the controller, to re-sync the
-    // CONTROLLER dropdown + post selector + hardware tabs to the loaded profile's controller.
-    window.ddcsRefreshControllerUI = () => { try { fillProfileOptions(); fillPostOptions(); applyHardwareTabs(); fill(); } catch (e) { /* */ } };
+    // CONTROLLER dropdown + hardware tabs to the loaded profile's controller.
+    window.ddcsRefreshControllerUI = () => { try { fillProfileOptions(); applyHardwareTabs(); fill(); } catch (e) { /* */ } };
 
     // --- Centralized "Pull from controller": read ALL machine data, then review each value (changed-vs-default)
     //     and tick what to apply. Everything pulled is PROFILE data — also settable by hand, saved via Export. ---
-    function activeDialect() {
-        const pid = getActivePostId();
-        return getDialect(pid && pid !== 'auto' ? pid : getActiveProfile().id);
-    }
+    // t2137 — no more override to consult; this workspace's machine profile IS the dialect.
+    function activeDialect() { return getDialect(getActiveProfile().id); }
     function upsertToolLength(a, num, len) {
         a.tools = a.tools || [];
         let rec = a.tools.find((t) => parseInt(t && t.num, 10) === num);
@@ -2220,7 +2188,6 @@ function wireSettingsOverlay(ov) {
         const vdb = window.ddcsStudio && window.ddcsStudio.variableDB;     // switch the #var list to the controller
         const ap = getActiveProfile(); if (ap && ap.varFamily && vdb) vdb.setControllerVars(ap.varFamily);
         fillProfileOptions();
-        fillPostOptions();   // refresh "Follow machine profile (…)" so the post/dialect matches the pulled controller
         const it = ov.querySelector('#io_input_table'); if (it) renderIoTable(it, 'input', getInputs(), syncIO);
         const ot = ov.querySelector('#io_output_table'); if (ot) renderIoTable(ot, 'output', getOutputs(), syncIO);
     }

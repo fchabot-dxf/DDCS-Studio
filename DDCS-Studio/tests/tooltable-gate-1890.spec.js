@@ -37,9 +37,12 @@ import { test, expect } from '@playwright/test';
  * `CAP_WHY.toolTable` entry is deleted; `CAP_FIELDS`/`data-cap="atc"` (still orphaned, but NOT this turn's call to
  * resolve) are left untouched.
  *
- * grbl is reached via the ACTIVE-POST override (`setActivePostId`, `wizards/dialects/index.js`) — a live,
- * user-reachable codegen target independent of the 4 selectable machine profiles (io-step-edge-dialect.spec.js's
- * own precedent) — not via `setActiveProfile` (grbl is not one of the 4 profiles in `controllerProfiles.js`).
+ * t2137 — grbl is reached via `__setDialectOverrideForTests` (`wizards/dialects/index.js`), an IN-MEMORY,
+ * TEST-ONLY dialect override — not via `setActiveProfile` (grbl is not one of the 4 real profiles in
+ * `controllerProfiles.js`, and is not meant to be: this turn retired the user-facing, localStorage-persisted
+ * post override that used to make grbl reachable from a real gesture — [[one-workspace-one-machine]] — this
+ * helper exists solely so postGating's own dialect-capability branching can still be exercised for the
+ * registered dialects that have no controller-profile counterpart, without reviving anything a user can reach).
  */
 
 const EXPERT = 'ddcs-expert-m350';
@@ -50,8 +53,8 @@ async function fieldUnder(page, { profileId, postId, opType, param }) {
     return page.evaluate(async ({ profileId, postId, opType, param }) => {
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         setActiveProfile(profileId);
-        const { setActivePostId } = await import('/wizards/dialects/index.js');
-        setActivePostId(postId || 'auto');
+        const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js');
+        __setDialectOverrideForTests(postId || null);
         window.ddcsEditWizardDef(opType);
         await new Promise((resolve, reject) => {
             const t0 = Date.now();
@@ -118,8 +121,8 @@ test('the vacuity trap: atcTable\'s includePockets (the atc-governed sibling) st
     const r = await page.evaluate(async () => {
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         setActiveProfile('ddcs-expert-m350');
-        const { setActivePostId } = await import('/wizards/dialects/index.js');
-        setActivePostId('grbl');
+        const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js');
+        __setDialectOverrideForTests('grbl');
         window.ddcsEditWizardDef('user_atc_table_data');
         await new Promise((resolve, reject) => {
             const t0 = Date.now();
@@ -146,8 +149,8 @@ test('atcWarmup has ZERO toolTable dependency — its fields stay live under grb
     const r = await page.evaluate(async () => {
         const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         setActiveProfile('ddcs-expert-m350');
-        const { setActivePostId } = await import('/wizards/dialects/index.js');
-        setActivePostId('grbl');
+        const { __setDialectOverrideForTests } = await import('/wizards/dialects/index.js');
+        __setDialectOverrideForTests('grbl');
         window.ddcsEditWizardDef('user_atc_warmup_data');
         await new Promise((r2) => setTimeout(r2, 400));
         const rpm1 = document.querySelector('[data-param="rpm1"]');

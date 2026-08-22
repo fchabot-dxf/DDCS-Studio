@@ -64,7 +64,7 @@ test('CROSS-DIALECT: user_atc_test_data == atcTestStack for EVERY registered dia
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcTestStack } = await import('/wizards/atcTestWizard.js');
-        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');   // t2137 — in-memory, test-only (see dialects/index.js)
         registerUserOp(atcTestDataDef());
         const build = builderOf('user_atc_test_data');
         const magazine = [{ tool: 1, x: 100, y: 40, z: -20 }, { tool: 2, x: 112, y: 45, z: -21 }];
@@ -74,7 +74,7 @@ test('CROSS-DIALECT: user_atc_test_data == atcTestStack for EVERY registered dia
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null, combos = 0;
         for (const dialectId of dialects) {
-            setActivePostId(dialectId);
+            __setDialectOverrideForTests(dialectId);
             for (const p of reps) {
                 combos++;
                 const twin = emitMapped(build(p)).text;
@@ -82,7 +82,7 @@ test('CROSS-DIALECT: user_atc_test_data == atcTestStack for EVERY registered dia
                 if (twin !== builtin) { diffs++; if (!first) first = { dialectId, p, twin: twin.slice(0, 400), builtin: builtin.slice(0, 400) }; }
             }
         }
-        setActivePostId('auto');
+        __setDialectOverrideForTests(null);
         return { diffs, first, combos, dialectCount: dialects.length };
     });
     if (r.first) console.log('ATC-TEST XDIALECT DIFF ' + JSON.stringify(r.first));

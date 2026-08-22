@@ -16,8 +16,10 @@ test('E1: the twin emit == atcTableStack byte-diff ZERO across toggles × table 
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { atcTableStack } = await import('/wizards/atcTableWizard.js');
         // t1900 — atcTableWizard.js also reads the dialect at build time (getDialect, :48/:61); widened from the
-        // 2-profile sweep to the full registry via setActivePostId (reaches grbl/centroid/rs274ngc/grblhal too).
-        const { setActivePostId, listPosts } = await import('/wizards/dialects/index.js');
+        // 2-profile sweep to the full registry via the dialect override (reaches grbl/centroid/rs274ngc/grblhal
+        // too). t2137 — that live override is retired; __setDialectOverrideForTests is the in-memory, test-only
+        // replacement (see dialects/index.js) — unreachable from any real UI.
+        const { __setDialectOverrideForTests, listPosts } = await import('/wizards/dialects/index.js');
         registerUserOp(atcTableDataDef());
         const build = builderOf('user_atc_table_data');
         const mkTools = (n) => Array.from({ length: n }, (_, i) => ({ num: i + 1, length: 40 + i * 3, name: 'T' + (i + 1) }));
@@ -25,7 +27,7 @@ test('E1: the twin emit == atcTableStack byte-diff ZERO across toggles × table 
         const dialects = listPosts().map((p) => p.id);
         let diffs = 0, first = null, combos = 0;
         for (const dialectId of dialects) {
-            setActivePostId(dialectId);
+            __setDialectOverrideForTests(dialectId);
             for (const nt of [0, 1, 5]) for (const np of [0, 3, 8]) for (const iL of [true, false]) for (const iP of [true, false]) {
                 combos++;
                 const tools = mkTools(nt), magazine = mkMag(np);
@@ -35,7 +37,7 @@ test('E1: the twin emit == atcTableStack byte-diff ZERO across toggles × table 
                 if (twin !== builtin) { diffs++; if (!first) { const tl = twin.split('\n'), bl = builtin.split('\n'); let i = 0; while (i < tl.length && tl[i] === bl[i]) i++; first = { dialectId, nt, np, iL, iP, line: i, twin: tl.slice(i, i + 3), builtin: bl.slice(i, i + 3) }; } }
             }
         }
-        setActivePostId('auto');
+        __setDialectOverrideForTests(null);
         return { diffs, first, combos, dialectCount: dialects.length };
     });
     if (r.first) console.log('ATC-TABLE E1 DIFF ' + JSON.stringify(r.first));

@@ -6,7 +6,7 @@
  * (the on-disk kind id stays `ddcs.macro` for back-compat). `.nc` is exported separately, on demand, for the
  * controller (terminal/lossy — not re-imported). (Was `macroFile.js` — a saved Studio program is not a controller macro.)
  */
-import { getActivePostId } from '../wizards/dialects/index.js';
+import { getDialect } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { serializeOpEdits, restoreOpEdits } from './opEdits.js';   // declared block-edits ride with the program so they survive reload
 import { confirmDestructiveLoad } from './saveStates.js';   // t1938 — ONE guard here beats one at each of loadProject's own 4 UI callers
@@ -23,7 +23,7 @@ export function serializeProject(name) {
     return {
         kind: MACRO_KIND, v: MACRO_VERSION,
         name: name || 'macro',
-        post: getActivePostId(),          // active post override or 'auto'
+        post: getDialect(profileId).id,   // t2137 — the RESOLVED dialect (no more override; was 'auto'/an override id)
         profile: profileId,               // machine profile at save time (informational)
         stock: settings.stock || null,
         stack,

@@ -54,8 +54,9 @@ import { fileURLToPath } from 'node:url';
  *
  * ── STABILITY ────────────────────────────────────────────────────────────────────────────────────────────────────
  * Emit is a pure function of (stack, dialect) here — default params, a fixed dialect object, no localStorage, no
- * active-post override (getActivePostId() reads the empty node store → 'auto', so `getDialect(id)` is exactly the id
- * asked for). Nothing on this path uses Date/Math.random/locale (the same grep that clears the other node goldens).
+ * ambient dialect state at all (t2137 retired the old active-post override entirely; `getDialect(id)` is a plain
+ * lookup with no ambient state to begin with). Nothing on this path uses Date/Math.random/locale (the same grep
+ * that clears the other node goldens).
  * CRLF: the compare splits on /\r?\n/ so a fixture checked out CRLF on Windows / LF on CI matches the always-LF fresh
  * render — a comparison of CONTENT, not line endings.
  */

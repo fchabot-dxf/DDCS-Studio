@@ -31,6 +31,18 @@ export function getDialect(profileId) {
     return DIALECTS[profileId] || DEFAULT_DIALECT;
 }
 
+// t2137 — TEST-ONLY dialect override, IN-MEMORY, never persisted. Distinct on purpose from the retired
+// ddcs_active_post localStorage override this turn removes: that one was reachable from a real user gesture,
+// survived opening a different workspace, and did not travel with the machine — the exact "one fact, two
+// homes" hazard this turn closes. This one is reachable ONLY by importing this module directly (no UI wires
+// to it, nothing persists it, a fresh page load always starts clear) — used solely so a spec can sweep every
+// REGISTERED dialect (centroid/rs274ngc/grblhal/grbl have no controller-profile counterpart in
+// shared/js/profiles/controllerProfiles.js, so there is no other way to drive resolveActivePost's real
+// call sites — opSession.js/programModel.js/opGlow.js/the wizard stacks' own local getDialect() helpers —
+// through them) without reviving a mechanism a real user could ever reach.
+let _testDialectOverride = null;
+export function __setDialectOverrideForTests(id) { _testDialectOverride = (id && DIALECTS[id]) ? id : null; }
+
 // ── Controller CAPABILITIES (not just G-code forms) ───────────────────────────────────────────────────────
 // "Dialect" is more than per-line text: controllers differ in what they can DO, which drives how wizards
 // COMPOSE a program and which form fields/wizards make sense. Each dialect module declares its own `caps`
@@ -66,34 +78,41 @@ export function getCaps(id) { return { ...DEFAULT_CAPS, ...((DIALECTS[id] && DIA
 export function resolveActiveCaps(profileId) { return getCaps(resolveActivePost(profileId).id); }
 
 // ── Post processor selection ────────────────────────────────────────────────
-// A "post processor" IS a dialect, surfaced as a user-facing, live codegen target.
-// The active machine PROFILE picks a default post; the user can override it here so the
-// emitted code (esp. the Blocks/codeblocks view) renders for another controller — e.g.
-// generate grbl/LinuxCNC G-code from a DDCS bench. Selection persists in localStorage.
+// A "post processor" IS a dialect. t2137 (human ruling, 2026-08-22) — "they are the same thing from a user
+// point of view and the override is not wanted... i dont want it, id just make a second workspace": the
+// emitted code ALWAYS follows this workspace's ONE machine ([[one-workspace-one-machine]]); there is no
+// separate user-facing post picker any more (settingsPanel.js's old `set_post` selector + headerPost.js's
+// dead post-switch handler are retired with it). Generating for a DIFFERENT controller is a different
+// machine, hence a different workspace.
 
 // Hardware-verified posts (the controllers we own/test). The rest are dump-derived =
 // simulator/reference until proven on hardware (see each dialect's `notes`).
 const POST_VERIFIED = new Set(['ddcs-expert-m350', 'ddcs-v41']);
-const ACTIVE_POST_KEY = 'ddcs_active_post';
 
-/** All posts for a picker: [{ id, name, verified }]. */
+/** All registered dialects: [{ id, name, verified }]. Read-only registry enumeration (tests / diagnostics) —
+ *  distinct from the retired SELECTOR: this never decided what's active, only what EXISTS. */
 export function listPosts() {
     return Object.values(DIALECTS).map((d) => ({ id: d.id, name: d.name, verified: POST_VERIFIED.has(d.id) }));
 }
 export function isPostVerified(id) { return POST_VERIFIED.has(id); }
 
-/** Active post id, or 'auto' = follow the machine profile. Persisted; Node/file:// safe. */
-export function getActivePostId() {
-    try { return localStorage.getItem(ACTIVE_POST_KEY) || 'auto'; } catch (e) { return 'auto'; }
-}
-export function setActivePostId(id) {
-    const v = (id && DIALECTS[id]) ? id : 'auto';
-    try { localStorage.setItem(ACTIVE_POST_KEY, v); } catch (e) { /* private mode / file:// */ }
-    return v;
+/** The dialect to emit with: this workspace's machine profile — always, no override. (Test-only escape
+ *  hatch above, __setDialectOverrideForTests, is the one exception, and it can never be reached from the app.) */
+export function resolveActivePost(profileId) {
+    if (_testDialectOverride) return DIALECTS[_testDialectOverride];
+    return getDialect(profileId);
 }
 
-/** The dialect to emit with: explicit post override if set, else the machine profile's post. */
-export function resolveActivePost(profileId) {
-    const id = getActivePostId();
-    return (id !== 'auto' && DIALECTS[id]) ? DIALECTS[id] : getDialect(profileId);
+// t2137 MIGRATION — a browser that had PINNED a post override before this release is, right now, silently
+// emitting for the wrong controller (the override is gone; every call site falls through to the workspace
+// profile, which may not be what was pinned). Read the legacy key ONCE, tell the user by name rather than
+// dropping it silently (an unannounced target-controller change is exactly the safety hazard this whole
+// turn exists to close), then remove it — never read again after the first call. Returns the retired
+// post's display name (for the boot-time notice), or null if there was nothing pinned to migrate.
+export function migratePinnedPostOverride() {
+    let pinned = null;
+    try { pinned = localStorage.getItem('ddcs_active_post'); } catch (_) { return null; }
+    if (!pinned || pinned === 'auto') { try { localStorage.removeItem('ddcs_active_post'); } catch (_) {} return null; }
+    try { localStorage.removeItem('ddcs_active_post'); } catch (_) { /* private mode / file:// */ }
+    return (DIALECTS[pinned] && DIALECTS[pinned].name) || pinned;
 }
