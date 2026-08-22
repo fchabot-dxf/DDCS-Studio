@@ -22,7 +22,7 @@
 import { restoreBackup, previewBackup, markWorkspaceSavedToFile, markItemsSavedToFile, forgetWorkspaceFile, workspaceDelta, changedItemsSince, changeLabel, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t1309 — the save-first modal names the programs too
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
 import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '../data/fsHandles.js';
-import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
+import { envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getAccount, connect, disconnect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
@@ -191,8 +191,8 @@ async function openWorkspaceObject(obj, fileName, label, { handle = null, place 
     if (!(await confirmDiscardBuffer(label || 'a workspace'))) return false;
     const t0 = Date.now();                          // t1257 — the window in which a re-seed counts as "settled"
     await restoreBackup(obj);                       // the WHOLE file, by construction — absent stores reset to default
-    // ORDER (t1225): the name is stamped BEFORE the save baseline, or the workspace is dirty the moment it is opened.
-    try { setMachineName(fileName); } catch (_) {}   // ONE-NAME RULE: a renamed file shows its OWN name everywhere
+    // t2145 — there is no machine-record name to stamp any more (BACKLOG F2): the workspace's name IS its file's
+    // name, and `markWorkspaceSavedToFile` below already records that independently — nothing else to keep in step.
     markWorkspaceSavedToFile(fileName, place);      // the buffer now IS this file, and we remember WHERE it lives
     try { await markItemsSavedToFile(); } catch (_) {}   // t1309 — …including the per-program baseline the file just became
     // …and then take the baseline AGAIN, because the open is not finished when restoreBackup returns. Adopting the

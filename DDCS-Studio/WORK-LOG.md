@@ -48314,3 +48314,144 @@ so the click then times out). Fixed by pointing all 4 at the real tab directly (
 by the combined role+F2 full-suite run — the cause is the role text, not the workspace-name change.
 
 🔨 turn 2145
+
+---
+
+# t2145 (tail) — BACKLOG F2: there is no workspace "name", only the file's name
+
+## The ruling and its blast radius, verified beyond the dispatched three
+
+Human ruling: *"we dont need a name just display the file name."* The dispatch named three readers
+(`headerPost.js:151`, `settingsPanel.js:505`, `profileStore.js:33`) as "verified" — a fresh sweep (grep every
+`getMachine().name` / `ap.name` across `web/`, not trusting the count, same discipline the advisor praised at
+t2143) found the REAL set is bigger: `headerPost.js` reads it in TWO places (the identity line AND the quick-menu
+button's title/aria-label, not just the one cited line), and `setupSheet.js:258` (the print-sheet subtitle) reads
+it too — a fourth reader the dispatch's own list missed entirely. `profileStore.js:33`
+(`buildProfile()`'s `name: machine.name || ''`) is confirmed genuinely separate — the dying, already-backlogged
+profile-library export format — and left untouched as scoped; its OWN write-side counterpart,
+`landImportedProfile()`'s `setMachine({ name: obj.name || … })`, now silently no-ops (the field it targets no
+longer exists) rather than crashing — a safe degradation of code already marked for death, not touched.
+
+**THE FIX**: `data/workspaceMachine.js`'s `getMachine()`/`setMachine()` no longer carry a `name` field at all;
+`setMachineName()` (and `window.ddcsSetMachineName`) are DELETED outright, not deprecated — every one of its 4
+call sites (`workspaceManager.js` ×1, `workspaceSave.js` ×3) already ran `markWorkspaceSavedToFile()` at the
+same save/open moment, which independently keeps `data/backup.js`'s `fileSavedName()` current, so removing the
+sync call loses nothing (and REMOVES a documented ordering hazard along with its cause — `workspaceSave.js`'s
+comments about "the name must be stamped before the bytes are built, or the file carries the previous name"
+described a race that literally cannot happen any more, since there's no second field left to race).
+
+**DECLARED ONCE, not four ways**: `data/backup.js` gained `fileSavedStem()` (the last-saved file's name minus
+`.ddcs`) — every one of the 4 fixed display readers, plus 2 pre-existing call sites that were separately
+reinventing the same `.replace(/\.ddcs$/i, '')` strip (`settingsPanel.js`'s `duplicateForController`,
+`workspaceSave.js`'s private `stemOf`), now read the one function. Every display surface shows "Not saved"
+(BACKLOG's own explicit wording) when the workspace has never been saved to a file — the localStorage-is-a-buffer
+principle made visible, not a fake title.
+
+## The two open questions the dispatch raised
+
+**"Locate where the workspace list is RENDERED"** — `settingsPanel.js`'s `workspaceFiles` (declared :193,
+persisted :430) is a DIFFERENT array entirely (the Macros tab's user-added-controller-files list, t664 E3), not
+the `.ddcs` workspace picker; the dispatch's own search premise pointed at the wrong array. The REAL workspace
+picker — `ui/workspaceManager.js`'s card list (`~:245-684`) — was ALREADY reading the file's own name
+(`f.name.replace(/\.ddcs$/i, '')`), never the machine record, so it needed no fix; stated here so the next
+sweep doesn't re-search for a renderer that was never broken.
+
+**The "menu absence-lock" ROADMAP's stale seat-B line referenced** — grepped the whole repo for any literal
+code concept named "absence-lock" or any gate conditioned on `!ap.name`/`!getMachine().name`: zero hits. The
+line comes from a plan track ("SEAT B … window never yet opened") that was never actually built. **Reporting
+it no longer exists**, per the dispatch's own escape clause, rather than inventing a lock to satisfy the note.
+
+## ⭐⭐ THE BIG FIND — `.name` was ALSO a functional Drive-folder KEY, not just a display string
+
+The full-suite run (not the targeted sweep) surfaced 12 failures the grep-based readers above never would have
+caught, because they read the SAME field for a completely different reason: `ui/gateway/views/status.js` and
+`send.js` call `readGatewayHeartbeat((getMachine() || {}).name)` and `submitJobToDrive(name, nc, hash,
+(getMachine() || {}).name)` — the machine-record `.name` was ALSO the Drive folder key
+(`<root>/<machine name>/gateway/…`) that (a) a phone CLIENT reads to check whether its gateway is alive
+(t2112, the whole reason Status was rebuilt to work from a phone) and (b) a client's SEND actually routes a
+job by. Confirmed via `driveJobs.js`'s `inboxFolder()`: with no machine name it doesn't misroute silently, it
+**throws** — so removing `.name` outright would have UNCONDITIONALLY broken send-via-Drive for every user,
+not degraded it. This was not in the dispatch's three-reader list and would not have been caught by targeted
+testing of the display surfaces alone — only the full-suite run found it, which is why the dispatch's own
+"run the FULL suite, don't trust a narrow gate" caution mattered here specifically.
+
+**The fix generalises cleanly, it isn't a workaround**: the Drive folder is keyed on "this machine's name",
+and under BACKLOG's own ruling that IS the workspace's file name now — so `status.js`/`send.js` (3 call sites)
+now pass `fileSavedStem()` too, same as every display reader. The real-world assumption this depends on (the
+user saves their workspace file under the same name they gave the gateway in Console → "Machine name") is a
+reasonable one and was already implicit in the pre-existing test fixture (`status-remote-machine-2112.spec.js`
+seeded BOTH the machine record's `.name` AND the mocked gateway's `machine_name` as the identical string
+`'Ultimate Bee'` — the test itself assumed they'd match).
+
+## Non-vacuity + gate
+
+No new spec for the field deletion itself (nothing to prove fails-then-passes the way a new guard would).
+Verified by running the FULL existing regression around every touched surface and fixing every assertion the
+field removal broke, rather than loosening any of them — three passes, widening each time a fuller gate found
+more:
+- `workspace-roundtrip.spec.js` — the FULL-record assertion (deliberately exhaustive, "the next field added has
+  to be stated here too") updated to drop `name` — the first field this assertion has LOST rather than gained.
+- `workspace-save-open-1225.spec.js` — 2 settle-barriers and 2 "did the name take" assertions switched from
+  `(await ddcsGetMachine()).name` to `ddcsFileSavedName()`/`ddcsFileSavedStem()`; the "ONE NAME" test's premise
+  is now stronger, not weaker (documented why) — there is no second field left that COULD go stale.
+- `controller-file-tree.spec.js`, `profile-cloud-library.spec.js` (×2), `lathe-model-1267.spec.js`,
+  `workspace-manager-truth-1231.spec.js`, `header-profile-menu.spec.js` — a `.name`-based probe/marker swapped
+  for a still-meaningful field (`controllerId`, `envX`, `fileSavedName()`) already present in the same test.
+- `status-remote-machine-2112.spec.js` — the fixture now stamps `fileSavedName` instead of the removed field,
+  matching the real Drive-heartbeat source above.
+- `import-safety-1219.spec.js` (3 tests) + `workspace-user-files.spec.js` — these exercise
+  `data/profileStore.js`, the DYING profile-library export/import path (out of scope per the dispatch, and
+  untouched) — but its OWN `.name` plumbing (`buildProfile`'s read, `landImportedProfile`'s write) now silently
+  no-ops once the field it targets is gone, so its tests needed the same swap-to-`controllerId` treatment as
+  everywhere else, even though the source file itself was never edited.
+- `workspace-cloud-tab-1233.spec.js`, `workspace-manager-1223.spec.js` (×2, incl. the `#set_identity_band`
+  test — a 5th reader the dispatch's list missed, `settingsPanel.js:renderIdentityBand`) — same pattern.
+- `send-gate-wiring-1585.spec.js`, `send-beacon-warning-2057.spec.js`, `send-history-real-path-2065.spec.js`,
+  `validation-divzero-not-syntax-1603.spec.js` — an UNRELATED collision from the ROLE work (t2145's other
+  half): these all click `page.getByText('GATEWAY', {exact:false}).first()` to open the Gateway tab, which
+  now ALSO matches the identity line's new lowercase "gateway" role text (Playwright text matching is
+  case-insensitive by default) — sometimes grabbing the wrong, hidden element. Re-pointed at the real tab via
+  `.tab[data-app="gateway"]` in all 4 files; a locator collision, not a role-text wording problem, so the role
+  display itself is unchanged.
+- 7 more test files carry now-inert `setMachine({ name: … })` setup calls that were never asserted on — left
+  as-is (harmless, out of scope for a surgical diff).
+
+**Three full Playwright suite runs total this turn** (role-only, role+F2, role+F2+the Drive-heartbeat fix),
+each time diagnosing every NEW name in the failure list rather than assuming it was noise:
+- Run 1 (role derivation only): 6 pre-existing failures, all previously confirmed via bisection in t2143/t2143-tail.
+- Run 2 (+ F2): 18 failed — the 5 pre-existing + 12 real F2 regressions (the Drive-heartbeat break + assorted
+  test assertions) + the GATEWAY-locator collision, all diagnosed and fixed as above.
+- Run 3 (final, after every fix above): **7 failed** — `header-profile-menu`, `pane-sizer-1353`,
+  `send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603` (all 5 the SAME
+  pre-existing failures, confirmed identical to t2143's own bisection — the baseline has not drifted), plus
+  `palette-by-role-1623.spec.js` and `passes-field-1613.spec.js` — both re-ran clean in isolation (the same
+  `!!window.__blkws` Blocks-boot timeout pattern that appears throughout this session's flaky lists on
+  completely unrelated files — parallel-worker contention, not a regression). **2645 passed** (up from 2637 on
+  run 2), confirming the fix count, not just the failure count, moved the right way.
+
+Node tier: 227/227 (stable across all runs). Smoke tier: 75/75.
+
+## Files
+- `DDCS-Studio/web/data/workspaceMachine.js` — `name` removed from `getMachine()`/`setMachine()`;
+  `setMachineName()`/`window.ddcsSetMachineName` deleted.
+- `DDCS-Studio/web/data/backup.js` — new `fileSavedStem()`.
+- `DDCS-Studio/web/ui/headerPost.js` — both `ap.name` reads (identity line, button title/aria-label) now read
+  `fileSavedStem()`.
+- `DDCS-Studio/web/ui/settingsPanel.js` — the auto-save toast, `duplicateForController`'s base name, AND
+  `renderIdentityBand()` (the 5th reader) all read `fileSavedStem()` now; `fileSavedName` import replaced.
+- `DDCS-Studio/web/ui/setupSheet.js` — the print-sheet subtitle's name reads `fileSavedStem()` now (the 4th
+  reader, not in the dispatch's original list).
+- `DDCS-Studio/web/ui/workspaceManager.js`, `DDCS-Studio/web/ui/workspaceSave.js` — the 4 `setMachineName()`
+  call sites + their now-obsolete ordering comments removed; the now-unused import dropped from each.
+- `DDCS-Studio/web/ui/gateway/views/status.js`, `DDCS-Studio/web/ui/gateway/views/send.js` — **the functional
+  fix**: all 4 `readGatewayHeartbeat`/`submitJobToDrive` call sites that used `getMachine().name` as the Drive
+  folder key now use `fileSavedStem()` instead — this is what actually keeps BYO-cloud send/heartbeat working.
+- `DDCS-Studio/tests/workspace-roundtrip.spec.js`, `workspace-save-open-1225.spec.js`,
+  `controller-file-tree.spec.js`, `profile-cloud-library.spec.js`, `lathe-model-1267.spec.js`,
+  `workspace-manager-truth-1231.spec.js`, `header-profile-menu.spec.js`, `status-remote-machine-2112.spec.js`,
+  `import-safety-1219.spec.js`, `workspace-user-files.spec.js`, `workspace-cloud-tab-1233.spec.js`,
+  `workspace-manager-1223.spec.js`, `send-gate-wiring-1585.spec.js`, `send-beacon-warning-2057.spec.js`,
+  `send-history-real-path-2065.spec.js`, `validation-divzero-not-syntax-1603.spec.js` — `.name`-based
+  assertions/markers/locators updated to the new source, per file as detailed above.
+
+🔨 turn 2145

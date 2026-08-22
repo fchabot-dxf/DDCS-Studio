@@ -24,6 +24,7 @@ import { estimateProgram, secondsForLines, fmtDuration } from '../engine/timeEst
 import { checkEnvelope, placementDeclared } from '../engine/envelopeCheck.js';
 import { wcsOffsetAt } from '../viz/sceneFrame.js';
 import { getMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record (the profile library is retired)
+import { fileSavedStem } from '../data/backup.js';   // t2145 — the workspace's name is its last-saved .ddcs file's name; no separate field
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { flipForSetup } from '../wizards/ops/transform.js';   // t879 — the two-sided FLIP declaration (per-setup page + instruction)
 import { flattenOps } from '../blocks/programModel.js';   // t1928 — the ONE declared enumeration: every real op, one level through a multi_step import wrapper
@@ -189,8 +190,10 @@ export function buildSheetHTML() {
     if (!est) { try { est = estimateProgram(prog, { rapidRate: machine.rapidRate || 6000, toolChangeSec: machine.toolChangeSec }); } catch (_) { est = null; } }
     let verdict = null;
     try { verdict = checkEnvelope(prog, S); } catch (_) { verdict = null; }
-    const ap = getMachine();   // t1217 — { name, controllerId } for THIS workspace
+    const ap = getMachine();   // t1217 — { controllerId, kind, … } for THIS workspace
     const ctrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
+    // t2145 (BACKLOG F2) — no separate machine-name field; the workspace's name is its last-saved .ddcs stem.
+    const apName = fileSavedStem();
     const jobName = (window.ddcsProjectName && window.ddcsProjectName()) || 'Untitled job';
     let dateStr; try { dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch (_) { dateStr = ''; }
 
@@ -255,7 +258,7 @@ export function buildSheetHTML() {
         + `</div>`;
 
     return `<div class="ss-title" contenteditable="true" spellcheck="false" title="Click to edit job name">${esc(jobName)}</div>`
-        + `<div class="ss-sub" contenteditable="true" spellcheck="false" title="Click to edit notes/details">${esc(dateStr)}${ap.name ? ' · ' + esc(ap.name) : ''}${ctrl ? ' · ' + esc(ctrl) : ''}</div>`
+        + `<div class="ss-sub" contenteditable="true" spellcheck="false" title="Click to edit notes/details">${esc(dateStr)} · ${esc(apName || 'Not saved')}${ctrl ? ' · ' + esc(ctrl) : ''}</div>`
         + `<section><h3>Stock</h3>${stockHTML}</section>`
         + `<section><h3>Work coordinate system</h3>${wcsHTML}</section>`
         + `<section><h3>Tools</h3>${toolsHTML}</section>`

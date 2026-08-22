@@ -5,7 +5,7 @@ import { el } from '../util.js';
 import { deriveStatus, deviceName } from '../../../shared/js/client.js';
 import { EXE_DOWNLOAD_URL } from '../../gatewayStatus.js';
 import { readGatewayHeartbeat, canSendViaDrive } from '../../cloud/driveJobs.js';   // t2112 - the machine's OWN report, when this device has no gateway
-import { getMachine } from '../../../data/workspaceMachine.js';
+import { fileSavedStem } from '../../../data/backup.js';   // t2101/t2145 - the Drive folder the gateway publishes under is keyed by the workspace's name — now the last-saved .ddcs file's name
 
 export default {
   id: 'status',
@@ -46,7 +46,7 @@ export default {
       if (!canSendViaDrive()) { this._hb = null; return; }
       if (Date.now() - this._hbAt < 30000) return;
       this._hbAt = Date.now();
-      try { this._hb = await readGatewayHeartbeat((getMachine() || {}).name); }
+      try { this._hb = await readGatewayHeartbeat(fileSavedStem()); }
       catch (_) { this._hb = { state: 'unreadable' }; }   // ignorance, not absence
     };
     ctx.root.append(this.conn, this.desc, this.vars);

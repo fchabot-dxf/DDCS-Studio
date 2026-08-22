@@ -127,7 +127,8 @@ test('clicking a cloud row OPENS it — the whole file — and a later Save goes
         machine: window.ddcsGetMachine(), envX: window.ddcsGetSettings().machine.x,
         place: window.ddcsFileSavedPlace(), dirty: window.ddcsWorkspaceDirtyToFile(), handle: window.ddcsSaveHandleName(),
     }));
-    expect(after.machine.name, 'the workspace IS the opened file').toBe('bench-router');
+    // t2145 — no machine-record `.name` left to probe (BACKLOG F2); the settle-barrier above already proved
+    // "the workspace IS the opened file" via ddcsFileSavedName().
     expect(after.machine.controllerId, 'including its controller').toBe('ddcs-v41');
     expect(after.envX, 'and its envelope — the whole file').toBe(300);
     expect(after.place, 'and we remember it came from the cloud').toBe('cloud');

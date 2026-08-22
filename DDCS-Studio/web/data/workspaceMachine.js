@@ -5,14 +5,20 @@
  *
  * WHY THIS RECORD IS TINY: the machine's real configuration — the envelope, WCS table, motors, homing, macros, user
  * variables — ALREADY persists in `ddcs_studio_settings` / `ddcs_vars_persistent`, and each already rides a `.ddcs` as
- * its own declared BACKUP_STORES row. The only bytes it uniquely owns are the NAME and the CONTROLLER ID.
+ * its own declared BACKUP_STORES row. The only bytes it uniquely owns are the CONTROLLER ID (and kind/chuck/toolPost).
  *
  * THE CONTROLLER TRAVELS WITH THE FILE: opening/restoring a workspace ADOPTS the file's controllerId (user ruling) —
  * keeping the receiving browser's controller would contradict "the file is the machine".
  *
- * THE NAME IS THE FILENAME (t1223 ONE-NAME RULE): the workspace's name, its filename stem and what every surface
- * displays are ONE string. There is no separate machine-name field to drift from the file it lives in; renaming is
- * Save As. `setMachineName` exists so the save path can keep the record in step with the file it just wrote.
+ * t2145 (BACKLOG F2, human ruling 2026-08-22: "we dont need a name just display the file name") — THERE IS NO NAME
+ * FIELD HERE ANY MORE. t1223's "ONE-NAME RULE" comment used to live in this exact spot, describing a `name` field
+ * kept IN SYNC with the filename via `setMachineName` at every save/open — two homes for one fact, and the human
+ * ruled that even a synced copy is one too many: the ONLY name is `data/backup.js`'s `fileSavedName()` (the last
+ * `.ddcs` file actually saved/opened to), read directly wherever a workspace name is shown. A workspace never saved
+ * to a file has no name to show — display "Not saved", not a fake title (the localStorage-is-a-buffer principle,
+ * made visible instead of implied). `setMachineName`/`window.ddcsSetMachineName` are DELETED, not deprecated: every
+ * call site already ran `markWorkspaceSavedToFile` at the same save/open moment, which independently keeps
+ * `fileSavedName()` current — removing the sync call loses nothing.
  *
  * t1223 LEGACY PURGE ([[no-legacy-burden]]): the profile-library migration, the one-time machine-config exports
  * (`machineConfigFile` / `legacyMachineConfigs` / `dropLegacyProfile`) and `migrateProfileLibrary` are GONE, along with
@@ -43,13 +49,14 @@ const cleanKind = (k) => (MACHINE_KINDS.includes(k) ? k : DEFAULT_KIND);
 const cleanChuck = (c) => (['spindle', 'axis'].includes(c) ? c : 'spindle');
 const cleanPost = (p) => (['front', 'top'].includes(p) ? p : 'front');
 
-/** THE machine record for this workspace: { name, controllerId, kind }. Never null — an un-named workspace is legal (''). */
+/** THE machine record for this workspace: { controllerId, kind, chuck, toolPost }. Never null. No `name` field
+ * (t2145) — the workspace's name is its FILE's name; read `fileSavedName()` (data/backup.js) instead. */
 export function getMachine() {
     const m = readJSON(MACHINE_KEY);
     if (m && typeof m === 'object') {
-        return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind), chuck: cleanChuck(m.chuck), toolPost: cleanPost(m.toolPost) };
+        return { controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind), chuck: cleanChuck(m.chuck), toolPost: cleanPost(m.toolPost) };
     }
-    return { name: '', controllerId: liveControllerId(), kind: DEFAULT_KIND };   // derived, NOT written — writing on read would mask a real save
+    return { controllerId: liveControllerId(), kind: DEFAULT_KIND };   // derived, NOT written — writing on read would mask a real save
 }
 
 /** Is this workspace a lathe? The one question every surface asks; nobody re-derives it from anything else. */
@@ -101,9 +108,8 @@ export const toolPostSide = (m = getMachine()) => (TOOL_POSTS.includes(m && m.to
 export function setMachine(next, applyController = true, opts = {}) {
     const cur = getMachine();
     const rec = {
-        name: String((next && next.name) != null ? next.name : cur.name),
         controllerId: (next && next.controllerId) || cur.controllerId,
-        // t1267 — the kind rides with the record, so it travels in the .ddcs like the name and the controller do
+        // t1267 — the kind rides with the record, so it travels in the .ddcs like the controller does
         // ([[one-workspace-one-machine]]: the file IS the machine, and what kind of machine is part of that).
         kind: cleanKind((next && next.kind) || cur.kind),
         chuck: cleanChuck((next && next.chuck) || cur.chuck),
@@ -122,16 +128,6 @@ export function setMachine(next, applyController = true, opts = {}) {
     }
     try { window.dispatchEvent(new CustomEvent('ddcs:machine-changed', { detail: { ...rec, restoring: !!(opts && opts.restoring) } })); } catch (_) {}
     return rec;
-}
-
-/**
- * ONE-NAME RULE (t1223): set the workspace's name from the FILE it was saved to / opened from. Takes a filename and
- * keeps the stem, so `Rig B.ddcs` and `Rig B` are the same name — the file on disk and the name on screen cannot
- * disagree. Never touches the controller.
- */
-export function setMachineName(fileName) {
-    const stem = String(fileName || '').split(/[\\/]/).pop().replace(/\.ddcs$/i, '');
-    return setMachine({ name: stem }, false);
 }
 
 /**
@@ -159,5 +155,4 @@ if (typeof window !== 'undefined') {
     window.ddcsIsLathe = isLathe;   // t1281 — the 3D reads the KIND to pick a turner's camera; the record is the one source
     window.ddcsToolPost = toolPostSide;   // t1321 — where the tool comes from; the 3D asks, the emit never does
     window.ddcsSetMachine = setMachine;
-    window.ddcsSetMachineName = setMachineName;
 }

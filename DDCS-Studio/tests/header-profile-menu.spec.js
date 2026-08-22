@@ -20,7 +20,9 @@ const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.w
 // program AS A WHOLE, never mid-edit. Clear alone stayed out (t1255) — the editor's own toolbar owns it now.
 const seedProfile = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
-    await page.evaluate(() => { window.ddcsSetMachine({ name: 'Rig B' }, false); });
+    // t2145 — the identity line's name is the last-SAVED .ddcs file's name (BACKLOG F2), not a machine-record
+    // field; stamp that directly rather than a name nothing reads any more.
+    await page.evaluate(() => { window.ddcsMarkWorkspaceSaved('Rig B.ddcs'); });
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
@@ -76,7 +78,7 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     expect(m.hasIdentity, 'the identity line').toBe(true);
     expect(m.identityIsButton, 'it is NOT a button any more — its click served the retired profile world').toBe(false);
     expect(m.identityAboveWs, 'it sits directly above Save / Open (save context)').toBe(true);
-    expect(m.identityName, 'identity shows the WORKSPACE name (t1217 — from the machine record)').toMatch(/Rig B/);
+    expect(m.identityName, 'identity shows the WORKSPACE name (t2145 — the last-saved .ddcs file\'s name)').toMatch(/Rig B/);
     // t1249 (user) — and the line SAYS what it describes, in the disk tooltip's wording
     expect(m.identityLabel, 'the line is labelled, so the name has a subject').toMatch(/^Workspace:/);
     expect(m.identityCtrl, 'and the dialect after it').toMatch(/·/);

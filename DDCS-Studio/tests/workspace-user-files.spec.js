@@ -102,5 +102,8 @@ test('baseline files are IMMUTABLE (Revert-to-default, never rename/delete); an 
     expect(imported.body, 'and their bodies').toBe('G0 Y2');
     // FULL SWAP, not a merge — this workspace's own user file is GONE, because it now IS the imported machine
     expect(imported.files, 'the previous machine\'s user file did NOT survive the import (a swap, not a blend)').not.toContain('mine.nc');
-    expect(imported.machine.name, 'and the workspace identifies as the imported machine').toBe('Imported');
+    // t2145 — no machine-record `.name` left to probe (BACKLOG F2; `landImportedProfile`'s name-setting is now a
+    // silent no-op, out of this turn's scope — profileStore.js is the dying profile library). controllerId is
+    // the surviving identity claim.
+    expect(imported.machine.controllerId, 'and the workspace identifies as the imported machine').toBe('ddcs-v41');
 });

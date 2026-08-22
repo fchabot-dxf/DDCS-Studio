@@ -382,6 +382,15 @@ export function fileSavedName() {
     try { return localStorage.getItem(SAVED_NAME_KEY) || null; } catch (_) { return null; }
 }
 
+/** t2145 (BACKLOG F2) — the last saved .ddcs file's STEM (no extension) — what "the workspace name" now means on
+ * every display surface (identity line, Settings toast, setup sheet, …), one place, so a `.ddcs` never leaks
+ * into a reader's face as "Rig B.ddcs" where they expect "Rig B". null when never saved (same contract as
+ * `fileSavedName`, which every caller here used to derive this stem separately before this was declared once). */
+export function fileSavedStem() {
+    const n = fileSavedName();
+    return n ? n.replace(/\.ddcs$/i, '') : null;
+}
+
 /** First-run baseline: adopt the current (seeded / restored) state as clean so the indicator only lights up on a real
  *  user CHANGE, not on boot's idempotent re-seed writes. No-op once a watermark exists. */
 export function ensureWorkspaceWatermark() {

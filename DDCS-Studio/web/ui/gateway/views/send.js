@@ -8,7 +8,7 @@ import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
 import { GcodeExecutionEngine } from '../../../engine/GcodeExecutionEngine.js';   // t1585 — the send gate reads the FILE, with the same parser the sim runs
 import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
-import { getMachine } from '../../../data/workspaceMachine.js';   // t2101 - the workspace's machine NAME is the Drive folder the gateway publishes under
+import { fileSavedStem } from '../../../data/backup.js';   // t2101/t2145 - the Drive folder the gateway publishes under is keyed by the workspace's name — now the last-saved .ddcs file's name
 import { createPreviewPanel } from '../../../viz/createPreviewPanel.js';
 import { submitJobToDrive, canSendViaDrive, readGatewayHeartbeat } from '../../cloud/driveJobs.js';   // t2080 — the CLIENT transport: no gateway on this device, so the job goes to the Drive inbox the machine's gateway polls
 import { normaliseGcode } from '../../../data/portingArc.js';   // t2020 — REUSED, not reimplemented: the V4.1 oracle's own strip-CRLF/drop-blank-comment/collapse-whitespace normaliser, so a job's content hash agrees on the SAME program regardless of line-ending or spacing noise
@@ -142,7 +142,7 @@ export default {
         let _hb = null;
         if (!this._gatewayReachable && canSendViaDrive()) {
           try {
-            _hb = await readGatewayHeartbeat((getMachine() || {}).name);
+            _hb = await readGatewayHeartbeat(fileSavedStem());
             if (_hb.state === 'fresh' && _hb.hb && _hb.hb.controller_profile_id) {
               const cmp = compareController(_hb.hb.controller_profile_id);
               if (!cmp.match) {
@@ -304,7 +304,7 @@ export default {
           r = await ctx.client.submitJob(name, nc, map, contentHash);
         } else {
           if (!canSendViaDrive()) throw new Error('No gateway on this PC, and no Google account connected — sign in (top right) to send through your Drive.');
-          r = await submitJobToDrive(name, file.text, contentHash, (getMachine() || {}).name);   // the ORIGINAL program: no beacons on this path
+          r = await submitJobToDrive(name, file.text, contentHash, fileSavedStem());   // the ORIGINAL program: no beacons on this path
         }
         toast('Queued ' + r.jobId);
         sfx('job.sent');
@@ -362,7 +362,7 @@ export default {
       const now = Date.now();
       if (now - this._hbAt < HB_REFRESH_MS) return;
       this._hbAt = now;
-      readGatewayHeartbeat((getMachine() || {}).name)
+      readGatewayHeartbeat(fileSavedStem())
         .then((r) => {
           this._hbState = r && r.state;
           // t2105 - the heartbeat carries the gateway's OWN reachability probe, so a client can tell

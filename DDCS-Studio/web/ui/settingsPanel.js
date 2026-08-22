@@ -34,7 +34,7 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dial
 import { getMachine, setMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record; t1231 — the signed envelope summary
 import { compareController, mismatchStatement } from '../data/controllerMatch.js';   // t1229 A2 — the ONE controller comparison + its wording (shared with the gateway send)
 import { saveWorkspace } from './workspaceSave.js';   // t1229 — Duplicate = the existing Save-As-a-copy, no second mechanism
-import { fileSavedName } from '../data/backup.js';
+import { fileSavedStem } from '../data/backup.js';
 import { confirmSetupRow } from './setupChecklist.js';   // t1217 — a visit+confirm satisfies a checklist row even when the value is unchanged   // t684 b — the profile browser (save-as / browse)
 // t1223 — ui/backupModal.js is DELETED: it WAS the restore-selected store-picker, and opening a workspace is now
 // always the WHOLE file through the workspace manager. A partial restore produced a state that was neither the
@@ -501,8 +501,9 @@ function showSavedToast() {
         app.appendChild(t);
     }
     
-    let name = 'unnamed';
-    try { name = getMachine().name || 'unnamed'; } catch (e) { /* pre-migration boot — keep 'unnamed' */ }
+    // t2145 (BACKLOG F2) — no separate machine-name field any more; the workspace's name is its last-saved
+    // .ddcs file's name (fileSavedStem, data/backup.js already imported above).
+    const name = fileSavedStem() || 'Not saved';
 
     // The word SAVED is reserved strictly for a .ddcs FILE save (persistence-A principle: localStorage is a TEMPORARY
     // buffer). A settings write only auto-persists to localStorage → announce it honestly, never as "Saved".
@@ -2074,9 +2075,10 @@ function wireSettingsOverlay(ov) {
     // configuration (envelope, WCS, motors, macros, variables) already lives in the live stores that ride the .ddcs.
     // Retiring the switching machinery retires the stale-snapshot bug class it created: an active profile held a COPY of
     // settings the live stores also held, and every switch/create/delete had to re-sync that copy.
-    // t1223 ONE-NAME RULE — there is no machine-name INPUT any more. The workspace's name is its FILENAME, set by
-    // saving (Save As renames), and shown by the identity band + the header disk button + the workspace cards. A second
-    // place to type it could only ever disagree with the file it names.
+    // t2145 (BACKLOG F2, superseding t1223's ONE-NAME RULE) — there is no machine-name FIELD any more, input or
+    // otherwise. The workspace's name IS its FILENAME (fileSavedStem, data/backup.js), set by saving (Save As
+    // renames), and shown by the identity band + the header disk button + the workspace cards — ONE source, not
+    // a synced copy of it.
     //
     // (6) THE IDENTITY BAND — display only: what this workspace IS, at a glance, above every tab. Every value is read
     // from its own declared source, never re-typed here: the NAME from the file, the CONTROLLER from the machine
@@ -2092,7 +2094,9 @@ function wireSettingsOverlay(ov) {
         // the workspace manager's file panel, so the band and the rows cannot describe the same machine differently.
         const envSummary = envelopeSummary(_ddcsSettings.machine || {});
         const envTxt = envSummary ? envSummary + ' mm' : 'not set';
-        const named = (m.name || '').trim();
+        // t2145 (BACKLOG F2) — no separate machine-record name any more; the workspace's name is its last-saved
+        // .ddcs file's name (fileSavedStem).
+        const named = (fileSavedStem() || '').trim();
         band.innerHTML = named
             ? `<span class="si-name">${escHtml(named)}</span>`
             : '<span class="si-name">Untitled workspace</span><span class="si-unsaved">not saved yet</span>';
@@ -2548,7 +2552,7 @@ function wireSettingsOverlay(ov) {
      * @returns {Promise<boolean>} false if the user backed out of naming the copy
      */
     async function duplicateForController(detected) {
-        const base = (fileSavedName() || 'workspace').replace(/\.ddcs$/i, '');
+        const base = fileSavedStem() || 'workspace';
         const slug = String(detected.name || detected.id).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const r = await saveWorkspace({ pickNew: true, suggestedName: `${base}-${slug}.ddcs` });
         if (!r || !r.ok) return false;

@@ -252,13 +252,12 @@ test('SAVE AND CONTINUE writes exactly ONE file — the user\'s own, no second c
 test('the quick-menu identity line carries the SIGNED envelope, from the same one source', async ({ page }) => {
     await boot(page);
     await page.evaluate(() => {
-        window.ddcsSetMachine({ name: 'm350-shop', controllerId: 'ddcs-expert-m350' }, true);
+        window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true);
         const s = window.ddcsGetSettings(); Object.assign(s.machine, { x: 850, y: -850, z: -120 });
         window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
     });
     await page.locator('#hdrPostBtn').click();
     const line = page.locator('#hdrPostMenu .hq-identity-line');
-    await expect(line).toContainText('m350-shop');
     await expect(line).toContainText(/Expert M350/);
     await expect(line, 'the envelope as declared — signs AND axis letters (t1243), from the one formatter').toContainText('X 850 Y -850 Z -120');
     expect(await page.evaluate(() => document.querySelector('#hdrPostMenu .hq-identity-line').tagName), 'still plain text, still not a button').not.toBe('BUTTON');

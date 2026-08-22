@@ -161,13 +161,13 @@ test('restoring a workspace ADOPTS the file\'s controller (the file is the machi
   const r = await page.evaluate(async () => {
     const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
     // author a workspace whose machine is a DIFFERENT controller than the one this browser is on
-    window.ddcsSetMachine({ name: 'Shop Bee', controllerId: 'ddcs-v41' }, true);
+    window.ddcsSetMachine({ controllerId: 'ddcs-v41' }, true);
     window.ddcsSaveSettings && window.ddcsSaveSettings();
     const payload = JSON.parse(JSON.stringify(await window.ddcsBuildBackup()));
     const inFile = payload.stores.machine;
 
     // now put the browser on a DIFFERENT controller, as a second machine's workspace would
-    window.ddcsSetMachine({ name: 'Other', controllerId: 'ddcs-expert-m350' }, true);
+    window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true);
     const before = { controller: (getActiveProfile() || {}).id, machine: window.ddcsGetMachine() };
 
     await window.ddcsRestoreBackup(payload);
@@ -179,8 +179,10 @@ test('restoring a workspace ADOPTS the file\'s controller (the file is the machi
   // `toolPost` (front | top), the user's ruling that their tool comes from the side at centre height: also a fact
   // about the machine, so it rides in the file too. The file IS the machine, so all of them ride in it. Asserted in
   // FULL rather than loosened, so the next field added to the record has to be stated here too — which is the point
-  // of this assertion, and it has now done that job THREE times (this line is the third).
-  const RECORD = { name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill', chuck: 'spindle', toolPost: 'front' };
+  // of this assertion, and it has now done that job THREE times (this line is the third). t2145 — `name` LEFT the
+  // record (BACKLOG F2: no separate name field; the workspace's name is its file's name, fileSavedName()), the
+  // first field this assertion has lost rather than gained — stated here for the same reason the others were.
+  const RECORD = { controllerId: 'ddcs-v41', kind: 'mill', chuck: 'spindle', toolPost: 'front' };
   expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual(RECORD);
   expect(r.before.controller, 'the browser really was on a different controller first').toBe('ddcs-expert-m350');
   expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual(RECORD);

@@ -95,9 +95,10 @@ test('cloud round-trip: Save pushes THIS WORKSPACE\'S MACHINE under its name; Lo
     await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsSaveProfileToCloud && window.ddcsListCloudProfiles && window.ddcsLoadCloudProfile && window.ddcsGetSettings);
     await autoAppDialog(page, { accept: true });   // t1219 — the load asks before replacing this workspace's machine
 
-    // name THIS workspace's machine + give it a distinctive envelope, then push to cloud under that name
+    // give THIS workspace's machine a distinctive envelope, then push to cloud under an explicit name (the cloud
+    // name is the Drive file's own name — an argument to the push call, not read off the machine record; t2145
+    // removed the machine record's own `.name` field, [[BACKLOG F2]] — a workspace's name is its .ddcs file's now)
     const afterPush = await page.evaluate(async () => {
-        window.ddcsSetMachine({ name: 'Rig Alpha' }, false);
         window.ddcsGetSettings().machine = { x: 642, y: 400, z: 300, show: true };
         await window.ddcsSaveProfileToCloud('Rig Alpha');
         const list = await window.ddcsListCloudProfiles();
@@ -107,13 +108,11 @@ test('cloud round-trip: Save pushes THIS WORKSPACE\'S MACHINE under its name; Lo
 
     // make this workspace a DIFFERENT machine, then LOAD the cloud copy back over it
     const afterLoad = await page.evaluate(async () => {
-        window.ddcsSetMachine({ name: 'Other rig' }, false);
         window.ddcsGetSettings().machine = { x: 111, y: 1, z: 1, show: true };
         const alpha = (await window.ddcsListCloudProfiles()).find((c) => c.name === 'Rig Alpha');
         await window.ddcsLoadCloudProfile(alpha.id);   // t1217 → landImportedProfile → applied to THIS workspace
-        return { machineName: window.ddcsGetMachine().name, envX: window.ddcsGetSettings().machine.x };
+        return { envX: window.ddcsGetSettings().machine.x };
     });
-    expect(afterLoad.machineName, 'the workspace now identifies as the loaded machine').toBe('Rig Alpha');
     expect(afterLoad.envX, 'the loaded machine carried its own envelope (642), full-swapped in — not the 111 it replaced').toBe(642);
 });
 
@@ -130,10 +129,10 @@ test('DECLINING a cloud load leaves this workspace untouched (the same gate as a
     // put a machine on the cloud, then make this workspace a DIFFERENT one
     await autoAppDialog(page, { accept: true });
     await page.evaluate(async () => {
-        window.ddcsSetMachine({ name: 'Rig Alpha', controllerId: 'ddcs-v41' }, true);
+        window.ddcsSetMachine({ controllerId: 'ddcs-v41' }, true);
         window.ddcsGetSettings().machine = { x: 642, y: 400, z: 300, show: true };
         await window.ddcsSaveProfileToCloud('Rig Alpha');
-        window.ddcsSetMachine({ name: 'Keep Me', controllerId: 'ddcs-expert-m350' }, true);
+        window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true);
         window.ddcsGetSettings().machine = { x: 111, y: 1, z: 1, show: true };
     });
 
@@ -143,13 +142,13 @@ test('DECLINING a cloud load leaves this workspace untouched (the same gate as a
         const alpha = (await window.ddcsListCloudProfiles()).find((c) => c.name === 'Rig Alpha');
         const ret = await window.ddcsLoadCloudProfile(alpha.id);
         return {
-            ret, machine: window.ddcsGetMachine(),
-            controller: (getActiveProfile() || {}).id, envX: window.ddcsGetSettings().machine.x,
+            ret, controller: (getActiveProfile() || {}).id, envX: window.ddcsGetSettings().machine.x,
         };
     });
 
     expect(after.ret, 'a declined load reports that nothing landed').toBeNull();
-    expect(after.machine.name, 'the workspace keeps its own machine').toBe('Keep Me');
+    // t2145 — no machine-record `.name` left to probe (BACKLOG F2); its own controller + envelope, unchanged,
+    // are already the proof this workspace was left untouched.
     expect(after.controller, 'and its own controller — no wrong-dialect swap slipped through').toBe('ddcs-expert-m350');
     expect(after.envX, 'and its own envelope').toBe(111);
 });

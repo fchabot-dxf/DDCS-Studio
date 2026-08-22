@@ -54,7 +54,12 @@ const mountStatus = async (page, { hb, hasDaemon }) => {
     await routeDrive(page, hb);
     return page.evaluate(async ({ hasDaemon }) => {
         localStorage.setItem('ddcs_cloud_token', 'test-token');       // canSendViaDrive() reads this
-        localStorage.setItem('ddcs_machine', JSON.stringify({ name: 'Ultimate Bee', controllerId: 'ddcs-v41', kind: 'mill' }));
+        localStorage.setItem('ddcs_machine', JSON.stringify({ controllerId: 'ddcs-v41', kind: 'mill' }));
+        // t2145 — the Drive-heartbeat lookup key is the workspace's FILE name now (fileSavedStem, data/backup.js),
+        // not a machine-record field (BACKLOG F2 removed it). Stamp a save under the same name the mocked
+        // gateway reports as its own machine_name, matching the real workflow this feature depends on: the
+        // workspace file is named after the physical machine.
+        localStorage.setItem('ddcs_file_saved_name', 'Ultimate Bee.ddcs');
         window.__hbCalls = 0;
         const mod = await import('/ui/gateway/views/status.js');
         document.getElementById('test-status-root')?.remove();

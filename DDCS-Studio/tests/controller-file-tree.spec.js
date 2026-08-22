@@ -79,7 +79,6 @@ test('the tree renders the ACTIVE controller declaration: Expert wraps panels, V
 test('editing a plain file persists in the workspace (survives reload)', async ({ page }) => {
     await openMacros(page);
     await setController(page, 'ddcs-v41');
-    await page.evaluate(() => window.ddcsSetMachine({ name: 'Rig A' }, false));
     await page.waitForFunction(() => [...document.querySelectorAll('#macros_tree .settings-tab')].some((b) => /probe-fix\.nc/.test(b.textContent)));
     await page.evaluate(() => [...document.querySelectorAll('#macros_tree .settings-tab')].find((b) => /probe-fix\.nc/.test(b.textContent)).click());
     await page.waitForFunction(() => document.getElementById('macfile_body'));
@@ -96,6 +95,7 @@ test('editing a plain file persists in the workspace (survives reload)', async (
     await page.waitForFunction(() => document.getElementById('macfile_body'));
     expect(await page.evaluate(() => document.getElementById('macfile_body').value), 'the edit survives reload (stored in the workspace)').toBe('G0 X1 ( A EDIT )');
 
-    // …and the machine record survived the reload with it (the workspace still identifies as Rig A)
-    expect(await page.evaluate(() => window.ddcsGetMachine().name), 'the machine name persists across the reload').toBe('Rig A');
+    // …and the machine record survived the reload with it (the workspace still targets ddcs-v41). t2145 — no
+    // more machine-record `.name` field to probe with; the controller it was set to is the persistence check now.
+    expect(await page.evaluate(() => window.ddcsGetMachine().controllerId), 'the machine record persists across the reload').toBe('ddcs-v41');
 });

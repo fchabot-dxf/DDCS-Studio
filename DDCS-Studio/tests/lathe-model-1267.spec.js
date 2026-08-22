@@ -35,7 +35,7 @@ test('(1) THE KIND is on the machine record, defaults to mill, and ROUND-TRIPS t
         const B = await import('/data/backup.js');
         localStorage.removeItem(M.MACHINE_KEY);
         const fresh = M.getMachine();                       // never set → the default
-        M.setMachine({ name: 'Martin lathe', kind: 'lathe' }, false);
+        M.setMachine({ kind: 'lathe' }, false);
         const set = M.getMachine();
         const isLathe = M.isLathe();
         // …and it travels in the FILE: build a backup, wipe the record, restore it
@@ -54,14 +54,13 @@ test('(1) THE KIND is on the machine record, defaults to mill, and ROUND-TRIPS t
     expect(r.isLathe, 'and one question answers it everywhere').toBe(true);
     expect(r.wiped.kind, 'wiped back to the default before the restore, so the round trip proves something').toBe('mill');
     expect(r.restored.kind, 'THE KIND RODE THE .ddcs — the file IS the machine, including which kind it is').toBe('lathe');
-    expect(r.restored.name).toBe('Martin lathe');
     expect(r.afterNonsense.kind, 'an undeclared kind falls back to mill rather than being stored').toBe('mill');
 });
 
 test('(1b) THE IDENTITY SURFACES say Lathe — and say nothing extra for a mill', async ({ page }) => {
     await boot(page);
     // the quick-menu identity line
-    await page.evaluate(() => { window.ddcsSetMachine({ name: 'Rig L', kind: 'lathe' }, false); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); });
+    await page.evaluate(() => { window.ddcsSetMachine({ kind: 'lathe' }, false); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); });
     await page.click('#hdrPostBtn');
     await page.waitForSelector('#hdrPostMenu:not([hidden])');
     await expect(page.locator('.hq-identity-line'), 'the line names the kind').toContainText(/Lathe/);

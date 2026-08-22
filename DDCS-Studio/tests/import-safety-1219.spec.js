@@ -27,7 +27,7 @@ async function bootWithImportBridge(page) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetSettings && window.ddcsGetMachine && window.ddcsSetMachine);
     await page.evaluate((bundle) => {
-        window.ddcsSetMachine({ name: 'Mine', controllerId: 'ddcs-expert-m350' }, true);
+        window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true);
         window.ddcsGetSettings().machine = { x: 500, y: 400, z: -120, show: true };
         delete window.__ddcsSafetyExport;
         window.pywebview = { api: { loadProfile: async () => JSON.stringify(bundle) } };
@@ -53,7 +53,8 @@ test('a file import ASKS before it swaps, and DECLINING leaves the workspace exa
     const after = await liveState(page);
     const asked = await appDialogLog(page);
     expect(asked.join(' '), 'the user was asked, and told what the swap costs').toMatch(/REPLACES this workspace's machine/);
-    expect(after.machine.name, 'a declined import changes NOTHING about the machine').toBe('Mine');
+    // t2145 — no machine-record `.name` left to probe (BACKLOG F2 retired the field); its own controller +
+    // envelope, unchanged, are the proof a declined import changed nothing.
     expect(after.controller, 'nor the live controller').toBe('ddcs-expert-m350');
     expect(after.envX, 'nor the envelope').toBe(500);
     expect(after.safety, 'and it does not spam an undo export for a swap that never happened').toBeNull();
@@ -74,7 +75,10 @@ test('accepting lands the swap whole — and never downloads a file nobody asked
     const ask = page.locator('.wsm-3way');
     try { await ask.waitFor({ state: 'visible', timeout: 2500 }); await ask.locator('[data-w3="discard"]').click(); } catch (_) { /* clean buffer → no prompt */ }
     await run;
-    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'Imported Rig', null, { timeout: 8000 });
+    // t2145 — landImportedProfile's setMachine({ name: obj.name, … }) now silently no-ops (BACKLOG F2 removed the
+    // field it targeted; profileStore.js itself is untouched, out of scope — see WORK-LOG), so `.name` can never
+    // settle any more. controllerId is the settle signal now.
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).controllerId === 'ddcs-v41', null, { timeout: 8000 });
 
     const after = await liveState(page);
     expect(downloaded, 'the silent safety download is GONE — an unasked-for file is not consent').toBe(false);
@@ -84,32 +88,39 @@ test('accepting lands the swap whole — and never downloads a file nobody asked
     // toolPost (the lathe work), none of which the import is about. Stale by construction: any field ever added to a
     // machine fails it. What must be true is that the imported IDENTITY landed and nothing of the old machine
     // survived it, and both are still checked — the second one explicitly, so this cannot pass on a partial swap.
-    expect(after.machine, 'the workspace became the imported machine').toMatchObject({ name: 'Imported Rig', controllerId: 'ddcs-v41' });
+    // t2145 — `name` dropped from the expected match: buildProfile/landImportedProfile's name plumbing is dead
+    // (BACKLOG F2), so the bundle's controllerId is now the whole "did the identity land" claim.
+    expect(after.machine, 'the workspace became the imported machine').toMatchObject({ controllerId: 'ddcs-v41' });
     expect(JSON.stringify(after.machine), 'and nothing of the machine it replaced survived the swap').not.toMatch(/before|Bee|previous/i);
     expect(after.controller, 'including its LIVE controller — the emit follows the imported machine').toBe('ddcs-v41');
     expect(after.envX, 'and the envelope full-swapped in').toBe(642);
 });
 
 /**
- * ONE SOURCE for the exported identity. buildProfile used to stamp the NAME from the machine record but the
- * CONTROLLER from getActiveProfile() — two reads of "which machine is this" in one document, which is how an export
- * ends up labelled for the wrong dialect. A bundle's identity is exactly the thing that must not be assembled from two
- * sources, so this forces the two apart and pins that BOTH fields still come from the record.
+ * ONE SOURCE for the exported identity. buildProfile stamps the CONTROLLER from the machine record, never from
+ * getActiveProfile() — two reads of "which machine is this" in one document is how an export ends up labelled
+ * for the wrong dialect. This forces the two apart and pins that the controller comes from the record.
+ *
+ * t2145 (BACKLOG F2) — the ORIGINAL version of this test also pinned a `name` field the SAME way (the bundle's
+ * name came from the machine record too, not getActiveProfile()). That half is now moot: `buildProfile()`'s
+ * `name: machine.name || ''` reads a field `getMachine()` no longer carries at all (dead, not fixed —
+ * `profileStore.js` is the dying, already-backlogged profile-library export format, explicitly out of this
+ * turn's scope), so the bundle's `name` is permanently `''` regardless of what "the record's name" would even
+ * mean now. Nothing left to test on that half; the controller-identity half this test was ALSO guarding stands.
  */
-test('an exported bundle takes its whole identity from the machine record (never a second source)', async ({ page }) => {
+test('an exported bundle takes its controller identity from the machine record (never a second source)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsGetMachine);
     const r = await page.evaluate(async () => {
         const store = await import('/data/profileStore.js');
         const { setActiveProfile, getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
-        window.ddcsSetMachine({ name: 'Bee', controllerId: 'ddcs-v41' }, false);
+        window.ddcsSetMachine({ controllerId: 'ddcs-v41' }, false);
         setActiveProfile('ddcs-expert-m350');   // force the divergence the restore fix makes unreachable via the UI
         const b = store.buildProfile();
-        return { bundle: { name: b.name, controllerId: b.controllerId }, live: (getActiveProfile() || {}).id };
+        return { bundleControllerId: b.controllerId, live: (getActiveProfile() || {}).id };
     });
     expect(r.live, 'the live controller really was the other one').toBe('ddcs-expert-m350');
-    expect(r.bundle, 'the bundle carries the RECORD\'s name AND controller — not a mix of two sources')
-        .toEqual({ name: 'Bee', controllerId: 'ddcs-v41' });
+    expect(r.bundleControllerId, 'the bundle carries the RECORD\'s controller — not getActiveProfile()').toBe('ddcs-v41');
 });
 
 /**

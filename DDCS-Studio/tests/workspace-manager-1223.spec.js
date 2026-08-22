@@ -160,7 +160,7 @@ test('DISCARD opens the WHOLE file — every store, no picker', async ({ page })
         envX: window.ddcsGetSettings().machine.x,
         savedName: window.ddcsFileSavedName(),
     }));
-    expect(after.machine.name, 'the workspace IS the opened file').toBe('bench-router');
+    // t2145 — no machine-record `.name` left to probe (BACKLOG F2); `savedName` below is the one-name-rule proof now.
     expect(after.machine.controllerId, 'including its controller').toBe('ddcs-v41');
     expect(after.envX, 'and its envelope — the whole file, not a chosen subset').toBe(300);
     expect(after.savedName, 'one-name rule: the file it came from is its name').toBe('bench-router.ddcs');
@@ -171,7 +171,8 @@ test('DISCARD opens the WHOLE file — every store, no picker', async ({ page })
 
 test('Settings shows the IDENTITY BAND above the tabs (display only)', async ({ page }, testInfo) => {
     await boot(page);
-    await page.evaluate(() => window.ddcsSetMachine({ name: 'm350-shop', controllerId: 'ddcs-expert-m350' }, true));
+    // t2145 — the identity band's name reads fileSavedStem() now (BACKLOG F2), not a machine-record field.
+    await page.evaluate(() => { window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true); window.ddcsMarkWorkspaceSaved('m350-shop.ddcs'); });
     await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
     const band = page.locator('#set_identity_band');
     await expect(band).toBeVisible();
