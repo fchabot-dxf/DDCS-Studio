@@ -679,10 +679,14 @@ layout question outright. `✎ Corner (data) · ≈ 28 s` becomes just the op's 
 three labelled chips do not, so a row above the code stays viable at any program length, and the wizard
 icons are already a designed per-op set (`ui/wizIcons.js`).
 
-⚠ Then the icon carries the whole identity, so it has to be legible at its render size and distinguishable
-op-from-op — ⭐ **the same 14px legibility constraint as the lathe icon work**, and the same trap: a set that
-reads fine enlarged and blurs into one shape at size. A tooltip/`aria-label` restores the name for anyone who
-needs it, but the icon must do the work unaided.
+The icons are the SAME per-op marks the wizard menu already uses (`ui/wizIcons.js`) — so the mark beside
+`Corner` in the menu is the mark on the chip above the corner probe's G-code. One vocabulary, two places.
+
+⚠ Note the bar is higher on a chip than in the menu: there the icon sits BESIDE its label and only has to
+support recognition; alone it has to carry it. ⭐ **Human ruling: ship it anyway** — *"its fine, we would
+redesign the icon if its hard to discern."* Do NOT gate the chips on an icon audit; let real use name which
+marks fail, then redesign only those. (Contrast the lathe set, which got a full review before anyone had a
+complaint.) Keep a tooltip / `aria-label` so the name is always recoverable.
 
 ⚠ Also check whether the `≈ 28 s` estimate belongs on this chip at all — it is a different fact (cycle time)
 riding on a navigation control.
