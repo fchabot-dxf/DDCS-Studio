@@ -554,3 +554,51 @@ last save"*, not *"did the USER change anything"*. Any normalising read, boot ba
 rewrite moves the signature. ⭐ And because it is one opaque hash it can only ever say "something differs",
 never WHAT — so the prompt cannot show what to review even if it wanted to. **A confirmation that fires
 when there is nothing to confirm teaches you to click through confirmations.**
+
+---
+
+## NO INDENTATION, EVER — remove the toggle AND every path that writes one
+*(human, 2026-08-22: "i dont want it, no indentation ever" · "remove the toggle")*
+
+⛔ Studio must never generate or insert leading whitespace in G-code. Flush left, always, no preference.
+
+⚠ **Why this is not cosmetic.** `blockEmitter.js:531-535`: *"`  N50` throws a syntax error, `N50` parses;
+indented STATEMENTS are fine, labels are NOT"* — a dialect declaring `flushIndent` already forces flush
+**regardless of the user's setting**. So the machine-correctness case is handled by the dialect; this
+setting only ever governed the cosmetic case, and its DEFAULT was `indented` — i.e. Studio shipped G-code
+with leading spaces by default, on a controller family where one column rule is a syntax error.
+
+### Everything to remove — the toggle is only the visible half
+| what | where |
+|---|---|
+| the settings row + persisted key | `ui/settingsPanel.js:437` |
+| the emit branch | `blocks/blockEmitter.js:535`, `wizards/previewEmit.js`, `data/indentStyle.js` |
+| ⚠ **the Tab keybinding** | `ui/editorTextOps.js:76` — **still live** |
+| the menu entry + its wiring | `ui/editorTextOps.js:96, :102` (`"⇥ Indent (N spaces)"`) |
+
+⭐ **THE BUTTONS WERE ALREADY REMOVED AND THE FUNCTION WAS LEFT BEHIND.** `indentEditor` has **0 external
+callers** — but `editorTextOps.js:76` still indents on **Tab**. The door was removed, the room stayed.
+⚠ Same pattern as `profileModal.js` (retired July, still on disk with 0 refs). This is exactly what the
+*"no legacy burden — delete rather than maintain"* ruling exists to prevent: an ask to remove a CONTROL gets
+read as "hide the control", not "remove the capability", because nothing forces the question *"what else
+still calls this?"*
+
+⛔ **DO NOT delete `indentStyle.js` wholesale** — `COMMENT_MARK` / `commentBlock` / `commentEditor` live in
+the same module and MUST survive. Only the indent half goes.
+
+---
+
+## COMMENT TOGGLE — a caret-follows button, not a toolbar item
+*(human, 2026-08-22: "comment should be a different kind of ui button… id want a button to appear only when
+the caret is in the editor, and button should appear at the end of the line")*
+
+Comment/uncomment stays (it survives the indent removal above), but it stops being a toolbar button and
+becomes contextual:
+
+- **Appears only when the caret is IN the editor** — not present otherwise.
+- **Positioned at the END OF THE CURRENT LINE**, following the caret's line as it moves.
+
+⚠ Worth thinking through before building: what it does with a multi-line selection (follow the last line?
+the first?), how it behaves on a very long line that is already scrolled off to the right, and whether it
+should hide while typing and reappear on idle. ⭐ The appeal is that it puts the action where the user is
+already looking instead of making them travel to a toolbar — same instinct as the sound-preview ▶ button.
