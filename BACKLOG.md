@@ -651,10 +651,35 @@ still calls this?"*
 ⚠ The ONE thing to not take with it: `indentStyle.js` happens to hold **two unrelated features** — the indent
 code AND `COMMENT_MARK` / `commentBlock` (the comment toggle, which SURVIVES and becomes the caret-following
 button). That is a filing accident: both were once "editor text operations".
+### ⛔ NO "INDENT" ANYWHERE — INCLUDING FILENAMES
+*(human, 2026-08-22: "what i want is indent mentions gone even in filenames")*
+
+**21 files** contain the word; **3 carry it in the filename**:
+
+| file | fate |
+|---|---|
+| `web/data/indentStyle.js` | strip the indent half, RENAME (see below) |
+| `tests/editor-indent-1450.spec.js` | the feature is gone ⇒ delete the spec |
+| `verification/t2095_indent_diag.mjs` | a diagnostic for a removed feature ⇒ delete |
+
+⚠ Sweep all 21 for stale prose too, not just code — `blockEmitter.js`, `settingsPanel.js`, `index.html`,
+`styles.css`, `editorTextOps.js`, `releaseNotes.js`, `opToSlot.js`, `editorOpHover.js`, `opContextMenu.js`,
+`headerPost.js`. ⛔ **Except `vendor/blockly/blockly.min.js`** — third-party, never edit.
+⭐ Historical WORK-LOG entries stay: they RECORD that indentation existed, which is different from the app
+still mentioning it.
+
 ⭐ **FIX: RENAME THE MODULE** *(human, 2026-08-22: "its a semantic problem, rename the module")* — the file
 is named after the half being deleted. Once the indent code is gone it holds only comment logic, so it
-becomes e.g. `data/commentStyle.js` (or folds into `editorTextOps`). Simpler than moving code out, same
-result, and it removes a filename that documents a feature that no longer exists.
+holds only `COMMENT_MARK` + a `commentBlock` text helper.
+
+⚠ **Do NOT name it after "comment"** — `commentBlock` ALREADY means two different things: this text-surgery
+helper, and a G-code comment OP at `wizards/ops/comment.js:6`. A comment-named file makes that collision
+worse.
+⭐ **Simplest: fold both survivors into `ui/editorTextOps.js` and DELETE `data/indentStyle.js`.** That file
+already imports and re-exports both at `:23`, so the module would otherwise be two exports whose only
+consumer is a near-identically-named file. No new name needed, one less indirection.
+(If a standalone module is preferred instead, `data/editorText.js` — named for what it does, string surgery
+on the editor buffer, not for the one feature left in it.)
 
 ---
 
