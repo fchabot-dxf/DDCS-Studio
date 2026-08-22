@@ -47984,3 +47984,111 @@ isolation with `--workers=1`, confirmed pre-existing parallel-worker contention,
 
 🔨 turn 2139
 
+---
+
+# t2141 — MACHINE-SAFETY: camN.nc bypassed both DDCS-syntax guards; fixed at the slotMacro boundary
+
+## What broke
+
+CAM slot macros (`camN.nc`, what a real controller actually loads) are built by the generator arms
+(`data/opToSlot.js`/`data/millToSlot.js`, `surfaceRasterLines` among them) as G-code TEXT directly — never
+through `emitMapped`. So NEITHER of t2070's/t2139's DDCS-syntax guards (inline-`IF…THEN` skip, unconditional
+flush-left) ever ran on a CAM macro. Both are bench-confirmed hard syntax errors on the DDCS Expert. VERIFIED BY
+RUNNING IT, not inferred: `surfaceRasterLines({})` alone emits 28 indented lines (6 of them indented N-labels)
+and 2 inline `IF … THEN var=val` lines. The human has never loaded a Studio-built CAM pack onto a real
+controller, so this shipped un-caught — this is why the dispatch was flagged MACHINE-SAFETY, not a style gap.
+
+## The fix
+
+`applyDdcsSyntaxGuards(T, dialect)` now runs at ONE boundary: `data/slotPack.js`'s `slotMacro`, on the FULLY
+COMPOSED body (after `composeParts` has already joined every part), on the way out — never per-part, because
+the clamp-skip's own label allocator scans for the current max `N<n>` and mints strictly above it; running it
+per-part would let two independently-processed parts mint the identical label, which the controller loads
+without complaint and then jumps to the wrong place — a wrong-cut bug, strictly worse than a refused file.
+
+**Extracted to a dependency-free leaf, not imported from `blockEmitter.js`.** The first cut imported the two
+passes straight from `blockEmitter.js` (safe by the existing `exposeClassifier.js`/`stackToSlot.js` precedent —
+no import cycle) but MEASURED, not assumed, to corrupt an unrelated `GcodeExecutionEngine` trace: a corner-probe
+CAM-slot sim test's first Y-probe segment collapsed to near-zero displacement even though the macro TEXT was
+proven byte-identical via `diff`. Bisected to `blockEmitter.js`'s own `wizards/ops/index.js` dependency (the
+full 50+-file BLOCKS registry) — importing THAT alone into `slotPack.js` reproduced the exact bug; root cause
+not chased to one specific file in the registry, not needed to fix it. Fix: extracted both passes into a new
+zero-import leaf, `data/gcodeSyntaxGuards.js`, matching this project's own `data/rotateProgram.js` precedent.
+
+**One export, not two.** The clamp-then-flush ORDER is itself a fact worth protecting (flush must run last
+because the clamp rewrite inserts new lines that also need flushing) — exporting the passes separately would
+copy that ordering fact into every caller, and a caller that ever got it backwards would ship a re-indented
+clamp-skip label with nobody the wiser. `gcodeSyntaxGuards.js` exports one function, `applyDdcsSyntaxGuards`,
+with the order baked in; `applyInlineClampSkip`/`flushLeft` are now private. `blockEmitter.js` and
+`slotPack.js`'s new `applyMachineSyntaxGuards` text↔token adapter both call the one entry point.
+
+**`slotMacro` defaults its dialect param to a literal DDCS gate** (`DDCS_GATE = { flushIndent: true }`), not a
+resolved active-post lookup — `camN.nc` is DDCS-only by definition (the file's own header docstring), and
+`slotPack.js` documents itself as staying "LIGHT" (no dialect-resolution import). The 4 call sites in
+`ui/macrosApp.js` pass no dialect arg at all now.
+
+**`hasReads`/`hasEnd` read the RAW body, not guard-transformed text.** These check what the CAM generator
+author originally wrote (does the body already declare mirror reads; does it already end on a terminator) —
+`slotMacro` computes them off the untransformed `body`, then applies the guard once to the FINAL joined
+head+reads+body+fallback text on the way out.
+
+**Word-operator gap, found while widening this to real CAM-generator text for the first time.** The inline-THEN
+regex only ever matched SYMBOLIC comparison operators (`>`, `==`, …); DDCS accepts word forms too (`GT`, `LT`,
+`GE`, `LE`, `EQ`, `NE`), and the hand-written CAM generator source uses them extensively (measured: the
+symbol-only regex caught 2 of 23 real inline-THEN lines across the twelve generator arms, silently passing the
+other 21 through unrewritten — including plain conditional assignments like `IF #1 EQ 2 THEN #90=0-1`, not just
+depth/row clamps). `CLAMP_RE`/`CLAMP_INV` extended to cover both forms; the rewritten inverse is emitted in the
+SAME form as the source (word stays word, symbol stays symbol) since these are hand-written DDCS text bodies,
+not emitter output — a symbolic inverse spliced into word-operator text would itself be a new syntax error.
+
+**Idempotent by construction, confirmed not assumed.** The universal CAM arm's body is already
+`emitMapped`-treated before it ever reaches `slotMacro`, so it passes through the guard a second time — this is
+required to be a byte-identical no-op. True by construction: neither internal pass matches its own rewritten
+output (a clamp-skip's rewritten line no longer has a `THEN`, so it can't re-match `CLAMP_RE`; flushing
+already-flush text is a no-op).
+
+## Non-vacuity
+
+`tests/cam-slot-syntax-guards-2141.spec.js` (4 tests): a composed multi-part CAM pack (rect-pocket +
+packed-slot, both `surfaceRasterLines`-based) asserts zero indented lines, zero inline-THEN, and every N-label
+unique; a single-part slot (composition is not the only path); a **probe arm** (`cornerSlot()` — word-operator
+corner-select clamps, not a mill loop — added per review: the inline-THEN defect hits all twelve generator arms
+including every probe, not just the two mill arms the first draft covered); a non-DDCS dialect (grbl accepts
+inline THEN, so it's correctly left alone, but flush still applies unconditionally per t2139). All 4 proven
+non-vacuous by stubbing `applyDdcsSyntaxGuards` to a no-op and confirming all 4 fail with the predicted symptom
+(e.g. "Expected: 0, Received: 37" on the flush assertion); restored, confirmed green.
+
+Also verified directly against the numbers found during investigation: `surfaceRasterLines({})` alone, through
+`slotMacro`, goes from 28 indented / 6 indented N-labels / 2 inline-THEN to 0 / 0 / 0.
+
+## Gate
+
+Targeted: `cam-slot-syntax-guards-2141.spec.js` (4/4), `cam-slot-sim.spec.js` (17/17, incl. the corner-probe
+test that exposed the import-graph regression during investigation — reconfirmed clean on the final leaf-module
+shape), `dialect-emit-golden-2072.test.mjs` (5/5). Node tier via `npm run test:node` (the project's declared
+loader-registered runner — an ad hoc `node file.test.mjs` loop mid-turn gave false-positive `ERR_MODULE_NOT_FOUND`/
+`document is not defined` failures from skipping the import-map/jsdom registration; not a real regression,
+noted so the next seat doesn't re-trip it): 227/227. Smoke tier (`test:smoke`): 75/75. Lint clean on every
+touched file.
+
+## Files
+- `DDCS-Studio/web/data/gcodeSyntaxGuards.js` — **new**, dependency-free leaf; one export
+  `applyDdcsSyntaxGuards(T, dialect)`, internally `applyInlineClampSkip` then `flushLeft` (both private, order
+  baked in); `CLAMP_RE`/`CLAMP_INV` widened to word-form operators.
+- `DDCS-Studio/web/blocks/blockEmitter.js` — imports the one merged function; the two former local passes and
+  their separate call sites collapsed into a single `applyDdcsSyntaxGuards(T, dialect)` call, same position.
+- `DDCS-Studio/web/data/slotPack.js` — new `DDCS_GATE` const + `applyMachineSyntaxGuards` text↔token adapter;
+  `slotMacro(slot, dialect = DDCS_GATE)` restructured so `hasReads`/`hasEnd` read the raw body and the guard
+  applies once to the final joined return text.
+- `DDCS-Studio/web/ui/macrosApp.js` — 4 `slotPack.slotMacro(...)` call sites take no dialect arg (the default
+  now carries it); the pre-existing `activeDialectOpts` import stays — still live for the unrelated homing
+  sysstart emit at line 641.
+- `DDCS-Studio/tests/cam-slot-syntax-guards-2141.spec.js` — **new**, 4 tests (composed pack, single-part,
+  probe arm, non-DDCS dialect).
+- `DDCS-Studio/tests/node/architecture-map-1698.test.mjs` — the `slotMacro` TRAP4 citation updated for the new
+  `(slot, dialect = DDCS_GATE)` signature.
+- `ARCHITECTURE.md` — the t2141 TRAP4 sections (post-passes list and the t2139-correction note) rewritten to
+  match the final merged-function/leaf-module/default-gate shape, not the first-cut two-function-import one.
+
+🔨 turn 2141
+

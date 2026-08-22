@@ -29,6 +29,7 @@ import { placeShiftFromParams } from '../wizards/ops/placement.js';
 import { translateProgram, rotateProgram, mirrorProgram, relativizeProgram } from '../data/rotateProgram.js';
 import { programRotation, flipForSetup } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY}); t879 — the two-sided per-setup FLIP
 import { serialBump, serialInline, glyphLibrary } from '../wizards/serialEngrave.js';   // t764 — {SN} dynamic serial: bump + per-digit dispatch + the shared glyph library
+import { applyDdcsSyntaxGuards } from '../data/gcodeSyntaxGuards.js';   // t2141 — a dependency-free leaf (see its own header for why: importing these FROM here dragged the whole ops registry into an unrelated caller)
 
 let _seq = 0;
 /** Fresh block record from a registry type, seeded with that primitive's defaults. */
@@ -520,16 +521,13 @@ export function emitMapped(blocks, settings = {}) {
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
-    applyInlineClampSkip(T, dialect);     // t2070 — DDCS rejects inline `IF x>y THEN x=y`; rewrite to an IF..GOTO-skip
-    // t2139 — NO INDENTATION, EVER (human ruling — BACKLOG.md "NO INDENTATION, EVER"): every emitted line is
-    // flush-left, unconditionally — no setting, no per-dialect branch. Applied at the ONE boundary, LAST,
-    // deliberately: every pass above reads and rewrites line TEXT (the modal-feed fold matches `F…`, cap-gating
-    // comments lines out, oword balancing looks for `o<n>`, the clamp-skip inserts its own `N<L>`), and any of
-    // them could be perturbed by leading whitespace appearing or vanishing underneath it. Running last means the
-    // whole pipeline sees exactly the bytes it always saw and only the final rendering differs. (`dialect.flushIndent`
-    // still exists and still matters — `applyInlineClampSkip` above reads it as its own "DDCS-family strict
-    // syntax" gate — this pass no longer needs it: every dialect gets flush now, not just the ones that require it.)
-    for (const t of T) if (t && typeof t.line === 'string') t.line = t.line.replace(/^[ \t]+/, '');
+    // t2070/t2139 — the two DDCS-syntax guards (inline-IF..THEN skip, then the unconditional flush-left strip —
+    // see gcodeSyntaxGuards.js for why they're ONE call with the order baked in). Applied at the ONE boundary,
+    // LAST, deliberately: every pass above reads and rewrites line TEXT (the modal-feed fold matches `F…`,
+    // cap-gating comments lines out, oword balancing looks for `o<n>`, the clamp-skip inserts its own `N<L>`),
+    // and any of them could be perturbed by leading whitespace appearing or vanishing underneath it. Running
+    // last means the whole pipeline sees exactly the bytes it always saw and only the final rendering differs.
+    applyDdcsSyntaxGuards(T, dialect);
     const lines = T.map((t) => t.line);
     // t1375 — the ABSORBED range map, exposed rather than kept private: it is the emitter's own declaration of which
     // lines already carry the program rotation, so a caller (and the coherence spec) can read it instead of guessing.
@@ -539,33 +537,6 @@ export function emitMapped(blocks, settings = {}) {
     // here must give a program whose traced feeds are identical — which is exactly what feed-modal-1377 does.
     const feedFolds = []; T.forEach((t, i) => { if (t.foldedF != null) feedFolds.push({ line: i, f: t.foldedF }); });
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src), absorbed, feedFolds };
-}
-
-// t2070 — INLINE `IF <cond> THEN <var>=<val>` IS A HARD SYNTAX ERROR on the DDCS Expert (bench-confirmed 2026-08-17:
-// the Expert does `IF <cond> GOTO <label>` only, never a THEN-assignment). Looped ops (surfacing/pocket/holecycle/…)
-// emit these as depth/row CLAMPS (`IF #z > #depth THEN #z=#depth`, `IF #n < 1 THEN #n=1`), so every one errored on the
-// Expert. Rewrite each to the equivalent GOTO-skip: `IF <var> <INVERSE-op> <bound> GOTO<L>` / `<var>=<val>` / `N<L>`
-// (skip the assignment unless the clamp condition holds — provably the same result as the inline form). Runs after the
-// tool/flip passes (opRanges is spent) and before the flush; inserted lines inherit the clamp's own src so `map`/
-// `absorbed`/`feedFolds` stay aligned. Labels start ABOVE the program's own (base-91) labels so they never collide.
-const CLAMP_INV = { '>': '<=', '<': '>=', '>=': '<', '<=': '>', '==': '!=', '!=': '==' };
-const CLAMP_RE = /^(\s*)IF\s+(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+?)\s+THEN\s+(\S+?)\s*=\s*(.+?)(\s+\(.*\))?\s*$/;
-function applyInlineClampSkip(T, dialect) {
-    if (!dialect || !dialect.flushIndent) return;   // DDCS family only — other dialects accept the inline THEN form
-    let next = 90;                                   // the next free label: strictly above every N-label already present
-    for (const t of T) { const m = /(?:^|\s)N(\d+)\b/.exec(t.line || ''); if (m) next = Math.max(next, +m[1]); }
-    next += 1;
-    for (let i = 0; i < T.length; i++) {
-        const m = CLAMP_RE.exec(T[i].line || '');
-        if (!m) continue;
-        const [, indent, lhs, op, rhs, av, aval, comment] = m;
-        const inv = CLAMP_INV[op]; if (!inv) continue;
-        const L = next++;
-        T[i].line = `${indent}IF ${lhs} ${inv} ${rhs} GOTO${L}${comment || ''}`;   // guard: skip unless the clamp fires
-        const mk = (line) => ({ ...T[i], line });    // inherit src/anc so the line map stays 1:1
-        T.splice(i + 1, 0, mk(`${indent}${av}=${aval}`), mk(`${indent}N${L}`));
-        i += 2;
-    }
 }
 
 /** t726 P2b — find the DECLARED entry-point marker anywhere in the stack (a childless `entry` block). */

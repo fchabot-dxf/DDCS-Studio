@@ -13,6 +13,14 @@
  */
 
 import { fieldVarCollisions } from './camScratch.js';   // t1081 — the DECLARED generator scratch bands (inert data; camScratch imports nothing, so no cycle)
+// t2141 — REUSE, not a second copy: the generator arms (opToSlot.js/millToSlot.js) build G-code TEXT directly —
+// surfaceRasterLines' own output among it — bypassing emitMapped entirely, so neither of blockEmitter's two
+// DDCS-syntax passes ever ran on a CAM slot macro. Both are bench-confirmed hard syntax errors on the Expert
+// (t2070): a leading space before an N-label, and an inline `IF … THEN var=val`. Imported from the dedicated
+// LEAF module (not `blocks/blockEmitter.js` — MEASURED, not assumed: that import drags in the full 50+-file
+// ops registry, which corrupted an UNRELATED GcodeExecutionEngine trace of a hand-written CAM macro — see
+// `data/gcodeSyntaxGuards.js`'s own header for the bisection that found it), so slotPack.js stays LIGHT.
+import { applyDdcsSyntaxGuards } from './gcodeSyntaxGuards.js';
 
 const POOL_MIN = 1100, POOL_MAX = 1499, MIRROR = 1500;
 
@@ -70,9 +78,44 @@ export function slotEng(slot) {
     return (slot.fields || []).map((f) => engLine(f, slot.slot)).join('\n');
 }
 
+// t2141 — camN.nc is DDCS-only BY DEFINITION (this file's own header) — importing dialect RESOLUTION here
+// (wizards/dialects/index.js) would add a dependency slotPack.js does not otherwise need, just to re-derive a
+// fact already known: this path always wants the DDCS gate. A literal, not a lookup.
+const DDCS_GATE = { flushIndent: true };
+
+// t2141 — thin TEXT ⇄ TOKEN adapter so the CAM path can call the shared guard UNCHANGED. `applyDdcsSyntaxGuards`
+// reads/writes only `.line` on a token; any OTHER field a caller's token carries (an editor line-map anchor,
+// `.src`, …) is preserved for free by the clamp pass's own object spread when it inserts new lines — a bare
+// {line} token here carries nothing extra to lose, not a special CAM-only branch that drops something real.
+function applyMachineSyntaxGuards(text, dialect) {
+    const T = String(text == null ? '' : text).split('\n').map((line) => ({ line }));
+    applyDdcsSyntaxGuards(T, dialect);
+    return T.map((t) => t.line).join('\n');
+}
+
 /** The cam<slot>.nc text: a labelled mirror-read block (#var = #[idx+1500]) per field, then the
- *  author's body, then M99. The author references each field's `var` (default #1,#2,… in field order). */
-export function slotMacro(slot) {
+ *  author's body, then M99. The author references each field's `var` (default #1,#2,… in field order).
+ *
+ * t2141 — `dialect` defaults to `DDCS_GATE` (above) — every camN.nc is DDCS by definition, so a caller never
+ * needs to resolve or pass one; the parameter exists so a TEST can inject a different gate (e.g. to prove the
+ * guard is a no-op for a hypothetical non-DDCS macro) without this file importing dialect resolution for it.
+ *
+ * ⛔ THE GUARD RUNS ON THE FINAL ASSEMBLED TEXT (the `return` line below), NOT on `body` in isolation — `hasReads`
+ * and `hasEnd` must read the RAW, untransformed body: they are OWN checks on what the AUTHOR already wrote
+ * (does this body already declare its own mirror reads; does it already end on a terminator), and answering
+ * them off a body the guard has already rewritten risks silently changing what they see. Transforming only
+ * the FINAL joined text — after `head`/`reads`/`body`/the M99 fallback are all decided — keeps those two
+ * checks exactly as they always were.
+ *
+ * ⛔ AND THAT FINAL TEXT MUST ALREADY BE THE FULLY-COMPOSED PROGRAM — `slot.body` after `composeParts` has
+ * already joined every part, never before. `composeParts` uniquifies each part's OWN labels into a band above
+ * the previous part's max; the guard's own clamp-skip mints NEW labels the same way (scan the current max,
+ * allocate above it) — correct only when it sees the WHOLE joined body at once. Run it once per part instead
+ * and two independently-numbered parts can mint the identical label, which the controller loads without
+ * complaint and then jumps to the wrong place — a wrong-cut bug, strictly worse than a refused file. Every
+ * caller sets `slot.body` via `slotPack.composeParts` before calling `slotMacro`, so calling the guard exactly
+ * once, here, on the fully assembled return text, is what keeps this correct by construction. */
+export function slotMacro(slot, dialect = DDCS_GATE) {
     const fields = slot.fields || [];
     const head = [`( cam${num(slot.slot, 0)}.nc — ${esc(slot.name) || 'CAM slot ' + num(slot.slot, 0)} )`,
         '( form values are read live from the #2600+ mirrors — never edit camsetting )'];
@@ -85,7 +128,8 @@ export function slotMacro(slot) {
     // body-wide scan would see one and wrongly conclude the program already terminates — leaving a trailing FRAGMENT
     // part (slotFromOp, which ends at M5) with NO terminator at all. Only a terminator at the END ends the program.
     const hasEnd = /\b(M99|M30|M0?2)\b[^\n]*\s*$/.test(body);
-    return head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
+    const macro = head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
+    return applyMachineSyntaxGuards(macro, dialect);
 }
 
 // ── compose N parts into ONE executable program ─────────────────────────────────────────────────────────────

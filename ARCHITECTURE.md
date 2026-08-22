@@ -167,14 +167,31 @@ In the live app: `listEntries().filter(e => e.kind === 'builtin').map(e => [e.id
 | `container` / `path` | 422 / 436 | stamp at `def.points(p)` / sweep along `cd.step(params, pt)` |
 | leaf / move | **456** | `def.emit(p, dx, dy, dialect)` — e.g. `wizards/ops/move.js` |
 
-### Post-passes, in declared order (`blockEmitter.js:515-532`)
+### Post-passes, in declared order (`blockEmitter.js:516-533`)
 
-`applySetupFlips` :515 → `applyToolChanges` :516 → `applyEntryWaypoint` :517 → `applyProgramTransform` :518 →
-`applySerialLibrary` :519 → `applyModalFeed` :520 → `applyCapGating` :521 → `balanceOwords` :522 →
-`applyInlineClampSkip` :523 → **the unconditional flush-left strip** :532 (an inline `for`, not a named pass —
-t2139, "NO INDENTATION, EVER": the `indentStyle` setting/toggle/emit-branch is retired outright, so there is
-nothing left to declare — every line loses its leading whitespace, always, no settings check). Runs **last**
-because every pass above it matches line *text* — the reasoning is written at `blockEmitter.js:524-531`.
+`applySetupFlips` :516 → `applyToolChanges` :517 → `applyEntryWaypoint` :518 → `applyProgramTransform` :519 →
+`applySerialLibrary` :520 → `applyModalFeed` :521 → `applyCapGating` :522 → `balanceOwords` :523 →
+`applyDdcsSyntaxGuards` :530 (t2070/t2139, inline-IF..THEN skip then the unconditional flush-left strip — every
+line loses its leading whitespace, always, no settings check). Runs **last** because every pass above it matches
+line *text* — the reasoning is written at `blockEmitter.js:524-529`.
+
+⭐ **t2141 — extracted to a dependency-free leaf, one export, order baked in.** `data/gcodeSyntaxGuards.js`
+exports ONE function, `applyDdcsSyntaxGuards(T, dialect)` — internally the same two passes, in the same fixed
+order, but not separately exported, so no caller can apply them out of order (the clamp rewrite inserts new
+lines that also need flushing). `blockEmitter.js:32` imports it. The CAM slot-macro path (`data/slotPack.js`'s
+`slotMacro`) needed the SAME guard (its generator arms build G-code TEXT directly, bypassing `emitMapped`
+entirely, so it never ran on a CAM macro before this) — it applies the guard to the FINAL joined macro text via
+a small text↔token adapter (`applyMachineSyntaxGuards`), defaulting `dialect` to a literal DDCS gate
+(`{ flushIndent: true }`) so `slotPack.js` stays free of any dialect-resolution import, per its own "stays
+LIGHT" design (`slotPack.js:194-196`). The first cut imported the two passes straight from `blockEmitter.js`
+(safe by the existing `data/exposeClassifier.js`/`data/stackToSlot.js` precedent — no cycle) but that pulls in
+`blockEmitter.js`'s own `wizards/ops/index.js` dependency (the full 50+-file BLOCKS registry) — MEASURED, not
+assumed, to corrupt an unrelated `GcodeExecutionEngine` trace of a hand-written CAM macro. Neither pass has any
+real reason to depend on the op registry, so the fix was to stop routing through a file that does (following
+`data/rotateProgram.js`'s own precedent as a zero-import leaf), not to chase the exact registry file at fault.
+Also found while widening this to real CAM-generator text for the first time: the inline-THEN regex only ever
+matched SYMBOLIC comparison operators (`>`, `==`, …); DDCS accepts word forms too (`GT`, `EQ`, …) and the
+hand-written CAM generator source uses them extensively — `CLAMP_RE`/`CLAMP_INV` now cover both forms.
 
 `emitMapped` returns `{ text, lines, map, absorbed, feedFolds }` (`blockEmitter.js:536`). `absorbed` (:531) and
 `feedFolds` (:535) are **passes declaring what they did**, so their invariants can be measured rather than trusted.
@@ -589,6 +606,22 @@ unconditionally (`blockEmitter.js`'s final pass, see the post-passes list above)
 returns `{ dialect }` only, matching the three modules that were already right. `data/indentStyle.js` is
 deleted; its surviving comment/uncomment half moved to `ui/editorTextOps.js`.
 
+⚠ **CORRECTION (t2141) — "unconditionally" above was true for `emitMapped` only, and t2139 did not say so.**
+The CAM slot-macro path (`data/slotPack.js`'s `slotMacro`, feeding every `camN.nc` a pack exports) NEVER went
+through `emitMapped` at all — its generator arms (`opToSlot.js`/`millToSlot.js`) build G-code TEXT directly,
+`surfaceRasterLines`' own output among it, so NEITHER guard ever touched a CAM macro. VERIFIED BY RUNNING IT: a
+default rect-pocket CAM slot emitted 28 indented lines (6 of them indented N-labels) and 2 inline
+`IF … THEN var=val` lines — both bench-confirmed hard syntax errors on the DDCS Expert (t2070), and the human
+has never loaded a Studio-built CAM pack onto a controller, so this shipped un-caught. Closed in t2141:
+`applyDdcsSyntaxGuards` now runs once, at the `slotMacro` boundary, on the fully composed body (never per-part
+— its internal label allocator would mint colliding labels across parts otherwise, a wrong-cut bug strictly
+worse than a refused file). Also widened the inline-THEN regex to word-form comparisons (`GT`/`LT`/`EQ`/…), not
+just symbols — the wizard-op path never exercised that form, but the hand-written CAM generator text uses it
+throughout (measured: the symbol-only regex caught 2 of 23 real inline-THEN lines across the twelve generator
+arms and silently passed the other 21). Verified directly against `surfaceRasterLines({})`: 28/6/2 → 0/0/0.
+The "unconditionally" claim above is now actually true for every G-code surface Studio produces, not just the
+wizard-op one — including every probe arm (`data/probeToSlot.js`'s `cornerSlot` etc.), not only the mill arms.
+
 ### 5 · A legacy `corner` op has a live ✎ Edit that opens onto nothing — CONFIRMED live at runtime, deliberately NOT fixed.
 `canEdit('corner')` (`wizardManager.js:323`) returns true because `paramFields('corner')` is non-empty —
 `FIELD_BIND.corner` (`blocks/opSchema.js:158`) is folded onto `SCHEMA.corner` at `:177-180`. But those 15 field
@@ -702,8 +735,9 @@ WORK-LOG- and test-header-reported; not re-measured.)*
 - **Nothing was executed.** No test, no browser, no dev server. Every claim above is static reading with a
   `file:line` you can check in one jump. All pass/fail counts, the "549 declared bindings", the "275 px" and
   "229 px" figures, and the "~2450 e2e tests" are WORK-LOG- or test-header-reported and were **not** re-measured.
-- **Trap #4 (`indentStyle`)** is RESOLVED (t2139) — the setting is retired outright, not reconciled; see the
-  entry above.
+- **Trap #4 (`indentStyle`)** is RESOLVED (t2139) — the setting is retired outright, not reconciled — AND the
+  CAM slot-macro gap t2139 missed is closed too (t2141, VERIFIED BY RUNNING IT, not inferred); see the entry
+  above.
 - **Traps #5 and #6** are read from source; neither was reproduced in a browser.
 - **Q3 §5 (the machine-frame twin's overlay path)** — for a homing/machine-frame twin, the overlay's `startPin()`
   and `envelopeRect()` branch the "wrong" way. Harmless today *only* because overlay mode never draws the envelope
