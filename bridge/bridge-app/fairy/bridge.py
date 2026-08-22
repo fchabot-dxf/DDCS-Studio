@@ -86,6 +86,30 @@ def build(config, beacons=None, position_poller=None):
     return backend, transfer, beacons, poller, position_poller
 
 
+# t2125 amendment 3 — the per-sound off-list travels as ui/sound.js's own ACTION names ("job.arrived" /
+# "job.delivered" / "job.failed"), not poller.py's short event names ("received" / "delivered" /
+# "failed") — same mapping ACTION itself declares (job.arrived -> 'in' etc is the EVENT side; this is
+# the ACTION-NAME side), kept here since chime.py has no reason to know about Studio's naming.
+_SOUND_ACTION_FOR = {"received": "job.arrived", "delivered": "job.delivered", "failed": "job.failed"}
+
+
+def _sound_allowed(config, event):
+    """t2129 (review) — extracted to a real, importable function so a test can assert the ACTUAL decision
+    (master toggle AND per-action off-list) rather than grepping run_loop's source for literal strings —
+    inverting this guard's polarity, or deleting the master-mute clause, used to leave the old grep-based
+    test green because the asserted text survived in a comment."""
+    return bool(config.sound_enabled) and _SOUND_ACTION_FOR.get(event) not in config.sound_off
+
+
+def _make_sound_hook(config, chime):
+    """Builds poller.on_sound: chime.play() iff _sound_allowed(). A function (not an inline closure in
+    run_loop) so tests can construct one against a fake config/chime and drive it directly."""
+    def _on_sound(event):
+        if _sound_allowed(config, event):
+            chime.play(config.studio_dir, event)
+    return _on_sound
+
+
 def run_loop(config):
     # t2101 (S4) — DriveBackend now REFUSES to construct with a blank machine name (the fallback to the old
     # flat, shared-across-machines folder is the exact hazard S4 closes). Caught here as one legible line, not
@@ -129,24 +153,14 @@ def run_loop(config):
     # --- audio feedback (the ONE toggle, live from Studio; chime.py) — t2125, SOUND-PLAN.md ---
     # Wired here, never inside fairy's own build()/self-test path (see chime.py's own header): run_loop()
     # is only ever reached by the real gateway, so a bare Poller() built by a test never gets a sound hook.
-    # The hook re-reads config.sound_enabled on EVERY fire (rather than gating whether it's wired at all)
-    # so a POST /api/config from Studio takes effect immediately — no restart, same as the old enable_chime
+    # _sound_allowed re-reads config on EVERY fire (rather than gating whether it's wired at all) so a
+    # POST /api/config from Studio takes effect immediately — no restart, same as the old enable_chime
     # toggle it replaces. chime.py itself is UNCHANGED (still the existing WAVs, unthemed — SOUND-PLAN.md
     # section 5 corrected the original "zero samples" plan: job sounds keep the learned door/register/
     # buzzer, only the browser's UI actions get themed synthesis).
     from . import chime
 
-    # t2125 amendment 3 — the per-sound off-list travels as ui/sound.js's own ACTION names ("job.arrived" /
-    # "job.delivered" / "job.failed"), not poller.py's short event names ("received" / "delivered" /
-    # "failed") — same mapping ACTION itself declares (job.arrived -> 'in' etc is the EVENT side; this is
-    # the ACTION-NAME side), kept here since chime.py has no reason to know about Studio's naming.
-    _SOUND_ACTION_FOR = {"received": "job.arrived", "delivered": "job.delivered", "failed": "job.failed"}
-
-    def _on_sound(event):
-        if config.sound_enabled and _SOUND_ACTION_FOR.get(event) not in config.sound_off:
-            chime.play(config.studio_dir, event)
-
-    poller.on_sound = _on_sound
+    poller.on_sound = _make_sound_hook(config, chime)
 
     server = None
     if config.serve:

@@ -47385,3 +47385,150 @@ week (uniform early-run timeouts that clear on an isolated re-run) — not a reg
 
 🔨 turn 2127
 
+---
+
+# t2129 — response to the t2128 sound-suite review: 2 blockers + 4 real bugs + 3 lying tests
+
+**Dispatch**: a cold adversarial review of `8a23f4d7` (t2125's sound suite), 36 findings all batch-verified,
+committed at `bridge/controllers/expert-m350/T2128-SOUND-REVIEW.md`. Two release blockers, both invisible to
+the gate because they only exist on the DEPLOYED topology (pushing to main deploys ddcs-studio.pages.dev,
+which is exactly where the gateway sync stops working); four further real bugs; three tests that would let
+each regress silently. Fixed all nine in priority order; picked up two cheap §4 polish items along the way.
+
+## BLOCKER A — the master switch didn't actually silence the Blocks tab
+
+`blocksApp.js`'s `sounds:false` inject option only gates `Options.hasSounds`, whose one consumer in the
+vendored bundle is the SAMPLE preload — `playErrorBeep()` synthesizes its own oscillator and is gated
+solely by `AudioManager.muted`, which nothing in the repo ever called (`setMuted` appeared once: its own
+definition). Sound OFF, Blocks tab, Delete on a non-deletable node → a 260Hz sine at ~2× our earcons' gain.
+Fixed with `ws.getAudioManager().setMuted(true)` right after inject — unconditionally, not toggle-synced:
+Blockly's engine is retired outright (replaced by `sfx('error')`, which DOES respect our toggle), not
+independently controllable, or a refusal would beep twice.
+
+## BLOCKER B (+ B-prime) — the gateway sync posted to the wrong origin on a hosted deploy
+
+`sound.js`'s `syncGatewaySound()` used a bare `fetch('/api/config')` — same-origin only. On the hosted
+deploy the gateway is auto-adopted at `127.0.0.1:8765` (jobs correctly route there through `makeClient()`);
+the bare fetch posted to pages.dev instead, so sound prefs silently never reached the mill PC — the exact
+"switch that lies on one machine" SOUND-PLAN.md section 5c exists to prevent. Fixed by routing through
+`makeClient().setConfig()`, the declared transport seam every other gateway call already uses — its own
+`resolveBase()` picks up the same adopted base, and its `call()`/`postJSON` do the HTTP-level `r.ok` check
+the bare fetch skipped, which also closes **B-prime** for free: a 403 CSRF refusal or a malformed body used
+to collapse to `{}` and read as "picked up" (`_lastSync.ok` never inspected `r.ok`); now both throw and are
+reported honestly as unconfirmed.
+
+## Four more real bugs (all confirmed, all fixed)
+
+1. **Sync was only pushed from two Settings change handlers** — never at boot, on a workspace swap
+   (`replaceSettings`), or when a gateway is freshly auto-adopted; a gateway that connects after the toggle
+   was already set elsewhere only learned the real state on a double-flip. Added `syncGatewaySound()` calls
+   at all three points (`settingsPanel.js` boot + `replaceSettings`, `gatewayPanel.js`'s `autoAdoptLocal`).
+2. **`settingsPanel.js`'s merge copied `sound.off` BY REFERENCE**, not cloned — every fresh/default-loaded
+   workspace shared the SAME array as `SETTINGS_DEFAULTS.sound.off`; the first toggle mutated the
+   module-level default in place, and every workspace loaded after that inherited the corruption. Python
+   already guarded the identical hazard (`config.py`'s `field(default_factory=list)`); the JS merge now
+   rebuilds `.off` as its own array every time.
+3. **`gcodeViz3d.js`'s completion glow passed PART-FRAME coordinates to `_glowAt`, which wants WORLD** — off
+   by ~120mm, correct only in the per-op view, the same class of bug `_probeDiscBurst` already documents
+   fixing. Restructured `_animTick()` to fire the glow AFTER the position-set loop (not before, from a raw
+   `Vector3`), reading `_animTool.getWorldPosition()` — the same conversion every other world-position
+   caller in the file already uses.
+4. **`ops.py`'s disk-persist step wrote the raw POST body verbatim**, bypassing the in-memory type guard —
+   a malformed `sound_off` (e.g. an int) was correctly rejected in memory but still reached `config.json`.
+   On the next restart, `from_env()` reads it straight back with no re-validation: `_on_sound`'s `not in
+   config.sound_off` raises `TypeError`, silently swallowed by `poller.py`'s own try/except — no job sound
+   ever again, nothing in the logs. Fixed with the same "reassign the validated value into `updates`" pattern
+   the function already used for `port`, applied to `sound_off`/`sound_enabled` too.
+
+## Three tests that would have let all of the above regress silently
+
+1. **`sound-toggle-2125.spec.js`** — every existing test asserted "never throws", never "actually stays
+   silent". Deleting `!masterOn() ||` from `sfx()` left the whole file green. Added a real audio-synthesis
+   spy (wraps `AudioContext.createOscillator`/`createBufferSource` and `HTMLAudioElement.prototype.play`
+   via `page.addInitScript`, before sound.js's lazy singleton ever calls `new`) and rewrote the master-mute,
+   per-action-off, and preview tests to count real nodes instead of checking for a thrown error. Also added
+   the WHERE-split assertion the review noted was "in the title, asserted nowhere" (job.arrived/delivered/
+   failed have zero `sfx()` call sites anywhere in the browser; job.sent has exactly one), and widened the
+   `enable_chime` module sweep (the original 3-file list never included where such a checkbox would
+   actually live).
+2. **`test_sound_toggle_2125.py`** — `test_on_sound_checks_the_per_action_off_list` grepped
+   `inspect.getsource(run_loop)` for literal strings; empirically, inverting the guard's polarity AND
+   deleting the master-mute clause each left it green (the asserted text survived in a comment). Extracted
+   `_sound_allowed(config, event)` and `_make_sound_hook(config, chime)` out of `run_loop`'s inline closure
+   into real, importable functions, and replaced the grep with three tests that construct a fake config +
+   fake chime and assert the actual decision and the actual `chime.play` call pattern.
+3. **`sound-event-axes-2125.test.mjs`** — three tests looped a frozen 7-name literal instead of
+   `Object.keys(ACTION)`, so a new or mistyped entry (this commit's own `'error'`, originally) was covered
+   by nothing. Replaced with a completeness check (every declared action is exactly one of voice/sample/synth)
+   plus per-shape tests that iterate `ACTION` itself.
+
+Non-vacuity on every one of the nine: reverted the fix, ran the specific new/changed test, confirmed it
+failed with the exact symptom the review demonstrated (including reproducing the review's own two named
+mutations — invert polarity, delete the master mute — against the extracted Python predicate), restored,
+confirmed green.
+
+## Two §4 polish items picked up along the way (cheap, high-value; the rest of §4 is disclosed, not fixed)
+
+- `sound-event-axes-2125.test.mjs`'s theme-base test only proved "five distinct values" — `fail` could be
+  stretched to 3s or `in` retuned to a third and it would stay green. Added exact-value assertions for all
+  five base pitches from SOUND-PLAN.md section 4.
+- `editor-copy-feedback-2125.spec.js`'s click-then-evaluate-once pattern could race `headerPost.js`'s own
+  600ms class removal under `workers:6` contention (flagged as a candidate for an unattributed 6th failure
+  in a prior gate). Replaced the single-sample reads with `page.waitForFunction` polls, which can't lose
+  that race.
+
+**Not fixed, disclosed**: `bridge.py`'s `_SOUND_ACTION_FOR` hand-codes Studio's ACTION names (a rename in
+`sound.js` desyncs it silently — would need a genuinely shared declaration across languages, out of
+proportion here); `config.py` has no `enable_chime`→`sound_enabled` read-forward (an existing installation
+that had previously muted the gateway via the old flag goes loud again on upgrade, and the retired key
+persists in `config.json` beside the new one) — a real but non-catastrophic upgrade-ergonomics gap that
+wants deliberate migration-semantics thought, not a rushed addition here; `tools/bundle_standalone.py`'s
+pre-existing brokenness (confirmed pre-existing by the review itself) untouched beyond the one fix already
+made in t2125; the `where:'client'|'gateway'` property never became a literal field on ACTION entries (the
+distinction is now enforced structurally in tests via a declared `JOB_SAMPLE_ACTIONS` set, which is the
+practical equivalent without touching runtime code); a few small "worth noting" wiring/polish suggestions
+(unused `ui.click`/`ui.toggle`/`file.saved` rows, a `SYNTH` lookup table instead of a `===` check,
+`previewSfx`'s own debounce).
+
+## Gate
+
+Node tier: 226/226 (was 224 — +2 from this turn's own strengthened tests). All bridge Python tests: clean,
+no regressions from the `bridge.py`/`ops.py` refactor. Targeted Playwright: `sound-toggle-2125.spec.js`
+(11 tests, up from 7), `editor-copy-feedback-2125.spec.js`, `settings-ia-regroup-1245.spec.js`,
+`blocks-theme.spec.js`, `boot-splash-2127.spec.js` — 33/33 together. `subscriber-error-surface-1656.spec.js`
+hit the SAME pre-existing Blocks-tab boot flakiness already confirmed unrelated to Blockly changes in t2125
+(passed on retry; not re-investigated).
+
+**Full `npm test`: 2640 passed / 6 failed / 27 flaky / 25 skipped (27.1m).** Checked the FAILED COUNT, not
+just the tail. 5 of the 6 match the established stable baseline verbatim (`header-profile-menu`,
+`pane-sizer-1353`, `send-gate-wiring-1585`, `send-history-real-path-2065`, `validation-divzero-not-syntax-1603`).
+**The 6th, `check-console.spec.js`, was a REAL regression this turn caused**: `syncGatewaySound()`'s new
+boot-time push (should-fix #1 above) POSTs `/api/config` on every load, which 404s against this dev
+mem-server (no real gateway behind it) — Chromium logs that as a console error regardless of how gracefully
+the JS itself handles the rejection, and `check-console.spec.js` asserts an exact, DECLARED list of
+acceptable absence-probe 404s (previously just `/api/descriptor`). Added `/api/config` to that declared
+list — the same "the optional gateway isn't here, and that's an honest absence, not a bug" shape the
+existing descriptor probe already established. Re-ran in isolation after the fix: 1/1 clean. Given a real,
+narrowly-scoped, already-reproduced-and-fixed regression, did not re-run the full 27-minute suite a third
+time to chase a fully clean count — the specific failure is independently verified fixed, and nothing else
+in the run's failure/flaky list is a name this turn's files could plausibly cause.
+
+## Files
+- `DDCS-Studio/web/blocks/blocksApp.js` — `ws.getAudioManager().setMuted(true)` (BLOCKER A).
+- `DDCS-Studio/web/ui/sound.js` — `syncGatewaySound()` routed through `makeClient().setConfig()` (BLOCKER B/B-prime).
+- `DDCS-Studio/web/ui/settingsPanel.js` — `sound.off` reference-copy fix; `syncGatewaySound()` at boot + `replaceSettings()`.
+- `DDCS-Studio/web/ui/gatewayPanel.js` — `syncGatewaySound()` on fresh gateway auto-adoption.
+- `DDCS-Studio/web/viz/gcodeViz3d.js` — glow position now world-frame, fired after the position-set loop.
+- `bridge/bridge-app/fairy/ops.py` — `set_config`'s persist step validates before writing to disk.
+- `bridge/bridge-app/fairy/bridge.py` — `_sound_allowed`/`_make_sound_hook` extracted for real testability.
+- `bridge/bridge-app/tests/test_sound_toggle_2125.py` — 3 new/rewritten tests, source-grep test replaced.
+- `DDCS-Studio/tests/sound-toggle-2125.spec.js` — audio-synthesis spy; master-mute, per-action, preview,
+  WHERE-split, and widened enable_chime tests rewritten/added (7→11 tests).
+- `DDCS-Studio/tests/node/sound-event-axes-2125.test.mjs` — completeness + per-shape tests replace the
+  frozen-literal loops; exact base-pitch assertions added.
+- `DDCS-Studio/tests/editor-copy-feedback-2125.spec.js` — race-hardened with `waitForFunction` polling.
+- `DDCS-Studio/tests/check-console.spec.js` — `/api/config` added to the declared absence-probe list (the
+  one real regression this turn's own boot-time sync push caused; found via the full gate, fixed, verified).
+
+🔨 turn 2129
+

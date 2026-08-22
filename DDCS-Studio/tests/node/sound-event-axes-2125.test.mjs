@@ -46,6 +46,17 @@ test('t2125 -- all five themes are declared, and each carries a distinct base pi
     expect(bases.size, 'every theme must have its own base pitch').toBe(names.length);
 });
 
+test('t2129 (review) -- base pitches match SOUND-PLAN.md section 4 exactly, not just "five distinct values"', () => {
+    // the test above only proved the five bases differ from each other -- it would stay green if `fail`
+    // were stretched to 3s or `in` retuned to a third, since nothing here checked the ACTUAL numbers the
+    // plan specifies. These are the exact figures the artifact's own source (and section 4) name.
+    expect(THEME.studio.base).toBe(392);
+    expect(THEME.futuristic.base).toBe(587);
+    expect(THEME.organic.base).toBe(330);
+    expect(THEME.steampunk.base).toBe(523);
+    expect(THEME.normal.base).toBe(440);
+});
+
 test('t2125 -- COMMIT is a real, lighter, distinct EVENT (not a reuse of DONE)', () => {
     expect(EVENT.commit, 'commit must be declared').toBeTruthy();
     expect(EVENT.commit.rhy.reduce((s, r) => Math.max(s, r[0] + r[1]), 0),
@@ -54,17 +65,30 @@ test('t2125 -- COMMIT is a real, lighter, distinct EVENT (not a reuse of DONE)',
     expect(EVENT.done, "'done' must stay declared even though no ACTION currently uses it").toBeTruthy();
 });
 
-test('t2125 -- UI actions (SOUND-PLAN.md section 3b) are themed VOICE, never samples', () => {
-    for (const name of ['ui.click', 'ui.toggle', 'wizard.opened', 'wizard.closed', 'keyboard.opened', 'wizard.inserted', 'file.saved']) {
-        const a = ACTION[name];
-        expect(a, `${name} must be declared`).toBeTruthy();
-        expect(typeof a.voice, `${name} must be a themed voice, not a sample`).toBe('string');
-        expect(a.sample, `${name} must not carry a sample`).toBeUndefined();
+// t2129 (review) — these three tests used to loop a frozen 7-name literal instead of deriving from ACTION
+// itself, so a brand-new entry (this file's own 'error', added the same commit) rendered a Settings row
+// and a preview button and was covered by NOTHING here — silent and green. Classifying EVERY declared key
+// by its own shape means a new action, or a typo inside one, is checked automatically, not by remembering
+// to update a name list by hand.
+const JOB_SAMPLE_ACTIONS = new Set(['job.arrived', 'job.delivered', 'job.failed']);   // the WHERE=gateway exceptions — see JOB-RULES.md §7
+
+test('t2125/t2129 -- every declared ACTION is exactly one kind: voice, sample, or synth (never zero, never two)', () => {
+    for (const [name, a] of Object.entries(ACTION)) {
+        const kinds = ['voice', 'sample', 'synth'].filter((k) => a[k] !== undefined);
+        expect(kinds.length, `${name} must declare exactly one of voice/sample/synth, got [${kinds.join(',')}]`).toBe(1);
     }
 });
 
-test('t2125 -- job events (SOUND-PLAN.md section 5 correction) are LEARNED samples, never synthesized', () => {
-    for (const name of ['job.arrived', 'job.delivered', 'job.failed']) {
+test('t2125 -- every UI/system action (not the 3 gateway job samples) is themed VOICE or a client-only synth', () => {
+    for (const [name, a] of Object.entries(ACTION)) {
+        if (JOB_SAMPLE_ACTIONS.has(name)) continue;   // the gateway-only samples, checked separately below
+        expect(a.sample, `${name} must not carry a sample (only job.arrived/delivered/failed do)`).toBeUndefined();
+        expect(typeof a.voice === 'string' || typeof a.synth === 'string', `${name} must be a themed voice or a synth`).toBe(true);
+    }
+});
+
+test('t2125 -- job.arrived/delivered/failed (SOUND-PLAN.md section 5 correction) are LEARNED samples, never synthesized', () => {
+    for (const name of JOB_SAMPLE_ACTIONS) {
         const a = ACTION[name];
         expect(a, `${name} must be declared`).toBeTruthy();
         expect(typeof a.sample, `${name} must carry a learned .wav sample, not a themed voice`).toBe('string');
@@ -73,9 +97,9 @@ test('t2125 -- job events (SOUND-PLAN.md section 5 correction) are LEARNED sampl
     }
 });
 
-test('t2125 -- every UI voice action resolves to a real THEME voice name (click, or a declared EVENT key)', () => {
-    for (const name of ['ui.click', 'ui.toggle', 'wizard.opened', 'wizard.closed', 'keyboard.opened', 'wizard.inserted', 'file.saved']) {
-        const a = ACTION[name];
+test('t2125 -- every declared voice action resolves to a real THEME voice name (click, or a declared EVENT key)', () => {
+    for (const [name, a] of Object.entries(ACTION)) {
+        if (typeof a.voice !== 'string') continue;   // sample/synth actions have nothing to resolve here
         const resolvable = a.voice === 'click' || !!EVENT[a.voice];
         expect(resolvable, `${a.voice} (from ${name}) must be 'click' or a declared EVENT key`).toBe(true);
     }

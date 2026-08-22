@@ -77,15 +77,57 @@ def test_two_config_instances_do_not_share_the_same_off_list():
     assert b.sound_off == [], "a second Config() must not see the first one's mutation"
 
 
-def test_on_sound_checks_the_per_action_off_list_not_just_the_master_toggle():
-    """Source-inspection, matching this file's own --no-chime check above: run_loop's _on_sound hook must
-    consult sound_off (mapped to ACTION-style names) before playing, not just sound_enabled."""
+def test_sound_allowed_respects_the_master_toggle():
+    """t2129 (review) -- REAL BEHAVIOUR, not a source grep. The original version of this test grepped
+    inspect.getsource(run_loop) for literal strings; empirically, inverting the guard's polarity AND
+    deleting the master-mute clause each left it green, because the asserted text survived in a comment.
+    _sound_allowed is the actual extracted decision function bridge.py's real hook calls -- mutate IT and
+    these assertions break for real."""
     from fairy import bridge
-    import inspect
-    src = inspect.getsource(bridge.run_loop)
-    assert "sound_off" in src, "_on_sound must consult the per-action off-list"
-    assert "job.arrived" in src and "job.delivered" in src and "job.failed" in src, \
-        "the poller-event -> ACTION-name mapping must name all three job events"
+    c = Config()
+    c.sound_enabled = False
+    assert bridge._sound_allowed(c, "received") is False, "master OFF must silence every job event"
+    c.sound_enabled = True
+    assert bridge._sound_allowed(c, "received") is True, "master ON, nothing silenced -> allowed"
+
+
+def test_sound_allowed_respects_the_per_action_off_list():
+    from fairy import bridge
+    c = Config()
+    c.sound_enabled = True
+    c.sound_off = ["job.arrived"]
+    assert bridge._sound_allowed(c, "received") is False, "job.arrived is silenced -- 'received' must not play"
+    assert bridge._sound_allowed(c, "delivered") is True, "job.delivered was NOT silenced -- must be unaffected"
+    assert bridge._sound_allowed(c, "failed") is True, "job.failed was NOT silenced -- must be unaffected"
+
+
+def test_sound_hook_calls_chime_play_only_when_allowed():
+    """The real wiring, not just the predicate: _make_sound_hook is the SAME function run_loop calls to
+    build poller.on_sound, exercised here with a fake chime module so no real audio plays."""
+    from fairy import bridge
+
+    class _FakeChime:
+        def __init__(self):
+            self.calls = []
+
+        def play(self, studio_dir, event):
+            self.calls.append(event)
+
+    c = Config()
+    c.sound_enabled = True
+    c.sound_off = ["job.arrived"]
+    fake_chime = _FakeChime()
+    hook = bridge._make_sound_hook(c, fake_chime)
+
+    hook("received")     # job.arrived -- silenced
+    hook("delivered")    # job.delivered -- not silenced
+    hook("failed")       # job.failed -- not silenced
+    assert fake_chime.calls == ["delivered", "failed"], fake_chime.calls
+
+    c.sound_enabled = False
+    fake_chime.calls.clear()
+    hook("delivered")
+    assert fake_chime.calls == [], "master OFF must block every event even when nothing is per-action-silenced"
 
 
 class _OpsShim:
@@ -145,6 +187,29 @@ def test_set_config_ignores_a_malformed_sound_off_rather_than_crashing():
         c = Config(config_path=os.path.join(tmp, "config.json"))
         ops_module.Ops.set_config(_OpsShim(c), {"sound_off": "not-a-list"})
         assert c.sound_off == [], "a non-list value must be ignored, not coerced or crashed on"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_malformed_sound_off_never_reaches_disk_either():
+    """t2129 (review) -- THE REAL BUG: the in-memory guard above was already correct, but the disk-persist
+    step used to write `updates` VERBATIM regardless of it, so a malformed value the in-memory check
+    correctly rejected still landed in config.json. On the next restart, from_env() reads it straight back
+    with no re-validation -- e.g. sound_off as an int would silently break every _on_sound check forever
+    (a TypeError swallowed by poller.py's own try/except: no job sound ever again, nothing in the logs).
+    This is the test the original (in-memory-only) assertion above could not have caught."""
+    tmp = tempfile.mkdtemp()
+    try:
+        c = Config(config_path=os.path.join(tmp, "config.json"))
+        ops_module.Ops.set_config(_OpsShim(c), {"sound_off": 5})
+        assert os.path.exists(c.config_path), "sanity: a config file must have been written"
+        with open(c.config_path, encoding="utf-8") as f:
+            saved = json.load(f)
+        assert "sound_off" not in saved or saved["sound_off"] is None, \
+            f"a malformed sound_off must never reach disk: {saved.get('sound_off')!r}"
+        # and the round-trip a restart would do must not resurrect it either
+        c2 = Config.from_env(config_path=c.config_path)
+        assert c2.sound_off == [], "a restart reading the persisted file must not inherit corrupted state"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

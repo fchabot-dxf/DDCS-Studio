@@ -10,6 +10,7 @@
  */
 import { makeClient, deriveStatus } from '../shared/js/client.js';
 import { getService, adoptLocal, probeLocalGateway } from './gateway/service.js';   // t1325 — the loopback auto-probe + the adopted base
+import { syncGatewaySound } from './sound.js';   // t2129 (review) — a freshly adopted gateway needs the CURRENT sound prefs pushed, not whatever it last had (or never had)
 import { el, clear } from './gateway/util.js';
 import statusView from './gateway/views/status.js';
 import sendView from './gateway/views/send.js';
@@ -117,6 +118,7 @@ async function autoAdoptLocal() {
         if (!found) return false;
         adoptLocal(found.base);
         ctx.client = makeClient({ base: found.base });   // rebuild on the new base — no reload, the panel is live
+        syncGatewaySound();   // t2129 — this gateway may never have heard the current toggle; tell it now, not on the next double-flip
         return true;
     } finally { probing = false; }
 }

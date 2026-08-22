@@ -982,17 +982,18 @@ export class GcodeViz3D {
             // scaled by _animSimSpeed (1 = real time). Each segment's ms ∝ length/feedrate, so the
             // tool moves at the programmed speed — slow probes crawl, rapids zip, like the engine.
             const total = this._animMs || 1;
+            let justCompleted = false;
             if (!this._animPaused) {
                 this._animDist += dt * 1000 * (this._animSimSpeed || 1);
                 if (this._animDist >= total) {       // reached the end → hold 2s (final datum/result visible), then loop
                     this._animDist = total;
                     this._animPaused = true;
+                    justCompleted = true;   // fire the glow below, AFTER the tool is actually at its final position
                     // t2125 (SOUND-PLAN.md section 5b) — a sound here was redundant (you're watching the preview,
-                    // not away from it) and fired every loop forever; replaced with the SAME quiet glow pulse
-                    // already used for the WCS/start markers (_glowAt), at the toolpath's real final position —
-                    // this branch runs exactly once per completion (guarded by _animPaused above).
-                    const lastSeg = segs[segs.length - 1];
-                    if (lastSeg && this.THREE) this._glowAt(new this.THREE.Vector3(lastSeg.bx, lastSeg.by, lastSeg.bz), 0xa0e8b0);
+                    // not away from it); replaced with the SAME quiet glow pulse already used for the WCS/start
+                    // markers (_glowAt). t2129 (review) — this fires once per LAP, same as the _beep it replaced
+                    // (autoLoop repeats the animation every ~2s hold + run, this isn't a one-shot for the whole
+                    // session) — the guard above only stops it firing every FRAME within one completion.
                     setTimeout(() => { this._animDist = 0; this._animPaused = false; this._animLast = 0; }, 2000);
                 }
             }
@@ -1007,6 +1008,15 @@ export class GcodeViz3D {
                     break;
                 }
                 d -= sg.ms;
+            }
+            // t2129 (review) — MUST run after the position-set loop above (not from segs[last].bx/by/bz
+            // directly, which is PART-FRAME): _glowAt wants WORLD coordinates, and _animTool.getWorldPosition()
+            // is the same conversion every other world-position caller in this file already uses (e.g. the
+            // camera-follow at _followTick). Reading it here, once the tool has actually reached that position
+            // this frame, avoids the ~120mm part-frame/world-frame offset a raw Vector3 from the segment had.
+            if (justCompleted && this.THREE) {
+                this._animTool.updateWorldMatrix(true, false);   // called BEFORE render() this tick — matches the defensive pattern at :906, not the post-render read at _followTick
+                this._glowAt(this._animTool.getWorldPosition(new this.THREE.Vector3()), 0xa0e8b0);
             }
             this.render();
         }

@@ -195,12 +195,18 @@ async function buildWorkspace() {
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
     // t2125 (SOUND-PLAN.md section 5b) — Blockly ships its OWN click/delete/disconnect/error-beep audio system,
-    // with its own defaults (sounds:true, pathToMedia a Google CDN) unless told otherwise. The one-toggle ruling
-    // requires our switch to genuinely silence the Blocks tab, so Blockly's own system is muted here; the
-    // equivalent feedback that matters (a refused connection) is routed through sfx() instead — see
-    // blocks/blockly/tokenGuard.js's own refusal path.
+    // with its own defaults (sounds:true, pathToMedia a Google CDN) unless told otherwise. sounds:false is
+    // NOT enough on its own — it only gates Options.hasSounds, whose one consumer in the vendored bundle is
+    // the sample PRELOAD; playErrorBeep() synthesizes its own oscillator and is gated solely by
+    // AudioManager.muted, which sounds:false never touches (t2128 review — a genuine claim-vs-code gap: the
+    // comment here and the commit that added it both said this was already handled). The equivalent
+    // feedback that matters (a refused connection) is routed through sfx() instead — see
+    // blocks/blockly/tokenGuard.js's own refusal path — so Blockly's own engine is retired outright, not
+    // toggled: it must never sound regardless of our own master switch, or a connection refusal would beep
+    // twice (once from us, once from Blockly).
     sounds: false,
   });
+  ws.getAudioManager().setMuted(true);   // t2129 — the actual mute; sounds:false above only stops preload
   installTokenGuard(ws);   // t1712 (cycle ACT 5) — REFUSE an ineligible token connection, the third authoring surface
 
   // GUARANTEE the popup singletons' DOM exists, so Blockly's global window-resize handler can never crash in

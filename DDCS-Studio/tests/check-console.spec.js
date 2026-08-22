@@ -6,7 +6,10 @@ import { test, expect } from '@playwright/test';
 // DECLARED expected-absence probes: requests the app makes to DISCOVER optional infrastructure — a 404 there is the
 // honest "not present" answer in a gateway-less environment (the static site included), and Chromium logs it as a
 // console error no matter how gracefully the app handles it. Everything else stays a hard failure.
-const EXPECTED_ABSENCE = ['/api/descriptor'];
+// t2129 (review) — '/api/config' joined the list: syncGatewaySound() now pushes the sound toggle once at
+// boot (settingsPanel.js), the same "try the optional gateway, log nothing louder than this" shape as the
+// existing descriptor probe — added so a gateway-less dev boot (this mem-server included) still reads clean.
+const EXPECTED_ABSENCE = ['/api/descriptor', '/api/config'];
 
 test('the app boots with ZERO console/page errors (beyond the declared absence probes)', async ({ page }) => {
   const errors = [];

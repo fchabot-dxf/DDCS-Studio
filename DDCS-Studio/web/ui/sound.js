@@ -18,6 +18,8 @@
 // (https://claude.ai/code/artifact/b3653ea6-f4e4-4eb6-9133-8cb9414c120c) — every number here is lifted
 // from that page, not reinterpreted.
 
+import { makeClient } from '../shared/js/client.js';   // t2129 — the declared transport seam; see syncGatewaySound
+
 let ctx = null;
 const live = [];
 
@@ -304,16 +306,21 @@ export async function syncGatewaySound() {
         off = (s.sound && Array.isArray(s.sound.off)) ? s.sound.off : [];
     } catch (_) { /* settings not loaded yet */ }
     try {
-        const r = await fetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-DDCS-Local': '1' },
-            body: JSON.stringify({ sound_enabled: enabled, sound_off: off }),
-        });
-        const j = await r.json().catch(() => ({}));
+        // t2129 (review, BLOCKER B) — a bare fetch('/api/config') is same-origin ONLY, so on the hosted
+        // deploy (ddcs-studio.pages.dev) it posts to pages.dev, never to the adopted gateway at
+        // 127.0.0.1:8765 — sound prefs silently stop reaching the mill PC while jobs (routed through
+        // makeClient()) keep working, exactly the "switch that lies on one machine" SOUND-PLAN.md section
+        // 5c warns about. makeClient()'s own resolveBase() picks up the SAME auto-adopted base every other
+        // gateway call already uses. Its call()/postJSON also does the HTTP-level r.ok check a bare fetch
+        // skipped (a 403 CSRF refusal or a non-JSON body now throws here instead of silently reading as
+        // success — closes B-prime too).
+        const client = makeClient();
+        const j = await client.setConfig({ sound_enabled: enabled, sound_off: off });
         _lastSync = { at: Date.now(), ok: !(j && j.ok === false), error: (j && j.error) || '' };
     } catch (e) {
-        // No gateway reachable on this device — the common case for a browser-only session. Not an error.
-        _lastSync = { at: Date.now(), ok: false, error: 'gateway unreachable' };
+        // No gateway reachable on this device (the common case for a browser-only session), or the request
+        // itself failed (bad HTTP status, malformed JSON) — either way, honestly unconfirmed, not success.
+        _lastSync = { at: Date.now(), ok: false, error: (e && e.message) || 'gateway unreachable' };
     }
     return _lastSync;
 }

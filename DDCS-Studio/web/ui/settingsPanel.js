@@ -413,7 +413,13 @@ function loadSettings() {
                 endProgram: { ...SETTINGS_DEFAULTS.endProgram, ...(p.endProgram || {}) },
                 motors: { ...SETTINGS_DEFAULTS.motors, ...(p.motors || {}) },
                 setup: { ...SETTINGS_DEFAULTS.setup, ...(p.setup || {}) },
-                sound: { ...SETTINGS_DEFAULTS.sound, ...(p.sound || {}) },
+                // t2129 (review) — a plain spread copies `.off` BY REFERENCE when p.sound is absent/partial,
+                // so every fresh/default-loaded workspace would share the SAME array as SETTINGS_DEFAULTS.sound.off
+                // — the first toggle mutates the module-level default in place (renderSoundTab's list.push/splice),
+                // and every workspace loaded after that inherits the corruption. Python already guards the
+                // identical hazard at config.py's field(default_factory=list); this rebuilds `.off` as its own
+                // array every time, the JS equivalent.
+                sound: { ...SETTINGS_DEFAULTS.sound, ...(p.sound || {}), off: Array.isArray((p.sound || {}).off) ? [...p.sound.off] : [] },
                 homing: mergeHoming(p.homing),
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
@@ -1025,6 +1031,10 @@ export function replaceSettings(incoming) {
     saveSettings();
     if (Array.isArray(_ddcsSettings.inputs)) syncFlatFromIO(_ddcsSettings);   // mirror the swapped I/O into the flat limits (declaredHomeEdgeSide reads these)
     if (_fillSettingsInputs) _fillSettingsInputs();
+    // t2129 (review) — a workspace swap can carry a DIFFERENT sound preference than whatever the gateway
+    // currently holds; without this, the gateway keeps the PREVIOUS workspace's toggle until someone
+    // happens to flip it twice in the new one.
+    syncGatewaySound();
 }
 
 function buildSettingsOverlay() {
@@ -3783,3 +3793,7 @@ window.ddcsOpenSettingsReturn = (label) => openSettings({ returnToken: pushRetur
 window.ddcsGetSettings = getSettings;
 window.ddcsSaveSettings = saveSettings;   // let wizards (e.g. the ATC table magazine editor) persist + broadcast edits
 window.ddcsApplySettings = applySettings;
+// t2129 (review) — push the CURRENT workspace's sound prefs to the gateway once at boot, fire-and-forget.
+// Without this, a gateway that (re)connects after the toggle was already set elsewhere only learns the
+// real state the next time someone happens to flip it twice.
+syncGatewaySound();

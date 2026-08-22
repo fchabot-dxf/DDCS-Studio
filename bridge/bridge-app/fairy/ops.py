@@ -1171,10 +1171,23 @@ class Ops:
         if "machine_id" in updates: c.machine_id = (updates["machine_id"] or "").strip()
         if "dest" in updates: c.expert_dest = (updates["dest"] or "").strip()
         if updates.get("com_port"): c.com_port = updates["com_port"].strip()
+        # t2129 (review) — the disk-persist loop below writes `updates` VERBATIM (not `c`'s validated
+        # values), so a guard here that only touches `c` in memory still lets a malformed value reach
+        # config.json unvalidated. On the NEXT restart, from_env() reads it straight back into `c` with no
+        # re-validation, so e.g. `sound_off` as an int would silently break `_on_sound`'s `not in
+        # config.sound_off` check forever (TypeError, swallowed by poller.py's own try/except) — no job
+        # sound ever again, with nothing in the logs pointing at why. Reassigning `updates` here (the same
+        # pattern already used for `port` below) makes the persist step see the SAME validated value `c`
+        # got, or drop the key entirely (None is filtered out of the persist dict) if it was never valid.
         if "sound_enabled" in updates and updates["sound_enabled"] is not None:
             c.sound_enabled = bool(updates["sound_enabled"])   # t2125 — live toggle, no restart (see bridge.py's _on_sound)
-        if "sound_off" in updates and isinstance(updates.get("sound_off"), list):
-            c.sound_off = list(updates["sound_off"])   # t2125 amendment 3 — the per-sound off-list, same live path
+            updates = {**updates, "sound_enabled": c.sound_enabled}
+        if "sound_off" in updates:
+            if isinstance(updates.get("sound_off"), list):
+                c.sound_off = list(updates["sound_off"])   # t2125 amendment 3 — the per-sound off-list, same live path
+                updates = {**updates, "sound_off": c.sound_off}
+            else:
+                updates = {**updates, "sound_off": None}   # invalid -- never persisted, never applied
         if "role_override" in updates and updates["role_override"] is not None:
             # t2103 (S0) — live, no restart: effective_role()/the claim gate both read c.role_override
             # fresh on every call, so a Setup change is authoritative the very next poll tick.

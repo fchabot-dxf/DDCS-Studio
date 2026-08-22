@@ -20,6 +20,36 @@ async function openSoundTab(page) {
     await page.waitForFunction(() => document.getElementById('set_sound_on'), null, { timeout: 30000 });
 }
 
+/**
+ * t2129 (review) — a real audio-synthesis spy, installed BEFORE navigation so it wraps the page's OWN
+ * AudioContext/HTMLAudioElement before sound.js's lazily-created singleton ever calls `new`. Without this,
+ * "never throws" was the only thing any test here actually proved — deleting the master-mute check
+ * entirely left the whole file green, because nothing asserted that muting silences real audio nodes.
+ */
+async function installAudioSpy(page) {
+    await page.addInitScript(() => {
+        window.__audioSpy = { synthCount: 0, sampleCount: 0 };
+        const OrigCtx = window.AudioContext || window.webkitAudioContext;
+        function SpyCtx(...args) {
+            const ctx = new OrigCtx(...args);
+            const origOsc = ctx.createOscillator.bind(ctx);
+            ctx.createOscillator = (...a) => { window.__audioSpy.synthCount++; return origOsc(...a); };
+            const origBuf = ctx.createBufferSource.bind(ctx);
+            ctx.createBufferSource = (...a) => { window.__audioSpy.synthCount++; return origBuf(...a); };
+            return ctx;
+        }
+        window.AudioContext = SpyCtx;
+        window.webkitAudioContext = SpyCtx;
+        const origPlay = HTMLAudioElement.prototype.play;
+        HTMLAudioElement.prototype.play = function (...a) {
+            window.__audioSpy.sampleCount++;
+            return origPlay.apply(this, a).catch(() => {});
+        };
+    });
+}
+async function resetSpy(page) { await page.evaluate(() => { window.__audioSpy = { synthCount: 0, sampleCount: 0 }; }); }
+async function spyCounts(page) { return page.evaluate(() => window.__audioSpy); }
+
 test('Sound is its own sub-tab under Look and feel, a peer of Appearance (amendment 4) — not bolted onto it', async ({ page }) => {
     await boot(page);
     await openSoundTab(page);
@@ -100,36 +130,115 @@ test('a per-sound row silences ONLY that action, stored as an exceptions-only of
     expect(await page.evaluate(() => window.ddcsGetSettings().sound.off), 're-enabling removes the exception entirely').toEqual([]);
 });
 
+test('sfx() actually silences synthesis when the master is OFF, and actually produces it when ON', async ({ page }) => {
+    // t2129 (review) — the central claim of the whole feature, previously asserted nowhere: deleting
+    // `!masterOn() || ` from sfx() left this file's OLD test suite fully green. Proven here by counting
+    // REAL AudioContext node creation, not by checking for the absence of a thrown error.
+    await installAudioSpy(page);
+    await boot(page);
+    await resetSpy(page);
+
+    await page.evaluate(async () => {
+        const { sfx } = await import('/ui/sound.js');
+        window.ddcsGetSettings().sound.enabled = false;
+        sfx('ui.click');
+    });
+    const off = await spyCounts(page);
+    expect(off.synthCount, 'master OFF must create ZERO audio nodes').toBe(0);
+
+    // a DIFFERENT action name than the OFF check above — sfx()'s own 60ms debounce is keyed per action
+    // name and module state (the lastFired Map) persists across these two evaluate() round trips, so
+    // reusing 'ui.click' here risks a false negative if the two calls land inside that window.
+    await page.evaluate(async () => {
+        const { sfx } = await import('/ui/sound.js');
+        const s = window.ddcsGetSettings();
+        s.sound.enabled = true; s.sound.off = [];
+        sfx('ui.toggle');
+    });
+    const on = await spyCounts(page);
+    expect(on.synthCount, 'master ON, nothing silenced, must actually synthesize').toBeGreaterThan(0);
+});
+
+test('sfx() silences ONLY the per-action off-listed sound, not its siblings', async ({ page }) => {
+    await installAudioSpy(page);
+    await boot(page);
+    await resetSpy(page);
+
+    await page.evaluate(async () => {
+        const { sfx } = await import('/ui/sound.js');
+        const s = window.ddcsGetSettings();
+        s.sound.enabled = true; s.sound.off = ['ui.click'];
+        sfx('ui.click');   // silenced
+    });
+    expect((await spyCounts(page)).synthCount, "the specifically-silenced action must create nothing").toBe(0);
+
+    await page.evaluate(async () => {
+        const { sfx } = await import('/ui/sound.js');
+        sfx('ui.toggle');   // a DIFFERENT action, never silenced
+    });
+    expect((await spyCounts(page)).synthCount, 'a sibling action must be unaffected').toBeGreaterThan(0);
+});
+
 test('the preview button plays a silenced sound regardless of its own toggle or the master switch', async ({ page }) => {
+    // t2129 (review) — the old assertion was only "does not throw", which a version of previewSfx that
+    // silently did nothing (killing the ▶ button for every muted sound) would also satisfy. Now proves
+    // audio is ACTUALLY produced despite both toggles being off.
+    await installAudioSpy(page);
     await boot(page);
     await openSoundTab(page);
-    const result = await page.evaluate(async () => {
+    await resetSpy(page);
+
+    const threw = await page.evaluate(async () => {
         const { previewSfx } = await import('/ui/sound.js');
         const s = window.ddcsGetSettings();
         s.sound.enabled = false;             // master OFF
         s.sound.off = ['ui.click'];          // AND this specific action silenced
-        let threw = null;
-        try { previewSfx('ui.click'); } catch (e) { threw = String(e); }
-        return { threw };
+        try { previewSfx('ui.click'); return null; } catch (e) { return String(e); }
     });
-    expect(result.threw, 'previewSfx must never throw, and must not be gated by either toggle').toBeNull();
+    expect(threw, 'previewSfx must never throw').toBeNull();
+    const counts = await spyCounts(page);
+    expect(counts.synthCount + counts.sampleCount, 'previewSfx must actually play — a silently-no-op preview button is the exact defect this test exists to catch').toBeGreaterThan(0);
+});
+
+test('previewSfx also plays a SAMPLE-kind action (job.arrived) despite both toggles', async ({ page }) => {
+    await installAudioSpy(page);
+    await boot(page);
+    await resetSpy(page);
+    await page.evaluate(async () => {
+        const { previewSfx } = await import('/ui/sound.js');
+        const s = window.ddcsGetSettings();
+        s.sound.enabled = false;
+        s.sound.off = ['job.arrived'];
+        previewSfx('job.arrived');
+    });
+    expect((await spyCounts(page)).sampleCount, 'a sample-kind preview must invoke real Audio.play()').toBeGreaterThan(0);
 });
 
 test('the gateway Setup toggle is gone — enable_chime is not part of the config payload', async ({ page }) => {
     // t2125 ruling: "THE GATEWAY OWN SETUP TOGGLE MUST GO" -- no second, independently-settable switch
-    // anywhere in Studio's own surface. Confirms nothing in the shipped app still references it.
+    // anywhere in Studio's own surface. t2129 (review): the original 3-module list was never where such a
+    // checkbox would actually live (web/ui/gateway/views/admin.js — which renders the sibling enable_slave
+    // checkbox — wasn't even in it), so this passed at the parent commit and on a full revert alike; the
+    // ONE real guard of the ⛔ ruling is bridge/bridge-app/tests/test_sound_toggle_2125.py's
+    // test_enable_chime_is_fully_retired. This is now an honest best-effort sweep of every UI module
+    // (broad enough to include admin.js) rather than a hand-picked list that happened to be wrong.
     await boot(page);
     const stillReferenced = await page.evaluate(async () => {
-        const modules = ['/ui/settingsPanel.js', '/ui/gatewayStatus.js', '/ui/gatewayPanel.js'];
+        const modules = [
+            '/ui/settingsPanel.js', '/ui/gatewayStatus.js', '/ui/gatewayPanel.js',
+            '/ui/gateway/views/admin.js', '/ui/gateway/views/status.js', '/ui/gateway/service.js',
+            '/ui/sound.js',
+        ];
+        const hits = [];
         for (const m of modules) {
             try {
                 const txt = await (await fetch(m)).text();
-                if (txt.includes('enable_chime')) return m;
+                if (txt.includes('enable_chime')) hits.push(m);
             } catch (_) { /* module may not exist under this name -- fine */ }
         }
-        return null;
+        return hits;
     });
-    expect(stillReferenced, 'no shipped module still references the retired enable_chime toggle').toBeNull();
+    expect(stillReferenced, 'no shipped module still references the retired enable_chime toggle').toEqual([]);
 });
 
 test('opening and closing a wizard (real sfx() call sites) never throws, sound ON or OFF', async ({ page }) => {
@@ -172,4 +281,30 @@ test('job.sent (client) is synthesized, never a sample; job.arrived/delivered/fa
         sentIsSynth: true,
         'job.arrived': 'ok', 'job.delivered': 'ok', 'job.failed': 'ok',
     });
+});
+
+test('the WHERE-split is real: job.arrived/delivered/failed have NO browser sfx() call site, job.sent has exactly one', async ({ page }) => {
+    // t2129 (review) — "the client/gateway split is in the title, asserted nowhere". job.arrived/delivered/
+    // failed are declared in ACTION (so the Settings preview button works) but must NEVER be triggered
+    // from this browser's own code — they're the gateway's chime.py's job, per JOB-RULES.md §7. Checks the
+    // SERVED source, not just the declaration, since a stray sfx('job.arrived') call site elsewhere in the
+    // app would double-fire it on a one-box setup and this ACTION-shape test alone would never catch that.
+    await boot(page);
+    const counts = await page.evaluate(async () => {
+        const files = [
+            '/app.js', '/wizardManager.js', '/ui/gateway/views/send.js', '/blocks/blockly/tokenGuard.js',
+            '/ui/gatewayPanel.js', '/ui/gateway/views/status.js', '/ui/gateway/views/jobs.js', '/ui/gateway/views/tracker.js',
+        ];
+        const texts = await Promise.all(files.map((f) => fetch(f).then((r) => r.text()).catch(() => '')));
+        const all = texts.join('\n');
+        const count = (needle) => (all.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+        return {
+            arrived: count("sfx('job.arrived')"), delivered: count("sfx('job.delivered')"), failed: count("sfx('job.failed')"),
+            sent: count("sfx('job.sent')"),
+        };
+    });
+    expect(counts.arrived, 'job.arrived must never be fired from the browser').toBe(0);
+    expect(counts.delivered, 'job.delivered must never be fired from the browser').toBe(0);
+    expect(counts.failed, 'job.failed must never be fired from the browser').toBe(0);
+    expect(counts.sent, 'job.sent must be fired from exactly the one real send point').toBe(1);
 });
