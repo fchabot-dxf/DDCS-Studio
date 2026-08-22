@@ -675,11 +675,10 @@ holds only `COMMENT_MARK` + a `commentBlock` text helper.
 ⚠ **Do NOT name it after "comment"** — `commentBlock` ALREADY means two different things: this text-surgery
 helper, and a G-code comment OP at `wizards/ops/comment.js:6`. A comment-named file makes that collision
 worse.
-⭐ **Simplest: fold both survivors into `ui/editorTextOps.js` and DELETE `data/indentStyle.js`.** That file
-already imports and re-exports both at `:23`, so the module would otherwise be two exports whose only
-consumer is a near-identically-named file. No new name needed, one less indirection.
-(If a standalone module is preferred instead, `data/editorText.js` — named for what it does, string surgery
-on the editor buffer, not for the one feature left in it.)
+⭐⭐ **DECIDED: fold both survivors into `ui/editorTextOps.js` and DELETE `data/indentStyle.js`.**
+That file already imports and re-exports both at `:23`, so keeping it would leave a module of two exports
+whose only consumer is a near-identically-named file — an indirection that exists solely because indentation
+used to live there. No new filename to argue about, one less hop, and the word disappears from the tree.
 
 ---
 
