@@ -101,10 +101,10 @@ export function attachLongPress(el, opts = {}) {
 /**
  * t1450 — OPEN AN ARBITRARY MENU in this same element: `[{ label, fn, disabled }]` at (x, y).
  *
- * Exported because the editor's indent/outdent entries are NOT op actions — they act on a text selection that may
- * have nothing to do with an op — and a second floating-menu implementation would be a second thing to dismiss, a
- * second thing to clamp into the viewport, and a second thing to forget on `ddcs:stop-previews`. One element, one
- * dismissal contract; the caller only decides what goes in it.
+ * Exported because the editor's own plain-text entries (comment/uncomment) are NOT op actions — they act on a
+ * text selection that may have nothing to do with an op — and a second floating-menu implementation would be a
+ * second thing to dismiss, a second thing to clamp into the viewport, and a second thing to forget on
+ * `ddcs:stop-previews`. One element, one dismissal contract; the caller only decides what goes in it.
  */
 export function openMenu(items, x, y) {
     const m = ensure();

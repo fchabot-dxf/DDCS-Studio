@@ -946,10 +946,8 @@ html, body { overflow-x: clip; }
 @media (orientation: portrait) {
     .editor-container:has(.viz3d-drawer.open) #align-rotate-btn { bottom: calc(var(--viz3d-size, 50%) + 12px) !important; }
     .editor-container:has(.viz3d-drawer.open) #editor-cam-btn { bottom: calc(var(--viz3d-size, 50%) + 44px) !important; }   /* stack ✚ CAM slot 32px above ⟳ Transform here too */
-    /* t1450 — the ⇥/⇤ indent pair is ONE more slot in the same declared stack (32px above ✚ Make), so it rides
+    /* t1450 — the comment toggle is one more slot in the same declared stack (32px above ✚ Make), so it rides
        the open drawer exactly as its neighbours do instead of carrying a magic offset of its own. */
-    .editor-container:has(.viz3d-drawer.open) #editor-indent,
-    .editor-container:has(.viz3d-drawer.open) #editor-outdent,
     .editor-container:has(.viz3d-drawer.open) #editor-comment { bottom: calc(var(--viz3d-size, 50%) + 76px) !important; }
 }
 .op-edit-chip[hidden] { display: none; }
@@ -4808,10 +4806,10 @@ svg [id$="_wcs"] { display: none; }
     /* ✚ CAM slot stacks ABOVE ⟳ Transform on the SAME --kbd-clear signal (btn 24px + 8px gap = 32px more) → the pair
        never overlaps and neither is ever occluded by the keyboard, whether it is collapsed (42px) or expanded (dock-h+42). */
     #editor-cam-btn { bottom: calc(var(--kbd-clear, 42px) + 40px) !important; }
-    /* t1450 — …and the ⇥/⇤ indent pair takes the next slot up (another 32px) on the SAME --kbd-clear signal.
+    /* t1450 — …and the comment toggle takes the next slot up (another 32px) on the SAME --kbd-clear signal.
        Joining the declared stack rather than picking a bottom: the inline values are overridden here, which is
        exactly how a hand-picked offset came to overlap ✚ Make at wide viewports (measured, then fixed here). */
-    #editor-indent, #editor-outdent, #editor-comment { bottom: calc(var(--kbd-clear, 42px) + 72px) !important; }   /* t1452 — the comment toggle shares the pair's row */
+    #editor-comment { bottom: calc(var(--kbd-clear, 42px) + 72px) !important; }
 }
 
 /* Variables tab — search row + Filters button */

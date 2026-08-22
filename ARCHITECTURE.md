@@ -167,13 +167,14 @@ In the live app: `listEntries().filter(e => e.kind === 'builtin').map(e => [e.id
 | `container` / `path` | 422 / 436 | stamp at `def.points(p)` / sweep along `cd.step(params, pt)` |
 | leaf / move | **456** | `def.emit(p, dx, dy, dialect)` — e.g. `wizards/ops/move.js` |
 
-### Post-passes, in declared order (`blockEmitter.js:514-527`)
+### Post-passes, in declared order (`blockEmitter.js:515-532`)
 
-`applySetupFlips` :514 → `applyToolChanges` :515 → `applyEntryWaypoint` :516 → `applyProgramTransform` :517 →
-`applySerialLibrary` :518 → `applyModalFeed` :519 → `applyCapGating` :520 → `balanceOwords` :521 →
-`applyIndentStyle` :527 (`data/indentStyle.js:169`). Each is byte-identical no-op when its declaration is absent.
-Indent runs **last** because every pass above it matches line *text* — the reasoning is written at
-`blockEmitter.js:522-526`.
+`applySetupFlips` :515 → `applyToolChanges` :516 → `applyEntryWaypoint` :517 → `applyProgramTransform` :518 →
+`applySerialLibrary` :519 → `applyModalFeed` :520 → `applyCapGating` :521 → `balanceOwords` :522 →
+`applyInlineClampSkip` :523 → **the unconditional flush-left strip** :532 (an inline `for`, not a named pass —
+t2139, "NO INDENTATION, EVER": the `indentStyle` setting/toggle/emit-branch is retired outright, so there is
+nothing left to declare — every line loses its leading whitespace, always, no settings check). Runs **last**
+because every pass above it matches line *text* — the reasoning is written at `blockEmitter.js:524-531`.
 
 `emitMapped` returns `{ text, lines, map, absorbed, feedFolds }` (`blockEmitter.js:536`). `absorbed` (:531) and
 `feedFolds` (:535) are **passes declaring what they did**, so their invariants can be measured rather than trusted.
@@ -575,21 +576,18 @@ gate catches a silently-dead handle days later.
 rg -n "_writable|_host|setFormHost" DDCS-Studio/web/wizards/ops/panelTypes.js DDCS-Studio/web/wizards/views/userOpView.js
 ```
 
-### 4 · A fact declared and read by nobody — the `indentStyle` split. **UNVERIFIED at runtime; strong static read.**
-`activeDialectOpts()` (`wizards/previewEmit.js:21`) returns `{ dialect, indentStyle }` and is imported by **29
-modules**. Three modules keep their own byte-identical `dialectOpts()` copy that returns `{ dialect }` only:
-```
-blocks/programModel.js:36   () => ({ dialect })
-blocks/opGlow.js:18         () => ({ dialect })
-blocks/opSession.js:25      () => ({ dialect })
-```
-`applyIndentStyle` no-ops unless `settings.indentStyle === 'flush'` (`data/indentStyle.js:51`). So setting indent
-style to `flush` appears to change the **wizard preview panel** but not the committed program projection
-(`programModel.js:245`), the glow diff, or the exported `.nc`.
-```bash
-rg -n "indentStyle" DDCS-Studio/web --glob '!data/indentStyle.js'
-```
-Only `ui/settingsPanel.js` (writes) and `wizards/previewEmit.js` (reads) appear. **I did not run this.**
+### 4 · RESOLVED (t2139) — the `indentStyle` split is gone, not just fixed.
+This finding used to read: `activeDialectOpts()` returned `{ dialect, indentStyle }`, three modules
+(`programModel.js`/`opGlow.js`/`opSession.js`) kept their own `{ dialect }`-only copy, and `indentStyle:'flush'`
+appeared to change the wizard preview panel but not the committed program/glow diff/exported `.nc` — a fact
+declared in one place and inconsistently read in the others.
+
+Human ruling, "no indentation ever" (BACKLOG.md "NO INDENTATION, EVER"): the entire `indentStyle`
+setting/toggle/emit-branch is RETIRED, not reconciled. There is no longer a split to close because there is no
+longer a SECOND behavior for the split copies to diverge from — every dialect emits flush-left,
+unconditionally (`blockEmitter.js`'s final pass, see the post-passes list above). `activeDialectOpts()` now
+returns `{ dialect }` only, matching the three modules that were already right. `data/indentStyle.js` is
+deleted; its surviving comment/uncomment half moved to `ui/editorTextOps.js`.
 
 ### 5 · A legacy `corner` op has a live ✎ Edit that opens onto nothing — CONFIRMED live at runtime, deliberately NOT fixed.
 `canEdit('corner')` (`wizardManager.js:323`) returns true because `paramFields('corner')` is non-empty —
@@ -704,8 +702,8 @@ WORK-LOG- and test-header-reported; not re-measured.)*
 - **Nothing was executed.** No test, no browser, no dev server. Every claim above is static reading with a
   `file:line` you can check in one jump. All pass/fail counts, the "549 declared bindings", the "275 px" and
   "229 px" figures, and the "~2450 e2e tests" are WORK-LOG- or test-header-reported and were **not** re-measured.
-- **Trap #4 (`indentStyle`)** is the one finding worth measuring before acting on. The grep across `web/` returned
-  only `settingsPanel.js` (writes) and `previewEmit.js` (reads), but I did not run the app.
+- **Trap #4 (`indentStyle`)** is RESOLVED (t2139) — the setting is retired outright, not reconciled; see the
+  entry above.
 - **Traps #5 and #6** are read from source; neither was reproduced in a browser.
 - **Q3 §5 (the machine-frame twin's overlay path)** — for a homing/machine-frame twin, the overlay's `startPin()`
   and `envelopeRect()` branch the "wrong" way. Harmless today *only* because overlay mode never draws the envelope

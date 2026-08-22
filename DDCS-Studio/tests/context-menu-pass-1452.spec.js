@@ -3,19 +3,18 @@ import { test, expect } from '@playwright/test';
 /**
  * t1452 — THE CONTEXT-MENU PASS: the EDITOR surface, plus the mechanism every other surface will reuse.
  *
+ * t2139 — this file used to ALSO cover indent/outdent (Tab/Shift+Tab, the ⇥/⇤ menu entries); NO INDENTATION,
+ * EVER (human ruling, BACKLOG.md) retired that capability entirely, not just its buttons. Comment/uncomment
+ * survives and is now the whole of this file's plain-text-menu coverage.
+ *
  * ── THE TWO HARD RULES, AND HOW THEY ARE ASSERTED ────────────────────────────────────────────────────────────────
- *   1. AN ENTRY ONLY SHORTCUTS AN ACTION THAT ALREADY EXISTS SOMEWHERE ELSE — never the only path. Originally
- *      operationalized as "a VISIBLE BUTTON too" (t1452), which is why comment/uncomment arrived as a FEATURE
- *      (button + Ctrl+/ + menu) rather than as a menu entry: it existed nowhere before, and a menu-only action is
- *      exactly what the rule forbids.
- *      t2099 — t2077 removed the indent/outdent buttons (human: "remove indent button now" — Tab/Shift+Tab were
- *      "always the primary path" per its own comment) and da280131/t2078 removed the comment button ("Ctrl+/ and
- *      the right-click menu keep it"). Both are documented, deliberate decisions that the dedicated BUTTON is no
- *      longer needed, not a menu-only regression — `editorTextOps.js`'s own header still states the invariant RULE
- *      1 actually protects: "Three ways in, ONE implementation: the toolbar buttons, Tab / Shift+Tab, and the
- *      right-click menu all call `indentEditor(dir)`" (buttons are now optional/absent, the other two doors are
- *      not). RULE 1 below is re-encoded around the KEYBOARD doors that survive, driven for real, rather than a
- *      button id that no longer exists for any of the three actions.
+ *   1. AN ENTRY ONLY SHORTCUTS AN ACTION THAT ALREADY EXISTS SOMEWHERE ELSE — never the only path. Comment/
+ *      uncomment arrived as a FEATURE (button + Ctrl+/ + menu) rather than as a menu entry for exactly this
+ *      reason: it existed nowhere before, and a menu-only action is what the rule forbids.
+ *      t2099 — da280131/t2078 retired the dedicated comment BUTTON too ("Ctrl+/ and the right-click menu keep
+ *      it") — a documented, deliberate decision that the button specifically is no longer needed, not a
+ *      menu-only regression: `editorTextOps.js`'s own header still states the invariant RULE 1 protects
+ *      ("Three ways in, ONE implementation"). RULE 1 below is driven through the keyboard door that survives.
  *   2. LONG-PRESS = RIGHT-CLICK. The user tests on a phone, where there is no right button — so a menu without it is
  *      a menu that does not exist on the surface it is most needed. Driven here as real touch events.
  *
@@ -62,7 +61,7 @@ const select = async (page, a, b) => {
 const val = (page) => page.evaluate(() => document.getElementById('editor').value);
 
 /** Re-select lines [a, b] of the editor's CURRENT value — unlike select(), never re-seeds it. For proving a
- * round trip (indent then outdent) where the second selection must land on the FIRST step's own result. */
+ * round trip (comment then uncomment) where the second selection must land on the FIRST step's own result. */
 const reselect = (page, a, b) => page.evaluate(({ a, b }) => {
     const ed = document.getElementById('editor');
     const L = ed.value.split(String.fromCharCode(10));
@@ -78,24 +77,16 @@ test('RULE 1 — every editor menu entry also has a KEYBOARD door (the menu is n
     const box = await page.locator('#editor').boundingBox();
     await page.mouse.click(box.x + 40, box.y + 60, { button: 'right' });
     const labels = await page.locator('.op-ctx-menu .op-ctx-item').allTextContents();
-    expect(labels.length, 'the plain-text menu offers its entries').toBeGreaterThanOrEqual(3);
-    expect(labels.join(' | ')).toMatch(/Indent/);
-    expect(labels.join(' | ')).toMatch(/Outdent/);
+    expect(labels.length, 'the plain-text menu offers its entry').toBeGreaterThanOrEqual(1);
     expect(labels.join(' | ')).toMatch(/Comment/);
     await page.keyboard.press('Escape');
 
-    // t2099 — none of the three keep a dedicated button (t2077/t2078 both retired theirs), so RULE 1's real claim
-    // is proven by DRIVING the keyboard door each one still has, not by locating a button id.
+    // t2099 — Comment keeps no dedicated button any more (t2078 retired it: "Ctrl+/ and the right-click menu
+    // keep it"), so RULE 1's real claim is proven by DRIVING the keyboard door it still has, not a button id.
     await page.locator('#editor').click();
     await reselect(page, 1, 2);
-    await page.keyboard.press('Tab');
-    expect(await val(page), 'Tab genuinely indents (editorTextOps.js: same implementation the menu calls)').not.toBe(s.before);
-    await reselect(page, 1, 2);   // the SAME lines, on the now-indented text — never re-seeded
-    await page.keyboard.press('Shift+Tab');
-    expect(await val(page), 'and Shift+Tab genuinely outdents it back — a real round trip, not a no-op key').toBe(s.before);
-    await reselect(page, 1, 2);
     await page.keyboard.press('Control+/');
-    expect(await val(page), 'Ctrl+/ genuinely comments (the third door — also its own dedicated test below)').not.toBe(s.before);
+    expect(await val(page), 'Ctrl+/ genuinely comments (the second door — also its own dedicated test below)').not.toBe(s.before);
     await page.keyboard.press('Control+z');
     expect(await val(page), 'undo leaves the editor exactly as this test found it').toBe(s.before);
 });
@@ -162,7 +153,7 @@ test('COMMENT / UNCOMMENT — real `;` bytes, a clean toggle, and blank lines le
 test('THE MARK CANNOT NEST — commenting a line that already has a ( comment ) stays legal', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { commentBlock, COMMENT_MARK } = await import('/data/indentStyle.js');
+        const { commentBlock, COMMENT_MARK } = await import('/ui/editorTextOps.js');
         const NL = String.fromCharCode(10);
         const src = ['G90   ( absolute )', 'G0 X0 Y0   ( rapid )'].join(NL);
         const out = commentBlock(src, 0, src.length).text;

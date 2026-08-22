@@ -8,7 +8,7 @@
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
 import { showOpMenu, showGroupMenu, hideOpMenu, openMenu, attachLongPress } from './opContextMenu.js';
-import { indentMenuItems, installEditorIndent } from './editorTextOps.js';   // t1450 — the editor's block indent/outdent: one implementation, three doors
+import { commentMenuItems, installEditorTextOps } from './editorTextOps.js';   // t1452 — the editor's comment toggle: one implementation, three doors
 import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
@@ -256,20 +256,20 @@ export function initEditorOpHover() {
             return;
         }
         /**
-         * t1450 — PLAIN TEXT: the indent/outdent entries. This is the branch that used to `return` and leave the
-         * native menu, and it is the only place the two entries can live without displacing something: over an OP the
+         * t1450 — PLAIN TEXT: the comment/uncomment entry. This is the branch that used to `return` and leave the
+         * native menu, and it is the only place the entry can live without displacing something: over an OP the
          * op actions are what the user came for, and over a loose run it is Group.
          *
          * The rule the next act's menu pass states is already honoured here — an entry only shortcuts an action that
-         * exists somewhere visible. Both of these are toolbar buttons AND Tab / Shift+Tab; the menu is the third door
-         * to one implementation, never its only door.
+         * exists somewhere visible. This is a toolbar button AND Ctrl+/; the menu is the third door to one
+         * implementation, never its only door. t2139 — indent/outdent's own two entries retired with the feature.
          */
         e.preventDefault();
         hide();
-        openMenu(indentMenuItems(), e.clientX, e.clientY);
+        openMenu(commentMenuItems(), e.clientX, e.clientY);
     });
     editor.addEventListener('scroll', hideOpMenu);
-    installEditorIndent();   // t1450 — Tab / Shift+Tab + the toolbar buttons (idempotent; the menu path is above)
+    installEditorTextOps();   // t1452 — Ctrl+/ + the toolbar button (idempotent; the menu path is above)
     // t1452 — LONG-PRESS = right-click. The user tests on a phone, where there is no right button, so without
     // this the editor menu simply does not exist on the surface it is most needed. It synthesises a real
     // `contextmenu` event, so the ONE handler above serves both inputs and they can never drift apart.

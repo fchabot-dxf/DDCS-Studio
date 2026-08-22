@@ -47865,3 +47865,122 @@ one). Node tier 226/226 unchanged. Lint clean on every touched file.
 
 🔨 turn 2137
 
+---
+
+# t2139 — NO INDENTATION, EVER: remove the toggle and every path that writes one
+
+**Dispatch**: BACKLOG.md "NO INDENTATION, EVER" — human ruling, stated four times: G-code is flush-left, always,
+no preference, no mention of the word anywhere including filenames. 21 files named, plus the emit branch, the
+Tab keybinding (still live even though its buttons were removed earlier), the menu entry, the persisted
+settings key, and `data/indentStyle.js`'s comment-toggle half folded into `editorTextOps.js` before deletion.
+
+## What actually changed (13 files edited, 2 deleted)
+
+- **`web/wizards/dialects/index.js`-adjacent emit**: `blockEmitter.js`'s conditional `applyIndentStyle(T,
+  dialect.flushIndent ? {...settings, indentStyle:'flush'} : settings)` became an unconditional
+  `for (const t of T) t.line = t.line.replace(/^[ \t]+/, '')` — every dialect, every time, no settings read at
+  all. `dialect.flushIndent` itself (the 3 DDCS dialect files) is UNCHANGED and stays load-bearing: it has a
+  SECOND live consumer, `applyInlineClampSkip`'s own "DDCS-family strict syntax" gate (t2070's inline-IF-THEN
+  rewrite) — this pass just no longer needs to read it, since flush is universal now.
+- **`web/data/indentStyle.js` deleted.** Its comment/uncomment half (`COMMENT_MARK`, `commentBlock`,
+  `allCommented`, the whole-line `blockOf` helper) moved into `ui/editorTextOps.js` — the file BACKLOG named as
+  the fold target, and the only remaining consumer. `editorTextOps.js` itself is now comment-only:
+  `indentEditor`/`indentBlock`/the Tab keydown handler/the indent-menu entries are gone; `installEditorIndent`
+  → `installEditorTextOps`, `indentMenuItems` → `commentMenuItems` (both renamed, both callers updated in
+  `editorOpHover.js`).
+- **`web/ui/settingsPanel.js`**: the whole "G-CODE OUTPUT" settings section deleted (it existed for nothing
+  else); the Tab/Shift+Tab editor-hint line replaced with the surviving Ctrl+/-comment one; the `set_indent_style`
+  wiring block deleted; `indentStyle` dropped from the settings-merge WHITELIST (a legacy saved workspace's
+  stale value is now silently discarded on load, not resurrected — the correct outcome once the emit is
+  unconditional); `activeDialect()` (the "Pull from controller" helper) simplified to the workspace profile only.
+- **`web/wizards/previewEmit.js`**: `activeDialectOpts()` no longer reads/returns `indentStyle` at all —
+  `{ dialect }` only, now byte-identical to the three modules (`programModel.js`/`opGlow.js`/`opSession.js`)
+  that were already `{ dialect }`-only (closes ARCHITECTURE.md's own TRAP #4, see below).
+- **`web/index.html`**: the settings row markup was JS-generated (settingsPanel.js, above), so nothing to
+  delete here — just two stale dev comments trimmed (one narrating the earlier button-only removal, now
+  superseded; one listing "indent/comment" as siblings, now just "the comment button").
+- **`web/styles.css`**: two selector lists (`#editor-indent, #editor-outdent, #editor-comment { ... }`) lost
+  their first two ids, keeping `#editor-comment`'s own position rule unchanged (comment SHARES the row, its
+  own offset doesn't move just because its former neighbours are gone).
+- **`web/data/opToSlot.js`**: a private, unexported local helper `const indent = (lines, pad) => ...` (pads CAM
+  macro text — nothing to do with the retired feature, just a same-word local function) renamed to `padLines`,
+  7 call sites updated. Purely cosmetic (zero behavior change) but the word is real, and BACKLOG named this
+  file for the sweep.
+- **`web/ui/editorOpHover.js`, `web/ui/opContextMenu.js`, `web/ui/headerPost.js`**: stale prose fixed (the
+  right-click plain-text branch now offers one entry not two; `openMenu`'s doc-comment no longer names
+  indent/outdent; a feature-list comment dropped "Indent").
+
+## Two files deleted outright, per BACKLOG's own table
+`tests/editor-indent-1450.spec.js` and `verification/t2095_indent_diag.mjs` — both test a feature that no
+longer exists.
+
+## Judgment calls made, and the reasoning
+
+- **`dialect.flushIndent` KEPT, not renamed.** It has a real second consumer (`applyInlineClampSkip`) and
+  BACKLOG's own text explains and uses the name approvingly without flagging it — and its own "21 files, 3
+  filenames" count and named-file list excludes the 3 dialect-definition files. Renaming it would be scope
+  creep on a name a different piece of live machinery also depends on, not requested.
+- **`web/data/releaseNotes.js` LEFT UNTOUCHED**, despite being named in BACKLOG's sweep list. Its one mention
+  (in the dated `'2026.08.20.x'` entry, whichever version that button-removal actually shipped in) describes
+  what was true THEN — the same historical-record status BACKLOG explicitly grants WORK-LOG entries. Rewriting
+  a past dated release note to match current reality would be revising history, not fixing stale prose. No new
+  entry added either — no release is being cut this turn.
+- **`bridge/controllers/expert-m350/FINDINGS.md`** (outside DDCS-Studio, a hardware-evidence document citing
+  the old file name) — same historical-record reasoning, left untouched. Confirmed by a repo-wide `indent`
+  grep outside `DDCS-Studio/` that everything else matching is either vendor source (linuxcnc/mach4 assets,
+  never touched) or Python/bridge code using "indent" for its own unrelated formatting concerns — out of scope,
+  correctly not a DDCS Studio G-code-emit-preference mention.
+- **`pocket-e0-superset.spec.js`'s "indent-1/CRLF format"** and **`styles.css`'s "an indented, togglable
+  list"** — both false positives (a JSON fixture's own pretty-print width; a generic CSS description of a
+  nested submenu), left untouched; neither is the retired feature.
+- **A found-not-fixed dead-code discovery, flagged rather than pulled in**: `#editor-comment` (the CSS rule I
+  preserved while stripping its indent/outdent siblings) turned out to ALREADY target a nonexistent DOM element
+  — the comment TOOLBAR BUTTON was retired at t2078, a prior turn (confirmed: zero `id="editor-comment"`
+  anywhere in `index.html`; comment is reachable only via Ctrl+/ and the right-click menu now). Both CSS rules
+  for it are dead, same as the indent/outdent ones I removed — but they were ALREADY dead before this turn, not
+  orphaned by my own edit, so per the surgical-changes rule this is reported, not pulled into this turn's diff.
+- **`ARCHITECTURE.md` updated** (the worker-skill mandate: fix the map when your own act proves it stale) — its
+  TRAP #4 ("`indentStyle` declared and read by nobody") documented exactly the split this turn closes; marked
+  RESOLVED with the new shape, not deleted (the map's own "mark, don't smooth over" discipline). The
+  post-passes pipeline list and the "honest gaps" caveat section were both updated to match.
+
+## Non-vacuity
+
+New node test (`dialect-emit-golden-2072.test.mjs`): builds `user_pocket_data` (a real WHILE-loop body the
+emitter has always written with real internal 2-space indentation) against `grbl` — a dialect with NO
+`flushIndent` cap — passing an explicit legacy `{ indentStyle: 'indented' }` setting. Proven non-vacuous by
+reverting `blockEmitter.js` + restoring `data/indentStyle.js` from HEAD and re-running: failed with the exact
+predicted symptom (3 real indented lines survived — `    GOTO96`, `  END2`, `  G0 Z5   (...)`); restored,
+confirmed green. This is the case that would have silently regressed if the strip had stayed conditional.
+
+## Gate
+
+Node tier: 227/227 (was 226, +1 the new test). Lint clean on every touched JS file. Targeted Playwright:
+`context-menu-pass-1452.spec.js` (7/7, incl. the rewritten RULE 1), `header-account-2077.spec.js` (5/5),
+`editor-toolbar-2078.spec.js` (3/3), `architecture-map-1698.test.mjs` (6/6, incl. the 2 corrected TRAP4
+citations), `settings-controller-group.spec.js` + `settings-ia-regroup-1245.spec.js` + `settings-modal.spec.js`
++ `settings-ux-1287.spec.js` + `workspace-roundtrip.spec.js` (34/34), `check-console.spec.js` (clean boot),
+`cam-drill-single-pattern.spec.js` + `cam-compose-framing.spec.js` + `cam-row-honesty-1414.spec.js` (14/14,
+regression insurance for the `opToSlot.js` rename), `corner-data-emit.spec.js` + `help-slot.spec.js` (4/4).
+2 flakes across the whole sweep (a settings-boot timeout, a CAM-boot timeout) — both re-ran 100% clean in
+isolation with `--workers=1`, confirmed pre-existing parallel-worker contention, not a regression.
+
+## Files
+- `ARCHITECTURE.md` — TRAP #4 marked RESOLVED; the post-passes pipeline list corrected.
+- `DDCS-Studio/web/blocks/blockEmitter.js` — the emit branch: unconditional flush, no settings.
+- `DDCS-Studio/web/data/indentStyle.js` — **deleted**; comment logic folded into `editorTextOps.js`.
+- `DDCS-Studio/web/ui/editorTextOps.js` — rewritten: comment-only now, `installEditorTextOps`/`commentMenuItems`.
+- `DDCS-Studio/web/ui/editorOpHover.js` — updated import/usage + stale prose.
+- `DDCS-Studio/web/ui/settingsPanel.js` — G-CODE OUTPUT section, wiring, whitelist entry, stale hint all removed.
+- `DDCS-Studio/web/ui/opContextMenu.js`, `web/ui/headerPost.js` — stale prose.
+- `DDCS-Studio/web/wizards/previewEmit.js` — `activeDialectOpts()` drops `indentStyle`.
+- `DDCS-Studio/web/index.html`, `web/styles.css` — stale comments / dead selector ids removed.
+- `DDCS-Studio/web/data/opToSlot.js` — local `indent()` → `padLines()` (cosmetic rename, 7 call sites).
+- `DDCS-Studio/tests/editor-indent-1450.spec.js`, `verification/t2095_indent_diag.mjs` — **deleted**.
+- `DDCS-Studio/tests/context-menu-pass-1452.spec.js` — RULE 1 rewritten (comment-only doors); import path fixed.
+- `DDCS-Studio/tests/header-account-2077.spec.js` — one assertion re-worded (the fact it checks is unchanged).
+- `DDCS-Studio/tests/node/architecture-map-1698.test.mjs` — 2 TRAP4 citations updated to match the resolution.
+- `DDCS-Studio/tests/node/dialect-emit-golden-2072.test.mjs` — new non-vacuous unconditional-flush test.
+
+🔨 turn 2139
+

@@ -11,15 +11,6 @@
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
-/**
- * t1450 — THE INDENT STYLE RIDES HERE TOO, for the reason this file exists in the first place: it is the ONE place
- * that answers "what does the ACTIVE workspace want the emit to look like", and the preview must show what INSERT
- * will write. A second reader would put the preview and the inserted program on different settings — the exact lie
- * this seam was built to close, one axis along. A caller that passes no settings still gets `indented`, which is the
- * bytes every emitter already wrote, so every existing path is byte-identical by construction.
- */
 export function activeDialectOpts() {
-    let indentStyle;
-    try { indentStyle = (window.ddcsGetSettings && window.ddcsGetSettings().indentStyle) || undefined; } catch (_) { /* headless */ }
-    try { return { dialect: resolveActivePost(getActiveProfile().id), indentStyle }; } catch (_) { return { indentStyle }; }
+    try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; }
 }

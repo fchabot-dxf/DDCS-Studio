@@ -61,9 +61,9 @@ test('the transfer button is gone and undo/redo moved into the editor pane', asy
     undoInHeader: !!document.querySelector('.hdr-controls #btn-undo'),
     undoExists: !!document.getElementById('btn-undo'),
     redoExists: !!document.getElementById('btn-redo'),
-    indentGone: !document.getElementById('editor-indent') && !document.getElementById('editor-outdent'),
+    blockShiftButtonsGone: !document.getElementById('editor-indent') && !document.getElementById('editor-outdent'),
   }));
-  expect(r.indentGone, 'indent/outdent buttons removed').toBe(true);
+  expect(r.blockShiftButtonsGone, 'the retired block-shift buttons stay gone').toBe(true);
   expect(r.transfer, 'transfer button deleted').toBe(false);
   expect(r.undoInHeader, 'undo no longer in the header').toBe(false);
   expect(r.undoExists && r.redoExists, 'undo/redo still exist (moved, not lost)').toBe(true);

@@ -173,7 +173,30 @@ test('FLUSH — no emitted line carries leading whitespace on any verified DDCS 
             if (ln.length && /^[ \t]/.test(ln)) indented.push(`${r.op.opType}@${r.dialectId} line ${i + 1}: ${JSON.stringify(ln)}`);
         });
     }
-    must('an emitted line starts with whitespace — the DDCS Expert rejects an indented N-label as a hard syntax error (t2070). dialect.flushIndent or applyIndentStyle stopped stripping it for this post.',
+    must('an emitted line starts with whitespace — the DDCS Expert rejects an indented N-label as a hard syntax error (t2070). blockEmitter.js\'s own unconditional flush-left pass (t2139) stopped stripping it for this post.',
+        () => expect(indented).toEqual([]));
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// t2139 — NO INDENTATION, EVER: flush is now UNCONDITIONAL, not just the flushIndent-DDCS-family fallback.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+test('t2139 flush is unconditional: a NON-flushIndent dialect (grbl — no per-dialect flush requirement) with a '
+    + 'legacy explicit indentStyle:"indented" setting STILL emits flush-left — the retired toggle is fully ignored, '
+    + 'not merely defaulted away', async () => {
+    const env = await boot();
+    // pocket/surfacing both have a real WHILE-loop body the emitter has always written with a real 2-space indent
+    // internally (blockEmitter.js's own header docstring) — the thing this pass exists to strip. grbl carries no
+    // `flushIndent` cap (only the 3 DDCS dialects do — wizards/dialects/*.js), so under the OLD code
+    // (blockEmitter.js: `applyIndentStyle(T, dialect.flushIndent ? {...settings, indentStyle:'flush'} : settings)`)
+    // an explicit `indentStyle:'indented'` on a non-flushIndent dialect would have SURVIVED the strip — this is the
+    // exact case that would have failed before t2139 and must pass after it.
+    const def = env.U.getUserDef('user_pocket_data');
+    const params = env.U.defaultParams(def);
+    const stack = env.builderOf('user_pocket_data')(params);
+    const text = env.emitMapped(stack, { dialect: env.getDialect('grbl'), indentStyle: 'indented' }).text;
+    const indented = text.split('\n').filter((ln) => ln.length && /^[ \t]/.test(ln));
+    must('a non-DDCS dialect with an explicit legacy indentStyle:"indented" setting produced an indented line — the '
+        + 'retired setting is still being consulted somewhere; it must be ignored unconditionally now',
         () => expect(indented).toEqual([]));
 });
 

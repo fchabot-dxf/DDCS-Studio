@@ -228,7 +228,7 @@ export function initHeaderPost() {
         // do with the program in front of you". The human's own refinement of that rule, which is why it is a
         // correction and not a flip-flop: Load / Insert / Export act on the program AS A WHOLE — they are what you
         // reach for with an EMPTY editor (start one) or a FINISHED one (ship it), never mid-edit. t1227's test was
-        // right; these three simply fall on the app side of it, unlike Comment/Indent/Undo which act on the text
+        // right; these three simply fall on the app side of it, unlike Comment/Undo which act on the text
         // under the caret and stay in the pane. The editor's own ▾ file button is gone with this, so these are
         // once again the ONE door to Load/Insert/Export, not a second one. Handlers are the SAME globals the editor menu called (loadGcodeFile / insertGcodeFile /
         // downloadFile), so there is one implementation, not a copy.

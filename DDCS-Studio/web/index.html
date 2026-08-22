@@ -168,8 +168,8 @@
 
         </nav>
         <div class="hdr-controls">
-            <!-- t2077 — UNDO / REDO MOVED, NOT LOST: they now sit in the EDITOR pane beside indent/comment (the
-                 pane they act on), the same "moved not lost" curation t1227 applied to Load/Insert/Export, PLUS
+            <!-- t2077 — UNDO / REDO MOVED, NOT LOST: they now sit in the EDITOR pane beside the comment button
+                 (the pane they act on), the same "moved not lost" curation t1227 applied to Load/Insert/Export, PLUS
                  real Ctrl+Z / Ctrl+Y bindings they never had. TRANSFER is DELETED: it was permanently `hidden`
                  and superseded by the Gateway tab's own Send. The space they held is the account chip's.
                  ⚠ bridgeTransfer.js no-ops when #transferBtn is absent (`if (!btn) return;`) — checked, not assumed. -->
@@ -208,12 +208,9 @@
                 <div class="editor-toolbar" role="toolbar" aria-label="Editor tools">
                     <button id="editor-cam-btn" type="button" onclick="ddcsEditorMakeMenu(this)" class="toolbar-btn settings-io" title="Make from the current program: a CAM slot, or a K-button macro." aria-label="Make from this program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span class="editor-file-caret" aria-hidden="true">▾</span></button>
                     <button id="align-rotate-btn" type="button" onclick="ddcsAlignRotate()" class="toolbar-btn settings-io" title="Alignment correction — rotate the whole program by a measured fence angle about a pivot (no G68 on DDCS, so Studio does it). Simulate after." aria-label="Alignment correction (rotate program)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg></button>
-                <!-- t2077 — THE ⇤ / ⇥ BUTTONS ARE GONE (human: "remove indent button now"), thinning the bottom-left
-                     cluster. THE FEATURE IS NOT LOST: Tab / Shift+Tab still indent and outdent the selection
-                     (editorTextOps.js's own keydown, which was always the primary path), and the right-click menu
-                     keeps its rows. editorTextOps' button loop skips ids that are absent, so nothing breaks by
-                     their removal — checked, not assumed. ⚠ t2070: on DDCS these are REAL leading spaces, and the
-                     Expert REJECTS an indented N-label, so indenting by hand is a thing to do knowingly. -->
+                <!-- t2139 — NO INDENTATION, EVER (human ruling): the emit is flush-left, unconditionally, and the
+                     editor's own block-indent capability (buttons, Tab/Shift+Tab, right-click entries) is retired
+                     with it, not just hidden. Comment/uncomment survives (editorTextOps.js). -->
                 <button id="btn-undo" type="button" class="toolbar-btn settings-io" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history) — Ctrl+Z" aria-label="Undo" disabled>↶</button>
                 <button id="btn-redo" type="button" class="toolbar-btn settings-io" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history) — Ctrl+Shift+Z or Ctrl+Y" aria-label="Redo" disabled>↷</button>
                 <button type="button" id="btn-clear" class="toolbar-btn" onclick="window.clearCode && window.clearCode()" title="Clear the program (editor + blocks)" aria-label="Clear program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>

@@ -1,51 +1,100 @@
 /**
- * ui/editorTextOps.js — the editor's LINE-BLOCK operations on a selection: indent / outdent (t1450) and
- * comment / uncomment (t1452). Both user-designed; both write REAL bytes.
+ * ui/editorTextOps.js — the editor's COMMENT / UNCOMMENT operation on a selection (t1452). Writes REAL bytes.
  *
- * Three ways in, ONE implementation: the toolbar buttons, Tab / Shift+Tab, and the right-click menu all call
- * `indentEditor(dir)`. Three entry points with three copies of the string surgery is how two of them come to disagree
- * about what a selection is — and here that disagreement writes bytes into the user's file.
+ * t2139 — this file used to also hold indent/outdent (t1450); retired entirely (human ruling — "no indentation
+ * ever", BACKLOG.md "NO INDENTATION, EVER"). Comment/uncomment survives and absorbs the two pieces
+ * `data/indentStyle.js` (now deleted) held alongside it by filing accident — `COMMENT_MARK` and the
+ * whole-line block-selection helper — so this file is the ONE remaining home for the editor's text ops.
  *
- * ── IT WRITES REAL SPACES, AND THAT IS THE RULING ────────────────────────────────────────────────────────────────
+ * ── IT WRITES REAL BYTES, AND THAT IS THE RULING ─────────────────────────────────────────────────────────────────
  * No display-only padding anywhere (ruled OUT by the user; deliberately not built). The editor is a byte-truth
- * surface: what you see is what the controller reads. So this edits the textarea's VALUE, the width comes from the
- * same `INDENT` the emitters write, and the syntax-colouring overlay follows because it re-renders from that value.
+ * surface: what you see is what the controller reads. So this edits the textarea's VALUE directly, and the
+ * syntax-colouring overlay follows because it re-renders from that value.
  *
  * ── UNDO IS THE HARD PART, AND IT IS WHY THIS GOES THROUGH execCommand ───────────────────────────────────────────
- * Assigning `textarea.value` WIPES the browser's native undo stack — the user indents a block, presses Ctrl+Z, and
- * loses not just the indent but every edit before it. `insertText` on a selection is the one path that records an
+ * Assigning `textarea.value` WIPES the browser's native undo stack — the user comments a block, presses Ctrl+Z, and
+ * loses not just the comment but every edit before it. `insertText` on a selection is the one path that records an
  * undoable step, so the block is selected and replaced in a single command. It is deprecated-but-universal for
  * exactly this reason and has no standard replacement; `setRangeText` does not enter the undo stack either. The
  * fallback (assignment) exists only for a host without it — noted rather than silent, since undo is the thing lost.
  */
-import { INDENT, INDENT_WIDTH, indentBlock, commentBlock, COMMENT_MARK } from '../data/indentStyle.js';
 
-export { INDENT, INDENT_WIDTH, COMMENT_MARK };
+/**
+ * ── t1452 — THE COMMENT MARK, AND WHY IT IS `;` AND NOT `( … )` ──────────────────────────────────────────────────
+ *
+ * G-code's usual comment is a parenthesis pair, and on THIS controller it cannot be used to comment out an arbitrary
+ * line: **DDCS refuses a nested `( … ( … ) )`** with "Unrecognized characters" (the export path already strips parens
+ * for exactly this reason). Wrapping a line that already carries a comment — which is most emitted lines, since every
+ * parametric body annotates itself — would produce a line the machine rejects. Nesting is not a rare case here; it is
+ * the common one.
+ *
+ * SO THE MARK IS A LEADING SEMICOLON, and that is EVIDENCE rather than preference: **189 lines in the captured
+ * factory corpus begin with `;`**. It is demonstrated on the controller, it needs no closing token, and it cannot
+ * nest — so commenting is total (any line, whatever it contains) and uncommenting is exact.
+ *
+ * THE MARK GOES AT THE LINE'S OWN LEADING WHITESPACE, not always at column 0: a commented line keeps its place, so
+ * commenting a loop body and uncommenting it round-trips to the identical bytes. That is asserted, not assumed.
+ */
+export const COMMENT_MARK = ';';
+
+/** Is every non-blank line in this block already commented? (Blank lines do not vote — else one empty line in a
+ *  selection would flip the whole block's meaning, and a user cannot see why.) */
+const allCommented = (lines) => {
+    const real = lines.filter((l) => l.trim() !== '');
+    return real.length > 0 && real.every((l) => l.trimStart().startsWith(COMMENT_MARK));
+};
+
+/** The whole-line block a selection covers — the SAME rule `indentBlock` used to share this with, kept here now
+ *  it is the only consumer: a caret with no selection acts on its own line; a selection is expanded to whole lines. */
+function blockOf(text, selStart, selEnd) {
+    const src = String(text == null ? '' : text);
+    const a = Math.max(0, Math.min(src.length, selStart | 0));
+    const b = Math.max(a, Math.min(src.length, selEnd | 0));
+    const from = src.lastIndexOf('\n', a - 1) + 1;
+    let to = src.indexOf('\n', b);
+    if (to === -1) to = src.length;
+    const end = (b > a && b === from) ? b : to;
+    return { blockStart: from, blockEnd: end, block: src.slice(from, end), a, b };
+}
 
 /** The editor textarea, or null when the editor is not mounted (a wizard-only screen). */
 const editorEl = () => document.getElementById('editor');
 
 /**
- * Indent (dir > 0) or outdent (dir < 0) the selected lines — or the caret's own line when nothing is selected.
- * Returns true when bytes actually changed, so a caller can skip the re-render and the toolbar can stay honest.
+ * Comment / uncomment the selected lines — a TOGGLE, like every editor: comment unless the block is already fully
+ * commented, in which case uncomment. BLANK LINES ARE LEFT ALONE (a `;` on an empty line is noise the user then
+ * has to clean up by hand).
  */
-export function indentEditor(dir = 1, ed = editorEl()) {
-    return applyBlock(ed, (v, s, e) => indentBlock(v, s, e, dir));
+export function commentBlock(text, selStart, selEnd) {
+    const B = blockOf(text, selStart, selEnd);
+    const lines = B.block.split('\n');
+    const off = allCommented(lines);
+    const out = lines.map((ln) => {
+        if (ln.trim() === '') return ln;
+        const lead = (ln.match(/^[ \t]*/) || [''])[0];
+        if (!off) return lead + COMMENT_MARK + ln.slice(lead.length);
+        const rest = ln.slice(lead.length);
+        return rest.startsWith(COMMENT_MARK) ? lead + rest.slice(COMMENT_MARK.length) : ln;
+    });
+    const replacement = out.join('\n');
+    return { ...B, replacement, commented: !off, changed: replacement !== B.block,
+        text: text.slice(0, B.blockStart) + replacement + text.slice(B.blockEnd),
+        start: B.blockStart, end: B.blockStart + replacement.length };
 }
 
 /**
- * t1452 — COMMENT / UNCOMMENT the selected lines, as a toggle. Shares `applyBlock` with indent, so both operations
- * take the same one undoable path: a second copy of that surgery is how one of them would quietly lose undo.
+ * t1452 — COMMENT / UNCOMMENT the selected lines. The one place bytes are replaced (`applyBlock`), so there is
+ * exactly one undoable path.
  */
 export function commentEditor(ed = editorEl()) {
     return applyBlock(ed, (v, s, e) => commentBlock(v, s, e));
 }
 
-/** Run a pure block operation against the editor and write it back UNDOABLY. The one place bytes are replaced. */
+/** Run a pure block operation against the editor and write it back UNDOABLY. */
 function applyBlock(ed, op) {
     if (!ed) return false;
     const r = op(ed.value, ed.selectionStart, ed.selectionEnd);
-    if (!r.changed) return false;                       // e.g. outdent on already-flush lines: do nothing, quietly
+    if (!r.changed) return false;                       // e.g. nothing selected and the line is blank: do nothing, quietly
     ed.focus();
     ed.setSelectionRange(r.blockStart, r.blockEnd);
     let ok = false;
@@ -58,33 +107,22 @@ function applyBlock(ed, op) {
 }
 
 /**
- * Wire the three entry points. Idempotent — safe to call again after a re-render, which the editor does often.
- *
- * ⚠ TAB IS TAKEN, AND TAKING IT IS A REAL DECISION. In a textarea Tab moves focus, which is the accessibility
- * default and the thing every code editor overrides. It is overridden HERE ONLY, and only while the editor has
- * focus, so the rest of the app keeps keyboard navigation; and Escape-then-Tab still leaves, because Escape blurs
- * nothing — the user can still reach the next control by clicking. That is the same trade every editor makes and it
- * is stated rather than assumed.
+ * Wire the comment toggle's two entry points (Ctrl+/ and the toolbar button). Idempotent — safe to call again
+ * after a re-render, which the editor does often.
  */
-export function installEditorIndent() {
+export function installEditorTextOps() {
     const ed = editorEl();
-    if (!ed || ed.dataset.indentWired === '1') return;
-    ed.dataset.indentWired = '1';
-    ed.addEventListener('keydown', (e) => {
-        if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
-        e.preventDefault();                              // never let Tab move focus out of the editor
-        indentEditor(e.shiftKey ? -1 : 1, ed);
-    });
+    if (!ed || ed.dataset.textOpsWired === '1') return;
+    ed.dataset.textOpsWired = '1';
     // t1452 — Ctrl+/ is the comment toggle every editor has. Same one implementation as the button and the menu.
     ed.addEventListener('keydown', (e) => {
         if (e.key !== '/' || !(e.ctrlKey || e.metaKey)) return;
         e.preventDefault();
         commentEditor(ed);
     });
-    for (const [id, dir] of [['editor-indent', 1], ['editor-outdent', -1], ['editor-comment', 0]]) {
-        const b = document.getElementById(id);
-        if (!b || b.dataset.indentWired === '1') continue;
-        b.dataset.indentWired = '1';
+    const b = document.getElementById('editor-comment');
+    if (b && b.dataset.textOpsWired !== '1') {
+        b.dataset.textOpsWired = '1';
         /**
          * ⚠ THE BUTTON MUST NOT TAKE FOCUS, and that is a real behaviour fix rather than a test convenience. Pressing
          * a toolbar button blurs the textarea; the blur drops the SELECTION the button is about to act on, and in this
@@ -93,13 +131,11 @@ export function installEditorIndent() {
          * `preventDefault` on mousedown is the standard cure: the click still fires, the caret never moves.
          */
         b.addEventListener('mousedown', (e) => e.preventDefault());
-        b.addEventListener('click', () => (dir === 0 ? commentEditor(ed) : indentEditor(dir, ed)));
+        b.addEventListener('click', () => commentEditor(ed));
     }
 }
 
-/** The two entries the right-click menu shows — declared here so the menu cannot describe a different action. */
-export const indentMenuItems = () => [
-    { label: `⇥ Indent (${INDENT_WIDTH} spaces)`, fn: () => indentEditor(1) },
-    { label: '⇤ Outdent', fn: () => indentEditor(-1) },
+/** The one entry the right-click menu shows — declared here so the menu cannot describe a different action. */
+export const commentMenuItems = () => [
     { label: `${COMMENT_MARK} Comment / uncomment`, fn: () => commentEditor() },
 ];

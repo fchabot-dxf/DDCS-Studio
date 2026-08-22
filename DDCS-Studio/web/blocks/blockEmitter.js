@@ -27,7 +27,6 @@ import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.
 import { num, r3 } from '../wizards/ops/util.js';
 import { placeShiftFromParams } from '../wizards/ops/placement.js';
 import { translateProgram, rotateProgram, mirrorProgram, relativizeProgram } from '../data/rotateProgram.js';
-import { applyIndentStyle } from '../data/indentStyle.js';   // t1450 — the ONE indent boundary transform; the editor shares its width constant
 import { programRotation, flipForSetup } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY}); t879 — the two-sided per-setup FLIP
 import { serialBump, serialInline, glyphLibrary } from '../wizards/serialEngrave.js';   // t764 — {SN} dynamic serial: bump + per-digit dispatch + the shared glyph library
 
@@ -521,18 +520,16 @@ export function emitMapped(blocks, settings = {}) {
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
-    // t1450 — THE INDENT STYLE, applied at the ONE boundary. LAST, deliberately: every pass above reads and rewrites
-    // line TEXT (the modal-feed fold matches `F…`, cap-gating comments lines out, oword balancing looks for `o<n>`),
-    // and any of them could be perturbed by leading whitespace appearing or vanishing underneath it. Running last
-    // means the whole pipeline sees exactly the bytes it always saw and only the final rendering differs — which is
-    // what makes "whitespace-only" a property of the ORDER as well as of the transform.
     applyInlineClampSkip(T, dialect);     // t2070 — DDCS rejects inline `IF x>y THEN x=y`; rewrite to an IF..GOTO-skip
-    // t2070 — DDCS controllers reject a leading space before an N-label (bench-confirmed on the Expert 2026-08-17:
-    // `  N50` throws a syntax error, `N50` parses; indented STATEMENTS are fine, labels are NOT). The `flush` style
-    // was built as exactly this fallback. DDCS dialects declare `flushIndent` so the whole family emits column-0
-    // regardless of the user's indent setting — indentation is cosmetic bytes, the machine's column rule is not.
-    // (Runs AFTER the clamp-skip so the inserted `N<L>` gets flushed too.)
-    applyIndentStyle(T, (dialect && dialect.flushIndent) ? { ...settings, indentStyle: 'flush' } : settings);
+    // t2139 — NO INDENTATION, EVER (human ruling — BACKLOG.md "NO INDENTATION, EVER"): every emitted line is
+    // flush-left, unconditionally — no setting, no per-dialect branch. Applied at the ONE boundary, LAST,
+    // deliberately: every pass above reads and rewrites line TEXT (the modal-feed fold matches `F…`, cap-gating
+    // comments lines out, oword balancing looks for `o<n>`, the clamp-skip inserts its own `N<L>`), and any of
+    // them could be perturbed by leading whitespace appearing or vanishing underneath it. Running last means the
+    // whole pipeline sees exactly the bytes it always saw and only the final rendering differs. (`dialect.flushIndent`
+    // still exists and still matters — `applyInlineClampSkip` above reads it as its own "DDCS-family strict
+    // syntax" gate — this pass no longer needs it: every dialect gets flush now, not just the ones that require it.)
+    for (const t of T) if (t && typeof t.line === 'string') t.line = t.line.replace(/^[ \t]+/, '');
     const lines = T.map((t) => t.line);
     // t1375 — the ABSORBED range map, exposed rather than kept private: it is the emitter's own declaration of which
     // lines already carry the program rotation, so a caller (and the coherence spec) can read it instead of guessing.

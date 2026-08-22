@@ -164,7 +164,7 @@ function cutLines(method, v, doN) {
         `  G1 Z[-#41] F${v.feed}`, `  G0 Z${v.clearance}   ;full retract to clear chips`, `END${doN}`];
 }
 
-const indent = (lines, pad) => lines.map((l) => pad + l);
+const padLines = (lines, pad) => lines.map((l) => pad + l);
 
 /**
  * WHY EACH BAKED ROW IS BAKED, in the words the operator reads on the greyed control. postGating's rule is grey and
@@ -260,25 +260,25 @@ function loopBody(pattern, v, method) {
     if (pattern === 'circle') {
         return ['#50=0', `WHILE #50 LT ${v.count} DO1`, `  #51=${v.startAngle}+#50*360/${v.count}`,
             `  G0 X[${v.posX}+[${v.dia}/2]*COS[#51]] Y[${v.posY}+[${v.dia}/2]*SIN[#51]]`,
-            ...indent(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1'].join('\n');
+            ...padLines(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1'].join('\n');
     }
     if (pattern === 'line') {
         return ['#50=0', `WHILE #50 LT ${v.count} DO1`,
             `  G0 X[${v.posX}+#50*${v.spacing}*COS[${v.angle}]] Y[${v.posY}+#50*${v.spacing}*SIN[${v.angle}]]`,
-            ...indent(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1'].join('\n');
+            ...padLines(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1'].join('\n');
     }
     if (pattern === 'grid') {
         return ['#52=0', `WHILE #52 LT ${v.rows} DO1`, '  #50=0', `  WHILE #50 LT ${v.cols} DO2`,
             `    G0 X[${v.posX}+#50*${v.dx}] Y[${v.posY}+#52*${v.dy}]`,
-            ...indent(cutLines(method, v, 3), '    '), '    #50=#50+1', '  END2', '  #52=#52+1', 'END1'].join('\n');
+            ...padLines(cutLines(method, v, 3), '    '), '    #50=#50+1', '  END2', '  #52=#52+1', 'END1'].join('\n');
     }
     // rect perimeter: top+bottom rows (nx each), then interior left+right columns (ny, skip shared corners)
     return ['#50=0', `WHILE #50 LT ${v.nx} DO1`, `  #53=${v.posX}+${v.w}*#50/[${v.nx}-1]`,
-        `  G0 X#53 Y${v.posY}`, ...indent(cutLines(method, v, 2), '  '),
-        `  G0 X#53 Y[${v.posY}+${v.h}]`, ...indent(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1',
+        `  G0 X#53 Y${v.posY}`, ...padLines(cutLines(method, v, 2), '  '),
+        `  G0 X#53 Y[${v.posY}+${v.h}]`, ...padLines(cutLines(method, v, 2), '  '), '  #50=#50+1', 'END1',
         '#52=1', `WHILE #52 LT [${v.ny}-1] DO1`, `  #54=${v.posY}+${v.h}*#52/[${v.ny}-1]`,
-        `  G0 X${v.posX} Y#54`, ...indent(cutLines(method, v, 2), '  '),
-        `  G0 X[${v.posX}+${v.w}] Y#54`, ...indent(cutLines(method, v, 2), '  '), '  #52=#52+1', 'END1'].join('\n');
+        `  G0 X${v.posX} Y#54`, ...padLines(cutLines(method, v, 2), '  '),
+        `  G0 X[${v.posX}+${v.w}] Y#54`, ...padLines(cutLines(method, v, 2), '  '), '  #52=#52+1', 'END1'].join('\n');
 }
 
 /**
