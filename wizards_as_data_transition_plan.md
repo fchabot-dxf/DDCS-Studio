@@ -39,6 +39,72 @@
 > and its block-built reproduction side by side and compare them.** Same standing rule as every wizard
 > review here — look at the full surface, form and panels.
 
+> ## ⭐⭐ MEASURED 2026-08-22 — and WHY the first attempt failed
+>
+> A 6-area survey (80 agents, adversarially verified) measured the actual state. It is worse than "partly
+> done", and the reason is specific and fixable.
+>
+> ### The numbers
+> | claim | state |
+> |---|---|
+> | (a) every built-in HAS a data twin | ✅ **25 of 25**, 0 orphans |
+> | (b) the twin carries its LAYOUT as blocks | ⛔ **0 of 32** |
+> | (c) reproducible by blocks | ⛔ falls with (b) |
+>
+> **Not one twin authors a single `formfield` block.** All 32 declare a `param_group` whose `children` array
+> is **empty**. Field identity, label, widget, help, order and section still live in hand-written JS arrays
+> (`*_BINDING_SPECS`). Plan Phase 1 step 3 — *"delete the `def.bindingSpecs` assignment"* — was never done on
+> **any** wizard, including all four named pilots.
+>
+> ⚠ **68 of 399 declared fields (17%) exist ONLY in JS, with no block at all.** Section ORDER is hardcoded in
+> imperative render code. Both are outright blockers for visual reproducibility.
+>
+> ### ⛔ The data flow was INVERTED, not executed
+> ```
+>   PLAN:     author formfield blocks -> delete bindingSpecs -> deriveBindings scans the canvas
+>   SHIPPED:  JS arrays -> materializeParamGroup auto-generates param_field blocks FROM them
+> ```
+> Blocks are *generated from* the hardcoded specs rather than being their source. `param_field` is not the
+> plan's `formfield` — it is presentation-only with no socket link, so it cannot bind, gate or carry
+> structure. `renderUiTree`, the layout-as-blocks renderer, is **unreachable for every built-in**.
+>
+> ### ⭐ WHY THE PORT FAILED — the part that matters
+> The branch is named after a port that was **made and reverted**. Reflog: `802e03e8` *"Port Corner Wizard to
+> Wizards-as-Data architecture"* (2026-08-04) → `reset` to `be8ea255` (2026-08-05). WORK-LOG t1559:
+> *"Diagnose **broken Corner wizard / missing preview drag handles & collapse buttons**, revert broken agent
+> commits."*
+>
+> ⭐⭐ **It failed because the block vocabulary is a STRICT SUBSET of the spec vocabulary.** `formfield`
+> declares `param label type section help widget options units key optional`. The specs also carry:
+>
+> | attribute | what it does | in any block? |
+> |---|---|---|
+> | `relTo: { row: 'wall1' }` | which sim row the drag handle anchors to | ⛔ **0 of 4** block-def files |
+> | `role: 'x' \| 'y'` | which half of the handle this field is | ⛔ **0 of 4** |
+> | `group: 'reposition'` | which handle the pair belongs to | ⛔ **0 of 4** |
+> | `formHidden: true` | "this is NOT a visible form input" | ⛔ **0 of 4** |
+> | `match: { type:'assign', var:'#23' }` | binds the field to its emitted `#var` | ◐ 2 of 4 |
+>
+> Corner's `cross1_x` / `cross1_y` / `startX` / `startY` are **not form inputs at all** — they are hidden
+> fields whose only job is to place draggable handles on the preview. Port the specs to `formfield` and all
+> five attributes are dropped ⇒ **the handles vanish.** Exactly the reported symptom.
+>
+> ⚠ **The 2026-08-05 recovery built the wrong axis.** It responded by adding `split_horizontal`/`split_vertical`
+> and 13 container blocks — *layout* vocabulary. Useful, and Phase 0 is genuinely done because of it. But the
+> blocker was never how fields are ARRANGED; it is that **a field cannot declare that it isn't a field.**
+>
+> ### ⭐ THE FIRST TASK — and it is not "port Corner"
+> ```
+>   1. extend `formfield` with formHidden + the relTo/role/group triple (and finish `match`)
+>   2. REUSE the existing gate machinery for when/optionGate — do NOT invent new ones
+>   3. THEN port Corner
+>   4. prove the drag handles survive — that is the pass/fail
+> ```
+> ⭐ Step 2 matters: `gate:` (27 files), `when:` (16), `optionGate` (4) and `clearWhenOff` (2) already exist
+> with a live consumer at `wizards/views/userOpView.js:514`. Three of the seven "missing" attributes need no
+> invention at all. See BACKLOG "GATE CONSOLIDATION" — the eight-mechanism inventory is why these should be
+> shaped as DATA rather than as more special cases.
+
 ## Background & The "One Source of Truth" Problem
 
 Historically, DDCS Studio's built-in wizards (e.g., Corner Probe, Pocket) were defined in two separate halves:

@@ -465,3 +465,43 @@ question; "merge it so the branch is gone" would put Worker code in an app repo 
 
 ⚠ **Coordinate with the analytics agent before touching either ref.** The untracked `.md` in the tree means
 the work is live, not abandoned.
+
+---
+
+## GATE CONSOLIDATION — eight mechanisms answering one question
+*(inventoried 2026-08-22; human: "we may need more specific gates for other departments of the code")*
+
+Every one of these answers **"is this available right now, and if not, why?"** — and each was invented
+locally, with its own shape, its own evaluator, and its own answer to the *why*.
+
+| mechanism | department | gates | files |
+|---|---|---|---|
+| `gate:` | wizards/ops + dataOps | a block or field, greyed | 27 |
+| `when:` | dataOps | field visibility | 16 |
+| `postGating` | ui | post caps → `.disabled` | 17 |
+| `optionGate` | dataOps | one `<option>` in a select | 4 |
+| `clearWhenOff` | tapData | clears a checkbox when gated off | 2 |
+| `requiresModbus` | gateway/views | a whole TAB | 2 |
+| `noFlow()` | wizards/ops | dialect cannot run it | 1 |
+| `liveTapCapable()` | wizards/ops | attestation, at emit time | 1 |
+
+**Rule-of-three says build the registry when a third case forces it. We are at eight.**
+
+### What consolidation means
+One declared shape all eight collapse into — `{ requireAll, onFail: hide|grey|clear|fallback, fallback,
+reason }` — with ONE evaluator reading it. `requiresModbus`, `noFlow()`, `liveTapCapable()` and `postGating`
+stop being bespoke code and become data.
+
+### Why it is worth doing
+1. ⭐ **Every gate carries its reason.** Three already do (`tokenRefusal` in 19 files, `optionGate.tip`);
+   five do not — so a greyed control just sits there and the user guesses.
+2. ⭐ **One place to audit the SAFETY gates.** `postGating`, `liveTapCapable` and `requiresModbus` decide
+   whether the app offers something the machine cannot do. Auditing that today means reading four mechanisms.
+3. ⭐⭐ **It makes wizards-as-data EASIER.** With one shape, the `formfield` block carries ONE `gate` field.
+   Under the current spread it would need a separate block field per gate kind — the exact vocabulary
+   explosion that made the 2026-08-04 Corner port fail.
+
+### ⛔ NOT FIRST
+~70 files, and **three are safety gates** where a refactor bug means offering an operation the machine
+cannot perform — the tap-into-steel class. The wizards-as-data port needs only four attributes on one block
+and touches no safety gate; do that first, shaped as DATA so this has less to clean up later.
