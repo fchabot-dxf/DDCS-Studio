@@ -48188,3 +48188,42 @@ confirmed by bisection, not assumed from a clean-looking diff.**
 
 🔨 turn 2143
 
+---
+
+# t2143 (tail, amendment) — M6.rc removed from the V4.1 file tree: it is compiled firmware build material, not G-code
+
+Per BACKLOG.md item 8 (full evidence there) and the advisor's amendment, delivered as a SEPARATE commit from
+the data-loss fix above so the diff stays reviewable — a data-loss fix and a tree-entry removal are unrelated
+changes.
+
+`M6.rc` was declared as an editable file in `CONTROLLER_FILES['ddcs-v41'].tree` (`data/controllerFiles.js:50`).
+It is not G-code: it is compiled SEGGER emWin C source (a `GUI_Builder`-generated `.rc` opening with
+`#include DIALOG.h` and a block of `GUI_ID_USER` widget-id defines) shipped as vendor firmware build material —
+C source that must be compiled before the controller can draw anything from it. `slib-m.nc`'s own
+`MarcoDialog "M6.rc"` line only POPS a dialog already baked into the firmware binary by name; editing the `.rc`
+copy on disk changes nothing the controller runs. Confirmed the tree-consistency argument independently: after
+removal, every remaining path across all three declared controller trees (`ddcs-expert-m350`, `ddcs-v41`,
+`ddcs-v3-dm500`) ends in `.nc` — `M6.rc` was genuinely the only anomaly, not one of several.
+
+**Change**: deleted the `M6.rc` line from the V4.1 tree, with a comment recording why (so the next person
+reading the tree doesn't wonder if it was an oversight). Removed `'M6.rc'` from the single
+`expect.arrayContaining([...])` assertion it appeared in (`tests/controller-file-tree.spec.js:38`) — every
+other name in that array is untouched, and the sibling `not.toContain('camN.nc')` guard two lines below (which
+went vacuous once already at t2117 and was repaired at t2118) was left EXACTLY as instructed, not touched.
+
+**Raising, not silently rewording** (per the amendment's explicit instruction): `slib-m.nc`'s subtitle is
+"M-macro library", but the real tool-change SEQUENCE lives there (`slib-m.nc:11-13` — the G53 move, the
+`MarcoDialog "M6.rc"` call, the G43 offset apply) — a user looking for tool-change editing now has nothing in
+the tree pointing them at it. Whether the subtitle should say so is the human's call, not changed here.
+
+## Gate
+`controller-file-tree.spec.js` (2/2). Node tier re-confirmed: 227/227. Lint clean. Grepped for any other `.rc`
+reference across `web/`+`tests/` after the removal: the only other hit is `factoryMacros.js`'s `slib-m.nc` BODY
+TEXT itself (the real macro's `MarcoDialog "M6.rc"` call by name) — correctly untouched, not a tree entry.
+
+## Files
+- `DDCS-Studio/web/data/controllerFiles.js` — the `M6.rc` line removed from the V4.1 tree, with a why-comment.
+- `DDCS-Studio/tests/controller-file-tree.spec.js` — `'M6.rc'` removed from the one assertion it was in.
+
+🔨 turn 2143
+

@@ -47,7 +47,13 @@ export const CONTROLLER_FILES = {
         tree: [
             { group: 'SYSDISK/', children: [
                 { path: 'advstart.nc',   title: 'advstart.nc',   sub: 'Advanced start (boot)', panel: 'macros_panel_sysstart' },
-                { path: 'M6.rc',         title: 'M6.rc',         sub: 'Tool-change dialog',   editable: true, seed: true },
+                // t2143 — M6.rc REMOVED: it is compiled SEGGER emWin C source (opens with `#include DIALOG.h`, a
+                // block of GUI_ID_USER defines), shipped as vendor firmware build material, not G-code the
+                // controller can interpret. slib-m.nc's `MarcoDialog "M6.rc"` only POPS a dialog already baked
+                // into the firmware binary — editing the .rc on disk changes nothing on the machine. See
+                // BACKLOG.md item 8 for the full evidence (the firmware dump's own source + the tree-consistency
+                // argument: every other .rc on the controller — array.rc, advstart.rc, break.rc, etc. — was
+                // already correctly omitted; this was the one anomaly).
                 { path: 'selcoord.nc',   title: 'selcoord.nc',   sub: 'WCS-select dialog',    editable: true, seed: true },
                 { path: 'probe-fix.nc',  title: 'probe-fix.nc',  sub: 'Fixed-position probe', editable: true, seed: true },
                 { path: 'gotoz.nc',      title: 'gotoz.nc',      sub: 'Go to Z zero',         editable: true, seed: true },
