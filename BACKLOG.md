@@ -1356,11 +1356,12 @@ wizardManager.js's `.wsm-place` markup and its EXACT wording verbatim (not indep
 THREE living sites now read `.wsm-place` / "📁 Local folder" / "☁ Cloud" identically. The "two different
 vocabularies" ⛔ below is CLOSED for these three specifically; what remains is three copy-pasted (not shared)
 implementations of the identical thing — a dedup, not a vocabulary fix.
-⚠ **t2192 (amendments 1-3, QUEUED, not built) — the count is about to drop further, but hasn't yet.** The human
-ruled the wizard/project managers' whole LIBRARY section (which carries this switcher) misrepresents itself and
-is being replaced by a plain Import button + a pre-import compatibility summary. When that lands, `.wsm-place`
-loses two of its three remaining sites (wizardManager.js's and projectManager.js's own Library tabs) — only
-workspaceManager.js's would remain. Do not count that reduction here until it is actually built.
+⭐ **UPDATE (t2194): the anticipated reduction landed — one site remains, not three.** The wizard/project
+managers' whole LIBRARY section (browsable shelf + this switcher) is retired outright, replaced by a plain
+Import button (a native file picker, no volume concept at all — a chosen file doesn't say where it came from).
+`.wsm-place` now has exactly ONE surviving site: `workspaceManager.js`'s own Cloud/Local tab. With only one
+instance left, "unify the vocabulary across sites" is moot for this switcher specifically — there is nothing
+left to disagree with. `.modal-card`'s other 15 call sites (unrelated to the switcher) are still open.
 
 Five markup sites, two class families, and ⛔ **two different vocabularies for the same concept** — a user reads
 `Local` in one modal and `📁 Local folder` in the next and has to work out they mean the same volume.
@@ -1374,13 +1375,13 @@ Both are the same failure: **a declaration exists, is correct, and every caller 
 things that are true in the source and untrue in the running app.
 
 ⇒ Adopt `.modal-card` at its remaining sites (down from 15 — three managers already share `.wsm-modal` as of
-t2190); extract ONE volume switcher for wherever it still survives once t2192's queued Library-shelf removal
-lands (down from five to as few as one — see the update note above; re-count when that turn actually ships).
-⚠ **Fix the vocabulary while unifying** — one name for the local volume, chosen once (already true for the
-survivors as of t2190; confirm it still holds after t2192's removal before treating this as done).
+t2190). The volume-switcher half is now down to ONE call site (workspaceManager.js, as of t2194) — nothing left
+to unify there; what remains of this item is `.modal-card` adoption alone.
+⚠ **Fix the vocabulary while unifying** — moot for the switcher (one site, one name, by construction); still
+applies wherever `.modal-card` adoption touches wording.
 
-⛔ **A turn of its own.** 20 call sites across two concerns is not a tail, and a half-migration leaves three
-spellings instead of two.
+⛔ **Re-scope before starting**, since the item's own premise (five switcher sites, two families) is gone —
+confirm what remains is really `.modal-card` adoption's own turn, not the two-concern turn originally sized here.
 
 ⚠ **Verify by screenshot matrix, not by diff**: the three modals side by side, in all five themes, before and
 after. The whole point is that they currently agree by coincidence — a diff cannot show you that they stopped.
