@@ -9,6 +9,7 @@
  * Layout (Studio workflow): Status · Send · Merge · Tracking · Files · Jobs · Console.
  */
 import { makeClient, deriveStatus } from '../shared/js/client.js';
+import { roleInfoFromDescriptor } from './gatewayStatus.js';   // t2151 — the client-side, workspace-relative role, applied to THIS panel's own polled `desc` (ctx.desc, poll() below) — never gatewayStatus.js's separately-polled cache
 import { getService, adoptLocal, probeLocalGateway } from './gateway/service.js';   // t1325 — the loopback auto-probe + the adopted base
 import { syncGatewaySound } from './sound.js';   // t2129 (review) — a freshly adopted gateway needs the CURRENT sound prefs pushed, not whatever it last had (or never had)
 import { el, clear } from './gateway/util.js';
@@ -73,6 +74,20 @@ export function setGatewayPanelVisible(on) {
  *   on ignorance would hide a working feature from anyone whose gateway is momentarily unreachable.
  */
 function viewUnavailable(view, desc) {
+    // t2151 (BACKLOG #9 dispatch) — ROLE gate, same declared-not-hand-rolled shape as the capability gate
+    // below. ⚠ SCOPED TO desc EXISTING — the "nothing answers at all" case is t1327's own, older contract
+    // (gateway-state-contract-1327: every data tab, tracker included, shows its OWN "UNREACHABLE" state via
+    // onPoll()'s own try/catch, not a pre-empting reason card here). This gate's actual, NEW value is the case
+    // t1327 never had to cover: a descriptor DOES answer, but the connected controller is not this workspace's
+    // — a real daemon, wrong role, which needs stating separately from plain unreachability.
+    if (view.requiresGateway && desc) {
+        const { role, reason } = roleInfoFromDescriptor(desc);
+        if (role === 'client') {
+            return reason
+                ? `This PC is not the gateway for the open workspace (${reason}) — ${view.label} needs to be.`
+                : `${view.label} needs this PC to be the workspace's gateway — connect one in the Console tab.`;
+        }
+    }
     if (!view.requiresModbus) return null;
     if (!desc || !desc.controller_family) return null;                 // unknown -> leave it alone
     // ⚠ Modbus RTU is an EXPERT capability. Naming the controllers that LACK it is a blacklist that silently

@@ -48809,3 +48809,169 @@ separate, not two sections still sharing one overlay.
   only `#help_faq`, exactly what they already did.
 
 🔨 turn 2149
+
+---
+
+# t2151 — ROLES S2: gate the tabs by role, and make the role WORKSPACE-RELATIVE
+
+Two parts from the dispatch, built in the order they naturally compose (Part B's comparison feeds Part A's
+gating, not the reverse).
+
+## Part B — BACKLOG #11: the role is workspace-relative
+
+**The rule** (human): `gateway ⇔ a disk is configured AND the connected controller MATCHES this workspace's
+declared controller — otherwise CLIENT`. Both sides already knew the fact needed: the gateway fingerprints the
+connected controller and exposes `controller_profile_id` in its descriptor (`ops.py:287`) — **the exact same
+id** `controllerProfiles.js` uses, so the comparison against `getMachine().controllerId` is a direct equality,
+never a family-name guess. This turned out to be genuinely cheap, as BACKLOG's own note predicted.
+
+`gatewayStatus.js` gained `roleInfoFromDescriptor(d)` — a **pure function**, deliberately, over an earlier
+draft that read a cached/polled module-level role. The cached version broke two existing hand-mounted specs
+(`settings-role-gate-2111`, `status-remote-machine-2112`) that supply their OWN mock `client.descriptor()` and
+never start gatewayStatus.js's separate polling loop — a real bug I found by RUNNING the wider gate rather than
+trusting the 6 tests I wrote for the new behaviour alone (found via full targeted-gate run, not assumed).
+Fixed by having every caller with its OWN freshly-fetched descriptor (admin.js's `render()`, status.js's
+`onPoll()`, gatewayPanel.js's `poll()`) call the pure function with THAT descriptor; only the identity line
+(which has no descriptor of its own to hand in) reads the cached `getRoleInfo()` wrapper.
+
+**The three edges**, all built and tested:
+1. `controller_profile_id` absent/null (fingerprint unknown) never demotes — UNKNOWN IS NOT A MISMATCH.
+2. No daemon at all → still client, unchanged from t2145 (S0/S1); the workspace comparison never runs.
+3. The role can now flip mid-session on a workspace switch — `reason` (e.g. "workspace targets DDCS Expert
+   M350; DDCS V4.1 is connected") rides as a title on the identity line's role span (BACKLOG #11 care #3 —
+   "say WHY, never just flip the bare word") and as the visible text in the two surfaces below.
+
+**admin.js — TWO different questions, kept apart.** `baseRole` (from the descriptor alone, unchanged source)
+still governs whether the wiring FIELDS exist — real settings for real hardware, unaffected by which workspace
+happens to be open. The NEW `mismatch` flag (baseRole=gateway AND workspace-relative role=client) adds a
+banner stating the disagreement WITHOUT hiding the fields — a genuine gateway for a different controller still
+has real wiring worth showing, per the standing "state it, never silently resolve" constraint (admin.js:189's
+own doctrine, now applied to a second kind of disagreement).
+
+## Part A — gate the tabs, reframe Status
+
+**Tracking** declared a new `requiresGateway: true` flag (same shape as its existing `requiresModbus`) —
+gated off, stated, when this PC is workspace-relatively a client. ⚠ **Scoped to `desc` existing** — the
+"nothing answers at all" case stays t1327's own older contract (each data tab shows its OWN "UNREACHABLE" via
+`onPoll()`, not a pre-empting reason card); my gate's actual new value is the case t1327 never covered: a
+descriptor DOES answer, but for the wrong controller. Getting this wrong first broke 2 of t1327's own contract
+tests (found by running that spec, fixed by adding the `desc &&` guard) — the two gates needed to divide the
+territory, not compete for the same state.
+
+**Status** now asks the question the DISPATCH's own human quote named ("the status tab should look different
+in client vs gateway"): `askMachine` (whether to read the Drive heartbeat / report the workspace's machine, vs
+show this PC's own raw descriptor table) is now driven by the workspace-relative role, not merely `!d`. A
+client PC that happens to run its OWN local daemon (wired to nothing, or to a different controller) used to
+fall into the raw-table branch and report ITS OWN non-existent/wrong controller link — now it asks the
+right question (is the WORKSPACE's gateway alive) the same way a phone with no daemon at all always has. The
+one no-heartbeat fallback message ("enter a daemon URL in the Console tab") only fires when there truly is no
+daemon here (`!d`); a client WITH its own daemon gets a different, honest message instead (asking it to sign
+into Drive), since "enter a daemon URL" would be actively wrong advice when one already answers.
+
+## Non-vacuity
+
+`tests/role-workspace-relative-2151.spec.js` — 6 tests (match/no-reason, mismatch/reason-stated, unknown-not-
+mismatch, no-daemon-unchanged, admin.js banner-without-hiding, Tracking gated). Proven non-vacuous: `git
+checkout HEAD --` on the 6 touched source files (scratch-copied first, restored after, never stashed) — 3 of 6
+failed exactly as predicted (the ones exercising genuinely new behaviour); the other 3 legitimately pin
+pre-existing t2145 facts (match stays gateway, no daemon stays client, unknown doesn't demote) that this
+turn's code doesn't change, only extends.
+
+## Gate
+
+Targeted (role/gateway/header): `role-workspace-relative-2151.spec.js`, `role-derived-client-side-2145.spec.js`,
+`settings-role-gate-2111.spec.js`, `status-remote-machine-2112.spec.js`, `gateway-state-contract-1327.spec.js`,
+`gateway-quiet-offline-1307.spec.js`, `gateway-mismatch-gate-1229.spec.js`, `gateway-position-stub-2073.spec.js`,
+`header-account-2077.spec.js`, `header-profile-menu.spec.js`, `header-menu-split-2149.spec.js`,
+`header-workspace-name-2147.spec.js`, `client-send-2080.spec.js` — 64/64 (1 pre-existing skip, unrelated).
+Node tier: 227/227. Smoke tier: 76/76. Lint clean.
+
+Full suite run to completion (this turn touches gateway/role machinery broadly, plus a global CSS selector in
+the tail — full run warranted per the standing policy): **2679 passed, 9 failed, 19 flaky, 25 skipped (26.7m)**.
+**4 of the 9 are the SAME pre-existing baseline** (`pane-sizer-1353`, `send-gate-wiring-1585`,
+`send-history-real-path-2065`, `validation-divzero-not-syntax-1603`), unchanged. **1 was this turn's own
+regression** — `gateway-position-stub-2073.spec.js` (both its "position enabled" tests) — its mock descriptor
+predates this turn's role-awareness and carried no `.role` field, so the new `requiresGateway` gate on Tracking
+correctly-but-unhelpfully hid the position stub this test's own assertions read; fixed by adding `role:
+'gateway'` to the mock (a fixture gap, not a design flaw — the SAME class of gap `status-remote-machine-2112`
+and `settings-role-gate-2111` had already surfaced earlier in this same turn). **The other 4**
+(`gateway-position-stub-2073` before the fix, plus `param-group-rows-1605`, `save-dialog-declared-1615` ×2)
+share ONE cause, confirmed by re-running them in isolation: the established `!!window.__blkws` Blocks-boot
+timeout this session has logged repeatedly as parallel-worker contention, not a regression — all four passed
+on a low-contention re-run. The 19 flaky entries are on files this turn never touched, same class.
+
+## Files
+- `DDCS-Studio/web/ui/gatewayStatus.js` — `roleInfoFromDescriptor(d)` (pure) + `getRoleInfo()` (cached wrapper,
+  identity-line-only) + `getEffectiveRole()` (unchanged signature, now workspace-relative underneath).
+- `DDCS-Studio/web/ui/headerPost.js` — the identity line's role span carries the demotion reason as a `title`
+  when present; import switched from `getEffectiveRole` to `getRoleInfo`.
+- `DDCS-Studio/web/ui/gateway/views/admin.js` — `baseRole`/`mismatch` split; a new stated-not-hidden banner for
+  the workspace-mismatch case, alongside the pre-existing `role_conflict` banner.
+- `DDCS-Studio/web/ui/gateway/views/status.js` — `askMachine` now role-driven; a role-aware fallback message
+  for a client with its own (non-matching) local daemon.
+- `DDCS-Studio/web/ui/gateway/views/tracker.js` — `requiresGateway: true` declared.
+- `DDCS-Studio/web/ui/gatewayPanel.js` — `viewUnavailable()` extended with the `desc &&`-scoped role gate.
+- `DDCS-Studio/tests/role-workspace-relative-2151.spec.js` — **new**, 6 tests (see Non-vacuity above).
+- `DDCS-Studio/tests/status-remote-machine-2112.spec.js`, `gateway-position-stub-2073.spec.js` — mock
+  descriptors gained `role: 'gateway'` (+ a matching `controller_profile_id` on the former) — real fixture
+  gaps this turn's role-awareness exposed, both found by running the wider/full gate rather than trusting the
+  6 tests written for the new behaviour alone.
+
+🔨 turn 2151
+
+---
+
+# t2151 (tail) — BACKLOG #12: the editor's focus ring was missing its LEFT edge
+
+**The real cause**, confirmed by reading the DOM/CSS before touching anything (matching the dispatch's own
+"CONFIRM before changing anything"): a real, deliberate `textarea:focus-visible` rule (this file's own house
+style, ~20 other consumers) drew correctly on `#editor` — but `#editor-gutter` is a plain SIBLING inside
+`.editor-container` (`editorManager.js`'s `insertBefore`, confirmed NOT an absolutely-positioned child needing
+a new wrapper — the DOM-check BACKLOG asked for, done first), sitting `position:absolute; left:0; width:44px;
+z-index:3` directly on top of `#editor`'s own left edge (`z-index:2`). The ring's left third was drawn, then
+immediately painted over by the gutter's own opaque background — not a UA default, not a clipping bug, a real
+rule on the wrong element.
+
+**The fix**: suppress `#editor`'s own ring and draw it instead on `.editor-container` — the ONE box that
+already contains both the gutter and the editor — via `:has(#editor:focus-visible)`, the exact same pattern
+this file already uses for `.editor-container:has(.viz3d-drawer.open)`. No new element, no JS.
+
+## ⚠ A finding that changes what BACKLOG's own plan can deliver — reported, not silently worked around
+
+BACKLOG #12 also asked for "click → no ring, Tab → ring" as part of the `:focus-visible` fix. **Measured, not
+assumed**: in this real Chromium, a `<textarea>` reports `:focus-visible === true` on a plain MOUSE CLICK too
+— confirmed by direct comparison against a `<button>` in the same page (`#hdrPostBtn`), which correctly reports
+`false` on click, proving the harness/methodology sound. This matches the CSS spec's own note: a text-editable
+widget is *"always considered to match `:focus-visible`… because a user typically wants to know where they
+will type"*, independent of input modality. ⇒ **CSS alone cannot suppress the ring on click for this element**
+— it never could, regardless of which rule draws it. Achieving that would need a JS input-modality tracker (a
+new mechanism), which is exactly the kind of unasked machinery this dispatch's own scope notes say to report
+rather than build. Shipped the part that IS real and fully fixable (a complete, honest ring wherever it
+appears, on every edge, in every theme) and named the part that is not, rather than claiming a false
+non-issue exists or quietly building new machinery to chase the original literal ask.
+
+⭐ **BONUS, by construction**: the STUDIO theme had its own `#editor { outline: none; }` rule (unrelated to this
+bug — about caret positioning, not accessibility) that suppressed the ring ENTIRELY in that one theme. Since
+the fix moves the ring to `.editor-container` (untouched by that rule), studio now gets the same accessible
+ring the other four themes always had — closing a real, separate gap the human's "check all five themes" ask
+would have caught anyway.
+
+## Non-vacuity
+
+`tests/editor-focus-ring-2151.spec.js` — 5 tests (unfocused: none; click: complete ring on the container, none
+on `#editor` itself; the gutter sits inside the ring's own left edge; Tab-focus: same ring; theme-independence
+across normal/futuristic/studio). Proven non-vacuous: `git checkout HEAD --` on `styles.css` (scratch-copied,
+restored after) — 3 of 5 failed exactly as predicted (the ring-presence tests); the other 2 (unfocused-is-none,
+the gutter's own position) legitimately pin pre-existing DOM facts untouched by this fix.
+
+## Gate
+`editor-focus-ring-2151.spec.js`, `mobile-layout.spec.js` — all green. File-disjoint from the main ROLES S2
+arc, as the dispatch required (touches only `styles.css` + its own new test file).
+
+## Files
+- `DDCS-Studio/web/styles.css` — `#editor:focus-visible { outline: none; }` + a new
+  `.editor-container:has(#editor:focus-visible) { outline: 2px solid …; outline-offset: -2px; }`, placed beside
+  the existing `#editor.editor-layer` rule.
+- `DDCS-Studio/tests/editor-focus-ring-2151.spec.js` — **new**, 5 tests (see Non-vacuity above).
+
+🔨 turn 2151

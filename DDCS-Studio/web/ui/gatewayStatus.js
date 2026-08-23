@@ -23,20 +23,78 @@
  * ⛔ DO NOT reintroduce a remembered/cached role here. A downgrade that outlives the daemon-down condition
  * that caused it is exactly the "cached-and-stuck" shape the human explicitly ruled out.
  *
- * SCOPE THIS TURN: derivation + a getter for DISPLAY only (the quick-menu identity line). Tab/settings GATING
- * (`admin.js`'s `isClient`, still sourced from a reachable daemon's own descriptor only) is the next step.
+ * t2151 (BACKLOG #11, human ruling: "if im connected to a controller the worspace should be client unless the
+ * controller match") — THE ROLE IS ALSO WORKSPACE-RELATIVE now, on top of t2145's daemon-reachability rule.
+ * `baseRole` is the server's answer (a controller disk is configured on THIS PC, full stop — still what
+ * governs whether this PC's OWN wiring fields exist in Setup, see admin.js). The EFFECTIVE role additionally
+ * demotes gateway→client when the CONNECTED controller (`descriptor().controller_profile_id`, ops.py:287 —
+ * the SAME id `controllerProfiles.js` uses, so this is a direct comparison, never a guess) does not match the
+ * OPEN WORKSPACE's declared controller (`getMachine().controllerId`). Truthful, not advisory: if the workspace
+ * targets an Expert and a V4.1 is plugged into THIS PC, this PC cannot deliver to the Expert — it is a gateway
+ * for some OTHER workspace, and a client relative to the one that is open.
+ * ⛔ `controller_profile_id` is `None`/absent when the fingerprint is unknown (ops.py:287) — UNKNOWN IS NOT A
+ * MISMATCH, never demote on it (the same failure S1 was built to avoid: a confident wrong label).
+ * ⚠ Role now depends on the OPEN WORKSPACE, so switching workspaces can flip it mid-session — correct under
+ * this rule, but `reason` exists so nothing just silently flips the bare word (see `getRoleInfo()`).
+ *
+ * SCOPE THIS TURN (t2151): the comparison lives HERE, in ONE pure function (`roleInfoFromDescriptor`) — and
+ * callers that used to read a raw descriptor's `.role` directly (admin.js's `isClient`, status.js's `!d`
+ * branch, gatewayPanel.js's tab gating) now call THAT with their OWN freshly-fetched descriptor, so the
+ * workspace-relative rule applies everywhere the role is consulted, not just the identity line. `getRoleInfo()`
+ * (no descriptor to hand in) stays the identity line's own cached reader — see its own comment for why pure
+ * vs cached is not a stylistic choice here: a hand-mounted view under test supplies its OWN mock descriptor
+ * and never starts gatewayStatus.js's separate polling loop, so a cache read would silently see nothing.
  */
 import { makeClient, deriveStatus } from '../shared/js/client.js';
+import { getMachine } from '../data/workspaceMachine.js';
+import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
 export const EXE_DOWNLOAD_URL = 'https://github.com/fchabot-dxf/DDCS-Studio/releases/latest';
 
-let _lastRole = '';   // t2145 — the CURRENT tick's role only; never written to storage, so a daemon-down
-                       // downgrade to 'client' self-corrects the moment the daemon answers again
+let _lastRole = '';        // t2145 — the CURRENT tick's SERVER-declared role only; never persisted (see above)
+let _lastProfileId = null; // t2151 — this tick's connected controller's profile id, or null when unreachable/unknown
 
-/** t2145 — read the client-side-derived role without waiting on a daemon. See the module header for the rule.
- * Returns 'gateway' | 'client' — the daemon's own answer when reachable, else 'client'. */
+const ctrlLabel = (id) => (id && (CONTROLLER_PROFILES[id] || {}).name) || id || 'an unknown controller';
+
+/**
+ * t2151 — THE PURE COMPARISON, taking a descriptor directly. Callers that already fetched their OWN
+ * `/api/descriptor` this tick (admin.js's render(), status.js's onPoll(), gatewayPanel's poll()) call this
+ * with THAT descriptor — never the cached one below — so a hand-mounted view under test (which supplies its
+ * own mock `client.descriptor()`, same pattern as settings-role-gate-2111/status-remote-machine-2112) is
+ * compared against the descriptor it was actually given, not a stale/absent value from gatewayStatus.js's
+ * OWN separate polling loop (which a unit-mounted view never starts).
+ * Returns { role, baseRole, reason } — see the module header for what each means.
+ */
+export function roleInfoFromDescriptor(d) {
+    const baseRole = (d && (d.role === 'gateway' || d.role === 'client')) ? d.role : 'client';
+    if (baseRole !== 'gateway') return { role: 'client', baseRole, reason: '' };
+    const profileId = (d && d.controller_profile_id) || null;
+    if (profileId) {   // null/absent = fingerprint unknown — never demote on ignorance
+        const wsId = getMachine().controllerId;
+        if (wsId && wsId !== profileId) {
+            return {
+                role: 'client', baseRole,
+                reason: `workspace targets ${ctrlLabel(wsId)}; ${ctrlLabel(profileId)} is connected`,
+            };
+        }
+    }
+    return { role: 'gateway', baseRole, reason: '' };
+}
+
+/**
+ * t2151 — the CACHED answer, off gatewayStatus.js's OWN polling loop (5-30s cadence). For callers with no
+ * descriptor of their own to hand in — today, only the quick-menu identity line, which renders far more often
+ * than any descriptor fetch and has nowhere to await one. Everywhere a descriptor IS already in hand, prefer
+ * `roleInfoFromDescriptor(d)` directly (see its own comment for why that matters for testability).
+ */
+export function getRoleInfo() {
+    return roleInfoFromDescriptor(_lastRole ? { role: _lastRole, controller_profile_id: _lastProfileId } : null);
+}
+
+/** t2145/t2151 — read the client-side-derived, workspace-relative role without waiting on a daemon.
+ * Returns 'gateway' | 'client'. See `getRoleInfo()` for the WHY when it demotes. */
 export function getEffectiveRole() {
-    return _lastRole === 'gateway' ? 'gateway' : 'client';
+    return getRoleInfo().role;
 }
 
 export function initGatewayStatus() {
@@ -62,11 +120,15 @@ export function initGatewayStatus() {
             // instead and describes a REMOTE gateway, not this device). Not persisted anywhere — see the
             // module header: a daemon-down downgrade must self-correct the moment the daemon answers again.
             _lastRole = (d && (d.role === 'gateway' || d.role === 'client')) ? d.role : '';
+            // t2151 — the connected controller's fingerprinted profile id (ops.py:287), for the workspace-
+            // relative comparison in getRoleInfo(). null/absent when unreadable — never a guess.
+            _lastProfileId = (d && d.controller_profile_id) || null;
         } catch (e) {
             led.className = 'gateway-led';   // unlit — no gateway (standalone / hosted / dev preview)
             led.title = 'Gateway: off';
             bridged = false;
             _lastRole = '';   // t2145 — no reachable daemon this tick ⇒ getEffectiveRole() reports 'client'
+            _lastProfileId = null;
             // Don't auto-kick out of the Gateway tab when nothing answers — its Console → Service picker is
             // how you point at one (a local daemon, the desktop exe's gateway, or a remote service).
         }

@@ -69,7 +69,11 @@ const mountStatus = async (page, { hb, hasDaemon }) => {
         document.body.appendChild(root);
         window.__statusErr = null;
         const client = {
-            descriptor: async () => { if (!hasDaemon) throw new Error('no gateway'); return { machine_name: 'Ultimate Bee', dest: 'x', backend: 'local', version: '1', controller_connected: true }; },
+            // t2151 (BACKLOG #11) — Status now reframes on the WORKSPACE-RELATIVE role, not merely on whether a
+            // daemon answers, so a "local daemon answers" mock must say it is a gateway for this workspace's
+            // controller (localStorage above sets the workspace to 'ddcs-v41'), or it demotes to client and this
+            // test's "raw table" expectations (below) would be reading the wrong branch.
+            descriptor: async () => { if (!hasDaemon) throw new Error('no gateway'); return { machine_name: 'Ultimate Bee', dest: 'x', backend: 'local', version: '1', controller_connected: true, role: 'gateway', controller_profile_id: 'ddcs-v41' }; },
             readVars: async () => ({}),
         };
         try { await mod.default.mount({ root, client }); await mod.default.onPoll({ root, client }); }

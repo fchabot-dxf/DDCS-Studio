@@ -35,7 +35,7 @@ import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
 import { getMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the identity line names THIS WORKSPACE'S MACHINE; t1231 — with its signed envelope
 import { fileSavedStem, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t2145 — the workspace's name IS its last-saved .ddcs file's name; no separate field. BACKLOG #7 — when + where it was saved, for the new menu footer line.
-import { EXE_DOWNLOAD_URL, getEffectiveRole } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page); t2145 — the client-side-derived PC role
+import { EXE_DOWNLOAD_URL, getRoleInfo } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page); t2145/t2151 — the client-side-derived, workspace-relative PC role
 import { openExternal } from './openExternal.js';   // t2066 — open external links once, host-side in the exe
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
 import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
@@ -225,7 +225,13 @@ export function initHeaderPost() {
         // getEffectiveRole() for how it derives client-side with no daemon required. Deliberately DERIVED, not
         // cached: a gateway whose daemon is down shows 'client' too (human ruling — it describes what this PC
         // can actually DO right now) and self-corrects the moment the daemon answers again, no restart needed.
-        const roleText = getEffectiveRole();
+        // t2151 (BACKLOG #11 care #3) — the role is now WORKSPACE-RELATIVE too (see gatewayStatus.js's
+        // getRoleInfo()), so it can flip mid-session on a workspace switch. "Say WHY, never just the bare
+        // word" — the reason (when the demotion is the workspace-mismatch kind, not a plain no-daemon client)
+        // rides as this span's title, a hover away rather than crowding the line itself.
+        const roleInfo = getRoleInfo();
+        const roleText = roleInfo.role;
+        const roleTitle = roleInfo.reason ? ` title="${esc(roleInfo.reason)}"` : '';
         const identityRow =
             `<div class="hq-identity-line hq-identity">`
             // t1249 (user) — the line says WHAT it describes. Without the label it is three facts with no subject:
@@ -234,7 +240,7 @@ export function initHeaderPost() {
             + `<span class="hq-identity-txt"><span class="hq-label">Workspace: </span><b>${esc(apName)}</b>`
             + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
             + `<span class="hq-cur">${esc(apKind)}</span>`
-            + `<span class="hq-cur"> · ${esc(roleText)}</span>`
+            + `<span class="hq-cur"${roleTitle}> · ${esc(roleText)}</span>`
             + (apEnv ? `<span class="hq-cur hq-env"> · ${esc(apEnv)}</span>` : '')
             + `</span>`
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`

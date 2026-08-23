@@ -15,6 +15,12 @@ export default {
   // ⛔ DECLARED, not hand-rolled into the panel: the view states its own requirement and gatewayPanel reads it,
   //    so a second capability-gated view adds a line here rather than a branch there.
   requiresModbus: true,
+  // t2151 (BACKLOG #9 dispatch, ROLES-PLAN section 1: "tracker: REFRAME or hide — live progress comes off the
+  // gateway's serial cable; a client can only mirror what the gateway published"). Mirroring (ROLES-PLAN S5) is
+  // not built, so for now this tab needs to BE the workspace's gateway — a client (this PC not currently
+  // wired to what's open, even with its own local daemon) cannot show anything live regardless of controller
+  // family, so it gates on role too, same declared-not-hand-rolled pattern as requiresModbus above.
+  requiresGateway: true,
   label: "Tracking",
 
   mount(ctx) {

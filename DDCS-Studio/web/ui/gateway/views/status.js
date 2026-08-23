@@ -3,7 +3,7 @@
 // (see [[live-cnc-readonly-when-away]]). Polled while visible.
 import { el } from '../util.js';
 import { deriveStatus, deviceName } from '../../../shared/js/client.js';
-import { EXE_DOWNLOAD_URL } from '../../gatewayStatus.js';
+import { EXE_DOWNLOAD_URL, roleInfoFromDescriptor } from '../../gatewayStatus.js';   // t2151 — the workspace-relative role, applied to THIS view's own freshly-fetched `d` below (not gatewayStatus.js's separately-polled cache — see that function's own comment)
 import { readGatewayHeartbeat, canSendViaDrive } from '../../cloud/driveJobs.js';   // t2112 - the machine's OWN report, when this device has no gateway
 import { fileSavedStem } from '../../../data/backup.js';   // t2101/t2145 - the Drive folder the gateway publishes under is keyed by the workspace's name — now the last-saved .ddcs file's name
 
@@ -57,6 +57,14 @@ export default {
     let d = null;
     try { d = await ctx.client.descriptor(); } catch { d = null; }
     const s = deriveStatus(ctx.client, d);
+    // t2151 (BACKLOG #9's dispatch, human: "the status tab should look different in client vs gateway") — THE
+    // QUESTION THIS TAB ASKS DEPENDS ON ROLE, not merely on whether THIS PC happens to run a daemon. A client
+    // with its OWN local daemon (an exe installed, but wired to a different controller than this workspace, or
+    // to none) still cannot answer "is my machine's gateway alive" from its own descriptor — that descriptor
+    // describes THIS PC's non-matching hardware, not the workspace's actual gateway. Role, from the same
+    // workspace-relative seam the identity line and admin.js's gating now both read.
+    const { role, reason: roleReason } = roleInfoFromDescriptor(d);
+    const askMachine = role === 'client';   // t2151 — was `!d`; a client with a local daemon still asks this
 
     this.conn.replaceChildren(
       el('div', { class: 'section-label' }, 'Connection'),
@@ -68,10 +76,13 @@ export default {
            (!d && this._hb && this._hb.state === 'fresh') ? 'no gateway on this device' : (s.label || 'unreachable')),
         s.device ? el('span', { class: 'muted' }, '· ' + s.device) : null));
 
-    if (!d) await this._refreshHeartbeat();
-    const hb = (!d && this._hb) || null;
+    if (askMachine) await this._refreshHeartbeat();
+    const hb = (askMachine && this._hb) || null;
     const live = (hb && hb.state === 'fresh' && hb.hb) || null;
     this.desc.replaceChildren(el('div', { class: 'section-label' }, 'Controller'));
+    // t2151 (BACKLOG #11 care #3) — a workspace-mismatch demotion states WHY, right where the reframed
+    // question appears — never just a bare role flip.
+    if (roleReason) this.desc.append(el('div', { class: 'muted', style: 'margin-bottom:6px' }, roleReason));
     if (live) {
       // ⭐ THREE STATES, NOT TWO - the mill is observable ONLY through its gateway, so with none running
       //    its state is UNKNOWN and must never be drawn as 'off'. Same rule and same dots as Send.
@@ -106,7 +117,7 @@ export default {
                : 'Studio cannot see a gateway for this machine on your Drive')),
         el('div', { class: 'row hb-row' }, el('span', { class: 'hb-dot unknown' }),
            el('span', {}, 'Machine state unknown — no gateway to ask')));
-    } else if (!d) {
+    } else if (askMachine && !d) {
       this.desc.append(
         // t1325 — THE MESSAGE IS NOW A PATH, not a description of one. It named the Console tab while the Console had
         // no daemon field to name; the field exists now, so the sentence CARRIES you there and focuses it. A message
@@ -120,6 +131,13 @@ export default {
       // t2093 — the inline "⬇ Get DDCS Studio for desktop" link that used to sit here is gone: the download
       // offer below (this.download, mount()) is now unconditional and covers this case too, so this branch
       // only needs to state ITS OWN specific guidance (finding an already-running gateway).
+    } else if (askMachine) {
+      // t2151 — a CLIENT with its OWN local daemon (this PC runs the exe, but is not this workspace's
+      // gateway) reaches here instead of the `!d` branch above: a daemon already answers on this PC, so
+      // "enter a daemon URL" would be actively wrong advice. The real blocker is Drive not being checkable
+      // (not signed in, or a fresh sign-in that has not published a heartbeat yet) — say that instead.
+      this.desc.append(el('div', { class: 'muted' },
+        'Studio could not check the workspace\'s gateway status — sign in to Drive (workspace manager → Cloud) to read its heartbeat.'));
     } else {
       const rows = [
         ['machine', d.machine_name || deviceName(d) || '—'],

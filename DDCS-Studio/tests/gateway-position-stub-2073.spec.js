@@ -14,9 +14,15 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const boot = async (page, positionBody) => {
+    // t2151 (BACKLOG #11/#9 dispatch) — Tracking now also gates on the WORKSPACE-RELATIVE role
+    // (`requiresGateway`, tracker.js): a descriptor with no `.role` reads as a client and hides this tab's
+    // content entirely, which is a real fixture gap this turn's role-awareness exposed, not a regression in
+    // the gate — the mock never needed a role before Tracking started reading one. `controller_profile_id`
+    // omitted deliberately: this test doesn't set a workspace controller either, so leaving it unset (unknown)
+    // is the honest match, not a guess.
     await page.route('**/api/descriptor', (route) => route.fulfill({
         status: 200, contentType: 'application/json',
-        body: JSON.stringify({ service: 'gateway', controller_connected: true, device: 'M350' }),
+        body: JSON.stringify({ service: 'gateway', controller_connected: true, device: 'M350', role: 'gateway' }),
     }));
     await page.route('**/api/queue', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
     await page.route('**/api/position', (route) => route.fulfill({

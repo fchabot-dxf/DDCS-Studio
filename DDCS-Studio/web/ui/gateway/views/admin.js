@@ -3,6 +3,7 @@
 // into the gateway — configure it on the machine PC). A form view: mounted on tab click, not polled.
 import { el, toast } from "../util.js";
 import { getService, setService, GATEWAY_PORTS, DEFAULT_LOCAL_BASE } from "../service.js";
+import { roleInfoFromDescriptor } from "../../gatewayStatus.js";   // t2151 — the client-side, workspace-relative role, applied to THIS view's own freshly-fetched descriptor (`d` below) — never gatewayStatus.js's separately-polled cache, which a hand-mounted view under test never populates
 
 export default {
   id: "admin",
@@ -186,9 +187,19 @@ export default {
     //    with a controller disk still configured. If we hid the disk field in that state the user could
     //    never CLEAR it, and the contradiction would be permanent. So a conflict SHOWS the fields and says
     //    what is wrong - stated, never silently resolved (S0's own constraint).
-    const isClient = d.role === 'client';
+    // t2151 (BACKLOG #11) — TWO DIFFERENT QUESTIONS, deliberately kept apart. `baseRole` (from THIS view's own
+    // freshly-fetched `d`, same source as before t2151) answers "does this PC have a controller disk
+    // configured at all?" and is what governs whether the WIRING FIELDS EXIST: real settings for real
+    // hardware, unaffected by which workspace happens to be open. `mismatch` answers a DIFFERENT question —
+    // "does the connected controller match the OPEN WORKSPACE's declared one?" — and must NEVER hide these
+    // fields: a PC that is a genuine gateway for a DIFFERENT controller still has real wiring to show/edit
+    // here, it just cannot currently act as gateway for the workspace that happens to be open right now (see
+    // the banner below, not a field hide).
+    const { baseRole, role: effRole, reason: mismatchReason } = roleInfoFromDescriptor(d);
+    const isClient = baseRole === 'client';
     const conflict = !!d.role_conflict;
     const hideWiring = isClient && !conflict;
+    const mismatch = baseRole === 'gateway' && effRole === 'client' && !!mismatchReason;
     const dest = (cfg.dest || "");
     const isRemote = dest.startsWith("\\\\") || dest.startsWith("//");
     const statusText = !dest ? "no controller set — enter the controller disk below"
@@ -277,6 +288,14 @@ export default {
       ...(conflict ? [el("div", { class: "wiz-usage", style: "border-left:3px solid var(--warn,#f59e0b);padding-left:8px" },
         "This PC is set to CLIENT, but a controller disk is still configured. Those disagree - clear the disk below, "
         + "or set the role back to gateway. Nothing has been changed for you.")] : []),
+      // t2151 (BACKLOG #11) — STATE IT, NEVER AUTO-SWITCH. This PC IS a gateway (wiring fields below are real
+      // and stay visible) but not FOR the workspace that happens to be open right now — a fact, not a caution,
+      // and never resolved by re-pointing anything: the user may be authoring for a machine not in front of
+      // them, which is legitimate.
+      ...(mismatch ? [el("div", { class: "wiz-usage", style: "border-left:3px solid var(--warn,#f59e0b);padding-left:8px" },
+        "This PC's own gateway is wired to a different controller than the WORKSPACE you have open (" + mismatchReason
+        + "). Sending/tracking here act as a CLIENT for this workspace — the job queues until a matching gateway "
+        + "claims it. This PC's own wiring below is unaffected; nothing has been changed for you.")] : []),
       el("div", {}, el("span", { class: "label" }, "Machine name"), name),
       ...(hideWiring ? [] : [
       el("div", { style: "margin-top:10px" },
