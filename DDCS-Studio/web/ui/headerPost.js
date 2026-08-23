@@ -343,11 +343,16 @@ export function initHeaderPost() {
         // of the same "open a thing" verb. Now literal: "Open workspace" (workspaceRow, above), "Load G-code…"
         // (below), "Open project…" (libraryRow, above — its door also reaches Wizards, but Projects is the
         // "open a saved thing" case this literalisation is about; the title still names both).
+        // t2178 (tail, extending the same literal-labels ruling to Export, sequenced AFTER amendment 8 rebuilt
+        // what it actually does) — "Export…" named the ACTION, not what it does now: opens the OS's own native
+        // save dialog, so the operator picks the destination directly. "Save G-code as…" says that; the title
+        // states the trade recorded in WORK-LOG (a native dialog asks every time — no more granted-folder
+        // convenience for this one action, deliberately, per direct instruction).
         const fileRows =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad" title="Load a G-code file into the editor (replaces the program) — not a workspace or a project">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load G-code…</span></button>'
-            + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Export…</span></button>';
+            + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport" title="Save the program as a .nc file — the native save dialog opens so you pick the destination yourself, every time">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Save G-code as…</span></button>';
 
         // ── ASSEMBLE ──────────────────────────────────────────────────────────────────────────────────
         menu.innerHTML =

@@ -434,8 +434,15 @@ export function setupGlobalFunctions(app) {
         // list, popping BELOW its button (it lives in the editor's top-right, unlike '＋ Make ▾' at the bottom).
         const EDITOR_FILE_ACTIONS = [
             { id: 'load', label: '📂 Load…', title: 'Load a program file (replaces the editor)', run: () => window.loadGcodeFile?.() },
+            // t2178 (tail) — this row's label was already fairly literal; the real gap is that its OWN handler
+            // (window.insertGcodeFile) was DELETED entirely at t2173 ("insert is redundant beside load, remove
+            // it completely") — this whole menu is dead code (see the file's own comment above: no caller left
+            // since t2078 retired the corner button that used to open it), so this row now names an action that
+            // no longer exists anywhere in the live app. `run` stays a safe no-op (optional chaining), unchanged.
             { id: 'insert', label: '➕ Insert…', title: 'Insert a program file at the cursor', run: () => window.insertGcodeFile?.() },
-            { id: 'export', label: '⭳ Export…', title: 'Deploy the program as a file', run: () => window.downloadFile?.() },
+            // t2178 — was "Deploy the program as a file" (stale since amendment 8: Export no longer deploys to a
+            // granted folder, it opens the OS's own native save dialog). Matches the quick-menu's own wording.
+            { id: 'export', label: '⭳ Save G-code as…', title: 'Save the program as a .nc file — the native save dialog opens so you pick the destination yourself', run: () => window.downloadFile?.() },
             // t1255 (user) — CLEAR IS NOT HERE. The header's 🗑 trash IS the clear, at every width now; this row was a
             // phone-only stand-in from t1227, back when the trash hid below 600px. Two doors to a destructive action is
             // one door too many — and the one that hid was the one people learned.
