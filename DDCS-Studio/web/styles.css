@@ -4049,6 +4049,27 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
     caret-color: #fff; /* Keep cursor visible */
 }
 
+/* BACKLOG #12 (human, 2026-08-22: "the border appear when i click in the editor" -> "just left is missing") —
+   THE RING'S LEFT EDGE WAS PAINTED OVER, not missing. It is the generic `textarea:focus-visible` rule
+   (this file, ~line 1929) doing its job correctly — a real, deliberate accessibility ring, not a stray UA
+   default (confirmed: no separate rule existed to delete). The bug is WHERE it draws: at `outline-offset:-2px`
+   on `#editor` itself, whose own left edge sits UNDER `#editor-gutter` (position:absolute, z-index:3, 44px
+   wide, directly above) — so the ring's left third is drawn, then immediately painted over by the gutter's own
+   opaque background. Top/right/bottom clear the gutter and draw fine, which is exactly the one-edge symptom.
+   ⛔ Not a clipping bug (no overflow:hidden ancestor sits between the ring and the viewport on that edge) —
+   confirmed by DOM/z-index reading before writing this, not assumed from the symptom shape.
+   THE FIX: `#editor-gutter` is a plain SIBLING of `#editor` inside `.editor-container` (editorManager.js's
+   `insertBefore`, not an absolutely-positioned child needing a new wrapper) — so the ring moves to the ONE
+   existing box that already contains both: `.editor-container` itself. `:has()` reaches the container from
+   the descendant's OWN :focus-visible state (already this file's pattern — `.editor-container:has(.viz3d-
+   drawer.open)` above), so this needs no new element and no JS. Click still shows NO ring (the point of
+   `:focus-visible` over plain `:focus`); Tab still shows one, now honestly framing the whole panel. */
+#editor:focus-visible { outline: none; }   /* suppress the generic per-element ring — it would still be the one the gutter covers */
+.editor-container:has(#editor:focus-visible) {
+    outline: 2px solid var(--field-focus-edge, var(--accent));
+    outline-offset: -2px;
+}
+
 /* Comment Color */
 .g-comment { color: var(--success) !important; font-weight: bold; }
 /* t2079 (P4c, bug #3) — CORRECTION to the dispatch's own premise, found by verifying rather than re-deriving:
