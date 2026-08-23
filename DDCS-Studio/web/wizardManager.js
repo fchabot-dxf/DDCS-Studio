@@ -20,7 +20,9 @@ import { openTemplatesPopover, closeTemplatesPopover, mountPresetRow } from './u
 import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
 import { makePanesCollapsible } from './ui/paneAccordion.js';   // t752 — individually collapsible preview/code panes (per-theme motion)
 import { needsPrereqPrompt } from './ui/wizardPrereq.js';   // just-in-time "add a probe / ATC" prompt for hardware-gated wizards
-import { findOpById, flattenOps } from './blocks/programModel.js';   // t1970 — direct import, not a window-guarded fallback (the guard could never fire, t1962's own boot-chain trace); opBuilders.js is the declared leaf, no cycle
+import { findOpById, flattenOps, getStack, replaceOpById, opFromMarker } from './blocks/programModel.js';   // t1970 — direct import, not a window-guarded fallback (the guard could never fire, t1962's own boot-chain trace); opBuilders.js is the declared leaf, no cycle. t2176 (BACKLOG 10) — the whole-program preview context: getStack() the committed program, replaceOpById() splices this op's live draft into it, opFromMarker() builds that draft from the SAME codec programModel's own marker-import already uses (one path, not a second op-building implementation)
+import { emitMapped } from './blocks/blockEmitter.js';   // t2176 — re-emits the whole program (this op's draft spliced in) for the wizard preview's spatial context
+import { activeDialectOpts } from './wizards/previewEmit.js';   // t2176 — the SAME per-controller dialect fold the single-op preview already uses (t634) — the whole-program re-emit must not silently drop back to the default dialect
 
 // Map the touch-probe wizards' per-op input fields to the global 3D-probe defaults
 // (settings.probes). open() pre-fills these so every wizard starts from the configured
@@ -420,8 +422,14 @@ export class WizardManager {
             params = { ...params, method };
         }
         this._seedForm(op.opType, params);             // params → form (the single source of truth)
-        this.update();                                 // re-render preview + code from the seeded values
+        // t2176 — set BEFORE update(), not after: preview3D's whole-program context (_contextGcode) reads
+        // this.editingOpId on the SAME render pass, and update() below is what actually calls preview3D for the
+        // very first time. Setting it after left that first render seeing editingOpId still null (open()'s own
+        // reset, two lines up) — no whole-program splice until the user's next keystroke re-rendered it. Nothing
+        // else in the render path reads editingOpId (only the later commit/insert flow does), so moving it
+        // earlier changes nothing else.
         this.editingOpId = opId;                       // now mark as editing this op
+        this.update();                                 // re-render preview + code from the seeded values
         const box = document.querySelector('.wiz-box'); if (box) box.classList.add('editing');  // accent glow
         // Transactional snapshot: capture the form state now, so a Cancel can revert to it.
         this._formSnapshot = this._captureForm();
@@ -571,10 +579,30 @@ export class WizardManager {
         this.close(false, false);
     }
 
+    // t2176 (BACKLOG 10, human: "without [a cad editor] multiop is lacking approachability" — open a wizard on op
+    // 3 of a 12-op program and you cannot see where your pocket sits relative to anything else). MEASURED first
+    // (a throwaway benchmark, not assumed): re-emitting a 60-op stack via emitMapped costs ~1.3ms, a 12-op one
+    // ~0.3ms — negligible against the ~200-300ms a live-typing debounce already waits, so the backlog's own
+    // "backdrop fallback if re-trace proves prohibitive" is not needed; the real whole-program feed is safe.
+    // `wholeProgramCtx` ({opType, params}), when the caller has it AND an existing op is being edited
+    // (this.editingOpId), builds a fresh draft of THIS op (opFromMarker — the SAME codec programModel's own
+    // marker-import already uses, not a second op-building path) and splices it into the CURRENT committed
+    // program (replaceOpById, also already a shared primitive) via ONE re-emit (emitMapped, the same call Studio/
+    // Blocks make for their own whole-program views — no second renderer). A brand-new (not-yet-committed) op has
+    // no position in the program to show yet, so it keeps the single-op-only preview unchanged.
+    _contextGcode(wholeProgramCtx) {
+        if (!wholeProgramCtx || !this.editingOpId) return null;
+        try {
+            const draft = opFromMarker(wholeProgramCtx.opType, wholeProgramCtx.params);
+            const combined = draft && replaceOpById(getStack(), this.editingOpId, draft);
+            return combined ? emitMapped(combined, activeDialectOpts()).text : null;
+        } catch (_) { return null; }   // best-effort context — a failure here must fall back to the single-op preview, never break it
+    }
+
     // Render the wizard's generated G-code in the active wizard's viz area using THE shared preview panel
     // (identical code + UI to Studio main + Blocks). The SVG schematic is hidden (kept in wizards/views/* +
     // _svgPreview.bak.js for the DDCS CAM-menu thumbnails). The wizard feeds its own op code + inferred start.
-    preview3D(gcode, containerId, start, startHints, simStock, tool) {
+    preview3D(gcode, containerId, start, startHints, simStock, tool, wholeProgramCtx) {
         const svgCont = document.getElementById(containerId);
         if (!svgCont || !svgCont.parentElement) return;
         const parent = svgCont.parentElement; // .viz-container
@@ -588,7 +616,14 @@ export class WizardManager {
             const visual = host.closest('.wiz-visual') || parent;
             const oldLeg = visual && visual.querySelector('.viz-legend'); if (oldLeg) oldLeg.remove();
             host.__panel = createPreviewPanel(host, {
-                getGcode: () => host.__gcode || '',
+                // t2176 — the STATIC route/trace reads the whole-program context when available (so the 3D view
+                // shows where this op sits among its neighbours); PLAY stays scoped to just this op's own code
+                // (getPlayGcode) — see createPreviewPanel.js's own comment on why Play isn't widened too: a
+                // whole-program Play needs a start-OFFSET into GcodeExecutionEngine's run loop (also the send
+                // safety-gate's own parser) to not sit through the preceding ops, and that is real engine work
+                // for its own turn, not a rushed addition riding in on this one.
+                getGcode: () => host.__contextGcode || host.__gcode || '',
+                getPlayGcode: () => host.__gcode || '',
                 getStart: () => host.__start,
                 // Sim-only var seed (GUI-1): the ATC firmware station's #1306/#1320-1326, authored in Studio, so the
                 // played push travel reaches the taught station instead of untaught-0. Read fresh each resetState (play),
@@ -605,6 +640,7 @@ export class WizardManager {
         }
         svgCont.style.display = 'none';
         host.__gcode = gcode || '';
+        host.__contextGcode = this._contextGcode(wholeProgramCtx);   // t2176 — null when not editing an existing op, or the splice failed; getGcode falls back to host.__gcode either way
         host.__start = start || null;
         host.__startHints = Array.isArray(startHints) ? startHints : null;
         host.__simStock = simStock || null;   // t417 E3 — the derived per-op sim stock (rotary round bar) or null → the global

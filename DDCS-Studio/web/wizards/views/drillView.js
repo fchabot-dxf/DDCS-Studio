@@ -190,7 +190,7 @@ export const drillView = {
 
         const gcode = wizard.generate(params);
         el('wiz_drill_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'drillVizContainer');
+        ctx.preview3D(gcode, 'drillVizContainer', undefined, undefined, undefined, undefined, { opType: 'drill', params });   // t2176 — BACKLOG 10: whole-program context when editing an existing op
 
         // 2D editable layout (left of the 3D verify view).
         layout.render(el('drillLayoutCanvas'), buildDrillSpec(params, s.stock));

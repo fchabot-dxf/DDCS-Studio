@@ -50747,3 +50747,111 @@ Full sweep: all 23 tests across those 5 files green. Smoke 76/76, node 227/227, 
 Insert nowhere in the menu.
 
 🔨 (worker, live human directive — not a numbered turn)
+
+## turn 2176 — BACKLOG 10: MULTI-OP APPROACHABILITY (arc step) + BACKLOG F2 (tail — already done, verified not built twice)
+
+### MEASURED FIRST, per the dispatch's own gate
+
+The backlog's one open question was whether re-tracing the WHOLE program on every keystroke is cheap enough to
+just do it (vs. the fallback static-backdrop design). Benchmarked live in the real app (not assumed): a
+throwaway Playwright test built 12/30/60-op stacks and timed `emitMapped()` directly — **12 ops ≈ 0.29ms, 30 ≈
+0.66ms, 60 ≈ 1.31ms**, against the ~200-300ms a live-typing debounce already waits. Negligible. The backdrop
+fallback is not needed; implemented the real fix.
+
+### THE FIX — one splice, one re-emit, the SAME primitives everywhere else already uses
+
+`wizardManager.js` gained one new private method, `_contextGcode(wholeProgramCtx)`:
+```
+opFromMarker(opType, params)      → a fresh draft of the CURRENTLY-EDITED op (the SAME codec
+                                     programModel's own marker-import already uses — not a second
+                                     op-building path)
+replaceOpById(getStack(), id, …)  → splice that draft into the CURRENT committed program, in place
+                                     (already a shared primitive, used by the real commit path too)
+emitMapped(combined, dialectOpts) → ONE re-emit of the whole thing (the same call Studio/Blocks make
+                                     for their own whole-program views — no second renderer)
+```
+Returns `null` (silently, try/caught) whenever there's nothing to splice — no `editingOpId` (a brand-new,
+not-yet-committed op has no position in the program to show), or the splice fails for any reason — so a failure
+here can only ever fall back to the single-op preview that already existed, never break it.
+
+`preview3D()` gained a 7th, optional param (`wholeProgramCtx = {opType, params}`) and now feeds the panel
+`host.__contextGcode || host.__gcode` as `getGcode` (whole program when available, single-op otherwise —
+UNCHANGED for every caller that doesn't pass the new arg). 7 callers updated to pass it: the 5 built-in views
+that map 1:1 to a `builderOf` opType (pocketView/surfacingView/slotView/contourView/drillView — one line each,
+`{ opType: 'pocket', params }` etc., reusing the SAME `params` object each view already builds for its own
+`wizard.generate(params)` call) and `userOpView.js` (both its call sites, for every custom op — EXCEPT the
+group-edit path, whose `applyGroupParams` shape isn't a single op this codec can rebuild; scoped out
+deliberately, not silently). `atcViews.js`'s 6 call sites were left untouched — ATC ops are singular setup
+actions, not the dense multi-op milling sequence the human's complaint was actually about, and one of its six
+calls passes a literal `'G90'` as `gcode`, a heterogeneity that made "whole-program context" a much fuzzier fit
+there than a deliberate scope-narrowing was worth chasing down this turn.
+
+### A REAL BUG, found by my OWN test's first failure, not by inspection
+
+`openForEdit(opId)` called `this.update()` (which triggers the FIRST `preview3D()`) BEFORE setting
+`this.editingOpId = opId` — so the very first render of a reopened op never saw its own `editingOpId` and never
+got whole-program context; only a SUBSEQUENT keystroke (which re-triggers `update()`) would. My own new test
+caught this directly (a live 3-op program, `openForEdit` on the middle one, `host.__contextGcode` came back
+empty) before I'd have shipped it silently broken on first open. Fixed by moving the assignment two lines
+earlier — nothing else in the render path reads `editingOpId` (only the later commit/insert flow does), so nothing else changes.
+
+### PLAY STAYS SCOPED — a deliberate, named simplification, not silently narrowed scope
+
+The backlog named "Press Play while editing op 3 and you would sit through ops 1-2" as one of two things the fix
+MUST answer, with its own suggested shape: a start OFFSET into the whole-program run, "not a different
+renderer." I did not build that. `GcodeExecutionEngine` — the thing `run()` lives on — is not preview-only
+plumbing: `ui/gateway/views/send.js` uses the SAME class as the send safety-gate's own parser ("t1585 — the send
+gate reads the FILE, with the same parser the sim runs"). Adding a silent-fast-forward-then-resume mode to its
+core execution loop is real, separate engine work that deserves its own careful turn and review, not a rushed
+addition riding in on a UI-context change. Instead: `createPreviewPanel.js` gained a second, optional getter,
+`getPlayGcode` — every PLAY-FAMILY action (play(), the loop-replay restart, the live-restart-equality-check that
+guards against a restart loop, and Step) now resolves through one new `getPlayCode()` helper
+(`get('getPlayGcode') || get('getGcode') || ''`), while the STATIC route/trace (`setGcode()`, what actually
+draws the spatial context this turn is about) still reads `getGcode` directly, unchanged. wizardManager.js feeds
+`getPlayGcode` this op's own isolated code — byte-identical to what Play always ran before this turn. Every
+OTHER `createPreviewPanel` consumer (Studio, Blocks, macros, gateway Send) never sets `getPlayGcode`, so `get`
+falls straight through to `getGcode` for them — zero behaviour change anywhere outside the wizard's own
+multi-op-editing case.
+**This is flagged, not hidden:** the engine-level start-offset is the direct, well-defined next step for this
+same backlog item, not vague future work — comments at both ends (wizardManager.js's `preview3D`,
+createPreviewPanel.js's `getPlayCode`) name exactly what's missing and why it wasn't attempted here.
+
+### Verification
+
+New `wizard-multiop-context-2176.spec.js`, 3 tests: whole-program context appears when editing an existing op
+of a real 3-op program (drill/pocket/slot, each built via `opFromMarker` so their bodies are real G-code, not a
+hand-rolled stand-in) and is strictly longer than the isolated op's own code; Play's own engine loads exactly
+the isolated op's line count, not the longer whole-program one; a brand-new (uncommitted) op gets no splice
+attempt at all (`editingOpId` null → `_contextGcode` short-circuits). The FIRST test failed for the exact right
+reason on the first run (see the openForEdit ordering bug above) — non-vacuity proven by the discovery process
+itself, not a separate revert-and-rerun ritual. Verified live too — screenshot of the 3D view mid-edit showing
+all three ops' toolpaths together (`verification/t2176-multiop-context-3d.png`, sent to the human).
+
+Collateral: this touches `createPreviewPanel.js` (the SAME shared component Studio/Blocks/macros/gateway Send
+all mount) and `wizardManager.js`'s `openForEdit`, so the blast radius is genuinely wide — 210 test files
+reference `preview3D`/`createPreviewPanel`/`openForEdit`/`wizardManager` by name. Ran all 210 (batched in 4
+groups of ~53 to keep each run bounded): 599 passed, 0 real failures. 4 tests reported "flaky" (failed once,
+passed on retry) across the batches — all four are generic app-boot `waitForFunction` timeouts
+(`window.ddcsStudio && window.showApp`-style), unrelated to anything this turn touched; re-ran each in isolation
+(one with `--workers=1` to remove parallel contention entirely) and all passed cleanly and quickly — confirmed
+pre-existing parallel-load flakiness, not a regression. Smoke 76/76, node 227/227, lint clean.
+
+## BACKLOG F2 status check ("a rename button for workspaces") — ALREADY DONE, verified not rebuilt (amendment 1 swapped this OUT as the turn's tail before commit — see below — but the finding stands on its own and is recorded so it isn't re-dispatched)
+
+Traced all three named readers (headerPost.js, settingsPanel.js, workspaceManager.js) plus the "workspace list"
+renderer (the OS-style file panel in the Open dialog) and the underlying `workspaceMachine.js` machine record
+itself. **Every one of them already reads `fileSavedStem()`/`fileSavedName()` — the file's own name — and the
+machine record's own comment already cites BACKLOG F2 and this SAME human quote** ("we dont need a name just
+display the file name"): a prior turn, t2145, already did this work in full, `name` field removed from the data
+model entirely. The one known exception, `data/profileStore.js:33` (`name: machine.name || ''`, now silently
+always `''` since the field is gone) is the SAME reader the backlog's own text names as "the dying profile
+library (already backlogged)" — an accepted, separately-tracked gap, not this item's to fix. A dedicated grep
+for any surviving "workspace name" input field (the thing F2's title literally asked for) found none —
+`workspaceManager.js` has its own standing, shipped ruling (t1223, "the name input is GONE... Renaming is Save
+As") that a rename PROMPT was deliberately rejected in favour of Save As, which is consistent with — not a gap
+in — the ✅-ruled text ("Rename = rename the file. Nothing else stores a name").
+**No code changed for this item — there is nothing left to build.** Flagging clearly, the same way the missing
+`t-roles-s3.md`/`t-badge-collapse.md` spec-path issue was flagged twice this session: BACKLOG.md's own F2 entry
+should be marked done (or removed) so it isn't dispatched a third time.
+
+🔨 turn 2176

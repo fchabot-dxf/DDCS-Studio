@@ -575,6 +575,10 @@ export function createUserOpView(ns, opts) {
             }
             const codeEl = elNS('wiz_user_code');
             if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);
+            // t2176 (BACKLOG 10) — whole-program preview context, SAME as the built-in views (opFromMarker needs a
+            // real builderOf(opType), which a group edit's `applyGroupParams` path does not go through — a
+            // multi_step group's own children are already a different shape, not a single op this codec rebuilds).
+            const wholeProgramCtx = isGroup ? undefined : { opType: _def.opType, params };
             // t566 — a DECLARED sim-gcode OVERRIDE: an op whose PREVIEW motion differs from its EMIT (the ATC change's automatic
             // methods emit a bare `T# M6` but the sim animates the choreography INTERPRETER's assumed path) previews that instead.
             // The CODE preview above stays the real emit; only the 3D animation swaps. null / no hook → preview the emit (unchanged).
@@ -625,7 +629,7 @@ export function createUserOpView(ns, opts) {
                 // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
                 const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
                 if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
-                mgr.preview3D(previewGcode, id('userViz3dContainer'), (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock, _opTool);
+                mgr.preview3D(previewGcode, id('userViz3dContainer'), (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock, _opTool, wholeProgramCtx);
                 // t1648 — a DECLARED, OPTIONAL sim-only var seed: lets an op seed live-frame/controller-read registers for
                 // the PREVIEW trace only (never emitted, never pushed to the controller — previewVarSeed's own contract).
                 // Read via the LIVE-fn registry (getUserPreviewVarSeed), NOT `_def.previewVarSeed` directly — a function
@@ -746,7 +750,7 @@ export function createUserOpView(ns, opts) {
                 // so a multi-pass op shows its ①②③④ markers here as well as in form3d+2d (they were only wired in the 3d2d branch).
                 let starts3d = null;
                 try { const stk = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock); starts3d = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
-                const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, id('userVizContainer'), (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool);
+                const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, id('userVizContainer'), (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool, wholeProgramCtx);
             } else if (pt.mode === '2d') {
                 if (viz3dBox) viz3dBox.style.display = 'none';
                 const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = elNS('userVizContainer'); if (c) c.style.display = '';

@@ -213,6 +213,17 @@ function withInterPassConnectors(segs, starts, passEnds) {
 
 export function createPreviewPanel(container, opts = {}) {
     const get = (k) => (typeof opts[k] === 'function' ? opts[k]() : opts[k]);
+    // t2176 (BACKLOG 10, wizard multi-op context) — getGcode may now be the WHOLE PROGRAM (this op's draft spliced
+    // in, so the static route/trace shows where this op sits among its neighbours), fed by wizardManager.js.
+    // Actually PLAYING the whole program on every Play/Step/loop-replay would mean sitting through the preceding
+    // ops just to watch this one — the exact regression the backlog named and asked to be answered with a start
+    // OFFSET into the whole-program run, not a second renderer. That offset is real engine work (GcodeExecutionEngine
+    // is also the send safety-gate's own parser, ui/gateway/views/send.js) that deserves its own careful turn, not
+    // a rushed addition here. `getPlayGcode`, if the caller provides it, is what every PLAY-FAMILY action below
+    // actually runs — wizardManager.js feeds it this op's own isolated code, so Play's behaviour is BYTE-IDENTICAL
+    // to before this turn. Every other caller (Studio, Blocks, macros, gateway Send) never sets it, so `get`
+    // falls straight through to `getGcode` — unaffected.
+    const getPlayCode = () => get('getPlayGcode') || get('getGcode') || '';
     // E3 (rotary round-bar) — a per-op SIM-STOCK override: if the op declares `getStock` (a DERIVED preview stock, e.g. the
     // rotary round bar projected from #57), use it for THIS panel's viz/engine/trace; else the shared global stock. Sim-only,
     // no settings.stock mutation. Every other op omits getStock → previewStock() === stockForViz() (byte-identical behaviour).
@@ -743,7 +754,7 @@ export function createPreviewPanel(container, opts = {}) {
                 // t1241 A6 — the loop replay used to hand-roll a PARTIAL seed (config + probe overlay + the deferred
                 // probe/datum state) and missed everything else seedFreshRun does — the stock-flip reset, the device
                 // rest states, the retired tool, the sim speed. A looped run is a FRESH run; seed it like one.
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); compMap = readEnabledComps(compOps()); seedFreshRun(engine); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // t1205 — re-apply THE ONE simConfig on a loop replay too (it bypassed it, so a config change mid-session only took effect after a manual re-run)   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = getPlayCode() || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); compMap = readEnabledComps(compOps()); seedFreshRun(engine); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // t1205 — re-apply THE ONE simConfig on a loop replay too (it bypassed it, so a config change mid-session only took effect after a manual re-run)   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;
@@ -1089,7 +1100,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (liveTimer) clearTimeout(liveTimer);
         liveTimer = setTimeout(() => {
             liveTimer = null;
-            if (engine && engine.running && (get('getGcode') || '') !== lastRunCode) { stopPlay(); play(); }
+            if (engine && engine.running && getPlayCode() !== lastRunCode) { stopPlay(); play(); }
         }, 180);
     }
 
@@ -1201,7 +1212,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz && viz.carveReseed && carveEnabled() && !_carveDegraded) { viz.carveReseed(); _carvePrev = null; _carveDirty = false; }
         if (viz && viz.setPartFlip) viz.setPartFlip(null);   // t881 — a fresh run starts un-flipped; recompute the two-sided boundaries for THIS program
         _flipsApplied.clear(); _flipBoundaries = computeFlipBoundaries();
-        lastRunCode = get('getGcode') || '';
+        lastRunCode = getPlayCode();
         eng.run(lastRunCode);
         updateRunBtn();
         setProgress(0);   // t865 — show the progress bar (empty) at run start now the program is loaded (engine.totalLines set); onLineChange fills it
@@ -1289,7 +1300,7 @@ export function createPreviewPanel(container, opts = {}) {
     q('.pp-step').addEventListener('click', () => {
         const eng = ensureEngine();
         if (!eng.running) { seedFreshRun(eng); if (viz) viz.setAnimate(false); }   // a stepped run IS a fresh run — same seed as play()
-        eng.step(get('getGcode') || '');
+        eng.step(getPlayCode());
         updateRunBtn();
     });
     q('.pp-loop').addEventListener('click', () => { loopOn = !loopOn; q('.pp-loop').classList.toggle('on', loopOn); if (!loopOn && loopTimer) { clearTimeout(loopTimer); loopTimer = null; } });

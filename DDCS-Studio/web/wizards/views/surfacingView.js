@@ -161,7 +161,7 @@ export const surfacingView = {
 
         const gcode = wizard.generate(params);
         el('wiz_surfacing_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'surfacingVizContainer');
+        ctx.preview3D(gcode, 'surfacingVizContainer', undefined, undefined, undefined, undefined, { opType: 'surfacing', params });   // t2176 — BACKLOG 10: whole-program context when editing an existing op
         // t1648/t1650 — the ONE declared seed shape (startMarkerVarSeed, surfacingData.js) — the twin calls the same
         // function for the same params; a future edit to the seed shape can no longer diverge between faces.
         if (ctx.previewVarSeed) ctx.previewVarSeed('surfacingVizContainer', startMarkerVarSeed(params));

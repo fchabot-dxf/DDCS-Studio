@@ -128,7 +128,7 @@ export const contourView = {
 
         const gcode = wizard.generate(params);
         el('wiz_contour_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'contourVizContainer');
+        ctx.preview3D(gcode, 'contourVizContainer', undefined, undefined, undefined, undefined, { opType: 'contour', params });   // t2176 — BACKLOG 10: whole-program context when editing an existing op
         layout.render(el('contourLayoutCanvas'), buildContourSpec(params, s.stock));
 
         const status = el('contourVizStatus');
