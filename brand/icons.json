@@ -1,0 +1,41 @@
+{
+  "_": "The DECLARATION for DDCS Studio's menu-icon colouring. The glyphs are NOT here — they live in web/ui/headerPost.js's HQ_ICONS and are read from it. This file says only which icons get a fill and what colours it uses.",
+
+  "ruling": {
+    "human": "2026-08-23, decided by circling a rendered comparison",
+    "rule": "Only icons that are a simple single-shape CONTAINER get a solid fill. Everything else stays exactly as it ships — pure outline, untouched.",
+    "filled": ["open", "cloud"],
+    "why": "A folder and a cloud are the only true containers in the set. A gear, a wand, a tick, an external-link frame and a trash can have no interior — filling them removes the lines that make them legible.",
+    "⚠": "Save, Local, Wizards, Setup sheet and Get for desktop were rendered filled and REJECTED. They are containers on paper but read worse filled. Do not re-add them because the rule seems to permit it — the rule is the list above, not an inference."
+  },
+
+  "fill": {
+    "_": "A CHOSEN solid colour. Not an opacity — an opacity composites with whatever sits behind the menu, so the same icon means a different colour on every surface.",
+    "open":  { "body": "#d99a2b", "over": "#f59e0b" },
+    "cloud": { "body": "#2f8fc4", "over": "#0ea5e9" }
+  },
+
+  "rejected": {
+    "_": "Built as live renders, looked at, and declined. Do not reintroduce.",
+    "opacity fills": "fill-opacity instead of a solid — changes meaning per surface",
+    "computed fills": "color-mix from the accent and the panel — derived, not chosen",
+    "hue-shifted palettes": "lightening/darkening each accent programmatically to manufacture a 2nd and 3rd colour. This is what read as 'funky' — a shifted hue is a different colour wearing the same name.",
+    "black outline": "correct on a light ground, invisible on dark. Four of the five themes are dark; Setup checklist and Clear disappeared entirely.",
+    "wide accent stroke behind the outline": "structurally a halo, reads as blur",
+    "redrawn glyphs": "a floppy for Save, an open folder for Open, a floppy-with-ellipsis for Save as. All three declined — the shipped drawings were fine.",
+    "a suite-wide fill rule": "leaves half the set untreated, which looks worse than either style alone"
+  },
+
+  "shared_glyphs": {
+    "_": "One glyph per ACT, not per row — the section header already says which thing is being opened.",
+    "open": ["workspace Open", "G-code Open", "project Open"],
+    "save": ["workspace Save", "project Save", "G-code Save as"],
+    "⚠": "Save and Save as share one glyph. The LABEL is the differentiator (human, 2026-08-23)."
+  },
+
+  "missing": {
+    "_": "Rows that render an EMOJI today and have no HQ_ICONS entry. Human ruling: 'if they dont have svg they need one'.",
+    "rows": ["FAQ", "About", "Rate / Feedback"],
+    "spec": "commandDeck.js:17 — inline line-art SVG, 24x24 stroke grid rendered at 16px, currentColor, its own accent colour, drawn in the spirit of the action."
+  }
+}
