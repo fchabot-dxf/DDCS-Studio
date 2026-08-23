@@ -152,6 +152,12 @@ export function builtinTypeForTwin(opType) {
     const b = BUILTINS.find((x) => x.opensAs === opType);
     return b ? { type: b.type, variant: b.variant } : null;
 }
+/** t2196 — a source opType, named for a human: a twin resolves to its built-in's plain label, a user op to its
+ *  own label, anything else falls back to its bare opType. Moved here (was local to ui/wizardManager.js) so
+ *  ui/importCompat.js can share it without an import cycle back through the manager. */
+export function friendlySource(opType) {
+    return builtinLabelForTwin(opType) || (listUserOps().find((d) => d.opType === opType) || {}).label || opType;
+}
 /** t-opchips — a PLACED op's `opType` resolved to the bar/Settings-resolved entry that identifies it (label,
  *  icon, iconOverride) — the ONE source the editor's persistent op-chip row reads, so a user's iconOverride
  *  reaches the chip with no extra code, exactly the way it already reaches the bar and the Settings picker.

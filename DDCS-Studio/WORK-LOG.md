@@ -52248,3 +52248,83 @@ in full, plus every OTHER spec referencing `wsSave` by name (`editor-file-menu-1
 `header-menu-split-2149`, `header-profile-menu` — 28 tests, none of which click-and-assert-modal, only
 presence/label/section checks, so none needed changing) — all green. The full smoke tier (77 tests) green
 both before and after this fix.
+
+## t2198 — THE CONFIRM-ON-IMPORT SUMMARY (amendment 3, deferred from t2192/t2194)
+
+t2196's turn shipped and released as V2026.08.23.4; this turn takes up the one item t2192 and t2194 both
+deliberately parked rather than built blind: replacing the retired standalone-file LIBRARY shelf's one real
+value — seeing what a file WAS before it became part of the workspace — with a summary shown at the moment of
+import itself, shared between `ui/wizardManager.js`'s and `ui/projects/projectManager.js`'s own Import buttons
+(t2194's own plain-file-picker replacement for the shelf). Spec, per t2192's amendment 3 and the advisor's own
+follow-up note: name clash, wrong machine/axes, wrong dialect, the #-variables used, what it makes, provenance
+— shared across BOTH file kinds (.wiz wizards, .mjson projects) rather than built twice.
+
+### Declared once: `ui/importCompat.js`
+
+The two "nearly-free" checks the advisor pointed at lead, because they PREVENT a bad import rather than
+reporting one after the file already copied in:
+- **Wrong machine/axes** reuses `ui/axisGating.js`'s OWN declared tables (`OP_AXIS_NEEDS`/`OP_FRAME_NEEDS`,
+  `missingAxesFor`/`frameWhy`) — the SAME ones that grey an op on the bar — rather than a second axis-need
+  table that could drift from the first. A stack entry's `opType` is a TWIN identity (e.g. `user_pocket_data`),
+  not the bare family name those tables are keyed on (`pocket`), so a small `axisKey()` resolves it first via
+  `blocks/wizardLibrary.js`'s own declared twin→built-in bridge (`builtinTypeForTwin`, t1049) — the SAME bridge
+  `friendlySource`/`forkBuiltin` already use, not a second string-munging convention.
+- **Wrong dialect** reads the def's own `post` field — a `.mjson` project always carries one
+  (`blocks/programFile.js`'s `serializeProject` stamps `getDialect(profileId).id` at save time); a `.wiz`
+  wizard never does, because a wizard is data-driven and post-GATED LIVE at render time instead (postGating.js)
+  — there is nothing frozen to compare. `buildImportSummary` just omits the line when `post` is absent rather
+  than inventing a check a wizard file cannot answer.
+- **#-variables used is a LISTED FACT, never a verdict** — the one item the advisor's dispatch explicitly
+  RULED changes shape mid-flight: the human's own reasoning, "my own workspace wouldn't know either if I set
+  them" — a workspace only ever knows a #-variable's NUMBER and whatever name a human typed beside it, never
+  what the number means on the machine that assigned it. A check that fires on ABSENCE (harmless: "never seen
+  #510") and stays silent on COLLISION (dangerous: this workspace's own #510 means something else) is worse
+  than no check — it grants confidence exactly where it should not. So `scanVarRefs` is a plain regex over the
+  RAW imported file text (not a semantic walk of the def/stack shape — deliberately: this is advisory text a
+  human reads, never a gate anything acts on, so a little over-matching costs nothing a verdict-based check
+  couldn't afford), and the summary line is worded as an instruction to look, never a claim of safety: "Uses
+  #510, #511 — check they mean what you expect on this machine." No "unknown"/"compatible"/"ok" anywhere.
+- **What it makes / provenance** — a wizard reuses `friendlySource` (moved from a local declaration in
+  `wizardManager.js` into `blocks/wizardLibrary.js` so `importCompat.js` can share it without an import cycle
+  back through the manager) for both the op family AND `forkedFrom`'s source; a project's `profile` field (also
+  stamped by `serializeProject`, informational) names the authoring machine via a small `profileName()` lookup
+  against `CONTROLLER_PROFILES`.
+
+`collectOpTypes(value)` is one small recursive walk collecting every `opType` field (not `type` — a stack
+entry's own shape is `{type:'op', opType:'user_pocket_data'}`, confirmed against `tests/backup-852.spec.js`'s
+own fixture; reading the wrong field would collect wrapper noise like `'op'`/`'move'` instead of real op
+identity) — used for BOTH a wizard's single opType and a project's whole nested stack, so a new nesting shape
+is covered automatically rather than needing a schema-specific reader.
+
+### Wired in, one confirm each, collision folded IN rather than asked twice
+
+Both managers' `importText`/`importIntoWorkspace` used to ask a SEPARATE bare "already in this workspace,
+replace it?" confirm only on a collision, and imported silently otherwise. Now: ONE `buildImportSummary()` +
+ONE `dlgConfirm` every time, collision (when present) folded in as its own line rather than a second dialog —
+matching how every other multi-fact ask in this codebase composes (the three-way unsaved-work prompt, the
+save-first modal). `dlgConfirm`'s `message` is `textContent`, not HTML, so the summary is newline-joined plain
+text with `⚠`/`ℹ` markers, matching `data/backup.js`'s own `changeLabel` convention rather than a bespoke rich
+modal.
+
+### Verification
+
+New `tests/import-compat-summary-2196.spec.js` — 7 tests: a clean wizard fork shows Makes/Provenance with no
+warnings; a wizard twin needing axes a LATHE workspace lacks is flagged BEFORE it lands, and Cancel genuinely
+leaves nothing imported (not just visually — read back from the registry); #-variables are listed without any
+verdict word; a name clash folds into the one summary; a project's wrong `post` names both dialects by their
+friendly names; a project stack repeating the same impossible op twice names the reason ONCE, not twice,
+alongside its `profile` provenance; and a real compatible import actually lands, read back from
+`projectStore.readProject`. Non-vacuity: `git stash -u` of all four app-code files (the three edited files plus
+the new untracked `importCompat.js`, keeping the test) → all 7 fail against pre-feature code (mostly "expected
+substring not found" against the plain old-style dialog text); `git stash pop` restored cleanly. Collateral:
+`wizard-manager-1617.spec.js` (10) + `project-manager-2190.spec.js` (7) — including the pre-existing "IMPORT
+COLLISION" and "IMPORT via the file picker" tests, both still green through the new one-summary flow since
+neither asserted on exact dialog text, only the structural (Escape-cancels / accept-and-land) behaviour. Full
+smoke tier (77) and node tier (227) green. Lint clean across every touched file.
+
+Left alone, deliberately: `friendlySource(opType)` for a genuine non-twin custom wizard falls back to the
+def's own `label`, which is already the summary's own `name` line — "Makes:" reads slightly redundant for that
+one case (a twin's "Makes: Corner" is the informative case; a from-scratch wizard's "Makes: My Custom Thing"
+under a title that already says "My Custom Thing" is not). Not worth a special case for a cosmetic near-
+duplicate on the LESS common path (most imported wizards are twins/forks, per this session's own architecture);
+flagged rather than smoothed over.

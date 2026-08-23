@@ -39,11 +39,13 @@
 import * as store from './projectStore.js';
 import { loadProject } from '../../blocks/programFile.js';
 import { writeLibraryFile, hasFSA } from '../../data/libraryFolder.js';
+import { friendlySource } from '../../blocks/wizardLibrary.js';
 import { dlgConfirm, dlgPrompt, dlgNotice, dlgChoice } from '../dialog.js';
 import { getAccount } from '../cloudAccount.js';
 import { busyRow } from '../busyRow.js';
 import { UIUtils } from '../uiUtils.js';
 import { popReturn } from '../navReturn.js';   // t2192 — the return path (Settings' Workspace tab → here → back)
+import { buildImportSummary, collectOpTypes, profileName } from '../importCompat.js';   // t2196 amendment 3 — the shared confirm-on-import summary
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const drive = () => import('../cloud/googleDrive.js');   // lazy, like the wizard/workspace managers' own drive()
@@ -95,9 +97,10 @@ export async function openProjectManager(opts = {}) {
         const f = fileInput.files && fileInput.files[0];
         fileInput.value = '';
         if (!f) return;
+        const text = await f.text();
         let obj = null;
-        try { obj = JSON.parse(await f.text()); } catch (e) { dlgNotice(`"${f.name}" is not valid JSON.`); return; }
-        if (await importIntoWorkspace(ov, obj, f.name.replace(/\.mjson$/i, ''))) await ov.__applyMine();
+        try { obj = JSON.parse(text); } catch (e) { dlgNotice(`"${f.name}" is not valid JSON.`); return; }
+        if (await importIntoWorkspace(ov, obj, f.name.replace(/\.mjson$/i, ''), text)) await ov.__applyMine();
     });
 
     await renderMine(ov);
@@ -211,9 +214,14 @@ async function saveCurrent(ov) {
     await renderMine(ov);
 }
 
-/** IMPORT — a copy INTO the workspace's own project list (not an immediate open, matching the wizard duality:
- *  crossing UP installs it here; opening it afterward is a second, explicit click on the row). */
-async function importIntoWorkspace(ov, obj, stem) {
+/**
+ * IMPORT — a copy INTO the workspace's own project list (not an immediate open, matching the wizard duality:
+ * crossing UP installs it here; opening it afterward is a second, explicit click on the row). t2196 amendment 3 —
+ * one confirm-on-import summary (collision, wrong machine/axes across the WHOLE stack, wrong dialect via the
+ * bundle's own `post` field, the #-variables it uses as a listed fact, what it makes, and where it was authored),
+ * sharing ui/importCompat.js's builder with wizardManager.js's own import rather than a second implementation.
+ */
+async function importIntoWorkspace(ov, obj, stem, rawText = '') {
     if (!obj || (obj.kind !== 'ddcs.macro' && obj.kind !== 'ddcs.project') || !Array.isArray(obj.stack)) {
         dlgNotice(`"${stem}" is not a saved-program file this version understands.`);
         return false;
@@ -221,10 +229,19 @@ async function importIntoWorkspace(ov, obj, stem) {
     const name = sanitize(obj.name || stem);
     const path = store.joinPath(ov.__cwd, name);
     const existing = await store.readProject(path);
-    if (existing) {
-        const ok = await dlgConfirm(`"${name}" is already in this workspace, in this folder.\n\nReplace it with the file's copy?`, { okLabel: 'Replace', danger: true });
-        if (!ok) return false;
-    }
+    const opTypes = collectOpTypes(obj.stack);
+    const makes = [...new Set(opTypes.map((t) => friendlySource(t)))];
+    const summary = buildImportSummary({
+        name: obj.name || stem,
+        existing: existing ? name : null,
+        opTypes,
+        post: obj.post || null,
+        rawText: rawText || JSON.stringify(obj),
+        whatItMakes: makes.join(', '),
+        provenance: obj.profile ? `Saved on a ${profileName(obj.profile)} workspace` : '',
+    });
+    const ok = await dlgConfirm(summary.body, { title: summary.title, okLabel: existing ? 'Replace' : 'Import', danger: summary.hasWarning || !!existing });
+    if (!ok) return false;
     await store.saveProject(path, obj);
     dlgNotice(`"${name}" is in this workspace now — open it from the list above.`);
     return true;

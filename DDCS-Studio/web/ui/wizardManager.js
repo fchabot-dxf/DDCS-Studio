@@ -38,8 +38,9 @@
  * parity spec proved adds nothing to an untouched fork.
  */
 import {
-    listEntries, exportWizard, importWizard, wizardFromFile, deleteWizard, builtinLabelForTwin, setEntryOverride,
+    listEntries, exportWizard, importWizard, wizardFromFile, deleteWizard, setEntryOverride, friendlySource,
 } from '../blocks/wizardLibrary.js';
+import { buildImportSummary } from './importCompat.js';   // t2196 amendment 3 — the shared confirm-on-import summary
 import { listUserOps, createUserOp, updateUserOp, forkInheritance, USER_OP_PREFIX } from '../blocks/userOps.js';
 import { writeLibraryFile, hasFSA } from '../data/libraryFolder.js';
 import { dlgConfirm, dlgPrompt, dlgNotice, dlgChoice } from './dialog.js';
@@ -56,11 +57,6 @@ const drive = () => import('./cloud/googleDrive.js');
 /** The PERSISTED def for an opType — JSON-safe (the live registry's def can carry re-attached function fields). */
 const storedDef = (opType) => listUserOps().find((d) => d.opType === opType) || null;
 const copy = (v) => JSON.parse(JSON.stringify(v));
-
-/** A source opType, named for a human: a twin resolves to its built-in label ("Corner"), a user op to its label. */
-function friendlySource(opType) {
-    return builtinLabelForTwin(opType) || (storedDef(opType) || {}).label || opType;
-}
 
 /** A unique user opType from a display name — the SAME slug rule the Blocks save dialog uses (one behaviour). */
 function uniqueOpType(name) {
@@ -136,21 +132,29 @@ async function renameWizard(opType) {
 
 /**
  * IMPORT — one path for both shelves. The proven importer (wizardLibrary.importWizard: hooks manifest, named
- * outcome) does the work; the only thing added here is the collision answer, and it is an EXPLICIT COPY question:
- * the same wizard already embedded in this workspace is replaced only when the user says so, never merged.
+ * outcome) does the work; what this adds is the ONE confirm-on-import summary (t2196 amendment 3) — collision,
+ * wrong machine/axes, wrong dialect (never applies to a wizard — see importCompat.js's own header), the #-variables
+ * it uses (a listed fact, not a verdict), what it makes and its provenance, all in one ask rather than a bare
+ * collision question with everything else invisible until after the file is already part of the workspace.
  */
 async function importText(text, sourceName) {
     const file = wizardFromFile(text);
     if (!file) { dlgNotice(`“${sourceName}” is not a wizard file this version understands.`); return false; }
     const existing = listUserOps().find((d) => d.opType === file.opType);
-    if (existing) {
-        const ok = await dlgConfirm(
-            `“${existing.label || file.opType}” is already in this workspace.\n\nReplace it with the file's copy? The embedded one is overwritten — this is a copy, not a link.`,
-            { okLabel: 'Replace', danger: true },
-        );
-        if (!ok) return false;
-        deleteWizard(file.opType);   // then the one import path below installs the file's copy
-    }
+    // file.opType is the twin's OWN identity (e.g. 'user_pocket_data') — buildImportSummary's axisCompatReasons
+    // resolves a twin back to its built-in family via the SAME declared bridge friendlySource uses below, so a
+    // genuine custom (non-twin) opType is passed through unresolved and simply never matches an axis-need row.
+    const summary = buildImportSummary({
+        name: file.label || file.opType,
+        existing: existing ? (existing.label || existing.opType) : null,
+        opTypes: [file.opType],
+        rawText: text,
+        whatItMakes: friendlySource(file.opType),
+        provenance: file.forkedFrom ? `Fork of "${friendlySource(file.forkedFrom)}"` : 'Authored from scratch',
+    });
+    const ok = await dlgConfirm(summary.body, { title: summary.title, okLabel: existing ? 'Replace' : 'Import', danger: summary.hasWarning || !!existing });
+    if (!ok) return false;
+    if (existing) deleteWizard(file.opType);   // then the one import path below installs the file's copy
     let def = null;
     try { def = importWizard(text); } catch (e) { dlgNotice('Import failed: ' + ((e && e.message) || e)); return false; }
     if (!def) { dlgNotice(`“${sourceName}” is not a wizard file this version understands.`); return false; }
