@@ -50146,3 +50146,99 @@ Collateral: `boot-splash-2127` — 9/9, unaffected. Smoke: 76/76. Node: 227/227.
   body unchanged (still iterates all 5 marks at the same tolerance). Baseline snapshot for organic updated.
 
 🔨 turn 2165
+
+# t2167 — Sniglet 400 traced as a comparison specimen (not shipped); an amendment then reopened whether Sniglet
+# 800 is really "broken" at all — resolved with a direct discriminator, and settled by the human in person.
+
+Dispatch: trace Sniglet 400 through the same declared path as every real mark (wordmarks.json + the unmodified
+interpreter), and produce a side-by-side of it against the shipped Fredoka 700 — both at real header size and
+enlarged, plus a weight-context row against mark-normal (Arial Black). Do NOT install anything; Fredoka ships
+until the human says otherwise. Note whether Sniglet 400 tracing correctly is independent proof the extraction
+was never at fault for Sniglet 800's own defect.
+
+## The specimen work
+
+Added `sniglet400Candidate` to `wordmarks.json` — identical slot treatment to `marks.organic` (size/baseline/
+slant/fit/colours), only the font differs, so the comparison isolates exactly one variable. Traced through
+`trace-wordmark.py`, unmodified. It renders correctly — legible, properly-proportioned counters — at both
+diagnostic scale and real header size (132×34), confirmed by rendering standalone and reading it, same
+discipline as every check in this whole series. This is itself the independent proof the dispatch asked for:
+the identical pipeline that produced Sniglet 800's broken 'D' produces a correct one from Sniglet 400, so the
+extraction code was never the fault.
+
+Built the requested comparison (`t2167-organic-candidates-sniglet400-vs-fredoka.png`) inside the REAL app,
+organic theme active, reusing the app's own `.app-header .brand .logo` DOM/CSS structure (not an approximated
+background) so the organic-theme drop-shadow treatment applies identically to every mark shown — real size,
+4× enlarged, and a weight-context row against mark-normal. Confirms what the dispatch expected: Sniglet 400
+reads visibly lighter than Fredoka Bold and much lighter than the Arial-Black-derived marks.
+
+## Amendment 1 — a live-visual challenge from the human, taken seriously and actually checked
+
+Mid-turn, the human asked to see the good/bad D directly, then said plainly they'd never seen it look broken.
+The advisor's own amendment inverted the working assumption: if the LIVE webfont rasterises a correct hole and
+only OUR trace shows it broken, that's an extraction bug — which would mean t2163/t2165's shared conclusion,
+and shipping Fredoka on the strength of it, was built on a mistake. The advisor named the exact discriminator
+to settle it before anything else, and named their OWN parallel mistake this same session (an independent
+verification that used a path parser sharing a hidden flaw with the thing it was "confirming") as the reason
+not to repeat the pattern in a different form.
+
+Ran the discriminator exactly as specified: Sniglet 800's live webfont, native browser text rendering (a fresh
+`@font-face` fetch, zero tracing code involved), rendered on the SAME page as our own traced extraction of the
+identical glyph, side by side, one screenshot. **Both show the identical collapsed counter.** Two genuinely
+independent readers (Chromium's own font rasterizer; fontTools + our transform kernel) agree — this is exactly
+the kind of cross-check the advisor's own note asked for, not a repeat of their "two readings sharing one
+reader" mistake. The `isComposite`-glyph candidate explanation (advisor's option (a)) was already ruled out in
+t2163 (`isComposite: False`, a normal 2-contour glyph) and re-confirmed here; options (b)/(c) (winding/fill-rule,
+pen contour order) are specific to OUR OWN transform pipeline and can't explain why the LIVE BROWSER RENDER —
+which never touches that pipeline — shows the identical defect.
+
+Went one step further before concluding "the font is broken and that's that": checked whether every OTHER
+counter-bearing capital (A, B, O, P, Q, R) shows the same collapse in Sniglet 800, and whether Sniglet 400 keeps
+NORMAL, letter-proportional counters for the same set. It does — Sniglet 400's counters scale naturally with
+each letter's own width (36–67%, varying per letterform, as a normal font does); Sniglet 800's counters are all
+within 1–2 units of each other in ABSOLUTE size (79–81 units) regardless of the letter's own width (601–743
+units) — a signature much more consistent with a uniform mechanical process (e.g. an emboldening/interpolation
+step that ran out of room) than hand-drawn per-letter design, though I can't say from the outside which it is.
+Either way: it is real, consistent, and reproduces identically through every reading method tried.
+
+**Resolution:** rendered Sniglet 800's actual traced wordmark at the real header size (132×34) and showed it to
+the human directly — at that size the collapsed counters are, if anything, WORSE (both D's read unambiguously
+as O's; the wordmark reads "DOCS"). The human's own conclusion, seeing that: keep Fredoka as shipped, don't
+install Sniglet. This resolves the amendment in the same direction t2163/t2165 already had it, but now on
+firmer, doubly-independent evidence rather than a single reading — and the human's original "I've never seen it
+broken" is still an open, unresolved loose end (most likely they were looking at a different rendering context
+— a different weight, a different specimen page, or simply too small to perceive the collapse rather than the
+counter actually being absent there — but this was never tracked down, and isn't worth chasing further now that
+the shipping decision is settled).
+
+## What NOT to conclude from this
+
+The font is genuinely, reproducibly degenerate at weight 800 across every method tried — that conclusion stands
+and is now stronger than before, not weaker. What changed is the CONFIDENCE behind it: t2163/t2165 rested on one
+reading method (fontTools extraction) confirmed against one upstream source; this turn added a second,
+completely independent reading method (a real browser's own rasterizer) and a systematic cross-letter check,
+which is what a genuinely skeptical re-examination should do when someone with more direct visual experience
+pushes back — check harder, not defend the prior conclusion by asserting it louder.
+
+## Files (all scoped to specimens, not the shipped product)
+
+- `brand/wordmarks.json` — two new candidate entries, `sniglet400Candidate` and `sniglet800Candidate`, both
+  clearly marked `"status": "SPECIMEN ONLY ... NOT SHIPPED, NOT INSTALLED"`. `trace-wordmark.py` untouched.
+- `brand/MARK-SNIGLET400CANDIDATE-TRACED.svg` / `MARK-SNIGLET800CANDIDATE-TRACED.svg` — NEW, the traced output
+  of those two declarations. Kept as evidence, not installed anywhere.
+- `DDCS-Studio/verification/t2167-*.png` — NEW: the formal comparison the dispatch asked for
+  (`organic-candidates-sniglet400-vs-fredoka.png`), the traced-D good/bad comparison
+  (`sniglet-D-good-vs-bad-TRACED.png` — an earlier RAW, untraced version was built first, correctly flagged by
+  the human as not actually tracing the glyphs, and replaced), the live-vs-traced discriminator
+  (`DISCRIMINATOR-live-vs-traced.png`), the native-browser weight-context render
+  (`sniglet800-native-browser-render.png`), and the real-header-size render that resolved the amendment
+  (`sniglet800-real-header-size.png`).
+- `DDCS-Studio/web/index.html` — UNTOUCHED, confirmed before commit. Fredoka Bold stays the shipped organic mark.
+
+## Gate
+
+No shipped behavior changed (index.html untouched), so the existing gate is the relevant one:
+`tests/wordmarks-2161.spec.js` — 5/5, unaffected. `boot-splash-2127` — 9/9, unaffected. Smoke: 76/76. Node:
+227/227. Lint: clean.
+
+🔨 turn 2167

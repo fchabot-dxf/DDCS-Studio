@@ -69,6 +69,24 @@
         { "line": "wordmark", "font": { "source": "local", "file": "fonts/Fredoka[wdth,wght].ttf", "family": "Fredoka", "weight": 700, "variableAxes": { "wght": 700, "wdth": 100 } }, "size": 26, "baseline": 23, "slantDeg": 9.0, "fit": "targetWidth", "fill": "#d9a03c" },
         { "line": "tagline", "font": { "source": "local", "file": "fonts/Fredoka[wdth,wght].ttf", "family": "Fredoka", "weight": 700, "variableAxes": { "wght": 700, "wdth": 100 } }, "size": 8.5, "baseline": 34, "slantDeg": 9.0, "fit": "targetWidth", "fill": "#a08d69" }
       ]
+    },
+
+    "sniglet400Candidate": {
+      "status": "SPECIMEN ONLY (t2167) — NOT SHIPPED, NOT INSTALLED in index.html. The human, seeing the Sniglet 800 D-glyph comparison, asked to trace Sniglet 400 too — the one Sniglet weight whose 'D' is intact (confirmed t2163/t2165: ~61%-width counter, correct). This entry exists to PRODUCE that comparison specimen through the same declared path as every real mark (this file + trace-wordmark.py, unmodified), not to propose shipping it. Fredoka Bold remains the organic mark that ships until the human says otherwise. Same slot treatment as marks.organic (size/baseline/slant/fit/colours) so the ONLY variable between this and the shipped mark is the font — a fair like-for-like comparison, not a differently-tuned specimen.",
+      "note": "t2167's own incidental proof: if this traces with a correct, properly-proportioned 'D' counter through the IDENTICAL pipeline that produced Sniglet 800's broken one, that is independent confirmation the extraction code was never the fault — the defect is specific to the 800 weight's own published outline, not this script, not fontTools, not the transform kernel. Expected to read visually LIGHT next to the four Arial-Black-derived marks (normal/studio/futuristic/steampunk) and Fredoka Bold — that weight mismatch is the actual question the human is evaluating, not a defect in this trace.",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "google", "family": "Sniglet", "weight": 400, "urlTextParam": "DDCS%20CNC%20MACRO%20STUDIO" }, "size": 26, "baseline": 23, "slantDeg": 9.0, "fit": "targetWidth", "fill": "#d9a03c" },
+        { "line": "tagline", "font": { "source": "google", "family": "Sniglet", "weight": 400, "urlTextParam": "DDCS%20CNC%20MACRO%20STUDIO" }, "size": 8.5, "baseline": 34, "slantDeg": 9.0, "fit": "targetWidth", "fill": "#a08d69" }
+      ]
+    },
+
+    "sniglet800Candidate": {
+      "status": "SPECIMEN ONLY (t2167) — NOT SHIPPED, NOT INSTALLED. The broken weight, traced through the exact same declared path as sniglet400Candidate (identical size/baseline/slant/fit/colours, only the weight differs), so the two can be compared as true like-for-like specimens — both went through the identical trace-wordmark.py kernel (shear, scale-to-width, 1-decimal rounding), not raw untraced font outlines. This is what a human visual request (t2167, mid-turn) asked to see directly: the actual traced 'D', not an approximation of it.",
+      "note": "Expected to reproduce the same broken counter t2161/t2163/t2165 already found and root-caused — this entry exists to let that be SEEN through the real pipeline output, not re-litigated.",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "google", "family": "Sniglet", "weight": 800, "urlTextParam": "DDCS%20CNC%20MACRO%20STUDIO" }, "size": 26, "baseline": 23, "slantDeg": 9.0, "fit": "targetWidth", "fill": "#d9a03c" },
+        { "line": "tagline", "font": { "source": "google", "family": "Sniglet", "weight": 800, "urlTextParam": "DDCS%20CNC%20MACRO%20STUDIO" }, "size": 8.5, "baseline": 34, "slantDeg": 9.0, "fit": "targetWidth", "fill": "#a08d69" }
+      ]
     }
   }
 }
