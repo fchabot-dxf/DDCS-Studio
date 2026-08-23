@@ -16,26 +16,31 @@
  *   projectStore.js capability; nothing here removes it) but rendered in the wizard manager's own row style, not the
  *   old file-explorer chrome.
  *
- *   BOTTOM — THE LIBRARY: standalone `.mjson` files on two shelves, the SAME two places the wizard/workspace managers
- *   use — the granted local folder (data/libraryFolder + ui/libraryShelf, reused whole via the declared `mjson` kind)
- *   and the Drive app folder (ui/cloud/googleDrive).
+ *   BOTTOM — a plain Import button (a native file picker), not a browsable shelf.
+ *
+ * t2194 (human, mirroring the same removal in ui/wizardManager.js) — THE STANDALONE .mjson LIBRARY SHELF THIS
+ * SECTION USED TO BE IS RETIRED, for the same three reasons that file's header now carries in full: it
+ * misrepresented itself as a second container for your projects, "unimported" is a moment not a place, and the
+ * OS file browser already does the browsing better than a one-extension shelf ever could. EXPORT SURVIVES
+ * UNTOUCHED — a local file or Drive is still a legitimate crossing OUT of the workspace; only the browse-then-
+ * import-from-a-remembered-folder half is gone, replaced by a plain OS file dialog.
  *
  * THE DUALITY IS THE SAME RULE wizardManager.js states: the workspace EMBEDS (a project you saved is IN the
- * workspace); the library folders SHELVE standalone files; crossing is an EXPLICIT COPY — Export down, Import up.
- * Import writes the file into THIS workspace's own project list (a copy, not a live open) — opening it afterward is
- * a second, explicit click on its new row, exactly like installing an imported wizard before using it.
+ * workspace); crossing is an EXPLICIT COPY — Export down, Import up. Import writes the file into THIS workspace's
+ * own project list (a copy, not a live open) — opening it afterward is a second, explicit click on its new row,
+ * exactly like installing an imported wizard before using it.
  *
  * t2190 (amendment 4) — THE ONE LINE THAT DIVIDES THE TWO ACTS, for projects AND wizards alike (wizardManager.js
  * carries the same line): everything inside the workspace is VIRTUAL — the "+ Folder" tree here is rooted at, and
- * confined to, the open workspace; the real OS filesystem is reachable ONLY through Export (writing out) and the
- * Library's Import (copying in). Save never sees a real folder or a Cloud destination; only Export does.
+ * confined to, the open workspace; the real OS filesystem is reachable ONLY through Export (writing out) and
+ * Import (copying in, now a plain file picker rather than a shelf). Save never sees a real folder or a Cloud
+ * destination; only Export does.
  */
 import * as store from './projectStore.js';
 import { loadProject } from '../../blocks/programFile.js';
 import { writeLibraryFile, hasFSA } from '../../data/libraryFolder.js';
-import { renderLibraryShelf } from '../libraryShelf.js';
-import { dlgConfirm, dlgPrompt, dlgNotice } from '../dialog.js';
-import { getAccount, connect, disconnect } from '../cloudAccount.js';
+import { dlgConfirm, dlgPrompt, dlgNotice, dlgChoice } from '../dialog.js';
+import { getAccount } from '../cloudAccount.js';
 import { busyRow } from '../busyRow.js';
 import { UIUtils } from '../uiUtils.js';
 import { popReturn } from '../navReturn.js';   // t2192 — the return path (Settings' Workspace tab → here → back)
@@ -65,12 +70,8 @@ export async function openProjectManager(opts = {}) {
         <div class="wsm-body">
             <section id="projmMine"></section>
             <section class="wsm-folder">
-                <div class="wizm-title">Library — standalone .mjson files (import is a copy into this workspace)</div>
-                <div class="wsm-places" role="tablist" aria-label="Where shared projects live">
-                    <button type="button" class="wsm-place is-active" data-place="local" role="tab">📁 Local folder</button>
-                    <button type="button" class="wsm-place" data-place="cloud" role="tab">☁ Cloud</button>
-                </div>
-                <div id="projmShelf"></div>
+                <button type="button" class="toolbar-btn settings-io" data-pm="importfile">⬆ Import .mjson file…</button>
+                <input type="file" accept=".mjson,application/json" id="projmImportInput" style="display:none">
             </section>
         </div>
     </div>`;
@@ -86,20 +87,20 @@ export async function openProjectManager(opts = {}) {
     ov.querySelector('.wsm-x').addEventListener('click', close);
 
     ov.__cwd = '';
-    ov.__place = 'local';
-    ov.querySelector('.wsm-places').addEventListener('click', async (e) => {
-        const t = e.target.closest('[data-place]');
-        if (!t || t.dataset.place === ov.__place) return;
-        ov.__place = t.dataset.place;
-        ov.querySelectorAll('.wsm-place').forEach((b) => b.classList.toggle('is-active', b.dataset.place === ov.__place));
-        await renderShelf(ov);
-    });
-
     ov.__applyMine = async () => { await renderMine(ov); };
     ov.querySelector('.wsm-body').addEventListener('click', (e) => onMineClick(ov, e, close));
 
+    const fileInput = ov.querySelector('#projmImportInput');
+    fileInput.addEventListener('change', async () => {
+        const f = fileInput.files && fileInput.files[0];
+        fileInput.value = '';
+        if (!f) return;
+        let obj = null;
+        try { obj = JSON.parse(await f.text()); } catch (e) { dlgNotice(`"${f.name}" is not valid JSON.`); return; }
+        if (await importIntoWorkspace(ov, obj, f.name.replace(/\.mjson$/i, ''))) await ov.__applyMine();
+    });
+
     await renderMine(ov);
-    await renderShelf(ov);
     if (opts.promptSave) await saveCurrent(ov);
     return ov;
 }
@@ -117,7 +118,7 @@ async function renderMine(ov) {
             <button type="button" class="wizm-act" data-pm="save" title="Save the current program into this folder">💾 Save current program</button>
         </div>`
         + (!entries.length
-            ? '<div class="wsm-empty">No saved programs here yet. Save the current program, or Import one from the library below.</div>'
+            ? '<div class="wsm-empty">No saved programs here yet. Save the current program, or import a .mjson file below.</div>'
             : `<div class="wizm-list wizm-scroll">${entries.map((en) => {
                 if (en.type === 'folder') {
                     return `<div class="wizm-row" data-frow="${esc(en.path)}">
@@ -139,7 +140,7 @@ async function renderMine(ov) {
                     <span class="wizm-acts">
                         <button type="button" class="wizm-act" data-pm="open" data-path="${esc(en.path)}" title="Open this program (replaces the current one)">▶ Open</button>
                         <button type="button" class="wizm-act" data-pm="ren" data-path="${esc(en.path)}" title="Rename">✎ Rename</button>
-                        <button type="button" class="wizm-act" data-pm="export" data-path="${esc(en.path)}" title="Copy it onto the library shelf below (the active tab decides which shelf)">⬇ Export</button>
+                        <button type="button" class="wizm-act" data-pm="export" data-path="${esc(en.path)}" title="Export it to a .mjson file or your Drive">⬇ Export</button>
                         <button type="button" class="wizm-act is-danger" data-pm="del" data-path="${esc(en.path)}" title="Delete">🗑</button>
                     </span>
                 </div>`;
@@ -156,6 +157,7 @@ async function onMineClick(ov, e, close) {
     if (!t) return;
     const act = t.dataset.pm, path = t.dataset.path || '';
     try {
+        if (act === 'importfile') { ov.querySelector('#projmImportInput').click(); return; }
         if (act === 'cd') { ov.__cwd = path; await renderMine(ov); return; }
         if (act === 'mkdir') {
             const name = await dlgPrompt('New folder name:');
@@ -192,7 +194,7 @@ async function onMineClick(ov, e, close) {
             }, { keepOnSuccess: false });
             return;
         }
-        if (act === 'export') { await exportToActiveShelf(ov, path); return; }
+        if (act === 'export') { await exportProjectFile(path); return; }
     } catch (err) { dlgNotice((act === 'open' ? 'Open' : 'Action') + ' failed: ' + ((err && err.message) || err)); }
 }
 
@@ -207,24 +209,6 @@ async function saveCurrent(ov) {
     const data = serializeProject(sanitize(name));
     await store.saveProject(store.joinPath(ov.__cwd, sanitize(name)), data);
     await renderMine(ov);
-}
-
-// ── THE LIBRARY — two shelves, the wizard/workspace managers' two places ───────────────────────────────────────
-async function renderShelf(ov) {
-    const token = (ov.__renderSeq = (ov.__renderSeq || 0) + 1);
-    const stale = () => ov.__renderSeq !== token;
-    const host = ov.querySelector('#projmShelf');
-    if (ov.__place === 'cloud') { await renderCloudShelf(ov, host, stale); return; }
-    await renderLibraryShelf(host, {
-        kindKey: 'mjson',
-        describe: (e) => {
-            const op = e.obj || {};
-            const n = Array.isArray(op.stack) ? op.stack.length : 0;
-            return `${n} op${n === 1 ? '' : 's'}${op.post ? ' · ' + op.post : ''}`;
-        },
-        emptyHint: 'Export one of your saved programs above and it lands here.',
-        onImport: async (e) => { if (await importIntoWorkspace(ov, e.obj, e.stem)) await ov.__applyMine(); },
-    });
 }
 
 /** IMPORT — a copy INTO the workspace's own project list (not an immediate open, matching the wizard duality:
@@ -246,83 +230,28 @@ async function importIntoWorkspace(ov, obj, stem) {
     return true;
 }
 
-async function renderCloudShelf(ov, host, stale = () => false) {
-    const acc = getAccount();
-    if (!acc.connected || acc.provider !== 'google') {
-        host.innerHTML = '<div class="wsm-empty">Keep shared programs in your own Google Drive too — the same app folder your cloud workspaces use.'
-            + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="projmCloudSignIn">☁ Sign in to Google Drive</button></div></div>';
-        host.querySelector('#projmCloudSignIn').addEventListener('click', async () => {
-            try { await connect('google'); } catch (_) { /* the shared flow reports its own failures */ }
-            const done = () => { window.removeEventListener('ddcs:cloud-account', done); renderShelf(ov); };
-            window.addEventListener('ddcs:cloud-account', done);
-            setTimeout(() => { window.removeEventListener('ddcs:cloud-account', done); if (getAccount().connected) renderShelf(ov); }, 15000);
-        });
-        return;
-    }
-    host.innerHTML = '<div class="wsm-dim">Reading your Drive…</div>';
-    let files = [];
-    try {
-        const d = await drive();
-        const root = await d.ensureRoot();
-        files = (await d.list(root)).filter((f) => f.type !== 'folder' && /\.mjson$/i.test(f.name)).slice(0, 60)
-            .sort((a, b) => a.name.localeCompare(b.name));
-    } catch (e) {
-        if (stale()) return;
-        const why = /cloud-auth/.test(String(e && e.message)) ? 'Your Google sign-in has expired.' : `Drive could not be reached (${(e && e.message) || e}).`;
-        host.innerHTML = `<div class="wsm-empty">${esc(why)} Your local shelf is unaffected — switch back to <b>Local folder</b>, or sign in again.`
-            + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="projmCloudSignIn">Sign in to Google Drive</button></div></div>';
-        const b = host.querySelector('#projmCloudSignIn');
-        if (b) b.addEventListener('click', () => renderShelf(ov));
-        return;
-    }
-    if (stale()) return;
-    ov.__cloudFiles = files;
-    host.innerHTML =
-        `<div class="wsm-cloudbar"><span class="wsm-dim">Signed in as</span> <b>${esc(acc.email || acc.name || 'your Google account')}</b>`
-        + '<button type="button" class="wss-link" id="projmCloudOut">Sign out</button></div>'
-        + (!files.length
-            ? '<div class="wsm-empty">No .mjson files in your Drive app folder yet. Export a saved program while this tab is open and it will show up here.</div>'
-            : `<div class="wsm-fp"><div class="wsm-fp-head"><span class="wsm-c-name">Name</span><span class="wsm-c-when">Saved</span></div>
-                <div class="wsm-fp-list">${files.map((f, i) => `<div class="wsm-fp-row">
-                    <button type="button" class="wsm-fp-open" data-pm-cloud="${i}" title="Import ${esc(f.name)} into this workspace (a copy, not a link)">
-                        <span class="wsm-c-name">${esc(f.name)}</span>
-                        <span class="wsm-c-when">${f.savedAt ? esc(String(f.savedAt).slice(0, 10)) : ''}</span>
-                    </button>
-                    <button type="button" class="wsm-fp-del" data-pm-trash="${i}" title="Move ${esc(f.name)} to your Drive trash" aria-label="Trash ${esc(f.name)}">🗑</button>
-                </div>`).join('')}</div></div>`);
-    host.querySelector('#projmCloudOut').addEventListener('click', async () => { disconnect(); await renderShelf(ov); });
-    if (host.__pmCloudBound) return;
-    host.__pmCloudBound = true;
-    host.addEventListener('click', async (e) => {
-        const del = e.target.closest('[data-pm-trash]');
-        if (del) {
-            const f = (ov.__cloudFiles || [])[Number(del.dataset.pmTrash)];
-            if (!f) return;
-            if (!(await dlgConfirm(`Move "${f.name}" to your Google Drive trash?\n\nDrive keeps trashed files for about 30 days, so you can restore it there.`, { danger: true, okLabel: 'Move to trash' }))) return;
-            try { await (await drive()).trash(f.id); } catch (err) { dlgNotice(`"${f.name}" could not be trashed: ${(err && err.message) || err}`); return; }
-            await renderShelf(ov);
-            return;
-        }
-        const open = e.target.closest('[data-pm-cloud]');
-        if (!open) return;
-        const f = (ov.__cloudFiles || [])[Number(open.dataset.pmCloud)];
-        if (!f) return;
-        try {
-            const obj = await (await drive()).read(f.id);
-            if (await importIntoWorkspace(ov, obj, f.name.replace(/\.mjson$/i, ''))) await ov.__applyMine();
-        } catch (err) { dlgNotice(`"${f.name}" could not be read from Drive: ${(err && err.message) || err}`); }
-    });
-}
-
-/** EXPORT — the crossing DOWN, an explicit copy onto whichever shelf is showing (the wizard manager's own "the
- *  active tab is where a save goes" rule). */
-async function exportToActiveShelf(ov, path) {
+/**
+ * EXPORT — the crossing DOWN, a copy leaving the workspace (t2194 — no more shelf to land on; the destination is
+ * asked for directly, once, only when there is a real choice to make). Both write paths are UNCHANGED from
+ * before the shelf's removal — only the "which one" question moved from a persistent tab to a one-shot ask.
+ */
+async function exportProjectFile(path) {
     const obj = await store.readProject(path);
     if (!obj) return;
     const stem = store.baseName(path) || 'macro';
     const text = JSON.stringify(obj, null, 2);
-    if (ov.__place === 'cloud') {
-        if (!getAccount().connected) { dlgNotice('Sign in on the Cloud tab first — the export writes into your Drive app folder.'); return; }
+
+    let target = 'local';
+    if (getAccount().connected) {
+        target = await dlgChoice(`Export "${stem}" to:`, [
+            { key: 'local', label: '📁 Local file', primary: true },
+            { key: 'cloud', label: '☁ Cloud' },
+            { key: 'cancel', label: 'Cancel' },
+        ], { cancelKey: 'cancel' });
+        if (target === 'cancel') return;
+    }
+
+    if (target === 'cloud') {
         try {
             const dr = await drive();
             const root = await dr.ensureRoot();
@@ -330,9 +259,8 @@ async function exportToActiveShelf(ov, path) {
             const existing = (await dr.list(root)).find((f) => f.type !== 'folder' && f.name === name);
             if (existing && !(await dlgConfirm(`"${name}" already exists in your Drive app folder. Replace it?`, { okLabel: 'Replace' }))) return;
             await dr.write(name, obj, root);
-            dlgNotice(`Saved "${name}" to your Drive app folder — it is on the shelf below.`);
-        } catch (e) { dlgNotice('Could not write to Drive: ' + ((e && e.message) || e)); return; }
-        await renderShelf(ov);
+            dlgNotice(`Saved "${name}" to your Drive app folder.`);
+        } catch (e) { dlgNotice('Could not write to Drive: ' + ((e && e.message) || e)); }
         return;
     }
     if (!hasFSA()) {
@@ -345,7 +273,7 @@ async function exportToActiveShelf(ov, path) {
     const r = await writeLibraryFile(stem, 'mjson', text, {
         confirmReplace: (name, where) => dlgConfirm(`"${name}" already exists in ${where}. Replace it?`, { okLabel: 'Replace' }),
     });
-    if (r.ok) { dlgNotice(`Saved "${r.name}" to your library folder — it is on the shelf below.`); await renderShelf(ov); }
+    if (r.ok) dlgNotice(`Saved "${r.name}" to your library folder.`);
     else if (!r.aborted) dlgNotice(`Could not write the .mjson file: ${r.error}`);
 }
 

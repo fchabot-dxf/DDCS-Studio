@@ -51966,3 +51966,87 @@ via the def's own `post` field, missing #-variables, what it makes, provenance),
 Not investigated or built here — flagging plainly rather than starting unscoped work or silently dropping it.
 BACKLOG item 16 already updated above to reflect the CURRENT (not the post-amendment) state of the switcher
 count, with a note not to count the further reduction until that turn actually ships.
+
+## t2194 — RETIRE THE LIBRARY SHELF, both managers (amendments 1-2 from t2192, dispatched for real this turn)
+
+The reasons, per amendment 2's own instruction ("put those three reasons in the commit, not the usage one"):
+(1) it misrepresented itself — named "Library", sitting directly under the list of the workspace's own wizards/
+projects, it read as a SECOND CONTAINER for them, when it was really a view of a folder holding files not yet
+imported; (2) unimported is a moment, not a place — a file stops being "unimported" the instant you click
+Import, so a transient state doesn't earn a permanent section; (3) the OS file browser already does the browsing
+better than a one-extension, no-rename, no-sort shelf ever could.
+
+### What changed, both `ui/wizardManager.js` and `ui/projects/projectManager.js`
+
+Removed: the whole `<section class="wsm-folder">` shelf block (title, Local/Cloud place-tabs, the shelf host
+div), `renderPlace`/`renderShelf`, `renderCloudShelf`, and (wizards only) `fillLibraryChips`/the `.wizm-inlib`
+"also in library" chip — that feature compared a workspace row's content against the shelf's own listing, and
+with no shelf left to compare against, there is nothing the chip could mean any more. Deleted, not hidden.
+
+Added: a plain "⬆ Import .wiz/.mjson file…" button wired to a hidden native `<input type="file">` — reading the
+chosen file directly (`FileReader`/`.text()`) and handing it to the SAME import logic the shelf used to call
+(`importText`/`importIntoWorkspace`) — the collision question (Replace/Cancel) and the "is in this workspace
+now" notice are UNCHANGED, only the discovery step (browse a remembered folder vs. pick a file) is gone.
+
+Export SURVIVES UNTOUCHED at the mechanism level — both write paths (`writeLibraryFile` into the same remembered
+granted folder, or `dr.write` into the Drive app folder) are byte-for-byte the same code as before. What changed
+is only how the DESTINATION is chosen: the old persistent place-tabs are gone, so Export now asks once, and only
+when there is a real choice (signed in) — `dlgChoice('local' / 'cloud' / 'cancel')`. Signed out, there is nothing
+to choose between, so it goes straight to local exactly as it always would have on that tab. This is the same
+per-row Export button, same title text, same everything except the destination question's shape.
+
+### The sweep amendment 1 asked for, before deleting anything
+
+Checked `data/libraryFolder.js`/`ui/libraryShelf.js` for other consumers before touching either — both are
+SHARED, generic modules: `macrosApp.js` (the CAM pack feature) also imports `writeLibraryFile`/`hasFSA` and
+`libraryShelf.js`'s `renderLibraryShelf` for its own `.cam` `LIBRARY_KINDS` row. Neither file is touched — only
+the two managers' own CALLS into them (for `wiz`/`mjson`) are removed; the CAM feature's shelf (a real, still-
+browsable folder for `.cam` recipes) is completely unaffected. `LIBRARY_KINDS.wiz`/`.mjson` themselves stay
+declared too — Export still writes through them (`writeLibraryFile(stem, 'wiz'|'mjson', ...)`), so neither kind
+is orphaned, only the BROWSE/LIST call sites (`listLibrary`/`renderLibraryShelf` for these two kinds) are gone.
+
+CSS: `.wsm-fp`/`.wsm-fp-row`/`.wsm-cloudbar`/`.wsm-places`/`.wsm-place`/`.wsm-c-name`/`.wsm-c-when` all confirmed
+to have exactly one remaining producer each — `ui/workspaceManager.js` — so none of that shared chrome was
+touched. Only `.wizm-chip`/`.wizm-inlib` (the "also in library" chip, now with zero producers anywhere) was
+removed. BACKLOG item 16 updated in the same pass: the switcher's site count is now genuinely down to one
+(workspaceManager.js), not the three t2192 had left it at.
+
+### Verification
+
+`tests/wizard-manager-1617.spec.js` — the round-trip test's import step switched from clicking a shelf card to
+`page.setInputFiles('#wizmImportInput', ...)` reading the SAME exported bytes; "IMPORT COLLISION" likewise;
+"THE DRIVE SHELF" test replaced with two new ones (signed-in destination-choice, signed-out straight-to-local);
+"ALSO IN LIBRARY" retired outright (nothing left to test). `tests/project-manager-2190.spec.js` — matching
+treatment: the old shelf-listing tests replaced with a signed-in cloud-export-choice test and a plain-file-
+picker import test; `installDriveMock` extended with an upload/write handler to support the new cloud-export
+assertion. Non-vacuity: `git stash` of just the three app-code files (both managers + styles.css) → 5 of 7
+touched/new test cases fail against pre-turn code; the other 2 (signed-out export in both managers) legitimately
+pin behaviour that already held before this turn (no cloud connection meant no place-tab choice either way) —
+reported honestly, not claimed as discriminating. Collateral: wizard-manager (7) + project-manager (10) +
+workspace-tab-2192 (10) + workspace-manager-1223 (6) = 33 tests, all green.
+
+### THE TAIL — GATED, not built: wizard bar arrangement folding into Look and feel ▸ Appearance
+
+Dispatch: fold `set_tab_wizards` ("Wizard bar") into Appearance, since bar arrangement IS appearance and the
+manager already owns lifecycle — but explicitly caveated: "the list is heavy for a tab that currently holds
+theme and scaling, so it likely wants a collapsed section rather than dumping inline; show the human before
+committing to a layout." Treating that caveat as the gate it plainly is (per the worker skill's own rule: an
+irreversible-enough or advisor-flagged layout call gets logged as options and passed back, not built blind).
+
+Investigated first: `ui/wizardManagerPanel.js` is 408 lines — a full tree editor (sections → dropdowns →
+wizards, icon picker, per-wizard rename/hide/reorder/restore, import/export/fork), not a light control. Dumping
+it inline under Appearance's existing theme/scaling controls would very likely bury those under it. Three
+options, for the human's call:
+  (A) A collapsed section (`<details>`-style, closed by default) inside Appearance — the tab stays light at a
+      glance; one click reveals the full tree. Matches the dispatch's own lean ("likely wants a collapsed
+      section").
+  (B) A single row in Appearance ("Wizard bar arrangement — [Open]") that launches the SAME tree UI in its own
+      small modal — reusing the existing `openToolLibrary`-style precedent (Settings' ATC/tool-table modal is
+      already opened this same way from a row, not inlined). Keeps Appearance itself minimal; the sub-tab as a
+      distinct main-nav item still dies, satisfying "folds into Appearance" while the heavy content stays out
+      of the tab's own scroll.
+  (C) Inline, un-collapsed, visually demoted (smaller heading, placed last) — simplest to build, but risks
+      exactly the "dumping inline" the dispatch warned against; listed for completeness, not recommended.
+Leaning (A), matching the dispatch's own instinct, with (B) as the fallback if a collapsed 408-line tree still
+reads as too heavy once seen. Not building either without the human's pick — reported here, and in the pass-
+back note, as the one open decision blocking this tail.

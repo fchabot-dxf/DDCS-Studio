@@ -6441,7 +6441,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wizm-act:disabled { opacity: .4; cursor: not-allowed; }
 .wizm-act.is-danger:hover { color: #ef4444; background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); }
 .wizm-badge { flex: 0 0 auto; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; color: #fff; background: #6b7b3a; }
-.wizm-chip { flex: 0 0 auto; font-size: 10px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
+/* t2194 — .wizm-chip / .wizm-inlib ("Also in library") retired with the shelf it compared workspace content
+   against — there is nothing left to compare a wizard's or project's content TO. */
 
 /* t2190 — THE PROJECT MANAGER (ui/projects/projectManager.js) reuses every .wizm-* row style above verbatim; these
    two are its own addition, for the folder breadcrumb the wizard manager has no equivalent of (wizards aren't

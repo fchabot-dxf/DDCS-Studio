@@ -15,11 +15,17 @@ import { autoAppDialog } from './_appDialog.js';
  *     handle was the drawer's own affordance, gone with it)
  *
  * THE ARCHITECTURE CHANGE THIS PROVES: Save writes into the WORKSPACE's own project store, always — there is no
- * more Local/Cloud SAVE TARGET (cloud-default-754's whole subject). Cloud participates only as a LIBRARY SHELF:
- * Export copies a workspace project OUT to a shelf (local folder or Drive), Import copies a shelf file IN to the
- * workspace's own list — never a live open straight from Drive. This is why "a cloud write failure falls back to
- * local" (the old Save behaviour) has no equivalent here: the project is ALREADY saved locally (in the workspace)
- * before Export ever runs, so an Export failure risks a copy, never the source — nothing to fall back FROM.
+ * more Local/Cloud SAVE TARGET (cloud-default-754's whole subject). Cloud participates only as an EXPORT
+ * destination: Export copies a workspace project OUT (to a local file or Drive, asked once when there's a real
+ * choice), Import copies a chosen file IN to the workspace's own list — never a live open straight from Drive.
+ * This is why "a cloud write failure falls back to local" (the old Save behaviour) has no equivalent here: the
+ * project is ALREADY saved locally (in the workspace) before Export ever runs, so an Export failure risks a
+ * copy, never the source — nothing to fall back FROM.
+ *
+ * t2194 — the browsable LIBRARY SHELF (a granted local folder + a Drive file list, both browsable in-app) is
+ * RETIRED: it misrepresented itself as a second container for your projects, "unimported" was a moment not a
+ * place, and the OS file browser already does that browsing better. Import is now a plain OS file picker
+ * (`#projmImportInput`); Export still writes to the same two destinations, chosen with a one-shot ask.
  */
 test.use({ viewport: { width: 1300, height: 980 } });
 
@@ -139,7 +145,7 @@ async function grantLibrary(page, seed = {}) {
     }, seed);
 }
 
-test('EXPORT writes a .mjson to the granted local library folder — it lands on the shelf below', async ({ page }) => {
+test('t2194 — EXPORT writes a .mjson to the granted local library folder (signed out: no destination ask, straight to local)', async ({ page }) => {
     await seed(page);
     await grantLibrary(page);
     const ov = await openViaMenu(page);
@@ -148,28 +154,53 @@ test('EXPORT writes a .mjson to the granted local library folder — it lands on
     await page.waitForFunction(() => window.__lib && window.__lib.has('Bracket.mjson'), null, { timeout: 8000 });
     const written = await page.evaluate(() => window.__lib.get('Bracket.mjson'));
     expect(JSON.parse(written).name, 'the exported file carries the stored project, not the live editor').toBe('Bracket');
-    // it also now shows on the shelf below (the local place is already active by default)
-    await expect(ov.locator('#projmShelf')).toContainText('Bracket', { timeout: 8000 });
 });
 
-// ── THE LIBRARY (bottom half) — local folder shelf + Drive shelf, mirroring the wizard manager's two places ──────
-test('LIBRARY (local): empty state names the kind; importing a seeded .mjson lands it in the workspace list, not an immediate open', async ({ page }) => {
+test('t2194 — EXPORT signed IN asks local vs cloud; choosing Cloud writes to Drive, not the local folder', async ({ page }) => {
+    await installDriveMock(page);
     await seed(page);
     const ov = await openViaMenu(page);
-    // no library folder granted in this headless run → the "pick one" empty state, worded for saved programs
-    await expect(ov.locator('#projmShelf')).toContainText(/saved program/i);
+    await ov.locator('[data-prow="Bracket"] [data-pm="export"]').click();
+    const dlg = page.locator('.app-dialog').last();
+    await dlg.waitFor({ state: 'visible', timeout: 8000 });
+    await expect(dlg, 'the ask names both real destinations').toContainText('Local file');
+    await expect(dlg).toContainText('Cloud');
+    await dlg.locator('button', { hasText: 'Cloud' }).click();
+    await autoAppDialog(page, { accept: true });   // "Saved to your Drive app folder"
+    await page.waitForFunction(() => window.__drive && window.__drive.writes.length === 1, null, { timeout: 8000 });
+    // the write is a multipart upload body (googleDrive.js's own format) — a raw-text CONTAINS check, matching
+    // wizard-manager-1617.spec.js's own equivalent, not a JSON.parse of the whole multipart envelope.
+    const upload = await page.evaluate(() => window.__drive.writes[0]);
+    expect(upload, 'the Drive upload carries the stored project, under its own name').toContain('Bracket.mjson');
+    expect(upload).toContain('"name": "Bracket"');
 });
 
+// t2194 — the browsable LIBRARY (local folder shelf + Drive shelf) is RETIRED entirely — see this file's own
+// header. Import is a plain OS file picker now (#projmImportInput), tested directly below rather than through a
+// listing: it does not distinguish where a file came from, so there is no separate "cloud import" any more.
+test('t2194 — IMPORT via the file picker lands a .mjson in the workspace list, not an immediate open', async ({ page }) => {
+    await seed(page);
+    const ov = await openViaMenu(page);
+    const fileText = JSON.stringify({ kind: 'ddcs.macro', v: 1, name: 'widget', stack: [{ type: 'op', opType: 'user_pocket_data' }] });
+    await autoAppDialog(page, { accept: true });   // "is in this workspace now"
+    await page.setInputFiles('#projmImportInput', { name: 'widget.mjson', mimeType: 'application/json', buffer: Buffer.from(fileText) });
+    await expect(page.locator('#projmOverlay')).toBeVisible();
+    await expect(ov.locator('[data-prow="widget"]')).toBeVisible();
+    expect(await page.evaluate(() => (window.ddcsGetBlockProgram() || []).some((n) => n.opType === 'user_pocket_data')), 'import does not touch the live editor').toBe(false);
+});
+
+// t2194 — extended with an upload/write handler (the shelf-listing tests that only needed GETs are retired; the
+// EXPORT-to-cloud test above needs the multipart POST/PATCH path, matching wizard-manager-1617.spec.js's fakeDrive).
 async function installDriveMock(page) {
     await page.addInitScript(() => {
         localStorage.setItem('ddcs_cloud_token', 'faketoken');
         localStorage.setItem('ddcs_cloud_provider', 'google');
         localStorage.setItem('ddcs_gdrive_folder', 'ROOT');
+        window.__drive = { writes: [] };
     });
     const FOLDER = 'application/vnd.google-apps.folder';
     const files = {
         ROOT: { id: 'ROOT', name: 'DDCS Studio', mimeType: FOLDER, parents: [], modifiedTime: '2024-01-01T00:00:00Z', content: null },
-        p1: { id: 'p1', name: 'widget.mjson', mimeType: 'application/json', parents: ['ROOT'], modifiedTime: '2024-06-02T00:00:00Z', content: { kind: 'ddcs.macro', v: 1, name: 'widget', stack: [{ type: 'op', opType: 'user_pocket_data' }] } },
     };
     await page.route('https://www.googleapis.com/**', async (route) => {
         const req = route.request();
@@ -185,37 +216,13 @@ async function installDriveMock(page) {
             return json({ files: list.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime })) });
         }
         if (method === 'GET' && /\/drive\/v3\/files\/[^/?]+$/.test(path)) { const id = path.split('/').pop(); const f = files[id]; return json(f ? { id: f.id, trashed: !!f.trashed } : {}); }
+        if (/\/upload\/drive\/v3\/files/.test(path)) {
+            await page.evaluate((b) => window.__drive.writes.push(b), route.request().postData() || '');
+            return json({ id: 'new-file' });
+        }
         return json({});
     });
 }
-
-test('LIBRARY (cloud): keyless list of .mjson files, IMPORT copies it into the workspace (not an immediate open)', async ({ page }) => {
-    await installDriveMock(page);
-    await seed(page);
-    const ov = await openViaMenu(page);
-    await ov.locator('[data-place="cloud"]').click();
-    await page.waitForSelector('#projmShelf [data-pm-cloud]', { timeout: 15000 });
-    await expect(ov.locator('#projmShelf [data-pm-cloud]')).toHaveCount(1);
-    await autoAppDialog(page, { accept: true });   // the "is in this workspace now" notice
-    await ov.locator('#projmShelf [data-pm-cloud="0"]').click();
-    await page.waitForTimeout(300);
-    // it landed in the WORKSPACE list, not loaded into the editor
-    await expect(page.locator('#projmOverlay')).toBeVisible();
-    await expect(ov.locator('[data-prow="widget"]')).toBeVisible();
-    expect(await page.evaluate(() => (window.ddcsGetBlockProgram() || []).some((n) => n.opType === 'user_pocket_data')), 'import does not touch the live editor').toBe(false);
-});
-
-test('the WONKY fix carries over: the disconnected Cloud shelf offers ONLY wired providers (no dead Dropbox/OneDrive buttons)', async ({ page }) => {
-    await page.addInitScript(() => { localStorage.removeItem('ddcs_cloud_token'); localStorage.removeItem('ddcs_cloud_provider'); });
-    await seed(page);
-    const ov = await openViaMenu(page);
-    await ov.locator('[data-place="cloud"]').click();
-    await page.waitForSelector('#projmCloudSignIn', { timeout: 15000 });
-    const text = await ov.locator('#projmShelf').textContent();
-    expect(text.toLowerCase(), 'only Google is offered').toContain('google');
-    expect(text.toLowerCase(), 'no Dropbox connect button').not.toContain('dropbox');
-    expect(text.toLowerCase(), 'no OneDrive connect button').not.toContain('onedrive');
-});
 
 test('reachable + legible at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 780 });

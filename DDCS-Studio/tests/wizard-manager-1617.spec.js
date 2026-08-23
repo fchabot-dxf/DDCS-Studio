@@ -4,9 +4,15 @@ import { test, expect } from '@playwright/test';
  * t1617 — THE WIZARD MANAGER: the workspace-manager idiom over the wizard registry.
  *
  * The ruled shape: ONE modal owning wizard LIFECYCLE — custom wizards listed (name · forkedFrom provenance · date)
- * with Rename / Duplicate / Delete; built-ins read-only with FORK as their one action; Import/Export `.wiz` via the
- * SAME two shelves the workspace manager proved (granted local folder + the Drive app folder). The duality is ruled:
- * the workspace EMBEDS, the library SHELVES, crossing is an EXPLICIT COPY — no references, no auto-sync, ever.
+ * with Rename / Duplicate / Delete; built-ins read-only with FORK as their one action. The duality is ruled: the
+ * workspace EMBEDS, crossing OUT is an EXPLICIT COPY (Export) — no references, no auto-sync, ever.
+ *
+ * t2194 — Import/Export used to go through TWO SHELVES (a granted local folder + the Drive app folder), each
+ * browsable in-app. The shelves are RETIRED (they misrepresented themselves as a second container for your
+ * wizards, "unimported" was a moment not a place, and the OS file browser already does that browsing better) —
+ * Export still writes to the SAME two destinations (a local file via the same library-folder path, or Drive,
+ * chosen with a one-shot ask only when signed in), but Import is now a plain OS file picker
+ * (`#wizmImportInput`), not a listing to click a card in.
  *
  * THE TEST THAT MATTERS is the full round trip THROUGH FILES, at the t1593 parity standard: fork a built-in from the
  * manager → rename it → export it → delete it from the workspace → import it back → the def returns IDENTICAL and it
@@ -167,10 +173,9 @@ test('THE ROUND TRIP THROUGH FILES: fork a built-in → rename → export → de
     }, null, { timeout: 8000 });
     expect(await page.evaluate(() => window.__lib.has('RT Renamed.wiz')), 'the exported file is untouched by the delete').toBe(true);
 
-    // ── IMPORT it back from the shelf card ─────────────────────────────────────────────────────────────────────
-    const card = page.locator('#wizmShelf .lsh-card').filter({ hasText: 'RT Renamed' });
-    await expect(card, 'the shelf lists the exported wizard').toBeVisible({ timeout: 8000 });
-    await card.click();
+    // ── IMPORT it back via the file picker (t2194 — the shelf is gone; import reads a chosen file directly) ──────
+    const fileText = await page.evaluate(() => window.__lib.get('RT Renamed.wiz'));
+    await page.setInputFiles('#wizmImportInput', { name: 'RT Renamed.wiz', mimeType: 'application/json', buffer: Buffer.from(fileText) });
     await answerDialog(page);   // "…is in this workspace now"
     await page.waitForFunction(async () => {
         const U = await import('/blocks/userOps.js');
@@ -242,53 +247,55 @@ test('DUPLICATE is a copy under a new identity, provenance kept verbatim', async
     expect(r.bV, 'and it starts fresh at v1').toBe(1);
 });
 
-test('THE DRIVE SHELF: lists only .wiz in the app folder, EXPORT uploads there, a row imports as a copy', async ({ page }) => {
+test('t2194 — EXPORT TO CLOUD: signed in offers a destination choice; the upload is the wizard file, unchanged', async ({ page }) => {
     await boot(page, { signedIn: true });
-    await fakeDrive(page, {
-        'w1': { name: 'Shared Lander.wiz', body: WIZ_FILE('user_shared_lander', 'Shared Lander') },
-        'w2': { name: 'Other.wizard', body: WIZ_FILE('user_other_share', 'Other Share') },
-        'ws': { name: 'a-workspace.ddcs', body: { kind: 'ddcs.backup' } },
-    });
+    await fakeDrive(page, {});
     await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         U.createUserOp(U.userOpFromStack('cloudy', 'Cloudy', [
             { type: 'move_rapid', params: { x: 1 } },
         ], [{ param: 'x', label: 'X', type: 'number', blockIndex: 0, key: 'x', dflt: 1 }]));
     });
-    await page.evaluate(() => window.openWizardManager({ place: 'cloud' }));
+    await page.evaluate(() => window.openWizardManager());
 
-    // LIST — the two wizard files, the workspace file filtered out, the account named
-    const rows = page.locator('#wizmShelf .wsm-fp-row');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.filter({ hasText: 'Shared Lander.wiz' })).toHaveCount(1);
-    await expect(page.locator('#wizmShelf'), 'a .ddcs is not a wizard and does not show here').not.toContainText('a-workspace');
-    await expect(page.locator('#wizmShelf .wsm-cloudbar')).toContainText('maker@example.com');
-
-    // EXPORT — the active tab is where the copy goes (the workspace manager's own rule)
+    // signed in → Export ASKS where (local / cloud / cancel), instead of a persistent tab deciding for it
     await page.locator('#wizmMine .wizm-row[data-row="user_cloudy"] [data-wizm="export"]').click();
+    const dlg = page.locator('.app-dialog').last();
+    await dlg.waitFor({ state: 'visible', timeout: 8000 });
+    await expect(dlg, 'the ask names both real destinations').toContainText('Local file');
+    await expect(dlg).toContainText('Cloud');
+    await dlg.locator('button', { hasText: 'Cloud' }).click();
+
     await page.waitForFunction(() => window.__drive.writes.length === 1, null, { timeout: 8000 });
     await answerDialog(page);   // "saved to your Drive app folder"
     const upload = await page.evaluate(() => window.__drive.writes[0]);
     expect(upload, 'the upload is the wizard file, name and all').toContain('Cloudy.wiz');
     expect(upload).toContain('ddcs.wizard');
     expect(upload).toContain('user_cloudy');
+});
 
-    // IMPORT — a click on a row copies it into the workspace through the ONE import path
-    await rows.filter({ hasText: 'Shared Lander.wiz' }).locator('.wsm-fp-open').click();
-    await answerDialog(page);   // "…is in this workspace now"
-    const live = await page.evaluate(async () => {
+test('t2194 — signed OUT, Export never asks: it goes straight to the local path (nothing to choose between)', async ({ page }) => {
+    await boot(page);   // signedIn: false (default)
+    await grantLibrary(page);
+    await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
-        return U.listUserOps().some((d) => d.opType === 'user_shared_lander');
+        U.createUserOp(U.userOpFromStack('offline', 'Offline', [
+            { type: 'move_rapid', params: { x: 1 } },
+        ], [{ param: 'x', label: 'X', type: 'number', blockIndex: 0, key: 'x', dflt: 1 }]));
     });
-    expect(live, 'the Drive row landed in the registry — an explicit copy, no reference').toBe(true);
-    await page.locator('#wizmOverlay .wsm-modal').screenshot({ path: 'verification/t1617-drive-shelf.png' });
+    await page.evaluate(() => window.openWizardManager());
+    await page.locator('#wizmMine .wizm-row[data-row="user_offline"] [data-wizm="export"]').click();
+    await page.waitForFunction(() => window.__lib && window.__lib.has('Offline.wiz'), null, { timeout: 8000 });
+    // no choice dialog ever appeared — the notice below is the ONLY dialog, straight to local
+    await answerDialog(page);
+    expect(await page.evaluate(() => JSON.parse(window.__lib.get('Offline.wiz')).op.opType)).toBe('user_offline');
 });
 
 // The two tests below were ADDED AFTER this turn's counted full-suite run (the t1613 precedent: the addition is
 // reported, and the file re-ran green in full afterwards) — they close the round-trip's two stated gaps.
 test('IMPORT COLLISION is an explicit-copy question — Replace overwrites, Cancel leaves the embedded one', async ({ page }) => {
     await boot(page);
-    await grantLibrary(page, { 'Collide.wiz': JSON.stringify(WIZ_FILE('user_collide', 'Collide v2')) });
+    const collideFile = JSON.stringify(WIZ_FILE('user_collide', 'Collide v2'));
     await page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         U.createUserOp(U.userOpFromStack('collide', 'Collide v1', [
@@ -296,50 +303,26 @@ test('IMPORT COLLISION is an explicit-copy question — Replace overwrites, Canc
         ], [{ param: 'x', label: 'X', type: 'number', blockIndex: 0, key: 'x', dflt: 9 }]));
     });
     await page.evaluate(() => window.openWizardManager());
-    await page.click('#wizmShelf [data-lsh="pick"]');   // the shelf's own first-use folder door
-    const card = page.locator('#wizmShelf .lsh-card').filter({ hasText: 'Collide' });
-    await expect(card).toBeVisible({ timeout: 8000 });
-
-    // CANCEL: Escape the Replace confirm → the embedded def is untouched
-    await card.click();
-    await page.locator('.app-dialog').waitFor({ state: 'visible', timeout: 8000 });
-    await page.keyboard.press('Escape');
     const labelOf = () => page.evaluate(async () => {
         const U = await import('/blocks/userOps.js');
         return U.listUserOps().find((d) => d.opType === 'user_collide').label;
     });
+
+    // CANCEL: Escape the Replace confirm → the embedded def is untouched
+    await page.setInputFiles('#wizmImportInput', { name: 'Collide.wiz', mimeType: 'application/json', buffer: Buffer.from(collideFile) });
+    await page.locator('.app-dialog').waitFor({ state: 'visible', timeout: 8000 });
+    await page.keyboard.press('Escape');
     expect(await labelOf(), 'Cancel leaves the workspace copy exactly as it was').toBe('Collide v1');
 
     // REPLACE: accept → the file's copy overwrites, through the ONE import path
-    await card.click();
+    await page.setInputFiles('#wizmImportInput', { name: 'Collide.wiz', mimeType: 'application/json', buffer: Buffer.from(collideFile) });
     await answerDialog(page);          // the Replace confirm (ok holds focus)
     await answerDialog(page);          // "…is in this workspace now"
     expect(await labelOf(), 'Replace is the file copy, whole — an explicit copy, never a merge').toBe('Collide v2');
 });
 
-test('“ALSO IN LIBRARY” is a shown content match — never a reference: divergence puts the chip out', async ({ page }) => {
-    await boot(page);
-    await grantLibrary(page);
-    await page.evaluate(async () => {
-        const U = await import('/blocks/userOps.js');
-        U.createUserOp(U.userOpFromStack('chippy', 'Chippy', [
-            { type: 'move_rapid', params: { x: 2 } },
-        ], [{ param: 'x', label: 'X', type: 'number', blockIndex: 0, key: 'x', dflt: 2 }]));
-    });
-    await page.evaluate(() => window.openWizardManager());
-    await page.click('#wizmShelf [data-lsh="pick"]');
-    const chip = page.locator('#wizmMine .wizm-row[data-row="user_chippy"] .wizm-inlib');
-    await expect(chip, 'no shelf copy yet → no chip').toBeHidden();
-    await page.locator('#wizmMine .wizm-row[data-row="user_chippy"] [data-wizm="export"]').click();
-    await page.waitForFunction(() => window.__lib && window.__lib.has('Chippy.wiz'), null, { timeout: 8000 });
-    await answerDialog(page);   // the export notice
-    await expect(chip, 'exported → the chip lights (a content-identical copy is on the shelf)').toBeVisible({ timeout: 8000 });
-    // rename the workspace copy → the contents diverge → the chip goes OUT: a match, not a link, nothing synced
-    await page.locator('#wizmMine .wizm-row[data-row="user_chippy"] [data-wizm="rename"]').click();
-    await answerDialog(page, 'Chippy 2');
-    await expect(page.locator('#wizmMine .wizm-row[data-row="user_chippy"] .wizm-inlib'),
-        'diverged → no chip: shown by CONTENT, never acted on, never synced').toBeHidden({ timeout: 8000 });
-});
+// t2194 — "ALSO IN LIBRARY" is RETIRED with the shelf it compared against (there is nothing left to compare a
+// workspace wizard's content TO). The chip, .wizm-inlib, and fillLibraryChips() are all deleted, not hidden.
 
 test('ENTRY POINTS: the header row beside the workspace manager, and the save dialog’s earned link', async ({ page }) => {
     await boot(page);
