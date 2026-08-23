@@ -117,7 +117,7 @@
              shape exactly (same .scale-pop/.hdr-quick-menu popover chrome), so the two menus share one
              dismissal contract (ui/headerPost.js's makePopover) rather than being two hand-rolled popovers. -->
         <div class="hdr-app-wrap" id="hdrAppWrap">
-            <button type="button" id="hdrAppBtn" class="brand" aria-haspopup="menu" aria-expanded="false"
+            <button type="button" id="hdrAppBtn" class="brand hdr-menu-trigger" aria-haspopup="menu" aria-expanded="false"
                     title="DDCS Studio menu — Settings, Help, the website" aria-label="DDCS Studio menu">
                 <svg class="logo logo-normal" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-normal"/></svg>
                 <svg class="logo logo-studio" viewBox="0 0 132 34" aria-label="DDCS CNC Macro Studio"><use href="#mark-studio"/></svg>
@@ -170,7 +170,7 @@
                  new #hdrAppMenu (the logo above): this menu is FILE scope now — only rows that act on the
                  workspace/program in front of you. See ui/headerPost.js for the row-by-row split and why. -->
             <div class="hdr-quick hdr-ws-chip" id="hdrQuick">
-                <button type="button" id="hdrPostBtn" class="hdr-quick-btn hdr-ws-chip-btn" aria-haspopup="menu" aria-expanded="false"
+                <button type="button" id="hdrPostBtn" class="hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger" aria-haspopup="menu" aria-expanded="false"
                         title="File menu — save / open, load / insert / export, library, wizards, setup docs">
                     <span class="hdr-ws-name-txt"></span>
                     <svg class="hdr-ws-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>

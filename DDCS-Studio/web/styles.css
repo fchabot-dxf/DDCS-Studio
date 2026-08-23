@@ -306,7 +306,11 @@ html, body { overflow-x: clip; }
 .app-header #hdrAppBtn[aria-expanded="true"] .hdr-app-chevron { transform: rotate(180deg); }
 
 /* Per-theme logo: all five marks are in the DOM, only the active theme's shows */
-.app-header .logo { height: 34px; width: auto; display: none; }
+/* t2182 — grown from 34px (human: "that would allow to be a bit bigger", once the border was gone to make room
+   for it). Every shrink-ladder stage below is scaled by the SAME ~12% this base step took, so the relative
+   cropping the ladder was tuned against (t2081/t748's own measurements) stays proportionate, not just the one
+   number a human happens to see at full width. */
+.app-header .logo { height: 38px; width: auto; display: none; }
 /* t2127 (BOOT-SPLASH-PLAN.md, trap 1) — the boot splash carries its own five marks too (index.html),
    OUTSIDE .app-header, so the hide rule above never reaches them. The SHOW rule below is already
    global ([data-theme=X] .logo-X, no ancestor scope) and would show one mark correctly — but with no
@@ -716,9 +720,14 @@ html, body { overflow-x: clip; }
 
 /* t2147 (BACKLOG #7, amended) — THE WORKSPACE CHIP: name + chevron, layered on the same .hdr-quick-btn chrome
    above (border, hover, expanded state — nothing duplicated), just WIDER and left-aligned to hold text before
-   the icon. ⛔ WHY BOUNDED (the reason, so it is not undone later): a bare label has no edge and bleeds toward
-   whatever sits beside it; this chip's own border is the boundary, and the chevron is the affordance that says
-   "this is clickable" the way a bare label never would. */
+   the icon. ⛔ WHY BOUNDED, AS ORIGINALLY WRITTEN (superseded below, kept for the history): a bare label has no
+   edge and bleeds toward whatever sits beside it; this chip's own border is the boundary, and the chevron is
+   the affordance that says "this is clickable" the way a bare label never would.
+   t2182 (amendments 6/9/10 unified) — THE BORDER ITSELF IS GONE, on direct instruction: see `.hdr-menu-trigger`
+   below, applied to this button now. The reasoning above isn't wrong, it's just been overridden by a fresher,
+   more specific ruling — the chevron alone is judged enough of an affordance once BOTH header triggers agree on
+   the same (borderless) language; a boundary that only one of two visually-paired controls carried was the bug
+   organic exposed, not a feature either needed alone. */
 .app-header button.hdr-ws-chip-btn {
     width: auto; max-width: 220px; height: 30px; padding: 0 8px 0 10px; gap: 6px; justify-content: flex-start;
 }
@@ -731,6 +740,30 @@ html, body { overflow-x: clip; }
 .app-header button.hdr-ws-chip-btn[aria-expanded="true"] .hdr-ws-name-txt { color: var(--text-main, #e6edf3); }
 .hdr-ws-chevron { flex: 0 0 auto; }
 .app-header button.hdr-ws-chip-btn[aria-expanded="true"] .hdr-ws-chevron { transform: rotate(180deg); }
+
+/* t2182 (amendments 6/9/10, unifying the TWO header menu triggers — logo + filename chip) — Human, across
+   three messages: "logo should lose the border... and that would allow to be a bit bigger" / "sorry the logo
+   border is only in organic" / "i think id rather unify the behavior of that button". ROOT CAUSE (measured, not
+   assumed — getComputedStyle diffed .brand between organic and normal): organic's own --btn-shadow token
+   (styles.css, organic's :root block) is a REAL, visible drop-shadow; the bare `button` type-selector rule sets
+   `box-shadow: var(--btn-shadow)` on every button, and `.app-header .brand`'s own reset only ever covered
+   background/border (written against the plain browser button chrome a link never had, t2149) — never
+   box-shadow. So the "edge" the human saw was never a border at all, and a per-theme shield (amendments 6/9's
+   original plan) would have fixed only the property this rule happens to name, leaving the two triggers still
+   two DIFFERENT declared rules that could drift apart again the same way. ⭐ UNIFIED instead, per the human's own
+   final ruling — ONE declared class on BOTH #hdrAppBtn and #hdrPostBtn, ASKED which direction with live organic
+   screenshots of both options (the logo gaining the chip's existing border vs. both going borderless): the human
+   chose BORDERLESS — the chip's own t792 border is retired too, not kept as the target the logo should match. */
+.app-header button.hdr-menu-trigger {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    text-shadow: none;
+}
+.app-header button.hdr-menu-trigger:hover,
+.app-header button.hdr-menu-trigger[aria-expanded="true"] {
+    background: var(--panel2, rgba(255,255,255,.10));
+}
 /* t2147 amendment 2 (human: "we can limit its width on phone") — ONLY THE NAME degrades on a narrow header;
    the chevron and the chip's own padding/border stay full size so it never stops looking like a button. Uses
    the SAME class-based yield ladder every other header control narrows through (.is-mini/.is-tiny below, driven
@@ -5470,7 +5503,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
    Each step is inert data until the loop adds its class; the yield SEQUENCE lives in one place (the array). */
 /* (a) logo yields first: crop the "CNC MACRO STUDIO" subtitle (bottom ~22% of the 0 0 132 34 viewBox) + shrink the
    mark, freeing horizontal width. The crop leaves the wordmark; the shorter box de-clutters the tight header. */
-.app-header.hy-logo .logo { height: 30px; clip-path: inset(0 0 27% 0); }
+.app-header.hy-logo .logo { height: 33px; clip-path: inset(0 0 27% 0); }   /* t2182 — 30px scaled by the same ~12% the base step took */
 .app-header.hy-logo .brand { gap: 8px; }
 /* (c) tab labels scale a step: tighter tracking + a touch smaller frees width before we drop to icons */
 .app-header.hy-tabscale .hdr-tabs .tab { letter-spacing: .5px; padding-left: 12px; padding-right: 12px; }
@@ -5490,7 +5523,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-tiny .hdr-tabs .tab .app-tx { display: none; }
 .app-header.is-tiny .hdr-tabs .tab { padding: 0 10px; }
 .app-header.is-tiny .brand { padding: 0 4px; gap: 4px; }
-.app-header.is-tiny .logo { height: 24px; }
+.app-header.is-tiny .logo { height: 27px; }   /* t2182 — 24px scaled by the same ~12% the base step took */
 .app-header.is-tiny button.hdr-quick-btn { width: 20px; }   /* t748 — reclaim phone px: the visible chevron tightens, its ≥44px ::before hit area is unchanged */
 /* ⚠ MUST WIN OVER THE RULE ABOVE for the workspace chip specifically — width:20px there would crush the name
    text to nothing, which the human explicitly ruled against ("do not let the cap shrink the name to nothing").
@@ -5508,7 +5541,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.hy-controls .hdr-controls .hdr-undo { padding: 2px 3px; font-size: 13px; }
 .app-header.hy-controls .hdr-tabs .tab { padding: 0 6px; }
 .app-header.hy-controls .brand { padding: 0 2px; }
-.app-header.hy-controls .logo { height: 22px; }
+.app-header.hy-controls .logo { height: 25px; }   /* t2182 — 22px scaled by the same ~12% the base step took */
 .app-header.hy-controls .hdr-quick { margin-right: 0; }
 .app-header.hy-controls .file-save-chip { margin-left: 0; }
 /* t2099 — the defensive backstop named above: min-width:0 overrides a flex ITEM's implicit min-width:auto (which

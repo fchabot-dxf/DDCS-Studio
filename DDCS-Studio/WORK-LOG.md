@@ -51081,3 +51081,89 @@ window, live direct human message, no advisor dispatch)"), which I flagged to th
 provenance is that commit, not an inference.
 
 🔨 turn 2180
+
+## t2182 — unify the two header menu triggers (logo + filename chip)
+
+### The task
+
+Amendments 6, 9 and 10 resolve into one arc step per the advisor: since t2149 the logo opens the APP menu and
+the filename chip opens the FILE menu, `index.html:116`'s own comment says they MIRROR each other in markup/ARIA/
+behaviour and diverge only in styling — which is why organic paints a visible edge on one and not the other. Make
+them one declared component; the organic-edge bug and the "let the logo be a bit bigger" request both fall out of
+that unification, they are not two separate tasks. The look was explicitly left to the human to rule.
+
+### Root cause — measured, not assumed
+
+`.app-header .brand`'s own reset (t2149) only ever covers `background`/`border` — written against plain browser
+button chrome, which never had a shadow. It never touches `box-shadow`. The global `button, .btn, .op-btn,
+.toolbar-btn { box-shadow: var(--btn-shadow); ... }` rule (styles.css:1963) leaks straight through it. Organic's
+own `--btn-shadow` token is a real, visible drop-shadow (`0 2px 5px rgba(0,0,0,.42), inset 0 1px 0
+rgba(255,255,255,.5)`); every other theme's token is transparent/near-zero, which is why the "border" only ever
+showed in organic. Confirmed live via `getComputedStyle` diffed between organic and normal for both `.brand` and
+the chip: `.brand`'s box-shadow was the real organic value in organic and `none` in normal; the chip's own
+box-shadow was already `"none"` in BOTH themes, because it's shielded by its own separate, more-specific
+`.hdr-quick-btn` rule with an explicit `box-shadow: none`. So the "edge" was never a border at all, and a
+per-theme shield on `.brand` alone (the original amendment 6/9 plan) would have fixed only the one property this
+rule happens to name — leaving two structurally separate, divergence-prone rules that could split apart again the
+same way. Unified instead: one declared class, `hdr-menu-trigger`, added to both `#hdrAppBtn` and `#hdrPostBtn`.
+
+### The ask
+
+Built two live CSS mockups in organic (via a throwaway Playwright `page.addStyleTag` script, logo already bumped
+~18% for visual context) plus a baseline screenshot — Option A: logo gains the chip's existing bordered-pill look;
+Option B: both converge to borderless, the chip's own t792 border retired too — sent all three, asked via
+`AskUserQuestion`. Answer: **Option B, borderless.**
+
+### The fix
+
+`index.html`: added `hdr-menu-trigger` to both `#hdrAppBtn` (`.brand`) and `#hdrPostBtn` (`.hdr-quick-btn
+.hdr-ws-chip-btn`). `styles.css`: one new rule after `.hdr-quick-btn`'s own block —
+`.app-header button.hdr-menu-trigger { border: none; background: transparent; box-shadow: none; text-shadow:
+none; }` plus a shared hover/`aria-expanded` background. Specificity (0,2,1) matches
+`.app-header button.hdr-quick-btn`'s own (0,2,1) exactly; source order (placed later) decides the winner with no
+`!important` needed — confirmed live via the final screenshots.
+
+### The logo grow
+
+Base `.app-header .logo` height 34px → 38px (~+12%), the "a bit bigger" the ask surfaced alongside unification.
+Walked the whole shrink ladder proportionally, scaling each named stage by the SAME ~12% the base step took
+rather than picking arbitrary numbers, to preserve the relative cropping behaviour each stage was originally
+tuned against (t2081/t748): `hy-logo` 30px→33px, `is-tiny` 24px→27px, `hy-controls` 22px→25px. Deliberately left
+the phone-media-query WIDTH clamp (`.app-header .brand .logo { width: 34px }`, tied to t1255/t1357's own
+hard-won 25px-overflow-margin history) untouched — confirmed via a live 360px measurement that the JS-driven
+`_fitAppHeader` shrink system (commandDeck.js) still absorbs the larger logo with zero overflow, cycling through
+the full `hy-logo → is-compact → hy-tabscale → is-mini → is-tiny → hy-controls` ladder exactly as before.
+
+### Boot-splash sweep
+
+`.ddcs-busy-card .logo` is a separate, `.app-header`-external rule (t2127) — confirmed none of this turn's edits
+reach it; every change stayed scoped to `.app-header .logo` and its `.app-header.*` shrink-stage variants.
+
+### Collateral + verification
+
+`wordmarks-2161.spec.js`'s 5 baseline screenshots (one per theme) failed as a DIRECT, EXPECTED consequence of the
+logo size change (132×35 → 148×39) — not a regression. Regenerated via `--update-snapshots`; re-eyeballed the new
+PNGs, letterforms unchanged, only the size grew as intended. `header-responsive.spec.js` (t2149's own suite)
+re-ran clean and, as a side effect of its own unconditional `page.screenshot()` calls, refreshed
+`verification/t2149-app-menu-{390,desktop}.png` and `t2149-file-menu-{390,desktop}.png` to the new, correct
+borderless/bigger-logo appearance — included in this commit since they now document the actual current state.
+Left untouched: several OTHER verification PNGs (`t1512-cam-pack/*`, `t1514-live-frame-rotation/*`,
+`t1526-origin-hoist/*`, `t1617-*.png`, `t1976-nested-op-glow.png`, `t1988-nested-group-glow.png`) that were
+already dirty in the working tree BEFORE this turn began (confirmed via mtime — dated 2026-08-22, a full turn
+earlier) — not mine to resolve, left exactly as found. Full collateral sweep (2 batches, ~35 spec files touching
+anything header/logo/library/wizard-adjacent): 91 passed, 2 skipped, then the 5 wordmark failures (now fixed and
+green). Smoke 76/76, node 227/227, lint clean. Verified live in both organic and normal
+(`verification/t2182-header-unified-organic.png`, `t2182-header-unified-normal.png`, sent to the human) — both
+triggers now share one flat, borderless look; the buggy organic glow is gone.
+
+### For the advisor
+
+Amendments 15/16/17 (file-menu section grouping — Workspace/G-code/Project/Reference bordered sections) arrived
+mid-task, explicitly marked queued for a later turn, not this one — read and acknowledged, not incorporated here.
+
+### Tail — NOT started this turn (separate commit)
+
+Amendment 11 (header disk → WORKSPACE save; verify Project's Library door; surface — don't decide — what happens
+to `#projOpenBtn`) is still outstanding.
+
+🔨 turn 2182
