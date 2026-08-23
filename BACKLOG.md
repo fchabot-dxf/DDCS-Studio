@@ -1336,6 +1336,11 @@ a **tabbed container**. t2180 deleted the tab strip; the body is still laid out 
 `.wsm-modal`, the SAME shell Wizards and Workspace already wore. All three managers now share one modal shell.
 `.modal-card`'s OTHER 15 call sites (setup-sheet, cloud-modal-panel, etc.) are untouched — this update narrows
 the count, it does not close the item.
+⭐ **UPDATE (t2196): `.modal-card` has its FIRST real consumer.** The zero-consumers claim above is no longer
+true — `ui/wizardManagerPanel.js`'s new `openWizardBarManager()` panel (`#wizbarOverlay`) uses `.modal-scrim`/
+`.modal-card`/`.modal-head`/`.modal-body` as-declared, no adaptation needed (a brand-new panel, nothing bespoke
+to migrate away from — cheap by construction). The OTHER 15 sites are still hand-painted and still this item's
+own subject; this is one more data point that the base works when a new consumer just uses it.
 
 ### The Local/Cloud switcher
 
