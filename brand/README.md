@@ -16,7 +16,7 @@ material it would help")*
 Sixteen faces were rendered side by side on the organic tokens to choose Sniglet; the fifteen that lost are
 not working material, they are a decision already made. Only the chosen face and its parameters survive, below.
 
-## Status (t2161)
+## Status (t2161, root-caused t2163)
 
 ✅ **normal / studio / futuristic / steampunk — INSTALLED in `index.html`, and VALIDATED.** `trace-wordmark.py`
 was actually run against `wordmarks.json` for these four (fontTools happened to be available) and produced
@@ -26,19 +26,27 @@ in the interpreter first (documented in its own header): `penx` pre-scaled (coll
 and a layer's `dx` applied twice (baked into the geometry *and* the wrapping `<g transform>`). Both fixed;
 neither is present in the shipped SVGs, which were hand-verified visually before this validation even started.
 
-⛔ **organic — NOT installed. `brand/MARK-ORGANIC-TRACED.svg`'s traced 'D' glyph is broken.** Its inner counter
-path is a ~2-unit stray fragment instead of tracing the letter's actual hole, so the mark visibly reads "DOCS"
-— confirmed by rendering the raw SVG file standalone (outside the app, outside this repo's index.html splice
-entirely) and by inspecting the path data directly. The C and S glyphs in the same file trace correctly, so
-this is a defect in extracting this one glyph, not the pipeline as a whole — but it is a broken company
-wordmark, and it does not ship on that basis. `index.html`'s `mark-organic` symbol is UNTOUCHED — still the
-original Georgia-italic `<text>` render, `textLength` and all — pending a fixed re-trace.
+⛔ **organic — NOT installed. Root cause found (t2163): Sniglet ExtraBold's own published 'D' glyph is broken,
+not this pipeline.** t2161 found the shipped `MARK-ORGANIC-TRACED.svg` visibly reads "DOCS" (a ~2-unit stray
+counter fragment instead of the letter's actual hole) but couldn't reach the Google Fonts fetch to test further
+(a false "no network" conclusion — the real blocker was a URL-matching bug, since fixed). t2163 re-ran the fetch
+for real and got the IDENTICAL broken 'D' back, so went one level deeper: read Sniglet's own `glyf` table
+directly. **Weight 800 (ExtraBold, this mark's declared weight)'s 'D' has a genuinely tiny counter — ~79×79
+units against a ~610×723 outer contour, under 13% of the width — in BOTH the API-subsetted webfont and the full
+un-subsetted one** (ruling out subsetting as the cause). **Weight 400 (Regular)'s 'D', fetched and inspected
+the same way, has a normal ~61%-width counter.** So: `fontTools` is extracting exactly what the font file
+contains; this is a defect in the currently-published Sniglet 800 webfont itself, specific to that one weight,
+and there is nothing in `wordmarks.json` or `trace-wordmark.py` that can fix it — a different declared weight or
+face is a DESIGN decision, not this folder's to make. `index.html`'s `mark-organic` symbol stays UNTOUCHED
+(original Georgia-italic `<text>` render, `textLength` and all) — the correct state to remain in until that
+decision is made, not a failure to resolve.
 
-`trace-wordmark.py`'s Google Fonts fetch path (the only path organic uses) was never actually run this turn —
-no network access in that session. Before trusting a regenerated organic mark: run it, then verify the OUTPUT
-the same way t2161 caught the bug — render the SVG standalone at real size and read the letters, don't just
-diff coordinates. See `trace-wordmark.py --check` for a coarse automated version of the same check (flags any
-glyph whose transformed bbox looks suspiciously small).
+Before trusting ANY future regenerated mark (organic once its font question is settled, or a re-trace of any
+other mark after a font update): run `trace-wordmark.py`, then verify the OUTPUT the way both t2161 and t2163
+did — render the SVG standalone at real size and READ the letters, never just diff coordinates or trust a clean
+run. `--check` prints a coarse automated version of the same idea (flags a suspiciously small glyph bbox) but is
+not a substitute for actually looking; it caught nothing extra here that reading the rendered letters hadn't
+already caught first.
 
 ## The organic mark's parameters
 *(also declared in `wordmarks.json`'s `marks.organic` — this table is the human-readable version)*

@@ -49931,3 +49931,115 @@ didn't change. Collateral: `tests/boot-splash-2127.spec.js` (the only other file
 - NEW: `DDCS-Studio/tests/wordmarks-2161.spec.js` — the 5-mark screenshot regression guard (above).
 
 🔨 turn 2161
+
+# t2163 — organic wordmark: root-caused, not fixed. Sniglet ExtraBold's own published 'D' glyph is broken; no
+# code fix exists. index.html stays on the old font-based organic render, correctly, per the dispatch's own
+# explicit instruction not to hand-author or approximate a fix.
+
+Dispatch: re-run `trace-wordmark.py`'s Google Fonts path for organic, fix the D-counter extraction, verify by
+rendering standalone and reading the letters. If there is no network, stop and say so — no hand-authored path
+data, no approximation. Also: the advisor's review note on t2161 asked the test file to say plainly that it
+guards layout, not glyph correctness (applied first, below, since it was cheap and didn't depend on the rest of
+the turn's outcome).
+
+## The advisor's t2161 review corrected my own premise before I could act on it wrong
+
+The advisor's own note: their dispatch had told me to treat `MARK-ORGANIC-TRACED.svg` as the reference the
+script should reproduce — but that file is the defective one, so following that literally would have taught
+`trace-wordmark.py` to faithfully reproduce a bug. They flagged this themselves rather than letting me walk into
+it, and independently re-verified my t2161 finding before accepting it (same numbers: a 2.2×2.1-unit, 17-point
+second subpath inside a 16.6×18.8 glyph, identical on both Ds — "deterministic extraction, not corruption").
+Noting this because it's the advisor doing the same "confirm before proceeding" discipline this project asks of
+the worker, applied to their own prior instruction.
+
+## "No network" was WRONG — and finding out why fixed a real, reusable bug
+
+First move this turn: check network access directly, since the whole task is gated on it. It works fine —
+`fonts.googleapis.com` returns 200. So t2161's conclusion was wrong, and I went to find out why the fetch had
+actually failed. `font_path_for()`'s regex required the WOFF2 url to end in a literal `.woff2` — but a live CSS
+response for Sniglet ExtraBold came back as `https://fonts.gstatic.com/l/font?kit=...&skey=...&v=v18` (a dynamic
+`/l/font?` endpoint, no file extension at all; `format('woff2')` in the CSS is what actually declares the
+format, not the URL shape). Fixed the regex to match any `fonts.gstatic.com` `url()`, not one requiring a
+literal suffix. This is a real, reusable fix — every Google-Fonts-sourced mark this script will ever fetch goes
+through this same code path, so it was blocking more than just organic.
+
+## With the fetch actually working, organic re-traced — and reproduced the IDENTICAL broken 'D'
+
+Ran the fixed script, then did exactly what my own t2161 method was (per the advisor's explicit instruction:
+"your own method, not a coordinate diff") — rendered the regenerated `MARK-ORGANIC-TRACED.svg` standalone,
+outside the app, at real size, and read it. Still "DOCS", not "DDCS". Same defect, byte-reproducible.
+
+This ruled out t2161's original hypothesis (a bug in my extraction code) — the fetch bug was real but unrelated
+to the glyph defect itself. So I went one level deeper than t2161 did: read Sniglet ExtraBold's own `glyf` table
+directly with `fontTools.ttLib`, rather than trust the rendered pixels alone.
+- The 'D' glyph has 2 contours. Contour 0 (43 points) is the outer silhouette, bbox 40–650 × -13–710 (610×723
+  units) — a normal-sized letterform. Contour 1 (12 points) is the counter, bbox 307–386 × 305–384 — **79×79
+  units, under 13% of the outer width.** A Sniglet counter should be a large fraction of the letter's interior,
+  not a near-point.
+- Checked whether Google's per-request SUBSETTING was the cause: fetched the FULL (un-subsetted) "latin" webfont
+  file directly (not the `&text=` narrowed one `trace-wordmark.py` normally uses) and read the same glyph —
+  **identical contour structure, byte-for-byte the same bbox**. Rules out subsetting.
+- Checked whether this is Sniglet-the-family or specific to weight 800: fetched Sniglet REGULAR (weight 400)'s
+  'D' the same way — **a normal glyph**, counter bbox 161–479 × 89–607 (318×518 units, ~61% of the outer
+  610×723... rather the 400-weight's own 519×718 outer bbox — proportioned like an actual D).
+
+Conclusion, with evidence at every step rather than an assumption at the end: **Sniglet ExtraBold (weight 800,
+the weight this mark declares) has a genuinely defective 'D' glyph in its currently-published webfont, specific
+to that weight** — not a bug in `trace-wordmark.py`, not in `wordmarks.json`'s declared parameters, not in
+Google's subsetting pipeline, not in the family as a whole. There is no code fix available to a script that
+faithfully reads what a font file contains. Per the dispatch's own explicit instruction, did NOT hand-author or
+approximate a replacement counter path — `index.html`'s `mark-organic` symbol remains on its original
+Georgia-italic `<text>` render, which the dispatch itself named as the correct state to remain in, not a
+failure. The regenerated (still-broken) `MARK-ORGANIC-TRACED.svg` was reverted back to the committed version
+(`git checkout HEAD --`) rather than left as a pointless diff of one broken file for another.
+
+**What this hands back to the human/advisor, since it's now a design question, not an engineering one:** the
+declared weight (800) is what's broken; Sniglet 400 is not. Options are outside this turn's authority to pick:
+change the declared weight (a visual-weight tradeoff the human would need to judge, not just a number swap —
+Sniglet 400 is a different visual weight/optical size than the redesign was chosen at), pick a different face
+entirely, wait on Sniglet's publisher to fix the outline (it's a live, actively-served Google Font — plausibly
+reportable upstream), or accept the interim Georgia-italic render for organic longer.
+
+## `tests/wordmarks-2161.spec.js` — added the advisor-requested clarification
+
+Per the review note: a diff-based screenshot test at any workable tolerance is a LAYOUT guard, not a glyph-
+correctness guard — 0.15 is loose enough that a single mis-shaped letter inside an otherwise-correctly-
+positioned mark would not cross the threshold. Added an explicit paragraph saying so in the file's own header,
+naming the organic 'D' as the concrete example of exactly this gap (it shipped undetected by any coordinate-
+level check; only reading the rendered letters caught it) — so a future green run here is never mistaken for
+proof the letters are right.
+
+## Non-vacuity / verification
+
+Not a code-change turn in the usual sense (no behavior of the shipped app changed — organic still renders
+exactly as it did after t2161), so there is no new user-facing assertion to prove non-vacuous. What was
+verified, and how: the fetch-URL fix — confirmed by successfully fetching and parsing a live Sniglet response
+that previously raised `RuntimeError`. The root-cause finding — confirmed three independent ways (rendered
+pixels, raw glyf-table bbox measurement, cross-check against the full un-subsetted font AND against a different
+weight of the same family) rather than resting on any single one.
+
+## Gate
+
+`tests/wordmarks-2161.spec.js` — 5/5, unchanged in substance (comment-only addition). Smoke: 76/76. Node:
+227/227. Lint: clean. No new automated test was written for the root-cause finding itself — it is a font-data
+fact about a third-party webfont, not a property of this repo's own code, so there is nothing here to regress-
+guard; the finding is recorded in `wordmarks.json`'s own `traps`/`marks.organic.status`, `brand/README.md`, and
+this entry instead.
+
+## Files
+
+- `brand/trace-wordmark.py` — fixed the WOFF2-url regex (no longer requires a literal `.woff2` suffix); rewrote
+  the module docstring to record the fetch-path validation AND the root-cause finding, replacing t2161's now-
+  incorrect "no network access in that session" note.
+- `brand/wordmarks.json` — `traps` array: added the URL-shape gotcha, and rewrote the organic-glyph trap entry
+  from "known broken" to "root-caused" with the actual measurements. `marks.organic.status` updated the same way.
+- `brand/README.md` — rewrote the organic status section with the root-cause finding and the options now on the
+  table; did NOT delete the note (per the advisor's own instruction: only once it lands, and it hasn't).
+- `DDCS-Studio/tests/wordmarks-2161.spec.js` — added the "this guards layout, not glyphs" clarification to the
+  header comment (no test-body change).
+- `.gitignore` — added `brand/.font-cache/` (the WOFF2 cache `trace-wordmark.py` creates on a Google-Fonts run;
+  downloaded, not source — was previously untracked-but-ungitignored, now explicit).
+- `brand/MARK-ORGANIC-TRACED.svg` — touched during investigation (regenerated, still broken, byte-different from
+  the committed version), reverted back to the committed file before this commit; not part of this turn's diff.
+
+🔨 turn 2163

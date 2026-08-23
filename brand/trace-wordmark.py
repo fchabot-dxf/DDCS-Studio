@@ -28,10 +28,22 @@ into the glyph geometry and once again by its wrapping <g transform> (visible as
 being exactly double the declared value). Both are fixed in the code below; the byte-identical re-run is what
 proved it, not inspection.
 
-UNVALIDATED for the GOOGLE-FONTS path (organic): no network access in that session, so the fetch in
-font_path_for() below has never actually run. Given the two bugs just found, do not assume it works — run it,
-then use --check (or open the SVG standalone, the way t2161 caught the shipped organic mark's broken 'D': by
-rendering the file alone, at real size, outside the app entirely) before trusting the result.
+VALIDATED as of t2163 for the GOOGLE-FONTS path itself (network access DOES work in this environment — t2161's
+"no network" note was wrong; the real cause was font_path_for()'s WOFF2-url regex requiring a literal `.woff2`
+suffix, which a live response for Sniglet doesn't carry — it comes back as a `/l/font?kit=...` endpoint with no
+extension at all, `format('woff2')` in the CSS is what actually says the format. Fixed below.
+
+⛔ ORGANIC STAYS UNSHIPPED — root-caused, not just re-observed. With the fetch fixed, re-running organic
+reproduces the EXACT SAME broken 'D' (rendered standalone and read, per t2161's own method — still "DOCS", not
+"DDCS"). Read the raw glyf table directly to find out why: Sniglet ExtraBold (wght 800 — the weight this mark
+declares) has a 'D' glyph whose second contour (the counter/hole) is a genuinely tiny ~79×79-unit fragment
+against a ~610×723-unit outer contour — under 13% of the letter's width, in BOTH the API-subsetted WOFF2 and
+the full un-subsetted one (ruling out subsetting as the cause). Sniglet REGULAR (wght 400)'s 'D', fetched and
+inspected the same way, has a normal counter — ~318×518 units against a ~519×718 outer contour, roughly 61% of
+the width. So: fontTools is extracting exactly what's in the file; this is a real defect in the published
+Sniglet 800 webfont's own 'D' outline, not in this script, not in wordmarks.json's declared parameters, and not
+fixable by writing different Python. Changing the declared weight (or face) is a DESIGN decision, not this
+script's to make — see brand/README.md and WORK-LOG.md t2163 for the finding as reported.
 """
 import argparse
 import json
@@ -70,9 +82,13 @@ def font_path_for(font_decl, text):
                        % (family, weight, font_decl.get('urlTextParam', text.replace(' ', '%20'))))
             req = urllib.request.Request(css_url, headers={'User-Agent': UA})   # trap: UA MUST be modern
             css = urllib.request.urlopen(req).read().decode('utf-8')
-            m = re.search(r'url\((https://fonts\.gstatic\.com/[^)]+\.woff2)\)', css)
+            # t2163 trap: the URL does NOT reliably end in .woff2 — a live response for Sniglet came back as
+            # https://fonts.gstatic.com/l/font?kit=...&skey=...&v=v18 (a dynamic /l/font? endpoint, no
+            # extension at all), format('woff2') is what actually says the format. Match any gstatic url()
+            # inside the response, not one requiring a literal .woff2 suffix.
+            m = re.search(r'url\((https://fonts\.gstatic\.com/[^)]+)\)', css)
             if not m:
-                raise RuntimeError('no WOFF2 url found in CSS for %s — check the UA/text param traps' % family)
+                raise RuntimeError('no font url found in CSS for %s — check the UA/text param traps. Response:\n%s' % (family, css))
             data = urllib.request.urlopen(urllib.request.Request(m.group(1), headers={'User-Agent': UA})).read()
             with open(dest, 'wb') as f:
                 f.write(data)

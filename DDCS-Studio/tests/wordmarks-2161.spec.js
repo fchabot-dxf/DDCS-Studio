@@ -30,8 +30,17 @@ import { test, expect } from '@playwright/test';
  * ── WHY THE LOOSENED TOLERANCE IS STILL SAFE ─────────────────────────────────────────────────────────────────
  * The header logo carries no live data (unlike t1792's DRO-driven visualization panes) — no timers, no clock,
  * no coordinate readout, so a diff here is either AA noise (small, edge-only, already characterized above) or a
- * real shape/position regression (which reads as a much larger diff — organic's own broken glyph was a 23%
- * diff, contour-scale, not edge-scale). 0.15 sits between those two regimes for this specific rendering method.
+ * real shape/position regression (which reads as a much larger diff — spliced organic's own broken glyph, in an
+ * earlier draft of this install before it was held back, measured a 23% diff against its own old baseline —
+ * contour-scale, not edge-scale). 0.15 sits between those two regimes for this specific rendering method.
+ *
+ * ⚠ WHAT THIS FILE DOES **NOT** GUARD (advisor review note, t2161 → t2163): a diff test at ANY reasonable
+ * tolerance is a LAYOUT/POSITION guard, not a glyph-correctness guard — 0.15 is loose enough that a single
+ * mis-shaped letter (a broken counter, a dropped stroke) inside an otherwise-correctly-positioned mark would
+ * NOT cross the threshold and would NOT fail here. This is exactly how the organic mark's broken 'D' shipped
+ * to brand/ undetected by any coordinate-level check — it was only caught by rendering the SVG standalone and
+ * READING the letters, a human/eyeball step no pixel-ratio number substitutes for. Green here means "nothing
+ * moved"; it does not mean "the letters are right." Re-verify by eye after any regeneration, every time.
  */
 
 test.use({ viewport: { width: 1500, height: 950 } });

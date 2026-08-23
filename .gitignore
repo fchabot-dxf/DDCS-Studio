@@ -72,6 +72,9 @@ DDCS-Studio/_*.js
 DDCS-Studio/**/_zz*.js
 .repro/
 
+# brand/trace-wordmark.py's fetched WOFF2 cache — downloaded, not source; wordmarks.json is the declaration
+brand/.font-cache/
+
 # Vendor repo CLONES (M150S, M350-LiveG, M3X-M350-IoT-Bridge) - kept on disk as the raw
 # source the Modbus register map was mined from. NOT tracked: they are git clones (nested
 # .git), they are third-party code under their own licences, and the VALUE is already
