@@ -128,7 +128,7 @@ async function openConnectModal(provider) {
     const ov = document.createElement('div');
     ov.className = 'cloud-modal';
     ov.innerHTML =
-        '<div class="cloud-modal-panel">'
+        '<div class="cloud-modal-panel modal-card">'
         + `<div class="proj-head"><span class="proj-title">🔗 Connect ${p.label}</span><button class="op-btn" data-cm="cancel" title="Cancel">✕</button></div>`
         + '<div class="cloud-modal-body">'
         + `<div class="cloud-modal-status">Opening ${p.label} sign-in…</div>`

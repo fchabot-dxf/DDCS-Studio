@@ -51,7 +51,7 @@ function askNameAndFolder(suggested, folder, place = 'local', { needsAllow = fal
         const ov = document.createElement('div');
         ov.className = 'wss-ask';   // its OWN class — never `app-dialog`, which generic dialog drivers answer for you
         ov.id = 'wssAsk';
-        ov.innerHTML = `<div class="wss-box">
+        ov.innerHTML = `<div class="wss-box modal-card">
             <div class="wss-title">Save this workspace</div>
             <label class="wss-lbl" for="wssName">Name</label>
             <div class="wss-namerow"><input id="wssName" class="wss-name" type="text" spellcheck="false" value="${esc(suggested)}"><span class="wss-ext">.ddcs</span></div>

@@ -1390,3 +1390,47 @@ confirm what remains is really `.modal-card` adoption's own turn, not the two-co
 
 ⚠ **Verify by screenshot matrix, not by diff**: the three modals side by side, in all five themes, before and
 after. The whole point is that they currently agree by coincidence — a diff cannot show you that they stopped.
+
+⭐ **UPDATE (t2200): ADOPTED at every LIVE site but one.** Re-scoped first, per the item's own instruction —
+the actual current inventory (found by scanning every `background: var(--modal-face)` rule in styles.css, not
+assumed from the old "15" count) was 10 selector-groups: the declaration itself, 8 live hand-painted consumers,
+one DEAD rule, and one genuine resistor. All 8 live ones now compose `.modal-card` in markup instead of
+restating its six properties under their own class name — `.wsm-modal` (wizardManager.js/workspaceManager.js/
+projectManager.js — three real surfaces, one shared class), `.help-modal`, `.setup-sheet-modal`,
+`.cloud-modal-panel`, `.wss-box`, `.ddcs-busy-card`, `.saved-pop-card`, and `.settings-modal` (`#settings-app`,
+a STATIC class in index.html rather than JS-built — the one site with a different migration shape). Each
+site's own CSS rule keeps only what `.modal-card` does not supply (width/height/padding/flex layout); the
+SCRIM classes (`.wsm-overlay`, `.help-overlay`, etc.) are deliberately left alone — their z-index tokens are
+per-modal-family on purpose (so one modal can stack over another), which `.modal-scrim`'s own single z-index
+token cannot express without an override at every site, so composing it there would be the wrong move, not a
+missed one.
+
+Two composed sites gained a real property they never had before, not just moved words: `.cloud-modal-panel`
+and `.settings-modal`/`#settings-app` never set their own `color` (`.modal-card` does — `var(--text)`); the
+other six now also carry `overflow:hidden` for the first time. **Checked, not assumed**: a 5-theme × 6-site
+screenshot matrix (`verification/t2200-*-after.png`, 30 images) plus a stashed BEFORE pass compared by eye —
+zero visible difference anywhere, including studio (the theme most likely to expose a white-on-white miss)
+and steampunk (asymmetric radii, where a stray `overflow:hidden` clip would show first).
+
+⛔ **ONE genuine resistor, reported rather than forced**: `.wiz-box, #blk_wiz_user` (the Generator/wizard
+modal AND the Blocks-tab docked Wizard View pane, sharing one rule) is NOT migrated. Three real reasons, not
+caution for its own sake: (1) it is the single busiest, most test-covered surface in the app — every op wizard
+opens through it; (2) the rule is genuinely DUAL-HOST — one selector paints both an actual modal (`.wiz-box`,
+inside `#wizard.overlay`) and a non-modal EMBEDDED pane (`#blk_wiz_user`, no scrim, no overlay at all) —
+composing `.modal-card` cleanly would mean splitting this into two rules with two different class targets, a
+bigger structural change than "add a class, drop four properties" every other site got; (3) its own comment
+history documents a PAST bug in exactly this area (`#blk_wiz_user` once inherited the wrong ground colour
+entirely) — `.modal-card`'s `color`/`overflow` additions are the same shape of change that broke it before.
+Left exactly as-is; a candidate for its own dedicated turn, not a corner cut on this one.
+
+Also found, not touched (out of THIS item's scope — adoption at live sites, not dead-code removal, per the
+global "mention it, don't delete it" convention for anything not directly asked): `.settings-box` (styles.css)
+and its own un-namespaced `.settings-head`/`.settings-close`/`.settings-body`/`.settings-section` siblings have
+ZERO consumers anywhere — no JS creates it, no HTML wears the class. A "SECOND, older settings dialog" per its
+own comment, apparently fully superseded by `#settings-app` and never removed. Flagged for a cleanup turn.
+
+Also fixed in passing, unrelated to modal-card itself: `tests/cloud-default-754.spec.js`'s own "EXPORT-to-
+cloud failure" test drove `[data-place="cloud"]` — the manager shelf tab t2194 deleted OUTRIGHT, months (turns)
+before this one. The test had been silently red since t2194, in a file that turn's own sweep never touched;
+fixed to drive the real `dlgChoice` destination-ask flow instead. Confirmed pre-existing (not something this
+turn's CSS change could cause) by running it against the pre-t2200 tree before touching it.

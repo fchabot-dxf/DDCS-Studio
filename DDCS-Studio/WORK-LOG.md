@@ -52328,3 +52328,98 @@ one case (a twin's "Makes: Corner" is the informative case; a from-scratch wizar
 under a title that already says "My Custom Thing" is not). Not worth a special case for a cosmetic near-
 duplicate on the LESS common path (most imported wizards are twins/forks, per this session's own architecture);
 flagged rather than smoothed over.
+
+## t2200 — BACKLOG 16: `.modal-card` ADOPTION, the largest declared-but-unused item finally closed at 8/9 sites
+
+t2196's confirm-on-import work was reviewed and released as V2026.08.23.4. This turn takes up BACKLOG item 16
+— the modal-shell half specifically (the volume-switcher half already closed itself down to one site at
+t2194) — now that `#wizbarOverlay` at t2196 gave `.modal-card` its first real consumer, proving the pattern in
+this codebase rather than proposing it cold.
+
+### Re-scoped first, per the item's own instruction
+
+The item's own "15 rules" count was written before t2190/t2194's own consolidations; re-scanning
+`background: var(--modal-face)` across the whole of styles.css (not trusting the old number) found the REAL
+current inventory: 10 selector-groups — `.modal-card` itself, 8 genuinely live hand-painted duplicates, one
+DEAD rule (`.settings-box` — zero consumers anywhere, JS or HTML), and one selector that is not a plain
+duplicate at all (`.wiz-box, #blk_wiz_user`, see below).
+
+### The 8 migrations — compose, don't replace
+
+Same pattern every time, matching `#wizbarOverlay`'s own precedent: add `modal-card` to the card element's
+class list where the JS (or, for one site, the static HTML) builds it; strip the now-redundant
+background/border/border-radius/box-shadow(/color) from that selector's own CSS rule, keeping only what
+`.modal-card` does not supply (width/height/padding/flex layout). The SCRIM classes (`.wsm-overlay`, `.help-
+overlay`, `.setup-sheet-overlay`, …) are deliberately UNTOUCHED — each carries its own z-index token
+(`--z-modal-workspace`, `--z-modal-help`, …), and that has to stay per-modal-family so one modal can stack
+correctly over another; `.modal-scrim`'s single shared z-index token cannot express that without an override
+at every site, so folding scrims in would be the wrong move here, not a missed one.
+
+Sites migrated: `.wsm-modal` (three real, heavily-tested surfaces sharing ONE class already —
+`ui/wizardManager.js`, `ui/workspaceManager.js`, `ui/projects/projectManager.js`), `.help-modal`
+(`ui/helpPanel.js`), `.setup-sheet-modal` (`ui/setupSheet.js`), `.cloud-modal-panel` (`ui/cloudAccount.js`),
+`.wss-box` (`ui/workspaceSave.js`), `.ddcs-busy-card` (`ui/busyRow.js`), `.saved-pop-card`
+(`ui/fileSaveState.js`), and `.settings-modal` — the one with a DIFFERENT shape: `#settings-app` carries the
+class as a STATIC attribute in `index.html`, never JS-built, so the migration is a one-line HTML edit
+(`class="settings-modal modal-card"`) instead of touching a template string.
+
+Two sites gained a property they never declared before, not just a renamed source for the same value:
+`.cloud-modal-panel` never set its own `color` (every sibling card already did, to `var(--text)` — this one
+was the anomaly, not the rule); `.settings-modal`/`#settings-app` likewise. Six sites gained `overflow:hidden`
+for the first time. Both are real, deliberate drift-closures the item's own framing predicted ("padding,
+header layout, button sizing and controls" drift because the tokens don't reach them) — not silently smoothed
+over; called out in both the CSS comments at each site and verified below, not assumed harmless.
+
+### Verified by screenshot matrix, not diff — exactly as the item demanded
+
+"The modals currently agree by coincidence, and a diff cannot show you that they stopped" — so a text diff of
+the CSS proves nothing about whether the two NEW properties (color/overflow) changed anything a person would
+see. Built a throwaway Playwright matrix (`_shotmatrix.spec.js`, deleted after use): all 6 migrated surface
+KINDS × all 5 themes (normal/studio/futuristic/organic/steampunk) = 30 screenshots, captured once on the
+CURRENT (after) tree, then again after `git stash` reverted to the pre-turn (before) tree, then eyeballed
+side by side — studio (the theme most likely to expose a white-on-white color miss) and steampunk (asymmetric
+corner radii, where a stray `overflow:hidden` clip shows first) checked specifically, not just spot-checked at
+random. Zero visible difference anywhere. The 30 AFTER images are kept as `verification/t2200-*-after.png`
+(the BEFORE set, a comparison aid only, was deleted once the comparison was done).
+
+### The one genuine resistor — reported, not forced
+
+`.wiz-box, #blk_wiz_user` (the Generator/wizard modal, styles.css) is NOT migrated. Real reasons, not caution
+alone: it is the single busiest, most test-covered surface in the whole app; the ONE rule is genuinely DUAL-
+HOST (paints BOTH an actual overlay modal — `.wiz-box` inside `#wizard.overlay` — AND a completely separate,
+non-modal EMBEDDED pane — `#blk_wiz_user`, the Blocks tab's docked Wizard View, no scrim at all), so a clean
+migration means splitting one rule into two class targets, not "add a class, drop four properties"; and its
+own surrounding comment already documents a PAST bug in exactly this spot — `#blk_wiz_user` once inherited the
+wrong ground colour entirely because it lacked its own explicit paint — meaning `.modal-card`'s `color`/
+`overflow` additions are the exact SHAPE of change history says already broke this rule once. Left alone,
+named in BACKLOG as its own future turn rather than a corner cut here.
+
+### Also found, not touched
+
+`.settings-box` (+ its own un-namespaced `.settings-head`/`.settings-close`/`.settings-body`/`.settings-
+section` siblings) — confirmed zero consumers anywhere (JS or HTML), a "second, older settings dialog"
+apparently fully superseded by `#settings-app` and never deleted. Out of THIS item's scope (adoption at LIVE
+sites, not dead-code removal) — flagged in BACKLOG per the global "mention it, don't delete it" convention for
+anything not directly asked, not removed.
+
+### A real, pre-existing bug caught in passing (separate concern, same turn)
+
+`tests/cloud-default-754.spec.js`'s "an EXPORT-to-cloud failure never touches the already-saved local copy"
+test drove `[data-place="cloud"]` — the manager's own Local/Cloud SHELF tab, which t2194 deleted OUTRIGHT
+(replaced by a one-shot `dlgChoice` destination ask) turns before this one. The test had been silently red
+since, in a file t2194's own collateral sweep never touched (it wasn't named `wizardManager`/`projectManager`,
+so it wasn't in that turn's search net). Confirmed this is genuinely pre-existing — not something today's CSS
+edits could cause — by running the test against the pre-t2200 tree (via `git stash`) BEFORE touching it: same
+failure. Fixed to drive the real flow: click Export, wait for the real destination-choice dialog, click
+"Cloud" explicitly (disconnecting the test's own generic `autoAppDialog` auto-observer first, since its
+"accept = click the last button" rule would otherwise hit Cancel — the choice dialog's own last button —
+before the explicit click lands).
+
+### Verification
+
+Full smoke tier (77) green both before touching anything and after. Targeted full-suite runs across every
+touched surface: `settings-*` (13 files, 43 tests), `wizard-manager-1617`/`project-manager-2190`/`workspace-
+manager-1223`/`workspace-save-open-1225` (58 tests combined), `setup-sheet-850`, `loading-feedback-1257`
+(busy overlay), `cloud-default-754`, `profile-cloud-library`, `workspace-cloud-tab-1233` — all green (one
+pre-existing red found and fixed, see above; not a regression from this turn's own edits). `check-console`
+(zero page errors) green. Lint clean across every touched file.

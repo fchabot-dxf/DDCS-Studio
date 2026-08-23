@@ -90,7 +90,7 @@ export function busyOverlay(label) {
     el.className = 'ddcs-busy-overlay';
     el.setAttribute('role', 'status');
     el.setAttribute('aria-live', 'polite');
-    el.innerHTML = `<div class="ddcs-busy-card"><div class="ddcs-busy-spin" aria-hidden="true"></div><div class="ddcs-busy-text"></div></div>`;
+    el.innerHTML = `<div class="ddcs-busy-card modal-card"><div class="ddcs-busy-spin" aria-hidden="true"></div><div class="ddcs-busy-text"></div></div>`;
     el.querySelector('.ddcs-busy-text').textContent = label ? `Opening ${label}…` : 'Opening…';
     document.body.appendChild(el);
     return () => { try { el.remove(); } catch (_) {} };

@@ -108,7 +108,7 @@ function announceSaved(res) {
     ov.className = 'saved-pop';
     ov.setAttribute('role', 'status');
     ov.setAttribute('aria-live', 'polite');
-    ov.innerHTML = `<div class="saved-pop-card">
+    ov.innerHTML = `<div class="saved-pop-card modal-card">
         <div class="saved-pop-title"></div>
         <div class="saved-pop-name"></div>
         <div class="saved-pop-what"></div>

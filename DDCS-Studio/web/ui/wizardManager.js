@@ -176,7 +176,7 @@ export async function openWizardManager(opts = {}) {
     ov.id = 'wizmOverlay';
     ov.className = 'wsm-overlay';   // the workspace manager's chrome, deliberately — one design language, one CSS
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
-    ov.innerHTML = `<div class="wsm-modal">
+    ov.innerHTML = `<div class="wsm-modal modal-card">
         <div class="wsm-head"><span class="wsm-title">Wizards</span><button type="button" class="wsm-x" aria-label="Close">✕</button></div>
         <div class="wsm-body">
             <section id="wizmMine"></section>

@@ -272,7 +272,7 @@ export function openSetupSheet() {
     const ov = document.createElement('div');
     ov.id = 'setupSheetOverlay';
     ov.className = 'setup-sheet-overlay';
-    ov.innerHTML = `<div class="setup-sheet-modal" role="dialog" aria-label="Setup sheet">`
+    ov.innerHTML = `<div class="setup-sheet-modal modal-card" role="dialog" aria-label="Setup sheet">`
         + `<div class="setup-sheet-chrome">`
         + `<span class="setup-sheet-chrome-title">Setup sheet</span>`
         + `<span><button type="button" id="setupSheetPrint" class="setup-sheet-btn">🖨 Print</button>`

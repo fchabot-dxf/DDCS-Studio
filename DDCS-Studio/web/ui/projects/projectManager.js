@@ -67,7 +67,7 @@ export async function openProjectManager(opts = {}) {
     ov.id = 'projmOverlay';
     ov.className = 'wsm-overlay';   // the workspace/wizard managers' own chrome, deliberately — one design language
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
-    ov.innerHTML = `<div class="wsm-modal">
+    ov.innerHTML = `<div class="wsm-modal modal-card">
         <div class="wsm-head"><span class="wsm-title">Projects</span><button type="button" class="wsm-x" aria-label="Close">✕</button></div>
         <div class="wsm-body">
             <section id="projmMine"></section>

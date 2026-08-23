@@ -139,7 +139,7 @@ export function openHelp(section = 'faq') {
     const ov = document.createElement('div');
     ov.className = 'help-overlay';
     ov.id = 'helpOverlay';
-    ov.innerHTML = `<div class="help-modal" role="dialog" aria-modal="true" aria-label="${isAbout ? 'About' : 'FAQ'}">
+    ov.innerHTML = `<div class="help-modal modal-card" role="dialog" aria-modal="true" aria-label="${isAbout ? 'About' : 'FAQ'}">
         <div class="help-head"><b>${isAbout ? 'About' : 'FAQ'}</b>
             <button type="button" class="help-close" id="helpClose" title="Close (Esc)" aria-label="Close help">&#10005;</button></div>
         <div class="help-body">
