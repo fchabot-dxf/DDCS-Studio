@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * t854 part 1 — THE LIBRARY. One tabbed modal opened from the header quick-menu "Library…" on the last-used tab.
+ * t854 part 1 — THE LIBRARY. One tabbed modal opened from the header quick-menu "Open project…" row (t2173 —
+ * literalised from "Library…"; the underlying door/data-act is unchanged) on the last-used tab.
  * Projects speaks the t805 select-then-load language; the Wizards tab embeds the bar-designer + New-from-current.
  * 390px reachability.
  *
@@ -20,7 +21,7 @@ async function seed(page) {
         await store.saveProject('Bracket', { kind: 'ddcs.macro', v: 1, name: 'Bracket', stack: [{ type: 'op', opType: 'user_pocket_data' }] });
     });
 }
-// Open the Library through the real header quick-menu "Library…" row.
+// Open the Library through the real header quick-menu "Open project…" row (t2173 — was "Library…").
 async function openViaMenu(page) {
     await page.click('#hdrPostBtn');
     await page.click('#hdrPostMenu [data-act="library"]');

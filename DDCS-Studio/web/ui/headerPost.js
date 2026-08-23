@@ -280,7 +280,7 @@ export function initHeaderPost() {
         const workspaceRow =
             `<div class="hq-ws-row">`   // its OWN class (a workspace row is not a gcode row); the menu-diet spec counts it
             + `<button type="button" class="hq-ws-btn" data-act="wsSave" title="Save this workspace to its .ddcs file">💾 Save</button>`
-            + `<button type="button" class="hq-ws-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open</button>`
+            + `<button type="button" class="hq-ws-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open workspace</button>`
             + `</div>`;
 
         // t1617 — the WIZARD MANAGER's entry, the workspace manager's sibling (same place, next row): the wizards
@@ -298,7 +298,7 @@ export function initHeaderPost() {
         const libraryRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="library" title="Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Load below">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('library')
-            + '<span class="hdr-quick-lbl">Library…</span></button>';
+            + '<span class="hdr-quick-lbl">Open project…</span></button>';
         const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
         const checklistRow = !healthOn ? '' :
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="checklist">'
@@ -327,9 +327,14 @@ export function initHeaderPost() {
         // .mjson JOB. Genuinely three different file formats, not one act with three names — CHECKED, not
         // assumed (Open reads a workspace via workspaceManager.js, Load reads a program via loadGcodeFile in
         // globalFunctions.js, Projects reads a multi-op .mjson via projectModal.js's openMacroText).
+        // t2173 (tail, human: "open load are gcode vs project it should be more litteral") — the KNOWLEDGE above
+        // already separated the three formats; it just never reached the LABELS, which all read like synonyms
+        // of the same "open a thing" verb. Now literal: "Open workspace" (workspaceRow, above), "Load G-code…"
+        // (below), "Open project…" (libraryRow, above — its door also reaches Wizards, but Projects is the
+        // "open a saved thing" case this literalisation is about; the title still names both).
         const fileRows =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad" title="Load a G-code file into the editor (replaces the program) — not a workspace or a project">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load…</span></button>'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load G-code…</span></button>'
             + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileInsert">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">➕ Insert…</span></button>'
             + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport">'
