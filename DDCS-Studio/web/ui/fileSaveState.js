@@ -4,23 +4,27 @@
  * PRINCIPLE (user): unsaved data is TEMPORARY, even when auto-saved to localStorage — localStorage is a working buffer,
  * only a .ddcs FILE counts as saved. The workspace auto-saves to localStorage ONLY; a .ddcs is its sole PORTABLE copy.
  * This surfaces that state so the user KNOWS when their work lives only in this browser:
- *   - ONE header DISK BUTTON (t1223): accent = unsaved, muted = saved, click = Save. Its tooltip is the filename plus
- *     the dialect; the name itself is displayed where there is room for it (the workspace modal, the Settings band).
+ *   - t2188 (amendment 1, human: "ok dot", superseding t1223/t2147's own "the disk chip's colour is the one
+ *     indicator" ruling) — the STANDALONE DISK BUTTON (#fileSaveChip) is GONE; its two jobs split. STATE is a
+ *     small DOT on the workspace chip itself (#hdrWsDirtyDot, inside #hdrPostBtn) — shown when unsaved, hidden
+ *     (not just faded) when saved, in a fixed slot so the name never reflows. ACTION is the file menu's own
+ *     Workspace-section Save button (t2184) — click the chip, the menu that opens IS the door. Two places state
+ *     the same fact deliberately: the dot is the passive, at-a-glance signal; the identity line says it in
+ *     words once the menu is open.
  *   (t1221 — there is deliberately NO exit warning. The buffer survives a reload/close, so a leave prompt would warn
- *   about a loss that does not happen; the chip tells the truth without blocking the gesture.)
+ *   about a loss that does not happen; the dot tells the truth without blocking the gesture.)
  *
  * The dirty signal is ONE SOURCE (data/backup.js workspaceSignature over the BACKUP_STORES registry) — this module only
  * reflects it in the UI. Parts (b) exe disk-file + (c) web File-System-Access are a separate concern; this is the
  * localStorage-vs-.ddcs AWARENESS layer only. The workspace .ddcs is the config/library grain (settings, wizards, CAM
  * pack, presets, layout); the current PROGRAM is the separate .mjson job grain and is not part of this signal.
  */
-import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedName, fileSavedStem, changeLabel } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads; t2147 — fileSavedStem for the header name (BACKLOG #7)
-import { getMachine } from '../data/workspaceMachine.js';   // t1223 — the tooltip names the file AND the dialect it generates for
-import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
+import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedStem, changeLabel } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads; t2147 — fileSavedStem for the header name (BACKLOG #7)
 
-let chip = null;
+let dot = null;
 let headerName = null, headerNameTxt = null;   // t2147 (BACKLOG #7) — the header workspace chip's button + name text.
-                                                 // ⛔ NO dirty-dot element/ref here — see refresh() below for why.
+                                                 // t2188 (amendment 1) — `dot` is the workspace chip's OWN dirty
+                                                 // indicator now (#hdrWsDirtyDot, index.html); see refresh() below.
 
 export { announceSaved, dismissSaved };   // t1287 — the Ctrl+S path announces through the same one voice
 
@@ -30,37 +34,32 @@ export { announceSaved, dismissSaved };   // t1287 — the Ctrl+S path announces
 function dismissSaved() { try { document.getElementById('fileSaveSaid')?.remove(); } catch (_) {} }
 
 /**
- * t1223 (5, user-refined) — ONE DISK BUTTON. Always present, because it is the Save control as well as the indicator.
- * The COLOUR is the whole state (accent = unsaved, muted = saved), and the TOOLTIP is the filename plus the dialect it
- * generates for — the two facts you actually want when hovering a save button. No label, no timestamp, no dot: the
- * fat pill spelled out in prose what one colour already says, and a timestamp nobody asked for kept re-rendering.
- * The NAME lives where there is room to read it — the workspace modal and the Settings identity band.
+ * t2188 (amendment 1) — THE DOT IS THE STATE SIGNAL NOW, replacing the retired disk chip's colour. This is the
+ * THIRD ruling on a dot for this exact fact, worth naming so nobody re-litigates it as new ground: an early dot
+ * was removed ("we can remove the dot") once the disk chip's own colour already said it; now the disk chip
+ * itself is gone, so the fact needs a home again — a dot, not the colour of a button that no longer exists.
+ * NOT an asterisk (the human's own reasoning): the chip's name already truncates, and an asterisk would compete
+ * with it for width and shift the chevron; a dot occupies a FIXED slot (styles.css) whether shown or hidden, so
+ * nothing reflows. NOT red — unsaved is not an error state (red is reserved for the pre-flight badge and
+ * Clear); a warm/accent tone reads as "notice", not "broken". HIDDEN, not just coloured, when clean — visually
+ * (no fill) AND from assistive tech (`aria-hidden`), so a screen reader never announces an empty status region.
+ * ACCESSIBLE NAME lives on the dot itself (`aria-label`), not on the button's own `title` — that stays
+ * headerPost.js's single-writer fact (see the ⚠ two-owners note that used to live here, still true of the
+ * button's title; just no longer true of this dot, which this module owns outright).
  */
 function refresh() {
     const dirty = isWorkspaceDirtyToFile();
-    if (chip) {
-        const name = fileSavedName();
-        let dialect = '';
-        try {
-            const cid = getMachine().controllerId;
-            dialect = (CONTROLLER_PROFILES[cid] || {}).name || cid || '';
-        } catch (_) { dialect = ''; }
-        chip.classList.toggle('dirty', dirty);
-        chip.classList.toggle('saved', !dirty);
-        // labelled "Workspace" so the tooltip says WHAT the name is, not just a bare filename floating on a header icon
-        chip.title = 'Workspace: ' + (name || 'not saved yet') + (dialect ? ' · ' + dialect : '');
-        chip.setAttribute('aria-label', dirty ? 'Save workspace (unsaved changes)' : 'Save workspace');
+    if (dot) {
+        dot.classList.toggle('is-on', dirty);
+        if (dirty) { dot.setAttribute('aria-label', 'Unsaved changes'); dot.removeAttribute('aria-hidden'); }
+        else { dot.removeAttribute('aria-label'); dot.setAttribute('aria-hidden', 'true'); }
     }
-    // t2147 (BACKLOG #7) — THE HEADER WORKSPACE CHIP'S NAME TEXT, the same source as the disk chip above (one
-    // dirty-tracker, not two): the stem, not the full filename with its .ddcs extension — matches the identity
-    // line's own convention (headerPost.js). "Not saved" is the honest label when there is no file, never a
-    // fake title. ⛔ NO DIRTY DOT (amendment, human ruling — "we can remove the dot"): once this chip sits
-    // directly beside the disk chip, a dot here would only repeat what the disk chip's own COLOUR already says
-    // (t1223's ruling above, unchanged: "the COLOUR is the whole state ... no dot"). The dirty state is still
-    // fully legible — the disk chip beside this one carries it — nothing becomes invisible by dropping this.
-    // ⚠ NOT the button's `title` — the chip is #hdrPostBtn itself now (merged control), and headerPost.js's own
-    // fillMenu() already owns that tooltip ("Quick actions — <name> · <ctrl>"); writing it here too would be
-    // two owners racing over one attribute. Text only, here; the tooltip stays a single-writer fact.
+    // t2147 (BACKLOG #7) — THE HEADER WORKSPACE CHIP'S NAME TEXT: the stem, not the full filename with its
+    // .ddcs extension — matches the identity line's own convention (headerPost.js). "Not saved" is the honest
+    // label when there is no file, never a fake title.
+    // ⚠ NOT the button's `title` — the chip is #hdrPostBtn itself (merged control), and headerPost.js's own
+    // fillFileMenu() already owns that tooltip ("File menu — <name> · <ctrl>"); writing it here too would be
+    // two owners racing over one attribute. Text (and now the dot) only, here; the tooltip stays a single-writer fact.
     if (headerNameTxt) headerNameTxt.textContent = fileSavedStem() || 'Not saved';
     return dirty;
 }
@@ -135,19 +134,22 @@ function saveWorkspace() {
 }
 
 function install() {
-    chip = document.getElementById('fileSaveChip');
-    if (chip) chip.addEventListener('click', saveWorkspace);
+    // t2188 (amendment 1) — #fileSaveChip is DELETED, not repointed: its own click-to-save wiring goes with it
+    // (the file menu's Workspace-section Save button is the one door now, t2184). `saveWorkspace()` below stays
+    // exposed on window.ddcsFileSaveState.save — a declared door, unused today, not dead: a future keyboard
+    // shortcut or automation caller is a real, cheap use for a function that already exists and works.
+    dot = document.getElementById('hdrWsDirtyDot');
     try { window.ddcsAnnounceSaved = announceSaved; window.ddcsDismissSaved = dismissSaved; } catch (_) {}   // t1287 — one voice for every save path
 
     // t2147 (BACKLOG #7, amended — merged into ONE control) — the name text lives INSIDE #hdrPostBtn now, the
     // SAME button that opens the quick menu (headerPost.js's own initHeaderPost() already wires its click) —
-    // no second "open the menu" implementation needed here, just the text to keep live.
+    // no second "open the menu" implementation needed here, just the text (and now the dot) to keep live.
     headerName = document.getElementById('hdrPostBtn');
     if (headerName) headerNameTxt = headerName.querySelector('.hdr-ws-name-txt');
 
     // t1221 — the beforeunload exit warning is REMOVED (user ruling). It warned about a loss that does not happen:
     // the localStorage buffer SURVIVES a reload or a tab close, so the browser's "Reload site?" prompt was crying
-    // wolf on every refresh. Being interrupted by a false alarm teaches people to click through real ones. The CHIP
+    // wolf on every refresh. Being interrupted by a false alarm teaches people to click through real ones. The DOT
     // is the only truth-teller about not-saved-to-a-file, and it says so without blocking anything.
 
     window.addEventListener('ddcs:file-state', refresh);   // fired by markWorkspaceSavedToFile (save / open)
@@ -161,8 +163,10 @@ function install() {
     // First-run baseline: a brand-new browser has no watermark. Boot writes/seeds backup stores at VARIOUS times
     // (init on DOMContentLoaded, lazy settings, gateway status, …), later than any single lifecycle event — so we
     // don't snapshot at a fixed moment. We wait for the signature to STABILIZE (unchanged for two ~400ms ticks) and
-    // adopt that settled default state as "clean". Until then the watermark stays unset → dirty is false → no chip and
-    // no exit-warning during boot. Returning users have a watermark, so this never runs for them.
+    // adopt that settled default state as "clean". Until then the watermark stays unset → dirty is false → no dot
+    // and no exit-warning during boot. Returning users have a watermark, so this never runs for them. t2188 — the
+    // `settings` store specifically is no longer "lazy" (ui/settingsPanel.js persists it at boot now, closing the
+    // exact race this stabilization loop exists to survive for the OTHER, still-lazy stores).
     if (!hasWorkspaceWatermark()) {
         let last = null, stable = 0, ticks = 0;
         const tick = () => {

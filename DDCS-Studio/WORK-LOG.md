@@ -51583,3 +51583,107 @@ settings-modal, workspace-manager-1223, replace-confirm-2184 — 38 tests) all g
 
 This turn is not yet signed off — the tail (amendment 1's workspace-chip dirty dot) follows below once that
 commit lands.
+
+## t2188 — tail: `#fileSaveChip` removed, its STATE job replaced by a dirty dot on the workspace chip
+
+Original dispatch: remove `#fileSaveChip` (index.html:189) — the human ruled its ACTION redundant ("its in the
+menu anyways"), and the dispatch's own original text planned NO replacement STATE indicator, with instruction
+to write that ruling beside the removal.
+
+**Amendment 1 superseded that "no indicator" plan mid-task.** Relayed verbatim: after seeing three conventions,
+the human said "ok dot" ⇒ the workspace chip (`#hdrPostBtn`) gets a dirty dot — filled before the name when
+unsaved, nothing when saved. `#fileSaveChip` still goes; the dot replaces its STATE job, the menu already
+covers its ACTION job. Amendment 1's own constraints, all honoured below: a DOT not an asterisk (the name
+already truncates; an asterisk would shift the chevron), NOT red (reserved for the pre-flight badge/Clear),
+an accessible name via `aria-label`/`role="status"` rather than relying on shape/colour alone, contrast
+measured composited across all five themes the same pixel-sampled way the identity line/footer were, and the
+dot's own slot RESERVED in the DOM so nothing reflows when it shows/hides.
+
+**Amendment 2 fixed the sequencing**, not the design: the human independently reported the same drift from a
+different angle ("but on oprn it shouldnt be dirty why is it always dirty"), so the root fix above had to land
+BEFORE this dot — a dot driven by an always-true flag is decoration, not information, and worse than the chip
+it replaces. Built in that order; this tail's own commit sits strictly after the root-fix commit.
+
+### What changed
+
+- `index.html` — `#fileSaveChip` (the flat-floppy SVG button and its two comment blocks) deleted outright.
+  Added `<span class="hdr-ws-dirty-dot" id="hdrWsDirtyDot" role="status" aria-hidden="true">` as the first
+  child of `#hdrPostBtn`, before `.hdr-ws-name-txt`.
+- `ui/fileSaveState.js` — `refresh()` now toggles the dot's `is-on` class off `isWorkspaceDirtyToFile()` and
+  swaps `aria-label="Unsaved changes"` / `aria-hidden="true"` accordingly, kept deliberately separate from
+  `#hdrPostBtn`'s own title/aria-label (owned exclusively by `headerPost.js`'s `fillFileMenu` — a pre-existing
+  single-writer-per-attribute convention already documented in this file's own comments). `install()` now
+  grabs `#hdrWsDirtyDot` instead of wiring a click handler to the deleted chip. `saveWorkspace()` itself is
+  KEPT (cheap, still exposed via `window.ddcsFileSaveState.save`, a legitimate door other code already used —
+  see the ownership-vs-sharing check below) even though its one caller (the chip's click) is gone. Orphaned
+  imports (`fileSavedName`, `getMachine`, `CONTROLLER_PROFILES`) removed after confirming zero remaining
+  references.
+- `styles.css` — `.file-save-chip` (display/margin/padding, saved/dirty filter+opacity cross-fade, hover,
+  the specificity override, the phone media query) removed entirely, replaced by:
+  ```css
+  .hdr-ws-dirty-dot {
+      display: inline-block; flex: 0 0 auto; width: 8px; height: 8px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--accent, #f0b429) 28%, var(--text-main, #1a1a1a) 72%);
+      opacity: 0; transform: scale(.4); transition: opacity .15s ease, transform .15s ease;
+  }
+  .hdr-ws-dirty-dot.is-on { opacity: 1; transform: scale(1); }
+  ```
+  Also dropped the dead `.app-header.hy-controls .file-save-chip { margin-left: 0; }` rule from the responsive
+  shrink ladder; the surrounding "three inter-group margins" comment math updated to two, re-measured at 360px
+  (zero overflow, unchanged from before).
+
+### Ownership-vs-sharing check before deleting
+
+`saveWorkspace()` was the chip's click handler, but it's also exported on `window.ddcsFileSaveState.save` and
+called directly by `tests/settings-ux-1287.spec.js`'s save-confirmation-popup coverage. Removed only the
+DOM-wiring that referenced the deleted element; kept the function.
+
+### Contrast — `--accent` alone failed 3/5 themes
+
+Pixel-sampled the same way as the identity line/footer (screenshot → canvas → `getImageData` → WCAG ratio
+against a nearby background sample). `var(--accent)` alone: normal 2.44, studio 2.00, steampunk 2.66 — all
+below 4.5:1. `color-mix` toward `--text-main` iterated: 55/45 → studio 3.47 (fail), 40/60 → studio 4.18 (fail),
+28/72 → studio 4.79 (pass) — all five themes clear at 28/72. Verified visually too:
+`verification/t2188-dot-{clean,dirty}.png` and `t2188-dot-final-{normal,studio,organic}.png`.
+
+### `#fileSaveChip`/`.file-save-chip` sweep — four test files updated to the dot's equivalents
+
+- `tests/header-workspace-name-2147.spec.js` — file-header comment appended noting items 2/3 of the original
+  t2147 ruling ("no dirty dot") are superseded by this amendment (old text left as-is — it was true then). The
+  "no dirty dot" test rewritten to assert the dot IS the indicator and the standalone chip is gone; the
+  DOM-order test's expected array `['hdrQuick', 'fileSaveChip', 'hdrAccount']` → `['hdrQuick', 'hdrAccount']`.
+- `tests/settings-ux-1287.spec.js` — the `save()` helper switched from clicking `#fileSaveChip` to
+  `window.ddcsFileSaveState.save()` directly, with a comment noting this exercises `announceSaved()`'s own
+  behaviour, not any particular element's click.
+- `tests/persistence-file-indicator.spec.js` — the ~50-line chip lifecycle test (title/filter/opacity/class
+  across clean→dirty→saved) rewritten for the dot (`is-on`, `aria-hidden`, `aria-label`, always-present slot).
+  The exit-warning test's chip references swapped for dot equivalents.
+- `tests/persistence-intentional-save.spec.js` — the post-save assertion block switched from chip
+  title/filter/label checks to `dotIsOn === false` plus the chip's own name text reading the saved stem.
+
+### New test: `tests/workspace-dirty-dot-2188.spec.js`
+
+Four tests: the chip is gone entirely; the dot is hidden+`aria-hidden` when clean and shown+`aria-label`
+when dirty; the dot's slot is fixed-size so the sibling name text never reflows when it toggles; the dot
+clears 4.5:1 contrast in all five themes. Non-vacuity proven by reverting `index.html`/`fileSaveState.js`/
+`styles.css` to HEAD (root-fix commit, pre-dot) and re-running — confirmed failing against that tree before
+restoring from a scratch copy and re-confirming green. (This required `TaskOutput({block:true})` to retrieve
+the background run's output after repeated `tail`/`cat` reads on the log file came back empty for an unusually
+long stretch — not a real hang, just an unreliable read path for that particular run; worth remembering for
+future non-vacuity cycles.)
+
+### Verification
+
+Full collateral sweep: 53 tests across 9 files, all green. Smoke 76/76, node 227/227, lint clean.
+
+### Amendments 3–5, received at the final poll — a separate topic, not folded into this turn
+
+`scratchpad/t-projects-in-workspace.md` was created between this turn's checkpoints: the human ruled (2026-08-23)
+that Projects belong to the OPEN WORKSPACE — no migration to disk, IndexedDB stays, Save writes into the open
+workspace and Open lists only that workspace's projects, matching how the Wizard Manager already reads. The
+scratchpad's own first instruction is investigative ("Does `projectStore.js` key projects BY WORKSPACE today,
+or is it one flat store? — report which, with evidence, before building anything"), not a correction to
+anything built this turn — it doesn't touch the file menu, the dot, or the watermark fix. Treating it as
+QUEUED work for the next turn rather than absorbing it here, consistent with how earlier QUEUED amendments
+were handled at t2184/t2186: flagged plainly in the pass-back note rather than silently started or dropped.

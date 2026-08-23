@@ -18,70 +18,55 @@ async function ready(page) {
 }
 
 /**
- * t1223 (user-refined) — THE INDICATOR IS ONE DISK BUTTON. Always present, because it is the Save control as well as
- * the state: accent = unsaved, muted = saved. It carries NO label and NO timestamp — the colour is the state — and its
- * tooltip is the FILENAME plus the dialect. The old fat pill spelled all of that out in prose beside the icon.
+ * t2188 (amendment 1) — SUPERSEDES the old "one disk button" indicator (t1223): #fileSaveChip is deleted, its
+ * STATE job now carried by #hdrWsDirtyDot on the workspace chip itself — always PRESENT in the DOM (its slot
+ * never disappears), clean = hidden (visually and from assistive tech), dirty = shown with an accessible name.
+ * No filter/opacity cross-fade any more (that was the old chip's own artwork treatment); the dot's own contrast
+ * and reflow properties are covered by tests/workspace-dirty-dot-2188.spec.js — this test stays focused on the
+ * LIFECYCLE (clean → dirty → saved) this file's own PERSISTENCE-A scope is about.
  */
-test('the disk button is always present; accent = unsaved, muted = saved; the tooltip names the file + dialect', async ({ page }) => {
+test('the workspace dot: always present, hidden when clean, shown when dirty, hidden again after a real save', async ({ page }) => {
   await ready(page);
   const clean = await page.evaluate(() => {
-    const c = document.getElementById('fileSaveChip');
-    const cs = getComputedStyle(c);
-    return { dirty: window.ddcsWorkspaceDirtyToFile(), savedAt: window.ddcsFileSavedAt(), hidden: c.hidden, title: c.title,
-             isSaved: c.classList.contains('saved'), isDirty: c.classList.contains('dirty'), text: c.textContent.trim(),
-             savedStyle: { filter: cs.filter, opacity: cs.opacity } };
+    const dot = document.getElementById('hdrWsDirtyDot');
+    return { dirty: window.ddcsWorkspaceDirtyToFile(), savedAt: window.ddcsFileSavedAt(), exists: dot !== null, isOn: dot.classList.contains('is-on'), ariaHidden: dot.getAttribute('aria-hidden') };
   });
   expect(clean.dirty, 'a freshly-baselined workspace is not dirty').toBe(false);
   expect(clean.savedAt, 'it has never been saved to a .ddcs file yet').toBe(null);
-  expect(clean.hidden, 'the disk is ALWAYS present — it is the Save control too').toBe(false);
-  expect(clean.isSaved, 'clean reads as the muted/saved styling').toBe(true);
-  expect(clean.savedStyle.filter, 'saved = the SAME artwork desaturated, not a different grey shape').toMatch(/grayscale/);
-  expect(clean.savedStyle.opacity, 'and it recedes — lower contrast/opacity at rest').not.toBe('1');
-  expect(clean.text, 'no label beside the icon').toBe('');
-  expect(clean.title, 'the tooltip says WHAT the name is').toMatch(/^Workspace:/);
-  expect(clean.title, 'never-saved is stated honestly, not faked as a filename').toMatch(/not saved yet/i);
+  expect(clean.exists, 'the dot\'s own slot is ALWAYS present in the DOM').toBe(true);
+  expect(clean.isOn, 'clean reads as no visible fill').toBe(false);
+  expect(clean.ariaHidden, 'clean is removed from the accessibility tree too').toBe('true');
 
   await page.evaluate((k) => {
     localStorage.setItem(k, JSON.stringify([{ n: 1 }]));   // a change to the 'presets' backup store
     window.ddcsFileSaveState.refresh();
   }, KEY);
-  // the states cross-fade (transition: filter/opacity), and getComputedStyle mid-transition returns the INTERPOLATED
-  // value — read the settled style, not the frame the assertion happened to catch
-  await page.waitForTimeout(300);
   const dirty = await page.evaluate(() => {
-    const c = document.getElementById('fileSaveChip');
-    const cs = getComputedStyle(c);
-    return { dirty: window.ddcsWorkspaceDirtyToFile(), hidden: c.hidden, isDirty: c.classList.contains('dirty'), text: c.textContent.trim(),
-             filter: cs.filter, opacity: cs.opacity, alsoSaved: c.classList.contains('saved') };
+    const dot = document.getElementById('hdrWsDirtyDot');
+    return { dirty: window.ddcsWorkspaceDirtyToFile(), exists: dot !== null, isOn: dot.classList.contains('is-on'), ariaLabel: dot.getAttribute('aria-label') };
   });
   expect(dirty.dirty, 'a workspace change makes it dirty-to-file').toBe(true);
-  expect(dirty.hidden, 'still present').toBe(false);
-  expect(dirty.isDirty, 'and switches to the accent (attention) styling').toBe(true);
-  expect(dirty.text, 'still no label — the colour is the whole message').toBe('');
-  expect(dirty.alsoSaved, 'the two states are exclusive').toBe(false);
-  expect(dirty.filter, 'unsaved keeps the artwork at FULL colour').toMatch(/none/);
-  expect(dirty.opacity, 'and comes forward at full strength — the colour does the work, not a border').toBe('1');
+  expect(dirty.exists, 'still present').toBe(true);
+  expect(dirty.isOn, 'and switches to the visible-fill state').toBe(true);
+  expect(dirty.ariaLabel, 'an accessible name that SAYS unsaved, not relying on shape/colour alone').toBe('Unsaved changes');
 
   const saved = await page.evaluate(() => {
     window.ddcsMarkWorkspaceSaved('m350-shop.ddcs');   // exactly what the save path calls after writing the .ddcs
     window.ddcsFileSaveState.refresh();
-    const c = document.getElementById('fileSaveChip');
-    return { dirty: window.ddcsWorkspaceDirtyToFile(), savedAt: window.ddcsFileSavedAt(), isSaved: c.classList.contains('saved'), title: c.title, text: c.textContent.trim() };
+    const dot = document.getElementById('hdrWsDirtyDot');
+    return { dirty: window.ddcsWorkspaceDirtyToFile(), savedAt: window.ddcsFileSavedAt(), isOn: dot.classList.contains('is-on') };
   });
   expect(saved.dirty, 'saving to a .ddcs clears the dirty signal').toBe(false);
   expect(saved.savedAt, 'a real .ddcs save stamps the time').toBeGreaterThan(0);
-  expect(saved.isSaved, 'the disk goes muted').toBe(true);
-  expect(saved.title, 'the tooltip is labelled, then the FILENAME…').toMatch(/^Workspace: m350-shop\.ddcs/);
-  expect(saved.title, '…plus the dialect it generates for').toMatch(/·\s*\S/);
-  expect(saved.text, 'and never grows a label or a timestamp').toBe('');
+  expect(saved.isOn, 'the dot goes hidden again').toBe(false);
 });
 
 /**
  * t1221 — NO EXIT WARNING (user ruling). This test used to assert that unsaved-to-file work triggered the browser's
  * leave prompt. It is inverted now, because the warning was about a loss that does not happen: the localStorage buffer
  * SURVIVES a reload and a tab close, so the prompt fired on every refresh over work that was never at risk. A false
- * alarm on every refresh is worse than none — it trains people to click through the real ones. The chip carries the
- * not-saved-to-a-file truth without blocking the gesture.
+ * alarm on every refresh is worse than none — it trains people to click through the real ones. t2188 — the workspace
+ * dot carries the not-saved-to-a-file truth now, without blocking the gesture (the disk chip that used to is gone).
  */
 test('closing or reloading is NEVER blocked — the buffer survives, so there is nothing to warn about', async ({ page }) => {
   await ready(page);
@@ -97,14 +82,14 @@ test('closing or reloading is NEVER blocked — the buffer survives, so there is
     window.ddcsFileSaveState.refresh();
     const ev = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(ev);
-    const chip = document.getElementById('fileSaveChip');
-    return { prevented: ev.defaultPrevented, chipAccent: !!(chip && chip.classList.contains('dirty')), chipShown: !!(chip && chip.offsetParent !== null) };
+    const dot = document.getElementById('hdrWsDirtyDot');
+    return { prevented: ev.defaultPrevented, dotOn: !!(dot && dot.classList.contains('is-on')), dotExists: dot !== null };
   }, KEY);
   expect(dirty.prevented, 'and NEITHER does unsaved-to-file work — the warning is gone').toBe(false);
 
-  // the state is still told, just not by a popup (t1223 — the disk's COLOUR says it, not a label)
-  expect(dirty.chipShown, 'the disk button is the one that speaks').toBe(true);
-  expect(dirty.chipAccent, 'and it goes accent to say the work is not in a file yet').toBe(true);
+  // the state is still told, just not by a popup (t2188 — the dot's fill says it, not a label)
+  expect(dirty.dotExists, 'the workspace chip\'s own dot is the one that speaks').toBe(true);
+  expect(dirty.dotOn, 'and it shows to say the work is not in a file yet').toBe(true);
 
   // the real reason the warning was wrong: the buffer is still there afterwards
   await page.reload();

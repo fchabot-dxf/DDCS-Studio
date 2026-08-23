@@ -164,38 +164,33 @@
                  that hazard from the OTHER direction (the logo stopped being a link at all — see #hdrAppBtn
                  above), but the chip had already moved beside the avatar by then, so the boundary reasoning
                  stands on its own regardless: a chevron-bearing chip reads as clickable; a bare label does not.
-                 Populated + kept live by ui/fileSaveState.js's `refresh()` (the SAME function that already drives
-                 the disk chip below — one dirty-tracker, not two — see that file for why there is no dirty DOT
-                 here: t1223's own ruling already said the disk chip's colour is the one indicator, and putting a
-                 second one beside it would repeat what the colour already says).
+                 Populated + kept live by ui/fileSaveState.js's `refresh()`.
+                 t2188 (amendment 1, human, after seeing three "no indicator" conventions in a row: "ok dot") —
+                 SUPERSEDES the two rulings this comment used to cite (t1223, t2147) that put the STATE signal on
+                 the standalone disk chip's colour alone. That chip (#fileSaveChip) is GONE — the menu covers its
+                 ACTION job (Save lives in the Workspace section now, t2184), and a small DOT here covers its
+                 STATE job: `.hdr-ws-dirty-dot`, a fixed ~10px slot before the name so nothing reflows when it
+                 shows/hides. A dot, not an asterisk — the name already truncates, and an asterisk would compete
+                 with it for width and shift the chevron. The header DOES have an at-a-glance unsaved signal now;
+                 the identity line states the same fact in words when the menu is open — two places, one passive,
+                 one explicit, deliberately.
                  t2149 (BACKLOG #9) — SETTINGS/HELP/DOWNLOAD/RATE/THEME/VERSION MOVED OUT of this menu into the
                  new #hdrAppMenu (the logo above): this menu is FILE scope now — only rows that act on the
                  workspace/program in front of you. See ui/headerPost.js for the row-by-row split and why. -->
             <div class="hdr-quick hdr-ws-chip" id="hdrQuick">
                 <button type="button" id="hdrPostBtn" class="hdr-quick-btn hdr-ws-chip-btn hdr-menu-trigger" aria-haspopup="menu" aria-expanded="false"
                         title="File menu — save / open, load / insert / export, library, wizards, setup docs">
+                    <span class="hdr-ws-dirty-dot" id="hdrWsDirtyDot" role="status" aria-hidden="true"></span>
                     <span class="hdr-ws-name-txt"></span>
                     <svg class="hdr-ws-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
             </div>
-            <!-- t1223 (5, amended); t2147 — MOVED here WITH the workspace chip, not left behind: the STATE (the
-                 chip's name) and the ACTION that resolves it (this button) belong at the same end of the header.
-                 THE CLASSIC FLAT FLOPPY. The BUTTON-NESS is the state: UNSAVED = full-colour glyph with a real
-                 button affordance (border + fill, clearly clickable); SAVED = the SAME artwork desaturated and
-                 lowered in contrast, with the border/fill removed, so it recedes into the header as a quiet status
-                 mark. Tooltip = the filename (+ the dialect it generates for). Nothing else sits beside it — see
-                 t2147's own note above for why the workspace chip carries no second (dot) indicator of the same fact. -->
-            <button type="button" id="fileSaveChip" class="file-save-chip" title="Not saved yet">
-                <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="2" y="2" width="20" height="20" rx="3" fill="#2f6fd0"/>
-                    <rect x="7" y="3" width="10" height="7.5" rx="1" fill="#ffffff"/>
-                    <rect x="13" y="4.2" width="2.8" height="5.2" rx="0.5" fill="#2f6fd0"/>
-                    <rect x="5.5" y="13" width="13" height="8" rx="1" fill="#ffffff"/>
-                    <line x1="7.5" y1="15.5" x2="16.5" y2="15.5" stroke="#9db4d6" stroke-width="1.1"/>
-                    <line x1="7.5" y1="17.8" x2="16.5" y2="17.8" stroke="#9db4d6" stroke-width="1.1"/>
-                </svg>
-            </button>
+            <!-- t2188 (amendment 1) — #fileSaveChip (the standalone flat-floppy disk button) is DELETED, not
+                 hidden. Its ACTION job (click to save) is covered by the file menu's own Workspace-section Save
+                 button (t2184); its STATE job (colour = dirty/clean) is covered by the dirty dot on the
+                 workspace chip above (ui/fileSaveState.js's own `refresh()` now owns both). No replacement
+                 button lives here. -->
             <!-- t2077 — UNDO / REDO MOVED, NOT LOST: they now sit in the EDITOR pane beside the comment button
                  (the pane they act on), the same "moved not lost" curation t1227 applied to Load/Insert/Export, PLUS
                  real Ctrl+Z / Ctrl+Y bindings they never had. TRANSFER is DELETED: it was permanently `hidden`

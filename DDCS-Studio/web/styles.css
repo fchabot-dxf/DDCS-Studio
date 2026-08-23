@@ -668,35 +668,10 @@ html, body { overflow-x: clip; }
    beside the brand and would double up here. */
 .hdr-ws-chip { margin-right: 0; align-self: center; }
 
-/* t1223 — THE PERSISTENCE INDICATOR IS ONE DISK BUTTON (user). The old fat pill carried a dot, a label and a
-   timestamp; the state only ever needed a colour. UNSAVED = accent (asks for attention), SAVED = muted (findable, not
-   shouting). Always present — it is the Save button as well as the indicator — and the tooltip carries the filename +
-   the dialect. Nothing sits beside it: no label, no timestamp, no unasked affordances. */
-.file-save-chip {
-    /* t1223 (user) — SAME size and style as the header's trash button (.hdr-undo/.hdr-clear): no border, transparent
-       background, a 15px glyph, and only a subtle hover tint. The earlier bordered pill stretched to 53px in a 54px
-       header and read as crammed; matching the existing header chrome is what makes it sit right. */
-    display: inline-flex; align-items: center; justify-content: center; align-self: center; flex: 0 0 auto;
-    padding: 2px 6px; margin-left: 4px; line-height: 1; border: none; border-radius: 4px;
-    background: transparent; cursor: pointer;
-    transition: filter .12s ease, opacity .12s ease, background .12s ease;
-}
-/* SAVED — the SAME artwork, drained of colour and contrast: at rest it is a status mark that recedes into the header
-   rather than a control asking to be pressed. */
-.file-save-chip.saved { filter: grayscale(1) contrast(.7); opacity: .5; }
-.file-save-chip.saved:hover { filter: grayscale(.4) contrast(.95); opacity: .95; background: rgba(128,128,128,.15); }
-/* UNSAVED — the full MULTI-COLOUR floppy (blue body, white shutter + label), because this is the state that wants the
-   eye. Same chrome as its neighbours; the colour does the work, not a border. */
-.file-save-chip.dirty { filter: none; opacity: 1; }
-.file-save-chip.dirty:hover { background: rgba(128,128,128,.15); }
-.file-save-chip svg { display: block; }
-/* the header's own button skin out-specifies a bare class, which is why this rendered 31px next to a 24px trash;
-   match the trash's exact box with the same specificity the header uses. */
-.app-header button.file-save-chip, .app-header .hdr-controls button.file-save-chip {
-    font-size: 15px; padding: 2px 6px; line-height: 1; border: none; border-radius: 4px; background: transparent;
-    min-height: 0; height: auto; width: auto; box-shadow: none; text-shadow: none; transform: none;
-}
-@media (max-width: 640px) { .app-header button.file-save-chip { margin-left: 2px; padding: 2px 4px; } }
+/* t2188 (amendment 1) — .file-save-chip (the standalone disk button, t1223) is RETIRED entirely: its STATE job
+   moved to .hdr-ws-dirty-dot (below, inside the workspace chip itself), its ACTION job to the file menu's own
+   Workspace-section Save button (t2184). See ui/fileSaveState.js's own header comment for the full ruling
+   history — this is the third time a dot has been the answer to this exact fact. */
 .app-header button.hdr-quick-btn {
     position: relative;   /* t748 — anchors the ≥44px hit-area expander (::before) */
     display: inline-flex; align-items: center; justify-content: center;
@@ -740,6 +715,27 @@ html, body { overflow-x: clip; }
 .app-header button.hdr-ws-chip-btn[aria-expanded="true"] .hdr-ws-name-txt { color: var(--text-main, #e6edf3); }
 .hdr-ws-chevron { flex: 0 0 auto; }
 .app-header button.hdr-ws-chip-btn[aria-expanded="true"] .hdr-ws-chevron { transform: rotate(180deg); }
+/* t2188 (amendment 1, human: "ok dot") — the workspace chip's own unsaved-state signal, replacing the retired
+   disk chip's colour (ui/fileSaveState.js's own header comment has the full ruling history). A dot, not an
+   asterisk: the name already truncates, and an asterisk would compete with it for width and shift the chevron.
+   FIXED slot — the element always occupies its own box (the parent's `gap` above already spaces it from the
+   name), only its VISUAL fill toggles via opacity/scale, so nothing reflows when a save clears it. NOT red
+   (unsaved is not an error — red is reserved for the pre-flight badge and Clear); the theme's own --accent
+   token, not one hardcoded hex fighting five palettes. Measured (pixel-sampled, composited over the real
+   header) at 3.5px effective radius against every theme's own header background — see t2188's own test for
+   the five numbers; all clear 4.5:1. */
+.hdr-ws-dirty-dot {
+    display: inline-block; flex: 0 0 auto; width: 8px; height: 8px;
+    border-radius: 50%;
+    /* --accent ALONE measured 2.00–2.66:1 in three of five themes (normal/studio/steampunk) — each theme's own
+       accent token is calibrated for its OWN typical use (buttons, borders), not for a small fill against the
+       header's own background specifically, and that background swings light-to-dark across themes the same
+       way the identity line's did. Same color-mix fix, blended toward --text-main (already guaranteed legible
+       against this exact background, since ordinary header text uses it) rather than the raw accent. */
+    background: color-mix(in srgb, var(--accent, #f0b429) 28%, var(--text-main, #1a1a1a) 72%);
+    opacity: 0; transform: scale(.4); transition: opacity .15s ease, transform .15s ease;
+}
+.hdr-ws-dirty-dot.is-on { opacity: 1; transform: scale(1); }
 
 /* t2182 (amendments 6/9/10, unifying the TWO header menu triggers — logo + filename chip) — Human, across
    three messages: "logo should lose the border... and that would allow to be a bit bigger" / "sorry the logo
@@ -5577,17 +5573,19 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
    + tab padding so they never scroll off-screen, instead of docking them away. Reached only when is-tiny still overflows.
    t2099 — MEASURED at 390px (post t2078, which removed Clear from the header): even every prior stage applied,
    the header still overflowed by 15px, and .hdr-tabs was already at min-content — no label left to shrink. The
-   fix is NOT to hide a control: the three inter-GROUP margins (.hdr-quick/.file-save-chip/.hdr-tabs, 12+4+16=32px)
-   sum to almost exactly the deficit, so collapsing them at this last rung recovers the room without removing a
-   single piece of information, tried before anything that would (see .hdr-tabs's own min-width:0/overflow-x:auto
-   below, kept as a defensive backstop for whatever content combination this margin recovery doesn't cover). */
+   fix is NOT to hide a control: the inter-GROUP margins (.hdr-quick/.hdr-tabs) sum to almost exactly the
+   deficit, so collapsing them at this last rung recovers the room without removing a single piece of
+   information, tried before anything that would (see .hdr-tabs's own min-width:0/overflow-x:auto below, kept
+   as a defensive backstop for whatever content combination this margin recovery doesn't cover). t2188 — the
+   .file-save-chip margin this math used to also collapse is gone WITH the element (amendment 1); re-measured
+   at 360px after removing it — still zero overflow, the retired chip's own width was never load-bearing for
+   this stage, it just happened to be one of the margins collapsed here. */
 .app-header.hy-controls .hdr-controls { gap: 1px; }
 .app-header.hy-controls .hdr-controls .hdr-undo { padding: 2px 3px; font-size: 13px; }
 .app-header.hy-controls .hdr-tabs .tab { padding: 0 6px; }
 .app-header.hy-controls .brand { padding: 0 2px; }
 .app-header.hy-controls .logo { height: 25px; }   /* t2182 — 22px scaled by the same ~12% the base step took */
 .app-header.hy-controls .hdr-quick { margin-right: 0; }
-.app-header.hy-controls .file-save-chip { margin-left: 0; }
 /* t2099 — the defensive backstop named above: min-width:0 overrides a flex ITEM's implicit min-width:auto (which
    floors .hdr-tabs at its own min-content size regardless of flex-shrink — the reason the ladder could exhaust
    every OTHER step and still overflow). Scoped to this last rung ONLY, after margin-collapse above has already

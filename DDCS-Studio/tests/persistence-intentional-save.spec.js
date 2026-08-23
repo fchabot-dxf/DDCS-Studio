@@ -43,7 +43,7 @@ async function answerSaveAsk(page, name = 'my-workspace') {
   if (await page.locator('#wssAsk').count()) await page.locator('#wssAsk [data-wss="save"]').click();
 }
 
-test('FSA save writes the workspace to a user-owned file, reuses the handle, and the disk reads saved + names the file', async ({ page }) => {
+test('FSA save writes the workspace to a user-owned file, reuses the handle, and the chip reads saved + names the file', async ({ page }) => {
   await ready(page);
   await page.evaluate(MOCK_FSA);
 
@@ -65,12 +65,15 @@ test('FSA save writes the workspace to a user-owned file, reuses the handle, and
   expect(second.wrote, 'the file was written again').toBe(2);
   expect(second.asked, 'and no dialog: a re-save is silent').toBe(false);
 
-  // the persistence-A chip reflects the filename
-  // t1223 — the indicator is a disk BUTTON: the state is its colour class, and the filename lives in the tooltip.
-  const chip = await page.evaluate(() => { const c = document.getElementById('fileSaveChip'); return { saved: c.classList.contains('saved'), title: c.title, label: c.textContent.trim() }; });
-  expect(chip.saved, 'the disk goes muted/saved').toBe(true);
-  expect(chip.title, 'and its tooltip names the file').toContain('my-workspace.ddcs');
-  expect(chip.label, 'with no label beside the icon').toBe('');
+  // the persistence-A indicators reflect the filename. t2188 (amendment 1) — the old disk chip's own
+  // saved/dirty colour class and title are gone with it; the workspace chip's dot (is-on) carries the
+  // dirty/clean state now, and its own name text (fileSaveState.js's headerNameTxt) carries the filename.
+  const state = await page.evaluate(() => ({
+    dotIsOn: document.getElementById('hdrWsDirtyDot').classList.contains('is-on'),
+    nameText: document.querySelector('#hdrPostBtn .hdr-ws-name-txt').textContent.trim(),
+  }));
+  expect(state.dotIsOn, 'the dot goes hidden (not dirty) after a real save').toBe(false);
+  expect(state.nameText, 'the chip\'s own name shows the saved file\'s stem').toBe('my-workspace');
 });
 
 test('Ctrl+S triggers the workspace save (Ctrl+Shift+S forces a re-pick = Save As)', async ({ page }) => {

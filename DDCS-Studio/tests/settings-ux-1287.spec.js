@@ -124,7 +124,11 @@ test('A REAL BOUND-FILE SAVE confirms in a DISMISSIBLE POPUP — at every width,
                  what: p.querySelector('.saved-pop-what').textContent,
                  centred: Math.abs((c.left + c.right) / 2 - window.innerWidth / 2) < 2, w: Math.round(c.width) };
     });
-    const save = async () => { await page.locator('#fileSaveChip').click(); await page.waitForTimeout(600); };
+    // t2188 (amendment 1) — #fileSaveChip is deleted; window.ddcsFileSaveState.save is the SAME saveWorkspace()
+    // function that used to be its click handler, still exposed as a declared door (see ui/fileSaveState.js's
+    // own install() comment) for exactly this kind of direct trigger — the popup under test here is
+    // announceSaved()'s own behavior, not any particular UI element's click.
+    const save = async () => { await page.evaluate(() => window.ddcsFileSaveState.save()); await page.waitForTimeout(600); };
 
     // (1) FIRST save to this file: no baseline, so it writes everything — and says so rather than "nothing changed",
     //     which would be false in the case where the most is happening.
