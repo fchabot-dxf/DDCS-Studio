@@ -23,6 +23,12 @@
  * FORK is one-source with the Blocks route (t1075/t1593): the template goes through the SAME wrapRecognizedForFork
  * and the declarations through the SAME forkInheritance the Customize→Save path uses — minus the canvas, which the
  * parity spec proved adds nothing to an untouched fork.
+ *
+ * t2190 (amendment 4, confirmed already true here, generalising the rule to ui/projects/projectManager.js too) —
+ * everything inside the workspace is VIRTUAL; the real OS filesystem is reachable ONLY through Export (writing
+ * out) and the Library's Import (copying in). This section (THIS WORKSPACE) never offers a Cloud destination of
+ * its own — only the LIBRARY tabs below do, because standalone .wiz files are the one place Cloud legitimately
+ * belongs (outside the workspace boundary).
  */
 import {
     listEntries, exportWizard, importWizard, wizardFromFile, deleteWizard, builtinLabelForTwin, setEntryOverride,

@@ -51687,3 +51687,176 @@ or is it one flat store? — report which, with evidence, before building anythi
 anything built this turn — it doesn't touch the file menu, the dot, or the watermark fix. Treating it as
 QUEUED work for the next turn rather than absorbing it here, consistent with how earlier QUEUED amendments
 were handled at t2184/t2186: flagged plainly in the pass-back note rather than silently started or dropped.
+
+## t2190 — PROJECTS SCOPE TO THE WORKSPACE: the wizard-manager idiom replaces the drawer/save-modal/Library split
+
+Spec: `scratchpad/t-projects-in-workspace.md`. Direct instruction: report whether `projectStore.js` is flat or
+workspace-keyed, with evidence, BEFORE building — amendment 3 had already settled the direction (the workspace
+is the storage boundary), so a flat store would be treated as the bug, not an open question.
+
+### The investigation, reported first as instructed
+
+`projectStore.js`'s own doc comment says it plainly: "One flat object store keyed by full PATH" — no workspace
+key in the schema. But `data/backup.js`'s `projects` BACKUP_STORES row (`clear: () => clearAllEntries()`,
+`write: (val) => importAllEntries(val)`) means `restoreBackup()` (t1225's whole-file Open) unconditionally
+CLEARS the entire project volume before writing the opened file's own entries — for EVERY store, even one a
+legacy file doesn't carry (`s.clear()` runs before the `hasOwnProperty` check, backup.js:153). Combined with
+this app's own "one workspace, one machine" architecture ([[one-workspace-one-machine]] — no "New workspace"
+action exists anywhere; the live browser state simply IS the current workspace until an explicit Open replaces
+it wholesale), this means the flat store is ALREADY 100% behaviorally scoped to "whatever workspace is
+currently open" for every real user flow — there is no scenario where two workspaces' projects coexist or
+bleed into each other, because Open always wipes-then-replaces the whole volume, same as every other declared
+store. So: the schema is flat (confirmed), but there is NO cross-workspace data leakage and NOTHING migrates
+for pre-existing entries — every project a user has ever saved already belongs to whichever workspace was open
+when they saved it. The actual defect was purely presentational: `ui/libraryModal.js`'s Open surface and
+`ui/projects/projectModal.js`'s Save surface both presented a Local/Cloud "volume" switcher and a folder-tree
+browser that told a story of external, independent storage — directly contradicting what the data model (and
+the Wizard Manager's own "THIS WORKSPACE — embedded in your .ddcs" framing) already said. Reported this finding
+plainly rather than overclaiming a data bug that wasn't there — the "test you refused to claim" discipline from
+t2188 applies here too: the honest finding is a UI/labeling fix, not a storage-boundary bug fix, even though the
+dispatch anticipated the latter was more likely.
+
+### The build: `ui/projects/projectManager.js`, mirroring `ui/wizardManager.js` structurally
+
+ONE modal (`openProjectManager()`) replaces THREE retired surfaces:
+- `ui/libraryModal.js`'s `openLibrary()` (the old tabbed-ish "Open" Projects modal)
+- `ui/projects/projectModal.js`'s `openSaveModal()` (the old separate Local/Cloud-target save modal)
+- `ui/projects/projectModal.js`'s `openOpenDrawer()`/`renderCloudInto()` (a dead-code drawer — zero live
+  callers even before this turn, confirmed by grep — plus its own independent cloud-browsing select-then-load
+  root, duplicated a second time inside `libraryModal.js`'s own Cloud tab)
+
+All three files deleted outright (`libraryModal.js`, `projectModal.js`) after confirming via grep that nothing
+else imports from them — `renderCloudInto` had exactly two callers, both retired in the same change.
+
+TOP half — "This workspace — embedded in your .ddcs (N)": every saved program in the open .ddcs, Open / Rename
+/ Export / Delete per row (Export is NEW — the human ruled it lives on the item's own row, never a file-menu
+row), "+ Folder" and "Save current program" (one `dlgPrompt`, like a wizard Duplicate — not a separate modal).
+FOLDERS ARE KEPT, not dropped: `projectStore.js`'s pre-existing mkdir/cd capability is real, working
+functionality nothing in this turn's dispatch said to remove, so it's rendered in the wizard-manager's own row
+style (`.wizm-row`) with two new small CSS additions (`.wizm-crumbrow`/`.wizm-crumb`/`.wizm-crumb-link` — a
+breadcrumb the wizard manager has no equivalent of, since wizards aren't foldered) rather than reused as-is
+from the deleted drawer chrome. Flagging this as a call made to unblock the turn, not a ruling: the scratchpad
+itself named "what the folder tree means now" as the human's own open question ("may still be wanted WITHIN a
+workspace's projects... this is the interesting part of the turn").
+
+BOTTOM half — "Library — standalone .mjson files (import is a copy into this workspace)": the SAME two shelves
+the wizard/workspace managers proved (granted local folder via `data/libraryFolder.js` + `ui/libraryShelf.js`,
+reused WHOLE via one new declared row — `mjson: { ext: '.mjson', kind: 'ddcs.macro', what: 'saved program' }`
+in `LIBRARY_KINDS`, per that file's own "a third kind is a row here, not a new module" — and the Drive app
+folder). Import writes the file into the workspace's OWN project list (a copy, not a live open) — opening it
+is a second, explicit click on its new row, exactly matching the wizard duality's "crossing is an EXPLICIT
+COPY, Export down, Import up, no auto-sync, ever."
+
+### The architecture change the ruling actually demanded: Save has no Cloud target any more
+
+Per "the save and open should search the workspace not another location outside," Save now ALWAYS writes into
+the workspace's own project store — never Cloud directly. The old save modal's Local/Cloud segmented toggle
+(pre-target cloud when signed in, t754/t1265) is gone entirely, not just its setting. Cloud participates only
+as a Library EXPORT shelf: since the project is already saved locally before Export ever runs, an Export
+failure risks a copy, never the source — there is no more "cloud write fails, falls back to local" case,
+because there is nothing left to fall back FROM (`tests/cloud-default-754.spec.js` re-encoded a second time to
+prove this: Save lands in the workspace regardless of connection state, and a forced-offline Export failure
+leaves the already-saved local copy untouched).
+
+### Export downloads the STORED row, not the live editor (a bug caught before it shipped)
+
+First draft of `exportToActiveShelf`'s FSA-unsupported fallback called `downloadMacro(stem)` — that function
+re-serializes whatever is CURRENTLY in the live editor, ignoring the `obj`/`text` already read from the STORED
+row being exported. Caught while writing the export test (a row export test exercising a DIFFERENT project
+than whatever's live would have silently downloaded the wrong content). Fixed to `UIUtils.downloadFile(name,
+text)` off the already-read stored object, matching `writeLibraryFile`'s own source.
+
+### A real, reproducible CSS bug found and fixed: `*/` inside a CSS comment's own prose
+
+Non-vacuity testing (below) initially showed EVERY manager-family test failing — not just the new ones —
+because `.wsm-overlay` (shared chrome for the workspace/wizard/project managers) had silently stopped applying
+`position:fixed`/`z-index` entirely, confirmed by reading `document.styleSheets`' own parsed `cssRules`: the
+rule was ABSENT from the loaded stylesheet. Root cause: two of my own explanatory comments referenced class
+names like "the wsm-*/wizm-* manager chrome" and ".library-*/.lib-*" — the literal `*/` substring inside that
+prose PREMATURELY CLOSED the CSS comment, leaving everything after it as raw, unparseable CSS text until the
+browser's parser found a recovery point, silently dropping a large stretch of the stylesheet including
+`.wsm-overlay` itself (declared ~200 lines later). Confirmed via `git stash` that `wizardManager.js`'s own
+`#wizmOverlay` (untouched by this turn) exhibited the identical `position:static`/`z-index:auto` failure on
+MY working tree but not on HEAD — proving it was this turn's CSS edit, not a pre-existing bug. Fixed by
+rewording both comments to avoid the literal `*/` sequence (`wsm- / wizm-` instead of `wsm-*/wizm-*`). Lesson
+for future CSS comments: never write a glob-style "A-*/B-*" pattern inside a `/* */` block.
+
+### Sweep of the retired surfaces across index.html/headerPost.js/CSS/6 test files
+
+- `headerPost.js` — `case 'library'` and `case 'projSave'` retargeted to `openProjectManager()` (Save opens the
+  same manager with `{promptSave:true}`, firing the save prompt immediately rather than a separate modal); the
+  file-menu row tooltips updated (one, "the wizard catalogue", was already stale since t2178 split wizards out
+  of `libraryModal.js` — fixed in passing since this exact area was being touched anyway).
+- `styles.css` — every `.proj-*`/`.library-*`/`.lib-*` rule exclusive to the deleted drawer/save-modal/Library
+  chrome removed, cross-checked via grep against remaining JS producers first (kept `.sl-*` — shared with
+  `profileModal.js`'s own select-then-load; kept `.cloud-login`/`.cloud-providers`/`.cloud-connect` — shared
+  with `cloudAccount.js`, also used by Settings → Network; kept `.cloud-modal-foot` split out of a combined
+  selector that also named the now-dead `.proj-savefoot`).
+- `tests/library-854.spec.js`, `tests/library-projects-cloud-863.spec.js`, `tests/select-load-805.spec.js` —
+  DELETED outright: their entire subject (the drawer, `renderCloudInto`, two independent select-then-load
+  cloud roots proving no singleton leak between them) no longer exists as code, not just moved. Their
+  still-valid assertions (the "wonky fix" — only wired providers offered — folder nav, cloud list+import) were
+  ported into the new `tests/project-manager-2190.spec.js`.
+- `tests/smalls-696.spec.js` — item (c), the projects-drawer resize handle, retired (the affordance is gone
+  with the drawer); items (a)/(b4), unrelated, untouched.
+- `tests/filemenu-sections-2184.spec.js` — the Project Save test retargeted to assert `#projmOverlay` opens
+  (full save-prompt coverage now lives in the new spec; this file stays focused on the file menu's own wiring).
+- `tests/cloud-default-754.spec.js` — re-encoded a second time (see above); its unrelated `savePrefs.js`
+  API-shape assertion (shared with profiles/wizard-templates) left untouched.
+
+### Verification
+
+New `tests/project-manager-2190.spec.js` — 11 tests: modal opens via both file-menu rows, row actions
+(Open/Rename/Export/Delete), folders (mkdir/nav/breadcrumb), Save-current-program, Library local shelf (empty
+state + import lands in workspace not an immediate open), Library cloud shelf (keyless list + import + the
+carried-over "wonky fix"), 390px reachability. Non-vacuity: `git stash push -u -- DDCS-Studio/web` (stashing
+only app code, keeping the new/edited tests) → 13/14 new/changed tests failed against the pre-turn tree
+(`window.openProjectManager` doesn't exist), the 1 pass being the `savePrefs.js` shape-invariant test that
+legitimately holds on both trees → `git stash pop` restored the real change, all 14 confirmed green again.
+
+Collateral: wizard-manager-1617 (11), workspace-manager-1223 (8), settings-ux-1287 (6), header-workspace-name-
+2147 (9), persistence-file-indicator (4), persistence-intentional-save (3), workspace-dirty-dot-2188 (4),
+watermark-timing-2188 (4) — 41 tests, none touched this turn's files directly but all exercise the shared
+`.wsm-*`/`.wizm-*` chrome the CSS bug above broke — all green after the fix, proving the fix's own reach.
+Smoke 76/76, node 227/227, lint clean.
+
+### Amendments 1–4 — arrived after the build above; mostly already satisfied by it, resolved without a redo
+
+Amendment 1: "Save…" → "Save as…" for the Project Save row (the verb now encodes "this always asks", the same
+fact G-code's Save as… already carried) — done, `headerPost.js` + the matching assertion in
+`filemenu-sections-2184.spec.js`. "The dialog offers a NAME and a FOLDER, rooted at the open workspace, and
+says whose workspace it is" — already true of the build above: `openProjectManager()`'s own top title ("This
+workspace — embedded in your .ddcs (N)") sits directly above "💾 Save current program", at the same level of
+directness the wizard manager's own "embedded in your .ddcs" line uses (the amendment's own instruction was to
+BORROW that directness, not exceed it) — the save prompt writes into whatever folder is currently navigated to
+in that SAME list, which functionally IS a folder-tree-rooted-at-the-workspace save, just expressed as
+"navigate, then Save" inside the unified manager rather than a second nested tree-picker dialog.
+
+Amendment 2 (read the handler first): confirmed — the OLD `openSaveModal`'s `data-starget="cloud"` branch wrote
+the PROJECT directly to the Drive app folder as a standalone `.mjson` (`gdrive.write(name + '.mjson', data,
+root)`), a project-level cloud save, NOT "the workspace itself lives on Drive." This capability was already
+MOVED (not deleted) to `exportToActiveShelf`'s cloud branch in the build above — nothing further to do.
+Confirmed too: the wizard manager's embedded ("This workspace") rows carry no Cloud destination of their own —
+Export there routes through whichever LIBRARY shelf tab is active, same as the new project manager.
+
+Amendment 3 (unambiguous, supersedes 1/2 where open): "delete `.proj-starget`'s Local/Cloud pair from the save
+path" — already done by construction: `projectModal.js` (which declared `.proj-starget`) was deleted outright
+this turn, and the new Save flow never had a volume switcher to begin with. Noting for BACKLOG item 16 (owed,
+not written this turn — the item isn't being reached/resolved yet): the project save volume-switcher instance
+is gone, one fewer of the five the backlog item counted.
+
+Amendment 4: (1) wizards already follow the model — confirmed, no build (added a cross-referencing comment to
+`wizardManager.js` saying so). (2) added the shared "everything inside the workspace is virtual; only Export/
+Import touch the real OS filesystem" line to both `projectManager.js`'s and `wizardManager.js`'s own header
+comments, each pointing at the other. (3) the shared-virtual-folders idea is explicitly NOT this turn — reporting
+the collision as instructed: the wizard manager's own structure is THIS WORKSPACE / BUILT-INS / LIBRARY, and a
+folder tree only applies to exactly one of those three (a built-in can't be filed anywhere; a library file
+isn't in the workspace at all) — so a shared project+wizard tree would need to either live ONLY inside "THIS
+WORKSPACE" for both content types (built-ins stay outside it, unfoldered, as today) or the wizard manager would
+need restructuring beyond a folder tree alone. Left for its own spec, as the amendment said.
+
+### Verification (amendment round)
+
+Re-ran `filemenu-sections-2184.spec.js` (15 tests) and `project-manager-2190.spec.js` (11 tests) after the
+label + comment changes — both green. No other collateral affected (label text and comments only, past the
+already-verified architecture).

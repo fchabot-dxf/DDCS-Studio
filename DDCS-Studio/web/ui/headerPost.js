@@ -44,8 +44,10 @@ import { fileSavedStem, fileSavedAt, fileSavedPlace } from '../data/backup.js'; 
 import { EXE_DOWNLOAD_URL, getRoleInfo } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page); t2145/t2151 — the client-side-derived, workspace-relative PC role
 import { openExternal } from './openExternal.js';   // t2066 — open external links once, host-side in the exe
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
-import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
-import { openSaveModal } from './projects/projectModal.js';   // t2184 — the Project section's own Save row; the SAME door the Library's own Save row already calls (and the now-deleted #projSaveBtn/macroBar.js used to), not a second implementation
+// t2190 — libraryModal.js's openLibrary() (Open) and projects/projectModal.js's openSaveModal() (Save) are BOTH
+// retired: the wizard-manager idiom replaces them with ONE door, projects/projectManager.js's openProjectManager()
+// — Save and Open are one surface now, exactly like Wizards. See that file's own header for the ruling.
+import { openProjectManager } from './projects/projectManager.js';
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
 const HQ_ICONS = {
@@ -122,7 +124,7 @@ function runQuickAction(act) {
         case 'settings': window.openSettings?.(); break;
         case 'checklist': window.openSetupChecklist?.(); break;
         case 'setupSheet': openSetupSheet(); break;   // t850 — the print-ready job page
-        case 'library': openLibrary(); break;   // t854 — the Library (last-used tab)
+        case 'library': openProjectManager(); break;   // t2190 — the project manager (was t854's Library)
         case 'rate': window.ddcsOpenRate?.(); break;   // t598 — the always-available Rate / Feedback path (opens the repo)
         // t2149 (human amendment: "i meant seperate them in 2 panel") — FAQ and About are TWO rows opening TWO
         // panels now, not one Help row opening one two-section panel. See helpPanel.js's own header for why.
@@ -137,9 +139,10 @@ function runQuickAction(act) {
         // delete + the .wiz library shelves). Distinct from 'wizard' above, which SAVES the current stack as one.
         case 'wizards': window.openWizardManager?.(); break;
         // t2184 — the Project section's own Save row. Until now the menu could save the OUTPUT (G-code) but not
-        // the WORK (the op stack + stock + post, as one job) — this is the door that was missing. Calls the SAME
-        // openSaveModal the Library's own Save row already calls; no new save logic.
-        case 'projSave': openSaveModal(); break;
+        // the WORK (the op stack + stock + post, as one job) — this is the door that was missing.
+        // t2190 — opens the SAME manager as Open, with the save prompt fired immediately (promptSave) — Save and
+        // Open are one surface now, not two separate modals.
+        case 'projSave': openProjectManager({ promptSave: true }); break;
     }
 }
 
@@ -360,19 +363,19 @@ export function initHeaderPost() {
         );
 
         // ── UTILITY ROWS (FILE-scoped) ────────────────────────────────────────────────────────────────
-        // t854/t2149 — the Library: one door to Projects · Wizards (the Profiles tab retired at t1217 — the
-        // workspace's ONE machine lives in Settings now, not a browsable list; this comment used to still name
-        // it, the removal-chain pattern again). Both Projects and Wizards are "bring something INTO this job",
-        // which is why Library stays FILE-scoped even though its own name sounds product-ish.
+        // t854/t2149/t2190 — Projects: both rows open the ONE project manager (projects/projectManager.js), on the
+        // half the user asked for — Save fires the save prompt immediately, Open lands on the workspace's own list.
         // t2184 — Project Save is NEW (scratchpad/t-filemenu-sections.md rule 4): it exists because a project IS
         // the program, saved — same op stack, same stock, same post, one live in the editor and one on disk.
-        // Calls the existing openSaveModal — no new save logic, see the import comment above.
         // t2186 (brand/icons.json's shared_glyphs — "one glyph per ACT, not per row") — Open here uses the SAME
         // 'open' icon key as Workspace Open and G-code Open; the label is the differentiator, not the glyph.
         // The old dedicated 'library' HQ_ICONS entry retired with this — no other caller was left reading it.
+        // t2190 (amendment 1) — "Save…" → "Save as…": the verb now encodes the SAME "does this interrupt me"
+        // fact the ellipsis already carried, promoted into the word — Workspace says plain Save because it
+        // writes a known file and never asks; G-code and Project both always ask, so both say Save as… now.
         const projectGrid = grid(
-            wsBtn('projSave', 'save', 'Save…', 'Save the current program as a project (.mjson) — the op stack, stock and post, as one job'),
-            wsBtn('library', 'open', 'Open…', 'Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Save as/Open above')
+            wsBtn('projSave', 'save', 'Save as…', 'Save the current program into this workspace, as a project (.mjson) — name it and pick a folder inside this workspace'),
+            wsBtn('library', 'open', 'Open…', 'Your saved projects, embedded in this workspace — not raw G-code files, see Save as/Open above')
         );
 
         const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);

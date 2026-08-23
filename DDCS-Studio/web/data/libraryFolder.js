@@ -41,6 +41,9 @@ const folder = makeGrantedFolder({ key: LIBRARY_KEY, pickerId: 'ddcsLibrary', wh
 export const LIBRARY_KINDS = {
     wiz: { ext: '.wiz', kind: 'ddcs.wizard', what: 'wizard' },
     cam: { ext: '.cam', kind: 'ddcs.cam', what: 'CAM recipe' },
+    // t2190 — a saved program (blocks/programFile.js's own on-disk kind id, kept `ddcs.macro` for back-compat with
+    // files already on disk; see that file's header comment).
+    mjson: { ext: '.mjson', kind: 'ddcs.macro', what: 'saved program' },
 };
 
 export const hasFSA = _hasFSA;

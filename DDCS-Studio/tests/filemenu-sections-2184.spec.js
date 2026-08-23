@@ -61,7 +61,9 @@ test('labels drop the noun the section title now carries, no emoji baked into an
     // straight to the known target (no ellipsis), Save as always asks (keeps its ellipsis).
     expect(s.wsSave, 'plain Save, no ellipsis (writes to the known target)').toBe('Save');
     expect(s.saveAs).toBe('Save as…');
-    expect(s.projSave, 'Project Save always opens the save modal, so it keeps its ellipsis').toBe('Save…');
+    // t2190 (amendment 1) — "Save…" → "Save as…": the verb itself now says "this always asks", the same fact
+    // G-code's Save as… already stated with the SAME word (previously the two agreed only on the ellipsis).
+    expect(s.projSave, 'Project Save always asks (name + folder), so it says Save as… like G-code does').toBe('Save as…');
 });
 
 test('every menu row carries a declared SVG icon — no emoji glyph baked into a label string', async ({ page }) => {
@@ -93,14 +95,14 @@ test('Settings moved from the APP menu into the FILE menu\'s Workspace section',
     expect(inFileMenu, 'settings now lives in the file menu').toBe(1);
 });
 
-test('Project Save is a real, new door — calls the same openSaveModal the Library and the old header disk used to', async ({ page }) => {
+test('Project Save is a real, new door — opens the project manager (t2190: was openSaveModal, now the same manager Open uses)', async ({ page }) => {
     await ready(page);
     await page.click('#hdrPostBtn');
     await page.click('[data-act="projSave"]');
-    // openSaveModal renders its own dialog; assert something from it actually opened rather than the button
-    // just existing (a dead data-act with no case in runQuickAction would look identical up to this point).
-    await expect(page.locator('.pm-save-modal, [data-testid="project-save-modal"], .modal:visible, [role="dialog"]:visible').first())
-        .toBeVisible({ timeout: 3000 });
+    // assert something from the manager actually opened rather than the button just existing (a dead data-act
+    // with no case in runQuickAction would look identical up to this point). Full save-prompt coverage lives in
+    // tests/project-manager-2190.spec.js — this spec only proves the FILE MENU'S OWN door reaches it.
+    await expect(page.locator('#projmOverlay')).toBeVisible({ timeout: 3000 });
 });
 
 test('the header disk buttons (#projSaveBtn/#projOpenBtn) and the macro-bar are gone entirely', async ({ page }) => {

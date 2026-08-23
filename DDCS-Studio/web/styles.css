@@ -1143,36 +1143,6 @@ html, body { overflow-x: clip; }
 .cap-off { opacity: .4; }
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
 
-/* Project VFS — Open/manage DRAWER (left sidebar, Fusion-style; top set in JS to the header height). */
-.proj-drawer {
-    position: fixed; left: 0; bottom: 0; top: 52px; width: var(--proj-drawer-w, 320px); max-width: 85vw; z-index: 1500;
-    display: flex; flex-direction: column;
-    background: var(--panel, #1d2530); border-right: 1px solid var(--border, rgba(255,255,255,.15));
-    box-shadow: 4px 0 24px rgba(0,0,0,.4);
-}
-.proj-drawer[hidden] { display: none; }
-/* t696 c — drag the right edge to resize; the width persists (ddcs_proj_drawer_w). */
-.proj-resize {
-    position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: ew-resize; z-index: 2;
-    background: transparent;
-}
-.proj-resize:hover, .proj-resize.dragging { background: linear-gradient(90deg, transparent, var(--accent, #4a90e2)); opacity: .5; }
-.proj-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
-.proj-title { font-weight: 600; }
-.proj-vol { font-weight: 400; font-size: 12px; }
-.proj-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.proj-actions { display: flex; gap: 6px; }
-.proj-crumb { display: flex; align-items: center; gap: 2px; font-size: 13px; flex-wrap: wrap; }
-.proj-crumb-link { background: none; border: none; color: var(--accent, #0ea5e9); cursor: pointer; font: inherit; padding: 2px 4px; }
-.proj-list { flex: 1; overflow: auto; padding: 6px 8px; }
-.proj-row { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--border); }
-.proj-row:last-child { border-bottom: 0; }
-.proj-name { flex: 1; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.proj-name:hover { background: var(--panel2, rgba(255,255,255,.06)); }
-.proj-meta { font-size: 11px; white-space: nowrap; }
-.proj-rowacts { display: flex; gap: 3px; }
-.proj-foot { padding: 7px 14px; border-top: 1px solid var(--border); font-size: 11px; }
-
 /* SELECT-THEN-LOAD — the shared row-selection model (projects + profiles browsers; ui/selectLoad.js).
    Selection uses a box-shadow ring so it never collides with a row's own inline/border styling. The ACTIVE
    badge (.sl-active-badge) is a separate pill, visually distinct from the selection ring. */
@@ -1185,41 +1155,12 @@ html, body { overflow-x: clip; }
 .sl-primary { padding: 6px 14px; font: 600 12px inherit; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent, #0ea5e9); background: var(--accent, #0ea5e9); color: #fff; }
 .sl-primary:disabled { opacity: .4; cursor: default; }
 
-/* Project VFS — SAVE modal (centered) with the folder tree picker. */
-/* t2087 (P5a) — background/z-index/card chrome migrated to the shared modal contract (--scrim, the
-   --z-modal-* scale, --modal-*): was rgba(0,0,0,.5) + a literal 2000 + var(--panel, #1d2530)/12px/hardcoded
-   shadow. Kept its own bespoke width/layout (min(440px,92vw), flex column) — that's structural, not chrome. */
-.proj-savemodal { position: fixed; inset: 0; z-index: var(--z-modal-save); background: var(--scrim); display: flex; align-items: center; justify-content: center; }
-.proj-savemodal[hidden] { display: none; }
-.proj-savepanel { width: min(440px, 92vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--modal-face); border: var(--modal-edge-w) solid var(--modal-edge); border-radius: var(--modal-radius); box-shadow: var(--modal-shadow); overflow: hidden; }
-.proj-savebody { padding: 14px 16px; overflow: auto; }
-.proj-savebody .label { display: block; margin: 0 0 4px; }
-/* t754 — the save TARGET toggle (Local | Cloud) + the quiet fallback note */
-.proj-save-target { display: flex; gap: 6px; margin: 10px 0 4px; }
-.proj-starget { flex: 1 1 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-dim); font: inherit; font-weight: 600; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
-.proj-starget:hover:not(:disabled) { color: var(--text-main); background: color-mix(in srgb, var(--bg) 40%, transparent); }
-.proj-starget.on { color: #fff; background: var(--accent, #0ea5e9); border-color: var(--accent, #0ea5e9); }
-.proj-starget:disabled { opacity: .45; cursor: default; }
-.proj-save-note { margin: 6px 0 2px; font-size: 12px; color: var(--hdr-dim, var(--text-dim)); }
-.proj-save-note[hidden] { display: none; }
-.proj-treehead { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; }
-.proj-tree { border: 1px solid var(--border); border-radius: 8px; max-height: 220px; overflow: auto; padding: 4px; }
-.proj-tree-row { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; font: inherit; padding: 5px 6px; border-radius: 5px; }
-.proj-tree-row:hover { background: var(--panel2, rgba(255,255,255,.06)); }
-.proj-tree-row.sel { background: var(--accent, #0ea5e9); color: #fff; }
-/* t2089 (P5b) — merged with .cloud-modal-foot (below): identical bodies once .proj-savefoot's own border-top
-   is migrated from var(--border) to var(--modal-foot-edge) — a gap left over from t2087's own modal-
-   harmonization pass, which migrated cloud-modal-foot but missed this direct sibling. --modal-foot-edge
-   equals var(--border) in every skin except studio (its own bevel-derived tone), so this is a real, if
-   minor, visual change for .proj-savefoot in studio specifically — the whole point of finishing the same
-   harmonization the sibling rule already got. */
-.proj-savefoot, .cloud-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--modal-foot-edge); }
+/* t2190 — Project VFS SAVE modal + drawer volume tabs (.proj-savemodal, .proj-tree, .proj-voltabs, etc.) are
+   retired with ui/projects/projectModal.js and ui/libraryModal.js — see ui/projects/projectManager.js's own
+   header for the replacement (the wsm- / wizm- manager chrome, reused rather than a new set of rules). */
+.cloud-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--modal-foot-edge); }
 
-/* Project drawer: Local / Cloud volume tabs + the cloud-login mount (also used in Settings → Network). */
-.proj-voltabs { display: flex; gap: 4px; padding: 8px 12px 0; }
-.proj-voltab { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--text-dim); cursor: pointer; font: 600 12px inherit; }
-.proj-voltab.on { background: var(--panel2, rgba(255,255,255,.06)); color: var(--text-main); border-color: var(--accent, #0ea5e9); }
-.proj-cloudmount { padding: 10px 12px; }
+/* The cloud-login mount (also used in Settings → Network). */
 .cloud-login { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 .cloud-providers { display: flex; flex-direction: column; gap: 6px; }
 .cloud-connect { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; }
@@ -6398,21 +6339,8 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* t2087 (P5a) — scrim/card chrome migrated to the shared modal contract; .library-head/-body's own token
    reads (already var(--border,...) etc., just a different token name) are left as-is — already correct, not
    debt. */
-.library-overlay { position:fixed; inset:0; z-index:var(--z-modal-library); background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:16px; }
-.library-modal { width:min(640px,96vw); height:min(680px,90vh); display:flex; flex-direction:column; background:var(--modal-face); color:var(--text); border:var(--modal-edge-w) solid var(--modal-edge); border-radius:var(--modal-radius); box-shadow:var(--modal-shadow); overflow:hidden; }
-.library-head { display:flex; align-items:center; gap:8px; padding:8px 12px 0; border-bottom:1px solid var(--border,#2a313b); }
-/* t2178 — replaces .library-tabs/.library-tab (deleted): a single tab reading as a tab was pointless clutter once
-   Wizards split into its own already-existing modal (window.openWizardManager). */
-.library-title { flex:1; font:inherit; font-size:15px; font-weight:600; padding:8px 4px; color:var(--text-main,#e6ecf2); }
-.library-x { font:inherit; font-size:15px; background:none; border:0; color:var(--text-dim,#9fb0c4); cursor:pointer; padding:4px 10px; align-self:flex-start; }
-.library-x:hover { color:var(--text-main,#fff); }
-.library-body { flex:1; overflow:auto; display:flex; flex-direction:column; min-height:180px; }
-.lib-projhead { display:flex; align-items:center; gap:8px; padding:12px 16px 8px; flex-wrap:wrap; }
-.lib-crumb { font-size:12px; color:var(--text-dim,#9fb0c4); }
-.lib-crumb-link { background:none; border:0; color:var(--accent,#2d7ff9); cursor:pointer; font:inherit; font-size:12px; padding:0 2px; }
-.lib-list { flex:1; overflow:auto; padding:0 16px 8px; display:flex; flex-direction:column; gap:4px; }
-.lib-row { display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--border,#2a313b); border-radius:6px; }
-.lib-name { background:none; border:0; color:inherit; cursor:pointer; font:inherit; text-align:left; }
+/* t2190 — the whole .library- / .lib- prefixed block (ui/libraryModal.js's own chrome) retired with that file;
+   see ui/projects/projectManager.js's header for the replacement (reuses the wsm- / wizm- manager chrome instead). */
 
 /* t1225 — the .backup-restore-* block is DELETED with the store-picker modal it styled (ui/backupModal.js, retired in
    t1223 when opening became the whole file). Orphaned CSS for a modal that cannot be opened is a trap for the next
@@ -6514,6 +6442,13 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wizm-act.is-danger:hover { color: #ef4444; background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.4); }
 .wizm-badge { flex: 0 0 auto; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; color: #fff; background: #6b7b3a; }
 .wizm-chip { flex: 0 0 auto; font-size: 10px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
+
+/* t2190 — THE PROJECT MANAGER (ui/projects/projectManager.js) reuses every .wizm-* row style above verbatim; these
+   two are its own addition, for the folder breadcrumb the wizard manager has no equivalent of (wizards aren't
+   foldered). Same visual language as the drawer's old .proj-crumb, just sized for the wizm-title row it sits in. */
+.wizm-crumbrow { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.wizm-crumb { display: flex; align-items: center; gap: 2px; font-size: 12px; flex-wrap: wrap; color: var(--text-dim); }
+.wizm-crumb-link { background: none; border: none; color: var(--accent, #2d7ff9); cursor: pointer; font: inherit; padding: 2px 4px; }
 
 /* ── t1271 — AXIS GATING. A wizard this machine cannot physically run is greyed, never hidden: hiding rewrites the
    screen and answers a question nobody asked, while leaving "can this machine do it?" unanswered. The tooltip is the

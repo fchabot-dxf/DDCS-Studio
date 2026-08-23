@@ -69,6 +69,9 @@ export function foldersFrom(all) {
 // ── volume ops ────────────────────────────────────────────────────────────
 export async function list(folder = '') { return childrenOf(await getAll(), folder); }
 export async function allFolders() { return foldersFrom(await getAll()); }
+/** t2190 — the workspace-manager-idiom count for the manager's own title ("embedded in your .ddcs (N)"), across
+ *  every folder — the same grain backup.js's own `projects` row count() already reads off this store's shape. */
+export async function countAll() { return (await getAll()).filter((e) => e.type === 'project').length; }
 export async function mkdir(path) { const p = norm(path); if (p) await put({ path: p, type: 'folder' }); }
 export async function saveProject(path, obj) {
     await put({ path: norm(path), type: 'project', data: obj, savedAt: new Date().toISOString() });

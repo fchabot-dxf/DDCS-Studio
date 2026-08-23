@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-/** t696 — three small independent items: (a) autostart staleness fingerprint, (c) projects-drawer resize handle,
- *  (b4) the wizard "Presets" affordance. */
-test.use({ viewport: { width: 1200, height: 900 } });   // (c) needs room — 85vw of the default 412px would clamp the drawer
+/** t696 — small independent items: (a) autostart staleness fingerprint, (b4) the wizard "Presets" affordance.
+ *  (c) the projects-drawer resize handle was retired at t2190 with the drawer itself (ui/projects/projectModal.js's
+ *  openOpenDrawer() is deleted — see ui/projects/projectManager.js's header for the replacement). */
+test.use({ viewport: { width: 1200, height: 900 } });
 
 test('(a) autostart STALENESS FINGERPRINT: a homing-config change flags the stored body; regenerate clears it; persists', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -26,32 +27,6 @@ test('(a) autostart STALENESS FINGERPRINT: a homing-config change flags the stor
     await page.reload();
     await page.waitForFunction(() => window.ddcsGetSettings);
     expect(await page.evaluate(() => window.ddcsGetSettings().autostartGenSig), 'the fingerprint persists (stored with the body)').toBeTruthy();
-});
-
-test('(c) PROJECTS DRAWER RESIZE HANDLE: drag sets a persisted, clamped width; survives reload', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio);
-    await page.evaluate(() => localStorage.removeItem('ddcs_proj_drawer_w'));
-    await page.evaluate(async () => { const m = await import('/ui/projects/projectModal.js'); m.openOpenDrawer(); });
-    await page.waitForSelector('.proj-drawer:not([hidden]) .proj-resize');
-    const w0 = await page.evaluate(() => document.querySelector('.proj-drawer').getBoundingClientRect().width);
-    // drag the right-edge grip from ~w0 to ~w0+140
-    const box = await page.locator('.proj-resize').boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + 200);
-    await page.mouse.down();
-    await page.mouse.move(w0 + 140, box.y + 200, { steps: 8 });
-    await page.mouse.up();
-    const w1 = await page.evaluate(() => document.querySelector('.proj-drawer').getBoundingClientRect().width);
-    expect(w1, 'the drawer widened by the drag').toBeGreaterThan(w0 + 80);
-    const stored = await page.evaluate(() => parseInt(localStorage.getItem('ddcs_proj_drawer_w'), 10));
-    expect(stored, 'the width persisted to localStorage').toBeGreaterThan(w0 + 80);
-    // reload → the width is restored
-    await page.reload();
-    await page.waitForFunction(() => window.ddcsStudio);
-    await page.evaluate(async () => { const m = await import('/ui/projects/projectModal.js'); m.openOpenDrawer(); });
-    await page.waitForSelector('.proj-drawer:not([hidden])');
-    const w2 = await page.evaluate(() => document.querySelector('.proj-drawer').getBoundingClientRect().width);
-    expect(Math.abs(w2 - w1), 'the resized width survives reload').toBeLessThan(6);
 });
 
 test('(b4) PRESETS affordance: the form-top preset row (header button retired) opens the popover with terse copy', async ({ page }) => {
