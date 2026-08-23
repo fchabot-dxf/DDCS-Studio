@@ -48975,3 +48975,354 @@ arc, as the dispatch required (touches only `styles.css` + its own new test file
 - `DDCS-Studio/tests/editor-focus-ring-2151.spec.js` — **new**, 5 tests (see Non-vacuity above).
 
 🔨 turn 2151
+
+---
+
+# t2153 — t2151 REVIEW CORRECTIONS (the focus-ring tail) + BACKLOG #13 (mobile toolbar, new tail)
+
+## Correction 1 — the code comment contradicted my own hand-back; fixed
+
+t2151's comment claimed "Click still shows NO ring". My OWN hand-back the same turn said the opposite,
+measured. The comment was simply wrong and I hadn't gone back to fix it once I'd measured the truth — the
+advisor caught it, correctly naming it the same "docs assert something false" shape this session's own
+removal-chain findings keep surfacing, worse here because a future reader would trust the comment over the
+(correct) code. Corrected in place: `styles.css`'s comment now states plainly that the ring shows on BOTH
+click and Tab (a `<textarea>` always matches `:focus-visible`, independent of input modality — the CSS spec's
+own documented behaviour, not a Chromium quirk), and that suppressing the click case would need a JS
+input-modality tracker this item's scope deliberately did not build.
+
+## ⭐ STATED PLAINLY, per the advisor's explicit instruction: the human's ORIGINAL complaint is NOT fixed
+
+*"the border appear when i click in the editor"* — it still does, exactly as before. **What t2151 fixed was
+the ring's SHAPE** (a complete rectangle instead of three edges with the left one painted over by the gutter),
+**never its TRIGGER**. Nobody should record BACKLOG #12 as closed on the strength of t2151 alone; the
+click-suppression half of the original ask remains open, and per the advisor's own instruction, building a JS
+modality tracker to close it needs a ruling first — it is new machinery for what may turn out to be a
+cosmetic want the human accepts once the ring frames the right box.
+
+### ⭐ AMENDMENT 7 — CLOSED BY ACCEPTANCE. The paragraph above is now history, not a standing gap.
+
+The human looked at the finished ring on the real app and said, verbatim, *"ok great it works"* — without
+re-raising the click case. Per the advisor's explicit reading of that: the click-suppression half above is
+**closed by acceptance, not by a code change**. The ring's shape fix apparently made the trigger a non-issue in
+practice, exactly as the advisor predicted when withholding the ruling to build a JS input-modality tracker.
+**That tracker is DEAD, not deferred** — recorded here so nobody revives it later as an unfinished item reading
+the paragraph above out of context. BACKLOG #12 is closed in full: shape (t2151) and trigger (accepted as-is,
+t2153) both.
+
+Also per amendment 7: the wide-mode right-edge symptom from amendment 6 is **gone on the human's own machine**
+— the z-index:7 fix already shipped (see below) is being kept as the correct, already-verified change, but no
+further chasing of that lead happened after this amendment landed (the advisor's offered viz3d-handle angle is
+explicitly withdrawn, unspent — nothing further was built off it). The phone-toolbar-inside-ring geometry from
+amendment 5 stays exactly what it was: a recorded measurement for the human to rule on, not a fix — the human
+has now called the mobile case fine twice.
+
+## Correction 2 — the "ring is on the wrong box" report: MEASURED, not confirmed as a wrong-box bug
+
+The advisor was explicit not to inherit a screenshot-only guess (having been wrong twice already on this same
+item) and to measure `.editor-container`'s `getBoundingClientRect()` against the code area before touching
+the selector. Done, at both 1400×900 and 390×844:
+
+```
+header    y:   0– 54
+dock-header (Setup/Probe/ATC/Mill/Lathe row)  y:  54–108
+.editor-container                             y: 108–900 (desktop) / 108–801 (390px)
+#editor / #editor-highlight / #editor-gutter  same y-range as the container
+```
+
+`.editor-container` is the ONLY element in the DOM carrying that class (confirmed by grep, matching the
+advisor's own check); its bounding box exactly matches `main.main`'s and sits flush — zero gap — directly
+below the dock-header row. Walking every ancestor of `.editor-container` for a stray `outline` found none;
+the ring is drawn on exactly one box, and that box is not "taller than it looks" — its rendered height matches
+its layout height, visible directly in the captured screenshot
+(`verification/t2153-ring-measurement.png`).
+
+**⇒ I did not find a wrong-box bug.** The likely explanation, stated as a hypothesis rather than acted on: the
+ring's top edge sits flush against the toolbar row with no visual gap or border between them, so at a glance
+it can read as "framing" that row too, even though it starts strictly below it.
+
+### ⚠ AMENDMENT — the human named the landmark precisely: the TOP ACTION BAR (`.dock-header.top-dock-header`,
+a sibling ABOVE `<main>`, not the inner `.editor-toolbar` — that confusion would have been a real miss).
+Re-measured to the amendment's own spec: `.top-dock-header`'s `getBoundingClientRect()` **and**
+`.editor-container`'s, together, editor focused, at both viewport sizes. Also checked the amendment's second
+lead — `.main` really is declared TWICE (`styles.css:1254` and `:1885`) and the two DO disagree (1254 leaves
+`overflow` unset/visible, 1885 sets `overflow: auto`; 1254 uses `flex: 1` — basis `0%` — while 1885 uses
+`flex: 1 1 auto` — basis `auto`) — a genuine duplicate-rule inconsistency, confirmed via `getComputedStyle`
+(the later rule wins both properties, as cascade order predicts: computed `overflow: auto`, `flexBasis: auto`).
+
+**The measured numbers, exactly:**
+```
+.top-dock-header.getBoundingClientRect().bottom  = 108
+.editor-container.getBoundingClientRect().top    = 108
+main.main.getBoundingClientRect()                = { top: 108, bottom: 900 }  (byte-identical to .editor-container's own rect)
+```
+**`dock.bottom === container.top`, exactly** — flush, not overlapping, not gapped either direction, at both
+1400×900 and 390×844. The `.main` duplicate-rule disagreement is real and worth fixing on its own merits (a
+second `flex-basis`/`overflow` declaration for one class is exactly the kind of thing this codebase's own
+removal-chain doctrine flags), but it does **not** change the computed geometry in a way that puts the ring
+outside `.editor-container`'s own correct box — `.main` and `.editor-container` measure IDENTICAL rects in
+this state, both flush below the toolbar row, confirmed twice now with two different measurement passes.
+
+**STILL NOT ACTED ON, for the same reason as before, at this point in the turn**: a twice-confirmed absence of
+a wrong-box bug relative to the `.top-dock-header` landmark. `.main`'s duplicate-rule fix offered as a
+separate, independently-justified cleanup, not attempted as a fix for the report — left unbuilt this turn.
+
+### ⚠ AMENDMENT 2 — landmark corrected AGAIN: it was neither the dock-header nor a wrong box — it was the
+INNER `.editor-toolbar` (Make/rotate/undo/redo/clear/copy), and the ring genuinely DID climb from below that
+row to above it once it moved to `.editor-container`. The human's own read (they call it "the top editor row")
+was right the whole time; amendment 1 sent me to the wrong sibling.
+
+**Measured, per the amendment's own condition, before building anything**: does `.editor-toolbar`
+(`position:absolute; top:8px`) actually float OVER line 1 of code — which would make excluding it cut the
+first line out of the ring, worse than the status quo? Seeded 5 real lines, focused, read every rect:
+```
+.editor-toolbar.getBoundingClientRect().bottom = 142
+first '.g-line'.getBoundingClientRect().top     = 168        (26px clean gap — no overlap)
+#editor / #editor-highlight / #editor-gutter    top: 154      (= .editor-container.top(108) + --editor-chip-inset(46))
+```
+**NO OVERLAP.** `#editor`/`#editor-highlight`/`#editor-gutter` already start at y=154, strictly below the
+toolbar's own band (108–153) — a boundary that ALREADY EXISTS, built for a completely different feature
+(t1323's runtime-estimate chip, which reserves that exact same 46px strip via the SAME `--editor-chip-inset`
+variable the toolbar happens to float within too). Per the amendment's own decision tree, this is the
+"boundary already exists — build that" branch, not the "propose a layout change and wait for a ruling" one.
+
+### ⭐ AMENDMENT 3 — THE RULING (two mockups compared side by side): the ring frames the CODE AREA ONLY; the
+toolbar row stays OUTSIDE it. Built, confirmed no-overlap per amendment 2's own measurement above, so no
+layout change was needed — only the right HOST element.
+
+**The construction, and why it needed a generated pseudo-element rather than picking a different existing
+one**: outline decorations paint AFTER an element's own subtree (confirmed empirically — this is WHY the
+round-1 fix on `.editor-container` never had a left-edge problem: the gutter is `.editor-container`'s
+DESCENDANT, so its outline paints on top of it regardless of the gutter's own z-index). `#editor` and
+`#editor-highlight` both start at the right y (154) and span the right width, but they are the GUTTER's
+SIBLINGS, not its ancestor — an outline there would repeat the ORIGINAL left-edge bug exactly. Only
+`.editor-container` is an ancestor of the gutter. So: a generated `.editor-container::before`, inset from the
+top by the SAME `--editor-chip-inset` variable the gutter/editor/highlight already use (not a new value — the
+declared source for "where the code area starts" already existed), gets both properties at once — it is a real
+descendant of `.editor-container` (so its own outline still paints after the gutter), and its own box is
+exactly the code area, chrome excluded. No new DOM element, no JS — CSS generated content only.
+
+**Verified, screenshot + pixel scan** (`verification/t2153-amend3-ring-below-toolbar.png` — the toolbar's six
+buttons visibly sit ABOVE the ring's top edge, outside it): a column scan at x=1 from y=100–200 shows the tan
+header bg through y=105, a dark border transition at 106, then **solid BLACK from y=108–153** (the toolbar's
+own band — correctly un-ringed) and the **ring's blue line starting exactly at y=154** — the code boundary, to
+the pixel.
+
+⚠ **A real detour while verifying this**: `getComputedStyle(container, '::before')` reported wrong values for
+EVERY property in this test harness — even `content`, unconditionally `''` in the rule — so the FIRST pixel
+scan (run against a mem-server I had started BEFORE this edit and never restarted) showed a misleading solid
+46px-tall blue band and sent me down a wrong track for a while. Restarting the server and re-scanning showed
+the true, correct boundary immediately. Both findings are named in the test file's own header comment now, so
+neither trap catches the next person: the stale-server one directly (a fresh `git status`/timestamp check
+would have caught it sooner — logged as a lesson, not repeated in the final verification), and the
+getComputedStyle-on-pseudo one by switching the whole test suite to pixel-based verification instead (see
+Non-vacuity below).
+
+**⭐ ALSO REPORTED, per the ruling's own explicit consequence to check**: with no overlap confirmed, the
+"toolbar needs its own in-flow strip" layout-change alternative the ruling floated never applies — nothing
+beyond the CSS above was needed, and nothing there requires further sign-off.
+
+### AMENDMENT 4 — a falsifiable prediction about the ROUND-1→ROUND-2 transition, checked and confirmed
+The advisor found the mechanism independently from source and asked for ONE measurement to confirm it before
+building anything further: does `.editor-container`'s own top equal `#editor`'s own top minus 46 (the
+chip-inset)? **Confirmed true** — `.editor-container.top = 108`, `#editor.top = 154`, `154 − 46 = 108`. The
+prediction's OWN conclusion ("the ring did not climb, it changed boxes — round 1 rehosted it from `#editor`
+[whose top already sat at the 46px line] onto `.editor-container` [whose top sits 46px higher]") is the same
+mechanism this WORK-LOG's own amendment-2/3 sections above already independently derived and built the fix
+for — two paths reaching the same, now doubly-confirmed, answer.
+⚠ Also raised, and separately addressed: item 13's 44px touch floor (8px offset + 44px height = 52px) exceeding
+the 46px band on phone. **Amendment 5 withdrew this itself** (below) once it re-checked against the phone media
+query that ALREADY moves the toolbar out of that band entirely on phone (`bottom:auto` → `bottom:8px`) — no
+overflow exists, confirmed by both amendments agreeing after the second look.
+⛔ **Per the amendment's own explicit instruction, no panel refactor was started**: if the correct host had
+turned out to require a NEW WRAPPER (not the case, per amendment 3's own `::before` construction), the
+instruction was to stop and hand back rather than build it. The human has since approved an editor-panel
+structural refactor as its OWN, separately-dispatched arc step — not started this turn, and everything learned
+about the 46px band (five tenants share it: `.preflight-badge`, `#editor-cam-btn`'s op-edit-chip, the t1323
+time-estimate chip, `.editor-toolbar`, and the bottom-anchored xform badge — all `position:absolute`, none in
+flow, `--editor-chip-inset` a hand-synced magic number nothing derives from measuring them) is recorded here
+specifically so that future dispatch starts from documented ground rather than rediscovering it.
+
+### AMENDMENT 5 — credited the amendment-3 build as the better answer, self-withdrew one claim, found a real one
+The advisor's own read of the uncommitted CSS credited the measure-first approach and the ancestor-outline
+mechanism explicitly, and WITHDREW amendment 4's 46-vs-52px overflow claim once it re-checked against the phone
+media query (see above — no defect there). **What it found INSTEAD, correctly, before the human's own
+observation superseded the fix instruction (amendment 6, immediately below)**: the `::before`'s `bottom: 0`
+means the toolbar sits OUTSIDE the ring on desktop (chip-inset band, above the ring's own top) but geometrically
+INSIDE it on phone (BACKLOG #13's own `bottom: 8px` anchor sits inside the ring's `bottom: 0` span) — the SAME
+ruling producing OPPOSITE outcomes by width, undocumented in the comment at the time. Told to verify at phone
+width before fixing, and NOT to hardcode a second magic constant if a fix was warranted.
+
+### AMENDMENT 6 (URGENT — suspended amendment 5's own fix instruction) — the human looked at the real app
+Direct, verbatim observation on the running app: *"the editor focus border circles fine on mobile but not in
+wide mode"* — the OPPOSITE of amendment 5's own prediction (which expected a phone-only defect). Per the
+amendment's own instruction, a human eye on the real screen outranks a prediction from reading a media query,
+so amendment 5's phone fix was NOT built (see the phone measurement in the test file's own header comment
+instead — confirmed the toolbar IS geometrically inside the ring there too, produces no visible artifact, and
+is left alone as a reported NOTE, not fixed, exactly as instructed for a falsified prediction).
+
+**The real, WIDE-width defect — reproduced before touching anything, per the amendment's own instruction ("I am
+NOT giving you a cause")**: `.viz3d-handle` (the 3D-preview pull-tab) is `position:absolute; right:0; z-index:6`,
+vertically centred on `.editor-container`. Its own rect (x:1372–1400, y:447–519 at 1400×900) squarely overlaps
+the ring's right edge line (drawn at x≈1398 via `outline-offset:-2px`) — and z-index 4 (the ring's, at the
+time) lost to the handle's 6, so the handle painted a 72px gap into the ring's right edge on every DESKTOP
+view, screenshot-confirmed before any fix (`verification/t2153-amend6-wide-right-edge.png`) and after
+(`verification/t2153-amend6-fixed-right-edge.png`). Absent on phone because a portrait media query relocates
+the handle to `bottom:0; left:50%` there — off the right edge, which is exactly why the human saw it fine on
+mobile. **This was the amendment's own OFFERED LEAD ("verify or kill it, do not assume it"), and it was
+correct on the first check** — no further hunting needed. FIX: raised the ring's `::before` to `z-index: 7`
+(above the handle's 6); an outline only paints a thin edge line, so this cannot cover the handle's own icon
+content or the preflight badge's z-index:12 interior, which sit well inside their own boxes, not at any edge
+this ring draws on.
+
+**⚠ A genuinely vacuous first draft of the test, caught by the standing non-vacuity discipline, not skipped
+past it**: the first version compared the same pixel's colour before/after focus and PASSED even with the bug
+reverted (z-index:4) — a small, unrelated colour shift on the handle itself (a `:focus-within`-adjacent style
+change, unrelated to the ring) happened to cross the threshold regardless of whether the ring showed through.
+Caught ONLY by deliberately re-running the "passing" test against the reverted CSS as the non-vacuity check
+requires — it should have failed and didn't, which is the check doing its job. Redesigned to compare, WITHIN
+one focused screenshot, the ring-line pixel against a reference pixel elsewhere on the handle's own plain fill
+— spatial contrast rather than a temporal diff — which correctly fails against the reverted code and passes
+against the fix. **A second, separate vacuity trap** then surfaced on the SAME test: this project's default
+Playwright viewport is 412×915 (phone) — with no explicit `page.setViewportSize()`, the test ran at phone width
+by omission, where the handle isn't even on the right edge, so it "passed" for a reason that had nothing to do
+with the fix. Caught the same way — a deliberate revert-and-rerun that should have failed and initially didn't.
+Fixed by setting an explicit 1400×900 viewport for this one test, matching the human's own "wide mode" report.
+Both traps and both fixes are named in the test file's own header comment.
+
+## The double-fill hover bug on Clear (amendment 2's new finding) — DIAGNOSED, a fix SHAPE proposed, NOT shipped
+
+Amendment 2 named two candidate causes and asked for ONE discriminating gesture (move the pointer off, look)
+before proposing (not shipping) a fix. Measured `#btn-clear`'s own computed style in three states — default,
+HOVER-only (mouse moved over it, never focused), and FOCUS-only (moved off first, then `.focus()`'d) — plus a
+sibling (`#align-rotate-btn`) in its own hover state for contrast:
+
+```
+default:        background: transparent + a metallic gradient backgroundImage (the base button chrome)
+HOVER (clear):   background: rgba(239,68,68,.14)   backgroundImage: none   borderColor: transparent   boxShadow: none
+FOCUS (clear):   the default gradient RETURNS, outline: solid 2px            (a DIFFERENT state, not hover)
+sibling HOVER:   background: transparent   borderColor: transparent   (its own opaque gradient carries the look instead)
+```
+
+**Candidate 1 (the ID-rule's `background`-only override letting the generic rule's `border-color`/`box-shadow`
+bleed through) is RULED OUT by direct measurement**: `border-color` and `box-shadow` are IDENTICAL between
+`#btn-clear`'s default and hover states (both transparent/none) — the generic `.toolbar-btn:hover` rule's
+`border-color: var(--btn-edge-hover)` never visibly applies here, because `--btn-edge-hover` itself resolves to
+transparent in this theme, not because of a specificity gap.
+
+**Candidate 2 (the `:focus-visible` inset outline) is also RULED OUT**: it is a genuinely separate STATE (only
+present when `.focus()`'d, never on plain hover), confirmed by testing them independently — the human's
+screenshot, if taken while merely hovering (the ordinary way to notice this), cannot be showing the focus ring.
+
+**What the screenshots (`background: rgba(239,68,68,.14)` vs the sibling's own opaque `var(--btn-face-hover)`
+gradient) DO show, and it is a DIFFERENT cause than either candidate**: Clear's hover fill is the ONLY one in
+the row that is TRANSLUCENT. Every sibling's hover state paints an OPAQUE themed gradient that fully covers the
+button's shape; Clear's `rgba(...,.14)` lets the button's own dark resting shape and the black toolbar
+background both show through underneath the red tint at once — which is very plausibly what reads as "double
+fill": not two overlapping DECORATIONS, but one translucent decoration failing to fully replace what's under
+it, unlike its opaque siblings.
+
+**PROPOSED SHAPE, not shipped, per the amendment's own instruction**: give `#btn-clear:hover` an OPAQUE
+background — a new token in the same family as `--btn-face-hover` (e.g. `--btn-face-hover-danger`), an opaque
+red-tinted gradient/fill rather than a flat translucent rgba — so Clear's hover reads as ONE clean fill like
+its siblings while staying visibly red (preserving t1255's intentional danger cue; explicitly NOT proposing
+removing the red). Exact colour values are a design call for the human, not shipped here.
+
+## BACKLOG #13 (new tail) — the mobile toolbar: touch floor + bottom anchor
+
+**Not a Clear-button sizing bug — the OTHER FIVE were undersized.** Only `#btn-clear` ever got the 44px phone
+touch floor (t1255); its five siblings (Make/+, ⟳ align-rotate, undo, redo, copy) had none. Raised the whole
+row via `.editor-toolbar > button` (not a per-id list) so a 7th button added later inherits the floor for
+free — the exact gap this rule already silently broke on once (a class rename left the old `.hdr-clear`
+selector matching nothing; the floor measured 24px, not 44px, until someone noticed by eye, per BACKLOG's own
+note). Shrinking Clear to match its siblings was explicitly rejected (BACKLOG's own reasoning, restated in the
+new CSS comment): it is the one destructive control in the row, and a cramped touch target there is an
+ergonomic regression, not a cosmetic fix.
+
+**The toolbar moves to the bottom on phone.** `top:8px` (the desktop position) floats it over the first line
+of code — exactly where the caret sits when a program is short, which is the common phone case. Moved to
+`bottom:8px` in the phone media query; a column layout was considered and rejected per BACKLOG's own
+arithmetic (6 stacked 44px buttons = 264px, covering most of the visible code down the right edge — a bigger
+obstruction than the row it replaces). ⚠ The override had to be placed in the LATER `@media (max-width:600px)`
+block (after `.editor-toolbar`'s own base rule in file order) rather than the earlier one beside `#btn-clear`
+— same selector, same specificity, so source order decides which wins; putting it in the wrong block would
+have been silently overridden by the base rule that comes after it.
+
+## Non-vacuity
+
+**Item 13 (touch floor + bottom anchor)**: `tests/editor-chrome.spec.js`'s phone test extended (not a new
+file, per BACKLOG's own "test asserting the computed tap size at phone width" ask, landed in the file that is
+already this repo's authoritative reference for the toolbar's shape): all 6 toolbar buttons' computed bounding
+boxes ≥44×44px, and `.editor-toolbar`'s computed `bottom` is `8px` (not `top`, which resolves to a real pixel
+value even under `top:auto` — a browser computed-style quirk found and worked around while writing the
+assertion, not assumed). Proven non-vacuous: `git checkout HEAD --` on `styles.css` (scratch-copied, restored
+after) — the touch-floor assertion failed exactly as predicted (24px measured against the required 44px, the
+SAME number BACKLOG's own note cites from the last time this broke); restored, re-ran, green.
+
+**The ring (amendment 3's build)**: `tests/editor-focus-ring-2151.spec.js` REWRITTEN — the original
+`getComputedStyle`-on-`::before` approach doesn't work in this harness (see amendment 3's own section above),
+so all 6 tests now verify by real screenshot pixels (a canvas + `getImageData` round trip), diffed
+before/after focus rather than hardcoded against one theme's colour. Proven non-vacuous against the REJECTED
+whole-container design (`git checkout HEAD --` to the pre-t2153 `styles.css`, scratch-copied first, restored
+after): **5 of 6 failed exactly as predicted** — the container's own outline read `solid` instead of `none`,
+and the boundary pixel at y=154 showed no change on focus (the old ring's real edge sat at y≈110, not 154) —
+across the toolbar-exclusion test, the left-edge test, the Tab-focus test, and all three themes in the
+theme-independence test. The 6th ("unfocused: no ring") legitimately passed on both trees — a pin, not a
+vacuous check: "nothing rings when nothing is focused" was already true under the rejected design too.
+Restored, re-ran, 6/6 green.
+
+⚠ **A genuine environment hazard hit repeatedly while proving this, all now named in the test file's own
+header so none repeats**: (1) a mem-server started BEFORE a CSS edit and never restarted served stale content
+through several measurement passes more than once this turn, producing misleading results that briefly looked
+like real bugs — caught each time by noticing the numbers didn't add up, not by assuming the first read was
+right; the fix is always the same (kill everything on :3211, start fresh, re-verify what's actually being
+served via a direct fetch before trusting a measurement). (2) `getComputedStyle(element, '::before')` reported
+wrong values for every property tried, including `content` (unconditionally `''` in the rule) — a real
+limitation of that API in this harness, worked around by testing rendered pixels instead of asking the DOM to
+describe them.
+
+**AMENDMENT 6's own right-edge fix (z-index 4→7)**: `tests/editor-focus-ring-2151.spec.js` gained a 7th test.
+Its FIRST draft was genuinely vacuous in TWO independent ways, both caught only because the standing discipline
+requires actually re-running a "passing" test against the reverted code rather than trusting it once green: (a)
+a before/after-focus diff at one pixel crossed the pass threshold even with the bug present, because the handle
+itself shifts colour slightly on focus for an unrelated reason — redesigned to compare, within one screenshot,
+the ring-line pixel against a reference pixel elsewhere on the handle's own plain fill (spatial contrast, not a
+temporal diff); (b) the redesigned test STILL passed against the reverted code, because this project's default
+Playwright viewport is 412×915 (phone) and the test never set an explicit size — at phone width the handle
+isn't even on the right edge, so the scenario this test names never actually occurred. Fixed with an explicit
+`page.setViewportSize({width:1400,height:900})`, matching the human's own "wide mode" report. With both fixed,
+the test genuinely discriminates: reverting z-index to 4 fails it (and ONLY it — the other 6 stay green);
+restoring 7 passes it. Both traps and both fixes are named in the test's own comment for the next reader.
+
+## Gate
+`editor-chrome.spec.js`, `editor-focus-ring-2151.spec.js`, `mobile-layout.spec.js`, `header-never-clips-748.spec.js`
+— 14/14, final confirmed run, all four files together after every amendment (including 7) landed. Node tier:
+227/227. Lint: clean.
+
+## Files
+- `DDCS-Studio/web/styles.css` — the stale click/Tab comment corrected; the ring moved from
+  `.editor-container` itself to a generated `.editor-container::before`, inset from the top by the existing
+  `--editor-chip-inset` variable, so it frames the code area only (amendment 3); its `z-index` raised from 4 to
+  7 so it paints on top of `.viz3d-handle` (6) instead of being broken by it at wide viewports (amendment 6);
+  `#btn-clear`'s own phone-width rule generalised to `.editor-toolbar > button` (all six, BACKLOG #13); a new
+  `.editor-toolbar { top: auto; bottom: 8px; }` override in the later phone media query (source-order note
+  above) — its phone-width interaction with the ring's own `bottom:0` is measured and left alone, reported not
+  fixed, per amendment 6's own instruction after the human's direct observation superseded the predicted phone
+  defect. The double-fill hover finding on Clear is diagnosed in this WORK-LOG but NOT shipped as CSS — no
+  token was picked, per the amendment's own instruction. The editor-panel-wide `--editor-chip-inset`
+  structural refactor the human has approved is explicitly OUT of this turn's scope (amendment 5) — everything
+  learned about the shared 46px band (five absolutely-positioned tenants, listed above) is recorded here for
+  that future dispatch, not acted on now.
+- `DDCS-Studio/tests/editor-chrome.spec.js` — the existing phone test extended with the 6-button touch-floor
+  sweep and the toolbar's bottom-anchor check (not a new file — this is the toolbar's authoritative spec).
+- `DDCS-Studio/tests/editor-focus-ring-2151.spec.js` — REWRITTEN to pixel-based verification, 7 tests total
+  (see Non-vacuity above for the two vacuity traps caught and fixed on the newest one).
+- `DDCS-Studio/verification/t2153-ring-measurement.png` — the desktop screenshot backing Correction 2's
+  (superseded) dock-header measurement, kept as part of the record.
+- `DDCS-Studio/verification/t2153-amend3-ring-below-toolbar.png` — the ruling-compliant ring's top edge: the
+  toolbar's six buttons visibly sit above and outside it.
+- `DDCS-Studio/verification/t2153-amend6-wide-right-edge.png` — the right-edge break, BEFORE the z-index fix.
+- `DDCS-Studio/verification/t2153-amend6-fixed-right-edge.png` — the same edge, AFTER — a continuous line
+  drawn cleanly on top of the handle.
+
+🔨 turn 2153

@@ -5429,7 +5429,14 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 #btn-clear { color: #ef4444; display: inline-flex; align-items: center; }
 #btn-clear:hover { opacity: 1; background: rgba(239,68,68,.14); }
 @media (max-width: 600px) {
-    .editor-toolbar #btn-clear { min-width: 44px; min-height: 44px; justify-content: center; }
+    /* BACKLOG #13 (human, from a phone screenshot: "the clear button appears larger than its siblings") — IT IS
+       NOT OVERSIZED, ITS FIVE SIBLINGS (Make/+, ⟳ align-rotate, undo, redo, copy) WERE UNDERSIZED: only #btn-clear
+       ever got the 44px touch floor (t1255), and shrinking clear to match them would have traded a cosmetic
+       complaint for an ergonomic one on the ONE destructive control in the row. Raised the whole row instead —
+       `.editor-toolbar > button`, not a per-id list, so a 7th button added later inherits the floor for free
+       rather than needing its own line (the exact gap this rule already broke once, see the t2099 note above:
+       a class rename left the floor's old selector matching nothing and it silently stopped applying). */
+    .editor-toolbar > button { min-width: 44px; min-height: 44px; justify-content: center; }
     /* t1255 — MAKING ROOM for it. At 390px the header was already at every shrink class it has (is-tiny et al) and
        still summed past the viewport once the trash claimed its 44px touch target. The cheapest thing to give up on a
        phone is the wordmark: the logo alone still identifies the app, and the alternative — a 44px hit area overlapping
@@ -5508,6 +5515,16 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
        (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
        (its Open/Save now live in the chevron). */
+    /* BACKLOG #13 — the toolbar moves to the BOTTOM right on phone. `top:8px` (the desktop position, base rule
+       above) parks it over the FIRST LINE of code, exactly where the caret usually sits when you start typing.
+       Most programs do not fill a phone screen, so the bottom sits over blank space instead — same row, same
+       6 buttons (284px = 6×44 + 5×4px gaps, fits a 390–430px viewport with `max-width:calc(100% - 16px)`
+       already guarding it), just anchored to the edge that is actually empty. A COLUMN was considered and
+       rejected: 6 stacked 44px buttons is 264px tall and would cover most of the visible code down the right
+       edge instead of just the first line — a bigger obstruction, not a smaller one. This override has to sit
+       AFTER `.editor-toolbar`'s own base rule in the file (same selector, same specificity — source order
+       decides), which is why it lives in this later phone query rather than the one right above `#btn-clear`. */
+    .editor-toolbar { top: auto; bottom: 8px; }
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */

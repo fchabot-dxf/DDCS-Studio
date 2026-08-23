@@ -76,6 +76,29 @@ test.describe('phone', () => {
     expect(Math.min(tb.width, tb.height), 'and is a real touch target').toBeGreaterThanOrEqual(44);
     expect(tb.x >= 0 && tb.x + tb.width <= 390, 'fully inside the viewport').toBe(true);
 
+    // BACKLOG #13 (human, from a phone screenshot: "the clear button appears larger than its siblings") — it
+    // was not oversized, its five siblings were undersized: only #btn-clear ever got the 44px floor. Asserts
+    // the COMPUTED tap size for every toolbar button, not a hand-check — this exact rule silently broke once
+    // already (a class rename left the old selector matching nothing, floor measured 24px not 44px) precisely
+    // because nobody had a test for it.
+    const ids = ['editor-cam-btn', 'align-rotate-btn', 'btn-undo', 'btn-redo', 'btn-clear', 'editor-copy-btn'];
+    for (const id of ids) {
+      const b = await page.locator('#' + id).boundingBox();
+      expect(b, `#${id} is on screen at 390px`).toBeTruthy();
+      expect(Math.min(b.width, b.height), `#${id} meets the 44px touch floor`).toBeGreaterThanOrEqual(44);
+    }
+    // BACKLOG #13 — the toolbar sits at the BOTTOM on phone (top:8px would float it over the first line of
+    // code, exactly where the caret usually is when you start typing).
+    const barTop = await page.evaluate(() => {
+      const bar = document.querySelector('.editor-toolbar');
+      const cs = getComputedStyle(bar);
+      // `top` resolves to a real pixel offset even when the source rule is `top:auto` (the browser computes
+      // the effective position), so `bottom` — set explicitly to 8px on phone — is the reliable computed check.
+      return { bottom: cs.bottom, rectBottom: bar.getBoundingClientRect().bottom, viewportH: window.innerHeight };
+    });
+    expect(barTop.bottom, 'bottom:8px is the phone-width anchor').toBe('8px');
+    expect(barTop.rectBottom, 'the row sits near the bottom of the viewport, not the top').toBeGreaterThan(barTop.viewportH - 100);
+
     // t2099 — the corner file menu is gone (t2078); Load/Insert/Export reach the quick menu instead, still
     // reachable at phone width, and Clear is still not duplicated into it.
     expect(await page.evaluate(() => !!document.getElementById('editor-file-btn')), 'the corner file button is gone').toBe(false);
