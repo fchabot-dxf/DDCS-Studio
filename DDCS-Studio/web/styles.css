@@ -5745,8 +5745,24 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
        icon buttons (#editor-copy-btn, #editor-file-btn) carry a separate ID-specificity padding/line-height
        rule above that a class-selector override here cannot out-specify, so leaving height to each button's own
        natural sizing left copy visibly taller/shorter than its text-labelled siblings (measured live: 24,24,22,
-       22,24,26 — not one shared value). `height` is a property nothing else here sets, so it wins outright. */
-    .editor-toolbar > button { min-width: 0; min-height: 0; flex: 1 1 0; height: 24px; }
+       22,24,26 — not one shared value). `height` is a property nothing else here sets, so it wins outright.
+       Declared (--editor-toolbar-handle-h) rather than repeated as a second 24px literal below — t2176
+       amendment 4A gives the pull-tab the SAME height for the SAME reason. */
+    .app-shell { --editor-toolbar-handle-h: 24px; }
+    .editor-toolbar > button { min-width: 0; min-height: 0; flex: 1 1 0; height: var(--editor-toolbar-handle-h); }
+    /* t2176 amendment 4A — the STRUCTURAL fix over a z-index one. Human, corrected after seeing it live: "the
+       preview button seem to not extend onto ring but it does a little bit" — a few px, not the deliberate
+       folder-tab straddle amendment 3 first considered, which settles it: make the tab not enter the ring's box
+       at all, rather than arbitrate who paints on top once it does. MEASURED (not assumed): the plain-portrait
+       block above sets `.viz3d-handle` to a fixed 28px tall, `bottom:0` — the SAME bottom edge the 24px-tall
+       toolbar row (declared just above) sits on, so the handle's own TOP sat 4px ABOVE the toolbar's top, i.e.
+       4px inside `.editor-code::before`'s own box (the ring ends exactly where the toolbar begins). Clamping the
+       handle to the SAME 24px height the toolbar's own buttons already use removes the overlap at its source —
+       both share one bottom edge and now one top edge too, so there is no longer anything TO cross, and no
+       z-index question to arbitrate. The DESKTOP right-edge fix (t2153 amendment 6, `.editor-code::before`
+       z-index:7 above the handle's 6) is completely untouched — this block only ever applies at the phone-
+       portrait intersection amendment 6 was never scoped to. */
+    .editor-container .viz3d-handle { height: var(--editor-toolbar-handle-h, 24px) !important; }
 }
 
 /* ── Probe-config source dot (PROBE-CONFIG-SOURCE.md) ───────────────────────
