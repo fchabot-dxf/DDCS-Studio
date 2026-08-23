@@ -34,8 +34,9 @@
   },
 
   "missing": {
-    "_": "Rows that render an EMOJI today and have no HQ_ICONS entry. Human ruling: 'if they dont have svg they need one'.",
-    "rows": ["FAQ", "About", "Rate / Feedback"],
+    "_": "STALE as of t2200 — kept for its own history, not as a live task list. Rows that render an EMOJI today and have no HQ_ICONS entry. Human ruling: 'if they dont have svg they need one'.",
+    "rows": [],
+    "resolved_2026-08-23_t2184": "All three (FAQ, About, Rate / Feedback) were already drawn — web/ui/headerPost.js's HQ_ICONS carries `help`/`about`/`rate` (a question-mark circle, an info circle, a five-point star tracing the row's own old emoji as line art), and fillAppMenu's own rows already call svgIco('help')/svgIco('about')/svgIco('rate'). This file's own 'rows' list was simply never updated after that turn landed — verified live at t2200 (screenshot + a page-error probe on the open app menu, no emoji, no crash) before touching anything, rather than redrawing icons that already exist.",
     "spec": "commandDeck.js:17 — inline line-art SVG, 24x24 stroke grid rendered at 16px, currentColor, its own accent colour, drawn in the spirit of the action."
   }
 }

@@ -52423,3 +52423,27 @@ manager-1223`/`workspace-save-open-1225` (58 tests combined), `setup-sheet-850`,
 (busy overlay), `cloud-default-754`, `profile-cloud-library`, `workspace-cloud-tab-1233` — all green (one
 pre-existing red found and fixed, see above; not a regression from this turn's own edits). `check-console`
 (zero page errors) green. Lint clean across every touched file.
+
+## t2200 (tail) — THE THREE "MISSING" ICONS WERE ALREADY DRAWN: a stale declaration, not a stale app
+
+Dispatched as a separate-commit tail: `brand/icons.json`'s own `missing` section names FAQ / About / Rate-
+Feedback as rows still rendering an emoji with no `HQ_ICONS` entry, spec'd for a fresh line-art draw. Checked
+the premise before drawing anything (the session's own standing rule — a plan/declaration is a claim, not
+evidence) — `ui/headerPost.js` already carries `HQ_ICONS.help`/`.about`/`.rate` (a question-mark circle, an
+info circle, a five-point star tracing the row's own old emoji as line art) and `fillAppMenu`'s own FAQ/About/
+Rate rows already call `svgIco('help')`/`svgIco('about')`/`svgIco('rate')` — all landed at t2184 ("SVG icons,
+no emoji, matching the file menu's own finished convention"), per that turn's own comment still sitting right
+there in the code. `brand/icons.json`'s `missing.rows` list was simply never updated after t2184 shipped — the
+declaration went stale, not the app.
+
+Verified live before touching anything (not trusted from reading code alone): opened the real app menu with a
+`pageerror` listener armed (an `HQ_ICONS[k]` lookup miss would throw, not fail quietly) and asserted an actual
+`<svg>` element under each of the three rows — one throwaway test, `verification/t2200-appmenu-iconcheck.png`
+kept as the visual record: three clean line-art glyphs (blue "?", grey "i", amber star), zero emoji, zero
+console errors. Confirms `brand/icons.json` was the thing lying, not the running app.
+
+No icons drawn (there was nothing left to draw — redrawing three already-shipped, already-verified glyphs
+would have been pure duplication for its own sake). `brand/icons.json`'s `missing` block updated instead: the
+`rows` list emptied, and a `resolved_2026-08-23_t2184` note added explaining what happened and why, kept
+alongside the original text rather than deleted — this file's own convention (matching BACKLOG.md's own
+"UPDATE, left the original intact" pattern) of showing what changed and when instead of rewriting history.
