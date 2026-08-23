@@ -19,6 +19,7 @@ import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractPar
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
+import { opLabelOf } from './opBuilders.js';   // t2156 — the save-modal op picker's label source, reused not reinvented
 import { confirmDestructiveLoad } from './saveStates.js';   // S4-1 — the shared destructive-load guard (snapshot + confirm before replacing the program)
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
 import { openCoordEditor } from '../ui/formWidgets.js';     // the coordinate-list ✎ editor (shares buildCoordEditor with the form)
@@ -58,22 +59,64 @@ function isAtom(blk) {
     return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'cam_field'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit + t1093 cam_table/cam_field: authoring/boundary/pendant-declaration metadata, not exposable values
 }
 
-// The authoring BODY for the live form / save: the op's children when there's an op wrapper, else the BARE top-level
-// atom stack (a program hand-built directly in Blocks — #12: a hand-built stack is form-editable too). Returns
-// { opRec, children, first } or null; `first` is the live Blockly block the bindings' pre-order indexes align to (the
-// op's DO-chain head, or the bare chain head). A bare stack gets a synthetic opType-less opRec so the rest is uniform.
-function authoringBody(ws) {
+// t2156 — every candidate op the workspace holds (top-level, wrapped, with children), each paired with its LIVE
+// block by a DIRECT id lookup (`ws.getBlockById`) — not a second, independent search. This is the fix for a real
+// hazard: `stack.find(b => b.type==='op')` (position-ordered, via workspaceToStack → getTopBlocks(true)) and
+// `ws.getAllBlocks().find(...)` (workspace-map order, NOT guaranteed to match position — Blockly's own
+// documented contract) can resolve to DIFFERENT ops the moment a workspace holds more than one disconnected
+// top-level op stack — confirmed live: load two independent op blocks, and `getAllBlocks()`'s "first op" stays
+// whichever was CREATED first even after `getTopBlocks(true)` reports a different one first by screen position.
+// A stack record's `id` is the SAME id as its source block (stackBridge.js's toRecord: `id: b.id`), so resolving
+// through it is unambiguous — one declared choice (the record) feeds both the children AND the live block that
+// binding indices align against, instead of two searches that can quietly disagree.
+function authorableOps(stack, ws) {
+    return stack
+        .filter((b) => b && b.type === 'op' && (b.children || []).length)
+        .map((opRec) => ({ opRec, blk: ws.getBlockById(opRec.id) }))
+        .filter((x) => x.blk);   // defensive: a record whose live block vanished between the two reads
+}
+
+// The authoring BODY for the live form / save: a NAMED op's children (opId), or the FIRST op when none is named
+// (today's default, preserved for the live-form/writeback paths that don't offer a picker), else the BARE
+// top-level atom stack (a program hand-built directly in Blocks — #12: a hand-built stack is form-editable too).
+// Returns { opRec, children, first } or null; `first` is the live Blockly block the bindings' pre-order indexes
+// align to (the op's DO-chain head, or the bare chain head). A bare stack gets a synthetic opType-less opRec so
+// the rest is uniform.
+function authoringBody(ws, opId) {
     const stack = workspaceToStack(ws);
-    const opRec = stack.find((b) => b && b.type === 'op');
-    if (opRec && (opRec.children || []).length) {
-        const opBlk = ws.getAllBlocks().find((b) => b.type === 'op' || b.type.endsWith('_op'));
-        const doIn = opBlk && (opBlk.getInput('GCODE') || opBlk.getInput('DO'));
+    const ops = authorableOps(stack, ws);
+    if (ops.length) {
+        const picked = opId != null ? ops.find((x) => x.opRec.id === opId) : ops[0];
+        if (!picked) return null;   // a named op that no longer exists in the workspace
+        const { opRec, blk } = picked;
+        const doIn = blk.getInput('GCODE') || blk.getInput('DO');
         return { opRec, children: opRec.children, first: (doIn && doIn.connection && doIn.connection.targetBlock()) || null };
     }
     const children = stack.filter((b) => b && b.type !== 'op' && !String(b.type || '').endsWith('_op') && b.type !== 'progstart' && b.type !== 'progend');
     if (!children.length) return null;                                                     // empty workspace → nothing to author
     const first = ws.getTopBlocks(true).find((b) => isAtom(b)) || null;                    // a bare stack = one connected chain head
     return { opRec: { type: 'op', opType: null, params: {}, children }, children, first };
+}
+
+// t2156 — the save modal's op-picker datapoints: the picked op's first 2-3 params WITH a flat value, in the op's
+// OWN declared field order — NOT a new per-type lookup. `opRec.params` is built (by every wizard, and by
+// stackBridge.toRecord for a live op block) as a plain object literal in the wizard's own source order, and JS
+// preserves string-key insertion order on iteration — so `Object.keys` already IS "the op's own declared field
+// order, identity-first" (this project's own convention), for free, with nothing to keep in sync: a wizard that
+// reorders its own params object reorders this list too, automatically. (BLOCKS/fieldsOf, used elsewhere in this
+// file, is the BLOCKLY ATOM palette — move/assign/param/… — a different namespace from a wizard's own opType;
+// there is no per-opType field-order registry to read here, which is exactly why this reads the params object
+// that's already ordered instead of inventing one.)
+function opIdentityDatapoints(opRec, max = 3) {
+    if (!opRec || !opRec.params) return [];
+    const out = [];
+    for (const f of Object.keys(opRec.params)) {
+        if (out.length >= max) break;
+        const v = opRec.params[f];
+        if (v === undefined || v === null || v === '' || typeof v === 'object') continue;   // absent, or a plugged reporter — not a flat value to show
+        out.push({ field: f, value: v });
+    }
+    return out;
 }
 
 // One NON-numeric inline exposure ({ param, blockIndex, key, default, type, widget?, widgetConfig? }) classified from
@@ -97,8 +140,8 @@ function inlineExposure(def, f, pname, blockIndex, defaultVal) {
 // reads no longer exists anywhere (augment() no longer creates it), so `exposures` is always []; kept rather than
 // removed because deriveAuthoredDef still needs opRec/varErr from authoringBody, and removing this would require
 // restructuring that still-live function for a change scoped to the knob's UI, not its callers.
-function collectAuthoring(ws) {
-    const body = authoringBody(ws);
+function collectAuthoring(ws, opId) {
+    const body = authoringBody(ws, opId);
     if (!body) return null;
     const { opRec, children, first } = body;
     const flat = flattenBlocks(children);
@@ -618,6 +661,12 @@ function openSaveDialog(init, onConfirm) {
         .blk-dev-savedlg .blk-dev-sim{display:flex;flex-direction:column;gap:4px;font:600 11px/1 inherit;color:var(--text-dim,#9fb0c0);}
         .blk-dev-savedlg .blk-dev-sim label{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;color:var(--text-main,#e6edf3);}
         .blk-dev-savedlg .blk-dev-sim-why{cursor:help;opacity:.7;}
+        .blk-dev-savedlg .blk-dev-oppick{display:flex;flex-direction:column;gap:4px;font:600 11px/1 inherit;color:var(--text-dim,#9fb0c0);}
+        .blk-dev-savedlg .blk-dev-opchoice{display:flex;align-items:flex-start;gap:7px;font-weight:400;cursor:pointer;color:var(--text-main,#e6edf3);padding:5px 6px;border-radius:6px;border:1px solid transparent;}
+        .blk-dev-savedlg .blk-dev-opchoice:hover{background:rgba(255,255,255,.05);}
+        .blk-dev-savedlg .blk-dev-opchoice input{margin-top:2px;}
+        .blk-dev-savedlg .blk-dev-opchoice-label{font-weight:700;}
+        .blk-dev-savedlg .blk-dev-opchoice-data{font-weight:400;font-size:10.5px;color:var(--text-dim,#9fb0c0);}
         .blk-dev-savedlg .bds-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:2px;}
         .blk-dev-savedlg button{padding:7px 13px;font:700 12px/1 inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line,rgba(255,255,255,.18));background:transparent;color:var(--text-main,#e6edf3);}
         .blk-dev-savedlg .blk-dev-save{border:none;color:#fff;background:var(--accent,#3b82f6);}
@@ -643,12 +692,18 @@ function openSaveDialog(init, onConfirm) {
                 <label><input type="checkbox" class="blk-dev-sim-machine"> Machine frame</label>
                 <label><input type="checkbox" class="blk-dev-sim-magazine"> ATC magazine</label>
             </div>`;
+    // t2156 — THE OP PICKER: shown only when the workspace holds a genuine choice (init.opChoices.length > 1).
+    // A placeholder here, populated via DOM APIs below (not innerHTML) — op labels and datapoint VALUES are
+    // user-authored text (typed op names, placed field values), so they go through .textContent, never string-
+    // concatenated into markup.
+    const showPicker = init.opChoices && init.opChoices.length > 1;
     m.innerHTML += `
         <div class="bds">
             <h3>Save as custom wizard</h3>
             <div class="blk-dev-hint" style="margin-bottom:8px;">Saved into this workspace — rides your .ddcs file.
                 <button type="button" class="blk-dev-managewiz" style="background:none;border:none;padding:0;font:inherit;font-size:11px;color:var(--accent,#3b82f6);cursor:pointer;text-decoration:underline;">Manage wizards…</button></div>
             <div class="blk-dev-editnote blk-dev-hint" hidden></div>
+            ${showPicker ? '<div class="blk-dev-oppick"></div>' : ''}
             <div class="blk-dev-hint">${init.knobs ? `${init.knobs} form field${init.knobs === 1 ? '' : 's'} declared.` : 'No form fields declared — saves a fixed (parameterless) wizard. Use a “Parameter Group” block to add them.'}</div>
             <label class="blk-dev-name">Wizard name <input type="text" class="blk-dev-opname" placeholder="my corner probe" /></label>
             ${panelRow}
@@ -661,6 +716,34 @@ function openSaveDialog(init, onConfirm) {
         </div>`;
     document.body.appendChild(m);
     const q = (s) => m.querySelector(s);
+    if (showPicker) {
+        const pick = q('.blk-dev-oppick');
+        const head = document.createElement('div'); head.textContent = 'Operation'; pick.appendChild(head);
+        for (const c of init.opChoices) {
+            const label = document.createElement('label'); label.className = 'blk-dev-opchoice';
+            const radio = document.createElement('input');
+            radio.type = 'radio'; radio.name = 'blk-dev-opchoice'; radio.value = c.id;
+            radio.checked = c.id === init.selectedOpId;
+            const span = document.createElement('span');
+            const nameSpan = document.createElement('span'); nameSpan.className = 'blk-dev-opchoice-label'; nameSpan.textContent = c.label;
+            span.appendChild(nameSpan);
+            if (c.datapoints.length) {
+                span.appendChild(document.createElement('br'));
+                const dataSpan = document.createElement('span'); dataSpan.className = 'blk-dev-opchoice-data';
+                dataSpan.textContent = c.datapoints.map((d) => `${d.field}: ${d.value}`).join(' · ');
+                span.appendChild(dataSpan);
+            }
+            label.appendChild(radio); label.appendChild(span);
+            // t2156 — switching the pick REOPENS the dialog for the new candidate (close() + the caller's own
+            // onPickOp, which calls openSaveDialog again) rather than live-patching every field in place: each
+            // candidate's panel/sim DECLARATIONS can genuinely differ (one op's stack may declare a panel block,
+            // another's may not), which changes which ROWS render, not just their values — a full reopen is the
+            // simple, always-consistent way to reflect that. The typed name carries over so switching picks
+            // doesn't discard what was typed.
+            radio.addEventListener('change', () => { if (radio.checked && init.onPickOp) { const typed = q('.blk-dev-opname').value; close(); init.onPickOp(c.id, typed); } });
+            pick.appendChild(label);
+        }
+    }
     q('.blk-dev-opname').value = init.name || '';
     if (!panelDeclared) q('.blk-dev-paneltype').value = init.panel || 'form3d';
     if (!simDeclared) {
@@ -711,7 +794,7 @@ function openSaveDialog(init, onConfirm) {
         }
         const panel = panelDeclared ? init.declPanel : (q('.blk-dev-paneltype').value || 'form3d');
         close();
-        onConfirm({ name, panel, sim, mode });
+        onConfirm({ name, panel, sim, mode, opId: init.selectedOpId });
     };
     q('.blk-dev-save').addEventListener('click', () => commit('new'));        // a fresh op, OR "Save as new" (a copy)
     const updBtn = q('.blk-dev-update'); if (updBtn) updBtn.addEventListener('click', () => commit('update'));   // explicit overwrite
@@ -737,33 +820,28 @@ export function isMaintainedAsData(def) {
     return !def.bindingSpecs.every((s) => authored.has(s.param));
 }
 
-// Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
-// → bindings → userOpFromStack → createWizard (into the library + bar). No exposures just means a parameterless
-// wizard (add form fields via a formfield/param_group block to add them). Called by the 💾 Save button + the ⌄ quick
-// menu.
-function saveAsCustomOp() {
-    if (!_ws) { alert('Open an operation in the Blocks tab first, then save it as a wizard.'); return; }
-    // Read the LIVE workspace SYNCHRONOUSLY here — BEFORE the Save dialog awaits user input — so the bindings/defaults
-    // freeze at save-initiation. Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0), so a value edited just
-    // before Save hasn't reprojected yet; capturing now keeps the saved default = the LIVE value, not a stale-model
-    // revert during the dialog.
-    const a = collectAuthoring(_ws);
-    if (!a) { alert('No operation to save — insert an operation in Blocks first.'); return; }
-    if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
-
+// t2156 — everything ONE candidate op needs to become a save-able wizard: the guards (varErr, dangling
+// formfield), the fork wrap, bindings, panel/sim declarations, the editing/lockUpdate context. Extracted so it
+// runs per CANDIDATE (a workspace with a genuine choice has several) rather than once for whichever op used to
+// win a silent stack.find(). The guards move here too, since which op's guard failures matter can only be judged
+// once a specific op is being committed — a picker cannot pre-judge which pick the human is about to make.
+// Returns { ok:true, a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate, meta } or { ok:false, error }.
+function prepareCandidate(a) {
+    if (a.varErr) return { ok: false, error: `The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.` };
     // t1636 — a `formfield` whose Match Var names no block in the stack used to save SILENTLY (formfieldBindings'
     // own catch → [], read only by the live preview) as a wizard with NO PARAMETERS — the emitted program then runs
     // whatever the canvas happened to hold, with no way for the operator to change it. Report every dangling field
     // at once (not just the first — deriveBindings aborts there) and REFUSE the save, matching the loud-failure
-    // discipline every other authoring guard on this canvas already holds (varErr above, the destructive-load guard).
+    // discipline every other authoring guard on this canvas already holds.
     const report = formfieldMatchReport(a.opRec.children);
     if (report.unmatched.length) {
         const list = report.unmatched.map((u) => `${u.param} (${u.target})`).join(', ');
-        alert(`${report.total} field${report.total === 1 ? '' : 's'} declared, ${report.matched} matched: ${list} `
-            + `— an Assign Var field must name an assign block's #var that exists in THIS stack; an Op Param field `
-            + `must name an atom type present exactly once in THIS stack. Fix it, or tick "optional" if the field `
-            + `is meant to be absent in some states, then save again.`);
-        return;
+        return {
+            ok: false, error: `${report.total} field${report.total === 1 ? '' : 's'} declared, ${report.matched} matched: ${list} `
+                + `— an Assign Var field must name an assign block's #var that exists in THIS stack; an Op Param field `
+                + `must name an atom type present exactly once in THIS stack. Fix it, or tick "optional" if the field `
+                + `is meant to be absent in some states, then save again.`,
+        };
     }
 
     // t1075 (Part C) — a placed RECOGNIZED op opened in Blocks DIRECTLY (not via Customize) and saved would fork as
@@ -792,7 +870,10 @@ function saveAsCustomOp() {
     const panelBlk = flattenBlocks(a.opRec.children).find((b) => b && b.type === 'panel');
     const blkPanel = (panelBlk && panelBlk.params && panelBlk.params.panel) || null;
     const blkSim = simIntentFromStack(a.opRec.children);   // undefined = no sim block in the stack
-    const editingDef = _editingWizard ? listUserOps().find((d) => d.opType === _editingWizard) : null;
+    // t2156 — scoped to THIS candidate: _editingWizard is the single-op "Customize" context (editWizardDef), and
+    // only applies when the candidate being prepared IS that same op — a second op floating alongside it in the
+    // workspace is not the wizard being edited, even while _editingWizard is still set.
+    const editingDef = (_editingWizard && a.opRec.opType === _editingWizard) ? listUserOps().find((d) => d.opType === _editingWizard) : null;
     const lockUpdate = isMaintainedAsData(editingDef);   // a maintained-as-data def refuses the visual Update (see isMaintainedAsData)
 
     // A 2D-point / 2D-rect knob is ONLY drag-to-edit on the Form+2D preview — so default a freshly-authored op that
@@ -800,59 +881,120 @@ function saveAsCustomOp() {
     // block, a re-authored wizard's own panel, and the dialog dropdown all override (group[0] carries the widget).
     const hasNumberRole = bindings.some((b) => b.widget === 'point' || b.widget === 'nrect');
 
-    openSaveDialog({
-        name: editingDef ? (editingDef.label || '') : '',
-        panel: blkPanel || (editingDef && editingDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
-        sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
-        // t1615 — the STACK's own declarations (a panel block / a sim block): when present the dialog does not
-        // ask, it shows them read-only and commits them. Blocks always win; a bare stack falls back to asking.
-        declPanel: blkPanel,
-        declSim: blkSim,
-        knobs: bindings.length,
-        editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
-        lockUpdate,   // maintained-as-data → the dialog disables Update + explains why (Save-as-new stays)
-    }, (meta) => {
-        const panel = blkPanel || meta.panel;
-        let sim = blkSim !== undefined ? blkSim : meta.sim;
-        // `simstart` blocks in the stack DECLARE the per-pass sim-starts → def.sim.starts (B3, read like the sim block).
-        const blkStarts = simStartsFromStack(a.opRec.children);
-        if (blkStarts && blkStarts.length) sim = { ...(sim || {}), starts: blkStarts };
-        // Non-destructive: only an EXPLICIT "Update" (mode 'update') overwrites the re-authored wizard. Anything else —
-        // a fresh op, or "Save as new" while editing — creates a SEPARATE wizard, leaving the original untouched.
-        const update = meta.mode === 'update' && _editingWizard;
-        // GUARD (belt-and-suspenders; the dialog already disables the Update button): a maintained-as-data def refuses
-        // the visual Update — it would strip bindingSpecs + the rich metadata. Save-as-new (a copy) is the path.
-        if (update && lockUpdate) {
-            alert(`“${(editingDef && editingDef.label) || _editingWizard}” is maintained as data — updating it here would strip its data-driven parameters. Use “Save as new”, or edit its template.`);
-            return;
-        }
-        // t1593 — the inherited declarations that are NOT the bindings list: `bindingSpecs` (the fork's emit re-derives its
-        // value sockets BY IDENTITY over its own pruned stack, exactly as the source does) and `forkedFrom` (which source
-        // this copy came from — the provenance registerUserOp reads to re-attach the source's code hooks, since a function
-        // cannot be stored on a def). Both are inert DATA on the def; neither is derivable from the template.
-        const authorFork = (type, name) => {
-            const d = userOpFromStack(type, name, a.opRec.children, bindings, panel, sim);
-            if (inherited) {
-                if (inherited.bindingSpecs) d.bindingSpecs = inherited.bindingSpecs;
-                d.forkedFrom = inherited.forkedFrom;
-            }
-            return d;
-        };
-        try {
-            if (update) {
-                const d = authorFork(_editingWizard, meta.name);
-                d.savedAt = new Date().toISOString();   // t1621 — an explicit Update IS a save, declared at the caller (updateUserOp preserves when undeclared — the boot reseed must not restamp)
-                updateUserOp(d);
-            } else {
-                const slug = meta.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
-                const existing = new Set(listUserOps().map((d) => d.opType));
-                let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
-                createWizard(authorFork(type, meta.name));
-            }
-        } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
+    return {
+        ok: true, a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate,
+        meta: {
+            name: editingDef ? (editingDef.label || '') : '',
+            panel: blkPanel || (editingDef && editingDef.panel) || (hasNumberRole ? 'form2d' : 'form3d'),
+            sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
+            // t1615 — the STACK's own declarations (a panel block / a sim block): when present the dialog does not
+            // ask, it shows them read-only and commits them. Blocks always win; a bare stack falls back to asking.
+            declPanel: blkPanel,
+            declSim: blkSim,
+            knobs: bindings.length,
+            editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
+            lockUpdate,   // maintained-as-data → the dialog disables Update + explains why (Save-as-new stays)
+        },
+    };
+}
 
-        if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
-        _editingWizard = null; _editingLabel = null; _authoringWizard = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
-        alert(update ? `Updated “${meta.name}”.` : `Saved “${meta.name}” as a new wizard — it's a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
-    });
+// Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
+// → bindings → userOpFromStack → createWizard (into the library + bar). No exposures just means a parameterless
+// wizard (add form fields via a formfield/param_group block to add them). Called by the 💾 Save button + the ⌄ quick
+// menu.
+//
+// t2156 — a workspace can hold MORE THAN ONE op: editWizardDefs loads a multi-op concat (a composed CAM slot
+// opened via "Customize as blocks"), and a user can drop a second op onto the canvas by hand too. This used to
+// silently save the FIRST op found and drop the rest — while a BARE atom chain (no op wrapper) saved everything,
+// same button, opposite policy. It also carried a real index-alignment hazard: the children came from one lookup
+// (workspaceToStack, position-ordered) and the live block bindings align against came from a SECOND, independent
+// lookup (ws.getAllBlocks(), NOT position-ordered — Blockly's own documented contract) — confirmed live to
+// resolve to DIFFERENT ops the moment the workspace holds more than one disconnected top-level op stack, which
+// would have attached knobs to the WRONG op's fields, quieter and worse than dropping ops outright.
+//
+// Fixed with ONE declared choice feeding everything: `authorableOps` pairs each stack record with its live block
+// by id (a direct map lookup, never a second search), and when there is a genuine choice the SAVE DIALOG itself
+// grows an op picker (the human's own ruling — not Blockly's native block selection, which was proposed and
+// rejected). The picker showing what it found IS the fix for the silent half: a picker cannot drop an op the way
+// a hidden .find() could, because the ops are on screen.
+function saveAsCustomOp() {
+    if (!_ws) { alert('Open an operation in the Blocks tab first, then save it as a wizard.'); return; }
+    // Read the LIVE workspace SYNCHRONOUSLY here — BEFORE the Save dialog awaits user input — so every candidate's
+    // bindings/defaults freeze at save-initiation. Blockly v13 batches change events (FIRE_QUEUE / setTimeout 0),
+    // so a value edited just before Save hasn't reprojected yet; capturing now keeps the saved default = the LIVE
+    // value, not a stale-model revert during the dialog.
+    const stack = workspaceToStack(_ws);
+    const ops = authorableOps(stack, _ws);
+    // ONE op in the workspace → no picker (today's shape, preserved byte-identical). A bare atom chain (no op
+    // wrapper at all) is ALSO one entry — "the whole stack" — matching the human's own ruling, not fragmented
+    // into per-atom choices.
+    const candidates = (ops.length ? ops.map(({ opRec }) => opRec) : [null]).map((opRec) => {
+        const id = opRec ? opRec.id : null;
+        const a = collectAuthoring(_ws, id);
+        return a && {
+            id, a,
+            label: opRec ? (opRec.label || opLabelOf(opRec.opType) || opRec.opType) : 'Hand-built stack',
+            datapoints: opRec ? opIdentityDatapoints(opRec) : [],
+        };
+    }).filter(Boolean);
+    if (!candidates.length) { alert('No operation to save — insert an operation in Blocks first.'); return; }
+
+    const startFor = (opId, carryName) => {
+        const cand = candidates.find((c) => c.id === opId) || candidates[0];
+        const prep = prepareCandidate(cand.a);
+        if (!prep.ok) { alert(prep.error); return; }
+        const { a, bindings, inherited, blkPanel, blkSim, editingDef, lockUpdate, meta } = prep;
+
+        openSaveDialog({
+            ...meta,
+            name: carryName || meta.name,
+            opChoices: candidates.length > 1 ? candidates.map((c) => ({ id: c.id, label: c.label, datapoints: c.datapoints })) : null,
+            selectedOpId: cand.id,
+            onPickOp: (newId, typedName) => startFor(newId, typedName),
+        }, (dlgMeta) => {
+            const panel = blkPanel || dlgMeta.panel;
+            let sim = blkSim !== undefined ? blkSim : dlgMeta.sim;
+            // `simstart` blocks in the stack DECLARE the per-pass sim-starts → def.sim.starts (B3, read like the sim block).
+            const blkStarts = simStartsFromStack(a.opRec.children);
+            if (blkStarts && blkStarts.length) sim = { ...(sim || {}), starts: blkStarts };
+            // Non-destructive: only an EXPLICIT "Update" (mode 'update') overwrites the re-authored wizard. Anything else —
+            // a fresh op, or "Save as new" while editing — creates a SEPARATE wizard, leaving the original untouched.
+            const update = dlgMeta.mode === 'update' && editingDef;
+            // GUARD (belt-and-suspenders; the dialog already disables the Update button): a maintained-as-data def refuses
+            // the visual Update — it would strip bindingSpecs + the rich metadata. Save-as-new (a copy) is the path.
+            if (update && lockUpdate) {
+                alert(`“${editingDef.label || _editingWizard}” is maintained as data — updating it here would strip its data-driven parameters. Use “Save as new”, or edit its template.`);
+                return;
+            }
+            // t1593 — the inherited declarations that are NOT the bindings list: `bindingSpecs` (the fork's emit re-derives its
+            // value sockets BY IDENTITY over its own pruned stack, exactly as the source does) and `forkedFrom` (which source
+            // this copy came from — the provenance registerUserOp reads to re-attach the source's code hooks, since a function
+            // cannot be stored on a def). Both are inert DATA on the def; neither is derivable from the template.
+            const authorFork = (type, name) => {
+                const d = userOpFromStack(type, name, a.opRec.children, bindings, panel, sim);
+                if (inherited) {
+                    if (inherited.bindingSpecs) d.bindingSpecs = inherited.bindingSpecs;
+                    d.forkedFrom = inherited.forkedFrom;
+                }
+                return d;
+            };
+            try {
+                if (update) {
+                    const d = authorFork(_editingWizard, dlgMeta.name);
+                    d.savedAt = new Date().toISOString();   // t1621 — an explicit Update IS a save, declared at the caller (updateUserOp preserves when undeclared — the boot reseed must not restamp)
+                    updateUserOp(d);
+                } else {
+                    const slug = dlgMeta.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
+                    const existing = new Set(listUserOps().map((d) => d.opType));
+                    let type = slug, n = 2; while (existing.has(USER_OP_PREFIX + type)) type = slug + '_' + (n++);
+                    createWizard(authorFork(type, dlgMeta.name));
+                }
+            } catch (e) { console.warn('save wizard failed', e); alert('Save failed: ' + ((e && e.message) || e)); return; }
+
+            if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();
+            _editingWizard = null; _editingLabel = null; _authoringWizard = null; refreshEditingChrome();   // exit the editing context (glow + chip clear)
+            alert(update ? `Updated “${dlgMeta.name}”.` : `Saved “${dlgMeta.name}” as a new wizard — it's a button in the bar (Custom)${bindings.length ? ` with ${bindings.length} knob${bindings.length === 1 ? '' : 's'}` : ''}.`);
+        });
+    };
+    startFor(candidates[0].id, null);
 }

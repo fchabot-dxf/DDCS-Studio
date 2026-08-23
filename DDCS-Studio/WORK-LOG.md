@@ -49544,3 +49544,133 @@ Node tier: 227/227. Lint: clean.
   `t2155-drawer-open-wide.png`, `t2155-handle-studio.png`, `t2155-handle-studio-hover.png`.
 
 🔨 turn 2155
+
+# t2156 — the save-as-wizard path dropped every op but the first, silently. Fixed, and the modal now asks.
+
+## The defect, confirmed from source
+
+`blocks/devMode.js`'s `authoringBody(ws)` used `stack.find(b => b.type === 'op')` — the FIRST op record,
+position-ordered via `workspaceToStack` → `getTopBlocks(true)` — to decide WHICH op's children got saved. A
+3-op workspace saved the first and dropped the other two with no message. The TWO branches also disagreed: a
+bare atom chain (no op wrapper) saved via `.filter(...)` — EVERYTHING; an op-wrapped workspace saved via
+`.find(...)` — ONE. Same "Save wizard…" button, opposite policy, decided silently by whether an op record
+existed. The round trip made this the real damage: `editWizardDefs` exists specifically to load a multi-op
+concat (a composed CAM slot, via "Customize as blocks") — load 3, edit, save, lose 2.
+
+## ⚠ THE SECOND HAZARD — verified live, not assumed, per the dispatch's own explicit instruction
+
+Right below the `.find()` sat a SECOND, independent lookup over a DIFFERENT collection: `ws.getAllBlocks().find(b
+=> b.type === 'op' || b.type.endsWith('_op'))`, feeding the LIVE BLOCK bindings' indices align against.
+`collectAuthoring`'s own comment already named the invariant this depends on ("aligns index-for-index with
+flat") — which holds only if `opRec` and this second lookup name the SAME op.
+
+**Reproduced, not inferred**: `scratchpad/t2156-hazard-probe3.cjs` loads one op normally, then creates a SECOND,
+disconnected top-level op block via Blockly's own `newBlock` API (simulating a fresh op dropped onto the canvas
+without connecting it — an ordinary drag-and-drop gesture, not a contrived state), positioned ABOVE the first on
+screen. Result: `getTopBlocks(true)` (position-ordered — what `workspaceToStack`/`opRec` uses) reports the
+NEW block first; `getAllBlocks()` (Blockly's own documented "not necessarily position-ordered" contract — what
+the second lookup used) still reports the ORIGINAL block first. **DIVERGES: true.** Two probes before this one
+(`t2156-hazard-probe.cjs`, `-probe2.cjs`) tried a single connected chain and a reordered chain — both agreed in
+those cases, which is *why* the third probe (disconnected stacks) was needed to actually trigger it; a workspace
+loaded via `ddcsLoadBlockStack` always chains multiple ops into one connected stack, but nothing stops a user
+from disconnecting one or dropping a fresh op unconnected — both are ordinary Blockly gestures. CONFIRMED real,
+per the dispatch's own framing: this is the more serious half of this turn — a misaligned index would have
+attached a knob to the WRONG op's field, quieter and worse than dropping ops outright.
+
+## The fix — human's own ruling, verbatim: "in block id rather have the save modal poll the stack and allow to
+## select the op to be saved in a modal" (NOT Blockly's native block selection, which was proposed and rejected)
+
+`authorableOps(stack, ws)` (devMode.js) pairs every stack-level op record with its LIVE block by a DIRECT id
+lookup — `ws.getBlockById(opRec.id)` — never a second, independent search. `stackBridge.js`'s `toRecord` already
+preserves `id: b.id` for every op record, so this is a plain map lookup, not new machinery. `authoringBody(ws,
+opId)` now takes an optional op selector: omitted, it defaults to the first candidate (today's shape, preserved
+byte-identical for the live-form/writeback paths that never offered a picker — `deriveAuthoredDef`,
+`writeAuthoredValue` — neither call site changed); named, it resolves THAT specific op's children AND live block
+from the SAME paired record — the structural fix the human's ruling asked for: "one declared choice feeding all
+three, instead of two independent searches that can disagree."
+
+`saveAsCustomOp()` is rewritten around this: it polls `authorableOps` up front, and when there is a genuine
+choice (2+ ops), the SAVE DIALOG (`openSaveDialog`, "Save as custom wizard") grows an op picker — one radio row
+per op, the label (op's own `.label`, falling back to `opLabelOf(opType)` — the SAME source the rest of the app
+already reads, not a new naming scheme) plus up to 3 datapoints. **ONE op → no picker** (today's shape,
+unfragmented). **A bare atom chain → one entry, "the whole stack"** (preserves the filter-branch's own
+"everything" behaviour, per the ruling's own instruction not to fragment it into per-atom choices).
+
+### The datapoints — identity-first, declared order, no per-type lookup
+
+Spec's instruction: "no hand-picked per-type field lists… the order IS the declaration… take the first two or
+three in declared order and stop." First attempt read `BLOCKS[opRec.opType]` + `fieldsOf` — WRONG NAMESPACE,
+caught by the new test failing with an empty datapoints string: `BLOCKS` (wizards/ops/index.js) is the BLOCKLY
+ATOM palette (move/assign/param/…), keyed by atom block TYPE — a wizard's own opType ('pocket', 'drill', a user
+op) was never in it at all. FIXED: `opRec.params` is built, by every wizard and by `stackBridge.toRecord`, as a
+plain object literal in the wizard's own source order — and JS preserves string-key insertion order on
+iteration, so `Object.keys(opRec.params)` already IS "the op's own declared field order, identity-first," for
+free, with nothing new to keep in sync: a wizard that reorders its own params object reorders this list too,
+automatically. Live values (not def defaults) — reading straight off the placed record, which is what
+distinguishes three placed "Drill" ops with identical defaults. A plugged reporter (an object, not a flat value)
+or an absent field is skipped, not shown as filler — "an op with no bindings shows label only" per the ruling.
+
+### Reactivity — switching the pick REOPENS the dialog, not live-patched
+
+Each candidate's panel/sim DECLARATIONS can genuinely differ (one op's own stack may carry a `panel` block,
+another's may not) — which changes which ROWS render, not just their values. Live-patching every field in place
+for that case is real complexity for a save-time picker; closing and reopening the dialog for the newly-picked
+candidate is simple and always internally consistent (every row reflects exactly what that op declares), at the
+cost of the typed name needing to be carried forward explicitly — which it is (`onPickOp(newId, typedName)`).
+
+### The guards moved WITH the candidate, not before it
+
+`varErr` (a variable plugged into a numeric knob) and the dangling-`formfield` refusal used to fire once, before
+the dialog opened, for whichever op the old `.find()` silently picked. Extracted into `prepareCandidate(a)`,
+called per-candidate — a picker cannot pre-judge which op's guard failures matter until the human has actually
+picked one, so the guard now fires at COMMIT time for the picked op specifically, not eagerly for every
+candidate (which would alarm about an op nobody was about to save).
+
+### `_editingWizard` scoped to the matching candidate, not blindly reused
+
+A subtler correctness fix along the way: `editingDef` (the "Update <name>" context from a single-op Customize
+session) used to be read from the GLOBAL `_editingWizard` unconditionally. If a user opened one wizard to
+Customize it (setting `_editingWizard`) then dropped a SECOND, unrelated op onto the canvas, both candidates
+would have offered "Update <the first wizard's name>" — wrong for the second op entirely. Fixed:
+`editingDef` only resolves when `a.opRec.opType === _editingWizard` — scoped per candidate, not global.
+
+## Non-vacuity
+
+`git stash` isolated the pre-fix `devMode.js` against the new test file (`tests/multi-op-save-picker-2156.spec.js`,
+written first): 2 of 4 tests fail correctly against the pre-fix code — the two that DEPEND on the picker (the
+3-op test: no `.blk-dev-opchoice` elements exist to read; the round-trip test: `page.check(...)` on a picker
+radio that was never rendered times out). The other two (1-op, bare-chain) correctly still PASS pre-fix, since
+those paths were never broken — exactly the expected non-vacuity signature (fails ONLY where the fix matters,
+passes where it doesn't). Restored, re-confirmed 4/4 green.
+
+The KEY test (`3-op workspace…`) is the index-alignment proof, not just the drop-fix proof: each of the 3 mock
+ops carries a param-pill on the SAME field name ("mark") with a DIFFERENT value (111/222/333). Picking op B and
+reading back the saved binding's `default` — 222, op B's own value — is the alignment claim tested directly, not
+argued: had the old independent-search hazard been live here, a misaligned pairing could have read 111 or 333
+instead.
+
+## Gate
+
+New: `tests/multi-op-save-picker-2156.spec.js` — 4/4 (all four scenarios the dispatch's own VERIFY section
+named: 3-op pick-and-verify, 1-op byte-identical, bare-chain unfragmented, round-trip library-untouched).
+Collateral sweep: every spec touching devMode.js's save/authoring surface (~50 files: blocks-*, cam-*,
+formfield-*, save-*, wizard-*, and others) — all green. A handful of `waitForFunction`/gate-polling timeouts
+surfaced under 6-worker parallel load (server-startup contention, not this turn's changes — confirmed by
+re-running the ONE genuine-looking failure, `tooltable-gate-1890.spec.js` — unrelated post-dialect field gating,
+nothing to do with devMode.js — in isolation, single worker: 5/5 clean). Smoke tier: 76/76. Node tier: 227/227.
+Lint: clean.
+
+## Files
+
+- `DDCS-Studio/web/blocks/devMode.js` — `authorableOps` (id-paired stack/live-block lookup, the structural fix),
+  `authoringBody`/`collectAuthoring` gain an optional `opId` selector, `opIdentityDatapoints` (picker data,
+  `Object.keys(opRec.params)` order), `prepareCandidate` (the per-op guards/bindings/panel/sim extraction),
+  `saveAsCustomOp` rewritten around candidates + `startFor`, `openSaveDialog` grows the op picker + `onPickOp`
+  reactivity + `opId` on commit.
+- `DDCS-Studio/tests/multi-op-save-picker-2156.spec.js` — NEW, the 4 VERIFY scenarios.
+
+(A separate, comment-only commit this same turn recorded t2155's own phone-drawer-covers-strip trade-off as a
+RULED, ACCEPTED note in styles.css, per the amendment carried in — unrelated to devMode.js, kept as its own
+trivial commit per the amendment's own instruction.)
+
+🔨 turn 2156
