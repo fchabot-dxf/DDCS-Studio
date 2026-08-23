@@ -49,18 +49,19 @@ import { openSaveModal } from './projects/projectModal.js';   // t2184 — the P
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
 const HQ_ICONS = {
-    open:   { c: '#f59e0b', d: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' },
+    // t2186 (brand/icons.json — the human's own ruling, "decided by circling a rendered comparison") — open and
+    // cloud are the only two true single-shape CONTAINERS in the set, so they alone get a solid fill (a CHOSEN
+    // colour, not an opacity — an opacity composites with whatever's behind the menu, so the same icon would
+    // read as a different colour on every surface). Every other icon stays pure outline, byte-identical.
+    open:   { c: '#f59e0b', d: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#d99a2b"/>' },
     save:   { c: '#0ea5e9', d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
-    load:   { c: '#f59e0b', d: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' },
     insert: { c: '#14b8a6', d: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>' },
     copy:   { c: '#6366f1', d: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' },
     clear:  { c: '#ef4444', d: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>' },
-    export: { c: '#0ea5e9', d: '<path d="M16 9h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><line x1="12" y1="14" x2="12" y2="3"/><polyline points="8 7 12 3 16 7"/>' },
     standalone: { c: '#22c55e', d: '<rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="8" x2="21" y2="8"/><polyline points="9 13 12 16 15 13"/><line x1="12" y1="11" x2="12" y2="16"/>' },
     settings: { c: '#94a3b8', d: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
     checklist: { c: '#3ddc84', d: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>' },
     setupSheet: { c: '#c084fc', d: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>' },
-    library: { c: '#38bdf8', d: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
     wizard: { c: '#a855f7', d: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>' },
     // t2184 (amendment 4's own rule, extended to the APP menu on direct human instruction: "yes, unify it too") —
     // three genuinely NEW icons (the file menu's rows all reused an existing entry; these didn't exist yet).
@@ -74,7 +75,7 @@ const HQ_ICONS = {
     // ⛔ NOT in ui/wizIcons.js — that registry holds OPERATION icons only; a save-location mark is UI CHROME, so
     // it belongs beside this menu's other chrome glyphs, same table, same convention.
     local: { c: '#0ea5e9', d: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>' },
-    cloud: { c: '#0ea5e9', d: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>' },
+    cloud: { c: '#0ea5e9', d: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" fill="#2f8fc4"/>' },
     // t2149 (BACKLOG #9) — the APP menu's "Open the website" row: the external-link glyph the retired brand
     // <a href> used to imply just by being a link, now carried explicitly since the logo itself no longer is one.
     website: { c: '#0ea5e9', d: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>' },
@@ -366,9 +367,12 @@ export function initHeaderPost() {
         // t2184 — Project Save is NEW (scratchpad/t-filemenu-sections.md rule 4): it exists because a project IS
         // the program, saved — same op stack, same stock, same post, one live in the editor and one on disk.
         // Calls the existing openSaveModal — no new save logic, see the import comment above.
+        // t2186 (brand/icons.json's shared_glyphs — "one glyph per ACT, not per row") — Open here uses the SAME
+        // 'open' icon key as Workspace Open and G-code Open; the label is the differentiator, not the glyph.
+        // The old dedicated 'library' HQ_ICONS entry retired with this — no other caller was left reading it.
         const projectGrid = grid(
             wsBtn('projSave', 'save', 'Save…', 'Save the current program as a project (.mjson) — the op stack, stock and post, as one job'),
-            wsBtn('library', 'library', 'Open…', 'Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Save as/Open above')
+            wsBtn('library', 'open', 'Open…', 'Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Save as/Open above')
         );
 
         const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
@@ -402,8 +406,11 @@ export function initHeaderPost() {
         // t2184 (amendment 17, "switch") — Save as now comes FIRST (the save action always leads); amendment 20
         // ("open vs load is not [legitimate]") — "Load…" → "Open…", matching Workspace/Project. The title still
         // carries Load's own warning (replaces the editor's contents — the only door, since Insert is gone).
+        // t2186 (brand/icons.json's shared_glyphs — "Save and Save as share one glyph, the LABEL is the
+        // differentiator") — Save as… uses the SAME 'save' icon key as Workspace Save and Project Save; the old
+        // dedicated 'export' HQ_ICONS entry retired with this, no other caller was left reading it.
         const gcodeGrid = grid(
-            wsBtn('fileExport', 'export', 'Save as…', 'Save the program as a .nc file — the native save dialog opens so you pick the destination yourself, every time'),
+            wsBtn('fileExport', 'save', 'Save as…', 'Save the program as a .nc file — the native save dialog opens so you pick the destination yourself, every time'),
             wsBtn('fileLoad', 'open', 'Open…', 'Open a G-code file into the editor (replaces the program) — not a workspace or a project')
         );
 

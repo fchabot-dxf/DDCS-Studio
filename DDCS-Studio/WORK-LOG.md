@@ -51485,3 +51485,34 @@ likely. Recommend its own turn — this is boot-sequencing/watermark-timing surg
 TAIL, not yet started: the icon-fill work referenced in the dispatch (brand/icons.json, commit b9056f86) —
 picking it up next, separate commit per the dispatch's own instruction. This turn is not yet signed off — see
 the tail entry appended below once that commit lands.
+
+### TAIL — the icon fill, per brand/icons.json (advisor's own commit b9056f86)
+
+Read the declaration fully before touching anything, per direct instruction — the ruling, the rejected list
+(opacity fills, computed fills, hue-shifted palettes, a black outline, three redrawn glyphs, all built,
+rendered, and declined), and shared_glyphs. Implemented exactly what's declared, nothing beyond it:
+
+- `open` and `cloud` — the only two true single-shape containers — gain a solid fill (a CHOSEN hex per
+  icons.json's own `fill` table: open #d99a2b, cloud #2f8fc4), added as a literal `fill="…"` attribute on their
+  one closed `<path>`. The outline colour (icons.json's "over") is unchanged — it's already the icon's existing
+  `c`. Every other icon's `d` string is byte-identical to before.
+- `shared_glyphs` (the SAME declaration, "one glyph per act, not per row — the label is the differentiator"):
+  Project Open now uses the 'open' icon key (was its own dedicated 'library' glyph) — matching Workspace Open
+  and G-code Open. G-code Save as… now uses the 'save' icon key (was its own dedicated 'export' glyph) —
+  matching Workspace Save and Project Save. Both were genuine divergences from the declared ruling that existed
+  in the code before this turn (t2184 built the rows before this ruling existed); reconciled now that it does.
+- The two HQ_ICONS entries this orphaned (`library`, `export`) are removed — no other caller was left reading
+  either (confirmed via grep, not assumed). Also removed `load` (already fully orphaned before this turn — its
+  own row switched to the 'open' icon key at t2184 amendment 20, but the entry itself was never cleaned up;
+  caught now while auditing the exact same table for this exact reason).
+- `insert` and `clear` HQ_ICONS entries are ALSO orphaned (pre-existing, unrelated to icon-key consolidation —
+  leftover from the Insert/Clear rows retired at t2173/t1255) — left untouched and named here rather than
+  silently swept, since they predate this turn's own reason for being in this file.
+
+Verified live (verification/t2186-iconfill-filemenu.png): the folder glyph on all three "Open…" rows now shows
+a solid amber fill; Save/Save…/Save as… all render the same floppy-disk glyph. Collateral (~51 tests across
+filemenu-sections-2184, header-menu-split-2149, replace-confirm-2184, header-responsive, header-profile-menu,
+workspace-manager-1223, wizard-manager-1617, editor-file-menu-1227) green — the icon-key swap changes only
+which glyph renders, not any data-act/structure the tests assert on. Smoke 76/76, node 227/227, lint clean.
+
+🔨 turn 2186
