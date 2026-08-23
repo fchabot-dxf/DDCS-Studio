@@ -49326,3 +49326,221 @@ restoring 7 passes it. Both traps and both fixes are named in the test's own com
   drawn cleanly on top of the handle.
 
 🔨 turn 2153
+
+# t2155 — ARC: the editor panel's top band becomes a DECLARED STRIP. Tail: the 3D handle joins the theme.
+
+Human's go, verbatim: *"editor panel only, and go."* t2153 shipped and was released (V2026.08.22.4) before this
+turn started — nothing here is chasing a live defect. This is a refactor of debt the advisor named directly
+after seeing t2153's own evidence trail, so the bar is higher than for a fix: byte-identical-or-better, every
+step, or stop and report. Two genuine, non-obvious regressions were found and fixed along the way (not
+"nothing regressed" — see below); one design change is deliberate and reported, not hidden.
+
+## THE EVIDENCE (read from source, not assumed)
+
+Five things shared one top band, ALL `position:absolute`, arbitrated by a hand-synced magic number
+(`--editor-chip-inset: 46px`) and a z-index war (badge 12 vs toolbar 3, "the badge must never be hidden"). All
+FIVE mount points were INFERRED — every one of `#editor-gutter` (editorManager.js), `.op-edit-chip` /
+`.xform-badge` (editorOpHover.js), `.preflight-badge` (preflightBadge.js) and `.time-estimate-chip` (timeChip.js)
+walked to `editor.parentElement` independently. The moment `#editor` moved into its own box, all five would have
+silently followed it there — the refactor would have done nothing for the two STRIP tenants while looking done.
+
+## THE FIX — declare the two hosts, once
+
+`uiUtils.js` gained `editorStripHost()` / `editorCodeHost()` (`document.querySelector('.editor-strip'` /
+`'.editor-code')`) — a DECLARED seam, not five independent `querySelector` copies. index.html gained the two
+real boxes: `.editor-strip` (auto-height, holds `.editor-toolbar`; JS appends the badge/chip here) and
+`.editor-code` (flex:1, holds `#editor-highlight`/`#editor`; the gutter/op-chip/rotation-badge mount here).
+Every one of the five mount sites was updated to ask for its host BY NAME:
+- `editorManager.js` — gutter → `editorCodeHost()` (was `editor.parentElement`, which would have "worked" by
+  coincidence post-refactor too — changed anyway, so nothing in this file still infers).
+- `editorOpHover.js` — chip + rotation badge → `editorCodeHost()`.
+- `preflightBadge.js` — badge → `editorStripHost()`, inserted FIRST (`insertBefore(badge, host.firstChild)`) so
+  it reads leftmost regardless of module init order — belt-and-suspenders alongside the CSS `order:1`.
+- `timeChip.js` — chip → `editorStripHost()`.
+- AUDITED (not changed — confirmed they mean it): `followExec.js:24`'s `.editor-container` query only null-checks
+  existence, never reads the node; `gcodePreviewTab.js:153`'s `.closest('.editor-container')` wants the full
+  container for a resize-drag bound (the drawer/handle stayed direct children of `.editor-container`, unchanged).
+
+CSS: `.editor-strip { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:8px; }`. The badge/
+chip/toolbar each DROPPED their own `position:absolute`/`top`/`left`/`z-index` and picked up `order:1/2/3`
+(toolbar also `margin-left:auto`, the flex-auto-margin that replaces a literal spacer element). ⭐ THE SAFETY
+PROPERTY ("badge never hidden behind the toolbar") now holds STRUCTURALLY: normal-flow flex siblings cannot
+overlap at all — a long "N outside envelope" pill can only push the toolbar right or wrap it, never cover it.
+Proven, not just designed: `THE PRE-FLIGHT BADGE IS NEVER COVERED BY THE TOOLBAR` (editor-focus-ring-2151.spec.js)
+force-sets a deliberately long red pill at a narrow (700px) viewport and asserts the rects never intersect.
+
+`--editor-chip-inset` and its whole consuming block (`.editor-container #editor, ...{ top:...; height:calc(...) }`,
+t1323's own reserved-strip mechanism) are DELETED, not replaced — `.editor-code`'s own box already starts where
+the code should start (the strip above it is auto-height), so `.editor-layer`'s pre-existing `top:0;height:100%`
+base rule is already correct inside it. **This deletion is the fix**, per t2155's own definition of "earned its
+keep" — proven by `THE RING'S BOX IS .editor-code's OWN BOX` (both widths): `#editor`'s own rect top === `.editor-
+code`'s rect top, gap < 1px, no leftover inset.
+
+`.op-edit-chip`'s hand-rolled collision dodge (measure both rects, flow right or stack below the badge — t893's
+own "a literal flex row can't hold it" rider) is DELETED, not replaced. Once the badge lives in `.editor-strip`
+(entirely above `.editor-code`) and the chip lives in `.editor-code` (starting at its own top), their boxes are
+structurally disjoint — not just for line 1 (the case that used to collide), for EVERY line. Proven by keeping the
+ORIGINAL t893 collision test (`traverse-clarity-893.spec.js`, unchanged) green with the dodge deleted, narrow-
+viewport branch included. `placeChip(topPx)` is now one line: `chip.style.top = topPx + 'px';`.
+
+## ⛔ TWO REAL REGRESSIONS FOUND — the plan was "outline `.editor-code` directly, delete the ::before entirely"
+
+Tried it first (per the dispatch's own stated goal). Broke two things a "wrap it in a positioned box" reading of
+the plan doesn't surface — both found by actually driving the page, not by reading the CSS:
+
+1. **`.viz3d-handle` became unclickable, at every width.** `.editor-code` needed `z-index:7` to beat the handle's
+   `z-index:6` (the SAME fight t2153 amendment 6 solved for the old `::before`) — but a z-indexed WRAPPER lifts
+   its whole subtree as one stacking unit, including `#editor` itself: a real, interactive `<textarea>`, not
+   `pointer-events:none`. `#editor` silently started capturing clicks meant for the handle wherever their boxes
+   overlapped — the 3D-preview toggle stopped responding to clicks entirely. Caught by the baseline screenshot
+   script itself timing out on `page.click('#view-toggle')` — not a designed test, an accident of actually
+   exercising the page the way t2155's own "byte-identical-or-better" bar demands.
+2. **`[data-theme="futuristic"]`'s CRT scanline stopped dimming the code text.** The same subtree-lift moved
+   `#editor`/`#editor-highlight` (individually z1/z2, unchanged) above the scanline's z5 — a real, visible theme
+   regression, not a paper one.
+
+**FIX: the ring STAYS a `::before`** — `.editor-code::before`, `pointer-events:none`, `inset:0` (no magic number:
+`.editor-code`'s own box already IS the code area). Content keeps its own original individual z-indices; only the
+thin, non-interactive ring pseudo needs z-index:7 to beat the handle, and it competes for PAINT order only, never
+for click targets. Both regressions gone — proven, not assumed: `THE RIGHT EDGE (t2153 amendment 6)` still passes
+(the ring beats the handle), and the new `the handle is still CLICKABLE at every theme` test
+(viz3d-handle-theme-2155.spec.js) exercises the actual click → open path. **A partial, not full, realization of
+"delete the ::before"** — the magic INSET NUMBER is gone (the goal's own stated proof-of-worth), the pseudo-
+element mechanism survives because decoupling ring-paint from content-stacking is a genuine, load-bearing property
+of this box, not incidental. Reported in styles.css's own comment on `.editor-code`, not silently kept.
+
+⭐ A related, deliberately-shipped design change, not a regression: `.editor-strip { order: 2; }` on phone
+(replacing the old `.editor-toolbar { top:auto; bottom:8px }`, itself last turn's own BACKLOG #13 work) moves the
+WHOLE strip — badge and time chip included, not just the toolbar — to the bottom on phone. This is the dispatch's
+own explicit instruction and it closes t2153 amendment 5's own "toolbar sits geometrically inside the ring on
+phone" note for real (see `THE RING EXCLUDES THE STRIP (t2155), phone`, a genuine pass replacing what used to be
+a report). ⚠ ONE SIDE EFFECT, not hidden: with the drawer open on phone, the WHOLE strip (time chip included) now
+sits behind the drawer and is invisible — before, only the toolbar (independently bottom-anchored) was covered;
+the chip (independently top-anchored) stayed visible. Verified via screenshot (`t2155-phone-drawer-open` in
+scratchpad, not attached — not a defect, a genuine trade-off of moving both tenants together as ONE strip); flagged
+here for the advisor/human to rule on if it matters — not fixed unasked, since the dispatch named the exact CSS
+change to make.
+
+## ⛔ FOUR THINGS THE DISPATCH ASKED TO VERIFY BEFORE MOVING ANYTHING
+
+1. Mount points — DONE (above). 1b. `.op-edit-chip` — confirmed it's the multi-op "✎ Edit" chip, LINE-anchored,
+NOT a strip tenant; stays absolute inside `.editor-code`; its collision dodge deleted (above). 2. THE THIRD
+`.editor-container` BLOCK (per-theme rules, "lives at the end deliberately, same specificity, last wins") — NOT
+consolidated; instead its POSITIONING half (the chip-inset consumers) is deleted outright (nothing left to
+consolidate there), and its per-theme COLOR/FONT rules are UNTOUCHED, confirmed by grep that no theme overrides
+`top`/`height`/`position` on `#editor`/`#editor-highlight`/`#editor-gutter` — no consolidation risk existed. 3. THE
+3D DRAWER MUST STILL COVER THE CODE WHEN OPEN — held automatically (content z-indices unchanged post-::before-fix,
+below the drawer's z4 exactly as before); verified via the drawer-open screenshot (`t2155-drawer-open-wide.png`).
+4. THE STRIP'S HEIGHT IS NOT TYPED — `flex:1` on `.editor-code`, no height/min-height number on `.editor-strip`
+at all; proven by `THE STRIP FITS ITS TALLEST CHILD at phone width`.
+
+## TAIL (separate commit) — the 3D pull-tab handle joins the theme
+
+`.editor-container .viz3d-handle` carried four hardcoded blues, every one `!important`. A
+`[data-theme="studio"] .viz3d-handle` rule ALREADY existed, trying to theme it via `var(--dock-handle-face)` etc.
+**VERIFIED dead before acting** (per the dispatch's own instruction, not assumed): `getComputedStyle` in studio
+read the hardcoded blue in every property, not the token — the base rule's `!important` always won regardless of
+specificity, in every prior release.
+
+FIX, swap first / cleanup second, per the dispatch's own order: declared `--viz3d-handle-face/-face-hover/-edge/
+-ink` in `:root` (t2075's own house pattern — defaults are the EXACT current hardcoded values, so declaring them
+changed nothing on their own; proven via getComputedStyle before moving on). Retargeted studio's dead rule to MAP
+its existing `--dock-handle-face`/`--dock-handle-edge` onto the NEW tokens (NOT promoted to `:root` — the
+dispatch's own instruction, since they aren't a general contract) — `--viz3d-handle-face-hover` is a genuinely
+NEW pairing (the dead rule never had a `:hover` at all), a bevel-hi/plate-hi brightening in the same family as
+studio's existing plate bevels, flagged as a judgment call in its own comment.
+
+⛔ **A REAL BUG, found by the swap itself**: the base rule used the `border: 1px solid X` COMPOUND shorthand.
+Studio's `--dock-handle-edge` is a 4-value PER-SIDE token (top/right/bottom/left — its own established shape,
+used the same way elsewhere in this file) — a compound shorthand only accepts ONE colour in its colour slot, so
+substituting a 4-value token there made the WHOLE shorthand invalid, silently dropping the border entirely
+(confirmed via getComputedStyle: border-width read 0px). FIXED by splitting into separate `border-width`/`-style`/
+`-color` properties (the standalone `border-color` property accepts 1–4 values natively). This is also, quietly,
+why studio's dead rule never rendered a border even in a hypothetical world where !important didn't block it —
+a second, independent reason the original author's intent never reached the screen.
+
+⭐ **!important CLEANUP, done AFTER the swap, per-property, proven not assumed**: removed `!important` from
+`color`/`background`/`border-width`/`-style`/`-color`/`border-right` and checked `getComputedStyle` across all 5
+themes with and without — byte-identical results either way (nothing in the cascade competes with `.editor-
+container .viz3d-handle`'s own specificity for these specific properties; the bare `button`/`[data-theme] button`
+rules that exist don't touch them). Confirmed dead, not left on the strength of "seems safe" — the OTHER
+!important flags (position, width, min-*, padding, border-radius, box-shadow, touch-action) are UNTOUCHED — a
+different, still-live concern (fighting `[data-theme] button`'s forced `position:relative` + bevel) this tail did
+not re-verify.
+
+Studio's handle now renders its own metallic silver-plate look (screenshot: `t2155-handle-studio.png`, hover:
+`t2155-handle-studio-hover.png`) — the dead rule's ORIGINAL, never-shipped intent, now actually reaching the
+screen. The other 4 themes render byte-identical to before this turn (screenshot-and-getComputedStyle verified,
+not assumed from "the default token value matches").
+
+## Dead-code findings, NOT fixed (out of scope, reported per the project's own standing convention)
+
+- `#editor-comment` — CSS targets an id that doesn't exist anywhere in HTML/JS any more (pre-t2078 leftover,
+  styles.css lines ~994/4928-ish before this turn's edits shifted line numbers).
+- `#align-rotate-btn`/`#editor-cam-btn` bottom-position `!important` overrides (both the portrait drawer-open
+  query and the landscape keyboard-active query) — dead since t2078 turned these into flex CHILDREN of
+  `.editor-toolbar` (position:static); a `bottom` override on a non-positioned flex child has no effect. Confirmed
+  by reading `.editor-toolbar > button`'s own rule (no individual position), not assumed from the selector names.
+  Neither cluster overlaps this turn's own scope; both predate it.
+
+## Non-vacuity
+
+Every new/rewritten test proven to fail against the pre-fix state, not just shown green once:
+- `THE RIGHT EDGE` (z-index 7→4 reverted): fails, and ONLY it, 1/7 in that file — matches t2153's own prior proof.
+- `THE RING EXCLUDES THE STRIP, phone` (`.editor-strip{order:2}` removed): fails as designed; 2 sibling tests
+  (LEFT EDGE, Tab) also fail as COLLATERAL of the same removal at the SAME default phone viewport they share —
+  not a vacuity problem, confirms multiple tests are genuinely sensitive to this one change.
+- `traverse-clarity-893.spec.js`'s ORIGINAL (unedited) collision test: proven to still pass with `placeChip`'s
+  dodge fully deleted — the disjointness claim, not argued.
+- `viz3d-handle-theme-2155.spec.js`'s studio border-width assertion: reverted to the compound-shorthand bug,
+  fails (`0px` where `1px` expected), and ONLY that test, 1/3 in the file — confirms the bug was real and the
+  fix is what closes it, not incidental.
+
+Two STALE tests found and fixed, not just left to coincidentally pass or silently broken:
+- `editor-chrome.spec.js`'s phone touch-floor test asserted `.editor-toolbar`'s own computed `bottom` — the
+  property that carried the phone anchor before this turn moved it to `.editor-strip`'s `order`. Rewritten to
+  assert the RENDERED rect instead of a CSS property that no longer exists on that element.
+- `editor-chip-space-1323.spec.js` (t1323's ORIGINAL spec) directly asserted `--editor-chip-inset`'s existence
+  and both editor layers' `top` equal to it — the exact mechanism this turn deleted. Rewritten: the geometry
+  test (chip/line-1 non-intersection) kept, its DIRECTION assertion made width-aware (desktop: chip above code,
+  unchanged; phone: chip below code, BACKLOG #13's own reorder) instead of assuming one fixed sign; the inset
+  test replaced with a same-top assertion between `#editor` and `.editor-code` (the property that actually
+  matters — the two layers must move together — now checked via a mechanism that doesn't need the deleted
+  variable to exist).
+- `editor-focus-ring-2151.spec.js`'s three OTHER hardcoded-pixel tests (LEFT EDGE, Tab, theme-independent) were
+  NOT failing, but were passing for an increasingly coincidental reason (the ring's left edge happens to sit at
+  x≈1 regardless of where the strip puts the top boundary) — rewritten to derive their point from `.editor-code`'s
+  own live rect instead of a hardcoded `[1, 154]`, so a future layout tweak can't make them pass by accident again.
+
+## Gate
+
+Targeted: `editor-chrome.spec.js`, `editor-focus-ring-2151.spec.js`, `mobile-layout.spec.js`,
+`header-never-clips-748.spec.js`, `editor-chip-space-1323.spec.js`, `traverse-clarity-893.spec.js`,
+`viz3d-handle-theme-2155.spec.js` — 26/26. Collateral-risk sweep (every spec touching the five relocated
+tenants or `.editor-container`/`.editor-toolbar`/`.editor-strip`/`.editor-code`, 28 files): all green (2
+pre-existing, unrelated `t1732`-ruling-needed skips; 2 flaky `waitForFunction` timeouts on server-startup
+contention under parallel workers, both passed on retry, unrelated to this turn's changes). Smoke tier: 76/76.
+Node tier: 227/227. Lint: clean.
+
+## Files
+
+- `DDCS-Studio/web/index.html` — `.editor-strip` (holds `.editor-toolbar`) and `.editor-code` (holds
+  `#editor-highlight`/`#editor`) declared as real boxes.
+- `DDCS-Studio/web/ui/uiUtils.js` — `editorStripHost()`/`editorCodeHost()`, the declared seam.
+- `DDCS-Studio/web/ui/editorManager.js`, `editorOpHover.js`, `preflightBadge.js`, `timeChip.js` — five mount
+  sites now ask for their host by name; `placeChip`'s collision dodge deleted.
+- `DDCS-Studio/web/styles.css` — the strip/code split, the ring re-hosted (stays a `::before`, now on
+  `.editor-code`, no magic inset), `--editor-chip-inset` and its whole consuming block deleted, the badge/chip/
+  toolbar converted from absolute+z-index to flex+order, the phone reorder moved from `.editor-toolbar` to
+  `.editor-strip`. TAIL: `--viz3d-handle-*` tokens declared, studio mapped, the border compound-shorthand bug
+  fixed, dead `!important` flags removed (proven, not assumed).
+- `DDCS-Studio/tests/editor-focus-ring-2151.spec.js` — 9 tests now (was 7): the toolbar-exclusion test split
+  desktop/phone (was one, silently wrong on phone), + `.editor-code`-box-equality, + strip-fits-tallest-child, +
+  badge-never-covered; three older tests de-hardcoded from a magic pixel coordinate to a live rect.
+- `DDCS-Studio/tests/editor-chrome.spec.js`, `editor-chip-space-1323.spec.js` — updated for the new mechanism
+  (see Non-vacuity).
+- `DDCS-Studio/tests/viz3d-handle-theme-2155.spec.js` — NEW, the tail's own regression coverage.
+- `DDCS-Studio/verification/t2155-wide-studio-strip.png`, `t2155-phone-strip-bottom.png`,
+  `t2155-drawer-open-wide.png`, `t2155-handle-studio.png`, `t2155-handle-studio-hover.png`.
+
+🔨 turn 2155

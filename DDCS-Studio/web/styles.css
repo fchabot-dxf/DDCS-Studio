@@ -184,6 +184,15 @@ svg [id*="Zfirst_travel"] {
     --btn-danger-face: var(--danger); --btn-danger-ink: #fff;
     --btn-warn-face: var(--warn); --btn-warn-ink: #000;
 
+    /* t2155 tail — THE 3D-PREVIEW PULL-TAB joins the theme, same house pattern as t2075's button material:
+       defaults here match exactly what `.editor-container .viz3d-handle` already renders (below) — every skin
+       is byte-identical until it opts in by overriding these in its own block. Studio does (see its own block);
+       normal/steampunk/futuristic/organic stay on the default blue, unopted, exactly as before this turn. */
+    --viz3d-handle-face: rgba(28, 86, 140, .95);
+    --viz3d-handle-face-hover: rgba(42, 120, 190, .98);
+    --viz3d-handle-edge: rgba(130, 195, 255, .65);
+    --viz3d-handle-ink: #eaf4ff;
+
     /* t2077 (P4b) — MODAL SHELL: the dialog face/rim/radius/shadow, title bar face+ink, footer separator, and
        the close key. Defaults here match exactly what the base .wiz-box/.wiz-head/.wiz-foot/.wiz-close rules
        already render, so declaring these tokens changes nothing on their own — each skin's own block relocates
@@ -3219,9 +3228,24 @@ body[data-theme="studio"] #editor.editor-layer { caret-color: var(--phosphor) !i
     background: #000; color: var(--cyan);
     border-left: 3px solid var(--dock-heading-edge); font-family: var(--mono); font-size: 12px;
 }
-[data-theme="studio"] .viz3d-handle {
-    background: var(--dock-handle-face);
-    color: #101010; border-style: solid; border-width: 2px; border-color: var(--dock-handle-edge);
+/* t2155 tail — was a PROPERTY override (background/color/border-color) that never rendered: the base
+   `.editor-container .viz3d-handle` rule carries !important on every one of those, so this always lost
+   regardless of specificity (confirmed via getComputedStyle before touching it — it read the base rule's own
+   hardcoded blue, not var(--dock-handle-face), in every prior release). FIXED by mapping studio's existing
+   dock-handle look onto the new DECLARED tokens instead of fighting the !important: the base rule reads
+   `var(--viz3d-handle-face)` etc. now, so setting the token here is enough — no !important needed on this side.
+   `--dock-handle-face`/`-edge` themselves stay studio-local (not promoted to :root) — the spec's own instruction,
+   since they aren't a general contract other skins would want. This is a genuinely NEW rendered look for
+   studio (metallic silver instead of the shared blue) — the dead rule's ORIGINAL, never-shipped intent, now
+   actually reaching the screen; verified via screenshot, not assumed to look right just because it compiles. */
+[data-theme="studio"] {
+    --viz3d-handle-face: var(--dock-handle-face);
+    /* -face-hover is a NEW pairing, not a pre-existing studio token — the dead rule never declared one (it had
+       no :hover at all). Brighter than the resting plate-hi→plate-lo gradient, same bevel-hi/plate-hi family
+       the dock's own bevels already use, so it reads as "this plate catches light" rather than a new colour. */
+    --viz3d-handle-face-hover: linear-gradient(180deg, var(--bevel-hi), var(--plate-hi));
+    --viz3d-handle-edge: var(--dock-handle-edge);
+    --viz3d-handle-ink: #101010;
 }
 
 /* --- Controller dock → silver command-deck plate ---
@@ -4541,7 +4565,18 @@ svg [id$="_wcs"] { display: none; }
 /* 3D drawer pull-tab — a small vertically-centred handle on the right edge that
    slides the drawer open/closed (like the dock handle, but on the side).
    Scoped under .editor-container + !important to out-rank the heavy [data-theme]
-   button rules (which force position:relative + a beveled ::before). */
+   button rules (which force position:relative + a beveled ::before).
+
+   t2155 tail — THEMED via `--viz3d-handle-face/-face-hover/-edge/-ink` (declared in :root, t2075's own house
+   pattern: defaults match exactly what this rule already rendered, so declaring them changed nothing on their
+   own — see :root). ⭐ THE !important ON color/background/border WAS DEAD WEIGHT, proven not assumed: removed
+   below and checked via getComputedStyle across all 5 themes — byte-identical results with or without it
+   (nothing else in the cascade actually competes for these specific properties at this selector's own
+   specificity, (.editor-container .viz3d-handle) = 2 classes, ahead of the bare `button`/`[data-theme] button`
+   rules that exist). The REMAINING !important flags (position, width, min-width, min-height, padding, border-
+   radius, box-shadow, touch-action) are UNTOUCHED — the module's own original comment names what they're
+   fighting (`[data-theme] button` forcing position:relative + a bevel), a different, still-live concern this
+   tail did not re-verify and is not the theming task's job to touch. */
 .editor-container .viz3d-handle {
     position: absolute !important;
     top: 50%;
@@ -4556,10 +4591,20 @@ svg [id$="_wcs"] { display: none; }
     align-items: center;
     justify-content: center;
     padding: 0 !important;
-    color: #eaf4ff !important;
-    background: rgba(28, 86, 140, .95) !important;
-    border: 1px solid rgba(130, 195, 255, .65) !important;
-    border-right: none !important;
+    color: var(--viz3d-handle-ink);
+    background: var(--viz3d-handle-face);
+    /* border-width/style/color SEPARATE, not the `border:` compound shorthand — found live, not assumed:
+       studio's --dock-handle-edge is a 4-value per-side token (top/right/bottom/left, its own established
+       shape, used the same way elsewhere in this file), and a compound `border: 1px solid X` shorthand only
+       accepts ONE colour in its colour slot — a 4-value var() there makes the WHOLE shorthand invalid, silently
+       falling back to the browser default (no border at all), which is exactly what studio rendered before
+       this was caught via getComputedStyle (border-width read 0px, not 1px). The standalone `border-color`
+       property accepts 1-4 values natively, so it's the one that actually works for both the default (single
+       colour) and studio's per-side token. */
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--viz3d-handle-edge);
+    border-right: none;
     border-radius: 8px 0 0 8px !important;
     box-shadow: -3px 0 10px rgba(0, 0, 0, .45) !important;
     cursor: pointer;
@@ -4568,7 +4613,7 @@ svg [id$="_wcs"] { display: none; }
 }
 .editor-container .viz3d-handle::before { display: none !important; } /* kill theme bevel */
 .editor-container .viz3d-handle.open { right: var(--viz3d-size, 50%) !important; } /* ride the (resizable) drawer edge */
-.editor-container .viz3d-handle:hover { background: rgba(42, 120, 190, .98) !important; }
+.editor-container .viz3d-handle:hover { background: var(--viz3d-handle-face-hover) !important; }
 .editor-container .viz3d-handle:active { transform: translateY(-50%) !important; }
 .viz3d-handle-cube { display: block; }
 /* While dragging the handle to resize the drawer, kill transitions so it tracks the pointer 1:1 */
