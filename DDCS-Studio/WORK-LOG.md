@@ -50043,3 +50043,106 @@ this entry instead.
   the committed version), reverted back to the committed file before this commit; not part of this turn's diff.
 
 🔨 turn 2163
+
+# t2165 — organic wordmark SHIPPED, as Fredoka Bold (700). Sniglet is broken upstream too (not just Google's
+# serving copy); the advisor's own fallback face traces correctly and is now installed in index.html.
+
+Dispatch (advisor's own call, the human expressed no preference among the options put to them): try Sniglet
+ExtraBold from its upstream OFL source before changing the face — the t2163 defect might be a Google Fonts
+serving-pipeline artifact, not the font itself. If upstream is also broken, fall back to Fredoka 700 (NOT
+Sniglet 400 — same face but too light beside the other four marks). No hand-authoring or approximating a fix
+either way. If both sources are broken, stop — the interim Georgia render is an acceptable state to remain in.
+
+## Sniglet's own upstream OFL source has the identical defect — not a Google serving artifact
+
+Fetched `Sniglet-ExtraBold.ttf` directly from `github.com/google/fonts`' canonical `ofl/sniglet/` directory (the
+same file Google's own serving pipeline is built from) and read its 'D' glyph's `glyf` table the same way t2163
+did against the API copy: **byte-for-byte identical contour coordinates** — same 43-point outer contour, same
+broken 12-point, 79×79-unit counter fragment. This rules out Google's WOFF2 subsetting/serving pipeline as the
+cause definitively (t2163 had already ruled out subsetting specifically; this rules out the serving pipeline as
+a whole) — the defect is in the font as currently published, full stop. Per the dispatch's own instruction, this
+meant falling back to Fredoka rather than attempting anything further with Sniglet.
+
+## Fredoka Bold (700): fetched, instanced, traced, and it just works
+
+Fredoka ships as a **variable font** (`Fredoka[wdth,wght].ttf`, axes wght 300–700 / wdth 75–125), not a static
+per-weight file like Sniglet — `trace-wordmark.py` had no way to handle that, so added a `source: "local"` font
+type (a vendored file, alongside its own OFL.txt) with an optional `variableAxes` dict that gets pinned to a
+static instance via `fontTools.varLib.instancer` once and cached (same shape as the existing google-fonts
+cache, so `trace_layer` always opens an ordinary static `TTFont` regardless of source). Read Fredoka Bold's own
+'D'/'C'/'S' glyf data before tracing anything, the same discipline as every check in this series: 'D' counter
+~247×333 units against a ~613×700 outer contour (~40% width) — a normal, correctly-proportioned letterform, not
+a fragment. 'C' and 'S' are each a single well-formed open contour. Vendored the exact upstream file (not a
+locally-pre-instanced derivative) from `github.com/google/fonts`' `ofl/fredoka/` into `brand/fonts/`, alongside
+its own `OFL.txt`, so the file that ships is the same one anyone else fetching that repo would get.
+
+## `fit`: plain stretch, not a re-derived blend — a judgement call, made and stated, not defaulted into
+
+Fredoka's natural "DDCS"/tagline widths need MORE stretch to hit the 146-unit target than Sniglet did (~2.26×
+wordmark, ~1.84× tagline, vs. Sniglet's already-rejected 2.09× full stretch) — reusing Sniglet's own 68/32
+blend numbers outright would have been wrong regardless (they're a specific ratio measured against SNIGLET's
+own natural width, meaningless for a different font's metrics), and inventing a NEW bespoke blend ratio for
+Fredoka is a design judgement I'm not positioned to make unilaterally. Used `fit: "targetWidth"` (the same
+plain stretch-to-width every other mark already uses) as the option requiring no invented parameter, rendered
+it, and looked: legible and correctly-proportioned at both diagnostic scale (900px) and the real header size
+(132×34) — the D's counter is a narrow vertical slit rather than round, visibly "wide," but unambiguously a
+closed D shape, not distorted past readability. Documented this as a stated tradeoff in `wordmarks.json`'s own
+note, not a silent default — if a future look judges it too stretched, a blend is the next thing to try,
+re-derived from Fredoka's own metrics.
+
+## Verification, the same method every time in this series
+
+Rendered `MARK-ORGANIC-TRACED.svg` standalone (outside the app, outside index.html) at both 900px and the real
+132×34 header size, and READ the letters — "DDCS" / "CNC MACRO STUDIO", clearly. Then installed into
+`index.html` via a deterministic string-index splice (not regex-based this time — t2161's own lazy-comment-
+match bug taught that lesson; this splice locates the exact `<symbol id="mark-organic">` marker by plain
+`str.index`, walks backward over whitespace only to confirm a single self-contained comment precedes it, and
+replaces exactly that span — no backtracking, no risk of over-matching into unrelated content) and re-rendered
+INSIDE the real app header, at the real 5-theme test harness, to confirm the same result held in the actual
+serving context, not just my standalone diagnostic page.
+
+## `--check`'s bbox heuristic is unreliable — noted, not trusted
+
+Ran `--check` against the Fredoka trace out of habit; it produced numbers that didn't line up with what the
+image actually showed (wildly inconsistent spans for the same glyph rendered twice, absurd values for T/U/O).
+The heuristic (every-other numeric token in the path string, not a real bbox parse) is fine for path shapes with
+regular Q-command runs (Sniglet's own paths, where it caught the t2161 bug) but breaks down for Fredoka's more
+curve-varied output. Didn't chase it — the real check (render + read) is what the whole method has rested on
+every time in this series, and it's what actually confirmed the result. Downgraded the script's own docstring
+claim about `--check` to say so explicitly, so nobody trusts it over the real check on a future font swap.
+
+## Non-vacuity / verification
+
+The 4 already-shipped marks were re-diffed byte-identical against their committed files after this turn's edits
+(confirms the docstring-only changes to `trace-wordmark.py` didn't touch behavior). Organic's new baseline
+(`tests/wordmarks-2161.spec.js-snapshots/wordmark-organic-win32.png`) was captured AFTER visually confirming the
+real-app render, not before — the test run that produced the diff showing the change (a large, EXPECTED 17%
+diff against the old Georgia baseline) was inspected by eye before accepting it as the new baseline, the same
+gate every prior baseline update in this series went through.
+
+## Gate
+
+`tests/wordmarks-2161.spec.js` — 5/5 (organic's baseline updated; the other four unchanged in substance).
+Collateral: `boot-splash-2127` — 9/9, unaffected. Smoke: 76/76. Node: 227/227. Lint: clean.
+
+## Files
+
+- `DDCS-Studio/web/index.html` — `mark-organic`'s `<symbol>` body replaced with the traced Fredoka paths (via
+  the deterministic splice script, above); the other four marks untouched.
+- `brand/wordmarks.json` — `marks.organic` repointed to `{source:"local", file:"fonts/Fredoka[wdth,wght].ttf",
+  variableAxes:{wght:700,wdth:100}}`, `fit` changed from Sniglet's `"blend"` to `"targetWidth"`, status →
+  SHIPPED. `traps`: the Sniglet-800 entry rewritten from "known broken, unresolved" to a historical note (kept
+  for anyone tempted to retry it; nothing to fix if they do — only the font question, unchanged if Sniglet's
+  publisher ever corrects it).
+- `brand/trace-wordmark.py` — added `source: "local"` + `variableAxes` (fontTools variable-font instancing,
+  cached like the google-fonts path). Docstring rewritten with the full Sniglet→Fredoka finding and a corrected,
+  more honest claim about `--check`'s reliability.
+- `brand/fonts/Fredoka[wdth,wght].ttf` + `brand/fonts/OFL-Fredoka.txt` — NEW, vendored from
+  `github.com/google/fonts`' `ofl/fredoka/` (the variable font as published, plus its own OFL license text).
+- `brand/MARK-ORGANIC-TRACED.svg` — regenerated from the new declaration (Fredoka, not Sniglet).
+- `brand/README.md` — rewritten: the full three-turn Sniglet→Fredoka story, Fredoka's own parameters, and its
+  OFL provenance (a new section — the first vendored font this folder has needed to source-attribute).
+- `DDCS-Studio/tests/wordmarks-2161.spec.js` — header comment updated to describe the two-face history; test
+  body unchanged (still iterates all 5 marks at the same tolerance). Baseline snapshot for organic updated.
+
+🔨 turn 2165

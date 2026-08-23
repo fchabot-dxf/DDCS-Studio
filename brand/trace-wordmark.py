@@ -13,11 +13,13 @@ Usage:
     pip install fonttools brotli requests      # all pure-python / no native build tooling needed
     python trace-wordmark.py normal            # regenerate one mark -> MARK-NORMAL-TRACED.svg (this dir)
     python trace-wordmark.py --all             # regenerate every mark declared in wordmarks.json
-    python trace-wordmark.py organic --check   # ALSO render each glyph's own bbox to stderr, so a corrupted
-                                                # counter (t2161's bug: a glyph's hole traces as a tiny stray
-                                                # fragment instead of the letter's actual interior) is visible
-                                                # as a suspiciously tiny sub-path bbox BEFORE you install the
-                                                # result — inspect anything under ~15% of the glyph's own bbox.
+    python trace-wordmark.py organic --check   # ALSO render each glyph's own bbox to stderr — a coarse, ROUGH
+                                                # heuristic (every-other numeric token in the path string, not a
+                                                # real bbox parse) that caught Sniglet's broken 'D' (t2161: its
+                                                # counter traced as a suspiciously tiny fragment) but produced
+                                                # noisy, unusable numbers for Fredoka's own curve-heavy paths
+                                                # (t2165). Useful as a cheap first pass, NEVER a substitute for
+                                                # the real check below.
 
 VALIDATED as of t2161 for the SYSTEM-FONT path (normal/studio/futuristic/steampunk): fontTools WAS available
 in that session, so all four were actually regenerated and diffed byte-for-byte against the human-approved
@@ -33,17 +35,23 @@ VALIDATED as of t2163 for the GOOGLE-FONTS path itself (network access DOES work
 suffix, which a live response for Sniglet doesn't carry — it comes back as a `/l/font?kit=...` endpoint with no
 extension at all, `format('woff2')` in the CSS is what actually says the format. Fixed below.
 
-⛔ ORGANIC STAYS UNSHIPPED — root-caused, not just re-observed. With the fetch fixed, re-running organic
-reproduces the EXACT SAME broken 'D' (rendered standalone and read, per t2161's own method — still "DOCS", not
-"DDCS"). Read the raw glyf table directly to find out why: Sniglet ExtraBold (wght 800 — the weight this mark
-declares) has a 'D' glyph whose second contour (the counter/hole) is a genuinely tiny ~79×79-unit fragment
-against a ~610×723-unit outer contour — under 13% of the letter's width, in BOTH the API-subsetted WOFF2 and
-the full un-subsetted one (ruling out subsetting as the cause). Sniglet REGULAR (wght 400)'s 'D', fetched and
-inspected the same way, has a normal counter — ~318×518 units against a ~519×718 outer contour, roughly 61% of
-the width. So: fontTools is extracting exactly what's in the file; this is a real defect in the published
-Sniglet 800 webfont's own 'D' outline, not in this script, not in wordmarks.json's declared parameters, and not
-fixable by writing different Python. Changing the declared weight (or face) is a DESIGN decision, not this
-script's to make — see brand/README.md and WORK-LOG.md t2163 for the finding as reported.
+SNIGLET (the human's original organic choice) IS NOT USABLE AT WEIGHT 800 — root-caused, not just re-observed.
+With the fetch fixed, re-running it reproduced the EXACT SAME broken 'D' (rendered standalone and read, per
+t2161's own method — still "DOCS", not "DDCS"). Reading the raw glyf table found why: the 'D' glyph's second
+contour (the counter/hole) is a genuinely tiny ~79×79-unit fragment against a ~610×723-unit outer contour —
+under 13% of the letter's width — in BOTH the Google Fonts API-subsetted copy AND the full un-subsetted webfont
+(rules out subsetting). t2165 went one step further and fetched Sniglet ExtraBold from its CANONICAL upstream
+OFL source (github.com/google/fonts, not the serving API) — byte-identical broken contours, ruling out a
+Google-specific serving artifact too. Sniglet REGULAR (wght 400) does NOT have this defect (~61%-width counter)
+but is too light a weight for this mark. None of this is fixable by writing different Python — fontTools
+extracts exactly what a font file contains.
+
+ORGANIC NOW SHIPS AS FREDOKA BOLD (700) instead (t2165, the advisor's call — the runner-up from the original
+live-specimen comparison). Added `source: "local"` + `variableAxes` support to font_path_for() below (Fredoka
+ships as a variable font; instanced once to a static file and cached, same shape as the google-fonts cache).
+Fredoka's D/C/S all trace with correctly-proportioned counters/openings — verified the same way as always:
+rendered standalone, outside the app, and READ. See brand/README.md for the full Sniglet→Fredoka story and
+Fredoka's OFL provenance, and WORK-LOG.md t2161/t2163/t2165 for the turn-by-turn finding as reported.
 """
 import argparse
 import json
@@ -92,6 +100,25 @@ def font_path_for(font_decl, text):
             data = urllib.request.urlopen(urllib.request.Request(m.group(1), headers={'User-Agent': UA})).read()
             with open(dest, 'wb') as f:
                 f.write(data)
+        return dest
+    if font_decl['source'] == 'local':
+        # t2165 — a font VENDORED into brand/fonts/ (its own OFL.txt sits alongside it; provenance goes in
+        # brand/README.md, not here). If it's a variable font, `variableAxes` names the coordinates to pin —
+        # instanced ONCE into a static file and cached, same shape as the google-fonts cache above, so
+        # trace_layer always opens an ordinary static TTFont regardless of source.
+        path = os.path.join(HERE, font_decl['file'])
+        axes = font_decl.get('variableAxes')
+        if not axes:
+            return path
+        cache = os.path.join(HERE, '.font-cache')
+        os.makedirs(cache, exist_ok=True)
+        key = '-'.join('%s%g' % (k, v) for k, v in sorted(axes.items()))
+        dest = os.path.join(cache, '%s-%s.ttf' % (font_decl.get('family', 'font').replace(' ', '_'), key))
+        if not os.path.exists(dest):
+            from fontTools.ttLib import TTFont
+            from fontTools.varLib.instancer import instantiateVariableFont
+            inst = instantiateVariableFont(TTFont(path), axes)
+            inst.save(dest)
         return dest
     raise ValueError('unknown font source: %r' % font_decl['source'])
 
