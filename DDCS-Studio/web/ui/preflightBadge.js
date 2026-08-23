@@ -13,6 +13,12 @@ let _mgr = null;
 let badge = null, label = null, pop = null;
 let iconEl = null, textEl = null;
 let lastResult = null;
+// t2176 amendment 4B — DECLARED, not inferred from the popover's own DOM: does this verdict have detail beyond
+// what the label already says? Amber (the reason it can't verify) and a whole-program red (the per-axis
+// numbers) do; the relative-anchor info note does not — its popover only repeats the SAME "needs X × Y × Z"
+// sentence already in the label. Set explicitly by render()'s own three branches, read by the click handler
+// below to decide whether a click opens the popover or just toggles collapse.
+let hasDetail = false;
 
 // t2171 — COLLAPSE TO ICON. Dispatch: "make it collapse after 2 seconds, both green or red" (a shorthand for
 // "whichever colour it's showing" — amber/info/red all collapse the same way, not just the two named). Three
@@ -39,11 +45,29 @@ function scheduleCollapse() {
 // icon+text as separate persistent nodes (not one textContent string) — collapse hides ONLY the text span,
 // so the icon (and the className driving the background colour) is unaffected by collapse state.
 function setLabel(icon, text) { iconEl.textContent = icon; textEl.textContent = text; }
+// t2176 amendment 2 — THE SECOND HALF of the fix (the key-strip alone wasn't enough). Each render() branch used
+// to do a bare `badge.className = 'preflight-badge preflight-X'` — a full reassignment that WIPES whatever else
+// was on the element, including 'collapsed', regardless of whether afterRender() below goes on to decide
+// "nothing actually changed." So even a correctly-detected no-op render still visibly un-collapsed the badge, a
+// SEPARATE bug from (but compounding) the className-in-the-key one. Routing every class assignment through this
+// preserves 'collapsed' across a same-verdict re-render; a REAL state change still un-collapses it correctly,
+// via expandBadge() in afterRender(), which removes the class explicitly right after this runs.
+function setBadgeClass(semantic) { badge.className = semantic + (collapsed ? ' collapsed' : ''); }
+// t2176 amendment 2 (human: "the needs dimension chip doesnt close after 2 second") — REGRESSION, root-caused
+// (not guessed — confirmed by reading the loop, then locked with a test that fails without this fix): the key
+// used to read `badge.className` DIRECTLY, and collapsing itself ADDS the 'collapsed' class to `badge` — so the
+// NEXT render() (any of them: editor input, onChange, settings-changed — nothing has to actually change) saw a
+// className that now differs from `lastLabelKey`, read that as "the verdict changed," and called expandBadge()
+// + scheduleCollapse() again. The collapsed state was an input to the very detector deciding whether to leave
+// it collapsed — a live version of the badge sat there re-expanding on every incidental re-render, which reads
+// as "never actually collapses" exactly as reported. Fixed by excluding the collapse marker from the key: only
+// the SEMANTIC class (which colour/verdict) plus the text drives "did this actually change."
+const semanticClass = () => badge.className.replace(/\s*\bcollapsed\b\s*/, ' ').trim();
 // rule 2 — re-expand + restart the timer, but ONLY on an actual state change (className+icon+text), not on
 // every render() (typing that leaves the verdict unchanged must not keep resetting the clock).
 function afterRender() {
     const visible = !badge.hidden;
-    const key = visible ? `${badge.className}|${iconEl.textContent}|${textEl.textContent}` : null;
+    const key = visible ? `${semanticClass()}|${iconEl.textContent}|${textEl.textContent}` : null;
     if (key === lastLabelKey) return;
     lastLabelKey = key;
     if (visible) { expandBadge(); scheduleCollapse(); }
@@ -186,18 +210,20 @@ function render() {
         const wholeProgram = res.violations.some((v) => v.line == null);
         badge.hidden = !wholeProgram; pop.hidden = true;
         if (wholeProgram) {
-            badge.className = 'preflight-badge preflight-red';
+            setBadgeClass('preflight-badge preflight-red');
             setLabel('⚠', ' needs more travel than the machine has');
             label.title = res.violations.filter((v) => v.line == null).map((v) => `${v.axis}: needs ${fmt(v.needed)} mm, the machine has ${fmt(v.span)} mm`).join('\n');
             renderPop(res);
+            hasDetail = true;   // the per-axis needed/span numbers — not in the label
         }
     } else if (res.status === 'amber') {
         // AMBER (can't verify) — keep a SMALL chip (there are no lines to annotate); the popover carries the reason.
         renderAnnotations(null);
-        badge.hidden = false; badge.className = 'preflight-badge preflight-amber';
+        badge.hidden = false; setBadgeClass('preflight-badge preflight-amber');
         setLabel('⚠', ' can’t verify');
         label.title = [res.reason, probeNote(res), softLimitNote()].filter(Boolean).join('\n\n');
         renderPop(res);
+        hasDetail = true;   // the WHY — not in the label, which only says "can't verify"
     } else {
         // GREEN — silence, with ONE exception (t1323): a jog-start program fits, but only from a start the operator
         // chooses, so the useful thing to say is how much room to leave. A quiet neutral chip, one sentence, no alarm
@@ -207,12 +233,16 @@ function render() {
         pop.hidden = true;
         badge.hidden = !note;
         if (note) {
-            badge.className = 'preflight-badge preflight-info';
+            setBadgeClass('preflight-badge preflight-info');
             const e = res.extent;
             setLabel('↔', ` needs ${fmt(e.x)} × ${fmt(e.y)} × ${fmt(e.z)} mm`);
             label.title = note;
             renderPop({ ...res, violations: [] });
             pop.insertBefore(Object.assign(document.createElement('div'), { className: 'preflight-pop-note', textContent: note }), pop.firstChild.nextSibling);
+            // t2176 amendment 4B — NOT hasDetail: the popover here just repeats the SAME "needs X × Y × Z"
+            // sentence the label already shows (line above) — nothing a click would newly reveal, which is why
+            // the human's own ask ("click should collapse/uncollapse, simple") lands cleanly on THIS state.
+            hasDetail = false;
         }
     }
     afterRender();
@@ -230,18 +260,38 @@ export function initPreflightBadge(mgr) {
     textEl = document.createElement('span'); textEl.className = 'preflight-badge-text';
     label.appendChild(iconEl); label.appendChild(textEl);
     pop = document.createElement('div'); pop.className = 'preflight-pop'; pop.hidden = true;
+    // t2176 amendment 4B (human: "clicking the need envellop chip should collapse uncollapse, simple") — ONE
+    // rule, not three: a click REVEALS WHATEVER DETAIL EXISTS.
+    //   1. collapsed → expand it. Always first — nothing else makes sense to do on a collapsed badge.
+    //   2. expanded + hasDetail (amber/red — a popover with real content beyond the label) → toggle the popover,
+    //      the existing behaviour.
+    //   3. expanded + !hasDetail (the relative-anchor info note — its popover only repeats the label) → nothing
+    //      to reveal, so the click just collapses it manually (not a 2s wait — a direct answer to a direct tap).
     label.addEventListener('click', () => {
         if (badge.hidden) return;
-        pop.hidden = !pop.hidden;
-        // rule 3 — opening un-collapses (reading the popover with only the icon showing above it read oddly)
-        // and pauses the timer for as long as it's open; closing resumes the normal 2s countdown.
-        if (pop.hidden) scheduleCollapse(); else expandBadge();
+        if (collapsed) { expandBadge(); scheduleCollapse(); return; }
+        if (hasDetail) {
+            pop.hidden = !pop.hidden;
+            // rule 3 — opening un-collapses (reading the popover with only the icon showing above it read oddly)
+            // and pauses the timer for as long as it's open; closing resumes the normal 2s countdown.
+            if (pop.hidden) scheduleCollapse(); else expandBadge();
+            return;
+        }
+        collapsed = true; badge.classList.add('collapsed'); cancelCollapse();
     });
     // rule 3 — the pointer being over the badge (reading it, about to click it) pauses collapse the same way
     // an open popover does; it does not force-expand an ALREADY-collapsed icon (nothing to protect there — the
     // icon stays clickable either way), only stops it from collapsing mid-hover.
-    badge.addEventListener('mouseenter', () => { hovering = true; cancelCollapse(); });
-    badge.addEventListener('mouseleave', () => { hovering = false; if (pop.hidden) scheduleCollapse(); });
+    // t2176 amendment 2's second candidate, CONFIRMED live: a touch tap synthesizes ONE mouseenter with no
+    // matching mouseleave (the device has no pointer to "leave" with), which would pin `hovering` true forever
+    // on first tap and permanently refuse to ever schedule a collapse again. Scoped to hover-CAPABLE devices
+    // only (matchMedia) — on touch, "engaging with the badge" is the popover/collapsed-state click handling
+    // above, not a hover concept that doesn't meaningfully exist there.
+    const canHover = !!(window.matchMedia && window.matchMedia('(hover: hover)').matches);
+    if (canHover) {
+        badge.addEventListener('mouseenter', () => { hovering = true; cancelCollapse(); });
+        badge.addEventListener('mouseleave', () => { hovering = false; if (pop.hidden) scheduleCollapse(); });
+    }
     badge.appendChild(label); badge.appendChild(pop);
     host.insertBefore(badge, host.firstChild);   // ⭐ FIRST child, so it reads leftmost regardless of module init order (also backed by `order` in CSS)
 

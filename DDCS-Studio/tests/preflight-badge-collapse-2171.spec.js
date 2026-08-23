@@ -145,3 +145,82 @@ test('RULE 2 — a real state change re-expands and restarts the timer (this tur
     await page.waitForTimeout(2200);
     expect((await badgeState(page)).collapsed, 'and the NEW state collapses on its own fresh 2s clock').toBe(true);
 });
+
+// t2176 amendment 2 (human: "the needs dimension chip doesnt close after 2 second") — REGRESSION FOUND: the
+// change-detection key used to read `badge.className` DIRECTLY, and collapsing itself adds 'collapsed' to that
+// SAME className — so any INCIDENTAL re-render after the 2s mark (nothing about the verdict actually changed)
+// saw a "new" key purely from the collapse marker, and re-expanded. The tests above only ever proved a single,
+// isolated collapse; none of them re-rendered the SAME state afterward, so none of them could have caught this.
+// Fixed by excluding the collapse marker from the key (semanticClass(), preflightBadge.js). This test is what
+// that fix's own absence would have failed on: fails 1/1 against the pre-fix key computation (confirmed live —
+// see WORK-LOG), passes now.
+test('RULE 2, THE REGRESSION IT MISSED — an UNCHANGED verdict re-rendering after collapse must not re-expand it', async ({ page }) => {
+    await ready(page);
+    await configureAmber(page);
+    await page.waitForTimeout(2200);
+    expect((await badgeState(page)).collapsed, 'collapsed once idle').toBe(true);
+
+    // re-render the SAME amber verdict several times (programModel's onChange fires on ANY settings-changed
+    // event, whether or not the computed status actually differs) — none of these is a real state change.
+    for (let i = 0; i < 3; i++) {
+        await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
+        await page.waitForTimeout(150);
+    }
+    const s = await badgeState(page);
+    expect(s.collapsed, 'an incidental re-render of the UNCHANGED verdict must not undo the collapse').toBe(true);
+    expect(s.cls).toContain('preflight-amber');
+});
+
+// t2176 amendment 4B (human: "clicking the need envellop chip should collapse uncollapse, simple") — click
+// REVEALS WHATEVER DETAIL EXISTS: collapsed → expand; expanded + a popover with real content (amber/red) →
+// toggle the popover; expanded + no popover worth opening (the relative-anchor info note, whose popover only
+// repeats the label) → a direct manual collapse, no 2s wait.
+test('RULE 4 (new) — clicking a COLLAPSED badge always expands it first, regardless of state', async ({ page }) => {
+    await ready(page);
+    await configureAmber(page);
+    await page.waitForTimeout(2200);
+    expect((await badgeState(page)).collapsed).toBe(true);
+    await page.click('#preflight-badge .preflight-badge-label');
+    const s = await badgeState(page);
+    expect(s.collapsed, 'the click expanded it').toBe(false);
+});
+
+test('RULE 4 (new) — the INFO/relative-anchor state (no popover payload): click is a plain manual toggle, no popover opens', async ({ page }) => {
+    await ready(page);
+    await page.evaluate(() => {
+        const S = window.ddcsGetSettings();
+        S.machine = { ...(S.machine || {}), x: 300, y: 200, z: -120, wcs: { active: 1, table: [{ n: 1, x: 0, y: 0, z: 0 }] } };
+        window.dispatchEvent(new Event('ddcs:settings-changed'));
+    });
+    const SKIM_FITS = ['( skim )', 'G91', 'M3 S12000', 'G1 Z-1.5 F200', 'G1 X50 F900', 'G1 Y18', 'G0 Z10.5', 'M5', 'M30'].join('\n');
+    await page.evaluate((prog) => {
+        const ed = document.getElementById('editor');
+        ed.value = prog;
+        ed.dispatchEvent(new Event('input', { bubbles: true }));
+    }, SKIM_FITS);
+    await page.waitForTimeout(600);
+    const before = await badgeState(page);
+    expect(before.cls, 'this is the info state, not amber/red').toContain('preflight-info');
+    expect(before.collapsed).toBe(false);
+
+    // click while EXPANDED, no detail → manual collapse, immediate (not a 2s wait)
+    await page.click('#preflight-badge .preflight-badge-label');
+    const afterFirstClick = await badgeState(page);
+    expect(afterFirstClick.collapsed, 'a click on this state collapses it directly').toBe(true);
+    await expect(page.locator('.preflight-pop'), 'no popover opened — there is nothing in it beyond the label').toBeHidden();
+
+    // click again while COLLAPSED → expands (rule: collapsed always expands first)
+    await page.click('#preflight-badge .preflight-badge-label');
+    const afterSecondClick = await badgeState(page);
+    expect(afterSecondClick.collapsed, 'a second click expands it back — simple toggle').toBe(false);
+});
+
+test('RULE 4 (new) — an EXPANDED amber badge (has real popover detail): click still opens the popover, unchanged', async ({ page }) => {
+    await ready(page);
+    await configureAmber(page);
+    // still expanded (well under 2s) — click should behave exactly as before this amendment
+    await page.click('#preflight-badge .preflight-badge-label');
+    await expect(page.locator('.preflight-pop'), 'amber HAS real detail (the reason) — the popover still opens').toBeVisible();
+    const s = await badgeState(page);
+    expect(s.collapsed, 'opening the popover does not collapse the badge').toBe(false);
+});
