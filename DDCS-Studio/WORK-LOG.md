@@ -23526,10 +23526,10 @@ release gate is the advisor's to run and judge, this is the isolated-rerun resul
 
 ### 2 — `tokenGuard.js` was genuinely binary, and it was my own mistake, not a tooling artifact
 
-Traced it: my own t1712 file content used the string literal `' '` (intending an ordinary JS escape
+Traced it: my own t1712 file content used the string literal `'\0'` (intending an ordinary JS escape
 sequence, a NUL character as a Map-key separator) in three places, including once inside a documentation
 comment. Whatever happened at that write landed the LITERAL NUL BYTE in the source file itself (3 raw 0x00
-bytes, confirmed by reading the file as a Buffer), not the six source characters ` ` — making the file
+bytes, confirmed by reading the file as a Buffer), not the six source characters `\0` — making the file
 byte-for-byte binary from git's own perspective (`file` reported "data"; a Buffer scan found 3 NUL bytes at the
 `map.set`/`.get` call sites and the docstring). This is exactly the "invisible to review" hazard the advisor
 named — nobody, including me on a later pass, could have read this file's diff again.
