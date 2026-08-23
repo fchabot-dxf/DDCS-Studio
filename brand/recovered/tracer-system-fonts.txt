@@ -1,0 +1,63 @@
+cd "c:/Users/danse/APPS/ddcs-studio-project" && python - <<'PYEOF'
+import sys, math, os, re
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+from fontTools.ttLib import TTFont
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.transformPen import TransformPen
+from fontTools.misc.transform import Identity
+F = os.environ.get('WINDIR','C:/Windows') + '/Fonts/'
+TARGET = 146.0
+SYNTH = 12.0   # browsers synthesise oblique at roughly this; ariblk has no italic
+
+def trace(fontfile, text, size, baseline, slant, prec=1):
+    f = TTFont(F + fontfile)
+    upem = f['head'].unitsPerEm
+    cmap, hmtx, gs = f.getBestCmap(), f['hmtx'], f.getGlyphSet()
+    s = size / upem
+    nat = sum(hmtx[cmap[ord(c)]][0] for c in text if ord(c) in cmap) * s
+    xs = TARGET / nat
+    sh = -math.tan(math.radians(slant))
+    parts, x = [], 0.0
+    for ch in text:
+        gn = cmap.get(ord(ch))
+        if gn is None: continue
+        t = (Identity.translate(x, baseline).transform((1,0,sh,1,0,0)).scale(s*xs, -s))
+        pen = SVGPathPen(gs); gs[gn].draw(TransformPen(pen, t))
+        d = pen.getCommands()
+        if d: parts.append('<path d="' + d + '"/>')
+        x += hmtx[gn][0] * s * xs
+    out = ''.join(parts)
+    out = re.sub(r'-?\d+\.\d+', lambda m: ('%.*f' % (prec, float(m.group(0)))).rstrip('0').rstrip('.'), out)
+    return out, xs
+
+W, T = 'DDCS', 'CNC MACRO STUDIO'
+MARKS = {
+ 'normal':     [('ariblk.ttf', W, 26, 23, SYNTH, '#C7A900'), ('arialbd.ttf', T, 8.5, 34, 0, '#666666')],
+ 'studio':     [('ariblk.ttf', W, 26, 24, SYNTH, '#f0eee8'), ('ariblk.ttf', W, 26, 23, SYNTH, '#55514a'),
+                ('arialbd.ttf', T, 8.5, 34.7, 0, '#f0eee8'), ('arialbd.ttf', T, 8.5, 34, 0, '#55514a')],
+ 'futuristic': [('ariblk.ttf', W, 26, 23, SYNTH, '#FFF100')],
+ 'steampunk':  [('georgiab.ttf', W, 26, 23, 0, 'url(#brass)'), ('georgiab.ttf', T, 8.5, 34, 0, '#8b7355')],
+}
+FUT_TAG = ('arialbd.ttf', T, 8.5, 34, 0, '#8892b0')
+MARKS['futuristic'].append(FUT_TAG)
+XOFF = {'studio': [1, 0, 0.7, 0]}
+
+total = 0
+for name, layers in MARKS.items():
+    L = ['<symbol id="mark-' + name + '" viewBox="0 0 150 36">']
+    for i, (ff, txt, size, base, slant, fill) in enumerate(layers):
+        d, xs = trace(ff, txt, size, base, slant)
+        dx = XOFF.get(name, [0]*9)[i] if name in XOFF else 0
+        g = '  <g fill="' + fill + '"'
+        if name == 'futuristic' and i == 0: g += ' filter="url(#neon)"'
+        if dx: g += ' transform="translate(' + str(dx) + ',0)"'
+        L.append(g + '>' + d + '</g>')
+    L.append('</symbol>')
+    svg = '\n'.join(L)
+    open('MARK-' + name.upper() + '-TRACED.svg', 'w', encoding='utf-8').write(svg)
+    total += len(svg)
+    print('%-11s %d layer(s)  %6d bytes' % (name, len(layers), len(svg)))
+org = len(open('MARK-ORGANIC-TRACED.svg', encoding='utf-8').read())
+print('organic     (Sniglet)  %6d bytes' % org)
+print('TOTAL for all five: %d bytes  (index.html is 145025)' % (total + org))
+PYEOF

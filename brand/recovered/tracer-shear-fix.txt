@@ -1,0 +1,54 @@
+cd "C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/3de917c3-a420-4169-991d-72bbb9bda076" && python - <<'PYEOF'
+import sys, json, math
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+from fontTools.ttLib import TTFont
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.transformPen import TransformPen
+from fontTools.misc.transform import Identity
+
+TARGET_W, FONT_SIZE, BASELINE_Y = 146.0, 26.0, 23.0
+SLANT_DEG = 9.0
+
+def word_path(name, text, size, baseline, xscale, slant_deg):
+    f = TTFont('fonts/' + name + '.woff2')
+    upem = f['head'].unitsPerEm
+    cmap, hmtx, gs = f.getBestCmap(), f['hmtx'], f.getGlyphSet()
+    s = size / upem
+    # FIX: the scale(-s) flips Y BEFORE this shear runs, so the sign must invert
+    # or the lean goes left. Verified by the sign of the resulting dx at cap height.
+    sh = -math.tan(math.radians(slant_deg))
+    out, penx = [], 0.0
+    for ch in text:
+        gn = cmap.get(ord(ch))
+        if gn is None: continue
+        t = (Identity.translate(0, baseline)
+             .transform((1, 0, sh, 1, 0, 0))
+             .scale(s * xscale, -s)
+             .translate(penx, 0))
+        pen = SVGPathPen(gs)
+        gs[gn].draw(TransformPen(pen, t))
+        d = pen.getCommands()
+        if d: out.append(d)
+        penx += hmtx[gn][0]
+    return ' '.join(out)
+
+# sanity: a point at cap height must move RIGHT (+x) after the transform
+def lean_check(slant):
+    sh = -math.tan(math.radians(slant))
+    t = Identity.translate(0, BASELINE_Y).transform((1, 0, sh, 1, 0, 0)).scale(0.026, -0.026)
+    x0, y0 = t.transformPoint((0, 0))        # baseline
+    x1, y1 = t.transformPoint((0, 700))      # cap height
+    return x1 - x0
+print('lean at cap height (must be POSITIVE = leans right):  %+.3f' % lean_check(SLANT_DEG))
+
+meta = json.load(open('trace_meta.json'))
+res = {}
+for n in ('nunito','sniglet','fredoka'):
+    xs = meta[n]['xs']
+    slant = 0.0 if abs(meta[n]['ital']) > 0.5 else SLANT_DEG
+    res[n] = {'stretched': word_path(n,'DDCS',FONT_SIZE,BASELINE_Y,xs,slant),
+              'natural':   word_path(n,'DDCS',FONT_SIZE,BASELINE_Y,1.0,slant),
+              'xs': xs, 'slantApplied': slant, 'nativeItalic': abs(meta[n]['ital'])>0.5}
+    print('%-8s slant %.1f  native italic %s' % (n, slant, res[n]['nativeItalic']))
+json.dump(res, open('traced.json','w'), indent=1)
+PYEOF
