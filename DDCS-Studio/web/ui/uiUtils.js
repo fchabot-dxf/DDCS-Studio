@@ -5,6 +5,13 @@
 
 export const el = (id) => document.getElementById(id);
 
+// t2155 — the editor panel's two DECLARED mount points, so chrome that floats over the editor asks for its
+// host BY NAME. Before this, five separate modules each inferred a host by walking to `#editor`'s own parent —
+// the day the editor moved into its own box (this refactor), every one of them would have silently followed it
+// there, including the two that belong in the STRIP above, not the code area. One declaration, five readers.
+export const editorStripHost = () => document.querySelector('.editor-strip');
+export const editorCodeHost = () => document.querySelector('.editor-code');
+
 /**
  * Make `element` draggable by `handle` (e.g. a modal by its title bar). On first drag it switches
  * to fixed left/top positioning and clamps the handle so it can't be dragged fully off-screen.

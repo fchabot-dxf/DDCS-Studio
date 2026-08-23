@@ -929,9 +929,13 @@ html, body { overflow-x: clip; }
 .editor-container .xform-badge-x { padding: 4px 8px; border-left: 1px solid color-mix(in srgb, #f0b429 50%, #000); font-weight: 800; }
 .editor-container .xform-badge-label:hover { filter: brightness(1.06); }
 .editor-container .xform-badge-x:hover { background: #ffd166; }
-/* t838 — the PRE-FLIGHT ENVELOPE badge (top-left of the editor): green fits / amber can't-verify / red N-outside, a solid
-   pill in the xform-badge visual language; click → a popover of violations (row-click jumps to the line). */
-.editor-container .preflight-badge { position: absolute; left: 8px; top: 8px; z-index: 12; display: inline-flex; flex-direction: column; align-items: flex-start; }
+/* t838 — the PRE-FLIGHT ENVELOPE badge: green fits / amber can't-verify / red N-outside, a solid pill in the
+   xform-badge visual language; click → a popover of violations (row-click jumps to the line).
+   t2155 — a STRIP TENANT now (was position:absolute; left:8; top:8; z-index:12 — the leftmost of the three
+   z-index-12 tenants this editor used to arbitrate by hand). `order:1` is belt-and-suspenders: preflightBadge.js
+   already inserts it as the strip's first child, but a declared order survives a future reader appending instead
+   of inserting. */
+.editor-container .preflight-badge { position: relative; display: inline-flex; flex-direction: column; align-items: flex-start; order: 1; }
 .editor-container .preflight-badge[hidden] { display: none; }
 .editor-container .preflight-badge-label {
     font: 700 11px/1 inherit; padding: 5px 11px; border-radius: 999px; cursor: pointer; white-space: nowrap;
@@ -946,8 +950,14 @@ html, body { overflow-x: clip; }
    colour regardless of theme. Fixed to read --ink (the real, declared token). */
 .editor-container .preflight-info   .preflight-badge-label { background: color-mix(in srgb, var(--panel, #23262b) 88%, #fff); color: var(--ink, #d7dae0); border-color: color-mix(in srgb, var(--ink, #d7dae0) 22%, transparent); font-weight: 500; }
 .editor-container .preflight-red    .preflight-badge-label { background: #e5484d; color: #2a0407; border-color: color-mix(in srgb, #ff5964 55%, #000); box-shadow: 0 2px 10px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, #ff5964 30%, transparent); }
+/* t2155 — position:absolute + the badge's own position:relative (below) so opening the popover overlays the
+   code area instead of growing `.preflight-badge`'s own box, which is now a normal-flow STRIP tenant: an
+   in-flow growth would push `.editor-strip`'s height (and everything below it) down on every click. Previously
+   this needed no position at all because `.preflight-badge` itself was position:absolute (out of flow already),
+   so its own growth never touched surrounding layout — same visual result, now reached deliberately. */
 .editor-container .preflight-pop {
-    margin-top: 6px; min-width: 210px; max-width: 330px; max-height: 42vh; overflow: auto;
+    position: absolute; top: 100%; left: 0; margin-top: 6px; z-index: 12;
+    min-width: 210px; max-width: 330px; max-height: 42vh; overflow: auto;
     background: var(--panel, #161b22); color: var(--text, #e6edf3); border: 1px solid var(--border, #30363d);
     border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 8px 10px; font: 500 11px/1.45 inherit;
 }
@@ -969,9 +979,12 @@ html, body { overflow-x: clip; }
     border: 1px solid color-mix(in srgb, #ff5964 55%, transparent); border-radius: 5px; padding: 0 6px;
     box-shadow: 0 1px 4px rgba(0,0,0,.45);
 }
-/* t844 — the TIME-ESTIMATE chip: an unobtrusive pill at the editor top-centre, the program's estimated run time (hover = the breakdown). */
+/* t844 — the TIME-ESTIMATE chip: an unobtrusive pill, the program's estimated run time (hover = the breakdown).
+   t2155 — a STRIP TENANT now (was position:absolute; top:8; left:50%; transform:translateX(-50%) — independently
+   centred across the WHOLE editor width). It now sits in normal flow next to the pre-flight badge instead —
+   `order:2` places it between the badge (order:1) and the toolbar (order:3, pushed right by its own margin). */
 .editor-container .time-estimate-chip {
-    position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 12; cursor: default;
+    cursor: default; order: 2;
     font: 600 11px/1 inherit; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
     background: color-mix(in srgb, var(--panel, #161b22) 90%, transparent); color: var(--text-dim, #8b949e);
     border: 1px solid var(--border, #30363d); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
@@ -3595,7 +3608,9 @@ body[data-theme="futuristic"] #editor.editor-layer { caret-color: var(--accent) 
 
 /* The editor is a CRT console: horizontal scanlines + a soft edge vignette over the whole screen.
    z-index 5 sits above the code/drawer (z1–4) but below the dock handle (z6); pointer-events:none so
-   typing + 3D-orbit still work. */
+   typing + 3D-orbit still work. t2155 — unaffected by the strip/code split: #editor/#editor-highlight/
+   #editor-gutter keep their own original individual z-indices inside `.editor-code` (see its own comment for
+   why giving THAT box a z-index instead broke the handle's clickability and would have broken this too). */
 [data-theme="futuristic"] .editor-container::after {
     content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
     background:
@@ -3957,9 +3972,44 @@ body #editor.editor-layer {
 }
 
 /* t865 — the FOLLOW-EXECUTION toggle (replaced the minimap): a small floating button on the editor top-right, just left
-   of Copy. When ON it auto-scrolls the editor to keep the running line in view during playback (a display pref; the
-   editor stays full-width — no strip, no padding inset). The minimap + all its gm-* CSS and pull-tab accommodations were
-   removed here; the pull-tab (.viz3d-handle) reverts to its base right:0 anchor (pre-t812). */
+   of Copy. When ON it auto-scrolls the editor to keep the running line in view during playback (a display pref). The
+   minimap + all its gm-* CSS and pull-tab accommodations were removed here; the pull-tab (.viz3d-handle) reverts to
+   its base right:0 anchor (pre-t812). */
+
+/* t2155 — THE DECLARED STRIP. Was five things independently choosing position:absolute inside `.editor-container`
+   (the badge, the time chip, the toolbar — each with its own left/top/z-index), arbitrated by a hand-synced magic
+   number (`--editor-chip-inset`, now deleted) and a z-index war between the badge and the toolbar. Now: one auto-
+   height flex row. `order` places each tenant regardless of DOM/module-init order (see the three `order:` rules
+   below) — badge left, chip next to it, toolbar pushed to the far right by ITS OWN `margin-left:auto` (there is no
+   literal spacer element; a flex auto-margin greedily eats the remaining row width). ⭐ THE SAFETY PROPERTY the old
+   z-index arbitration protected ("a safety readout must never be hidden behind a convenience button") now holds
+   STRUCTURALLY instead of by number: normal-flow flex siblings cannot visually overlap each other at all, so a long
+   "N outside envelope" pill can only PUSH the toolbar right or WRAP it to a second line — never cover it. */
+.editor-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    padding: 8px;
+}
+
+/* t2155 — THE CODE BOX: #editor-gutter (JS-inserted), #editor, #editor-highlight, the op-edit chip and the
+   rotation badge (editorOpHover.js) all mount/position INSIDE this box now, via the declared editorCodeHost()
+   (uiUtils.js) — see index.html's own comment on `.editor-code`. flex:1 — auto height, no typed number: it
+   simply fills whatever `.editor-strip` above it doesn't use.
+   Deliberately NO z-index here (see the ring rules above for why a z-indexed wrapper broke two things — the
+   handle's clickability and the futuristic scanline — that the old, content-less ::before never touched). The
+   code layers keep their own original individual z-indices (1–3) unchanged, so both stay exactly as they were:
+   the drawer (z4) still covers them when open, and the futuristic scanline (z5) still dims the code text. */
+.editor-code {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+}
+/* the RING pseudo alone needs to yield to the open drawer (z4) — its own z7 would otherwise paint a thin outline
+   artifact over the 3D preview panel at the code area's right edge; pointer-events:none either way, so this is
+   purely cosmetic, unlike the concerns above */
+.editor-container:has(.viz3d-drawer.open) .editor-code::before { z-index: 3; }
 
 .editor-layer {
     position: absolute;
@@ -4049,75 +4099,38 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
     caret-color: #fff; /* Keep cursor visible */
 }
 
-/* BACKLOG #12 (human, 2026-08-22: "the border appear when i click in the editor" -> "just left is missing") —
-   THE RING'S LEFT EDGE WAS PAINTED OVER, not missing. It is the generic `textarea:focus-visible` rule
-   (this file, ~line 1929) doing its job correctly — a real, deliberate accessibility ring, not a stray UA
-   default (confirmed: no separate rule existed to delete). The bug is WHERE it draws: at `outline-offset:-2px`
-   on `#editor` itself, whose own left edge sits UNDER `#editor-gutter` (position:absolute, z-index:3, 44px
-   wide, directly above) — so the ring's left third is drawn, then immediately painted over by the gutter's own
-   opaque background. Top/right/bottom clear the gutter and draw fine, which is exactly the one-edge symptom.
-   ⛔ Not a clipping bug (no overflow:hidden ancestor sits between the ring and the viewport on that edge) —
-   confirmed by DOM/z-index reading before writing this, not assumed from the symptom shape.
-   THE FIX: `#editor-gutter` is a plain SIBLING of `#editor` inside `.editor-container` (editorManager.js's
-   `insertBefore`, not an absolutely-positioned child needing a new wrapper) — so the ring moves to the ONE
-   existing box that already contains both: `.editor-container` itself. `:has()` reaches the container from
-   the descendant's OWN :focus-visible state (already this file's pattern — `.editor-container:has(.viz3d-
-   drawer.open)` above), so this needs no new element and no JS.
-   ⚠ t2151/t2153 — CORRECTED, having been wrong the first time this comment was written: the ring shows on
-   BOTH click and Tab, not "click → none, Tab → one". Measured directly (a real click, compared against a
-   `<button>` in the same page which correctly suppresses on click): a `<textarea>` reports `:focus-visible ===
-   true` even on a plain mouse click, in this Chromium — the CSS spec's own documented behaviour for
-   text-editable widgets ("always considered to match :focus-visible… because a user typically wants to know
-   where they will type"), independent of input modality. So `:focus-visible` fixes the ring's SHAPE here (a
-   complete rectangle instead of three edges), never its TRIGGER — the human's original complaint ("the border
-   appears when I click in the editor") is UNCHANGED and still true after this fix. Suppressing it on click
-   would need a JS input-modality tracker, which is new machinery this item's own scope deliberately did not
-   build without a ruling — see BACKLOG #12 / WORK-LOG t2151/t2153 for the full reasoning.
-   ⚠ t2153 amendment 3 (human RULING, two mockups compared side by side) — CORRECTED AGAIN: ringing the WHOLE
-   `.editor-container` (this comment's own earlier fix) was REJECTED. The ring frames the CODE AREA ONLY; the
-   `.editor-toolbar` row (Make, rotate, undo, redo, clear, copy) stays OUTSIDE it. MEASURED first, per the
-   ruling's own condition, before building anything: does `.editor-toolbar` (position:absolute, top:8px)
-   actually float OVER line 1 of code, which would make excluding it cut the first line out of the ring
-   instead of fixing anything? Seeded 5 real lines, focused the editor, read every rect — `.editor-toolbar`
-   bottom sits at y=142, the first `.g-line`'s own top at y=168, a clean 26px gap. NO OVERLAP: `#editor`,
-   `#editor-highlight` and `#editor-gutter` already start BELOW the toolbar's own band, at
-   `top: var(--editor-chip-inset)` (46px — t1323's OWN reserved strip, built for the runtime-estimate chip
-   that floats in the same band the toolbar occupies) — so the boundary the ruling asks for ALREADY EXISTS in
-   the layout; nothing needed restructuring (the "toolbar gets its own in-flow strip" alternative the ruling
-   floated for the overlap case never applies here).
-   ⭐ THE ONLY GAP: no single EXISTING element's box is exactly "the container, inset by the chip-band, with
-   the gutter still inside it" — `#editor`/`#editor-highlight` span the right width but are the gutter's
-   SIBLINGS (a sibling's outline is still painted per normal stacking order, so the gutter — z-index 3 — would
-   cover it on the left again, the ORIGINAL bug); only `.editor-container` is an ANCESTOR of the gutter, and an
-   ancestor's outline paints AFTER its whole subtree regardless of a child's z-index (why the previous,
-   REJECTED fix never had a left-edge problem — that mechanism was right, just applied to the wrong box). A
-   generated `::before` on `.editor-container`, inset from the top by the SAME `--editor-chip-inset` variable
-   the gutter/editor/highlight already use (not a new value — the declared source for "where the code area
-   starts" already existed), gets both properties at once: it is a real descendant of `.editor-container` (so
-   its own outline still paints after the gutter), and its own box is exactly the code area, chrome excluded.
-   No new DOM element, no JS — CSS generated content only. */
-#editor:focus-visible { outline: none; }   /* suppress the generic per-element ring — it would still be the one the gutter covers */
-.editor-container { position: relative; }   /* (already true elsewhere — restated here so the ::before below has an explicit anchor beside it) */
-/* ⚠ t2153 amendment 6 — THE WIDE-WIDTH BREAK, human-observed direct on the real app ("circles fine on mobile
-   but not in wide mode" — the OPPOSITE of what an earlier amendment predicted for phone, which was correctly
-   withdrawn once the human looked at the real screen). Reproduced at 1400×900, editor focused, before touching
-   anything: `.viz3d-handle` (the 3D-preview pull-tab) sits `position:absolute; right:0; z-index:6`, vertically
-   centred — its own rect (x:1372–1400, y:447–519 in this viewport) squarely overlaps the ring's right edge
-   (drawn at x≈1398, the SAME 2px line, via outline-offset:-2px). z-index 4 loses to the handle's 6, so the
-   handle painted a 72px-tall gap into the ring's own right edge, screenshot-confirmed
-   (`verification/t2153-amend6-wide-right-edge.png`). Not present in portrait/phone because a SEPARATE media
-   query relocates the handle to `bottom:0; left:50%` there (styles.css, `@media (orientation: portrait)`) —
-   off the right edge entirely, which is exactly why the human saw it fine on mobile and broken on desktop. */
-.editor-container::before {
+/* BACKLOG #12 / t2151 / t2153 — THE RING, three rounds of correction (full history preserved in WORK-LOG:
+   t2151/t2153), CLOSED (t2153 amendment 7, human: "ok great it works"). Summary: a `<textarea>` reports
+   `:focus-visible === true` even on a plain click in this Chromium (the CSS spec's own documented behaviour
+   for text-editable widgets), so this ring fixes SHAPE (a complete rectangle, clearing the gutter on every
+   edge) — the human accepted the result without re-raising the click-trigger question, closing it by
+   acceptance rather than by a JS input-modality tracker (deliberately not built — see BACKLOG #12).
+
+   t2155 — RE-HOSTED, not fully deleted. The plan was to drop the ::before and outline `.editor-code` directly
+   (its own box is now exactly "the code area, chrome excluded" — no more magic inset number needed for THAT
+   part). Tried it, and it broke TWO things a plain "wrap it in a positioned box" reading doesn't surface,
+   both found by actually clicking things rather than trusting the CSS on paper:
+     1. `.editor-code` would need z-index:7 to beat `.viz3d-handle` (6) — the same fight t2153 amendment 6 fixed
+        for the old ::before. But a z-indexed box lifts its WHOLE SUBTREE as one stacking unit, including
+        #editor itself — an interactive `<textarea>` that isn't pointer-events:none. That silently made #editor
+        capture clicks meant for the handle button wherever their boxes overlap (the handle's own right-edge
+        strip), breaking the 3D-preview toggle ENTIRELY at every width. A thin, pointer-events:none ::before
+        never had this problem — it only ever competed for PAINT order, never for click targets.
+     2. The same lift also moved #editor/#editor-highlight above [data-theme="futuristic"]'s CRT scanline
+        (`.editor-container::after`, z5), which is deliberately built to dim the code text as part of its "over
+        the whole screen" effect — a real, visible theme regression, not a paper one.
+   Both are non-obvious consequences of coupling ring-paint to content-stacking, which is exactly what made the
+   OLD `.editor-container::before` the right shape in the first place — it just needed a better BOX to inset
+   from than a hand-synced magic number. That's what `.editor-code` still gives it: the ::before survives, but
+   the inset arithmetic it used to need does not — `inset:0` on a box that already starts in the right place. */
+#editor:focus-visible { outline: none; }   /* suppress the generic per-element ring — the ::before below carries it, decoupled from #editor's own stacking so it can never steal a click meant for something else */
+.editor-code::before {
     content: '';
-    position: absolute;
-    top: var(--editor-chip-inset, 0); left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 7;   /* above .viz3d-handle (6, the pull-tab that broke the right edge — see the amendment-6 note
-                     above) and #editor-gutter (3); the preflight badge (12) stays visually unaffected since an
-                     OUTLINE only paints a thin edge line, never fills the interior area the badge sits inside */
+    position: absolute; inset: 0; pointer-events: none;
+    z-index: 7;   /* beats .viz3d-handle (6) — see the note above; purely visual (pointer-events:none), so
+                     nothing it wins against loses its own clickability the way #editor itself would have */
 }
-.editor-container:has(#editor:focus-visible)::before {
+.editor-code:has(#editor:focus-visible)::before {
     outline: 2px solid var(--field-focus-edge, var(--accent));
     outline-offset: -2px;
 }
@@ -5466,15 +5479,14 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
    `left`/`bottom` offsets were hand-computed multiples of 36px (add one and you recomputed the rest; change a
    label and it silently overlapped its neighbour). Order is now declarative — it is the DOM order.
 
-   ⚠ ANCHORED RIGHT so it never starts on top of the PRE-FLIGHT BADGE, whose home is top-left of this same strip.
-   ⚠ AND THE BADGE OUTRANKS IT (human's call): the badge carries z-index 12, this row 3, so when a long
-   "N outside envelope" pill overflows toward the middle it covers these buttons rather than being covered — a
-   safety readout must never be hidden behind a convenience button. The row stays right-anchored, so the buttons
-   nearest the edge (file, copy) survive the overlap longest. */
+   t2155 — a STRIP TENANT now, not its own absolutely-positioned island (was position:absolute; right:8; top:8;
+   z-index:3). `margin-left:auto` inside the flex row IS the "anchored right" behaviour — it eats all the row's
+   remaining width, pushing everything after the badge/chip as far right as they'll go. `order:3` keeps it last
+   regardless of DOM position. THE BADGE OUTRANKING IT is no longer a z-index number (12 vs 3) — see
+   `.editor-strip`'s own comment for why normal-flow siblings make that fight structurally impossible to lose. */
 .editor-toolbar {
-    position: absolute; right: 8px; top: 8px; z-index: 3;
     display: flex; align-items: center; gap: 4px;
-    max-width: calc(100% - 16px);
+    margin-left: auto; order: 3;
 }
 .editor-toolbar > button {
     opacity: .75; font-size: 11px; padding: 3px 8px; line-height: 1;
@@ -5515,16 +5527,18 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
        (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
        (its Open/Save now live in the chevron). */
-    /* BACKLOG #13 — the toolbar moves to the BOTTOM right on phone. `top:8px` (the desktop position, base rule
-       above) parks it over the FIRST LINE of code, exactly where the caret usually sits when you start typing.
-       Most programs do not fill a phone screen, so the bottom sits over blank space instead — same row, same
-       6 buttons (284px = 6×44 + 5×4px gaps, fits a 390–430px viewport with `max-width:calc(100% - 16px)`
-       already guarding it), just anchored to the edge that is actually empty. A COLUMN was considered and
-       rejected: 6 stacked 44px buttons is 264px tall and would cover most of the visible code down the right
-       edge instead of just the first line — a bigger obstruction, not a smaller one. This override has to sit
-       AFTER `.editor-toolbar`'s own base rule in the file (same selector, same specificity — source order
-       decides), which is why it lives in this later phone query rather than the one right above `#btn-clear`. */
-    .editor-toolbar { top: auto; bottom: 8px; }
+    /* BACKLOG #13 — the strip moves to the BOTTOM on phone. Sitting at the top (base position) parks the toolbar
+       over the FIRST LINE of code, exactly where the caret usually sits when you start typing. Most programs do
+       not fill a phone screen, so the bottom sits over blank space instead.
+       t2155 — this used to be a position:absolute override on `.editor-toolbar` alone (`top:auto; bottom:8px`),
+       a SECOND magic number living only in this query. Now it is one flex `order` on the WHOLE strip: `.editor-
+       code` keeps its default order (0) and `.editor-strip` reorders to AFTER it in the column — no new number,
+       and the strip's own tenants (badge, chip) move to the bottom WITH the toolbar instead of splitting across
+       two edges. This is also the fix for the phone-width inconsistency flagged in t2153 amendment 5 (the
+       toolbar used to sit geometrically INSIDE the focus ring on phone, since the ring's own box didn't change
+       with this override): the ring now belongs to `.editor-code` alone, so the strip is OUTSIDE it at every
+       width, phone included, with no separate reasoning needed for the phone case. */
+    .editor-strip { order: 2; }
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
@@ -6385,18 +6399,13 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .saved-pop-ok:hover { background: rgba(255, 255, 255, .16); }
 
 
-/* t1323 (USER SCREENSHOT) — THE TIME CHIP GETS ITS OWN SPACE. It floats at the top of the editor while the code
-   started 14px down, so the estimate sat ON line 1 — two controls owning the same pixels, the rule the header
-   chevron settled at t1303. Docking it into a chrome row was the alternative and it loses: the editor's chrome is
-   its corners (file, copy, Make, Transform), and an estimate of THIS program belongs over the code it describes.
-   So the code moves down by exactly the chip's height instead, applied to BOTH layers — the textarea and its
-   highlight overlay shift together, or every glow would sit a line off.
-   It lives at the END of the file deliberately: the per-theme editor rules carry the same specificity, and the last
-   one wins. Written earlier in the file it looked right and changed nothing. */
-.editor-container { --editor-chip-inset: 46px; }   /* the chip sits 8px down and stands ~31px tall — measured, not guessed, plus breathing room */
-.editor-container #editor,
-.editor-container #editor-highlight,
-.editor-container #editor-gutter { top: var(--editor-chip-inset); height: calc(100% - var(--editor-chip-inset)); }
+/* t1323 (USER SCREENSHOT) — THE TIME CHIP GOT ITS OWN SPACE, historically via a hand-synced magic number
+   (`--editor-chip-inset: 46px`) pushing #editor/#editor-highlight/#editor-gutter's `top`/`height` down to clear
+   it — deleted by t2155: the chip lives in `.editor-strip` now (an auto-height box), and #editor/#editor-
+   highlight/#editor-gutter live in `.editor-code` (a sibling box that starts wherever the strip ends, always,
+   with no number to keep in sync). Their own `.editor-layer`/`#editor-gutter` base rules already say
+   `top:0; height:100%` — inside `.editor-code`, that is already exactly "the code area, chip band excluded",
+   so nothing replaces this block. Its deletion IS the fix. */
 
 [data-theme="studio"] #editor-gutter { font-size: 15px; padding: 14px 8px 14px 0; }
 

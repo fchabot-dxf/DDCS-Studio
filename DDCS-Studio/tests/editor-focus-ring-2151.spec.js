@@ -32,19 +32,28 @@ import { test, expect } from '@playwright/test';
  * the handle's own content or the preflight badge's z-index:12 interior — nothing else sits AT an edge this
  * ring draws on).
  *
+ * ROUND 4 (t2155, the editor-strip/editor-code refactor) — the ring's HOST changed from `.editor-container`
+ * (inset from the top by a hand-synced `--editor-chip-inset: 46px`) to `.editor-code` (a real box that already
+ * starts exactly where the code area starts — the strip above it is auto-height, no number to keep in sync).
+ * The ring STAYS a `::before` (`.editor-code::before`), not the box's own outline — tried outlining `.editor-
+ * code` directly first, and it broke two things a plain reading doesn't surface: a z-indexed WRAPPER lifts its
+ * whole subtree, including `#editor` itself (a real, clickable `<textarea>`), so it silently stole clicks
+ * meant for `.viz3d-handle` wherever their boxes overlapped — the 3D-preview toggle became unusable, not just
+ * visually wrong. It also lifted the code text above `[data-theme="futuristic"]`'s CRT scanline effect, which
+ * is deliberately built to dim it. A thin, `pointer-events:none` `::before` has neither problem — seen styles.
+ * css's own comment on `.editor-code` for the full reasoning. THE OTHER PART OF t2155: the toolbar (and the
+ * whole strip with it) is now excluded from the ring at EVERY width, including phone, where it used to sit
+ * geometrically INSIDE the ring's own box (a note in the previous round, not fixed then — see the phone test
+ * below, now a real pass instead of a report).
+ *
  * ⚠ WHY THIS SUITE VERIFIES PIXELS, NOT `getComputedStyle` ON THE PSEUDO-ELEMENT: tried first, and
  * `getComputedStyle(container, '::before')` reported wrong values for EVERY property in this harness — even
  * `content`, which is unconditionally `''` in the rule — a real limitation of that two-argument form here, not
  * a property of the CSS. Verified instead by DIFF: the same pixel, focused vs unfocused — a ring appearing is
- * a real, themed-colour-agnostic change a broken computed-style API cannot lie about.
- *
- * ⚠ NOTE FOR THE HUMAN, NOT ACTED ON (amendment 6's own instruction: report, do not fix, "they may simply not
- * mind"): on PHONE, the toolbar (bottom-anchored at `bottom:8px` since BACKLOG #13, this same turn) sits
- * GEOMETRICALLY inside the ring's own box (ring bottom ≈ y=799 at 390px, toolbar spans y=749–793) — the same
- * "ruling says outside, geometry says inside" shape amendment 5 predicted, just for the bottom edge instead of
- * the right one. Measured AND screenshotted: unlike the right-edge break above, this produces NO visible
- * artifact — the toolbar sits well clear of the ring's actual 2px line, just inside the enclosed area near the
- * bottom. Left alone, per the explicit instruction and the human's own "fine on mobile" verdict.
+ * a real, themed-colour-agnostic change a broken computed-style API cannot lie about. Where a plain DOM rect
+ * comparison answers the question just as well (e.g. "does #editor start where .editor-code starts"), this
+ * file uses `getBoundingClientRect()` instead — no screenshot needed, and it survives a future layout tweak
+ * that a hardcoded pixel coordinate would silently start lying about.
  */
 async function ready(page) {
     await page.goto('http://localhost:3211');
@@ -84,6 +93,14 @@ async function pixelsAt(page, points) {
 const isBlack = ([r, g, b]) => r < 10 && g < 10 && b < 10;
 const colorDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
+/** A point ON the ring's left edge line, a few px below its top-left corner — derived from `.editor-code`'s own
+ * live rect (t2155: no more hardcoded --editor-chip-inset offset to guess at). Works at any width, since the
+ * left edge is at x≈1 for the entire vertical span of the box, regardless of where the strip puts the top. */
+const leftEdgePoint = (page) => page.evaluate(() => {
+    const r = document.querySelector('.editor-code').getBoundingClientRect();
+    return [Math.round(r.left) + 1, Math.round(r.top) + 6];
+});
+
 test('unfocused: no ring anywhere, at the boundary line or inside the toolbar band', async ({ page }) => {
     await ready(page);
     await page.evaluate(() => document.activeElement && document.activeElement.blur());
@@ -100,34 +117,74 @@ test('focused: neither #editor nor .editor-container itself carries the ring (it
     expect(s.editorOutline, '#editor carries none either — a ring there would repeat the original left-edge bug').toBe('none');
 });
 
-test('THE RING EXCLUDES THE TOOLBAR ROW (t2153 ruling): the boundary pixel changes on focus, the toolbar-band pixel does not', async ({ page }) => {
+test('THE RING EXCLUDES THE TOOLBAR ROW (t2153 ruling), desktop: the boundary pixel changes on focus, the strip pixel does not', async ({ page }) => {
+    // t2155 — explicit desktop size. The strip sits at the TOP only above 600px; below that it reorders to the
+    // bottom (BACKLOG #13 / this same refactor), which is covered by its own phone test below instead of by
+    // guessing a shared pixel coordinate could mean the same thing at both widths.
+    await page.setViewportSize({ width: 1400, height: 900 });
     await ready(page);
     await seedLines(page);
-    const POINTS = [
-        [1, 130],   // inside the toolbar's own band (y:108-153) — must stay unchanged; the ring must never reach here
-        [1, 154],   // the code boundary (container.top(108) + --editor-chip-inset(46)) — the ring's real top edge
-        [400, 400], // well inside the code area — plain black either way, never swallowed by an oversized ring
-    ];
+    // Points DERIVED from the live rects, not hardcoded — `.editor-strip`'s own height is auto (t2155 deleted
+    // the old --editor-chip-inset magic number), so a fixed y coordinate would silently drift the day padding
+    // or font-size changes it.
+    const { stripPoint, boundaryPoint, deepPoint } = await page.evaluate(() => {
+        const strip = document.querySelector('.editor-strip').getBoundingClientRect();
+        const code = document.querySelector('.editor-code').getBoundingClientRect();
+        return {
+            stripPoint: [1, Math.round(strip.top + strip.height / 2)],   // inside the strip's own band — must stay unchanged
+            boundaryPoint: [1, Math.round(code.top) + 2],                // the code box's own top edge — the ring's real top edge
+            deepPoint: [Math.round(code.left + code.width / 2), Math.round(code.top + code.height / 2)],   // well inside the code area
+        };
+    });
+    const POINTS = [stripPoint, boundaryPoint, deepPoint];
     await page.evaluate(() => document.activeElement && document.activeElement.blur());
     const before = await pixelsAt(page, POINTS);
     await page.click('#editor');
     await page.waitForTimeout(120);
     const after = await pixelsAt(page, POINTS);
 
-    expect(colorDist(before[0], after[0]), `toolbar-band pixel unchanged by focus: ${before[0]} -> ${after[0]}`).toBeLessThan(20);
+    expect(colorDist(before[0], after[0]), `strip-band pixel unchanged by focus: ${before[0]} -> ${after[0]}`).toBeLessThan(20);
     expect(colorDist(before[1], after[1]), `boundary pixel changes on focus — the ring's own top edge: ${before[1]} -> ${after[1]}`).toBeGreaterThan(40);
     expect(isBlack(after[2]), `the code area itself stays plain black, not ring-filled: ${after[2]}`).toBe(true);
+});
+
+test('THE RING EXCLUDES THE STRIP (t2155), phone: the strip moved to the bottom, and the ring still stops above it', async ({ page }) => {
+    // t2153 amendment 5 measured this exact case and found the toolbar sat GEOMETRICALLY inside the ring's own
+    // box on phone (bottom-anchored at bottom:8px, but the ring's box was still the WHOLE .editor-container) —
+    // reported as a note, not fixed, since it produced no visible artifact. t2155 fixes the underlying cause
+    // (the ring's box is `.editor-code` now, and the strip is a genuine SIBLING outside it, at every width) —
+    // this test is that note's replacement: a real assertion instead of a screenshot note.
+    await ready(page);   // default viewport is phone-sized (412×915) — no explicit size needed
+    await seedLines(page);
+    const { code, strip } = await page.evaluate(() => ({
+        code: document.querySelector('.editor-code').getBoundingClientRect(),
+        strip: document.querySelector('.editor-strip').getBoundingClientRect(),
+    }));
+    expect(strip.top, 'the strip sits BELOW the code box on phone, not overlapping it').toBeGreaterThanOrEqual(code.top + code.height - 1);
+});
+
+test('THE RING\'S BOX IS .editor-code\'s OWN BOX, at both widths (t2155 — no leftover inset)', async ({ page }) => {
+    for (const size of [{ width: 1400, height: 900 }, { width: 412, height: 915 }]) {
+        await page.setViewportSize(size);
+        await ready(page);
+        const { editorTop, codeTop, gap } = await page.evaluate(() => {
+            const editorTop = document.getElementById('editor').getBoundingClientRect().top;
+            const codeTop = document.querySelector('.editor-code').getBoundingClientRect().top;
+            return { editorTop, codeTop, gap: editorTop - codeTop };
+        });
+        expect(gap, `${size.width}px: #editor starts at .editor-code's own top (no --editor-chip-inset left over): editor=${editorTop} code=${codeTop}`).toBeLessThan(1);
+    }
 });
 
 test('THE LEFT EDGE (round 1\'s own fix, still true): the gutter sits INSIDE the ring at the code boundary, not under it', async ({ page }) => {
     await ready(page);
     await seedLines(page);
-    const POINT = [[1, 156]];   // 2px below the boundary — a -2px-offset ring's top-left corner resolves here, the SAME edge the gutter itself occupies
+    const point = await leftEdgePoint(page);
     await page.evaluate(() => document.activeElement && document.activeElement.blur());
-    const [before] = await pixelsAt(page, POINT);
+    const [before] = await pixelsAt(page, [point]);
     await page.click('#editor');
     await page.waitForTimeout(120);
-    const [after] = await pixelsAt(page, POINT);
+    const [after] = await pixelsAt(page, [point]);
     expect(colorDist(before, after), `the ring's left edge reaches x≈1 at the code boundary: ${before} -> ${after}`).toBeGreaterThan(40);
 });
 
@@ -170,14 +227,14 @@ test('THE RIGHT EDGE (t2153 amendment 6): the ring paints ON TOP of the 3D-previ
 test('focused via keyboard (Tab): the same ring — one mechanism for both input modalities', async ({ page }) => {
     await ready(page);
     await seedLines(page);
-    const POINT = [[1, 154]];
+    const point = await leftEdgePoint(page);
     await page.evaluate(() => document.activeElement && document.activeElement.blur());
-    const [before] = await pixelsAt(page, POINT);
+    const [before] = await pixelsAt(page, [point]);
     await page.click('#editor');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
     await page.waitForTimeout(120);
-    const [after] = await pixelsAt(page, POINT);
+    const [after] = await pixelsAt(page, [point]);
     expect(colorDist(before, after), `Tab-focus rings the code boundary too: ${before} -> ${after}`).toBeGreaterThan(40);
 });
 
@@ -190,12 +247,44 @@ test('theme-independent: the boundary pixel changes on focus in normal, futurist
         await page.selectOption('#set_theme', theme);
         await expect.poll(() => page.getAttribute('body', 'data-theme')).toBe(theme);
         await page.evaluate(() => window.closeSettings && window.closeSettings());
-        const POINT = [[1, 154]];
+        const point = await leftEdgePoint(page);
         await page.evaluate(() => document.activeElement && document.activeElement.blur());
-        const [before] = await pixelsAt(page, POINT);
+        const [before] = await pixelsAt(page, [point]);
         await page.click('#editor');
         await page.waitForTimeout(120);
-        const [after] = await pixelsAt(page, POINT);
+        const [after] = await pixelsAt(page, [point]);
         expect(colorDist(before, after), `${theme}: the boundary pixel changes on focus: ${before} -> ${after}`).toBeGreaterThan(40);
     }
+});
+
+test('THE STRIP FITS ITS TALLEST CHILD at phone width (t2155 — auto height, the 44px touch floor still fits)', async ({ page }) => {
+    await ready(page);   // default viewport is phone-sized
+    const h = await page.evaluate(() => document.querySelector('.editor-strip').getBoundingClientRect().height);
+    // BACKLOG #13's own floor (editor-chrome.spec.js is the authoritative spec for the buttons themselves) —
+    // this just confirms the STRIP, now auto-height instead of a typed number, actually grew to fit them.
+    expect(h, `the strip is at least as tall as a 44px button (measured ${h}px)`).toBeGreaterThanOrEqual(44);
+});
+
+test('THE PRE-FLIGHT BADGE IS NEVER COVERED BY THE TOOLBAR (t2155 — structural now, not z-index arbitration)', async ({ page }) => {
+    // t2078's own comment documented this as a DELIBERATE z-index call (badge:12 over toolbar:3) because a long
+    // "N outside envelope" pill could otherwise cover the toolbar. t2155 replaces the z-index arbitration with
+    // plain flex flow, where two normal-flow siblings structurally cannot occupy the same pixels at all — so
+    // this test doesn't need an artificially long pill to prove the property; it holds for ANY badge width.
+    // A wide one is used anyway, matching the scenario the original comment worried about.
+    await page.setViewportSize({ width: 700, height: 800 });   // narrow enough that a long pill would be forced to interact with the toolbar if it still could
+    await ready(page);
+    await page.evaluate(() => {
+        const badge = document.getElementById('preflight-badge');
+        const label = badge.querySelector('.preflight-badge-label');
+        badge.hidden = false; badge.className = 'preflight-badge preflight-red';
+        label.textContent = '12 moves leave the machine travel envelope on every axis, X Y and Z';   // deliberately long
+    });
+    await page.waitForTimeout(50);
+    const { badgeRect, toolbarRect } = await page.evaluate(() => ({
+        badgeRect: document.getElementById('preflight-badge').getBoundingClientRect(),
+        toolbarRect: document.querySelector('.editor-toolbar').getBoundingClientRect(),
+    }));
+    const overlapsVertically = badgeRect.top < toolbarRect.bottom && badgeRect.bottom > toolbarRect.top;
+    const overlapsHorizontally = badgeRect.left < toolbarRect.right && badgeRect.right > toolbarRect.left;
+    expect(overlapsVertically && overlapsHorizontally, `badge=${JSON.stringify(badgeRect)} toolbar=${JSON.stringify(toolbarRect)}`).toBe(false);
 });

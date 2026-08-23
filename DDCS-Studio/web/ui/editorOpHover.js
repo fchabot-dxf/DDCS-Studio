@@ -12,6 +12,7 @@ import { commentMenuItems, installEditorTextOps } from './editorTextOps.js';   /
 import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
+import { editorCodeHost } from './uiUtils.js';   // t2155 — both the op-edit chip and the rotation badge are CODE-area tenants
 
 // t844 — the op's estimated run time from the cached program estimate (window.ddcsTimeEstimate), summed over its lines.
 function opTimeLabel(lines) {
@@ -23,30 +24,22 @@ const r3 = (n) => { const v = Math.round(n * 1000) / 1000; return Object.is(v, -
 export function initEditorOpHover() {
     const editor = document.getElementById('editor');
     const overlay = document.getElementById('editor-highlight');
-    if (!editor || !overlay || !editor.parentElement) return;
+    const host = editorCodeHost();   // t2155 — the chip is LINE-anchored, i.e. a CODE-area tenant, not a strip one
+    if (!editor || !overlay || !host) return;
 
     const chip = document.createElement('button');
     chip.id = 'op-edit-chip'; chip.className = 'op-edit-chip'; chip.type = 'button'; chip.hidden = true;
-    editor.parentElement.appendChild(chip);
+    host.appendChild(chip);
 
-    // t893 (rider) — NEVER absolute-overlap the top-left PRE-FLIGHT BADGE. The op-edit chip is LINE-anchored (its top tracks
-    // the hovered op), so a literal flex row can't hold it; instead a declared collision rule: set the chip's top, then when
-    // its band intersects the badge's band, FLOW it to the RIGHT of the badge (a row, gap 6) — or, at a narrow editor, STACK
-    // it BELOW the badge. The two bounding boxes then never intersect. Off-badge (a lower op) the chip keeps its CSS left (12px).
+    // t893 (rider) — NEVER absolute-overlap the top-left PRE-FLIGHT BADGE. Originally a hand-rolled collision
+    // dodge: measure both rects, flow the chip right of the badge or stack it below when their bands overlapped.
+    // t2155 — DELETED, not replaced. The badge now lives in `.editor-strip` (a box entirely ABOVE `.editor-code`,
+    // t2155's own strip/code split); the chip is a CODE-area tenant, so its box starts at `.editor-code`'s own
+    // top — below the strip, always. Their boxes cannot intersect any more, structurally, not by arithmetic:
+    // proven by keeping the ORIGINAL t893/traverse-clarity-893.spec.js collision test (unchanged) green with this
+    // dodge removed, including its narrow-viewport (850px) case that used to need the "stack below" branch.
     function placeChip(topPx) {
         chip.style.top = topPx + 'px';
-        chip.style.left = '';
-        const badge = document.getElementById('preflight-badge');
-        const cont = editor.parentElement;
-        if (!badge || badge.hidden || !cont) return;
-        const cr = cont.getBoundingClientRect(), br = badge.getBoundingClientRect();
-        if (!br.width) return;
-        const badgeTop = br.top - cr.top, badgeBot = badgeTop + br.height, gap = 6, chipH = 26;
-        if (topPx < badgeBot + gap && topPx + chipH > badgeTop - gap) {   // vertical bands overlap → they'd collide
-            const rightOfBadge = (br.right - cr.left) + gap;
-            if (rightOfBadge + 150 <= cr.width) chip.style.left = rightOfBadge + 'px';   // room → flow into the row beside the badge
-            else chip.style.top = (badgeBot + gap) + 'px';                                // narrow → drop BELOW the badge (stack)
-        }
     }
 
     // t736 — the PROGRAM ROTATION badge: a program-level pill beside the ⟳ Transform button showing the DECLARED xform
@@ -67,7 +60,7 @@ export function initEditorOpHover() {
         if (typeof window.ddcsLoadBlockStack === 'function') window.ddcsLoadBlockStack(rest);
     });
     badge.appendChild(badgeLabel); badge.appendChild(badgeX);
-    editor.parentElement.appendChild(badge);
+    host.appendChild(badge);
     const updateBadge = () => {
         const rot = (typeof window.ddcsGetBlockProgram === 'function') ? programRotation(window.ddcsGetBlockProgram() || []) : { angle: 0, pivotX: 0, pivotY: 0 };
         if (!rot.angle) { badge.hidden = true; return; }

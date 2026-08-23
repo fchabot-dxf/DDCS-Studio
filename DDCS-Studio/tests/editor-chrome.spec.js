@@ -89,14 +89,15 @@ test.describe('phone', () => {
     }
     // BACKLOG #13 — the toolbar sits at the BOTTOM on phone (top:8px would float it over the first line of
     // code, exactly where the caret usually is when you start typing).
+    // t2155 — the anchor moved from `.editor-toolbar { top:auto; bottom:8px }` (its own absolute position) to
+    // `.editor-strip { order: 2 }` (a flex reorder of the whole strip, toolbar included — see styles.css). The
+    // toolbar itself is a plain flex child now with no `bottom` of its own; the strip's `order` is a layout
+    // instruction, not a resolvable computed-style value like `bottom` was, so this checks the RENDERED rect
+    // (where it actually ends up) rather than a CSS property that no longer exists on this element.
     const barTop = await page.evaluate(() => {
       const bar = document.querySelector('.editor-toolbar');
-      const cs = getComputedStyle(bar);
-      // `top` resolves to a real pixel offset even when the source rule is `top:auto` (the browser computes
-      // the effective position), so `bottom` — set explicitly to 8px on phone — is the reliable computed check.
-      return { bottom: cs.bottom, rectBottom: bar.getBoundingClientRect().bottom, viewportH: window.innerHeight };
+      return { rectBottom: bar.getBoundingClientRect().bottom, viewportH: window.innerHeight };
     });
-    expect(barTop.bottom, 'bottom:8px is the phone-width anchor').toBe('8px');
     expect(barTop.rectBottom, 'the row sits near the bottom of the viewport, not the top').toBeGreaterThan(barTop.viewportH - 100);
 
     // t2099 — the corner file menu is gone (t2078); Load/Insert/Export reach the quick menu instead, still

@@ -7,6 +7,7 @@
 import { onChange } from '../blocks/programModel.js';
 import { checkEnvelope } from '../engine/envelopeCheck.js';
 import { blockLintViolations } from './preflightBlockLint.js';   // t1568 — the BLOCK-side contributor to this same surface
+import { editorStripHost } from './uiUtils.js';   // t2155 — the badge is a STRIP tenant, not a code-area one
 
 let _mgr = null;
 let badge = null, label = null, pop = null;
@@ -182,14 +183,15 @@ function render() {
 export function initPreflightBadge(mgr) {
     _mgr = mgr;
     const editor = document.getElementById('editor');
-    if (!editor || !editor.parentElement) return;
+    const host = editorStripHost();   // t2155 — a STRIP tenant now, not editor.parentElement
+    if (!editor || !host) return;
 
     badge = document.createElement('div'); badge.id = 'preflight-badge'; badge.className = 'preflight-badge'; badge.hidden = true;
     label = document.createElement('button'); label.type = 'button'; label.className = 'preflight-badge-label'; label.setAttribute('aria-label', 'Pre-flight envelope check');
     pop = document.createElement('div'); pop.className = 'preflight-pop'; pop.hidden = true;
     label.addEventListener('click', () => { if (badge.hidden) return; pop.hidden = !pop.hidden; });
     badge.appendChild(label); badge.appendChild(pop);
-    editor.parentElement.appendChild(badge);
+    host.insertBefore(badge, host.firstChild);   // ⭐ FIRST child, so it reads leftmost regardless of module init order (also backed by `order` in CSS)
 
     let inputT = null;
     const debounced = () => { clearTimeout(inputT); inputT = setTimeout(render, 250); };   // don't re-trace on every keystroke

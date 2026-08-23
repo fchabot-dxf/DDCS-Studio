@@ -4,6 +4,7 @@
 
 import { onChange } from '../blocks/programModel.js';
 import { estimateProgram, fmtDuration } from '../engine/timeEstimate.js';
+import { editorStripHost } from './uiUtils.js';   // t2155 — a STRIP tenant, not editor.parentElement
 
 let chip = null;
 let last = null;   // cache the last full estimate (incl. perLine) — the op-hover chip reads it without re-tracing per mousemove
@@ -29,13 +30,14 @@ function render() {
 
 export function initTimeChip() {
     const editor = document.getElementById('editor');
-    if (!editor || !editor.parentElement) return;
+    const host = editorStripHost();
+    if (!editor || !host) return;
     chip = document.createElement('div');
     chip.id = 'time-estimate-chip';
     chip.className = 'time-estimate-chip';
     chip.hidden = true;
     chip.setAttribute('aria-label', 'Estimated run time');
-    editor.parentElement.appendChild(chip);
+    host.appendChild(chip);   // order:2 in CSS places it between the badge and the toolbar regardless of DOM position
 
     let t = null;
     const debounced = () => { clearTimeout(t); t = setTimeout(render, 250); };   // don't re-trace on every keystroke

@@ -3,7 +3,7 @@
  * Handles the main G-code text editor functionality
  */
 
-import { el, UIUtils } from './uiUtils.js';
+import { el, UIUtils, editorCodeHost } from './uiUtils.js';
 import { SNIPPETS } from '../data/snippets.js';
 import { opLabelOf } from '../blocks/opBuilders.js';   // t975 — derive a clean export title from the op model (fixes g90_absolute.nc)
 import { confirmDestructiveLoad } from '../blocks/saveStates.js';   // t1938 — the ONE destructive-load seam Clear routes through
@@ -27,13 +27,18 @@ export class EditorManager {
     setupSync() {
         if (!this.editor || !this.highlight) return;
 
-        // Line-number gutter (dark grey, left), scroll-synced with the editor.
+        // Line-number gutter (dark grey, left), scroll-synced with the editor. t2155 — mounts into the
+        // DECLARED code host, not `this.editor.parentElement` (that happens to be the same box today, but
+        // asking for it by name is the whole point of the strip/code split — see uiUtils.js).
         this.gutter = el('editor-gutter');
-        if (!this.gutter && this.editor.parentElement) {
-            this.gutter = document.createElement('div');
-            this.gutter.id = 'editor-gutter';
-            this.gutter.setAttribute('aria-hidden', 'true');
-            this.editor.parentElement.insertBefore(this.gutter, this.editor);
+        if (!this.gutter) {
+            const host = editorCodeHost();
+            if (host) {
+                this.gutter = document.createElement('div');
+                this.gutter.id = 'editor-gutter';
+                this.gutter.setAttribute('aria-hidden', 'true');
+                host.insertBefore(this.gutter, this.editor);
+            }
         }
 
         const syncText = () => {
