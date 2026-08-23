@@ -256,3 +256,51 @@ test('a machine-less (pre-pivot) .ddcs is REFUSED with one plain message, not si
     expect(await page.evaluate(() => window.ddcsGetMachine()), 'the workspace is untouched').toEqual(before);
     expect(await page.evaluate(() => window.ddcsGetSettings().machine.x), 'the refused envelope never landed').not.toBe(1);
 });
+
+/**
+ * t2196 (amendment 2, bug 2) — THE FILE MENU'S OWN "Save" ROW WRITES IN PLACE, no modal. A live human report caught
+ * ui/headerPost.js's `case 'wsSave'` opening the workspace manager instead of writing — a regression against this
+ * row's own label ("Save", no ellipsis) and tooltip ("Save this workspace to its .ddcs file"), and against the same
+ * silent-re-save contract Ctrl+S already honours (ui/workspaceSave.js's saveWorkspace(), wired to both). These two
+ * tests drive the actual menu click (`#hdrPostBtn` → `[data-act="wsSave"]`), not the underlying function directly,
+ * because the bug was in the WIRING between the row and the door, not in the door itself.
+ */
+test('THE FILE MENU\'S "Save" ROW writes an already-open workspace IN PLACE — no dialog, no manager', async ({ page }) => {
+    await boot(page, { 'alpha.ddcs': wsFile('alpha') });
+    await openFromFolder(page, 'alpha');
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'alpha.ddcs');
+    // a real open normally reloads the page, tearing the manager modal down with it; __ddcsNoReload keeps the
+    // page (so this test can inspect state after), which also means the modal itself is still up — close it,
+    // the same way a real reload would, before driving the file menu's own Save row.
+    await page.locator('#wsmOverlay .wsm-x').click();
+    await expect(page.locator('#wsmOverlay')).toHaveCount(0);
+
+    // a real edit, so the save has something true to write
+    await page.evaluate(() => { localStorage.setItem('ddcs_tpl_zzz_wssave', JSON.stringify([{ n: 1 }])); window.ddcsFileSaveState.refresh(); });
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile())).toBe(true);
+
+    await page.click('#hdrPostBtn');
+    await page.click('#hdrPostMenu [data-act="wsSave"]');
+
+    // no dialog, no manager — the write is silent
+    await expect(page.locator('#wssAsk'), 'no name/folder ask — a handle already exists').toHaveCount(0);
+    await expect(page.locator('#wsmOverlay'), 'no manager modal').toHaveCount(0);
+    await page.waitForFunction(() => window.ddcsWorkspaceDirtyToFile() === false, null, { timeout: 5000 });
+
+    const files = await readFs(page);
+    expect(files['alpha.ddcs'], 'the file was actually rewritten').toContain('zzz_wssave');
+});
+
+test('THE FILE MENU\'S "Save" ROW asks ONCE when there is nothing to write to yet (never saved)', async ({ page }) => {
+    await boot(page, {});   // no remembered file — a brand-new user, same as the FIRST-save test above
+    await page.click('#hdrPostBtn');
+    await page.click('#hdrPostMenu [data-act="wsSave"]');
+
+    await page.waitForSelector('#wssAsk', { timeout: 8000 });   // nothing to write to yet — asking once is correct, not a bug
+    await page.fill('#wssName', 'first-save');
+    await page.locator('#wssAsk [data-wss="save"]').click();
+
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'first-save.ddcs', null, { timeout: 8000 });
+    const files = await readFs(page);
+    expect(Object.keys(files)).toContain('first-save.ddcs');
+});

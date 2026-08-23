@@ -52196,3 +52196,55 @@ it out before baselining, but a controller-dependent def whose settle window som
 cap would still slip through. Not touched this turn: the dispatch asked for the flag to be right, not for
 that function to stop churning, and doing both would have widened an already-precise bug fix into a
 refactor. Flagged here for whoever next touches `seedDefaultPortedUserOps`.
+
+## t2196 (amendment 2, bug 2) — THE FILE MENU'S "Save" ROW NOW WRITES, instead of opening the manager
+
+Second of amendment 2's two urgent bugs, human-reported: "the in menu workspace save is opening the modal no
+saving in place." This breaks the rule the file menu's own row already promises — plain "Save", no ellipsis
+(`filemenu-sections-2184.spec.js`'s own existing assertion: `'plain Save, no ellipsis (writes to the known
+target)'`) — Save writes silently to the known target; Save-as always asks. `ui/headerPost.js:136`'s
+`case 'wsSave': window.openWorkspaceManager?.('save')` was the culprit — a t1223-era handler (its own comment:
+"Both open the ONE manager modal, on the half the user asked for") that pre-dated the silent-save contract
+t1199/t2184 later established for this exact row and was never updated to match once that contract existed.
+
+### Measured before assumed — the caution the dispatch asked for
+
+The dispatch explicitly asked to verify saving in place is not secretly a browser-permission dead end before
+calling the handler simply wrong. It isn't: `ui/workspaceSave.js`'s `saveWorkspace()` (`window.ddcsSaveWorkspace`,
+already wired to Ctrl+S at that same file's own `onKeydown`) is a fully-built, already-shipping direct-write
+door — a remembered FSA file handle persists across a reload in IndexedDB (`data/fsHandles.js`, whose own
+header names exactly this: "IndexedDB remembers them across reloads and the app can re-save in place"), and
+`requestHandle()` re-verifies permission INSIDE the click's own user gesture (not before it, where Chromium
+auto-denies) before writing. When there is no handle yet it falls through to the SAME name+folder ask Ctrl+S's
+own Save-As path uses — "ask once, nothing to write to yet" is not a special case to build, it already exists.
+
+### The fix
+
+One line: `case 'wsSave': window.ddcsFileSaveState?.save?.();` — the thin wrapper (`ui/fileSaveState.js`) that
+calls `ddcsSaveWorkspace()` and also refreshes the dot + announces the result via the popup Ctrl+S's own
+success path already uses (`window.ddcsAnnounceSaved`), so this row's silent write gets the SAME feedback
+Ctrl+S already gives, not a second, divergent announcement path. `wsOpen` is untouched — Open genuinely needs
+a picker, there is no silent-open concept.
+
+### A documented test had to change, on purpose, not by oversight
+
+`workspace-manager-1223.spec.js`'s own first test asserted the OLD behavior outright: "and so does Save — one
+surface, two entry points." This is exactly the behavior the human is reporting as wrong, so the assertion is
+the stale half of the file, not a real regression the fix introduced — updated in place to prove Save reaches
+the direct-save door (a spy on `window.ddcsFileSaveState.save`) and does NOT raise `#wsmOverlay`, while Open
+still does. The full write-in-place mechanics (byte-for-byte, no dialog, on an already-open workspace; and the
+"ask once" first-save path) got two NEW end-to-end tests in `workspace-save-open-1225.spec.js`, which already
+owned the fake-filesystem plumbing (`fakeFs`/`openFromFolder`) this needed — driven through the actual
+`#hdrPostBtn` → `[data-act="wsSave"]` click, not the underlying function directly, since the bug was in the
+WIRING between the row and the door, not in the door itself.
+
+### Verification
+
+Non-vacuity: `git stash` of `ui/headerPost.js` alone (keeping all three test edits) → all 3 new/changed
+assertions fail against pre-fix code (the manager-modal spy count reads 0, `#wsmOverlay` still appears, the
+"ask once" test times out waiting for `#wssAsk` because the manager opened instead); `git stash pop` restored
+the fix cleanly. Collateral: `workspace-manager-1223.spec.js` (6) and `workspace-save-open-1225.spec.js` (10)
+in full, plus every OTHER spec referencing `wsSave` by name (`editor-file-menu-1227`, `filemenu-sections-2184`,
+`header-menu-split-2149`, `header-profile-menu` — 28 tests, none of which click-and-assert-modal, only
+presence/label/section checks, so none needed changing) — all green. The full smoke tier (77 tests) green
+both before and after this fix.

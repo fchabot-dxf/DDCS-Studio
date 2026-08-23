@@ -131,9 +131,20 @@ function runQuickAction(act) {
         case 'helpFaq':   import('./helpPanel.js').then((m) => m.openHelp('faq')); break;
         case 'helpAbout': import('./helpPanel.js').then((m) => m.openHelp('about')); break;
         case 'openWebsite': openExternal(WEBSITE_URL); break;   // t2149 — the logo's old <a href>, now a menu row
-        // t1223 — WORKSPACE (the .ddcs). Both open the ONE manager modal, on the half the user asked for: Save
-        // focuses the current workspace + its delta, Open focuses the granted folder's cards.
-        case 'wsSave': window.openWorkspaceManager?.('save'); break;
+        // t1223 — WORKSPACE (the .ddcs). Open still opens the ONE manager modal, focused on the granted folder's
+        // cards — browsing genuinely needs a picker, there is no "silent open".
+        // t2196 (amendment 2, bug 2) — Save no longer does: this row's own label ("Save", no ellipsis, unlike
+        // every OTHER row here that needs more input from you — "Open…", "Save as…") and its tooltip ("Save
+        // this workspace to its .ddcs file") both already promised a direct write, but the handler opened the
+        // manager instead — the SAME regression class the file-menu's Ctrl+S-equivalent contract exists to rule
+        // out. ui/workspaceSave.js's saveWorkspace() (window.ddcsSaveWorkspace, wired to Ctrl+S at that file's
+        // own onKeydown) already IS the "write silently to the remembered FSA handle, ask only when there is
+        // nothing to write to yet" door — the handle persists across a reload via IndexedDB (data/fsHandles.js),
+        // so this is not the browser-permission dead end it might look like; requestHandle() re-verifies inside
+        // this very click's own user gesture. window.ddcsFileSaveState.save (ui/fileSaveState.js) is the thin
+        // wrapper that also refreshes the dot and announces the result — the same one Ctrl+S's own success path
+        // feeds into (window.ddcsAnnounceSaved).
+        case 'wsSave': window.ddcsFileSaveState?.save?.(); break;
         case 'wsOpen': window.openWorkspaceManager?.('open'); break;
         // t1617 — the WIZARD manager, the workspace manager's sibling: wizard lifecycle (fork / rename / duplicate /
         // delete + the .wiz library shelves). Distinct from 'wizard' above, which SAVES the current stack as one.

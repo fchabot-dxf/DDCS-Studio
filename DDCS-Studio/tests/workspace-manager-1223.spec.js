@@ -49,7 +49,7 @@ async function grantFolder(page, files) {
     }, files);
 }
 
-test('the quick menu carries SAVE and OPEN as primary buttons, and both open the ONE manager', async ({ page }) => {
+test('the quick menu carries SAVE and OPEN as primary buttons; Open lands in the manager, Save writes in place', async ({ page }) => {
     await boot(page);
     await page.locator('#hdrPostBtn').click();
     // t2184 — FOUR `.hq-ws-row` pairs exist now (Workspace/G-code/Project/Reference); scope to the ONE that
@@ -60,12 +60,23 @@ test('the quick menu carries SAVE and OPEN as primary buttons, and both open the
     await expect(row.locator('[data-act="wsOpen"]')).toBeVisible();
 
     await row.locator('[data-act="wsOpen"]').click();
-    await expect(page.locator('#wsmOverlay'), 'Open lands in the manager').toBeVisible();
+    await expect(page.locator('#wsmOverlay'), 'Open lands in the manager — browsing genuinely needs a picker').toBeVisible();
     await page.locator('#wsmOverlay .wsm-x').click();
 
+    // t2196 (amendment 2, bug 2) — Save no longer opens the manager: it used to (this test asserted exactly that,
+    // "one surface, two entry points"), which a live human report caught as the row's own label/tooltip breaking
+    // its own promise ("Save", no ellipsis — "write it now", not "let me review first"). The full write-in-place
+    // mechanics (a real FSA handle, byte-for-byte, no dialog) are covered end-to-end in
+    // workspace-save-open-1225.spec.js, which already owns the fake-filesystem plumbing this needs; here we only
+    // prove the WIRING — the click reaches the direct-save door, not the modal.
+    let saveCalls = 0;
+    await page.evaluate(() => { window.__origWsSave = window.ddcsFileSaveState.save; window.ddcsFileSaveState.save = () => { window.__wsSaveCalls = (window.__wsSaveCalls || 0) + 1; }; });
     await page.click('#hdrPostBtn');
     await page.locator('#hdrPostMenu [data-act="wsSave"]').click();
-    await expect(page.locator('#wsmOverlay'), 'and so does Save — one surface, two entry points').toBeVisible();
+    saveCalls = await page.evaluate(() => window.__wsSaveCalls || 0);
+    expect(saveCalls, 'the click reached the direct-save door').toBe(1);
+    await expect(page.locator('#wsmOverlay'), 'and did NOT open the manager').toHaveCount(0);
+    await page.evaluate(() => { window.ddcsFileSaveState.save = window.__origWsSave; });
 });
 
 test('the top half names THIS workspace, shows the per-store DELTA, and offers Save / Save As / Duplicate', async ({ page }, testInfo) => {
