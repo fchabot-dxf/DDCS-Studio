@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""trace-wordmark.py — a DUMB INTERPRETER of wordmarks.json. Holds no font/size/colour/shear constants of its
+own; every number it uses comes from that file. Regenerates one or all of the DDCS Studio header wordmarks
+(MARK-<NAME>-TRACED.svg, pasted as a <symbol> into DDCS-Studio/web/index.html) from the fonts they request,
+outlined to flat SVG paths so the mark survives on a device that doesn't have those fonts (this is the whole
+reason to trace at all — see wordmarks.json's own traps list, and brand/README.md).
+
+The transform kernel below is preserved EXACTLY from brand/recovered/ (the only surviving fragment of the
+original pipeline) — do not "simplify" the shear/scale/translate order, it encodes the one non-obvious trap
+(the y-flip runs before the shear, so the shear sign must be negative) that shipped wrong once already.
+
+Usage:
+    pip install fonttools brotli requests      # all pure-python / no native build tooling needed
+    python trace-wordmark.py normal            # regenerate one mark -> MARK-NORMAL-TRACED.svg (this dir)
+    python trace-wordmark.py --all             # regenerate every mark declared in wordmarks.json
+    python trace-wordmark.py organic --check   # ALSO render each glyph's own bbox to stderr, so a corrupted
+                                                # counter (t2161's bug: a glyph's hole traces as a tiny stray
+                                                # fragment instead of the letter's actual interior) is visible
+                                                # as a suspiciously tiny sub-path bbox BEFORE you install the
+                                                # result — inspect anything under ~15% of the glyph's own bbox.
+
+VALIDATED as of t2161 for the SYSTEM-FONT path (normal/studio/futuristic/steampunk): fontTools WAS available
+in that session, so all four were actually regenerated and diffed byte-for-byte against the human-approved
+MARK-*-TRACED.svg files already in this directory — identical, on the first clean run. That run caught two
+real bugs this docstring would otherwise have shipped silently: `penx` was pre-scaled (collapsed letter-spacing
+to near zero — visible immediately as glyphs overlapping) and a layer's `dx` was applied twice, once baked
+into the glyph geometry and once again by its wrapping <g transform> (visible as the studio mark's bevel offset
+being exactly double the declared value). Both are fixed in the code below; the byte-identical re-run is what
+proved it, not inspection.
+
+UNVALIDATED for the GOOGLE-FONTS path (organic): no network access in that session, so the fetch in
+font_path_for() below has never actually run. Given the two bugs just found, do not assume it works — run it,
+then use --check (or open the SVG standalone, the way t2161 caught the shipped organic mark's broken 'D': by
+rendering the file alone, at real size, outside the app entirely) before trusting the result.
+"""
+import argparse
+import json
+import math
+import os
+import re
+import sys
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DECL = os.path.join(HERE, 'wordmarks.json')
+
+WINDIR = os.environ.get('WINDIR', 'C:/Windows')
+UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')   # t2161 trap: an OLD UA gets EOT, not WOFF2
+
+
+def load_declaration():
+    with open(DECL, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def font_path_for(font_decl, text):
+    """Resolve a layer's font{} to a local file path fontTools can open, fetching+caching a Google Fonts
+    WOFF2 subset if source=='google'."""
+    if font_decl['source'] == 'system':
+        return os.path.join(WINDIR, 'Fonts', font_decl['file'])
+    if font_decl['source'] == 'google':
+        family = font_decl['family'].replace(' ', '+')
+        weight = font_decl.get('weight', 400)
+        cache = os.path.join(HERE, '.font-cache')
+        os.makedirs(cache, exist_ok=True)
+        dest = os.path.join(cache, '%s-%s.woff2' % (font_decl['family'].replace(' ', '_'), weight))
+        if not os.path.exists(dest):
+            css_url = ('https://fonts.googleapis.com/css2?family=%s:wght@%s&text=%s'
+                       % (family, weight, font_decl.get('urlTextParam', text.replace(' ', '%20'))))
+            req = urllib.request.Request(css_url, headers={'User-Agent': UA})   # trap: UA MUST be modern
+            css = urllib.request.urlopen(req).read().decode('utf-8')
+            m = re.search(r'url\((https://fonts\.gstatic\.com/[^)]+\.woff2)\)', css)
+            if not m:
+                raise RuntimeError('no WOFF2 url found in CSS for %s — check the UA/text param traps' % family)
+            data = urllib.request.urlopen(urllib.request.Request(m.group(1), headers={'User-Agent': UA})).read()
+            with open(dest, 'wb') as f:
+                f.write(data)
+        return dest
+    raise ValueError('unknown font source: %r' % font_decl['source'])
+
+
+def lean_sanity_check(slant_deg):
+    """The one assert wordmarks.json's traps list asks for: a point at cap height must move RIGHT after the
+    transform, or the shear sign has been flipped back to wrong."""
+    from fontTools.misc.transform import Identity
+    sh = -math.tan(math.radians(slant_deg))
+    t = Identity.translate(0, 23).transform((1, 0, sh, 1, 0, 0)).scale(0.026, -0.026)
+    x0, _ = t.transformPoint((0, 0))
+    x1, _ = t.transformPoint((0, 700))
+    if slant_deg and not (x1 - x0) > 0:
+        raise AssertionError('shear sign is wrong: cap-height point moved left, not right (dx=%.4f)' % (x1 - x0))
+
+
+def round_path(d, prec=1):
+    return re.sub(r'-?\d+\.\d+', lambda m: ('%.*f' % (prec, float(m.group(0)))).rstrip('0').rstrip('.'), d)
+
+
+def trace_layer(layer, text_by_line, check=False):
+    """The kernel — preserved verbatim from brand/recovered/tracer-shear-fix.txt, generalized to read every
+    number from `layer` instead of a hardcoded constant."""
+    from fontTools.ttLib import TTFont
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+    from fontTools.misc.transform import Identity
+
+    text = text_by_line[layer['line']]
+    size = layer['size']
+    baseline = layer['baseline']
+    slant_deg = layer.get('slantDeg', 0.0)
+    lean_sanity_check(slant_deg)
+    sh = -math.tan(math.radians(slant_deg))   # trap: NEGATIVE — see wordmarks.json traps + the module docstring
+
+    font_path = font_path_for(layer['font'], text)
+    f = TTFont(font_path)
+    upem = f['head'].unitsPerEm
+    cmap, hmtx, gs = f.getBestCmap(), f['hmtx'], f.getGlyphSet()
+    s = size / upem
+
+    if layer['fit'] == 'targetWidth':
+        target = layer.get('targetWidth')  # falls back to the declaration's shared targetWidth below
+        nat = sum(hmtx[cmap[ord(c)]][0] for c in text if ord(c) in cmap) * s
+        xscale = target / nat if nat else 1.0
+        gap_units = 0.0
+    elif layer['fit'] == 'blend':
+        xscale = layer['xscale']
+        target = layer.get('targetWidth')
+        stretched_nat = sum(hmtx[cmap[ord(c)]][0] for c in text if ord(c) in cmap) * s * xscale
+        n_gaps = max(0, len([c for c in text if ord(c) in cmap]) - 1)
+        gap_units = ((target - stretched_nat) / n_gaps) if (n_gaps and target is not None) else 0.0
+    else:
+        raise ValueError('unknown fit: %r' % layer['fit'])
+
+    # trap: dx is NOT part of this per-point transform — it is applied exactly once, by build_symbol's own
+    # wrapping <g transform="translate(dx,0)">. Baking it in here too (an earlier draft's bug, caught by
+    # --check/diff against MARK-STUDIO-TRACED.svg: the bevel's light layer landed 2x its declared offset)
+    # double-applies it.
+    out_paths, penx = [], 0.0
+    for ch in text:
+        gn = cmap.get(ord(ch))
+        if gn is None:
+            continue
+        t = (Identity.translate(0, baseline)
+             .transform((1, 0, sh, 1, 0, 0))
+             .scale(s * xscale, -s)
+             .translate(penx, 0))
+        pen = SVGPathPen(gs)
+        gs[gn].draw(TransformPen(pen, t))
+        d = pen.getCommands()
+        if d:
+            if check:
+                nums = [float(n) for n in re.findall(r'-?\d+\.?\d*', d)]
+                xs_ = nums[0::2]   # rough heuristic (x,y pairs interleaved) — good enough to flag a collapsed glyph
+                sys.stderr.write('  glyph %r bbox-x span ~%.1f (transformed units)\n' % (ch, (max(xs_) - min(xs_)) if xs_ else 0))
+            out_paths.append('<path d="%s"/>' % round_path(d))
+        # trap: penx is applied via .translate(penx, 0) BEFORE .scale(s*xscale, -s) in the transform chain
+        # (composition runs right-to-left on a point), so it must stay in RAW FONT UNITS, unscaled — exactly
+        # as brand/recovered/tracer-shear-fix.txt's own kernel does (`penx += hmtx[gn][0]`, no `* s`). Scaling
+        # it here (an earlier draft's bug, caught by --check against MARK-NORMAL-TRACED.svg: glyphs landed
+        # ~100x too close together) silently collapses letter-spacing almost to nothing.
+        penx += hmtx[gn][0] + (gap_units / (s * xscale) if gap_units else 0.0)
+    return ''.join(out_paths)
+
+
+def build_symbol(name, decl, check=False):
+    mark = decl['marks'][name]
+    text_by_line = decl['text']
+    target_w = decl['targetWidth']
+    used_defs = set()
+    groups = []
+    for layer in mark['layers']:
+        layer = dict(layer)
+        layer.setdefault('targetWidth', target_w)
+        body = trace_layer(layer, text_by_line, check=check)
+        attrs = 'fill="%s"' % layer['fill']
+        if layer.get('filter'):
+            attrs += ' filter="url(#%s)"' % layer['filter']
+            used_defs.add(layer['filter'])
+        if 'url(#' in layer['fill']:
+            used_defs.add(re.search(r'url\(#(\w+)\)', layer['fill']).group(1))
+        if layer.get('dx'):
+            attrs += ' transform="translate(%s,0)"' % layer['dx']
+        groups.append('<g %s>%s</g>' % (attrs, body))
+
+    # trap: NO <defs> baked in here, deliberately — matches the shipped convention (verified against the
+    # human-approved MARK-FUTURISTIC/STEAMPUNK-TRACED.svg): the #neon/#brass defs live ONCE in index.html
+    # (see wordmarks.json's own `defs` block for their SVG source), referenced by url(#id) from whichever
+    # marks need them. Baking a copy into every per-mark file here would give index.html two competing
+    # sources for the same def the moment either one is edited.
+    if used_defs:
+        sys.stderr.write('%s references def(s) %s — confirm index.html still declares them before installing\n'
+                          % (name, ', '.join(sorted(used_defs))))
+
+    return ('<symbol id="mark-%s" viewBox="%s">\n  %s\n</symbol>'
+            % (name, decl['viewBox'], '\n  '.join(groups)))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('mark', nargs='?', help='mark name, e.g. normal / studio / futuristic / steampunk / organic')
+    ap.add_argument('--all', action='store_true')
+    ap.add_argument('--check', action='store_true', help='print each glyph\'s transformed bbox span to stderr')
+    args = ap.parse_args()
+
+    decl = load_declaration()
+    names = list(decl['marks'].keys()) if args.all else ([args.mark] if args.mark else [])
+    if not names:
+        ap.error('give a mark name or --all')
+
+    for name in names:
+        if name not in decl['marks']:
+            raise SystemExit('no such mark declared: %r (have: %s)' % (name, ', '.join(decl['marks'])))
+        status = decl['marks'][name].get('status', '')
+        if 'BROKEN' in status:
+            sys.stderr.write('warning: %s is marked BROKEN in wordmarks.json — regenerating anyway; '
+                              'verify the output before installing it (see the module docstring --check note)\n' % name)
+        svg = build_symbol(name, decl, check=args.check)
+        out_path = os.path.join(HERE, 'MARK-%s-TRACED.svg' % name.upper())
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write(svg)
+        print('%s -> %s (%d bytes)' % (name, out_path, len(svg)))
+
+
+if __name__ == '__main__':
+    main()

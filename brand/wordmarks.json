@@ -1,0 +1,74 @@
+{
+  "_readme": "The DDCS Studio header wordmark, DECLARED. brand/trace-wordmark.py is a DUMB INTERPRETER of this file — it holds no font/size/colour/shear constants of its own. Every mark is two lines: the 'DDCS' wordmark and the 'CNC MACRO STUDIO' tagline, each made of one or more coloured LAYERS (a layer = one traced line of text, offset/coloured/filtered independently — a mark with a bevel or a glow just stacks more than one layer of the same text). Regenerate a mark by re-running trace-wordmark.py against this file; never hand-edit a MARK-*-TRACED.svg's path data directly.",
+
+  "viewBox": "0 0 150 36",
+  "targetWidth": 146,
+  "text": { "wordmark": "DDCS", "tagline": "CNC MACRO STUDIO" },
+
+  "traps": [
+    "SHEAR SIGN IS NEGATIVE: sh = -tan(radians(slantDeg)). The y-flip in scale(s*xscale, -s) runs BEFORE the shear in the transform chain, so a positive shear leans the letters the WRONG way. Assert it: transform a point at cap height (e.g. y=700 in font units) and confirm the resulting x-delta from the baseline point is POSITIVE (leans right). This shipped wrong once.",
+    "GOOGLE FONTS WOFF2 FETCH: the URL must carry '&text=DDCS%20CNC%20MACRO%20STUDIO' (every glyph either line uses) AND a MODERN User-Agent string. An old/absent UA gets EOT instead of WOFF2; omitting &text= gets a Cyrillic subset with no 'D' in it at all. Both actually happened.",
+    "SYSTEM FONTS (normal/studio/futuristic/steampunk) load from %WINDIR%/Fonts/ariblk.ttf, arialbd.ttf, georgiab.ttf directly via fontTools — no fetch, no &text= concern.",
+    "'fit':'targetWidth' layers (the four AS-IS marks) compute xscale PER RUN as targetWidth / naturalWidthAtSize — always re-derive it from the live glyph metrics, never hard-code a captured xscale number for these; the font file is the source of truth.",
+    "'fit':'blend' layers (organic only) use a DECLARED xscale + trackingEm instead of a full fit-to-width stretch — see the organic mark's own note for why.",
+    "PRECISION: round path coordinates to 1 decimal on output (0.1 unit on a 150-unit box = 0.07% error, visually identical, ~66% smaller file than full float).",
+    "KNOWN BROKEN (t2161): the organic mark's 'D' glyph traces with a corrupted inner counter path (a ~2-unit stray fragment instead of the letter's actual hole), so the shipped brand/MARK-ORGANIC-TRACED.svg visibly reads 'DOCS'. The C and S glyphs in the same file trace correctly, so this is a per-glyph extraction defect, not a wrong parameter below — re-verify the regenerated D specifically (render it standalone, at real size, before installing) before this mark ships. See brand/README.md and WORK-LOG.md t2161."
+  ],
+
+  "defs": {
+    "neon": {
+      "kind": "filter",
+      "svg": "<filter id=\"neon\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"160%\"><feGaussianBlur stdDeviation=\"1.6\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter>"
+    },
+    "brass": {
+      "kind": "linearGradient",
+      "svg": "<linearGradient id=\"brass\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"#F0CC3A\"/><stop offset=\"55%\" stop-color=\"#C89B2A\"/><stop offset=\"100%\" stop-color=\"#8b6914\"/></linearGradient>"
+    }
+  },
+
+  "marks": {
+    "normal": {
+      "status": "traced, installed",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "system", "file": "ariblk.ttf" }, "size": 26, "baseline": 23, "slantDeg": 12.0, "fit": "targetWidth", "fill": "#C7A900" },
+        { "line": "tagline", "font": { "source": "system", "file": "arialbd.ttf" }, "size": 8.5, "baseline": 34, "slantDeg": 0, "fit": "targetWidth", "fill": "#666666" }
+      ]
+    },
+
+    "studio": {
+      "status": "traced, installed",
+      "note": "the engraved-nameplate bevel: each line is stamped TWICE, a light layer offset +dx/+dy behind a dark layer at the true position, same font/size/slant/fit both times.",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "system", "file": "ariblk.ttf" }, "size": 26, "baseline": 24, "dx": 1, "slantDeg": 12.0, "fit": "targetWidth", "fill": "#f0eee8" },
+        { "line": "wordmark", "font": { "source": "system", "file": "ariblk.ttf" }, "size": 26, "baseline": 23, "dx": 0, "slantDeg": 12.0, "fit": "targetWidth", "fill": "#55514a" },
+        { "line": "tagline", "font": { "source": "system", "file": "arialbd.ttf" }, "size": 8.5, "baseline": 34.7, "dx": 0.7, "slantDeg": 0, "fit": "targetWidth", "fill": "#f0eee8" },
+        { "line": "tagline", "font": { "source": "system", "file": "arialbd.ttf" }, "size": 8.5, "baseline": 34, "dx": 0, "slantDeg": 0, "fit": "targetWidth", "fill": "#55514a" }
+      ]
+    },
+
+    "futuristic": {
+      "status": "traced, installed",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "system", "file": "ariblk.ttf" }, "size": 26, "baseline": 23, "slantDeg": 12.0, "fit": "targetWidth", "fill": "#FFF100", "filter": "neon" },
+        { "line": "tagline", "font": { "source": "system", "file": "arialbd.ttf" }, "size": 8.5, "baseline": 34, "slantDeg": 0, "fit": "targetWidth", "fill": "#8892b0" }
+      ]
+    },
+
+    "steampunk": {
+      "status": "traced, installed",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "system", "file": "georgiab.ttf" }, "size": 26, "baseline": 23, "slantDeg": 0, "fit": "targetWidth", "fill": "url(#brass)" },
+        { "line": "tagline", "font": { "source": "system", "file": "georgiab.ttf" }, "size": 8.5, "baseline": 34, "slantDeg": 0, "fit": "targetWidth", "fill": "#8b7355" }
+      ]
+    },
+
+    "organic": {
+      "status": "BROKEN — see the traps entry above and brand/README.md. index.html still shows the OLD font-request <text> render (Georgia italic, textLength=146), NOT this declaration, pending a fixed re-trace.",
+      "note": "human-chosen 2026-08-22, from live specimens compared across Sniglet/Fredoka/Nunito (an upright, unsheared Sniglet was also compared and NOT chosen — round bowls shear worse than they read wrong upright, but the 9deg lean was kept to match futuristic/normal's own lean; steampunk is the only other upright mark, so this is not the odd one out). FLAT (no bevel/glow/gradient) — one layer per line, both Sniglet 800. 'fit':'blend' means: stretch glyphs by the declared xscale (NOT a full fit-to-targetWidth stretch — that was measured at ~2.09x and judged too distorting for Sniglet's round bowls), then add trackingEm*size of extra advance between each pair of glyphs (not after the last) until the line totals targetWidth.",
+      "layers": [
+        { "line": "wordmark", "font": { "source": "google", "family": "Sniglet", "weight": 800, "urlTextParam": "DDCS%20CNC%20MACRO%20STUDIO" }, "size": 26, "baseline": 23, "slantDeg": 9.0, "fit": "blend", "xscale": 1.7406, "trackingEm": 0.312, "fill": "#d9a03c" },
+        { "line": "tagline", "font": { "source": "google", "family": "Sniglet", "weight": 800, "urlTextParam": "DDCS%20CNC%20MACRO%20STUDIO" }, "size": 8.5, "baseline": 34, "slantDeg": 9.0, "fit": "blend", "xscale": 1.3922, "trackingEm": 0.134, "fill": "#a08d69" }
+      ]
+    }
+  }
+}

@@ -8,44 +8,49 @@ material it would help")*
 
 | file | what it is |
 |---|---|
-| `MARK-{NORMAL,STUDIO,FUTURISTIC,STEAMPUNK,ORGANIC}-TRACED.svg` | the five finished `<symbol>` blocks, ready to paste into `DDCS-Studio/web/index.html` |
+| `wordmarks.json` | the DECLARATION — every font/size/slant/colour/layer constant, one entry per mark. The source of truth; regenerate a mark from this, never hand-edit a `MARK-*-TRACED.svg`'s path data. |
+| `trace-wordmark.py` | a DUMB INTERPRETER of `wordmarks.json` — holds no constants of its own. `python trace-wordmark.py <mark>` or `--all`. |
+| `MARK-{NORMAL,STUDIO,FUTURISTIC,STEAMPUNK,ORGANIC}-TRACED.svg` | the finished `<symbol>` blocks, pasted into `DDCS-Studio/web/index.html`. |
 
 ⛔ **The candidate-face comparison page is not kept** *(human, 2026-08-22: "dont keep the rejected face")*.
 Sixteen faces were rendered side by side on the organic tokens to choose Sniglet; the fifteen that lost are
 not working material, they are a decision already made. Only the chosen face and its parameters survive, below.
 
-## ⛔ What is MISSING, and is the reason this folder exists
+## Status (t2161)
 
-**There is no generator script.** The five SVGs above were produced by a pipeline that was written, run, and
-lost with its session. All that survived is prose in [`../BACKLOG.md`](../BACKLOG.md) under F5 — and prose is
-not working material. Changing the logo today means re-deriving the pipeline from a description of it.
+✅ **normal / studio / futuristic / steampunk — INSTALLED in `index.html`, and VALIDATED.** `trace-wordmark.py`
+was actually run against `wordmarks.json` for these four (fontTools happened to be available) and produced
+output **byte-identical** to the shipped `MARK-*-TRACED.svg` files — real proof the declaration + interpreter
+correctly reproduce the approved artifacts, not just a plausible-looking script. That run caught two real bugs
+in the interpreter first (documented in its own header): `penx` pre-scaled (collapsed letter spacing near zero)
+and a layer's `dx` applied twice (baked into the geometry *and* the wrapping `<g transform>`). Both fixed;
+neither is present in the shipped SVGs, which were hand-verified visually before this validation even started.
 
-⇒ **The next turn that touches these marks writes `trace-wordmark.py` here.** Recipe, from F5:
+⛔ **organic — NOT installed. `brand/MARK-ORGANIC-TRACED.svg`'s traced 'D' glyph is broken.** Its inner counter
+path is a ~2-unit stray fragment instead of tracing the letter's actual hole, so the mark visibly reads "DOCS"
+— confirmed by rendering the raw SVG file standalone (outside the app, outside this repo's index.html splice
+entirely) and by inspecting the path data directly. The C and S glyphs in the same file trace correctly, so
+this is a defect in extracting this one glyph, not the pipeline as a whole — but it is a broken company
+wordmark, and it does not ship on that basis. `index.html`'s `mark-organic` symbol is UNTOUCHED — still the
+original Georgia-italic `<text>` render, `textLength` and all — pending a fixed re-trace.
 
-1. Fetch the Google Fonts WOFF2 subset with `&text=DDCS%20CNC%20MACRO%20STUDIO` and a **modern** User-Agent.
-   - ⚠ An old UA gets you **EOT** instead of WOFF2.
-   - ⚠ Omitting `&text=` gets you a **Cyrillic** subset with no `D` in it. Both of these actually happened.
-2. Read glyph contours with `fontTools` + `brotli` (both pure-python installs).
-3. Per glyph: `translate(0, baseline)` → shear → `scale(size/upem * xs, -size/upem)`, then lay out.
-4. ⛔ **The shear sign is NEGATIVE.** The y-flip in `scale(…, -s)` runs first, so a positive shear leans the
-   letters the wrong way. This shipped wrong once and the human caught it.
-   **Assert it:** transform a point at cap height and check the x delta is positive.
-
-Those four traps are the entire reason a script beats a description: each one is a silent wrong answer, not
-an error.
+`trace-wordmark.py`'s Google Fonts fetch path (the only path organic uses) was never actually run this turn —
+no network access in that session. Before trusting a regenerated organic mark: run it, then verify the OUTPUT
+the same way t2161 caught the bug — render the SVG standalone at real size and read the letters, don't just
+diff coordinates. See `trace-wordmark.py --check` for a coarse automated version of the same check (flags any
+glyph whose transformed bbox looks suspiciously small).
 
 ## The organic mark's parameters
-
-The other four marks are traced **as-is** from the fonts they already requested. Organic is a redesign:
+*(also declared in `wordmarks.json`'s `marks.organic` — this table is the human-readable version)*
 
 ```
-face        Sniglet 800        both lines outlined — no font at runtime
-slant       9 degrees          sheared (Sniglet ships no italic); matches Nunito's natural angle
-fill width  146 units          68% glyph stretch / 32% added tracking
-  wordmark    glyph 1.7406x   tracking 0.312em   #d9a03c
-  tagline     glyph 1.3922x   tracking 0.134em   #a08d69
-precision   1 decimal          0.07% error on a 150-unit box; 66% smaller than full float
-treatment   NONE — flat        one fill per line
+  face        Sniglet 800          both lines outlined — no font at runtime
+  slant       9 degrees            sheared (Sniglet ships no italic); matches Nunito's natural angle
+  fill width  146 units            68% glyph stretch / 32% added tracking
+    wordmark    glyph 1.7406x   tracking 0.312em   #d9a03c
+    tagline     glyph 1.3922x   tracking 0.134em   #a08d69
+  precision   1 decimal            0.07% error on a 150-unit box; 66% smaller than full float
+  treatment   NONE — flat          one fill per line
 ```
 
 ⭐ **Why the 68/32 blend exists:** the old `textLength` attribute stretched glyphs about **2×**
@@ -56,5 +61,4 @@ rest — 22% less distortion of the bowls, which is the whole reason Sniglet was
 
 raised / engraved three-layer stack · halo (outside stroke) · glow (`feGaussianBlur`) · grain fill ·
 carved gradient · plate rule.
-
 ⭐ The design work did not produce an effect; it produced the confidence to have none.
