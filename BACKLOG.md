@@ -1258,7 +1258,8 @@ Prove the *id* is unreferenced, not the *feature* — they are not the same ques
 ⇒ **A tail-sized item.** Two clusters, one commit each, with the grep evidence for each deletion in the message.
 
 ### 15. INVALID CSS SHORTHANDS THAT SILENTLY VOID THEIR WHOLE DECLARATION — a category, not two bugs
-*(found twice in two days, both by measuring rather than by reading — t2155 tail and t2173)*
+*(found twice in two days, both by measuring rather than by reading — t2155 tail and t2173; a relative found at
+t2190, one level up: a comment that ends itself)*
 
 A CSS shorthand is all-or-nothing: if **one** component is invalid, the browser discards the **entire**
 declaration. No console error, no warning, no partial application. The rule looks correct in the file and
@@ -1276,6 +1277,17 @@ renders as though it were never written.
                          └─ `inherit` is not valid as a COMPONENT of the font shorthand
                             (only as the whole value). The entire font declaration is dropped.
 ```
+
+⭐ **The same disease one level up (t2190): a comment that ends itself.** An explanatory comment reading
+`.library-*/.lib-*` (glob-style prose, meant as "library-prefixed and lib-prefixed") contains the literal
+sequence `*/` — which is CSS's own comment-close token. The comment ended three words early; everything after
+it, until the parser found a recovery point, became unparsed garbage — silently dropping `.wsm-overlay` (shared
+chrome for the workspace/wizard/project managers) from the loaded stylesheet. Same tell as the shorthand cases:
+**the file still parses** (no error, no warning), and the rule looks completely correct at its own call site —
+only `document.styleSheets`'s own parsed `cssRules` (not the source text) showed it was gone. Confirmed via
+`git stash` bisection that `wizardManager.js`'s own overlay — untouched that turn — broke identically, proving
+the cause was the new comment, not something pre-existing. ⇒ **The rule for future CSS comments**: never write
+a glob/path-style "A-*/B-*" pattern inside a `/* */` block — spell out "A- or B-prefixed" instead.
 
 ⭐ **Why this is worth a sweep rather than two fixes.** Both were found by *measuring a computed value*, and
 neither would ever be found by reading. The failure is invisible in the source, invisible in the diff, and
@@ -1319,20 +1331,41 @@ radius and shadow agree; padding, header layout, button sizing and controls do n
 
 ⚠ Projects looks the most different for a specific reason: it still wears `.library-modal`, the shell built for
 a **tabbed container**. t2180 deleted the tab strip; the body is still laid out to sit inside one.
+⭐ **UPDATE (t2190): this is fixed, as a side effect of an unrelated turn, not this item.** `libraryModal.js` (the
+`.library-modal` shell) is deleted outright — Projects' new manager (`ui/projects/projectManager.js`) reuses
+`.wsm-modal`, the SAME shell Wizards and Workspace already wore. All three managers now share one modal shell.
+`.modal-card`'s OTHER 15 call sites (setup-sheet, cloud-modal-panel, etc.) are untouched — this update narrows
+the count, it does not close the item.
 
 ### The Local/Cloud switcher
 
 ```
-  .proj-voltab    libraryModal.js:68          "☁ Cloud"           Projects
-  .proj-voltab    projectModal.js:76          "☁ Cloud"           save modal
-  .proj-starget   projectModal.js:377         "☁ Cloud"           save target
+  .proj-voltab    libraryModal.js:68          "☁ Cloud"           Projects        ⛔ GONE (t2190 — file deleted)
+  .proj-voltab    projectModal.js:76          "☁ Cloud"           save modal      ⛔ GONE (t2190 — file deleted;
+  .proj-starget   projectModal.js:377         "☁ Cloud"           save target        Save has no Cloud target any more)
   .wsm-place      wizardManager.js:167-168    "📁 Local folder"  ⎫ the same two lines,
-  .wsm-place      workspaceManager.js:285-6   "📁 Local folder"  ⎭ verbatim, including
-                                                                    the is-active ternary
+  .wsm-place      workspaceManager.js:285-6   "📁 Local folder"  ⎮ verbatim, including
+  .wsm-place      projectManager.js:65-66     "📁 Local folder"  ⎭ the is-active ternary — t2190's REPLACEMENT
+                                                                    for the three GONE rows above already reused
+                                                                    this exact class + wording, not a new one.
 ```
+
+⭐ **UPDATE (t2190): three of the five original sites are deleted, and the two survivors' vocabulary problem is
+ALREADY SOLVED for what remains** — projectManager.js's own Library shelf (t2190) was built by copying
+wizardManager.js's `.wsm-place` markup and its EXACT wording verbatim (not independently re-derived), so all
+THREE living sites now read `.wsm-place` / "📁 Local folder" / "☁ Cloud" identically. The "two different
+vocabularies" ⛔ below is CLOSED for these three specifically; what remains is three copy-pasted (not shared)
+implementations of the identical thing — a dedup, not a vocabulary fix.
+⚠ **t2192 (amendments 1-3, QUEUED, not built) — the count is about to drop further, but hasn't yet.** The human
+ruled the wizard/project managers' whole LIBRARY section (which carries this switcher) misrepresents itself and
+is being replaced by a plain Import button + a pre-import compatibility summary. When that lands, `.wsm-place`
+loses two of its three remaining sites (wizardManager.js's and projectManager.js's own Library tabs) — only
+workspaceManager.js's would remain. Do not count that reduction here until it is actually built.
 
 Five markup sites, two class families, and ⛔ **two different vocabularies for the same concept** — a user reads
 `Local` in one modal and `📁 Local folder` in the next and has to work out they mean the same volume.
+*(as originally written, before the t2190 update above — left intact per this file's own convention of not
+rewriting history; the update note says what changed and when.)*
 
 ### ⭐ Why this is one item and not two
 
@@ -1340,8 +1373,11 @@ Both are the same failure: **a declaration exists, is correct, and every caller 
 `.viz3d-handle`'s dead studio override (t2155) and `wizardManagerPanel`'s claimed-but-absent Fork (t2180) —
 things that are true in the source and untrue in the running app.
 
-⇒ Adopt `.modal-card` at all 15 sites; extract ONE volume switcher and use it at all five.
-⚠ **Fix the vocabulary while unifying** — one name for the local volume, chosen once.
+⇒ Adopt `.modal-card` at its remaining sites (down from 15 — three managers already share `.wsm-modal` as of
+t2190); extract ONE volume switcher for wherever it still survives once t2192's queued Library-shelf removal
+lands (down from five to as few as one — see the update note above; re-count when that turn actually ships).
+⚠ **Fix the vocabulary while unifying** — one name for the local volume, chosen once (already true for the
+survivors as of t2190; confirm it still holds after t2192's removal before treating this as done).
 
 ⛔ **A turn of its own.** 20 call sites across two concerns is not a tail, and a half-migration leaves three
 spellings instead of two.
