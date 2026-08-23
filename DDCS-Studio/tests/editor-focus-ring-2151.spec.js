@@ -60,12 +60,31 @@ async function ready(page) {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 }
 
-/** Seed real multi-line content so "line 1" and the toolbar band are both meaningful, not the placeholder. */
+/** Seed real multi-line content so "line 1" and the toolbar band are both meaningful, not the placeholder.
+ *  t2169 — also force the pre-flight badge closed: this content is comment-only (zero real moves), which a
+ *  real preflight pass legitimately flags — and since `.editor-strip-chrome` (badge included) now stays at the
+ *  TOP on phone too (t2169's own re-split), a shown badge sits exactly where these tests sample the ring's own
+ *  left-edge pixel. Before t2169 the whole strip relocated to the BOTTOM on phone, so this interaction was
+ *  structurally impossible there; it is real now, and out of scope for what these tests are actually about
+ *  (the ring, not badge content) — so it is closed here rather than left to intermittently fail depending on
+ *  what the preflight pass happens to think of five bare comment lines. */
 async function seedLines(page) {
     await page.evaluate(() => {
         const ed = document.getElementById('editor');
         ed.value = '( line 1 )\n( line 2 )\n( line 3 )\n( line 4 )\n( line 5 )';
         ed.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // TWO independent debounces both react to this same input event and can re-show the badge after we close
+    // it: preflightBadge.js's own 250ms `inputT` timer (re-renders straight from editor text), AND
+    // programModel.js's 500ms reconcile timer (editor.js:614 `setTimeout(reconcileFromEditor, 500)`), whose
+    // `setStack(...)` call fires the `onChange` subscription preflightBadge.js also renders from (line 198) —
+    // a SECOND, later trigger a shorter wait doesn't clear. Confirmed live: even a 350ms wait (past the first
+    // debounce alone) still read badge.hidden back as false. 650ms clears both with margin, and no further
+    // input follows, so nothing re-triggers it after.
+    await page.waitForTimeout(650);
+    await page.evaluate(() => {
+        const badge = document.getElementById('preflight-badge');
+        if (badge) badge.hidden = true;   // see this function's own header — closed on purpose, not a real state
     });
 }
 
@@ -148,19 +167,23 @@ test('THE RING EXCLUDES THE TOOLBAR ROW (t2153 ruling), desktop: the boundary pi
     expect(isBlack(after[2]), `the code area itself stays plain black, not ring-filled: ${after[2]}`).toBe(true);
 });
 
-test('THE RING EXCLUDES THE STRIP (t2155), phone: the strip moved to the bottom, and the ring still stops above it', async ({ page }) => {
+test('THE RING EXCLUDES THE TOOLBAR (t2155, re-split t2169), phone: the toolbar moved to the bottom, and the ring still stops above it', async ({ page }) => {
     // t2153 amendment 5 measured this exact case and found the toolbar sat GEOMETRICALLY inside the ring's own
     // box on phone (bottom-anchored at bottom:8px, but the ring's box was still the WHOLE .editor-container) —
     // reported as a note, not fixed, since it produced no visible artifact. t2155 fixes the underlying cause
     // (the ring's box is `.editor-code` now, and the strip is a genuine SIBLING outside it, at every width) —
     // this test is that note's replacement: a real assertion instead of a screenshot note.
+    // t2169 — queries `.editor-toolbar` now, not `.editor-strip`: the strip re-split (chrome stays up, only the
+    // toolbar relocates) made `.editor-strip` itself `display:contents` at phone width, so its OWN
+    // getBoundingClientRect() is a zero rect (contents elements generate no box at all) — the toolbar is the
+    // thing that actually moved to the bottom now, so it's the meaningful thing to check.
     await ready(page);   // default viewport is phone-sized (412×915) — no explicit size needed
     await seedLines(page);
-    const { code, strip } = await page.evaluate(() => ({
+    const { code, toolbar } = await page.evaluate(() => ({
         code: document.querySelector('.editor-code').getBoundingClientRect(),
-        strip: document.querySelector('.editor-strip').getBoundingClientRect(),
+        toolbar: document.querySelector('.editor-toolbar').getBoundingClientRect(),
     }));
-    expect(strip.top, 'the strip sits BELOW the code box on phone, not overlapping it').toBeGreaterThanOrEqual(code.top + code.height - 1);
+    expect(toolbar.top, 'the toolbar sits BELOW the code box on phone, not overlapping it').toBeGreaterThanOrEqual(code.top + code.height - 1);
 });
 
 test('THE RING\'S BOX IS .editor-code\'s OWN BOX, at both widths (t2155 — no leftover inset)', async ({ page }) => {
@@ -257,12 +280,34 @@ test('theme-independent: the boundary pixel changes on focus in normal, futurist
     }
 });
 
-test('THE STRIP FITS ITS TALLEST CHILD at phone width (t2155 — auto height, the 44px touch floor still fits)', async ({ page }) => {
+test('THE CHROME GROUP AND THE TOOLBAR EACH FIT THEIR OWN TALLEST CHILD at phone width (auto height, not clipped)', async ({ page }) => {
+    // t2155's original version checked `.editor-strip` (then a single box) grew to fit BACKLOG #13's 44px touch
+    // floor. t2169 changed BOTH premises at once: `.editor-strip` itself is `display:contents` at phone width
+    // now (its own getBoundingClientRect() is a zero rect by construction — contents elements generate no box),
+    // and the 44px floor was removed on direct human instruction (see editor-chrome.spec.js's own updated
+    // note). What's still worth checking — an auto-height container actually growing to fit its content, not
+    // silently clipping it — is checked against the two REAL boxes that replaced the one strip: the chrome
+    // group and the toolbar each contain a real button, so each container's own height must be at least that
+    // button's height. A geometry-relative check, not a hardcoded pixel constant that would just go stale again
+    // the next time a button's own size changes.
     await ready(page);   // default viewport is phone-sized
-    const h = await page.evaluate(() => document.querySelector('.editor-strip').getBoundingClientRect().height);
-    // BACKLOG #13's own floor (editor-chrome.spec.js is the authoritative spec for the buttons themselves) —
-    // this just confirms the STRIP, now auto-height instead of a typed number, actually grew to fit them.
-    expect(h, `the strip is at least as tall as a 44px button (measured ${h}px)`).toBeGreaterThanOrEqual(44);
+    // seed real content with a feed rate, so the time-estimate chip (a `.editor-strip-chrome` tenant) actually
+    // has something to show — an untouched editor legitimately renders an EMPTY (zero-height) chrome group,
+    // which would make this assertion vacuous rather than testing "auto-height, not clipped" for real.
+    await page.evaluate(() => {
+        const ed = document.getElementById('editor');
+        ed.value = 'G0 X0 Y0\nG1 X50 F300\nG1 Y50 F300\nM30';
+        ed.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForTimeout(300);
+    const h = await page.evaluate(() => {
+        const chromeH = document.querySelector('.editor-strip-chrome').getBoundingClientRect().height;
+        const toolbarH = document.querySelector('.editor-toolbar').getBoundingClientRect().height;
+        const toolbarBtnH = document.querySelector('.editor-toolbar > button').getBoundingClientRect().height;
+        return { chromeH, toolbarH, toolbarBtnH };
+    });
+    expect(h.toolbarH, `the toolbar is at least as tall as its own button (toolbar=${h.toolbarH}px, button=${h.toolbarBtnH}px)`).toBeGreaterThanOrEqual(h.toolbarBtnH);
+    expect(h.chromeH, `the chrome group has real, non-zero height (measured ${h.chromeH}px) — not silently collapsed`).toBeGreaterThan(0);
 });
 
 test('THE PRE-FLIGHT BADGE IS NEVER COVERED BY THE TOOLBAR (t2155 — structural now, not z-index arbitration)', async ({ page }) => {

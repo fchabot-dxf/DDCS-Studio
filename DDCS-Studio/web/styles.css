@@ -4006,6 +4006,22 @@ body #editor.editor-layer {
     padding: 8px;
 }
 
+/* t2169 — the CHROME group: badge + time-chip + op-chip-row (program-level NAVIGATION), kept apart from
+   `.editor-toolbar` (program-level ACTIONS) so phone width can relocate the toolbar alone — see index.html's
+   own comment on `.editor-strip` for the human ruling and why. `flex:1 1 auto` takes over the "push the toolbar
+   flush right" job `.op-chip-row` used to do directly against `.editor-strip` (now it does that job one level
+   up, against THIS wrapper, which does it against `.editor-strip` in turn — same mechanism, one more hop). At
+   every width except phone, this wrapper is functionally invisible: same children, same order, same visual
+   result as before it existed. */
+.editor-strip-chrome {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 /* t-opchips — THE PERSISTENT OP-CHIP ROW (RULING 1: "we dont need the hover for these chips and that they can be
    always visible in the top row" — replaces the old hover-revealed single floating chip). `order:3` sits it
    between the time chip (order:2) and the toolbar (order:4, below) — `flex:1 1 auto; min-width:0` lets it claim
@@ -5564,6 +5580,9 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     opacity: .75; font-size: 11px; padding: 3px 8px; line-height: 1;
     display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto;
 }
+/* t2169 — a no-op everywhere except the phone-portrait intersection below, where it grows to split the toolbar
+   around the 3D pull-tab. width:0 + flex:0 0 auto here so it adds no gap/width at any other size. */
+.editor-toolbar-spacer { flex: 0 0 auto; width: 0; }
 .editor-toolbar > button:hover:not(:disabled) { opacity: 1; }
 .editor-toolbar > button:disabled { opacity: .3; }
 /* the two icon buttons keep their tighter icon padding */
@@ -5599,27 +5618,45 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
        (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
        (its Open/Save now live in the chevron). */
-    /* BACKLOG #13 — the strip moves to the BOTTOM on phone. Sitting at the top (base position) parks the toolbar
+    /* BACKLOG #13 (t2155) — the toolbar moves to the BOTTOM on phone. Sitting at the top (base position) parks it
        over the FIRST LINE of code, exactly where the caret usually sits when you start typing. Most programs do
        not fill a phone screen, so the bottom sits over blank space instead.
-       t2155 — this used to be a position:absolute override on `.editor-toolbar` alone (`top:auto; bottom:8px`),
-       a SECOND magic number living only in this query. Now it is one flex `order` on the WHOLE strip: `.editor-
-       code` keeps its default order (0) and `.editor-strip` reorders to AFTER it in the column — no new number,
-       and the strip's own tenants (badge, chip) move to the bottom WITH the toolbar instead of splitting across
-       two edges. This is also the fix for the phone-width inconsistency flagged in t2153 amendment 5 (the
-       toolbar used to sit geometrically INSIDE the focus ring on phone, since the ring's own box didn't change
-       with this override): the ring now belongs to `.editor-code` alone, so the strip is OUTSIDE it at every
-       width, phone included, with no separate reasoning needed for the phone case.
-       ⚠ ACCEPTED, RULED (human, 2026-08-22), NOT AN OVERSIGHT: with the 3D drawer open on phone, `.viz3d-drawer`
-       covers the full panel, so the strip — the pre-flight safety badge included — sits behind it until the
-       preview closes. Before this turn the badge (top-anchored) and toolbar (bottom-anchored) were split across
-       two edges, so opening the drawer only ever covered the toolbar; moving them together as one strip means
-       the badge is now covered too while the drawer is open. Flagged, not fixed unasked — two mockups were put
-       to the human (scope the drawer to `.editor-code` so the strip stays visible, vs. leave it as shipped);
-       the alternative was REJECTED, this is the kept behaviour. Do not "fix" this by re-splitting the strip or
-       rescoping the drawer without a fresh ruling — the next reader finding a hidden safety readout is the
-       exact trap this comment exists to prevent. */
-    .editor-strip { order: 2; }
+       t2169 — RE-SPLIT on a fresh human ruling ("so tool button go down in mobile but op chips will stay up"),
+       overriding t2155's own "do not re-split without a fresh ruling" note below (this IS that ruling). The
+       badge/time-chip/op-chip-row group (`.editor-strip-chrome` — NAVIGATION: which op am I looking at) now
+       stays at the TOP beside what it navigates; only `.editor-toolbar` (program-wide ACTIONS) relocates to the
+       bottom, beside the 3D pull-tab. `.editor-strip` itself goes `display:contents` — its two children,
+       `.editor-strip-chrome` and `.editor-toolbar`, become independent flex items of `.editor-container`'s own
+       column and get ordered directly against `.editor-code` (order only applies among siblings — while chrome
+       and toolbar were both grandchildren of `.editor-container`, wrapped inside `.editor-strip`, `order` could
+       only rank them against EACH OTHER, never against `.editor-code` itself; `display:contents` promotes them
+       to real siblings of it). ⚠ A naive first attempt ordered `.editor-strip`'s ORIGINAL four direct children
+       (badge/chip/toolbar each independently) the same way instead of grouping three of them first — broken,
+       verified live: `.op-chip-row`'s own `flex:1 1 auto` (written for a ROW context, to grow sideways and push
+       the toolbar right) instead grew VERTICALLY as a bare child of a COLUMN flex container, ballooning to over
+       300px tall. The wrapper exists specifically so `.op-chip-row`'s row-context flex properties keep behaving
+       inside a real row (`.editor-strip-chrome` itself) regardless of what the OUTER context is doing.
+       This is also the fix for the phone-width inconsistency flagged in t2153 amendment 5 (the toolbar used to
+       sit geometrically INSIDE the focus ring on phone, since the ring's own box didn't change with this
+       override): the ring belongs to `.editor-code` alone, so the strip's chrome is OUTSIDE it at every width,
+       phone included, with no separate reasoning needed for the phone case.
+       ⚠ THE OLD "badge hidden behind the open drawer" TRADEOFF (t2155, human-ruled 2026-08-22) IS CHANGED BY
+       THIS SPLIT, VERIFIED not assumed: the badge now sits at the TOP with the chrome group, and the drawer is
+       BOTTOM-anchored (`.viz3d-drawer`, portrait), so at the drawer's DEFAULT size the badge stays visible while
+       the drawer is open — confirmed live, screenshot in WORK-LOG t2169. It can still be covered if the drawer
+       is resized tall enough to reach the top (the resize handle has no cap tying it to the chrome's own
+       height) — a NARROWER remaining exposure than t2155's "always hidden whenever any drawer is open," not a
+       full close of the gap t2155 flagged. Still flagged, still not silently fixed beyond what was asked. */
+    .editor-strip { display: contents; }
+    /* flex:0 0 auto OVERRIDES the base rule's flex:1 1 auto (that value is for the DESKTOP row context, where
+       growing sideways pushes the toolbar right — see .editor-strip-chrome's own comment). Once `display:
+       contents` promotes this wrapper into `.editor-container`'s COLUMN flow, an inherited flex-grow:1 means
+       "grow TALL to fill remaining vertical space" instead — verified live, caught before shipping: without
+       this override the chrome wrapper ballooned to ~185-340px depending on dock state, instead of sizing to
+       its own single-row content. */
+    .editor-strip-chrome { order: 1; flex: 0 0 auto; }
+    .editor-code { order: 2; }
+    .editor-toolbar { order: 3; }
 }
 
 /* ===== Portrait / mobile: 3D drawer pulls UP from the bottom of the editor ===== */
@@ -5673,6 +5710,37 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
         bottom: var(--viz3d-size, 50%);
         transition: bottom 0.22s ease;
     }
+}
+
+/* t2169 — THE RESIDUAL OVERLAP: `.editor-toolbar` relocating to the bottom (the `max-width:600px` query above)
+   and `.viz3d-handle` ALSO bottom-anchoring in portrait (the `@media (orientation:portrait)` block just above —
+   a different, ORIENTATION condition) are each individually correct; a phone in portrait satisfies BOTH, so the
+   two independently-correct rules land in the same band. Scoped to the exact INTERSECTION, not broadened onto
+   the plain portrait query above: a wide portrait TABLET keeps the toolbar at its default top position (only
+   `max-width:600px` relocates it), so it must not inherit this at all.
+   ⭐ Human ruling, direct, refined twice live against real screenshots: the HANDLE stays clamped to the true
+   bottom edge (unchanged, `bottom:0` from the plain portrait block above) and does NOT stack above/below the
+   toolbar at all — the toolbar SPLITS around it instead, 3 buttons each side, all in the SAME row. The
+   `.editor-toolbar-spacer` (index.html, a no-op `<span>` everywhere else) sits between button 3 (redo) and
+   button 4 (clear); `flex:1 1 auto` with a `min-width` equal to the handle's own width means it greedily claims
+   whatever room is left in the row while never shrinking narrower than the handle's own footprint — buttons 1-3
+   pack left, buttons 4-6 get pushed flush right, and the handle drops into the reserved gap between them,
+   centred, without covering any button at any width this row might render at (a fixed-pixel gap would only be
+   correct at exactly one width).
+   ⚠ ALSO overrides the 44px touch-target floor (`.editor-toolbar > button`, in the `max-width:600px` block
+   above) for this same intersection — human's own explicit call, KNOWING the tradeoff: that floor exists
+   specifically because one sibling (#btn-clear, the trash/DESTRUCTIVE action) getting the same treatment as its
+   five safe neighbours was judged to risk mis-taps (BACKLOG #13, from a real phone report). Overridden here on
+   direct instruction after that tradeoff was named aloud, not silently. */
+@media (max-width: 600px) and (orientation: portrait) {
+    .app-shell { --editor-toolbar-handle-w: 72px; }   /* == .viz3d-handle's own width in this same intersection */
+    .editor-toolbar-spacer { flex: 1 1 auto; min-width: var(--editor-toolbar-handle-w, 72px); }
+    /* An explicit `height` (not touching padding/line-height) is what actually makes all six uniform: the two
+       icon buttons (#editor-copy-btn, #editor-file-btn) carry a separate ID-specificity padding/line-height
+       rule above that a class-selector override here cannot out-specify, so leaving height to each button's own
+       natural sizing left copy visibly taller/shorter than its text-labelled siblings (measured live: 24,24,22,
+       22,24,26 — not one shared value). `height` is a property nothing else here sets, so it wins outright. */
+    .editor-toolbar > button { min-width: 0; min-height: 0; flex: 1 1 0; height: 24px; }
 }
 
 /* ── Probe-config source dot (PROBE-CONFIG-SOURCE.md) ───────────────────────

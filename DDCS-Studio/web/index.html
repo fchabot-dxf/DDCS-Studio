@@ -222,11 +222,22 @@
             <div class="editor-container">
                 <!-- t2155 — THE TOP BAND IS A DECLARED STRIP, not an accident of five things independently
                      picking position:absolute inside the same box. `.preflight-badge` and `.time-estimate-chip`
-                     (JS-mounted, editorOpHover.js/preflightBadge.js/timeChip.js) land in here too, via the
-                     declared editorStripHost() — see uiUtils.js. Order is flex order (badge, chip, toolbar
-                     pushed right by its own margin-left:auto), so the badge can never be covered by the toolbar:
-                     they are normal-flow siblings, not two absolutely-positioned things arbitrated by z-index. -->
+                     (JS-mounted, editorOpHover.js/preflightBadge.js/timeChip.js) land in `.editor-strip-chrome`
+                     below, via the declared editorStripHost() — see uiUtils.js. Order is flex order (badge, chip,
+                     toolbar pushed right by its own margin-left:auto), so the badge can never be covered by the
+                     toolbar: they are normal-flow siblings, not two absolutely-positioned things arbitrated by
+                     z-index.
+                     t2169 — `.editor-strip-chrome` GROUPS the program-level tenants (badge/time-chip/op-chip-row)
+                     apart from `.editor-toolbar` (program-wide ACTIONS), so phone width can relocate the toolbar
+                     alone to the bottom of the editor while navigation (which op am I looking at) stays beside
+                     what it navigates, at the top — human ruling: "so tool button go down in mobile but op chips
+                     will stay up". `.editor-strip` itself goes `display:contents` at phone width (see styles.css)
+                     so these two groups become independent flex items of `.editor-container`'s own column, not
+                     an accident of un-grouped `order` values fighting the strip's own row layout (that WAS tried
+                     and broke `.op-chip-row`'s sizing — flex:1 in a row means grow sideways, the same rule in a
+                     column means grow tall; verified live before shipping this shape, not assumed). -->
                 <div class="editor-strip">
+                    <div class="editor-strip-chrome"></div>
                     <!-- t2078 — ONE REAL TOOLBAR ROW (human: "there is a whole row unused above the editor … we can put
                          all of the cluster buttons inside this row"). Every one of these used to be its own
                          absolutely-positioned button with a hand-computed `left`/`bottom`, stacked over the editor's
@@ -239,6 +250,10 @@
                          editor's own block-indent capability (buttons, Tab/Shift+Tab, right-click entries) is retired
                          with it, not just hidden. Comment/uncomment survives (editorTextOps.js). -->
                     <button id="btn-undo" type="button" class="toolbar-btn settings-io" onclick="window.ddcsUndo && window.ddcsUndo()" title="Undo (program history) — Ctrl+Z" aria-label="Undo" disabled>↶</button>
+                    <!-- t2169 — a no-op everywhere except the phone-portrait intersection (styles.css), where it
+                         grows to reserve room for the 3D pull-tab (`.viz3d-handle`, clamped to the true bottom
+                         edge, centred) between this toolbar's two halves — 3 buttons each side, human ruling. -->
+                    <span class="editor-toolbar-spacer" aria-hidden="true"></span>
                     <button id="btn-redo" type="button" class="toolbar-btn settings-io" onclick="window.ddcsRedo && window.ddcsRedo()" title="Redo (program history) — Ctrl+Shift+Z or Ctrl+Y" aria-label="Redo" disabled>↷</button>
                     <button type="button" id="btn-clear" class="toolbar-btn" onclick="window.clearCode && window.clearCode()" title="Clear the program (editor + blocks)" aria-label="Clear program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                         <button id="editor-copy-btn" type="button" class="toolbar-btn" title="Copy the program to the clipboard" aria-label="Copy program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>

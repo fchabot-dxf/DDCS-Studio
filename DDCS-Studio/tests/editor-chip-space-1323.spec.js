@@ -10,11 +10,15 @@ import { test, expect } from '@playwright/test';
  * t2155 (the editor-strip/editor-code refactor) — the MECHANISM changed: the chip now lives in `.editor-strip`, an
  * auto-height box in normal flow ABOVE `.editor-code` (no inset variable at all — the code area simply starts
  * where the strip ends, whatever height the strip's tallest child needs). On DESKTOP this still reads the same as
- * before (chip above the code). On PHONE, BACKLOG #13 (the same turn) reorders the WHOLE STRIP — chip included —
- * to the BOTTOM, so the code isn't pushed down by chrome sitting over its first line; the chip's own home moved
- * WITH the toolbar it now shares a row with, which is a deliberate, DIFFERENT design call from t1323's original
- * "centred over the code" — not a regression of the ORIGINAL defect this test was written to catch (the chip and
- * line 1 sharing pixels), which the geometry check below still enforces regardless of which side the chip is on.
+ * before (chip above the code). On PHONE, BACKLOG #13 (the same turn) originally reordered the WHOLE STRIP — chip
+ * included — to the BOTTOM, so the code wasn't pushed down by chrome sitting over its first line.
+ *
+ * t2169 — RE-SPLIT on a fresh human ruling: the time-chip (program-level NAVIGATION, `.editor-strip-chrome`) now
+ * stays at the TOP on phone too — only `.editor-toolbar` (program-level ACTIONS) relocates to the bottom, beside
+ * the 3D pull-tab. So the chip is above line 1 at EVERY width now, not just desktop; BACKLOG #13's own
+ * "code isn't pushed down by chrome over its first line" concern is unaffected (the chrome group, chip included,
+ * is small — a badge/chip row, not the whole toolbar). The geometry check below still enforces the ORIGINAL
+ * defect this test was written to catch (the chip and line 1 sharing pixels), regardless of which side.
  *
  * This asserts by GEOMETRY, not by a class name or a pixel constant: read both rects and require they do not
  * intersect. That is what makes it survive a font change, a theme change or a longer estimate string — the day the
@@ -60,14 +64,9 @@ for (const { w, name } of WIDTHS) {
         expect(r.text, 'and it carries an estimate').toMatch(/\d/);
         expect(r.line1, 'and line 1 is rendered in the highlight layer').toBe(true);
         expect(r.intersects, `the chip and line 1 share no pixels: ${JSON.stringify(r)}`).toBe(false);
-        // t2155 — direction is now WIDTH-DEPENDENT by design (see the module header): desktop keeps the chip
-        // above the code (t1323's original placement, unchanged), phone moves the whole strip below it
-        // (BACKLOG #13). Assert the direction that's actually true for each width, not one fixed sign.
-        if (name === 'desktop') {
-            expect(r.gap, `desktop: line 1 starts below the chip with room to breathe: ${JSON.stringify(r)}`).toBeGreaterThanOrEqual(0);
-        } else {
-            expect(-r.gap, `phone: the chip starts below line 1 with room to breathe (BACKLOG #13's bottom strip): ${JSON.stringify(r)}`).toBeGreaterThanOrEqual(0);
-        }
+        // t2169 — the chip stays ABOVE the code at every width now (t2155's original phone exception — the
+        // WHOLE strip relocating below — no longer applies to the chip specifically; only the toolbar moves).
+        expect(r.gap, `line 1 starts below the chip with room to breathe (${name}): ${JSON.stringify(r)}`).toBeGreaterThanOrEqual(0);
     });
 }
 

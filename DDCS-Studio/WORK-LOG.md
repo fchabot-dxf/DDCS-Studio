@@ -50294,4 +50294,216 @@ a worker turn touches it, rather than a quick unreviewed patch mid-flow on an un
 Reported the root cause to the human directly (screenshots + explanation) so they had a real answer, not a
 placeholder. No code changed for this finding; nothing to gate.
 
-🔨 (unscheduled — flagging for the advisor's next dispatch, not signing a turn number for this)
+# t2169 — preview-handle/toolbar overlap, formally dispatched. MEASURED as instructed; a GATE, not implemented
+# yet — the advisor's own candidate fix has a real, quantified side effect that needs a decision before coding.
+
+Dispatch: the phone overlap is now a tracked turn. One candidate named explicitly as a candidate, not a
+diagnosis (position `.viz3d-handle` against `.editor-code` instead of `.editor-container`). Explicit instruction:
+measure the rects of strip/handle/dock in portrait at 390px and report before changing any selector; also check
+whether the strip needs to respect `--kbd-clear` when the dock is expanded.
+
+## Measurements (390×844 portrait, `getBoundingClientRect()`, not inference)
+
+Dock COLLAPSED: `editorCode.bottom=741` (== `editorStrip.top`) · `editorStrip` 741→801 (h=60) · `editorToolbar`
+749→793 · `handle` 773→801 · `dock.top=801` (flush with handle, no gap). **Overlap: handle∩toolbar = 773→793
+(20px).**
+Dock EXPANDED: identical shape, shifted up — `editorStrip` 462.5→522.5 (h=60) · `handle` 494.5→522.5 ·
+`editorToolbar` 470.5→514.5. **Overlap: 494.5→514.5 (20px), same 20px both states** (it's `handle height (28) −
+strip padding (8) = 20`, independent of where the whole assembly sits).
+
+`--kbd-clear` question, answered directly: `getComputedStyle(...).getPropertyValue('--kbd-clear')` returns
+EMPTY STRING at 390px width. It's declared only inside `@media (min-width: 700px) and (orientation: landscape)`
+(styles.css:4987) — at phone width it is simply never set, in either dock state. Nothing for the strip to
+"respect" because the variable doesn't exist on this code path; `.editor-container`'s own height already
+shrinks correctly for the expanded dock via plain flex sizing (`editorContainer.bottom` tracked `dock.top`
+exactly in both measurements, 0px error) — introducing `--kbd-clear` here would be solving an already-solved
+problem.
+
+## A THIRD measurement the dispatch didn't ask for, and it changes the fix that's safe: the strip is not a fixed
+## height
+
+Re-measured with a realistic loaded program (8 op chips + the pre-flight badge) instead of an empty editor —
+`tests` screenshot `t2169-strip-realistic-390.png` shows it directly: **the strip wraps to 2 rows** (chip row
+714.5→740.5, toolbar 749→793, total strip height 97px vs 60px empty). This matters directly for which fix is
+even VIABLE: any fix that hardcodes a clearance number (e.g. "60px, matching what I measured") would under-clear
+the handle by 37px the moment a realistic program is loaded — the bug would persist for actual usage, only fixed
+for an empty editor. Ruled out a hardcoded-constant fix on this evidence, not by preference.
+
+## The advisor's own candidate, checked against the DOM and measured for its OWN side effect
+
+`#view-toggle` is currently a DOM SIBLING of `.editor-code` (both direct children of `.editor-container`, per
+index.html:252-273) — NOT a descendant. So "position against `.editor-code`" is not a one-line selector edit; it
+requires actually moving the button in the DOM tree, since CSS absolute positioning needs a positioned ANCESTOR,
+not a sibling. Checked this is otherwise safe: no `.editor-container > .viz3d-handle`-style child-combinator
+selector anywhere that a DOM move would break.
+
+But the move has a real, measured side effect BEYOND the phone case it's meant to fix: `.editor-code` already
+sits BELOW `.editor-strip` in normal flow at EVERY width (the strip is DOM-first with equal `order:0` outside
+the phone media query, so `.editor-code`'s box has always excluded the strip's height — this isn't phone-
+specific). At desktop width (1500×950), `.editor-container`'s vertical center is at y=529; `.editor-code`'s own
+vertical center is at y=550 — **a 21px downward shift** in exactly where the handle's `top:50%` would land if it
+started centering against the smaller box. Structurally this is arguably MORE correct (the handle's job is
+toggling a preview of the CODE, so centering within the code area rather than the code+strip combined reads as
+more intentional) — but it is a real, visible, universal (every width, not just phone) position change nobody
+asked for as part of "fix the phone overlap," and it needs an explicit yes/no, not a silent side effect
+discovered later by someone wondering why the desktop handle moved.
+
+## Three options, not a silent pick — this is a gate
+
+**(A) Move `#view-toggle` into `.editor-code`'s DOM subtree**, matching the advisor's own candidate exactly.
+Automatically correct at ANY strip height (wrapped or not) — no magic number, ever. Cost: the measured 21px
+desktop shift (universal), needing either (a1) accepted as a minor, arguably-more-correct repositioning, or
+(a2) compensated with a CSS offset so desktop stays pixel-identical and only phone-portrait actually changes
+(more moving parts, defeats some of option A's "no offset constant" appeal).
+
+**(B) A hardcoded clearance constant scoped to `@media (max-width:600px) and (orientation:portrait)`** (the
+EXACT intersection the advisor's own diagnosis named as where two individually-correct rules stack). Zero DOM
+change, zero desktop impact, smallest possible diff. **Ruled inadequate by the wrap measurement above** — it
+would only fix the empty-editor case, not realistic loaded-program usage, unless the constant is set large
+enough for the WORST-case wrap (unknown ceiling — chips scroll horizontally within their own row per t-opchips
+ruling 2, so the row count is bounded by badge+chip-row+toolbar each needing their own line at minimum, i.e.
+worst case is bounded, but I have not measured that worst-case number).
+
+**(C) A JS-measured `--strip-h` custom property** (ResizeObserver on `.editor-strip`, written the same way
+`--dock-h` already is by `dockManager.js` — an established pattern in this codebase, just currently driven by a
+user drag gesture rather than passive content changes). Robust to any wrap, zero DOM move, zero desktop impact
+(scoped to the same phone media-query intersection as B, just referencing a JS-measured variable instead of a
+constant). Cost: a new ResizeObserver, the first passive (non-gesture-driven) CSS-var writer in this codebase —
+more machinery than A or B, though the LEAST amount of behavior change of any of the three.
+
+**My read, not yet acted on:** (C) is the most conservative given a stated project practice of not hand-rolling
+magic numbers where a declaration fits ("declare over hand-roll" — a `--strip-h` var IS the declaration; a
+hardcoded constant is the hand-roll this convention exists to avoid) — but (A) is architecturally the
+cleanest and the strip's OWN wrap-count is bounded (badge + chip-row + toolbar, at most 3 lines by construction,
+so a2's "compensate the desktop shift" is a boundable, not open-ended, correction if that route is preferred).
+Did not implement either — this is exactly the kind of decision the dispatch itself asked to have measured and
+reported before a selector changes, not decided solo.
+
+## Gate
+
+No code changed (measurement only, per instruction). `t2169-measure-expanded-390.png` and
+`t2169-strip-realistic-390.png` (verification/) are the supporting screenshots for the numbers above.
+
+🔨 turn 2169
+
+## AMENDMENT 2 — the preview handle/toolbar overlap: implemented, live-iterated with the human, collateral-swept (turn 2169)
+
+The gate above (three options, unimplemented) was superseded mid-turn: the human interrupted directly ("no"),
+corrected the direction twice more ("the preview handle needs to be clamped to the bottom"), then drove the
+actual shape through live screenshot iteration rather than picking one of A/B/C. What shipped is closer to
+option B in mechanism (scoped to the exact `max-width:600px` + `orientation:portrait` intersection, no DOM
+move, no new ResizeObserver) but the SHAPE is the human's own, arrived at live — not any of the three as written.
+
+### The re-split: chrome stays up, only the toolbar relocates
+
+`.editor-strip` used to reorder as ONE unit on phone (BACKLOG #13, t2155). Re-split into two independent flex
+items of `.editor-container`'s own column: `.editor-strip-chrome` (badge + time-chip + op-chip-row — program
+NAVIGATION) stays at the top; `.editor-toolbar` (the 6 action buttons) alone relocates to the bottom, beside
+the 3D pull-tab. Mechanism: `.editor-strip { display: contents }` (so it stops generating its own box and its
+two children become direct, independently-`order`-able items of the SAME parent — `order` only works among true
+siblings) + a new `.editor-strip-chrome` wrapper div (index.html, first child of `.editor-strip`, immediately
+before the pre-existing `.editor-toolbar`). `editorStripHost()` (uiUtils.js) now targets `.editor-strip-chrome`
+instead of `.editor-strip` itself — the toolbar stays static HTML, untouched by that seam. Its three existing
+consumers (editorOpHover.js, preflightBadge.js, timeChip.js) needed zero changes: they only ever ask "where's
+the strip host," never assumed which element that resolves to.
+
+Two flex-context bugs caught live before landing:
+1. First naive attempt gave badge/timechip/chiprow/toolbar each their OWN `order` as direct children of the
+   column — `.op-chip-row`'s own `flex:1 1 auto` (tuned for a ROW context: grow sideways) instead grew
+   VERTICALLY to ~322px as a bare column item. Fixed by grouping the three navigation tenants into ONE wrapper
+   (`.editor-strip-chrome`) so they keep their internal row-context behaviour; only the wrapper itself becomes
+   the column item.
+2. The wrapper repeated the exact same bug on itself — `flex: 1 1 auto` (correct for its desktop row-sibling
+   role) ballooned it to 185-340px once it became a phone-width column item. Fixed with an explicit
+   `.editor-strip-chrome { order: 1; flex: 0 0 auto; }` inside the phone media query.
+
+A positive, unplanned side effect, confirmed live: the pre-flight badge now stays VISIBLE even with the 3D
+drawer open (previously always hidden — t2155's own accepted tradeoff, since the whole strip used to relocate
+together). Not asked for; flagged and kept since it's strictly better than the prior behaviour it replaces, not
+a scope-creep addition.
+
+### The overlap fix + the human's own layout, iterated live (4 rounds, screenshots at each)
+
+Round 1 (rejected on sight, "no"): a `padding-bottom` clearance number so the toolbar stacked ABOVE a
+bottom-clamped handle. Round 2 (per an AskUserQuestion answer + a same-breath correction I read as superseding
+it — "button above it" / "resize the buttons so they fit"): built a stacked, shrunk-button layout — this was
+then itself superseded. Round 3 ("oios i meant 3 button on each side"): reverted to split-around-the-handle,
+3 left / 3 right, via a new `.editor-toolbar-spacer` span between `#btn-undo` and `#btn-redo` — first placement
+was wrong (between redo and clear, giving 4-left/2-right; caught by counting buttons in my own screenshot,
+moved to the correct slot). Round 4 ("flex size the button so they fit exactly"): buttons flex-grow evenly to
+fill their half rather than being sized by content padding alone.
+
+Final mechanism, `@media (max-width:600px) and (orientation:portrait)` (styles.css, after the pre-existing
+plain-portrait handle rule — placement matters, see the cascade bug below):
+- `--editor-toolbar-handle-w: 72px` (declared, matches `.viz3d-handle`'s own width in this exact intersection).
+- `.editor-toolbar-spacer { flex: 1 1 auto; min-width: var(--editor-toolbar-handle-w) }` — greedily claims
+  whatever room is left, never narrower than the handle's own footprint, so buttons 1-3 pack left, 4-6 pack
+  right, and the handle drops into the reserved gap without ever covering a button.
+- `.editor-toolbar > button { min-width:0; min-height:0; flex:1 1 0 }` — the human's own, KNOWING override of
+  BACKLOG #13's 44px touch floor (named aloud as a tradeoff before building it: the ONE destructive control,
+  `#btn-clear`, loses its extra-safety sizing along with its five siblings). Human's explicit call, not mine.
+
+**Second real bug caught by measuring, not reading:** buttons still rendered 3 different heights (24,24,22,22,
+24,26 — measured via a Playwright bounding-box loop) even after the flex-grow fix, because `#editor-copy-btn`/
+`#editor-file-btn` carry a separate, ID-specificity `padding:4px 6px; line-height:0` rule declared elsewhere in
+the file — an ID selector a same-media class rule cannot out-specify regardless of source order. Fixed by adding
+an explicit `height: 24px` in the override instead of touching padding/line-height: `height` is a property
+nothing else here sets, so (with the file's existing universal `box-sizing:border-box`) it wins outright and
+normalizes all six regardless of each button's own padding quirks.
+
+**Cascade-order bug, caught by re-measuring computed values, not by reading the rules:** an early version of the
+handle-clearance rule was placed BEFORE the pre-existing `@media (orientation:portrait) { .viz3d-handle {
+bottom:0 !important } }` block. Equal specificity, both `!important` → later-in-file wins, so the pre-existing
+rule silently defeated the new one every time until it was moved to AFTER that block. (Superseded by round 3's
+"split around the handle, don't move it" direction — the handle keeps its plain, unmodified `bottom:0
+!important` now — but the ordering lesson is why the final block sits where it does.)
+
+Verified live at 390×800 (`verification/t2169-v2-390.png`, `t2169-final-3-3-split.png`) and confirmed by the
+human ("ok fine" / "ok send theball").
+
+### Collateral sweep — full, not partial
+
+21 files referencing the touched selectors (`.editor-strip`, `editorStripHost()`, `.editor-toolbar`,
+`--editor-toolbar-*`) or geometrically adjacent to the touched region were identified and ALL 21 run:
+editor-chip-space-1323, editor-focus-ring-2151, editor-chrome, wordmarks-2161, boot-splash-2127, op-chips-2159,
+traverse-clarity-893, viz3d-handle-theme-2155, preflight-badge-838, kbutton-authoring, editor-file-menu-1227,
+editor-toolbar-2078, gcode-to-stack, cam-build-mode, blocks-mobile-drawers,
+preflight-names-unresolved-expr-1568, lathe-feel-1321, envelope-extent-1323, stock-shape-1313,
+lathe-honest-3d-1301, lathe-preview-1297, lathe-surfaces-1295, soft-limit-awareness-973. Two genuine breaks
+found and fixed, both in files this turn's own diff touches:
+
+**editor-chip-space-1323.spec.js** — rewritten: the time-chip now asserted ABOVE line 1 at EVERY width, not
+just desktop (t2155's phone exception — the whole strip relocating — no longer applies to the chip, only the
+toolbar moves now).
+
+**editor-chrome.spec.js** — the phone touch-floor assertions replaced with the new shape's own properties
+(visible, on-screen, all six SAME height via a Set-of-rounded-heights check) instead of a 44px floor that no
+longer applies here; extensive comment names the human's direct, informed override.
+
+**editor-focus-ring-2151.spec.js** — 3 of 5 initially-broken tests fixed straightforwardly (rename
+`.editor-strip` to `.editor-toolbar` querying, since `.editor-strip` is now `display:contents` and reads as a
+zero-rect; geometry-relative chrome/toolbar height assertions instead of a hardcoded 44px). The remaining 2
+("THE LEFT EDGE", "focused via keyboard (Tab)") needed real diagnosis — both sampled a fixed point derived from
+`.editor-code`'s own rect and got a flat `0,0,0,255 -> 0,0,0,255` (no colour change at all, worse than a flaky
+near-miss). Root cause, found with a throwaway diagnostic Playwright test rather than by inspection: this
+suite's seed content is comment-only (five bare comment lines, zero real moves), which the pre-flight check
+legitimately flags amber/info — and since the chrome group (badge included) now stays at the TOP on phone too,
+a SHOWN badge sits exactly where these tests sample the ring's left edge. `seedLines()`'s existing badge-hide (a
+150ms wait, then force `badge.hidden = true`) looked like the fix but wasn't: TWO independent debounces react to
+the same input event and can re-show the badge after the hide — preflightBadge.js's own 250ms `inputT` timer,
+AND programModel.js's SEPARATE 500ms reconcile timer (editor.js:614), whose `setStack(...)` call fires the same
+`onChange` subscription preflightBadge.js renders from. A 350ms wait (clearing only the first) still read
+`badge.hidden` back as `false` when checked directly with a diagnostic test, before touching the real one.
+Fixed by widening `seedLines()`'s wait to 650ms, clearing both debounces with margin; all 11 tests in the file
+pass afterward.
+
+Full sweep: 68/68 collateral specs green, 76/76 smoke tier, 227/227 node tier, lint clean.
+
+### Cleanup
+
+Deleted `t2169-real-fix-390.png` / `t2169-real-fix-drawer-open-390.png` (verification/) — screenshots of the
+round-1 "stacked above, padding-bottom" design, rejected on sight and superseded three rounds ago; nothing
+downstream references them. Kept `t2169-v2-390.png` (the round-3 correction) and added
+`t2169-final-3-3-split.png` (the shipped, flex-sized final state) as the surviving record.
+
+🔨 turn 2169

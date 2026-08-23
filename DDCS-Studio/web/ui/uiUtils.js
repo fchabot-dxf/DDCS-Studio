@@ -9,7 +9,12 @@ export const el = (id) => document.getElementById(id);
 // host BY NAME. Before this, five separate modules each inferred a host by walking to `#editor`'s own parent —
 // the day the editor moved into its own box (this refactor), every one of them would have silently followed it
 // there, including the two that belong in the STRIP above, not the code area. One declaration, five readers.
-export const editorStripHost = () => document.querySelector('.editor-strip');
+// t2169 — editorStripHost() now returns `.editor-strip-chrome` (the badge/time-chip/op-chip-row group), NOT
+// `.editor-strip` itself: the toolbar stays a direct `.editor-strip` child (static HTML) so phone width can
+// relocate it alone to the bottom while chrome stays up top — see index.html's own comment on `.editor-strip`.
+// The three callers (editorOpHover.js, preflightBadge.js, timeChip.js) needed no changes for this — they only
+// ever asked for "the strip host," never assumed which element that resolved to.
+export const editorStripHost = () => document.querySelector('.editor-strip-chrome');
 export const editorCodeHost = () => document.querySelector('.editor-code');
 
 /**

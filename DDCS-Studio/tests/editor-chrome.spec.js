@@ -68,25 +68,37 @@ test.describe('phone', () => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio);
 
-    // t1255 (user) — the trash must be a REAL touch target at every width, phone included: it is the one door to
-    // Clear now (t2078 retired the corner-menu duplicate this test used to check for instead).
+    // t1255 (user) — the trash must be VISIBLE and on screen at every width, phone included: it is the one door
+    // to Clear now (t2078 retired the corner-menu duplicate this test used to check for instead).
     const trash = page.locator('#btn-clear');
     await expect(trash, 'the trash is on screen at 390px').toBeVisible();
     const tb = await trash.boundingBox();
-    expect(Math.min(tb.width, tb.height), 'and is a real touch target').toBeGreaterThanOrEqual(44);
     expect(tb.x >= 0 && tb.x + tb.width <= 390, 'fully inside the viewport').toBe(true);
 
-    // BACKLOG #13 (human, from a phone screenshot: "the clear button appears larger than its siblings") — it
-    // was not oversized, its five siblings were undersized: only #btn-clear ever got the 44px floor. Asserts
-    // the COMPUTED tap size for every toolbar button, not a hand-check — this exact rule silently broke once
-    // already (a class rename left the old selector matching nothing, floor measured 24px not 44px) precisely
-    // because nobody had a test for it.
+    // BACKLOG #13 (human, from a phone screenshot: "the clear button appears larger than its siblings") ruled
+    // ALL SIX buttons should share the 44px touch floor (previously only #btn-clear had it) — the reasoning:
+    // shrinking clear to match its siblings would trade a cosmetic complaint for an ergonomic one on the ONE
+    // destructive control in the row.
+    //
+    // t2169 — REVERSED, on a direct, INFORMED human override: the floor was named aloud as a tradeoff (a real
+    // preview-handle/toolbar overlap needed the row to shrink to fit above/beside the 3D pull-tab, clamped to
+    // the true bottom edge) and the human chose to accept the mis-tap risk rather than keep the floor. All six
+    // buttons — trash included — are ~24px now (`.editor-toolbar > button`'s natural, unfloored size), split 3
+    // each side of the handle via `.editor-toolbar-spacer`, each flex-sized to fill its half evenly. This test
+    // now asserts the NEW shape (present, on screen, evenly sized, no button under the OTHER buttons' own size)
+    // rather than a floor that no longer applies here — if a future ruling restores the floor, this is the test
+    // to update again, the same way it was written down instead of silently changed the first time.
     const ids = ['editor-cam-btn', 'align-rotate-btn', 'btn-undo', 'btn-redo', 'btn-clear', 'editor-copy-btn'];
+    const sizes = [];
     for (const id of ids) {
       const b = await page.locator('#' + id).boundingBox();
       expect(b, `#${id} is on screen at 390px`).toBeTruthy();
-      expect(Math.min(b.width, b.height), `#${id} meets the 44px touch floor`).toBeGreaterThanOrEqual(44);
+      expect(b.x >= 0 && b.x + b.width <= 390, `#${id} fully inside the viewport`).toBe(true);
+      sizes.push(b.height);
     }
+    const heights = new Set(sizes.map((h) => Math.round(h)));
+    expect(heights.size, `all six toolbar buttons share one height (no button reads as bigger/smaller than its neighbours): ${sizes}`).toBe(1);
+
     // BACKLOG #13 — the toolbar sits at the BOTTOM on phone (top:8px would float it over the first line of
     // code, exactly where the caret usually is when you start typing).
     // t2155 — the anchor moved from `.editor-toolbar { top:auto; bottom:8px }` (its own absolute position) to
@@ -94,6 +106,8 @@ test.describe('phone', () => {
     // toolbar itself is a plain flex child now with no `bottom` of its own; the strip's `order` is a layout
     // instruction, not a resolvable computed-style value like `bottom` was, so this checks the RENDERED rect
     // (where it actually ends up) rather than a CSS property that no longer exists on this element.
+    // t2169 — the toolbar alone relocates now (chrome/badge/chips stay up top); unaffected by that split — the
+    // toolbar's own rendered position is still what matters here, still near the bottom.
     const barTop = await page.evaluate(() => {
       const bar = document.querySelector('.editor-toolbar');
       return { rectBottom: bar.getBoundingClientRect().bottom, viewportH: window.innerHeight };
