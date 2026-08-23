@@ -395,6 +395,18 @@ let _ddcsSettings = loadSettings();
 // Migrate any legacy dense / bare-number tool storage to the sparse library shape (one pass, idempotent).
 if (_ddcsSettings.atc) _ddcsSettings.atc.tools = libraryTools(_ddcsSettings.atc);
 
+// t2188 (root fix for the watermark-timing bug traced at t2186 — data/backup.js's own workspaceSignature) —
+// PERSIST NOW if this key has never been written: the app is ALREADY operating with this exact object in
+// memory the instant this module loads (this line runs at BOOT, statically imported before ui/fileSaveState.js
+// in app.js — never lazily on first Settings interaction), so the workspace's own boot watermark must see it
+// from day one too. Without this, the `settings` BACKUP_STORES row transitions from "absent" (skipped by
+// workspaceSignature's own read-undefined guard) to "present with UNCHANGED content" the first time anyone
+// ever opens Settings and touches anything — and that shape change alone, never any real edit, permanently
+// flipped isWorkspaceDirtyToFile() for the rest of the session (confirmed live: calling saveSettings() with
+// the in-memory object completely untouched reproduced it). Fixing the INPUT here, not compensating for it in
+// wouldLoseWork() — "a predicate compensating for a lying input is two bugs" (direct instruction).
+try { if (localStorage.getItem(DDCS_SETTINGS_KEY) == null) localStorage.setItem(DDCS_SETTINGS_KEY, JSON.stringify(_ddcsSettings)); } catch (e) { /* ignore */ }
+
 function loadSettings() {
     try {
         const raw = localStorage.getItem(DDCS_SETTINGS_KEY);

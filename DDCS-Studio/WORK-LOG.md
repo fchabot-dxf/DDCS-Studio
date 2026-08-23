@@ -51516,3 +51516,70 @@ workspace-manager-1223, wizard-manager-1617, editor-file-menu-1227) green — th
 which glyph renders, not any data-act/structure the tests assert on. Smoke 76/76, node 227/227, lint clean.
 
 🔨 turn 2186
+
+## t2188 — the watermark-timing bug, fixed at the root (arc step), plus the workspace-chip dirty dot (tail)
+
+### The arc step: fixing the input, not the predicate
+
+t2186 diagnosed but didn't fix: `data/backup.js`'s `settings` BACKUP_STORES row read `undefined` (skipped by
+`workspaceSignature()`'s own accumulator) until the FIRST time `ui/settingsPanel.js`'s `saveSettings()` ever
+ran in a session — at which point `ddcs_studio_settings` materialized in localStorage and the store stopped
+being skipped. The signature's own SHAPE changed (a new `settings=…;` segment appeared where none had), not its
+content — confirmed live at t2186 by calling `saveSettings()` with the in-memory object completely untouched
+and watching `isDirty` flip true anyway.
+
+Direct instruction: fix the INPUT, not the predicate ("a predicate compensating for a lying input is two
+bugs") — `wouldLoseWork()` stays untouched this turn. Root fix: `ui/settingsPanel.js` persists `_ddcsSettings`
+to `ddcs_studio_settings` immediately at module load, if the key has never been written. This is safe and
+correctly ordered because `_ddcsSettings = loadSettings()` already runs at BOOT — `settingsPanel.js` is
+statically imported (app.js line 62) strictly BEFORE `ui/fileSaveState.js` (line 78), which is what
+establishes the watermark on `DOMContentLoaded`. So the persist-if-absent line is guaranteed to run before any
+watermark gets captured — the store can never again transition from absent to present mid-session; it's
+populated from the very first script evaluation.
+
+### The acceptance bar, three-sided, all proven
+
+Direct instruction: the dirty flag must be true IF AND ONLY IF something actually changed. Tests added to
+tests/watermark-timing-2188.spec.js:
+- the settings key exists immediately after boot (before any Settings interaction) — proven.
+- CLEAN: `saveSettings()` with the in-memory object completely untouched leaves the workspace not dirty.
+- DIRTY: a genuine field edit (units) still flips dirty — not a "never dirty" regression.
+- CLEAN ON OPEN (amendment 2): a truly fresh browser context (guaranteed empty localStorage), opening a
+  workspace as its very first action, reads clean immediately.
+
+Non-vacuity: reverting `settingsPanel.js` to HEAD and re-running showed the FIRST TWO of these fail precisely
+(settings key absent at boot; a no-op save flips dirty) — the exact bug, reproduced and then closed. The DIRTY
+test passes both ways (that behaviour was already correct — never the bug). The CLEAN-ON-OPEN test is reported
+HONESTLY as NOT independently discriminating: it also passes on reverted code, because
+`restoreBackup()`'s own write-then-mark ordering (the settings store is WRITTEN during restore, and
+`markWorkspaceSavedToFile`'s signature read happens strictly AFTER) was already safe against this exact
+mechanism by construction — this specific synthetic repro was never vulnerable to it either way. It stays in
+the suite as a real, valuable acceptance guard (this property should hold, and does, before and after), not as
+proof of having found the open-path trigger for the human's exact real-world symptom.
+
+### Amendment 2's own evidence, and where the diagnosis stands now
+
+The human independently reported the SAME symptom from a different angle, unprompted: "on oprn it shouldnt be
+dirty why is it always dirty" — their own screenshots of the same workspace disagreeing across moments (Saved
+yesterday 19:53 vs Not saved) is consistent with a signal that hadn't settled yet. Investigated directly: could
+NOT reproduce a distinct "dirty immediately after a real workspace open" failure via a fresh-context
+restore+reload, either before or after this fix — see the CLEAN-ON-OPEN test's own honest non-vacuity note
+above. Two honest possibilities, not resolved this turn: (a) the fix already closes it too, and the specific
+open-path repro this test drives just isn't the exact mechanical path the human hit in the real UI (its own
+`openWorkspaceObject` does an extra `controllerSettled()` wait + a SECOND mark this synthetic test doesn't
+exercise), or (b) a genuinely separate trigger remains, most plausibly the settings-panel RENDER-time backfill
+already reported at t2186 as a distinct finding (WCS table `null`→populated array, limit-pin `""`→`null`,
+discovered while investigating the theme-switch confound) — if that backfill can fire from something the real
+open flow touches, it would explain a LATER (not immediate) drift the synthetic test's tighter timing wouldn't
+catch. If the symptom persists after this ships, that is the next thread to pull, not a re-litigation of this
+fix.
+
+### Verification
+
+Collateral (persistence-file-indicator, settings-ia-regroup-1245, settings-done-faq, settings-responsive,
+settings-modal, workspace-manager-1223, replace-confirm-2184 — 38 tests) all green, including the pre-existing
+"dirty state persists across a reload" test (confirms the fix doesn't disturb legitimate persistence). Smoke
+76/76, node 227/227, lint clean.
+
+This turn is not yet signed off — the tail (amendment 1's workspace-chip dirty dot) follows below once that
+commit lands.
