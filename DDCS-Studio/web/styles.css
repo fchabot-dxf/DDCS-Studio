@@ -4062,10 +4062,62 @@ pre[id^="wiz_"][id$="_code"] .g-line.active-line {
    `insertBefore`, not an absolutely-positioned child needing a new wrapper) — so the ring moves to the ONE
    existing box that already contains both: `.editor-container` itself. `:has()` reaches the container from
    the descendant's OWN :focus-visible state (already this file's pattern — `.editor-container:has(.viz3d-
-   drawer.open)` above), so this needs no new element and no JS. Click still shows NO ring (the point of
-   `:focus-visible` over plain `:focus`); Tab still shows one, now honestly framing the whole panel. */
+   drawer.open)` above), so this needs no new element and no JS.
+   ⚠ t2151/t2153 — CORRECTED, having been wrong the first time this comment was written: the ring shows on
+   BOTH click and Tab, not "click → none, Tab → one". Measured directly (a real click, compared against a
+   `<button>` in the same page which correctly suppresses on click): a `<textarea>` reports `:focus-visible ===
+   true` even on a plain mouse click, in this Chromium — the CSS spec's own documented behaviour for
+   text-editable widgets ("always considered to match :focus-visible… because a user typically wants to know
+   where they will type"), independent of input modality. So `:focus-visible` fixes the ring's SHAPE here (a
+   complete rectangle instead of three edges), never its TRIGGER — the human's original complaint ("the border
+   appears when I click in the editor") is UNCHANGED and still true after this fix. Suppressing it on click
+   would need a JS input-modality tracker, which is new machinery this item's own scope deliberately did not
+   build without a ruling — see BACKLOG #12 / WORK-LOG t2151/t2153 for the full reasoning.
+   ⚠ t2153 amendment 3 (human RULING, two mockups compared side by side) — CORRECTED AGAIN: ringing the WHOLE
+   `.editor-container` (this comment's own earlier fix) was REJECTED. The ring frames the CODE AREA ONLY; the
+   `.editor-toolbar` row (Make, rotate, undo, redo, clear, copy) stays OUTSIDE it. MEASURED first, per the
+   ruling's own condition, before building anything: does `.editor-toolbar` (position:absolute, top:8px)
+   actually float OVER line 1 of code, which would make excluding it cut the first line out of the ring
+   instead of fixing anything? Seeded 5 real lines, focused the editor, read every rect — `.editor-toolbar`
+   bottom sits at y=142, the first `.g-line`'s own top at y=168, a clean 26px gap. NO OVERLAP: `#editor`,
+   `#editor-highlight` and `#editor-gutter` already start BELOW the toolbar's own band, at
+   `top: var(--editor-chip-inset)` (46px — t1323's OWN reserved strip, built for the runtime-estimate chip
+   that floats in the same band the toolbar occupies) — so the boundary the ruling asks for ALREADY EXISTS in
+   the layout; nothing needed restructuring (the "toolbar gets its own in-flow strip" alternative the ruling
+   floated for the overlap case never applies here).
+   ⭐ THE ONLY GAP: no single EXISTING element's box is exactly "the container, inset by the chip-band, with
+   the gutter still inside it" — `#editor`/`#editor-highlight` span the right width but are the gutter's
+   SIBLINGS (a sibling's outline is still painted per normal stacking order, so the gutter — z-index 3 — would
+   cover it on the left again, the ORIGINAL bug); only `.editor-container` is an ANCESTOR of the gutter, and an
+   ancestor's outline paints AFTER its whole subtree regardless of a child's z-index (why the previous,
+   REJECTED fix never had a left-edge problem — that mechanism was right, just applied to the wrong box). A
+   generated `::before` on `.editor-container`, inset from the top by the SAME `--editor-chip-inset` variable
+   the gutter/editor/highlight already use (not a new value — the declared source for "where the code area
+   starts" already existed), gets both properties at once: it is a real descendant of `.editor-container` (so
+   its own outline still paints after the gutter), and its own box is exactly the code area, chrome excluded.
+   No new DOM element, no JS — CSS generated content only. */
 #editor:focus-visible { outline: none; }   /* suppress the generic per-element ring — it would still be the one the gutter covers */
-.editor-container:has(#editor:focus-visible) {
+.editor-container { position: relative; }   /* (already true elsewhere — restated here so the ::before below has an explicit anchor beside it) */
+/* ⚠ t2153 amendment 6 — THE WIDE-WIDTH BREAK, human-observed direct on the real app ("circles fine on mobile
+   but not in wide mode" — the OPPOSITE of what an earlier amendment predicted for phone, which was correctly
+   withdrawn once the human looked at the real screen). Reproduced at 1400×900, editor focused, before touching
+   anything: `.viz3d-handle` (the 3D-preview pull-tab) sits `position:absolute; right:0; z-index:6`, vertically
+   centred — its own rect (x:1372–1400, y:447–519 in this viewport) squarely overlaps the ring's right edge
+   (drawn at x≈1398, the SAME 2px line, via outline-offset:-2px). z-index 4 loses to the handle's 6, so the
+   handle painted a 72px-tall gap into the ring's own right edge, screenshot-confirmed
+   (`verification/t2153-amend6-wide-right-edge.png`). Not present in portrait/phone because a SEPARATE media
+   query relocates the handle to `bottom:0; left:50%` there (styles.css, `@media (orientation: portrait)`) —
+   off the right edge entirely, which is exactly why the human saw it fine on mobile and broken on desktop. */
+.editor-container::before {
+    content: '';
+    position: absolute;
+    top: var(--editor-chip-inset, 0); left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 7;   /* above .viz3d-handle (6, the pull-tab that broke the right edge — see the amendment-6 note
+                     above) and #editor-gutter (3); the preflight badge (12) stays visually unaffected since an
+                     OUTLINE only paints a thin edge line, never fills the interior area the badge sits inside */
+}
+.editor-container:has(#editor:focus-visible)::before {
     outline: 2px solid var(--field-focus-edge, var(--accent));
     outline-offset: -2px;
 }
