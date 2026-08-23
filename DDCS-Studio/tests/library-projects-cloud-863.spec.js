@@ -67,11 +67,13 @@ async function openViaDeepLink(page) {
         await page.evaluate(() => document.getElementById('projOpenBtn').click());
         await expect(ov).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 10000 });
-    await expect(ov.locator('.library-tab[data-lib-tab="projects"]')).toHaveClass(/active/);
+    // t2178 (amendment 14) — the Library SPLIT: this modal is Projects-only now, no tab bar to assert "active"
+    // on. Assert the Projects content itself mounted instead (the volumes toggle only this tab ever had).
+    await expect(ov.locator('.proj-voltabs')).toBeVisible();
     return ov;
 }
 
-test('the 📂 Open header button DEEP-LINKS to the Library Projects tab (not the drawer), with Local + Cloud volumes', async ({ page }) => {
+test('the 📂 Open header button DEEP-LINKS to the Projects modal (not the drawer), with Local + Cloud volumes', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(READY, null, { timeout: 15000 });
     await seedLocal(page);

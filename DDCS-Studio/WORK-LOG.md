@@ -51009,3 +51009,75 @@ wordsmithing dead text. Verified live (`verification/t2178-export-label.png`, se
 (all select by `data-act`). Smoke/node/lint re-run clean.
 
 🔨 turn 2178
+
+## turn 2180 — AMENDMENT 14: SPLIT THE LIBRARY MODAL
+
+### CHECKED FIRST, per instruction — and the answer changed the shape of the fix
+
+Before touching anything, mapped every live entry point for both halves (delegated to a research-only sweep,
+then verified the load-bearing claims myself):
+
+**Wizards: an independent, richer, already-wired standalone modal ALREADY EXISTS.** `window.openWizardManager()`
+(t1617, `ui/wizardManager.js`) covers rename/duplicate/**fork**/export/delete + its own local/cloud shelves —
+capabilities `libraryModal.js`'s own "Wizards" tab never had at all (confirmed by reading both files' actual
+button lists, not their header comments — `wizardManagerPanel.js`'s own doc claims "fork a built-in", but no
+such action exists anywhere in that file; the claim was stale/aspirational). And **nothing anywhere deep-links to
+`openLibrary('wizards')`** — grepped the whole tree, zero call sites pass that argument. The quick-menu's own
+"Wizards…" row already calls `openWizardManager()` directly, bypassing the Library's Wizards tab entirely; that
+tab was reachable only by opening the Library some other way and manually clicking it inside the shell. This
+was **restoring a door that was already open and deleting a shell around it** — exactly the shape the dispatch
+asked me to check for, not "authoring two modals."
+
+**Projects: no equivalent standalone surface exists.** The old `openOpenDrawer`/`buildDrawer`
+(`ui/projects/projectModal.js`) is dead code, reachable only from tests (`library-projects-cloud-863`,
+`select-load-805`, `smalls-696` — all via dynamic `import()`, never from app UI); `macroBar.js`'s own comment
+claiming it "stays mounted for the save flow" is itself slightly stale — `openSaveModal()` doesn't depend on it.
+So Projects keeps its EXISTING logic (`renderProjectsTab`, unchanged) — the split there is just removing the
+now-pointless single-tab switcher around it, not restoring or rebuilding anything.
+
+### The fix
+
+`libraryModal.js`: deleted `renderWizardsTab` and the `TABS` registry entirely (one destination doesn't need a
+registry); `openLibrary()` now takes no argument and mounts Projects directly. The tab-bar UI (`.library-tabs`,
+`.library-tab` × N) is gone, replaced with a plain `.library-title` ("Projects") — a single-item tab bar would
+have been the exact clutter this split was asked to remove. Kept the exported name (`openLibrary`) and the
+`#libraryOverlay` id: every real caller (`macroBar.js`'s `#projOpenBtn`, `headerPost.js`'s "Open project…" row)
+already only ever wanted Projects, so neither needed to change — the sweep the dispatch asked for
+("`openLibrary(tab)` has callers, and a retired shell leaves them pointing at nothing") came back clean: both
+callers pass either `'projects'` or nothing, and `openLibrary()` ignoring an extra argument is harmless.
+
+CSS: removed `.library-tabs`/`.library-tab` (added `.library-title`), removed `#library_wizard_manager` (fully
+orphaned), and trimmed `.lib-wizhead` out of its shared selector with `.lib-projhead` (which stays live). Grepped
+`styles.css` afterward for any stray reference to the deleted selectors — none.
+
+### The "New from current" question — checked, not assumed away
+
+The deleted Wizards tab's own "New from current" button called `window.ddcsSaveAsWizard`. Before deleting it,
+confirmed the SAME global already has its own independent door: the quick-menu's `case 'wizard'`
+(`headerPost.js:78`) calls it directly. Nothing was lost.
+
+### Verification
+
+`library-854.spec.js` rewritten (its own former "last-used tab" test is gone with the thing it tested — there's
+nothing left to remember between one tab and itself): asserts no tab bar exists at all, the title reads
+"Projects", the existing select-then-load/save-as behaviour is untouched, AND a new test asserting
+`window.openWizardManager` is the real door (the quick-menu's "Wizards…" row never opens `#libraryOverlay`).
+`library-projects-cloud-863.spec.js`'s one stale assertion (an `.active` tab class that no longer exists) fixed
+to check the Projects content mounted directly instead. Collateral: `wizard-manager-1617`, `wizard-manager`,
+`library-sources-1247`, `settings-done-faq`, `settings-ia-regroup-1245`, `wizard-restore-default`,
+`wizard-value-persistence-1437`, `wizbar-icon-picker` (everything reachable from either `openWizardManager()` or
+Settings' own Wizards tab, neither of which this turn touched) — 50/50 green. Smoke 76/76, node 227/227, lint
+clean. Verified live (`verification/t2180-projects-modal-split.png`, sent to the human) — a clean, single-purpose
+modal, no vestigial one-item tab bar.
+
+### For the advisor's own question (t2178's Insert removal)
+
+The "insert is redundant beside load remove it completely" ruling is a REAL, direct, live human message — it did
+not come through an advisor dispatch and is not inferred from t2173's own scope. It happened in THIS worker
+window, mid-session, right after t2173 was passed back — see commit `7754fa07` ("quick menu: Insert removed
+completely (live human directive)", 2026-08-23 08:24:16) and its own WORK-LOG entry ("OUT-OF-BAND (worker
+window, live direct human message, no advisor dispatch)"), which I flagged to the advisor at the time via a
+`pass --to advisor` note quoting the commit hash. Answering again here since the question came back — the
+provenance is that commit, not an inference.
+
+🔨 turn 2180

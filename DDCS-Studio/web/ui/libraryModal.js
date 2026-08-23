@@ -1,17 +1,24 @@
 /**
- * ui/libraryModal.js — THE LIBRARY (t854, part 1). ONE tabbed modal for the user's stuff: Projects · Wizards.
- * (t1217 — the Profiles tab retired with the profile library; the workspace's ONE machine lives in Settings.)
+ * ui/libraryModal.js — THE PROJECTS MODAL (t854, part 1; SPLIT from Wizards at t2178 amendment 14).
  *
- * ONE DOOR: `openLibrary(tab)` opens a single modal on the last-used tab (persisted). Every old entry point (the
- * projects drawer button, Profiles…, the wizard manager) becomes a DEEP-LINK into its tab — nothing breaks on landing
- * day; the old surfaces stay reachable and are retired later.
+ * t854 built this as ONE tabbed modal — Projects · Wizards · Profiles. t1217 retired Profiles (a workspace holds
+ * exactly ONE machine, so there is no library of machines to browse — see [[one-workspace-one-machine]]), leaving
+ * two tabs sharing nothing but a modal frame and a persisted last-tab. t2178 (human: "i think the modal should be
+ * seperated, wizard modal and project modal dont need to be shared") finishes the split — checked FIRST whether an
+ * independent Wizards surface already existed rather than authoring a new one: `window.openWizardManager()` (t1617,
+ * `ui/wizardManager.js`) already is a fully independent, already-wired, RICHER modal (rename/duplicate/fork/export/
+ * delete + its own local/cloud shelves) than this file's old Wizards tab ever offered (that tab only ever embedded
+ * `wizardManagerPanel.renderWizardLibrary`, the bar-ARRANGEMENT designer — also independently reachable from
+ * Settings). And nothing in the app ever deep-linked to `openLibrary('wizards')` directly (confirmed by grep) — the
+ * quick-menu's own "Wizards…" row already called `openWizardManager()`, bypassing this tab entirely. So this was
+ * restoring a door that was already open and deleting a shell around it, not building anything new.
  *
- * REUSE, not rebuild: each tab hosts the EXISTING surface's own logic —
- *   Projects → the projectStore API + the shared selectLoad contract + projectModal.openSaveModal (save-as-into-folders)
- *   Wizards  → wizardManagerPanel.renderWizardLibrary (the bar-designer) + a New-from-current door
- * The three tabs are a DECLARED registry (TABS) so adding one is a row, not new machinery.
+ * ONE DOOR, now for Projects alone: `openLibrary()` opens the projects browser — REUSING its existing logic
+ * unchanged (the projectStore API + the shared selectLoad contract + projectModal.openSaveModal), just without the
+ * now-pointless single-tab switcher around it. Kept the exported name (`openLibrary`) and the `#libraryOverlay` id
+ * — every existing caller (macroBar.js, headerPost.js's "Open project…" row) already only ever wanted this tab, so
+ * neither needed to change.
  */
-import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { installSelectLoad, syncPrimary } from './selectLoad.js';
 import * as store from './projects/projectStore.js';
 import { openSaveModal, renderCloudInto } from './projects/projectModal.js';
@@ -19,27 +26,12 @@ import { loadProject } from '../blocks/programFile.js';
 import { dlgPrompt, dlgConfirm, dlgNotice } from './dialog.js';
 import { busyRow } from './busyRow.js';   // t1257 — feedback on the row you clicked
 
-const TAB_KEY = 'ddcs_library_tab';
 const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-
-const lastTab = () => { try { return localStorage.getItem(TAB_KEY) || 'projects'; } catch (_) { return 'projects'; } };
-const rememberTab = (id) => { try { localStorage.setItem(TAB_KEY, id); } catch (_) { /* private mode */ } };
-
-// The declared tab registry — each mounts its surface into the shared body.
-const TABS = [
-    // t1217 RETIRED ([[one-workspace-one-machine]]): the Profiles tab is gone — a workspace holds exactly ONE machine,
-    // so there is no library to browse. The machine lives in Settings ("This workspace's machine"); a second machine is
-    // a second .ddcs. A deep-link to 'profiles' now lands on the first surviving tab rather than 404-ing.
-
-    { id: 'projects', label: 'Projects', mount: (body, ctx) => renderProjectsTab(body, ctx) },
-    { id: 'wizards', label: 'Wizards', mount: (body, ctx) => renderWizardsTab(body, ctx) },
-];
 
 let _ov = null;
 
-/** Open the Library on `tab` (default: the last-used tab). Idempotent — re-opens onto the requested tab. */
-export function openLibrary(tab) {
-    const want = TABS.some((t) => t.id === tab) ? tab : lastTab();
+/** Open the Projects modal. Idempotent — re-opening replaces any already-open instance. */
+export function openLibrary() {
     if (_ov) { _ov.remove(); _ov = null; }
     const ov = document.createElement('div');
     ov.id = 'libraryOverlay';
@@ -47,7 +39,7 @@ export function openLibrary(tab) {
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
     ov.innerHTML = `<div class="library-modal">
         <div class="library-head">
-            <div class="library-tabs" role="tablist">${TABS.map((t) => `<button type="button" class="library-tab" role="tab" data-lib-tab="${t.id}">${esc(t.label)}</button>`).join('')}</div>
+            <div class="library-title">Projects</div>
             <button type="button" class="library-x" aria-label="Close">✕</button>
         </div>
         <div class="library-body" id="libraryBody"></div>
@@ -61,15 +53,7 @@ export function openLibrary(tab) {
     ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
     ov.querySelector('.library-x').addEventListener('click', close);
 
-    const show = (id) => {
-        rememberTab(id);
-        ov.querySelectorAll('.library-tab').forEach((b) => b.classList.toggle('active', b.dataset.libTab === id));
-        body.innerHTML = '';
-        const t = TABS.find((x) => x.id === id) || TABS[0];
-        Promise.resolve(t.mount(body, { close, show })).catch((e) => { body.innerHTML = `<div style="padding:20px; opacity:.7;">Could not open ${esc(t.label)}: ${esc(e && e.message || e)}</div>`; });
-    };
-    ov.querySelectorAll('.library-tab').forEach((b) => b.addEventListener('click', () => show(b.dataset.libTab)));
-    show(want);
+    Promise.resolve(renderProjectsTab(body, { close })).catch((e) => { body.innerHTML = `<div style="padding:20px; opacity:.7;">Could not open Projects: ${esc(e && e.message || e)}</div>`; });
     return ov;
 }
 
@@ -158,26 +142,11 @@ function renderProjectsTab(body, ctx) {
     render();
 }
 
-// ── WIZARDS tab — the embedded bar-designer (reused) + a New-from-current door ────────────────────────────────────
-function renderWizardsTab(body, ctx) {
-    body.innerHTML = `
-        <div class="lib-wizhead">
-            <button type="button" class="toolbar-btn settings-io" data-newwiz title="Turn the operation you have open in Blocks into a saved wizard on your bar">＋ New from current</button>
-            <span class="settings-hint" style="flex:1; margin:0;">Manage your wizards and arrange them on the toolbar. New wizards land on the bar; drag, group, show/hide here.</span>
-        </div>
-        <div id="library_wizard_manager"></div>`;
-    body.querySelector('[data-newwiz]').addEventListener('click', () => {
-        if (window.ddcsSaveAsWizard) { ctx.close(); window.ddcsSaveAsWizard(); }
-        else dlgNotice('Open an operation in the Blocks tab first, then New from current turns it into a wizard.');
-    });
-    // Reuse the existing bar-designer as-is. Its ✎ Edit switches to the Blocks tab (to re-author the wizard), so close
-    // the Library after that click so the user lands on the editor — via a capture listener, NOT a global override.
-    const mgr = body.querySelector('#library_wizard_manager');
-    renderWizardLibrary(mgr);
-    mgr.addEventListener('click', (e) => {
-        const btn = e.target.closest('button');
-        if (btn && /✎\s*Edit/.test(btn.textContent || '')) setTimeout(ctx.close, 0);   // let the switch-to-Blocks handler run first
-    }, true);
-}
+// t2178 — the WIZARDS tab that used to live here is GONE, not relocated: it only ever embedded
+// `wizardManagerPanel.renderWizardLibrary` (the bar-arrangement designer, independently reachable from Settings'
+// own Wizards tab) plus a "New from current" button that duplicates the quick-menu's own `case 'wizard'` door
+// (headerPost.js) — and `window.openWizardManager()` (ui/wizardManager.js, t1617) already covers the RICHER
+// lifecycle actions (rename/duplicate/fork/export/delete + its own library shelves) this tab never had at all.
+// Nothing deep-linked to `openLibrary('wizards')` (confirmed by grep before deleting), so no caller is stranded.
 
 if (typeof window !== 'undefined') window.openLibrary = openLibrary;
