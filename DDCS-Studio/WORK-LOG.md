@@ -50854,4 +50854,90 @@ in — the ✅-ruled text ("Rename = rename the file. Nothing else stores a name
 `t-roles-s3.md`/`t-badge-collapse.md` spec-path issue was flagged twice this session: BACKLOG.md's own F2 entry
 should be marked done (or removed) so it isn't dispatched a third time.
 
+## AMENDMENT 1 — TAIL SWAPPED: dock-closed-at-boot investigated, NOT reproduced, regression-locked instead
+
+Human: "the app opens on the keyboard dock open, wrong" / "it should be closed on open." Followed the advisor's
+own facts (index.html:292's markup carries no `is-expanded`; that class is added ONLY inside dockManager.js's
+own interaction handlers, neither of which runs at boot; only a HEIGHT persists to localStorage, never
+open/closed) and MEASURED the candidate they named (`--dock-h` restored at boot without requiring
+`.is-expanded`) rather than assuming it:
+  - `.dock-body`'s tall-height rule (styles.css ~1657) IS correctly scoped under `#controller-dock.is-expanded`.
+  - The unscoped base rule (~1633) is `display:none` unconditionally.
+  - Grepped the whole `web/` tree for `is-expanded` — only styles.css and dockManager.js ever reference it.
+  - Live-measured boot state at phone (412×915) AND desktop (1400×900) width, with AND without a saved
+    `ddcs_dock_h`, across a 7-point timing sweep (0/50/100/200/400/800/1500ms after `page.goto`): `is-expanded`
+    never present, `.dock-body` `display:none` from the moment it first exists in the DOM, no flash.
+**The advisor's own candidate does not hold, and I could not reproduce the reported symptom in this local
+harness at all**, in any of the scenarios above. Rather than force a speculative CSS change against a bug I
+can't see (which risks "fixing" something that was never broken), added `dock-closed-at-boot-2176.spec.js` — 3
+tests locking the exact invariant the dispatch named ("closed-on-boot is the DEFAULT, not a stored preference")
+as a permanent regression guard, and flagging back: this needs more repro specifics (real device/browser? the
+deployed pages.dev site specifically, which serves whatever was last pushed to `main` — this branch is ahead of
+it — rather than this local dev server? intermittent or every time?) than this harness can currently supply.
+
+## AMENDMENT 2 — t2171 REGRESSION: the badge did not actually stay collapsed (root-caused, TWO bugs, both fixed)
+
+Human: "the needs dimension chip doesnt close after 2 second." Root-caused by reading the loop the advisor
+pointed at, then CONFIRMED (not assumed) with a live diagnostic before touching anything — logged the exact
+state before/after three incidental `ddcs:settings-changed` dispatches on an UNCHANGED verdict and watched it
+re-expand every time. Two separate, compounding bugs, both real:
+
+1. **The advisor's own candidate — confirmed.** `afterRender()`'s change-detection key read `badge.className`
+   directly, and collapsing itself ADDS `'collapsed'` to that same className — so the key changed on the very
+   next render for no real reason, and the (correct) "state changed" branch un-collapsed it. Fixed: the key now
+   reads a `semanticClass()` helper that strips the collapse marker before comparing, so collapsing itself can
+   never register as "the verdict changed."
+2. **A second bug the first fix alone did NOT cover, found because the diagnostic still failed after fix #1
+   alone:** every one of `render()`'s three branches did a bare `badge.className = 'preflight-badge preflight-
+   X'` — a full reassignment that wipes whatever else was on the element, including `'collapsed'`, REGARDLESS of
+   whether `afterRender()` goes on to decide "nothing actually changed." So even a correctly-detected no-op
+   render still visibly un-collapsed the badge on the DOM, independent of the key logic. Fixed with a
+   `setBadgeClass(semantic)` helper (routing all three assignment sites through it) that re-appends `'
+   collapsed'` when the JS-tracked `collapsed` flag says it should still be there — a real state change still
+   un-collapses correctly via `expandBadge()`, which runs immediately after and removes the class explicitly.
+
+**The second candidate in the dispatch — a touch tap pinning `hovering` true forever (no matching `mouseleave`
+after a synthesized `mouseenter` on tap) — is ALSO real and independently fixed**, gated behind
+`matchMedia('(hover: hover)')`: the hover listeners are simply never attached on a touch-primary device now, so
+`hovering` can never get stuck (rule 3's other clause, the popover-open check, still governs pausing there).
+
+New regression test (`preflight-badge-collapse-2171.spec.js`, "RULE 2, THE REGRESSION IT MISSED"): re-renders
+the SAME unchanged amber verdict three times after collapse and asserts it stays collapsed. Failed 1/1 against
+the fix for bug #1 alone (confirmed live, not assumed) — proving bug #2 was a real, separate defect, not
+redundant with the first. Passes now with both fixes in place.
+
+## AMENDMENT 4B — clicking the badge now collapses/uncollapses, riding on TOP of amendment 2's fix as instructed
+
+"clicking the need envellop chip should collapse uncollapse, simple." Declared a `hasDetail` flag, set explicitly
+by each of render()'s three branches (not inferred from the popover's own DOM) — true for amber (the reason,
+not in the label) and whole-program red (the per-axis numbers, not in the label), false for the relative-anchor
+info state (whose popover only repeats the SAME sentence already in the label — nothing a click would newly
+reveal). Click logic, one rule: collapsed → always expand first; expanded + `hasDetail` → toggle the popover
+(unchanged from t2171); expanded + `!hasDetail` → a direct manual collapse (no 2s wait — a tap gets a direct
+answer). Three new tests cover collapsed→expand, the info state's plain toggle (and that no popover opens for
+it), and that amber's popover-opening click is unchanged.
+
+## AMENDMENT 4A — the 3D pull-tab no longer protrudes into the focus ring's box (structural, not z-index)
+
+Human, correcting amendment 3's open design question: "the preview button seem to not extend onto ring but it
+does a little bit" — a few px, not a deliberate folder-tab straddle. MEASURED first: at the phone+portrait
+intersection, `.viz3d-handle` was a fixed 28px tall sharing a `bottom:0` edge with the 24px-tall toolbar row —
+so its own top sat 4px above the toolbar's top, i.e. 4px inside `.editor-code::before`'s own ring box (which
+ends exactly where the toolbar begins). Fixed structurally, per the human's own steer away from a z-index
+arbitration: declared `--editor-toolbar-handle-h: 24px` (the toolbar buttons' own height, already declared
+inline before this — now shared, not duplicated) and clamped the handle to the SAME value in this one
+intersection. Both share one bottom edge and now one top edge too — nothing crosses, so there's no z-index
+question left to arbitrate. Re-measured: 0px protrusion (was 4px). The desktop right-edge case (t2153 amendment
+6, `.editor-code::before` z-index:7 above the handle) is completely untouched — scoped to a different media
+condition — and its own regression suite (`editor-focus-ring-2151.spec.js`, all 11 tests) re-ran green. New
+`pulltab-ring-protrusion-2176.spec.js` locks the fix.
+
+### Full verification, all four items together
+
+Collateral: `preflight-badge-838`, `preflight-names-unresolved-expr-1568`, `envelope-extent-1323`,
+`soft-limit-awareness-973`, `traverse-clarity-893`, `editor-focus-ring-2151`, `editor-chrome`,
+`editor-chip-space-1323`, `op-chips-2159` — 48/48 green. Smoke 76/76, node 227/227, lint clean. Screenshots sent
+to the human live: the badge staying collapsed through repeated incidental re-renders
+(`verification/t2176-badge-stays-collapsed.png`).
+
 🔨 turn 2176
