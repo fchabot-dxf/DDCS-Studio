@@ -18,7 +18,10 @@ import { toast } from './gateway/util.js';   // t899 — the safe-Z Apply-Now fe
 import { renderIoTable, renderMagazineTable, renderAtcPinPicker } from './ioTable.js';
 import { renderAtcSetupCanvas, defaultFirmwareStation } from '../viz/atcSetupCanvas.js';
 import { renderAtcChanger } from './atcChangerGui.js';
-import { renderWizardLibrary } from './wizardManagerPanel.js';
+// t2196 — settingsPanel.js was wizardManagerPanel.js's ONLY importer (confirmed by grep); it no longer calls
+// renderWizardLibrary directly (that moved into openWizardBarManager, called via window.*), but this side-effect
+// import must stay or the module — and its window.openWizardBarManager registration — never loads at all.
+import './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
 import { ACTION, previewSfx, syncGatewaySound, getGatewaySyncStatus } from './sound.js';   // t2125 — the master+per-sound toggle, its self-rendering Sound tab, and the gateway-sync honesty readout
@@ -1022,6 +1025,21 @@ let _returnTok = null;   // live nav-return token for this Settings session (see
 // them through this module-level pointer, set once the overlay is built, rather than reaching across directly.
 let _refreshWorkspaceTab = null;
 
+/** THE RETURN PATH (t2192, generalised at t2196 to a plain module-level function — it needs nothing from
+ *  wireSettingsOverlay's own closure, so it is reachable from anywhere in this file without a bridge pointer):
+ *  push "how to get back to Settings" (ui/navReturn.js), hide Settings (its own closeSettings — a class toggle,
+ *  never a DOM teardown, so the tab you were on survives untouched), then open the given surface with that
+ *  token. The surface's own close() pops it on EVERY exit (✕ / Esc / backdrop — they already share one close
+ *  function), reopening Settings on the SAME tab. Opened from elsewhere (the file menu, say) instead, the
+ *  surface gets no token and closes to the app exactly as it always has. Used by the Workspace tab's own
+ *  manager doors and, since t2196, Appearance's "Wizard bar…" row — the same door, two callers. */
+function openManagerFromWorkspace(opener) {
+    if (typeof opener !== 'function') { dlgNotice('That manager is not available right now.'); return; }
+    const tok = pushReturn('Settings', () => openSettings());
+    closeSettings();
+    opener({ returnToken: tok });
+}
+
 // Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
 // Restores the FULL persisted config (mirrors the load-merge) so a loaded profile brings back the magazine,
 // tool library, macros, I/O, head, etc. — not just a subset.
@@ -1168,9 +1186,10 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="lookfeel" data-target="set_tab_sound">Sound</button>
                     <button class="settings-tab" data-group="lookfeel" data-target="set_tab_preview">Preview</button>
                     <button class="settings-tab" data-group="lookfeel" data-target="set_tab_compose">Editor</button>
-                    <!-- "Wizards" said WHICH wizards exist; this tab configures the WIZARD BAR (what shows, in what
-                         order). Renamed to what it edits (t1245). -->
-                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_wizards">Wizard bar</button>
+                    <!-- t2196 — the "Wizard bar" sub-tab (t1245's rename of the old "Wizards" tab) is RETIRED: a
+                         400+-line tree buried Appearance's own theme/setup-health controls under it. The tree
+                         itself is unchanged and lives on — reached via ONE row in Appearance, in its own small
+                         panel (openWizardBarManager, ui/wizardManagerPanel.js), not a sixth sidebar button. -->
                     <div class="sidebar-group-label" data-group-label="controller" style="display:none;">Controller</div>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_profile">Profile</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_wcs">WCS</button>
@@ -1187,10 +1206,6 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="workspace" data-target="set_tab_workspace" style="display:none;">Inventory</button>
                 </div>
                 <div class="settings-content">
-                <!-- LOOK AND FEEL: WIZARD BAR (the wizard-bar library manager — rendered by wizardManagerPanel.js) -->
-                <div id="set_tab_wizards" style="display:none;">
-                    <div id="wizard_library_manager"></div>
-                </div>
                 <!-- LOOK AND FEEL: PREVIEW (3D/2D toolpath view + simulation) -->
                 <div id="set_tab_preview" style="display:none;">
                     <div class="settings-section">
@@ -1340,6 +1355,16 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">SETUP HEALTH</div>
                         <label class="settings-check"><span class="ddcs-switch"><input type="checkbox" id="set_health_signals"><span class="ddcs-slider"></span></span> Show setup health signals — the first-run nudge, the unset-tab + field glows, and the Stock-button glow</label>
                         <div class="settings-hint">When off: no setup nudges anywhere, and the Setup checklist is hidden from the header menu. Re-enable here.</div>
+                    </div>
+                    <!-- t2196 — WIZARD BAR: what shows, in what order — bar arrangement IS appearance, and the
+                         manager already owns lifecycle (Rename/Duplicate/Export/Delete/Fork), so this is a door,
+                         not the tree itself (that lives in its own small panel, openWizardBarManager). -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">WIZARD BAR</div>
+                        <div class="settings-row">
+                            <button type="button" class="toolbar-btn settings-io" id="set_wizbar_open">Wizard bar…</button>
+                        </div>
+                        <div class="settings-hint">Which wizards show on the bar, in what dropdown, in what order — and their icons. Add or delete a dropdown, show/hide or re-icon any wizard (built-ins too), or reset the whole layout to factory.</div>
                     </div>
                 </div>
 
@@ -2155,17 +2180,6 @@ function wireSettingsOverlay(ov) {
         userOps: { label: 'Open manager', run: () => openManagerFromWorkspace(window.openWizardManager) },
         projects: { label: 'Open manager', run: () => openManagerFromWorkspace(window.openProjectManager) },
     };
-    /** THE RETURN PATH (t2192): push "how to get back to Settings" (ui/navReturn.js), hide Settings (its own
-     *  closeSettings — a class toggle, never a DOM teardown, so the tab you were on survives untouched), then
-     *  open the manager with that token. The manager's own close() pops it on EVERY exit (✕ / Esc / backdrop —
-     *  they already share one close function), reopening Settings on the SAME tab. Opened from the file menu
-     *  instead, the manager gets no token and closes to the app exactly as it always has. */
-    function openManagerFromWorkspace(opener) {
-        if (typeof opener !== 'function') { dlgNotice('That manager is not available right now.'); return; }
-        const tok = pushReturn('Settings', () => openSettings());
-        closeSettings();
-        opener({ returnToken: tok });
-    }
     async function renderWorkspaceInventory() {
         const host = q('set_workspace_inventory');
         if (!host) return;
@@ -3444,6 +3458,10 @@ function wireSettingsOverlay(ov) {
         _health.checked = (_ddcsSettings.setup || {}).health !== false;
         _health.addEventListener('change', () => { try { window.ddcsSetHealthSignals && window.ddcsSetHealthSignals(_health.checked); } catch (_) { /* noop */ } });
     }
+    // t2196 — WIZARD BAR: the tree itself lives in its own small panel (ui/wizardManagerPanel.js's
+    // openWizardBarManager), reached through the SAME return-path door the Workspace tab's manager rows use.
+    const _wizbarOpen = q('set_wizbar_open');
+    if (_wizbarOpen) _wizbarOpen.addEventListener('click', () => openManagerFromWorkspace(window.openWizardBarManager));
     // Spindle / Program → insert generated G-code into the editor (mirrors the ATC "Insert tool table").
     const _emInsert = (code) => {
         const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
@@ -3590,7 +3608,7 @@ function wireSettingsOverlay(ov) {
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
         // t1245 — five panels left Settings entirely (Workspace + Cloud duplicated the workspace manager; FAQ + About
         // moved to the quick menu's Help; Feedback merged into Rate / Feedback). They are deleted, not hidden.
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_sound', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_sound', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway',
                      'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc', 'set_tab_workspace'];
     /**
      * t1245 — A PANEL CARRIES ITS OWN GROUP. Its subtab button already declares one (data-group), so showing a panel
@@ -3609,7 +3627,6 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderAtcSetup();
         if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
-        if (id === 'set_tab_wizards') renderWizardLibrary(ov.querySelector('#wizard_library_manager'));   // the wizard-bar library manager
         if (id === 'set_tab_sound') renderSoundTab(ov);   // t2125 — self-renders fresh from ACTION on every open
         // t2192 — re-render fresh on every visit (the spec's own acceptance bar: "add a wizard, reopen the tab,
         // the number moves"), same pattern as set_tab_machine/atc above.

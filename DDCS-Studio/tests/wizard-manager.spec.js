@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { autoAppDialog } from './_appDialog.js';   // t684 d — the in-app dialog replaced native confirm/prompt/alert
 
 /**
- * The Settings "Wizard library manager" — a section tree that designs the bar. Drives the real overlay:
- * open Settings → Look and feel → Wizard bar, then exercise every control (hide, rename, regroup, reorder, reset) and
- * assert each edit flows LIVE to the wizard bar. A custom op (authored in Dev mode) shows in its Custom dropdown.
+ * The wizard bar arrangement manager (ui/wizardManagerPanel.js) — a section tree that designs the bar. Drives
+ * the real overlay: t2196 — reached from Settings → Look and feel → Appearance → "Wizard bar…", opening in its
+ * own small panel (#wizbarOverlay) rather than a sixth sidebar sub-tab. Exercises every control (hide, rename,
+ * regroup, reorder, reset) and asserts each edit flows LIVE to the wizard bar. A custom op (authored in Dev
+ * mode) shows in its Custom dropdown.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -32,13 +34,11 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
   await autoAppDialog(page, { accept: true });   // confirm → proceed; notice → dismiss
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
-  // open Settings → Look and feel → Wizard bar (t1245 — the shrink; this tab configures the wizard BAR)
-  await page.evaluate(() => window.openSettings());
-  await page.click('.settings-main-tab[data-group="lookfeel"]');
-  await page.click('[data-target="set_tab_wizards"]');
-  await expect(page.locator('#set_tab_wizards')).toBeVisible();
+  // t2196 — the wizard-bar panel opens directly (own small panel, not a Settings sub-tab any more)
+  await page.evaluate(() => window.openWizardBarManager());
+  await expect(page.locator('#wizbarOverlay')).toBeVisible();
 
-  const mgr = page.locator('#wizard_library_manager');
+  const mgr = page.locator('#wizbarTree');
   // catalog rendered incl. hidden-capable entries; a built-in row carries the badge (no per-row action — arrange only)
   await expect(mgr.locator('[data-entry="pocket"]')).toContainText('BUILT-IN');
 
@@ -56,7 +56,7 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
     L.createWizard(U.userOpFromStack('my_op', 'My Op', [{ type: 'move', params: { x: 0, y: 0, z: -5 } }], [{ param: 'depth', blockIndex: 0, key: 'z', type: 'number', default: -5 }]));
     window.ddcsRefreshWizardBar();
   });
-  await page.click('[data-target="set_tab_wizards"]');   // re-render the manager to pick up the new op
+  await page.evaluate(() => window.openWizardBarManager());   // reopen to re-render the manager, pick up the new op
   await expect(mgr.locator('[data-entry="user_my_op"]')).toContainText('CUSTOM');
   let groups = await readBar(page);
   const custom = groups.find((g) => g.label === 'Custom');
@@ -99,10 +99,8 @@ test('Wizard library manager: the section tree — create dropdown, move a wizar
   await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openSettings && window.ddcsRefreshWizardBar);
   await autoAppDialog(page, { accept: true });
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
-  await page.evaluate(() => window.openSettings());
-  await page.click('.settings-main-tab[data-group="lookfeel"]');
-  await page.click('[data-target="set_tab_wizards"]');
-  const mgr = page.locator('#wizard_library_manager');
+  await page.evaluate(() => window.openWizardBarManager());
+  const mgr = page.locator('#wizbarTree');
 
   // the three section blocks render
   await expect(mgr).toContainText('LEFT SECTION');

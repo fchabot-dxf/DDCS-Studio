@@ -145,7 +145,7 @@ test('every Settings path the FAQ names actually resolves — the claim cannot o
   const CLAIMED = [
     { says: /Settings → Controller → Gateway/, panel: 'set_tab_gateway', group: 'controller' },
     { says: /Settings → Controller → Profile/, panel: 'set_tab_profile', group: 'controller' },
-    { says: /Settings → Look and feel → Wizard bar/, panel: 'set_tab_wizards', group: 'lookfeel' },
+    { says: /Settings → Look and feel → Appearance → Wizard bar…/, panel: 'set_tab_appearance', group: 'lookfeel' },
     { says: /Settings → <?b?>?Hardware/, panel: 'set_tab_machine', group: 'hardware' },
   ];
   for (const c of CLAIMED) {
@@ -196,7 +196,7 @@ test('every registered FAQ link opens its surface — and every registry entry i
   const LANDS = {
     'settings-gateway':   async () => expect(page.locator('#set_tab_gateway')).toBeVisible(),
     'settings-profile':   async () => expect(page.locator('#set_tab_profile')).toBeVisible(),
-    'settings-wizardbar': async () => expect(page.locator('#set_tab_wizards')).toBeVisible(),
+    'settings-wizardbar': async () => expect(page.locator('#set_tab_appearance')).toBeVisible(),
     'settings-hardware':  async () => expect(page.locator('#set_tab_machine')).toBeVisible(),
     'workspace-manager':  async () => expect(page.locator('#wsmOverlay')).toBeVisible(),
     'workspace-cloud':    async () => expect(page.locator('.wsm-place[data-place="cloud"]')).toHaveClass(/is-active/),

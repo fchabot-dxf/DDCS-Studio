@@ -35,7 +35,9 @@ import { BACKUP_STORES } from '../data/backup.js';   // t1253 — the file's own
 export const FAQ_LINKS = {
     'settings-gateway':   { label: 'Settings → Controller → Gateway',      open: async () => (await import('./settingsPanel.js')).openSettings({ panel: 'set_tab_gateway' }) },
     'settings-profile':   { label: 'Settings → Controller → Profile',      open: async () => (await import('./settingsPanel.js')).openSettings({ panel: 'set_tab_profile' }) },
-    'settings-wizardbar': { label: 'Settings → Look and feel → Wizard bar', open: async () => (await import('./settingsPanel.js')).openSettings({ panel: 'set_tab_wizards' }) },
+    // t2196 — the Wizard bar sub-tab is retired; its own small panel is reached from the "Wizard bar…" row on
+    // Appearance now (like the other entries here, this lands on the tab and stops — the user takes it from there).
+    'settings-wizardbar': { label: 'Settings → Look and feel → Appearance → Wizard bar…', open: async () => (await import('./settingsPanel.js')).openSettings({ panel: 'set_tab_appearance' }) },
     'settings-hardware':  { label: 'Settings → Hardware',                  open: async () => (await import('./settingsPanel.js')).openSettings({ panel: 'set_tab_machine' }) },
     'workspace-manager':  { label: 'the workspace manager',                open: () => window.openWorkspaceManager && window.openWorkspaceManager('open') },
     'workspace-cloud':    { label: 'the Cloud tab',                        open: () => window.openWorkspaceManager && window.openWorkspaceManager('open', { place: 'cloud' }) },

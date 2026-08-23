@@ -2101,6 +2101,14 @@ button.primary:hover {
     border-top: 1px solid var(--modal-foot-edge);
 }
 
+/* t2196 — THE WIZARD BAR PANEL (ui/wizardManagerPanel.js's openWizardBarManager): the first real consumer of the
+   .modal-scrim/.modal-card/.modal-head/.modal-body base above (it had zero — BACKLOG 16). Sizing is the caller's
+   own job by this base's own design (see the P5a comment above), same as every other modal here scopes its size
+   by id. */
+#wizbarOverlay .modal-card { width: min(760px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+#wizbarOverlay .modal-body { overflow: auto; flex: 1; color: var(--text-main); }
+#wizbarOverlay .wizbar-x { background: transparent; border: none; color: inherit; font-size: 18px; cursor: pointer; padding: 4px 8px; }
+
 /* ============================================
    WIZARDS (Structure)
    ============================================ */

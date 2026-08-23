@@ -63,10 +63,12 @@ test('the strip is FOUR tabs — Look and feel, Controller, Hardware, Workspace'
     expect(await page.locator('.settings-main-tab[data-group="general"]').count(), 'the catch-all is gone').toBe(0);
 });
 
-test('Look and feel holds FIVE subtabs, and Wizards is renamed to what it actually edits', async ({ page }) => {
+test('Look and feel holds FOUR subtabs (t2196 — Wizard bar retired as a sub-tab; its tree moved into a row on Appearance)', async ({ page }) => {
     // t2125 (SOUND-PLAN.md amendment 4) — Sound joined as a sub-tab peer of Appearance (not a 4th MAIN
     // tab: ~11 toggle rows is too thin for one and too big to bolt onto Appearance), so this grew from
     // four to five. Adjacent to Appearance on purpose — sound follows the theme, which lives there.
+    // t2196 — and back to four: the "Wizard bar" sub-tab (a 400+-line tree) buried Appearance's own theme/
+    // setup-health controls under it. The tree lives on, in its own small panel — see wizard-manager.spec.js.
     await openSettings(page);
     const tabs = await page.evaluate(() => [...document.querySelectorAll('#settings-app .settings-sidebar .settings-tab[data-group="lookfeel"]')]
         .map((b) => ({ id: b.dataset.target, label: b.textContent.trim() })));
@@ -75,13 +77,15 @@ test('Look and feel holds FIVE subtabs, and Wizards is renamed to what it actual
         { id: 'set_tab_sound', label: 'Sound' },
         { id: 'set_tab_preview', label: 'Preview' },
         { id: 'set_tab_compose', label: 'Editor' },
-        { id: 'set_tab_wizards', label: 'Wizard bar' },
     ]);
-    // and all five still open — a rename that broke its panel would be worse than the old name
+    // and all four still open — a rename that broke its panel would be worse than the old name
     for (const t of tabs) {
         await page.click(`.settings-tab[data-target="${t.id}"]`);
         await expect(page.locator(`#${t.id}`), `${t.label} opens`).toBeVisible();
     }
+    // the wizard-bar door lives on Appearance now, not a sidebar entry of its own
+    await page.click('.settings-tab[data-target="set_tab_appearance"]');
+    await expect(page.locator('#set_wizbar_open'), 'Wizard bar… row is on Appearance').toBeVisible();
 });
 
 test('the five retired subtabs are DELETED, not hidden — no panel, no button, no orphaned control', async ({ page }) => {
@@ -227,7 +231,7 @@ test('EVERY surviving panel deep-links to itself — a panel carries its own gro
     await openSettings(page);
     const panels = await page.evaluate(() => [...document.querySelectorAll('#settings-app .settings-sidebar .settings-tab')]
         .map((b) => ({ id: b.dataset.target, group: b.dataset.group })));
-    expect(panels.length, 'sixteen subtabs (t2125 added Sound, t2192 added the Workspace tab)').toBe(16);
+    expect(panels.length, 'fifteen subtabs (t2125 added Sound, t2192 added the Workspace tab, t2196 removed Wizard bar)').toBe(15);
 
     for (const p of panels) {
         const r = await page.evaluate(async (panel) => {

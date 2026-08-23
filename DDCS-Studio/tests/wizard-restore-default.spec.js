@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { autoAppDialog } from './_appDialog.js';
 
-// t1107 — a per-BUILT-IN "Restore default" in the Wizard manager (Settings → Wizards). The safety net now built-ins are
+// t1107 — a per-BUILT-IN "Restore default" in the wizard-bar arrangement panel (ui/wizardManagerPanel.js, t2196 —
+// reached from Settings → Look and feel → Appearance → "Wizard bar…", its own small panel). The safety net now built-ins are
 // becoming editable: revert JUST one built-in to factory — its layout override (rename/reorder/regroup/icon/hide) AND its
 // opensAs data-twin — leaving every other wizard and every custom op untouched. Shown ONLY when that built-in is actually
 // customized (a layout override OR a diverged twin). Distinct from the blanket ↺ Reset to factory (whole bar).
@@ -29,10 +30,12 @@ test('per-wizard Restore: shows only on a customized built-in; reverts THAT one;
     const mgr = page.locator('#twp');
     const restoreBtn = (id) => mgr.locator(`[data-entry="${id}"] button`, { hasText: 'Restore default' });
 
-    // (1) a PRISTINE built-in shows NO Restore; a custom op shows NO Restore (it has Delete instead)
+    // (1) a PRISTINE built-in shows NO Restore; a custom op shows NO Restore either — that whole concept is
+    // built-in only (t2196 — this panel's per-row Delete moved to ui/wizardManager.js; the row itself, its
+    // visibility toggle, still renders here since arrangement — on/off, rename, group, order, icon — stays).
     await expect(restoreBtn('drill')).toHaveCount(0);
     await expect(restoreBtn('surfacing')).toHaveCount(0);
-    await expect(mgr.locator('[data-entry="user_rtest"] button', { hasText: 'Delete' })).toHaveCount(1);
+    await expect(mgr.locator('[data-entry="user_rtest"]')).toHaveCount(1);
     await expect(restoreBtn('user_rtest')).toHaveCount(0);
 
     // (2) customize TWO built-ins (rename) → both show Restore
@@ -53,7 +56,7 @@ test('per-wizard Restore: shows only on a customized built-in; reverts THAT one;
     await expect(mgr.locator('[data-entry="drill"] input[type="text"]'), 'drill back to its factory label').toHaveValue('Drill');
     await expect(restoreBtn('drill'), 'drill no longer customized → no Restore').toHaveCount(0);
     await expect(restoreBtn('surfacing'), 'the neighbour is still customized → still has Restore').toHaveCount(1);
-    await expect(mgr.locator('[data-entry="user_rtest"] button', { hasText: 'Delete' }), 'the custom op survives untouched').toHaveCount(1);
+    await expect(mgr.locator('[data-entry="user_rtest"]'), 'the custom op survives untouched').toHaveCount(1);
 });
 
 test('per-wizard Restore: a diverged TWIN shows Restore (no layout override) and reseeding restores the factory twin', async ({ page }) => {

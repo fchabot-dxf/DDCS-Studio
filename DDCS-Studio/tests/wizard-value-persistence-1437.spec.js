@@ -298,10 +298,11 @@ test('THE BAR GESTURE — the opensAs TWIN remembers too, and shows it after a r
  */
 test('THE PER-WIZARD RESET — the button appears only when a record exists, and forgetting removes it', async ({ page }) => {
     await boot(page);
+    // t2196 — the panel opens directly (its own small panel, not a Settings sub-tab any more)
     const openWizardTab = async () => page.evaluate(async () => {
-        if (window.openSettings) window.openSettings({ group: 'lookfeel', panel: 'set_tab_wizards' });
+        if (window.openWizardBarManager) window.openWizardBarManager();
         await new Promise((r) => setTimeout(r, 500));
-        const rows = [...document.querySelectorAll('#wizard_library_manager [data-entry]')];
+        const rows = [...document.querySelectorAll('#wizbarTree [data-entry]')];
         return rows.map((row) => ({
             entry: row.dataset.entry,
             reset: [...row.querySelectorAll('button')].some((b) => /Reset values/i.test(b.textContent || '')),
@@ -319,9 +320,8 @@ test('THE PER-WIZARD RESET — the button appears only when a record exists, and
     await page.evaluate(async () => {
         const { saveLastValues } = await import('/data/wizardLastValues.js');
         saveLastValues('user_pocket_data', { w: 123 });   // the key the BAR gesture writes
-        if (window.closeSettings) window.closeSettings();
     });
-    const after = await openWizardTab();
+    const after = await openWizardTab();   // openWizardTab's own openWizardBarManager() call self-cleans any prior overlay
     const withReset = after.filter((r) => r.reset);
     expect(withReset.length, 'exactly the remembering wizard grows the button — not every row').toBe(1);
 
@@ -329,7 +329,6 @@ test('THE PER-WIZARD RESET — the button appears only when a record exists, and
     await page.evaluate(async () => {
         const { clearLastValues } = await import('/data/wizardLastValues.js');
         for (const t of ['pocket', 'user_pocket_data']) clearLastValues(t);
-        if (window.closeSettings) window.closeSettings();
     });
     const cleared = await openWizardTab();
     expect(cleared.some((r) => r.reset), 'and once forgotten the button is gone — no control with nothing to do').toBe(false);

@@ -709,15 +709,17 @@ export class CommandDeck {
             const entry = entryFor(optype);
             const label = (entry && entry.label) || btn.textContent.trim() || optype;
             ev.preventDefault();
-            const [{ openMenu }, LV, SP] = await Promise.all([
-                import('./opContextMenu.js'), import('../data/wizardLastValues.js'), import('./settingsPanel.js'),
+            const [{ openMenu }, LV] = await Promise.all([
+                import('./opContextMenu.js'), import('../data/wizardLastValues.js'),
             ]);
             // the reset clears BOTH keys the library row clears (type AND opensAs) — one behaviour, not a near-copy
             const types = [entry && entry.type, entry && entry.opensAs, optype].filter(Boolean);
             const hasVals = types.some((t) => LV.hasLastValues(t));
             openMenu([
                 { label: `▶ Open ${label}`, fn: () => btn.click() },
-                { label: '⚙ Wizard settings…', fn: () => SP.openSettings({ panel: 'set_tab_wizards' }) },
+                // t2196 — the arrangement tree opens directly now (its own small panel), not via a Settings deep-link
+                // to a sub-tab that no longer exists.
+                { label: '⚙ Wizard settings…', fn: () => window.openWizardBarManager && window.openWizardBarManager() },
                 {
                     label: '↺ Reset values',
                     disabled: !hasVals,

@@ -1,29 +1,39 @@
 /**
- * ui/wizardManagerPanel.js — the Settings "Wizard library manager": a simple TREE that designs the wizard bar.
+ * ui/wizardManagerPanel.js — BAR ARRANGEMENT: a simple TREE that designs the wizard bar (distinct from
+ * ui/wizardManager.js, which owns wizard LIFECYCLE — Rename/Duplicate/Export/Delete/Fork/Import; t1617's own
+ * header always said so, and t2196 is the turn that stopped this file's rows from also carrying Edit/Export/
+ * Delete, a boundary that had leaked back in).
  *
  * The bar has three SECTIONS (left · centre · right), each holding dropdowns, each holding wizards. This panel
  * renders that tree (blocks/wizardLibrary.getLibrary, includeHidden + includeEmpty) and lets the user design it
- * without touching code: add / delete / rename a dropdown, move a dropdown between sections, and show/hide, rename,
- * re-group, re-order any wizard (built-ins included), delete or export a custom op, import a `.wiz`, fork a
- * built-in into an editable copy, or reset to factory. Every edit persists through the library layer (the bar
- * layout in `ddcs_wizard_layout`, user ops in `ddcs_user_ops`) and is pushed LIVE to the bar (ddcsRefreshWizardBar).
+ * without touching code: add / delete / rename a dropdown, move a dropdown between sections, and show/hide,
+ * rename, re-group, re-order any wizard (built-ins included), import a shared `.wiz`, or reset to factory.
+ * Every edit persists through the library layer (the bar layout in `ddcs_wizard_layout`, user ops in
+ * `ddcs_user_ops`) and is pushed LIVE to the bar (ddcsRefreshWizardBar).
  *
  * Built like ioTable.renderIoTable: a `rerender()` closure rebuilds the tree in place after each mutation.
+ *
+ * t2196 — MOUNTED IN ITS OWN SMALL PANEL now, not a Settings sub-tab (the fifth "Wizard bar" sub-tab under Look
+ * and feel is retired — bar layout still IS appearance, but a 400+-line tree buried the tab's own theme/setup-
+ * health controls). `openWizardBarManager()` opens the SAME `renderWizardLibrary(container)` this file always
+ * exported — ONE tree, ONE implementation, reached from a single "Wizard bar — Open" row in Appearance via the
+ * SAME return-path stack (ui/navReturn.js) the Workspace tab's own manager doors use (t2192): closing this
+ * panel returns to Settings, on Appearance, on every exit.
  */
-import { UIUtils } from './uiUtils.js';
 import {
     getLibrary, setEntryOverride, setGroupOverride, resetLayout,
-    deleteWizard, exportWizard, importWizard,
+    importWizard,
     createGroup, deleteGroup, SECTIONS,
     entryHasOverride, clearEntryOverride,   // t1107 — per-wizard Restore to factory
 } from '../blocks/wizardLibrary.js';
 import { ICON_REGISTRY, entryIconHtml } from './wizIcons.js';
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
-// t1247 — THE LIBRARY FOLDER: one granted folder holds the shareable sources (.wiz here, .cam on the CAM surface)
-import { writeLibraryFile, hasFSA } from '../data/libraryFolder.js';
 import { renderLibraryShelf } from './libraryShelf.js';
 import { hasLastValues, clearLastValues } from '../data/wizardLastValues.js';   // t1437 — the per-wizard "forget what I last used"
+import { popReturn } from './navReturn.js';   // t2196 — the return path (Settings' Appearance tab → here → back)
 // Authoring custom ops lives in Blocks → Dev mode (the one authoring path); this panel only DESIGNS the bar.
+// t2196 — lifecycle (Edit / Export .wiz / Delete) moved to ui/wizardManager.js; this file no longer needs
+// deleteWizard/exportWizard/writeLibraryFile/hasFSA/UIUtils, all orphaned by that move.
 
 const SECTION_LABEL = { left: 'LEFT', center: 'CENTRE', right: 'RIGHT' };
 
@@ -104,29 +114,6 @@ function regroup(entry, newGroup) {
     const target = getLibrary({ includeHidden: true, includeEmpty: true }).groups.find((g) => g.id === newGroup);
     const maxOrder = target ? target.items.reduce((m, e) => Math.max(m, e.order), -1) : -1;
     setEntryOverride(entry.id, { group: newGroup, order: maxOrder + 1 });   // append to the end of the target dropdown
-}
-
-/**
- * t1247 — EXPORT WRITES A `.wiz` INTO THE LIBRARY FOLDER, not into Downloads. A download is a one-way door: the file
- * lands where the app can never read it back, so the shelf below could never list what you just exported. ONE-NAME —
- * the file is named after the wizard, so what you see on the bar and what you see in the folder are one string.
- * The download stays as the TRUE fallback: an environment with no File System Access at all.
- */
-async function exportEntry(entry, onDone) {
-    const text = exportWizard(entry.type);
-    if (!text) return;
-    const stem = (entry.label || entry.type).trim() || 'wizard';
-    if (!hasFSA()) {
-        const safe = stem.replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
-        UIUtils.downloadFile(`${safe}.wiz`, text);
-        dlgNotice(`This browser cannot grant a folder, so “${safe}.wiz” was downloaded instead. The desktop app keeps it in your library folder.`);
-        return;
-    }
-    const r = await writeLibraryFile(stem, 'wiz', text, {
-        confirmReplace: (name, where) => dlgConfirm(`“${name}” already exists in ${where}. Replace it?`, { okLabel: 'Replace' }),
-    });
-    if (r.ok) { dlgNotice(`Saved “${r.name}” to your library folder — it is on the shelf below, and anyone you send it to can import it.`); if (onDone) onDone(); }
-    else if (!r.aborted) dlgNotice(`Could not write the .wiz file: ${r.error}`);
 }
 
 let _importInput = null;
@@ -380,15 +367,12 @@ function renderRow(entry, group, ei, allGroups, apply) {
             }
         }, { title: 'Forget this wizard’s last-used values — its form opens on the shipped defaults again (saved presets are kept)' }));
     }
-    // re-author / export / delete are custom-op only (built-ins are authored in Blocks → Dev mode)
-    if (entry.kind === 'user') {
-        row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
-            { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
-        row.appendChild(mkBtn('Export .wiz', () => exportEntry(entry, apply), { title: 'Write this operation to your library folder as a shareable .wiz source — it imports live and editable, not baked' }));
-        row.appendChild(mkBtn('Delete', async () => {
-            if (await dlgConfirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`, { danger: true, okLabel: 'Delete' })) { deleteWizard(entry.type); apply(); }
-        }, { danger: true, title: 'Remove this custom operation' }));
-    } else {
+    // t2196 — Edit / Export .wiz / Delete are LIFECYCLE, not bar arrangement, and moved OUT: they are
+    // ui/wizardManager.js's own job (t1617's own header already said so — the boundary was declared, then
+    // leaked here). This panel keeps only what actually arranges the bar: on/off, rename, group, order, icon,
+    // reset values. Reach the manager for anything else — this row's visibility toggle and rename above still
+    // work on a custom op exactly as they do on a built-in.
+    if (entry.kind !== 'user') {
         // t1107 — a per-BUILT-IN "Restore default": shown ONLY when THIS built-in is actually customized — a layout override
         // (rename/reorder/regroup/re-icon/hide) OR a diverged opensAs twin (its form/pendant param blocks were edited). Reverts
         // JUST this one to factory (its layout override + its factory twin), leaving every other wizard + custom op untouched.
@@ -405,4 +389,41 @@ function renderRow(entry, group, ei, allGroups, apply) {
         }
     }
     return row;
+}
+
+// ── THE PANEL (t2196) ───────────────────────────────────────────────────────────────────────────────────────────
+let _ov = null;
+
+/** Open the wizard-bar tree in its own small panel. `opts.returnToken` — a token from ui/navReturn.js's
+ *  pushReturn(); when given, closing this panel (✕ / Esc / backdrop — all one `close()`) pops it and reopens
+ *  whoever pushed it (Settings' Appearance tab). Uses the shared, previously-zero-consumer modal base
+ *  (.modal-scrim/.modal-card/.modal-head/.modal-body, styles.css's own P5a declaration) rather than a new
+ *  bespoke shell — the SAME question BACKLOG 16 asks of every other modal in the app, answered here for free. */
+export function openWizardBarManager(opts = {}) {
+    if (_ov) { _ov.remove(); _ov = null; }
+    const returnToken = opts.returnToken;
+    const ov = document.createElement('div');
+    ov.id = 'wizbarOverlay';
+    ov.className = 'modal-scrim';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = `<div class="modal-card">
+        <div class="modal-head"><span>Wizard bar</span><button type="button" class="wizbar-x" aria-label="Close">✕</button></div>
+        <div class="modal-body"><div id="wizbarTree"></div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    _ov = ov;
+    const close = () => {
+        ov.remove(); if (_ov === ov) _ov = null; document.removeEventListener('keydown', onKey, true);
+        if (returnToken != null) popReturn(returnToken);
+    };
+    const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.app-dialog')) { e.preventDefault(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+    ov.querySelector('.wizbar-x').addEventListener('click', close);
+    renderWizardLibrary(ov.querySelector('#wizbarTree'));
+    return ov;
+}
+
+if (typeof window !== 'undefined') {
+    window.openWizardBarManager = openWizardBarManager;
 }

@@ -52050,3 +52050,82 @@ options, for the human's call:
 Leaning (A), matching the dispatch's own instinct, with (B) as the fallback if a collapsed 408-line tree still
 reads as too heavy once seen. Not building either without the human's pick — reported here, and in the pass-
 back note, as the one open decision blocking this tail.
+
+## t2196 — THE WIZARD BAR ARRANGEMENT TAIL, BUILT: one row in Appearance, one shared panel, lifecycle moved out
+
+The human picked "a row that launches the tree in its own small panel" (my option B above; the advisor's own
+relay initially mislabeled it "Option A" — the concrete description settled it, not the letter). Amendment 1
+(mid-task) sharpened the instruction before I built anything: this must NOT be a second implementation of the
+tree — `renderWizardLibrary(container)` is ONE function, called from a NEW mount point, not forked or copied.
+Named the exact disease this session keeps meeting: `.modal-card` existed with zero consumers, the volume
+switcher was hand-painted five times, the icon convention was documented and half-ignored — every one a
+declaration that exists and gets bypassed. A second wizard tree would have joined that list tonight.
+
+### What was built
+
+`ui/wizardManagerPanel.js` gains `openWizardBarManager(opts)` — a small modal (`#wizbarOverlay`) that mounts
+the SAME `renderWizardLibrary` export unchanged, wired with the SAME return-path pattern the Workspace tab's
+manager doors use (t2192): `opts.returnToken`, popped by the panel's own `close()` on every exit (✕/Esc/
+backdrop — one function, confirmed before wiring anything). `ui/settingsPanel.js` loses the fifth "Wizard bar"
+sidebar sub-tab (`set_tab_wizards`, its content div, its `ALL_IDS` entry, its `showPanel` case) and gains ONE
+row in Appearance — "Wizard bar…" — wired through `openManagerFromWorkspace` (promoted from a nested-scope
+helper to a plain module-level function this turn, since it needed nothing from `wireSettingsOverlay`'s own
+closure; now reachable from anywhere in the file without a bridge pointer, and used by both the Workspace tab's
+doors and this new one — one door, two callers, per the amendment's own framing).
+
+THE SHELL is `.modal-scrim`/`.modal-card`/`.modal-head`/`.modal-body` — styles.css's own P5a-declared modal
+base, which BACKLOG 16 named as having ZERO consumers. This panel is its first. Per amendment 1's own
+instruction ("if adopting .modal-card here is cheap, do it and note it against that item") — it was cheap: a
+brand-new panel with no existing bespoke styling to migrate away from, so using the right class names cost
+nothing extra. Sizing (`#wizbarOverlay .modal-card { width: min(760px, 94vw); ... }`) is the caller's own job
+by the base's own documented design (every other modal here scopes its size by id the same way).
+
+### The lifecycle boundary, restored
+
+`renderRow`'s `if (entry.kind === 'user') { …Edit / Export .wiz / Delete… }` block is deleted outright — those
+three are `ui/wizardManager.js`'s own job (its header already said so; the boundary had leaked back into this
+file). What remains on a custom-op row: the visibility switch, rename, regroup select, reorder arrows, icon
+picker, and (built-ins only) Restore-default / Reset-values — pure arrangement, nothing that touches identity
+or existence. Orphaned by the removal: `exportEntry` (the whole function), and the `exportWizard`/`deleteWizard`/
+`writeLibraryFile`/`hasFSA`/`UIUtils` imports it was the sole user of — all removed, confirmed via lint (zero
+`no-unused-vars`), not just by inspection.
+
+Left untouched, deliberately, and flagged rather than silently expanded into: the page-level "⬆ Import a file…"
+button and the "SHARED WIZARDS (.wiz)" shelf section (`#wiz_library_shelf`) still live in this panel. The
+dispatch named exactly three things ("Edit, Export .wiz and Delete") — all three PER-ROW actions on existing
+identity — and this shelf is a page-level IMPORT concern, not one of the three. It also visibly overlaps with
+t2194's own retirement of the SAME shelf pattern from `ui/wizardManager.js` (same "misrepresents itself" shape),
+but expanding this turn's own mandate to cover it would be scope creep on an already-precise instruction —
+noted here for whoever specs that turn, not decided unilaterally.
+
+### A real bug caught before it shipped: the orphaned import
+
+First pass just deleted `import { renderWizardLibrary } from './wizardManagerPanel.js';` from settingsPanel.js
+(no longer calling it directly — the new panel calls it internally now). Grep proved settingsPanel.js was
+`wizardManagerPanel.js`'s ONLY importer in the whole app — meaning that module, and its
+`window.openWizardBarManager` registration, would never load at all, and the new Appearance row would fail
+silently (`openManagerFromWorkspace`'s own `typeof opener !== 'function'` guard would catch it with a notice,
+but the feature would be dead). Fixed with a bare side-effect import (`import './wizardManagerPanel.js';`) and
+covered by its own dedicated regression test (`wizardbar-panel-2196.spec.js`'s last test) rather than trusting
+the fix to hold without a discriminating check.
+
+Also fixed in passing, found by grep rather than assumed absent: `ui/commandDeck.js`'s right-click context menu
+on a bar wizard ("⚙ Wizard settings…") deep-linked to `openSettings({panel:'set_tab_wizards'})` — the dead
+panel id. Retargeted to `window.openWizardBarManager()` directly (a shortcut skipping the Settings hop
+entirely, which fits a context-menu action better than the old two-step deep-link ever did).
+
+### Verification
+
+New `tests/wizardbar-panel-2196.spec.js` — 8 tests: the old sub-tab genuinely deleted (not hidden), the
+Appearance door opens the shared panel, the return path on ✕/Esc/backdrop, no-return when opened directly,
+lifecycle buttons absent from a custom row while arrangement (visibility toggle) still functions and reaches
+the live bar, and the orphaned-import regression itself. Six existing files updated for the new entry point
+(`wizard-manager.spec.js`, `wizard-restore-default.spec.js`, `wizard-value-persistence-1437.spec.js`,
+`settings-done-faq.spec.js` — including the FAQ_LINKS registry text itself in `helpPanel.js`, not just the
+test — `settings-ia-regroup-1245.spec.js`, `library-sources-1247.spec.js`). Non-vacuity: `git stash` of all
+five app-code files (settingsPanel/wizardManagerPanel/commandDeck/helpPanel/styles.css) → 16 of the touched/
+new test cases fail against pre-turn code; `wizard-restore-default.spec.js`'s edit and
+`context-menu-wizbar-1458.spec.js` legitimately don't discriminate (the former weakened an assertion from
+"has a Delete button" to "the row exists," which holds on both trees since only the BUTTON was removed, not
+the row; the latter only ever checked the context-menu LABEL text, never the navigation behavior). 72
+collateral tests across every touched file, all green.

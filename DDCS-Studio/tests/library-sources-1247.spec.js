@@ -226,7 +226,8 @@ test('the .wiz shelf is ON THE WIZARD SURFACE, and an imported op lands on the b
         opType: 'user_bar_lander', label: 'Bar Lander', template: [{ type: 'move_rapid', params: { x: 3 } }],
         bindings: [{ param: 'x', label: 'X', type: 'number', blockIndex: 0, key: 'x', dflt: 3 }], group: 'Probing',
     } }) });
-    await page.evaluate(() => window.openSettings({ panel: 'set_tab_wizards' }));
+    // t2196 — the tree (and its shelf section) opens in its own small panel now, not a Settings sub-tab
+    await page.evaluate(() => window.openWizardBarManager());
     await page.waitForSelector('#wiz_library_shelf', { timeout: 8000 });
     // pick the folder (the shelf's own first-use door), then the card appears
     await page.click('#wiz_library_shelf [data-lsh="pick"]');
