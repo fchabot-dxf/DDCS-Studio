@@ -1,12 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Headline feature — a HAND-BUILT stack gets the editor edit-chip (hover → click → edit as a form). The chip only
- * attaches to a type==='op' block; a hand-built stack is loose atoms → no chip. Fix (advisor-gated design): wrap the
- * loose atoms in a generic `group` op (`opSession.groupLooseAtoms`) so the line→op map finds it.
+ * Headline feature — a HAND-BUILT stack gets an editor edit-chip. The chip only attaches to a type==='op' block; a
+ * hand-built stack is loose atoms → no chip. Fix (advisor-gated design): wrap the loose atoms in a generic `group`
+ * op (`opSession.groupLooseAtoms`) so the line→op map finds it.
  *
- * INCREMENT 1 (this test): wrapping makes the chip APPEAR on the hand-built stack's lines (opAtLine resolves the
- * group op). Editability of the chip (chip → form) is increment 2.
+ * INCREMENT 1 (this test): wrapping makes the chip APPEAR (opAtLine resolves the group op, and the group — now a
+ * real top-level op — renders its own entry in the persistent op-chip row). Editability of the chip (chip → form)
+ * is increment 2.
+ *
+ * t-opchips — REWRITTEN for the persistent chip row: the chip used to be hover-revealed (a single floating
+ * element you had to mouse over the right line to see); now it's just PRESENT the instant the op exists, no
+ * hover step needed to prove it "appeared."
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -48,7 +53,7 @@ test('increment 1: groupLooseAtoms wraps a hand-built stack → the editor chip 
   expect(wrap.opTypes, 'the program is now ONE group op').toContain('group');
   expect(wrap.groupChildren, 'the group holds the 3 hand-built atoms').toBe(3);
 
-  // AFTER: hover the editor → the chip appears on the grouped lines.
+  // AFTER: the group's own chip is PRESENT in the row — no hover needed, it's a real top-level op now.
   const after = await page.evaluate(async () => {
     const prog = window.ddcsGetBlockProgram() || [];
     const grp = prog.find((b) => b && b.type === 'op' && b.opType === 'group');
@@ -56,20 +61,15 @@ test('increment 1: groupLooseAtoms wraps a hand-built stack → the editor chip 
     const text = ed.value || '';
     const lines = text.split('\n');
     let resolved = 0; for (let i = 0; i < lines.length; i++) { const o = window.ddcsOpAtLine && window.ddcsOpAtLine(i); if (o && o.id === grp.id) resolved++; }
-    const firstLine = (window.ddcsLinesForOp && window.ddcsLinesForOp(grp.id) || [0])[0] || 0;
-    const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-    const rect = ed.getBoundingClientRect();
-    ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + firstLine * lh + lh / 2 - ed.scrollTop }));
-    await new Promise((r) => setTimeout(r, 60));
-    const c = document.getElementById('op-edit-chip');
+    const c = document.querySelector(`.op-chip[data-op-id="${grp.id}"]`);
     return {
       linesResolvedToGroup: resolved, gcode: text,
-      chip: c ? { exists: true, hidden: c.hidden, text: c.textContent, disabled: c.disabled } : { exists: false },
+      chip: c ? { exists: true, title: c.title, disabled: c.disabled } : { exists: false },
     };
   });
   expect(after.linesResolvedToGroup, 'the group op now owns its emitted lines (opAtLine resolves)').toBeGreaterThan(0);
-  expect(after.chip.hidden, 'the edit chip APPEARS on the hand-built stack after wrapping').toBe(false);
-  expect(after.chip.text, 'the chip shows the group label').toContain('Hand-built');
+  expect(after.chip.exists, 'the edit chip APPEARS in the row for the hand-built stack after wrapping').toBe(true);
+  expect(after.chip.title, 'the tooltip shows the group label').toContain('Hand-built');
   // emit is byte-identical (the group just wraps the same atoms) — the G-code is unchanged
   expect(after.gcode, 'wrapping does not change the emitted G-code').toContain('M3 S12000');
   console.log('increment-1 chip:', JSON.stringify(after.chip), '· disabled(=increment-2 gap):', after.chip.disabled);

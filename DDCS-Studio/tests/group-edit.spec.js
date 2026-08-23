@@ -24,20 +24,17 @@ async function rightClickEditorLine(page, lineIdx) {
   }, lineIdx);
 }
 
-// hover the group's first emitted line so the ✎ chip surfaces, then click it (→ window.ddcsEditOp). Returns the
-// chip's pre-click state (hidden / disabled / text), so the test can assert it's the EDITABLE chip, not the lock.
-async function hoverAndClickChip(page) {
+// t-opchips — the group's chip is now PERSISTENT (no hover needed: it's a real top-level op the instant it's
+// grouped, so the row already shows it). Find it by data-op-id, read its state, click it (→ window.ddcsEditOp
+// → wizardManager.openForEdit → _openGroupForEdit, async). Returns { exists, disabled, title } — icon-only now,
+// so the label (and the increment-1-vs-2 🔒-vs-✎ distinction) lives in `title`/`disabled`, not chip text.
+async function clickGroupChip(page) {
   return page.evaluate(() => {
     const prog = window.ddcsGetBlockProgram() || [];
     const grp = prog.find((b) => b && b.type === 'op' && b.opType === 'group');
-    const ed = document.getElementById('editor');
-    const firstLine = ((window.ddcsLinesForOp && window.ddcsLinesForOp(grp.id)) || [0])[0] || 0;
-    const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-    const rect = ed.getBoundingClientRect();
-    ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + firstLine * lh + lh / 2 - ed.scrollTop }));
-    const chip = document.getElementById('op-edit-chip');
-    const info = { hidden: chip.hidden, disabled: chip.disabled, text: chip.textContent };
-    chip.click();   // → window.ddcsEditOp(groupId) → wizardManager.openForEdit → _openGroupForEdit (async)
+    const chip = grp && document.querySelector(`.op-chip[data-op-id="${grp.id}"]`);
+    const info = { exists: !!chip, disabled: chip ? chip.disabled : null, title: chip ? chip.title : null };
+    if (chip) chip.click();
     return info;
   });
 }
@@ -68,12 +65,11 @@ test('increment 2: group chip → editable form → edit a knob → writes back 
   await page.evaluate(() => { [...document.querySelectorAll('.op-ctx-menu .op-ctx-item')].find((b) => /Group/.test(b.textContent)).click(); });
   await page.waitForTimeout(250);
 
-  // The chip is now ENABLED (increment 2) — increment 1 showed 🔒, this shows ✎.
-  const chip = await hoverAndClickChip(page);
-  expect(chip.hidden, 'the chip appears on the grouped run').toBe(false);
+  // The chip is now ENABLED (increment 2) — increment 1 disabled it (🔒), this is clickable.
+  const chip = await clickGroupChip(page);
+  expect(chip.exists, 'the chip appears in the persistent row for the grouped run').toBe(true);
   expect(chip.disabled, 'increment 2: the group chip is now EDITABLE (not the 🔒 lock)').toBe(false);
-  expect(chip.text, 'the chip shows the edit affordance + label').toContain('✎');
-  expect(chip.text).toContain('Hand-built');
+  expect(chip.title, 'the tooltip carries the label').toContain('Hand-built');
   await page.waitForTimeout(350);   // _openGroupForEdit is async (dynamic import devMode + render)
 
   // The form OPENED, derived from the group's stored children: a "depth" field seeded with the child's current Z (-2).
@@ -131,7 +127,7 @@ test('increment 2: group chip → editable form → edit a knob → writes back 
   expect(reproj.hasExpose, 'the knob exposure survives (so the form re-derives)').toBe(true);
 
   // Re-open the chip after the reproject → the form re-derives from the stored children, now showing the edited -5.
-  const chip2 = await hoverAndClickChip(page);
+  const chip2 = await clickGroupChip(page);
   expect(chip2.disabled, 'the reprojected group chip is still editable').toBe(false);
   await page.waitForTimeout(350);
   const reField = await page.evaluate(() => { const f = document.querySelector('#wiz_user_form [data-param="depth"]'); return f ? Number(f.value) : null; });

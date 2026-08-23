@@ -5,16 +5,20 @@ import { test, expect } from '@playwright/test';
  * clearance / retract), so its form can expose those. A hand-built group used to EXCLUDE framing. Now groupLooseAtoms
  * SPANS the adjacent framing into the group, and deriveGroupDef auto-surfaces rpm/clearance/retractZ as knobs — so a
  * hand-built program's form reaches the same spindle/retract knobs. Grouping framing is emit-byte-identical (a group
- * emits its children in order at its slot). Drives the REAL studio view + auto-chip path.
+ * emits its children in order at its slot). Drives the REAL studio view.
+ *
+ * t-opchips — the trigger for `groupLooseAtoms` changed from the (now-retired) auto-hover chip to the right-click
+ * "Group" menu — see group-auto.spec.js's own header for the full account of why. `looseRunAtLine` (what the
+ * menu resolves against) already spans framing correctly; this file's own subject (framing parity) is untouched.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('a hand-built program with framing → group spans progstart/progend → form exposes rpm/clearance/retractZ + writes back', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram && window.insertWiz && window.ddcsAutoGroupRunAtLine);
+  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram && window.insertWiz && window.ddcsLooseRunAtLine);
 
-  // a FULL hand-built program: Program Start (rpm/clearance) + moves + Program End (retractZ). No real op → AUTO case.
+  // a FULL hand-built program: Program Start (rpm/clearance) + moves + Program End (retractZ). No real op.
   await page.evaluate(() => window.ddcsLoadBlockStack([
     { id: 'ps', type: 'progstart', params: { rpm: 10000, dir: 'cw', spinUp: 0, clearance: 5 } },
     { id: 'm1', type: 'move', params: { mode: 'rapid', x: 10, y: 20, z: 5 } },
@@ -25,19 +29,21 @@ test('a hand-built program with framing → group spans progstart/progend → fo
   await page.waitForTimeout(400);
   const gcodeBefore = await page.evaluate(() => document.getElementById('editor')?.value || '');
 
-  // find a loose-run line (a move's projected line; framing lines resolve to null), hover it → auto-chip → click.
+  // find a loose-run line (a move's projected line; framing lines resolve to null), right-click it → Group → click.
   const lineIdx = await page.evaluate(() => {
     const n = (document.getElementById('editor')?.value || '').split('\n').length;
-    for (let i = 0; i < n; i++) { const r = window.ddcsAutoGroupRunAtLine && window.ddcsAutoGroupRunAtLine(i); if (r && r.length) return i; }
+    for (let i = 0; i < n; i++) { const r = window.ddcsLooseRunAtLine && window.ddcsLooseRunAtLine(i); if (r && r.length) return i; }
     return -1;
   });
-  expect(lineIdx, 'a loose-run line resolves even with framing present (the auto-chip can appear)').toBeGreaterThanOrEqual(0);
+  expect(lineIdx, 'a loose-run line resolves even with framing present (the Group menu item can appear)').toBeGreaterThanOrEqual(0);
   await page.evaluate((li) => {
     const ed = document.getElementById('editor');
     const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
     const rect = ed.getBoundingClientRect();
-    ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + li * lh + lh / 2 - ed.scrollTop }));
-    document.getElementById('op-edit-chip').click();
+    ed.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rect.left + 40, clientY: rect.top + pad + li * lh + lh / 2 - ed.scrollTop }));
+    const menu = document.querySelector('.op-ctx-menu');
+    const btn = menu && !menu.hidden ? Array.from(menu.querySelectorAll('button')).find((b) => /Group/.test(b.textContent)) : null;
+    if (btn) btn.click();
   }, lineIdx);
   await page.waitForTimeout(600);
 
@@ -54,6 +60,16 @@ test('a hand-built program with framing → group spans progstart/progend → fo
   expect(wrap.topLen, 'the whole framed program collapsed to ONE group').toBe(1);
   expect(wrap.childTypes, 'the group SPANS the framing (progstart … progend)').toEqual(['progstart', 'move', 'move', 'progend']);
   expect(wrap.gcode, 'grouping the framing is emit byte-identical').toBe(gcodeBefore);
+
+  // t-opchips — the wrap no longer auto-opens the form (that was the retired auto-chip's own extra step); the
+  // new group is a real top-level op, so it renders its own chip immediately — click it to open the form.
+  const grpId = await page.evaluate(() => {
+    const prog = window.ddcsGetBlockProgram() || [];
+    const grp = prog.find((b) => b && b.type === 'op' && b.opType === 'group');
+    return grp ? grp.id : null;
+  });
+  await page.click(`.op-chip[data-op-id="${grpId}"]`);
+  await page.waitForTimeout(400);
 
   // the form auto-surfaced the framing knobs (no _expose needed — parity with built-ins).
   const form = await page.evaluate(() => {

@@ -23,13 +23,23 @@ test('B: a 2D group knob is drag-editable on the form2d preview → drag writes 
   await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(300);
 
-  // REAL path: hover → auto ✎ chip → click → wraps + opens the group form (now form2d because it has a 2D knob).
+  // REAL path: right-click → "Group" → the new group's own PERSISTENT chip → click → opens the group form
+  // (now form2d because it has a 2D knob).
   await page.evaluate(() => {
     const ed = document.getElementById('editor');
     const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
     const rect = ed.getBoundingClientRect();
-    ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + lh / 2 - ed.scrollTop }));
-    document.getElementById('op-edit-chip').click();
+    ed.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rect.left + 40, clientY: rect.top + pad + lh / 2 - ed.scrollTop }));
+    const menu = document.querySelector('.op-ctx-menu');
+    const btn = menu && !menu.hidden ? Array.from(menu.querySelectorAll('button')).find((b) => /Group/.test(b.textContent)) : null;
+    if (btn) btn.click();
+  });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    const prog = window.ddcsGetBlockProgram() || [];
+    const grp = prog.find((b) => b && b.type === 'op' && b.opType === 'group');
+    const chip = grp && document.querySelector(`.op-chip[data-op-id="${grp.id}"]`);
+    if (chip) chip.click();
   });
   await page.waitForTimeout(500);
 

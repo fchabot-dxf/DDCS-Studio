@@ -107,21 +107,21 @@ test('CHIP: the editor shows the estimate live + updates on edit; legible in bot
     }
 });
 
-test('PER-OP hover chip shows the op estimate; the editor shows both chips (screenshot)', async ({ page }, testInfo) => {
+test('PER-OP chip tooltip shows the op estimate; the editor shows both chips (screenshot)', async ({ page }, testInfo) => {
     await page.evaluate(async () => {
         window.ddcsLoadBlockStack([]);
         window.openWiz('pocket', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
     });
     await page.waitForTimeout(450);
-    const ed = await page.locator('#editor').boundingBox();
-    const chip = page.locator('#op-edit-chip');
-    let shown = false;
-    for (let ln = 2; ln <= 18 && !shown; ln++) {                 // scan editor lines until the op-hover chip appears
-        await page.mouse.move(ed.x + 30, ed.y + ln * 20 + 4);
-        await page.waitForTimeout(70);
-        const txt = (await chip.textContent().catch(() => '')) || '';
-        if (await chip.isVisible().catch(() => false) && /≈/.test(txt)) shown = true;
-    }
-    expect(shown, 'hovering an op line shows the per-op run-time on the chip (≈ …)').toBe(true);
+    // t-opchips — the chip is PERSISTENT (icon-only) now, no hover-to-reveal step; the per-op run-time that used
+    // to render as the chip's own visible text now rides in its tooltip (title), alongside the label (ruling 3's
+    // own "label -> tooltip" pattern, extended here).
+    const title = await page.evaluate(() => {
+        const prog = window.ddcsGetBlockProgram() || [];
+        const op = prog.find((b) => b && b.type === 'op');
+        const chip = op && document.querySelector(`.op-chip[data-op-id="${op.id}"]`);
+        return chip ? chip.title : null;
+    });
+    expect(title, `the chip's tooltip carries the per-op run-time (≈ …): ${title}`).toMatch(/≈/);
     await page.locator('.editor-container').screenshot({ path: testInfo.outputPath('editor-context.png') });
 });

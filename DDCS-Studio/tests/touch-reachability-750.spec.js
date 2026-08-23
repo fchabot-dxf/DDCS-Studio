@@ -1,17 +1,21 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * t750 — MOBILE REACHABILITY guard. The editor op-edit chip was HOVER-ONLY (editorOpHover mousemove), so on a touch
- * device you could never re-open an op for editing from its G-code. The fix reuses the SAME chip + code path
- * (updateChipForLine) behind a touch trigger: a TAP on an op's lines reveals the chip; tap the chip to edit; tap a
- * non-op line to dismiss — desktop stays hover-only (the touch trigger is gated to pointerType 'touch').
+ * t750 — MOBILE REACHABILITY guard. The editor op-edit chip used to be HOVER-ONLY (editorOpHover mousemove), so
+ * on a touch device you could never re-open an op for editing from its G-code — the fix (this file, originally)
+ * added a tap-to-reveal trigger behind pointerType 'touch'.
  *
- * This spec is also the GUARD: it pins the known touch path (op-edit tap) so a future hover-only control can't ship
- * silently — if the touch trigger regresses, this goes red.
+ * t-opchips — REWRITTEN. Ruling 1 ("we dont need the hover for these chips and that they can be always visible
+ * in the top row") retired reveal-on-any-gesture entirely — the chip is PERSISTENT now, at every width and every
+ * input mode, so there is no tap-to-reveal step left to guard and no tap-elsewhere-to-dismiss cycle (nothing was
+ * ever hidden to dismiss). What t750's own concern — REACHABILITY on a touch device — still means today: is the
+ * chip actually THERE and TAPPABLE at phone width, with no hover precondition a touch device can never satisfy.
+ * This file now guards that instead, at both phone width and desktop (the SAME persistent chip, not two paths
+ * to keep in sync — there is no separate "touch path" any more to regress out of sync with a "desktop path").
  */
 
 // Insert an EDITABLE custom op (✎, not the 🔒 locked case) so the editor has a live line→op map — same setup as
-// custom-op-chip.spec.js. Waits until the map actually resolves the op.
+// custom-op-chip.spec.js. Waits until the map actually resolves the op AND its chip has rendered.
 async function seedOp(page, type = 'user_asis') {
   await page.evaluate(async (t) => {
     if (t === 'user_asis') {
@@ -25,83 +29,55 @@ async function seedOp(page, type = 'user_asis') {
   }, type);
   await page.waitForFunction((t) => {
     const op = (window.ddcsGetBlockProgram() || []).filter((b) => b && b.type === 'op').find((b) => (b.opType || '') === t);
-    if (!op || typeof window.ddcsOpAtLine !== 'function' || !window.ddcsLinesForOp) return false;
-    const lines = window.ddcsLinesForOp(op.id) || [];
-    return lines.length > 0 && lines.some((ln) => { const o = window.ddcsOpAtLine(ln); return o && o.id === op.id; });
+    return !!(op && document.querySelector(`.op-chip[data-op-id="${op.id}"]`));
   }, type, { timeout: 8000 });
 }
 
-// Reveal the chip for an op by dispatching the trigger (touch pointerup, or mouse mousemove) over its mapped lines.
-// POLLS the real outcome (t710): the program's line→op map transiently rebuilds after an insert, so a one-shot
-// dispatch can race it — keep re-dispatching over the lines until the chip actually shows (bounded).
-const revealChip = (page, opType, touch) => page.evaluate(async ({ t, touch }) => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  for (let round = 0; round < 50; round++) {
-    const op = (window.ddcsGetBlockProgram() || []).filter((b) => b && b.type === 'op').find((b) => (b.opType || '') === t);
-    if (op && typeof window.ddcsOpAtLine === 'function') {
-      const all = (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || [0];
-      const lines = all.length ? all : [0];
-      const ed = document.getElementById('editor');
-      for (const ln of lines) {
-        const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-        const rect = ed.getBoundingClientRect();
-        const x = rect.left + 30, y = rect.top + pad + ln * lh + lh / 2 - ed.scrollTop;
-        ed.dispatchEvent(touch
-          ? new PointerEvent('pointerup', { pointerType: 'touch', bubbles: true, clientX: x, clientY: y })
-          : new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
-        await sleep(15);
-        const c = document.getElementById('op-edit-chip');
-        if (c && !c.hidden) return { found: true, shown: true, text: c.textContent, disabled: c.disabled, opId: c.dataset.opId, targetOp: op.id };
-      }
-    }
-    await sleep(60);
-  }
-  return { found: true, shown: false, targetOp: null };
-}, { t: opType, touch });
-
-test.describe('touch: op-edit chip', () => {
+test.describe('touch: persistent op chip', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-  test('a TAP on an op reveals the ✎ Edit chip at 390px; tapping the chip edits; tapping elsewhere dismisses', async ({ page }) => {
+  test('the chip is visible with NO gesture at 390px (touch); tapping it edits that op', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsOpAtLine);
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.insertWiz && window.ddcsGetBlockProgram);
     await seedOp(page);
     await page.evaluate(() => { window.__editCalls = []; const o = window.ddcsEditOp; window.ddcsEditOp = (id) => { window.__editCalls.push(id); return o && o(id); }; });
 
-    // 1) TAP reveals the chip (no hover)
-    const r = await revealChip(page, 'user_asis', true);
-    expect(r.shown, 'a touch tap reveals the chip').toBe(true);
-    expect(r.text, 'the chip carries the ✎ edit affordance').toContain('✎');
-    expect(r.disabled, 'the op is editable (chip enabled)').toBe(false);
-    expect(r.opId, 'the chip targets the tapped op').toBe(r.targetOp);
-
-    // 2) TAP a non-op region (far past the program) → the chip dismisses
-    const dismissed = await page.evaluate(async () => {
-      const ed = document.getElementById('editor'); const rect = ed.getBoundingClientRect();
-      ed.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch', bubbles: true, clientX: rect.left + 30, clientY: rect.bottom + 400 }));
-      await new Promise((r) => setTimeout(r, 60));
-      const c = document.getElementById('op-edit-chip'); return !c || c.hidden;
+    // t-opchips — NO gesture at all: the chip is already there, straight after seeding, on a fresh touch page
+    // load. This is the whole point of ruling 1 — reachability no longer depends on a tap-to-reveal step a
+    // touch device could get wrong (or a user could not discover).
+    const chip = await page.evaluate(() => {
+      const op = (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op');
+      const el = op && document.querySelector(`.op-chip[data-op-id="${op.id}"]`);
+      return el ? { exists: true, disabled: el.disabled, opId: el.dataset.opId, targetOp: op.id } : { exists: false };
     });
-    expect(dismissed, 'tapping a non-op region dismisses the chip').toBe(true);
+    expect(chip.exists, 'the chip is present with no tap/hover needed').toBe(true);
+    expect(chip.disabled, 'the op is editable (chip enabled)').toBe(false);
+    expect(chip.opId, 'the chip targets the seeded op').toBe(chip.targetOp);
 
-    // 3) re-reveal, then TAP the chip → the edit path fires for that op
-    const r2 = await revealChip(page, 'user_asis', true);
-    expect(r2.shown, 're-revealed for the edit check').toBe(true);
-    await page.locator('#op-edit-chip').click();
+    // TAP the chip → the edit path fires for that op (a real touch tap, not a mouse click standing in for one).
+    const box = await page.locator(`.op-chip[data-op-id="${chip.targetOp}"]`).boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(150);
     const edited = await page.evaluate(() => window.__editCalls);
-    expect(edited, 'tapping the chip opens that op for editing').toContain(r2.targetOp);
+    expect(edited, 'tapping the chip opens that op for editing').toContain(chip.targetOp);
   });
 });
 
-test.describe('desktop: hover unchanged (no regression)', () => {
+test.describe('desktop: the same persistent chip (no separate path to regress out of sync)', () => {
   test.use({ viewport: { width: 1400, height: 1000 } });
 
-  test('mouse hover still reveals the chip (the touch trigger did not replace hover)', async ({ page }) => {
+  test('the chip is visible with no hover needed on desktop either; clicking it edits that op', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.insertWiz && window.ddcsGetBlockProgram && window.ddcsOpAtLine);
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.insertWiz && window.ddcsGetBlockProgram);
     await seedOp(page);
-    const r = await revealChip(page, 'user_asis', false);
-    expect(r.shown, 'hover still reveals the chip on desktop').toBe(true);
-    expect(r.text).toContain('✎');
+    const chip = await page.evaluate(() => {
+      const op = (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op');
+      return op ? { exists: !!document.querySelector(`.op-chip[data-op-id="${op.id}"]`), targetOp: op.id } : { exists: false };
+    });
+    expect(chip.exists, 'the chip is present on desktop too, no hover needed to reveal it').toBe(true);
+    await page.click(`.op-chip[data-op-id="${chip.targetOp}"]`);
+    await page.waitForTimeout(150);
+    const wizActive = await page.evaluate(() => document.getElementById('wizard').classList.contains('active'));
+    expect(wizActive, 'clicking the chip opened the wizard').toBe(true);
   });
 });

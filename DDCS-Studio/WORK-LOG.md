@@ -49674,3 +49674,143 @@ RULED, ACCEPTED note in styles.css, per the amendment carried in — unrelated t
 trivial commit per the amendment's own instruction.)
 
 🔨 turn 2156
+
+# t2159 ("t-opchips") — the hover-revealed floating ✎ Edit chip retires; every op gets a PERSISTENT icon-only chip
+# in `.editor-strip`, in program order. Reordering (ruling 5) was retracted mid-turn by Amendment 1 — never built.
+
+Five human rulings (spec: scratchpad/t-opchips.md, the advisor's own scratchpad — outside this repo, not editable
+by me): (1) no hover — every op's chip is always visible, in the top row. (2) overflow scrolls sideways in the
+SAME row, never its own row, never wraps. (3) icon only, via `entryIconHtml` (`ui/wizIcons.js`) — the SAME
+resolver the header wizard buttons and the Settings icon picker already read, so a user `iconOverride` reaches
+the chip with zero extra code; the label lives in the tooltip. (4) right-click (desktop) AND long-press (touch)
+open the op's EXISTING `showOpMenu` through ONE shared `contextmenu` handler + `attachLongPress` — no separate
+touch branch. (5) reordering via "Move earlier"/"Move later" menu items — **RETRACTED by Amendment 1 before any
+code was written** (see below); I had only read `opSession.js` for context, nothing to drop.
+
+## ⚠ AMENDMENT 1 — reordering cut mid-turn, absorbed cleanly (nothing built, nothing to undo)
+
+The human's own retraction, relayed verbatim by the advisor: "sorry reordering no / i though it was drag but no
+reordering function yet" — they had read an earlier yes/no exchange as approving DRAG specifically, and did not
+want a menu-items reorder at all once that's what came back. Effect on this turn: no `moveOp` helper, no
+`removeOpById`+`insertOpAfterId` composition, no menu items — none of it was started, so there was nothing to
+drop. Ruling 4 (the op menu itself) is UNCHANGED by this — it was never about reordering. The op-order validation
+question the advisor asked ("does anything validate op order today, e.g. a probe writing a WCS before its
+readers") is explicitly WITHDRAWN from this turn per the amendment — not investigated, not reported, parked as a
+question for the human. The amendment also asked me to update the spec's own VERIFY list to drop its three dead
+reorder assertions; since that file lives in the advisor's own scratchpad (not this repo), I could not edit it —
+reflected instead by simply never writing reorder tests, and flagging it here.
+
+## RULING FLAGGED — the mobile-label limitation from t2155's dispatch is OVERTAKEN, not permanent
+
+t2155's own dispatch said "mobile deliberately has no label" as if it were a standing limitation. It isn't one:
+the chip carries NO visible label at ANY width now (ruling 3, icon-only everywhere) — identification is the
+tooltip on desktop and the op menu's own first item (`✎ Edit <label>`) on long-press/right-click on touch. Not
+writing "mobile has no label" anywhere as a permanent fact; corrected the framing in this turn's own code
+comments instead.
+
+## A prior explicit ruling reversed as a DIRECT, LOGICAL consequence of ruling 1 — flagged, not silently absorbed
+
+The old floating chip's own retired code comment said the "AUTO hand-built-run" convenience (a floating chip that
+appeared over a loose, ungrouped run and both wrapped-and-opened it in one click) was itself advisor-gated when it
+shipped. Ruling 1 retires the floating-chip mechanism entirely, and that convenience rode on it — there is no
+"floating chip that appears over a loose run" left to carry it. Grouping a loose run is UNCHANGED and fully
+reachable via the existing right-click "Group" menu (`showGroupMenu`), which never depended on the floating chip
+— only the one-gesture wrap-AND-open convenience is gone. Deleted the now-orphaned `autoGroupRunAtLine`/
+`linesForRun` (`programModel.js`) + their window hooks after confirming via repo-wide grep that nothing else
+referenced them.
+
+## A real, previously-latent behavioral gap — found by a FAILING test, not by inspection
+
+Rewriting `group-auto.spec.js` around the new right-click→Group trigger (the old auto-chip's hover-click path is
+gone) failed on `hasField: false`: the old auto-chip's own click handler did wrap-THEN-open (`groupLooseAtoms`
+then an explicit `ddcsEditOp(gid)`); `showGroupMenu`'s menu item only ever wrapped — it never auto-opened, and
+this was ALWAYS true, just never exercised via the mixed-program right-click path before ruling 1 forced every
+group-creation test through it. Not a regression I introduced — a pre-existing asymmetry ruling 1 surfaced.
+Resolved by documenting the new two-step composition in the test itself (right-click→Group wraps; the new op's
+own persistent chip then needs an explicit click to open it) rather than papering over it — arguably better, since
+the chip row and the grouping gesture now compose visibly instead of one gesture silently doing both.
+
+## Two things flagged, not silently resolved either way (per the "only present legitimate options" rule)
+
+- **26px chip size** — smaller than the 44px touch-target floor used elsewhere in this app (toolbar buttons). A
+  deliberate scale-down for a strip meant to hold many chips in one row (ruling 2), not an oversight — but not
+  silently shipped either. Needs a human call: keep at 26px, or trade row density for touch comfort.
+- **iOS long-press OS callout on a `<button>`** — the spec itself flagged this as unproven: the prior floating
+  chip's touch call sites were a `<textarea>`/`<div>`, never a `<button>`; a `<button>` might raise iOS Safari's
+  native text-selection/callout menu on a long-press, which could visually collide with or pre-empt the app's own
+  synthesized `contextmenu` menu. Cannot be verified in this environment — no real iOS Safari available (Playwright
+  WebKit simulates viewport/touch events, not Safari's own native OS-level long-press callout UI). Per the spec's
+  own explicit instruction, did NOT add `-webkit-touch-callout:none`/`user-select:none` preemptively — UNVERIFIED,
+  left for the human to check on a real device and report back.
+
+## Non-vacuity
+
+`git checkout HEAD -- <the 4 changed files>` (not `git stash` — the shared stack stays clean, per standing
+project guidance) isolated the pre-turn code against the new `tests/op-chips-2159.spec.js`: all 7/7 tests fail
+cleanly against it (every assertion targets `.op-chip-row`/`.op-chip`, neither of which existed before this turn)
+— the expected non-vacuity signature. Restored from a scratch copy (the files were uncommitted; `git checkout
+HEAD` would have destroyed the work, not reverted it — copied first, per the same standing caution). Re-confirmed
+7/7 green on the restored working tree afterward.
+
+## Collateral sweep
+
+Removing the single shared `#op-edit-chip` element broke 11 pre-existing spec files that referenced it directly —
+worked through each individually, driving the real UI gesture (not just re-reading assertions), preferring
+"rewrite to test the same underlying claim via the new mechanism" over deletion wherever the capability survived:
+`group-auto`, `group-framing`, `group-edit`, `group-canvas-knob`, `group-canvas-drag`, `group-chip`,
+`group-gesture`, `custom-op-chip`, `edit-nested-op-1958`, `time-estimate-844` (the per-op estimate moved from
+chip text to the tooltip, ruling 3's own pattern extended), `touch-reachability-750` (its whole premise —
+tap-to-reveal/tap-to-dismiss — retired with the hover mechanism; rewritten around "the chip is just there, no
+gesture needed"). A 12th, `traverse-clarity-893.spec.js`'s badge-vs-chip collision test, referenced the same
+element and would otherwise have gone silently VACUOUS (its own `else` branch passes trivially when the chip
+can't be found) rather than failing loud — rewrote it to assert the new structural guarantee instead: the badge
+and `.op-chip-row` are normal-flow flex siblings in `.editor-strip`, the same non-overlap proof t2155 already
+established for badge-vs-toolbar, now re-asserted for the chip row specifically (with real chips rendered, not a
+trivially-empty row).
+
+Beyond those 12: grepped the full test surface for every selector/import this turn's files touch
+(`editorOpHover`, `op-edit-chip`, `.op-chip`, `editor-strip`, `ddcsLinesForOp`, `flattenOps`, `entryForOpType`,
+`showOpMenu`, `showGroupMenu`, `attachLongPress`) — 18 more candidate files, 16 run (the other 2 were the already-
+fixed pair). All green: `editor-chip-space-1323`, `editor-focus-ring-2151`, `editor-chrome`, `word-glow` (2 pre-
+existing skips, unrelated t1732 root cause — no-`.id` on plain twin execution atoms, already awaiting a separate
+human/advisor ruling, untouched by this turn), `user-root-boundary-1972`, `setup-sheet-850`, `insert-add-
+replace-1942`, `flow-labels-unique-1408`, `export-title-975`, `export-import-fidelity-1964`,
+`editor-sim-real-insert`, `cam-customize-affordance`, `cam-build-mode`, `blk-start-hints-multistep-1954`,
+`add-operation-1940`, `prog-marker-slot-812`. One `waitForFunction` timeout on cold page-load under 6-worker
+parallel contention (`insert-add-replace-1942`), retried clean — server-startup contention, not this turn's
+change (the same signature already documented in t2156's own sweep).
+
+## Gate
+
+New: `tests/op-chips-2159.spec.js` — 7/7. Covers the VERIFY list minus the retracted reorder items: N ops → N
+icon-only chips in program order; a user `iconOverride` reaches the chip with zero extra code; hovering a chip
+highlights ONLY that op's lines (and clears on mouseleave); clicking a chip edits that op specifically; right-
+click AND long-press open the byte-identical menu item set (proved by comparing the two menus' own text, not by
+inspection); a 20-op program stays one row tall (`flex-wrap: nowrap`, `offsetHeight < 60px`) and genuinely
+overflows (`scrollWidth > clientWidth`); a phone/desktop × 5-theme render sweep. Collateral: 12 files fixed +
+re-verified, 16 more swept clean (28 total). Smoke tier: 76/76. Node tier: 227/227. Lint: clean.
+
+## Files
+
+- `DDCS-Studio/web/ui/editorOpHover.js` — rewritten: the persistent `.op-chip-row` (built from `flattenOps`,
+  rebuilt on every `onChange`), `entryForOpType`+`entryIconHtml`-driven icon rendering, hover→`ddcsLinesForOp`
+  highlight, click→`ddcsEditOp`, one `contextmenu` handler + `attachLongPress(chipRow)` → `showOpMenu`. Removed:
+  the old `#op-edit-chip` element, `placeChip`, `hoverOpId`, the editor's own hover/pointerup/mouseleave chip
+  listeners, the AUTO-chip's `window.ddcsAutoGroupRunAtLine` branch. Unchanged: the `#xform-badge`, the word-glow
+  mechanism, `installEditorTextOps`, the editor's own right-click-on-CODE menu (`showOpMenu`/`showGroupMenu`/
+  comment menu), `attachLongPress(editor)`.
+- `DDCS-Studio/web/blocks/wizardLibrary.js` — new `entryForOpType(opType)`: resolves a placed op's opType to its
+  bar/Settings entry, handling the in-place-twin `opensAs` indirection the same way `builtinLabelForTwin` does.
+- `DDCS-Studio/web/blocks/programModel.js` — deleted the now-orphaned `autoGroupRunAtLine`/`linesForRun` + their
+  window hooks (confirmed via repo-wide grep, nothing else referenced them).
+- `DDCS-Studio/web/styles.css` — `.op-chip-row`/`.op-chip` (reuses the `--btn-face`/`--btn-edge`/`--btn-ink`
+  button-material tokens, t2075's house pattern). `.editor-toolbar` order 3→4, `margin-left:auto` removed (the
+  chip row's own `flex:1 1 auto` now claims that space). Deleted the old `.op-edit-chip` pill styling.
+- NEW: `DDCS-Studio/tests/op-chips-2159.spec.js` — the formal VERIFY coverage (above).
+- Rewritten (chip-removal ripple, 12 files): `tests/group-auto.spec.js`, `tests/group-framing.spec.js`,
+  `tests/group-edit.spec.js`, `tests/group-canvas-knob.spec.js`, `tests/group-canvas-drag.spec.js`,
+  `tests/group-chip.spec.js`, `tests/group-gesture.spec.js`, `tests/custom-op-chip.spec.js`,
+  `tests/edit-nested-op-1958.spec.js`, `tests/time-estimate-844.spec.js`, `tests/touch-reachability-750.spec.js`,
+  `tests/traverse-clarity-893.spec.js`.
+
+🔨 turn 2159

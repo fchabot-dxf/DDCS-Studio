@@ -152,6 +152,23 @@ export function builtinTypeForTwin(opType) {
     const b = BUILTINS.find((x) => x.opensAs === opType);
     return b ? { type: b.type, variant: b.variant } : null;
 }
+/** t-opchips — a PLACED op's `opType` resolved to the bar/Settings-resolved entry that identifies it (label,
+ *  icon, iconOverride) — the ONE source the editor's persistent op-chip row reads, so a user's iconOverride
+ *  reaches the chip with no extra code, exactly the way it already reaches the bar and the Settings picker.
+ *  Two cases, mirroring builtinLabelForTwin's own reasoning: a plain op's opType matches an entry's `id`
+ *  directly; an IN-PLACE TWIN's opType (e.g. 'user_pocket_data') does NOT — its own bar entry is hidden
+ *  (OPENS_AS_TARGETS, above) so the built-ins don't show a duplicate slot — so it resolves via the SAME
+ *  `opensAs` declaration `builtinLabelForTwin`/`builtinTypeForTwin` already use, back to the built-in's `id`
+ *  ('pocket'), then reads THAT entry (override-applied, like everything else `listEntries()` returns). Returns
+ *  null for an opType with no wizard-bar identity at all (a hand-built `group`, framing types, etc.). */
+export function entryForOpType(opType) {
+    const entries = listEntries();
+    const direct = entries.find((e) => e.id === opType);
+    if (direct) return direct;
+    const b = BUILTINS.find((x) => x.opensAs === opType);
+    return b ? (entries.find((e) => e.id === b.id) || null) : null;
+}
+
 function userEntries() {
     return listUserOps().filter((d) => !OPENS_AS_TARGETS.has(d.opType)).map((d) => ({
         id: d.opType,

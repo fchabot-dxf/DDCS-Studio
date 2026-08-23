@@ -1,35 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * REGRESSION (ROADMAP Gaps #11): a custom op MUST get the editor hover-Edit ✎ chip — the headline custom-wizard loop
- * (make a wizard → insert → hover its G-code → ✎ Edit → its form opens). The codebase had NO test that a custom op
- * commits as an editable 'op' block and hover-resolves; #11 stayed "confirmed-but-unreproducible" because of that gap.
+ * REGRESSION (ROADMAP Gaps #11): a custom op MUST get an editor op-chip — the headline custom-wizard loop
+ * (make a wizard → insert → its chip renders → ✎ Edit → its form opens). The codebase had NO test that a custom op
+ * commits as an editable 'op' block and gets a chip; #11 stayed "confirmed-but-unreproducible" because of that gap.
  *
  * The break #11 hypothesised — a builder-LESS op (`builderOf` undefined → `commitActiveOp` false → `commitDecodedCode`
  * decodes loose atoms with NO 'op' wrapper → no chip) — can't fire now: the wizard-to-blocks port gave EVERY built-in a
  * builder, and forking a built-in registers one via `createWizard → createUserOp`. These two tests pin that down with
- * the REAL flows (a plain custom op + the actual Save-as-wizard "fork Tool Length"), driving a real editor hover and
- * asserting the chip. If a future change reintroduces a builder-less commit path, the chip dies and these go red.
+ * the REAL flows (a plain custom op + the actual Save-as-wizard "fork Tool Length"), asserting the chip appears in the
+ * persistent row. If a future change reintroduces a builder-less commit path, the chip dies and these go red.
+ *
+ * t-opchips — REWRITTEN for the persistent row: the chip used to be hover-revealed (had to mouse over the op's own
+ * line to see it); it's just PRESENT now, found by the op's own id — no hover scan needed.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-// Drive the editor: hover the op's first line (or scan a few lines) and read the floating #op-edit-chip.
+// Find the op record matching `opMatch`, then its own chip in the persistent row by data-op-id.
 async function chipFor(page, opMatch) {
-  return page.evaluate(async (re) => {
+  return page.evaluate((re) => {
     const prog = window.ddcsGetBlockProgram() || [];
     const op = prog.filter((b) => b && b.type === 'op').find((b) => new RegExp(re).test(b.opType || ''));
     if (!op) return { customFound: false };
-    const ed = document.getElementById('editor');
-    const lines = (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || [0];
-    const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-    const rect = ed.getBoundingClientRect();
-    for (const ln of (lines.length ? lines : [0])) {
-      ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + ln * lh + lh / 2 - ed.scrollTop }));
-      await new Promise((r) => setTimeout(r, 25));
-      const c = document.getElementById('op-edit-chip');
-      if (c && !c.hidden) return { customFound: true, opType: op.opType, chipText: c.textContent, chipDisabled: c.disabled };
-    }
-    return { customFound: true, opType: op.opType, chipText: null };
+    const c = document.querySelector(`.op-chip[data-op-id="${op.id}"]`);
+    return { customFound: true, opType: op.opType, chipTitle: c ? c.title : null, chipDisabled: c ? c.disabled : null };
   }, opMatch);
 }
 
@@ -54,8 +48,7 @@ test('a plain custom op → insert → the editor shows its ✎ Edit chip', asyn
   const r = await chipFor(page, '^user_asis$');
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
   expect(r.customFound).toBe(true);
-  expect(r.chipText, 'hovering the custom op shows its ✎ Edit chip').toContain('✎');
-  expect(r.chipText).toContain('As Is');
+  expect(r.chipTitle, 'the custom op gets its own chip, tooltip carrying the label').toContain('As Is');
   expect(r.chipDisabled, 'a custom op is editable (chip enabled)').toBe(false);
 });
 
@@ -108,6 +101,5 @@ test('fork a built-in ("Tool Length") via Save-as-wizard → insert the fork →
   const r = await chipFor(page, 'tool_length');
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
   expect(r.customFound).toBe(true);
-  expect(r.chipText, 'hovering the forked op shows its ✎ Edit chip').toContain('✎');
-  expect(r.chipText).toContain('Tool Length Copy');
+  expect(r.chipTitle, 'the forked op gets its own chip, tooltip carrying its label').toContain('Tool Length Copy');
 });

@@ -5,8 +5,9 @@ import { test, expect } from '@playwright/test';
  * multi-select: the gesture is RIGHT-CLICK any atom in a loose run → a context-menu "Group" item → wraps the
  * CONTIGUOUS loose run that atom belongs to into ONE editable `group` op. Each loose run groups independently.
  *
- * Verify-first: this drives the REAL editor right-click → the real "Group" menu button → the real hover ✎ chip,
- * AND survives a reprojection (leave the Blocks tab and return). No model shortcut for the gesture itself.
+ * Verify-first: this drives the REAL editor right-click → the real "Group" menu button → the new group's own
+ * PERSISTENT chip in the strip, AND survives a reprojection (leave the Blocks tab and return). No model
+ * shortcut for the gesture itself.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -84,22 +85,16 @@ test('increment 3: right-click a loose atom → "Group" wraps its contiguous run
   expect(wrap.topTypes, 'the loose run is now ONE group op').toEqual(['group']);
   expect(wrap.groupChildren, 'the group holds the 3 hand-built atoms').toBe(3);
 
-  // AFTER: hover the editor → the ✎ chip appears on the grouped lines (the headline win).
+  // AFTER: the group's own chip is PRESENT in the row (the headline win) — no hover needed.
   const after = await page.evaluate(async () => {
     const prog = window.ddcsGetBlockProgram() || [];
     const grp = prog.find((b) => b && b.type === 'op' && b.opType === 'group');
-    const ed = document.getElementById('editor');
-    const text = ed.value || '';
-    const firstLine = (window.ddcsLinesForOp && window.ddcsLinesForOp(grp.id) || [0])[0] || 0;
-    const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-    const rect = ed.getBoundingClientRect();
-    ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + firstLine * lh + lh / 2 - ed.scrollTop }));
-    await new Promise((r) => setTimeout(r, 60));
-    const c = document.getElementById('op-edit-chip');
-    return { gcode: text, chip: c ? { hidden: c.hidden, text: c.textContent } : { hidden: true, text: '' } };
+    const text = document.getElementById('editor')?.value || '';
+    const c = document.querySelector(`.op-chip[data-op-id="${grp.id}"]`);
+    return { gcode: text, chip: c ? { exists: true, title: c.title } : { exists: false, title: '' } };
   });
-  expect(after.chip.hidden, 'the edit chip APPEARS on the grouped run').toBe(false);
-  expect(after.chip.text, 'the chip shows the group label').toContain('Hand-built');
+  expect(after.chip.exists, 'the edit chip APPEARS on the grouped run').toBe(true);
+  expect(after.chip.title, 'the tooltip shows the group label').toContain('Hand-built');
   expect(after.gcode, 'grouping does not change the emitted G-code').toContain('M3 S12000');
 
   // SURVIVES A REPROJECTION: leave to the Blocks tab (projects through Blockly) and back to the editor — the group
@@ -109,26 +104,20 @@ test('increment 3: right-click a loose atom → "Group" wraps its contiguous run
   await page.evaluate(() => window.showApp('studio'));
   await page.waitForTimeout(400);
 
-  const reproj = await page.evaluate(async () => {
+  const reproj = await page.evaluate(() => {
     const prog = window.ddcsGetBlockProgram() || [];
     const grp = prog.find((b) => b && b.type === 'op' && b.opType === 'group');
-    const ed = document.getElementById('editor');
-    if (!grp) return { stillOneGroup: false, chipHidden: true, children: -1 };
-    const firstLine = (window.ddcsLinesForOp && window.ddcsLinesForOp(grp.id) || [0])[0] || 0;
-    const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-    const rect = ed.getBoundingClientRect();
-    ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + firstLine * lh + lh / 2 - ed.scrollTop }));
-    await new Promise((r) => setTimeout(r, 60));
-    const c = document.getElementById('op-edit-chip');
+    if (!grp) return { stillOneGroup: false, chipExists: false, children: -1 };
+    const c = document.querySelector(`.op-chip[data-op-id="${grp.id}"]`);
     return {
       stillOneGroup: prog.filter((b) => b && b.type === 'op' && b.opType === 'group').length === 1,
       children: (grp.children || []).length,
-      chipHidden: c ? c.hidden : true,
+      chipExists: !!c,
     };
   });
   expect(reproj.stillOneGroup, 'the group op survives a reprojection (Blocks tab round-trip)').toBe(true);
   expect(reproj.children, 'and still holds its 3 atoms').toBe(3);
-  expect(reproj.chipHidden, 'the chip still appears after the reproject').toBe(false);
+  expect(reproj.chipExists, 'the chip still appears after the reproject').toBe(true);
 });
 
 test('increment 3: a MIXED program groups ONLY the clicked loose run — the real op + the other run are untouched', async ({ page }) => {

@@ -1,46 +1,104 @@
 /**
- * ui/editorOpHover.js — hover an op in the editor → highlight its lines + a floating "✎ Edit" chip → click to
- * re-open that op's wizard for editing.
+ * ui/editorOpHover.js — the PERSISTENT op-chip row (icon-only, one per top-level op, always visible in
+ * `.editor-strip`) + the editor's own right-click op/text menus + the rotation badge + the "edited in Blocks"
+ * word-glow.
  *
- * Uses the program model's line→op map (window.ddcsOpAtLine / ddcsLinesForOp), which is only valid while the
- * editor still matches the live projection (the model guards that — hand-edited text returns no op). The op's
- * params are the single source of truth; ddcsEditOp seeds the wizard from them and replaceOp rebuilds the op.
- * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
+ * t-opchips — RULING 1 (human, verbatim): "we dont need the hover for these chips and that they can be always
+ * visible in the top row." The single FLOATING "✎ Edit" chip that used to appear on mousemove-over-a-line and
+ * vanish on mouseleave is RETIRED — every op gets its own small icon chip, always shown, in program order,
+ * in the strip (not line-anchored inside the code area any more). Along with it: the AUTO hand-built-run
+ * floating chip (the "group this loose run with one click" convenience) is also retired — grouping a loose run
+ * is still reachable, unaffected, via the existing right-click "Group" menu below (showGroupMenu), which never
+ * depended on the floating chip.
+ *
+ * Uses the program model's line→op map (window.ddcsLinesForOp) to drive the hover highlight FROM the chip now,
+ * and the declared op enumeration (programModel.flattenOps) to build the row. Right-click on the CODE ITSELF
+ * (not a chip) still opens the same per-op menu via window.ddcsOpAtLine — that gesture was never hover-based
+ * and this ruling doesn't touch it.
  */
 import { showOpMenu, showGroupMenu, hideOpMenu, openMenu, attachLongPress } from './opContextMenu.js';
 import { commentMenuItems, installEditorTextOps } from './editorTextOps.js';   // t1452 — the editor's comment toggle: one implementation, three doors
-import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
+import { onChange, flattenOps } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change; t-opchips — the ONE declared top-level-op enumeration (t1928)
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
-import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
-import { editorCodeHost } from './uiUtils.js';   // t2155 — both the op-edit chip and the rotation badge are CODE-area tenants
+import { editorCodeHost, editorStripHost } from './uiUtils.js';   // t2155 — the rotation badge is a CODE-area tenant; t-opchips — the chip row is a STRIP tenant
+import { entryForOpType } from '../blocks/wizardLibrary.js';   // t-opchips — opType -> the bar/Settings-resolved entry (label/icon/iconOverride)
+import { entryIconHtml } from './wizIcons.js';   // t-opchips — THE shared icon resolver (header buttons + Settings picker read the same one)
+import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time, folded into the tooltip now (ruling 3's own "label -> tooltip" pattern, extended to the time this chip used to show as text)
 
+const r3 = (n) => { const v = Math.round(n * 1000) / 1000; return Object.is(v, -0) ? 0 : v; };
 // t844 — the op's estimated run time from the cached program estimate (window.ddcsTimeEstimate), summed over its lines.
 function opTimeLabel(lines) {
     try { const est = window.ddcsTimeEstimate && window.ddcsTimeEstimate(); if (!est || !est.perLine) return ''; const s = secondsForLines(est.perLine, lines); return s > 0 ? '  ·  ≈ ' + fmtDuration(s) : ''; } catch (_) { return ''; }
 }
 
-const r3 = (n) => { const v = Math.round(n * 1000) / 1000; return Object.is(v, -0) ? 0 : v; };
-
 export function initEditorOpHover() {
     const editor = document.getElementById('editor');
     const overlay = document.getElementById('editor-highlight');
-    const host = editorCodeHost();   // t2155 — the chip is LINE-anchored, i.e. a CODE-area tenant, not a strip one
-    if (!editor || !overlay || !host) return;
+    const host = editorCodeHost();     // t2155 — the rotation badge is a CODE-area tenant
+    const stripHost = editorStripHost();   // t-opchips — the op-chip row is a STRIP tenant, alongside the badge/toolbar
+    if (!editor || !overlay || !host || !stripHost) return;
 
-    const chip = document.createElement('button');
-    chip.id = 'op-edit-chip'; chip.className = 'op-edit-chip'; chip.type = 'button'; chip.hidden = true;
-    host.appendChild(chip);
+    // t-opchips — THE PERSISTENT OP-CHIP ROW. `.op-chip-row` is its own horizontally-scrolling strip tenant
+    // (RULING 2: same row, scrolls sideways — own-row and wrap were both shown as mockups and rejected), so a
+    // 20-op program still leaves the STRIP itself one row tall (styles.css owns the scroll mechanics).
+    const chipRow = document.createElement('div');
+    chipRow.className = 'op-chip-row';
+    chipRow.setAttribute('role', 'toolbar');
+    chipRow.setAttribute('aria-label', 'Program operations');
+    stripHost.appendChild(chipRow);
 
-    // t893 (rider) — NEVER absolute-overlap the top-left PRE-FLIGHT BADGE. Originally a hand-rolled collision
-    // dodge: measure both rects, flow the chip right of the badge or stack it below when their bands overlapped.
-    // t2155 — DELETED, not replaced. The badge now lives in `.editor-strip` (a box entirely ABOVE `.editor-code`,
-    // t2155's own strip/code split); the chip is a CODE-area tenant, so its box starts at `.editor-code`'s own
-    // top — below the strip, always. Their boxes cannot intersect any more, structurally, not by arithmetic:
-    // proven by keeping the ORIGINAL t893/traverse-clarity-893.spec.js collision test (unchanged) green with this
-    // dodge removed, including its narrow-viewport (850px) case that used to need the "stack below" branch.
-    function placeChip(topPx) {
-        chip.style.top = topPx + 'px';
+    let currentOps = [];   // the last-rendered flattenOps() result — contextmenu/long-press resolve against THIS, not a re-derive
+    const clearRowHi = () => overlay.querySelectorAll('.g-line.op-hover').forEach((s) => s.classList.remove('op-hover'));
+    const highlightOp = (opId) => {
+        clearRowHi();
+        const lines = (window.ddcsLinesForOp && window.ddcsLinesForOp(opId)) || [];
+        lines.forEach((j) => { const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-hover'); });
+    };
+
+    // t-opchips RULING 3 (human, verbatim): "it should also reuse the wizard icon it has" + "so no label just the
+    // icon, and tooltips with label" — entryForOpType resolves the SAME entry the bar/Settings picker read
+    // (wizardLibrary.js), so a user iconOverride reaches the chip with zero extra code; entryIconHtml is the ONE
+    // resolver — no per-op-type glyph map here or anywhere else.
+    function renderOpChips() {
+        const program = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+        currentOps = flattenOps(program);   // t1928 — the ONE declared top-level-op enumeration; a group's own children are its G-code body, not sibling ops (unchanged nested-op scope, see WORK-LOG)
+        chipRow.innerHTML = '';
+        for (const op of currentOps) {
+            if (!op || op.id == null) continue;
+            const entry = entryForOpType(op.opType);
+            const label = op.label || (entry && entry.label) || op.opType || 'operation';
+            const lines = (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || [];
+            const tooltip = label + opTimeLabel(lines);   // t844 — the per-op run-time, folded in (was the chip's own visible text; ruling 3 moved the label to the tooltip, so the time rides with it)
+            const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
+            const btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'op-chip'; btn.dataset.opId = op.id;
+            btn.title = tooltip; btn.setAttribute('aria-label', label);   // RULING 3 — icon only; the label (+ time) lives in the tooltip (desktop) and the op menu (touch, ruling 4). aria-label stays the plain label — a screen reader doesn't need the run-time estimate to identify the control.
+            btn.innerHTML = (entry && entryIconHtml(entry)) || '⚙';   // a generic fallback for an opType with no bar identity (e.g. a hand-built `group`)
+            btn.disabled = !editable;
+            if (!editable) btn.title = `${label}: form-edit not wired yet`;
+            btn.addEventListener('mouseenter', () => highlightOp(op.id));
+            btn.addEventListener('mouseleave', clearRowHi);
+            btn.addEventListener('click', () => { if (editable && window.ddcsEditOp) window.ddcsEditOp(op.id); });
+            chipRow.appendChild(btn);
+        }
     }
+    onChange(() => renderOpChips());
+    renderOpChips();
+
+    // t-opchips RULING 4: right-click AND long-press open the op's context menu — the SAME editorOpHover.js:
+    // contextmenu -> showOpMenu path this file already proved for right-click-on-the-CODE (below), plus
+    // attachLongPress (opContextMenu.js), which SYNTHESIZES a real contextmenu event on touch so this is the
+    // ONLY handler either input mode goes through — no separate touch branch, per that module's own comment.
+    // Wired ONCE on the ROW (not per chip), matching how attachLongPress(editor) already works below: the
+    // synthesized/native event's own `target` names which chip was pressed.
+    chipRow.addEventListener('contextmenu', (e) => {
+        const chipEl = e.target.closest && e.target.closest('.op-chip');
+        if (!chipEl) return;
+        e.preventDefault();
+        const op = currentOps.find((o) => o && String(o.id) === chipEl.dataset.opId);
+        if (op) showOpMenu(op, e.clientX, e.clientY);
+    });
+    attachLongPress(chipRow);
 
     // t736 — the PROGRAM ROTATION badge: a program-level pill beside the ⟳ Transform button showing the DECLARED xform
     // rotation ("⟳ 6.98°"). Click the label = reopen Transform prefilled; the ✕ = clear the declaration to 0 (the emit's
@@ -71,7 +129,9 @@ export function initEditorOpHover() {
     onChange(() => updateBadge());
     updateBadge();
 
-    let hoverOpId = null;
+    // t-opchips — lineHeight/padTop/lineAtY are still needed: right-click on the CODE ITSELF (not a chip) still
+    // resolves which op/loose-run owns the clicked line, below. Only the floating hover-chip machinery that used
+    // to live here (hoverOpId, its own clearHi/hide) is gone — clearRowHi (above) is the chip row's replacement.
     const lineHeight = () => {
         const cs = getComputedStyle(editor);
         const lh = parseFloat(cs.lineHeight);
@@ -79,8 +139,6 @@ export function initEditorOpHover() {
     };
     const padTop = () => parseFloat(getComputedStyle(editor).paddingTop) || 0;
     const lineAtY = (clientY) => Math.max(0, Math.floor((clientY - editor.getBoundingClientRect().top + editor.scrollTop - padTop()) / lineHeight()));
-    const clearHi = () => overlay.querySelectorAll('.g-line.op-hover').forEach((s) => s.classList.remove('op-hover'));
-    const hide = () => { clearHi(); chip.hidden = true; hoverOpId = null; };
 
     // Wrap chars [start, end) of a .g-line in a <span class="word-edited"> (glow just the edited token). Walks the
     // line's text nodes — they concatenate to the rendered line text, so offsets map straight through the colour
@@ -161,74 +219,6 @@ export function initEditorOpHover() {
         glowEdited();
     }).catch(() => { /* detector optional */ });
 
-    const updateChipForLine = (line) => {
-        if (typeof window.ddcsOpAtLine !== 'function') return;
-        const op = window.ddcsOpAtLine(line);
-        if (!op) {
-            // AUTO (advisor-gated): a PURE hand-built stack (whole program = one loose run, no real ops) auto-shows an
-            // editable chip with NO gesture. No mutation on render — the chip just appears; clicking it WRAPS the run
-            // in a group op (groupLooseAtoms) then opens the inc-2 form. A mixed program returns null here (the
-            // right-click "Group" gesture owns those), so the auto-chip never shows over a mixed program.
-            const run = (typeof window.ddcsAutoGroupRunAtLine === 'function') ? window.ddcsAutoGroupRunAtLine(line) : null;
-            if (run && run.length) {
-                if (hoverOpId === '__autorun__') return;        // already showing it → don't thrash
-                hoverOpId = '__autorun__';
-                clearHi();
-                const lines = (window.ddcsLinesForRun && window.ddcsLinesForRun(run)) || [];
-                lines.forEach((j) => { const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-hover'); });
-                const first = lines.length ? lines[0] : 0;
-                chip.textContent = '✎ Hand-built';
-                chip.disabled = false;
-                chip.title = 'Edit this hand-built stack as a form';
-                placeChip(Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)));
-                chip.dataset.opId = '';                          // no op yet — the wrap happens on click
-                chip.dataset.autoRun = JSON.stringify(run);
-                chip.hidden = false;
-                return;
-            }
-            if (hoverOpId) hide();
-            return;
-        }
-        if (op.id === hoverOpId) return;            // unchanged → don't thrash
-        hoverOpId = op.id;
-        clearHi();
-        const lines = (window.ddcsLinesForOp && window.ddcsLinesForOp(op.id)) || [];
-        lines.forEach((j) => { const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-hover'); });
-        const first = lines.length ? lines[0] : 0;
-        const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
-        chip.textContent = (editable ? '✎ ' : '🔒 ') + (op.label || op.opType) + opTimeLabel(lines);   // t844 — per-op run-time estimate
-        chip.disabled = !editable;
-        chip.title = editable ? `Edit this ${op.label || op.opType}` : `${op.label || op.opType}: form-edit not wired yet`;
-        placeChip(Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)));   // t903 — route the REAL-op chip through placeChip too (was a direct top-set), so it never overlaps the amber pre-flight badge (the chip-row collision contract now covers BOTH paths)
-        // Chip floats on the LEFT of the editor (left: 12px in CSS) — clear of the right-side 3D preview
-        // drawer / view-cube gizmo, so it's always reachable (the "out of reach" report).
-        chip.dataset.opId = op.id;
-        chip.dataset.autoRun = '';                  // a real op chip, not the auto-run chip
-        chip.hidden = false;
-    };
-    editor.addEventListener('mousemove', (e) => updateChipForLine(lineAtY(e.clientY)));
-    // t750 — TOUCH reachability: touch devices have no hover, so a TAP on an op's lines reveals the SAME chip through
-    // the SAME code path (updateChipForLine). Tap the chip to edit; tapping a non-op line dismisses it. Gated to
-    // pointerType 'touch' so desktop stays hover-only (a mouse click to place the caret must not pop the chip).
-    editor.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') updateChipForLine(lineAtY(e.clientY)); });
-    // Keep the chip visible when the pointer moves onto it; hide otherwise.
-    editor.addEventListener('mouseleave', () => setTimeout(() => { if (!chip.matches(':hover')) hide(); }, 60));
-    chip.addEventListener('click', async () => {
-        const id = chip.dataset.opId;
-        let autoRun = null; try { autoRun = chip.dataset.autoRun ? JSON.parse(chip.dataset.autoRun) : null; } catch (_) { /* */ }
-        hide();
-        if (id && window.ddcsEditOp) { window.ddcsEditOp(id); return; }
-        // AUTO: wrap the lone loose run into a group op (explicit on the edit click, not on render), then open its form.
-        if (autoRun && autoRun.length) {
-            try {
-                const { groupLooseAtoms } = await import('../blocks/opSession.js');
-                const gid = groupLooseAtoms('Hand-built', autoRun);
-                if (gid && window.ddcsEditOp) window.ddcsEditOp(gid);
-            } catch (_) { /* */ }
-        }
-    });
-    editor.addEventListener('scroll', () => { if (!chip.hidden) hide(); });   // avoid drift; re-hover to show again
-
     // Right-click an op → shared context menu (✎ Edit / ⧉ Duplicate / 🗑 Delete). Over a LOOSE hand-built run
     // (no op wrapper → ddcsOpAtLine null) → the in-context "Group" menu instead: wrap that contiguous run in one
     // `group` op so it becomes editable (the headline feature; each loose run groups independently).
@@ -237,14 +227,14 @@ export function initEditorOpHover() {
         const op = (typeof window.ddcsOpAtLine === 'function') ? window.ddcsOpAtLine(line) : null;
         if (op) {
             e.preventDefault();
-            hide();                                        // drop the hover chip while the menu is up
+            clearRowHi();                                  // don't leave a stale chip-row highlight lit under the menu
             showOpMenu(op, e.clientX, e.clientY);
             return;
         }
         const run = (typeof window.ddcsLooseRunAtLine === 'function') ? window.ddcsLooseRunAtLine(line) : null;
         if (run && run.length) {
             e.preventDefault();
-            hide();
+            clearRowHi();
             showGroupMenu(run, e.clientX, e.clientY);
             return;
         }
@@ -258,7 +248,6 @@ export function initEditorOpHover() {
          * implementation, never its only door. t2139 — indent/outdent's own two entries retired with the feature.
          */
         e.preventDefault();
-        hide();
         openMenu(commentMenuItems(), e.clientX, e.clientY);
     });
     editor.addEventListener('scroll', hideOpMenu);

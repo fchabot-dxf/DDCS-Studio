@@ -53,19 +53,15 @@ function clickNow(page, selector) {
     return page.evaluate((sel) => { const el = document.querySelector(sel); if (el) el.click(); }, selector);
 }
 
-// Hover the editor at op `opId`'s first projected line so the ✎ chip surfaces (group-edit-1954's own pattern),
-// returning its pre-click render state — hidden/disabled/text — WITHOUT clicking. Caller clicks separately so the
-// chip's promise and the click's effect are two distinct, orderable observations (t1958's own dispatch: "assert
-// the chip and the click cannot disagree" needs its own assertion, not folded into a single combined step).
+// t-opchips — the chip is PERSISTENT now, found by the op's own id in the row — no hover needed. `flattenOps`
+// (what builds the row) treats a `multi_step` wrapper transparently, so a NESTED op still gets its own real
+// chip; this is the exact same nested-resolution claim t1958 proved via hover, now via a direct lookup instead.
+// Caller clicks separately so the chip's existence and the click's effect stay two distinct, orderable
+// observations (t1958's own dispatch: "assert the chip and the click cannot disagree").
 async function hoverChipFor(page, opId) {
     return page.evaluate((id) => {
-        const ed = document.getElementById('editor');
-        const firstLine = ((window.ddcsLinesForOp && window.ddcsLinesForOp(id)) || [0])[0] || 0;
-        const cs = getComputedStyle(ed); const lh = parseFloat(cs.lineHeight) || 22; const pad = parseFloat(cs.paddingTop) || 0;
-        const rect = ed.getBoundingClientRect();
-        ed.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: rect.left + 40, clientY: rect.top + pad + firstLine * lh + lh / 2 - ed.scrollTop }));
-        const chip = document.getElementById('op-edit-chip');
-        return { hidden: chip.hidden, disabled: chip.disabled, text: chip.textContent, opId: chip.dataset.opId };
+        const chip = document.querySelector(`.op-chip[data-op-id="${id}"]`);
+        return chip ? { hidden: false, disabled: chip.disabled, title: chip.title, opId: chip.dataset.opId } : { hidden: true, disabled: null, title: null, opId: null };
     }, opId);
 }
 
@@ -118,7 +114,7 @@ test('a real Add-built 2-op program: Edit on the SECOND (nested) op opens seeded
     // THE CLICK'S EFFECT — the chip and the click must NOT disagree. Pre-fix: the chip above rendered enabled and
     // clicking it did NOTHING (openForEdit's own top-level-only `.find` silently failed) — this is that exact
     // defect shape's own dedicated assertion, not folded into the "eventually the form is right" check below.
-    await clickNow(page, '#op-edit-chip');
+    await clickNow(page, `.op-chip[data-op-id="${structure.secondOpId}"]`);
     await page.waitForTimeout(350);   // openForEdit → open() → _seedForm → update(), all synchronous once triggered
     const after = await page.evaluate(() => ({
         overlayActive: document.getElementById('wizard').classList.contains('active'),
@@ -226,7 +222,7 @@ test('a real Merge choice on a nested (2nd) op keeps its hand-edited Blocks valu
     await page.waitForTimeout(300);
     const chip = await hoverChipFor(page, structure.secondOpId);
     expect(chip.hidden, 'the chip renders for the nested, block-edited op').toBe(false);
-    await clickNow(page, '#op-edit-chip');
+    await clickNow(page, `.op-chip[data-op-id="${structure.secondOpId}"]`);
     await page.waitForTimeout(350);
     await page.evaluate(() => {
         const el = document.getElementById('sf_w');

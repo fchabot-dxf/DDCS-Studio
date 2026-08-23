@@ -54,50 +54,49 @@ test('the 2D distinguishes a LIFTED safe-travel traverse (dimmed/dashed) from cu
     expect(r.lifted === r.feed, 'but it is never the CUT colour').toBe(false);
 });
 
-test('the op-edit chip never overlaps the pre-flight badge (declared collision rule); screenshot', async ({ page }, testInfo) => {
+// t-opchips — REWRITTEN. The op-edit chip this test originally guarded was the single, hover-revealed, LINE-
+// ANCHORED chip living inside the code area (`#op-edit-chip`, position:absolute, its own hand-rolled collision
+// dodge against the badge — t893's own subject). That chip is retired (ruling 1: "always visible in the top
+// row"); its replacement, `.op-chip-row`, lives in `.editor-strip` ALONGSIDE the badge, as a normal-flow flex
+// SIBLING — the exact same structural guarantee t2155 already proved for the badge-vs-toolbar pair ("normal-
+// flow flex siblings cannot visually overlap each other at all"). No hover needed to raise it either — it's
+// just there. This asserts the SAME collision-freedom claim against the NEW element, at both widths the
+// original test covered.
+test('the op-chip row never overlaps the pre-flight badge (both are normal-flow strip siblings now); screenshot', async ({ page }, testInfo) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack, null, { timeout: 15000 });
-    // load a 2-op program so the FIRST op sits at the very top (line 0 region) + the pre-flight badge shows
+    // load a 2-op program so the pre-flight badge shows AND the row has real chips to render.
     await page.evaluate(() => {
         const mkOp = (id, label) => ({ type: 'op', id, opType: 'pocket', label, params: { depth: 5, shape: 'rect', w: 20, h: 20 }, children: [{ type: 'move', id: id + 'm', params: { mode: 'cut', x: 10, y: 10, z: -5, feed: 200 } }] });
         window.ddcsLoadBlockStack([mkOp('o1', 'Front pocket'), mkOp('o2', 'Back pocket')]);
         window.ddcsPreflightCheck && window.ddcsPreflightCheck();
     });
     await page.waitForTimeout(600);
-    // hover the FIRST op's line to raise the op-edit chip at the top
-    const rects = await page.evaluate(() => {
-        const ov = document.getElementById('editor-highlight');
-        const firstLine = ov && ov.querySelector('.g-line[data-line-index="0"]') || ov && ov.querySelector('.g-line');
-        if (firstLine) { const b = firstLine.getBoundingClientRect(); firstLine.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: b.left + 40, clientY: b.top + 4 })); }
-        return null;
-    });
-    await page.waitForTimeout(400);
     const geo = await page.evaluate(() => {
-        const badge = document.getElementById('preflight-badge'), chip = document.getElementById('op-edit-chip');
+        const badge = document.getElementById('preflight-badge'), row = document.querySelector('.op-chip-row');
         const vis = (e) => e && !e.hidden && e.offsetParent !== null;
-        if (!vis(badge) || !vis(chip)) return { badgeVis: vis(badge), chipVis: vis(chip) };
-        const a = badge.getBoundingClientRect(), b = chip.getBoundingClientRect();
+        if (!vis(badge) || !vis(row) || !row.children.length) return { badgeVis: vis(badge), rowVis: vis(row), chipCount: row ? row.children.length : 0 };
+        const a = badge.getBoundingClientRect(), b = row.getBoundingClientRect();
         const intersect = !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
-        return { badgeVis: true, chipVis: true, intersect, a: { l: a.left, t: a.top, r: a.right, b: a.bottom }, b: { l: b.left, t: b.top, r: b.right, b: b.bottom } };
+        return { badgeVis: true, rowVis: true, chipCount: row.children.length, intersect, a: { l: a.left, t: a.top, r: a.right, b: a.bottom }, b: { l: b.left, t: b.top, r: b.right, b: b.bottom } };
     });
     await page.screenshot({ path: testInfo.outputPath('t893-chips.png'), clip: { x: 0, y: 60, width: 700, height: 200 } });
-    if (geo.badgeVis && geo.chipVis) {
-        expect(geo.intersect, `the badge ${JSON.stringify(geo.a)} and the op-edit chip ${JSON.stringify(geo.b)} must NOT intersect`).toBe(false);
+    expect(geo.chipCount, 'the row actually rendered the 2 ops\' chips (not an empty, trivially-non-overlapping row)').toBe(2);
+    if (geo.badgeVis && geo.rowVis) {
+        expect(geo.intersect, `the badge ${JSON.stringify(geo.a)} and the op-chip row ${JSON.stringify(geo.b)} must NOT intersect`).toBe(false);
     } else {
         // if one didn't show in this harness, at least assert the collision helper is present (the fix shipped)
         expect(true).toBe(true);
     }
-    // at 850px the chip still doesn't collide (stacks below the badge)
+    // at 850px the row still doesn't collide (wraps to a new strip line before it would overlap)
     await page.setViewportSize({ width: 850, height: 900 });
     await page.waitForTimeout(300);
-    await page.evaluate(() => { const ov = document.getElementById('editor-highlight'); const fl = ov && (ov.querySelector('.g-line[data-line-index="0"]') || ov.querySelector('.g-line')); if (fl) { const b = fl.getBoundingClientRect(); fl.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: b.left + 40, clientY: b.top + 4 })); } });
-    await page.waitForTimeout(300);
     const geo850 = await page.evaluate(() => {
-        const badge = document.getElementById('preflight-badge'), chip = document.getElementById('op-edit-chip');
+        const badge = document.getElementById('preflight-badge'), row = document.querySelector('.op-chip-row');
         const vis = (e) => e && !e.hidden && e.offsetParent !== null;
-        if (!vis(badge) || !vis(chip)) return { skip: true };
-        const a = badge.getBoundingClientRect(), b = chip.getBoundingClientRect();
+        if (!vis(badge) || !vis(row)) return { skip: true };
+        const a = badge.getBoundingClientRect(), b = row.getBoundingClientRect();
         return { intersect: !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top) };
     });
-    if (!geo850.skip) expect(geo850.intersect, 'at 850px the chip still does not overlap the badge (stacks/wraps)').toBe(false);
+    if (!geo850.skip) expect(geo850.intersect, 'at 850px the row still does not overlap the badge (wraps)').toBe(false);
 });

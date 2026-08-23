@@ -249,23 +249,6 @@ export function looseRunAtLine(i) {
     return stack.slice(s, e + 1).map((b) => b.id);
 }
 
-// AUTO (advisor-gated): a PURE hand-built stack (the WHOLE program is one loose run, no real ops) auto-shows the
-// editable ✎ chip with NO right-click gesture. The "no real ops" guard scopes auto-show to the UNAMBIGUOUS case —
-// a MIXED program (loose runs among real ops) returns null here, so the right-click "Group" gesture owns those
-// (the single-vs-multi boundary split). No model mutation: the chip just appears; clicking it wraps (groupLooseAtoms).
-/** The loose run for line `i`, but ONLY when the whole program is a single loose run (pure stack); else null. */
-export function autoGroupRunAtLine(i) {
-    if (stack.some((b) => b && b.type === 'op')) return null;       // any real op → mixed → the gesture owns it
-    return looseRunAtLine(i);
-}
-/** All projected line indices belonging to any top-level block id in `ids` (a loose run's highlight range). */
-export function linesForRun(ids) {
-    const set = new Set(ids || []);
-    const out = [];
-    (proj.map || []).forEach((anc, i) => { if (anc && anc.length && set.has(anc[0])) out.push(i); });
-    return out;
-}
-
 /** Serialize the program to .nc text WITH self-describing op markers (for export / persistence). The live
  *  editor projection (proj.text) stays CLEAN — markers are a file-format concern, read back on import. A
  *  ( @DDCS:1 {…} ) marker carrying the op record is inserted before each op's first projected line. */
@@ -616,14 +599,12 @@ export function initProgramModel() {
     // Editor hover-to-edit: which op owns a line, an op's line range, and whether the map is currently valid.
     window.ddcsOpAtLine = (i) => (editorMatchesProjection() ? opAtLine(i) : null);
     window.ddcsLooseRunAtLine = (i) => (editorMatchesProjection() ? looseRunAtLine(i) : null);   // the in-context "Group" gesture
-    window.ddcsAutoGroupRunAtLine = (i) => (editorMatchesProjection() ? autoGroupRunAtLine(i) : null);   // AUTO: pure stack auto-shows the chip
     window.ddcsLinesForOp = linesForOp;
     window.ddcsFlattenOps = flattenOps;   // t1928 — every real operation, one level through a multi_step import wrapper
     window.ddcsFindOpById = findOpById;   // t1958 — the ONE recursive by-id lookup, same convention as ddcsFlattenOps
     window.ddcsReplaceOpById = replaceOpById;   // t1958 — its write-side counterpart, for opSession.js's replaceOp
     window.ddcsAddOperation = addOperation;   // t1940 — DATA-LEVEL ONLY: grow a program by one operation; no UI calls this yet
     window.ddcsRegroupOps = regroupOps;   // t1948 — the shared flatten-then-regroup pipeline addOperation and workspaceToStack both use
-    window.ddcsLinesForRun = linesForRun;   // AUTO chip highlight (a loose run's lines)
     window.ddcsGetProjection = getProjection;   // { text, lines, map } — map[i] = block ancestry of line i (for the block-edit glow)
     window.ddcsSerializeWithMarkers = serializeWithMarkers;   // .nc text + self-describing op markers (export only; editor stays clean)
 
