@@ -1256,3 +1256,41 @@ indentation removal and still owns comment/uncomment through **three doors** (bu
 Prove the *id* is unreferenced, not the *feature* — they are not the same question, and the feature is live.
 
 ⇒ **A tail-sized item.** Two clusters, one commit each, with the grep evidence for each deletion in the message.
+
+### 15. INVALID CSS SHORTHANDS THAT SILENTLY VOID THEIR WHOLE DECLARATION — a category, not two bugs
+*(found twice in two days, both by measuring rather than by reading — t2155 tail and t2173)*
+
+A CSS shorthand is all-or-nothing: if **one** component is invalid, the browser discards the **entire**
+declaration. No console error, no warning, no partial application. The rule looks correct in the file and
+renders as though it were never written.
+
+**Two confirmed instances, both shipped and unnoticed for months:**
+
+```
+  .viz3d-handle          border: 1px solid var(--dock-handle-edge)
+                         └─ studio's token is a 4-VALUE per-side value; a shorthand's colour
+                            slot takes ONE. Studio rendered the handle with NO BORDER AT ALL.
+                            Caught by getComputedStyle reading border-width: 0px, not 1px.
+
+  .preflight-badge-label font: … inherit
+                         └─ `inherit` is not valid as a COMPONENT of the font shorthand
+                            (only as the whole value). The entire font declaration is dropped.
+```
+
+⭐ **Why this is worth a sweep rather than two fixes.** Both were found by *measuring a computed value*, and
+neither would ever be found by reading. The failure is invisible in the source, invisible in the diff, and
+invisible in review — which means however many more exist, they will not surface on their own.
+
+⇒ **Sweep the file for shorthands whose value contains a `var()`**, since that is the shape that hides it: the
+token's contents are not visible at the call site, so a 4-value token in a 1-value slot reads as fine.
+`border`, `font`, `background`, `margin`/`padding`, `flex`, `grid`, `transition`, `animation`.
+
+⚠ **VERIFY BY COMPUTED VALUE, NEVER BY EYE.** The whole category is defined by looking correct. A candidate is
+only confirmed by `getComputedStyle` disagreeing with the source — that is also what makes each fix testable.
+
+⛔ **Fix by splitting, not by inlining the token.** `border-width` / `border-style` / `border-color` as separate
+longhands keeps the token doing its job; replacing `var(--x)` with a literal would fix the render and lose the
+theming, which is the wrong trade in a file built on tokens.
+
+⚠ **Both known instances are already flagged in the WORK-LOG and NOT fixed** — the handle one was fixed at
+t2155, the badge-label one is outstanding. Confirm which is which before starting.
