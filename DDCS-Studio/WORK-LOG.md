@@ -50712,3 +50712,38 @@ reader (not an assertion). Verified live via a real quick-menu screenshot (`veri
 labels.png`, sent to the human). Smoke/node/lint re-run clean.
 
 🔨 turn 2173
+
+## OUT-OF-BAND (worker window, live direct human message, no advisor dispatch) — Insert removed completely
+
+After turn 2173 was passed back and the waiter re-armed, the human typed directly into this window: "insert is
+redundant beside load remove it completely." Acted on it immediately rather than waiting for the next advisor
+dispatch — small, unambiguous, and the human was looking right at the quick menu I'd just screenshotted for
+t2173's tail.
+
+**"Completely" was taken literally, traced with the ownership test before deleting anything:**
+- The quick-menu row (headerPost.js `fileRows`) and its `case 'fileInsert'` handler — removed.
+- `window.insertGcodeFile` itself (commandDeck.js) — deleted too: once the quick-menu row is gone, its only
+  other reference is `globalFunctions.js`'s `EDITOR_FILE_ACTIONS` 'insert' entry, which belongs to
+  `window.ddcsEditorFileMenu` — the editor's OWN corner file menu, confirmed (by grep, zero callers anywhere)
+  to already be dead code since t2078 retired the button that used to open it. That array is PRE-EXISTING dead
+  code, predating this change — left untouched, per "don't remove unrelated dead code, mention it" — its
+  `insert` entry still calls `window.insertGcodeFile?.()`, which is now a safe no-op (optional chaining) rather
+  than a crash, since nothing can ever reach that dead menu to trigger it anyway.
+- Updated every comment in headerPost.js that named "Load/Insert/Export" as a live trio (module header, layout
+  comment, fileRows comment) — EXCEPT two lines describing t1227/t2078's own HISTORY, which are left as they
+  were at the time rather than rewritten to erase what actually happened, with a note added explaining why.
+
+**Collateral (5 test files touched, all previously asserted Insert's PRESENCE as an invariant):**
+`editor-file-menu-1227.spec.js` (two tests rewritten: the ordered-click-through now proves Load/Export only,
+plus a new explicit assertion that both the row AND `window.insertGcodeFile` itself are gone, not just
+unrouted), `editor-toolbar-2078.spec.js` (same shape — row absent, handler absent), `editor-chrome.spec.js`
+(phone-width sweep), `header-menu-split-2149.spec.js` (file-menu act list), `header-profile-menu.spec.js` (the
+authoritative "N rows, in this exact order" test — 10 → 9 rows, `fileRows` count 3 → 2, plus a dedicated
+`fileInsertCount` lock). Stale test TITLES that still named "Insert" as present were also corrected (titles are
+read by humans scanning `--reporter=list` output — a passing test with a false title is its own small lie).
+
+Full sweep: all 23 tests across those 5 files green. Smoke 76/76, node 227/227, lint clean. Verified live
+(`verification/t2173-insert-removed.png`, sent to the human) — Load G-code now sits directly beside Export,
+Insert nowhere in the menu.
+
+🔨 (worker, live human directive — not a numbered turn)

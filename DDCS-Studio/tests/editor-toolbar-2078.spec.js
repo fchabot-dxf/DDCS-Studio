@@ -11,7 +11,10 @@ import { test, expect } from '@playwright/test';
  *
  * Also here: Make/Transform lost their word labels (icon + chevron only), Clear moved out of the HEADER into the
  * pane it acts on, and Load/Insert/Export moved to the quick menu — the human's own refinement of t1227's rule:
- * those three act on the program AS A WHOLE (empty editor, or finished one), never mid-edit.
+ * those act on the program AS A WHOLE (empty editor, or finished one), never mid-edit.
+ *
+ * t2173 (tail, human: "insert is redundant beside load remove it completely") — Insert REMOVED entirely, not
+ * relocated; the quick-menu test below now proves two rows (Load/Export), not three.
  */
 test.use({ viewport: { width: 1400, height: 900 } });
 
@@ -57,15 +60,17 @@ test('Make and Transform are icon-only but still named for screen readers', asyn
   expect(r[1].text, 'Transform is icon-only').toBe('');
 });
 
-test('Load / Insert / Export are reachable from the quick menu, wired to the one implementation', async ({ page }) => {
+test('Load / Export are reachable from the quick menu, wired to the one implementation; Insert is gone', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
   await page.click('#hdrPostBtn');
   await page.waitForTimeout(250);
   const r = await page.evaluate(() => {
     const acts = [...document.querySelectorAll('#hdrPostMenu [data-act]')].map((b) => b.dataset.act);
-    return { acts, hasHandlers: ['loadGcodeFile','insertGcodeFile','downloadFile'].every((f) => typeof window[f] === 'function') };
+    return { acts, hasHandlers: ['loadGcodeFile','downloadFile'].every((f) => typeof window[f] === 'function'), hasInsertHandler: typeof window.insertGcodeFile === 'function' };
   });
-  expect(r.acts, 'the three program-file rows are in the quick menu').toEqual(expect.arrayContaining(['fileLoad','fileInsert','fileExport']));
+  expect(r.acts, 'the two program-file rows are in the quick menu').toEqual(expect.arrayContaining(['fileLoad','fileExport']));
+  expect(r.acts, 'Insert stays out of the menu (t2173)').not.toContain('fileInsert');
   expect(r.hasHandlers, 'they call the same globals the editor menu called — one implementation').toBe(true);
+  expect(r.hasInsertHandler, 'and its own handler is deleted, not just unrouted').toBe(false);
 });

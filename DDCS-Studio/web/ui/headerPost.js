@@ -1,11 +1,11 @@
 /**
  * ui/headerPost.js — the app header's TWO menus: #hdrPostBtn / #hdrPostMenu (the FILE menu — workspace
- * save/open, load/insert/export, the library, the wizard manager, setup docs) and #hdrAppBtn / #hdrAppMenu
+ * save/open, load/export, the library, the wizard manager, setup docs) and #hdrAppBtn / #hdrAppMenu
  * (the APP menu — Settings, FAQ, About, the desktop download, Rate, the website). Plus a capability LINT
  * (#hdrPostWarn) on the loaded program against the workspace's OWN controller.
  *
  * t2149 (BACKLOG #9) — THE SPLIT, and the test that drew the line: does going through this door bring
- * something INTO your work, or come OUT of it? Save/Open/Load/Insert/Export/Library/Wizards/Setup-sheet/
+ * something INTO your work, or come OUT of it? Save/Open/Load/Export/Library/Wizards/Setup-sheet/
  * Setup-checklist all do (FILE scope); Settings/FAQ/About/the desktop download/Rate/the version are about the
  * PRODUCT itself, never this file (APP scope). Before this turn both lived in ONE menu hanging off the
  * workspace filename chip — so "Settings…" under your filename read as THIS FILE's settings, a mismatch
@@ -76,10 +76,16 @@ function runQuickAction(act) {
         case 'open':   document.getElementById('projOpenBtn')?.click(); break;
         case 'save':   document.getElementById('projSaveBtn')?.click(); break;
         case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an operation in the Blocks tab first, then save it as a wizard.'); break;
-        // t2078 — Load / Insert / Export are BACK (see the fileRows comment for the human's reasoning: they act
+        // t2078 — Load / Export are BACK (see the fileRows comment for the human's reasoning: they act
         // on the program as a whole, not on the text under the caret). ONE implementation — these call the same
         // window globals ui/globalFunctions.js EDITOR_FILE_ACTIONS called, never a second copy of the logic.
         // ⛔ CLEAR is deliberately NOT routed here (t1255): the 🗑 in the editor toolbar is the one clear.
+        // t2173 (tail, human: "insert is redundant beside load remove it completely") — Insert is GONE, not
+        // hidden: the row, this case, and its own handler (window.insertGcodeFile, commandDeck.js) are all
+        // deleted. The pre-existing, already-unreachable corner-menu leftover (globalFunctions.js
+        // EDITOR_FILE_ACTIONS' own 'insert' entry — dead since t2078 retired the button that opened it) still
+        // references the now-gone global via `?.()`, so it stays a safe no-op; left untouched as pre-existing
+        // dead code, not this turn's to clean up.
         case 'getDesktop': {
             // opened through the SAME door the update banner uses: in the exe the gateway opens the real
             // system browser server-side, which fires exactly once — window.open double-fired inside the
@@ -89,7 +95,6 @@ function runQuickAction(act) {
             break;
         }
         case 'fileLoad':   window.loadGcodeFile ? window.loadGcodeFile() : dlgNotice('Loading is unavailable.'); break;
-        case 'fileInsert': window.insertGcodeFile ? window.insertGcodeFile() : dlgNotice('Insert is unavailable.'); break;
         case 'fileExport': window.downloadFile ? window.downloadFile() : dlgNotice('Export is unavailable.'); break;
         case 'standalone':
             // The "standalone" IS the desktop EXE (bundles the gateway, runs fully offline) — open the SAME
@@ -189,12 +194,14 @@ export function initHeaderPost() {
     const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
 
     // ── FILE MENU (#hdrPostBtn/#hdrPostMenu) — everything that acts on THIS workspace/program. ─────────────
-    // Layout: identity row · saved row · workspace row (Save/Open) · Wizards… · Load/Insert/Export · Library… ·
+    // Layout: identity row · saved row · workspace row (Save/Open) · Wizards… · Load/Export · Library… ·
     // Setup sheet… · Setup checklist. MOVED NOT LOST, across several turns: standalone/checklist-toggle → Settings
     // (now the APP menu); t1227 Load/Insert/Export/Clear → the editor's corner menu, then t2078 brought
     // Load/Insert/Export back HERE (Clear alone stayed in the editor toolbar, t1255); BACKLOG #1 (t2147) — Theme
     // → Settings' own #set_theme picker; BACKLOG #9 (t2149) — Settings/FAQ/About/desktop-download/Rate/version →
     // the new APP menu, because none of them act on this file (see this file's header comment for the test that split them).
+    // t2173 (tail) — Insert REMOVED entirely (human: too close a duplicate of Load to earn its own row); the two
+    // history lines above are left as they were AT THE TIME, not rewritten to erase what actually happened.
 
     const fillFileMenu = (btn, menu) => {
         // ── IDENTITY LINE (t1227 amendment, user) ─────────────────────────────────────────────────────
@@ -272,8 +279,8 @@ export function initHeaderPost() {
         }
 
         // t1227 CURATION (user ruling), REVERSED BY t2078 — see the fileRows comment below for the current story.
-        // Load / Insert / Export are back in THIS menu; the editor's own corner file button/menu is gone entirely.
-        // Clear alone stayed out (t1255) — it lives in the editor's own toolbar row.
+        // Load / Export are back in THIS menu (Insert removed entirely, t2173); the editor's own corner file
+        // button/menu is gone entirely. Clear alone stayed out (t1255) — it lives in the editor's own toolbar row.
 
         // ── t1223 (1) — WORKSPACE ROW: Save + Open are the PRIMARY buttons, and all workspace management lives
         //    here rather than in a new header menu. ────────────────────────────────────────────────────────────
@@ -314,14 +321,18 @@ export function initHeaderPost() {
         // t2078 (human: "the load insert export button can go in the quick menu") — THE PROGRAM FILE ROWS RETURN.
         // ⚠ THIS REVERSES t1227, which moved them OUT of here because this menu is for APP things, "not what to
         // do with the program in front of you". The human's own refinement of that rule, which is why it is a
-        // correction and not a flip-flop: Load / Insert / Export act on the program AS A WHOLE — they are what you
+        // correction and not a flip-flop: Load / Export act on the program AS A WHOLE — they are what you
         // reach for with an EMPTY editor (start one) or a FINISHED one (ship it), never mid-edit. t1227's test was
-        // right; these three simply fall on the app side of it, unlike Comment/Undo which act on the text
+        // right; these fall on the app side of it, unlike Comment/Undo which act on the text
         // under the caret and stay in the pane. The editor's own ▾ file button is gone with this, so these are
-        // once again the ONE door to Load/Insert/Export, not a second one. Handlers are the SAME globals the editor menu called (loadGcodeFile / insertGcodeFile /
+        // once again the ONE door to Load/Export, not a second one. Handlers are the SAME globals the editor menu called (loadGcodeFile /
         // downloadFile), so there is one implementation, not a copy.
         // ⛔ CLEAR IS STILL NOT HERE (t1255): the 🗑 is the one clear, now in the editor's toolbar row. Two doors
         // to a destructive action is one too many.
+        // t2173 (tail, human: "insert is redundant beside load remove it completely") — Insert ITSELF is gone
+        // too, not just muted: it duplicated Load closely enough (both "bring a G-code file in," differing only
+        // by replace-vs-splice-at-caret) that the human judged the second row wasn't earning its place. See the
+        // `case 'fileInsert'` removal above for the handler side.
         // t2149 — Load…'s title disambiguates the "three doors to open a saved thing" (BACKLOG #9): Open (above)
         // opens a WORKSPACE (.ddcs — the machine), Load opens a raw G-CODE FILE, Library→Projects opens a
         // .mjson JOB. Genuinely three different file formats, not one act with three names — CHECKED, not
@@ -335,8 +346,6 @@ export function initHeaderPost() {
         const fileRows =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad" title="Load a G-code file into the editor (replaces the program) — not a workspace or a project">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load G-code…</span></button>'
-            + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileInsert">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">➕ Insert…</span></button>'
             + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Export…</span></button>';
 

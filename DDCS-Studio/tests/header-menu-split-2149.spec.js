@@ -73,7 +73,7 @@ test('app menu: Settings, FAQ, About, desktop download, Rate, Open the website, 
     }
 });
 
-test('file menu: Save/Open/Wizards/Load/Insert/Export/Library/Setup — and NOTHING app-scoped', async ({ page }) => {
+test('file menu: Save/Open/Wizards/Load/Export/Library/Setup — and NOTHING app-scoped', async ({ page }) => {
     await ready(page);
     await page.click('#hdrPostBtn');
     const s = await page.evaluate(() => {
@@ -85,6 +85,8 @@ test('file menu: Save/Open/Wizards/Load/Insert/Export/Library/Setup — and NOTH
     expect(s.acts).toContain('wizards');   // stays FILE-scoped per the ✅ split's own reasoning — see header comment
     expect(s.acts).toContain('library');
     expect(s.acts).toContain('fileLoad');
+    expect(s.acts).toContain('fileExport');
+    expect(s.acts, 'Insert stays removed (t2173)').not.toContain('fileInsert');
     expect(s.acts).toContain('setupSheet');
     expect(s.hasVersion, 'the version moved out to the app menu, not here any more').toBe(0);
     for (const appAct of ['settings', 'helpFaq', 'helpAbout', 'getDesktop', 'rate', 'openWebsite']) {

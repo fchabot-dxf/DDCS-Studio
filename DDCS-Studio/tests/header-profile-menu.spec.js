@@ -29,7 +29,7 @@ const seedProfile = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the FILE menu: identity line (name·controller, ↧) + one workspace row + Library; the file rows are BACK (t2078), 10 rows', async ({ page }) => {
+test('the FILE menu: identity line (name·controller, ↧) + one workspace row + Library; the file rows are BACK (t2078), 9 rows (t2173: Insert removed)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -49,9 +49,12 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
             hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),   // t1243 — must now be FALSE (the badge moved to the manager's Cloud tab)
             hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
             hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
-            // t2099 — t2078 REVERSED t1227's removal: Load/Insert/Export are back, as plain hdr-quick-item rows
-            // (data-act="fileLoad"/"fileInsert"/"fileExport"), not the retired .hq-gcode-row/data-act="load" shape.
-            fileRows: menu.querySelectorAll('[data-act="fileLoad"], [data-act="fileInsert"], [data-act="fileExport"]').length,
+            // t2099 — t2078 REVERSED t1227's removal: Load/Insert/Export came back, as plain hdr-quick-item rows
+            // (data-act="fileLoad"/"fileInsert"/"fileExport"), not the retired .hq-gcode-row/data-act="load"
+            // shape. t2173 — Insert removed entirely (human: too close a duplicate of Load); fileRows counts
+            // only the two survivors now, and fileInsertCount below locks the removal itself.
+            fileRows: menu.querySelectorAll('[data-act="fileLoad"], [data-act="fileExport"]').length,
+            fileInsertCount: menu.querySelectorAll('[data-act="fileInsert"]').length,
             hasClear: menu.querySelectorAll('[data-act="clear"]').length,
             hasSetupSheet: menu.querySelectorAll('[data-act="setupSheet"]').length,
             // t2149 (BACKLOG #9) — Settings/FAQ/About/getDesktop/Rate/version all MOVED OUT to the new #hdrAppMenu;
@@ -98,7 +101,8 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
     expect(m.hasPull, 'so does the ↧ pull tap target').toBe(true);
     // The compact rows
     expect(m.hasLibrary, 'Library row').toBe(1);
-    expect(m.fileRows, 'Load/Insert/Export are BACK (t2078) — they act on the program as a whole').toBe(3);
+    expect(m.fileRows, 'Load/Export are BACK (t2078) — they act on the program as a whole').toBe(2);
+    expect(m.fileInsertCount, 'Insert stays removed (t2173)').toBe(0);
     expect(m.wsRows, 'ONE workspace row').toBe(1);
     expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
     expect(m.hasSetupSheet, 'Setup sheet stays — it is FILE-scoped (a document ABOUT this job)').toBe(1);
@@ -124,11 +128,12 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
     // t2149 (BACKLOG #9) — settings/help/getDesktop/rate/hq-ver-footer LEAVE this menu for the new #hdrAppMenu
     // (see header-menu-split-2149.spec.js for that side); nothing else in the row set changes.
     expect(m.rowNames, 'exactly these rows, in this order').toEqual([
-        'hq-identity-line', 'hq-saved-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileInsert', 'fileExport', 'library', 'setupSheet', 'checklist',
+        'hq-identity-line', 'hq-saved-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileExport', 'library', 'setupSheet', 'checklist',
     ]);
-    // t1245/t1617/t2099 grew this menu across three turns (see WORK-LOG for that history); t2149 is the first
+    // t1245/t1617/t2099 grew this menu across three turns (see WORK-LOG for that history); t2149 was the first
     // turn to SHRINK it — five app-scoped rows (settings, help, getDesktop, rate, hq-ver-footer) moved out.
-    expect(m.rowCount, 'the FILE menu is 10 rows (15, minus the 5 rows that moved to the app menu)').toBe(10);
+    // t2173 (tail, human: "insert is redundant beside load remove it completely") shrank it a second time.
+    expect(m.rowCount, 'the FILE menu is 9 rows (10, minus Insert)').toBe(9);
 
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.

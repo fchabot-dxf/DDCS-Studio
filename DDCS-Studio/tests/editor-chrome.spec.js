@@ -64,7 +64,7 @@ test.describe('desktop', () => {
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 800 } });
 
-  test('PHONE: the TRASH is the Clear — visible and tappable at 390px; Load/Insert/Export reach the quick menu', async ({ page }, testInfo) => {
+  test('PHONE: the TRASH is the Clear — visible and tappable at 390px; Load/Export reach the quick menu, Insert stays gone', async ({ page }, testInfo) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio);
 
@@ -114,15 +114,17 @@ test.describe('phone', () => {
     });
     expect(barTop.rectBottom, 'the row sits near the bottom of the viewport, not the top').toBeGreaterThan(barTop.viewportH - 100);
 
-    // t2099 — the corner file menu is gone (t2078); Load/Insert/Export reach the quick menu instead, still
+    // t2099 — the corner file menu is gone (t2078); Load/Export reach the quick menu instead, still
     // reachable at phone width, and Clear is still not duplicated into it.
+    // t2173 — Insert dropped out of this trio entirely (removed, not relocated).
     expect(await page.evaluate(() => !!document.getElementById('editor-file-btn')), 'the corner file button is gone').toBe(false);
     await page.locator('#hdrPostBtn').click();
     const menu = page.locator('#hdrPostMenu');
     await expect(menu).toBeVisible();
-    for (const act of ['fileLoad', 'fileInsert', 'fileExport']) {
+    for (const act of ['fileLoad', 'fileExport']) {
       await expect(menu.locator(`[data-act="${act}"]`), `${act} is in the quick menu at 390px`).toBeVisible();
     }
+    await expect(menu.locator('[data-act="fileInsert"]'), 'Insert is gone, not just narrower').toHaveCount(0);
     await expect(menu.locator('[data-act="clear"]'), 'and Clear is not duplicated here').toHaveCount(0);
     await page.keyboard.press('Escape');
     await page.screenshot({ path: 'scratchpad/s1255-phone-trash.png' });
