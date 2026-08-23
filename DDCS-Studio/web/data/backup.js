@@ -183,6 +183,14 @@ const STORE_MARKS_KEY = 'ddcs_file_store_marks';   // t1223 — per-store signat
 const ITEM_MARKS_KEY = 'ddcs_file_item_marks';    // t1309 — per-ITEM signatures for the stores that declare an item grain
 const SAVED_NAME_KEY = 'ddcs_file_saved_name';   // the last .ddcs file NAME (for the indicator's "Saved to <name>"); optional
 const SAVED_PLACE_KEY = 'ddcs_file_saved_place';   // t1233 — WHERE that file lives: 'local' (a granted folder) | 'cloud' (Drive)
+// t2196 (bug fix) — an OPEN marks the watermark twice, but BOTH marks land BEFORE ui/workspaceManager.js's own
+// location.reload(). Boot itself re-derives controller-dependent content AFTER that reload (app.js's own
+// seedDefaultPortedUserOps() re-seeds the custom-wizard registry for whichever controller the opened file just
+// adopted — measured live: switching controllers through an open left `userOps` genuinely different from what the
+// pre-reload marks had captured, so the freshly-opened file read dirty before the user touched anything). The
+// pre-reload marks can't see that — nothing running before a full page reload can. So the open leaves ONE NAME here
+// for the reloaded page's own boot to pick up and take the REAL baseline only once boot has settled.
+const PENDING_OPEN_KEY = 'ddcs_pending_open_mark';
 const hash32 = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
 
 /** A cheap SYNCHRONOUS content signature of the localStorage-backed workspace stores. Skips the async IDB projects
@@ -389,6 +397,25 @@ export function fileSavedName() {
 export function fileSavedStem() {
     const n = fileSavedName();
     return n ? n.replace(/\.ddcs$/i, '') : null;
+}
+
+/** t2196 — record that a reload-in-flight is a workspace OPEN, not a plain refresh: the name/place to baseline
+ *  against once the reloaded page's own boot (controller-dependent re-seeds included) has settled. Read-once. */
+export function markPendingOpen(name, place = 'local') {
+    const file = String(name == null ? '' : name).trim();
+    if (!file) return;
+    try { localStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ name: file, place: place === 'cloud' ? 'cloud' : 'local' })); } catch (_) {}
+}
+
+/** Consume the pending-open marker left by markPendingOpen, if any — null on a plain boot/refresh. */
+export function takePendingOpen() {
+    try {
+        const raw = localStorage.getItem(PENDING_OPEN_KEY);
+        if (raw == null) return null;
+        localStorage.removeItem(PENDING_OPEN_KEY);
+        const v = JSON.parse(raw);
+        return (v && v.name) ? v : null;
+    } catch (_) { return null; }
 }
 
 /** First-run baseline: adopt the current (seeded / restored) state as clean so the indicator only lights up on a real

@@ -52129,3 +52129,70 @@ new test cases fail against pre-turn code; `wizard-restore-default.spec.js`'s ed
 "has a Delete button" to "the row exists," which holds on both trees since only the BUTTON was removed, not
 the row; the latter only ever checked the context-menu LABEL text, never the navigation behavior). 72
 collateral tests across every touched file, all green.
+
+## t2196 (amendment 2, bug 1) — THE DOT ON OPEN: `location.reload()` outran its own watermark
+
+The main tail above shipped and committed; amendment 2 then arrived with two urgent, functional bugs ranked
+ahead of the (cosmetic, already-done) tail. This entry is bug 1: "the dot still shows on open" — t2188's own
+root fix (`settingsPanel.js`'s boot-time persist-if-absent guard) did not close it; the human confirmed live
+it still fires. Acceptance bar set by the dispatch: dirty true IFF something genuinely changed — clean on
+open, clean after a no-op settings write, dirty after a real edit — and explicitly NOT fixable by adjusting
+the dot/UI layer, since it reads the flag correctly; the flag itself is wrong.
+
+### Chase, not guess
+
+Three synthetic reproductions (direct `data/backup.js` calls, no controller change) all read CLEAN — matching
+`watermark-timing-2188.spec.js`'s own coverage, which is why that suite never caught this. The turn to a real
+repro was reading `ui/workspaceManager.js`'s actual `openWorkspaceObject()` end to end (not the synthetic
+calls): it marks the watermark TWICE — once right after `restoreBackup`, once after `controllerSettled()`
+(a bounded wait for `variableDB`'s async controller-var re-seed) — but BOTH marks land BEFORE its own
+`location.reload()`. A reload throws the whole page away and reboots from scratch; anything boot does AFTER
+that point is invisible to marks taken before it.
+
+`app.js`'s `DDCSStudio.init()` calls `seedDefaultPortedUserOps()` on every single boot (not just an open) —
+it re-derives every seeded custom-wizard twin from `SEED_BUILDERS` and unconditionally rewrites
+`ddcs_user_ops` if the twin already exists. Some of those builders are genuinely CONTROLLER-DEPENDENT: e.g.
+`user_atc_length_data`'s tool-length macro emits a real register `assign` for a controller with a mapped
+current-tool register, and a `"⚠ REFUSED - Studio has no current-tool register mapped for this controller"`
+comment block for one that doesn't ([[ddcs-1504-requested-tool-unconfirmed]]). Reproduced live with a
+Playwright test driving the exact `restoreBackup` → mark ×2 → wait → mark → reload sequence with the
+restored file's `machine.controllerId` set to a DIFFERENT profile than the one active pre-open: post-reload,
+`workspaceDelta()` named exactly one changed store — `userOps` — and the byte diff was that exact REFUSED
+comment appearing/disappearing around the register assign. The pre-reload marks captured the file's own
+content; boot's post-reload reseed silently rewrote it for the newly-adopted dialect, and nothing ever
+re-baselined against THAT.
+
+### The fix — hand the baseline to the page that can actually see it
+
+Declared, not patched: `data/backup.js` gains `markPendingOpen(name, place)` / `takePendingOpen()`, a small
+one-shot marker (`ddcs_pending_open_mark`) — `openWorkspaceObject()` calls `markPendingOpen(fileName, place)`
+right before its `location.reload()` (the two pre-reload marks are left exactly as they were; harmless, since
+the reload discards their effect on the live page anyway — removing them was out of scope for a flag-accuracy
+fix). On the reloaded page, `ui/fileSaveState.js`'s `install()` now checks `takePendingOpen()`: if set, it
+re-baselines under the file's real name once boot has SETTLED — reusing the exact stabilize-loop the
+first-run baseline already used (extracted to a shared `settleThenMark(onSettled)` helper rather than a
+second copy of the same tick loop; two consumers is exactly [[declare-or-handroll-before-dispatch]]'s
+"reusable concept" bar). Two consumers, one loop: first-run calls `ensureWorkspaceWatermark()` once settled,
+the pending-open path calls `markWorkspaceSavedToFile(name, place)` + `markItemsSavedToFile()`.
+
+### Verification
+
+New test in `tests/persistence-file-indicator.spec.js` drives the SAME sequence `openWorkspaceObject()` does
+(the UI door itself needs a granted-folder FSA handle this harness cannot grant headlessly, so the sequence
+is what's under test, matching how the bug was found) — real `restoreBackup` with a switched controllerId,
+real double pre-reload mark, real `markPendingOpen`, real `page.reload()`. Asserts BOTH halves of the
+acceptance bar: clean immediately after the settled reload, AND still dirty after a genuine edit made right
+after. Non-vacuity: `git stash` of the three app-code files (backup.js/workspaceManager.js/fileSaveState.js,
+keeping the test) → new test fails with `markPendingOpen is not a function` against pre-fix code; the other 3
+pre-existing tests in that file stay green (not a fixture change masquerading as a fix). Collateral: the full
+smoke tier (77 tests) plus a 25-file sweep of every spec touching `workspaceManager`/`fileSaveState`/
+`data/backup`/`ddcsWorkspaceDirtyToFile` (172 tests, including `watermark-timing-2188.spec.js`'s own "CLEAN ON
+OPEN" case) — all green, `git stash pop` restored the fix cleanly.
+
+Left alone, deliberately: `seedDefaultPortedUserOps()`'s unconditional-rewrite-on-every-boot shape itself
+(t1621's own comment already named this exact churn pattern once and guarded `defV`/`savedAt` against it,
+but not the write itself) is a smell worth a second look — it works today because `settleThenMark` now waits
+it out before baselining, but a controller-dependent def whose settle window somehow exceeded the 8s safety
+cap would still slip through. Not touched this turn: the dispatch asked for the flag to be right, not for
+that function to stop churning, and doing both would have widened an already-precise bug fix into a
+refactor. Flagged here for whoever next touches `seedDefaultPortedUserOps`.

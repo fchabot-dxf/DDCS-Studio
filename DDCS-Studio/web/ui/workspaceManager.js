@@ -19,7 +19,7 @@
  * workspace that was neither the file nor what you had. If the buffer has unsaved work you get ONE prompt —
  * Save and continue / Discard / Cancel — and never a silent download.
  */
-import { restoreBackup, previewBackup, markWorkspaceSavedToFile, markItemsSavedToFile, forgetWorkspaceFile, workspaceDelta, changedItemsSince, changeLabel, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t1309 — the save-first modal names the programs too
+import { restoreBackup, previewBackup, markWorkspaceSavedToFile, markItemsSavedToFile, markPendingOpen, forgetWorkspaceFile, workspaceDelta, changedItemsSince, changeLabel, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t1309 — the save-first modal names the programs too; t2196 — markPendingOpen hands the real baseline to the reloaded page
 import { wouldLoseWork } from '../blocks/saveStates.js';   // t2184 (amendment 23) — "am I really going to lose something", the ONE shared predicate
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
 import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '../data/fsHandles.js';
@@ -212,6 +212,11 @@ async function openWorkspaceObject(obj, fileName, label, { handle = null, place 
     markWorkspaceSavedToFile(fileName, place);
     try { await markItemsSavedToFile(); } catch (_) {}   // t1309 — the opened file is the new per-program baseline
     await adoptSaveHandle(handle || null);          // …and Save writes THIS file (a cloud open has no local handle)
+    // t2196 — the two marks above are only ever as good as what THIS page can see, and a controller-dependent boot
+    // re-seed (e.g. app.js's seedDefaultPortedUserOps) runs again on the RELOADED page, after everything above has
+    // already run. Leave the real name for that reloaded boot to re-baseline against once it has settled — see
+    // ui/fileSaveState.js's own pending-open handling, which reuses its first-run stabilize-then-mark loop.
+    markPendingOpen(fileName, place);
     // t1329 — the reload takes the page, overlay and all. When the harness stands in for it, stand in FULLY:
     // otherwise the centred open glyph survives an open that 'succeeded' and blocks the next click.
     if (!window.__ddcsNoReload) location.reload(); else clearBusyOverlay();

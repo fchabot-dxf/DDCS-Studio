@@ -19,7 +19,7 @@
  * localStorage-vs-.ddcs AWARENESS layer only. The workspace .ddcs is the config/library grain (settings, wizards, CAM
  * pack, presets, layout); the current PROGRAM is the separate .mjson job grain and is not part of this signal.
  */
-import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedStem, changeLabel } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads; t2147 — fileSavedStem for the header name (BACKLOG #7)
+import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedStem, changeLabel, takePendingOpen, markWorkspaceSavedToFile, markItemsSavedToFile } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads; t2147 — fileSavedStem for the header name (BACKLOG #7); t2196 — takePendingOpen/markWorkspaceSavedToFile/markItemsSavedToFile for the post-open re-baseline
 
 let dot = null;
 let headerName = null, headerNameTxt = null;   // t2147 (BACKLOG #7) — the header workspace chip's button + name text.
@@ -133,6 +133,20 @@ function saveWorkspace() {
     else if (window.openSettings) { window.openSettings(); }
 }
 
+/** t2196 (extracted from the first-run baseline loop, now shared with the post-open re-baseline) — wait for
+ *  workspaceSignature() to STOP CHANGING (two stable ~400ms ticks, or an 8s safety cap) before calling `onSettled`.
+ *  Boot's own async/lazy stores land at unpredictable times; a fixed-moment snapshot would race them. */
+function settleThenMark(onSettled) {
+    let last = null, stable = 0, ticks = 0;
+    const tick = () => {
+        const sig = String(workspaceSignature());
+        if (sig === last) stable++; else { stable = 0; last = sig; }
+        if (stable >= 2 || ++ticks > 20) { onSettled(); refresh(); return; }
+        setTimeout(tick, 400);
+    };
+    setTimeout(tick, 400);
+}
+
 function install() {
     // t2188 (amendment 1) — #fileSaveChip is DELETED, not repointed: its own click-to-save wiring goes with it
     // (the file menu's Workspace-section Save button is the one door now, t2184). `saveWorkspace()` below stays
@@ -168,15 +182,21 @@ function install() {
     // `settings` store specifically is no longer "lazy" (ui/settingsPanel.js persists it at boot now, closing the
     // exact race this stabilization loop exists to survive for the OTHER, still-lazy stores).
     if (!hasWorkspaceWatermark()) {
-        let last = null, stable = 0, ticks = 0;
-        const tick = () => {
-            if (hasWorkspaceWatermark()) { refresh(); return; }   // a save/open set it meanwhile
-            const sig = String(workspaceSignature());
-            if (sig === last) stable++; else { stable = 0; last = sig; }
-            if (stable >= 2 || ++ticks > 20) { ensureWorkspaceWatermark(); refresh(); return; }   // settled (or a 8s safety cap)
-            setTimeout(tick, 400);
-        };
-        setTimeout(tick, 400);
+        settleThenMark(() => { if (!hasWorkspaceWatermark()) ensureWorkspaceWatermark(); });   // a save/open may have set it meanwhile
+    }
+
+    // t2196 — an OPEN left its real name here (ui/workspaceManager.js's markPendingOpen, right before the reload
+    // that brought us to THIS boot). A watermark already exists at this point (from the pre-reload marks the open
+    // itself made), so the branch above never fires for this case — but boot's own controller-dependent re-seeds
+    // (app.js's seedDefaultPortedUserOps among them) run AFTER those pre-reload marks were taken and can genuinely
+    // change what a fresh .ddcs of THIS workspace would contain. Re-baseline against the SETTLED post-boot state,
+    // under the file's real name, the same way first-run does — reusing the exact stabilize loop, not a second one.
+    const pendingOpen = takePendingOpen();
+    if (pendingOpen) {
+        settleThenMark(() => {
+            markWorkspaceSavedToFile(pendingOpen.name, pendingOpen.place);
+            try { markItemsSavedToFile(); } catch (_) {}
+        });
     }
 
     // t1231 — `markSaved()` is GONE with the nameless mark it wrapped: it stamped "saved" without a file name, which is

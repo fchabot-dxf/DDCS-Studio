@@ -114,3 +114,50 @@ test('the dirty state persists across a reload (watermark is stored), and Save s
   await page.waitForFunction(() => window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);
   expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'clean after Save survives a reload').toBe(false);
 });
+
+/**
+ * t2196 (bug fix) — OPENING a workspace for a DIFFERENT controller than the one active in this browser must settle
+ * clean, not dirty. ui/workspaceManager.js's own openWorkspaceObject() marks the watermark twice, but both marks
+ * land BEFORE its location.reload() — and app.js's boot re-seeds controller-dependent user-op content (e.g. a tool
+ * register that only some dialects map) AFTER that reload, on the fresh page. The pre-reload marks cannot see that,
+ * so a freshly-opened file that adopts a new controller read dirty before anyone touched anything (measured live:
+ * `userOps` was the one store that differed). The fix leaves a pending-open marker (markPendingOpen) for the
+ * reloaded page's own boot to consume and re-baseline against, once boot has settled — reusing the exact
+ * stabilize-loop the first-run baseline already uses (ui/fileSaveState.js's settleThenMark).
+ *
+ * This test drives the SAME sequence openWorkspaceObject does (build → restore → mark ×2 → markPendingOpen →
+ * reload), rather than calling the UI door, because the door needs a granted-folder File System Access handle this
+ * harness cannot grant headlessly — the sequence itself, not the click path, is what regressed.
+ */
+test('opening a workspace under a DIFFERENT controller settles clean, not dirty, once boot re-seeds settle', async ({ page }) => {
+  await ready(page);
+
+  const before = await page.evaluate(async () => {
+    const backup = await import('/data/backup.js');
+    const profiles = await import('/shared/js/profiles/controllerProfiles.js');
+    const obj = await backup.buildBackup();
+    const cur = profiles.getActiveProfile().id;
+    const other = Object.keys(profiles.CONTROLLER_PROFILES).find((id) => id !== cur);
+    if (obj.stores && obj.stores.machine) obj.stores.machine.controllerId = other;
+    await backup.restoreBackup(obj);
+    backup.markWorkspaceSavedToFile('open-2196.ddcs', 'local');
+    try { await backup.markItemsSavedToFile(); } catch (_) {}
+    await new Promise((r) => setTimeout(r, 950));   // mirrors controllerSettled()'s own wait
+    backup.markWorkspaceSavedToFile('open-2196.ddcs', 'local');
+    try { await backup.markItemsSavedToFile(); } catch (_) {}
+    backup.markPendingOpen('open-2196.ddcs', 'local');   // t2196 — the fix under test
+    return { switched: cur !== other };
+  });
+  expect(before.switched, 'the two profiles picked really differ (or this test proves nothing)').toBe(true);
+
+  await page.reload();
+  await page.waitForFunction(() => window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);
+  // the settle loop ticks at 400ms, needs 2 stable ticks; boot's own re-seed is synchronous, so this is generous.
+  await page.waitForFunction(() => window.ddcsWorkspaceDirtyToFile() === false, null, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);   // let refresh()'s DOM/dot update land too
+  expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'a just-opened file must not read dirty before any edit').toBe(false);
+
+  // and the acceptance bar's other half: a REAL edit after the settle must still be caught.
+  await page.evaluate((k) => { localStorage.setItem(k, JSON.stringify([{ n: 9 }])); window.ddcsFileSaveState.refresh(); }, KEY);
+  expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'a real edit right after open is still caught').toBe(true);
+});
