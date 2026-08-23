@@ -9,7 +9,10 @@ material it would help")*
 | file | what it is |
 |---|---|
 | `MARK-{NORMAL,STUDIO,FUTURISTIC,STEAMPUNK,ORGANIC}-TRACED.svg` | the five finished `<symbol>` blocks, ready to paste into `DDCS-Studio/web/index.html` |
-| `wordmark-specimens.html` | the live comparison page — 16 candidate faces rendered on the organic theme's own tokens, which is how Sniglet was chosen over Nunito and Fredoka |
+
+⛔ **The candidate-face comparison page is not kept** *(human, 2026-08-22: "dont keep the rejected face")*.
+Sixteen faces were rendered side by side on the organic tokens to choose Sniglet; the fifteen that lost are
+not working material, they are a decision already made. Only the chosen face and its parameters survive, below.
 
 ## ⛔ What is MISSING, and is the reason this folder exists
 
