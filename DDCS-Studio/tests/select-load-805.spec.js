@@ -42,13 +42,15 @@ async function installDriveMock(page) {
     });
 }
 
-// Open the drawer via the module directly (ESM singleton) — deterministic, no dependence on macroBar's boot-time wiring.
+// Open the drawer via the module directly (ESM singleton) — deterministic, no dependence on any header button's
+// boot-time wiring. t2184 — macroBar.js (and the #projOpenBtn readiness proxy this file used to poll for) is
+// deleted entirely; the boot-readiness gate above now waits on the standard ddcsReady flag instead.
 const openProjectsDrawer = (page) => page.evaluate(async () => { const m = await import('/ui/projects/projectModal.js'); m.openOpenDrawer(); });
 
 test('projects CLOUD: keyless list + SELECT-THEN-[Open] — Open disabled until a file is selected, then loads (folders navigate)', async ({ page }) => {
     await installDriveMock(page);
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsLoadBlockStack && document.getElementById('projOpenBtn'));
+    await page.waitForFunction(() => window.ddcsLoadBlockStack && document.documentElement.dataset.ddcsReady === '1');
     await openProjectsDrawer(page);
     await page.click('.proj-voltab[data-vol="cloud"]');
     await page.waitForSelector('#projCloudMount .sl-row', { timeout: 15000 });   // the keyless drive.file listing rendered
@@ -78,7 +80,7 @@ test('projects CLOUD: keyless list + SELECT-THEN-[Open] — Open disabled until 
 test('projects CLOUD: DOUBLE-CLICK a file is the shortcut (loads immediately)', async ({ page }) => {
     await installDriveMock(page);
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsLoadBlockStack && document.getElementById('projOpenBtn'));
+    await page.waitForFunction(() => window.ddcsLoadBlockStack && document.documentElement.dataset.ddcsReady === '1');
     await openProjectsDrawer(page);
     await page.click('.proj-voltab[data-vol="cloud"]');
     await page.waitForSelector('#projCloudMount .sl-row[data-sl-id="p1"]', { timeout: 15000 });
@@ -89,7 +91,7 @@ test('projects CLOUD: DOUBLE-CLICK a file is the shortcut (loads immediately)', 
 test('the WONKY fix: the disconnected Cloud tab offers ONLY wired providers (no dead Dropbox/OneDrive buttons)', async ({ page }) => {
     await page.addInitScript(() => { localStorage.removeItem('ddcs_cloud_token'); localStorage.removeItem('ddcs_cloud_provider'); });
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => document.getElementById('projOpenBtn'));
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1');
     await openProjectsDrawer(page);
     await page.click('.proj-voltab[data-vol="cloud"]');
     await page.waitForSelector('#projCloudMount .cloud-connect', { timeout: 15000 });
@@ -102,7 +104,7 @@ test('the WONKY fix: the disconnected Cloud tab offers ONLY wired providers (no 
 
 test('projects LOCAL: single-click selects one at a time (not load); folders still navigate', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram && document.getElementById('projOpenBtn'));
+    await page.waitForFunction(() => window.ddcsGetBlockProgram && document.documentElement.dataset.ddcsReady === '1');
     // seed two local projects + a folder via the store
     await page.evaluate(async () => {
         const store = await import('/ui/projects/projectStore.js');

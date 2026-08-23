@@ -51,7 +51,7 @@ test('⛔ INVERTED (was a navigation test): clicking the logo opens the app menu
     expect(page.url(), 'still on the app, no navigation happened').toBe(startUrl);
 });
 
-test('app menu: Settings, FAQ, About, desktop download, Rate, Open the website, version — and NOTHING file-scoped', async ({ page }) => {
+test('app menu: FAQ, About, desktop download, Rate, Open the website, version — and NOTHING file-scoped', async ({ page }) => {
     await ready(page);
     await page.click('#hdrAppBtn');
     const s = await page.evaluate(() => {
@@ -63,17 +63,38 @@ test('app menu: Settings, FAQ, About, desktop download, Rate, Open the website, 
             hasThemeRow: document.querySelectorAll('#hdrAppMenu [data-theme]').length,
         };
     });
-    expect(s.acts).toEqual(['settings', 'helpFaq', 'helpAbout', 'getDesktop', 'rate', 'openWebsite']);
+    // t2184 (amendment 2) — 'settings' moved OUT of this list: it's saved into the .ddcs (backup.js's own save
+    // registry), so it's workspace content now, in the FILE menu's Workspace section instead.
+    expect(s.acts).toEqual(['helpFaq', 'helpAbout', 'getDesktop', 'rate', 'openWebsite']);
     expect(s.hasVersion, 'the version footer lives here now').toBe(1);
     expect(s.hasIdentity, 'no workspace identity line — that is file-scoped').toBe(0);
     expect(s.hasThemeRow, 'no Theme row — Settings already reaches it in one step (BACKLOG #1)').toBe(0);
-    // none of the file-scoped acts leaked into this menu
-    for (const fileAct of ['wsSave', 'wsOpen', 'wizards', 'library', 'fileLoad', 'fileInsert', 'fileExport', 'setupSheet', 'checklist']) {
+    // none of the file-scoped acts leaked into this menu ('settings' included — it is file-scoped as of t2184)
+    for (const fileAct of ['wsSave', 'wsOpen', 'wizards', 'settings', 'library', 'fileLoad', 'fileInsert', 'fileExport', 'projSave', 'setupSheet', 'checklist']) {
         expect(s.acts.includes(fileAct), `${fileAct} is file-scoped, must not be in the app menu`).toBe(false);
     }
 });
 
-test('file menu: Save/Open/Wizards/Load/Export/Library/Setup — and NOTHING app-scoped', async ({ page }) => {
+// t2184 (amendment 4's convention, extended here after asking the human directly — screenshots of both menus,
+// answer "yes, unify it too") — the app menu's four emoji rows (FAQ/About/getDesktop/Rate) now carry the SAME
+// declared SVG icons as the file menu; three ("help"/"about"/"rate") are genuinely new (nothing existing fit),
+// "standalone" is reused for getDesktop (it already means "the desktop EXE" on the Gateway page).
+test('app menu: every row carries a declared SVG icon — no emoji glyph baked into a label string', async ({ page }) => {
+    await ready(page);
+    await page.click('#hdrAppBtn');
+    const s = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('#hdrAppMenu [data-act]')];
+        const emojiRe = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+        return rows.map((b) => ({ act: b.dataset.act, hasSvg: !!b.querySelector('svg'), labelHasEmoji: emojiRe.test(b.textContent) }));
+    });
+    expect(s.length, 'rows are actually present to check').toBeGreaterThan(0);
+    for (const row of s) {
+        expect(row.hasSvg, `${row.act} carries an SVG icon`).toBe(true);
+        expect(row.labelHasEmoji, `${row.act}'s label has no baked-in emoji`).toBe(false);
+    }
+});
+
+test('file menu: Save/Open/Wizards/Settings/Load/Export/Library/Save-as-project/Setup — and NOTHING app-scoped', async ({ page }) => {
     await ready(page);
     await page.click('#hdrPostBtn');
     const s = await page.evaluate(() => {
@@ -83,13 +104,16 @@ test('file menu: Save/Open/Wizards/Load/Export/Library/Setup — and NOTHING app
     expect(s.acts).toContain('wsSave');
     expect(s.acts).toContain('wsOpen');
     expect(s.acts).toContain('wizards');   // stays FILE-scoped per the ✅ split's own reasoning — see header comment
+    // t2184 (amendment 2) — 'settings' joins the file menu's Workspace section (see the app-menu test above).
+    expect(s.acts).toContain('settings');
     expect(s.acts).toContain('library');
+    expect(s.acts).toContain('projSave');   // t2184 — Project section's NEW Save row
     expect(s.acts).toContain('fileLoad');
     expect(s.acts).toContain('fileExport');
     expect(s.acts, 'Insert stays removed (t2173)').not.toContain('fileInsert');
     expect(s.acts).toContain('setupSheet');
     expect(s.hasVersion, 'the version moved out to the app menu, not here any more').toBe(0);
-    for (const appAct of ['settings', 'helpFaq', 'helpAbout', 'getDesktop', 'rate', 'openWebsite']) {
+    for (const appAct of ['helpFaq', 'helpAbout', 'getDesktop', 'rate', 'openWebsite']) {
         expect(s.acts.includes(appAct), `${appAct} is app-scoped, must not be in the file menu`).toBe(false);
     }
 });

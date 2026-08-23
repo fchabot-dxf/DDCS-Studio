@@ -1,18 +1,24 @@
 /**
  * ui/headerPost.js — the app header's TWO menus: #hdrPostBtn / #hdrPostMenu (the FILE menu — workspace
- * save/open, load/export, the library, the wizard manager, setup docs) and #hdrAppBtn / #hdrAppMenu
- * (the APP menu — Settings, FAQ, About, the desktop download, Rate, the website). Plus a capability LINT
+ * save/open/settings, load/export, the library, the wizard manager, setup docs) and #hdrAppBtn / #hdrAppMenu
+ * (the APP menu — FAQ, About, the desktop download, Rate, the website). Plus a capability LINT
  * (#hdrPostWarn) on the loaded program against the workspace's OWN controller.
  *
  * t2149 (BACKLOG #9) — THE SPLIT, and the test that drew the line: does going through this door bring
  * something INTO your work, or come OUT of it? Save/Open/Load/Export/Library/Wizards/Setup-sheet/
- * Setup-checklist all do (FILE scope); Settings/FAQ/About/the desktop download/Rate/the version are about the
+ * Setup-checklist all do (FILE scope); FAQ/About/the desktop download/Rate/the version are about the
  * PRODUCT itself, never this file (APP scope). Before this turn both lived in ONE menu hanging off the
  * workspace filename chip — so "Settings…" under your filename read as THIS FILE's settings, a mismatch
  * t2147 made worse by design. The logo, previously a plain `<a href>` out to the marketing site (a real
  * mis-click hazard — the same one that forced t2147's whole layout argument), is now the APP menu's own
  * trigger; "open the website" is one row inside it. Both menus share ONE dismissal contract (`makePopover`
  * below) rather than being two hand-rolled popovers, and opening one closes the other.
+ * t2184 (amendment 2) — SETTINGS MOVED BACK, from the APP menu into the FILE menu's Workspace section (last
+ * row, after Save/Open/Wizards). Not a reversal of the t2149 test above, a DIFFERENT and more specific one:
+ * backup.js's own save registry carries a 'settings' row (key ddcs_studio_settings) — Settings is SAVED INTO
+ * the .ddcs, so it travels with the workspace exactly as Wizards does, even though opening it doesn't "bring
+ * something in" the way Load does. The mechanical rule going forward: in backup.js's registry → workspace
+ * (file-scoped); not in it → app/device (stays app-scoped, e.g. FAQ/About/Rate/the desktop download/website).
  * ⚠ THEME IS NOT A ROW HERE: t2147 already moved the theme picker to Settings (#set_theme, Look and feel →
  * Appearance) and it already switches independently. A `Theme ▸` row would only point at Settings one click
  * deeper for no reason — BACKLOG item 1's own warning — so it is deliberately absent, not forgotten.
@@ -39,6 +45,7 @@ import { EXE_DOWNLOAD_URL, getRoleInfo } from './gatewayStatus.js';   // the "st
 import { openExternal } from './openExternal.js';   // t2066 — open external links once, host-side in the exe
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
 import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
+import { openSaveModal } from './projects/projectModal.js';   // t2184 — the Project section's own Save row; the SAME door the Library's own Save row already calls (and the now-deleted #projSaveBtn/macroBar.js used to), not a second implementation
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
 const HQ_ICONS = {
@@ -55,6 +62,14 @@ const HQ_ICONS = {
     setupSheet: { c: '#c084fc', d: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>' },
     library: { c: '#38bdf8', d: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
     wizard: { c: '#a855f7', d: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>' },
+    // t2184 (amendment 4's own rule, extended to the APP menu on direct human instruction: "yes, unify it too") —
+    // three genuinely NEW icons (the file menu's rows all reused an existing entry; these didn't exist yet).
+    // Same 24×24 stroke-grid convention, drawn in the spirit of each: a question mark for "ask something" (FAQ),
+    // an info glyph for "read about this" (About), a star for "rate this" (the literal glyph the row's own old
+    // emoji already used, traced as line art instead of a platform emoji).
+    help: { c: '#38bdf8', d: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>' },
+    about: { c: '#94a3b8', d: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="11"/><line x1="12" y1="7.5" x2="12.01" y2="7.5"/>' },
+    rate: { c: '#f0b429', d: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
     // BACKLOG #7 — the "Saved …" footer line's WHERE, an icon not a word (fileSavedPlace() is a strict binary).
     // ⛔ NOT in ui/wizIcons.js — that registry holds OPERATION icons only; a save-location mark is UI CHROME, so
     // it belongs beside this menu's other chrome glyphs, same table, same convention.
@@ -73,8 +88,9 @@ const WEBSITE_URL = 'https://ddcs-studio.pages.dev';
 
 function runQuickAction(act) {
     switch (act) {
-        case 'open':   document.getElementById('projOpenBtn')?.click(); break;
-        case 'save':   document.getElementById('projSaveBtn')?.click(); break;
+        // t2184 (amendment 1) — 'open'/'save' REMOVED: they proxied clicks to #projOpenBtn/#projSaveBtn, both
+        // deleted this turn (nothing anywhere ever called runQuickAction with either act — dead since whatever
+        // turn stopped wiring a row to them; the menu's own 'library'/'projSave' cases below are the live doors).
         case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an operation in the Blocks tab first, then save it as a wizard.'); break;
         // t2078 — Load / Export are BACK (see the fileRows comment for the human's reasoning: they act
         // on the program as a whole, not on the text under the caret). ONE implementation — these call the same
@@ -119,6 +135,10 @@ function runQuickAction(act) {
         // t1617 — the WIZARD manager, the workspace manager's sibling: wizard lifecycle (fork / rename / duplicate /
         // delete + the .wiz library shelves). Distinct from 'wizard' above, which SAVES the current stack as one.
         case 'wizards': window.openWizardManager?.(); break;
+        // t2184 — the Project section's own Save row. Until now the menu could save the OUTPUT (G-code) but not
+        // the WORK (the op stack + stock + post, as one job) — this is the door that was missing. Calls the SAME
+        // openSaveModal the Library's own Save row already calls; no new save logic.
+        case 'projSave': openSaveModal(); break;
     }
 }
 
@@ -194,12 +214,16 @@ export function initHeaderPost() {
     const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
 
     // ── FILE MENU (#hdrPostBtn/#hdrPostMenu) — everything that acts on THIS workspace/program. ─────────────
-    // Layout: identity row · saved row · workspace row (Save/Open) · Wizards… · Load/Export · Library… ·
-    // Setup sheet… · Setup checklist. MOVED NOT LOST, across several turns: standalone/checklist-toggle → Settings
-    // (now the APP menu); t1227 Load/Insert/Export/Clear → the editor's corner menu, then t2078 brought
-    // Load/Insert/Export back HERE (Clear alone stayed in the editor toolbar, t1255); BACKLOG #1 (t2147) — Theme
-    // → Settings' own #set_theme picker; BACKLOG #9 (t2149) — Settings/FAQ/About/desktop-download/Rate/version →
-    // the new APP menu, because none of them act on this file (see this file's header comment for the test that split them).
+    // Layout: FOUR labelled sections (t2184, scratchpad/t-filemenu-sections.md), each a two-column GRID of the
+    // SAME declared tile button (amendment 16 — one shared style, every width, no odd-item special case) —
+    // Workspace (identity + saved lines, then Save/Open/Wizards…/Settings… as a 2x2) · G-code (Save
+    // as…/Open… — save-first, amendment 17) · Project (Save…/Open…) · Reference (Setup sheet…/Setup checklist).
+    // MOVED NOT LOST, across several turns:
+    // standalone/checklist-toggle → Settings (t2149 to the APP menu, t2184 amendment 2 back here — see this
+    // file's own header comment for the two different tests each move used); t1227 Load/Insert/Export/Clear →
+    // the editor's corner menu, then t2078 brought Load/Insert/Export back HERE (Clear alone stayed in the
+    // editor toolbar, t1255); BACKLOG #1 (t2147) — Theme → Settings' own #set_theme picker; BACKLOG #9 (t2149) —
+    // FAQ/About/desktop-download/Rate/version → the new APP menu, because none of them act on this file.
     // t2173 (tail) — Insert REMOVED entirely (human: too close a duplicate of Load to earn its own row); the two
     // history lines above are left as they were AT THE TIME, not rewritten to erase what actually happened.
 
@@ -239,12 +263,13 @@ export function initHeaderPost() {
         const roleInfo = getRoleInfo();
         const roleText = roleInfo.role;
         const roleTitle = roleInfo.reason ? ` title="${esc(roleInfo.reason)}"` : '';
+        // t2184 (amendment 13, human: "identity can be inside the workspace border") — the "Workspace: " label
+        // (t1249) is DROPPED: the line now lives inside the WORKSPACE section (see the assembly below), so the
+        // section header already states the subject once — the line reads as the box's content (name, dialect,
+        // role, travel), not a fourth fact needing its own label.
         const identityRow =
             `<div class="hq-identity-line hq-identity">`
-            // t1249 (user) — the line says WHAT it describes. Without the label it is three facts with no subject:
-            // a reader has to work out that "Rig B" is the workspace and not, say, the controller. Same wording as
-            // the disk tooltip, so the two surfaces name the same thing the same way.
-            + `<span class="hq-identity-txt"><span class="hq-label">Workspace: </span><b>${esc(apName)}</b>`
+            + `<span class="hq-identity-txt"><b>${esc(apName)}</b>`
             + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
             + `<span class="hq-cur">${esc(apKind)}</span>`
             + `<span class="hq-cur"${roleTitle}> · ${esc(roleText)}</span>`
@@ -282,41 +307,77 @@ export function initHeaderPost() {
         // Load / Export are back in THIS menu (Insert removed entirely, t2173); the editor's own corner file
         // button/menu is gone entirely. Clear alone stayed out (t1255) — it lives in the editor's own toolbar row.
 
-        // ── t1223 (1) — WORKSPACE ROW: Save + Open are the PRIMARY buttons, and all workspace management lives
-        //    here rather than in a new header menu. ────────────────────────────────────────────────────────────
-        const workspaceRow =
-            `<div class="hq-ws-row">`   // its OWN class (a workspace row is not a gcode row); the menu-diet spec counts it
-            + `<button type="button" class="hq-ws-btn" data-act="wsSave" title="Save this workspace to its .ddcs file">💾 Save</button>`
-            + `<button type="button" class="hq-ws-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open workspace</button>`
-            + `</div>`;
+        // t2184 (amendment 3A, human: "icons arent unified, keep the more fancy ones"; amendment 4 closed the
+        // escape hatch — "if they dont have svg they need one", enforcing commandDeck.js's own documented icon
+        // convention rather than a taste) — EVERY row renders the declared SVG icon (svgIco/HQ_ICONS); no emoji
+        // baked into a label string anywhere in this menu. `wsBtn` is the one place a row is built. In practice
+        // every action already had a matching HQ_ICONS entry — nothing new needed drawing.
+        // t2184 (amendments 3B → 16, human: "also use the workspace layout with 2 colums" → "make it a grid in
+        // wide too... and all buttons can share their style") — amendment 16 SUPERSEDES 3's pairs-plus-an-
+        // odd-item-spanning-full-width rule entirely: ONE shared tile button, in a GRID, at every width — no
+        // more a full-width `.hdr-quick-item` for Wizards/Settings while their neighbours are boxed pairs. This
+        // is a SIMPLIFICATION, not an addition: it deletes both the odd-item rule from amendment 3 and the
+        // mobile-only split amendment 15 first proposed — both were solving a problem that stops existing once
+        // every row is one tile in one grid. The counts fall out clean: Workspace is now four (2x2), G-code /
+        // Project / Reference are two each (one row).
+        const wsBtn = (act, icon, label, title) =>
+            `<button type="button" class="hq-ws-btn" data-act="${act}"${title ? ` title="${esc(title)}"` : ''}>`
+            + svgIco(icon) + label + `</button>`;
+        const grid = (...btns) => `<div class="hq-ws-row">${btns.filter(Boolean).join('')}</div>`;
 
-        // t1617 — the WIZARD MANAGER's entry, the workspace manager's sibling (same place, next row): the wizards
-        // embedded in THIS workspace + the .wiz library shelves. Lifecycle, not bar arrangement (that stays in Settings).
-        const wizardsRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="wizards">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('wizard')
-            + '<span class="hdr-quick-lbl">Wizards…</span></button>';
+        // t2184 (amendment 17, human, arrow between Load and Save as: "switch") — THE SAVE ACTION IS ALWAYS
+        // FIRST IN ITS SECTION. Workspace: Save then Open. G-code: Save as then Open (was Load then Save as —
+        // swapped). Project: Save then Open. A future row added to any section has an obvious position: is it
+        // the save action? First. Everything else follows.
+        // t2184 (amendments 18/19/20, human: "the labels are different for the same action... save vs save as
+        // is legitimate... open vs load is not") — THE MENU'S FIVE LABEL RULES, all from the human, all reached
+        // by looking at a picture rather than arguing prose:
+        //   1. the section carries the noun, the item carries the verb (rule 1, scratchpad/t-filemenu-sections.md)
+        //   2. the save action is always first in its section (this comment, above)
+        //   3. a trailing ellipsis means the action will ask you something first — a dialog, a picker, a modal;
+        //      no ellipsis means it just happens
+        //   4. Save vs Save as is the one legitimate exception to rule 3: Save writes straight to the known
+        //      target (falling back to a picker only in the not-yet-saved state, which is what "Save" already
+        //      means in every app anyone has used — not a state worth disclosing in the label), Save as always
+        //      asks. Neither gets "harmonised" to match the other.
+        //   5. OPEN is the only word for picking a file — G-code's "Load…" is now "Open…", matching Workspace
+        //      and Project. (Load carried a real warning Open doesn't — loading replaces the editor's contents
+        //      and Insert is gone (t2173), so this is the only door and it IS destructive. That warning still
+        //      lives in the title attribute below; amendment 20 also asked whether a stale confirm-before-
+        //      replace fires on an empty canvas — investigated and reported in WORK-LOG, not fixed this turn:
+        //      the root cause traces into boot/watermark timing in data/backup.js, real surgery that deserves
+        //      its own turn rather than a rushed patch onto this one.)
+        const workspaceGrid = grid(
+            wsBtn('wsSave', 'save', 'Save', 'Save this workspace to its .ddcs file'),
+            wsBtn('wsOpen', 'open', 'Open…', 'Open a workspace from your workspaces folder'),
+            // t1617 — the WIZARD MANAGER's entry, the workspace manager's sibling: the wizards embedded in THIS
+            // workspace + the .wiz library shelves. Lifecycle, not bar arrangement (that stays in Settings).
+            wsBtn('wizards', 'wizard', 'Wizards…', ''),
+            // t2184 (amendment 2) — SETTINGS, moved here from the APP menu (see this file's own header comment
+            // for why: it's SAVED INTO the .ddcs, so it's workspace content, not product chrome).
+            wsBtn('settings', 'settings', 'Settings…', '')
+        );
 
         // ── UTILITY ROWS (FILE-scoped) ────────────────────────────────────────────────────────────────
         // t854/t2149 — the Library: one door to Projects · Wizards (the Profiles tab retired at t1217 — the
         // workspace's ONE machine lives in Settings now, not a browsable list; this comment used to still name
         // it, the removal-chain pattern again). Both Projects and Wizards are "bring something INTO this job",
         // which is why Library stays FILE-scoped even though its own name sounds product-ish.
-        const libraryRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="library" title="Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Load below">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('library')
-            + '<span class="hdr-quick-lbl">Open project…</span></button>';
-        const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
-        const checklistRow = !healthOn ? '' :
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="checklist">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('checklist')
-            + '<span class="hdr-quick-lbl">Setup checklist</span></button>';
+        // t2184 — Project Save is NEW (scratchpad/t-filemenu-sections.md rule 4): it exists because a project IS
+        // the program, saved — same op stack, same stock, same post, one live in the editor and one on disk.
+        // Calls the existing openSaveModal — no new save logic, see the import comment above.
+        const projectGrid = grid(
+            wsBtn('projSave', 'save', 'Save…', 'Save the current program as a project (.mjson) — the op stack, stock and post, as one job'),
+            wsBtn('library', 'library', 'Open…', 'Your saved projects (.mjson) and the wizard catalogue — not raw G-code files, see Save as/Open above')
+        );
 
-        // t850 — print-ready job page.
-        const setupSheetRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="setupSheet">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('setupSheet')
-            + '<span class="hdr-quick-lbl">Setup sheet…</span></button>';
+        const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
+        // t2184 — Reference grid (Setup sheet + Setup checklist); grid()'s own Boolean filter drops Setup
+        // checklist cleanly when health signals are off, no separate branch needed.
+        const referenceGrid = grid(
+            wsBtn('setupSheet', 'setupSheet', 'Setup sheet…', ''),   // t850 — print-ready job page.
+            healthOn ? wsBtn('checklist', 'checklist', 'Setup checklist', '') : ''
+        );
 
         // t2078 (human: "the load insert export button can go in the quick menu") — THE PROGRAM FILE ROWS RETURN.
         // ⚠ THIS REVERSES t1227, which moved them OUT of here because this menu is for APP things, "not what to
@@ -333,39 +394,36 @@ export function initHeaderPost() {
         // too, not just muted: it duplicated Load closely enough (both "bring a G-code file in," differing only
         // by replace-vs-splice-at-caret) that the human judged the second row wasn't earning its place. See the
         // `case 'fileInsert'` removal above for the handler side.
-        // t2149 — Load…'s title disambiguates the "three doors to open a saved thing" (BACKLOG #9): Open (above)
-        // opens a WORKSPACE (.ddcs — the machine), Load opens a raw G-CODE FILE, Library→Projects opens a
-        // .mjson JOB. Genuinely three different file formats, not one act with three names — CHECKED, not
-        // assumed (Open reads a workspace via workspaceManager.js, Load reads a program via loadGcodeFile in
-        // globalFunctions.js, Projects reads a multi-op .mjson via projectModal.js's openMacroText).
-        // t2173 (tail, human: "open load are gcode vs project it should be more litteral") — the KNOWLEDGE above
-        // already separated the three formats; it just never reached the LABELS, which all read like synonyms
-        // of the same "open a thing" verb. Now literal: "Open workspace" (workspaceRow, above), "Load G-code…"
-        // (below), "Open project…" (libraryRow, above — its door also reaches Wizards, but Projects is the
-        // "open a saved thing" case this literalisation is about; the title still names both).
-        // t2178 (tail, extending the same literal-labels ruling to Export, sequenced AFTER amendment 8 rebuilt
-        // what it actually does) — "Export…" named the ACTION, not what it does now: opens the OS's own native
-        // save dialog, so the operator picks the destination directly. "Save G-code as…" says that; the title
-        // states the trade recorded in WORK-LOG (a native dialog asks every time — no more granted-folder
-        // convenience for this one action, deliberately, per direct instruction).
-        const fileRows =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileLoad" title="Load a G-code file into the editor (replaces the program) — not a workspace or a project">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">📂 Load G-code…</span></button>'
-            + '<button type="button" role="menuitem" class="hdr-quick-item" data-act="fileExport" title="Save the program as a .nc file — the native save dialog opens so you pick the destination yourself, every time">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭳ Save G-code as…</span></button>';
+        // t2149/t2173/t2178 (superseded by t2184 amendment 20 below) — this row's label went through "Load…" →
+        // "Load G-code…" → back to "Load…", each pass disambiguating it from Workspace's Open and the Library's
+        // Open. Left as history, not rewritten: at each of those points the label WAS the most literal choice
+        // available; amendment 20 is what finally named the actual shared concept (picking a file) "Open"
+        // everywhere, superseding the disambiguation-by-different-words approach entirely.
+        // t2184 (amendment 17, "switch") — Save as now comes FIRST (the save action always leads); amendment 20
+        // ("open vs load is not [legitimate]") — "Load…" → "Open…", matching Workspace/Project. The title still
+        // carries Load's own warning (replaces the editor's contents — the only door, since Insert is gone).
+        const gcodeGrid = grid(
+            wsBtn('fileExport', 'export', 'Save as…', 'Save the program as a .nc file — the native save dialog opens so you pick the destination yourself, every time'),
+            wsBtn('fileLoad', 'open', 'Open…', 'Open a G-code file into the editor (replaces the program) — not a workspace or a project')
+        );
 
-        // ── ASSEMBLE ──────────────────────────────────────────────────────────────────────────────────
+        // ── ASSEMBLE — t2184 (scratchpad/t-filemenu-sections.md, the human's own pasted mockup is the spec) ────
+        // FOUR labelled, bordered sections: Workspace (identity + saved-line, then a 2x2 grid — Save, Open,
+        // Wizards…, Settings…), G-code (Save as…/Open… grid), Project (Save…/Open… grid), Reference (Setup
+        // sheet…/Setup checklist grid). See the label-rules comment above workspaceGrid for the five rules that
+        // govern every row's wording.
+        // t2184 (amendment 13, human: "identity can be inside the workspace border") — the identity line lives
+        // inside the Workspace box as its first row (above the grid), resolving the "does the box header
+        // restate the identity line" worry a floating identity line raised: inside the box, the header labels
+        // the box and the identity is its content, not a competing statement of the same fact six pixels away.
+        // The saved-line (BACKLOG #7 — when/where last saved) moves with it, same reasoning.
+        const section = (title, rows) =>
+            `<div class="hdr-menu-section"><div class="hdr-menu-section-title">${esc(title)}</div>${rows}</div>`;
         menu.innerHTML =
-            identityRow          // t1227 — the quiet name · dialect line sits WITH the workspace buttons (save context)
-            + savedRow           // BACKLOG #7 — when + where this workspace was last saved; nothing when never saved
-            + workspaceRow
-            + wizardsRow         // t1617 — the wizard manager, beside the workspace it serves
-            + '<div class="hdr-quick-sep"></div>'
-            + fileRows
-            + '<div class="hdr-quick-sep"></div>'
-            + libraryRow
-            + '<div class="hdr-quick-sep"></div>'
-            + setupSheetRow + checklistRow;
+            section('Workspace', identityRow + savedRow + workspaceGrid)
+            + section('G-code', gcodeGrid)
+            + section('Project', projectGrid)
+            + section('Reference', referenceGrid);
 
         btn.title = `File menu — ${apName} · ${apCtrl}`;
         btn.setAttribute('aria-label', `File menu (${apName} · ${apCtrl})`);
@@ -373,22 +431,25 @@ export function initHeaderPost() {
 
     // ── APP MENU (#hdrAppBtn/#hdrAppMenu) — the product itself, never this file. Small and rarely opened,
     //    which BACKLOG #9 calls out as correct, not lopsided: most of what a user does lives in the file menu. ──
+    // t2184 (amendment 2) — Settings MOVED OUT, to the FILE menu's Workspace section (see fillFileMenu above and
+    // this file's own header comment for why: it's saved into the .ddcs, so it's workspace content).
     const fillAppMenu = (btn, menu) => {
-        const settingsRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
-            + '<span class="hdr-quick-lbl">Settings…</span></button>';
         // t1245 (user) — HELP leaves Settings and lands here. FAQ and About are not settings: nothing on either
         // changes how the app behaves, so a gear was the wrong door for them.
         // t2149 (human amendment: "i meant seperate them in 2 panel") — TWO rows, TWO panels, not one Help row
         // opening one two-section panel: FAQ (searched when stuck) and About (identity — version, credits) are
         // different things at very different visit frequencies. See helpPanel.js's own header for the full reasoning.
+        // t2184 (amendment 4's own convention, extended here on direct human instruction — asked via
+        // AskUserQuestion with a screenshot of both menus side by side: "yes, unify it too") — SVG icons, no
+        // emoji, matching the file menu's own finished convention.
         const faqRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="helpFaq">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">❓ FAQ</span></button>';
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('help')
+            + '<span class="hdr-quick-lbl">FAQ</span></button>';
         const aboutRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="helpAbout">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">ℹ About</span></button>';
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('about')
+            + '<span class="hdr-quick-lbl">About</span></button>';
         // t598 — always-available Rate / Feedback. t1245 — and now the ONE feedback door: Settings' Report-a-bug
         // button was a bare mailto pointing at the same maintainer this toast already reaches (with stars and a
         // comment), so it retired rather than being carried along beside it.
@@ -397,12 +458,16 @@ export function initHeaderPost() {
         // ⚠ THE UNCONDITIONAL RULING SURVIVES THE MOVE: the human ruled this is never gated on whether a
         //    gateway answers ("its not because i have the app open that i dont want to download it again"), and
         //    it is not gated here either.
+        // t2184 — reuses the 'standalone' icon (already means "the desktop EXE" everywhere else it appears,
+        // e.g. the Gateway page) rather than drawing a second desktop-download glyph.
         const downloadRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="getDesktop">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⬇ Get DDCS Studio for desktop</span></button>';
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('standalone')
+            + '<span class="hdr-quick-lbl">Get DDCS Studio for desktop</span></button>';
         const rateRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('rate')
+            + '<span class="hdr-quick-lbl">Rate / Feedback</span></button>';
         // t2149 (BACKLOG #9) — "open the website" is the retired brand <a href>'s one function, carried over as
         // a row now that the logo itself opens this menu instead of navigating away.
         const websiteRow =
@@ -420,9 +485,7 @@ export function initHeaderPost() {
         const versionFooter = verText ? `<div class="hq-ver-footer" title="App version">${esc(verText)}</div>` : '';
 
         menu.innerHTML =
-            settingsRow
-            + '<div class="hdr-quick-sep"></div>'
-            + faqRow + aboutRow + downloadRow + rateRow + websiteRow
+            faqRow + aboutRow + downloadRow + rateRow + websiteRow
             + (verText ? '<div class="hdr-quick-sep"></div>' : '')
             + versionFooter;
     };

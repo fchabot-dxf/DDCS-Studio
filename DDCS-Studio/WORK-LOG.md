@@ -51167,3 +51167,206 @@ Amendment 11 (header disk → WORKSPACE save; verify Project's Library door; sur
 to `#projOpenBtn`) is still outstanding.
 
 🔨 turn 2182
+
+## t2184 — the file menu becomes four labelled sections (grid layout, label rules, legibility fix), the header
+## disk buttons retire, the app menu's icons unify, and the empty-canvas replace-confirm bug is fixed
+
+This is ONE turn (24 amendments, all absorbed mid-task per the mailbox-poll protocol) building on the human's
+own pasted mockup for the file menu, then following where each of their own corrections led. Documented as one
+arc rather than amendment-by-amendment, since most amendments refined or superseded an earlier one rather than
+adding independent scope.
+
+### Part 1 — four labelled sections (scratchpad/t-filemenu-sections.md)
+
+The spec was explicit: "if any sentence contradicts the picture, the picture wins." Built the four sections
+(Workspace/G-code/Project/Reference) exactly as pasted, with the section carrying the noun so items drop it
+("Open workspace" -> "Open", "Open project..." -> "Open..."), file actions leading each section, and the NEW
+Project Save row (amendment 18's rule 4 -- a project IS the program, saved; calls the existing openSaveModal,
+no new save logic).
+
+### Part 2 — icons: enforced, not just followed (amendments 3, 4, 24)
+
+First pass unified icons within the file menu using the DECLARED SVG convention (svgIco/HQ_ICONS) instead of
+inline emoji. Amendment 4 reframed this correctly: commandDeck.js:17 already documents "inline line-art SVG
+(not emoji)... 24x24 stroke grid... each icon carries its own accent colour" -- the emoji rows were violating
+an existing rule, not expressing a different taste. Every FILE-menu action already had a matching HQ_ICONS
+entry -- nothing new needed drawing there.
+
+Amendment 24 (later) asked the SAME question for the APP menu (surfaced back in amendment 3B, deliberately left
+undecided -- "surface, do not decide"). Asked directly via AskUserQuestion with side-by-side screenshots
+(verification/t2184-final-organic-desktop.png vs t2184-appmenu-current-organic.png); answer: unify. THIS time
+three genuinely new icons were needed (help, about, rate -- none existed for FAQ/About/Rate); the fourth (Get
+DDCS Studio for desktop) reuses the existing standalone icon, which already means "the desktop EXE" on the
+Gateway page. Verified: verification/t2184-appmenu-unified-organic.png.
+
+### Part 3 — legibility (amendments 5/6): measured, not eyeballed
+
+Human, with screenshots of the in-progress menu in organic and futuristic: "verify this label is legible in all
+theme, organic is especially not." Built a real diagnostic (not a CSS-token guess) — screenshot the actual
+rendered popover, decode it in-page via an img→canvas→getImageData pipeline, sample the text region's own most-
+extreme pixel against a background sample beside it, compute WCAG contrast. Composited over a REAL loaded
+program + wizard bar (amendment 6's explicit worst case), not the bare --modal-face token.
+
+Root cause: .hq-identity-txt { opacity: .85 } stacked with .hq-cur { opacity: .55 } on the dialect/role/travel
+spans, compounding to ~.47 effective. Measured BEFORE fix: identity 2.50-4.00:1, section headers 2.00-2.69:1
+across the 5 themes — every single one under the 4.5:1 floor.
+
+Fix: NOT opacity (amendment 6: "the fix is the TEXT... popover background... untouched"). Tried raising opacity
+to 1 first — still failed in 2/5 themes (studio 3.75/4.02, steampunk 3.66/2.65), because opacity blends toward
+whatever's BEHIND the text, which swings from near-black to near-white across themes — no single opacity value
+clears the floor everywhere. Switched to color-mix(in srgb, var(--text-dim) 45%, var(--text-main) 55%) — a
+THEME-CONSISTENT blend (every theme's real button labels already use --text-main and are legible by
+construction, so blending toward it structurally guarantees headroom, not a tuned-per-theme number). color-mix
+is already an established convention in this file (60+ existing uses). Measured AFTER: identity 5.96-10.77:1,
+section headers 6.28-13.46:1 — all five themes clear 4.5:1 comfortably. tests/filemenu-sections-2184.spec.js's
+own contrast test runs this exact measurement as a real assertion (>=4.5:1, all 5 themes), not just a one-time
+probe.
+
+Amendment 24 asked the SAME check for the app menu's version footer (same dim-small-text recipe) — REPORT only,
+explicitly told not to restyle it. Measured: 1.70:1 (studio) to 2.57:1 (organic) — WORSE than the original
+identity-line bug, fails in all 5 themes. Left untouched per direct instruction; flagged for the advisor below.
+
+### Part 4 — identity line moves inside the box (amendment 13)
+
+Human: "identity can be inside the workspace border." The identity + saved lines (name/dialect/role/travel, and
+"Saved 14:22") move from floating above all four sections to being the Workspace section's own first rows,
+above Save/Open. This resolved a concern from the section-title comment I'd written myself when the sections
+first shipped — a floating identity line directly above a box titled "Workspace" reads like two statements of
+the same fact six pixels apart; moving it INSIDE the box means the header labels the box and the identity is
+its content, not a competing claim. The "Workspace: " prefix on the identity line (t1249) is dropped for the
+same reason — the box title now states the subject once. The orphaned .hq-label CSS rule (its only consumer)
+retired with it. Height cost: ~0 (307px -> 421px -> 390px -> 388px across the arc so far — relocating content,
+not duplicating it).
+
+### Part 5 — the grid (amendments 14→15→16, in that order, each superseding the last)
+
+14: "on mobile the file menu buttons can be bigger" — t2153's own 44px touch floor had never reached this menu.
+15: "in a grid" — a grid buys the SAME touch area while fitting two actions per row, instead of one tall row
+per action; this is why 15 beats 14 rather than just refining it. 16 (the human, with arrows at Wizards/
+Settings): "make it a grid in wide too... and all buttons can share their style" — SUPERSEDES 15's mobile-only
+scope entirely: ONE shared tile button (.hq-ws-btn), in a two-column CSS GRID (.hq-ws-row, display: grid;
+grid-template-columns: repeat(2, 1fr)), at every width, no exceptions. This DELETES two things built earlier
+today rather than adding a third: amendment 3's "pair plus an odd item spans full width" rule, and the mobile-
+only split amendment 15 first proposed. Wizards and Settings — which had stayed full-width .hdr-quick-item rows
+while their neighbours were boxed pairs — became the same .hq-ws-btn tile as everything else. The counts fall
+out clean: Workspace is now four items (a tidy 2x2), G-code/Project/Reference stay two each (one row).
+
+The 44px floor is phone-only (@media (max-width: 600px) { .hq-ws-btn { min-height: 44px } }) — desktop tiles
+stay compact; asserted, not eyeballed, per amendment 14's own instruction (tests/filemenu-sections-2184.spec.js
+measures actual getBoundingClientRect().height at both widths). Height re-measured: 450px at 390px (up from
+388px — the floor spends some of what the grid bought back, exactly as amendment 14 predicted it would; still
+comfortably under the popover's 560px cap), 365px at desktop (unaffected, floor is phone-only).
+
+### Part 6 — five label rules (amendments 17-20), all reached by looking at a picture, not arguing prose
+
+17 (arrow between Load/Save-as: "switch") — THE SAVE ACTION IS ALWAYS FIRST IN ITS SECTION. G-code's pair
+swapped to Save as / Open (was Load / Save as).
+18/19/20 — three rounds converging on: a trailing ellipsis means the action asks something first (dialog/
+picker/modal); Save vs Save as is the one legitimate exception (Save writes straight to the known target, no
+ellipsis; Save as always asks, keeps its ellipsis — amendment 19 explicitly ruled the never-saved-yet fallback
+is NOT a state worth disclosing in the label, matching how "Save" already works in every app); OPEN is the only
+word for picking a file (amendment 20: "open vs load is not [legitimate]" — G-code's "Load..." -> "Open...",
+matching Workspace and Project). The five rules are written into headerPost.js's own comment above
+workspaceGrid, not just this log, so the next row added has a place to look rather than a debate to have.
+
+Amendment 20 also asked me to check what happens today when the editor holds unsaved work and you Load — this
+became the seed for Part 8 below.
+
+### Part 7 — the header disk buttons retire (amendment 1)
+
+Human, correcting their own earlier request that an advisor turn had misread: "the header disk button can be
+removed and we will use the one in the file menu." #projSaveBtn/#projOpenBtn (the .macro-bar, already
+display: none at every width — confirmed via measurement, not assumed, so this was dead visual weight, not a
+regression) are DELETED outright, not repointed — the file menu now states every save door three ways
+(Workspace/Project/G-code Save). ui/macroBar.js is deleted entirely rather than left mounting nothing (its
+only two consumers were the two deleted buttons); the initMacroBar() call removed from index.html's own
+deferred-init sequence. Swept: runQuickAction's dead case 'open'/case 'save' (nothing anywhere ever called
+them — confirmed via grep, not assumed), libraryModal.js's stale caller comment, six test files
+(header-responsive, select-load-805, library-projects-cloud-863, header-menu-split-2149, workspace-manager-1223,
+editor-file-menu-1227) that either polled #projOpenBtn as a boot-readiness proxy (swapped for the standard
+ddcsReady flag, which — per index.html's own t1279 comment — fires strictly AFTER this deferred init block, a
+stricter guarantee than the button ever was) or drove #projOpenBtn as their actual door (swapped for the file
+menu's own [data-act="library"] row, the real remaining door).
+Measured (not assumed) at 360px: zero overflow before and after — the macro-bar was already invisible there.
+
+### Part 8 — the empty-canvas replace-confirm bug (amendments 20-23): investigated, root-caused, fixed
+
+Amendment 20 asked what happens loading G-code over unsaved work — investigation found the marker-based path
+already correctly guards via confirmDestructiveLoad (silent on an empty program); found separately that
+Workspace Open's OWN gate (confirmDiscardBuffer) checks isWorkspaceDirtyToFile() alone, a WORKSPACE-file
+signal, not "does the program have anything to lose."
+
+Amendment 21 named the shape: "the hazard is LOSING UNSAVED WORK, the guard is checking [something else] —
+those coincide only sometimes." I dug into WHY they diverge, live, not from reading the code: a fresh, pristine,
+untouched boot does NOT trigger the prompt (measured — isDirty=false, no .wsm-3way); but switching THEME
+(a stated device-only preference, not workspace content, per amendment 2's own Part B framing) flips
+isWorkspaceDirtyToFile() to true. Traced further: the settings BACKUP_STORES row reads undefined until the
+FIRST interaction with any Settings field, at which point ddcs_studio_settings materializes into localStorage
+for the first time — the watermark, captured earlier while that store read undefined, now sees a real value and
+calls it "dirty," regardless of whether anything MEANINGFUL changed. This is a genuine, deeper bug in boot/
+watermark timing (data/backup.js, fileSaveState.js) — NOT fixed this turn. It touches core persistence
+sequencing on an already-large turn; flagged below for a dedicated turn rather than a rushed patch.
+
+Amendments 22/23 finalized what TO build regardless of that deeper bug: the human's own reframing — "it makes
+me wonder what did i do wrong" (a needless confirm isn't friction, it's the app implying a mistake that didn't
+happen) — and the predicate's name, from the human directly: "am i really going to lose something." Built
+wouldLoseWork({ workspace }) in blocks/saveStates.js — PROGRAM scope (default): is there a non-empty program
+right now (the shared half every door asks first); WORKSPACE scope (opt-in): additionally asks
+isWorkspaceDirtyToFile(), since Workspace Open replaces the whole workspace via a full page reload (t1137's own
+comment on workspaceManager.js), which would ALSO wipe an unsaved program even on a workspace that itself reads
+clean — the exact gap the old isWorkspaceDirtyToFile()-only gate had. Reused the existing signals per direct
+instruction ("do NOT invent a second dirty-flag") rather than fixing their own accuracy — that's the deferred,
+deeper bug's job, not this predicate's.
+
+confirmDestructiveLoad (already the ONE seam for G-code Open, Project Open, wizardManager's Insert,
+editorManager's Clear, devMode's two callers — S4-1's own doc comment) now delegates its base "is there
+anything to lose" check to wouldLoseWork(), keeping its own incoming-stack-signature refinement (loading the
+IDENTICAL stack is also nothing lost) as a layer on top, since that needs the incoming stack wouldLoseWork()
+deliberately doesn't take. confirmDiscardBuffer (Workspace Open) now gates on wouldLoseWork({workspace: true})
+instead of isWorkspaceDirtyToFile() alone.
+
+Tested BOTH sides per amendment 22's explicit instruction ("one-sided tests are how the fix drifts back") in
+the new tests/replace-confirm-2184.spec.js: SILENT on a fresh empty boot; PRESENT with real program content
+even when the workspace itself reads clean (the exact case the old gate missed — confirmed via a sanity
+assertion that isDirty() genuinely reads false there); PRESENT with real workspace content (a settings change)
+even on an empty canvas; and the same two-sided bar for G-code Open via confirmDestructiveLoad directly.
+Non-vacuity proven by reverting saveStates.js/workspaceManager.js to HEAD and re-running: exactly the ONE test
+targeting the new behavior (program content, workspace clean) failed — the other three, testing behavior that
+was already correct, stayed green, which is the right signature for a precise, minimal fix.
+
+NOT fixed this turn (reported, not built, per direct instruction not to build a confirm without telling them
+first): raw/marker-free G-code loads (commandDeck.js's loadGcodeFile, the non-@DDCS: branch) bypass
+confirmDestructiveLoad entirely — ed.value = text with no guard at all. A real gap, silently replacing unsaved
+work on that specific file shape; flagged for the advisor below, not patched.
+
+### Verification
+
+Full collateral sweep across every header/settings/workspace/wizard-adjacent spec touched this turn (~20 files,
+run repeatedly as the structure changed): final pass 108 passed, 1 flaky-then-passed (a pre-existing
+.app-dialog pointer-intercept race under parallel-worker contention, the same class diagnosed as environmental
+multiple times earlier this session — passed on retry, not a regression). Smoke 76/76, node 227/227, lint
+clean. Non-vacuity proven directly for the two riskiest additions (the identity-placement DOM-order test, the
+replace-confirm predicate) by reverting to HEAD and confirming the right tests — and only those — failed.
+
+Live screenshots, all 5 themes where relevant: verification/t2184-filemenu-sections-{desktop,390}.png,
+t2184-final-{normal,studio,futuristic,organic,steampunk}-{desktop,390 where captured}.png,
+t2184-legibility-{normal,organic,steampunk}.png, t2184-appmenu-{current,unified}-organic.png.
+
+### For the advisor
+
+1. **The deeper persistence-timing bug** (Part 8): ddcs_studio_settings lazily materializes from undefined on
+   the first Settings-panel interaction of any kind (not uniquely theme), and the boot watermark — captured
+   before that materialization — reads the resulting appearance as "dirty" even when nothing meaningful
+   changed. This is why the human sees the replace-confirm fire more than wouldLoseWork()'s own logic alone
+   would predict on a session that has touched Settings at all. Root-caused live (not from reading code); not
+   fixed — real surgery to data/backup.js's watermark timing / fileSaveState.js's boot sequencing, deserves its
+   own turn.
+2. **Raw G-code Load has no confirm at all** (Part 8) — commandDeck.js's non-marker branch. A real gap;
+   reported per direct instruction, not patched.
+3. **The version footer is illegible** (Part 3) — 1.70-2.57:1 across all 5 themes, worse than the original
+   identity-line bug. Measured and reported per direct instruction not to restyle it.
+4. Amendments 7/8/9/10/11/12 (tab-glow-under-macro-and-gateway in futuristic; the mismatch-line two-datapoint
+   split; the menu-trigger's per-theme hover/resting-state design) all arrived mid-task explicitly marked
+   QUEUED — acknowledged, not started.
+
+🔨 turn 2184

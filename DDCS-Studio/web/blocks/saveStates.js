@@ -9,6 +9,7 @@
  */
 
 import { onChange as onProgramChange } from './programModel.js';
+import { isWorkspaceDirtyToFile } from '../data/backup.js';   // t2184 (amendment 23) — wouldLoseWork()'s workspace-scope half
 
 const MAX = 100;
 let history = [];      // [{ stack, label }] oldest → newest
@@ -51,6 +52,36 @@ export const redoLabel = () => (canRedo() ? history[ptr + 1].label : '');
 export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
 
 /**
+ * t2184 (amendments 21-23) — "am I really going to lose something?" (the human's own question, verbatim — put
+ * here because it is the reason this predicate exists, not decoration). This RETIRES "will this replace
+ * content" as the guard's own question: a confirm firing on an empty canvas isn't friction, it's the app
+ * telling someone they may have made a mistake when they haven't — "it makes me wonder what did i do wrong"
+ * (the human, on hitting this while opening something over nothing). A name like willReplaceContent() invites
+ * exactly that widening back, because replacing content SOUNDS dangerous and the name agrees; this one can't be
+ * widened without the widener noticing they're lying about what it answers.
+ *
+ * PROGRAM scope (default): is there a real, non-empty program in the editor right now? Loading ANYTHING over an
+ * empty canvas has nothing to lose — the emptiness itself is the whole answer, before any incoming-stack
+ * comparison. `confirmDestructiveLoad` below layers ONE further refinement on top for its own callers (loading
+ * the IDENTICAL stack back over itself is also nothing lost), but that refinement needs the incoming stack,
+ * which this predicate deliberately doesn't take — it answers the simpler, shared question every door asks
+ * first.
+ *
+ * WORKSPACE scope (`workspace: true`): Workspace Open additionally replaces settings/wizards/CAM/etc via a full
+ * page reload (ui/workspaceManager.js), which would ALSO wipe an unsaved program even if the workspace's own
+ * dirty-to-file signal were clean — so it asks BOTH halves. Reuses `isWorkspaceDirtyToFile()` (data/backup.js)
+ * as-is rather than inventing a second dirty-flag (the human's own instruction) — its own accuracy (it can read
+ * dirty on an untouched device-only change like a theme switch, a separate, deeper bug traced but not fixed
+ * this turn — see WORK-LOG) is a property of THAT signal, not of this predicate composing it honestly.
+ */
+export function wouldLoseWork({ workspace = false } = {}) {
+    const cur = getProg();
+    if (Array.isArray(cur) && cur.length > 0) return true;
+    if (workspace) { try { if (isWorkspaceDirtyToFile()) return true; } catch (_) { /* matches isWorkspaceDirtyToFile's own read-error default: not dirty */ } }
+    return false;
+}
+
+/**
  * S4-1 — the SHARED destructive-load guard, the ONE seam every door that replaces the program routes through
  * (t1938 — commandDeck.js's .nc import, programFile.js's loadProject, editorManager.js's Clear; t1942 —
  * wizardManager.js's own Insert, now 3-way). Loading a stack REPLACES the current program
@@ -81,7 +112,10 @@ export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
  */
 export async function confirmDestructiveLoad(incoming, opts = {}) {
     const cur = getProg();
-    const willReplace = Array.isArray(cur) && cur.length > 0 && sig(cur) !== sig(incoming);
+    // t2184 — wouldLoseWork() answers the shared, simpler half ("is there anything here at all"); the
+    // signature comparison is this caller's own refinement (loading the IDENTICAL stack back is also nothing
+    // lost), which needs the incoming stack wouldLoseWork() deliberately doesn't take.
+    const willReplace = wouldLoseWork() && sig(cur) !== sig(incoming);
     if (!willReplace) return opts.choices ? (opts.silentKey != null ? opts.silentKey : true) : true;   // nothing to lose → silent
     snapshot(opts.label || 'before edit');               // the recovery point → the message promises Undo (t1161 made it work)
     if (opts.choices) {

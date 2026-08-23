@@ -135,11 +135,13 @@
              live textContent on each menu open. -->
         <span hidden class="ver">V2026.08.23.1</span>
         <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
-        <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
-        <div class="macro-bar" id="macroBar">
-            <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span></button>
-            <button class="op-btn" id="projSaveBtn" title="Save the current program as a project (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span></button>
-        </div>
+        <!-- t2184 (amendment 1) — the standalone 📂 Open / 💾 Save project buttons (macro-bar, ui/macroBar.js) are
+             RETIRED, not repointed. Human, after correcting a misread of their own earlier request: "the header
+             disk button can be removed and we will use the one in the file menu" — the file menu's Workspace
+             Save, Project Save AND G-code Save as already state every save door; a fourth, unlabelled,
+             tooltip-only disk was a door to something the menu already says three ways. #projOpenBtn's sibling
+             went with it for the same reason (Project section carries "Open…"). ui/macroBar.js is DELETED
+             outright, not left mounting nothing — see index.html's own deferred-init block for the removed call. -->
         <!-- App-switcher: STUDIO ↔ GATEWAY ↔ SETTINGS. Wired by ui/gatewayStatus.js -->
         <nav class="hdr-tabs" aria-label="App switcher">
             <button type="button" class="tab active" data-app="studio" onclick="window.showApp && window.showApp('studio')"><span class="dot"></span><span class="app-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span><span class="app-tx">STUDIO</span></button>
@@ -1421,10 +1423,8 @@
                 const { initPostGating } = await import('./ui/postGating.js');
                 initPostGating();                 // grey wizard fields the active post can't use (tooltip-only why)
             } catch (err) { console.error('post gating init failed', err); }
-            try {
-                const { initMacroBar } = await import('./ui/macroBar.js');
-                initMacroBar();                   // header 📂 Open / 💾 Save project buttons
-            } catch (err) { console.error('macro bar init failed', err); }
+            // t2184 (amendment 1) — initMacroBar() call REMOVED with the module itself: the two buttons it wired
+            // (#projOpenBtn/#projSaveBtn) are gone, so there is nothing left for this init to do.
             try {
                 const { initEditorOpHover } = await import('./ui/editorOpHover.js');
                 initEditorOpHover();

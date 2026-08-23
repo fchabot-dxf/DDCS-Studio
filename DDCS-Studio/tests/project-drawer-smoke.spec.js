@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 // Guards the project Open drawer's import chain (projectModal → googlePicker → googleDrive/providers). That chain is
-// STATIC ESM (imported at boot via macroBar.js), so a broken import kills the module graph → macroBar can't wire
-// #projOpenBtn → the drawer never renders. Hence the REAL guard is the POSITIVE render assertions (.proj-voltab + the
-// cloud pane) — they deterministically fail if the import chain is broken.
+// STATIC ESM (imported at boot via headerPost.js), so a broken import kills the module graph → the file menu's
+// Project-section "Open…" row can't wire → the drawer never renders. Hence the REAL guard is the POSITIVE render
+// assertions (.proj-voltab + the cloud pane) — they deterministically fail if the import chain is broken.
+// t2184 — macroBar.js/#projOpenBtn (what this comment used to describe) are deleted outright (amendment 1); this
+// spec is already test.skip below and was not otherwise touched this turn.
 //
 // t672 DE-FLAKE (was a REPEAT flaky, t645/t664/t670): the ROOT CAUSE was a SPEC-RACE, not an app race. The pageerror
 // listener was attached at goto and asserted `== []` at the END, so it captured errors across the ENTIRE concurrent

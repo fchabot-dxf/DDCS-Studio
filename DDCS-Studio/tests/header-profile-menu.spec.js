@@ -29,7 +29,7 @@ const seedProfile = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the FILE menu: identity line (name·controller, ↧) + one workspace row + Library; the file rows are BACK (t2078), 9 rows (t2173: Insert removed)', async ({ page }) => {
+test('the FILE menu: identity line (name·controller, ↧) + four labelled sections; the file rows are BACK (t2078), 6 rows (t2184 grid restructure)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -44,8 +44,10 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
             identityLabel: id ? (id.querySelector('.hq-identity-txt') || {}).textContent.trim() || '' : '',
             identityCtrl: id ? (id.querySelector('.hq-cur') || {}).textContent || '' : '',
             // …and it sits directly above the Save / Open buttons (t2147 — with the new Saved-line between them
-            // now, BACKLOG #7), so a save has its context
-            identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.nextElementSibling && id.nextElementSibling.nextElementSibling.classList.contains('hq-ws-row')),
+            // now, BACKLOG #7), so a save has its context. t2184 (amendment 13) — the identity line now lives
+            // INSIDE the Workspace section, as its first row; saved-line comes right after, then Save/Open.
+            identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.nextElementSibling
+                && id.nextElementSibling.nextElementSibling.classList.contains('hq-ws-row')),
             hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),   // t1243 — must now be FALSE (the badge moved to the manager's Cloud tab)
             hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
             hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
@@ -57,9 +59,12 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
             fileInsertCount: menu.querySelectorAll('[data-act="fileInsert"]').length,
             hasClear: menu.querySelectorAll('[data-act="clear"]').length,
             hasSetupSheet: menu.querySelectorAll('[data-act="setupSheet"]').length,
-            // t2149 (BACKLOG #9) — Settings/FAQ/About/getDesktop/Rate/version all MOVED OUT to the new #hdrAppMenu;
+            // t2184 (amendment 2) — Settings is BACK in this menu (workspace content — saved into the .ddcs),
+            // so it's asserted PRESENT below, not in this absence list any more.
+            hasSettings: menu.querySelectorAll('[data-act="settings"]').length,
+            // t2149 (BACKLOG #9) — FAQ/About/getDesktop/Rate/version all MOVED OUT to the new #hdrAppMenu;
             // asserted absent from THIS menu here, present in the app menu by header-menu-split-2149.spec.js.
-            appScopedLeaked: menu.querySelectorAll('[data-act="settings"], [data-act="helpFaq"], [data-act="helpAbout"], [data-act="getDesktop"], [data-act="rate"]').length,
+            appScopedLeaked: menu.querySelectorAll('[data-act="helpFaq"], [data-act="helpAbout"], [data-act="getDesktop"], [data-act="rate"]').length,
             themeChips: menu.querySelectorAll('.hq-theme-chip[data-theme]').length,
             // t2147 (BACKLOG #1/#7) — theme is gone from this menu (Settings' own #set_theme picker is the one
             // door now); the "Saved …" line and the version footer are new.
@@ -84,9 +89,13 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
             wsRows: menu.querySelectorAll('.hq-ws-row').length,
             wsBtns: menu.querySelectorAll('.hq-ws-row [data-act="wsSave"], .hq-ws-row [data-act="wsOpen"]').length,
             rowCount: menu.querySelectorAll('.hq-identity-line, .hq-saved-line, .hdr-quick-item, .hq-ws-row, .hq-ver-footer').length,
-            // every row, named — so a count change has to be explained, not just re-numbered
+            // every row, named — so a count change has to be explained, not just re-numbered. t2184 — FOUR
+            // `.hq-ws-row` pairs now exist (Workspace/G-code/Project/Reference), not one, so a bare className
+            // would make them indistinguishable; name each by the data-acts of the buttons it holds instead.
             rowNames: [...menu.querySelectorAll('.hq-identity-line, .hq-saved-line, .hdr-quick-item, .hq-ws-row, .hq-ver-footer')]
-                .map((r) => r.dataset.act || r.className.split(' ')[0]),
+                .map((r) => r.dataset.act || (r.classList.contains('hq-ws-row')
+                    ? 'hq-ws-row:' + [...r.querySelectorAll('[data-act]')].map((b) => b.dataset.act).join('+')
+                    : r.className.split(' ')[0])),
         };
     });
     // The identity LINE — display only (t1227), with its two live sub-targets
@@ -94,8 +103,10 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
     expect(m.identityIsButton, 'it is NOT a button any more — its click served the retired profile world').toBe(false);
     expect(m.identityAboveWs, 'it sits directly above Save / Open (save context)').toBe(true);
     expect(m.identityName, 'identity shows the WORKSPACE name (t2145 — the last-saved .ddcs file\'s name)').toMatch(/Rig B/);
-    // t1249 (user) — and the line SAYS what it describes, in the disk tooltip's wording
-    expect(m.identityLabel, 'the line is labelled, so the name has a subject').toMatch(/^Workspace:/);
+    // t1249 (user) — the line USED TO carry its own "Workspace: " label so a reader could tell what it named.
+    // t2184 (amendment 13) — DROPPED: the line now lives inside the box titled WORKSPACE, so the subject is
+    // already stated once, by the section header.
+    expect(m.identityLabel, 'no "Workspace: " prefix any more — the section title states the subject').not.toMatch(/^Workspace:/);
     expect(m.identityCtrl, 'and the dialect after it').toMatch(/·/);
     expect(m.hasCloud, 'the cloud badge is RETIRED (t1243) — cloud lives in the workspace manager Cloud tab, one door not two').toBe(false);
     expect(m.hasPull, 'so does the ↧ pull tap target').toBe(true);
@@ -103,10 +114,14 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
     expect(m.hasLibrary, 'Library row').toBe(1);
     expect(m.fileRows, 'Load/Export are BACK (t2078) — they act on the program as a whole').toBe(2);
     expect(m.fileInsertCount, 'Insert stays removed (t2173)').toBe(0);
-    expect(m.wsRows, 'ONE workspace row').toBe(1);
+    // t2184 (amendments 2/3/16) — FOUR two-column `.hq-ws-row` GRIDS now: Workspace (Save/Open/Wizards/
+    // Settings, 2x2), G-code (Save as/Open), Project (Save/Open), Reference (Setup sheet/Setup checklist) —
+    // not one.
+    expect(m.wsRows, 'four grids (Workspace/G-code/Project/Reference), not one').toBe(4);
     expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
     expect(m.hasSetupSheet, 'Setup sheet stays — it is FILE-scoped (a document ABOUT this job)').toBe(1);
-    expect(m.appScopedLeaked, 't2149 — Settings/Help/getDesktop/Rate moved OUT to the app menu, none leaked back in').toBe(0);
+    expect(m.hasSettings, 't2184 (amendment 2) — Settings is BACK: it is saved into the .ddcs, workspace content').toBe(1);
+    expect(m.appScopedLeaked, 't2149 — FAQ/getDesktop/Rate moved OUT to the app menu, none leaked back in').toBe(0);
     expect(m.hasClear, 'Clear alone stayed OUT (t1255) — the editor toolbar\'s own trash owns it').toBe(0);
     // t2147 (BACKLOG #1) — NO theme in this menu any more: not the chips, not even the section shell (leave
     // nothing behind — a row that merely opened Settings would still be the row the item meant to free).
@@ -125,15 +140,23 @@ test('the FILE menu: identity line (name·controller, ↧) + one workspace row +
     expect(m.generateFor, 'the "Generate for" label is gone').toBe(false);
     // The diet target, re-encoded honestly after the t1227 curation. Nothing is hidden from the count by class
     // (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
-    // t2149 (BACKLOG #9) — settings/help/getDesktop/rate/hq-ver-footer LEAVE this menu for the new #hdrAppMenu
-    // (see header-menu-split-2149.spec.js for that side); nothing else in the row set changes.
+    // t2184 (scratchpad/t-filemenu-sections.md, amendments 2/3/16) — FOUR SECTIONS, each ONE shared-style grid:
+    // Wizards and Settings are no longer standalone `.hdr-quick-item` rows either (amendment 16 retired that
+    // distinction entirely) — every action in a section is one `.hq-ws-btn` inside that section's single
+    // `.hq-ws-row` grid, named below by the data-acts it holds. Amendment 17 — G-code's save action leads
+    // (fileExport before fileLoad).
     expect(m.rowNames, 'exactly these rows, in this order').toEqual([
-        'hq-identity-line', 'hq-saved-line', 'hq-ws-row', 'wizards', 'fileLoad', 'fileExport', 'library', 'setupSheet', 'checklist',
+        'hq-identity-line', 'hq-saved-line',
+        'hq-ws-row:wsSave+wsOpen+wizards+settings',
+        'hq-ws-row:fileExport+fileLoad',
+        'hq-ws-row:projSave+library',
+        'hq-ws-row:setupSheet+checklist',
     ]);
-    // t1245/t1617/t2099 grew this menu across three turns (see WORK-LOG for that history); t2149 was the first
-    // turn to SHRINK it — five app-scoped rows (settings, help, getDesktop, rate, hq-ver-footer) moved out.
-    // t2173 (tail, human: "insert is redundant beside load remove it completely") shrank it a second time.
-    expect(m.rowCount, 'the FILE menu is 9 rows (10, minus Insert)').toBe(9);
+    // t1245/t1617/t2099 grew this menu across three turns (see WORK-LOG for that history); t2149 shrank it —
+    // five app-scoped rows moved out. t2173 (tail) shrank it again (Insert removed). t2184 restructured it into
+    // four one-grid-each sections (net: Settings returns, Project gains a real Save… row, Wizards/Settings fold
+    // into their section's grid instead of standing alone) — 6 rows.
+    expect(m.rowCount, 'the FILE menu is 6 rows after the t2184 grid restructure').toBe(6);
 
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.

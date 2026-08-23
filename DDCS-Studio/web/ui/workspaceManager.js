@@ -20,6 +20,7 @@
  * Save and continue / Discard / Cancel — and never a silent download.
  */
 import { restoreBackup, previewBackup, markWorkspaceSavedToFile, markItemsSavedToFile, forgetWorkspaceFile, workspaceDelta, changedItemsSince, changeLabel, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t1309 — the save-first modal names the programs too
+import { wouldLoseWork } from '../blocks/saveStates.js';   // t2184 (amendment 23) — "am I really going to lose something", the ONE shared predicate
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
 import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '../data/fsHandles.js';
 import { envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
@@ -35,10 +36,17 @@ const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirector
  * THE UNSAVED GATE — the ONE prompt (user ruling). Opening replaces the whole buffer, so if there is unsaved work the
  * user chooses once: keep it (save first), drop it, or back out. There is deliberately no silent safety download here:
  * a file appearing in Downloads that nobody asked for is not consent, and it taught people nothing about their state.
+ *
+ * t2184 (amendments 21-23) — gated on wouldLoseWork({workspace: true}), not isWorkspaceDirtyToFile() alone:
+ * opening a workspace RELOADS THE PAGE (t1137's own comment on this file), which would ALSO wipe an unsaved
+ * PROGRAM even on a workspace that itself has nothing new to save. "am I really going to lose something" (the
+ * human's own question) has to ask both halves — the workspace's file-dirty signal AND the editor's own
+ * content — or the empty-canvas-but-workspace-dirty case still fires (and the reverse: a program full of real
+ * work under a workspace that happens to read clean would have silently gone unprotected before this).
  * @returns {Promise<boolean>} may the caller proceed
  */
 export async function confirmDiscardBuffer(what) {
-    if (!isWorkspaceDirtyToFile()) return true;
+    if (!wouldLoseWork({ workspace: true })) return true;
     const choice = await threeWay(
         `Opening ${what} replaces everything in this workspace, and you have changes that are not in a file yet.`,
     );

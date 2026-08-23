@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * t854 part 1 — THE PROJECTS MODAL. Opened from the header quick-menu "Open project…" row (t2173 — literalised
- * from "Library…"; the underlying door/data-act is unchanged) — select-then-load over the local + cloud
- * volumes, plus the save-as door. 390px reachability.
+ * t854 part 1 — THE PROJECTS MODAL. Opened from the header quick-menu's Project-section "Open…" row (t2173 —
+ * literalised from "Library…" to "Open project…"; t2184 dropped "project" once the section title took it over;
+ * the underlying door/data-act is unchanged throughout) — select-then-load over the local + cloud volumes, plus
+ * the save-as door. 390px reachability.
  *
  * t1217 — the PROFILES tab retired first ([[one-workspace-one-machine]]): a workspace holds exactly one
  * machine, so there is no library of machines to browse or switch between (a second machine is a second
@@ -28,7 +29,7 @@ async function seed(page) {
         await store.saveProject('Bracket', { kind: 'ddcs.macro', v: 1, name: 'Bracket', stack: [{ type: 'op', opType: 'user_pocket_data' }] });
     });
 }
-// Open the modal through the real header quick-menu "Open project…" row (t2173 — was "Library…").
+// Open the modal through the real header quick-menu's Project-section "Open…" row (t2173 — was "Library…").
 async function openViaMenu(page) {
     await page.click('#hdrPostBtn');
     await page.click('#hdrPostMenu [data-act="library"]');

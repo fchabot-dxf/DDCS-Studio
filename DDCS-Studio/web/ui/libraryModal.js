@@ -16,7 +16,8 @@
  * ONE DOOR, now for Projects alone: `openLibrary()` opens the projects browser — REUSING its existing logic
  * unchanged (the projectStore API + the shared selectLoad contract + projectModal.openSaveModal), just without the
  * now-pointless single-tab switcher around it. Kept the exported name (`openLibrary`) and the `#libraryOverlay` id
- * — every existing caller (macroBar.js, headerPost.js's "Open project…" row) already only ever wanted this tab, so
+ * — every existing caller (headerPost.js's Project-section "Open…" row, t2184 — macroBar.js's own #projOpenBtn
+ * caller retired the same turn, see amendment 1) already only ever wanted this tab, so
  * neither needed to change.
  */
 import { installSelectLoad, syncPrimary } from './selectLoad.js';

@@ -814,9 +814,30 @@ html, body { overflow-x: clip; }
 .hq-swatch { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
 .hdr-quick-sep { height: 1px; margin: 5px 4px; background: var(--menu-edge, var(--kbd-edge, var(--border, #444))); opacity: .6; }
 
+/* t2184 (scratchpad/t-filemenu-sections.md) — the FILE menu's four labelled sections (Workspace/G-code/Project/
+   Reference). A border, not another .hdr-quick-sep line: the sections replace flat-list-plus-dividers with
+   actual grouping, so the section's own edge does the separating — no dividers needed between sections too. */
+.hdr-menu-section {
+    border: 1px solid var(--menu-edge, var(--kbd-edge, var(--border, #444)));
+    border-radius: 6px;
+    padding: 3px;
+    margin: 3px 0;
+}
+.hdr-menu-section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    /* t2184 (amendments 5/6) — opacity:.6 measured WORST of the three (as low as 2.0:1, composited over a real
+       loaded program). Same color-mix fix as .hq-identity-txt above (see its comment for the full reasoning);
+       bold weight + letter-spacing + uppercase already read as "a label, not a button" without needing opacity
+       to do that job too. */
+    color: color-mix(in srgb, var(--text-dim, #9fb0c4) 45%, var(--text-main, #e6edf3) 55%);
+    padding: 3px 6px 2px;
+}
+
 /* Collapsible submenus (Post-processor, Theme): a header row + an indented, togglable list */
 .hdr-quick-sub { font-weight: 700; }
-.hq-cur { font-weight: 400; opacity: .55; }
+/* t2184 (amendments 5/6) — same color-mix fix as .hq-identity-txt above (its own comment has the measured
+   numbers + the reasoning for color-mix over opacity); opacity dropped entirely rather than raised further. */
+.hq-cur { font-weight: 400; color: color-mix(in srgb, var(--text-dim, #9fb0c4) 45%, var(--text-main, #e6edf3) 55%); }
 .hq-caret { margin-left: auto; flex: 0 0 auto; opacity: .55; transition: transform .12s ease; }
 .hdr-quick-sub.is-open .hq-caret { transform: rotate(90deg); }
 /* t2147 (BACKLOG #1) — the theme picker (a row of .hq-theme-chip swatches under .hdr-quick-subitems) is RETIRED
@@ -836,13 +857,23 @@ html, body { overflow-x: clip; }
 .hq-identity-txt {
     /* WRAPS rather than ellipsizes: the envelope is the point of the line, so hiding its tail would defeat it. */
     flex: 1 1 auto; min-width: 0;
-    font-size: 11.5px; font-weight: 600; color: var(--text-dim, #9fb0c4); opacity: .85; line-height: 1.35;
+    /* t2184 (amendments 5/6, human: "verify this label is legible in all theme... font need adjusting only") —
+       MEASURED (pixel-sampled contrast, composited over a real loaded program + wizard bar, all 5 themes): the
+       old opacity:.85 (plus .hq-cur's own opacity:.55, compounding to ~.47 effective) failed 4.5:1 in every
+       theme (2.5–4.0:1). Fixed on the TEXT alone (the popover's translucent background/backdrop-filter is
+       untouched, per direct instruction) — but plain opacity blends toward whatever's BEHIND the text, which
+       swings from near-black (futuristic) to near-white (normal), so no single opacity value clears the floor
+       everywhere. color-mix toward --text-main instead: a THEME-CONSISTENT dimming (every theme's button labels
+       already use --text-main and are legible by construction, so blending toward it — rather than toward an
+       unpredictable background — structurally guarantees headroom, not a tuned-per-theme number). */
+    font-size: 11.5px; font-weight: 600;
+    color: color-mix(in srgb, var(--text-dim, #9fb0c4) 45%, var(--text-main, #e6edf3) 55%);
+    line-height: 1.35;
 }
 .hq-identity-txt b { font-weight: 700; }
-/* t1249 — the identity line's SUBJECT label. Its own class, not .hq-cur: the dialect and the envelope are VALUES
-   the line reports, the label is what the line is ABOUT, and giving them one class made the two indistinguishable
-   to anything reading the row (a spec found it immediately). */
-.hq-identity-txt .hq-label { color: var(--text-dim, #9fb0c4); font-weight: 600; }
+/* t1249's own .hq-label rule (the identity line's "Workspace: " subject label) is RETIRED at t2184 (amendment
+   13) — the label's only consumer is gone, dropped when the identity line moved inside the WORKSPACE section
+   (the box header states the subject now, so the line no longer needs to). */
 /* the envelope wraps as ONE unit — a machine's travel must never break across a line mid-number */
 .hq-identity-txt .hq-env { white-space: nowrap; }
 
@@ -875,13 +906,16 @@ html, body { overflow-x: clip; }
     opacity: 1; background: var(--panel2, rgba(255,255,255,.14));
 }
 
-/* Workspace row: small compact buttons in one horizontal row. (t1227 — the .hq-gcode-* twin went with the gcode row
-   itself: Load/Insert/Export moved to the editor's corner file menu, so this styling has one user again.) */
+/* t2184 (amendment 16, human: "make it a grid in wide too... and all buttons can share their style") — a
+   two-column GRID of the SAME tile button, at every width, for every file-menu action (was: flex pairs plus an
+   odd item spanning full width, t1227/t2184 amendment 3). A GRID rather than flex: with 2 items it's one row
+   (unchanged from before), with 4 (Workspace: Save/Open/Wizards/Settings) it auto-wraps into a clean 2x2 with
+   no extra markup — the row count falls out of the item count instead of being hand-split into a pair + spans. */
 .hq-ws-row {
-    display: flex; gap: 4px; padding: 3px 6px 4px; align-items: center;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; padding: 3px 6px 4px;
 }
 .hq-ws-btn {
-    flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
     padding: 5px 4px; border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 5px;
     background: var(--panel2, rgba(255,255,255,.06)); color: var(--text-main, #e6edf3);
     font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
@@ -891,6 +925,13 @@ html, body { overflow-x: clip; }
     background: var(--panel2, rgba(255,255,255,.14)); border-color: var(--accent, #0ea5e9);
 }
 .hq-ws-btn svg { flex: 0 0 auto; }
+/* t2184 (amendment 14/16) — the 44px touch floor (t2153's own ruling: "raise the others, do not shrink clear")
+   reaching a surface that never had it, PHONE-ONLY: a desktop pointer doesn't need it, and inflating every tile
+   at every width would cost real popover height for nothing (the identity line's own "not the text" carve-out
+   applies here to DESKTOP, not to the buttons themselves — these are real tap targets). */
+@media (max-width: 600px) {
+    .hq-ws-btn { min-height: 44px; }
+}
 
 /* Profile/post capability warning — a prominent amber badge (was an easy-to-miss 15px glyph) that gently
    pulses to draw the eye; only ever shown when there's a real warning (hidden otherwise). */
@@ -1095,13 +1136,6 @@ html, body { overflow-x: clip; }
 /* Capability gating: grey (not hide) a field the active post can't use — layout stays put; tooltip explains. */
 .cap-off { opacity: .4; }
 .cap-off input, .cap-off select, .cap-off button { pointer-events: none; }
-
-/* Header project buttons (📂 Open drawer / 💾 Save modal) — borderless ghost icon buttons. */
-/* Open/Save: on desktop/tablet they live in the chevron quick-menu (hidden here); on PHONE the chevron is
-   hidden, so the standalone Open/Save come back to the header (see the max-width:600px rule). */
-.macro-bar { display: none; gap: 6px; align-items: center; }
-.macro-bar .op-btn { border-color: transparent; background: transparent; }
-.macro-bar .op-btn:hover { background: var(--panel2, rgba(255, 255, 255, .08)); }
 
 /* Project VFS — Open/manage DRAWER (left sidebar, Fusion-style; top set in JS to the header height). */
 .proj-drawer {
@@ -5650,13 +5684,13 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
     .app-header .logo { height: 26px; }
 }
 /* The post-processor chevron is icon-only at every width; on PHONE hide it entirely (set it in
-   Settings → Post processor). Project Open/Save (macro-bar) stay in the header. */
+   Settings → Post processor). */
 @media (max-width: 600px) {
     .app-header.is-mini .hdr-tabs .tab { padding: 0 13px; }
     .hdr-controls { gap: 6px; }
     /* The chevron quick-menu stays visible on phone — it's the single quick-access point everywhere
-       (Open/Save/Load/Insert/Copy/Clear/Export + post + theme). The standalone macro-bar stays hidden
-       (its Open/Save now live in the chevron). */
+       (Save/Open/Wizards/Load/Export/Project/setup docs + post + theme). t2184 — the standalone macro-bar
+       this comment used to also cover is deleted outright now, not just hidden here; nothing to say about it. */
     /* BACKLOG #13 (t2155) — the toolbar moves to the BOTTOM on phone. Sitting at the top (base position) parks it
        over the FIRST LINE of code, exactly where the caret usually sits when you start typing. Most programs do
        not fill a phone screen, so the bottom sits over blank space instead.

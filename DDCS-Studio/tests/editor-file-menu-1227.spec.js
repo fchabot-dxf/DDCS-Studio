@@ -74,7 +74,9 @@ test('the header quick menu offers Load / Export (t2078 reversal) but never Inse
     await expect(async () => {
         const open = await page.evaluate(() => { const m = document.getElementById('hdrPostMenu'); return !!(m && !m.hidden && m.children.length); });
         if (!open) await page.locator('#hdrPostBtn').click();
-        await expect(menu.locator('.hq-ws-row')).toBeVisible({ timeout: 1500 });
+        // t2184 — FOUR `.hq-ws-row` pairs exist now (Workspace/G-code/Project/Reference); `.first()` is just a
+        // "the menu has rendered its row shapes" readiness check, not asserting how many there are.
+        await expect(menu.locator('.hq-ws-row').first()).toBeVisible({ timeout: 1500 });
     }).toPass({ timeout: 15000 });
     // t2099 — t2078 put these BACK (this used to assert their absence; see the file-header comment).
     await expect(menu.locator('[data-act="fileLoad"]'), 'Load is back — acts on the program as a whole').toBeVisible();

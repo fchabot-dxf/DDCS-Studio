@@ -5,7 +5,9 @@ import { autoAppDialog } from './_appDialog.js';
  * t863 — THE PROJECTS-CLOUD REFACTOR. The Library Projects tab now hosts BOTH volumes (Local + Cloud) as two SEPARATE
  * select-then-load roots (#libProjLocal / #libProjCloud, each with its own [data-sl-primary]), via the reusable
  * `renderCloudInto` factored off the drawer singletons — each mount owns its OWN cloud folder stack (closure, not the
- * old module `cloudStack`). The 📂 Open header button DEEP-LINKS here (the drawer is no longer an entry point).
+ * old module `cloudStack`). The file menu's Project-section "Open…" row DEEP-LINKS here (the drawer is no longer an
+ * entry point). t2184 — this used to be the standalone 📂 Open header button; that button is retired outright
+ * (amendment 1), the file menu's own door is now the only one.
  *
  * Asserts: both roots select-then-load, folder nav in both, save-as round-trips through the Library door, the deep-link
  * opens the Library (not the drawer), and NO singleton folder-state leaks between the drawer's cloud + the Library's
@@ -45,7 +47,10 @@ async function installDriveMock(page) {
     });
 }
 
-const READY = () => window.ddcsStudio && window.openLibrary && document.getElementById('projOpenBtn');
+// t2184 — the #projOpenBtn readiness proxy is gone with the button itself (macroBar.js deleted, amendment 1);
+// the standard ddcsReady flag is the replacement (it fires strictly after ALL deferred header/menu wiring,
+// including what macroBar's init used to do — see index.html's own t1279 comment on that flag).
+const READY = () => window.ddcsStudio && window.openLibrary && document.documentElement.dataset.ddcsReady === '1';
 
 // Seed a couple of LOCAL projects + a folder (the projectStore API — deterministic, no editor state needed).
 async function seedLocal(page) {
@@ -57,23 +62,22 @@ async function seedLocal(page) {
     });
 }
 
-// THE DEEP-LINK under test: #projOpenBtn's wiring (macroBar → openLibrary('projects')). The button is a stable HIDDEN
-// proxy target (.macro-bar is display:none), so we fire its click programmatically — exactly what any proxy caller does —
-// bypassing Playwright's visibility gate on the intentionally-hidden element. This IS the wiring t863 retired to the Library.
-// Poll-click: initMacroBar attaches the listener at boot; retry the click until the overlay appears (avoids the boot race).
+// THE DEEP-LINK under test: the file menu's Project-section "Open…" row (headerPost.js [data-act="library"] →
+// openLibrary('projects')). t2184 (amendment 1) — the OLD door this test drove, #projOpenBtn/macroBar.js, is
+// deleted outright (not repointed): the file menu already stated the same door three ways, so the standalone
+// disk was retired rather than kept as a second path to the same call. This is now the ONE real door.
 async function openViaDeepLink(page) {
     const ov = page.locator('#libraryOverlay');
-    await expect(async () => {
-        await page.evaluate(() => document.getElementById('projOpenBtn').click());
-        await expect(ov).toBeVisible({ timeout: 1000 });
-    }).toPass({ timeout: 10000 });
+    await page.click('#hdrPostBtn');
+    await page.click('#hdrPostMenu [data-act="library"]');
+    await expect(ov).toBeVisible();
     // t2178 (amendment 14) — the Library SPLIT: this modal is Projects-only now, no tab bar to assert "active"
     // on. Assert the Projects content itself mounted instead (the volumes toggle only this tab ever had).
     await expect(ov.locator('.proj-voltabs')).toBeVisible();
     return ov;
 }
 
-test('the 📂 Open header button DEEP-LINKS to the Projects modal (not the drawer), with Local + Cloud volumes', async ({ page }) => {
+test('the file menu\'s Open… row DEEP-LINKS to the Projects modal (not the drawer), with Local + Cloud volumes', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(READY, null, { timeout: 15000 });
     await seedLocal(page);

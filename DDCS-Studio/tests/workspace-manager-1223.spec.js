@@ -52,9 +52,10 @@ async function grantFolder(page, files) {
 test('the quick menu carries SAVE and OPEN as primary buttons, and both open the ONE manager', async ({ page }) => {
     await boot(page);
     await page.locator('#hdrPostBtn').click();
-    await page.waitForSelector('#hdrPostMenu .hq-ws-row', { timeout: 8000 });
-    const row = page.locator('#hdrPostMenu .hq-ws-row');
-    await expect(row, 'the workspace row exists').toBeVisible();
+    // t2184 — FOUR `.hq-ws-row` pairs exist now (Workspace/G-code/Project/Reference); scope to the ONE that
+    // actually holds Save/Open (the Workspace section's own pair), not just any `.hq-ws-row`.
+    const row = page.locator('#hdrPostMenu .hq-ws-row:has([data-act="wsSave"])');
+    await expect(row, 'the workspace row exists').toBeVisible({ timeout: 8000 });
     await expect(row.locator('[data-act="wsSave"]')).toBeVisible();
     await expect(row.locator('[data-act="wsOpen"]')).toBeVisible();
 
