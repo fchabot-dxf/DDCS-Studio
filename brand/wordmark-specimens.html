@@ -1,0 +1,613 @@
+<title>Organic Wordmark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,800;0,900;1,800;1,900&family=Asap:ital,wght@0,700;0,800;1,700;1,800&family=Rubik:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=M+PLUS+Rounded+1c:wght@700;800;900&family=Fredoka:wght@600;700&family=Sniglet:wght@800&family=Hind:wght@600;700&family=Red+Hat+Display:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Figtree:ital,wght@0,800;0,900;1,800;1,900&family=Be+Vietnam+Pro:ital,wght@0,700;0,800;1,700;1,800&family=Cabin:ital,wght@0,600;0,700;1,600;1,700&family=Baloo+2:wght@700;800&family=Varela+Round&family=Quicksand:wght@600;700&family=Signika:wght@600;700&display=swap">
+
+<style>
+  /* The organic theme's OWN tokens, verbatim from styles.css [data-theme="organic"].
+     This page is the thing it is deciding about, so it commits to one visual world
+     deliberately — no light variant, every colour painted explicitly. */
+  :root {
+    --floor:    #14110b;   /* --bg        forest floor            */
+    --canopy:   #14110b;   /* --hdr-bg  <- CORRECTED: .app-header paints --hdr-bg, which
+                             organic sets to var(--bg). #25301a is --band-bg, the GREEN
+                             strip BELOW the header, not the surface the mark sits on. */
+    --bark:     #211a11;   /* --panel     bark shadow             */
+    --bark2:    #2d2417;   /* --panel2    bark                    */
+    --seam:     #5c4a30;   /* --border    bark seam               */
+    --sap:      #d9a03c;   /* --accent    sap amber               */
+    --sapwood:  #ece0c6;   /* --text                              */
+    --weather:  #a08d69;   /* --text-dim                          */
+    --stale:    #A89000;   /* what the mark uses TODAY            */
+    --stale-sub:#7d7d6f;   /* the tagline's stale grey-olive      */
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--floor);
+    color: var(--sapwood);
+    font: 15px/1.65 "Signika", system-ui, sans-serif;
+    padding: 40px 24px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 38px; }
+
+  h1 {
+    font: 800 30px/1.2 "Nunito", system-ui, sans-serif;
+    margin: 0; color: var(--sapwood); text-wrap: balance;
+  }
+  .lede { margin: 0; color: var(--weather); max-width: 62ch; }
+  h2 {
+    font: 700 12px/1 "Signika", system-ui, sans-serif;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--sap); margin: 0 0 14px;
+  }
+  p { margin: 0 0 12px; }
+  code {
+    font: 13px/1 ui-monospace, "Cascadia Code", Consolas, monospace;
+    background: var(--bark2); color: var(--sap);
+    padding: 2px 6px; border-radius: 4px;
+  }
+
+  .panel {
+    background: var(--bark); border: 1px solid var(--seam);
+    border-radius: 16px; padding: 22px;
+  }
+
+  /* ── the header band: the real surface the mark sits on ────────────── */
+  .band {
+    background: var(--canopy);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex; align-items: center; gap: 26px;
+    overflow-x: auto;
+  }
+  .band + .meta { margin-top: 12px; }
+
+  .mark { display: flex; flex-direction: column; line-height: 1; flex: 0 0 auto; }
+  .mark .word {
+    font-size: 26px; letter-spacing: .01em;
+    color: var(--ink, var(--stale));
+  }
+  .mark .tag {
+    font-size: 8.5px; letter-spacing: .18em; margin-top: 4px;
+    color: var(--subink, var(--stale-sub)); font-weight: 600;
+  }
+
+  /* the candidates. ITALIC is the house convention — FOUR of five shipping marks are
+     italic (three Arial Black + organic's Georgia); STEAMPUNK IS UPRIGHT, its symbol
+     carries no font-style. `.upright` on .wrap flips them all back for A/B. */
+  .mark .word, .mark .tag { font-style: italic; }
+  .wrap.upright .mark .word, .wrap.upright .mark .tag { font-style: normal; }
+
+  .f-current .word { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+  .f-current .tag  { font-family: Georgia, serif; }
+  .f-nunito  .word { font-family: "Nunito", sans-serif; font-weight: 900; }
+  .f-nunito  .tag  { font-family: "Nunito", sans-serif; font-weight: 700; }
+  .f-asap    .word { font-family: "Asap", sans-serif; font-weight: 800; }
+  .f-asap    .tag  { font-family: "Asap", sans-serif; font-weight: 700; }
+  .f-baloo   .word { font-family: "Baloo 2", cursive; font-weight: 800; }
+  .f-baloo   .tag  { font-family: "Baloo 2", cursive; font-weight: 700; }
+  .f-varela  .word { font-family: "Varela Round", sans-serif; }
+  .f-varela  .tag  { font-family: "Varela Round", sans-serif; }
+  .f-quick   .word { font-family: "Quicksand", sans-serif; font-weight: 700; }
+  .f-quick   .tag  { font-family: "Quicksand", sans-serif; font-weight: 600; }
+
+
+  .f-rubik   .word { font-family: "Rubik", sans-serif; font-weight: 800; }
+  .f-rubik   .tag  { font-family: "Rubik", sans-serif; font-weight: 600; }
+  .f-mplus   .word { font-family: "M PLUS Rounded 1c", sans-serif; font-weight: 800; }
+  .f-mplus   .tag  { font-family: "M PLUS Rounded 1c", sans-serif; font-weight: 700; }
+  .f-fredoka .word { font-family: "Fredoka", sans-serif; font-weight: 700; }
+  .f-fredoka .tag  { font-family: "Fredoka", sans-serif; font-weight: 600; }
+  .f-sniglet .word { font-family: "Sniglet", cursive; font-weight: 800; }
+  .f-sniglet .tag  { font-family: "Sniglet", cursive; font-weight: 800; }
+  .f-nunblk  .word { font-family: "Nunito", sans-serif; font-weight: 900; }
+  .f-nunblk  .tag  { font-family: "Nunito", sans-serif; font-weight: 700; }
+  .f-hind    .word { font-family: "Hind", sans-serif; font-weight: 700; }
+  .f-hind    .tag  { font-family: "Hind", sans-serif; font-weight: 600; }
+
+
+  .f-redhat  .word { font-family: "Red Hat Display", sans-serif; font-weight: 800; }
+  .f-redhat  .tag  { font-family: "Red Hat Display", sans-serif; font-weight: 600; }
+  .f-figtree .word { font-family: "Figtree", sans-serif; font-weight: 900; }
+  .f-figtree .tag  { font-family: "Figtree", sans-serif; font-weight: 700; }
+  .f-bevn    .word { font-family: "Be Vietnam Pro", sans-serif; font-weight: 800; }
+  .f-bevn    .tag  { font-family: "Be Vietnam Pro", sans-serif; font-weight: 600; }
+  .f-cabin   .word { font-family: "Cabin", sans-serif; font-weight: 700; }
+  .f-cabin   .tag  { font-family: "Cabin", sans-serif; font-weight: 600; }
+
+
+  .svgdemo { background: var(--canopy); border-radius: 12px; padding: 8px 18px; overflow-x: auto; }
+  .svgdemo svg { display: block; height: 58px; }
+  .pair { display: flex; gap: 24px; flex-wrap: wrap; }
+  .pair > div { flex: 1 1 300px; }
+  .term { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; }
+  .term span {
+    font: 600 12px/1 "Signika", sans-serif; padding: 6px 11px; border-radius: 999px;
+    background: var(--bark2); color: var(--weather); border: 1px solid var(--seam);
+  }
+  .term span.yes { border-color: color-mix(in srgb, #4f9d5d 60%, transparent); color: #7fd08c; }
+  .term span.no  { border-color: var(--seam); color: var(--weather); opacity: .65; }
+
+
+  /* ── the family strip ── */
+  .fam { display: grid; gap: 14px; }
+  .famrow { display: grid; grid-template-columns: 116px 1fr; gap: 14px; align-items: center; }
+  .famname {
+    font: 700 10px/1.35 "Signika", sans-serif; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--weather); text-align: right;
+  }
+  .famband { border-radius: 10px; padding: 12px 18px; overflow-x: auto; }
+  .fammark { display: flex; flex-direction: column; line-height: 1; }
+  .fammark .w { font-size: 26px; letter-spacing: .01em; }
+  .fammark .t { font-size: 8.5px; letter-spacing: .18em; margin-top: 4px; font-weight: 600; }
+  .arial .w, .arial .t { font-family: "Arial Black", Arial, sans-serif; font-weight: 900; font-style: italic; }
+  .geo   .w, .geo   .t { font-family: Georgia, serif; font-weight: 700; font-style: italic; }
+  .geoup .w, .geoup .t { font-family: Georgia, serif; font-weight: 700; }
+  .studio-stack { position: relative; }
+  .studio-stack .w { color: #55514a; }
+  .studio-stack .w::after {
+    content: 'DDCS'; position: absolute; left: 1px; top: 1px; color: #f0eee8;
+  }
+  .cand .w, .cand .t { font-style: italic; }
+  .c-snig .w { font-family: "Sniglet", cursive; font-weight: 800; }
+  .c-snig .t { font-family: "Sniglet", cursive; font-weight: 800; }
+  .c-nun  .w { font-family: "Nunito", sans-serif; font-weight: 900; }
+  .c-nun  .t { font-family: "Nunito", sans-serif; font-weight: 700; }
+  .c-fred .w { font-family: "Fredoka", sans-serif; font-weight: 700; }
+  .c-fred .t { font-family: "Fredoka", sans-serif; font-weight: 600; }
+
+  .kind.real { background: color-mix(in srgb, #4f9d5d 26%, transparent); color: #7fd08c; }
+  .kind.fake { background: color-mix(in srgb, #e6c04a 22%, transparent); color: #e6c04a; }
+
+  .meta { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .name { font-weight: 700; color: var(--sapwood); font-size: 15px; }
+  .kind {
+    font: 700 10px/1 "Signika", sans-serif; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 999px;
+  }
+  .kind.hum  { background: color-mix(in srgb, var(--sap) 22%, transparent); color: var(--sap); }
+  .kind.geo  { background: color-mix(in srgb, #cf4436 26%, transparent); color: #f0917f; }
+  .kind.now  { background: var(--bark2); color: var(--weather); }
+  .note { color: var(--weather); font-size: 14px; flex: 1 1 240px; min-width: 200px; }
+
+  .row { display: flex; flex-direction: column; gap: 0; }
+  .row + .row { margin-top: 26px; padding-top: 26px; border-top: 1px solid var(--seam); }
+
+  /* ── controls ──────────────────────────────────────────────────────── */
+  .controls {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 20px;
+  }
+  .controls .lbl {
+    font: 700 11px/1 "Signika", sans-serif; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--weather); margin-right: 4px;
+  }
+  button.swatch {
+    font: 600 13px/1 "Signika", sans-serif;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bark2); color: var(--sapwood);
+    border: 1px solid var(--seam); border-radius: 999px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  button.swatch:hover { border-color: var(--sap); }
+  button.swatch:focus-visible { outline: 2px solid var(--sap); outline-offset: 2px; }
+  button.swatch[aria-pressed="true"] { border-color: var(--sap); background: color-mix(in srgb, var(--sap) 16%, var(--bark2)); }
+  .dot { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,.4); }
+
+  /* ── the squeeze demo ──────────────────────────────────────────────── */
+  .squeeze { display: flex; gap: 30px; flex-wrap: wrap; }
+  .squeeze > div { flex: 1 1 260px; }
+  .sq-band { background: var(--canopy); border-radius: 12px; padding: 14px 20px; }
+  .sq-word {
+    font: 900 26px/1 "Nunito", sans-serif; color: var(--sap);
+    display: block;
+  }
+  .sq-word.squeezed { transform: scaleX(.72); transform-origin: left center; }
+  .cap {
+    font: 700 10px/1 "Signika", sans-serif; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--weather); margin-top: 10px; display: block;
+  }
+
+  .verdict { border-left: 3px solid var(--sap); padding-left: 18px; }
+  ul { margin: 0; padding-left: 20px; color: var(--weather); }
+  li { margin-bottom: 7px; }
+  li strong { color: var(--sapwood); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <h1>The organic wordmark</h1>
+    <p class="lede">
+      Two separate problems wearing one complaint. The letterforms are a bold italic serif in a theme whose own
+      source calls itself <em>humanist soft</em>; the colour is a leftover from before the tree retheme. Judge
+      them one at a time — the colour buttons below change every candidate at once.
+    </p>
+  </header>
+
+  <section class="panel">
+    <h2>The family &mdash; every mark on its own header</h2>
+    <p style="margin:0 0 8px;color:var(--weather)">
+      ⚠ <strong>Correction:</strong> everything above renders on <code>#14110b</code> now. The earlier version used
+      <code>#25301a</code>, which is <code>--band-bg</code> &mdash; the GREEN strip <em>below</em> the header, not the
+      surface the logo sits on. <code>.app-header</code> paints <code>--hdr-bg</code>, and organic sets that to
+      <code>--bg</code>. Colour judgements made before this were against the wrong ground.
+    </p>
+    <p style="margin:0 0 20px;color:var(--weather)">
+      ⚠ <strong>Second correction:</strong> steampunk is <em>upright</em> &mdash; its symbol has no
+      <code>font-style="italic"</code>. So it is four of five italic, not five.
+    </p>
+
+    <div class="fam">
+      <div class="famrow"><div class="famname">normal</div><div class="famband" style="background:#f4f4f4"><div class="fammark arial"><span class="w" style="color:#C7A900">DDCS</span><span class="t" style="color:#666666">CNC MACRO STUDIO</span></div></div></div>
+      <div class="famrow"><div class="famname">studio</div><div class="famband" style="background:#b6b1a5"><div class="fammark arial studio-stack"><span class="w" style="color:#55514a">DDCS</span><span class="t" style="color:#55514a">CNC MACRO STUDIO</span></div></div></div>
+      <div class="famrow"><div class="famname">futuristic</div><div class="famband" style="background:#0c1422"><div class="fammark arial" style="text-shadow:0 0 8px rgba(255,241,0,.55),0 0 18px rgba(255,241,0,.3)"><span class="w" style="color:#FFF100">DDCS</span><span class="t" style="color:#8892b0">CNC MACRO STUDIO</span></div></div></div>
+      <div class="famrow"><div class="famname">steampunk &mdash; upright</div><div class="famband" style="background:#2a1810"><div class="fammark geoup"><span class="w" style="color:#c9962f">DDCS</span><span class="t" style="color:#8b7355">CNC MACRO STUDIO</span></div></div></div>
+      <div class="famrow"><div class="famname">organic &mdash; TODAY</div><div class="famband" style="background:#14110b"><div class="fammark geo"><span class="w" style="color:#A89000">DDCS</span><span class="t" style="color:#7d7d6f">CNC MACRO STUDIO</span></div></div></div>
+    </div>
+
+    <h2 style="margin-top:30px">The three candidates in organic&rsquo;s slot</h2>
+    <p style="margin:0 0 18px;color:var(--weather)">
+      Same ground, same size, sap amber. Ask one question: does it look like it belongs to the four above?
+    </p>
+    <div class="fam">
+      <div class="famrow"><div class="famname">Sniglet 800</div><div class="famband" style="background:#14110b"><div class="fammark cand c-snig"><span class="w" style="color:#d9a03c">DDCS</span><span class="t" style="color:#a08d69">CNC MACRO STUDIO</span></div></div></div>
+      <div class="famrow"><div class="famname">Nunito Black 900</div><div class="famband" style="background:#14110b"><div class="fammark cand c-nun"><span class="w" style="color:#d9a03c">DDCS</span><span class="t" style="color:#a08d69">CNC MACRO STUDIO</span></div></div></div>
+      <div class="famrow"><div class="famname">Fredoka 700</div><div class="famband" style="background:#14110b"><div class="fammark cand c-fred"><span class="w" style="color:#d9a03c">DDCS</span><span class="t" style="color:#a08d69">CNC MACRO STUDIO</span></div></div></div>
+    </div>
+
+    <ul style="margin-top:24px">
+      <li>⭐ <strong>The family is HEAVY and INDUSTRIAL.</strong> Three of five are Arial Black &mdash; the widest,
+        bluntest thing on the machine. Whatever goes in organic&rsquo;s slot has to hold that weight or it will
+        read as the odd one out the moment someone switches themes.</li>
+      <li>⚠ <strong>Sniglet is the test of that.</strong> It is the roundest option available and it is the one
+        most likely to look like a different product. Judge it against <em>futuristic</em>, not against organic
+        alone &mdash; that is the neighbour it has to survive.</li>
+      <li><strong>Nunito Black is the compromise candidate</strong> &mdash; round terminals, but at 900 it keeps
+        enough mass to sit beside Arial Black without looking soft.</li>
+      <li>⚠ <strong>Two of five headers are LIGHT.</strong> Organic is near-black, so an amber mark works &mdash;
+        but do not generalise any of this to normal or studio, where the same colour would vanish.</li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>Candidates, on the real header</h2>
+
+    <div class="controls">
+      <span class="lbl">Ink</span>
+      <button class="swatch" data-ink="#A89000" data-sub="#7d7d6f" aria-pressed="true">
+        <span class="dot" style="background:#A89000"></span> Today &nbsp;<code>#A89000</code>
+      </button>
+      <button class="swatch" data-ink="#d9a03c" data-sub="#a08d69" aria-pressed="false">
+        <span class="dot" style="background:#d9a03c"></span> Sap amber &nbsp;<code>--accent</code>
+      </button>
+      <button class="swatch" data-ink="#ece0c6" data-sub="#a08d69" aria-pressed="false">
+        <span class="dot" style="background:#ece0c6"></span> Sapwood &nbsp;<code>--text</code>
+      </button>
+    </div>
+
+    <div class="controls">
+      <span class="lbl">Slant</span>
+      <button class="swatch" id="tog-italic" aria-pressed="true">Italic &mdash; the house convention</button>
+      <button class="swatch" id="tog-upright" aria-pressed="false">Upright</button>
+      <span class="note" style="flex-basis:100%">
+        All five shipping marks are italic. ⚠ But only <strong>Nunito</strong> and <strong>Asap</strong> ship a
+        <em>drawn</em> italic — the rest are slanted by the browser, which shears the letterforms rather than
+        redrawing them. At 26&nbsp;px on four capitals it is subtle; on the tagline it is not.
+      </span>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-current"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Georgia bold italic</span>
+        <span class="kind now">shipping now</span>
+        <span class="note">The only sharp, angular, high-contrast element in a theme built entirely on soft curves.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-nunito"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Nunito ExtraBold</span>
+        <span class="kind hum">humanist rounded</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">Rounded terminals, but the letterform skeleton stays humanist — it reads warm rather than toy-like.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-asap"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Asap ExtraBold</span>
+        <span class="kind hum">humanist, softly rounded</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">Less obviously round than Nunito — the corners are eased rather than circular. Closer to the current mark's weight and width, so it changes less.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-baloo"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Baloo 2 ExtraBold</span>
+        <span class="kind hum">humanist rounded</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">Heavier and friendlier. More character than Nunito, and more risk of reading soft for a machine tool.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-varela"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Varela Round</span>
+        <span class="kind hum">humanist rounded</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">One weight only. Fine for a logo you outline anyway, but nothing to fall back on elsewhere.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-quick"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Quicksand Bold</span>
+        <span class="kind geo">geometric — the counter-example</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">Included deliberately. Circular bowls, even strokes — this is what &ldquo;rounded&rdquo; looks like when it stops being humanist and starts reading tech-toy.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Rounder and heavier &mdash; closer to the house weight</h2>
+    <p style="margin:0 0 20px;color:var(--weather)">
+      The first set leaned humanist and light. These sit closer to what the other three themes actually use &mdash;
+      Arial Black&rsquo;s heavy, wide, industrial silhouette &mdash; but with the corners eased or fully rounded.
+      ⚠ The italic constraint bites hard here: <strong>only Rubik and Nunito ship a drawn italic</strong>, and the
+      rest are sheared by the browser.
+    </p>
+
+    <div class="row">
+      <div class="band"><div class="mark f-rubik"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Rubik 800</span>
+        <span class="kind hum">subtly rounded, technical</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">⭐ The closest thing to &ldquo;Arial Black with the corners taken off&rdquo;. Wide, heavy, reads as engineered rather than friendly &mdash; and it has a real italic. If the brief is <em>similar but rounded</em>, this is it.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-mplus"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">M PLUS Rounded 1c 800</span>
+        <span class="kind hum">fully rounded terminals</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">Properly round-ended strokes, still heavy. Warmer than Rubik and further from the current mark. ⚠ No drawn italic, and rounded terminals shear worse than flat ones.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-nunblk"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Nunito Black 900</span>
+        <span class="kind hum">humanist rounded, heavier</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">The same face shown above, at 900 instead of 800. Heavier answers the &ldquo;too light&rdquo; complaint without changing family &mdash; worth comparing before moving to a different one.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-fredoka"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Fredoka 700</span>
+        <span class="kind geo">geometric rounded</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">⚠ Bold and round, but the bowls are circular &mdash; it drifts toward the playful end. Included to mark where &ldquo;rounded&rdquo; stops reading as a tool.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-sniglet"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Sniglet 800</span>
+        <span class="kind geo">very rounded, quirky</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">⛔ The far end of the axis. Shown so the range is honest, not as a candidate &mdash; a machine control should not look like a childrens book.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-hind"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Hind 700</span>
+        <span class="kind hum">humanist, softly eased</span>
+        <span class="kind fake">slanted, not drawn</span>
+        <span class="note">The most restrained option: barely rounded, close to the current weight. ⚠ Possibly too close &mdash; if it does not clearly beat Georgia on the band, it is not worth the change.</span>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="panel">
+    <h2>Semi-rounded &mdash; corners eased, not circled</h2>
+    <p style="margin:0 0 20px;color:var(--weather)">
+      ⭐ This is where the italic constraint stops hurting. Fully-rounded faces with a drawn italic are basically
+      Rubik and Nunito &mdash; but <strong>every face below has one</strong>, because semi-rounded is a normal thing
+      for a working text family to be. They keep Arial Black&rsquo;s squared silhouette and just take the hardness
+      off the corners.
+    </p>
+
+    <div class="row">
+      <div class="band"><div class="mark f-redhat"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Red Hat Display 800</span>
+        <span class="kind hum">semi-rounded, technical</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">⭐ Designed as a semi-rounded technical sans &mdash; corners softened on purpose, not as a side effect. Heavy weights, real italic, and it reads as engineering rather than friendliness. The closest match to <em>similar but rounded</em> of anything on this page.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-figtree"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Figtree Black 900</span>
+        <span class="kind hum">geometric-humanist, softly eased</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">Heavier and slightly wider than Red Hat. The eased corners are subtle enough that at 26&nbsp;px you read the weight first and the softness second &mdash; which may be exactly right for a machine tool.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-bevn"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Be Vietnam Pro 800</span>
+        <span class="kind hum">humanist, soft corners</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">Between Asap and Red Hat. Warmer than Figtree without becoming round. ⚠ Slightly narrower &mdash; it will need more of the width axis to fill the same lockup.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="band"><div class="mark f-cabin"><span class="word">DDCS</span><span class="tag">CNC MACRO STUDIO</span></div></div>
+      <div class="meta">
+        <span class="name">Cabin 700</span>
+        <span class="kind hum">humanist, gently rounded</span>
+        <span class="kind real">drawn italic</span>
+        <span class="note">The softest of the four and the lightest. ⚠ Likely too light against a dark band at this size &mdash; included because it is the classic humanist-with-rounded-corners answer and it deserves a look.</span>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="panel">
+    <h2>Rounded ends &mdash; the thing you actually meant</h2>
+    <p style="margin:0 0 6px;color:var(--weather)">
+      ⚠ Two different features get called &ldquo;rounded&rdquo;, and the sections above chase the wrong one:
+    </p>
+    <div class="term">
+      <span>rounded <strong>CORNERS</strong> &mdash; where strokes MEET are filleted &nbsp;→&nbsp; Rubik, Red Hat, Figtree</span>
+      <span class="yes">rounded <strong>TERMINALS</strong> &mdash; the stroke ENDS are semicircular &nbsp;→&nbsp; what you want</span>
+    </div>
+    <p style="margin:16px 0 6px;color:var(--weather)">
+      Faces with genuinely round stroke ends, and whether they ship a drawn italic:
+    </p>
+    <div class="term">
+      <span class="yes">Nunito &mdash; italic ✓</span>
+      <span class="no">M PLUS Rounded 1c &mdash; no italic</span>
+      <span class="no">Varela Round &mdash; no italic</span>
+      <span class="no">Baloo 2 &mdash; no italic</span>
+      <span class="no">Quicksand &mdash; no italic</span>
+      <span class="no">Comfortaa &mdash; no italic</span>
+      <span class="no">Fredoka &mdash; no italic</span>
+    </div>
+    <p style="margin:16px 0 20px;color:var(--weather)">
+      ⭐ <strong>Nunito is essentially the only one that is both.</strong> Round-terminal faces are usually display
+      families, and display families skip italics.
+    </p>
+
+    <h2 style="margin-top:28px">⭐ Or round ANY face yourself</h2>
+    <p style="margin:0 0 18px;color:var(--weather)">
+      Since the mark is being outlined to paths anyway, the terminals can be rounded MECHANICALLY: stroke the
+      glyphs in <em>their own fill colour</em> with <code>stroke-linecap="round"</code> and
+      <code>stroke-linejoin="round"</code>, under <code>paint-order="stroke fill"</code>. The stroke swells the
+      shape outward and every end and corner comes back round. ⚠ SVG only &mdash; CSS
+      <code>-webkit-text-stroke</code> exposes no linecap, which is why this is demonstrated in real SVG below.
+    </p>
+    <div class="pair">
+      <div>
+        <div class="svgdemo"><svg viewBox="0 0 200 58" width="200" role="img" aria-label="DDCS"><text x="4" y="42" font-family="Asap" font-weight="800" font-style="italic" font-size="40" fill="#d9a03c" >DDCS</text></svg></div>
+        <span class="cap">Asap 800 &mdash; flat ends, as drawn</span>
+      </div>
+      <div>
+        <div class="svgdemo"><svg viewBox="0 0 200 58" width="200" role="img" aria-label="DDCS"><text x="4" y="42" font-family="Asap" font-weight="800" font-style="italic" font-size="40" fill="#d9a03c" stroke="#d9a03c" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" >DDCS</text></svg></div>
+        <span class="cap">the same face, round-capped stroke &mdash; ends and corners now round</span>
+      </div>
+    </div>
+    <div class="pair" style="margin-top:20px">
+      <div>
+        <div class="svgdemo"><svg viewBox="0 0 200 58" width="200" role="img" aria-label="DDCS"><text x="4" y="42" font-family="Red Hat Display" font-weight="800" font-style="italic" font-size="40" fill="#d9a03c" >DDCS</text></svg></div>
+        <span class="cap">Red Hat Display 800 &mdash; flat ends</span>
+      </div>
+      <div>
+        <div class="svgdemo"><svg viewBox="0 0 200 58" width="200" role="img" aria-label="DDCS"><text x="4" y="42" font-family="Red Hat Display" font-weight="800" font-style="italic" font-size="40" fill="#d9a03c" stroke="#d9a03c" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke fill" >DDCS</text></svg></div>
+        <span class="cap">round-capped</span>
+      </div>
+    </div>
+
+    <ul style="margin-top:22px">
+      <li>⭐ <strong>It removes the italic constraint entirely.</strong> Any face with a drawn italic can be given
+        round ends, so the choice stops being &ldquo;which round face has an italic&rdquo; and becomes
+        &ldquo;which letterform do I want&rdquo;.</li>
+      <li>⚠ <strong>It rounds EVERYTHING uniformly</strong> &mdash; corners you might want crisp go too, and the
+        letter gets heavier by the stroke width. Drop the weight axis to compensate: a 700 with a round cap
+        lands near an 800 without one.</li>
+      <li>⚠ <strong>Counters tighten.</strong> The stroke grows inward as well as outward, so the D bowls close
+        first. Check them before the outer silhouette.</li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>The squeeze nobody asked for</h2>
+    <p>
+      Every mark in <code>index.html</code> carries <code>textLength="146" lengthAdjust="spacingAndGlyphs"</code>,
+      which stretches or compresses the actual glyphs to force both lines to the same width. It is an intentional
+      device — it aligns the wordmark and the tagline into one block — and all five themes use it.
+    </p>
+    <p>
+      ⚠ But it bites hardest on narrow faces. Georgia and a rounded sans are both narrower than Arial Black, so they
+      get pushed further. <strong>Judge whichever face you pick at its squeezed width, not its natural one</strong> —
+      or bake the width into outlined paths and drop the attribute for this mark.
+    </p>
+    <div class="squeeze">
+      <div>
+        <div class="sq-band"><span class="sq-word">DDCS</span></div>
+        <span class="cap">natural width</span>
+      </div>
+      <div>
+        <div class="sq-band"><span class="sq-word squeezed">DDCS</span></div>
+        <span class="cap">compressed to fit — exaggerated to show the effect</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel verdict">
+    <h2>What I'd pick, and why</h2>
+    <ul>
+      <li><strong>Nunito ExtraBold.</strong> Rounded enough to stop fighting the theme's 16&nbsp;px tab radius and its slow unfold, humanist enough not to read as a toy. It also has real weights, so the tagline can sit at a lighter one instead of being faked.</li>
+      <li><strong>Sap amber over the stale olive.</strong> <code>#A89000</code> predates the tree retheme — it is a desaturated yellow-green sitting on a desaturated green band, which is why it looks muddy rather than wrong. This is the same miss the retheme already warned about for <code>--edit-glow-rgb</code>; the glow was caught and the logo was not.</li>
+      <li>⚠ <strong>The italic requirement narrows the field.</strong> Every shipping mark is italic, and only
+        Nunito and Asap ship a <em>drawn</em> italic — Baloo&nbsp;2, Varela Round and Quicksand get a browser
+        shear instead. For a mark you will outline anyway that is survivable, but a sheared letterform is a
+        worse starting point to trace than a drawn one.</li>
+      <li><strong>Outline it to paths.</strong> A logo whose shape depends on which fonts a viewer has installed is not a logo — and outlining lets the 146-unit width be baked in rather than applied as a distortion.</li>
+      <li><strong>Organic only.</strong> The other four marks sit on bands that never moved. The squeeze is shared, so if you change that, say so rather than silently altering all five.</li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+  const wrap = document.querySelector('.wrap');
+  const ital = document.getElementById('tog-italic');
+  const upr  = document.getElementById('tog-upright');
+  function setSlant(on) {
+    wrap.classList.toggle('upright', !on);
+    ital.setAttribute('aria-pressed', String(on));
+    upr.setAttribute('aria-pressed', String(!on));
+  }
+  ital.addEventListener('click', () => setSlant(true));
+  upr.addEventListener('click', () => setSlant(false));
+
+  const btns = [...document.querySelectorAll('button.swatch')].filter((b) => b.dataset.ink);
+  btns.forEach((b) => b.addEventListener('click', () => {
+    btns.forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    document.querySelectorAll('.mark').forEach((m) => {
+      m.style.setProperty('--ink', b.dataset.ink);
+      m.style.setProperty('--subink', b.dataset.sub);
+    });
+  }));
+</script>
