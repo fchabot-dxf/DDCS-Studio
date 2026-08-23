@@ -50941,3 +50941,71 @@ to the human live: the badge staying collapsed through repeated incidental re-re
 (`verification/t2176-badge-stays-collapsed.png`).
 
 🔨 turn 2176
+
+## turn 2178 — AMENDMENT 8: EXPORT USES THE NATIVE SAVE-FILE DIALOG (arc step) + tail: literal Export/Insert labels
+
+### THE RULING
+
+Human: "export should simply be a ffile browser with a native save file." Export used to route through the
+granted DEPLOY FOLDER (`data/deployFolder.js`, t1249) — a DIRECTORY picker where File System Access exists,
+silently degrading to a plain download where it doesn't: two branches, one label, the operator never told which
+one they'd get. `editorManager.downloadFile()` now opens the OS's own `showSaveFilePicker` SAVE dialog directly
+— the operator names the destination FILE themselves, every time. Where `showSaveFilePicker` doesn't exist,
+this already IS the plain download (the exact fallback the old code already had), so the fork disappears rather
+than getting a third branch: one act, everywhere.
+
+### Scoped to Export ONLY — swept before touching anything, per instruction
+
+`deployFolder.js` (the granted-DIRECTORY mechanism) is completely UNCHANGED and still serves every other
+caller: the CAM pack bundle export (`macrosApp.js`, two call sites), a probe macro's `T.nc`
+(`settingsPanel.js`), and the Gateway Files surface. Confirmed via grep before editing — `deployFiles()` has 5
+call sites total; only `editorManager.js`'s was touched. `bridgeTransfer.js` (TRANSFER) was named as sharing
+naming logic with Export — checked, and it shares ONLY `buildProgram()` (the title/filename derivation), never
+`deployFiles()` itself; Transfer writes to the controller over its own channel entirely, so nothing about how it
+writes was ever at risk from this change.
+
+### The trade, recorded per instruction
+
+t1249's whole point was a GRANTED folder so a repeat export doesn't re-ask — the .nc lands on the stick without
+hunting through Downloads. A native save dialog asks EVERY time; there is no "remembered target" for Export any
+more. The human chose operator control over that convenience, explicitly, so this is a recorded trade, not a
+silent regression.
+
+### Implementation
+
+`downloadFile()`: no `showSaveFilePicker` → `UIUtils.downloadFile()` (byte-identical to the old fallback path).
+`showSaveFilePicker` present → open it (`suggestedName` = the same derived `<title>.nc` `buildProgram()` always
+computed), then `createWritable()` → `write()` → `close()`. An `AbortError` (the operator declined) returns
+`{aborted:true}` with nothing announced — the SAME "a refusal is an answer" contract the old deploy path had. A
+genuine write failure is named via `dlgNotice`, not swallowed. A clean save shows `"Saved <name>."` — deliberately
+NOT the old `deployedMessage()` wording ("Deployed N files to <dir>"), since "deploy" language no longer
+describes what this action does.
+
+### Tests rewritten, not just re-run
+
+`deploy-folder-1249.spec.js`'s two tests that drove `editorManager.downloadFile()` through a MOCKED
+`showDirectoryPicker` no longer describe reality — rewritten to mock `showSaveFilePicker` instead (a fake handle
+recording its one write), plus a new explicit no-FSA-fallback test and a write-failure test. The file's OTHER
+six tests (CAM bundle, write-failure via `deployFiles()` directly, the "deployed never saved" wording, re-pick,
+sources-are-not-deploys, the Gateway Files surface) are UNTOUCHED and re-verified green — none of them exercise
+Export, all of them still exercise the unchanged `deployFolder.js`. 10/10 green.
+
+Collateral: `editor-file-menu-1227`, `editor-toolbar-2078`, `gateway-jobs-history-view-2026`, `backup-852` (all
+referenced `downloadFile` by name) — none exercise the internal picker logic (they check wiring/stub behaviour
+only), all unaffected, all re-run green. Smoke 76/76, node 227/227, lint clean.
+
+## TAIL (separate commit) — Export relabeled "Save G-code as…"; the dead corner-menu's Insert/Export entries too
+
+Sequenced deliberately AFTER the arc step (per the advisor's own note): the label now describes the NEW
+behaviour, not the old one. Quick-menu Export: `"⭳ Export…"` → `"⭳ Save G-code as…"`, with a new title stating
+the destination-picking + the every-time trade. Also updated `globalFunctions.js`'s dead
+`EDITOR_FILE_ACTIONS`/`ddcsEditorFileMenu` entries (the already-unreachable corner menu, per t2078/t2173's own
+prior findings — confirmed again, no caller) for consistency: Export's stale "Deploy the program as a file"
+title corrected to match, and a comment added to the Insert row noting its own handler
+(`window.insertGcodeFile`) was fully deleted at t2173 — the row's label was already reasonably literal, but the
+ACTION it names no longer exists anywhere in the live app, which is the more important fact to record than
+wordsmithing dead text. Verified live (`verification/t2178-export-label.png`, sent to the human). Collateral
+(`header-menu-split-2149`, `header-profile-menu`, `library-854`) — 14/14 green, none assert literal button text
+(all select by `data-act`). Smoke/node/lint re-run clean.
+
+🔨 turn 2178

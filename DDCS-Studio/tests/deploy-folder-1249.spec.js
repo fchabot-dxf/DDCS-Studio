@@ -8,13 +8,21 @@ import { test, expect } from '@playwright/test';
  *   DEPLOY      where BAKED OUTPUT goes                      — things the CONTROLLER eats
  *
  * The headline case is granting the USB STICK ITSELF, so a deploy writes straight onto the medium that walks to the
- * machine. That is the point of every assertion here: a download lands in Downloads, and then a human has to find it,
+ * machine. That is the point of most assertions here: a download lands in Downloads, and then a human has to find it,
  * copy it to a stick, and remember which of four similarly-named files was the current one. Granting the stick makes
- * the export BE the copy.
+ * the export BE the copy. STILL TRUE for the CAM bundle, a probe macro's T.nc, and the Gateway Files surface.
  *
- * THE RULES, each with a test: no downloads when a folder is granted; a DECLINED picker writes nothing and downloads
- * nothing (a refusal is an answer, not a problem to route around); only the deploy's own files are written; a write
- * failure is named, not swallowed; and the CAM bundle's bytes are the SAME bytes the download produced.
+ * t2178 (human ruling: "export should simply be a ffile browser with a native save file") — THE PROGRAM EXPORT
+ * ITSELF NO LONGER USES THIS MECHANISM. `editorManager.downloadFile()` now opens the OS's own native save-file
+ * dialog (`showSaveFilePicker`) instead of writing into a granted DIRECTORY; the two tests that used to drive it
+ * through the directory-picker mock are rewritten below to drive the new one instead. `deployFolder.js` itself,
+ * and every OTHER caller of `deployFiles()` (the CAM bundle, the probe macro, Gateway Files), are UNCHANGED —
+ * this was a scoped change to Export specifically, not a removal of the deploy mechanism.
+ *
+ * THE RULES for what's left, each with a test: no downloads when a folder is granted; a DECLINED picker writes
+ * nothing and downloads nothing (a refusal is an answer, not a problem to route around); only the deploy's own
+ * files are written; a write failure is named, not swallowed; and the CAM bundle's bytes are the SAME bytes the
+ * download produced.
  */
 // The suite's own server. DDCS_BASE exists only so a second agent can run this against a private mem-server while
 // someone else's full suite holds 3211 — the DEFAULT must be the shared one, or the spec passes for me and nobody else.
@@ -49,9 +57,27 @@ const boot = async (page) => {
 };
 const deployed = (page) => page.evaluate(() => [...window.__deploy.keys()].sort());
 
-test('A PROGRAM EXPORT IS A DEPLOY: it lands in the granted folder, and nothing downloads', async ({ page }) => {
+/** A fake native save-file picker (t2178) — records the ONE write it grants a handle for. */
+async function grantSaveFilePicker(page, { writeError = null } = {}) {
+    await page.evaluate((err) => {
+        window.__saved = new Map();
+        window.__saveFilePickerCalls = 0;
+        window.showSaveFilePicker = async (opts) => {
+            window.__saveFilePickerCalls++;
+            const name = opts && opts.suggestedName;
+            return {
+                createWritable: async () => {
+                    if (err) throw new Error(err);
+                    return { write: async (d) => window.__saved.set(name, d), close: async () => {} };
+                },
+            };
+        };
+    }, writeError);
+}
+
+test('EXPORT USES THE NATIVE SAVE DIALOG (t2178): the operator\'s own pick gets the file, nothing downloads', async ({ page }) => {
     await boot(page);
-    await grantDeploy(page);
+    await grantSaveFilePicker(page);
     let downloads = 0;
     page.on('download', () => { downloads++; });
 
@@ -59,10 +85,35 @@ test('A PROGRAM EXPORT IS A DEPLOY: it lands in the granted folder, and nothing 
     const r = await page.evaluate(() => window.ddcsStudio.editorManager.downloadFile());
     expect(r.written.length, 'one file written').toBe(1);
     expect(r.written[0], 'named after the program').toMatch(/\.nc$/);
-    expect(await deployed(page), 'and it really is in the folder').toEqual(r.written);
-    const body = await page.evaluate((n) => window.__deploy.get(n), r.written[0]);
+    const saved = await page.evaluate(() => [...window.__saved.keys()]);
+    expect(saved, 'and it really went through the native picker\'s own handle').toEqual(r.written);
+    const body = await page.evaluate((n) => window.__saved.get(n), r.written[0]);
     expect(body, 'carrying the program, not a stub').toContain('G1 Z-2 F100');
-    expect(downloads, 'NO download fired — a granted folder means the export IS the copy').toBe(0);
+    expect(downloads, 'NO plain download fired — the native dialog IS the save, not a fallback path').toBe(0);
+});
+
+test('EXPORT WITHOUT File System Access: the SAME action degrades to a plain download, not a second behaviour', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => { delete window.showSaveFilePicker; });
+    let downloadedFile = null;
+    page.on('download', (d) => { downloadedFile = d.suggestedFilename(); });
+
+    await page.evaluate(() => { window.ddcsStudio.editorManager.setValue('G0 X1\nM30'); });
+    const r = await page.evaluate(() => window.ddcsStudio.editorManager.downloadFile());
+    expect(r.viaDownload, 'no native picker on this browser — the fallback path').toBe(true);
+    expect(r.written.length).toBe(1);
+    await page.waitForTimeout(200);
+    expect(downloadedFile, 'the SAME file the native path would have saved, just via a plain download').toBe(r.written[0]);
+});
+
+test('A WRITE FAILURE via the native dialog is NAMED, not swallowed', async ({ page }) => {
+    await boot(page);
+    await grantSaveFilePicker(page, { writeError: 'The disk is write-protected' });
+    await page.evaluate(() => { window.ddcsStudio.editorManager.setValue('G0 X1\nM30'); });
+    const r = await page.evaluate(() => window.ddcsStudio.editorManager.downloadFile());
+    expect(r.ok, 'the export did not succeed').toBe(false);
+    expect(r.failed[0].why, 'the reason, not a generic failure').toMatch(/write-protected/i);
+    await expect(page.locator('.app-dialog'), 'the failure is announced, not silent').toBeVisible();
 });
 
 test('THE CAM BUNDLE deploys the SAME FILE SET the download produced — byte for byte', async ({ page }) => {
@@ -116,15 +167,19 @@ test('THE CAM BUNDLE deploys the SAME FILE SET the download produced — byte fo
     // same fact added no coverage.
 });
 
-test('A DECLINED PICKER WRITES NOTHING AND DOWNLOADS NOTHING — a refusal is an answer', async ({ page }) => {
+test('A DECLINED EXPORT PICKER WRITES NOTHING AND DOWNLOADS NOTHING — a refusal is an answer', async ({ page }) => {
     await boot(page);
-    await page.evaluate(() => { window.showDirectoryPicker = async () => { throw new Error('user declined'); }; });
+    // showSaveFilePicker rejects with a real DOMException-shaped AbortError when the operator cancels the
+    // native dialog — the exact shape editorManager.downloadFile() checks for (e.name === 'AbortError').
+    await page.evaluate(() => {
+        window.showSaveFilePicker = async () => { const e = new Error('The user aborted a request.'); e.name = 'AbortError'; throw e; };
+    });
     let downloads = 0;
     page.on('download', () => { downloads++; });
 
     await page.evaluate(() => { window.ddcsStudio.editorManager.setValue('G0 X1\nM30'); });
     const r = await page.evaluate(() => window.ddcsStudio.editorManager.downloadFile());
-    expect(r.aborted, 'the deploy aborted').toBe(true);
+    expect(r.aborted, 'the export aborted').toBe(true);
     expect(r.written, 'nothing written').toEqual([]);
     expect(downloads, 'and CRUCIALLY no download — turning a refusal into a surprise file is the app overruling the user').toBe(0);
     await expect(page.locator('.app-dialog'), 'no announcement of a thing that did not happen').toHaveCount(0);

@@ -257,20 +257,43 @@ export class EditorManager {
     }
 
     /**
-     * EXPORT THE PROGRAM — a DEPLOY, not a save (t1249). The .nc is baked output that a controller eats, so it goes to
-     * the granted deploy target (typically the USB stick itself) rather than into Downloads, where the user would then
-     * have to find it and copy it by hand. The download survives only where File System Access does not exist.
+     * EXPORT THE PROGRAM (t2178, human ruling: "export should simply be a ffile browser with a native save
+     * file") — the operator picks the destination in the OS's OWN save dialog; the app stops choosing for them.
+     * This REMOVES the capability fork rather than annotating it: `showSaveFilePicker` unavailable already IS
+     * the plain download (the same code path this used as its own fallback before), so the two branches this
+     * used to silently choose between become the SAME ACT everywhere, not two behaviours wearing one label.
+     * ⚠ SCOPED to Export only — `data/deployFolder.js` (the granted-folder DIRECTORY picker) is UNCHANGED and
+     * still serves every other caller (the CAM pack bundle, a probe macro's T.nc, gateway Files) exactly as
+     * before; this is not a removal of that mechanism, only Export's own use of it.
+     * ⚠ THE TRADE, recorded per instruction: t1249's whole point was a GRANTED folder so a repeat export does
+     * not re-ask — the .nc lands on the stick without hunting through Downloads. A native save dialog asks
+     * EVERY time; the human chose operator control over that convenience.
      */
     async downloadFile() {
         const { name, code } = this.buildProgram();
-        const D = await import('../data/deployFolder.js');
-        const r = await D.deployFiles([{ name, data: code }], {
-            fallbackDownload: (files) => files.forEach((f) => UIUtils.downloadFile(f.name, f.data)),
-        });
         const { dlgNotice } = await import('./dialog.js');
-        if (r.aborted) return r;   // declined the picker → nothing written, nothing downloaded, nothing to announce
-        dlgNotice(D.deployedMessage(r));
-        return r;
+        if (typeof window.showSaveFilePicker !== 'function') {
+            UIUtils.downloadFile(name, code);
+            return { ok: true, written: [name], viaDownload: true };
+        }
+        let handle;
+        try {
+            handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'G-code', accept: { 'text/plain': ['.nc'] } }] });
+        } catch (e) {
+            if (e && e.name === 'AbortError') return { aborted: true, written: [] };   // declined the picker → nothing to announce, same as before
+            dlgNotice(`Could not save the file: ${(e && e.message) || e}`);
+            return { ok: false, written: [], failed: [{ name, why: (e && e.message) || String(e) }] };
+        }
+        try {
+            const writable = await handle.createWritable();
+            await writable.write(code);
+            await writable.close();
+        } catch (e) {
+            dlgNotice(`Could not save the file: ${(e && e.message) || e}`);
+            return { ok: false, written: [], failed: [{ name, why: (e && e.message) || String(e) }] };
+        }
+        dlgNotice(`Saved ${name}.`);
+        return { ok: true, written: [name] };
     }
 
     getValue() {
