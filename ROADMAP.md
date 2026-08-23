@@ -10,26 +10,49 @@
 >
 > ```
 >   IN FLIGHT
->     t2143  systemHooks data loss + the macrosApp NUL byte
->            tail: remove the M6.rc entry from the V4.1 tree      (queued as an amendment)
+>     OP CHIPS — the hover-revealed "✎ Edit" chip becomes a PERSISTENT icon-only op
+>            list in the editor strip. Icon from entryIconHtml (the SAME resolver the
+>            header buttons + Settings picker read); one contextmenu handler serves
+>            right-click AND long-press.  spec: scratchpad/t-opchips.md
+>            ⛔ REORDERING WAS CUT MID-TURN — the human read the ask as approving DRAG;
+>              when it came back as menu items they retracted it. Not deferred: not built.
+>
+>   SHIPPED SINCE THE LAST RECONCILIATION (all released in V2026.08.22.4)
+>     t2149  the menu split — logo owns the APP menu, filename owns the FILE menu   BACKLOG 9
+>     t2151  ROLES S1 + S2 — role derived client-side, and workspace-RELATIVE
+>     t2151/t2153  the editor focus ring: left edge, then the code-area-only ruling,
+>            then the wide-mode right-edge break (the 3D pull-tab was painting over it)
+>     t2153  BACKLOG 13 — the mobile toolbar: 44px floor on all six, row to the bottom
+>     t2155  THE EDITOR STRIP — the top band becomes a declared box. Two mount points
+>            (editorStripHost / editorCodeHost) replace five modules each inferring a
+>            host from editor.parentElement. --editor-chip-inset DELETED; placeChip's
+>            collision dodge DELETED; both proven dead, not assumed.
+>     t2155  the 3D pull-tab joins the theme — and caught a live bug nobody reported:
+>            studio's 4-value edge token inside a `border:` shorthand invalidated the
+>            WHOLE declaration, so studio rendered no border at all.
+>     t2156  save-as-wizard dropped every op but the first, SILENTLY. The two-lookup
+>            divergence was real (getAllBlocks vs getTopBlocks, confirmed live) —
+>            fixed by pairing record↔block BY ID, plus the human's op picker.
 >
 >   READY — ruled and specced, dispatch in this order
->     0  MENU SPLIT: the logo owns the APP menu, the filename owns the FILE menu.
->            Sequenced AFTER t2147 by the human. Un-linking the logo also REMOVES the
->            navigate-away mis-click that forced t2147's whole layout argument.   BACKLOG 9
->     1  F2   workspace: DELETE the name field, display the filename   BACKLOG F2
->     2  #1+7 menu merge: theme chips OUT, version to footer,
->              workspace name OUT to the header  — ONE turn            BACKLOG 1 + 7
->     3  #4   lathe icons: centreline removed, draw polygon +
->              face-probe, re-judge the five at 16px FIRST              BACKLOG 4
+>     1  INSTALL THE 5 TRACED WORDMARKS — the artefacts EXIST (MARK-*-TRACED.svg, repo
+>            root, ~47 KB total) and are not pasted in. Every mark today is a font
+>            REQUEST Android declines. A paste, not a design task.        BACKLOG F5
+>     2  F2   workspace: DELETE the name field, display the filename      BACKLOG F2
+>     3  #4   lathe icons: centreline removed, draw polygon + face-probe,
+>              re-judge the five at 16px FIRST                            BACKLOG 4
+>     4  ROLES S3 — the arc the human chose, paused while the editor panel took over
+>     5  #10  multi-op preview: show where the op sits                    BACKLOG 10
+>     6  #14  two dead-code clusters in the editor chrome (tail-sized)    BACKLOG 14
 >
->   NEXT ARC — ✅ CHOSEN BY THE HUMAN 2026-08-22 ("i think roles")
->     4  ROLES S1: derive the role CLIENT-SIDE
->            ⚠ the blocker for everything else in that project: admin.js:97 reads the role from
->            descriptor(), which needs a RUNNING DAEMON — so on a phone it throws, render() bails,
->            and NO gating code runs. Nothing gates and no tab is labelled until this lands.
->            Chosen over wizards-as-data because it is smaller, fully diagnosed, and it is the
->            thing the human actually complained about.
+>   ⏸ PARKED — raised, not ruled. Do NOT infer scope from these.
+>     · reordering ops (and drag, which collides with the strip's own sideways scroll)
+>     · does anything validate op ORDER? a probe must precede its WCS readers — unknown
+>     · wizard PACKS — several wizards saved/shared as one unit; persistence unread
+>     · version duplication: app-menu footer AND the About panel both show it  BACKLOG 9
+>     · three doors to "open a saved thing": Open / Load… / Library → Projects BACKLOG 9
+>     · font licensing for outlining Arial Black + Georgia (the 4 non-organic marks)
+>     · organic: remove button + panel borders for a flatter modern look
 >
 >   ⭐ STANDING POLICY — human, 2026-08-22: "everyturn add a small item from backlog"
 >     Each dispatch = the ARC step + ONE small backlog item as a TAIL.

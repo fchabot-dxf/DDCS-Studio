@@ -93,122 +93,82 @@ not doing it now.")* Five firmware-native features incl. **Array machining** and
 (a `template.txt` origin list with per-cell rotation). Full evidence + the three reasons it matters now live
 in [`ROADMAP.md`](ROADMAP.md) under "V4.1 ADVANCED MACHINING". Photos: `images/4.1 advance machining1 (1)/`.
 
-### F5. The DDCS wordmark in ORGANIC: rounder, probably sans
-> ⏸ **MOCK-UP FIRST, AND NOT URGENT** *(human, 2026-08-22: "make a mock up, in time")* — the advisor owes a
-> visual comparison of 2-3 humanist-rounded candidates ON the green canopy band, before any code is written.
-> ⛔ Do not pick a typeface from prose. The colour fix (`#A89000` is stale) and the outline-to-paths decision
-> ride with the mock-up, not ahead of it.
-⇒ **BACKLOG.** *(human, 2026-08-22: "the logo needs to be rounded more, maybe sans serif")*
+### F5. The DDCS wordmark in ORGANIC — ✅ DECIDED AND TRACED, ready to build
+*(human, 2026-08-22, chosen from live specimens. Preview of the final symbol:
+https://claude.ai/code/artifact/2431d2ac-9252-47ca-aa9d-b362f088b161)*
 
-Current mark — `index.html`, `<symbol id="mark-organic">`:
-`font-family="Georgia,'Times New Roman',serif"`, **bold ITALIC**, `fill="#A89000"`.
+### ⭐ THE ARTEFACT ALREADY EXISTS: `MARK-ORGANIC-TRACED.svg` (repo root, 14 KB)
+A complete, ready-to-paste `<symbol id="mark-organic">`. Replace the existing one in `web/index.html` with it.
+⚠ Move the file out of the repo root once pasted — it is a handoff artefact, not a source file.
 
-- **Rounded: agreed, and it is the theme's own word.** Organic is `--tab-radius: 16px` and its source describes
-  its motion as *"humanist soft — a slow UNFOLD"*. The wordmark is the only sharp, angular, high-contrast
-  element in a theme built entirely on soft curves — it fights its own chrome.
-- **Sans: yes, but HUMANIST rounded, not geometric.** Geometric-rounded reads tech-toy; humanist-rounded reads
-  warm and botanical. "Humanist" is the theme's own declared adjective — match it rather than picking a taste.
-- ⚠ **THE COLOUR IS STALE, AND MAY MATTER MORE THAN THE LETTERFORMS.** `#A89000` is a dull olive-gold from
-  BEFORE the tree retheme. The mark now sits on the green canopy band `--band-bg: #25301a` — two desaturated
-  yellow-greens fighting each other. Use the sap amber `--accent: #d9a03c` or the sapwood `--text: #ece0c6`.
-  The subtitle's `#7d7d6f` grey-olive is stale for the same reason.
-- ⚠ **CONSTRAINT — decide before drawing:** a rounded humanist sans is NOT a system font on Windows. For a
-  LOGO the right answer is to convert the wordmark to OUTLINED PATHS: a logo whose shape depends on the
-  viewer's installed fonts is not a logo. ⚠ Paths also change how `textLength` behaves — see F5b.
+```
+  face        Sniglet 800          BOTH LINES traced to outlines — no font at runtime
+  slant       9 degrees            SHEARED (Sniglet ships no italic); matches Nunito's native angle
+  fill width  146 units            68% glyph stretch / 32% added tracking
+    wordmark    glyph 1.7406x   tracking 0.312em   #d9a03c    2,987 bytes
+    tagline     glyph 1.3922x   tracking 0.134em   #a08d69    9,955 bytes
+  precision   1 decimal            0.1 unit on a 150-unit box = 0.07%; 66% smaller than full float
+  treatment   NONE — FLAT          one fill per line, same structure as mark-normal
+```
 
-#### F5a — CHECKED ACROSS ALL FIVE MARKS: the stale colour is ORGANIC ONLY
-*(human, 2026-08-22: "verify those 2 against the other themes too, if they also are to be fixed")*
+### ⛔ TRACE BOTH LINES, OR NEITHER — a draft that traced only the wordmark was WRONG
+An intermediate version left the tagline as `<text>`, reasoning that a fallback at 8.5px is barely visible.
+**That judged the tagline against ITSELF instead of against the wordmark above it.** A traced Sniglet wordmark
+over a tagline rendering as Roboto is *two unrelated typefaces in one lockup*, and that reads wrong at any size.
+⚠ The saving was not worth it either: tracing the tagline costs 10 KB of the 14 KB, and 14 KB against a 145 KB
+`index.html` is not a weight problem.
 
-| mark | wordmark fill | verdict |
-|---|---|---|
-| `mark-normal` | `#C7A900` brand gold | ✅ fine — sits on a light `--band-bg: var(--panel)` that never moved |
-| `mark-studio` | `#f0eee8` over `#55514a`, two-layer engraved | ✅ fine — deliberately tuned to `--hdr-bg: var(--bg)` |
-| `mark-futuristic` | `#FFF100` + `filter="url(#neon)"` | ✅ fine — the neon IS the theme |
-| **`mark-organic`** | **`#A89000`** | ⛔ **STALE — the only one** |
-| `mark-steampunk` | `url(#brass)` gradient | ✅ fine — brass is thematically correct |
+### ⛔ WHAT WAS CONSIDERED AND DECLINED — do not reintroduce
+raised / engraved three-layer stack · halo (outside stroke) · glow (feGaussianBlur) · grain fill ·
+carved gradient · plate rule. Each was built as a live specimen and rejected.
+⭐ The design work did not produce an effect; it produced the confidence to have none.
 
-⭐ **AND IT IS A SECOND INSTANCE OF A HAZARD THE RETHEME ALREADY DOCUMENTED.**
-`ORGANIC-TREE-PLAN.md` warned: *"⛔ `--edit-glow-rgb` is the one that gets forgotten. It is the same coral in
-RGB … change the accent alone and the pink survives in the animation."* The retheme moved `--band-bg` from
-coral `#bf6850` to moss `#25301a` and caught the glow — **but the logo holds its own hardcoded colour and was
-missed by exactly the same mechanism.** The other four marks are fine only because their bands never changed.
+### ⭐ THE POINT IS THE TRACING, NOT THE FACE
+*(human: "it will be traced right? as android doesnt display correctly")*
 
-⭐ **THE STRUCTURAL FIX, if anyone wants it:** all five marks HARDCODE their palette, with nothing reconciling
-them to the theme tokens — five two-homes instances waiting to go stale the next time a theme moves.
-`fill="currentColor"` plus one CSS rule per theme would make this class of drift impossible.
-⚠ It does NOT cover all five: studio needs two colours (engraved), futuristic a filter, steampunk a gradient.
-It cleanly fixes **organic and normal**. Worth doing for those two; do not force the other three.
+⛔ **ALL FIVE MARKS RENDER WRONG ON ANDROID TODAY.** Neither font they request exists there:
+```
+  Arial Black   normal / studio / futuristic   -> absent -> Roboto bold
+  Georgia       organic / steampunk            -> absent -> Noto Serif
+```
+They are a font REQUEST the device declines, not logos. Outlining repairs a live cross-platform defect that
+predates this whole redesign — worth more than any letterform choice made here.
 
-#### F5b — CHECKED: `textLength` is SHARED BY ALL FIVE, and I was wrong to call it a bug
-`textLength="146" lengthAdjust="spacingAndGlyphs"` is on **every text element of every mark** — both the
-wordmark and the "CNC MACRO STUDIO" line, all five themes.
+### ⚠ THE `textLength` ATTRIBUTE GOES — FOR THIS MARK ONLY
+The fill is baked into the path geometry, so `textLength="146" lengthAdjust="spacingAndGlyphs"` must NOT be
+applied on top; it would squeeze an already-correct mark a second time.
+⛔ Do NOT strip it from the other four — it is an intentional device they still rely on.
 
-⇒ **That makes it an INTENTIONAL DEVICE, not a defect.** Forcing both lines to exactly 146 units is what makes
-the wordmark and its tagline align into one tidy block. ⛔ **Do not "fix" it, and do not strip it from the
-other four.** I called it a deformation earlier; that was wrong — it is a justification device used
-consistently.
+⭐ **WHY THE BLEND EXISTS, measured against real font metrics:** the current attribute stretches glyphs by
+about **2×** (Sniglet natural 69.9 → 146 = 2.09×). The 68/32 blend brings that to **1.74×** and lets tracking
+carry the rest — 22% less distortion of the bowls, which is the entire reason Sniglet was chosen.
 
-⚠ **BUT IT IS STILL LIVE FOR THIS TASK, for a narrower reason (INFERRED, not measured):** the amount of
-distortion depends on how far a face's natural width sits from 146. The three Arial Black marks are already
-wide and take it well. **Organic and steampunk are Georgia — a narrower face, stretched further.** A rounded
-humanist sans is narrower still, so whatever is chosen will be stretched MORE than Georgia is now.
-⇒ **Whoever draws this must judge the new face AT 146 units**, not at its natural width, or it will look
-right in the type specimen and wrong in the header. If outlining to paths, bake the 146 width into the paths.
+### ⚠ SCOPE DECISION THE HUMAN STILL OWES
+This entry is ORGANIC ONLY, but the Android fallback hits every mark equally:
+```
+  organic only   this ships; the other four stay broken on Android      +14 KB
+  all five       trace each existing mark AS-IS (no redesign) + this one  ~70 KB
+```
+⭐ Advisor leans ALL FIVE — tracing the other four is a pure fidelity fix with **no design decision attached**.
+⚠ But the honest number is **~70 KB on a 145 KB `index.html`, a 48% increase** — not the rounding error it
+looked like when only wordmarks were being counted. ⛔ Human's call with that figure in hand.
+*(human, 2026-08-22, noticing the inconsistency: "wait other logo use a font")*
 
----
-## OPEN
+### ⚠ HOW TO REGENERATE — the paths are DERIVED, never hand-edited
+Recipe, so nobody edits path data by hand:
+1. Fetch the Google Fonts WOFF2 subset with `&text=DDCS%20CNC%20MACRO%20STUDIO` and a **modern** User-Agent.
+   ⚠ An old UA gets you **EOT**, and no `&text=` gets you a Cyrillic subset with no `D` in it. Both happened.
+2. Read glyph contours with `fontTools` + `brotli` (neither was installed; both are pure-python installs).
+3. Per glyph: `translate(0, baseline)` · shear · `scale(size/upem * xs, -size/upem)`, then lay out with the
+   blend above.
+4. ⛔ **THE SHEAR SIGN IS NEGATIVE.** The y-flip in `scale(..., -s)` runs first, so a positive shear leans the
+   wrong way — this shipped wrong once and the human caught it. **Assert it:** transform a point at cap height
+   and check the x delta is POSITIVE.
 
-### 1. Move the theme selector out of the quick menu into Settings
-> ⭐ **MERGE THIS WITH ITEM 7 — ONE TURN, NOT TWO.** *(human, 2026-08-22: "yes")* Both restructure the SAME
-> quick-menu popover (`ui/headerPost.js`): this item REMOVES the theme chips, item 7 moves the version INTO
-> the menu footer and the workspace name OUT to the header. Done separately, that file gets opened twice and
-> the layout gets re-decided twice. ⛔ Do not start either alone.
-*(human, 2026-08-19)* — `headerPost.js` `themeSection` renders a heading + five `.hq-theme-chip`s in a menu the
-t851 "menu diet" cut to ~9 rows. A theme is chosen once; Settings is where appearance preferences live. ⚠ Leave
-NOTHING behind (a "Theme…" row that opens Settings keeps the row it was meant to free). ⚠ Reuse
-`setQuickTheme()` — do not re-implement switching — and keep the active-theme ring reflecting live `data-theme`.
-
-### 2. The exe only checks for updates at boot
-*(human, 2026-08-19)* — `initUpdateCheck()` is called once from `index.html` ("one check per launch"); a release
-cut while Studio is open is invisible until restart. The WEB build already re-checks on `visibilitychange`
-(`initWebVersionNudge`) — the exe, which cannot reload itself and most needs telling, has no equivalent. Reuse
-that pattern, throttled (`_lastWebCheck` is the precedent). ⚠ Must not re-nag a version already dismissed —
-`update-check.spec.js` asserts that.
-
-### 3. The welcome / "What's new" panel: shorter, and link to the thing it describes
-*(human, 2026-08-19: "the panel on boot can be a little bit less lines and perhaps a link on each panel to go to
-the function associated with the note whenever possible… maybe it's nice to have a screenshot of the function or
-the menu for each note.")*
-
-Three separable asks, in increasing cost — the first is worth doing alone:
-1. **Fewer lines.** `RELEASE_NOTES[v][].full` is currently a paragraph per entry (the t2075 schema deliberately
-   allowed the modal to say the HOW). It has drifted long — the t2078 notes run 4-5 lines each. Tighten the
-   authored copy; no code change.
-2. **A link per panel to the feature.** ⚠ OPTIONAL BY THE HUMAN'S OWN WORDS — *"not an obligation… if it's
-   convenient or easy"*. Cheap version: an optional `go` field on a note (`{ short, full, go }`) whose value is
-   an existing global the app already exposes (`window.openSettings`, `showApp('gateway')`, the quick menu).
-   ⛔ Do NOT invent a navigation layer for this; if a note's target has no existing door, it simply gets no link.
-3. **A screenshot per note.** ⚠ **MY FIRST OBJECTION HERE WAS WRONG AND IS CORRECTED, so it does not get
-   re-raised:** I argued images would go stale against a weekly-changing UI. The human's answer —
-   *"of course they go stale, but that's why we release new updates"* — is right, and it dissolves the problem:
-   **release notes are VERSIONED AND IMMUTABLE.** A picture in the V2026.08.19.4 notes documents what
-   V2026.08.19.4 introduced; it is a historical record, not a live document, and it is CORRECT for it to keep
-   showing that release's layout forever.
-
-   That reframing also makes it cheap, via a fact about the surface: **the welcome modal only ever fires for the
-   version just installed** (`checkWelcomeNotice` compares stored-vs-current at boot). So only the CURRENT
-   release's images can ever render — historical ones are never displayed and must NOT be accumulated in the
-   bundle. ⇒ **Ship images for the newest release only; drop the previous release's when cutting a new one.**
-   The note TEXT stays for history (the banner still reads older entries); the images do not.
-
-   Remaining real costs, neither fatal: (a) someone must capture + crop at release time — a per-release chore
-   the ritual has to name, or it silently stops happening; (b) they must be BUNDLED, not fetched — the gateway is
-   offline-first, so a CDN URL would break exactly the shop-with-no-internet user this is for. Budget a few tens
-   of KB for ~3 cropped PNGs and keep them out of `--onefile` growth by replacing rather than appending.
-
-Files: `web/data/releaseNotes.js` (the authored source), `web/ui/updateCheck.js` (`checkWelcomeNotice` renders
-one panel per entry). ⚠ `update-check.spec.js` asserts the modal's panel-per-entry structure and the
-no-notes fallback — read it before changing the schema.
+### Verify
+The header in organic at real size, **and** the boot splash — the mark renders on `--modal-face` there, a
+different surface (`BOOT-SPLASH-PLAN.md` trap 3). ⚠ **And on an ANDROID device**, since that is the defect
+this actually fixes.
 
 ---
 
@@ -538,134 +498,25 @@ firmware directory as build material — so if any other declared entry ever res
 same defect.
 
 
-### 9. SPLIT THE ONE MENU IN TWO — the logo owns the APP, the filename owns the FILE
-*(human, 2026-08-22: "should we split the menu items in 2, using the ddcs logo as a entry point" — agreed, and sequenced AFTER t2147 lands)*
+### 9. TWO LOOSE ENDS FROM THE MENU SPLIT (t2149 shipped the split itself)
+*(the split is DONE and its entry is retired — it also carried a self-contradiction of the advisor's own making:
+an early sketch sorted `Wizards…` as APP scope, left in place after the reasoning moved it to FILE. The worker
+built to the reasoned section and FLAGGED the stale one rather than silently picking. Doc debt, now deleted.)*
 
-**The diagnosis: the quick menu is two menus wearing one hat.** Its rows do not share a scope —
+#### a. ⚠ THE VERSION IS IN TWO PLACES — needs a human pick
+*(worker flagged, deliberately unresolved: "app-menu version footer duplicates About's own version line")*
+Predicted in the dispatch and it landed: the APP menu's footer shows the version, and the new dedicated
+**About panel** conventionally shows it too. Two homes for one fact, one click apart.
+⇒ **Pick ONE.** ⭐ Advisor's lean: keep the FOOTER, drop it from About — the footer answers "what am I running"
+without opening anything, which is the question people actually have. About then carries credits/legal, which
+is what makes it a separate panel from FAQ in the first place.
+⛔ Do not "solve" it by making the footer link to About; that was raised and the human declined the notes link.
 
-```
-  Workspace identity · Saved <when> · Save · Open · Load…      FILE scope
-  Wizards… · Settings… · theme chips · the version             APP  scope
-```
-
-⛔ **And t2147 makes the mismatch WORSE, which is why this follows it.** Once that menu hangs off the
-workspace filename, *"Settings…"* under your filename reads as **this file's** settings. Filename-as-menu-door
-is a normal, well-established pattern (Figma's `[file name ∨]` is exactly it) — **but only when the menu holds
-file-scoped actions.** Ours does not yet.
-
-### ✅ THE SPLIT, WORKED OUT WITH THE HUMAN 2026-08-22
-
-**The test that resolves every row:** *does going through this door bring something INTO your work, or come
-out of it?* Save/Open/Load/Insert/Export obviously do. Wizards inserts an op into THIS program. Setup sheet and
-checklist are documents ABOUT this job. Everything else is about the product itself.
-
-```
-  ┌─ DDCS ∨ ─────────────┐   ┌─ <filename> ∨ ─────────────────┐
-  │  ⚙  Settings…            │   │  Workspace: … · role · envelope     │
-  │  ────────────────────  │   │  ──────────────────────────────  │
-  │  ❓ Help — FAQ & About   │   │  💾 Save          📂 Open        │
-  │  ↓  Get Studio for desk… │   │  ──────────────────────────────  │
-  │  ⭐ Rate / Feedback      │   │  📘 Library…   ✨ Wizards…        │
-  │  ────────────────────  │   │  📁 Load…  ➕ Insert…  ↧ Export…  │
-  │  V2026.08.22.2           │   │  ──────────────────────────────  │
-  └────────────────────────┘   │  📄 Setup sheet…  ✅ Setup checklist │
-     THE PRODUCT — small,       └──────────────────────────────────┘
-     rarely visited                THIS JOB — the working menu
-```
-⭐ **THE LOPSIDEDNESS IS CORRECT, not a flaw.** The product menu SHOULD be small and rarely opened. The file
-menu carries the weight because that is where the work happens. A 50/50 split would mean the line was drawn
-in the wrong place.
-
-⭐ **LIBRARY GOES IN THE FILE MENU** *(human: "shouldnt library be in the file menu?")*. Its NAME sounds
-app-ish — a library is where you look things up — but its FUNCTION is a **loading dock**: you go in to bring
-something back. `libraryModal.js:2` — "ONE tabbed modal for the user's stuff: **Projects · Wizards**".
-**Projects** is your saved work browsable in folders (`projects/projectStore.js`); **Wizards** is the
-catalogue, built-in plus your own. Both are unambiguously "bring something into the current job".
-
-⚠ **A STALE COMMENT FOUND WHILE DECIDING THIS — fix it in the same turn.** `headerPost.js:206` reads
-*"the Library: one door to Profiles · Projects · Wizards"*, but the **Profiles tab was RETIRED at t1217**
-(`libraryModal.js:3`: "the Profiles tab retired with the profile library; the workspace's ONE machine lives
-in Settings"). The tab went; the comment advertising it stayed — the removal-chain pattern again.
-
-⭐ **DOES "PROJECTS" NAME ITSELF? A NEAR-MISS WORTH RECORDING** *(2026-08-22)*. The human proposed RETIRING
-projects on the premise that *"a project is a wizard in a specific config — most of the time we dont need to
-repeat it exactly and the wizard alone is fine."* ⛔ **The premise is wrong**: a `.mjson` holds a MULTI-OP
-PROGRAM (`projectModal.js:194` imports via `openMacroText`; the failure reads "Not a valid .mjson macro"), and
-it is not browser-trapped either — there is a Drive volume (`:283`, `:440`) and file Import/Export (`:90`,
-`:387`). Retiring it would have deleted the JOB LIBRARY.
-
-⚠ **BUT THE MISREAD IS THE FINDING, not the error.** The person who BUILT this app modelled a project as one
-wizard's parameters. If it does not read as a job library to him, it reads that way to nobody. The label is not
-carrying its meaning — "Projects" gives no hint these are whole programs, where **"Jobs"** or **"Programs"**
-would. ⭐ The menu split is exactly when labels get looked at, so weigh a rename then; ⛔ but do NOT rename
-on this note alone — it is a naming call for the human, and `.mjson`/`projectStore`/the drawer all carry the
-word.
-
-⭐ **THE SHAPE THAT CAME OUT OF IT, and it is coherent — no redundancy to resolve:**
-```
-  .ddcs workspace  =  THE MACHINE   config, settings, user files + whatever program is loaded
-  .mjson project   =  A JOB         the program itself, in folders, local + Drive
-```
-ONE workspace, MANY projects — one mill, many parts. The only surviving overlap is that the workspace ALSO
-carries a program, so "save what I am working on" has two answers; the disk chip already says
-"Workspace: …", which probably settles which one the Save button means.
-
-⚠ **THREE DOORS TO "OPEN A SAVED THING", within four rows of each other:** `Open`, `Load…`, and
-`Library → Projects`. They may be genuinely distinct (open a WORKSPACE vs load a PROGRAM into the editor) —
-**CHECK BEFORE BUILDING.** If two are the same act, this split is the natural moment to collapse them; if
-they differ, the LABELS must say how, because right now they do not.
-
-### The shape
-```
-  ┌─ DDCS ∨ ────────────┐              ┌─ MILLING-DDDD4.1 ∨ ─┐
-  │  Settings…          │              │  Saved 14:22  ☁     │
-  │  Wizards…           │              │  Save    Open       │
-  │  Theme  ▸           │              │  Load…              │
-  │  ─────────────      │              └─────────────────────┘
-  │  Open the website   │
-  │  V2026.08.22.2      │                 FILE scope — what t2147 built,
-  └─────────────────────┘                 minus the three app rows
-     APP scope — new
-```
-The split runs along the one line people actually navigate by: **am I acting on the APP, or on this FILE?**
-
-### ⭐ THE SECOND PAYOFF — it dissolves the hazard that drove t2147's whole layout argument
-The brand logo is currently an `<a href="https://ddcs-studio.pages.dev">` that **navigates AWAY from the app**.
-That is the mis-click risk that forced the workspace chip across the header in the first place. **Make the
-logo a MENU BUTTON and the hazard is gone** — and "open the website" becomes one ROW inside it, which is where
-it always belonged. ⇒ this is not just tidying; it removes a live footgun.
-
-### ⛔ UN-LINKING THE LOGO IS A REMOVAL — sweep the chain
-The `<a class="brand">` stops being a link. Account for every survivor: the `href`, `target`, `rel`, its
-`title` tooltip, any `:hover`/`:visited` styling that only made sense on a link, and any test asserting the
-brand navigates. ⚠ A test that checks the logo links out must be **INVERTED** to assert it opens the menu —
-not deleted. ⚠ Keep it a real `<button>` with the accessible name the anchor had, so the tab order and screen
-readers do not regress.
-
-### What moves, exactly
-- **OUT of the file menu, INTO the app menu:** `Settings…`, `Wizards…`, the theme control, and the version.
-- ⚠ **The version is moved TWICE across the two turns** — t2147 puts it in the quick-menu footer, this turn
-  moves it to the app menu. That is one row and it is cheap; do not "optimise" by skipping t2147's placement,
-  which is correct for the menu as it exists at that moment.
-- ⚠ **Theme:** t2147 already relocates the chips to Settings. So the app menu's `Theme ▸` is a POINTER to that
-  Settings section, not a second copy of the chips. ⛔ Do NOT reinstate chips in the menu — BACKLOG item 1's
-  own warning applies: a row that merely opens Settings must EARN its place, or it keeps the row it freed.
-  ⇒ if `Settings…` already reaches the theme in one step, **drop `Theme ▸` entirely** and say so.
-- **STAYS in the file menu:** the identity line, `Saved <when> + place icon`, `Save`, `Open`, `Load…`.
-
-### ⚠ Cares
-- **Two menus, one dismissal contract.** `ui/opContextMenu.js`'s `openMenu()` already exists precisely so
-  there is not a second floating-menu implementation to dismiss, clamp to the viewport and forget on
-  `ddcs:stop-previews`. ⛔ Reuse the existing menu machinery; do not write a second popover.
-- **Opening one must CLOSE the other.** Two menus that can be open simultaneously is a bug, not a feature.
-- ⚠ **The narrow header.** Two entry points instead of one, at opposite ends. Verify at 390px
-  (`verification/t2099-header-390.png`) that both survive alongside the tabs.
-- ⭐ **Recent ▸ is NOT in scope** — it is drawn in the sketch above as where it would go, not as work. Do not
-  build it.
-
-**Verify:** screenshots of BOTH menus open (separately), desktop and 390px, so the human can judge the split
-visually — the standing rule for anything that changes what a surface looks like.
-
+#### b. ⚠ THREE DOORS TO "OPEN A SAVED THING", still unexamined
+`Open`, `Load…`, and `Library → Projects` sit within a few rows of each other in the FILE menu. They MAY be
+genuinely distinct (open a WORKSPACE vs load a PROGRAM into the editor) — nobody has checked.
+⇒ If two are the same act, collapse them. If they differ, the LABELS must say how, because right now they do
+not. ⛔ Report before collapsing — this is a naming/behaviour call, not a tidy-up.
 
 ### 10. MULTI-OP APPROACHABILITY: the wizard preview shows ONE op, with no idea where it sits
 *(design conversation with the human, 2026-08-22)*
@@ -728,6 +579,188 @@ the plan — it keeps the isolation AND adds a second render path, which is why 
 designs were argued and dropped in the same conversation — a program-scoped canvas (would add a fourth surface
 beside a component already doing the job) and an op selector inside the wizard modal (helps one host of three).
 ⛔ Do not resurrect either without new evidence.
+
+### 11. NOTHING CHECKS THE WORKSPACE'S DECLARED CONTROLLER AGAINST THE ONE ACTUALLY PLUGGED IN
+> ## ✅ RULED — ROLE IS WORKSPACE-RELATIVE: a mismatch means CLIENT, not a warning
+> *(human, 2026-08-22: "if im connected to a controller the worspace should be client unless the controller
+> match" — this SUPERSEDES the advisor's earlier framing of a lint/warning, and an intermediate misreading
+> where the advisor recorded it as declined.)*
+>
+> ```
+>   TODAY       gateway  ⇔  a controller disk is configured
+>   THE RULE    gateway  ⇔  a disk is configured AND the CONNECTED controller MATCHES
+>                          this workspace's declared controller — otherwise CLIENT
+> ```
+>
+> ⭐ **WHY THIS BEATS A WARNING: it is TRUTHFUL, not advisory.** If the workspace targets an Expert and a V4.1
+> is plugged in, this PC genuinely CANNOT deliver this program to its machine. It is a gateway — for some
+> OTHER workspace. Relative to the one that is open, it is a client. Saying so is a fact, not a caution.
+>
+> ⭐ **AND IT TURNS A WARNING INTO AN INTERLOCK.** Instead of reporting the disagreement and letting the push
+> happen anyway, the gateway-only surfaces gate off by themselves — the SAME mechanism doing the safety work,
+> with no new machinery. This also means the "loud failure" argument for skipping it no longer applies: the
+> point is no longer to warn earlier than the controller does, it is to not offer the action at all.
+>
+> ⭐ **THE MACHINERY IS FRESH.** Roles S1 (t2145) just moved role derivation CLIENT-SIDE, which is exactly
+> where this comparison must live. The gateway already exposes `controller_firmware`; the workspace already
+> declares its controller. This is a comparison at a seam that now exists.
+>
+> ### ⚠ THREE EDGES IT MUST GET RIGHT
+> 1. ⛔ **`family` is `"unknown"` when the fingerprint fails** (`ops.py:374`). **UNKNOWN IS NOT A MISMATCH.**
+>    A failed read must never demote a real gateway to client — that is precisely the confident-wrong-label
+>    failure S1's own design avoided.
+> 2. **No daemon at all** → already client by S1. No interaction, nothing to add.
+> 3. ⚠ **Role now depends on the OPEN WORKSPACE**, so switching workspaces can change the role mid-session.
+>    Correct under this rule, but it must be VISIBLE — the role display must not quietly flip. Say WHY it is
+>    client ("workspace targets Expert; a V4.1 is connected"), never just the bare word.
+>
+> ⚠ **DIRECTION STILL MATTERS for how loudly to say it** — see the asymmetry below; the Expert dialect is the
+> stricter one, so Expert-workspace-on-V4.1 is the benign direction and the reverse is the dangerous one.
+> The ROLE demotion applies to both; the EXPLANATION can be calmer for the benign case.
+>
+> ### The gap this closes (both sides already know)
+```
+  the loaded program  vs  the workspace's DECLARED controller   ✅ LINTED  (#hdrPostWarn)
+  the DECLARED controller  vs  the ACTUAL connected hardware    ⛔ NOTHING COMPARES THEM
+```
+
+**BOTH SIDES ALREADY KNOW, which is what makes this cheap:**
+- The GATEWAY fingerprints the hardware: `bridge/bridge-app/fairy/ops.py:331` — *"Read-only fingerprint of the
+  connected controller (V4.1 vs Expert), from its firmware `.out`"*; `:371` resolves a `family`
+  (`ddcsv4.out` = V4.1); `:280` exposes `"controller_firmware"` in the descriptor; `:404`'s discovery returns
+  `{ip, dest, family, firmware}` per device.
+- STUDIO declares its own controller in the workspace, and `ui/headerPost.js` already renders a lint element
+  (`#hdrPostWarn`) — *"a capability LINT on the loaded program against the workspace's OWN controller"*.
+
+⇒ The comparison is two known values and an existing warning surface. It is not new machinery.
+
+### ⚠ Direction matters — do NOT treat the two cases as symmetric
+The Expert dialect is the STRICTER one (flush-left `N`-labels, no inline `IF..THEN`, per t2070/t2141).
+```
+  Expert workspace -> V4.1 hardware    probably HARMLESS  — a stricter subset runs on the looser control
+  V4.1 workspace   -> Expert hardware  the DANGEROUS one  — the Expert REJECTS what the V4.1 accepts
+```
+⭐ That asymmetry is a happy accident of which way the strictness runs, **not a safeguard**. And it should
+shape the warning: a mismatch in the dangerous direction deserves louder treatment than the benign one.
+
+### ⚠ Cares
+- ⛔ **STATE IT, do not auto-switch.** The standing constraint in this area (`admin.js:189`) is that a role
+  contradiction *"SHOWS the fields and says what is wrong — stated, never silently resolved"*. Same here:
+  never silently re-point a workspace at the hardware it happens to be plugged into. The user may be
+  authoring for a machine that is not in front of them, which is legitimate.
+- ⚠ **The check needs a REACHABLE gateway** — on a client with no daemon there is no hardware to compare
+  against, so the warning must be ABSENT, not falsely reassuring and not falsely alarming.
+- ⚠ `family` is `"unknown"` when the fingerprint fails (`ops.py:374`). Unknown must NOT read as a mismatch.
+
+### 12. A ring appears around the editor when you CLICK it — kill it for mouse, keep it for keyboard
+*(human, 2026-08-22, with screenshots in futuristic AND steampunk: "can we remove this border and instead make
+the editor panel a different color than the top row" → then the key clarification: **"the border appear when i
+click in the editor"**.)*
+
+⭐ **IT IS A FOCUS RING, NOT A BORDER — that clarification changes the whole fix.**
+
+### What the advisor already checked (do not redo)
+```
+  styles.css:1266  .editor-container { … border: none; }            the container has NO border
+  styles.css:3949  .editor-container { background: var(--screen, #000) }  it ALREADY has its own surface
+  grep ':focus' near editor/gcode/code-/wrap in styles.css   → NO MATCHES
+```
+⇒ **The second half of the request is already true**: the editor panel is a different colour from the top row
+(`--screen` vs `--band-bg`). So there is nothing to do there — what reads as a border is only the ring.
+⇒ And since no `:focus` rule exists for it, the ring is most likely the **browser's DEFAULT UA outline** on the
+`#editor` textarea, which is why it appears on click and looks different in each theme. ⚠ CONFIRM that before
+changing anything — it could also be a `:focus-within` on an ancestor, or an `outline` inherited from a shared
+input rule.
+
+### ⛔ DO NOT JUST REMOVE IT — that is an ACCESSIBILITY REGRESSION
+The outline is the keyboard-focus indicator. Delete it and a Tab user has no idea where they are.
+
+⭐ **ONLY THE LEFT EDGE IS MISSING — top, right and bottom all draw.**
+*(human, 2026-08-22, correcting the advisor: first "it only top and right side", then "wait bottom is there",
+then "just left is missing". ⛔ The advisor's clipping theory — overflow:hidden cutting a full-height outline
+— was WRONG and is deleted; it predicted a missing BOTTOM, which is not what happens.)*
+
+⭐ **THE HUMAN'S OWN DIAGNOSIS IS THE RIGHT ONE: "i think its because line number colum cover it."**
+One element, one edge, one cause. Supporting evidence: `styles.css:3180` sets the editor
+`padding: 14px 16px 14px 52px;` with the comment *"left clears the line-number gutter"* — so `#editor-gutter`
+is overlaid on the container's LEFT edge, and anything drawn at that edge is painted over by it.
+
+### ⭐ THE FIX FOLLOWS FROM THAT: the ring needs an element that CONTAINS the gutter
+An outline on `.editor-container` sits UNDER an overlaid gutter, so moving it to the container is not enough
+— it must go on a box that WRAPS both the gutter and the code, so the gutter is INSIDE the ring rather than
+on top of it.
+⚠ **VERIFY THE DOM FIRST:** is `#editor-gutter` a child of `.editor-container` positioned absolutely over its
+left edge, or a flex SIBLING? If it is already a sibling in a shared parent, the ring belongs on that parent
+and this is a one-line change. If it is absolutely positioned, a wrapper may be needed — report before adding
+one.
+⛔ Do NOT solve it by insetting the ring to start right of the gutter: that draws a ring around the CODE, not
+around the PANEL, and the left edge would still visibly disagree with the other three.
+⛔ Do NOT solve it by making the gutter transparent — it needs its own background to sit over scrolling code.
+
+⭐ **THE FIX IS `:focus-visible`**, which this stylesheet already uses in ~20 places, so it is house style:
+```
+  click in  ->  NO ring     the user knows where they clicked
+  TAB in    ->  ring        the user needs telling
+```
+
+### ⚠ Cares
+- **Check all five themes.** The human reported it in futuristic AND steampunk, so whatever draws it is
+  theme-independent — the fix must be too.
+- ⚠ **The editor is a DUAL-LAYER surface** (`#editor` invisible over `#editor-highlight`, see styles.css:3174).
+  Make sure the ring is suppressed on the layer that actually takes focus, not a sibling that never does.
+- ⚠ **Do not suppress focus rings globally.** Scope it to the editor. Other inputs still need theirs.
+- ⛔ If it turns out NOT to be a UA default but a deliberate rule someone added for a reason, REPORT it rather
+  than deleting — the reason may be a real one nobody wrote down.
+
+### 13. On mobile the CLEAR button dwarfs its siblings - and the siblings are the bug
+*(human, 2026-08-22, from a phone screenshot: "on mobile the clear button appears larger then its sibling")*
+
+**It looks like clear is oversized. It is not — the other five are UNDERSIZED.** `styles.css:5380`:
+```css
+  @media (max-width: 600px) {
+    .editor-toolbar #btn-clear { min-width: 44px; min-height: 44px; justify-content: center; }
+  }
+```
+44px is the standard minimum touch target, and ONLY the clear button gets it. Its five siblings in that row
+(+, refresh, undo, redo, copy) have no floor at all, so on a phone they sit well under a comfortable tap size.
+
+⭐ **SO THE FIX IS TO RAISE THE OTHER FIVE, NOT SHRINK CLEAR.** Shrinking clear would fix the appearance by
+making every button in the row too small to hit reliably - trading a cosmetic complaint for an ergonomic one.
+
+### ⚠ THE SECOND PROBLEM, and it is the more interesting one
+**The one button with a proper tap target is the DESTRUCTIVE one.** On a touch screen the easiest thing to hit
+is Delete. That is backwards, and it is worth deciding deliberately rather than inheriting it:
+- equal sizing (the fix above) at least stops singling it out
+- ⚠ but check whether clear CONFIRMS before wiping. If it does not, an easy-to-hit destructive control with no
+  confirm is the actual hazard here, and the button size is only how it was noticed.
+⛔ Do NOT solve this by making clear SMALLER than its siblings - a deliberately hard-to-hit control is a
+usability smell, and it would also break the 44px accessibility floor it currently satisfies.
+
+### ⭐ A CHEAPER WIN IN THE SAME RULE — move the toolbar to the BOTTOM on mobile
+*(human, 2026-08-22, considering a vertical stack: "maybe on mobile these need to be a colomn just asking")*
+
+⛔ **A column was considered and is worse.** `styles.css:5415` shows the toolbar is
+`position: absolute; right: 8px; top: 8px` — it **floats over the code**, it does not sit in its own band.
+A row obscures the first line or two; a vertical stack of six 44px buttons is **264px tall** and would cover
+most of the visible code down the entire right edge, exactly where line-ends are. Bigger obstruction, not smaller.
+
+⭐ **The arithmetic says the ROW survives at proper size:** 6 × 44px + 5 × 4px gaps = **284px**, against a
+390–430px phone viewport. Tight but it fits, and `max-width: calc(100% - 16px)` already guards it.
+
+⭐ **The real annoyance is `top: 8px`** — it parks the toolbar over the FIRST LINE, which is where the caret
+usually is. On mobile, move it to the BOTTOM right: most programs do not fill a phone screen, so it would
+float over blank space instead. One line in the same media query, and it solves more than reorienting does.
+
+⚠ **What would justify revisiting a column:** a seventh control, or any of them gaining labels. At that point
+the answer is still not a column — it is collapsing the rare ones into an overflow menu and keeping two or
+three primaries visible. Six floating controls is already a lot for a phone.
+
+### ⚠ THIS RULE HAS ALREADY SILENTLY BROKEN ONCE
+`styles.css:5374-5376` records it: t1255 set the floor via a `.hdr-clear` class, a later move to
+`.editor-toolbar #btn-clear` left the old selector matching NOTHING, and the phone floor stopped applying —
+**measured at 24px, not 44px** - until someone noticed by eye. ⭐ That is the removal-chain pattern again
+(the selector survived its element), and it argues for a TEST asserting the computed tap size at phone width
+rather than another hand-check.
 
 ## THE JOBS FOLDER IS SETTABLE — FOLD THE "SYNC FOLDER" ROUTE INTO **LOCAL**, NOT A THIRD OPTION
 *(human, 2026-08-20: "i dont like that it would look like a 3rd option can we fold this in the local folder
@@ -1196,3 +1229,30 @@ riding on a navigation control.
 
 ⇒ Delete the dead override branches, de-duplicate `homingPostIsExpert`, and route both through the workspace
 profile the way t2137 did for the `settingsPanel` copy.
+
+### 14. TWO DEAD-CODE CLUSTERS IN THE EDITOR CHROME, found during t2155 and deliberately NOT swept
+*(worker, t2155 — reported rather than removed, because a refactor turn must not also be a removal turn)*
+
+Both are pre-`t2078` leftovers: `t2078` rebuilt the editor's button row as one flex row and these two never
+got cleaned up behind it.
+
+```
+  #editor-comment                                the comment/uncomment control's old id
+  #align-rotate-btn / #editor-cam-btn  bottom:*  absolute offsets from when each button
+                                                 positioned itself over the editor's corner
+```
+
+⚠ **Why they are worth a line rather than a silent delete.** `t2099` is the precedent that makes this a real
+category and not tidying: a class rename left `.hdr-controls .hdr-clear` matching nothing, so the phone-width
+44px touch floor **silently stopped applying** — measured at 24px — and nobody noticed until it was looked for.
+A selector that matches nothing is indistinguishable from a rule that works, right up until you measure.
+
+⛔ **Sweep the chain, do not just delete the rule.** The standing doctrine: a removal is a SWEEP — the id or
+class, every CSS rule that names it, every JS reader, any test asserting it, and any comment that documents it.
+Deleting only the CSS leaves a dangling id in markup that reads as live.
+
+⚠ **VERIFY DEAD, DO NOT ASSUME DEAD.** `#editor-comment` in particular: `editorTextOps.js` survived the `t2139`
+indentation removal and still owns comment/uncomment through **three doors** (button, keyboard, context menu).
+Prove the *id* is unreferenced, not the *feature* — they are not the same question, and the feature is live.
+
+⇒ **A tail-sized item.** Two clusters, one commit each, with the grep evidence for each deletion in the message.
