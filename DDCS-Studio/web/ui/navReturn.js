@@ -10,41 +10,48 @@
  *   - The SOURCE calls `const tok = pushReturn(label, reopenFn)` BEFORE navigating away, and hands `tok` to the
  *     destination (via its open() options).
  *   - The destination keeps `tok` for its session. On a user CLOSE (✕ / Done / Esc / scrim) it calls
- *     `popReturn(tok)` — which runs `reopenFn` only if `tok` is still the live entry. If the destination instead
- *     navigates onward (or is replaced by a fresh open), it calls `dropReturn(tok)` so the path doesn't leak.
+ *     `popReturn(tok)` — which runs `reopenFn` only if `tok` is still the TOP of the stack. If the destination
+ *     instead navigates onward (or is replaced by a fresh open), it calls `dropReturn(tok)` so the path doesn't leak.
  *
- * Why token-matched (not a bare stack): a destination can only ever fire the CURRENTLY live return, so a flag
- * left over from an abandoned flow can never reopen the wrong screen. Depth-1 today (one live return), which is
- * all the current flows need; swap `_live` for an array to nest without changing the call sites.
+ * t2192 — A REAL STACK, not a bare depth-1 slot: this file's own header used to say "swap `_live` for an array to
+ * nest without changing the call sites" when a real nested flow arrived, and one has (Settings → the wizard/project
+ * manager → Settings again, no depth limit, a cycle is just more entries). Token-matched still holds, generalised:
+ * a destination can only ever fire the return CURRENTLY ON TOP, so a stale token from an abandoned flow further
+ * down the stack can never fire out of turn or reopen the wrong screen. Every existing call site (openHomingSetup,
+ * openAtcSetup, the Setup checklist, …) is unchanged — they still only ever push/pop the one level relative to
+ * themselves, which is exactly a depth-1 stack.
  */
-let _live = null;   // { id, label, fn } — the single live return target, or null
+const _stack = [];   // [{ id, label, fn }, …] — top of stack (last element) is the one that can fire next
 let _seq = 0;
 
 /** Register "how to get back to me". Returns an opaque token the destination passes back to popReturn/dropReturn. */
 export function pushReturn(label, fn) {
-    _live = { id: ++_seq, label, fn };
-    return _live.id;
+    const entry = { id: ++_seq, label, fn };
+    _stack.push(entry);
+    return entry.id;
 }
 
-/** If `token` is the live return, clear it and run its reopen fn. Returns true if it fired. */
+/** If `token` is the TOP of the stack, pop it and run its reopen fn. Returns true if it fired. */
 export function popReturn(token) {
-    if (_live && _live.id === token) {
-        const fn = _live.fn;
-        _live = null;
-        try { fn(); } catch (_) { /* a broken reopener must not wedge the close */ }
+    const top = _stack[_stack.length - 1];
+    if (top && top.id === token) {
+        _stack.pop();
+        try { top.fn(); } catch (_) { /* a broken reopener must not wedge the close */ }
         return true;
     }
     return false;
 }
 
-/** Discard `token` if it's the live return, without running it (the user navigated onward instead of back). */
+/** Discard `token` if it's the top of the stack, without running it (the user navigated onward instead of back). */
 export function dropReturn(token) {
-    if (_live && _live.id === token) _live = null;
+    const top = _stack[_stack.length - 1];
+    if (top && top.id === token) _stack.pop();
 }
 
-/** Inspect the live return (label only) — for debugging / "where will Back go?". */
+/** Inspect the live (topmost) return (label only) — for debugging / "where will Back go?". */
 export function activeReturn() {
-    return _live ? { label: _live.label } : null;
+    const top = _stack[_stack.length - 1];
+    return top ? { label: top.label } : null;
 }
 
 // Debug handle: `window.ddcsNavReturn.activeReturn()` to see the live return target.

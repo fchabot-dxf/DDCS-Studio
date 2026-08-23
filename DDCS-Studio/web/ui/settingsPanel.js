@@ -34,7 +34,7 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dial
 import { getMachine, setMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record; t1231 — the signed envelope summary
 import { compareController, mismatchStatement } from '../data/controllerMatch.js';   // t1229 A2 — the ONE controller comparison + its wording (shared with the gateway send)
 import { saveWorkspace } from './workspaceSave.js';   // t1229 — Duplicate = the existing Save-As-a-copy, no second mechanism
-import { fileSavedStem } from '../data/backup.js';
+import { fileSavedStem, BACKUP_STORES } from '../data/backup.js';
 import { confirmSetupRow } from './setupChecklist.js';   // t1217 — a visit+confirm satisfies a checklist row even when the value is unchanged   // t684 b — the profile browser (save-as / browse)
 // t1223 — ui/backupModal.js is DELETED: it WAS the restore-selected store-picker, and opening a workspace is now
 // always the WHOLE file through the workspace manager. A partial restore produced a state that was neither the
@@ -1017,6 +1017,10 @@ function renderWcsTable(host, machine) {
 let _fillSettingsInputs = null;
 let _settingsNavTo = null;   // (group, panelId) → deep-link a tab (set after the overlay is built)
 let _returnTok = null;   // live nav-return token for this Settings session (see ui/navReturn.js); null = no return
+// t2192 — same cross-scope bridge as _settingsNavTo above: renderIdentityBand/renderWorkspaceInventory live in a
+// different function scope than showPanel (see the t1567 lesson a few lines below theirs), so showPanel reaches
+// them through this module-level pointer, set once the overlay is built, rather than reaching across directly.
+let _refreshWorkspaceTab = null;
 
 // Merge incoming settings (e.g. from an imported / cloud-loaded profile), persist, and refresh the panel.
 // Restores the FULL persisted config (mirrors the load-merge) so a loaded profile brings back the magazine,
@@ -1110,16 +1114,14 @@ function buildSettingsOverlay() {
             #settings-app .mach-travel-row { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12px; }
             #settings-app .mach-travel-row .mach-ax { width: 12px; display: inline-block; text-align: center; }
             /* t1223 — the IDENTITY BAND (display only), full width above the tab strip. */
-            /* t1265 — the header row: the identity band takes the space, the close keeps its corner. align-items
-               flex-start puts the X level with the band's FIRST line (the name), not floating in the middle of a
-               band that has wrapped to two lines on a phone. */
-            #settings-app .settings-headerrow { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 8px;
+            /* t1265 — the header row used to also carry the identity band (t2192 moved it into the Workspace tab);
+               justify-content:flex-end keeps the X in its corner now that it is the row's only child. */
+            #settings-app .settings-headerrow { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px;
                 background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-bottom: 1px solid var(--border); }
-            #settings-app .settings-headerrow .settings-identity { flex: 1 1 auto; min-width: 0; background: none; border-bottom: none; }
-            /* the X never rides over the envelope text: it is its own flex item with a reserved 44px box, so the band
-               truncates/wraps against it rather than underneath it */
             #settings-app .settings-headerrow .settings-close { flex: 0 0 auto; min-width: 44px; min-height: 44px;
                 display: inline-flex; align-items: center; justify-content: center; margin: 0; align-self: flex-start; }
+            /* t2192 — the identity band's own styling, now scoped to the Workspace tab it lives in instead of the
+               header row (the rule above no longer needs a .settings-identity child selector). */
             #settings-app .settings-identity { flex: 0 0 auto; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
                 padding: 8px 16px; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-bottom: 1px solid var(--border); }
             #settings-app .settings-identity .si-name { font-weight: 700; font-size: 14px; color: var(--text-main); }
@@ -1127,16 +1129,13 @@ function buildSettingsOverlay() {
             #settings-app .settings-identity .si-item { font-size: 12px; color: var(--text-dim); }
             #settings-app .settings-identity .si-item b { color: var(--text-main); font-weight: 600; }
         </style>
-            <!-- t1223 (6) — THE IDENTITY BAND. Display only: which machine this workspace IS, at a glance, above
-                 everything else in Settings. Nothing here is editable — the name comes from the FILE (one-name rule),
-                 the controller from the dropdown below, the envelope from the machine panel. -->
-            <!-- t1265 (user sketch) — THE BAND AND THE X ARE ONE HEADER. The close used to sit in the tab-strip row
-                 below, which read as a control belonging to the TABS rather than to the modal. Lifted into the band's
-                 own row, top-right, the two together are the modal's one true header: what this is, and the way out.
-                 The X is a SIBLING of the band, not inside it — the band's innerHTML is re-rendered whenever the
-                 machine changes, and a button living in there would be wiped on the next render. -->
+            <!-- t1223 (6) — THE IDENTITY BAND used to live here, always-visible above every tab. t2192 moved it INTO
+                 the new Workspace tab (below) — it is workspace CONTENT (what this .ddcs IS), so it belongs beside
+                 the rest of the workspace's own inventory, not floating above tabs that have nothing to do with it.
+                 Nothing in it is editable — the name comes from the FILE (one-name rule), the controller from the
+                 dropdown, the envelope from the machine panel. Its own render function (renderIdentityBand) and
+                 target id (#set_identity_band) are UNCHANGED — only where that id lives moved. -->
             <div class="settings-headerrow">
-                <div class="settings-identity" id="set_identity_band"></div>
                 <button class="settings-close" type="button" title="Close (Esc)" aria-label="Close settings" onclick="window.closeSettings && window.closeSettings()">✕</button>
             </div>
             <div class="settings-head">
@@ -1150,6 +1149,12 @@ function buildSettingsOverlay() {
                         <button class="settings-main-tab active" data-group="lookfeel">Look and feel</button>
                         <button class="settings-main-tab" data-group="controller">Controller</button>
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
+                        <!-- t2192 — WORKSPACE: the .ddcs made visible. Its job is the INVENTORY, not navigation — a
+                             number and a button per row, reading data/backup.js's own declared BACKUP_STORES counts
+                             directly. See scratchpad/t-workspace-tab.md. Not a return of t1245's deleted Workspace
+                             subtab (that one duplicated the workspace manager's Save/Open); this one answers a
+                             different question — what IS in the file, not how to save or open it. -->
+                        <button class="settings-main-tab" data-group="workspace">Workspace</button>
                     </div>
                 </div>
             </div>
@@ -1178,6 +1183,8 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_input" style="display:none;">Input</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_output" style="display:none;">Output</button>
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
+                    <div class="sidebar-group-label" data-group-label="workspace" style="display:none;">Workspace</div>
+                    <button class="settings-tab" data-group="workspace" data-target="set_tab_workspace" style="display:none;">Inventory</button>
                 </div>
                 <div class="settings-content">
                 <!-- LOOK AND FEEL: WIZARD BAR (the wizard-bar library manager — rendered by wizardManagerPanel.js) -->
@@ -1694,6 +1701,20 @@ function buildSettingsOverlay() {
                         </div>
                     </div>
                 </div>
+                <!-- WORKSPACE: the .ddcs made visible (t2192). THE IDENTITY BAND (moved from the header, t2192) +
+                     a per-store INVENTORY — count + unit read live off data/backup.js's own declared BACKUP_STORES,
+                     never re-typed here. A row gets a button only where an actual manager exists for it (Wizards,
+                     Projects, the tool table's own Settings tab); every other row is a count with no door. -->
+                <div id="set_tab_workspace" style="display:none">
+                    <div class="settings-section" style="border-top:none; padding-top:0;">
+                        <div class="settings-identity" id="set_identity_band"></div>
+                        <div class="settings-hint">Everything below travels INSIDE this workspace's <b>.ddcs</b> file — opening it elsewhere brings all of it. The one exception is the theme (Look and feel ▸ Appearance), saved on this device only.</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">WHAT'S IN THIS WORKSPACE</div>
+                        <div id="set_workspace_inventory"></div>
+                    </div>
+                </div>
 
                         </div><!-- end settings-content -->
                 </div><!-- end settings-body -->
@@ -2123,6 +2144,53 @@ function wireSettingsOverlay(ov) {
     renderMachineLine();
     window.addEventListener('ddcs:settings-changed', () => { try { renderMachineLine(); } catch (e) { /* */ } });
     window.addEventListener('ddcs:file-state', () => { try { renderMachineLine(); } catch (e) { /* */ } });
+
+    // t2192 — THE WORKSPACE TAB'S INVENTORY. Reads data/backup.js's own declared BACKUP_STORES directly (count +
+    // unit + label already exist there; nothing here re-derives or re-types them). A row gets a door ONLY where a
+    // real manager exists (Wizards, Projects, the tool table's own Settings tab) — every other row is a count with
+    // no button, per the ruling: "a count with no door is fine and honest; inventing a manager so a row can have a
+    // button is not."
+    const WORKSPACE_DOORS = {
+        settings: { label: 'Open settings', run: () => showPanel('set_tab_atc') },
+        userOps: { label: 'Open manager', run: () => openManagerFromWorkspace(window.openWizardManager) },
+        projects: { label: 'Open manager', run: () => openManagerFromWorkspace(window.openProjectManager) },
+    };
+    /** THE RETURN PATH (t2192): push "how to get back to Settings" (ui/navReturn.js), hide Settings (its own
+     *  closeSettings — a class toggle, never a DOM teardown, so the tab you were on survives untouched), then
+     *  open the manager with that token. The manager's own close() pops it on EVERY exit (✕ / Esc / backdrop —
+     *  they already share one close function), reopening Settings on the SAME tab. Opened from the file menu
+     *  instead, the manager gets no token and closes to the app exactly as it always has. */
+    function openManagerFromWorkspace(opener) {
+        if (typeof opener !== 'function') { dlgNotice('That manager is not available right now.'); return; }
+        const tok = pushReturn('Settings', () => openSettings());
+        closeSettings();
+        opener({ returnToken: tok });
+    }
+    async function renderWorkspaceInventory() {
+        const host = q('set_workspace_inventory');
+        if (!host) return;
+        const rows = await Promise.all(BACKUP_STORES.map(async (s) => {
+            let v; try { v = await s.read(); } catch (_) { v = undefined; }
+            return { id: s.id, label: s.label, unit: s.unit, count: (s.count ? (s.count(v) || 0) : 0) };
+        }));
+        host.innerHTML = rows.map((r) => {
+            const door = WORKSPACE_DOORS[r.id];
+            // an empty workspace reads sensibly ("no wizards yet"), not "0 wizards" in a row that looks broken —
+            // only worth the honest phrasing where a door invites you to go add one; a bare count stays a number.
+            const countText = (r.count === 0 && door) ? `no ${r.unit} yet` : `${r.count} ${r.unit}`;
+            return `<div class="settings-row" data-wsrow="${escHtml(r.id)}" style="justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);">
+                <span>${escHtml(r.label)}</span>
+                <span style="display:flex; align-items:center; gap:10px;">
+                    <b>${escHtml(countText)}</b>
+                    ${door ? `<button type="button" class="toolbar-btn settings-io" data-wsinv="${escHtml(r.id)}">${escHtml(door.label)}</button>` : ''}
+                </span>
+            </div>`;
+        }).join('');
+        host.querySelectorAll('[data-wsinv]').forEach((b) => {
+            b.addEventListener('click', () => { const d = WORKSPACE_DOORS[b.dataset.wsinv]; if (d) d.run(); });
+        });
+    }
+    _refreshWorkspaceTab = () => { renderMachineLine(); renderWorkspaceInventory(); };
 
     // t1223 — the LEGACY-MACHINES DOOR is REMOVED ([[no-legacy-burden]]). It surfaced leftover pre-t1217 profiles as
     // one-time machine-config exports, plus an Open-machine-config reader for the file it wrote. Both existed only to
@@ -3523,7 +3591,7 @@ function wireSettingsOverlay(ov) {
         // t1245 — five panels left Settings entirely (Workspace + Cloud duplicated the workspace manager; FAQ + About
         // moved to the quick menu's Help; Feedback merged into Rate / Feedback). They are deleted, not hidden.
         const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_sound', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway',
-                     'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
+                     'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc', 'set_tab_workspace'];
     /**
      * t1245 — A PANEL CARRIES ITS OWN GROUP. Its subtab button already declares one (data-group), so showing a panel
      * can ACTIVATE that group itself instead of trusting the caller to name it. That is what makes this turn's split
@@ -3543,6 +3611,9 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
         if (id === 'set_tab_wizards') renderWizardLibrary(ov.querySelector('#wizard_library_manager'));   // the wizard-bar library manager
         if (id === 'set_tab_sound') renderSoundTab(ov);   // t2125 — self-renders fresh from ACTION on every open
+        // t2192 — re-render fresh on every visit (the spec's own acceptance bar: "add a wizard, reopen the tab,
+        // the number moves"), same pattern as set_tab_machine/atc above.
+        if (id === 'set_tab_workspace' && _refreshWorkspaceTab) _refreshWorkspaceTab();
     }
     /**
      * `want` (optional) is the panel the caller is heading for — passed in by showPanel so the group switch does not

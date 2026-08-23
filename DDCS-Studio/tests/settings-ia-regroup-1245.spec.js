@@ -6,10 +6,15 @@ import { test, expect } from '@playwright/test';
  *
  *   Appearance · Preview · Editor · Wizards  →  STAY, as Look and feel (Wizards renamed WIZARD BAR — it configures
  *                                               the bar, it does not list wizards)
- *   Workspace                                →  DELETED. Its two buttons opened the workspace manager, which the
- *                                               quick menu's Save / Open already do. Settings keeps ZERO workspace
- *                                               controls; the identity band above the strip still SAYS which
- *                                               workspace this is, display-only.
+ *   Workspace                                →  DELETED (AT THE TIME). Its two buttons opened the workspace
+ *                                               manager, which the quick menu's Save / Open already do. Settings
+ *                                               kept ZERO workspace controls; the identity band above the strip
+ *                                               still SAID which workspace this is, display-only.
+ *                                               ⚠ SUPERSEDED (t2192): a Workspace tab exists again, but for a
+ *                                               different job — the INVENTORY (counts + open-manager buttons off
+ *                                               data/backup.js's own declared stores), not Save/Open controls.
+ *                                               The identity band moved OUT of the always-visible header and
+ *                                               INTO this new tab, since it is workspace content.
  *   Cloud                                    →  DELETED. Sign-in / identity / sign-out moved to the manager's Cloud
  *                                               tab in t1243; its ONE unique control, Default save location, moved
  *                                               there with it rather than being dropped.
@@ -42,7 +47,10 @@ const openAppMenu = async (page) => {
     await page.waitForSelector('#hdrAppMenu:not([hidden])', { timeout: 6000 });
 };
 
-test('the strip is THREE tabs — Look and feel, Controller, Hardware', async ({ page }) => {
+test('the strip is FOUR tabs — Look and feel, Controller, Hardware, Workspace', async ({ page }) => {
+    // t2192 — Workspace joined as a fourth, for a different job than the three above (the inventory, not
+    // settings): scratchpad/t-workspace-tab.md. Not a return of the DELETED t1245 Workspace subtab (that one
+    // duplicated the workspace manager's Save/Open) — this one answers what IS in the file.
     await openSettings(page);
     const strip = await page.evaluate(() => [...document.querySelectorAll('#settings-app .settings-tabs .settings-main-tab')]
         .map((b) => ({ group: b.dataset.group, label: b.textContent.trim() })));
@@ -50,6 +58,7 @@ test('the strip is THREE tabs — Look and feel, Controller, Hardware', async ({
         { group: 'lookfeel', label: 'Look and feel' },
         { group: 'controller', label: 'Controller' },
         { group: 'hardware', label: 'Hardware' },
+        { group: 'workspace', label: 'Workspace' },
     ]);
     expect(await page.locator('.settings-main-tab[data-group="general"]').count(), 'the catch-all is gone').toBe(0);
 });
@@ -218,7 +227,7 @@ test('EVERY surviving panel deep-links to itself — a panel carries its own gro
     await openSettings(page);
     const panels = await page.evaluate(() => [...document.querySelectorAll('#settings-app .settings-sidebar .settings-tab')]
         .map((b) => ({ id: b.dataset.target, group: b.dataset.group })));
-    expect(panels.length, 'fifteen subtabs survive the shrink (t2125 added Sound)').toBe(15);
+    expect(panels.length, 'sixteen subtabs (t2125 added Sound, t2192 added the Workspace tab)').toBe(16);
 
     for (const p of panels) {
         const r = await page.evaluate(async (panel) => {
@@ -270,7 +279,7 @@ test('the setup checklist Set buttons still ARRIVE — including the cloud one, 
     await expect(page.locator('.wsm-place[data-place="cloud"]'), 'and it opens ON the cloud tab, not beside it').toHaveClass(/is-active/);
 });
 
-test('THREE tabs still fit a 390px phone', async ({ page }) => {
+test('all FOUR main tabs still fit a 390px phone', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openSettings(page);
     const m = await page.evaluate(() => {
@@ -281,44 +290,51 @@ test('THREE tabs still fit a 390px phone', async ({ page }) => {
     expect(m.bodyScroll, 'and the page never scrolls sideways').toBeLessThanOrEqual(m.vw);
 });
 
-test('t1265 — the close X lives in the identity band row, not the tab strip', async ({ page }) => {
-    // The band and the X together are the modal's ONE header: what this is, and the way out. Before, the X sat in the
-    // tab-strip row, which read as a control belonging to the TABS.
+test('t1265 — the close X lives in its own header row, not the tab strip', async ({ page }) => {
+    // t2192 — the identity band that USED to share this row moved into the Workspace tab (workspace content
+    // belongs beside the rest of the workspace's own inventory, not floating above unrelated tabs), so the X's
+    // own claim shrinks to what is still true of it: its own corner, off the tab strip, still a real target.
     await openSettings(page);
     expect(await page.locator('#settings-app .settings-head .settings-close').count(),
-        'the tab row no longer carries it').toBe(0);
+        'the tab row does not carry it').toBe(0);
     const x = page.locator('#settings-app .settings-headerrow .settings-close');
     await expect(x, 'the header row does').toBeVisible();
 
     const m = await page.evaluate(() => {
-        const band = document.querySelector('#settings-app .settings-identity').getBoundingClientRect();
         const btn = document.querySelector('#settings-app .settings-headerrow .settings-close').getBoundingClientRect();
         const head = document.querySelector('#settings-app .settings-head').getBoundingClientRect();
         const modal = document.getElementById('settings-app').getBoundingClientRect();
-        return { bandRight: band.right, xLeft: btn.left, w: btn.width, h: btn.height,
-                 fromRightEdge: modal.right - btn.right,
-                 topAligned: Math.abs(btn.top - band.top) <= 2, aboveTabs: btn.bottom <= head.top + 1 };
+        return { w: btn.width, h: btn.height, fromRightEdge: modal.right - btn.right, aboveTabs: btn.bottom <= head.top + 1 };
     });
-    expect(m.topAligned, 'level with the band’s first line, not floating mid-band when it wraps').toBe(true);
-    expect(m.aboveTabs, 'and above the tab strip entirely').toBe(true);
+    expect(m.aboveTabs, 'above the tab strip entirely').toBe(true);
     expect(Math.min(m.w, m.h), 'still a ≥44px target').toBeGreaterThanOrEqual(44);
-    expect(m.xLeft, 'and it does not sit on top of the band text').toBeGreaterThanOrEqual(m.bandRight);
-    expect(m.fromRightEdge, 'in the modal’s top-right CORNER — right of the band is not the same claim').toBeLessThan(24);
+    expect(m.fromRightEdge, 'in the modal’s top-right corner').toBeLessThan(24);
     // it still closes
     await x.click();
     await expect(page.locator('#settings-overlay.active')).toHaveCount(0);
 });
 
-test('t1265 — at 390px the X still clears the envelope line', async ({ page }) => {
+test('t2192 — on the Workspace tab, the identity band sits below the (now solitary) header X, never under it', async ({ page }) => {
+    await openSettings(page);
+    await page.click('.settings-main-tab[data-group="workspace"]');
+    await page.waitForSelector('#set_identity_band', { state: 'visible' });
+    const m = await page.evaluate(() => {
+        const band = document.querySelector('#set_identity_band').getBoundingClientRect();
+        const btn = document.querySelector('#settings-app .settings-headerrow .settings-close').getBoundingClientRect();
+        return { bandBelowX: band.top >= btn.bottom - 1, overlaps: !(band.right <= btn.left || band.left >= btn.right || band.bottom <= btn.top || band.top >= btn.bottom) };
+    });
+    expect(m.overlaps, 'the band never sits under the X').toBe(false);
+    expect(m.bandBelowX, 'the band is content, below the header row').toBe(true);
+});
+
+test('t1265/t2192 — at 390px the X is still a full 44px target, fully on screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openSettings(page);
     const m = await page.evaluate(() => {
-        const band = document.querySelector('#settings-app .settings-identity').getBoundingClientRect();
         const btn = document.querySelector('#settings-app .settings-headerrow .settings-close').getBoundingClientRect();
-        return { gap: btn.left - band.right, inView: btn.right <= innerWidth + 1, w: btn.width, h: btn.height };
+        return { inView: btn.right <= innerWidth + 1, w: btn.width, h: btn.height };
     });
-    expect(m.gap, 'the band truncates AGAINST the X, never underneath it').toBeGreaterThanOrEqual(0);
-    expect(m.inView, 'and the X is fully on screen').toBe(true);
+    expect(m.inView, 'the X is fully on screen').toBe(true);
     expect(Math.min(m.w, m.h), 'a phone target is still ≥44px').toBeGreaterThanOrEqual(44);
 });
 

@@ -40,6 +40,7 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';
 import { getAccount, connect, disconnect } from './cloudAccount.js';
 import { entryIconHtml } from './wizIcons.js';
 import { UIUtils } from './uiUtils.js';
+import { popReturn } from './navReturn.js';   // t2192 — the return path (Settings' Workspace tab → here → back)
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // LAZY, like the workspace manager's drive() — the Drive adapter (and devMode's fork wrap) load on first use, not at boot.
@@ -154,9 +155,14 @@ async function importText(text, sourceName) {
 // ── the modal ────────────────────────────────────────────────────────────────────────────────────────────────────
 let _ov = null;
 
-/** Open the manager. `opts.place` = 'local' | 'cloud' — which library shelf to land on (default local). */
+/** Open the manager. `opts.place` = 'local' | 'cloud' — which library shelf to land on (default local).
+ *  `opts.returnToken` — t2192: a token from ui/navReturn.js's pushReturn(); when given, closing this manager
+ *  (✕ / Esc / backdrop — all one `close()`, so this covers every exit) pops it and reopens whoever pushed it
+ *  (e.g. Settings' Workspace tab) instead of just closing to the app. Opened from the file menu (no token),
+ *  it closes to the app exactly as before — the token's mere presence is the signal, not a separate flag. */
 export async function openWizardManager(opts = {}) {
     if (_ov) { _ov.remove(); _ov = null; }
+    const returnToken = opts.returnToken;
     const place0 = opts.place === 'cloud' ? 'cloud' : 'local';
     const ov = document.createElement('div');
     ov.id = 'wizmOverlay';
@@ -179,7 +185,10 @@ export async function openWizardManager(opts = {}) {
     </div>`;
     document.body.appendChild(ov);
     _ov = ov;
-    const close = () => { ov.remove(); if (_ov === ov) _ov = null; document.removeEventListener('keydown', onKey, true); };
+    const close = () => {
+        ov.remove(); if (_ov === ov) _ov = null; document.removeEventListener('keydown', onKey, true);
+        if (returnToken != null) popReturn(returnToken);
+    };
     // Escape closes the MANAGER — unless an app-dialog (rename prompt / replace confirm) is up: both listen on
     // document in capture, so the dialog's stopPropagation cannot shield this one, and without the guard one
     // Escape cancelled the prompt AND took the whole manager with it (caught by the collision spec's Cancel arm).

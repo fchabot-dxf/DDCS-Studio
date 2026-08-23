@@ -51860,3 +51860,109 @@ need restructuring beyond a folder tree alone. Left for its own spec, as the ame
 Re-ran `filemenu-sections-2184.spec.js` (15 tests) and `project-manager-2190.spec.js` (11 tests) after the
 label + comment changes — both green. No other collateral affected (label text and comments only, past the
 already-verified architecture).
+
+## t2192 — THE WORKSPACE TAB: Settings gains a fourth top-level tab (the inventory), and the return path
+
+Spec: `scratchpad/t-workspace-tab.md`. Two halves: a Workspace tab reading data/backup.js's own declared counts
+(never re-typed), and a general return-path mechanism so opening the wizard/project manager FROM Settings comes
+back to Settings, on the same tab, on every exit, at any depth.
+
+### The inventory: a number and a button, nothing more
+
+`ui/settingsPanel.js` gains a fourth `.settings-main-tab` group ("Workspace", after Hardware) with ONE sub-tab
+("Inventory"). Its content reads `data/backup.js`'s `BACKUP_STORES` directly — `await s.read()` then `s.count(v)`
+per row — never re-deriving or hardcoding a count or label. A row gets a button ONLY where a real manager exists:
+`settings` (tools) → jumps to Settings' own `set_tab_atc` tab (no new surface); `userOps` (wizards) → opens the
+wizard manager; `projects` → opens the project manager. The other 8 rows (machine, campack, wizardLayout, presets,
+wizardValues, variables, displayPrefs, panePrefs) are count-only, per the explicit ruling that "a count with no
+door is fine and honest; inventing a manager so a row can have a button is not" — variables notably has a real
+Settings tab already and STILL gets no button here, because the spec's own example list named it count-only.
+An empty door-bearing row reads "no wizards yet" / "no projects yet" / "no tools yet" rather than "0 x", per the
+spec's own acceptance bar ("a hardcoded or stale count is worse than no count, because it is believed" — the
+sibling worry here: a count that reads like a broken zero is worse than one that reads honestly empty).
+
+THE IDENTITY BAND moved from the always-visible header (`.settings-headerrow`, shared across every tab) into
+this new tab's content — checked first whether it was load-bearing for anything else (t1567's own comment on
+`renderIdentityBand` says it is display-only, re-rendered off `ddcs:settings-changed`/`ddcs:file-state`; nothing
+reads FROM its DOM) — safe to move. `.settings-headerrow` keeps only the ✕, now `justify-content:flex-end`ed
+into its own corner since it's the row's sole child. THE DEVICE-ONLY CORRECTION the dispatch carried: only the
+THEME is device-only; `displayPrefs`/`panePrefs` are BACKUP_STORES rows and travel with the .ddcs — the tab's own
+hint line says so, correctly, unlike an earlier (wrong) claim the dispatch itself flagged not to repeat.
+
+### A cross-scope trap this file already had a name for (t1567), hit again immediately
+
+First attempt called `renderMachineLine()`/`renderWorkspaceInventory()` directly from inside `showPanel` — ESLint
+caught it instantly (`no-undef`) despite both apparently living in the same enclosing function by naive `grep
+'^function'` reading. They don't: `renderIdentityBand`/`renderMachineLine` live inside a block-scoped region of
+`wireSettingsOverlay` that function declarations in ES6+ strict mode do NOT hoist out of, while `showPanel` is a
+sibling statement outside that block — exactly the trap a `t1567` comment on `renderIdentityBand` already
+documented from an earlier bug ("not reachable from here... a ReferenceError the try/catch silently ate"). Fixed
+the same way `_settingsNavTo` already bridges this exact gap: a module-level `let _refreshWorkspaceTab = null;`,
+assigned inside the block where the real functions live, called through the pointer from `showPanel`. Lint clean
+after; a live reminder that this file's own historical comments are worth reading before assuming scope from
+indentation alone.
+
+### The return path: `ui/navReturn.js` generalised from one slot to a real stack
+
+That file's own header already anticipated this: "Depth-1 today... swap `_live` for an array to nest without
+changing the call sites." Did exactly that — `_live` (single `{id,label,fn}`) → `_stack` (array), `popReturn`/
+`dropReturn` now check the TOP of the stack instead of the one slot. Every existing call site (openHomingSetup,
+openAtcSetup, the Setup checklist) is behaviourally unchanged — they only ever pushed/popped one level relative
+to themselves, which is exactly what a depth-1 stack already was.
+
+Wired into both managers identically: `openWizardManager(opts)`/`openProjectManager(opts)` gain `opts.returnToken`;
+their shared `close()` (already the ONE function ✕/Esc/backdrop all call — confirmed before touching anything)
+pops it if present. Opened from the file menu (no token), `popReturn` no-ops and the manager closes to the app
+exactly as before — the token's mere presence is the signal, not a caller-supplied flag the manager has to trust.
+
+Settings itself needed no "suspend, don't unmount" work — `closeSettings()` already only ever toggles the
+`.active` CSS class (`buildSettingsOverlay()` guards against rebuilding: `if (parent.querySelector('.settings-
+body')) return;`), so the DOM — and every tab's scroll/search/selection state — was already surviving a close
+untouched. The Workspace-tab door does: `pushReturn('Settings', () => openSettings())` → `closeSettings()` →
+`opener({returnToken})`. Calling `openSettings()` with no `nav` argument lands wherever the DOM already was
+(the Workspace tab), which is the "same tab" requirement for free.
+
+NO DEPTH LIMIT, proven directly rather than assumed: a test opens Settings from the Workspace tab, opens the
+wizard manager, then — while THAT is open — calls `window.openSettings()` a second, independent time (simulating
+a deeper chain without inventing a UI door that doesn't exist), closes that second Settings, confirms the wizard
+manager is still there untouched, closes it, and confirms the ORIGINAL return fires correctly. No cycle
+detection, no dedup, no "already open" cleverness — push on open, pop on close, always, exactly as ruled.
+
+### Verification
+
+New `tests/workspace-tab-2192.spec.js` — 10 tests covering the spec's own VERIFY section: real counts (add a
+wizard, revisit, the number moves), doors only on the 3 real-manager rows, empty-state wording, the tool-table
+row's in-Settings jump, the return path on ✕/Esc/backdrop, no-return when opened from the file menu, the no-
+depth-limit/cycle proof, and 390px across all five themes. Non-vacuity: `git stash` to pre-t2192 code (t2190
+stays committed) → 9/10 fail (the 10th, file-menu-closes-to-app, legitimately holds on both trees — not a new
+behaviour). One test-side race caught during this: the inventory renders async (the `projects` row's count is
+an IndexedDB read via `Promise.all` over all 11 stores), so a test asserting immediately after the panel becomes
+*visible* — before that promise resolves — reads it empty; fixed by waiting for actual `[data-wsrow]` content,
+not just panel visibility.
+
+Collateral fully swept for `.settings-identity`/`.settings-headerrow`/tab-count assumptions across the whole
+suite (grep, not guesswork) — 5 pre-existing tests genuinely broke on the intentional changes (three tabs → four,
+the band leaving the shared header) and were updated in place, not worked around: `settings-ia-regroup-1245.spec.js`
+(tab count 3→4, panel count 15→16, the "X shares a row with the band" test rewritten into two — the X's own
+corner, and a new band-position check scoped to the Workspace tab) and `workspace-manager-1223.spec.js` (the
+identity-band test now opens Settings on the Workspace tab instead of Controller ▸ Profile). 88 collateral tests
+run across settings/wizard-manager/project-manager/workspace-manager/lathe-model/field-deeplink specs, all green.
+Smoke 76/76, node 227/227, lint clean throughout.
+
+### Amendments 1–3, received at the final poll — explicitly QUEUED, not built this turn
+
+All three arrived after this turn's own work was complete and tested, and all three are explicitly deferred by
+their own text: amendment 1 opens "⛔ QUEUED, NOT THIS TURN"; amendment 3 opens "⛔ Its own turn, AFTER the
+removal — keep that commit clean." Summary for the next turn that picks this up: retire the standalone-file
+LIBRARY shelf in BOTH managers (wizardManager.js's and projectManager.js's own Local-folder/Cloud sections) —
+not for a usage reason, but because it misrepresents itself as a second container for your wizards/projects when
+it is really a view of unimported files, and "unimported" is a moment, not a place worth a permanent section.
+Replace it with a plain Import button; sweep the granted-handle machinery it owned (report other consumers
+before deleting, the same discipline used for `data/libraryFolder.js` before touching Export this turn); keep
+Export-to-cloud untouched (Cloud stays legitimate there — it crosses OUT of the workspace). A SEPARATE, later
+turn (amendment 3) replaces the shelf's one real value — pre-import visibility — with a compatibility summary
+shown at the Import step itself (name clash, wrong machine/axes via the existing axisGating.js, wrong dialect
+via the def's own `post` field, missing #-variables, what it makes, provenance), shared between both managers.
+Not investigated or built here — flagging plainly rather than starting unscoped work or silently dropping it.
+BACKLOG item 16 already updated above to reflect the CURRENT (not the post-amendment) state of the switcher
+count, with a note not to count the further reduction until that turn actually ships.

@@ -38,6 +38,7 @@ import { dlgConfirm, dlgPrompt, dlgNotice } from '../dialog.js';
 import { getAccount, connect, disconnect } from '../cloudAccount.js';
 import { busyRow } from '../busyRow.js';
 import { UIUtils } from '../uiUtils.js';
+import { popReturn } from '../navReturn.js';   // t2192 — the return path (Settings' Workspace tab → here → back)
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const drive = () => import('../cloud/googleDrive.js');   // lazy, like the wizard/workspace managers' own drive()
@@ -48,9 +49,13 @@ const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_
 let _ov = null;
 
 /** Open the manager. `opts.promptSave` = true fires the "Save current program" prompt immediately (the file menu's
- *  own Save… row) — the same modal either way, since Save and Open are one surface now, like Wizards. */
+ *  own Save… row) — the same modal either way, since Save and Open are one surface now, like Wizards.
+ *  `opts.returnToken` — t2192: a token from ui/navReturn.js's pushReturn(); when given, closing this manager
+ *  (✕ / Esc / backdrop — all one `close()`) pops it and reopens whoever pushed it (e.g. Settings' Workspace tab)
+ *  instead of just closing to the app. Opened from the file menu (no token), it closes to the app as before. */
 export async function openProjectManager(opts = {}) {
     if (_ov) { _ov.remove(); _ov = null; }
+    const returnToken = opts.returnToken;
     const ov = document.createElement('div');
     ov.id = 'projmOverlay';
     ov.className = 'wsm-overlay';   // the workspace/wizard managers' own chrome, deliberately — one design language
@@ -71,7 +76,10 @@ export async function openProjectManager(opts = {}) {
     </div>`;
     document.body.appendChild(ov);
     _ov = ov;
-    const close = () => { ov.remove(); if (_ov === ov) _ov = null; document.removeEventListener('keydown', onKey, true); };
+    const close = () => {
+        ov.remove(); if (_ov === ov) _ov = null; document.removeEventListener('keydown', onKey, true);
+        if (returnToken != null) popReturn(returnToken);
+    };
     const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.app-dialog')) { e.preventDefault(); close(); } };
     document.addEventListener('keydown', onKey, true);
     ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });

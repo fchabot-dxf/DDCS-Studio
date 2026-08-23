@@ -170,11 +170,13 @@ test('DISCARD opens the WHOLE file — every store, no picker', async ({ page })
     expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'a just-opened workspace is CLEAN, controller change and all').toBe(false);
 });
 
-test('Settings shows the IDENTITY BAND above the tabs (display only)', async ({ page }, testInfo) => {
+test('Settings shows the IDENTITY BAND in the Workspace tab (display only)', async ({ page }, testInfo) => {
     await boot(page);
     // t2145 — the identity band's name reads fileSavedStem() now (BACKLOG F2), not a machine-record field.
+    // t2192 — the band moved OUT of the always-visible header and INTO the Workspace tab (workspace CONTENT
+    // belongs beside the rest of the workspace's own inventory) — land there, not Controller ▸ Profile.
     await page.evaluate(() => { window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true); window.ddcsMarkWorkspaceSaved('m350-shop.ddcs'); });
-    await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
+    await page.evaluate(() => window.openSettings({ group: 'workspace', panel: 'set_tab_workspace' }));
     const band = page.locator('#set_identity_band');
     await expect(band).toBeVisible();
     await expect(band).toContainText('m350-shop');
