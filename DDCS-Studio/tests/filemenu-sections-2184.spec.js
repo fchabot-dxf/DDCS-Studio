@@ -122,12 +122,13 @@ test('390px: the four-section menu still fits under the popover\'s own height ca
     const menu = page.locator('#hdrPostMenu');
     await expect(menu).toBeVisible();
     const box = await menu.boundingBox();
-    // t2184 measured at 390px: 307px (pre-sections) -> 421px (stacked sections, pre amendment 3) -> 390px
+    // t2184/t2186 measured at 390px: 307px (pre-sections) -> 421px (stacked sections, pre amendment 3) -> 390px
     // (two-column pairs) -> 388px (amendment 13 — identity+saved lines moved inside the Workspace box, costs
     // ~nothing since it's relocated not duplicated) -> 450px (amendment 14/16 — the 44px touch floor spends
-    // some of the height the grid bought back, as amendment 14 itself predicted it would). Desktop: 365px
-    // (unaffected by the phone-only floor). The popover's own cap (styles.css .hdr-quick-menu) is
-    // min(72vh, 560px); 844*0.72 = 607px, so 560px is the real ceiling at 390px.
+    // some of the height the grid bought back, as amendment 14 itself predicted it would) -> 441px (t2186
+    // amendment 1 — the bordered box retired; the label + gap alone were already doing the separating, the
+    // border just repeated it). Desktop: 365px (unaffected by the phone-only floor). The popover's own cap
+    // (styles.css .hdr-quick-menu) is min(72vh, 560px); 844*0.72 = 607px, so 560px is the real ceiling at 390px.
     expect(box.height, `menu is ${box.height}px — must stay under the popover's own 560px cap`).toBeLessThan(560);
 });
 

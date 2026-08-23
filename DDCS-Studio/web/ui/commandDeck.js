@@ -169,6 +169,22 @@ window.loadGcodeFile = function loadGcodeFile() {
                         }
                     } catch (_) { /* fall through to raw load */ }
                 }
+                // t2186 — raw/marker-free files used to overwrite the editor with NO confirm at all: the only
+                // door in (Insert was deleted at t2173), silently replacing unsaved work. Same predicate as the
+                // marker path above (blocks/saveStates.js's wouldLoseWork, t2184) — not a second check: raw
+                // text has no "incoming stack" to compare (confirmDestructiveLoad's own signature-diff
+                // refinement needs one), so this asks wouldLoseWork's simpler shared half directly and handles
+                // the dialog/Undo-snapshot itself, the same shape confirmDestructiveLoad uses internally.
+                const { wouldLoseWork, snapshot } = await import('../blocks/saveStates.js');
+                if (wouldLoseWork()) {
+                    const { dlgConfirm } = await import('./dialog.js');
+                    const proceed = await dlgConfirm(
+                        `Loading "${f.name}" replaces your current program — it's saved to Undo, or Cancel to keep it.`,
+                        { title: 'Load this file?', okLabel: 'Load (replace)', cancelLabel: 'Cancel' }
+                    );
+                    if (!proceed) return;
+                    snapshot('before open');   // the recovery point — matches confirmDestructiveLoad's own promise of Undo
+                }
                 ed.value = text; ed.dispatchEvent(new Event('input', { bubbles: true }));
             };
             r.readAsText(f);

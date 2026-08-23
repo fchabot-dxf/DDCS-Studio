@@ -51370,3 +51370,118 @@ t2184-legibility-{normal,organic,steampunk}.png, t2184-appmenu-{current,unified}
    QUEUED — acknowledged, not started.
 
 🔨 turn 2184
+
+## t2186 — the three flagged-not-fixed findings from t2184, in the order dispatched, plus a small visual cut
+
+### Part 1 — the raw G-code Load data-loss gap: fixed
+
+commandDeck.js's loadGcodeFile had TWO branches: files carrying `( @DDCS:… )` markers went through
+confirmDestructiveLoad (already correct, t2184); marker-free files fell straight to `ed.value = text` with NO
+guard at all — the ONLY door in (Insert was deleted at t2173), silently overwriting unsaved work. Routed
+through the SAME wouldLoseWork() predicate t2184 built — not a second check, not a copy: raw text has no
+"incoming stack" to diff against (confirmDestructiveLoad's own signature-comparison refinement needs one), so
+this asks wouldLoseWork's simpler shared half directly, then handles the dialog + Undo-snapshot itself, the
+same shape confirmDestructiveLoad already uses internally (snapshot('before open') as the recovery point,
+dlgConfirm with the same wording).
+
+Two-sided tests added to tests/replace-confirm-2184.spec.js: SILENT on an empty canvas (loads immediately,
+verified the file's own content actually landed in the editor), PRESENT with real unsaved program content
+(dialog appears). Non-vacuity proven by reverting commandDeck.js to HEAD: the PRESENT test failed (silently
+loaded before, exactly the bug), the SILENT test stayed green (that half was never broken — raw load never had
+a confirm to begin with, so "no dialog on empty" was trivially already true).
+
+### Part 2 — the watermark-timing bug: reported plainly, as asked
+
+**What it is.** `data/backup.js`'s BACKUP_STORES `settings` row reads `ddcs_studio_settings` from localStorage.
+On any browser session where that key has never been written, `read()` returns `undefined` and
+`workspaceSignature()` SKIPS the store entirely (`if (v === undefined) continue`) — the accumulator string it
+hashes simply never contains a `settings=…;` segment. The boot-time watermark (`ensureWorkspaceWatermark()`)
+gets captured against THAT shape. The first time `ui/settingsPanel.js`'s `saveSettings()` ever runs in the
+session, `ddcs_studio_settings` is written to localStorage for the first time — after which
+`workspaceSignature()` STOPS skipping the store and its hash becomes part of the accumulator. The resulting
+signature is now structurally different from the watermark (a new segment exists where none did before), so
+`isWorkspaceDirtyToFile()` reads `true` from that point on.
+
+**What it makes wrong, confirmed directly (not inferred):** this has NOTHING to do with what changed. Calling
+`saveSettings()` with the in-memory settings object completely UNCHANGED — no field touched, same object,
+re-persisted verbatim — flips `isDirty` from `false` to `true` just as reliably as an actual edit does. It is
+purely "has this store ever been written," not "did anything meaningful change." It is also not specific to
+theme (my earlier live investigation happened to trip it via a theme change, but that was incidental — theme's
+own handler doesn't even call `saveSettings()`; whatever closed the settings panel afterward did). Any settings
+interaction that reaches `saveSettings()` for the first time in a session triggers it. It is STICKY, not
+transient: once tripped, `isDirty` stays `true` for the rest of the session (the watermark only resets on an
+actual `.ddcs` save, per `markWorkspaceSavedToFile`) — it survives page reloads too, since
+`ensureWorkspaceWatermark()` only ever sets the watermark once, on first boot, never re-derives it. And it is
+structural, not unique to `settings`: several other BACKUP_STORES rows (`campack`, `wizardLayout`, `presets`,
+`wizardValues`, `displayPrefs`, `panePrefs`) read keys that may equally not exist on a given browser until their
+own first use — the same undefined→populated cliff applies to each of them independently. This wasn't tested
+this turn (out of scope for what was asked), but the shape of the bug says it isn't a one-store defect.
+
+**Can the confirm you just shipped be trusted while this stands?** Partially, and it's worth being precise
+about which half. `wouldLoseWork()`'s PROGRAM-scope check (the default, used by G-code Open and Project Open)
+is entirely unaffected — it reads `getProg()`, which has nothing to do with `isWorkspaceDirtyToFile()` or this
+bug. That half is trustworthy as shipped. The WORKSPACE-scope half (`{workspace: true}`, used only by Workspace
+Open's `confirmDiscardBuffer`) inherits this bug's false positives by design — the human's own instruction was
+"reuse whatever [signal] exists, do NOT invent a second dirty-flag," and `isWorkspaceDirtyToFile()` is that
+existing signal. So: Workspace Open's confirm is CORRECT in shape (it asks the right question, composes the
+right two signals, and is proven to fire exactly when it should when its inputs are honest) but its WORKSPACE
+half can still cry wolf in the one specific circumstance this bug describes — any session where Settings has
+been opened and interacted with at all, even with zero meaningful change, from that point on Workspace Open
+will always show the prompt, regardless of whether there's truly anything to lose. It is a narrower version of
+the exact complaint that started this whole thread ("it makes me wonder what did i do wrong") — reduced from
+"can fire on nearly any Open" to "can fire once-per-session, specifically after touching Settings, regardless of
+what was actually opened" — but not eliminated. Fixing it at the ROOT (rather than patching `wouldLoseWork()`
+to distrust its own input) means either seeding the watermark's baseline AFTER the settings store's own first
+materialization (so "existing but empty" isn't structurally different from "existing but unchanged"), or
+hydrating `ddcs_studio_settings` with a real value at boot before the watermark is ever captured, so the
+undefined→populated transition never happens mid-session. Both are real surgery to `data/backup.js`'s
+watermark timing and/or `fileSaveState.js`'s boot sequencing — not done this turn, per the advisor's own
+instruction to report rather than patch it inline.
+
+### Part 3 — the version footer: made legible, not loud
+
+Same pixel-sampled, composited-over-the-real-menu contrast method as t2184's identity-line/section-header fix.
+Root cause identical: `.hq-ver-footer { opacity: .55 }`. Measured before: 1.70:1 (studio) to 2.57:1 (organic) —
+worse than either of the bugs already fixed. The human's earlier "no as is for now" ruling on this footer
+(declining to make it a link to the release page) was about behaviour, not legibility — confirmed this wasn't a
+standing instruction to leave the text alone before touching it.
+
+Fixed via the same color-mix(in srgb, var(--text-dim) N%, var(--text-main) (100-N)%) approach, but the file
+menu's own 45/55 ratio left studio at 4.44:1 — just under the floor, since this footer's own background
+differs slightly from the file menu's. Tightened to 40/60; studio now clears at 4.62:1, every other theme
+comfortably higher (7.81–12.50:1). Size/weight/letter-spacing untouched — still visibly the quietest text in
+either menu, verified live (verification/t2186-footer-legible-studio.png), just no longer illegible. Regression
+test added to tests/header-menu-split-2149.spec.js (the app menu's own file), same >=4.5:1 assertion across all
+5 themes as t2184's file-menu equivalent.
+
+### Amendment 1 (mid-task) — the section borders retired
+
+Human, having seen the finished four-section menu: "now realise the border are not as usefull as the labels,
+we can just use the labels to seperate the sections." Not a reversal — they asked for bordered sections, saw
+the built thing, and the built thing showed the label + gap already did the whole job while the border repeated
+it. `.hdr-menu-section`'s border/padding/border-radius removed; kept ONLY a deliberate margin-top (10px between
+sections, 2px before the first) so the gap itself stays legible as a boundary — too tight and the four groups
+read as one list again, exactly what the labels exist to prevent. Height re-measured: 441px at 390px (down
+from 450px — the border/padding weren't buying much height, most of the earlier savings already came from the
+grid). Buttons keep their own individual borders; only the wrapping box is gone. Verified live in both
+organic/390px and desktop (verification/t2186-noborder-{desktop,390}-organic.png).
+
+### Verification
+
+Full collateral for everything touched this turn (~55 tests across filemenu-sections-2184, header-menu-split-
+2149, replace-confirm-2184, header-responsive, header-profile-menu, workspace-manager-1223, wizard-manager-1617,
+editor-file-menu-1227, canvas-handle-writable-1804): all green. Smoke 76/76, node 227/227, lint clean.
+Non-vacuity proven directly for the raw-load fix (revert to HEAD, confirm exactly the targeted test fails).
+
+### For the advisor
+
+The watermark-timing bug's own answer is above (Part 2), in full — the short version: PROGRAM-scope confirms
+are unaffected and trustworthy; the WORKSPACE-scope half can still false-positive once per session after any
+Settings interaction, a narrower version of the original complaint, not a full fix. It generalizes beyond
+`settings` to at least five other BACKUP_STORES rows by the same shape of bug, unverified but structurally
+likely. Recommend its own turn — this is boot-sequencing/watermark-timing surgery in `data/backup.js` and
+`fileSaveState.js`, not something to fold into a menu-polish turn.
+
+TAIL, not yet started: the icon-fill work referenced in the dispatch (brand/icons.json, commit b9056f86) —
+picking it up next, separate commit per the dispatch's own instruction. This turn is not yet signed off — see
+the tail entry appended below once that commit lands.

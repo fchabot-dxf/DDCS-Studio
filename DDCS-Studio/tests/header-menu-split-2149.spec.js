@@ -198,3 +198,60 @@ test('verify: screenshot both menus open, desktop and 390px (human judges the sp
     await page.click('#hdrPostBtn');
     await page.screenshot({ path: 'verification/t2149-file-menu-390.png' });
 });
+
+// t2186 (advisor, closing the t2184 contrast sweep's own last gap) — the version footer measured 1.70:1
+// (studio) to 2.57:1 (organic), the same dim-small-text recipe as the identity line/section headers t2184
+// already fixed. Fixed via the same color-mix approach (a slightly richer 40/60 blend — the footer's own
+// background differs enough from the file menu's that 45/55 left studio at 4.44:1, just under the floor).
+// The human's earlier "no as is for now" ruling on this footer was about the proposed release-page LINK, not
+// its legibility — untouched here, still the quietest thing in either menu.
+test('app menu: the version footer clears WCAG AA (4.5:1), composited over the app menu, all 5 themes', async ({ page }) => {
+    await ready(page);
+    const luminance = ([r, g, b]) => {
+        const c = [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const contrast = (a, b) => {
+        const [L1, L2] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return (L1 + 0.05) / (L2 + 0.05);
+    };
+    for (const theme of ['normal', 'studio', 'futuristic', 'organic', 'steampunk']) {
+        await page.evaluate((t) => document.body.setAttribute('data-theme', t), theme);
+        await page.waitForTimeout(150);
+        await page.click('#hdrAppBtn');
+        const menu = page.locator('#hdrAppMenu');
+        await menu.waitFor({ state: 'visible' });
+        const box = await page.locator('#hdrAppMenu .hq-ver-footer').boundingBox();
+        const menuBox = await menu.boundingBox();
+        const buf = await menu.screenshot();
+        const b64 = buf.toString('base64');
+        const result = await page.evaluate(async ({ b64, box, menuBox }) => {
+            const img = new Image();
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = 'data:image/png;base64,' + b64; });
+            const cnv = document.createElement('canvas');
+            cnv.width = img.naturalWidth; cnv.height = img.naturalHeight;
+            const ctx = cnv.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const scaleX = img.naturalWidth / menuBox.width, scaleY = img.naturalHeight / menuBox.height;
+            const x0 = Math.max(0, Math.round((box.x - menuBox.x) * scaleX));
+            const y0 = Math.max(0, Math.round((box.y - menuBox.y) * scaleY));
+            const w = Math.max(1, Math.round(box.width * scaleX)), h = Math.max(1, Math.round(box.height * scaleY));
+            const data = ctx.getImageData(x0, y0, w, h).data;
+            const bgx = Math.min(cnv.width - 1, x0 + 2), bgy = Math.max(0, y0 - 3);
+            const bg = [...ctx.getImageData(bgx, bgy, 1, 1).data].slice(0, 3);
+            const bgLum = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
+            let best = null, bestDiff = -1;
+            for (let py = 0; py < h; py++) {
+                for (let px = 0; px < w; px++) {
+                    const r = data[(py * w + px) * 4], g = data[(py * w + px) * 4 + 1], bl = data[(py * w + px) * 4 + 2];
+                    const diff = Math.abs((0.2126 * r + 0.7152 * g + 0.0722 * bl) - bgLum);
+                    if (diff > bestDiff) { bestDiff = diff; best = [r, g, bl]; }
+                }
+            }
+            return { text: best, bg };
+        }, { b64, box, menuBox });
+        const c = contrast(result.text, result.bg);
+        expect(c, `${theme}: version-footer contrast ${c.toFixed(2)}:1 (need >= 4.5:1)`).toBeGreaterThanOrEqual(4.5);
+        await page.click('#hdrAppBtn');
+    }
+});

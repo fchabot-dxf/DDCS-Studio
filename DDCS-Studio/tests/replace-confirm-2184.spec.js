@@ -8,6 +8,9 @@ import { test, expect } from '@playwright/test';
  * predicate (blocks/saveStates.js's wouldLoseWork()) asking BOTH halves for Workspace Open, reused by G-code
  * Open / Project Open (already routed through the SAME seam, confirmDestructiveLoad, for the program half).
  *
+ * t2186 — the SAME predicate closes a third gap the t2184 sweep found and reported rather than fixed: raw/
+ * marker-free G-code loads bypassed the confirm entirely (commandDeck.js's loadGcodeFile fallback branch).
+ *
  * TWO-SIDED on purpose (amendment 22's own instruction: "one-sided tests are how the fix drifts back") — silent
  * when there's nothing to lose, present when there is, both asserted, never just one.
  */
@@ -87,4 +90,37 @@ test('SILENT vs PRESENT — G-code Open (confirmDestructiveLoad, the marker-base
     // cancel it so the evaluate() promise resolves and the test can finish cleanly
     await page.keyboard.press('Escape');
     await dialogPromise;
+});
+
+// t2186 — raw/marker-free G-code loads (commandDeck.js's loadGcodeFile, the fallback branch — files with no
+// `( @DDCS:… )` markers) used to bypass the confirm ENTIRELY: `ed.value = text` with no guard at all, silently
+// destroying unsaved work. The only door in (Insert was deleted at t2173). Fixed via the SAME wouldLoseWork()
+// predicate the marker path already used through confirmDestructiveLoad — not a second check.
+async function pickRawFile(page, name, text) {
+    await page.evaluate(({ name, text }) => {
+        window.loadGcodeFile();
+        const input = document.getElementById('gcode-file-input');
+        const file = new File([text], name, { type: 'text/plain' });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, { name, text });
+}
+
+test('SILENT: raw G-code Load on an empty canvas — loads immediately, no dialog', async ({ page }) => {
+    await ready(page);
+    await pickRawFile(page, 'raw1.nc', 'G90\nG0 X0 Y0\nG1 Z-1 F100\n');
+    await page.waitForTimeout(400);
+    await expect(page.locator('.app-dialog, [role="dialog"]'), 'no dialog — nothing on the canvas to lose').toHaveCount(0);
+    const val = await page.evaluate(() => document.getElementById('editor').value);
+    expect(val, 'the file actually loaded').toContain('G1 Z-1');
+});
+
+test('PRESENT: raw G-code Load with real unsaved program content — asks first', async ({ page }) => {
+    await ready(page);
+    await page.evaluate(() => window.ddcsLoadBlockStack([{ type: 'op', opType: 'pocket', label: 'Pocket', params: {}, children: [{ type: 'move', params: { x: 0, y: 0, z: -1, mode: 'rapid' } }], simChildren: [] }]));
+    await page.waitForTimeout(300);
+    await pickRawFile(page, 'raw2.nc', 'G90\nG0 X10 Y10\n');
+    await expect(page.locator('.app-dialog, [role="dialog"]').first(), 'prompt fires — real, unsaved content would be lost').toBeVisible({ timeout: 3000 });
 });

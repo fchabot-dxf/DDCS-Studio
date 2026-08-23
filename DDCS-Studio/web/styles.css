@@ -815,14 +815,16 @@ html, body { overflow-x: clip; }
 .hdr-quick-sep { height: 1px; margin: 5px 4px; background: var(--menu-edge, var(--kbd-edge, var(--border, #444))); opacity: .6; }
 
 /* t2184 (scratchpad/t-filemenu-sections.md) — the FILE menu's four labelled sections (Workspace/G-code/Project/
-   Reference). A border, not another .hdr-quick-sep line: the sections replace flat-list-plus-dividers with
-   actual grouping, so the section's own edge does the separating — no dividers needed between sections too. */
+   Reference). t2186 (amendment 1, human, having seen it built: "now realise the border are not as usefull as
+   the labels, we can just use the labels to seperate the sections") — the BORDER is gone; the label plus the
+   gap above it already does the whole separating job, a bordered box just repeated it. The gap is now the ONLY
+   boundary marker, so it has to read as deliberate: generous margin-top (space FROM the section before), a
+   small margin-bottom (the label sits close to ITS OWN rows) — too tight and the four groups read as one list
+   again, which is exactly what the labels exist to prevent. */
 .hdr-menu-section {
-    border: 1px solid var(--menu-edge, var(--kbd-edge, var(--border, #444)));
-    border-radius: 6px;
-    padding: 3px;
-    margin: 3px 0;
+    margin: 10px 0 0;
 }
+.hdr-menu-section:first-child { margin-top: 2px; }
 .hdr-menu-section-title {
     font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
     /* t2184 (amendments 5/6) — opacity:.6 measured WORST of the three (as low as 2.0:1, composited over a real
@@ -830,7 +832,7 @@ html, body { overflow-x: clip; }
        bold weight + letter-spacing + uppercase already read as "a label, not a button" without needing opacity
        to do that job too. */
     color: color-mix(in srgb, var(--text-dim, #9fb0c4) 45%, var(--text-main, #e6edf3) 55%);
-    padding: 3px 6px 2px;
+    padding: 0 6px 4px;
 }
 
 /* Collapsible submenus (Post-processor, Theme): a header row + an indented, togglable list */
@@ -888,10 +890,18 @@ html, body { overflow-x: clip; }
 
 /* t2147 (BACKLOG #7) — the app version, moved out of the header brand anchor entirely and into this footer.
    SELECTABLE on purpose, overriding .hdr-quick-menu's inherited user-select:none (from .app-header) — read to
-   confirm a release landed, so it must be copyable, not just visible. */
+   confirm a release landed, so it must be copyable, not just visible.
+   t2186 (advisor, closing the t2184 contrast sweep's last gap) — MEASURED (same pixel-sampled, composited-over-
+   a-real-menu method as the identity line/section headers): opacity:.55 read 1.70:1 (studio) to 2.57:1
+   (organic), worse than either of those bugs. The human's earlier "no as is for now" ruling on this footer was
+   about the LINK-to-release-page proposal, not its legibility — untouched here. Same color-mix fix as the file
+   menu's own text (theme-consistent, not a per-theme number); opacity dropped, letter-spacing/size/weight stay
+   exactly as they were — still visibly the quietest thing in either menu, just no longer illegible. */
 .hq-ver-footer {
     padding: 4px 10px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
-    color: var(--text-dim, #9fb0c4); opacity: .55; text-align: center;
+    /* 40/60, not the file menu's 45/55 — studio measured 4.44:1 at 45/55, just under the floor (this footer's
+       own background differs slightly from the file menu's, so the same ratio doesn't land identically). */
+    color: color-mix(in srgb, var(--text-dim, #9fb0c4) 40%, var(--text-main, #e6edf3) 60%); text-align: center;
     user-select: text; cursor: text;
 }
 .hq-pull-btn {
