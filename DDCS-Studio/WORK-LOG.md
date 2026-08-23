@@ -50242,3 +50242,56 @@ No shipped behavior changed (index.html untouched), so the existing gate is the 
 227/227. Lint: clean.
 
 🔨 turn 2167
+
+# ⚠ UNDISPATCHED FINDING (post-t2167, reported by the human live on-device) — the 3D preview pull-tab overlaps
+# the editor toolbar strip on phone-width screens. Root-caused, NOT fixed — flagging for a proper dispatch.
+
+The human sent a real Android screenshot (ddcs-studio.pages.dev, on-device) mid-turn: the blue "toggle 3D
+toolpath preview" pull-tab (`#view-toggle`/`.viz3d-handle`, the cube icon) visibly overlaps the editor toolbar
+row (+/refresh/undo/redo/trash/copy). Investigated live rather than from the CSS alone — reproduced at a 412×892
+portrait viewport with the glass keyboard expanded, and measured the actual rendered boxes via
+`getBoundingClientRect()`:
+```
+toolbar: top 502.6, bottom 546.6
+handle:  top 526.6, bottom 554.6   (554.6 == editor-container's own bottom edge, == dock's top edge)
+```
+~20px of direct, measured overlap — not a guess from reading the rules.
+
+## Root cause
+
+Two independent CSS rules, neither aware of the other:
+1. `@media (max-width: 600px) { .editor-strip { order: 2; } }` (styles.css:5622, a t2155/BACKLOG#13 decision,
+   with its own detailed comment) moves the WHOLE strip — badge, op-chip row, AND the toolbar — to the bottom of
+   `.editor-container` on phone, deliberately, so the toolbar sits over blank space instead of the first line of
+   code. This is in-flow (flex `order`), so it correctly reserves real layout space.
+2. `.editor-container .viz3d-handle` (styles.css:4606) is `position: absolute; bottom: 0` relative to
+   `.editor-container` — unconditionally, in every layout mode. On phone it lands exactly where the now-
+   relocated strip already put content, because an absolutely-positioned element neither pushes nor is pushed by
+   flex siblings.
+
+There's already a live precedent for exactly this class of problem: `--kbd-clear` (styles.css:4992-5012) is a
+declared CSS variable that keeps several other floating buttons (`#align-rotate-btn`, `#editor-cam-btn`,
+`#editor-comment`, `.viz3d-handle` itself) clear of the on-screen glass keyboard in LANDSCAPE mode — but that
+whole accommodation block is explicitly scoped to `@media (min-width: 700px) and (orientation: landscape)`
+(styles.css:4987), with a comment asserting portrait doesn't need it because the keyboard is in-flow there. That
+assertion is correct for the KEYBOARD itself, but the STRIP-relocation-on-phone rule (`order: 2`) was added
+LATER (t2155/BACKLOG#13) and never got the equivalent treatment for the handle specifically.
+
+## What I did NOT do, and why
+
+Did not attempt a fix. Two reasons: (1) `#align-rotate-btn` / `#editor-cam-btn` / `#editor-comment` are also
+absolutely-positioned bottom-pinned buttons living in the same area (styles.css:1002-1006, 5005-5012) — I have
+not checked whether they share this exact bug once the strip reorders on phone, and a fix scoped to only the
+handle could leave siblings with the identical problem undiscovered. (2) The strip itself is `flex-wrap: wrap`
+(styles.css:4001-4007) — it can be MORE than one row tall depending on content/width, so a hardcoded pixel
+clearance (the quick fix) would be fragile; the honest fix likely needs either a JS-measured height (a new
+declared `--strip-clear`-style variable, matching the `--kbd-clear` precedent exactly) or repositioning these
+buttons relative to `.editor-code` (which does NOT reorder — it stays above the relocated strip) instead of
+`.editor-container` as a whole. Both are real design decisions about where the "declare it once" boundary should
+sit, not a one-line patch — exactly the kind of thing this project's own process puts through the advisor before
+a worker turn touches it, rather than a quick unreviewed patch mid-flow on an unrelated turn.
+
+Reported the root cause to the human directly (screenshots + explanation) so they had a real answer, not a
+placeholder. No code changed for this finding; nothing to gate.
+
+🔨 (unscheduled — flagging for the advisor's next dispatch, not signing a turn number for this)
